@@ -994,3 +994,28 @@ Quyết định:
 
 Lý do: mất điện thoại không được đồng nghĩa với mất tài khoản khi không có quản trị
 viên giúp; recovery code là cách chuẩn (GitHub, Google) và không cần email.
+
+## D-053 · Đăng nhập hai bước — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- `POST /api/v1/auth/login` với tài khoản đã bật MFA trả **202 Accepted** kèm
+  `{mfa_token, expires_in, methods}` thay vì token; client gửi `mfa_token` cùng mã
+  TOTP hoặc recovery code tới `POST /api/v1/auth/login/mfa` để nhận cặp token. Mã
+  trạng thái khác (200 / 202) và hình dạng khác cho hai kết quả: client và AI agent
+  rẽ nhánh theo mã trạng thái, không phải đoán theo trường.
+- `mfa_token`: 32 byte ngẫu nhiên, database giữ SHA-256 (bảng `auth_mfa_challenge`),
+  sống 5 phút, cấp token đúng một lần (xoá dòng có điều kiện — test đồng thời trên hai
+  database), cho sai tối đa 5 lần.
+- Mỗi mã sai cũng ghi một lần sai vào login throttling của email: kẻ đã biết mật khẩu
+  không mở được lượt mới vô hạn để đoán 10⁶ mã. Số lần sai chỉ được xoá khi qua cả hai
+  bước.
+- Đổi ở code: `SessionService::login` trả `LoginOutcome` (`Tokens` | `MfaRequired`).
+
+Lý do: cách chuẩn của các hệ thống có MFA (đăng nhập theo bước, token tạm của bước
+hai). Không gói mã vào chung request đăng nhập để client không phải biết trước tài
+khoản có bật MFA hay không.
+
+Đã cân nhắc: `mfa_token` là JWT không lưu database — không đếm được số lần sai và
+không bảo đảm dùng một lần; trả 401 với mã `auth.mfa_required` — 401 nghĩa là chưa
+xác thực được, trong khi mật khẩu đã đúng.

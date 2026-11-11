@@ -249,7 +249,7 @@
           "auth"
         ],
         "summary": "Sign in with email and password.",
-        "description": "Returns a short-lived access token and a refresh token. The same error answers\nan unknown email and a wrong password. After several failed attempts the email\nis locked for a while, even for the right password.",
+        "description": "Returns a short-lived access token and a refresh token. When the account has\ntwo-step sign-in on, answers 202 instead: send the `mfa_token` and a code to\n`POST /api/v1/auth/login/mfa`. The same error answers an unknown email and a\nwrong password. After several failed attempts the email is locked for a while,\neven for the right password.",
         "operationId": "auth_login",
         "requestBody": {
           "content": {
@@ -268,6 +268,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Data_TokenResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Password accepted; a code is needed. Continue with `POST /api/v1/auth/login/mfa`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MfaChallengeResponse"
                 }
               }
             }
@@ -304,6 +314,88 @@
           },
           "429": {
             "description": "Too many failed sign-ins for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login/mfa": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Finish signing in with a code from the authenticator app or a recovery code.",
+        "description": "Send the `mfa_token` from `POST /api/v1/auth/login` within its `expires_in`\nseconds. Each `mfa_token` allows five wrong codes; wrong codes also count\ntowards the sign-in lock of the email.",
+        "operationId": "auth_login_mfa",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginMfaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The code is wrong (`auth.invalid_mfa_code`), or the `mfa_token` is unknown, expired or used up (`auth.invalid_mfa_token`: sign in again).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The account is disabled; code `auth.user_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is missing a field or a value is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed attempts for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2418,6 +2510,48 @@
           }
         }
       },
+      "Data_MfaChallengeResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "Two-step sign-in: the password was right, a code is needed.",
+            "required": [
+              "mfa_token",
+              "expires_in",
+              "methods"
+            ],
+            "properties": {
+              "expires_in": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Seconds left to send the code.",
+                "example": 300,
+                "minimum": 0
+              },
+              "methods": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Accepted kinds of code: `totp` (6 digits from the authenticator app) and\n`recovery_code`.",
+                "example": [
+                  "totp",
+                  "recovery_code"
+                ]
+              },
+              "mfa_token": {
+                "type": "string",
+                "description": "Send this with the code to `POST /api/v1/auth/login/mfa`. Works once."
+              }
+            }
+          }
+        }
+      },
       "Data_MfaStatusResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -2766,6 +2900,25 @@
           }
         }
       },
+      "LoginMfaRequest": {
+        "type": "object",
+        "description": "The second step of signing in.",
+        "required": [
+          "mfa_token",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The current 6-digit code from the authenticator app, or an unused recovery code.",
+            "example": "123456"
+          },
+          "mfa_token": {
+            "type": "string",
+            "description": "The `mfa_token` returned by `POST /api/v1/auth/login`."
+          }
+        }
+      },
       "LoginRequest": {
         "type": "object",
         "description": "Email and password of an account.",
@@ -2828,6 +2981,39 @@
             "example": [
               "auth.roles.read"
             ]
+          }
+        }
+      },
+      "MfaChallengeResponse": {
+        "type": "object",
+        "description": "Two-step sign-in: the password was right, a code is needed.",
+        "required": [
+          "mfa_token",
+          "expires_in",
+          "methods"
+        ],
+        "properties": {
+          "expires_in": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds left to send the code.",
+            "example": 300,
+            "minimum": 0
+          },
+          "methods": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Accepted kinds of code: `totp` (6 digits from the authenticator app) and\n`recovery_code`.",
+            "example": [
+              "totp",
+              "recovery_code"
+            ]
+          },
+          "mfa_token": {
+            "type": "string",
+            "description": "Send this with the code to `POST /api/v1/auth/login/mfa`. Works once."
           }
         }
       },

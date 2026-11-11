@@ -281,6 +281,20 @@ mod tests {
 
             // Tắt bằng một recovery code (như khi mất điện thoại).
             let body = json!({"code": renewed["data"]["recovery_codes"][0]});
+            // Bật rồi thì đăng nhập phải qua hai bước.
+            let credentials = json!({"email": "ada@example.com", "password": PASSWORD});
+            let (status, _, login) = call(&app, "POST", "/login", None, Some(credentials)).await;
+            assert_eq!(status, StatusCode::ACCEPTED, "{login}");
+            assert!(login["data"].get("access_token").is_none());
+            assert_eq!(login["data"]["methods"], json!(["totp", "recovery_code"]));
+            let second = json!({
+                "mfa_token": login["data"]["mfa_token"],
+                "code": renewed["data"]["recovery_codes"][1],
+            });
+            let (status, _, tokens) = call(&app, "POST", "/login/mfa", None, Some(second)).await;
+            assert_eq!(status, StatusCode::OK, "{tokens}");
+            assert!(tokens["data"]["access_token"].is_string());
+
             let (status, _, off) =
                 call(&app, "POST", "/me/mfa/totp/disable", Some(&ada), Some(body)).await;
             assert_eq!(status, StatusCode::OK, "{off}");

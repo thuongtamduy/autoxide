@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0, 1 và 2 xong; đang ở bước 3**, mục "Đăng nhập hai bước khi đã bật MFA".
+Trạng thái: **bước 0–3 xong; đang ở bước 4**, mục "Event ghi cùng transaction rồi mới phát".
 
 ## 0. Khung dự án
 
@@ -43,7 +43,7 @@ Trạng thái: **bước 0, 1 và 2 xong; đang ở bước 3**, mục "Đăng n
 
 - [x] TOTP: bật, xác nhận, tắt
 - [x] Recovery code dùng một lần
-- [ ] Đăng nhập hai bước khi đã bật MFA
+- [x] Đăng nhập hai bước khi đã bật MFA
 
 ## 4. Event và audit log
 
@@ -55,8 +55,8 @@ Trạng thái: **bước 0, 1 và 2 xong; đang ở bước 3**, mục "Đăng n
 
 - [ ] Job lưu trong database; claim job an toàn khi nhiều worker (test đồng thời)
 - [ ] Retry có backoff, dead-letter queue
-- [ ] Lịch chạy định kỳ (job đầu tiên: dọn dòng hết hạn của `auth_login_throttle` và
-      `auth_refresh_token`)
+- [ ] Lịch chạy định kỳ (job đầu tiên: dọn dòng hết hạn của `auth_login_throttle`,
+      `auth_refresh_token` và `auth_mfa_challenge`)
 - [ ] Process role: `api`, `worker`, hoặc cả hai
 
 ## 6. i18n và idempotency

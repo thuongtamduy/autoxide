@@ -12,8 +12,8 @@ core không chứa khái niệm nghiệp vụ — những thứ đó thuộc v�
 
 ## Trạng thái
 
-Đang ở giai đoạn đầu. **Bước 0 đến bước 2 của lộ trình (khung dự án, nền, và đăng
-nhập cùng role và permission) đã xong**: workspace Cargo, gate chất lượng, cấu hình, truy cập database, migration theo
+Đang ở giai đoạn đầu. **Bước 0 đến bước 3 của lộ trình (khung dự án, nền, đăng
+nhập cùng role và permission, đăng nhập hai bước) đã xong**: workspace Cargo, gate chất lượng, cấu hình, truy cập database, migration theo
 module, hợp đồng module, máy chủ HTTP dưới `/api/v1` kèm OpenAPI, health check, log,
 metrics, tracing và CLI. Module `auth` lưu người dùng
 với mật khẩu hash bằng Argon2id và cho đăng nhập bằng access token sống ngắn cùng
@@ -24,7 +24,9 @@ cập theo role: mỗi module khai permission của mình, role gom chúng lại
 khoản qua `/api/v1/auth/users`. Người dùng chỉ tự tạo được tài khoản khi đặt
 `AUTOXIDE_AUTH_SELF_REGISTRATION=true`. Chương trình và AI agent dùng API key
 (`/api/v1/auth/api-keys`): key hành động thay người tạo ra nó, chỉ trong các permission
-ghi trên key, và được gửi như access token (`Authorization: Bearer axk_…`).
+ghi trên key, và được gửi như access token (`Authorization: Bearer axk_…`). Người
+dùng có thể bật đăng nhập hai bước bằng ứng dụng authenticator (TOTP) kèm recovery
+code dùng một lần (`/api/v1/auth/me/mfa`).
 
 Core sẽ gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 

@@ -686,7 +686,8 @@ mod update_tests {
             Accounts::create(users.as_ref(), account("root@example.com", true)).await.unwrap();
             let ada =
                 Accounts::create(users.as_ref(), account("ada@example.com", false)).await.unwrap();
-            let tokens = services.sessions.login("ada@example.com", PASSWORD).await.unwrap();
+            let tokens =
+                services.sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
 
             let renamed = users
                 .update(ada.id, UserChanges { name: Some("  Ada L. ".to_owned()), disabled: None })
@@ -708,7 +709,7 @@ mod update_tests {
 
             let enabled = users.update(ada.id, disable(false)).await.unwrap();
             assert!(enabled.is_active());
-            services.sessions.login("ada@example.com", PASSWORD).await.unwrap();
+            services.sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
 
             let missing = users.update(Uuid::now_v7(), disable(true)).await.unwrap_err();
             assert_eq!(missing.code(), "auth.user_not_found");

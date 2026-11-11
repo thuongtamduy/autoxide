@@ -8,6 +8,7 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
 use axum::extract::State;
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -18,11 +19,12 @@ use validator::Validate;
 
 use super::HttpState;
 use crate::api::User;
-use crate::session::Tokens;
+use crate::session::{LoginOutcome, Tokens};
 
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
         .routes(routes!(login))
+        .routes(routes!(login_mfa))
         .routes(routes!(refresh))
         .routes(routes!(logout))
         .routes(routes!(me))
@@ -38,6 +40,32 @@ pub(crate) struct LoginRequest {
     #[validate(length(min = 1, max = 1024))]
     #[schema(example = "correct horse battery staple")]
     password: String,
+}
+
+/// Two-step sign-in: the password was right, a code is needed.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct MfaChallengeResponse {
+    /// Send this with the code to `POST /api/v1/auth/login/mfa`. Works once.
+    mfa_token: String,
+    /// Seconds left to send the code.
+    #[schema(example = 300)]
+    expires_in: u64,
+    /// Accepted kinds of code: `totp` (6 digits from the authenticator app) and
+    /// `recovery_code`.
+    #[schema(example = json!(["totp", "recovery_code"]))]
+    methods: Vec<String>,
+}
+
+/// The second step of signing in.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub(crate) struct LoginMfaRequest {
+    /// The `mfa_token` returned by `POST /api/v1/auth/login`.
+    #[validate(length(min = 1, max = 256))]
+    mfa_token: String,
+    /// The current 6-digit code from the authenticator app, or an unused recovery code.
+    #[validate(length(min = 1, max = 64))]
+    #[schema(example = "123456")]
+    code: String,
 }
 
 /// A refresh token, as returned by sign-in or by the previous refresh.
@@ -111,9 +139,11 @@ impl MeResponse {
 
 /// Sign in with email and password.
 ///
-/// Returns a short-lived access token and a refresh token. The same error answers
-/// an unknown email and a wrong password. After several failed attempts the email
-/// is locked for a while, even for the right password.
+/// Returns a short-lived access token and a refresh token. When the account has
+/// two-step sign-in on, answers 202 instead: send the `mfa_token` and a code to
+/// `POST /api/v1/auth/login/mfa`. The same error answers an unknown email and a
+/// wrong password. After several failed attempts the email is locked for a while,
+/// even for the right password.
 #[utoipa::path(
     post,
     path = "/login",
@@ -121,6 +151,7 @@ impl MeResponse {
     request_body = LoginRequest,
     responses(
         (status = 200, description = "Signed in.", body = Data<TokenResponse>),
+        (status = 202, description = "Password accepted; a code is needed. Continue with `POST /api/v1/auth/login/mfa`.", body = Data<MfaChallengeResponse>),
         (status = 401, description = "Wrong email or password; code `auth.invalid_credentials`.", body = Problem),
         (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
         (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
@@ -130,8 +161,47 @@ impl MeResponse {
 async fn login(
     State(state): State<Arc<HttpState>>,
     ValidJson(input): ValidJson<LoginRequest>,
+) -> Result<Response, Error> {
+    // Hai kết quả, hai hình dạng: `Response` là kiểu chung của mọi response.
+    Ok(match state.sessions.login(&input.email, &input.password).await? {
+        LoginOutcome::Tokens(tokens) => Data { data: TokenResponse::from(tokens) }.into_response(),
+        LoginOutcome::MfaRequired { mfa_token, expires_in } => {
+            let data = MfaChallengeResponse {
+                mfa_token,
+                expires_in,
+                methods: METHODS.map(String::from).to_vec(),
+            };
+            (StatusCode::ACCEPTED, Data { data }).into_response()
+        }
+    })
+}
+
+/// Cách nhập lớp thứ hai mà `/login/mfa` nhận.
+const METHODS: [&str; 2] = ["totp", "recovery_code"];
+
+/// Finish signing in with a code from the authenticator app or a recovery code.
+///
+/// Send the `mfa_token` from `POST /api/v1/auth/login` within its `expires_in`
+/// seconds. Each `mfa_token` allows five wrong codes; wrong codes also count
+/// towards the sign-in lock of the email.
+#[utoipa::path(
+    post,
+    path = "/login/mfa",
+    operation_id = "login_mfa",
+    request_body = LoginMfaRequest,
+    responses(
+        (status = 200, description = "Signed in.", body = Data<TokenResponse>),
+        (status = 401, description = "The code is wrong (`auth.invalid_mfa_code`), or the `mfa_token` is unknown, expired or used up (`auth.invalid_mfa_token`: sign in again).", body = Problem),
+        (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
+        (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
+        (status = 429, description = "Too many failed attempts for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.", body = Problem),
+    )
+)]
+async fn login_mfa(
+    State(state): State<Arc<HttpState>>,
+    ValidJson(input): ValidJson<LoginMfaRequest>,
 ) -> Result<Data<TokenResponse>, Error> {
-    let tokens = state.sessions.login(&input.email, &input.password).await?;
+    let tokens = state.sessions.complete_mfa(&input.mfa_token, &input.code).await?;
     Ok(Data { data: tokens.into() })
 }
 
