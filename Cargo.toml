@@ -42,6 +42,7 @@ autoxide-auth = { path = "modules/auth" }
 autoxide-idempotency = { path = "modules/idempotency" }
 autoxide-mail = { path = "modules/mail" }
 autoxide-files = { path = "modules/files" }
+autoxide-notes = { path = "modules/notes" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }

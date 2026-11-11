@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–9 xong; đang ở bước 10**, mục "Một module nghiệp vụ nhỏ dùng đủ…".
+Trạng thái: **bước 0–10 xong; đang ở bước 11**, mục "Lệnh CLI chép dữ liệu giữa SQLite và Postgres".
 
 ## 0. Khung dự án
 
@@ -99,9 +99,9 @@ Cho AI agent gọi chức năng của hệ thống như công cụ (Model Contex
 
 ## 10. Module mẫu
 
-- [ ] Một module nghiệp vụ nhỏ dùng đủ: migration, permission, service, REST, OpenAPI,
+- [x] Một module nghiệp vụ nhỏ dùng đủ: migration, permission, service, REST, OpenAPI,
       event, audit, MCP tool — làm khuôn cho module về sau
-- [ ] Hướng dẫn viết module (tiếng Anh + tiếng Việt)
+- [x] Hướng dẫn viết module (tiếng Anh + tiếng Việt)
 
 ## 11. Công cụ và deploy
 

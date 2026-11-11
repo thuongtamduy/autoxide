@@ -12,9 +12,9 @@ core không chứa khái niệm nghiệp vụ — những thứ đó thuộc v�
 
 ## Trạng thái
 
-Đang ở giai đoạn đầu. **Bước 0 đến bước 9 của lộ trình (khung dự án, nền, đăng
+Đang ở giai đoạn đầu. **Bước 0 đến bước 10 của lộ trình (khung dự án, nền, đăng
 nhập cùng role và permission, đăng nhập hai bước, event và audit log, job queue, i18n
-và idempotency, email, lưu file, MCP endpoint) đã xong**: workspace Cargo, gate chất lượng, cấu hình, truy cập database, migration theo
+và idempotency, email, lưu file, MCP endpoint, module mẫu) đã xong**: workspace Cargo, gate chất lượng, cấu hình, truy cập database, migration theo
 module, hợp đồng module, máy chủ HTTP dưới `/api/v1` kèm OpenAPI, health check, log,
 metrics, tracing và CLI. Module `auth` lưu người dùng
 với mật khẩu hash bằng Argon2id và cho đăng nhập bằng access token sống ngắn cùng
@@ -248,8 +248,10 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — dựng gì, theo thứ tự nào
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — nhật ký quyết định
 - [`CLAUDE.md`](CLAUDE.md) — luật cho người đóng góp, là người hay AI agent
+- [`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md) — cách viết một module, bắt đầu
+  từ module mẫu [`modules/notes`](modules/notes) (mặc định không đăng ký)
 
-Bốn tài liệu này điều hành dự án và được viết bằng tiếng Việt, thuật ngữ kỹ thuật
+Bốn tài liệu đầu điều hành dự án và được viết bằng tiếng Việt, thuật ngữ kỹ thuật
 giữ nguyên tiếng Anh. Tài liệu cho người dùng (README này, hướng dẫn cài đặt và sử
 dụng, mô tả API) viết bằng tiếng Anh, kèm bản dịch tiếng Việt song song.
 

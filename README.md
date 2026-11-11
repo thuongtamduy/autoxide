@@ -12,9 +12,9 @@ the core contains no business concepts — those belong to modules.
 
 ## Status
 
-Early development. **Steps 0 to 9 of the roadmap (project skeleton, foundation,
+Early development. **Steps 0 to 10 of the roadmap (project skeleton, foundation,
 login with roles and permissions, two-step sign-in, events and audit log, job queue,
-i18n and idempotency, email, file storage, MCP endpoint) are done**: the Cargo workspace, the quality gate, configuration,
+i18n and idempotency, email, file storage, MCP endpoint, sample module) are done**: the Cargo workspace, the quality gate, configuration,
 database access, per-module migrations, the module contract, the HTTP server
 under `/api/v1` with OpenAPI, health checks, logs, metrics, tracing and the CLI.
 The `auth` module stores
@@ -252,8 +252,10 @@ never share foreign keys. These rules are checked automatically by the gate.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — what is built, in what order
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — the decision log
 - [`CLAUDE.md`](CLAUDE.md) — the rules for contributors, human or AI agent
+- [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) — how to write a module, starting
+  from the sample module [`modules/notes`](modules/notes) (not registered by default)
 
-These four documents steer the project and are written in Vietnamese, with
+The first four documents steer the project and are written in Vietnamese, with
 technical terms kept in English. User-facing documentation (this README, the
 installation and usage guides, API descriptions) is written in English with a
 Vietnamese translation alongside.

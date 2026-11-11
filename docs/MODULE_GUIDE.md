@@ -1,0 +1,168 @@
+# Writing a module
+
+[Tiếng Việt](MODULE_GUIDE.vi.md)
+
+Business features live in modules, not in the core. A module is one crate under
+`modules/<name>` that owns its tables, declares what it needs from the core through the
+`Module` trait, and is registered in exactly one place. The sample module
+[`modules/notes`](../modules/notes) uses every part of the contract; start from a copy
+of it.
+
+## Rules that the gate enforces
+
+- **One crate, two public items.** A module exposes only `pub mod api;` (types and
+  traits other modules may use) and `pub fn module()` (for the binary). Everything else
+  is private. Other modules write `autoxide_<name>::api::…` and nothing else.
+- **Own tables only.** Every table of module `notes` is named `notes_…`, including the
+  migration history `notes_migrations`. Never read, write or join another module's
+  tables, and never add a foreign key to them: keep the id only.
+- **Both databases.** Everything runs on SQLite and PostgreSQL. Do not use a type,
+  function or syntax only one of them has. Tests run on both.
+- **Logic in the service.** REST handlers and MCP tools take input, check the
+  permission, call one service method and return its result. They never touch the
+  database.
+- **Errors have a stable `code`** with the module prefix (`notes.title_taken`) and a
+  Vietnamese translation in `locales/vi.json`.
+
+`./gate.sh` checks all of this; a module is done when the gate is green.
+
+## Step by step
+
+### 1. Create the crate
+
+Copy `modules/notes` to `modules/<name>` and replace `notes` everywhere: the crate name
+(`autoxide-<name>`) in `Cargo.toml`, `Module::name`, table names, permission names,
+event names, error codes and the keys in `locales/vi.json`. Then:
+
+1. add `autoxide-<name> = { path = "modules/<name>" }` under `[workspace.dependencies]`
+   in the root `Cargo.toml`;
+2. add `autoxide-<name>.workspace = true` to `crates/app/Cargo.toml`;
+3. add one line to `all()` in `crates/app/src/modules.rs`:
+   `Box::new(autoxide_<name>::module())`. A module that uses another module's trait
+   is registered after it.
+
+The crate's `Cargo.toml` lists dependencies as `<library>.workspace = true`, with
+`license.workspace = true` and `[lints] workspace = true`.
+
+### 2. Tables: migrations and entities
+
+Each migration is a file in `src/migration/` and a line at the end of `all()`. A
+committed migration is never edited — add a new one. Every migration has a `down`.
+
+- Ids are UUIDv7 made by the application (`Uuid::now_v7()`), never auto-increment.
+- Times are UTC; money is an integer of the smallest unit plus a currency code.
+- Add an index for every list and every lookup, and a unique index for every
+  uniqueness rule — the database, not a prior `SELECT`, settles concurrent writes.
+- Modules that record events add `autoxide_kernel::event::outbox_migration(...)`; modules
+  with background jobs add `autoxide_kernel::job::jobs_migration(...)`.
+
+Entities use SeaORM (`src/entity.rs`). Read with `Database::read()`, write with
+`Database::write()`, and group writes in `Database::begin_write()`. Keep write
+transactions short: no network calls, no password hashing inside.
+
+### 3. Permissions
+
+Declare them in `src/permissions.rs` as `<module>.<action>` and return them from
+`Module::permissions`. Check permissions, never role names. Roles are made by
+administrators from the permissions every module declares.
+
+### 4. Service
+
+`src/service.rs` holds every rule. It takes an `Actor` (who acts; from
+`Actor::from(&principal)`) so that events record who did it. Each write records its
+event in the same transaction with `Outbox::record(&transaction, actor, subject,
+&event)` — the change and its audit entry exist together or not at all.
+
+### 5. REST API and OpenAPI
+
+Routes live in `src/http.rs`, are registered with `OpenApiRouter::routes(routes!(…))`,
+and are mounted under `/api/v1/<name>`; a module declares only the tail (`/`, `/{id}`).
+
+- Read JSON bodies with `ValidJson<T>` (`T: Deserialize + Validate + ToSchema`).
+- Answer with `Data<T>`, `Page<T>` (lists, via `fetch_page` with
+  `limit`/`cursor`/`order`) or an `Error` (sent as RFC 9457 Problem Details).
+- A handler that needs a signed-in caller takes `principal: Principal` and calls
+  `principal.require(&PERMISSION)?`.
+- Document every handler: a `///` line (the summary), the required permission, and a
+  `description` for every response with the error `code`s. Doc comments on handlers and
+  schema types are English, written for API callers.
+- Breaking change: add a new endpoint and declare the old one in `Module::deprecations`.
+
+### 6. Events and the audit log
+
+Declare events in `src/events.rs` and return them from `Module::events`. The payload is
+`{"before": …, "after": …}` (omit what does not apply) and never contains secrets. The
+`audit` module records every event; other modules subscribe through
+`Module::subscriptions` and must accept receiving the same event twice.
+
+### 7. MCP tools
+
+`Module::tools` returns `autoxide_kernel::mcp::Tool`s. Each tool takes an input type
+(`Deserialize + Validate + ToSchema`, plain fields), requires the same permission as the
+matching REST endpoint, and calls the same service method:
+
+```rust
+Tool::new("create_note", "Create a note.", move |principal: Principal, input: CreateNoteRequest| {
+    let service = service.clone();
+    async move {
+        let note = service.create(Actor::from(&principal), input.into()).await?;
+        Ok::<_, Error>(NoteResponse::from(note))
+    }
+})
+.requires(NOTES_WRITE)
+```
+
+Mark tools that only read with `.read_only()` and tools that destroy data with
+`.destructive()`. Use `PageInput` for list tools.
+
+### 8. Working with other modules
+
+Publish a trait in `src/api.rs` and provide it in `Module::start` with
+`context.provide::<dyn Trait>(…)`. Another module gets it with
+`context.require::<dyn Trait>()` and is registered after you. The core's own shared
+services work the same way: `dyn Mailer` (send mail; module `mail`) and `dyn Storage`
+(store files; module `files`).
+
+### 9. Configuration, jobs, limits
+
+- Settings: declare each with `Setting` and read it in `Module::configure` through
+  `ConfigReader` (never `std::env::var`); names start with `AUTOXIDE_<NAME>_`. Then
+  regenerate `.env.example`: `cargo run -p autoxide -- config --env-example > .env.example`.
+- Background work: `Module::jobs` (handlers), `Module::schedules` (recurring jobs), and
+  `context.jobs()` to enqueue.
+- A route that needs a larger request body than the default declares it in
+  `Module::body_limits`.
+
+### 10. Translations
+
+Every error `code` and mail template key has a Vietnamese text in `locales/vi.json`,
+returned from `Module::translations`. The English text stays in the code where the
+error is made.
+
+### 11. Tests
+
+Tests that touch the database use `TestDatabase::run(async |test| { … })` from
+`autoxide-testkit`: every test gets an empty database, SQLite or PostgreSQL depending
+on `TEST_DATABASE_URL`, and the gate runs both. `modules/notes/src/tests.rs` shows how
+to build the module the way the binary does and call it through REST and a real MCP
+client. Anything written concurrently (unique names, single-use tokens, counters) needs
+a concurrency test.
+
+### 12. Finish
+
+1. If the API changed, regenerate the contract:
+   `cargo run -p autoxide -- openapi > docs/openapi.json`.
+2. Run `./gate.sh` until it is green.
+
+## Checklist
+
+- [ ] Crate added to the workspace and registered in `crates/app/src/modules.rs`
+- [ ] Tables named `<module>_…`, UUIDv7 ids, indexes for every list and lookup,
+      migrations with `down`
+- [ ] Permissions declared; every handler and tool requires one
+- [ ] Logic only in the service; each write records its event in the same transaction
+- [ ] Every route documented (summary, permission, every response)
+- [ ] MCP tools for what agents should be able to do
+- [ ] Error codes prefixed and translated
+- [ ] Tests on both databases, including concurrent writes
+- [ ] `docs/openapi.json` and `.env.example` regenerated; gate green

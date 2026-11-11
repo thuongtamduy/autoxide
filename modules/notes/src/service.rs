@@ -1,0 +1,191 @@
+//! Service của ghi chú: MỌI logic nằm ở đây. Handler REST và tool MCP chỉ lấy dữ liệu
+//! vào, kiểm permission, gọi service — nên hai đường cho cùng một kết quả.
+//!
+//! Mỗi lệnh ghi đi cùng một event trong CÙNG transaction (luật kiến trúc 3): thay đổi
+//! và dòng audit log hoặc cùng có, hoặc cùng không.
+
+use autoxide_kernel::database::Database;
+use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use chrono::{DateTime, SubsecRound, Utc};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set, SqlErr,
+};
+use serde_json::{Value, json};
+use uuid::Uuid;
+
+use crate::api::{NoteSummary, Notes};
+use crate::entity::{self, Column, Entity};
+use crate::events::{self, Change};
+
+/// Một ghi chú.
+pub(crate) type Note = entity::Model;
+
+/// Dữ liệu để tạo ghi chú (đã qua kiểm độ dài ở REST / MCP).
+#[derive(Debug, Clone)]
+pub(crate) struct NewNote {
+    pub title: String,
+    pub body: String,
+}
+
+/// Thay đổi cho một ghi chú; trường `None` giữ nguyên.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct NoteChanges {
+    pub title: Option<String>,
+    pub body: Option<String>,
+}
+
+pub(crate) struct NoteService {
+    database: Database,
+    outbox: Outbox,
+}
+
+impl NoteService {
+    pub(crate) fn new(database: Database, outbox: Outbox) -> Self {
+        NoteService { database, outbox }
+    }
+
+    /// Tạo ghi chú của `actor`. Tên trùng với ghi chú khác của cùng người thì
+    /// `notes.title_taken`.
+    pub(crate) async fn create(&self, actor: Actor, input: NewNote) -> Result<Note, Error> {
+        let owner = owner(actor)?;
+        let title = check_title(&input.title)?;
+        let now = now();
+        let transaction = self.database.begin_write().await?;
+        let note = entity::ActiveModel {
+            id: Set(Uuid::now_v7()),
+            owner_id: Set(owner),
+            title: Set(title.clone()),
+            body: Set(input.body),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(&transaction)
+        .await
+        .map_err(|error| title_conflict(error, &title))?;
+        let event = events::NoteCreated(Change { before: None, after: Some(snapshot(&note)) });
+        self.outbox.record(&transaction, actor, events::note_subject(note.id), &event).await?;
+        transaction.commit().await?;
+        tracing::info!(note_id = %note.id, "note created");
+        Ok(note)
+    }
+
+    /// Một trang ghi chú của `actor`, mới tạo trước (mặc định).
+    pub(crate) async fn list(&self, actor: Actor, page: &PageRequest) -> Result<Page<Note>, Error> {
+        let select = Entity::find().filter(Column::OwnerId.eq(owner(actor)?));
+        fetch_page(select, Column::Id, |row| row.id, page, self.database.read()).await
+    }
+
+    /// Ghi chú `id` của `actor`. Ghi chú của người khác báo như không có.
+    pub(crate) async fn get(&self, actor: Actor, id: Uuid) -> Result<Note, Error> {
+        let note = Entity::find_by_id(id).one(self.database.read()).await?;
+        note.filter(|note| Some(note.owner_id) == actor.user_id).ok_or_else(|| not_found(id))
+    }
+
+    /// Đổi tên hay nội dung ghi chú `id` của `actor`.
+    pub(crate) async fn update(
+        &self,
+        actor: Actor,
+        id: Uuid,
+        changes: NoteChanges,
+    ) -> Result<Note, Error> {
+        let title = changes.title.as_deref().map(check_title).transpose()?;
+        let transaction = self.database.begin_write().await?;
+        let before = Entity::find_by_id(id)
+            .one(&transaction)
+            .await?
+            .filter(|note| Some(note.owner_id) == actor.user_id)
+            .ok_or_else(|| not_found(id))?;
+        let mut row = before.clone().into_active_model();
+        if let Some(title) = &title {
+            row.title = Set(title.clone());
+        }
+        if let Some(body) = changes.body {
+            row.body = Set(body);
+        }
+        row.updated_at = Set(now());
+        let after = row
+            .update(&transaction)
+            .await
+            .map_err(|error| title_conflict(error, title.as_deref().unwrap_or_default()))?;
+        let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
+        let event = events::NoteUpdated(change);
+        self.outbox.record(&transaction, actor, events::note_subject(id), &event).await?;
+        transaction.commit().await?;
+        Ok(after)
+    }
+
+    /// Xoá ghi chú `id` của `actor`. Hai request xoá cùng lúc: một bên nhận
+    /// `notes.note_not_found`.
+    pub(crate) async fn delete(&self, actor: Actor, id: Uuid) -> Result<(), Error> {
+        let transaction = self.database.begin_write().await?;
+        let note = Entity::find_by_id(id)
+            .one(&transaction)
+            .await?
+            .filter(|note| Some(note.owner_id) == actor.user_id)
+            .ok_or_else(|| not_found(id))?;
+        let deleted = Entity::delete_by_id(id).exec(&transaction).await?;
+        if deleted.rows_affected == 0 {
+            transaction.rollback().await?;
+            return Err(not_found(id));
+        }
+        let event = events::NoteDeleted(Change { before: Some(snapshot(&note)), after: None });
+        self.outbox.record(&transaction, actor, events::note_subject(id), &event).await?;
+        transaction.commit().await?;
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl Notes for NoteService {
+    async fn find(&self, id: Uuid) -> Result<Option<NoteSummary>, Error> {
+        let note = Entity::find_by_id(id).one(self.database.read()).await?;
+        Ok(note.map(|note| NoteSummary { id: note.id, owner_id: note.owner_id, title: note.title }))
+    }
+}
+
+/// Người dùng của `actor`. Ghi chú luôn thuộc một người; "hệ thống" không có ghi chú.
+fn owner(actor: Actor) -> Result<Uuid, Error> {
+    actor.user_id.ok_or_else(|| Error::internal("notes need a signed-in user"))
+}
+
+/// Tên: bỏ khoảng trắng hai đầu, không rỗng.
+fn check_title(title: &str) -> Result<String, Error> {
+    let title = title.trim();
+    if title.is_empty() {
+        return Err(Error::validation(vec![FieldError::new(
+            "title",
+            "length",
+            "must not be empty or only spaces",
+        )]));
+    }
+    Ok(title.to_owned())
+}
+
+/// Vi phạm index unique (chủ, tên) thành lỗi 409 dễ hiểu; lỗi khác giữ nguyên.
+fn title_conflict(error: sea_orm::DbErr, title: &str) -> Error {
+    match error.sql_err() {
+        Some(SqlErr::UniqueConstraintViolation(_)) => Error::conflict(
+            "notes.title_taken",
+            "You already have a note titled `{title}`. Choose another title.",
+        )
+        .with_param("title", title),
+        _ => Error::from(error),
+    }
+}
+
+fn not_found(id: Uuid) -> Error {
+    Error::not_found("notes.note_not_found", "You have no note `{id}`.").with_param("id", id)
+}
+
+/// Những gì audit cần biết về một ghi chú.
+fn snapshot(note: &Note) -> Value {
+    json!({"title": note.title, "body": note.body})
+}
+
+/// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên. Cắt
+/// trước để hai database trả về cùng một giá trị.
+fn now() -> DateTime<Utc> {
+    Utc::now().trunc_subsecs(6)
+}

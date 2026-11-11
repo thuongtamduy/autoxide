@@ -1460,3 +1460,24 @@ lẫn MCP thì không có lỗ hổng riêng của MCP.
 nhanh; macro `#[tool]` của `rmcp` — gắn module vào `rmcp` và schemars, trong khi kiểu
 đầu vào đã có `ToSchema` + `Validate` như REST; giữ phiên (session) — cần lưu phiên
 chung giữa các máy chủ mà không thêm được gì cho tool hiện có.
+
+## D-069 · Module mẫu `notes` không đăng ký sẵn trong binary — 2026-11-11 — agent quyết
+
+Quyết định: module mẫu của bước 10 là `modules/notes` (ghi chú cá nhân: mỗi người
+chỉ thấy ghi chú của mình, tên không trùng trong ghi chú của một người). Nó dùng đủ hợp
+đồng module: migration (index unique theo chủ + tên), permission `notes.read` /
+`notes.write`, service, REST + OpenAPI, event (`notes.note_created` / `_updated` /
+`_deleted`, vào audit log), tool MCP (`list_notes`, `get_note`, `create_note`,
+`update_note`, `delete_note`), bản dịch, và trait `api::Notes` cho module khác. Module
+**không** được đăng ký trong `crates/app/src/modules.rs`: test của nó tự dựng module
+như binary dựng (migration → start → REST + MCP qua lớp HTTP của kernel, client MCP
+thật) trên cả hai database, và kiểm tài liệu OpenAPI bằng `http::lint`. Hướng dẫn viết
+module: `docs/MODULE_GUIDE.md` + `docs/MODULE_GUIDE.vi.md`.
+
+Lý do: core trung lập với nghiệp vụ và mọi bản cài không nên có bảng `notes_…` không
+ai dùng; module đầu tiên do chủ dự án chọn. Ghi chú là ví dụ không thuộc ngành nào, đã
+được dùng làm ví dụ xuyên suốt tài liệu và doc test của kernel.
+
+Đã cân nhắc: đăng ký sẵn và bật/tắt bằng cấu hình — thêm một cơ chế chỉ để phục vụ
+module mẫu; để module mẫu trong thư mục `examples/` — khi đó gate không kiểm ranh giới
+module của nó như module thật.
