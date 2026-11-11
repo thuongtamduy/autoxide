@@ -143,23 +143,49 @@ Phiên bản thư viện ở đây **mới hơn kiến thức có sẵn của mo
 
 ## Gate — định nghĩa "xong"
 
-Một bước chỉ xong khi `./gate.sh` xanh (file này được tạo ở bước 0 của lộ trình).
-Gate gồm, theo thứ tự:
+Một bước chỉ xong khi `./gate.sh` xanh. Gate gồm, theo thứ tự:
 
 ```bash
 cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo xtask check                                    # ranh giới workspace, license, lint
+cargo deny check                                     # license, lỗ hổng, nguồn thư viện
 cargo test --workspace                               # SQLite
-TEST_DATABASE_URL=postgres://… cargo test --workspace  # Postgres (Docker)
-# + kiểm ranh giới module, kiểm OpenAPI không lệch với code
+TEST_DATABASE_URL=postgres://… cargo test --workspace  # Postgres (gate tự dựng bằng Docker)
+# + kiểm OpenAPI không lệch với code (thêm ở bước 1)
 ```
 
 - Gate đỏ thì sửa code, **không** nới gate, không tắt lint, không đánh dấu test
   bỏ qua. Ngoại lệ thật sự cần thiết phải ghi vào `docs/DECISIONS.md`.
 - Code mới phải có test. Thứ liên quan ghi đồng thời (job, idempotency, refresh
   token) phải có test đồng thời chạy trên cả hai database.
+- Test chạm database lấy database qua `TestDatabase::run(async |database| { … })`
+  của crate `autoxide-testkit`: mỗi test một database trống, tự chọn SQLite hay
+  Postgres theo `TEST_DATABASE_URL`. Không tự mở kết nối tới một database cố định.
+- `unwrap` / `expect` trong test: viết trong `#[cfg(test)] mod tests` (clippy tự
+  miễn) hoặc trong `tests/` với dòng `#![allow(…)]` đầu file như các file sẵn có.
+  Trong `src/` không được tắt các lint này — `cargo xtask check` chặn.
 - Xong một bước: đánh dấu trong `docs/ROADMAP.md`, rồi `git commit` cục bộ. Không
   push khi chủ dự án chưa yêu cầu.
+
+## Bố cục workspace
+
+| Thư mục          | Crate              | Vai                                                     |
+| ---------------- | ------------------ | ------------------------------------------------------- |
+| `crates/kernel`  | `autoxide-kernel`  | Nền mọi module dựa vào; không phụ thuộc module nào      |
+| `crates/testkit` | `autoxide-testkit` | Đồ dùng cho test; chỉ được khai ở `[dev-dependencies]`  |
+| `crates/app`     | `autoxide`         | Binary; nơi duy nhất đăng ký module                     |
+| `modules/<tên>`  | `autoxide-<tên>`   | Mỗi module một crate                                    |
+| `xtask`          | `xtask`            | Công cụ cho người phát triển (`cargo xtask check`)      |
+
+- Phiên bản và feature flag của thư viện khai ở `[workspace.dependencies]` của
+  `Cargo.toml` gốc; crate con chỉ viết `<tên>.workspace = true`.
+- Mỗi crate phải có `license.workspace = true` và `[lints] workspace = true`.
+- Crate của module chỉ mở ra ngoài đúng hai thứ: `pub mod api;` (hợp đồng: trait và
+  kiểu dữ liệu cho module khác dùng) và `pub fn module(…)` (cho binary đăng ký).
+  Mọi thứ khác là `mod` riêng tư hoặc `pub(crate)`. Module khác chỉ được viết
+  `autoxide_<tên>::api::…`; `api` không tham chiếu phần bên trong (`crate::…`).
+- Các luật trên do `cargo xtask check` kiểm trong gate; lý do ở D-031.
 
 ## Luật kiến trúc
 

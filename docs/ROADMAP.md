@@ -3,23 +3,25 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **chưa bắt đầu** — chờ chủ dự án nói "bắt đầu".
+Trạng thái: **bước 0 xong; đang ở bước 1**, mục "Cấu hình từ env, kiểm lúc khởi động".
 
 ## 0. Khung dự án
 
-- [ ] Workspace Cargo, cấu hình lint chung (cấm `unsafe`, cấm `unwrap` ngoài test)
-- [ ] Khai `license = "MIT OR Apache-2.0"` cho mọi crate
-- [ ] `README.md` (tiếng Anh) + `README.vi.md`: dự án là gì, cách chạy, license
-- [ ] Ghim phiên bản thư viện nền; xác nhận chúng tương thích với nhau
-- [ ] `gate.sh`: fmt, clippy, test SQLite, test Postgres (Docker)
-- [ ] Kiểm ranh giới module tự động trong gate
+- [x] Workspace Cargo, cấu hình lint chung (cấm `unsafe`, cấm `unwrap` ngoài test)
+- [x] Khai `license = "MIT OR Apache-2.0"` cho mọi crate
+- [x] `README.md` (tiếng Anh) + `README.vi.md`: dự án là gì, cách chạy, license
+- [x] Ghim phiên bản thư viện nền; xác nhận chúng tương thích với nhau
+- [x] `gate.sh`: fmt, clippy, test SQLite, test Postgres (Docker)
+- [x] Kiểm ranh giới module tự động trong gate
 
 ## 1. Nền
 
 - [ ] Cấu hình từ env, kiểm lúc khởi động
 - [ ] Kết nối database: tách đọc / ghi, WAL trên SQLite
 - [ ] Migration theo module (up, down, status)
-- [ ] Hợp đồng module + đăng ký ở một chỗ
+- [ ] Kiểm trong gate: tên bảng mang tiền tố module, không foreign key xuyên module
+- [ ] Hợp đồng module + đăng ký ở một chỗ (khi có module đầu tiên: thêm `"modules/*"`
+      vào `members` của `Cargo.toml` gốc)
 - [ ] Kiểu lỗi chung, envelope trả về, pagination theo UUIDv7
 - [ ] HTTP: `/api/v1`, request id, timeout, giới hạn body, CORS, graceful shutdown
 - [ ] OpenAPI sinh từ code + kiểm không lệch trong gate
@@ -100,7 +102,9 @@ Cho AI agent gọi chức năng của hệ thống như công cụ (Model Contex
 - [ ] Bộ đo hiệu năng (đọc, list, ghi, ghi đồng thời) trên cả hai database, có số gốc để so về sau
 - [ ] Dockerfile multi-stage + `compose.yml` (ứng dụng + Postgres)
 - [ ] Backup và restore
-- [ ] CI: gate đầy đủ + `cargo-deny`
+- [ ] CI: gate đầy đủ (đã gồm `cargo-deny`) trên Postgres tối thiểu và mới nhất; quét
+      secret bằng gitleaks
+- [ ] Thử gỡ ngoại lệ RUSTSEC-2026-0459 trong `deny.toml` (D-032)
 - [ ] Hướng dẫn cài đặt và deploy (tiếng Anh + tiếng Việt), đủ để người lạ tự làm theo
 
 ## Sau core (chưa mở)

@@ -1,0 +1,128 @@
+# Autoxide
+
+**English** · [Tiếng Việt](README.vi.md)
+
+Autoxide is an open-source backend core written in Rust. The core is built first;
+business modules plug in on top of it. It runs on **both SQLite and PostgreSQL**
+from a single code base, exposes a REST API described by OpenAPI, and is designed
+to be used by AI agents as well as by people.
+
+It is a foundation for new products. It is not tied to any company or industry:
+the core contains no business concepts — those belong to modules.
+
+## Status
+
+Early development. **Step 0 of the roadmap (project skeleton) is done**: the Cargo
+workspace, shared lint rules, the pinned library stack verified on both databases,
+automated boundary checks, and the quality gate. There is no server to run yet;
+that arrives with step 1.
+
+What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
+
+1. Foundation: configuration, database access, migrations per module, the module
+   contract, one error type, HTTP under `/api/v1`, OpenAPI, health checks, logs,
+   metrics, tracing, CLI
+2. Login, roles and permissions, API keys for machines and AI agents
+3. MFA (TOTP and recovery codes)
+4. Events and an append-only audit log
+5. A job queue stored in the database (no Redis)
+6. i18n (English, Vietnamese) and idempotency keys
+7. Email, password reset, email verification
+8. File storage (local disk and S3)
+9. An MCP endpoint so AI agents can call the system as tools
+10. A sample module and a guide for writing modules
+11. Tooling and deployment: data copy between SQLite and PostgreSQL, benchmarks,
+    Docker, backup and restore, CI
+
+## Requirements
+
+- [Rust](https://rustup.rs) — `rustup` installs the exact toolchain pinned in
+  `rust-toolchain.toml` the first time you run `cargo`
+- A C compiler (SQLite is compiled from source and bundled into the binary)
+- To run the full quality gate: [Docker](https://docs.docker.com/get-docker/) and
+  [`cargo-deny`](https://github.com/EmbarkStudios/cargo-deny)
+  (`cargo install cargo-deny --locked`)
+
+## Getting started
+
+```bash
+git clone <repository-url> autoxide
+cd autoxide
+
+# Build and run the command-line interface
+cargo run -p autoxide -- --help
+
+# Run the tests on SQLite (no setup needed)
+cargo test --workspace
+
+# Run the full quality gate: format, lints, boundary checks, dependency audit,
+# tests on SQLite, tests on PostgreSQL (started in a throwaway Docker container)
+./gate.sh
+```
+
+If you are going to commit, enable the Git hooks once. They scan staged changes
+for secrets (when [`gitleaks`](https://github.com/gitleaks/gitleaks) is installed)
+and check formatting:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+### Running the tests against your own PostgreSQL
+
+Tests pick their database from `TEST_DATABASE_URL`. Unset means SQLite. To use
+PostgreSQL 16 or newer, point it at any database on a server where the user may
+`CREATE DATABASE` — every test creates its own empty database and drops it
+afterwards:
+
+```bash
+TEST_DATABASE_URL=postgres://user:password@localhost:5432/postgres cargo test --workspace
+```
+
+`./gate.sh` does this for you with Docker. To make the gate use an existing
+server instead, set `GATE_POSTGRES_URL` to the same kind of URL.
+
+## Project layout
+
+| Path             | What it is                                                              |
+| ---------------- | ----------------------------------------------------------------------- |
+| `crates/kernel`  | The foundation every module builds on. Knows no module.                 |
+| `crates/app`     | The `autoxide` binary: the one place where modules are registered.      |
+| `crates/testkit` | Test support: an isolated database per test, on SQLite or PostgreSQL.   |
+| `modules/<name>` | One crate per module (none yet).                                        |
+| `xtask`          | Developer tooling: `cargo xtask check` enforces the workspace boundaries. |
+| `gate.sh`        | The quality gate. A change is done only when this is green.             |
+
+Modules own their tables, talk to each other only through published traits, and
+never share foreign keys. These rules are checked automatically by the gate.
+
+## Documentation
+
+- [`STACK.md`](STACK.md) — which libraries are used and why
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — what is built, in what order
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) — the decision log
+- [`CLAUDE.md`](CLAUDE.md) — the rules for contributors, human or AI agent
+
+These four documents steer the project and are written in Vietnamese, with
+technical terms kept in English. User-facing documentation (this README, the
+installation and usage guides, API descriptions) is written in English with a
+Vietnamese translation alongside.
+
+## Contributing
+
+Run `./gate.sh` before you commit; a change is accepted only when the gate is
+green on both SQLite and PostgreSQL. Never commit secrets — only `.env.example`
+belongs in Git, never `.env`.
+
+## License
+
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
+
+at your option.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this project by you, as defined in the Apache-2.0 license, shall
+be dual licensed as above, without any additional terms or conditions.

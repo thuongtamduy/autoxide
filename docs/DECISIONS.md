@@ -323,3 +323,97 @@ Lý do: Postgres 16 còn được hỗ trợ dài và có đủ tính năng core
 để người cài không phụ thuộc phiên bản của hệ điều hành. CI test trên phiên bản
 Postgres tối thiểu và phiên bản mới nhất.
 
+
+## D-031 · Bố cục workspace và luật ranh giới kiểm tự động — 2026-11-11 — agent quyết
+
+Quyết định: workspace gồm `crates/kernel` (nền, không biết module nào),
+`crates/testkit` (đồ test, chỉ là dev-dependency), `crates/app` (binary `autoxide`,
+nơi duy nhất đăng ký module), `modules/<tên>` (mỗi module một crate
+`autoxide-<tên>`) và `xtask` (công cụ). Lệnh `cargo xtask check` chạy trong gate và
+kiểm:
+
+- crate nằm đúng chỗ; mọi crate khai `MIT OR Apache-2.0` và dùng lint chung;
+- chiều phụ thuộc: kernel và testkit không phụ thuộc module; testkit chỉ là
+  dev-dependency; không ai phụ thuộc vào binary hay xtask;
+- crate của module chỉ mở ra ngoài `pub mod api;` và `pub fn module(…)`; module
+  khác chỉ dùng `autoxide_<tên>::api::…`; `api` không tham chiếu `crate::…` ngoài
+  chính nó; module không xuất macro;
+- trong `src/` không được `#[allow]` / `#[expect]` các lint an toàn (`unsafe_code`,
+  `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented`, `dbg_macro`). File
+  trong `tests/` được khai `#![allow(…)]` ở đầu file.
+
+Tên gọi: "kernel" là crate nền; "core" vẫn chỉ toàn bộ phần lõi theo lộ trình (kernel
+cộng các module đăng nhập, audit, job…), để hai từ không lẫn nhau.
+
+Lý do: trình biên dịch đã chặn truy cập vào thứ không `pub`, nên chỉ cần ép bề mặt
+`pub` của module về đúng hai cửa là entity (bảng), service và migration của module
+tự động kín với module khác — đó là cách rẻ nhất để giữ luật "module sở hữu bảng
+của mình" và "gọi nhau qua trait công bố" (D-005). Phần trình biên dịch không biết
+(chiều phụ thuộc, license, nới lint) thì xtask kiểm. Luật đọc mã nguồn theo dòng,
+dựa vào định dạng đã chuẩn hoá bởi `cargo fmt`; nó chặn lỗi vô ý, không phải bộ
+phân tích cú pháp đầy đủ.
+
+Đã cân nhắc: tách mỗi module thành hai crate (`-api` và phần cài đặt) — chặt hơn
+nhưng gấp đôi số crate và thêm việc cho mỗi module mới; script shell với `jq` —
+không viết test được; dùng `syn` để phân tích cú pháp — thêm thư viện cho việc vài
+chục dòng làm được.
+
+Chưa kiểm ở bước này (đã thêm vào lộ trình bước 1): tên bảng mang tiền tố module và
+không foreign key xuyên module — cần có migration theo module mới kiểm được.
+
+Ghi chú: `"modules/*"` chưa nằm trong `members` của `Cargo.toml` gốc vì cargo báo lỗi
+khi một glob không khớp thư mục nào; thêm vào khi tạo module đầu tiên. Thông báo của
+công cụ (`xtask`, `gate.sh`) viết tiếng Anh vì người đóng góp bên ngoài đọc chúng;
+comment vẫn tiếng Việt (D-023).
+
+## D-032 · Ngoại lệ cho lỗ hổng của SQLite đóng gói kèm (RUSTSEC-2026-0459) — 2026-11-11 — agent quyết
+
+Quyết định: `deny.toml` bỏ qua đúng một cảnh báo, RUSTSEC-2026-0459 (SQLite trước
+3.54.0, đóng gói trong `libsqlite3-sys` trước 0.39). Trong lúc ngoại lệ còn hiệu
+lực, Autoxide **không mở file SQLite do bên không tin cậy cung cấp** — áp cho lệnh
+chép dữ liệu và restore ở bước 11.
+
+Lý do: không có phiên bản nào chọn được. `sqlx-sqlite` 0.9.0 (mới nhất, là bản SeaORM
+2.0 dùng) yêu cầu `libsqlite3-sys` < 0.38, còn bản đã vá là ≥ 0.39. Lỗ hổng chỉ khai
+thác được khi tiến trình mở một file database kèm file `-wal` do kẻ tấn công chuẩn
+bị; file SQLite của Autoxide do chính ứng dụng tạo và giữ, ai ghi được vào đó thì đã
+có toàn bộ dữ liệu. Đây là ngoại lệ cho luật "gate đỏ thì sửa code" theo đúng điều
+khoản ngoại lệ của luật đó.
+
+Tự hết hạn: gate chạy `cargo deny check -D advisory-not-detected`, nên ngay khi cây
+phụ thuộc không còn bản lỗi (sau khi sqlx cho phép `libsqlite3-sys` ≥ 0.39 và ta
+`cargo update`), gate đỏ cho tới khi gỡ dòng ngoại lệ. Mỗi lần nâng `sea-orm` hoặc
+`sqlx` phải thử gỡ ngoại lệ này.
+
+Đã cân nhắc: dùng SQLite của hệ điều hành thay cho bản đóng gói — trái D-030 và
+phiên bản khi đó không kiểm soát được (có thể cũng chưa vá); ghi đè `libsqlite3-sys`
+bằng một bản fork — phá luật "chỉ lấy thư viện từ crates.io" và không qua được ràng
+buộc phiên bản của sqlx.
+
+## D-033 · Database cho test: mỗi test một database, qua `TestDatabase::run` — 2026-11-11 — agent quyết
+
+Quyết định: test chạm database dùng `TestDatabase::run(async |database| { … })` của
+`autoxide-testkit`. Biến `TEST_DATABASE_URL` không đặt thì mỗi test một file SQLite
+trong thư mục tạm; đặt `postgres://…` thì mỗi test một database Postgres riêng
+(`CREATE DATABASE`), xoá bằng `DROP DATABASE … WITH (FORCE)` sau khi bài test chạy
+xong. Tên database chứa UUIDv7; database sót lại do tiến trình test bị giết sẽ được
+lần chạy sau dọn khi đã cũ hơn một giờ. Gate dựng Postgres bằng một container Docker
+dùng xong bỏ (mật khẩu ngẫu nhiên mỗi lần, `fsync=off`), image mặc định là phiên bản
+tối thiểu (D-030); CI truyền Postgres có sẵn qua `GATE_POSTGRES_URL`.
+
+Lý do chọn `run(…)` bọc quanh bài test thay vì một biến tự dọn khi ra khỏi scope
+(`Drop`): xoá database là việc `async`, `Drop` không `await` được. Đã thử và đo ngày
+11/11/2026 trên Postgres 16: (1) đứng chờ trong `Drop` chặn thread của runtime tokio,
+trong khi `DROP DATABASE` chờ mọi kết nối đang bắt tay dở do chính thread đó phục vụ
+— test đồng thời treo tới hết `authentication_timeout` (60 giây), 2 trên 4 lượt; (2)
+giao cho thread nền thì không treo nhưng tiến trình test thoát trước khi dọn xong —
+sót 94 database sau 12 lượt. Với `run`: 15 trên 15 lượt xanh, không sót database nào.
+
+Ngoại lệ cho D-029 (SQL trực tiếp): `CREATE DATABASE` và `DROP DATABASE` trong
+testkit là SQL viết tay, chỉ chạy trên Postgres — lệnh quản trị không có trong query
+builder và không có tương đương trên SQLite. Chỉ áp cho đồ test.
+
+Đã cân nhắc: mỗi test một schema trong cùng một database — tạo nhanh hơn nhưng test
+chạy với `search_path` khác production, dễ che lỗi; SQLite trong bộ nhớ — mỗi kết
+nối thấy một database khác nhau, không dùng được với pool hay kết nối đọc / ghi tách
+nhau (D-009).

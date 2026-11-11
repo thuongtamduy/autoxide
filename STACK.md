@@ -54,6 +54,10 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | ID                 | `uuid` (v7)                     | 1.29      |                                                     |
 | Thời gian          | `chrono`                        | 0.4       | Lưu UTC                                             |
 | CLI                | `clap`                          | 4.6       | `serve`, `migrate`, `user`, `db copy`…              |
+| Gọi router trong test | `tower` (feature `util`)     | 0.5       | Chỉ dùng trong test: gửi request thẳng vào router   |
+
+Kết nối database dùng TLS của `rustls` (feature `runtime-tokio-rustls` của SeaORM):
+binary không phụ thuộc OpenSSL của hệ điều hành.
 
 ### Bảo mật
 
@@ -117,12 +121,15 @@ ghi quyết định vào `docs/DECISIONS.md` nếu đổi.
 Một binary. Mỗi module là một crate trong cùng workspace và tuân các luật ranh
 giới sau, để sau này tách module nào thành service riêng chỉ là thêm network layer:
 
+Bố cục thư mục và crate: [`CLAUDE.md`](CLAUDE.md), mục "Bố cục workspace".
+
 1. Module sở hữu bảng của mình; không module nào đọc, ghi hay join bảng của
    module khác.
 2. Module gọi nhau qua trait do module kia công bố.
 3. Việc phụ (audit, thông báo) đi qua event, không gọi thẳng.
 4. Không foreign key xuyên module — chỉ giữ ID.
-5. Phụ thuộc một chiều; CI kiểm việc import vào phần bên trong của module khác.
+5. Phụ thuộc một chiều; `cargo xtask check` (chạy trong gate và CI) kiểm chiều phụ
+   thuộc và việc import vào phần bên trong của module khác.
 
 Logic nằm ở service layer. Handler REST chỉ là wrapper mỏng — nhờ vậy thêm GraphQL
 sau này không phải sửa code cũ.
@@ -151,8 +158,11 @@ repo này; giao diện là dự án riêng dùng API.
 | Định dạng           | `cargo fmt` (cấu hình `rustfmt.toml`)                           |
 | Lint                | `cargo clippy`, cảnh báo tính là lỗi                            |
 | Test                | `cargo test` trên SQLite và Postgres                            |
-| Kiểm phụ thuộc      | `cargo-deny` (license, lỗ hổng đã công bố) — chạy trong gate và CI |
-| Postgres cho test   | Docker                                                          |
+| Database cho test   | `autoxide-testkit` — mỗi test một database trống (D-033)        |
+| Kiểm ranh giới      | `cargo xtask check` — bố cục, license, lint, chiều phụ thuộc, bề mặt module (D-031) |
+| Kiểm phụ thuộc      | `cargo-deny` (license, lỗ hổng đã công bố, nguồn) — cấu hình `deny.toml`, chạy trong gate và CI |
+| Postgres cho test   | Docker — `gate.sh` tự dựng một container dùng xong bỏ           |
+| Gate                | `./gate.sh` — chạy tất cả các mục trên theo thứ tự              |
 
 ## Deploy
 
