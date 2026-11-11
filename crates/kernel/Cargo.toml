@@ -7,6 +7,9 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[dependencies]
+dotenvy.workspace = true
+
 [dev-dependencies]
 # Dùng bởi tests/stack.rs — bài test xác nhận các thư viện nền hợp nhau trên cả
 # hai database. Khi kernel bắt đầu dùng thư viện nào ở bước 1 thì chuyển nó lên

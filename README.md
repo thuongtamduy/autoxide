@@ -68,6 +68,25 @@ and check formatting:
 git config core.hooksPath .githooks
 ```
 
+## Configuration
+
+Every setting has a working default, so a fresh clone runs without any
+configuration. Settings are read from environment variables and from a `.env`
+file in the current directory; environment variables win.
+
+```bash
+# Check the configuration and show every setting with its current value
+cargo run -p autoxide -- config
+
+# Start your own configuration from the documented defaults
+cp .env.example .env
+```
+
+[`.env.example`](.env.example) lists every setting with its description and
+default. It is generated from the code, so it cannot go out of date. An invalid
+configuration is reported in full — every problem at once, each saying what to
+fix — and the command exits with status 2. Secrets are never printed.
+
 ### Running the tests against your own PostgreSQL
 
 Tests pick their database from `TEST_DATABASE_URL`. Unset means SQLite. To use

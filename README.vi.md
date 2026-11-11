@@ -68,6 +68,25 @@ dạng code:
 git config core.hooksPath .githooks
 ```
 
+## Cấu hình
+
+Mọi biến cấu hình đều có giá trị mặc định dùng được, nên bản clone mới chạy được
+ngay mà không cần cấu hình gì. Cấu hình đọc từ biến môi trường và từ file `.env`
+trong thư mục hiện tại; biến môi trường thắng.
+
+```bash
+# Kiểm cấu hình và xem mọi biến kèm giá trị đang có hiệu lực
+cargo run -p autoxide -- config
+
+# Bắt đầu cấu hình của riêng bạn từ các giá trị mặc định đã ghi sẵn
+cp .env.example .env
+```
+
+[`.env.example`](.env.example) liệt kê mọi biến kèm mô tả và giá trị mặc định. File
+này sinh ra từ code nên không thể lỗi thời. Cấu hình sai được báo đầy đủ — mọi vấn
+đề cùng một lượt, mỗi vấn đề nói rõ phải sửa gì — và lệnh thoát với mã 2. Secret
+không bao giờ bị in ra.
+
 ### Chạy test trên PostgreSQL của riêng bạn
 
 Test chọn database theo biến `TEST_DATABASE_URL`. Không đặt nghĩa là SQLite. Để dùng

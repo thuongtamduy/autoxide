@@ -54,6 +54,7 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | ID                 | `uuid` (v7)                     | 1.29      |                                                     |
 | Thời gian          | `chrono`                        | 0.4       | Lưu UTC                                             |
 | CLI                | `clap`                          | 4.6       | `serve`, `migrate`, `user`, `db copy`…              |
+| Đọc file `.env`    | `dotenvy`                       | 0.15      | Chỉ đọc thành cặp tên / giá trị; biến môi trường thật thắng |
 | Gọi router trong test | `tower` (feature `util`)     | 0.5       | Chỉ dùng trong test: gửi request thẳng vào router   |
 
 Kết nối database dùng TLS của `rustls` (feature `runtime-tokio-rustls` của SeaORM):

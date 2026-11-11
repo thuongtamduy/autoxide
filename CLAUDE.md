@@ -229,6 +229,10 @@ TEST_DATABASE_URL=postgres://… cargo test --workspace  # Postgres (gate tự d
 - Tên trong code và OpenAPI bằng tiếng Anh. Comment, tài liệu, tên test viết tiếng
   Việt được.
 - Secret không vào git: chỉ có `.env.example`, không có `.env`.
+- Cấu hình: mỗi biến khai một lần bằng `Setting` và đọc qua `ConfigReader` của
+  `autoxide_kernel::config`; không gọi `std::env::var` trực tiếp. Tên biến: tên
+  chuẩn ngành nếu có (`DATABASE_URL`), còn lại tiền tố `AUTOXIDE_`. Thêm biến thì
+  sinh lại `.env.example` (`cargo run -p autoxide -- config --env-example`).
 - Không thêm thư viện khi vài chục dòng tự viết là đủ; thêm thì ghi vào `STACK.md`.
 
 ## Luật ngôn ngữ của tài liệu

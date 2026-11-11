@@ -417,3 +417,37 @@ builder và không có tương đương trên SQLite. Chỉ áp cho đồ test.
 chạy với `search_path` khác production, dễ che lỗi; SQLite trong bộ nhớ — mỗi kết
 nối thấy một database khác nhau, không dùng được với pool hay kết nối đọc / ghi tách
 nhau (D-009).
+
+## D-034 · Quy ước cấu hình — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Cấu hình đọc từ biến môi trường và file `.env` trong thư mục hiện tại; biến môi
+  trường thật thắng `.env`. Chuỗi rỗng coi như không đặt.
+- Mỗi biến khai một lần bằng `Setting` (tên, mô tả, mặc định, có phải secret) và đọc
+  qua `ConfigReader` của `autoxide_kernel::config`. Không gọi `std::env::var` trực
+  tiếp trong kernel, binary hay module — `cargo xtask check` chặn.
+- Tên biến: tên chuẩn ngành nếu có (`DATABASE_URL`, về sau `OTEL_*`); còn lại mang
+  tiền tố `AUTOXIDE_`, biến của module là `AUTOXIDE_<MODULE>_…`.
+- Mọi biến có mặc định dùng được trừ secret thật; không đặt gì thì chạy bằng SQLite
+  tại `data/autoxide.sqlite`.
+- Kiểm lúc khởi động: gom mọi lỗi của kernel và mọi module rồi báo một lượt, mỗi lỗi
+  nói rõ phải sửa gì; giá trị của secret không bao giờ xuất hiện trong thông báo.
+  Tiến trình thoát với mã 2.
+- `.env.example` sinh từ code (`autoxide config --env-example`); một test so file
+  trong repo với bản sinh ra.
+- Không có biến "chế độ" kiểu `APP_ENV=production`: mỗi hành vi có biến riêng (vd
+  bật trang xem API, định dạng log). Một công tắc ngầm đổi nhiều hành vi cùng lúc
+  là thứ khó đoán với người cài đặt và với AI agent.
+- Thông báo của CLI và log viết tiếng Anh. Luật "thông báo đi qua i18n key" áp cho
+  thông báo trả về qua API (chọn ngôn ngữ theo header), không áp cho thông báo của
+  người vận hành.
+
+Lý do: tiêu chí "người lạ tự cài được" (D-016) và "phù hợp AI agent" (D-020) — cấu
+hình tự mô tả, tài liệu không lệch code, lỗi nói rõ cách sửa. Đọc qua một nguồn duy
+nhất còn để test truyền cấu hình vào mà không sửa môi trường tiến trình (việc đó
+`unsafe` từ Rust 2024).
+
+Đã cân nhắc: thư viện `config` / `figment` (nhiều nguồn, nhiều định dạng) — thừa so
+với nhu cầu, và không cho danh sách biến tự mô tả; tự viết bộ đọc `.env` — `dotenvy`
+đã nằm sẵn trong cây phụ thuộc và xử lý đúng dấu nháy, ký tự thoát.

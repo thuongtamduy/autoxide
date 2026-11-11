@@ -8,6 +8,8 @@
 //! 2. `license`, `lints` — mọi crate khai license chung và dùng lint chung.
 //!    `lint-allow` — không tắt các lint an toàn (`unsafe`, `unwrap`, `expect`,
 //!    `panic`…) trong `src/`; chỉ file trong `tests/` và `benches/` được tắt.
+//!    `env-access` — cấu hình chỉ đọc qua `autoxide_kernel::config`, không gọi
+//!    `std::env::var` rải rác.
 //! 3. `dependency` — chiều phụ thuộc: kernel không biết module, testkit chỉ dùng
 //!    cho test, không ai phụ thuộc vào binary.
 //! 4. `module-surface` — module chỉ mở ra ngoài `pub mod api` (hợp đồng) và
@@ -61,6 +63,7 @@ pub fn check_workspace(workspace: &Workspace) -> Result<Vec<Violation>, String> 
         for file in rust_files(&crate_dir.join("src"))? {
             let text = read(&crate_dir.join(&file))?;
             violations.extend(check_lint_allows(package, &file, &text));
+            violations.extend(check_env_access(package, &file, &text));
         }
     }
 
@@ -187,6 +190,39 @@ fn contains_lint(line: &str, lint: &str) -> bool {
         let after = line[position + lint.len()..].chars().next();
         !before.is_some_and(is_ident_char) && !after.is_some_and(is_ident_char)
     })
+}
+
+/// File duy nhất của kernel được đọc biến môi trường của tiến trình.
+const ENV_ACCESS_FILE: &str = "src/config/source.rs";
+
+/// Luật `env-access`: kernel, binary và module đọc cấu hình qua `ConfigSource` /
+/// `ConfigReader` của kernel (D-034) — để mọi biến đều được khai bằng `Setting`,
+/// được kiểm lúc khởi động và có mặt trong `.env.example`. Testkit và xtask là
+/// công cụ, không thuộc luật này.
+pub fn check_env_access(package: &Package, file: &str, text: &str) -> Vec<Violation> {
+    let governed = matches!(package.role, Role::Kernel | Role::App | Role::Module);
+    if !governed || (package.role == Role::Kernel && file == ENV_ACCESS_FILE) {
+        return Vec::new();
+    }
+    let mut violations = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        if line.trim_start().starts_with("//") {
+            continue;
+        }
+        let reads_environment = ["env::var(", "env::var_os(", "env::vars(", "env::vars_os("]
+            .iter()
+            .any(|call| line.contains(call));
+        if reads_environment {
+            violations.push(Violation {
+                rule: "env-access",
+                location: format!("{}/{}:{}", package.dir, file, index + 1),
+                message: "read configuration through `autoxide_kernel::config` (declare a \
+                          `Setting`), not from the process environment directly"
+                    .to_owned(),
+            });
+        }
+    }
+    violations
 }
 
 /// Luật `dependency`: chiều phụ thuộc giữa các crate nội bộ.
@@ -528,6 +564,55 @@ let message = \"do not allow(clippy::unwrap_used) here\";
 let value = result.expect(\"clippy::expect_used bắt dòng này, không phải xtask\");
 ";
         assert_eq!(check_lint_allows(&package, "src/lib.rs", text), []);
+    }
+
+    // --- env-access ---
+
+    #[test]
+    fn doc_bien_moi_truong_truc_tiep_bi_bao() {
+        for (name, dir) in [
+            ("autoxide-kernel", "crates/kernel"),
+            ("autoxide", "crates/app"),
+            ("autoxide-auth", "modules/auth"),
+        ] {
+            let package = package(name, dir, &[]);
+            for line in [
+                "let url = std::env::var(\"DATABASE_URL\")?;",
+                "    if env::var_os(\"DEBUG\").is_some() {",
+                "for (name, value) in std::env::vars() {",
+                "for (name, value) in std::env::vars_os() {",
+            ] {
+                let violations = check_env_access(&package, "src/service.rs", line);
+                assert_eq!(rules(&violations), ["env-access"], "{name}: {line}");
+            }
+        }
+    }
+
+    #[test]
+    fn noi_duoc_phep_doc_bien_moi_truong() {
+        let line = "for (name, value) in std::env::vars_os() {";
+        // File nguồn cấu hình của kernel.
+        let kernel = package("autoxide-kernel", "crates/kernel", &[]);
+        assert_eq!(check_env_access(&kernel, "src/config/source.rs", line), []);
+        // Cùng tên file ở crate khác thì không được miễn.
+        let app = package("autoxide", "crates/app", &[]);
+        assert_eq!(rules(&check_env_access(&app, "src/config/source.rs", line)), ["env-access"]);
+        // Công cụ: testkit đọc TEST_DATABASE_URL, xtask đọc CARGO.
+        for (name, dir) in [("autoxide-testkit", "crates/testkit"), ("xtask", "xtask")] {
+            assert_eq!(check_env_access(&package(name, dir, &[]), "src/lib.rs", line), []);
+        }
+    }
+
+    #[test]
+    fn code_khong_doc_moi_truong_thi_khong_bi_bao() {
+        let kernel = package("autoxide-kernel", "crates/kernel", &[]);
+        let text = "\
+// std::env::var(\"X\") trong chú thích
+let directory = std::env::temp_dir();
+let arguments: Vec<String> = std::env::args().collect();
+let version = env!(\"CARGO_PKG_VERSION\");
+";
+        assert_eq!(check_env_access(&kernel, "src/lib.rs", text), []);
     }
 
     // --- module source ---
