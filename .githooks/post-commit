@@ -1,0 +1,6 @@
+#!/bin/sh
+# Giữ index CodeGraph mới sau commit / pull / checkout / rebase (chạy nền, không chặn).
+if [ -d .codegraph ] && command -v codegraph >/dev/null 2>&1; then
+  (codegraph sync >/dev/null 2>&1 &)
+fi
+exit 0

@@ -1,0 +1,15 @@
+# gitleaks: luật mặc định + danh sách file chỉ chứa giá trị mẫu.
+# Chạy tay: gitleaks dir . --no-banner --redact
+title = "autoxide"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "File env mẫu và file sinh ra cục bộ không chứa secret thật"
+paths = [
+  '''^\.env\.example$''',
+  '''^\.codegraph/''',
+  '''^target/''',
+  '''^data/''',
+]

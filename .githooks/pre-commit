@@ -1,0 +1,19 @@
+#!/bin/sh
+# Pre-commit: chặn secret lọt vào git, rồi kiểm định dạng code Rust.
+# Bật một lần sau khi clone: git config core.hooksPath .githooks
+# Phần nặng (clippy, test trên hai database) nằm ở ./gate.sh, không ở đây.
+set -eu
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --staged --no-banner --redact
+else
+  echo "pre-commit: không tìm thấy gitleaks — BỎ QUA quét secret" >&2
+fi
+
+# Chỉ kiểm định dạng khi có file Rust được stage và workspace đã tồn tại.
+if [ -f Cargo.toml ] && git diff --cached --name-only --diff-filter=ACMR | grep -q '\.rs$'; then
+  cargo fmt --all --check || {
+    echo "pre-commit: chạy 'cargo fmt --all' rồi stage lại" >&2
+    exit 1
+  }
+fi
