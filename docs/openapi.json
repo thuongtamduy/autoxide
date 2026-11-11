@@ -6,6 +6,232 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/v1/audit": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "summary": "List the audit log.",
+        "description": "Requires `audit.read`. Newest first unless `order=asc`. Changes appear a moment\nafter they happen.",
+        "operationId": "audit_list_entries",
+        "parameters": [
+          {
+            "name": "actor_user_id",
+            "in": "query",
+            "description": "Only changes made by this user.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "description": "Only changes to this record, e.g. `auth.user:<id>`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "Only this kind of change, e.g. `auth.user_updated`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "module",
+            "in": "query",
+            "description": "Only changes in this module, e.g. `auth`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Order"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of audit entries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AuditEntryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A filter has the wrong type, e.g. `actor_user_id` is not a UUID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `audit.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/audit/{id}": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "summary": "Get one audit entry.",
+        "description": "Requires `audit.read`.",
+        "operationId": "audit_get_entry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the entry.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The entry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AuditEntryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `audit.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No entry has this id; code `audit.entry_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/api-keys": {
       "get": {
         "tags": [
@@ -2307,6 +2533,77 @@
           }
         }
       },
+      "AuditEntryResponse": {
+        "type": "object",
+        "description": "One change, as recorded in the audit log.",
+        "required": [
+          "id",
+          "module",
+          "action",
+          "occurred_at",
+          "recorded_at"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "What happened: the event name, `<module>.<what_happened>`.",
+            "example": "auth.user_updated"
+          },
+          "actor_api_key_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "API key used, when the change was made with one."
+          },
+          "actor_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "User who made the change; `null` for the system (command line, background jobs,\nself-registration)."
+          },
+          "after": {
+            "description": "State after the change, when it applies."
+          },
+          "before": {
+            "description": "State before the change, when it applies."
+          },
+          "details": {
+            "description": "Other facts about the change."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id of the event that recorded the change; ids sort by time."
+          },
+          "module": {
+            "type": "string",
+            "description": "Module where the change happened.",
+            "example": "auth"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the change happened."
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the audit log recorded it (shortly after)."
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Record that changed, as `<kind>:<id>`, e.g. `auth.user:0190…`.",
+            "example": "auth.user:01936f0e-6c9f-7cc2-8a52-2b2f4d1c1e5a"
+          }
+        }
+      },
       "CodeRequest": {
         "type": "object",
         "description": "A code from the authenticator app, or (where stated) a recovery code.",
@@ -2401,6 +2698,86 @@
           }
         ],
         "description": "A new API key, with its secret. The secret is shown only here."
+      },
+      "Data_AuditEntryResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "One change, as recorded in the audit log.",
+            "required": [
+              "id",
+              "module",
+              "action",
+              "occurred_at",
+              "recorded_at"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "description": "What happened: the event name, `<module>.<what_happened>`.",
+                "example": "auth.user_updated"
+              },
+              "actor_api_key_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "API key used, when the change was made with one."
+              },
+              "actor_user_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "User who made the change; `null` for the system (command line, background jobs,\nself-registration)."
+              },
+              "after": {
+                "description": "State after the change, when it applies."
+              },
+              "before": {
+                "description": "State before the change, when it applies."
+              },
+              "details": {
+                "description": "Other facts about the change."
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Id of the event that recorded the change; ids sort by time."
+              },
+              "module": {
+                "type": "string",
+                "description": "Module where the change happened.",
+                "example": "auth"
+              },
+              "occurred_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When the change happened."
+              },
+              "recorded_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When the audit log recorded it (shortly after)."
+              },
+              "subject": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Record that changed, as `<kind>:<id>`, e.g. `auth.user:0190…`.",
+                "example": "auth.user:01936f0e-6c9f-7cc2-8a52-2b2f4d1c1e5a"
+              }
+            }
+          }
+        }
       },
       "Data_CreatedApiKeyResponse": {
         "type": "object",
@@ -3101,6 +3478,94 @@
                   "type": "string",
                   "description": "The first characters of the key, to recognize it.",
                   "example": "axk_3q9ZbXcV"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Page_AuditEntryResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "One change, as recorded in the audit log.",
+              "required": [
+                "id",
+                "module",
+                "action",
+                "occurred_at",
+                "recorded_at"
+              ],
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "description": "What happened: the event name, `<module>.<what_happened>`.",
+                  "example": "auth.user_updated"
+                },
+                "actor_api_key_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "API key used, when the change was made with one."
+                },
+                "actor_user_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "User who made the change; `null` for the system (command line, background jobs,\nself-registration)."
+                },
+                "after": {
+                  "description": "State after the change, when it applies."
+                },
+                "before": {
+                  "description": "State before the change, when it applies."
+                },
+                "details": {
+                  "description": "Other facts about the change."
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Id of the event that recorded the change; ids sort by time."
+                },
+                "module": {
+                  "type": "string",
+                  "description": "Module where the change happened.",
+                  "example": "auth"
+                },
+                "occurred_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the change happened."
+                },
+                "recorded_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the audit log recorded it (shortly after)."
+                },
+                "subject": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Record that changed, as `<kind>:<id>`, e.g. `auth.user:0190…`.",
+                  "example": "auth.user:01936f0e-6c9f-7cc2-8a52-2b2f4d1c1e5a"
                 }
               }
             },

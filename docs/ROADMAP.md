@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–3 xong; đang ở bước 4**, mục "API xem audit log (có permission riêng)".
+Trạng thái: **bước 0–4 xong; đang ở bước 5**, mục "Job lưu trong database; claim job an toàn khi nhiều worker (test đồng thời)".
 
 ## 0. Khung dự án
 
@@ -49,7 +49,7 @@ Trạng thái: **bước 0–3 xong; đang ở bước 4**, mục "API xem audit
 
 - [x] Event ghi cùng transaction rồi mới phát
 - [x] Audit log chỉ thêm: ai, làm gì, bản ghi nào, lúc nào, trước / sau
-- [ ] API xem audit log (có permission riêng)
+- [x] API xem audit log (có permission riêng)
 
 ## 5. Job queue
 

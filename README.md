@@ -12,8 +12,8 @@ the core contains no business concepts — those belong to modules.
 
 ## Status
 
-Early development. **Steps 0 to 3 of the roadmap (project skeleton, foundation,
-login with roles and permissions, two-step sign-in) are done**: the Cargo workspace, the quality gate, configuration,
+Early development. **Steps 0 to 4 of the roadmap (project skeleton, foundation,
+login with roles and permissions, two-step sign-in, events and audit log) are done**: the Cargo workspace, the quality gate, configuration,
 database access, per-module migrations, the module contract, the HTTP server
 under `/api/v1` with OpenAPI, health checks, logs, metrics, tracing and the CLI.
 The `auth` module stores
@@ -28,7 +28,9 @@ Programs and AI agents use API keys (`/api/v1/auth/api-keys`): a key acts as the
 user who created it, limited to the permissions listed on it, and is sent like an
 access token (`Authorization: Bearer axk_…`). Users can turn on two-step sign-in
 with an authenticator app (TOTP) and get one-time recovery codes
-(`/api/v1/auth/me/mfa`).
+(`/api/v1/auth/me/mfa`). Every change is kept in an append-only audit log — who,
+what, which record, when, before and after — readable at `/api/v1/audit` with the
+`audit.read` permission.
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
