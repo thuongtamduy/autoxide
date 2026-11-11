@@ -1,0 +1,504 @@
+//! Kiểu lỗi chung cho mọi layer.
+//!
+//! Service, handler REST và tool MCP đều trả [`Error`] này. Nó mang đủ thông tin
+//! cho hai người đọc khác nhau:
+//!
+//! - **client** (người hoặc AI agent): `code` ổn định để máy rẽ nhánh, thông báo
+//!   nói rõ phải sửa gì, và danh sách lỗi theo từng trường với lỗi đầu vào;
+//! - **người vận hành**: nguyên nhân gốc (`source`) — chỉ ghi vào log, KHÔNG BAO
+//!   GIỜ gửi cho client.
+//!
+//! `code` là hợp đồng với client: đổi một mã là thay đổi phá vỡ. `code` cũng
+//! chính là i18n key của thông báo; câu tiếng Anh viết ở chỗ tạo lỗi là bản mặc
+//! định, bản dịch tra theo `code` (docs/DECISIONS.md D-039).
+//!
+//! ```
+//! use autoxide_kernel::error::Error;
+//!
+//! fn find(id: u32) -> Result<&'static str, Error> {
+//!     Err(Error::not_found("notes.note_not_found", "Note {id} does not exist.")
+//!         .with_param("id", id))
+//! }
+//! let error = find(7).unwrap_err();
+//! assert_eq!(error.code(), "notes.note_not_found");
+//! assert_eq!(error.message(), "Note 7 does not exist.");
+//! ```
+
+use std::borrow::Cow;
+use std::fmt;
+
+use validator::{ValidationErrors, ValidationErrorsKind};
+
+/// Loại lỗi; quyết định mã trạng thái HTTP.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorKind {
+    /// Request không đọc được (JSON hỏng, thiếu tham số, sai kiểu). HTTP 400.
+    BadRequest,
+    /// Chưa xác thực, hoặc thông tin xác thực không hợp lệ. HTTP 401.
+    Unauthenticated,
+    /// Đã xác thực nhưng không có permission. HTTP 403.
+    Forbidden,
+    /// Không có tài nguyên đó. HTTP 404.
+    NotFound,
+    /// Trái với trạng thái hiện tại (trùng giá trị unique, sửa bản đã cũ). HTTP 409.
+    Conflict,
+    /// Request đọc được nhưng giá trị không qua kiểm tra. HTTP 422.
+    Validation,
+    /// Gọi quá nhiều. HTTP 429.
+    TooManyRequests,
+    /// Lỗi phía máy chủ; chi tiết chỉ nằm trong log. HTTP 500.
+    Internal,
+    /// Tạm thời chưa phục vụ được (database chưa sẵn sàng, đang tắt). HTTP 503.
+    Unavailable,
+}
+
+impl ErrorKind {
+    /// Mã trạng thái HTTP tương ứng.
+    pub fn status(self) -> u16 {
+        match self {
+            ErrorKind::BadRequest => 400,
+            ErrorKind::Unauthenticated => 401,
+            ErrorKind::Forbidden => 403,
+            ErrorKind::NotFound => 404,
+            ErrorKind::Conflict => 409,
+            ErrorKind::Validation => 422,
+            ErrorKind::TooManyRequests => 429,
+            ErrorKind::Internal => 500,
+            ErrorKind::Unavailable => 503,
+        }
+    }
+}
+
+/// Lỗi của một trường trong dữ liệu đầu vào.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FieldError {
+    /// Đường dẫn tới trường: `name`, `address.city`, `items[2].quantity`.
+    pub field: String,
+    /// Mã ổn định của loại lỗi: `required`, `length`, `range`, `email`…
+    pub code: String,
+    /// Câu nói rõ giá trị phải như thế nào.
+    pub message: String,
+}
+
+impl FieldError {
+    pub fn new(
+        field: impl Into<String>,
+        code: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        FieldError { field: field.into(), code: code.into(), message: message.into() }
+    }
+}
+
+/// Nguyên nhân gốc của một lỗi, giữ cho log.
+type Source = Box<dyn std::error::Error + Send + Sync>;
+
+/// Lỗi chung của Autoxide. Xem tài liệu đầu file.
+#[derive(Debug)]
+pub struct Error {
+    kind: ErrorKind,
+    // `Cow<'static, str>`: thường là chuỗi viết sẵn trong code (không tốn bộ nhớ
+    // cấp phát), nhưng vẫn nhận được chuỗi dựng lúc chạy khi cần.
+    code: Cow<'static, str>,
+    /// Câu tiếng Anh mặc định, có thể chứa chỗ điền `{tên}`.
+    template: Cow<'static, str>,
+    params: Vec<(Cow<'static, str>, String)>,
+    fields: Vec<FieldError>,
+    source: Option<Source>,
+}
+
+/// Mã và thông báo của lỗi nội bộ. Client chỉ thấy đúng hai thứ này.
+const INTERNAL_CODE: &str = "internal_error";
+const INTERNAL_MESSAGE: &str =
+    "An internal error occurred. Retry later; if it persists, report the request id.";
+
+impl Error {
+    /// Tạo lỗi. `code` là mã ổn định cho máy và là i18n key: `snake_case`, lỗi của
+    /// module mang tiền tố `<module>.` (vd `notes.title_taken`). `message` là câu
+    /// tiếng Anh nói rõ phải sửa gì; chỗ điền viết `{tên}` và gán bằng
+    /// [`with_param`](Self::with_param).
+    pub fn new(
+        kind: ErrorKind,
+        code: impl Into<Cow<'static, str>>,
+        message: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Error {
+            kind,
+            code: code.into(),
+            template: message.into(),
+            params: Vec::new(),
+            fields: Vec::new(),
+            source: None,
+        }
+    }
+
+    pub fn bad_request(
+        code: impl Into<Cow<'static, str>>,
+        message: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Error::new(ErrorKind::BadRequest, code, message)
+    }
+
+    pub fn unauthenticated(
+        code: impl Into<Cow<'static, str>>,
+        message: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Error::new(ErrorKind::Unauthenticated, code, message)
+    }
+
+    pub fn forbidden(
+        code: impl Into<Cow<'static, str>>,
+        message: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Error::new(ErrorKind::Forbidden, code, message)
+    }
+
+    pub fn not_found(
+        code: impl Into<Cow<'static, str>>,
+        message: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Error::new(ErrorKind::NotFound, code, message)
+    }
+
+    pub fn conflict(
+        code: impl Into<Cow<'static, str>>,
+        message: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Error::new(ErrorKind::Conflict, code, message)
+    }
+
+    pub fn too_many_requests(
+        code: impl Into<Cow<'static, str>>,
+        message: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Error::new(ErrorKind::TooManyRequests, code, message)
+    }
+
+    pub fn unavailable(
+        code: impl Into<Cow<'static, str>>,
+        message: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Error::new(ErrorKind::Unavailable, code, message)
+    }
+
+    /// Dữ liệu đầu vào không qua kiểm tra; `fields` nói rõ từng trường sai gì.
+    pub fn validation(fields: Vec<FieldError>) -> Self {
+        let mut error = Error::new(
+            ErrorKind::Validation,
+            "validation_failed",
+            "The request contains invalid values. See `errors` for each field.",
+        );
+        error.fields = fields;
+        error
+    }
+
+    /// Lỗi phía máy chủ. `source` là nguyên nhân gốc: ghi vào log, không gửi cho
+    /// client — client chỉ nhận mã `internal_error` và một câu chung.
+    pub fn internal(source: impl Into<Source>) -> Self {
+        Error::new(ErrorKind::Internal, INTERNAL_CODE, INTERNAL_MESSAGE).with_source(source)
+    }
+
+    /// Gán giá trị cho chỗ điền `{name}` trong thông báo.
+    pub fn with_param(mut self, name: impl Into<Cow<'static, str>>, value: impl ToString) -> Self {
+        self.params.push((name.into(), value.to_string()));
+        self
+    }
+
+    /// Thêm lỗi của một trường.
+    pub fn with_field(mut self, field: FieldError) -> Self {
+        self.fields.push(field);
+        self
+    }
+
+    /// Gắn nguyên nhân gốc (cho log).
+    pub fn with_source(mut self, source: impl Into<Source>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    pub fn kind(&self) -> ErrorKind {
+        self.kind
+    }
+
+    /// Mã ổn định cho máy; cũng là i18n key của thông báo.
+    pub fn code(&self) -> &str {
+        &self.code
+    }
+
+    /// Câu tiếng Anh mặc định, chưa điền giá trị.
+    pub fn template(&self) -> &str {
+        &self.template
+    }
+
+    /// Các giá trị điền vào thông báo, theo thứ tự đã gán.
+    pub fn params(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.params.iter().map(|(name, value)| (name.as_ref(), value.as_str()))
+    }
+
+    /// Thông báo tiếng Anh đã điền giá trị.
+    pub fn message(&self) -> String {
+        fill(&self.template, &self.params)
+    }
+
+    /// Lỗi theo từng trường (với lỗi đầu vào).
+    pub fn fields(&self) -> &[FieldError] {
+        &self.fields
+    }
+}
+
+/// Thay từng `{tên}` trong `template` bằng giá trị tương ứng.
+fn fill(template: &str, params: &[(Cow<'static, str>, String)]) -> String {
+    let mut text = template.to_owned();
+    for (name, value) in params {
+        text = text.replace(&format!("{{{name}}}"), value);
+    }
+    text
+}
+
+// `Display` là thứ đi vào log: mã, thông báo, và nguyên nhân gốc nếu có.
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.code, self.message())?;
+        if let Some(source) = &self.source {
+            write!(f, " (caused by: {source})")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        // Đổi `&Box<dyn Error + Send + Sync>` thành `&dyn Error`.
+        self.source.as_deref().map(|source| source as &(dyn std::error::Error + 'static))
+    }
+}
+
+// Nhờ `From`, service viết `?` trên kết quả của SeaORM: lỗi database tự thành lỗi
+// nội bộ, nguyên nhân được giữ cho log và không lộ ra client.
+impl From<sea_orm::DbErr> for Error {
+    fn from(error: sea_orm::DbErr) -> Self {
+        Error::internal(error)
+    }
+}
+
+// Kết quả của `input.validate()` (thư viện validator) thành lỗi đầu vào có danh
+// sách trường.
+impl From<ValidationErrors> for Error {
+    fn from(errors: ValidationErrors) -> Self {
+        let mut fields = Vec::new();
+        collect_fields("", &errors, &mut fields);
+        // validator giữ lỗi trong HashMap (thứ tự ngẫu nhiên); sắp lại để cùng một
+        // đầu vào luôn cho cùng một đầu ra.
+        fields.sort_by(|a, b| (&a.field, &a.code).cmp(&(&b.field, &b.code)));
+        Error::validation(fields)
+    }
+}
+
+/// Trải cây lỗi lồng nhau của validator thành danh sách phẳng có đường dẫn trường.
+fn collect_fields(prefix: &str, errors: &ValidationErrors, fields: &mut Vec<FieldError>) {
+    for (name, kind) in errors.errors() {
+        let path = if prefix.is_empty() { name.to_string() } else { format!("{prefix}.{name}") };
+        match kind {
+            ValidationErrorsKind::Field(problems) => {
+                for problem in problems {
+                    fields.push(FieldError {
+                        field: path.clone(),
+                        code: problem.code.to_string(),
+                        message: field_message(problem),
+                    });
+                }
+            }
+            ValidationErrorsKind::Struct(nested) => collect_fields(&path, nested, fields),
+            ValidationErrorsKind::List(items) => {
+                for (index, nested) in items {
+                    collect_fields(&format!("{path}[{index}]"), nested, fields);
+                }
+            }
+        }
+    }
+}
+
+/// Câu tiếng Anh cho một lỗi của validator, dựng từ mã và tham số của nó.
+fn field_message(problem: &validator::ValidationError) -> String {
+    if let Some(message) = &problem.message {
+        return message.to_string();
+    }
+    // Tham số là JSON; chuỗi thì bỏ dấu nháy bao quanh.
+    let param = |name: &str| {
+        problem.params.get(name).map(|value| match value {
+            serde_json::Value::String(text) => text.clone(),
+            other => other.to_string(),
+        })
+    };
+    let (min, max, equal) = (param("min"), param("max"), param("equal"));
+    match problem.code.as_ref() {
+        "required" => "is required".to_owned(),
+        "email" => "must be a valid email address".to_owned(),
+        "url" => "must be a valid URL".to_owned(),
+        "length" => match (min, max, equal) {
+            (_, _, Some(equal)) => format!("must be exactly {equal} characters long"),
+            (Some(min), Some(max), _) => format!("must be between {min} and {max} characters long"),
+            (Some(min), None, _) => format!("must be at least {min} characters long"),
+            (None, Some(max), _) => format!("must be at most {max} characters long"),
+            (None, None, None) => "has an invalid length".to_owned(),
+        },
+        "range" => match (min, max) {
+            (Some(min), Some(max)) => format!("must be between {min} and {max}"),
+            (Some(min), None) => format!("must be at least {min}"),
+            (None, Some(max)) => format!("must be at most {max}"),
+            (None, None) => "is out of range".to_owned(),
+        },
+        "must_match" => match param("other") {
+            Some(other) => format!("must match `{other}`"),
+            None => "does not match".to_owned(),
+        },
+        _ => "is not valid".to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::error::Error as _;
+    use validator::Validate;
+
+    #[test]
+    fn moi_loai_loi_co_mot_ma_trang_thai() {
+        let cases = [
+            (Error::bad_request("c", "m"), 400),
+            (Error::unauthenticated("c", "m"), 401),
+            (Error::forbidden("c", "m"), 403),
+            (Error::not_found("c", "m"), 404),
+            (Error::conflict("c", "m"), 409),
+            (Error::validation(Vec::new()), 422),
+            (Error::too_many_requests("c", "m"), 429),
+            (Error::internal("boom"), 500),
+            (Error::unavailable("c", "m"), 503),
+        ];
+        for (error, status) in cases {
+            assert_eq!(error.kind().status(), status, "{error}");
+        }
+    }
+
+    #[test]
+    fn tham_so_duoc_dien_vao_thong_bao() {
+        let error =
+            Error::conflict("notes.title_taken", "A note titled `{title}` exists ({count}).")
+                .with_param("title", "Hello")
+                .with_param("count", 2);
+
+        assert_eq!(error.code(), "notes.title_taken");
+        assert_eq!(error.template(), "A note titled `{title}` exists ({count}).");
+        assert_eq!(error.message(), "A note titled `Hello` exists (2).");
+        assert_eq!(error.params().collect::<Vec<_>>(), [("title", "Hello"), ("count", "2")]);
+        assert_eq!(error.to_string(), "notes.title_taken: A note titled `Hello` exists (2).");
+    }
+
+    #[test]
+    fn loi_noi_bo_giu_nguyen_nhan_cho_log_va_khong_dua_vao_thong_bao() {
+        let error = Error::internal("connection reset by peer");
+
+        assert_eq!(error.code(), "internal_error");
+        // Thông báo cho client không chứa nguyên nhân…
+        assert!(!error.message().contains("connection reset"));
+        // …còn log (Display) và `source()` thì có.
+        assert!(error.to_string().ends_with("(caused by: connection reset by peer)"));
+        assert_eq!(error.source().unwrap().to_string(), "connection reset by peer");
+    }
+
+    #[test]
+    fn loi_database_thanh_loi_noi_bo() {
+        let error: Error = sea_orm::DbErr::Custom("syntax error at or near".to_owned()).into();
+
+        assert_eq!(error.kind(), ErrorKind::Internal);
+        assert_eq!(error.code(), "internal_error");
+        assert!(!error.message().contains("syntax error"));
+        assert!(error.to_string().contains("syntax error at or near"));
+    }
+
+    #[derive(Validate)]
+    struct Address {
+        #[validate(length(min = 1))]
+        city: String,
+    }
+
+    #[derive(Validate)]
+    struct Item {
+        #[validate(range(min = 1, max = 99))]
+        quantity: u32,
+    }
+
+    #[derive(Validate)]
+    struct Order {
+        #[validate(length(min = 3, max = 20))]
+        reference: String,
+        #[validate(email)]
+        email: String,
+        #[validate(url)]
+        website: String,
+        #[validate(length(equal = 2))]
+        country: String,
+        #[validate(range(min = 0))]
+        discount: i64,
+        #[validate(nested)]
+        address: Address,
+        #[validate(nested)]
+        items: Vec<Item>,
+    }
+
+    fn invalid_order() -> Order {
+        Order {
+            reference: "ab".to_owned(),
+            email: "not-an-email".to_owned(),
+            website: "nope".to_owned(),
+            country: "VNM".to_owned(),
+            discount: -5,
+            address: Address { city: String::new() },
+            items: vec![Item { quantity: 5 }, Item { quantity: 0 }],
+        }
+    }
+
+    #[test]
+    fn loi_cua_validator_thanh_danh_sach_truong_co_duong_dan() {
+        let error: Error = invalid_order().validate().unwrap_err().into();
+
+        assert_eq!(error.kind(), ErrorKind::Validation);
+        assert_eq!(error.code(), "validation_failed");
+        let fields: Vec<(&str, &str, &str)> = error
+            .fields()
+            .iter()
+            .map(|f| (f.field.as_str(), f.code.as_str(), f.message.as_str()))
+            .collect();
+        assert_eq!(
+            fields,
+            [
+                ("address.city", "length", "must be at least 1 characters long"),
+                ("country", "length", "must be exactly 2 characters long"),
+                ("discount", "range", "must be at least 0"),
+                ("email", "email", "must be a valid email address"),
+                ("items[1].quantity", "range", "must be between 1 and 99"),
+                ("reference", "length", "must be between 3 and 20 characters long"),
+                ("website", "url", "must be a valid URL"),
+            ]
+        );
+    }
+
+    #[test]
+    fn thong_bao_rieng_va_ma_la_cua_validator_deu_duoc_giu() {
+        let mut custom = validator::ValidationError::new("taken");
+        custom.message = Some("is already used by another account".into());
+        assert_eq!(field_message(&custom), "is already used by another account");
+        assert_eq!(field_message(&validator::ValidationError::new("exotic")), "is not valid");
+        assert_eq!(field_message(&validator::ValidationError::new("required")), "is required");
+    }
+
+    #[test]
+    fn them_loi_truong_bang_tay() {
+        let error = Error::validation(Vec::new()).with_field(FieldError::new(
+            "email",
+            "taken",
+            "is already used",
+        ));
+        assert_eq!(error.fields(), [FieldError::new("email", "taken", "is already used")]);
+    }
+}

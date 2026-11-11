@@ -6,5 +6,8 @@
 
 pub mod config;
 pub mod database;
+pub mod error;
 pub mod migration;
 pub mod module;
+pub mod pagination;
+pub mod response;

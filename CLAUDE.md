@@ -230,10 +230,19 @@ TEST_DATABASE_URL=postgres://… cargo test --workspace  # Postgres (gate tự d
 ## Luật code
 
 - `unsafe` bị cấm. Không `unwrap()` / `expect()` / `panic!` ngoài test — trả lỗi.
-- Một kiểu lỗi chung cho mọi layer; mã lỗi (`code`) là hợp đồng với client, đổi mã
-  là thay đổi phá vỡ.
-- Thông báo cho người dùng đi qua i18n key, không viết câu cứng. Client không nêu
-  ngôn ngữ thì trả **tiếng Anh**.
+- Một kiểu lỗi chung cho mọi layer: `autoxide_kernel::error::Error`. Mã lỗi
+  (`code`) là hợp đồng với client, đổi mã là thay đổi phá vỡ. Mã viết `snake_case`;
+  lỗi của module mang tiền tố `<module>.` (vd `notes.title_taken`).
+- Thông báo cho người dùng đi qua i18n key, không viết câu cứng: **`code` của lỗi
+  chính là i18n key**; câu tiếng Anh ở chỗ tạo lỗi là bản mặc định, bản dịch tra
+  theo `code` (D-039). Client không nêu ngôn ngữ thì trả **tiếng Anh**.
+- Response chỉ có ba hình dạng: `Data<T>` (`{"data": …}`), `Page<T>`
+  (`{"data": […], "pagination": {…}}`) và lỗi `Problem` (RFC 9457). Danh sách lấy
+  bằng `fetch_page` với tham số `limit` / `cursor` / `order`; không tự viết
+  `OFFSET`.
+- Doc comment `///` trên kiểu có `ToSchema` / `IntoParams` và trên handler có
+  `#[utoipa::path]` được chép vào tài liệu OpenAPI: viết **tiếng Anh**, cho người
+  gọi API. Giải thích cho người đọc code thì dùng `//`.
 - Tên trong code và OpenAPI bằng tiếng Anh. Comment, tài liệu, tên test viết tiếng
   Việt được.
 - Secret không vào git: chỉ có `.env.example`, không có `.env`.

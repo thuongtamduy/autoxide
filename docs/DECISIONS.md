@@ -557,3 +557,41 @@ dùng `unsafe` và làm thứ tự đăng ký khó thấy.
 
 Chưa có ở bước này: cách một module lấy trait của module khác lúc khởi động — thêm
 cùng lúc với việc module dựng service và route (mục HTTP).
+
+## D-039 · Kiểu lỗi, hình dạng response, pagination — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- **Một kiểu lỗi** `autoxide_kernel::error::Error` cho service, REST và MCP: loại lỗi
+  (quyết định mã HTTP), `code` ổn định cho máy, thông báo, lỗi theo từng trường, và
+  nguyên nhân gốc chỉ dành cho log. Lỗi database và lỗi của thư viện validator tự đổi
+  sang kiểu này. Lỗi nội bộ luôn ra ngoài với mã `internal_error` và một câu chung.
+- **`code` là i18n key.** Chỗ tạo lỗi viết mã cùng câu tiếng Anh mặc định (có chỗ
+  điền `{tên}`); bước 6 thêm bản dịch tra theo `code` mà không phải sửa chỗ tạo lỗi.
+- **Lỗi trả về theo RFC 9457** (Problem Details, `application/problem+json`): `type`
+  luôn là `about:blank`, `title`, `status`, `detail`, cộng hai trường mở rộng `code`
+  và `errors` (danh sách `field` / `code` / `detail`). Request đọc được nhưng giá trị
+  sai là 422; request không đọc được là 400.
+- **Thành công:** `{"data": …}` cho một đối tượng; `{"data": […], "pagination":
+  {"limit", "next_cursor"}}` cho danh sách.
+- **Pagination theo con trỏ trên ID** (UUIDv7): tham số `limit` (1–200, mặc định
+  50), `cursor`, `order` (`desc` mặc định, `asc`); luôn sắp theo thời điểm tạo. Hàm
+  `fetch_page` lấy dư một dòng để biết còn trang sau, không chạy câu lệnh đếm.
+- Doc comment trên kiểu và handler có mặt trong OpenAPI viết tiếng Anh (utoipa chép
+  nguyên vào tài liệu API).
+
+Lý do: RFC 9457 là chuẩn của IETF cho lỗi của HTTP API (tiêu chí "tiêu chuẩn"), và
+`code` + `errors` cho AI agent đủ thông tin để tự sửa request (D-020). Gộp `code`
+với i18n key để mỗi lỗi chỉ có một định danh phải giữ ổn định. Pagination theo con
+trỏ: trang sâu nhanh như trang đầu vì đi bằng index của khoá chính, và dữ liệu mới
+chen vào không làm trùng hay sót dòng — test
+`du_lieu_them_giua_chung_khong_lam_trung_hay_sot` kiểm điều này trên cả hai database.
+
+Giới hạn đã chấp nhận: danh sách chỉ sắp theo thời điểm tạo. Sắp theo cột khác cần
+con trỏ ghép (giá trị cột + ID); thêm khi một module thật sự cần, qua một quyết định
+mới.
+
+Đã cân nhắc: envelope lỗi tự chế `{"error": {…}}` — đơn giản nhưng không chuẩn nào
+biết; `type` là URL tới trang mô tả từng lỗi — cần một địa chỉ công khai mà dự án
+chưa có; pagination `page` / `per_page` — quen thuộc nhưng chậm dần theo số trang và
+trùng dòng khi dữ liệu thay đổi; trả tổng số dòng — tốn một câu lệnh đếm mỗi request.

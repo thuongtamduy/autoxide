@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0 xong; đang ở bước 1**, mục "Kiểu lỗi chung, envelope trả về, pagination theo UUIDv7".
+Trạng thái: **bước 0 xong; đang ở bước 1**, mục "HTTP: `/api/v1`, request id, timeout, giới hạn body, CORS, graceful shutdown".
 
 ## 0. Khung dự án
 
@@ -22,7 +22,7 @@ Trạng thái: **bước 0 xong; đang ở bước 1**, mục "Kiểu lỗi chun
 - [x] Kiểm trong gate: tên bảng mang tiền tố module, không foreign key xuyên module
 - [x] Hợp đồng module + đăng ký ở một chỗ (khi có module đầu tiên: thêm `"modules/*"`
       vào `members` của `Cargo.toml` gốc)
-- [ ] Kiểu lỗi chung, envelope trả về, pagination theo UUIDv7
+- [x] Kiểu lỗi chung, envelope trả về, pagination theo UUIDv7
 - [ ] HTTP: `/api/v1`, request id, timeout, giới hạn body, CORS, graceful shutdown
 - [ ] OpenAPI sinh từ code + kiểm không lệch trong gate
 - [ ] Health check (`/health/live`, `/health/ready`)
@@ -62,6 +62,9 @@ Trạng thái: **bước 0 xong; đang ở bước 1**, mục "Kiểu lỗi chun
 ## 6. i18n và idempotency
 
 - [ ] Thông báo lỗi và hệ thống theo i18n key (vi, en), chọn theo header; mặc định tiếng Anh
+      (`code` của lỗi là i18n key, câu tiếng Anh mặc định đã nằm ở chỗ tạo lỗi — D-039;
+      việc còn lại: bản dịch vi tra theo `code`, chọn ngôn ngữ theo header, và gate kiểm mọi
+      `code` đều có bản dịch)
 - [ ] Idempotency key cho lệnh ghi (test gửi trùng đồng thời)
 - [ ] Đánh dấu endpoint deprecated
 

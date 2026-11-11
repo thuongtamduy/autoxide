@@ -8,27 +8,26 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+axum.workspace = true
 dotenvy.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
-
-[dev-dependencies]
-# Dùng bởi tests/stack.rs — bài test xác nhận các thư viện nền hợp nhau trên cả
-# hai database. Khi kernel bắt đầu dùng thư viện nào ở bước 1 thì chuyển nó lên
-# [dependencies].
-autoxide-testkit.workspace = true
-axum.workspace = true
-chrono.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+utoipa.workspace = true
+uuid.workspace = true
+validator.workspace = true
+
+[dev-dependencies]
+# tests/stack.rs xác nhận các thư viện nền hợp nhau trên cả hai database. Thư viện
+# nào kernel bắt đầu dùng thì chuyển lên [dependencies].
+autoxide-testkit.workspace = true
+chrono.workspace = true
 tokio.workspace = true
 tower.workspace = true
 tower-http.workspace = true
-utoipa.workspace = true
 utoipa-axum.workspace = true
 utoipa-scalar.workspace = true
-uuid.workspace = true
-validator.workspace = true
 
 [lints]
 workspace = true
