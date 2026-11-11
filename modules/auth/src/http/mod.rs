@@ -4,6 +4,7 @@
 mod api_keys;
 mod email;
 mod mfa;
+mod passkeys;
 mod reset;
 pub(crate) mod roles;
 pub(crate) mod session;
@@ -31,6 +32,7 @@ pub(crate) struct HttpState {
     pub mfa: Arc<MfaService>,
     pub resets: Arc<PasswordResets>,
     pub verifications: Arc<EmailVerifications>,
+    pub passkeys: Arc<crate::passkey::PasskeyService>,
     /// Cho người lạ tự đăng ký (`POST /register`).
     pub self_registration: bool,
 }
@@ -43,6 +45,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(mfa::routes())
         .merge(reset::routes())
         .merge(email::routes())
+        .merge(passkeys::routes())
         .with_state(Arc::new(state))
 }
 
@@ -128,6 +131,7 @@ pub(crate) mod test_support {
             mfa: services.mfa.clone(),
             resets: services.resets.clone(),
             verifications: services.verifications.clone(),
+            passkeys: services.passkeys.clone(),
             self_registration,
         };
         let router = autoxide_kernel::http::build(

@@ -136,6 +136,13 @@ getrandom = "0.4"
 # TOTP (RFC 6238). Chỉ bật `std` và `otpauth` (đường dẫn `otpauth://` cho ứng dụng
 # authenticator); không bật `qr` (kéo thư viện ảnh) và `gen_secret` (secret tự sinh
 # bằng `getrandom` như mọi chỗ khác).
+# Passkey (WebAuthn, phía máy chủ): thuần Rust trên RustCrypto, không OpenSSL (D-077).
+webauthn_rp = { version = "0.3", default-features = false, features = [
+  "serde_relaxed",
+  "serializable_server_state",
+] }
+# Chỉ cho test: authenticator phần mềm ký câu trả lời passkey bằng P-256.
+p256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
 totp-rs = { version = "6.0", default-features = false, features = ["std", "otpauth"] }
 
 # --- Observability (STACK.md, bảng "Observability") ---

@@ -14,7 +14,7 @@ core không chứa khái niệm nghiệp vụ — những thứ đó thuộc v�
 
 Core đã hoàn chỉnh: **mọi bước của lộ trình đã xong** — khung dự án, nền, đăng nhập
 cùng role và permission, đăng nhập hai bước, event và audit log, job queue, i18n và
-idempotency, email, lưu file, MCP endpoint, module mẫu, công cụ và deploy. Kế tiếp là
+idempotency, email, lưu file, MCP endpoint, module mẫu, công cụ và deploy, passkey. Kế tiếp là
 các module nghiệp vụ. Core có workspace Cargo, gate chất lượng, cấu hình, truy cập database, migration theo
 module, hợp đồng module, máy chủ HTTP dưới `/api/v1` kèm OpenAPI, health check, log,
 metrics, tracing và CLI. Module `auth` lưu người dùng
@@ -182,6 +182,15 @@ Mặc định mỗi địa chỉ client được gửi 600 request mỗi phút
 (`AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE`), và một email bị khoá đăng nhập 15 phút sau 5
 lần sai. Chạy sau reverse proxy thì đặt `AUTOXIDE_HTTP_CLIENT_IP_HEADER` (ví dụ
 `X-Forwarded-For`) để phân biệt client theo địa chỉ của chính họ thay vì của proxy.
+
+Người dùng cũng có thể đăng nhập bằng passkey (Face ID, vân tay, khoá bảo mật) thay cho
+mật khẩu. Đặt `AUTOXIDE_AUTH_PASSKEY_RP_ID` bằng tên miền của trang (và
+`AUTOXIDE_AUTH_PASSKEY_ORIGINS` khi ứng dụng web chạy ở tên miền con); người dùng đã đăng
+nhập thêm passkey bằng `POST /api/v1/auth/me/passkeys/registration` và
+`POST /api/v1/auth/me/passkeys`, rồi đăng nhập bằng `POST /api/v1/auth/login/passkey/options`
+và `POST /api/v1/auth/login/passkey` — không cần email. `options` trả về đưa thẳng vào
+`PublicKeyCredential.parseCreationOptionsFromJSON()` / `parseRequestOptionsFromJSON()` của
+trình duyệt.
 
 Người dùng có permission `files.upload` tải file lên bằng cách gửi nguyên nội dung tới
 `POST /api/v1/files?name=report.pdf` kèm `Content-Type` của nó, rồi xem danh sách, tải

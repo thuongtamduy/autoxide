@@ -15,7 +15,7 @@ the core contains no business concepts — those belong to modules.
 The core is complete: **every step of the roadmap is done** — project skeleton,
 foundation, login with roles and permissions, two-step sign-in, events and audit log,
 job queue, i18n and idempotency, email, file storage, MCP endpoint, sample module,
-tooling and deployment. Business modules come next. The core has the Cargo workspace, the quality gate, configuration,
+tooling and deployment, passkeys. Business modules come next. The core has the Cargo workspace, the quality gate, configuration,
 database access, per-module migrations, the module contract, the HTTP server
 under `/api/v1` with OpenAPI, health checks, logs, metrics, tracing and the CLI.
 The `auth` module stores
@@ -185,6 +185,15 @@ Each client address may make 600 requests a minute by default
 5 failed sign-ins. Behind a reverse proxy, set `AUTOXIDE_HTTP_CLIENT_IP_HEADER` (for
 example to `X-Forwarded-For`) so that clients are told apart by their own address
 rather than the proxy's.
+
+Users can also sign in with a passkey (Face ID, fingerprint, security key) instead of a
+password. Set `AUTOXIDE_AUTH_PASSKEY_RP_ID` to your site's domain (and
+`AUTOXIDE_AUTH_PASSKEY_ORIGINS` when your web app runs on a subdomain); a signed-in user
+adds one with `POST /api/v1/auth/me/passkeys/registration` and `POST /api/v1/auth/me/passkeys`,
+and signs in with `POST /api/v1/auth/login/passkey/options` and
+`POST /api/v1/auth/login/passkey` — no email needed. The `options` returned go straight to
+`PublicKeyCredential.parseCreationOptionsFromJSON()` / `parseRequestOptionsFromJSON()` in the
+browser.
 
 Users with the `files.upload` permission upload a file by sending its raw content to
 `POST /api/v1/files?name=report.pdf` with its `Content-Type`, then list, download

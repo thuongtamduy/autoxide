@@ -23,6 +23,7 @@ serde_json.workspace = true
 sha2.workspace = true
 tokio.workspace = true
 totp-rs.workspace = true
+webauthn_rp.workspace = true
 tracing.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
@@ -30,6 +31,7 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+p256.workspace = true
 autoxide-testkit.workspace = true
 tower.workspace = true
 

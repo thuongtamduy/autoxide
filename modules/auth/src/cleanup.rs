@@ -64,7 +64,8 @@ impl JobHandler for Cleanup {
         )
         .await?;
         // Token đặt lại mật khẩu và xác minh email đã hết hạn (dùng rồi hay chưa).
-        for table in ["auth_password_reset", "auth_email_verification"] {
+        // Cùng với nghi thức passkey bỏ dở.
+        for table in ["auth_password_reset", "auth_email_verification", "auth_passkey_ceremony"] {
             let expired = Condition::all().add(Expr::col(Alias::new("expires_at")).lt(now));
             removed += delete(connection, table, expired).await?;
         }

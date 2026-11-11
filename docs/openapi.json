@@ -715,6 +715,130 @@
         }
       }
     },
+    "/api/v1/auth/login/passkey": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign in with a passkey: finish the ceremony from `POST /api/v1/auth/login/passkey/options`.",
+        "description": "Returns the same tokens as `POST /api/v1/auth/login`. A passkey verifies the user\nitself, so no two-step code is asked for.",
+        "operationId": "auth_passkey_login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The ceremony is unknown, expired or used; code `auth.invalid_passkey_ceremony`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The passkey was not accepted; code `auth.passkey_sign_in_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The account is disabled (`auth.user_disabled`), or passkeys are off (`auth.passkeys_disabled`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is missing a field, or the credential is not a WebAuthn response; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login/passkey/options": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Start signing in with a passkey.",
+        "description": "Needs no email: the browser lets the user pick one of their passkeys for this site.",
+        "operationId": "auth_start_passkey_login",
+        "responses": {
+          "200": {
+            "description": "Options for the browser, and the ceremony to finish with `POST /api/v1/auth/login/passkey`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CeremonyResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Passkeys are off on this server; code `auth.passkeys_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/logout": {
       "post": {
         "tags": [
@@ -1314,6 +1438,330 @@
           },
           "422": {
             "description": "The code is wrong or expired; `errors` names the field `code`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/passkeys": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List your passkeys.",
+        "description": "Newest first unless `order=asc`.",
+        "operationId": "auth_list_passkeys",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Order"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of your passkeys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PasskeyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Add a passkey: finish the ceremony started with `POST /api/v1/auth/me/passkeys/registration`.",
+        "description": "Needs a session signed in with a password. Afterwards the passkey signs in with\n`POST /api/v1/auth/login/passkey`.",
+        "operationId": "auth_add_passkey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPasskeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The passkey was added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PasskeyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The ceremony is unknown, expired or used (`auth.invalid_passkey_ceremony`), or the credential was not accepted (`auth.passkey_rejected`; the message says why).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Called with an API key (`auth.session_required`), or passkeys are off (`auth.passkeys_disabled`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This passkey is already registered; code `auth.passkey_already_registered`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is missing a field or a value is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/passkeys/registration": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Start adding a passkey to your account.",
+        "description": "Needs a session signed in with a password (an API key cannot do this). Answers 403\nwith code `auth.passkeys_disabled` when the server has passkeys off.",
+        "operationId": "auth_start_passkey_registration",
+        "responses": {
+          "200": {
+            "description": "Options for the browser, and the ceremony to finish with `POST /api/v1/auth/me/passkeys`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CeremonyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Called with an API key (`auth.session_required`), or passkeys are off (`auth.passkeys_disabled`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "You already have the most passkeys allowed; code `auth.passkey_limit`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/passkeys/{id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Remove one of your passkeys.",
+        "description": "Needs a session signed in with a password. The passkey stops working at once; also\ndelete it from the device.",
+        "operationId": "auth_delete_passkey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the passkey.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Called with an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "You have no passkey with this id; code `auth.passkey_not_found`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3453,6 +3901,31 @@
   },
   "components": {
     "schemas": {
+      "AddPasskeyRequest": {
+        "type": "object",
+        "description": "The authenticator's answer to an add-passkey ceremony.",
+        "required": [
+          "ceremony_id",
+          "name",
+          "credential"
+        ],
+        "properties": {
+          "ceremony_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The `ceremony_id` from `POST /api/v1/auth/me/passkeys/registration`."
+          },
+          "credential": {
+            "type": "object",
+            "description": "The created credential as JSON (`credential.toJSON()` in the browser)."
+          },
+          "name": {
+            "type": "string",
+            "description": "A name to recognize the passkey by, 1 to 100 characters.",
+            "example": "Ada's phone"
+          }
+        }
+      },
       "ApiKeyResponse": {
         "type": "object",
         "description": "An API key, without its secret.",
@@ -3578,6 +4051,25 @@
             ],
             "description": "Record that changed, as `<kind>:<id>`, e.g. `auth.user:0190…`.",
             "example": "auth.user:01936f0e-6c9f-7cc2-8a52-2b2f4d1c1e5a"
+          }
+        }
+      },
+      "CeremonyResponse": {
+        "type": "object",
+        "description": "A passkey ceremony in progress.",
+        "required": [
+          "ceremony_id",
+          "options"
+        ],
+        "properties": {
+          "ceremony_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Send this back with the authenticator's answer, within 5 minutes. Works once."
+          },
+          "options": {
+            "type": "object",
+            "description": "WebAuthn options as JSON: pass them to\n`PublicKeyCredential.parseCreationOptionsFromJSON()` (adding a passkey) or\n`PublicKeyCredential.parseRequestOptionsFromJSON()` (signing in), then to\n`navigator.credentials.create()` / `.get()`."
           }
         }
       },
@@ -3786,6 +4278,34 @@
                 ],
                 "description": "Record that changed, as `<kind>:<id>`, e.g. `auth.user:0190…`.",
                 "example": "auth.user:01936f0e-6c9f-7cc2-8a52-2b2f4d1c1e5a"
+              }
+            }
+          }
+        }
+      },
+      "Data_CeremonyResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A passkey ceremony in progress.",
+            "required": [
+              "ceremony_id",
+              "options"
+            ],
+            "properties": {
+              "ceremony_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Send this back with the authenticator's answer, within 5 minutes. Works once."
+              },
+              "options": {
+                "type": "object",
+                "description": "WebAuthn options as JSON: pass them to\n`PublicKeyCredential.parseCreationOptionsFromJSON()` (adding a passkey) or\n`PublicKeyCredential.parseRequestOptionsFromJSON()` (signing in), then to\n`navigator.credentials.create()` / `.get()`."
               }
             }
           }
@@ -4031,6 +4551,47 @@
               "totp_enabled": {
                 "type": "boolean",
                 "description": "Sign-in asks for a code from an authenticator app."
+              }
+            }
+          }
+        }
+      },
+      "Data_PasskeyResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A passkey of the signed-in user. Holds no secret.",
+            "required": [
+              "id",
+              "name",
+              "created_at"
+            ],
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "last_used_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When it was last used to sign in; `null` if never."
+              },
+              "name": {
+                "type": "string",
+                "description": "Name the user gave it, e.g. the device.",
+                "example": "Ada's phone"
               }
             }
           }
@@ -4785,6 +5346,55 @@
           }
         }
       },
+      "Page_PasskeyResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A passkey of the signed-in user. Holds no secret.",
+              "required": [
+                "id",
+                "name",
+                "created_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "last_used_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "When it was last used to sign in; `null` if never."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Name the user gave it, e.g. the device.",
+                  "example": "Ada's phone"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
       "Page_RoleResponse": {
         "type": "object",
         "description": "One page of a list.",
@@ -4938,6 +5548,57 @@
               "null"
             ],
             "description": "Pass this as `cursor` to get the next page. `null` means this is the last\npage."
+          }
+        }
+      },
+      "PasskeyLoginRequest": {
+        "type": "object",
+        "description": "The authenticator's answer to a sign-in ceremony.",
+        "required": [
+          "ceremony_id",
+          "credential"
+        ],
+        "properties": {
+          "ceremony_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The `ceremony_id` from `POST /api/v1/auth/login/passkey/options`."
+          },
+          "credential": {
+            "type": "object",
+            "description": "The assertion as JSON (`credential.toJSON()` in the browser)."
+          }
+        }
+      },
+      "PasskeyResponse": {
+        "type": "object",
+        "description": "A passkey of the signed-in user. Holds no secret.",
+        "required": [
+          "id",
+          "name",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was last used to sign in; `null` if never."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name the user gave it, e.g. the device.",
+            "example": "Ada's phone"
           }
         }
       },

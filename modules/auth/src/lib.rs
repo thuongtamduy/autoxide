@@ -17,6 +17,7 @@ mod events;
 mod http;
 mod mfa;
 mod migration;
+mod passkey;
 mod password;
 mod permissions;
 mod reset;
@@ -120,6 +121,13 @@ impl Module for AuthModule {
             mfa.clone(),
             outbox.clone(),
         )?);
+        let passkeys = Arc::new(passkey::PasskeyService::new(
+            database.clone(),
+            users.clone(),
+            sessions.clone(),
+            outbox.clone(),
+            config.passkey.as_ref(),
+        )?);
         let verifications = Arc::new(verify::EmailVerifications {
             database: database.clone(),
             users: users.clone(),
@@ -152,6 +160,7 @@ impl Module for AuthModule {
             mfa,
             resets,
             verifications,
+            passkeys,
             self_registration: config.self_registration,
         });
         Ok(())
@@ -234,6 +243,7 @@ pub(crate) mod testing {
         pub mfa: Arc<crate::mfa::MfaService>,
         pub resets: Arc<crate::reset::PasswordResets>,
         pub verifications: Arc<crate::verify::EmailVerifications>,
+        pub passkeys: Arc<crate::passkey::PasskeyService>,
         pub mails: Arc<FakeMailer>,
         pub database: Database,
         pub authenticator: Arc<dyn autoxide_kernel::access::Authenticator>,
@@ -317,7 +327,22 @@ pub(crate) mod testing {
             outbox: autoxide_kernel::event::Outbox::standalone("auth"),
             url: None,
         });
+        let passkey_config = crate::config::PasskeyConfig {
+            rp_id: "example.com".to_owned(),
+            origins: vec!["https://example.com".to_owned()],
+        };
+        let passkeys = Arc::new(
+            crate::passkey::PasskeyService::new(
+                database.clone(),
+                users.clone(),
+                sessions.clone(),
+                autoxide_kernel::event::Outbox::standalone("auth"),
+                Some(&passkey_config),
+            )
+            .unwrap(),
+        );
         Services {
+            passkeys,
             users,
             sessions,
             roles,

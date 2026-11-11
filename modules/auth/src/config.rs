@@ -74,6 +74,23 @@ pub(crate) const EMAIL_VERIFICATION_URL: Setting = Setting::new(
 )
 .with_example("https://app.example.com/verify-email?token={token}");
 
+pub(crate) const PASSKEY_RP_ID: Setting = Setting::new(
+    "AUTOXIDE_AUTH_PASSKEY_RP_ID",
+    "Domain that passkeys belong to (the WebAuthn relying party id), usually your site's \
+     domain without scheme or port, e.g. `example.com`; passkeys then work on that domain and \
+     its subdomains. When unset, passkey sign-in is off. Changing it later makes every \
+     registered passkey unusable.",
+)
+.with_example("example.com");
+
+pub(crate) const PASSKEY_ORIGINS: Setting = Setting::new(
+    "AUTOXIDE_AUTH_PASSKEY_ORIGINS",
+    "Web origins allowed to use passkeys, comma-separated, e.g. \
+     `https://app.example.com,https://example.com`. Each must be on AUTOXIDE_AUTH_PASSKEY_RP_ID \
+     or a subdomain of it. Unset: `https://<AUTOXIDE_AUTH_PASSKEY_RP_ID>`.",
+)
+.with_example("https://app.example.com");
+
 /// Độ dài tối thiểu của khoá ký token: 256 bit, bằng độ dài đầu ra của SHA-256.
 const MIN_SECRET_LENGTH: usize = 32;
 
@@ -95,6 +112,17 @@ pub(crate) struct AuthConfig {
     pub password_reset_url: Option<String>,
     /// Trang xác minh email của giao diện, có `{token}`.
     pub email_verification_url: Option<String>,
+    /// `None`: passkey tắt.
+    pub passkey: Option<PasskeyConfig>,
+}
+
+/// Cấu hình passkey (WebAuthn).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PasskeyConfig {
+    /// RP ID: tên miền mà passkey thuộc về.
+    pub rp_id: String,
+    /// Origin được phép, dạng `https://host[:port]`.
+    pub origins: Vec<String>,
 }
 
 impl AuthConfig {
@@ -130,6 +158,41 @@ impl AuthConfig {
         });
         let password_reset_url = reader.optional_with(&PASSWORD_RESET_URL, token_url);
         let email_verification_url = reader.optional_with(&EMAIL_VERIFICATION_URL, token_url);
+        let rp_id = reader.optional_with(&PASSKEY_RP_ID, |raw| {
+            let domain = raw.trim().to_ascii_lowercase();
+            let valid = !domain.is_empty()
+                && domain.split('.').all(|label| {
+                    !label.is_empty()
+                        && label.len() <= 63
+                        && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+                });
+            if valid {
+                Ok(domain)
+            } else {
+                Err("must be a domain name like `example.com`, without scheme or port".to_owned())
+            }
+        });
+        let origins = reader.optional_with(&PASSKEY_ORIGINS, |raw| {
+            raw.split(',')
+                .map(str::trim)
+                .filter(|origin| !origin.is_empty())
+                .map(|origin| {
+                    let origin = origin.trim_end_matches('/');
+                    let host = origin
+                        .strip_prefix("https://")
+                        .or_else(|| origin.strip_prefix("http://localhost").map(|_| "localhost"));
+                    match host {
+                        Some(host) if !host.is_empty() && !host.contains('/') => {
+                            Ok(origin.to_owned())
+                        }
+                        _ => Err(format!(
+                            "`{origin}` must be an origin like `https://app.example.com` (plain \
+                             http only for localhost)"
+                        )),
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()
+        });
         Ok(AuthConfig {
             token_secret: token_secret?,
             access_token_ttl: Duration::from_secs(access?),
@@ -140,8 +203,38 @@ impl AuthConfig {
             totp_issuer: totp_issuer?,
             password_reset_url: password_reset_url?,
             email_verification_url: email_verification_url?,
+            passkey: passkey_config(reader, rp_id?, origins?)?,
         })
     }
+}
+
+/// Ghép RP ID với origin; origin phải nằm trên RP ID hoặc tên miền con của nó (luật của
+/// WebAuthn — trình duyệt cũng từ chối nếu sai, nên báo ngay lúc khởi động).
+fn passkey_config(
+    reader: &mut ConfigReader<'_>,
+    rp_id: Option<String>,
+    origins: Option<Vec<String>>,
+) -> Result<Option<PasskeyConfig>, Invalid> {
+    let Some(rp_id) = rp_id else {
+        return Ok(None);
+    };
+    let origins =
+        origins.filter(|list| !list.is_empty()).unwrap_or_else(|| vec![format!("https://{rp_id}")]);
+    for origin in &origins {
+        let host = origin.split("://").nth(1).unwrap_or_default();
+        let host = host.split(':').next().unwrap_or_default();
+        let belongs = host == rp_id || host.ends_with(&format!(".{rp_id}")) || host == "localhost";
+        if !belongs {
+            return reader.reject(
+                &PASSKEY_ORIGINS,
+                format!(
+                    "`{origin}` is not on `{rp_id}` (AUTOXIDE_AUTH_PASSKEY_RP_ID) or a subdomain \
+                     of it"
+                ),
+            );
+        }
+    }
+    Ok(Some(PasskeyConfig { rp_id, origins }))
 }
 
 /// Địa chỉ http(s) có chỗ điền `{token}`.
@@ -180,6 +273,7 @@ mod tests {
         assert_eq!(config.password_reset_url, None);
         assert!(read(&[("AUTOXIDE_AUTH_PASSWORD_RESET_URL", "https://app/reset")]).is_err());
         assert!(read(&[("AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL", "ftp://x/{token}")]).is_err());
+        assert_eq!(config.passkey, None);
         assert!(read(&[("AUTOXIDE_AUTH_TOTP_ISSUER", "A:B")]).is_err());
         assert!(read(&[("AUTOXIDE_AUTH_SELF_REGISTRATION", "true")]).unwrap().self_registration);
     }
@@ -201,5 +295,33 @@ mod tests {
         .unwrap_err();
 
         assert!(error.contains("(2 problems)"), "{error}");
+    }
+
+    #[test]
+    fn cau_hinh_passkey() {
+        let only_rp = read(&[("AUTOXIDE_AUTH_PASSKEY_RP_ID", "Example.com")]).unwrap();
+        let expected = PasskeyConfig {
+            rp_id: "example.com".to_owned(),
+            origins: vec!["https://example.com".to_owned()],
+        };
+        assert_eq!(only_rp.passkey, Some(expected));
+        let both = read(&[
+            ("AUTOXIDE_AUTH_PASSKEY_RP_ID", "example.com"),
+            ("AUTOXIDE_AUTH_PASSKEY_ORIGINS", "https://app.example.com/, http://localhost:5173"),
+        ])
+        .unwrap();
+        let origins = both.passkey.unwrap().origins;
+        assert_eq!(origins, ["https://app.example.com", "http://localhost:5173"]);
+
+        for (rp, origins) in [
+            ("https://example.com", ""),
+            ("example.com", "http://app.example.com"),
+            ("example.com", "https://evil.com"),
+            ("example.com", "https://notexample.com"),
+        ] {
+            let pairs =
+                [("AUTOXIDE_AUTH_PASSKEY_RP_ID", rp), ("AUTOXIDE_AUTH_PASSKEY_ORIGINS", origins)];
+            assert!(read(&pairs).is_err(), "{rp} {origins}");
+        }
     }
 }

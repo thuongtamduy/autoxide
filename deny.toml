@@ -18,6 +18,8 @@ targets = [
 # ở đây VÀ ở docs/DECISIONS.md. Gate chạy với `-D advisory-not-detected`: ngoại
 # lệ không còn cần nữa thì gate đỏ cho tới khi gỡ dòng đó đi.
 ignore = [
+  { id = "RUSTSEC-2023-0071", reason = "rsa: timing side channel when using a PRIVATE key. Only reached through webauthn_rp, which verifies passkey signatures with PUBLIC keys; no secret is ever processed. See docs/DECISIONS.md D-077." },
+  { id = "RUSTSEC-2026-0387", reason = "crypto-bigint < 0.7.6: timing side channels on SECRET integers. Only reached through webauthn_rp (p256/p384 0.13) for public-key signature verification; no secret is ever processed. See docs/DECISIONS.md D-077." },
   { id = "RUSTSEC-2026-0459", reason = "SQLite bundled by libsqlite3-sys < 0.39; sqlx-sqlite 0.9.0 (latest) requires < 0.38, so no fixed version can be selected yet. Only exploitable through a database file supplied by an untrusted party, which Autoxide never opens. See docs/DECISIONS.md D-032." },
 ]
 

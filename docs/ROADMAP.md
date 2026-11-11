@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–11 xong — core xong** (mọi bước xanh trên cả SQLite và Postgres). Việc tiếp theo do chủ dự án chọn: module nghiệp vụ đầu tiên, hoặc mở một mục ở "Sau core".
+Trạng thái: **bước 0–12 xong** (core + passkey), mọi bước xanh trên cả SQLite và Postgres. Việc tiếp theo do chủ dự án chọn: module nghiệp vụ đầu tiên, hoặc mở một mục ở "Sau core".
 
 ## 0. Khung dự án
 
@@ -114,6 +114,16 @@ Cho AI agent gọi chức năng của hệ thống như công cụ (Model Contex
 - [x] Thử gỡ ngoại lệ RUSTSEC-2026-0459 trong `deny.toml` (D-032) — chưa gỡ được, xem D-075
 - [x] Hướng dẫn cài đặt và deploy (tiếng Anh + tiếng Việt), đủ để người lạ tự làm theo
 
+## 12. Passkey (mở sau core, chủ dự án chọn ngày 11/11/2026)
+
+Đăng nhập bằng passkey (WebAuthn: vân tay, Face ID, khoá bảo mật) bên cạnh mật khẩu + TOTP.
+
+- [x] Người dùng đã đăng nhập thêm, xem, xoá passkey của mình
+- [x] Đăng nhập bằng passkey không cần email (discoverable credential), cấp token như đăng nhập thường
+- [x] Trạng thái nghi thức lưu trong database (nhiều máy chủ chạy song song được), dùng một lần, có hạn
+- [x] Cấu hình RP ID và origin; không cấu hình thì tính năng tắt, báo lỗi rõ
+- [x] Test bằng authenticator phần mềm trên cả hai database, kể cả dùng đồng thời một nghi thức
+
 ## Sau core (chưa mở)
 
-GraphQL · passkey · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.
+GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.

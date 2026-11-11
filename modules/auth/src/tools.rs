@@ -109,6 +109,7 @@ mod tests {
             mfa: services.mfa.clone(),
             resets: services.resets.clone(),
             verifications: services.verifications.clone(),
+            passkeys: services.passkeys.clone(),
             self_registration: false,
         })
     }

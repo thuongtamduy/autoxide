@@ -12,6 +12,7 @@ mod m0008_create_mfa_challenge;
 mod m0011_create_password_reset;
 mod m0012_add_email_verified;
 mod m0013_create_email_verification;
+mod m0014_create_passkeys;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -32,5 +33,6 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0011_create_password_reset::Migration),
         Box::new(m0012_add_email_verified::Migration),
         Box::new(m0013_create_email_verification::Migration),
+        Box::new(m0014_create_passkeys::Migration),
     ]
 }

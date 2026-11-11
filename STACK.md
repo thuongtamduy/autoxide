@@ -68,7 +68,8 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | Hash mật khẩu       | `argon2`          | 0.6       | Argon2id                                        |
 | Access token       | JWT HS256 tự viết trên `hmac` + `sha2` + `base64` | 0.13 / 0.11 / 0.22 | Sống ngắn; refresh token rotation lưu database. Không dùng `jsonwebtoken` (D-045) |
 | Số ngẫu nhiên      | `getrandom`       | 0.4       | Refresh token, khoá ký tạm thời                 |
-| MFA                | `totp-rs`         | 6.0       | TOTP + recovery code. Passkey để sau             |
+| MFA                | `totp-rs`         | 6.0       | TOTP + recovery code                             |
+| Passkey            | `webauthn_rp`     | 0.3       | WebAuthn phía máy chủ, thuần Rust (RustCrypto: p256, p384, ed25519, rsa — chỉ kiểm chữ ký bằng khoá công khai), không OpenSSL. Test dùng `p256` làm authenticator phần mềm (D-077) |
 | Rate limiting  | Tự viết (GCRA, ~100 dòng) | —   | Theo địa chỉ client, trong bộ nhớ; login throttling đếm trong database. Không dùng `tower_governor` (D-047) |
 
 ### Dịch vụ của core
@@ -151,7 +152,6 @@ repo này; giao diện là dự án riêng dùng API.
 | MySQL          | SeaORM vẫn chạy được, nhưng không test và không cam kết                 |
 | MongoDB        | Ngoài phạm vi: không ORM SQL nào phủ được                               |
 | Multi-tenant   | Ngoài phạm vi core                                                      |
-| Passkey        | Sau TOTP                                                                |
 
 ## Công cụ
 

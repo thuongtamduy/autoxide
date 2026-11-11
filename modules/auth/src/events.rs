@@ -51,6 +51,8 @@ events! {
     PASSWORD_RESET_REQUESTED, PasswordResetRequested, "auth.password_reset_requested", "A password-reset mail was sent to a user.";
     EMAIL_VERIFICATION_REQUESTED, EmailVerificationRequested, "auth.email_verification_requested", "A mail to confirm an email address was sent; `after.email` is that address.";
     EMAIL_VERIFIED, EmailVerified, "auth.email_verified", "A user confirmed an email address; when it was a new one, it replaced the old (`before.email`).";
+    PASSKEY_ADDED, PasskeyAdded, "auth.passkey_added", "A user added a passkey; `after.name` is its name.";
+    PASSKEY_REMOVED, PasskeyRemoved, "auth.passkey_removed", "A user removed a passkey; `before.name` is its name.";
     RECOVERY_CODES_REPLACED, RecoveryCodesReplaced, "auth.recovery_codes_replaced", "A user made new recovery codes.";
 }
 

@@ -1641,3 +1641,46 @@ tìm ra từ số đo, sửa không đổi hành vi (test cũ vẫn xanh trên h
 
 Đã cân nhắc: cache quyền trong bộ nhớ — nhanh hơn nữa nhưng quyền đổi (gỡ role, khoá tài
 khoản) phải có hiệu lực ngay trên mọi máy chủ; một câu join đã đủ.
+
+## D-077 · Passkey (WebAuthn) bằng `webauthn_rp`; hai ngoại lệ `cargo deny` — 2026-11-11 — chủ dự án mở, agent quyết cách làm
+
+Chủ dự án mở mục "Passkey" của "Sau core" (bước 12 của lộ trình). Cách làm:
+
+- Thư viện `webauthn_rp` 0.3 (MIT OR Apache-2.0): Relying Party theo W3C WebAuthn Level 3,
+  thuần Rust trên RustCrypto, không OpenSSL (D-043). `webauthn-rs` phổ biến hơn nhưng cần
+  OpenSSL. Feature `serde_relaxed` (nhận JSON `credential.toJSON()` của mọi trình duyệt)
+  và `serializable_server_state` (trạng thái nghi thức lưu được vào database).
+- Mọi kiểu của thư viện ở trong `modules/auth/src/passkey/webauthn.rs`; phần còn lại chỉ
+  thấy byte và JSON.
+- Bảng `auth_passkey` (credential ID duy nhất, user handle, khoá công khai và trạng thái
+  động do thư viện mã hoá; không secret) và `auth_passkey_ceremony` (trạng thái nghi thức,
+  hạn 5 phút, job dọn dẹp xoá). Mỗi nghi thức dùng một lần nhờ `DELETE` có điều kiện; nghi
+  thức đăng ký gắn với người bắt đầu. Máy chủ nào hoàn tất cũng được.
+- User handle: 64 byte ngẫu nhiên (khuyến nghị của đặc tả), chung cho mọi passkey của một
+  người; tối đa 20 passkey mỗi người; trình duyệt nhận danh sách passkey đã có để không tạo
+  trùng.
+- Đăng nhập là discoverable (không cần email); passkey đã xác minh người dùng (UV bắt buộc)
+  nên không hỏi thêm TOTP; cấp cùng cặp token như đăng nhập mật khẩu (event `signed_in`,
+  method `passkey`). Mọi lỗi đăng nhập cùng một mã `auth.passkey_sign_in_failed` (không lộ
+  passkey có tồn tại không; lý do ghi log mức info).
+- Thêm / xoá passkey chỉ trong phiên đăng nhập bằng mật khẩu (không qua API key), như cài
+  đặt MFA. Event `auth.passkey_added` / `auth.passkey_removed`.
+- Cấu hình `AUTOXIDE_AUTH_PASSKEY_RP_ID` (không đặt: tính năng tắt, 403
+  `auth.passkeys_disabled`) và `AUTOXIDE_AUTH_PASSKEY_ORIGINS` (mặc định
+  `https://<rp id>`; mỗi origin phải thuộc RP ID — kiểm lúc khởi động; `http://` chỉ cho
+  localhost).
+- Test: authenticator phần mềm (`passkey/testing.rs`: khoá P-256 bằng `p256`, CBOR theo
+  CTAP2, chữ ký theo đặc tả) — đăng ký, đăng nhập, gửi lại, sai origin (chống phishing),
+  credential lạ, user handle sai, xoá, tài khoản khoá, tắt tính năng, và 5 request đồng
+  thời trên một nghi thức (đúng một thành công) — trên cả hai database; cộng luồng REST.
+
+Ngoại lệ `cargo deny` (theo điều khoản ngoại lệ của luật gate): RUSTSEC-2023-0071 (`rsa`,
+Marvin) và RUSTSEC-2026-0387 (`crypto-bigint` < 0.7.6). Cả hai là rò rỉ thời gian khi xử
+lý dữ liệu BÍ MẬT (khoá riêng); chỉ đến từ `webauthn_rp`, nơi chúng chỉ kiểm chữ ký bằng
+khoá CÔNG KHAI — không có bí mật để rò. Điều kiện: không dùng `rsa`, `p256`, `p384` cho
+khoá riêng ở đâu khác. Tự hết hạn: gate chạy `-D advisory-not-detected`.
+
+Đã cân nhắc: tự viết phần kiểm WebAuthn trên `ring` — vài trăm dòng mã bảo mật, trái
+tiêu chí "theo chuẩn ngành thay vì tự chế"; lưu nghi thức trong bộ nhớ — hỏng khi chạy
+nhiều máy chủ; quản trị viên xoá passkey của người khác — để sau, khi có nhu cầu (tài
+khoản bị khoá thì passkey cũng không đăng nhập được).

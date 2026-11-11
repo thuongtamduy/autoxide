@@ -155,6 +155,17 @@ impl SessionService {
         self.start_session(user_id, "password_change").await
     }
 
+    /// Mở phiên cho người dùng `user_id` vừa chứng minh bằng passkey (đã kiểm ở
+    /// `PasskeyService`). Tài khoản bị khoá thì từ chối.
+    pub(crate) async fn login_with_passkey(&self, user_id: Uuid) -> Result<Tokens, Error> {
+        let user =
+            self.users.get(user_id).await?.ok_or_else(|| crate::user::user_not_found(user_id))?;
+        if !user.is_active() {
+            return Err(crate::user::user_disabled());
+        }
+        self.start_session(user_id, "passkey").await
+    }
+
     /// Kiểm mật khẩu hiện tại của người dùng `user_id` trước một việc nhạy cảm (đổi mật
     /// khẩu, đổi email). Sai thì `auth.wrong_password` và tính vào login throttling.
     pub(crate) async fn check_password(&self, user_id: Uuid, current: &str) -> Result<User, Error> {
