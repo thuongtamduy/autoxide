@@ -1598,3 +1598,21 @@ cả secret đã commit rồi xoá.
 
 Đã cân nhắc: chỉ PostgreSQL mới nhất — bỏ sót lỗi trên bản tối thiểu được hỗ trợ;
 `gitleaks-action` — cần license cho tổ chức.
+
+## D-075 · Thử gỡ ngoại lệ RUSTSEC-2026-0459: chưa gỡ được — 2026-11-11 — agent quyết
+
+Quyết định: giữ ngoại lệ của D-032. Đã thử ngày 11/11/2026: `sqlx-sqlite` mới nhất vẫn
+là 0.9.0 và vẫn đòi `libsqlite3-sys >= 0.30.1, < 0.38`; bản vá cần ≥ 0.39 (mới nhất hiện
+có 0.40). `cargo update -p libsqlite3-sys` không đổi gì. Cơ chế tự hết hạn của D-032 vẫn
+còn: gate chạy `cargo deny check -D advisory-not-detected`.
+
+Điều kiện an toàn của D-032 với các lệnh mới của bước 11:
+
+- `autoxide copy`: nguồn là database của chính máy chủ; đích là database mới do lệnh
+  tạo.
+- `autoxide backup`: tạo file SQLite mới, đóng hẳn trước khi xong (không để lại `-wal`).
+- `autoxide restore`: chỉ chép đúng file `database.sqlite` của bản backup sang thư mục
+  tạm rồi mở bản sao — không bao giờ mở file `-wal` / `-shm` nằm cạnh, là đường khai thác
+  của lỗ hổng. README dặn chỉ khôi phục bản backup do chính mình tạo.
+
+Lần thử kế: khi nâng `sea-orm` hay `sqlx`, hoặc khi gate báo ngoại lệ không còn cần.

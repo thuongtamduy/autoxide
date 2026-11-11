@@ -130,7 +130,10 @@ pub(crate) async fn run_restore(settings: Settings, directory: PathBuf) -> Resul
     prepared?;
 
     // Làm trên một bản sao của file backup: migration mới hơn (nếu có) được áp dụng lên
-    // bản sao, bản backup giữ nguyên.
+    // bản sao, bản backup giữ nguyên. Chỉ chép đúng `database.sqlite`, KHÔNG chép file
+    // `-wal` / `-shm` nằm cạnh (backup đóng database trước khi xong nên không có): lỗ hổng
+    // RUSTSEC-2026-0459 của SQLite đóng gói chỉ khai thác được qua một file `-wal` do kẻ
+    // tấn công chuẩn bị (D-032, D-075).
     let scratch = std::env::temp_dir().join(format!("autoxide-restore-{}", uuid::Uuid::now_v7()));
     std::fs::create_dir_all(&scratch).map_err(|error| error.to_string())?;
     let result = async {

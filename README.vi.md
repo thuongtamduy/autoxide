@@ -162,6 +162,9 @@ cargo run -p autoxide -- backup backups/2026-11-11
 cargo run -p autoxide -- restore backups/2026-11-11
 ```
 
+Chỉ khôi phục bản backup do chính bạn tạo: một bản backup là toàn bộ nội dung của máy
+chủ.
+
 Muốn chuyển sang PostgreSQL về sau (hay mang dữ liệu về SQLite), dừng máy chủ rồi chép
 mọi thứ sang một database mới, trống; database đó được áp dụng mọi migration trước:
 

@@ -165,6 +165,8 @@ cargo run -p autoxide -- backup backups/2026-11-11
 cargo run -p autoxide -- restore backups/2026-11-11
 ```
 
+Restore only backups you made yourself: a backup is the whole content of the server.
+
 To move to PostgreSQL later (or bring data back to SQLite), stop the server and copy
 everything into a new, empty database; it gets every migration first:
 
