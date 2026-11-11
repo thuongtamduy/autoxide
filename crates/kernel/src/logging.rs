@@ -78,7 +78,43 @@ where
     let mut layers = vec![format];
     layers.extend(extra);
     // Lọc theo mức áp cho mọi lớp.
-    Registry::default().with(layers).with(level_filter(config.level))
+    Registry::default().with(layers).with(QuietClientGone).with(level_filter(config.level))
+}
+
+/// Thông điệp mà thư viện ghi ở mức ERROR cho một việc bình thường: client ngắt kết nối
+/// trước khi nhận xong câu trả lời. Để ở ERROR thì mỗi lần agent huỷ một lời gọi MCP lại
+/// làm nhiễu cảnh báo vận hành (đo được khi chạy tải, D-076).
+const CLIENT_GONE: [(&str, &str); 1] =
+    [("rmcp::service", "failed to send pending response during drain")];
+
+/// Lớp bỏ các thông điệp trong [`CLIENT_GONE`]; mọi log khác đi qua nguyên vẹn.
+struct QuietClientGone;
+
+impl<S: Subscriber> Layer<S> for QuietClientGone {
+    fn event_enabled(
+        &self,
+        event: &tracing::Event<'_>,
+        _context: tracing_subscriber::layer::Context<'_, S>,
+    ) -> bool {
+        let target = event.metadata().target();
+        if !CLIENT_GONE.iter().any(|(gone, _)| target == *gone) {
+            return true;
+        }
+        let mut message = MessageOf(String::new());
+        event.record(&mut message);
+        !CLIENT_GONE.iter().any(|(gone, text)| target == *gone && message.0 == *text)
+    }
+}
+
+/// Đọc trường `message` của một sự kiện log.
+struct MessageOf(String);
+
+impl tracing::field::Visit for MessageOf {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn fmt::Debug) {
+        if field.name() == "message" {
+            self.0 = format!("{value:?}");
+        }
+    }
 }
 
 fn level_filter(level: LogLevel) -> LevelFilter {
@@ -163,6 +199,25 @@ mod tests {
         assert_eq!(entry["attempts"], 3);
         assert_eq!(entry["span"]["request_id"], "abc");
         assert!(entry["timestamp"].is_string(), "{entry}");
+    }
+
+    #[test]
+    fn bo_thong_diep_client_ngat_ket_noi_cua_rmcp() {
+        let config = LogConfig { level: LogLevel::Info, format: LogFormat::Text };
+
+        let output = capture(config, || {
+            tracing::error!(
+                target: "rmcp::service",
+                error = "channel closed",
+                "failed to send pending response during drain"
+            );
+            tracing::error!(target: "rmcp::service", "fail to close sink");
+            tracing::error!("failed to send pending response during drain");
+        });
+
+        assert_eq!(output.lines().count(), 2, "{output}");
+        assert!(output.contains("fail to close sink"), "{output}");
+        assert!(!output.contains("rmcp::service: failed to send pending"), "{output}");
     }
 
     #[test]

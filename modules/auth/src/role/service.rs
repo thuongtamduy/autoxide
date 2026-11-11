@@ -254,27 +254,37 @@ impl RoleService {
     /// Bên gọi là người dùng `user_id`: permission của họ là hợp các permission của
     /// mọi role của họ. Hai câu truy vấn, không phụ thuộc số role.
     pub(crate) async fn principal(&self, user_id: Uuid) -> Result<Principal, Error> {
-        let connection = self.database.read();
-        let roles_of_user = || {
-            Query::select()
-                .column(user_role::Column::RoleId)
-                .from(user_role::Entity)
-                .and_where(user_role::Column::UserId.eq(user_id))
-                .to_owned()
-        };
-        let all = role::Entity::find()
-            .filter(role::Column::AllPermissions.eq(true))
-            .filter(role::Column::Id.in_subquery(roles_of_user()))
-            .count(connection)
-            .await?;
-        if all > 0 {
-            return Ok(Principal::with_all_permissions(user_id));
+        use sea_orm::sea_query::ExprTrait as _;
+        // MỘT câu cho mọi request đã đăng nhập (đường nóng): mỗi dòng là một role của
+        // người dùng kèm một permission của role đó (NULL nếu role không có permission
+        // nào). Trước đây là hai câu — trên Postgres mỗi câu thêm một vòng mạng (D-076).
+        let mut select = Query::select();
+        select
+            .column((role::Entity, role::Column::AllPermissions))
+            .column((role_permission::Entity, role_permission::Column::Permission))
+            .from(user_role::Entity)
+            .inner_join(
+                role::Entity,
+                Expr::col((role::Entity, role::Column::Id))
+                    .equals((user_role::Entity, user_role::Column::RoleId)),
+            )
+            .left_join(
+                role_permission::Entity,
+                Expr::col((role_permission::Entity, role_permission::Column::RoleId))
+                    .equals((role::Entity, role::Column::Id)),
+            )
+            .and_where(Expr::col((user_role::Entity, user_role::Column::UserId)).eq(user_id));
+        let rows = self.database.read().query_all(&select).await?;
+        let mut permissions = Vec::with_capacity(rows.len());
+        for row in rows {
+            if row.try_get::<bool>("", "all_permissions")? {
+                return Ok(Principal::with_all_permissions(user_id));
+            }
+            if let Some(permission) = row.try_get::<Option<String>>("", "permission")? {
+                permissions.push(permission);
+            }
         }
-        let rows = role_permission::Entity::find()
-            .filter(role_permission::Column::RoleId.in_subquery(roles_of_user()))
-            .all(connection)
-            .await?;
-        Ok(Principal::new(user_id, rows.into_iter().map(|row| row.permission)))
+        Ok(Principal::new(user_id, permissions))
     }
 
     /// Kiểm và chuẩn hoá dữ liệu vào; báo mọi trường sai cùng lúc.

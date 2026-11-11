@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
+use axum::serve::ListenerExt as _;
 use tokio::net::TcpListener;
 use tokio::sync::Notify;
 
@@ -39,6 +40,14 @@ where
     // `with_connect_info`: mỗi request mang địa chỉ của kết nối, để rate limiting
     // biết client là ai.
     let service = router.into_make_service_with_connect_info::<SocketAddr>();
+    // `TCP_NODELAY`: gửi ngay từng mảnh của câu trả lời. Không bật thì header và thân
+    // (vd file tải xuống) gửi thành hai mảnh vướng thuật toán Nagle + delayed ACK của
+    // TCP, mỗi request chờ thêm ~40 ms dù máy chủ rảnh (đo được khi chạy tải, D-076).
+    let listener = listener.tap_io(|stream| {
+        if let Err(error) = stream.set_nodelay(true) {
+            tracing::warn!(error = %error, "cannot set TCP_NODELAY on a connection");
+        }
+    });
     let server = axum::serve(listener, service).with_graceful_shutdown(async move {
         shutdown.await;
         bell.notify_one();

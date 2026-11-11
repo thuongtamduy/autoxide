@@ -1616,3 +1616,28 @@ còn: gate chạy `cargo deny check -D advisory-not-detected`.
   của lỗ hổng. README dặn chỉ khôi phục bản backup do chính mình tạo.
 
 Lần thử kế: khi nâng `sea-orm` hay `sqlx`, hoặc khi gate báo ngoại lệ không còn cần.
+
+## D-076 · Đo tải qua API thật; bật TCP_NODELAY; một câu query lấy quyền — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- `scripts/loadtest.sh` đo hiệu năng và chịu tải qua API thật: binary release,
+  `autoxide serve`, TCP, đăng nhập thật, bằng `oha` (công cụ ngoài, cài bằng
+  `cargo install oha`, không phải phụ thuộc của dự án). Chạy được trên SQLite và trên
+  một database PostgreSQL trống (`LOADTEST_DATABASE_URL`). Kết quả ghi ở
+  `docs/BENCHMARKS.md`. Gate không chạy nó (tốn phút và số đo phụ thuộc máy).
+- Kernel bật `TCP_NODELAY` trên mọi kết nối (`ListenerExt::tap_io` của axum): đo thấy
+  câu trả lời gửi thành nhiều mảnh (tải file, MCP) chờ ~40 ms vì Nagle + delayed ACK.
+- `RoleService::principal` (chạy ở MỌI request đã đăng nhập) lấy quyền bằng một câu
+  JOIN `auth_user_role` – `auth_role` – `auth_role_permission` thay vì hai câu; trên
+  PostgreSQL mỗi câu là một vòng mạng. Join chỉ trong bảng của chính module `auth`.
+- Lớp log của kernel bỏ đúng thông điệp
+  `rmcp::service: failed to send pending response during drain`: thư viện ghi nó ở mức
+  ERROR khi client ngắt kết nối giữa lời gọi MCP — việc bình thường. Đã kiểm: chạy trọn
+  vẹn 20.000 lời gọi thì không có dòng này; chỉ có khi client bỏ đi.
+
+Lý do: đo trước rồi mới tối ưu (CLAUDE.md, tiêu chí "Nhanh"/"Tối ưu"); cả ba chỗ đều
+tìm ra từ số đo, sửa không đổi hành vi (test cũ vẫn xanh trên hai database).
+
+Đã cân nhắc: cache quyền trong bộ nhớ — nhanh hơn nữa nhưng quyền đổi (gỡ role, khoá tài
+khoản) phải có hiệu lực ngay trên mọi máy chủ; một câu join đã đủ.
