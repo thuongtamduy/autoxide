@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–12 xong** (core + passkey), mọi bước xanh trên cả SQLite và Postgres. Việc tiếp theo do chủ dự án chọn: module nghiệp vụ đầu tiên, hoặc mở một mục ở "Sau core".
+Trạng thái: **bước 0–12 xong**; đang ở bước 13 (củng cố core), mục "CI chạy xanh trên GitHub".
 
 ## 0. Khung dự án
 
@@ -123,6 +123,30 @@ Cho AI agent gọi chức năng của hệ thống như công cụ (Model Contex
 - [x] Trạng thái nghi thức lưu trong database (nhiều máy chủ chạy song song được), dùng một lần, có hạn
 - [x] Cấu hình RP ID và origin; không cấu hình thì tính năng tắt, báo lỗi rõ
 - [x] Test bằng authenticator phần mềm trên cả hai database, kể cả dùng đồng thời một nghi thức
+
+## 13. Củng cố core (chủ dự án giao ngày 11/11/2026, agent quyết cách làm)
+
+Kiểm lại phần đã có:
+
+- [ ] CI chạy xanh trên GitHub
+- [ ] Rà soát bảo mật toàn repo bằng một lượt đọc độc lập; sửa mọi lỗi tìm thấy
+- [ ] Thử tải dài hạn: không rò bộ nhớ, không rò kết nối database
+
+Hệ thống tài khoản:
+
+- [ ] Quản lý phiên đăng nhập: người dùng xem và đăng xuất từng thiết bị; quản trị viên thu hồi mọi phiên của một người
+- [ ] Xoá tài khoản (event cho mọi module dọn dữ liệu của người đó) và xuất dữ liệu cá nhân
+- [ ] Tìm người dùng theo email hoặc tên
+
+Phát hành và nâng cấp:
+
+- [ ] Số phiên bản, `CHANGELOG`, bản phát hành trên GitHub
+- [ ] CI build và đăng image Docker lên GitHub Container Registry
+- [ ] Dependabot đề xuất nâng cấp; kiểm lỗ hổng thư viện hằng ngày
+
+Tích hợp:
+
+- [ ] Webhook: gửi event ra hệ thống bên ngoài, có chữ ký, thử lại, theo dõi được
 
 ## Sau core (chưa mở)
 
