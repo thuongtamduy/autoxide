@@ -1,0 +1,445 @@
+//! Service của file: tải lên, xem, tải xuống, xoá. Handler REST (và tool MCP ở bước
+//! sau) chỉ gọi vào đây.
+//!
+//! Nội dung nằm ở nơi lưu (`Storage`), thông tin nằm trong bảng `files_file`. Thứ tự
+//! ghi để không bao giờ có dòng trỏ tới nội dung không tồn tại:
+//!
+//! - tải lên: ghi nội dung trước, rồi dòng (kèm event) trong một transaction; ghi dòng
+//!   hỏng thì xoá nội dung vừa ghi;
+//! - xoá: xoá dòng (kèm event) trước, rồi nội dung; xoá nội dung hỏng thì chỉ còn một
+//!   file mồ côi ở nơi lưu (ghi log), người dùng không thấy gì sai.
+
+use std::sync::{Arc, Mutex};
+
+use autoxide_kernel::access::Principal;
+use autoxide_kernel::database::Database;
+use autoxide_kernel::error::{Error, ErrorKind, FieldError};
+use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::storage::{ByteStream, Storage};
+use chrono::{DateTime, SubsecRound, Utc};
+use futures_util::StreamExt as _;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use serde_json::json;
+use sha2::{Digest, Sha256};
+use uuid::Uuid;
+
+use crate::config::{Limits, normalize_type};
+use crate::entity::{self, Column, Entity};
+use crate::events;
+use crate::permissions::{FILES_MANAGE, FILES_UPLOAD};
+
+/// Độ dài tối đa của tên file, theo ký tự.
+const NAME_MAX_LENGTH: usize = 255;
+
+/// Thông tin của một file.
+pub(crate) type FileRecord = entity::Model;
+
+/// Một file đang được tải xuống.
+pub(crate) struct Download {
+    pub file: FileRecord,
+    pub content: ByteStream,
+}
+
+pub(crate) struct FileService {
+    database: Database,
+    storage: Arc<dyn Storage>,
+    outbox: Outbox,
+    limits: Limits,
+}
+
+impl FileService {
+    pub(crate) fn new(
+        database: Database,
+        storage: Arc<dyn Storage>,
+        outbox: Outbox,
+        limits: Limits,
+    ) -> Self {
+        FileService { database, storage, outbox, limits }
+    }
+
+    pub(crate) fn limits(&self) -> &Limits {
+        &self.limits
+    }
+
+    /// Tải lên `content` với tên `name` và loại `content_type`; người tải là chủ file.
+    /// Tên và loại được kiểm TRƯỚC khi đọc nội dung.
+    pub(crate) async fn upload(
+        &self,
+        principal: &Principal,
+        name: &str,
+        content_type: Option<&str>,
+        content: ByteStream,
+    ) -> Result<FileRecord, Error> {
+        principal.require(&FILES_UPLOAD)?;
+        let name = check_name(name)?;
+        let content_type = self.check_type(content_type)?;
+
+        let id = Uuid::now_v7();
+        let key = entity::storage_key(id);
+        let hasher = Arc::new(Mutex::new(Sha256::new()));
+        let content = self.measure(content, hasher.clone());
+        let size = self.storage.put(&key, content).await?;
+        let sha256 = {
+            let hasher = hasher.lock().map_err(|_| Error::internal("hasher lock"))?;
+            hex(&hasher.clone().finalize())
+        };
+
+        let saved = self.save(principal, id, name, content_type, size, sha256).await;
+        if saved.is_err() {
+            // Không để nội dung không ai trỏ tới nằm lại ở nơi lưu.
+            if let Err(error) = self.storage.delete(&key).await {
+                tracing::warn!(file_id = %id, error = %error, "cannot remove an unsaved upload");
+            }
+        }
+        let file = saved?;
+        tracing::info!(file_id = %file.id, size = file.size, "file uploaded");
+        metrics::counter!("files_uploaded_total").increment(1);
+        Ok(file)
+    }
+
+    /// Thông tin file `id`, nếu người gọi được xem.
+    pub(crate) async fn get(&self, principal: &Principal, id: Uuid) -> Result<FileRecord, Error> {
+        let file = Entity::find_by_id(id).one(self.database.read()).await?;
+        visible(principal, file, id)
+    }
+
+    /// Một trang file của người gọi, mới tải trước (mặc định).
+    pub(crate) async fn list(
+        &self,
+        principal: &Principal,
+        page: &PageRequest,
+    ) -> Result<Page<FileRecord>, Error> {
+        principal.require(&FILES_UPLOAD)?;
+        let select = Entity::find().filter(Column::OwnerId.eq(principal.user_id()));
+        fetch_page(select, Column::Id, |row| row.id, page, self.database.read()).await
+    }
+
+    /// Thông tin và nội dung của file `id`.
+    pub(crate) async fn download(
+        &self,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<Download, Error> {
+        let file = self.get(principal, id).await?;
+        let stored = self.storage.get(&file.storage_key()).await?.ok_or_else(|| {
+            // Có dòng mà không có nội dung: nơi lưu bị đổi từ bên ngoài.
+            Error::internal(format!("the content of file {id} is missing from storage"))
+        })?;
+        Ok(Download { file, content: stored.content })
+    }
+
+    /// Xoá file `id`.
+    pub(crate) async fn delete(&self, principal: &Principal, id: Uuid) -> Result<(), Error> {
+        let file = self.get(principal, id).await?;
+        let transaction = self.database.begin_write().await?;
+        let deleted = Entity::delete_by_id(id).exec(&transaction).await?;
+        if deleted.rows_affected == 0 {
+            // Một request khác vừa xoá trước.
+            transaction.rollback().await?;
+            return Err(file_not_found(id));
+        }
+        let event = events::FileDeleted { before: details(&file) };
+        let actor = Actor::from(principal);
+        self.outbox.record(&transaction, actor, events::file_subject(id), &event).await?;
+        transaction.commit().await?;
+        if let Err(error) = self.storage.delete(&file.storage_key()).await {
+            tracing::warn!(file_id = %id, error = %error, "file deleted but its content remains");
+        }
+        tracing::info!(file_id = %id, "file deleted");
+        Ok(())
+    }
+
+    fn check_type(&self, content_type: Option<&str>) -> Result<String, Error> {
+        let content_type = match content_type {
+            None => "application/octet-stream".to_owned(),
+            Some(raw) => normalize_type(raw).ok_or_else(|| {
+                Error::bad_request(
+                    "files.invalid_content_type",
+                    "The `Content-Type` header must be a media type like `application/pdf`.",
+                )
+            })?,
+        };
+        if !self.limits.allows(&content_type) {
+            let allowed = self.limits.allowed_types.clone().unwrap_or_default().join(", ");
+            return Err(Error::new(
+                ErrorKind::UnsupportedMediaType,
+                "files.type_not_allowed",
+                "Files of type `{type}` cannot be uploaded here. Allowed types: {allowed}.",
+            )
+            .with_param("type", &content_type)
+            .with_param("allowed", allowed));
+        }
+        Ok(content_type)
+    }
+
+    /// Luồng `content` qua bộ đếm (vượt giới hạn thì dừng bằng lỗi 413) và bộ băm.
+    fn measure(&self, content: ByteStream, hasher: Arc<Mutex<Sha256>>) -> ByteStream {
+        let max = self.limits.max_bytes;
+        let mut seen: u64 = 0;
+        content
+            .map(move |chunk| {
+                let chunk = chunk?;
+                seen += chunk.len() as u64;
+                if seen > max {
+                    return Err(too_large(max));
+                }
+                hasher.lock().map_err(|_| Error::internal("hasher lock"))?.update(&chunk);
+                Ok(chunk)
+            })
+            .boxed()
+    }
+
+    async fn save(
+        &self,
+        principal: &Principal,
+        id: Uuid,
+        name: String,
+        content_type: String,
+        size: u64,
+        sha256: String,
+    ) -> Result<FileRecord, Error> {
+        let transaction = self.database.begin_write().await?;
+        let file = entity::ActiveModel {
+            id: Set(id),
+            owner_id: Set(principal.user_id()),
+            name: Set(name),
+            content_type: Set(content_type),
+            size: Set(i64::try_from(size).map_err(Error::internal)?),
+            sha256: Set(sha256),
+            created_at: Set(now()),
+        }
+        .insert(&transaction)
+        .await?;
+        let event = events::FileUploaded { after: details(&file) };
+        let actor = Actor::from(principal);
+        self.outbox.record(&transaction, actor, events::file_subject(id), &event).await?;
+        transaction.commit().await?;
+        Ok(file)
+    }
+}
+
+/// Người gọi xem được file nếu là chủ (và còn `files.upload`) hoặc có `files.manage`.
+/// Không được xem thì báo "không có" — không để lộ file của người khác có tồn tại.
+fn visible(principal: &Principal, file: Option<FileRecord>, id: Uuid) -> Result<FileRecord, Error> {
+    if !principal.has(&FILES_UPLOAD) && !principal.has(&FILES_MANAGE) {
+        principal.require(&FILES_UPLOAD)?;
+    }
+    file.filter(|file| {
+        principal.has(&FILES_MANAGE)
+            || (file.owner_id == principal.user_id() && principal.has(&FILES_UPLOAD))
+    })
+    .ok_or_else(|| file_not_found(id))
+}
+
+/// Tên file: bỏ khoảng trắng hai đầu; 1 tới 255 ký tự; không có `/`, `\` hay ký tự điều
+/// khiển (tên chỉ để hiển thị và đặt khi tải về, không bao giờ thành đường dẫn).
+fn check_name(name: &str) -> Result<String, Error> {
+    let name = name.trim();
+    let length = name.chars().count();
+    let valid = (1..=NAME_MAX_LENGTH).contains(&length)
+        && !name.chars().any(|c| c == '/' || c == '\\' || c.is_control());
+    if valid {
+        return Ok(name.to_owned());
+    }
+    Err(Error::validation(vec![FieldError::new(
+        "name",
+        "invalid",
+        format!(
+            "must be 1 to {NAME_MAX_LENGTH} characters, without `/`, `\\` or control characters"
+        ),
+    )]))
+}
+
+fn details(file: &FileRecord) -> serde_json::Value {
+    json!({
+        "name": file.name,
+        "content_type": file.content_type,
+        "size": file.size,
+        "sha256": file.sha256,
+        "owner_id": file.owner_id,
+    })
+}
+
+pub(crate) fn too_large(max: u64) -> Error {
+    Error::new(
+        ErrorKind::PayloadTooLarge,
+        "files.too_large",
+        "The file is larger than {max} bytes, the most this server accepts.",
+    )
+    .with_param("max", max)
+}
+
+fn file_not_found(id: Uuid) -> Error {
+    Error::not_found("files.file_not_found", "File `{id}` does not exist.").with_param("id", id)
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Bây giờ, cắt tới micro giây để hai database trả cùng giá trị.
+fn now() -> DateTime<Utc> {
+    Utc::now().trunc_subsecs(6)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use autoxide_testkit::TestDatabase;
+    use bytes::Bytes;
+    use futures_util::TryStreamExt as _;
+    use sea_orm::{ConnectionTrait, Statement};
+
+    use crate::testing::{no_limits, service};
+
+    fn uploader(id: Uuid) -> Principal {
+        Principal::new(id, ["files.upload".to_owned()])
+    }
+
+    fn body(text: &'static str) -> ByteStream {
+        futures_util::stream::iter([Ok(Bytes::from_static(text.as_bytes()))]).boxed()
+    }
+
+    async fn content(download: Download) -> Vec<u8> {
+        let chunks: Vec<Bytes> = download.content.try_collect().await.unwrap();
+        chunks.concat()
+    }
+
+    async fn events(database: &Database) -> Vec<String> {
+        let backend = database.read().get_database_backend();
+        let sql = "SELECT name FROM files_events ORDER BY id";
+        let rows = database.read().query_all_raw(Statement::from_string(backend, sql)).await;
+        rows.unwrap().iter().map(|row| row.try_get("", "name").unwrap()).collect()
+    }
+
+    #[tokio::test]
+    async fn tai_len_xem_tai_xuong_va_xoa() {
+        TestDatabase::run(async |test| {
+            let (files, database) = service(test, no_limits()).await;
+            let ada = uploader(Uuid::now_v7());
+
+            let file = files
+                .upload(&ada, " notes.txt ", Some("Text/Plain; charset=utf-8"), body("hello"))
+                .await
+                .unwrap();
+
+            assert_eq!(file.name, "notes.txt");
+            assert_eq!(file.content_type, "text/plain");
+            assert_eq!(file.size, 5);
+            // SHA-256 của "hello".
+            assert_eq!(
+                file.sha256,
+                "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+            );
+            assert_eq!(files.get(&ada, file.id).await.unwrap(), file);
+            let page = files.list(&ada, &PageRequest::first(10, Default::default())).await.unwrap();
+            assert_eq!(page.data, vec![file.clone()]);
+            assert_eq!(content(files.download(&ada, file.id).await.unwrap()).await, b"hello");
+
+            files.delete(&ada, file.id).await.unwrap();
+            let gone = files.get(&ada, file.id).await.unwrap_err();
+            assert_eq!(gone.code(), "files.file_not_found");
+            assert!(files.storage.get(&file.storage_key()).await.unwrap().is_none());
+            assert_eq!(events(&database).await, ["files.file_uploaded", "files.file_deleted"]);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn chi_chu_file_va_nguoi_quan_ly_thay_file() {
+        TestDatabase::run(async |test| {
+            let (files, _) = service(test, no_limits()).await;
+            let (ada, bob) = (uploader(Uuid::now_v7()), uploader(Uuid::now_v7()));
+            let manager = Principal::new(Uuid::now_v7(), ["files.manage".to_owned()]);
+            let nobody = Principal::new(ada.user_id(), []);
+            let file = files.upload(&ada, "a.txt", None, body("a")).await.unwrap();
+            assert_eq!(file.content_type, "application/octet-stream");
+
+            // Người khác: như thể file không có.
+            assert_eq!(files.get(&bob, file.id).await.unwrap_err().code(), "files.file_not_found");
+            assert_eq!(
+                files.delete(&bob, file.id).await.unwrap_err().code(),
+                "files.file_not_found"
+            );
+            let empty = files.list(&bob, &PageRequest::first(10, Default::default())).await;
+            assert!(empty.unwrap().data.is_empty());
+            // Mất permission: kể cả file của mình cũng không.
+            let denied = files.get(&nobody, file.id).await.unwrap_err();
+            assert_eq!(denied.code(), "permission_denied");
+            let denied = files.upload(&nobody, "b.txt", None, body("b")).await.unwrap_err();
+            assert_eq!(denied.code(), "permission_denied");
+
+            assert_eq!(files.get(&manager, file.id).await.unwrap().id, file.id);
+            files.delete(&manager, file.id).await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn gioi_han_kich_thuoc_loai_va_ten() {
+        TestDatabase::run(async |test| {
+            let limits = Limits { max_bytes: 4, allowed_types: Some(vec!["image/*".into()]) };
+            let (files, database) = service(test, limits).await;
+            let ada = uploader(Uuid::now_v7());
+
+            let large = files.upload(&ada, "a.png", Some("image/png"), body("12345")).await;
+            let large = large.unwrap_err();
+            assert_eq!(
+                (large.kind(), large.code()),
+                (ErrorKind::PayloadTooLarge, "files.too_large")
+            );
+            let exact = files.upload(&ada, "b.png", Some("image/png"), body("1234")).await;
+            assert_eq!(exact.unwrap().size, 4);
+
+            let pdf = files.upload(&ada, "a.pdf", Some("application/pdf"), body("1")).await;
+            let pdf = pdf.unwrap_err();
+            assert_eq!(pdf.kind(), ErrorKind::UnsupportedMediaType);
+            assert!(pdf.message().contains("Allowed types: image/*"), "{}", pdf.message());
+            let broken = files.upload(&ada, "a.png", Some("png"), body("1")).await.unwrap_err();
+            assert_eq!(broken.code(), "files.invalid_content_type");
+            for name in ["", "   ", "a/b.png", "a\\b.png", "a\nb.png", &"x".repeat(256)] {
+                let invalid = files.upload(&ada, name, Some("image/png"), body("1")).await;
+                assert_eq!(invalid.unwrap_err().code(), "validation_failed", "{name:?}");
+            }
+
+            // Chỉ file hợp lệ có dòng trong database.
+            let page = files.list(&ada, &PageRequest::first(10, Default::default())).await;
+            assert_eq!(page.unwrap().data.len(), 1);
+            assert_eq!(events(&database).await, ["files.file_uploaded"]);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Nhiều request cùng xoá một file: đúng một bên xoá được — trên cả hai database.
+    #[tokio::test]
+    async fn xoa_dong_thoi_chi_mot_ben_duoc() {
+        TestDatabase::run(async |test| {
+            let (files, database) = service(test, no_limits()).await;
+            let ada = uploader(Uuid::now_v7());
+            let file = files.upload(&ada, "a.txt", None, body("a")).await.unwrap();
+
+            let attempts: Vec<_> = (0..5)
+                .map(|_| {
+                    let (files, ada) = (files.clone(), ada.clone());
+                    tokio::spawn(async move { files.delete(&ada, file.id).await })
+                })
+                .collect();
+            let mut deleted = 0;
+            for attempt in attempts {
+                match attempt.await.unwrap() {
+                    Ok(()) => deleted += 1,
+                    Err(error) => assert_eq!(error.code(), "files.file_not_found"),
+                }
+            }
+
+            assert_eq!(deleted, 1);
+            assert_eq!(events(&database).await, ["files.file_uploaded", "files.file_deleted"]);
+        })
+        .await
+        .unwrap();
+    }
+}

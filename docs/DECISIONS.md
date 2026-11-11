@@ -1390,3 +1390,37 @@ thư viện đó. Test S3 trên máy chủ giả lập chạy được ở mọi
 Đã cân nhắc: `aws-sdk-s3` — rất nặng, chỉ S3; MinIO để test — bản mã nguồn mở đã ngừng
 phát hành (dl.min.io trả 410, ngày 11/11/2026); `LocalFileSystem::new_with_prefix` —
 đòi thư mục có sẵn lúc khởi động (test và lệnh CLI sẽ tạo thư mục rác).
+
+## D-067 · API file: thân request là nội dung thô, metadata trong `files_file` — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- `POST /files?name=…` nhận **nguyên nội dung file làm thân request** (kèm
+  `Content-Type`), không nhận form multipart: đọc theo luồng thẳng vào nơi lưu, dễ gọi
+  từ máy và AI agent (`curl --data-binary`), không cần thêm thư viện. Trả `FileResponse`
+  (id, tên, loại, kích thước, SHA-256, chủ, lúc tạo). Gửi lại an toàn qua
+  `Idempotency-Key`.
+- `GET /files` (file của mình, phân trang), `GET /files/{id}`, `GET /files/{id}/content`
+  (luôn `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, `ETag` là
+  SHA-256), `DELETE /files/{id}`.
+- Permission `files.upload` (tải lên, và xem / tải về / xoá file của mình) và
+  `files.manage` (với tới file của mọi người). File người khác mà không có quyền thì
+  báo 404 như không tồn tại.
+- Bảng `files_file` (chủ chỉ giữ ID — luật kiến trúc 4); nội dung ở khoá `files/<id>`.
+  Tải lên: ghi nội dung trước, rồi dòng + event `files.file_uploaded` trong một
+  transaction, hỏng thì xoá nội dung. Xoá: xoá dòng + event `files.file_deleted` trước
+  (hai request xoá cùng lúc thì một bên nhận 404), rồi xoá nội dung; xoá nội dung hỏng
+  chỉ để lại file mồ côi ở nơi lưu (ghi log).
+- Giới hạn: `AUTOXIDE_FILES_MAX_BYTES` (mặc định 25 MiB) — module khai làm giới hạn
+  thân request của route tải lên (D-066), service còn đếm lại trong lúc đọc (cho cả
+  đường MCP sau này); `AUTOXIDE_FILES_ALLOWED_TYPES` (danh sách `loại/kiểu` hoặc
+  `loại/*`, không đặt: mọi loại) — kiểm trên `Content-Type` đã khai, trước khi đọc nội
+  dung; trả 413 `files.too_large` / 415 `files.type_not_allowed`.
+
+Lý do: một cách tải lên duy nhất, chạy theo luồng nên file lớn không tốn bộ nhớ; tải về
+luôn là attachment + nosniff nên loại đã khai không làm hại được trình duyệt dù sai.
+
+Đã cân nhắc: multipart/form-data — tiện cho form HTML nhưng cần thư viện phân tích và
+khó gọi từ máy hơn (giao diện là dự án riêng, gửi được thân thô); đoán loại theo nội
+dung (magic number) — cần thêm thư viện, mà loại khai sai không gây hại nhờ hai header
+trên; thêm sau nếu có nhu cầu.

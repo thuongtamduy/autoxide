@@ -2920,6 +2920,462 @@
         ]
       }
     },
+    "/api/v1/files": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "List your files.",
+        "description": "Requires `files.upload`. Newest first unless `order=asc`.",
+        "operationId": "files_list_files",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Order"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of your files.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_FileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `files.upload`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload a file.",
+        "description": "Requires `files.upload`. Send the raw content as the body (not a multipart form),\nits media type as `Content-Type` (default `application/octet-stream`) and its name\nin `name`. The server may limit the size (413) and the media types (415) it\naccepts. Retry safely with an `Idempotency-Key` header.",
+        "operationId": "files_upload_file",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "description": "File name, 1 to 255 characters, without `/` or `\\`. Given back on download.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "report.pdf"
+          }
+        ],
+        "requestBody": {
+          "description": "The content of the file, with any `Content-Type`.",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Uploaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The `Content-Type` is not a media type (code `files.invalid_content_type`), or the upload was cut off (code `files.upload_interrupted`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `files.upload`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file is too large; code `files.too_large` (or `payload_too_large` when `Content-Length` already says so).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "This media type is not accepted; code `files.type_not_allowed`. The message lists the accepted types.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The name is missing or invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/files/{id}": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Get the details of a file.",
+        "description": "Requires `files.upload` for your own files, `files.manage` for anyone's.",
+        "operationId": "files_get_file",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the file.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `files.upload`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No file with this id that you may see; code `files.file_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Delete a file.",
+        "description": "Requires `files.upload` for your own files, `files.manage` for anyone's.",
+        "operationId": "files_delete_file",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the file.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `files.upload`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No file with this id that you may see (or it was already deleted); code `files.file_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/files/{id}/content": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Download the content of a file.",
+        "description": "Requires `files.upload` for your own files, `files.manage` for anyone's. The\nresponse carries the file's `Content-Type`, its size as `Content-Length`, and its\nname in `Content-Disposition` (always `attachment`).",
+        "operationId": "files_download_file",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the file.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The content, with the file's own `Content-Type`.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `files.upload`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No file with this id that you may see; code `files.file_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "tags": [
@@ -3362,6 +3818,64 @@
               }
             ],
             "description": "A new API key, with its secret. The secret is shown only here."
+          }
+        }
+      },
+      "Data_FileResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "An uploaded file. The content is at `GET /api/v1/files/{id}/content`.",
+            "required": [
+              "id",
+              "name",
+              "content_type",
+              "size",
+              "sha256",
+              "owner_id",
+              "created_at"
+            ],
+            "properties": {
+              "content_type": {
+                "type": "string",
+                "description": "Media type given at upload.",
+                "example": "application/pdf"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "File name given at upload.",
+                "example": "report.pdf"
+              },
+              "owner_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The user who uploaded the file."
+              },
+              "sha256": {
+                "type": "string",
+                "description": "SHA-256 of the content, as 64 hex digits: check a download against it."
+              },
+              "size": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Size in bytes.",
+                "example": 48213,
+                "minimum": 0
+              }
+            }
           }
         }
       },
@@ -3835,6 +4349,55 @@
           }
         }
       },
+      "FileResponse": {
+        "type": "object",
+        "description": "An uploaded file. The content is at `GET /api/v1/files/{id}/content`.",
+        "required": [
+          "id",
+          "name",
+          "content_type",
+          "size",
+          "sha256",
+          "owner_id",
+          "created_at"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string",
+            "description": "Media type given at upload.",
+            "example": "application/pdf"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "File name given at upload.",
+            "example": "report.pdf"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The user who uploaded the file."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "SHA-256 of the content, as 64 hex digits: check a download against it."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Size in bytes.",
+            "example": 48213,
+            "minimum": 0
+          }
+        }
+      },
       "Health": {
         "type": "object",
         "description": "Health of the service.",
@@ -4146,6 +4709,72 @@
                   ],
                   "description": "Record that changed, as `<kind>:<id>`, e.g. `auth.user:0190…`.",
                   "example": "auth.user:01936f0e-6c9f-7cc2-8a52-2b2f4d1c1e5a"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Page_FileResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "An uploaded file. The content is at `GET /api/v1/files/{id}/content`.",
+              "required": [
+                "id",
+                "name",
+                "content_type",
+                "size",
+                "sha256",
+                "owner_id",
+                "created_at"
+              ],
+              "properties": {
+                "content_type": {
+                  "type": "string",
+                  "description": "Media type given at upload.",
+                  "example": "application/pdf"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "File name given at upload.",
+                  "example": "report.pdf"
+                },
+                "owner_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "The user who uploaded the file."
+                },
+                "sha256": {
+                  "type": "string",
+                  "description": "SHA-256 of the content, as 64 hex digits: check a download against it."
+                },
+                "size": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "Size in bytes.",
+                  "example": 48213,
+                  "minimum": 0
                 }
               }
             },

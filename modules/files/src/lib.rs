@@ -3,19 +3,35 @@
 //! Có `AUTOXIDE_FILES_S3_BUCKET` thì lưu trên S3 (hay dịch vụ tương thích S3); không có
 //! thì lưu trong thư mục `AUTOXIDE_FILES_DIR`. Module khác dùng `dyn Storage`
 //! (`autoxide_kernel::storage`) mà không cần biết file nằm ở đâu.
+//!
+//! Người dùng tải file lên, xem, tải xuống và xoá qua `/api/v1/files` (D-067); thông
+//! tin file nằm trong bảng `files_file`, có giới hạn kích thước và loại.
 
 pub mod api;
 mod config;
+mod entity;
+mod events;
+mod http;
+mod migration;
+mod permissions;
+mod service;
 mod store;
 
 use std::sync::Arc;
 
+use autoxide_kernel::access::Permission;
 use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::event::EventInfo;
+use autoxide_kernel::http::BodyLimit;
+use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
 use autoxide_kernel::storage::Storage;
+use axum::http::Method;
+use utoipa_axum::router::OpenApiRouter;
 
 use crate::config::{Backend, FilesConfig};
+use crate::service::FileService;
 use crate::store::ObjectStorage;
 
 /// Module `files`, để binary đăng ký trong `crates/app/src/modules.rs` — TRƯỚC các
@@ -28,11 +44,32 @@ pub fn module() -> impl Module {
 struct FilesModule {
     /// Có sau `configure`.
     config: Option<FilesConfig>,
+    /// Có sau `start`.
+    service: Option<Arc<FileService>>,
 }
 
 impl Module for FilesModule {
     fn name(&self) -> &'static str {
         "files"
+    }
+
+    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
+        migration::all()
+    }
+
+    fn permissions(&self) -> Vec<Permission> {
+        permissions::all()
+    }
+
+    fn events(&self) -> Vec<EventInfo> {
+        events::all()
+    }
+
+    fn body_limits(&self) -> Vec<BodyLimit> {
+        // Tải lên nhận tới giới hạn file, thay cho giới hạn chung của request.
+        let max = self.config.as_ref().map_or(0, |config| config.limits.max_bytes);
+        let bytes = usize::try_from(max).unwrap_or(usize::MAX);
+        vec![BodyLimit::new(Method::POST, "/", bytes)]
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -55,10 +92,57 @@ impl Module for FilesModule {
             }
             Backend::S3(s3) => tracing::info!(bucket = %s3.bucket, "files are stored in S3"),
         }
-        let storage = Arc::new(ObjectStorage::open(&config.backend)?);
+        let storage: Arc<dyn Storage> = Arc::new(ObjectStorage::open(&config.backend)?);
+        let outbox = context.outbox()?;
+        let database = context.database().clone();
+        self.service =
+            Some(Arc::new(FileService::new(database, storage.clone(), outbox, config.limits)));
         context.provide::<dyn Storage>(storage)
+    }
+
+    fn routes(&self) -> OpenApiRouter {
+        self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
     }
 }
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+pub(crate) mod testing {
+    //! Đồ dùng chung cho test trong crate này.
+
+    use std::sync::Arc;
+
+    use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
+    use autoxide_kernel::database::Database;
+    use autoxide_kernel::event::Outbox;
+    use autoxide_kernel::migration::{Migrator, ModuleMigrations};
+    use autoxide_testkit::TestDatabase;
+
+    use crate::config::{Backend, Limits};
+    use crate::service::FileService;
+    use crate::store::ObjectStorage;
+
+    /// Service trên database (đã migrate) của test, lưu file trong một thư mục tạm.
+    pub async fn service(test: &TestDatabase, limits: Limits) -> (Arc<FileService>, Database) {
+        let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
+        let mut reader = ConfigReader::new(&source);
+        let config = Config::read(&mut reader);
+        let (config, _) = reader.finish(config).unwrap();
+        let database = Database::connect(&config.database).await.unwrap();
+        Migrator::new(vec![ModuleMigrations::new("files", crate::migration::all())])
+            .unwrap()
+            .up(&database)
+            .await
+            .unwrap();
+        let dir = std::env::temp_dir().join(format!("autoxide-files-{}", uuid::Uuid::now_v7()));
+        let storage = Arc::new(ObjectStorage::open(&Backend::Local { dir }).unwrap());
+        let outbox = Outbox::standalone("files");
+        (Arc::new(FileService::new(database.clone(), storage, outbox, limits)), database)
+    }
+
+    pub fn no_limits() -> Limits {
+        Limits { max_bytes: 1024 * 1024, allowed_types: None }
+    }
+}

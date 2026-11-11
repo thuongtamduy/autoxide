@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–7 xong; đang ở bước 8**, mục "Tải lên, tải xuống, xoá; metadata trong database".
+Trạng thái: **bước 0–8 xong; đang ở bước 9**, mục "Endpoint MCP qua HTTP, xác thực bằng API key hoặc access token".
 
 ## 0. Khung dự án
 
@@ -83,8 +83,8 @@ Trạng thái: **bước 0–7 xong; đang ở bước 8**, mục "Tải lên, t
 ## 8. Lưu file
 
 - [x] Trait chung; cài đặt ổ đĩa cục bộ và S3
-- [ ] Tải lên, tải xuống, xoá; metadata trong database
-- [ ] Giới hạn kích thước và loại file
+- [x] Tải lên, tải xuống, xoá; metadata trong database
+- [x] Giới hạn kích thước và loại file
 
 ## 9. MCP endpoint
 

@@ -1,1 +1,7 @@
-{}
+{
+  "files.file_not_found": "Không có file `{id}`.",
+  "files.invalid_content_type": "Header `Content-Type` phải là một loại nội dung như `application/pdf`.",
+  "files.too_large": "File lớn hơn {max} byte, mức lớn nhất máy chủ này nhận.",
+  "files.type_not_allowed": "Không tải lên được file loại `{type}` ở đây. Các loại được nhận: {allowed}.",
+  "files.upload_interrupted": "Việc tải lên bị ngắt trước khi nhận đủ file. Hãy gửi lại."
+}

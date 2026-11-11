@@ -153,6 +153,13 @@ Each client address may make 600 requests a minute by default
 example to `X-Forwarded-For`) so that clients are told apart by their own address
 rather than the proxy's.
 
+Users with the `files.upload` permission upload a file by sending its raw content to
+`POST /api/v1/files?name=report.pdf` with its `Content-Type`, then list, download
+(`GET /api/v1/files/{id}/content`) and delete their own files; `files.manage` reaches
+everyone's. Uploads are limited to 25 MiB (`AUTOXIDE_FILES_MAX_BYTES`) and, when you
+set `AUTOXIDE_FILES_ALLOWED_TYPES` (for example `image/*,application/pdf`), to those
+media types.
+
 Uploaded files are stored in `data/files` until you set `AUTOXIDE_FILES_S3_BUCKET`
 (with `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_ENDPOINT_URL`
 for an S3-compatible service such as Cloudflare R2). Back up `data/files` together with

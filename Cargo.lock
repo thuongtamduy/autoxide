@@ -432,12 +432,23 @@ dependencies = [
  "async-trait",
  "autoxide-kernel",
  "autoxide-testkit",
+ "axum",
  "bytes",
+ "chrono",
  "futures-util",
+ "metrics",
  "object_store",
  "reqwest",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
  "tokio",
+ "tower",
  "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
 ]
 
 [[package]]

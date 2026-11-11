@@ -10,16 +10,27 @@ publish.workspace = true
 [dependencies]
 async-trait.workspace = true
 autoxide-kernel.workspace = true
+axum.workspace = true
 bytes.workspace = true
+chrono.workspace = true
 futures-util.workspace = true
+metrics.workspace = true
 object_store.workspace = true
 # Không gọi trực tiếp: khai để chọn TLS cho `object_store` (xem Cargo.toml gốc).
 reqwest.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 autoxide-testkit.workspace = true
+tower.workspace = true
 
 [lints]
 workspace = true

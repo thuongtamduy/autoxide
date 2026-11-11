@@ -150,6 +150,13 @@ Mặc định mỗi địa chỉ client được gửi 600 request mỗi phút
 lần sai. Chạy sau reverse proxy thì đặt `AUTOXIDE_HTTP_CLIENT_IP_HEADER` (ví dụ
 `X-Forwarded-For`) để phân biệt client theo địa chỉ của chính họ thay vì của proxy.
 
+Người dùng có permission `files.upload` tải file lên bằng cách gửi nguyên nội dung tới
+`POST /api/v1/files?name=report.pdf` kèm `Content-Type` của nó, rồi xem danh sách, tải
+xuống (`GET /api/v1/files/{id}/content`) và xoá file của mình; `files.manage` với tới
+file của mọi người. File tải lên tối đa 25 MiB (`AUTOXIDE_FILES_MAX_BYTES`) và, khi bạn
+đặt `AUTOXIDE_FILES_ALLOWED_TYPES` (ví dụ `image/*,application/pdf`), chỉ thuộc các loại
+đó.
+
 File tải lên được lưu trong `data/files` cho tới khi bạn đặt `AUTOXIDE_FILES_S3_BUCKET`
 (kèm `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, và `AWS_ENDPOINT_URL`
 cho dịch vụ tương thích S3 như Cloudflare R2). Backup `data/files` cùng lúc với
