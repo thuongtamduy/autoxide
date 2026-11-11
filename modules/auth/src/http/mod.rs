@@ -124,7 +124,14 @@ pub(crate) mod test_support {
             &config.http,
             OpenApiRouter::new(),
             vec![("auth", super::routes(state))],
-            Some(services.authenticator.clone()),
+            autoxide_kernel::http::Extras {
+                authenticator: Some(services.authenticator.clone()),
+                translations: autoxide_kernel::i18n::Translations::new(vec![(
+                    "auth",
+                    vec![("vi", include_str!("../../locales/vi.json"))],
+                )])
+                .unwrap(),
+            },
         )
         .router;
         (router, services)

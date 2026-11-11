@@ -28,6 +28,7 @@ use crate::config::{ConfigReader, Invalid};
 use crate::database::Database;
 use crate::error::Error;
 use crate::event::{Dispatcher, EventCatalog, EventInfo, Outbox, Subscription};
+use crate::i18n::Translations;
 use crate::job::{JobHandler, JobQueue, JobRegistration, Schedule, Worker};
 use crate::migration::{MigrationError, Migrator, ModuleMigrations};
 
@@ -124,6 +125,13 @@ pub trait Module: Send + Sync {
     /// Lịch định kỳ của module: mỗi lịch đưa một job (loại do chính module chạy) vào
     /// hàng đợi sau mỗi khoảng. Gọi sau `start`.
     fn schedules(&self) -> Vec<Schedule> {
+        Vec::new()
+    }
+
+    /// Bản dịch thông báo lỗi của module: `(ngôn ngữ, nội dung JSON)`, thường là
+    /// `vec![("vi", include_str!("../locales/vi.json"))]`. Mỗi `code` lỗi của module
+    /// phải có bản dịch (`cargo xtask check` kiểm).
+    fn translations(&self) -> Vec<(&'static str, &'static str)> {
         Vec::new()
     }
 
@@ -273,6 +281,7 @@ pub struct Modules {
     modules: Vec<Box<dyn Module>>,
     permissions: PermissionCatalog,
     events: EventCatalog,
+    translations: Translations,
     /// Chuông đánh thức bộ phát event, dùng chung cho mọi `Outbox`.
     wake: Arc<tokio::sync::Notify>,
     /// Các trait module đã công bố; có sau [`start`](Self::start).
@@ -295,11 +304,18 @@ impl Modules {
             problems.extend(errors);
             EventCatalog::default()
         });
+        let declared =
+            modules.iter().map(|module| (module.name(), module.translations())).collect();
+        let translations = Translations::new(declared).unwrap_or_else(|errors| {
+            problems.extend(errors);
+            Translations::default()
+        });
         if problems.is_empty() {
             Ok(Modules {
                 modules,
                 permissions,
                 events,
+                translations,
                 wake: Arc::new(tokio::sync::Notify::new()),
                 apis: Apis::default(),
             })
@@ -363,6 +379,11 @@ impl Modules {
     /// Mọi permission của các module đã đăng ký.
     pub fn permissions(&self) -> &PermissionCatalog {
         &self.permissions
+    }
+
+    /// Bản dịch thông báo lỗi của kernel và mọi module.
+    pub fn translations(&self) -> &Translations {
+        &self.translations
     }
 
     /// Mọi loại event của các module đã đăng ký.

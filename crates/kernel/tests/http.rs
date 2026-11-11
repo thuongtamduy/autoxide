@@ -106,7 +106,7 @@ fn api_with(config: &HttpConfig) -> Api {
         config,
         OpenApiRouter::new(),
         vec![("notes", notes_routes()), ("empty", OpenApiRouter::new())],
-        None,
+        http::Extras::default(),
     )
 }
 
@@ -483,7 +483,12 @@ async fn bo_kiem_tai_lieu_bat_endpoint_thieu_mo_ta() {
     assert_eq!(http::lint(&api_with(&default_config()).openapi), Vec::<String>::new());
 
     let routes = notes_routes().routes(routes!(undocumented)).routes(routes!(duplicate::duplicate));
-    let api = http::build(&default_config(), OpenApiRouter::new(), vec![("notes", routes)], None);
+    let api = http::build(
+        &default_config(),
+        OpenApiRouter::new(),
+        vec![("notes", routes)],
+        http::Extras::default(),
+    );
 
     assert_eq!(
         http::lint(&api.openapi),
@@ -621,4 +626,52 @@ async fn tat_rate_limiting_thi_khong_gioi_han() {
         let response = app.clone().oneshot(from_client("/api/v1/notes", [192, 0, 2, 1])).await;
         assert_eq!(response.unwrap().status(), StatusCode::OK);
     }
+}
+
+fn localized_app() -> Router {
+    let extras = http::Extras {
+        translations: autoxide_kernel::i18n::Translations::new(vec![(
+            "notes",
+            vec![("vi", r#"{"notes.note_not_found": "Không có ghi chú {id}."}"#)],
+        )])
+        .unwrap(),
+        ..Default::default()
+    };
+    http::build(&default_config(), OpenApiRouter::new(), vec![("notes", notes_routes())], extras)
+        .router
+}
+
+fn with_language(path: &str, language: Option<&str>) -> Request<Body> {
+    let mut request = Request::builder().uri(path);
+    if let Some(language) = language {
+        request = request.header(header::ACCEPT_LANGUAGE, language);
+    }
+    request.body(Body::empty()).unwrap()
+}
+
+#[tokio::test]
+async fn loi_duoc_dich_theo_accept_language() {
+    let app = localized_app();
+
+    let english = send(app.clone(), with_language("/api/v1/notes/7", None)).await;
+    assert_eq!(english.headers()[header::CONTENT_LANGUAGE], "en");
+    let problem_en = problem(english, 404, "notes.note_not_found").await;
+    assert_eq!(problem_en.detail, "Note 7 does not exist.");
+
+    let vietnamese =
+        send(app.clone(), with_language("/api/v1/notes/7", Some("vi-VN,vi;q=0.9,en;q=0.5"))).await;
+    assert_eq!(vietnamese.headers()[header::CONTENT_LANGUAGE], "vi");
+    let problem_vi = problem(vietnamese, 404, "notes.note_not_found").await;
+    assert_eq!(problem_vi.detail, "Không có ghi chú 7.");
+    // `code` không đổi theo ngôn ngữ: máy vẫn rẽ nhánh như cũ.
+    assert_eq!(problem_vi.code, problem_en.code);
+
+    // Lỗi do thư viện sinh ra (không có route) cũng được dịch, bằng bản dịch của kernel.
+    let missing = send(app.clone(), with_language("/api/v1/nope", Some("vi"))).await;
+    let problem_missing = problem(missing, 404, "not_found").await;
+    assert!(problem_missing.detail.starts_with("Không có endpoint này"), "{problem_missing:?}");
+
+    // Ngôn ngữ chưa hỗ trợ: tiếng Anh.
+    let french = send(app, with_language("/api/v1/notes/7", Some("fr"))).await;
+    assert_eq!(french.headers()[header::CONTENT_LANGUAGE], "en");
 }

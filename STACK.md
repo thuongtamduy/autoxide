@@ -79,7 +79,7 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | Event        | Tự viết: ghi vào database cùng transaction với thay đổi rồi mới phát        |
 | Audit log      | Tự viết: bảng chỉ thêm — ai, làm gì, bản ghi nào, lúc nào, trước / sau      |
 | Lưu file       | `object_store` 0.14 — một trait chung cho ổ đĩa cục bộ và S3 / R2 / MinIO     |
-| i18n    | `rust-i18n` 4.2 — thông báo lỗi và hệ thống (vi, en), chọn theo header      |
+| i18n    | Tự viết: `locales/<ngôn ngữ>.json` mỗi crate, dịch theo `code` lỗi ở lớp HTTP, chọn theo `Accept-Language`; không dùng `rust-i18n` (D-057) |
 | Idempotency    | Tự viết: key do client gửi, lưu kết quả lệnh ghi để gửi lại không tạo trùng |
 | MCP endpoint   | `rmcp` 3.9 (SDK chính thức của Model Context Protocol) — module khai báo tool, gắn permission |
 | Email          | `lettre` — SMTP sau một trait, gửi qua job queue; chưa cấu hình SMTP thì ghi ra file |

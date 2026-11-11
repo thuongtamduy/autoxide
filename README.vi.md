@@ -31,7 +31,8 @@ thêm — ai, làm gì, bản ghi nào, lúc nào, trước và sau — xem tạ
 permission `audit.read`. Job chạy nền cũng nằm trong database (không cần Redis): lỗi
 thì thử lại với backoff, hỏng hẳn thì được giữ lại (`autoxide jobs failed`, `autoxide
 jobs retry`), và chạy theo lịch khi module yêu cầu. `AUTOXIDE_PROCESS_ROLE` tách một
-bản triển khai thành tiến trình API và tiến trình worker.
+bản triển khai thành tiến trình API và tiến trình worker. Thông báo lỗi có tiếng Anh và
+tiếng Việt, chọn bằng header `Accept-Language`.
 
 Core sẽ gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 

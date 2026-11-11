@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–5 xong; đang ở bước 6**, mục "Thông báo lỗi và hệ thống theo i18n key (vi, en), chọn theo header; mặc định tiếng Anh".
+Trạng thái: **bước 0–5 xong; đang ở bước 6**, mục "Dịch cả thông báo của từng trường (`errors[].detail`)".
 
 ## 0. Khung dự án
 
@@ -62,10 +62,12 @@ Trạng thái: **bước 0–5 xong; đang ở bước 6**, mục "Thông báo l
 
 ## 6. i18n và idempotency
 
-- [ ] Thông báo lỗi và hệ thống theo i18n key (vi, en), chọn theo header; mặc định tiếng Anh
+- [x] Thông báo lỗi và hệ thống theo i18n key (vi, en), chọn theo header; mặc định tiếng Anh
       (`code` của lỗi là i18n key, câu tiếng Anh mặc định đã nằm ở chỗ tạo lỗi — D-039;
       việc còn lại: bản dịch vi tra theo `code`, chọn ngôn ngữ theo header, và gate kiểm mọi
       `code` đều có bản dịch)
+- [ ] Dịch cả thông báo của từng trường (`errors[].detail`): `FieldError` mang chỗ điền như
+      `Error`, bản dịch theo `code` của trường
 - [ ] Idempotency key cho lệnh ghi (test gửi trùng đồng thời)
 - [ ] Đánh dấu endpoint deprecated
 

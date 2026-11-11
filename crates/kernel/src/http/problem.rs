@@ -6,13 +6,14 @@
 //! dạng, để client chỉ phải biết đúng một kiểu lỗi.
 
 use std::any::Any;
+use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use tower_http::catch_panic::ResponseForPanic;
 
-use crate::error::Error;
+use crate::error::{Error, ErrorKind};
 use crate::response::{PROBLEM_CONTENT_TYPE, Problem};
 
 /// Thân lỗi dạng chữ dài hơn mức này thì không chép vào `detail`.
@@ -42,9 +43,13 @@ pub(super) async fn normalize(response: Response) -> Response {
         title: status.canonical_reason().unwrap_or("Error").to_owned(),
         status: status.as_u16(),
         code: code_for(status).to_owned(),
-        detail,
+        detail: detail.clone(),
         errors: Vec::new(),
     };
+    // Gắn lỗi tương ứng vào extensions, như mọi lỗi khác: lớp chọn ngôn ngữ dịch theo
+    // `code` của nó. (Loại lỗi ở đây không quyết định gì: trạng thái giữ như response.)
+    let kind = if status.is_server_error() { ErrorKind::Internal } else { ErrorKind::BadRequest };
+    parts.extensions.insert(Arc::new(Error::new(kind, code_for(status), detail)));
     // Giữ các header khác của response gốc (vd `allow` của lỗi 405).
     parts.headers.remove(header::CONTENT_LENGTH);
     parts.headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(PROBLEM_CONTENT_TYPE));
@@ -61,6 +66,9 @@ fn is_problem(response: &Response) -> bool {
 }
 
 /// Mã lỗi ổn định cho một mã trạng thái HTTP do thư viện trả.
+/// Mã cho trạng thái lỗi không có trong bảng dưới.
+const FALLBACK_CODE: &str = "http_error";
+
 fn code_for(status: StatusCode) -> &'static str {
     match status.as_u16() {
         400 => "bad_request",
@@ -82,7 +90,7 @@ fn code_for(status: StatusCode) -> &'static str {
         501 => "not_implemented",
         503 => "unavailable",
         504 => "gateway_timeout",
-        _ => "http_error",
+        _ => FALLBACK_CODE,
     }
 }
 

@@ -253,8 +253,11 @@ sẵn lệnh.
   (`code`) là hợp đồng với client, đổi mã là thay đổi phá vỡ. Mã viết `snake_case`;
   lỗi của module mang tiền tố `<module>.` (vd `notes.title_taken`).
 - Thông báo cho người dùng đi qua i18n key, không viết câu cứng: **`code` của lỗi
-  chính là i18n key**; câu tiếng Anh ở chỗ tạo lỗi là bản mặc định, bản dịch tra
-  theo `code` (D-039). Client không nêu ngôn ngữ thì trả **tiếng Anh**.
+  chính là i18n key**; câu tiếng Anh ở chỗ tạo lỗi là bản mặc định, bản dịch tiếng
+  Việt nằm ở `locales/vi.json` của crate (cùng chỗ điền `{tên}`), khai qua
+  `Module::translations` (D-039, D-057). Thêm `code` mới thì thêm bản dịch —
+  `cargo xtask check` chặn `code` thiếu bản dịch. Client không nêu ngôn ngữ thì trả
+  **tiếng Anh**.
 - Response chỉ có ba hình dạng: `Data<T>` (`{"data": …}`), `Page<T>`
   (`{"data": […], "pagination": {…}}`) và lỗi `Problem` (RFC 9457). Danh sách lấy
   bằng `fetch_page` với tham số `limit` / `cursor` / `order`; không tự viết

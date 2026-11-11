@@ -4,6 +4,7 @@
 //! `boundaries.rs`). `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
 
 mod boundaries;
+mod i18n;
 mod workspace;
 
 use std::process::ExitCode;
@@ -32,7 +33,10 @@ fn check() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let violations = match boundaries::check_workspace(&workspace) {
+    let violations = match boundaries::check_workspace(&workspace).and_then(|mut violations| {
+        violations.extend(i18n::check_translations(&workspace)?);
+        Ok(violations)
+    }) {
         Ok(violations) => violations,
         Err(error) => {
             eprintln!("xtask check: {error}");

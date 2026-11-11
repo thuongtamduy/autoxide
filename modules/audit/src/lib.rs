@@ -51,6 +51,10 @@ impl Module for AuditModule {
         Ok(())
     }
 
+    fn translations(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("vi", include_str!("../locales/vi.json"))]
+    }
+
     fn permissions(&self) -> Vec<Permission> {
         vec![http::AUDIT_READ]
     }

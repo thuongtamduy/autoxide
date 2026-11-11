@@ -1132,3 +1132,32 @@ thể hỏng giữa chừng, mà `failed_at` đã đủ để lọc.
 Đã cân nhắc: cú pháp cron cho lịch — cần thêm thư viện hoặc tự viết bộ phân tích,
 chưa có nhu cầu (thêm khi có lịch "3 giờ sáng mỗi ngày"); API REST cho dead-letter
 queue — core chưa có permission cho người vận hành hệ thống, CLI đủ cho người cài.
+
+## D-057 · i18n: bản dịch theo `code`, dịch ở lớp HTTP — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- **Không dùng `rust-i18n`** (STACK.md ghi trước đây). Nó dịch bằng macro `t!` trong
+  từng crate lúc biên dịch; ở đây thông báo cần dịch là lỗi đã tạo xong ở service,
+  dịch ở MỘT chỗ (lớp HTTP) theo `code`, với bản dịch do từng module mang theo. Phần đó
+  khoảng 150 dòng tự viết (`crates/kernel/src/i18n.rs`).
+- **Bản dịch:** mỗi crate có `locales/vi.json` (`{"code": "câu"}`), cùng chỗ điền `{tên}`
+  như câu tiếng Anh; module khai qua `Module::translations` (mặc định rỗng — D-038).
+  Module chỉ được dịch `code` của mình (`<module>.…`); kernel dịch `code` không tiền tố.
+  File sai là lỗi khởi động. Câu tiếng Anh vẫn nằm ở chỗ tạo lỗi (D-039).
+- **Chọn ngôn ngữ:** lớp HTTP `localize` đọc `Accept-Language` (có xét `q`), dịch
+  `detail` của Problem theo `code` và giá trị chỗ điền của chính lỗi đó, gắn
+  `Content-Language`. Không nêu, hay nêu ngôn ngữ chưa có: tiếng Anh (D-027). Bản dịch
+  dùng chỗ điền mà lỗi không có giá trị thì rơi về tiếng Anh, không bao giờ lộ `{tên}`.
+  Lỗi do thư viện sinh ra (404, 405…) cũng mang `Error` trong extensions nên dịch được.
+- **Gate:** `cargo xtask check` đọc mã nguồn kernel và module (bỏ chú thích và phần
+  `#[cfg(test)]`), tìm `code` ở mọi chỗ tạo lỗi, báo `code` thiếu bản dịch, bản dịch
+  thừa, và `code` của module thiếu tiền tố `<module>.`.
+
+Giới hạn đã chấp nhận ở mục này: `title` (cụm chuẩn của mã HTTP) và thông báo của từng
+trường (`errors[].detail`) vẫn tiếng Anh. Thông báo trường được thêm thành mục riêng
+của lộ trình; `code` của trường (`length`, `email`…) đã ổn định cho máy.
+
+Đã cân nhắc: dịch ở chỗ tạo lỗi (service biết ngôn ngữ) — mọi service phải nhận thêm
+ngôn ngữ, và lỗi trong log đổi theo ngôn ngữ người gọi; file TOML/YAML — thêm thư viện
+đọc file trong khi JSON đã có `serde_json`.

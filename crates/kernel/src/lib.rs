@@ -10,6 +10,7 @@ pub mod database;
 pub mod error;
 pub mod event;
 pub mod http;
+pub mod i18n;
 pub mod job;
 pub mod logging;
 pub mod metrics;

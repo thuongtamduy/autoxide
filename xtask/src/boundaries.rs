@@ -380,7 +380,7 @@ fn read(path: &Path) -> Result<String, String> {
 }
 
 /// Mọi file `.rs` dưới `src_dir`, trả về dạng `src/...` dùng `/`, đã sắp xếp.
-fn rust_files(src_dir: &Path) -> Result<Vec<String>, String> {
+pub(crate) fn rust_files(src_dir: &Path) -> Result<Vec<String>, String> {
     let mut files = Vec::new();
     collect_rust_files(src_dir, "src", &mut files)?;
     files.sort();

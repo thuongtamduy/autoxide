@@ -331,6 +331,23 @@ mod tests {
             assert_eq!(status, StatusCode::UNAUTHORIZED);
             assert_eq!(problem["code"], "auth.missing_token");
 
+            // Cùng lỗi, bằng tiếng Việt khi client yêu cầu.
+            let request = axum::http::Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/login")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::ACCEPT_LANGUAGE, "vi")
+                .body(axum::body::Body::from(
+                    json!({"email": "ada@example.com", "password": "wrong password"}).to_string(),
+                ))
+                .unwrap();
+            let response = tower::ServiceExt::oneshot(app.clone(), request).await.unwrap();
+            assert_eq!(response.headers()[header::CONTENT_LANGUAGE], "vi");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+            let vi: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(vi["code"], "auth.invalid_credentials");
+            assert_eq!(vi["detail"], "Email hoặc mật khẩu không đúng.");
+
             let empty = json!({"email": "", "password": ""});
             let (status, _, problem) = call(&app, "POST", "/login", None, Some(empty)).await;
             assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);

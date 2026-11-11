@@ -33,7 +33,8 @@ what, which record, when, before and after — readable at `/api/v1/audit` with 
 `audit.read` permission. Background jobs live in the database too (no Redis): retried
 with backoff, kept when they fail for good (`autoxide jobs failed`, `autoxide jobs
 retry`), and run on a schedule when a module asks. `AUTOXIDE_PROCESS_ROLE` splits a
-deployment into API processes and worker processes.
+deployment into API processes and worker processes. Error messages come in English or
+Vietnamese, chosen with the `Accept-Language` header.
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 

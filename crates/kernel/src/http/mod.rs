@@ -14,14 +14,16 @@
 //! 2. **log** — mỗi request một dòng log khi xong; lỗi 5xx kèm nguyên nhân gốc;
 //! 3. **CORS** — trình duyệt ở origin nào được gọi;
 //! 4. **rate limiting** — mỗi địa chỉ client chỉ được gửi chừng ấy request mỗi phút;
-//! 5. **chuẩn hoá lỗi** — mọi response lỗi đều là Problem Details (RFC 9457), kể
+//! 5. **ngôn ngữ** — `Accept-Language` chọn ngôn ngữ của `detail` trong lỗi;
+//! 6. **chuẩn hoá lỗi** — mọi response lỗi đều là Problem Details (RFC 9457), kể
 //!    cả lỗi do thư viện sinh ra (404, 405, 413…);
-//! 6. **bắt panic** — handler panic thành lỗi 500 thay vì đứt kết nối;
-//! 7. **timeout** — request chạy quá lâu bị cắt, trả 503;
-//! 8. **giới hạn body** — body quá lớn bị từ chối, trả 413.
+//! 7. **bắt panic** — handler panic thành lỗi 500 thay vì đứt kết nối;
+//! 8. **timeout** — request chạy quá lâu bị cắt, trả 503;
+//! 9. **giới hạn body** — body quá lớn bị từ chối, trả 413.
 
 mod extract;
 mod health;
+mod language;
 mod log;
 mod metrics;
 mod openapi;
@@ -50,6 +52,7 @@ use utoipa_scalar::{Scalar, Servable};
 use crate::access::Authenticator;
 use crate::config::{CorsOrigins, HttpConfig};
 use crate::error::Error;
+use crate::i18n::Translations;
 
 pub use extract::ValidJson;
 pub use health::{Health, health_routes};
@@ -71,14 +74,23 @@ pub struct Api {
 /// route `root` ở gốc (ngoài `/api/v1`, vd [`health_routes`]), và bọc các lớp xử lý
 /// chung quanh tất cả.
 ///
-/// `authenticator`: bộ xác thực một module đã công bố; handler nhận
-/// [`Principal`](crate::access::Principal) dùng nó. `None`: chưa module nào xác
-/// thực — handler cần đăng nhập trả lỗi 500 nói rõ thiếu gì.
+/// Những thứ dùng chung cho mọi request, ngoài route.
+#[derive(Clone, Default)]
+pub struct Extras {
+    /// Bộ xác thực một module đã công bố; handler nhận
+    /// [`Principal`](crate::access::Principal) dùng nó. `None`: chưa module nào xác
+    /// thực — handler cần đăng nhập trả lỗi 500 nói rõ thiếu gì.
+    pub authenticator: Option<Arc<dyn Authenticator>>,
+    /// Bản dịch thông báo lỗi (mặc định: chỉ bản dịch của kernel thì dùng
+    /// `Translations::new(Vec::new())`; rỗng thì mọi lỗi bằng tiếng Anh).
+    pub translations: Translations,
+}
+
 pub fn build(
     config: &HttpConfig,
     root: OpenApiRouter,
     modules: Vec<(&'static str, OpenApiRouter)>,
-    authenticator: Option<Arc<dyn Authenticator>>,
+    extras: Extras,
 ) -> Api {
     let mut api = OpenApiRouter::new();
     for (name, mut routes) in modules {
@@ -104,13 +116,14 @@ pub fn build(
         router = router.merge(Scalar::with_url(DOCS_PATH, openapi.clone()));
     }
 
-    if let Some(authenticator) = authenticator {
+    if let Some(authenticator) = extras.authenticator {
         // Đặt bộ xác thực vào "extensions" của mọi request, nơi extractor
         // `Principal` tìm nó.
         router = router.layer(Extension(authenticator));
     }
 
     // `None` khi rate limiting bị tắt; lớp vẫn có mặt và cho mọi request đi qua.
+    let translations = Arc::new(extras.translations);
     let limiter = rate_limit::RateLimiter::new(config.rate_limit, config.client_ip_header.clone())
         .map(Arc::new);
     let request_timeout = config.request_timeout;
@@ -124,6 +137,10 @@ pub fn build(
         }))
         .layer(CatchPanicLayer::custom(problem::PanicToProblem))
         .layer(middleware::map_response(problem::normalize))
+        // NGOÀI lớp chuẩn hoá: mọi lỗi đã là Problem kèm `Error`, sẵn để dịch.
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            language::localize(translations.clone(), request, next)
+        }))
         // TRONG lớp CORS: request preflight của trình duyệt không bị đếm, còn response
         // 429 vẫn mang header CORS để trang web đọc được lỗi.
         .layer(middleware::from_fn(move |request: Request, next: Next| {

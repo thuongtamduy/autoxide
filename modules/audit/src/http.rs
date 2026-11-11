@@ -200,7 +200,10 @@ mod tests {
             &config.http,
             OpenApiRouter::new(),
             vec![("audit", routes(service))],
-            Some(authenticator),
+            autoxide_kernel::http::Extras {
+                authenticator: Some(authenticator),
+                ..Default::default()
+            },
         )
         .router;
         (router, crate::recorder::Recorder::new(database))

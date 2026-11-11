@@ -48,7 +48,13 @@ fn app(authenticator: Option<Arc<dyn Authenticator>>) -> Router {
     let config = HttpConfig::read(&mut reader);
     let config = reader.finish(config).unwrap().0;
     let routes = OpenApiRouter::new().routes(routes!(write));
-    http::build(&config, OpenApiRouter::new(), vec![("notes", routes)], authenticator).router
+    http::build(
+        &config,
+        OpenApiRouter::new(),
+        vec![("notes", routes)],
+        http::Extras { authenticator, ..Default::default() },
+    )
+    .router
 }
 
 async fn call(app: Router, authorization: Option<&str>) -> (StatusCode, serde_json::Value) {

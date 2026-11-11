@@ -84,7 +84,8 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
     } else {
         (Vec::new(), None)
     };
-    let api = http::build(&config.http, root, routes, authenticator);
+    let extras = http::Extras { authenticator, translations: modules.translations().clone() };
+    let api = http::build(&config.http, root, routes, extras);
     Ok(Runtime { config, database, modules, api, dispatcher, worker })
 }
 

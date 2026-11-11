@@ -133,6 +133,10 @@ impl Module for AuthModule {
         Ok(())
     }
 
+    fn translations(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("vi", include_str!("../locales/vi.json"))]
+    }
+
     fn permissions(&self) -> Vec<Permission> {
         permissions::all()
     }

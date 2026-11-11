@@ -45,6 +45,9 @@ stable `code` field, never on `detail`. Validation problems list every invalid f
 - **Authentication**: endpoints that need it list the `bearer` security scheme. Send \
 `Authorization: Bearer <access token>`. A `401` response carries `WWW-Authenticate: Bearer`; \
 its `code` says whether the token is missing, invalid or expired.
+- **Language**: send `Accept-Language` (e.g. `vi`) to get the `detail` of errors in that \
+language; English (`en`) by default and for unsupported languages. Responses carry \
+`Content-Language`. Codes never change with the language.
 - **Rate limits**: too many requests from one address are answered with `429` (code \
 `rate_limited`) and a `Retry-After` header giving the seconds to wait.
 - **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote \
