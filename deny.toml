@@ -1,0 +1,53 @@
+# cargo-deny: kiểm license, lỗ hổng đã công bố và nguồn của mọi thư viện.
+# Chạy tay: cargo deny check        (./gate.sh chạy lệnh này)
+
+[graph]
+# Chỉ xét các nền tảng Autoxide hỗ trợ; bỏ qua thư viện chỉ dùng cho nền tảng khác.
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-unknown-linux-musl",
+  "aarch64-unknown-linux-musl",
+  "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+]
+
+[advisories]
+# Mặc định: lỗ hổng và thư viện bị bỏ hoang đều là lỗi. Ngoại lệ phải ghi lý do
+# ở đây VÀ ở docs/DECISIONS.md. Gate chạy với `-D advisory-not-detected`: ngoại
+# lệ không còn cần nữa thì gate đỏ cho tới khi gỡ dòng đó đi.
+ignore = [
+  { id = "RUSTSEC-2026-0459", reason = "SQLite bundled by libsqlite3-sys < 0.39; sqlx-sqlite 0.9.0 (latest) requires < 0.38, so no fixed version can be selected yet. Only exploitable through a database file supplied by an untrusted party, which Autoxide never opens. See docs/DECISIONS.md D-032." },
+]
+
+[licenses]
+# Autoxide phát hành theo MIT OR Apache-2.0 (D-021). Chỉ nhận thư viện có license
+# cho phép dùng trong sản phẩm như vậy; license copyleft (GPL, AGPL, LGPL) bị từ
+# chối vì không nằm trong danh sách.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  # Bảng dữ liệu Unicode (các crate icu_*, dùng khi xử lý URL).
+  "Unicode-3.0",
+  # Danh sách chứng chỉ gốc của Mozilla (webpki-roots, dùng bởi rustls).
+  "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+# Hai phiên bản của cùng một thư viện làm binary phình ra nhưng không sai; với
+# các thư viện nền (axum, sqlx, http, tower) thì `cargo tree -d` là chỗ kiểm.
+multiple-versions = "allow"
+# `*` làm bản build không lặp lại được.
+wildcards = "deny"
+# Crate nội bộ phụ thuộc nhau bằng `path`, không có phiên bản — được phép.
+allow-wildcard-paths = true
+
+[sources]
+# Chỉ lấy thư viện từ crates.io: không git, không registry lạ.
+unknown-registry = "deny"
+unknown-git = "deny"
