@@ -1057,3 +1057,37 @@ quyết định có cần nhánh riêng không (D-009).
 phát event trong bộ nhớ ngay sau commit — mất event khi tiến trình chết giữa commit và
 lúc phát; mỗi bên nhận một dòng theo dõi riêng — chính xác hơn khi giao lại nhưng nhân
 số dòng theo số bên nhận, chưa cần.
+
+## D-055 · Audit log là một module nhận mọi event — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- **Module `audit`** (`modules/audit`) đăng ký nhận MỌI event (`Subscription::ALL`) và
+  ghi mỗi event thành một dòng `audit_entry`: module, hành động (tên event), người làm
+  (người dùng, API key; trống là hệ thống), bản ghi (`subject`), trước / sau, thời điểm
+  xảy ra và thời điểm ghi. Không module nào gọi audit trực tiếp; thêm module mới mà
+  phát event thì tự có audit, không sửa audit.
+- **Khoá chính của `audit_entry` là ID của event** (UUIDv7 sinh lúc xảy ra): event
+  giao lại (giao ít nhất một lần, D-054) thì dòng đã có — bỏ qua; sắp theo ID là sắp
+  theo thời gian xảy ra.
+- **Quy ước payload "trước / sau":** event mang `{"before": …, "after": …}` thì hai phần
+  vào cột `before` / `after`, phần còn lại vào `details`. Mọi event của `auth` theo quy
+  ước này; event không bao giờ chứa mật khẩu, hash, secret TOTP, token, API key hay
+  recovery code (có test kiểm).
+- **Chỉ thêm:** code của module không có lệnh sửa hay xoá dòng audit. Không dùng
+  trigger chặn ở database vì cú pháp trigger khác nhau giữa SQLite và Postgres (luật
+  số một); người có quyền ghi thẳng vào database vẫn sửa được — chuỗi băm chống sửa để
+  sau (D-008).
+- **Module `auth` phát event cho mọi thay đổi:** tạo / sửa người dùng, đổi mật khẩu,
+  đăng nhập / đăng xuất, phát hiện dùng lại refresh token, tạo / sửa / xoá role, đổi
+  role của người dùng, tạo / thu hồi API key, bật / tắt MFA, sinh lại recovery code.
+  Service nhận thêm tham số `Actor`: handler truyền `Actor::from(&principal)`, lệnh CLI
+  và tự đăng ký truyền `Actor::system()`.
+
+Lý do: luật kiến trúc 3 ("việc phụ đi qua event") và yêu cầu audit "ai, làm gì, bản
+ghi nào, lúc nào, trước / sau" (lộ trình bước 4). Audit ghi sau khi commit (qua bộ phát)
+chứ không cùng transaction, nhưng không thể mất: event đã nằm trong database cùng
+transaction với thay đổi.
+
+Đã cân nhắc: mỗi module tự ghi audit — lặp code ở mọi module và dễ quên; audit trong
+kernel — phá luật mọi bảng thuộc một module.

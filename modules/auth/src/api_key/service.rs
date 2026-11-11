@@ -20,9 +20,12 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::entity::{api_key, api_key_permission};
+use crate::events;
 use crate::role::RoleService;
 use crate::token;
 use crate::user::UserService;
+use autoxide_kernel::event::{Actor, Outbox};
+use serde_json::json;
 
 /// Mọi API key bắt đầu bằng chuỗi này: nhìn là biết đây là API key (không phải access
 /// token), và công cụ quét secret nhận ra được khi key lỡ bị commit.
@@ -73,6 +76,7 @@ pub(crate) struct ApiKeyService {
     database: Database,
     users: Arc<UserService>,
     roles: Arc<RoleService>,
+    outbox: Outbox,
 }
 
 impl ApiKeyService {
@@ -80,8 +84,9 @@ impl ApiKeyService {
         database: Database,
         users: Arc<UserService>,
         roles: Arc<RoleService>,
+        outbox: Outbox,
     ) -> Self {
-        ApiKeyService { database, users, roles }
+        ApiKeyService { database, users, roles, outbox }
     }
 
     /// Tạo key cho `creator`, với permission nằm trong số permission `creator` đang có.
@@ -138,6 +143,15 @@ impl ApiKeyService {
             .insert(&transaction)
             .await?;
         }
+        let after = json!({
+            "user_id": user_id,
+            "name": name,
+            "prefix": prefix,
+            "permissions": permissions,
+            "expires_at": input.expires_at,
+        });
+        let event = events::ApiKeyCreated { before: None, after: Some(after) };
+        self.outbox.record(&transaction, Actor::from(creator), key_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, api_key_id = %id, "API key created");
         let key = ApiKey {
@@ -169,21 +183,27 @@ impl ApiKeyService {
         }))
     }
 
-    /// Thu hồi (xoá) key `id` của người dùng `user_id`. Key thôi dùng được ngay.
-    pub(crate) async fn revoke(&self, user_id: Uuid, id: Uuid) -> Result<(), Error> {
-        let deleted = api_key::Entity::delete_many()
-            .filter(api_key::Column::Id.eq(id))
+    /// Thu hồi (xoá) key `id` của bên gọi. Key thôi dùng được ngay.
+    pub(crate) async fn revoke(&self, caller: &Principal, id: Uuid) -> Result<(), Error> {
+        let user_id = caller.user_id();
+        let transaction = self.database.begin_write().await?;
+        let row = api_key::Entity::find_by_id(id)
             .filter(api_key::Column::UserId.eq(user_id))
-            .exec(self.database.write())
-            .await?;
-        if deleted.rows_affected == 0 {
-            return Err(Error::not_found(
-                "auth.api_key_not_found",
-                "You have no API key with id `{id}`. List your keys with \
-                 `GET /api/v1/auth/api-keys`.",
-            )
-            .with_param("id", id));
-        }
+            .one(&transaction)
+            .await?
+            .ok_or_else(|| {
+                Error::not_found(
+                    "auth.api_key_not_found",
+                    "You have no API key with id `{id}`. List your keys with \
+                     `GET /api/v1/auth/api-keys`.",
+                )
+                .with_param("id", id)
+            })?;
+        api_key::Entity::delete_by_id(id).exec(&transaction).await?;
+        let before = json!({"user_id": user_id, "name": row.name, "prefix": row.prefix});
+        let event = events::ApiKeyRevoked { before: Some(before), after: None };
+        self.outbox.record(&transaction, Actor::from(caller), key_subject(id), &event).await?;
+        transaction.commit().await?;
         tracing::info!(user_id = %user_id, api_key_id = %id, "API key revoked");
         Ok(())
     }
@@ -323,6 +343,11 @@ fn to_api_key(row: api_key::Model, permissions: Vec<String>) -> ApiKey {
     }
 }
 
+/// Chủ thể (subject) của event về API key `id`.
+fn key_subject(id: Uuid) -> Option<String> {
+    Some(format!("auth.api_key:{id}"))
+}
+
 fn invalid_api_key() -> Error {
     Error::unauthenticated(
         "auth.invalid_api_key",
@@ -359,14 +384,17 @@ mod tests {
         let ada = Accounts::create(services.users.as_ref(), ada).await.unwrap();
         let role = services
             .roles
-            .create(RoleInput {
-                name: "reader".to_owned(),
-                description: String::new(),
-                permissions: vec!["auth.users.read".to_owned(), "auth.roles.read".to_owned()],
-            })
+            .create(
+                Actor::system(),
+                RoleInput {
+                    name: "reader".to_owned(),
+                    description: String::new(),
+                    permissions: vec!["auth.users.read".to_owned(), "auth.roles.read".to_owned()],
+                },
+            )
             .await
             .unwrap();
-        services.roles.set_user_roles(ada.id, vec![role.id]).await.unwrap();
+        services.roles.set_user_roles(Actor::system(), ada.id, vec![role.id]).await.unwrap();
         let principal = services.roles.principal(ada.id).await.unwrap();
         (services, principal)
     }
@@ -452,12 +480,12 @@ mod tests {
             let created =
                 services.api_keys.create(&ada, new_key(&["auth.users.read"])).await.unwrap();
 
-            services.roles.set_user_roles(ada.user_id(), vec![]).await.unwrap();
+            services.roles.set_user_roles(Actor::system(), ada.user_id(), vec![]).await.unwrap();
             let after_role = services.api_keys.authenticate(&created.secret).await.unwrap();
             assert!(!after_role.allows("auth.users.read"));
 
             let disable = UserChanges { name: None, disabled: Some(true) };
-            services.users.update(ada.user_id(), disable).await.unwrap();
+            services.users.update(Actor::system(), ada.user_id(), disable).await.unwrap();
             let error = services.api_keys.authenticate(&created.secret).await.unwrap_err();
             assert_eq!(error.code(), "auth.user_disabled");
         })
@@ -474,9 +502,10 @@ mod tests {
             let expiring = keys.create(&ada, new_key(&["auth.users.read"])).await.unwrap();
 
             // Người khác không thu hồi được key của Ada.
-            let other = keys.revoke(Uuid::now_v7(), revoked.key.id).await.unwrap_err();
+            let other =
+                keys.revoke(&Principal::new(Uuid::now_v7(), []), revoked.key.id).await.unwrap_err();
             assert_eq!(other.code(), "auth.api_key_not_found");
-            keys.revoke(ada.user_id(), revoked.key.id).await.unwrap();
+            keys.revoke(&ada, revoked.key.id).await.unwrap();
             let error = keys.authenticate(&revoked.secret).await.unwrap_err();
             assert_eq!(error.kind(), ErrorKind::Unauthenticated);
             assert_eq!(error.code(), "auth.invalid_api_key");

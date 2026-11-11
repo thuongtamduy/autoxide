@@ -359,15 +359,38 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 name = "autoxide"
 version = "0.1.0"
 dependencies = [
+ "autoxide-audit",
  "autoxide-auth",
  "autoxide-kernel",
  "autoxide-testkit",
  "base64 0.22.1",
  "clap",
  "getrandom 0.4.3",
+ "sea-orm",
  "serde_json",
  "tokio",
  "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "autoxide-audit"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
 ]
 
 [[package]]

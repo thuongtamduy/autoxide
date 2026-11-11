@@ -15,6 +15,9 @@ use uuid::Uuid;
 
 use super::entity::totp::{self, Column, Entity};
 use super::recovery;
+use crate::events;
+use autoxide_kernel::event::{Actor, Outbox};
+use serde_json::json;
 
 /// Độ dài secret: 160 bit, như RFC 4226 khuyến nghị cho HMAC-SHA1.
 const SECRET_BYTES: usize = 20;
@@ -44,11 +47,12 @@ pub(crate) struct TotpSetup {
 pub(crate) struct MfaService {
     database: Database,
     issuer: String,
+    outbox: Outbox,
 }
 
 impl MfaService {
-    pub(crate) fn new(database: Database, issuer: String) -> Self {
-        MfaService { database, issuer }
+    pub(crate) fn new(database: Database, issuer: String, outbox: Outbox) -> Self {
+        MfaService { database, issuer, outbox }
     }
 
     pub(crate) async fn status(&self, user_id: Uuid) -> Result<MfaStatus, Error> {
@@ -126,6 +130,9 @@ impl MfaService {
             return Err(setup_not_started());
         }
         let codes = recovery::replace(&transaction, user_id, now).await?;
+        let event = events::MfaEnabled { before: None, after: Some(json!({"method": "totp"})) };
+        let subject = events::user_subject(user_id);
+        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "two-step sign-in turned on");
         Ok(codes)
@@ -166,6 +173,9 @@ impl MfaService {
         }
         let transaction = self.database.begin_write().await?;
         let codes = recovery::replace(&transaction, user_id, now()).await?;
+        let event = events::RecoveryCodesReplaced::default();
+        let subject = events::user_subject(user_id);
+        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "recovery codes replaced");
         Ok(codes)
@@ -206,19 +216,29 @@ impl MfaService {
         if !self.verify_second_factor(user_id, code).await? {
             return Err(invalid_code());
         }
-        self.remove(user_id).await
+        self.remove(Actor::user(user_id), user_id, false).await
     }
 
     /// Xoá MFA của người dùng mà không cần mã — cho quản trị viên khi người dùng mất
     /// thiết bị. Chưa bật thì không có gì để xoá, vẫn coi là xong.
-    pub(crate) async fn reset(&self, user_id: Uuid) -> Result<(), Error> {
-        self.remove(user_id).await
+    pub(crate) async fn reset(&self, actor: Actor, user_id: Uuid) -> Result<(), Error> {
+        self.remove(actor, user_id, true).await
     }
 
-    async fn remove(&self, user_id: Uuid) -> Result<(), Error> {
+    async fn remove(&self, actor: Actor, user_id: Uuid, by_admin: bool) -> Result<(), Error> {
         let transaction = self.database.begin_write().await?;
-        Entity::delete_many().filter(Column::UserId.eq(user_id)).exec(&transaction).await?;
+        let removed =
+            Entity::delete_many().filter(Column::UserId.eq(user_id)).exec(&transaction).await?;
         recovery::remove(&transaction, user_id).await?;
+        // Chưa bật thì không có gì thay đổi: không ghi event.
+        if removed.rows_affected > 0 {
+            let event = events::MfaDisabled {
+                before: Some(json!({"method": "totp"})),
+                after: Some(json!({"by_administrator": by_admin})),
+            };
+            let subject = events::user_subject(user_id);
+            self.outbox.record(&transaction, actor, subject, &event).await?;
+        }
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "two-step sign-in turned off");
         Ok(())
@@ -412,8 +432,8 @@ pub(crate) mod tests {
             let setup = mfa.start_totp(user, "ada@example.com").await.unwrap();
             mfa.confirm_totp(user, &code_at(&setup.secret, unix_now())).await.unwrap();
 
-            mfa.reset(user).await.unwrap();
-            mfa.reset(user).await.unwrap();
+            mfa.reset(Actor::system(), user).await.unwrap();
+            mfa.reset(Actor::system(), user).await.unwrap();
 
             assert!(!mfa.status(user).await.unwrap().totp_enabled);
         })
@@ -479,7 +499,7 @@ mod recovery_tests {
             assert_eq!(new.len(), recovery::COUNT);
             assert!(!mfa.verify_second_factor(user, &old[1]).await.unwrap());
             assert!(mfa.verify_second_factor(user, &new[1]).await.unwrap());
-            mfa.reset(user).await.unwrap();
+            mfa.reset(Actor::system(), user).await.unwrap();
             assert_eq!(mfa.status(user).await.unwrap().recovery_codes_remaining, 0);
         })
         .await

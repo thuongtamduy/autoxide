@@ -16,7 +16,10 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::entity::{role, role_permission, user_role};
+use crate::events;
 use crate::user::entity as user;
+use autoxide_kernel::event::{Actor, Outbox};
+use serde_json::json;
 
 const NAME_MAX_LENGTH: usize = 64;
 const DESCRIPTION_MAX_LENGTH: usize = 500;
@@ -50,11 +53,12 @@ pub(crate) struct RoleInput {
 pub(crate) struct RoleService {
     database: Database,
     catalog: PermissionCatalog,
+    outbox: Outbox,
 }
 
 impl RoleService {
-    pub(crate) fn new(database: Database, catalog: PermissionCatalog) -> Self {
-        RoleService { database, catalog }
+    pub(crate) fn new(database: Database, catalog: PermissionCatalog, outbox: Outbox) -> Self {
+        RoleService { database, catalog, outbox }
     }
 
     /// Mọi permission của chương trình.
@@ -85,7 +89,7 @@ impl RoleService {
         Ok(to_role(row, permissions.remove(&id).unwrap_or_default()))
     }
 
-    pub(crate) async fn create(&self, input: RoleInput) -> Result<Role, Error> {
+    pub(crate) async fn create(&self, actor: Actor, input: RoleInput) -> Result<Role, Error> {
         let (name, description, permissions) = self.check(input)?;
         let now = now();
         let id = Uuid::now_v7();
@@ -93,7 +97,7 @@ impl RoleService {
         role::ActiveModel {
             id: Set(id),
             name: Set(name.clone()),
-            description: Set(description),
+            description: Set(description.clone()),
             all_permissions: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
@@ -102,13 +106,22 @@ impl RoleService {
         .await
         .map_err(|error| name_taken_or(error, &name))?;
         insert_permissions(&transaction, id, &permissions).await?;
+        let after =
+            Some(json!({"name": name, "description": description, "permissions": permissions}));
+        let event = events::RoleCreated { before: None, after };
+        self.outbox.record(&transaction, actor, role_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role created");
         self.get(id).await
     }
 
     /// Thay toàn bộ tên, mô tả và permission của role `id`.
-    pub(crate) async fn update(&self, id: Uuid, input: RoleInput) -> Result<Role, Error> {
+    pub(crate) async fn update(
+        &self,
+        actor: Actor,
+        id: Uuid,
+        input: RoleInput,
+    ) -> Result<Role, Error> {
         let (name, description, permissions) = self.check(input)?;
         let transaction = self.database.begin_write().await?;
         let current = role::Entity::find_by_id(id)
@@ -118,9 +131,10 @@ impl RoleService {
         if current.all_permissions {
             return Err(builtin_role());
         }
+        let before = role_snapshot(&transaction, &current).await?;
         role::Entity::update_many()
             .col_expr(role::Column::Name, Expr::value(name.clone()))
-            .col_expr(role::Column::Description, Expr::value(description))
+            .col_expr(role::Column::Description, Expr::value(description.clone()))
             .col_expr(role::Column::UpdatedAt, Expr::value(now()))
             .filter(role::Column::Id.eq(id))
             .exec(&transaction)
@@ -131,13 +145,16 @@ impl RoleService {
             .exec(&transaction)
             .await?;
         insert_permissions(&transaction, id, &permissions).await?;
+        let after = json!({"name": name, "description": description, "permissions": permissions});
+        let event = events::RoleUpdated { before: Some(before), after: Some(after) };
+        self.outbox.record(&transaction, actor, role_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role changed");
         self.get(id).await
     }
 
     /// Xoá role `id`; người dùng đang có role này mất nó.
-    pub(crate) async fn delete(&self, id: Uuid) -> Result<(), Error> {
+    pub(crate) async fn delete(&self, actor: Actor, id: Uuid) -> Result<(), Error> {
         let transaction = self.database.begin_write().await?;
         let current = role::Entity::find_by_id(id)
             .one(&transaction)
@@ -146,7 +163,10 @@ impl RoleService {
         if current.all_permissions {
             return Err(builtin_role());
         }
+        let before = role_snapshot(&transaction, &current).await?;
         role::Entity::delete_by_id(id).exec(&transaction).await?;
+        let event = events::RoleDeleted { before: Some(before), after: None };
+        self.outbox.record(&transaction, actor, role_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role deleted");
         Ok(())
@@ -164,6 +184,7 @@ impl RoleService {
     /// Thay toàn bộ role của người dùng `user_id` bằng `role_ids`.
     pub(crate) async fn set_user_roles(
         &self,
+        actor: Actor,
         user_id: Uuid,
         role_ids: Vec<Uuid>,
     ) -> Result<Vec<Role>, Error> {
@@ -199,6 +220,7 @@ impl RoleService {
             )]));
         }
         let admins_before = count_active_admins(&transaction).await?;
+        let before = role_names(&roles_of_user(&transaction, user_id).await?);
         user_role::Entity::delete_many()
             .filter(user_role::Column::UserId.eq(user_id))
             .exec(&transaction)
@@ -220,9 +242,13 @@ impl RoleService {
             transaction.rollback().await?;
             return Err(last_admin());
         }
+        let after = roles_of_user(&transaction, user_id).await?;
+        let event =
+            events::UserRolesChanged { before: Some(before), after: Some(role_names(&after)) };
+        self.outbox.record(&transaction, actor, events::user_subject(user_id), &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, roles = role_ids.len(), "user roles changed");
-        roles_of_user(self.database.write(), user_id).await
+        Ok(after)
     }
 
     /// Bên gọi là người dùng `user_id`: permission của họ là hợp các permission của
@@ -319,6 +345,26 @@ pub(crate) async fn grant_admin<C: ConnectionTrait>(
     .insert(connection)
     .await?;
     Ok(())
+}
+
+/// Chủ thể (subject) của event về role `id`.
+fn role_subject(id: Uuid) -> Option<String> {
+    Some(format!("auth.role:{id}"))
+}
+
+/// Ảnh chụp một role cho audit: tên, mô tả, permission.
+async fn role_snapshot<C: ConnectionTrait>(
+    connection: &C,
+    row: &role::Model,
+) -> Result<serde_json::Value, Error> {
+    let mut permissions = permissions_of(connection, [row.id]).await?;
+    let granted = permissions.remove(&row.id).unwrap_or_default();
+    Ok(json!({"name": row.name, "description": row.description, "permissions": granted}))
+}
+
+/// Tên các role, cho audit.
+fn role_names(roles: &[Role]) -> serde_json::Value {
+    json!(roles.iter().map(|role| role.name.as_str()).collect::<Vec<_>>())
 }
 
 fn is_role_name(name: &str) -> bool {
@@ -488,7 +534,7 @@ mod tests {
 
     async fn user(services: &Services, email: &str) -> Uuid {
         let input = NewUser { email: email.to_owned(), name: "U".to_owned(), password: None };
-        services.users.create(input).await.unwrap().id
+        services.users.create(Actor::system(), input).await.unwrap().id
     }
 
     async fn admin_role(roles: &RoleService) -> Role {
@@ -505,8 +551,9 @@ mod tests {
 
             assert_eq!(admin.name, "admin");
             assert!(admin.permissions.is_empty());
-            let changed = roles.update(admin.id, input("boss", &[])).await.unwrap_err();
-            let deleted = roles.delete(admin.id).await.unwrap_err();
+            let changed =
+                roles.update(Actor::system(), admin.id, input("boss", &[])).await.unwrap_err();
+            let deleted = roles.delete(Actor::system(), admin.id).await.unwrap_err();
             assert_eq!(changed.code(), "auth.role_builtin");
             assert_eq!(deleted.code(), "auth.role_builtin");
         })
@@ -520,22 +567,30 @@ mod tests {
             let roles = crate::testing::services(test).await.roles;
 
             let created = roles
-                .create(input(" editor ", &["notes.write", "auth.roles.read", "notes.write"]))
+                .create(
+                    Actor::system(),
+                    input(" editor ", &["notes.write", "auth.roles.read", "notes.write"]),
+                )
                 .await
                 .unwrap();
             assert_eq!(created.name, "editor");
             assert_eq!(created.permissions, ["auth.roles.read", "notes.write"]);
             assert!(!created.all_permissions);
 
-            let changed =
-                roles.update(created.id, input("writer", &["notes.write"])).await.unwrap();
+            let changed = roles
+                .update(Actor::system(), created.id, input("writer", &["notes.write"]))
+                .await
+                .unwrap();
             assert_eq!(changed.name, "writer");
             assert_eq!(changed.permissions, ["notes.write"]);
             assert_eq!(roles.get(created.id).await.unwrap(), changed);
 
-            roles.delete(created.id).await.unwrap();
+            roles.delete(Actor::system(), created.id).await.unwrap();
             assert_eq!(roles.get(created.id).await.unwrap_err().code(), "auth.role_not_found");
-            assert_eq!(roles.delete(created.id).await.unwrap_err().code(), "auth.role_not_found");
+            assert_eq!(
+                roles.delete(Actor::system(), created.id).await.unwrap_err().code(),
+                "auth.role_not_found"
+            );
         })
         .await
         .unwrap();
@@ -546,17 +601,19 @@ mod tests {
         TestDatabase::run(async |test| {
             let roles = crate::testing::services(test).await.roles;
 
-            let invalid =
-                roles.create(input("Bad Name", &["notes.write", "nope.read"])).await.unwrap_err();
+            let invalid = roles
+                .create(Actor::system(), input("Bad Name", &["notes.write", "nope.read"]))
+                .await
+                .unwrap_err();
             let fields: Vec<(&str, &str)> =
                 invalid.fields().iter().map(|f| (f.field.as_str(), f.code.as_str())).collect();
             assert_eq!(fields, [("name", "pattern"), ("permissions[1]", "unknown")]);
 
-            roles.create(input("editor", &[])).await.unwrap();
-            let taken = roles.create(input("editor", &[])).await.unwrap_err();
+            roles.create(Actor::system(), input("editor", &[])).await.unwrap();
+            let taken = roles.create(Actor::system(), input("editor", &[])).await.unwrap_err();
             assert_eq!(taken.kind(), ErrorKind::Conflict);
             assert_eq!(taken.code(), "auth.role_name_taken");
-            let admin = roles.create(input("admin", &[])).await.unwrap_err();
+            let admin = roles.create(Actor::system(), input("admin", &[])).await.unwrap_err();
             assert_eq!(admin.code(), "auth.role_name_taken");
         })
         .await
@@ -568,12 +625,17 @@ mod tests {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
             let roles = &services.roles;
-            let reader = roles.create(input("reader", &["auth.roles.read"])).await.unwrap();
-            let writer = roles.create(input("writer", &["notes.write"])).await.unwrap();
+            let reader =
+                roles.create(Actor::system(), input("reader", &["auth.roles.read"])).await.unwrap();
+            let writer =
+                roles.create(Actor::system(), input("writer", &["notes.write"])).await.unwrap();
             let ada = user(&services, "ada@example.com").await;
 
             assert_eq!(roles.principal(ada).await.unwrap().permissions(), Vec::<String>::new());
-            let assigned = roles.set_user_roles(ada, vec![writer.id, reader.id]).await.unwrap();
+            let assigned = roles
+                .set_user_roles(Actor::system(), ada, vec![writer.id, reader.id])
+                .await
+                .unwrap();
 
             let names: Vec<&str> = assigned.iter().map(|role| role.name.as_str()).collect();
             assert_eq!(names, ["reader", "writer"]);
@@ -583,11 +645,11 @@ mod tests {
             assert_eq!(roles.user_roles(ada).await.unwrap(), assigned);
 
             // Sửa role: người có role nhận permission mới ngay.
-            roles.update(writer.id, input("writer", &[])).await.unwrap();
+            roles.update(Actor::system(), writer.id, input("writer", &[])).await.unwrap();
             assert!(!roles.principal(ada).await.unwrap().has(&NOTES_WRITE));
 
             let admin = admin_role(roles).await;
-            roles.set_user_roles(ada, vec![admin.id]).await.unwrap();
+            roles.set_user_roles(Actor::system(), ada, vec![admin.id]).await.unwrap();
             assert!(roles.principal(ada).await.unwrap().has_all_permissions());
         })
         .await
@@ -600,8 +662,10 @@ mod tests {
             let services = crate::testing::services(test).await;
             let ada = user(&services, "ada@example.com").await;
 
-            let no_user = services.roles.set_user_roles(Uuid::now_v7(), vec![]).await;
-            let no_role = services.roles.set_user_roles(ada, vec![Uuid::now_v7()]).await;
+            let no_user =
+                services.roles.set_user_roles(Actor::system(), Uuid::now_v7(), vec![]).await;
+            let no_role =
+                services.roles.set_user_roles(Actor::system(), ada, vec![Uuid::now_v7()]).await;
             let read_no_user = services.roles.user_roles(Uuid::now_v7()).await;
 
             assert_eq!(no_user.unwrap_err().code(), "auth.user_not_found");
@@ -620,16 +684,16 @@ mod tests {
             let admin = admin_role(roles).await;
             let ada = user(&services, "ada@example.com").await;
             let bob = user(&services, "bob@example.com").await;
-            roles.set_user_roles(ada, vec![admin.id]).await.unwrap();
+            roles.set_user_roles(Actor::system(), ada, vec![admin.id]).await.unwrap();
 
-            let error = roles.set_user_roles(ada, vec![]).await.unwrap_err();
+            let error = roles.set_user_roles(Actor::system(), ada, vec![]).await.unwrap_err();
             assert_eq!(error.kind(), ErrorKind::Conflict);
             assert_eq!(error.code(), "auth.last_admin");
             assert!(roles.principal(ada).await.unwrap().has_all_permissions());
 
             // Có admin khác thì bỏ được.
-            roles.set_user_roles(bob, vec![admin.id]).await.unwrap();
-            roles.set_user_roles(ada, vec![]).await.unwrap();
+            roles.set_user_roles(Actor::system(), bob, vec![admin.id]).await.unwrap();
+            roles.set_user_roles(Actor::system(), ada, vec![]).await.unwrap();
         })
         .await
         .unwrap();
@@ -646,8 +710,16 @@ mod tests {
             let ada = user(&services, "ada@example.com").await;
             let mut sets = Vec::new();
             for index in 0..4 {
-                let first = roles.create(input(&format!("a{index}"), &[])).await.unwrap().id;
-                let second = roles.create(input(&format!("b{index}"), &[])).await.unwrap().id;
+                let first = roles
+                    .create(Actor::system(), input(&format!("a{index}"), &[]))
+                    .await
+                    .unwrap()
+                    .id;
+                let second = roles
+                    .create(Actor::system(), input(&format!("b{index}"), &[]))
+                    .await
+                    .unwrap()
+                    .id;
                 sets.push(BTreeSet::from([first, second]));
             }
 
@@ -656,7 +728,9 @@ mod tests {
                 .map(|set| {
                     let roles: Arc<RoleService> = roles.clone();
                     let ids: Vec<Uuid> = set.iter().copied().collect();
-                    tokio::spawn(async move { roles.set_user_roles(ada, ids).await })
+                    tokio::spawn(
+                        async move { roles.set_user_roles(Actor::system(), ada, ids).await },
+                    )
                 })
                 .collect();
             for attempt in attempts {

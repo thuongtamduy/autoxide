@@ -12,6 +12,8 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Người dùng, mật khẩu (và sau này đăng nhập, role, permission): mọi module
         // khác có thể cần, nên đứng đầu.
         Box::new(autoxide_auth::module()),
+        // Audit log: nhận event của mọi module; không module nào cần trait của nó.
+        Box::new(autoxide_audit::module()),
     ]
 }
 
@@ -44,6 +46,50 @@ mod tests {
             }
             migrator.up(&db).await.unwrap();
             assert!(migrator.pending(&db).await.unwrap().is_empty());
+            db.close().await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Xuyên module: `auth` ghi event cùng transaction, bộ phát giao, `audit` ghi
+    /// đúng một dòng — trên database gate đang chọn.
+    #[tokio::test]
+    async fn thay_doi_cua_auth_vao_audit_log() {
+        use autoxide_auth::api::{Accounts, NewAccount};
+        use sea_orm::{ConnectionTrait, Statement};
+
+        TestDatabase::run(async |database| {
+            let source = ConfigSource::from_pairs([("DATABASE_URL", database.url())]);
+            let mut settings = crate::settings::read(&source).unwrap();
+            let db = Database::connect(&settings.config.database).await.unwrap();
+            settings.modules.migrator().unwrap().up(&db).await.unwrap();
+            settings.modules.start(&db).unwrap();
+            let accounts = settings.modules.api::<dyn Accounts>().unwrap();
+            let dispatcher = settings.modules.dispatcher(&db).unwrap();
+
+            let account = NewAccount {
+                email: "ada@example.com".to_owned(),
+                name: "Ada".to_owned(),
+                password: None,
+                admin: true,
+            };
+            let ada = accounts.create(account).await.unwrap();
+            assert_eq!(dispatcher.run_once().await.unwrap(), 1);
+            assert_eq!(dispatcher.run_once().await.unwrap(), 0);
+
+            let backend = db.read().get_database_backend();
+            let sql = "SELECT action, subject, actor_user_id, after FROM audit_entry";
+            let rows = db.read().query_all_raw(Statement::from_string(backend, sql)).await.unwrap();
+            assert_eq!(rows.len(), 1);
+            let action: String = rows[0].try_get("", "action").unwrap();
+            let subject: Option<String> = rows[0].try_get("", "subject").unwrap();
+            let actor: Option<uuid::Uuid> = rows[0].try_get("", "actor_user_id").unwrap();
+            let after: Option<String> = rows[0].try_get("", "after").unwrap();
+            assert_eq!(action, "auth.user_created");
+            assert_eq!(subject, Some(format!("auth.user:{}", ada.id)));
+            assert_eq!(actor, None, "created from the command line, by the system");
+            assert!(after.unwrap().contains(r#""admin":true"#));
             db.close().await.unwrap();
         })
         .await

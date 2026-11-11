@@ -12,8 +12,11 @@ use validator::ValidateEmail;
 
 use super::entity::{self, Column, Entity};
 use crate::api::{Accounts, NewAccount, User, Users};
+use crate::events;
 use crate::password::{self, Passwords, Verification};
 use crate::session::SessionService;
+use autoxide_kernel::event::{Actor, Outbox};
+use serde_json::json;
 
 /// Độ dài tối đa của email (RFC 5321) và của tên hiển thị, theo ký tự.
 const EMAIL_MAX_LENGTH: usize = 254;
@@ -39,11 +42,12 @@ pub(crate) struct UserChanges {
 pub(crate) struct UserService {
     database: Database,
     passwords: Passwords,
+    outbox: Outbox,
 }
 
 impl UserService {
-    pub(crate) fn new(database: Database, passwords: Passwords) -> Self {
-        UserService { database, passwords }
+    pub(crate) fn new(database: Database, passwords: Passwords, outbox: Outbox) -> Self {
+        UserService { database, passwords, outbox }
     }
 
     /// Người dùng có ID `id`.
@@ -108,14 +112,15 @@ impl UserService {
 
     /// Tạo người dùng. Email được chuẩn hoá (bỏ khoảng trắng hai đầu, chữ thường)
     /// và phải chưa ai dùng.
-    pub(crate) async fn create(&self, input: NewUser) -> Result<User, Error> {
-        self.create_with_roles(input, false).await
+    pub(crate) async fn create(&self, actor: Actor, input: NewUser) -> Result<User, Error> {
+        self.create_with_roles(actor, input, false).await
     }
 
     /// Như [`create`](Self::create); `admin` thì gán luôn role `admin` trong CÙNG
     /// transaction — không bao giờ có người dùng "admin dở dang" khi một bước hỏng.
     pub(crate) async fn create_with_roles(
         &self,
+        actor: Actor,
         input: NewUser,
         admin: bool,
     ) -> Result<User, Error> {
@@ -162,6 +167,9 @@ impl UserService {
         if admin {
             crate::role::grant_admin(&transaction, row.id).await?;
         }
+        let after = Some(json!({"email": row.email, "name": row.name, "admin": admin}));
+        let event = events::UserCreated { before: None, after };
+        self.outbox.record(&transaction, actor, events::user_subject(row.id), &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %row.id, admin, "user created");
         Ok(row.into())
@@ -169,12 +177,19 @@ impl UserService {
 
     /// Đổi tên và/hoặc khoá, mở khoá người dùng `id`. Khoá thì đăng xuất người đó ở
     /// mọi nơi; không khoá được admin cuối cùng còn hoạt động.
-    pub(crate) async fn update(&self, id: Uuid, changes: UserChanges) -> Result<User, Error> {
+    pub(crate) async fn update(
+        &self,
+        actor: Actor,
+        id: Uuid,
+        changes: UserChanges,
+    ) -> Result<User, Error> {
         let name = changes.name.map(|name| name.trim().to_owned());
         if let Some(problem) = name.as_deref().and_then(check_name) {
             return Err(Error::validation(vec![problem]));
         }
         let transaction = self.database.begin_write().await?;
+        let before =
+            Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| user_not_found(id))?;
         let admins_before = crate::role::count_active_admins(&transaction).await?;
         let now = now();
         let mut update = Entity::update_many().col_expr(Column::UpdatedAt, Expr::value(now));
@@ -209,6 +224,9 @@ impl UserService {
         }
         let row =
             Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| user_not_found(id))?;
+        let event =
+            events::UserUpdated { before: Some(snapshot(&before)), after: Some(snapshot(&row)) };
+        self.outbox.record(&transaction, actor, events::user_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, disabled = ?changes.disabled, "user changed");
         Ok(row.into())
@@ -233,7 +251,12 @@ impl UserService {
 
     /// Đặt mật khẩu mới cho người dùng `id`.
     #[cfg_attr(not(test), expect(dead_code, reason = "used by password reset, roadmap step 7"))]
-    pub(crate) async fn set_password(&self, id: Uuid, password: String) -> Result<(), Error> {
+    pub(crate) async fn set_password(
+        &self,
+        actor: Actor,
+        id: Uuid,
+        password: String,
+    ) -> Result<(), Error> {
         if let Some(problem) = password::check_rules("password", &password) {
             return Err(Error::validation(vec![problem]));
         }
@@ -252,6 +275,8 @@ impl UserService {
             return Err(user_not_found(id));
         }
         SessionService::revoke_user(&transaction, id).await?;
+        let event = events::PasswordChanged::default();
+        self.outbox.record(&transaction, actor, events::user_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, "password changed");
         Ok(())
@@ -263,7 +288,8 @@ impl Accounts for UserService {
     async fn create(&self, account: NewAccount) -> Result<User, Error> {
         let input =
             NewUser { email: account.email, name: account.name, password: account.password };
-        self.create_with_roles(input, account.admin).await
+        // Chỉ lệnh CLI dùng trait này: người vận hành máy chủ, tức "hệ thống".
+        self.create_with_roles(Actor::system(), input, account.admin).await
     }
 }
 
@@ -272,6 +298,11 @@ impl Users for UserService {
     async fn find(&self, id: Uuid) -> Result<Option<User>, Error> {
         self.get(id).await
     }
+}
+
+/// Ảnh chụp những gì audit cần biết về một người dùng (không có hash mật khẩu).
+fn snapshot(row: &entity::Model) -> serde_json::Value {
+    json!({"email": row.email, "name": row.name, "disabled_at": row.disabled_at})
 }
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên.
@@ -333,7 +364,11 @@ mod tests {
     const PASSWORD: &str = "correct horse battery staple";
 
     async fn service(test: &TestDatabase) -> UserService {
-        UserService::new(crate::testing::database(test).await, Passwords::new())
+        UserService::new(
+            crate::testing::database(test).await,
+            Passwords::new(),
+            Outbox::standalone("auth"),
+        )
     }
 
     fn new_user(email: &str) -> NewUser {
@@ -349,7 +384,8 @@ mod tests {
         TestDatabase::run(async |test| {
             let users = service(test).await;
 
-            let created = users.create(new_user("  Ada@Example.COM ")).await.unwrap();
+            let created =
+                users.create(Actor::system(), new_user("  Ada@Example.COM ")).await.unwrap();
 
             assert_eq!(created.email, "ada@example.com");
             assert_eq!(created.name, "Ada Lovelace");
@@ -367,7 +403,7 @@ mod tests {
     async fn mat_khau_luu_duoi_dang_hash_argon2id() {
         TestDatabase::run(async |test| {
             let users = service(test).await;
-            let created = users.create(new_user("ada@example.com")).await.unwrap();
+            let created = users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
 
             let row = Entity::find_by_id(created.id).one(users.database.read()).await.unwrap();
 
@@ -383,9 +419,10 @@ mod tests {
     async fn email_trung_khong_phan_biet_hoa_thuong_bi_tu_choi() {
         TestDatabase::run(async |test| {
             let users = service(test).await;
-            users.create(new_user("ada@example.com")).await.unwrap();
+            users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
 
-            let error = users.create(new_user("ADA@example.com")).await.unwrap_err();
+            let error =
+                users.create(Actor::system(), new_user("ADA@example.com")).await.unwrap_err();
 
             assert_eq!(error.kind(), ErrorKind::Conflict);
             assert_eq!(error.code(), "auth.email_taken");
@@ -409,7 +446,9 @@ mod tests {
             let attempts: Vec<_> = (0..6)
                 .map(|_| {
                     let users = users.clone();
-                    tokio::spawn(async move { users.create(new_user("ada@example.com")).await })
+                    tokio::spawn(async move {
+                        users.create(Actor::system(), new_user("ada@example.com")).await
+                    })
                 })
                 .collect();
             let mut created = 0;
@@ -436,7 +475,7 @@ mod tests {
                 password: Some("short".to_owned()),
             };
 
-            let error = users.create(input).await.unwrap_err();
+            let error = users.create(Actor::system(), input).await.unwrap_err();
 
             assert_eq!(error.code(), "validation_failed");
             let fields: Vec<(&str, &str)> = error
@@ -454,7 +493,7 @@ mod tests {
     async fn kiem_thong_tin_dang_nhap() {
         TestDatabase::run(async |test| {
             let users = service(test).await;
-            let created = users.create(new_user("ada@example.com")).await.unwrap();
+            let created = users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
 
             let signed_in = users.check_credentials(" ADA@example.com", PASSWORD).await.unwrap();
             let wrong = users.check_credentials("ada@example.com", "wrong password").await;
@@ -478,7 +517,7 @@ mod tests {
         TestDatabase::run(async |test| {
             let users = service(test).await;
             let input = NewUser { password: None, ..new_user("ada@example.com") };
-            users.create(input).await.unwrap();
+            users.create(Actor::system(), input).await.unwrap();
 
             let error = users.check_credentials("ada@example.com", "").await.unwrap_err();
 
@@ -492,7 +531,7 @@ mod tests {
     async fn tai_khoan_bi_khoa_khong_dang_nhap_duoc() {
         TestDatabase::run(async |test| {
             let users = service(test).await;
-            let created = users.create(new_user("ada@example.com")).await.unwrap();
+            let created = users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
             Entity::update_many()
                 .col_expr(Column::DisabledAt, Expr::value(Some(now())))
                 .filter(Column::Id.eq(created.id))
@@ -513,18 +552,19 @@ mod tests {
     async fn doi_mat_khau() {
         TestDatabase::run(async |test| {
             let users = service(test).await;
-            let created = users.create(new_user("ada@example.com")).await.unwrap();
+            let created = users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
             let new_password = "a brand new passphrase";
 
-            users.set_password(created.id, new_password.to_owned()).await.unwrap();
+            users.set_password(Actor::system(), created.id, new_password.to_owned()).await.unwrap();
 
             assert!(users.check_credentials("ada@example.com", PASSWORD).await.is_err());
             let user = users.check_credentials("ada@example.com", new_password).await.unwrap();
             assert!(user.updated_at >= created.updated_at);
 
-            let missing = users.set_password(Uuid::now_v7(), new_password.to_owned()).await;
+            let missing =
+                users.set_password(Actor::system(), Uuid::now_v7(), new_password.to_owned()).await;
             assert_eq!(missing.unwrap_err().code(), "auth.user_not_found");
-            let short = users.set_password(created.id, "short".to_owned()).await;
+            let short = users.set_password(Actor::system(), created.id, "short".to_owned()).await;
             assert_eq!(short.unwrap_err().code(), "validation_failed");
         })
         .await
@@ -538,7 +578,7 @@ mod tests {
 
         TestDatabase::run(async |test| {
             let users = service(test).await;
-            let created = users.create(new_user("ada@example.com")).await.unwrap();
+            let created = users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
             let weak = Argon2::new(
                 Algorithm::Argon2id,
                 Version::V0x13,
@@ -572,7 +612,7 @@ mod tests {
             for index in 0..3 {
                 let input =
                     NewUser { password: None, ..new_user(&format!("u{index}@example.com")) };
-                created.push(users.create(input).await.unwrap().id);
+                created.push(users.create(Actor::system(), input).await.unwrap().id);
             }
 
             let first = users.list(&PageRequest::first(2, Order::Asc)).await.unwrap();
@@ -593,7 +633,8 @@ mod tests {
     async fn trait_users_cho_module_khac() {
         TestDatabase::run(async |test| {
             let service = std::sync::Arc::new(service(test).await);
-            let created = service.create(new_user("ada@example.com")).await.unwrap();
+            let created =
+                service.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
             let users: std::sync::Arc<dyn Users> = service;
 
             assert_eq!(users.find(created.id).await.unwrap(), Some(created));
@@ -690,16 +731,20 @@ mod update_tests {
                 services.sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
 
             let renamed = users
-                .update(ada.id, UserChanges { name: Some("  Ada L. ".to_owned()), disabled: None })
+                .update(
+                    Actor::system(),
+                    ada.id,
+                    UserChanges { name: Some("  Ada L. ".to_owned()), disabled: None },
+                )
                 .await
                 .unwrap();
             assert_eq!(renamed.name, "Ada L.");
             assert!(renamed.is_active());
 
-            let disabled = users.update(ada.id, disable(true)).await.unwrap();
+            let disabled = users.update(Actor::system(), ada.id, disable(true)).await.unwrap();
             assert!(!disabled.is_active());
             // Khoá lần nữa giữ thời điểm khoá cũ.
-            let again = users.update(ada.id, disable(true)).await.unwrap();
+            let again = users.update(Actor::system(), ada.id, disable(true)).await.unwrap();
             assert_eq!(again.disabled_at, disabled.disabled_at);
             // Đăng xuất ở mọi nơi: refresh token cũ hết dùng được.
             let refresh = services.sessions.refresh(&tokens.refresh_token).await.unwrap_err();
@@ -707,14 +752,18 @@ mod update_tests {
             let login = services.sessions.login("ada@example.com", PASSWORD).await.unwrap_err();
             assert_eq!(login.code(), "auth.user_disabled");
 
-            let enabled = users.update(ada.id, disable(false)).await.unwrap();
+            let enabled = users.update(Actor::system(), ada.id, disable(false)).await.unwrap();
             assert!(enabled.is_active());
             services.sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
 
-            let missing = users.update(Uuid::now_v7(), disable(true)).await.unwrap_err();
+            let missing =
+                users.update(Actor::system(), Uuid::now_v7(), disable(true)).await.unwrap_err();
             assert_eq!(missing.code(), "auth.user_not_found");
             let empty = UserChanges { name: Some(" ".to_owned()), disabled: None };
-            assert_eq!(users.update(ada.id, empty).await.unwrap_err().code(), "validation_failed");
+            assert_eq!(
+                users.update(Actor::system(), ada.id, empty).await.unwrap_err().code(),
+                "validation_failed"
+            );
         })
         .await
         .unwrap();
@@ -728,14 +777,14 @@ mod update_tests {
             let root =
                 Accounts::create(users.as_ref(), account("root@example.com", true)).await.unwrap();
 
-            let error = users.update(root.id, disable(true)).await.unwrap_err();
+            let error = users.update(Actor::system(), root.id, disable(true)).await.unwrap_err();
 
             assert_eq!(error.kind(), ErrorKind::Conflict);
             assert_eq!(error.code(), "auth.last_admin");
             assert!(users.get(root.id).await.unwrap().unwrap().is_active());
             // Có admin khác còn hoạt động thì khoá được.
             Accounts::create(users.as_ref(), account("second@example.com", true)).await.unwrap();
-            users.update(root.id, disable(true)).await.unwrap();
+            users.update(Actor::system(), root.id, disable(true)).await.unwrap();
         })
         .await
         .unwrap();

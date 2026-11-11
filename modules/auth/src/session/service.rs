@@ -28,7 +28,10 @@ use crate::token::{self, AccessTokens};
 use crate::user::UserService;
 
 use super::{LoginThrottle, challenge};
+use crate::events;
 use crate::mfa::MfaService;
+use autoxide_kernel::event::{Actor, Outbox};
+use serde_json::json;
 
 /// Mã lỗi khi sai email hoặc mật khẩu (tạo ở `user::service`).
 const INVALID_CREDENTIALS: &str = "auth.invalid_credentials";
@@ -53,6 +56,7 @@ pub(crate) struct SessionService {
     refresh_token_ttl: chrono::Duration,
     throttle: LoginThrottle,
     mfa: Arc<MfaService>,
+    outbox: Outbox,
 }
 
 /// Kết quả của bước nhập mật khẩu.
@@ -83,10 +87,19 @@ impl SessionService {
         refresh_token_ttl: std::time::Duration,
         throttle: LoginThrottle,
         mfa: Arc<MfaService>,
+        outbox: Outbox,
     ) -> Result<Self, Error> {
         let refresh_token_ttl = chrono::Duration::from_std(refresh_token_ttl)
             .map_err(|error| Error::internal(format!("refresh token lifetime: {error}")))?;
-        Ok(SessionService { database, users, access_tokens, refresh_token_ttl, throttle, mfa })
+        Ok(SessionService {
+            database,
+            users,
+            access_tokens,
+            refresh_token_ttl,
+            throttle,
+            mfa,
+            outbox,
+        })
     }
 
     /// Đăng nhập bằng email và mật khẩu. Tài khoản chưa bật MFA: mở một họ refresh
@@ -116,7 +129,7 @@ impl SessionService {
             });
         }
         self.throttle.clear(email).await?;
-        Ok(LoginOutcome::Tokens(self.start_session(user.id).await?))
+        Ok(LoginOutcome::Tokens(self.start_session(user.id, "password").await?))
     }
 
     /// Bước hai của đăng nhập: `code` là mã TOTP hoặc một recovery code. Mỗi lần sai
@@ -142,15 +155,21 @@ impl SessionService {
             return Err(crate::user::user_disabled());
         }
         self.throttle.clear(&user.email).await?;
-        self.start_session(user.id).await
+        self.start_session(user.id, "password_and_mfa").await
     }
 
     /// Mở một họ refresh token mới và cấp cặp token đầu tiên.
-    async fn start_session(&self, user_id: Uuid) -> Result<Tokens, Error> {
+    /// `method`: cách đã xác thực (`password`, `password_and_mfa`), ghi vào audit.
+    async fn start_session(&self, user_id: Uuid, method: &str) -> Result<Tokens, Error> {
         let now = now();
         let expires_at = now + self.refresh_token_ttl;
         let (refresh_token, row) = new_refresh_token(user_id, Uuid::now_v7(), now, expires_at)?;
-        row.insert(self.database.write()).await?;
+        let transaction = self.database.begin_write().await?;
+        row.insert(&transaction).await?;
+        let event = events::SignedIn { before: None, after: Some(json!({"method": method})) };
+        let subject = events::user_subject(user_id);
+        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
+        transaction.commit().await?;
         tracing::info!(user_id = %user_id, "signed in");
         self.tokens(user_id, refresh_token, expires_at, now)
     }
@@ -175,7 +194,7 @@ impl SessionService {
         }
         let user = self.users.get(row.user_id).await?.ok_or_else(invalid_refresh_token)?;
         if !user.is_active() {
-            self.revoke_family(row.family_id).await?;
+            revoke_family(self.database.write(), row.family_id).await?;
             return Err(crate::user::user_disabled());
         }
 
@@ -208,7 +227,12 @@ impl SessionService {
             .one(self.database.write())
             .await?;
         if let Some(row) = row {
-            self.revoke_family(row.family_id).await?;
+            let transaction = self.database.begin_write().await?;
+            revoke_family(&transaction, row.family_id).await?;
+            let event = events::SignedOut::default();
+            let subject = events::user_subject(row.user_id);
+            self.outbox.record(&transaction, Actor::user(row.user_id), subject, &event).await?;
+            transaction.commit().await?;
             tracing::info!(user_id = %row.user_id, "signed out");
         }
         Ok(())
@@ -240,16 +264,6 @@ impl SessionService {
         Ok(())
     }
 
-    async fn revoke_family(&self, family_id: Uuid) -> Result<(), Error> {
-        Entity::update_many()
-            .col_expr(Column::RevokedAt, Expr::value(Some(now())))
-            .filter(Column::FamilyId.eq(family_id))
-            .filter(Column::RevokedAt.is_null())
-            .exec(self.database.write())
-            .await?;
-        Ok(())
-    }
-
     /// Thu hồi cả họ của `row` và trả lỗi báo token bị dùng lại.
     async fn reuse_detected(&self, row: &entity::Model) -> Error {
         tracing::warn!(
@@ -257,7 +271,17 @@ impl SessionService {
             family_id = %row.family_id,
             "refresh token reused; revoking the whole session"
         );
-        if let Err(error) = self.revoke_family(row.family_id).await {
+        let ended = async {
+            let transaction = self.database.begin_write().await?;
+            revoke_family(&transaction, row.family_id).await?;
+            let event = events::RefreshTokenReused::default();
+            let subject = events::user_subject(row.user_id);
+            self.outbox.record(&transaction, Actor::user(row.user_id), subject, &event).await?;
+            transaction.commit().await?;
+            Ok::<(), Error>(())
+        }
+        .await;
+        if let Err(error) = ended {
             return error;
         }
         Error::unauthenticated(
@@ -281,6 +305,17 @@ impl SessionService {
             refresh_token_expires_at,
         })
     }
+}
+
+/// Thu hồi mọi refresh token của họ `family_id`.
+async fn revoke_family<C: ConnectionTrait>(connection: &C, family_id: Uuid) -> Result<(), Error> {
+    Entity::update_many()
+        .col_expr(Column::RevokedAt, Expr::value(Some(now())))
+        .filter(Column::FamilyId.eq(family_id))
+        .filter(Column::RevokedAt.is_null())
+        .exec(connection)
+        .await?;
+    Ok(())
 }
 
 /// Sinh một refresh token mới và dòng database tương ứng (chưa ghi).
@@ -349,11 +384,14 @@ mod tests {
     async fn setup(test: &TestDatabase) -> (Arc<SessionService>, Arc<UserService>, User) {
         let (sessions, users) = crate::testing::sessions(test).await;
         let user = users
-            .create(NewUser {
-                email: "ada@example.com".to_owned(),
-                name: "Ada".to_owned(),
-                password: Some(PASSWORD.to_owned()),
-            })
+            .create(
+                Actor::system(),
+                NewUser {
+                    email: "ada@example.com".to_owned(),
+                    name: "Ada".to_owned(),
+                    password: Some(PASSWORD.to_owned()),
+                },
+            )
             .await
             .unwrap();
         (sessions, users, user)
@@ -548,7 +586,10 @@ mod tests {
             let first = sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
             let second = sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
 
-            users.set_password(user.id, "a brand new passphrase".to_owned()).await.unwrap();
+            users
+                .set_password(Actor::system(), user.id, "a brand new passphrase".to_owned())
+                .await
+                .unwrap();
 
             for tokens in [first, second] {
                 let error = sessions.refresh(&tokens.refresh_token).await.unwrap_err();
@@ -597,11 +638,14 @@ mod mfa_login_tests {
         let services = crate::testing::services(test).await;
         let ada = services
             .users
-            .create(NewUser {
-                email: "ada@example.com".to_owned(),
-                name: "Ada".to_owned(),
-                password: Some(PASSWORD.to_owned()),
-            })
+            .create(
+                Actor::system(),
+                NewUser {
+                    email: "ada@example.com".to_owned(),
+                    name: "Ada".to_owned(),
+                    password: Some(PASSWORD.to_owned()),
+                },
+            )
             .await
             .unwrap();
         let setup = services.mfa.start_totp(ada.id, &ada.email).await.unwrap();

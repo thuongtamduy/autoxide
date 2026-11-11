@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
@@ -191,7 +192,7 @@ async fn create_role(
     ValidJson(input): ValidJson<RoleRequest>,
 ) -> Result<(StatusCode, Data<RoleResponse>), Error> {
     principal.require(&ROLES_MANAGE)?;
-    let role = state.roles.create(input.into()).await?;
+    let role = state.roles.create(Actor::from(&principal), input.into()).await?;
     Ok((StatusCode::CREATED, Data { data: role.into() }))
 }
 
@@ -247,7 +248,7 @@ async fn replace_role(
     ValidJson(input): ValidJson<RoleRequest>,
 ) -> Result<Data<RoleResponse>, Error> {
     principal.require(&ROLES_MANAGE)?;
-    Ok(Data { data: state.roles.update(id, input.into()).await?.into() })
+    Ok(Data { data: state.roles.update(Actor::from(&principal), id, input.into()).await?.into() })
 }
 
 /// Delete a role.
@@ -273,7 +274,7 @@ async fn delete_role(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
     principal.require(&ROLES_MANAGE)?;
-    state.roles.delete(id).await?;
+    state.roles.delete(Actor::from(&principal), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -329,11 +330,12 @@ async fn replace_user_roles(
     ValidJson(input): ValidJson<UserRolesRequest>,
 ) -> Result<Data<Vec<RoleResponse>>, Error> {
     principal.require(&ROLES_MANAGE)?;
-    Ok(roles(state.roles.set_user_roles(id, input.role_ids).await?))
+    Ok(roles(state.roles.set_user_roles(Actor::from(&principal), id, input.role_ids).await?))
 }
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::event::Actor;
     use autoxide_kernel::pagination::{Order, PageRequest};
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
@@ -358,7 +360,7 @@ mod tests {
             let page = services.roles.list(&PageRequest::first(10, Order::Asc)).await.unwrap();
             let admin = page.data.iter().find(|role| role.all_permissions).unwrap();
             let user = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
-            services.roles.set_user_roles(user.id, vec![admin.id]).await.unwrap();
+            services.roles.set_user_roles(Actor::system(), user.id, vec![admin.id]).await.unwrap();
 
             let (status, _, me) = call(&app, "GET", "/me", Some(&ada), None).await;
             assert_eq!(status, StatusCode::OK, "{me}");
@@ -413,15 +415,18 @@ mod tests {
             let (app, services) = app(test).await;
             let reader = services
                 .roles
-                .create(crate::role::RoleInput {
-                    name: "reader".to_owned(),
-                    description: String::new(),
-                    permissions: vec!["auth.roles.read".to_owned()],
-                })
+                .create(
+                    Actor::system(),
+                    crate::role::RoleInput {
+                        name: "reader".to_owned(),
+                        description: String::new(),
+                        permissions: vec!["auth.roles.read".to_owned()],
+                    },
+                )
                 .await
                 .unwrap();
             let user = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
-            services.roles.set_user_roles(user.id, vec![reader.id]).await.unwrap();
+            services.roles.set_user_roles(Actor::system(), user.id, vec![reader.id]).await.unwrap();
             let ada = bearer(&app, "ada@example.com", PASSWORD).await;
 
             let (status, _, _) = call(&app, "GET", "/roles", Some(&ada), None).await;

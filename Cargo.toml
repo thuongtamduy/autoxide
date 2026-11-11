@@ -37,6 +37,7 @@ dbg_macro = "deny"
 # --- Crate nội bộ ---
 autoxide-kernel = { path = "crates/kernel" }
 autoxide-testkit = { path = "crates/testkit" }
+autoxide-audit = { path = "modules/audit" }
 autoxide-auth = { path = "modules/auth" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---

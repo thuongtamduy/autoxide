@@ -12,6 +12,7 @@ mod access;
 pub mod api;
 mod api_key;
 mod config;
+mod events;
 mod http;
 mod mfa;
 mod migration;
@@ -27,6 +28,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::{Authenticator, Permission};
 use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::event::EventInfo;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
 use utoipa_axum::router::OpenApiRouter;
@@ -74,7 +76,8 @@ impl Module for AuthModule {
             .clone()
             .ok_or_else(|| Error::internal("module `auth` started before it was configured"))?;
         let database = context.database().clone();
-        let users = Arc::new(UserService::new(database.clone(), Passwords::new()));
+        let outbox = context.outbox()?;
+        let users = Arc::new(UserService::new(database.clone(), Passwords::new(), outbox.clone()));
         let secret = match config.token_secret {
             Some(secret) => secret,
             None => {
@@ -89,7 +92,8 @@ impl Module for AuthModule {
         let access_tokens = AccessTokens::new(secret, config.access_token_ttl);
         let throttle =
             LoginThrottle::new(database.clone(), config.login_max_failures, config.login_lock)?;
-        let mfa = Arc::new(MfaService::new(database.clone(), config.totp_issuer.clone()));
+        let mfa =
+            Arc::new(MfaService::new(database.clone(), config.totp_issuer.clone(), outbox.clone()));
         let sessions = Arc::new(SessionService::new(
             database.clone(),
             users.clone(),
@@ -97,9 +101,14 @@ impl Module for AuthModule {
             config.refresh_token_ttl,
             throttle,
             mfa.clone(),
+            outbox.clone(),
         )?);
-        let roles = Arc::new(RoleService::new(database.clone(), context.permissions().clone()));
-        let api_keys = Arc::new(ApiKeyService::new(database, users.clone(), roles.clone()));
+        let roles = Arc::new(RoleService::new(
+            database.clone(),
+            context.permissions().clone(),
+            outbox.clone(),
+        ));
+        let api_keys = Arc::new(ApiKeyService::new(database, users.clone(), roles.clone(), outbox));
         let authenticator = RequestAuthenticator {
             sessions: sessions.clone(),
             roles: roles.clone(),
@@ -122,6 +131,10 @@ impl Module for AuthModule {
 
     fn permissions(&self) -> Vec<Permission> {
         permissions::all()
+    }
+
+    fn events(&self) -> Vec<EventInfo> {
+        events::all()
     }
 
     fn routes(&self) -> OpenApiRouter {
@@ -172,20 +185,27 @@ pub(crate) mod testing {
         pub roles: Arc<crate::role::RoleService>,
         pub api_keys: Arc<crate::api_key::ApiKeyService>,
         pub mfa: Arc<crate::mfa::MfaService>,
+        pub database: Database,
         pub authenticator: Arc<dyn autoxide_kernel::access::Authenticator>,
     }
 
     pub async fn services(test: &TestDatabase) -> Services {
         let database = database(test).await;
+        let outbox = autoxide_kernel::event::Outbox::standalone("auth");
         let users = Arc::new(crate::user::UserService::new(
             database.clone(),
             crate::password::Passwords::new(),
+            outbox.clone(),
         ));
         let tokens = crate::token::AccessTokens::new(
             b"test-key-test-key-test-key-test-key".to_vec(),
             std::time::Duration::from_secs(900),
         );
-        let mfa = Arc::new(crate::mfa::MfaService::new(database.clone(), "Autoxide".to_owned()));
+        let mfa = Arc::new(crate::mfa::MfaService::new(
+            database.clone(),
+            "Autoxide".to_owned(),
+            outbox.clone(),
+        ));
         let sessions = Arc::new(
             crate::session::SessionService::new(
                 database.clone(),
@@ -199,6 +219,7 @@ pub(crate) mod testing {
                 )
                 .unwrap(),
                 mfa.clone(),
+                outbox.clone(),
             )
             .unwrap(),
         );
@@ -210,15 +231,20 @@ pub(crate) mod testing {
             ),
         ])
         .unwrap();
-        let roles = Arc::new(crate::role::RoleService::new(database.clone(), catalog));
-        let api_keys =
-            Arc::new(crate::api_key::ApiKeyService::new(database, users.clone(), roles.clone()));
+        let roles =
+            Arc::new(crate::role::RoleService::new(database.clone(), catalog, outbox.clone()));
+        let api_keys = Arc::new(crate::api_key::ApiKeyService::new(
+            database.clone(),
+            users.clone(),
+            roles.clone(),
+            outbox,
+        ));
         let authenticator = Arc::new(crate::access::RequestAuthenticator {
             sessions: sessions.clone(),
             roles: roles.clone(),
             api_keys: api_keys.clone(),
         });
-        Services { users, sessions, roles, api_keys, mfa, authenticator }
+        Services { users, sessions, roles, api_keys, mfa, database, authenticator }
     }
 
     /// Service phiên đăng nhập kèm service người dùng dùng chung database.
@@ -227,5 +253,30 @@ pub(crate) mod testing {
     ) -> (Arc<crate::session::SessionService>, Arc<crate::user::UserService>) {
         let services = services(test).await;
         (services.sessions, services.users)
+    }
+
+    /// Các event đã ghi vào `auth_events`, theo thứ tự: (tên, người dùng gây ra,
+    /// subject, payload).
+    pub async fn recorded_events(
+        database: &Database,
+    ) -> Vec<(String, Option<uuid::Uuid>, Option<String>, String)> {
+        use sea_orm::ConnectionTrait;
+        let backend = database.write().get_database_backend();
+        let sql = "SELECT name, actor_user_id, subject, payload FROM auth_events ORDER BY id";
+        let rows = database
+            .write()
+            .query_all_raw(sea_orm::Statement::from_string(backend, sql))
+            .await
+            .unwrap();
+        rows.iter()
+            .map(|row| {
+                (
+                    row.try_get("", "name").unwrap(),
+                    row.try_get("", "actor_user_id").unwrap(),
+                    row.try_get("", "subject").unwrap(),
+                    row.try_get("", "payload").unwrap(),
+                )
+            })
+            .collect()
     }
 }

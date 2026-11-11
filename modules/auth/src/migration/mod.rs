@@ -22,5 +22,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0006_create_totp::Migration),
         Box::new(m0007_create_recovery_codes::Migration),
         Box::new(m0008_create_mfa_challenge::Migration),
+        // Bảng `auth_events` (transactional outbox), định nghĩa ở kernel.
+        autoxide_kernel::event::outbox_migration("m0009_create_events", "auth"),
     ]
 }

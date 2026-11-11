@@ -81,6 +81,8 @@ pub(crate) mod test_support {
     use tower::ServiceExt as _;
     use utoipa_axum::router::OpenApiRouter;
 
+    use autoxide_kernel::event::Actor;
+
     use crate::testing::Services;
     use crate::user::NewUser;
 
@@ -96,11 +98,14 @@ pub(crate) mod test_support {
         let services = crate::testing::services(test).await;
         services
             .users
-            .create(NewUser {
-                email: "ada@example.com".to_owned(),
-                name: "Ada".to_owned(),
-                password: Some(PASSWORD.to_owned()),
-            })
+            .create(
+                Actor::system(),
+                NewUser {
+                    email: "ada@example.com".to_owned(),
+                    name: "Ada".to_owned(),
+                    password: Some(PASSWORD.to_owned()),
+                },
+            )
             .await
             .unwrap();
         let source = ConfigSource::default();

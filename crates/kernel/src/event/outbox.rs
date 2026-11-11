@@ -22,8 +22,14 @@ pub struct Outbox {
 }
 
 impl Outbox {
-    pub(crate) fn new(module: &'static str, wake: Arc<Notify>) -> Self {
+    pub(crate) fn with_wake(module: &'static str, wake: Arc<Notify>) -> Self {
         Outbox { module, table: table_name(module).into(), wake }
+    }
+
+    /// `Outbox` đứng riêng, không nối với bộ phát của chương trình — cho test của
+    /// module. Trong chương trình thật, lấy bằng `StartContext::outbox`.
+    pub fn standalone(module: &'static str) -> Self {
+        Outbox::with_wake(module, Arc::new(Notify::new()))
     }
 
     /// Ghi `event` do `actor` gây ra, về bản ghi `subject` (dạng `<loại>:<id>`, nếu

@@ -167,7 +167,7 @@ async fn revoke_api_key(
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    state.api_keys.revoke(principal.user_id(), id).await?;
+    state.api_keys.revoke(&principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

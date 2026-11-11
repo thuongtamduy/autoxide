@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
@@ -154,7 +155,7 @@ async fn create_user(
 ) -> Result<(StatusCode, Data<UserResponse>), Error> {
     principal.require(&USERS_MANAGE)?;
     let input = NewUser { email: input.email, name: input.name, password: input.password };
-    let user = state.users.create(input).await?;
+    let user = state.users.create(Actor::from(&principal), input).await?;
     Ok((StatusCode::CREATED, Data { data: user.into() }))
 }
 
@@ -213,7 +214,7 @@ async fn update_user(
 ) -> Result<Data<UserResponse>, Error> {
     principal.require(&USERS_MANAGE)?;
     let changes = UserChanges { name: input.name, disabled: input.disabled };
-    Ok(Data { data: state.users.update(id, changes).await?.into() })
+    Ok(Data { data: state.users.update(Actor::from(&principal), id, changes).await?.into() })
 }
 
 /// Create your own account.
@@ -244,7 +245,8 @@ async fn register(
         ));
     }
     let input = NewUser { email: input.email, name: input.name, password: Some(input.password) };
-    let user = state.users.create(input).await?;
+    // Chưa đăng nhập, chưa có tài khoản: "hệ thống" tạo thay người đăng ký.
+    let user = state.users.create(Actor::system(), input).await?;
     Ok((StatusCode::CREATED, Data { data: user.into() }))
 }
 
@@ -347,6 +349,93 @@ mod tests {
             let short = json!({"email": "x@example.com", "name": "X", "password": "short"});
             let (status, _, _) = call(&app, "POST", "/register", None, Some(short)).await;
             assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        })
+        .await
+        .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod event_tests {
+    use autoxide_testkit::TestDatabase;
+    use axum::http::StatusCode;
+    use serde_json::json;
+
+    use crate::api::{Accounts, NewAccount};
+    use crate::http::test_support::{PASSWORD, app, bearer, call};
+    use crate::mfa::service::tests::code_at;
+    use crate::testing::recorded_events;
+
+    /// Mỗi thay đổi ghi một event, đúng người làm, và không event nào chứa bí mật.
+    #[tokio::test]
+    async fn moi_thay_doi_ghi_event_khong_lo_bi_mat() {
+        TestDatabase::run(async |test| {
+            let (app, services) = app(test).await;
+            let root = NewAccount {
+                email: "root@example.com".to_owned(),
+                name: "Root".to_owned(),
+                password: Some(PASSWORD.to_owned()),
+                admin: true,
+            };
+            let root = Accounts::create(services.users.as_ref(), root).await.unwrap();
+            let admin = bearer(&app, "root@example.com", PASSWORD).await;
+
+            let body = json!({"email": "bob@example.com", "name": "Bob", "password": PASSWORD});
+            let (_, _, bob) = call(&app, "POST", "/users", Some(&admin), Some(body)).await;
+            let bob_id = bob["data"]["id"].as_str().unwrap().to_owned();
+            let body = json!({"name": "reader", "permissions": ["auth.users.read"]});
+            let (_, _, role) = call(&app, "POST", "/roles", Some(&admin), Some(body)).await;
+            let body = json!({"role_ids": [role["data"]["id"]]});
+            let path = format!("/users/{bob_id}/roles");
+            let (status, _, _) = call(&app, "PUT", &path, Some(&admin), Some(body)).await;
+            assert_eq!(status, StatusCode::OK);
+            let body = json!({"disabled": true});
+            let path = format!("/users/{bob_id}");
+            call(&app, "PATCH", &path, Some(&admin), Some(body)).await;
+            let body = json!({"name": "agent", "permissions": ["auth.users.read"]});
+            let (_, _, key) = call(&app, "POST", "/api-keys", Some(&admin), Some(body)).await;
+            let (_, _, setup) = call(&app, "POST", "/me/mfa/totp", Some(&admin), None).await;
+            let secret = setup["data"]["secret"].as_str().unwrap().to_owned();
+            let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
+            let body = json!({"code": code_at(&secret, now)});
+            let (_, _, codes) =
+                call(&app, "POST", "/me/mfa/totp/confirm", Some(&admin), Some(body)).await;
+
+            let events = recorded_events(&services.database).await;
+            let names: Vec<&str> = events.iter().map(|(name, ..)| name.as_str()).collect();
+            assert_eq!(
+                names,
+                [
+                    "auth.user_created", // `ada` của router test
+                    "auth.user_created", // root, bằng CLI
+                    "auth.signed_in",
+                    "auth.user_created",
+                    "auth.role_created",
+                    "auth.user_roles_changed",
+                    "auth.user_updated",
+                    "auth.api_key_created",
+                    "auth.mfa_enabled",
+                ]
+            );
+            // Do người tạo bằng CLI ("hệ thống") và do quản trị viên làm.
+            assert_eq!(events[1].1, None);
+            assert!(events[3..].iter().all(|(_, actor, ..)| *actor == Some(root.id)));
+            assert_eq!(events[3].2.as_deref(), Some(format!("auth.user:{bob_id}").as_str()));
+            let disabled: serde_json::Value = serde_json::from_str(&events[6].3).unwrap();
+            assert!(disabled["before"]["disabled_at"].is_null());
+            assert!(disabled["after"]["disabled_at"].is_string());
+            let roles: serde_json::Value = serde_json::from_str(&events[5].3).unwrap();
+            assert_eq!(roles, json!({"before": [], "after": ["reader"]}));
+
+            let everything: String = events.iter().map(|(.., payload)| payload.as_str()).collect();
+            for secret_value in [
+                PASSWORD,
+                key["data"]["key"].as_str().unwrap(),
+                &secret,
+                codes["data"]["recovery_codes"][0].as_str().unwrap(),
+            ] {
+                assert!(!everything.contains(secret_value), "a secret leaked into an event");
+            }
         })
         .await
         .unwrap();

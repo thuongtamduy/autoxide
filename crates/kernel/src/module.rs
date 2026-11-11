@@ -153,7 +153,7 @@ impl StartContext<'_> {
                 self.module
             )));
         }
-        Ok(Outbox::new(self.module, Arc::clone(self.wake)))
+        Ok(Outbox::with_wake(self.module, Arc::clone(self.wake)))
     }
 
     /// Công bố một trait cho module khác dùng. `T` là kiểu `dyn Trait` khai trong

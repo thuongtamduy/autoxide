@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
 use axum::extract::{Path, State};
@@ -235,7 +236,7 @@ async fn reset_user_mfa(
 ) -> Result<StatusCode, Error> {
     principal.require(&USERS_MANAGE)?;
     state.users.get(id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
-    state.mfa.reset(id).await?;
+    state.mfa.reset(Actor::from(&principal), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
