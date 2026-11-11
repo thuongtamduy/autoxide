@@ -22,10 +22,18 @@ tracing.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+axum.workspace = true
 chrono.workspace = true
 autoxide-testkit.workspace = true
+# MCP client thật cho test đầu-cuối của endpoint MCP.
+rmcp = { workspace = true, features = [
+  "client",
+  "transport-streamable-http-client-reqwest",
+  "reqwest-tls-no-provider",
+] }
 sea-orm.workspace = true
 serde_json.workspace = true
+tower.workspace = true
 
 [lints]
 workspace = true

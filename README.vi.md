@@ -12,8 +12,9 @@ core không chứa khái niệm nghiệp vụ — những thứ đó thuộc v�
 
 ## Trạng thái
 
-Đang ở giai đoạn đầu. **Bước 0 đến bước 4 của lộ trình (khung dự án, nền, đăng
-nhập cùng role và permission, đăng nhập hai bước, event và audit log, job queue) đã xong**: workspace Cargo, gate chất lượng, cấu hình, truy cập database, migration theo
+Đang ở giai đoạn đầu. **Bước 0 đến bước 9 của lộ trình (khung dự án, nền, đăng
+nhập cùng role và permission, đăng nhập hai bước, event và audit log, job queue, i18n
+và idempotency, email, lưu file, MCP endpoint) đã xong**: workspace Cargo, gate chất lượng, cấu hình, truy cập database, migration theo
 module, hợp đồng module, máy chủ HTTP dưới `/api/v1` kèm OpenAPI, health check, log,
 metrics, tracing và CLI. Module `auth` lưu người dùng
 với mật khẩu hash bằng Argon2id và cho đăng nhập bằng access token sống ngắn cùng
@@ -33,7 +34,9 @@ thì thử lại với backoff, hỏng hẳn thì được giữ lại (`autoxid
 jobs retry`), và chạy theo lịch khi module yêu cầu. `AUTOXIDE_PROCESS_ROLE` tách một
 bản triển khai thành tiến trình API và tiến trình worker. Thông báo lỗi có tiếng Anh và
 tiếng Việt, chọn bằng header `Accept-Language`. Lệnh ghi gửi kèm header
-`Idempotency-Key` gửi lại an toàn: lần gửi lại nhận đúng kết quả lần đầu.
+`Idempotency-Key` gửi lại an toàn: lần gửi lại nhận đúng kết quả lần đầu. Mail gửi qua
+SMTP từ job queue (đặt lại mật khẩu, xác minh email). File lưu trên ổ đĩa hoặc S3. AI
+agent gọi hệ thống như công cụ qua MCP ở `/mcp`.
 
 Core sẽ gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -139,6 +142,16 @@ Hợp đồng của API là một tài liệu OpenAPI sinh ra từ code. Nó n�
 chủ đang chạy phục vụ nó ở `/api/v1/openapi.json`. Phần mô tả của tài liệu liệt kê
 các quy ước mọi endpoint tuân theo (envelope của response, lỗi theo RFC 9457 với
 `code` ổn định, pagination theo con trỏ, request id).
+
+AI agent dùng cùng các chức năng đó như công cụ (tool) qua
+[Model Context Protocol](https://modelcontextprotocol.io) ở `/mcp` (Streamable HTTP),
+xác thực như API — thường dùng API key. Agent chỉ thấy và gọi được tool mà permission
+của nó cho phép; mỗi tool chạy đúng code của endpoint REST tương ứng, nên lệnh ghi vào
+audit log. Ví dụ với Claude Code:
+
+```bash
+claude mcp add --transport http autoxide http://127.0.0.1:8080/mcp --header "Authorization: Bearer <api key>"
+```
 
 [`.env.example`](.env.example) liệt kê mọi biến kèm mô tả và giá trị mặc định. File
 này sinh ra từ code nên không thể lỗi thời. Cấu hình sai được báo đầy đủ — mọi vấn

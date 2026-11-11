@@ -139,7 +139,7 @@ pub(crate) struct MeResponse {
 }
 
 impl MeResponse {
-    fn new(user: User, principal: &Principal) -> Self {
+    pub(crate) fn new(user: User, principal: &Principal) -> Self {
         MeResponse {
             id: user.id,
             email: user.email,

@@ -5,9 +5,9 @@ mod api_keys;
 mod email;
 mod mfa;
 mod reset;
-mod roles;
-mod session;
-mod users;
+pub(crate) mod roles;
+pub(crate) mod session;
+pub(crate) mod users;
 
 use std::sync::Arc;
 

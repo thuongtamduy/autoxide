@@ -1424,3 +1424,39 @@ luôn là attachment + nosniff nên loại đã khai không làm hại được 
 khó gọi từ máy hơn (giao diện là dự án riêng, gửi được thân thô); đoán loại theo nội
 dung (magic number) — cần thêm thư viện, mà loại khai sai không gây hại nhờ hai header
 trên; thêm sau nếu có nhu cầu.
+
+## D-068 · MCP endpoint: `rmcp` ở kernel, tool khai qua hợp đồng module — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Kernel phục vụ MCP (Streamable HTTP) ở `/mcp` bằng `rmcp` 3.9 (SDK chính thức), chế
+  độ **không giữ phiên, trả JSON**: mỗi request độc lập, nhiều máy chủ chạy song song
+  như REST. Chỉ có khi một module công bố `Authenticator`.
+- Xác thực ở lớp chạy trước `rmcp`, cùng `Authenticator` với REST (access token hay
+  API key); thiếu hay sai thì 401 kiểu Problem kèm `WWW-Authenticate: Bearer`. Kiểm
+  `Host` của `rmcp` tắt (chỉ có ích cho máy chủ không xác thực); kiểm `Origin` theo
+  cùng danh sách `AUTOXIDE_HTTP_CORS_ORIGINS`. CORS cho phép thêm header của MCP.
+- `Module::tools()` (mặc định rỗng — D-038) trả `kernel::mcp::Tool`: tên ngắn (kernel
+  thêm `<module>.`), mô tả tiếng Anh, đầu vào là kiểu Rust `Deserialize + Validate +
+  ToSchema` (JSON Schema sinh từ cùng kiểu, kiểm như `ValidJson`; không cho kiểu lồng vì
+  client MCP không đọc `$ref`), permission (`requires`), gợi ý `read_only` /
+  `destructive`. `Modules::tools()` kiểm khai báo lúc khởi động (tên, trùng, permission
+  có người khai). `PageInput` cho tool liệt kê, cùng ý nghĩa `limit`/`cursor`/`order`.
+- `tools/list` chỉ có tool người gọi có permission; gọi tool khác nhận cùng lỗi như tool
+  không tồn tại. Kết quả: `structuredContent = {"data": …}` (cùng envelope với REST);
+  lỗi của tool là kết quả `isError` với `code`, `message` dịch theo `Accept-Language`
+  và `errors` như Problem.
+- Tool chỉ gọi service, cùng permission với endpoint REST tương ứng; service ghi event
+  với `Actor` của người gọi nên lệnh ghi qua MCP vào audit log như REST. Tool của core
+  (module `auth`): `whoami`, `list_permissions`, `list_users`, `update_user`.
+- `rustls` cần provider: kernel `tls::install_crypto_provider()` (D-066) cũng dùng cho
+  client MCP trong test.
+
+Lý do: SDK chính thức theo kịp đặc tả (phiên bản giao thức, metadata, lỗi); stateless
+hợp với triển khai nhiều máy chủ; một đường xác thực và một service layer cho cả REST
+lẫn MCP thì không có lỗ hổng riêng của MCP.
+
+Đã cân nhắc: tự viết JSON-RPC — ít thư viện hơn nhưng phải tự theo kịp đặc tả đang đổi
+nhanh; macro `#[tool]` của `rmcp` — gắn module vào `rmcp` và schemars, trong khi kiểu
+đầu vào đã có `ToSchema` + `Validate` như REST; giữ phiên (session) — cần lưu phiên
+chung giữa các máy chủ mà không thêm được gì cho tool hiện có.

@@ -23,6 +23,7 @@ mod reset;
 mod role;
 mod session;
 mod token;
+mod tools;
 mod user;
 mod verify;
 
@@ -177,6 +178,10 @@ impl Module for AuthModule {
 
     fn schedules(&self) -> Vec<Schedule> {
         vec![cleanup::schedule()]
+    }
+
+    fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {
+        self.state.clone().map_or_else(Vec::new, |state| tools::all(&Arc::new(state)))
     }
 
     fn routes(&self) -> OpenApiRouter {

@@ -40,6 +40,20 @@ pub(crate) struct PermissionResponse {
     description: String,
 }
 
+impl PermissionResponse {
+    /// Mọi permission, theo thứ tự tên.
+    pub(crate) fn catalog(roles: &crate::role::RoleService) -> Vec<PermissionResponse> {
+        roles
+            .catalog()
+            .iter()
+            .map(|permission| PermissionResponse {
+                name: permission.name().to_owned(),
+                description: permission.description().to_owned(),
+            })
+            .collect()
+    }
+}
+
 /// A role: a named set of permissions given to users.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(crate) struct RoleResponse {
@@ -131,16 +145,7 @@ async fn list_permissions(
     principal: Principal,
 ) -> Result<Data<Vec<PermissionResponse>>, Error> {
     principal.require(&ROLES_READ)?;
-    let data = state
-        .roles
-        .catalog()
-        .iter()
-        .map(|permission| PermissionResponse {
-            name: permission.name().to_owned(),
-            description: permission.description().to_owned(),
-        })
-        .collect();
-    Ok(Data { data })
+    Ok(Data { data: PermissionResponse::catalog(&state.roles) })
 }
 
 /// List roles.

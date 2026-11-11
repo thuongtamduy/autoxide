@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–8 xong; đang ở bước 9**, mục "Endpoint MCP qua HTTP, xác thực bằng API key hoặc access token".
+Trạng thái: **bước 0–9 xong; đang ở bước 10**, mục "Một module nghiệp vụ nhỏ dùng đủ…".
 
 ## 0. Khung dự án
 
@@ -90,12 +90,12 @@ Trạng thái: **bước 0–8 xong; đang ở bước 9**, mục "Endpoint MCP 
 
 Cho AI agent gọi chức năng của hệ thống như công cụ (Model Context Protocol).
 
-- [ ] Endpoint MCP qua HTTP, xác thực bằng API key hoặc access token
-- [ ] Module tự khai báo tool của mình qua hợp đồng module (như route và permission)
-- [ ] Mỗi tool gắn permission; chỉ liệt kê và cho gọi tool mà người gọi có permission
-- [ ] Tool gọi vào service layer (cùng logic với REST); lệnh ghi đi qua audit log
-- [ ] Tool của core: ít nhất đọc thông tin người gọi và danh mục permission
-- [ ] Test bằng một MCP client thật trên cả hai database
+- [x] Endpoint MCP qua HTTP, xác thực bằng API key hoặc access token
+- [x] Module tự khai báo tool của mình qua hợp đồng module (như route và permission)
+- [x] Mỗi tool gắn permission; chỉ liệt kê và cho gọi tool mà người gọi có permission
+- [x] Tool gọi vào service layer (cùng logic với REST); lệnh ghi đi qua audit log
+- [x] Tool của core: ít nhất đọc thông tin người gọi và danh mục permission
+- [x] Test bằng một MCP client thật trên cả hai database
 
 ## 10. Module mẫu
 

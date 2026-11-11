@@ -134,6 +134,12 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Tool MCP của module (D-068). Gọi sau `start` (tool thường gọi vào service dựng
+    /// lúc đó). Tên khai ngắn (`create_note`); kernel thêm tiền tố `<module>.`.
+    fn tools(&self) -> Vec<crate::mcp::Tool> {
+        Vec::new()
+    }
+
     /// Route cần thân request lớn hơn giới hạn chung (`AUTOXIDE_HTTP_BODY_LIMIT_BYTES`),
     /// vd tải file lên. Gọi sau `configure` (giới hạn có thể lấy từ cấu hình của module).
     fn body_limits(&self) -> Vec<crate::http::BodyLimit> {
@@ -414,6 +420,36 @@ impl Modules {
                 module.deprecations().into_iter().map(move |deprecation| (name, deprecation))
             })
             .collect()
+    }
+
+    /// Tool MCP của mọi module, tên đầy đủ `<module>.<tên>`. Gọi sau
+    /// [`start`](Self::start). Khai báo sai (tên sai dạng hay trùng, đầu vào không phải
+    /// object, permission không ai khai) là lỗi khởi động.
+    pub fn tools(&self) -> Result<Vec<crate::mcp::Tool>, ModuleError> {
+        let mut tools = Vec::new();
+        let mut problems = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+        for module in &self.modules {
+            let name = module.name();
+            for tool in module.tools() {
+                let tool = tool.qualify(name);
+                problems.extend(tool.problems(name));
+                if let Some(permission) = tool.permission()
+                    && !self.permissions.contains(permission.name())
+                {
+                    problems.push(format!(
+                        "tool `{}` requires permission `{}`, which no module declares",
+                        tool.name(),
+                        permission.name()
+                    ));
+                }
+                if !seen.insert(tool.name().to_owned()) {
+                    problems.push(format!("tool `{}` is declared twice", tool.name()));
+                }
+                tools.push(tool);
+            }
+        }
+        if problems.is_empty() { Ok(tools) } else { Err(ModuleError(problems.join("; "))) }
     }
 
     /// Giới hạn thân request riêng của mọi module: `(tên module, khai báo)`.

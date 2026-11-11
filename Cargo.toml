@@ -103,6 +103,14 @@ object_store = { version = "0.14", default-features = false, features = [
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
 # Để kernel cài provider `ring` cho rustls (reqwest không tự chọn khi không kèm provider).
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+# MCP endpoint (SDK chính thức của Model Context Protocol): server Streamable HTTP ở
+# kernel. Bỏ feature mặc định (macro tool — tool khai bằng hợp đồng module, không bằng
+# macro). Client (`client`, `transport-streamable-http-client-reqwest`,
+# `reqwest-tls-no-provider`) chỉ bật trong [dev-dependencies] cho test.
+rmcp = { version = "3.9", default-features = false, features = [
+  "server",
+  "transport-streamable-http-server",
+] }
 # Gửi mail qua SMTP. Bỏ bộ feature mặc định (native-tls kéo OpenSSL); TLS dùng rustls với
 # `ring` — cùng thư viện mật mã sqlx đang dùng, tránh xung đột ở D-043.
 lettre = { version = "0.11", default-features = false, features = [

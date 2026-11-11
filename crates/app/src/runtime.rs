@@ -79,11 +79,18 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
     }
     // Tiến trình chỉ làm việc nền (`worker`) không phục vụ API của module, chỉ health
     // check (và số đo) để hệ thống vận hành theo dõi.
-    let (routes, authenticator) = if config.process.role.serves_api() {
+    let (routes, authenticator, tools) = if config.process.role.serves_api() {
         // Bộ xác thực (nếu một module công bố) được gắn vào mọi request.
-        (modules.routes(), modules.api::<dyn Authenticator>())
+        let tools = match modules.tools() {
+            Ok(tools) => tools,
+            Err(error) => {
+                let _ = database.close().await;
+                return Err(error.to_string());
+            }
+        };
+        (modules.routes(), modules.api::<dyn Authenticator>(), tools)
     } else {
-        (Vec::new(), None)
+        (Vec::new(), None, Vec::new())
     };
     let extras = http::Extras {
         authenticator,
@@ -91,6 +98,7 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         translations: modules.translations().clone(),
         deprecations: modules.deprecations(),
         body_limits: modules.body_limits(),
+        tools,
     };
     let api = http::build(&config.http, root, routes, extras);
     Ok(Runtime { config, database, modules, api, dispatcher, worker })

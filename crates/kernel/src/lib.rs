@@ -15,6 +15,7 @@ pub mod idempotency;
 pub mod job;
 pub mod logging;
 pub mod mail;
+pub mod mcp;
 pub mod metrics;
 pub mod migration;
 pub mod module;

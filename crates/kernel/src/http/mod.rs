@@ -30,6 +30,7 @@ mod health;
 mod idempotency;
 mod language;
 mod log;
+mod mcp;
 mod metrics;
 mod openapi;
 mod problem;
@@ -42,7 +43,7 @@ use std::time::Duration;
 use std::sync::Arc;
 
 use axum::extract::{DefaultBodyLimit, Request};
-use axum::http::{HeaderValue, Method, header};
+use axum::http::{HeaderName, HeaderValue, Method, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Router};
@@ -63,6 +64,7 @@ pub use body_limit::{BodyLimit, is_too_large};
 pub use deprecation::Deprecation;
 pub use extract::ValidJson;
 pub use health::{Health, health_routes};
+pub use mcp::MCP_PATH;
 pub use metrics::metrics_routes;
 pub use openapi::{BEARER_AUTH, DOCS_PATH, OPENAPI_PATH, lint};
 pub use request_id::REQUEST_ID_HEADER;
@@ -95,6 +97,9 @@ pub struct Extras {
     pub deprecations: Vec<(&'static str, Deprecation)>,
     /// Giới hạn thân request riêng của route do module khai: `(tên module, khai báo)`.
     pub body_limits: Vec<(&'static str, BodyLimit)>,
+    /// Tool MCP của các module, tên đầy đủ (`Modules::tools`). Endpoint `/mcp` có mặt
+    /// khi có `authenticator`.
+    pub tools: Vec<crate::mcp::Tool>,
     /// Bản dịch thông báo lỗi (mặc định: chỉ bản dịch của kernel thì dùng
     /// `Translations::new(Vec::new())`; rỗng thì mọi lỗi bằng tiếng Anh).
     pub translations: Translations,
@@ -131,6 +136,16 @@ pub fn build(
         router = router.merge(Scalar::with_url(DOCS_PATH, openapi.clone()));
     }
 
+    let translations = Arc::new(extras.translations);
+    if let Some(mcp) = mcp::router(
+        extras.tools,
+        translations.clone(),
+        extras.authenticator.clone(),
+        &config.cors_origins,
+    ) {
+        router = router.merge(mcp);
+    }
+
     if let Some(authenticator) = extras.authenticator {
         // Đặt bộ xác thực vào "extensions" của mọi request, nơi extractor
         // `Principal` tìm nó.
@@ -138,7 +153,6 @@ pub fn build(
     }
 
     // `None` khi rate limiting bị tắt; lớp vẫn có mặt và cho mọi request đi qua.
-    let translations = Arc::new(extras.translations);
     let body_limits = Arc::new(body_limit::BodyLimits::new(config.body_limit, &extras.body_limits));
     let idempotency = extras.idempotency.map(|store| {
         Arc::new(idempotency::Settings {
@@ -218,8 +232,16 @@ fn cors(origins: &CorsOrigins) -> CorsLayer {
             header::CONTENT_TYPE,
             idempotency::IDEMPOTENCY_KEY,
             REQUEST_ID_HEADER,
+            // Header của giao thức MCP (endpoint `/mcp`).
+            HeaderName::from_static("mcp-protocol-version"),
+            HeaderName::from_static("mcp-session-id"),
+            HeaderName::from_static("last-event-id"),
         ])
-        .expose_headers([REQUEST_ID_HEADER, idempotency::IDEMPOTENT_REPLAYED])
+        .expose_headers([
+            REQUEST_ID_HEADER,
+            idempotency::IDEMPOTENT_REPLAYED,
+            HeaderName::from_static("mcp-session-id"),
+        ])
         .max_age(Duration::from_secs(3600));
     match origins {
         // Không khai origin nào: không thêm header CORS, trình duyệt tự chặn.

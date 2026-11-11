@@ -12,8 +12,9 @@ the core contains no business concepts — those belong to modules.
 
 ## Status
 
-Early development. **Steps 0 to 4 of the roadmap (project skeleton, foundation,
-login with roles and permissions, two-step sign-in, events and audit log, job queue) are done**: the Cargo workspace, the quality gate, configuration,
+Early development. **Steps 0 to 9 of the roadmap (project skeleton, foundation,
+login with roles and permissions, two-step sign-in, events and audit log, job queue,
+i18n and idempotency, email, file storage, MCP endpoint) are done**: the Cargo workspace, the quality gate, configuration,
 database access, per-module migrations, the module contract, the HTTP server
 under `/api/v1` with OpenAPI, health checks, logs, metrics, tracing and the CLI.
 The `auth` module stores
@@ -35,7 +36,10 @@ with backoff, kept when they fail for good (`autoxide jobs failed`, `autoxide jo
 retry`), and run on a schedule when a module asks. `AUTOXIDE_PROCESS_ROLE` splits a
 deployment into API processes and worker processes. Error messages come in English or
 Vietnamese, chosen with the `Accept-Language` header. Write requests sent with an
-`Idempotency-Key` header are safe to retry: a repeat returns the first result.
+`Idempotency-Key` header are safe to retry: a repeat returns the first result. Mail
+goes out through SMTP from the job queue (password reset, email verification). Files
+are stored on local disk or in S3. AI agents call the system as tools over MCP at
+`/mcp`.
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -141,6 +145,16 @@ as [`docs/openapi.json`](docs/openapi.json), printed by `autoxide openapi`, and
 served by the running server at `/api/v1/openapi.json`. Its description lists the
 conventions every endpoint follows (response envelope, RFC 9457 errors with a
 stable `code`, cursor pagination, request ids).
+
+AI agents reach the same functions as tools through the
+[Model Context Protocol](https://modelcontextprotocol.io) at `/mcp` (Streamable
+HTTP), authenticated like the API — an API key is the usual choice. An agent sees and
+calls only the tools its permissions allow; each tool runs the same code as the
+matching REST endpoint, so writes land in the audit log. For example, with Claude Code:
+
+```bash
+claude mcp add --transport http autoxide http://127.0.0.1:8080/mcp --header "Authorization: Bearer <api key>"
+```
 
 [`.env.example`](.env.example) lists every setting with its description and
 default. It is generated from the code, so it cannot go out of date. An invalid

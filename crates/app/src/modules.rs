@@ -128,4 +128,99 @@ mod tests {
         .await
         .unwrap();
     }
+
+    /// Đầu-cuối: chương trình thật, database thật (gate chạy cả hai), client MCP thật.
+    /// Quản trị viên đăng nhập, gọi tool ghi qua MCP; thay đổi vào audit log, ghi đúng
+    /// người làm.
+    #[tokio::test]
+    async fn client_mcp_goi_tool_ghi_va_vao_audit_log() {
+        use autoxide_auth::api::{Accounts, NewAccount};
+        use rmcp::ServiceExt as _;
+        use rmcp::model::CallToolRequestParams;
+        use rmcp::transport::StreamableHttpClientTransport;
+        use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
+        use sea_orm::{ConnectionTrait, Statement};
+        use serde_json::json;
+        use tower::ServiceExt as _;
+
+        TestDatabase::run(async |database| {
+            let source = ConfigSource::from_pairs([("DATABASE_URL", database.url())]);
+            let settings = crate::settings::read(&source).unwrap();
+            let db = Database::connect(&settings.config.database).await.unwrap();
+            settings.modules.migrator().unwrap().up(&db).await.unwrap();
+            db.close().await.unwrap();
+            let runtime =
+                crate::runtime::start(settings, crate::runtime::Migrations::RequireApplied)
+                    .await
+                    .unwrap();
+            let accounts = runtime.modules.api::<dyn Accounts>().unwrap();
+            let password = "correct horse battery staple";
+            let account = |email: &str, admin: bool| NewAccount {
+                email: email.to_owned(),
+                name: "Someone".to_owned(),
+                password: Some(password.to_owned()),
+                admin,
+            };
+            let root = accounts.create(account("root@example.com", true)).await.unwrap();
+            let bob = accounts.create(account("bob@example.com", false)).await.unwrap();
+            runtime.dispatcher.run_once().await.unwrap();
+
+            // Đăng nhập qua REST để lấy access token.
+            let login = json!({"email": "root@example.com", "password": password});
+            let request = axum::http::Request::builder()
+                .method("POST")
+                .uri("/api/v1/auth/login")
+                .header("content-type", "application/json")
+                .body(axum::body::Body::from(login.to_string()))
+                .unwrap();
+            let response = runtime.api.router.clone().oneshot(request).await.unwrap();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            let token = body["data"]["access_token"].as_str().unwrap().to_owned();
+
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = format!("http://{}/mcp", listener.local_addr().unwrap());
+            let router = runtime.api.router.clone();
+            let server = tokio::spawn(async move { axum::serve(listener, router).await });
+            autoxide_kernel::tls::install_crypto_provider();
+            let config = StreamableHttpClientTransportConfig::with_uri(url).auth_header(token);
+            let client =
+                ().serve(StreamableHttpClientTransport::from_config(config)).await.unwrap();
+
+            let tools = client.list_all_tools().await.unwrap();
+            let names: Vec<&str> = tools.iter().map(|tool| tool.name.as_ref()).collect();
+            for expected in ["auth.whoami", "auth.list_permissions", "auth.update_user"] {
+                assert!(names.contains(&expected), "{names:?}");
+            }
+            let whoami = client.call_tool(CallToolRequestParams::new("auth.whoami")).await;
+            let whoami = whoami.unwrap().structured_content.unwrap();
+            assert_eq!(whoami["data"]["email"], "root@example.com");
+            assert_eq!(whoami["data"]["all_permissions"], true);
+
+            let arguments = json!({"id": bob.id, "name": "Robert"});
+            let call = CallToolRequestParams::new("auth.update_user")
+                .with_arguments(arguments.as_object().unwrap().clone());
+            let updated = client.call_tool(call).await.unwrap();
+            assert_eq!(updated.is_error, Some(false), "{updated:?}");
+            assert_eq!(updated.structured_content.unwrap()["data"]["name"], "Robert");
+            client.cancel().await.unwrap();
+            server.abort();
+
+            assert!(runtime.dispatcher.run_once().await.unwrap() >= 1);
+            let backend = runtime.database.read().get_database_backend();
+            let sql = "SELECT actor_user_id FROM audit_entry WHERE action = 'auth.user_updated'";
+            let rows = runtime
+                .database
+                .read()
+                .query_all_raw(Statement::from_string(backend, sql))
+                .await
+                .unwrap();
+            assert_eq!(rows.len(), 1);
+            let actor: Option<uuid::Uuid> = rows[0].try_get("", "actor_user_id").unwrap();
+            assert_eq!(actor, Some(root.id));
+            runtime.database.close().await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
 }
