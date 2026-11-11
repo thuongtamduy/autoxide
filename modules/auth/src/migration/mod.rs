@@ -7,6 +7,7 @@ mod m0003_create_roles;
 mod m0004_create_login_throttle;
 mod m0005_create_api_keys;
 mod m0006_create_totp;
+mod m0007_create_recovery_codes;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -18,5 +19,6 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0004_create_login_throttle::Migration),
         Box::new(m0005_create_api_keys::Migration),
         Box::new(m0006_create_totp::Migration),
+        Box::new(m0007_create_recovery_codes::Migration),
     ]
 }

@@ -973,3 +973,24 @@ cấu hình bắt buộc mà lợi ích nhỏ. Cân nhắc lại khi có biến 
 
 Đã cân nhắc: tự viết TOTP — thư viện đã chọn, nhỏ và đúng chuẩn; trả ảnh QR —
 kéo thư viện ảnh vào core trong khi client vẽ QR từ URL dễ dàng.
+
+## D-052 · Recovery code — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Xác nhận TOTP sinh 10 recovery code, trả về một lần duy nhất. Mỗi mã 80 bit ngẫu
+  nhiên, viết 16 ký tự base32 chữ thường chia nhóm 4 (`abcd-efgh-ijkl-mnop`) —
+  không có ký tự dễ nhầm như `0`/`O`, `1`/`l`. Gõ hoa, thừa khoảng trắng hay thiếu
+  `-` vẫn nhận. Database lưu SHA-256 của mã (bảng `auth_recovery_code`): 80 bit
+  ngẫu nhiên thì băm nhanh vẫn không đoán ngược được.
+- Recovery code thay cho mã TOTP ở chỗ cần "lớp thứ hai" (tắt MFA, và đăng nhập ở
+  mục sau); mỗi mã dùng một lần bằng `UPDATE … WHERE used_at IS NULL` (test đồng thời
+  trên hai database).
+- Sinh lại bộ mới (`POST /api/v1/auth/me/mfa/recovery-codes`) cần mã TOTP, không nhận
+  recovery code — ai chỉ cầm một recovery code không tự đẻ thêm mã. Tắt MFA hoặc quản
+  trị viên xoá MFA thì xoá luôn các mã còn lại. `GET /me/mfa` cho biết còn bao nhiêu mã.
+- Base32 cho đúng 10 byte tự viết (~15 dòng, có vector thử của RFC 4648) thay vì
+  thêm thư viện.
+
+Lý do: mất điện thoại không được đồng nghĩa với mất tài khoản khi không có quản trị
+viên giúp; recovery code là cách chuẩn (GitHub, Google) và không cần email.

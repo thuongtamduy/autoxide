@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0, 1 và 2 xong; đang ở bước 3**, mục "Recovery code dùng một lần".
+Trạng thái: **bước 0, 1 và 2 xong; đang ở bước 3**, mục "Đăng nhập hai bước khi đã bật MFA".
 
 ## 0. Khung dự án
 
@@ -42,7 +42,7 @@ Trạng thái: **bước 0, 1 và 2 xong; đang ở bước 3**, mục "Recovery
 ## 3. MFA
 
 - [x] TOTP: bật, xác nhận, tắt
-- [ ] Recovery code dùng một lần
+- [x] Recovery code dùng một lần
 - [ ] Đăng nhập hai bước khi đã bật MFA
 
 ## 4. Event và audit log

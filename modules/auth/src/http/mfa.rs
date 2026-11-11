@@ -26,6 +26,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
         .routes(routes!(start_totp))
         .routes(routes!(confirm_totp))
         .routes(routes!(disable_totp))
+        .routes(routes!(regenerate_recovery_codes))
         .routes(routes!(reset_user_mfa))
 }
 
@@ -34,12 +35,26 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 pub(crate) struct MfaStatusResponse {
     /// Sign-in asks for a code from an authenticator app.
     totp_enabled: bool,
+    /// Unused recovery codes left. Make new ones before they run out.
+    recovery_codes_remaining: u64,
 }
 
 impl From<MfaStatus> for MfaStatusResponse {
     fn from(status: MfaStatus) -> Self {
-        MfaStatusResponse { totp_enabled: status.totp_enabled }
+        MfaStatusResponse {
+            totp_enabled: status.totp_enabled,
+            recovery_codes_remaining: status.recovery_codes_remaining,
+        }
     }
+}
+
+/// One-time recovery codes. Shown only once.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct RecoveryCodesResponse {
+    /// Each code signs in once in place of an authenticator code, e.g. after losing
+    /// the phone. Store them somewhere safe, away from the phone.
+    #[schema(example = json!(["abcd-efgh-ijkl-mnop", "qrst-uvwx-yz23-4567"]))]
+    recovery_codes: Vec<String>,
 }
 
 /// What to enter in the authenticator app.
@@ -55,10 +70,11 @@ pub(crate) struct TotpSetupResponse {
     otpauth_url: String,
 }
 
-/// A code from the authenticator app.
+/// A code from the authenticator app, or (where stated) a recovery code.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct CodeRequest {
-    /// The 6-digit code currently shown by the app.
+    /// The 6-digit code currently shown by the app, or a recovery code where the
+    /// endpoint accepts one.
     #[validate(length(min = 1, max = 64))]
     #[schema(example = "123456")]
     code: String,
@@ -112,7 +128,8 @@ async fn start_totp(
 
 /// Confirm two-step sign-in with the first code from the app.
 ///
-/// From now on, signing in asks for a code. Needs a password session.
+/// From now on, signing in asks for a code. The response holds ten one-time
+/// recovery codes, shown only this once. Needs a password session.
 #[utoipa::path(
     post,
     path = "/me/mfa/totp/confirm",
@@ -120,7 +137,7 @@ async fn start_totp(
     security(("bearer" = [])),
     request_body = CodeRequest,
     responses(
-        (status = 200, description = "Two-step sign-in is on.", body = Data<MfaStatusResponse>),
+        (status = 200, description = "Two-step sign-in is on; store the recovery codes now.", body = Data<RecoveryCodesResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "The request used an API key; code `auth.session_required`.", body = Problem),
         (status = 409, description = "No setup was started (`auth.mfa_setup_not_started`), or it is already on (`auth.mfa_already_enabled`).", body = Problem),
@@ -131,15 +148,45 @@ async fn confirm_totp(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
     ValidJson(input): ValidJson<CodeRequest>,
-) -> Result<Data<MfaStatusResponse>, Error> {
+) -> Result<Data<RecoveryCodesResponse>, Error> {
     require_session(&principal)?;
-    state.mfa.confirm_totp(principal.user_id(), &input.code).await?;
-    Ok(Data { data: state.mfa.status(principal.user_id()).await?.into() })
+    let recovery_codes = state.mfa.confirm_totp(principal.user_id(), &input.code).await?;
+    Ok(Data { data: RecoveryCodesResponse { recovery_codes } })
+}
+
+/// Replace your recovery codes with ten new ones.
+///
+/// The old codes stop working. Needs a current authenticator code (not a recovery
+/// code) and a password session.
+#[utoipa::path(
+    post,
+    path = "/me/mfa/recovery-codes",
+    operation_id = "regenerate_recovery_codes",
+    security(("bearer" = [])),
+    request_body = CodeRequest,
+    responses(
+        (status = 200, description = "The new codes; store them now.", body = Data<RecoveryCodesResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "The request used an API key; code `auth.session_required`.", body = Problem),
+        (status = 409, description = "Two-step sign-in is not on; code `auth.mfa_not_enabled`.", body = Problem),
+        (status = 422, description = "The code is wrong or expired; `errors` names the field `code`.", body = Problem),
+    )
+)]
+async fn regenerate_recovery_codes(
+    State(state): State<Arc<HttpState>>,
+    principal: Principal,
+    ValidJson(input): ValidJson<CodeRequest>,
+) -> Result<Data<RecoveryCodesResponse>, Error> {
+    require_session(&principal)?;
+    let recovery_codes =
+        state.mfa.regenerate_recovery_codes(principal.user_id(), &input.code).await?;
+    Ok(Data { data: RecoveryCodesResponse { recovery_codes } })
 }
 
 /// Turn off two-step sign-in.
 ///
-/// Needs a current code, and a password session.
+/// Needs a current authenticator code or an unused recovery code, and a password
+/// session. Remaining recovery codes are deleted.
 #[utoipa::path(
     post,
     path = "/me/mfa/totp/disable",
@@ -221,10 +268,19 @@ mod tests {
             let (status, _, on) =
                 call(&app, "POST", "/me/mfa/totp/confirm", Some(&ada), Some(body)).await;
             assert_eq!(status, StatusCode::OK, "{on}");
+            assert_eq!(on["data"]["recovery_codes"].as_array().unwrap().len(), 10);
             let (_, _, status_body) = call(&app, "GET", "/me/mfa", Some(&ada), None).await;
             assert_eq!(status_body["data"]["totp_enabled"], true);
+            assert_eq!(status_body["data"]["recovery_codes_remaining"], 10);
 
             let body = json!({"code": code_at(&secret, now + 30)});
+            let (status, _, renewed) =
+                call(&app, "POST", "/me/mfa/recovery-codes", Some(&ada), Some(body)).await;
+            assert_eq!(status, StatusCode::OK, "{renewed}");
+            assert_ne!(renewed["data"]["recovery_codes"], on["data"]["recovery_codes"]);
+
+            // Tắt bằng một recovery code (như khi mất điện thoại).
+            let body = json!({"code": renewed["data"]["recovery_codes"][0]});
             let (status, _, off) =
                 call(&app, "POST", "/me/mfa/totp/disable", Some(&ada), Some(body)).await;
             assert_eq!(status, StatusCode::OK, "{off}");

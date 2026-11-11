@@ -472,6 +472,93 @@
         ]
       }
     },
+    "/api/v1/auth/me/mfa/recovery-codes": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Replace your recovery codes with ten new ones.",
+        "description": "The old codes stop working. Needs a current authenticator code (not a recovery\ncode) and a password session.",
+        "operationId": "auth_regenerate_recovery_codes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The new codes; store them now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RecoveryCodesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Two-step sign-in is not on; code `auth.mfa_not_enabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The code is wrong or expired; `errors` names the field `code`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/me/mfa/totp": {
       "post": {
         "tags": [
@@ -545,7 +632,7 @@
           "auth"
         ],
         "summary": "Confirm two-step sign-in with the first code from the app.",
-        "description": "From now on, signing in asks for a code. Needs a password session.",
+        "description": "From now on, signing in asks for a code. The response holds ten one-time\nrecovery codes, shown only this once. Needs a password session.",
         "operationId": "auth_confirm_totp",
         "requestBody": {
           "content": {
@@ -559,11 +646,11 @@
         },
         "responses": {
           "200": {
-            "description": "Two-step sign-in is on.",
+            "description": "Two-step sign-in is on; store the recovery codes now.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Data_MfaStatusResponse"
+                  "$ref": "#/components/schemas/Data_RecoveryCodesResponse"
                 }
               }
             }
@@ -632,7 +719,7 @@
           "auth"
         ],
         "summary": "Turn off two-step sign-in.",
-        "description": "Needs a current code, and a password session.",
+        "description": "Needs a current authenticator code or an unused recovery code, and a password\nsession. Remaining recovery codes are deleted.",
         "operationId": "auth_disable_totp",
         "requestBody": {
           "content": {
@@ -2130,14 +2217,14 @@
       },
       "CodeRequest": {
         "type": "object",
-        "description": "A code from the authenticator app.",
+        "description": "A code from the authenticator app, or (where stated) a recovery code.",
         "required": [
           "code"
         ],
         "properties": {
           "code": {
             "type": "string",
-            "description": "The 6-digit code currently shown by the app.",
+            "description": "The 6-digit code currently shown by the app, or a recovery code where the\nendpoint accepts one.",
             "example": "123456"
           }
         }
@@ -2342,12 +2429,48 @@
             "type": "object",
             "description": "Your two-step sign-in settings.",
             "required": [
-              "totp_enabled"
+              "totp_enabled",
+              "recovery_codes_remaining"
             ],
             "properties": {
+              "recovery_codes_remaining": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Unused recovery codes left. Make new ones before they run out.",
+                "minimum": 0
+              },
               "totp_enabled": {
                 "type": "boolean",
                 "description": "Sign-in asks for a code from an authenticator app."
+              }
+            }
+          }
+        }
+      },
+      "Data_RecoveryCodesResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "One-time recovery codes. Shown only once.",
+            "required": [
+              "recovery_codes"
+            ],
+            "properties": {
+              "recovery_codes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Each code signs in once in place of an authenticator code, e.g. after losing\nthe phone. Store them somewhere safe, away from the phone.",
+                "example": [
+                  "abcd-efgh-ijkl-mnop",
+                  "qrst-uvwx-yz23-4567"
+                ]
               }
             }
           }
@@ -2712,9 +2835,16 @@
         "type": "object",
         "description": "Your two-step sign-in settings.",
         "required": [
-          "totp_enabled"
+          "totp_enabled",
+          "recovery_codes_remaining"
         ],
         "properties": {
+          "recovery_codes_remaining": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unused recovery codes left. Make new ones before they run out.",
+            "minimum": 0
+          },
           "totp_enabled": {
             "type": "boolean",
             "description": "Sign-in asks for a code from an authenticator app."
@@ -3031,6 +3161,26 @@
             "type": "string",
             "description": "Path to the field: `name`, `address.city`, `items[2].quantity`.",
             "example": "name"
+          }
+        }
+      },
+      "RecoveryCodesResponse": {
+        "type": "object",
+        "description": "One-time recovery codes. Shown only once.",
+        "required": [
+          "recovery_codes"
+        ],
+        "properties": {
+          "recovery_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Each code signs in once in place of an authenticator code, e.g. after losing\nthe phone. Store them somewhere safe, away from the phone.",
+            "example": [
+              "abcd-efgh-ijkl-mnop",
+              "qrst-uvwx-yz23-4567"
+            ]
           }
         }
       },

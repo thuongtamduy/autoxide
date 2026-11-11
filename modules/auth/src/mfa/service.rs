@@ -14,6 +14,7 @@ use totp_rs::{Algorithm, Builder, Secret, Totp};
 use uuid::Uuid;
 
 use super::entity::totp::{self, Column, Entity};
+use super::recovery;
 
 /// Độ dài secret: 160 bit, như RFC 4226 khuyến nghị cho HMAC-SHA1.
 const SECRET_BYTES: usize = 20;
@@ -27,6 +28,8 @@ const SKEW: u16 = 1;
 pub(crate) struct MfaStatus {
     /// TOTP đã bật và xác nhận.
     pub totp_enabled: bool,
+    /// Số recovery code chưa dùng.
+    pub recovery_codes_remaining: u64,
 }
 
 /// Thứ người dùng nhập vào ứng dụng authenticator khi bắt đầu bật TOTP.
@@ -50,7 +53,11 @@ impl MfaService {
 
     pub(crate) async fn status(&self, user_id: Uuid) -> Result<MfaStatus, Error> {
         let row = self.row(user_id).await?;
-        Ok(MfaStatus { totp_enabled: row.is_some_and(|row| row.confirmed_at.is_some()) })
+        let remaining = recovery::remaining(self.database.write(), user_id).await?;
+        Ok(MfaStatus {
+            totp_enabled: row.is_some_and(|row| row.confirmed_at.is_some()),
+            recovery_codes_remaining: remaining,
+        })
     }
 
     /// Bắt đầu bật TOTP cho người dùng `user_id` (email `email`, hiện trong ứng dụng):
@@ -90,8 +97,12 @@ impl MfaService {
     }
 
     /// Xác nhận việc bật TOTP bằng một mã từ ứng dụng: chứng tỏ người dùng đã lưu
-    /// secret đúng. Từ đây đăng nhập cần mã.
-    pub(crate) async fn confirm_totp(&self, user_id: Uuid, code: &str) -> Result<(), Error> {
+    /// secret đúng. Từ đây đăng nhập cần mã. Trả về bộ recovery code (chỉ lần này).
+    pub(crate) async fn confirm_totp(
+        &self,
+        user_id: Uuid,
+        code: &str,
+    ) -> Result<Vec<String>, Error> {
         let row = self.row(user_id).await?.ok_or_else(setup_not_started)?;
         if row.confirmed_at.is_some() {
             return Err(Error::conflict(
@@ -100,19 +111,64 @@ impl MfaService {
             ));
         }
         let step = self.matching_step(&row, code, unix_now())?.ok_or_else(invalid_code)?;
+        let now = now();
+        let transaction = self.database.begin_write().await?;
         let confirmed = Entity::update_many()
-            .col_expr(Column::ConfirmedAt, Expr::value(Some(now())))
+            .col_expr(Column::ConfirmedAt, Expr::value(Some(now)))
             .col_expr(Column::LastUsedStep, Expr::value(Some(step)))
             .filter(Column::Id.eq(row.id))
             .filter(Column::ConfirmedAt.is_null())
-            .exec(self.database.write())
+            .exec(&transaction)
             .await?;
         if confirmed.rows_affected == 0 {
             // Một request khác vừa xác nhận (hay bắt đầu lại) cùng lúc.
+            transaction.rollback().await?;
             return Err(setup_not_started());
         }
+        let codes = recovery::replace(&transaction, user_id, now).await?;
+        transaction.commit().await?;
         tracing::info!(user_id = %user_id, "two-step sign-in turned on");
-        Ok(())
+        Ok(codes)
+    }
+
+    /// Kiểm lớp thứ hai: mã TOTP hoặc một recovery code chưa dùng. `true` nếu đúng;
+    /// mã đúng thì không dùng lại được.
+    pub(crate) async fn verify_second_factor(
+        &self,
+        user_id: Uuid,
+        code: &str,
+    ) -> Result<bool, Error> {
+        if !self.status(user_id).await?.totp_enabled {
+            return Ok(false);
+        }
+        if recovery::looks_like_code(code) {
+            let used = recovery::redeem(self.database.write(), user_id, code, now()).await?;
+            if used {
+                tracing::warn!(user_id = %user_id, "recovery code used");
+            }
+            return Ok(used);
+        }
+        self.verify_totp(user_id, code).await
+    }
+
+    /// Thay bộ recovery code bằng bộ mới (mã cũ hết dùng được). Cần một mã TOTP: ai
+    /// chỉ cầm recovery code không tự đẻ thêm được.
+    pub(crate) async fn regenerate_recovery_codes(
+        &self,
+        user_id: Uuid,
+        code: &str,
+    ) -> Result<Vec<String>, Error> {
+        if !self.status(user_id).await?.totp_enabled {
+            return Err(not_enabled());
+        }
+        if !self.verify_totp(user_id, code).await? {
+            return Err(invalid_code());
+        }
+        let transaction = self.database.begin_write().await?;
+        let codes = recovery::replace(&transaction, user_id, now()).await?;
+        transaction.commit().await?;
+        tracing::info!(user_id = %user_id, "recovery codes replaced");
+        Ok(codes)
     }
 
     /// Kiểm một mã TOTP của người dùng đã bật MFA. `true` nếu đúng và chưa dùng; mã
@@ -142,12 +198,12 @@ impl MfaService {
         Ok(used.rows_affected == 1)
     }
 
-    /// Tắt TOTP, sau khi kiểm một mã. Dùng cho chính người dùng.
+    /// Tắt TOTP, sau khi kiểm một mã TOTP hoặc recovery code. Dùng cho chính người dùng.
     pub(crate) async fn disable_totp(&self, user_id: Uuid, code: &str) -> Result<(), Error> {
         if !self.status(user_id).await?.totp_enabled {
             return Err(not_enabled());
         }
-        if !self.verify_totp(user_id, code).await? {
+        if !self.verify_second_factor(user_id, code).await? {
             return Err(invalid_code());
         }
         self.remove(user_id).await
@@ -160,10 +216,10 @@ impl MfaService {
     }
 
     async fn remove(&self, user_id: Uuid) -> Result<(), Error> {
-        Entity::delete_many()
-            .filter(Column::UserId.eq(user_id))
-            .exec(self.database.write())
-            .await?;
+        let transaction = self.database.begin_write().await?;
+        Entity::delete_many().filter(Column::UserId.eq(user_id)).exec(&transaction).await?;
+        recovery::remove(&transaction, user_id).await?;
+        transaction.commit().await?;
         tracing::info!(user_id = %user_id, "two-step sign-in turned off");
         Ok(())
     }
@@ -216,8 +272,8 @@ pub(crate) fn invalid_code() -> Error {
     Error::validation(vec![FieldError::new(
         "code",
         "invalid",
-        "is not a current code from your authenticator app, or was already used; wait for the \
-         next code and try again",
+        "is not a current code from your authenticator app or an unused recovery code, or was \
+         already used; wait for the next code and try again",
     )])
 }
 
@@ -360,6 +416,98 @@ pub(crate) mod tests {
             mfa.reset(user).await.unwrap();
 
             assert!(!mfa.status(user).await.unwrap().totp_enabled);
+        })
+        .await
+        .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use std::sync::Arc;
+
+    use super::tests::code_at;
+    use super::*;
+    use autoxide_testkit::TestDatabase;
+
+    use crate::api::{Accounts, NewAccount};
+
+    /// Người dùng đã bật MFA; trả về service, ID, secret và bộ recovery code.
+    async fn enabled(test: &TestDatabase) -> (Arc<MfaService>, Uuid, String, Vec<String>) {
+        let services = crate::testing::services(test).await;
+        let ada = NewAccount {
+            email: "ada@example.com".to_owned(),
+            name: "Ada".to_owned(),
+            password: None,
+            admin: false,
+        };
+        let ada = Accounts::create(services.users.as_ref(), ada).await.unwrap();
+        let setup = services.mfa.start_totp(ada.id, "ada@example.com").await.unwrap();
+        let codes =
+            services.mfa.confirm_totp(ada.id, &code_at(&setup.secret, unix_now())).await.unwrap();
+        (services.mfa, ada.id, setup.secret, codes)
+    }
+
+    #[tokio::test]
+    async fn moi_recovery_code_dung_mot_lan() {
+        TestDatabase::run(async |test| {
+            let (mfa, user, _, codes) = enabled(test).await;
+            assert_eq!(codes.len(), recovery::COUNT);
+
+            // Gõ hoa, có khoảng trắng vẫn nhận.
+            let typed = format!(" {} ", codes[0].to_uppercase());
+            assert!(mfa.verify_second_factor(user, &typed).await.unwrap());
+            assert!(!mfa.verify_second_factor(user, &codes[0]).await.unwrap());
+            assert!(!mfa.verify_second_factor(user, "aaaa-aaaa-aaaa-aaaa").await.unwrap());
+            assert_eq!(mfa.status(user).await.unwrap().recovery_codes_remaining, 9);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn sinh_lai_thi_ma_cu_het_dung_duoc() {
+        TestDatabase::run(async |test| {
+            let (mfa, user, secret, old) = enabled(test).await;
+            let next = code_at(&secret, unix_now() + STEP_SECONDS);
+
+            // Recovery code không dùng để sinh lại được.
+            let by_recovery = mfa.regenerate_recovery_codes(user, &old[0]).await.unwrap_err();
+            assert_eq!(by_recovery.code(), "validation_failed");
+            let new = mfa.regenerate_recovery_codes(user, &next).await.unwrap();
+
+            assert_eq!(new.len(), recovery::COUNT);
+            assert!(!mfa.verify_second_factor(user, &old[1]).await.unwrap());
+            assert!(mfa.verify_second_factor(user, &new[1]).await.unwrap());
+            mfa.reset(user).await.unwrap();
+            assert_eq!(mfa.status(user).await.unwrap().recovery_codes_remaining, 0);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Nhiều request dùng CÙNG một recovery code cùng lúc: đúng một bên được nhận —
+    /// trên cả hai database.
+    #[tokio::test]
+    async fn dung_cung_recovery_code_dong_thoi() {
+        TestDatabase::run(async |test| {
+            let (mfa, user, _, codes) = enabled(test).await;
+
+            let attempts: Vec<_> = (0..6)
+                .map(|_| {
+                    let mfa = mfa.clone();
+                    let code = codes[3].clone();
+                    tokio::spawn(async move { mfa.verify_second_factor(user, &code).await })
+                })
+                .collect();
+            let mut accepted = 0;
+            for attempt in attempts {
+                if attempt.await.unwrap().unwrap() {
+                    accepted += 1;
+                }
+            }
+
+            assert_eq!(accepted, 1);
         })
         .await
         .unwrap();
