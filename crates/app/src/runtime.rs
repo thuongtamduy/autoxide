@@ -29,6 +29,6 @@ pub async fn start(settings: Settings) -> Result<Runtime, String> {
         let _ = database.close().await;
         return Err(error.to_string());
     }
-    let api = http::build(&config.http, modules.routes());
+    let api = http::build(&config.http, http::health_routes(database.clone()), modules.routes());
     Ok(Runtime { config, database, modules, api })
 }

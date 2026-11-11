@@ -5,9 +5,121 @@
     "description": "REST API of Autoxide.\n\n## Conventions\n\nEvery endpoint follows the same rules, so learning one endpoint teaches all of them.\n\n- **Success**: a single result is `{\"data\": …}`; a list is `{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`.\n- **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the stable `code` field, never on `detail`. Validation problems list every invalid field in `errors`.\n- **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.\n- **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote it when reporting a problem.\n- **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount in the smallest currency unit plus a currency code.",
     "version": "0.1.0"
   },
-  "paths": {},
+  "paths": {
+    "/health/live": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness probe: is the process running?",
+        "description": "Never touches the database. Restart the process when this fails.",
+        "operationId": "health_live",
+        "responses": {
+          "200": {
+            "description": "The process is running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Health"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness probe: can the service handle requests?",
+        "description": "Checks that the database answers. Stop sending traffic when this fails.",
+        "operationId": "health_ready",
+        "responses": {
+          "200": {
+            "description": "Ready to handle requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Health"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A dependency is unavailable; code `not_ready`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
   "components": {
     "schemas": {
+      "Data_Health": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "Health of the service.",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Always `ok`; a service that is not healthy answers with an error instead.",
+                "example": "ok"
+              }
+            }
+          }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "description": "Health of the service.",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Always `ok`; a service that is not healthy answers with an error instead.",
+            "example": "ok"
+          }
+        }
+      },
       "Problem": {
         "type": "object",
         "description": "An error, as RFC 9457 Problem Details. Branch on `code`; show `detail` to people.",

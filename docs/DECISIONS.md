@@ -659,3 +659,18 @@ service của module), nên lệnh này kết nối database nhưng không cần
 Đã cân nhắc: chỉ phục vụ tài liệu lúc chạy, không đưa vào repo — thay đổi API không
 ai thấy khi xem lại; bật trang xem tài liệu mặc định — tiện, nhưng mặc định nên là
 không tải script của bên thứ ba.
+
+## D-042 · Health check — 2026-11-11 — agent quyết
+
+Quyết định: `/health/live` trả 200 miễn là tiến trình trả lời được, không đụng
+database. `/health/ready` trả 200 khi database trả lời trong 2 giây, ngược lại 503
+dạng Problem Details với mã `not_ready` (chi tiết lỗi của database chỉ vào log). Hai
+endpoint nằm ngoài `/api/v1`, có trong tài liệu OpenAPI với tag `health`, và dùng
+cùng envelope `{"data": {"status": "ok"}}`.
+
+Lý do: tách hai câu hỏi vì hệ thống vận hành xử lý khác nhau — `live` hỏng thì khởi
+động lại tiến trình, `ready` hỏng thì chỉ ngừng gửi request. Nếu `live` cũng kiểm
+database thì database tạm mất sẽ khiến mọi bản máy chủ bị khởi động lại liên tục.
+
+Chưa làm: báo "chưa sẵn sàng" trong một khoảng trước khi tắt (để bộ cân bằng tải rút
+request trước) — cần khi chạy nhiều bản sau bộ cân bằng tải; xem lại ở bước deploy.

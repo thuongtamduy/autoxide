@@ -100,7 +100,11 @@ fn default_config() -> HttpConfig {
 }
 
 fn api_with(config: &HttpConfig) -> Api {
-    http::build(config, vec![("notes", notes_routes()), ("empty", OpenApiRouter::new())])
+    http::build(
+        config,
+        OpenApiRouter::new(),
+        vec![("notes", notes_routes()), ("empty", OpenApiRouter::new())],
+    )
 }
 
 fn app() -> Router {
@@ -476,7 +480,7 @@ async fn bo_kiem_tai_lieu_bat_endpoint_thieu_mo_ta() {
     assert_eq!(http::lint(&api_with(&default_config()).openapi), Vec::<String>::new());
 
     let routes = notes_routes().routes(routes!(undocumented)).routes(routes!(duplicate::duplicate));
-    let api = http::build(&default_config(), vec![("notes", routes)]);
+    let api = http::build(&default_config(), OpenApiRouter::new(), vec![("notes", routes)]);
 
     assert_eq!(
         http::lint(&api.openapi),

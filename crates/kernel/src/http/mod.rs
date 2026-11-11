@@ -19,6 +19,7 @@
 //! 6. **giới hạn body** — body quá lớn bị từ chối, trả 413.
 
 mod extract;
+mod health;
 mod openapi;
 mod problem;
 mod request_id;
@@ -43,6 +44,7 @@ use crate::config::{CorsOrigins, HttpConfig};
 use crate::error::Error;
 
 pub use extract::ValidJson;
+pub use health::{Health, health_routes};
 pub use openapi::{DOCS_PATH, OPENAPI_PATH, lint};
 pub use request_id::REQUEST_ID_HEADER;
 pub use server::{Shutdown, serve, shutdown_signal};
@@ -56,15 +58,21 @@ pub struct Api {
     pub openapi: OpenApi,
 }
 
-/// Ghép route của các module (tên module, router) dưới [`API_PREFIX`] và bọc các
-/// lớp xử lý chung.
-pub fn build(config: &HttpConfig, modules: Vec<(&'static str, OpenApiRouter)>) -> Api {
+/// Ghép route của các module (tên module, router) dưới [`API_PREFIX`], thêm các
+/// route `root` ở gốc (ngoài `/api/v1`, vd [`health_routes`]), và bọc các lớp xử lý
+/// chung quanh tất cả.
+pub fn build(
+    config: &HttpConfig,
+    root: OpenApiRouter,
+    modules: Vec<(&'static str, OpenApiRouter)>,
+) -> Api {
     let mut api = OpenApiRouter::new();
     for (name, mut routes) in modules {
         openapi::label_module(name, routes.get_openapi_mut());
         api = api.nest(&format!("/{name}"), routes);
     }
     let (router, mut openapi) = OpenApiRouter::with_openapi(openapi::base_document())
+        .merge(root)
         .nest(API_PREFIX, api)
         .split_for_parts();
     openapi::finish(&mut openapi);
