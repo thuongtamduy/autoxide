@@ -186,6 +186,10 @@ TEST_DATABASE_URL=postgres://… cargo test --workspace  # Postgres (gate tự d
   Mọi thứ khác là `mod` riêng tư hoặc `pub(crate)`. Module khác chỉ được viết
   `autoxide_<tên>::api::…`; `api` không tham chiếu phần bên trong (`crate::…`).
 - Các luật trên do `cargo xtask check` kiểm trong gate; lý do ở D-031.
+- Module cài trait `Module` của `autoxide_kernel::module` (tên, migration, cấu
+  hình…) và được đăng ký ở đúng một chỗ: `crates/app/src/modules.rs`. Phần mới của
+  core cần module khai thêm gì thì thêm một hàm vào `Module` **kèm cài đặt mặc
+  định** — không bắt module cũ phải sửa (D-038).
 
 ## Luật kiến trúc
 

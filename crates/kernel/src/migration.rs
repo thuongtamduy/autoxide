@@ -13,12 +13,14 @@
 
 use std::collections::BTreeSet;
 use std::fmt;
+use std::sync::Arc;
 
 use sea_orm::DbErr;
 use sea_orm::sea_query::{Alias, DynIden, IntoIden};
 use sea_orm_migration::{MigrationName, MigrationTrait, MigratorTraitSelf, SchemaManager};
 
 use crate::database::Database;
+use crate::module::{is_identifier, module_name_problems};
 
 /// Những thứ cần để viết một migration.
 pub mod prelude {
@@ -39,22 +41,20 @@ impl fmt::Display for MigrationError {
 impl std::error::Error for MigrationError {}
 
 /// Các migration của một module, theo thứ tự áp dụng.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone)]
 pub struct ModuleMigrations {
     module: &'static str,
-    // Con trỏ hàm chứ không phải một `Vec` sẵn: `Box<dyn MigrationTrait>` không
-    // `Clone` được, mà mỗi lần hỏi trạng thái hay chạy đều cần một danh sách mới.
-    migrations: fn() -> Vec<Box<dyn MigrationTrait>>,
+    // `Arc` (con trỏ đếm tham chiếu) vì thư viện migration đòi một danh sách MỚI
+    // mỗi lần hỏi trạng thái hay chạy, mà `Box<dyn MigrationTrait>` không sao chép
+    // được. Với `Arc`, "sao chép" chỉ là thêm một tham chiếu tới cùng migration.
+    migrations: Vec<Arc<dyn MigrationTrait>>,
 }
 
 impl ModuleMigrations {
     /// `module` là tên module (chữ thường, số, `_`; bắt đầu bằng chữ). Mọi bảng của
     /// module phải mang tiền tố `<module>_`.
-    pub const fn new(
-        module: &'static str,
-        migrations: fn() -> Vec<Box<dyn MigrationTrait>>,
-    ) -> Self {
-        ModuleMigrations { module, migrations }
+    pub fn new(module: &'static str, migrations: Vec<Box<dyn MigrationTrait>>) -> Self {
+        ModuleMigrations { module, migrations: migrations.into_iter().map(Arc::from).collect() }
     }
 
     pub fn module(&self) -> &'static str {
@@ -67,7 +67,16 @@ impl ModuleMigrations {
     }
 
     fn names(&self) -> Vec<String> {
-        (self.migrations)().iter().map(|migration| migration.name().to_owned()).collect()
+        self.migrations.iter().map(|migration| migration.name().to_owned()).collect()
+    }
+}
+
+impl fmt::Debug for ModuleMigrations {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ModuleMigrations")
+            .field("module", &self.module)
+            .field("migrations", &self.names())
+            .finish()
     }
 }
 
@@ -89,18 +98,9 @@ impl Migrator {
     /// Kiểm khai báo rồi dựng migrator. Lỗi khai báo (tên trùng, tên sai dạng) là
     /// lỗi của người viết module, báo ngay lúc khởi động chứ không đợi tới khi chạy.
     pub fn new(modules: Vec<ModuleMigrations>) -> Result<Self, MigrationError> {
-        let mut problems = Vec::new();
-        let mut seen_modules = BTreeSet::new();
+        let module_names: Vec<&str> = modules.iter().map(|set| set.module).collect();
+        let mut problems = module_name_problems(&module_names);
         for set in &modules {
-            if !is_identifier(set.module) {
-                problems.push(format!(
-                    "module name `{}` must be lowercase letters, digits and `_`, starting with a letter",
-                    set.module
-                ));
-            }
-            if !seen_modules.insert(set.module) {
-                problems.push(format!("module `{}` is registered twice", set.module));
-            }
             let mut seen_names = BTreeSet::new();
             for name in set.names() {
                 if !is_identifier(&name) {
@@ -114,18 +114,6 @@ impl Migrator {
                     problems.push(format!(
                         "module `{}`: migration `{name}` is declared twice",
                         set.module
-                    ));
-                }
-            }
-        }
-        // `auth` và `auth_keys` cùng tồn tại thì bảng `auth_keys_x` thuộc về ai?
-        // Cấm từ đầu để tiền tố bảng luôn chỉ ra đúng một module.
-        for first in &seen_modules {
-            for second in &seen_modules {
-                if second.starts_with(&format!("{first}_")) {
-                    problems.push(format!(
-                        "module names `{first}` and `{second}` are ambiguous: tables of `{second}` \
-                         would also carry the prefix of `{first}`"
                     ));
                 }
             }
@@ -236,23 +224,19 @@ fn failure(module: &str, action: &str, error: &DbErr) -> MigrationError {
     MigrationError(format!("module `{module}`: {action}: {error}"))
 }
 
-/// Chữ thường, số và `_`; bắt đầu bằng chữ; không kết thúc bằng `_`.
-fn is_identifier(text: &str) -> bool {
-    let mut characters = text.chars();
-    characters.next().is_some_and(|first| first.is_ascii_lowercase())
-        && text.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
-        && !text.ends_with('_')
-}
-
 /// Nối một [`ModuleMigrations`] vào bộ máy của sea-orm-migration.
 struct ModuleMigrator<'a>(&'a ModuleMigrations);
 
 impl MigratorTraitSelf for ModuleMigrator<'_> {
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        (self.0.migrations)()
-            .into_iter()
+        self.0
+            .migrations
+            .iter()
+            // `Arc::clone`: thêm một tham chiếu, không sao chép migration.
             // `as Box<dyn …>`: đổi kiểu cụ thể thành "bất kỳ kiểu nào cài trait này".
-            .map(|migration| Box::new(Transactional(migration)) as Box<dyn MigrationTrait>)
+            .map(|migration| {
+                Box::new(Transactional(Arc::clone(migration))) as Box<dyn MigrationTrait>
+            })
             .collect()
     }
 
@@ -262,7 +246,7 @@ impl MigratorTraitSelf for ModuleMigrator<'_> {
 }
 
 /// Bọc một migration để nó luôn chạy trong transaction, trên database nào cũng vậy.
-struct Transactional(Box<dyn MigrationTrait>);
+struct Transactional(Arc<dyn MigrationTrait>);
 
 impl MigrationName for Transactional {
     fn name(&self) -> &str {
@@ -326,18 +310,18 @@ mod tests {
     #[test]
     fn khai_bao_hop_le_duoc_nhan() {
         let migrator = Migrator::new(vec![
-            ModuleMigrations::new("auth", one),
-            ModuleMigrations::new("notes", one),
+            ModuleMigrations::new("auth", one()),
+            ModuleMigrations::new("notes", one()),
         ]);
         assert!(migrator.is_ok());
         assert!(Migrator::new(Vec::new()).is_ok());
-        assert_eq!(ModuleMigrations::new("auth", one).history_table(), "auth_migrations");
+        assert_eq!(ModuleMigrations::new("auth", one()).history_table(), "auth_migrations");
     }
 
     #[test]
     fn ten_module_sai_dang_bi_tu_choi() {
         for module in ["", "Auth", "1auth", "auth-keys", "auth_", "au th"] {
-            let message = error(vec![ModuleMigrations::new(module, one)]);
+            let message = error(vec![ModuleMigrations::new(module, one())]);
             assert!(
                 message.contains("must be lowercase letters, digits and `_`"),
                 "{module}: {message}"
@@ -348,31 +332,31 @@ mod tests {
     #[test]
     fn module_dang_ky_hai_lan_bi_tu_choi() {
         let message =
-            error(vec![ModuleMigrations::new("auth", one), ModuleMigrations::new("auth", one)]);
+            error(vec![ModuleMigrations::new("auth", one()), ModuleMigrations::new("auth", one())]);
         assert!(message.contains("module `auth` is registered twice"), "{message}");
     }
 
     #[test]
     fn migration_trung_ten_hoac_sai_dang_bi_tu_choi() {
-        let message = error(vec![ModuleMigrations::new("auth", duplicated)]);
+        let message = error(vec![ModuleMigrations::new("auth", duplicated())]);
         assert!(message.contains("module `auth`: migration `m0001_first` is declared twice"));
 
-        let message = error(vec![ModuleMigrations::new("auth", badly_named)]);
+        let message = error(vec![ModuleMigrations::new("auth", badly_named())]);
         assert!(message.contains("migration name `Create Users` must be lowercase"), "{message}");
     }
 
     #[test]
     fn ten_module_la_tien_to_cua_module_khac_bi_tu_choi() {
         let message = error(vec![
-            ModuleMigrations::new("auth", one),
-            ModuleMigrations::new("auth_keys", one),
+            ModuleMigrations::new("auth", one()),
+            ModuleMigrations::new("auth_keys", one()),
         ]);
         assert!(message.contains("module names `auth` and `auth_keys` are ambiguous"), "{message}");
         // `auth` và `authz` không đụng nhau: tiền tố bảng là `auth_` và `authz_`.
         assert!(
             Migrator::new(vec![
-                ModuleMigrations::new("auth", one),
-                ModuleMigrations::new("authz", one)
+                ModuleMigrations::new("auth", one()),
+                ModuleMigrations::new("authz", one())
             ])
             .is_ok()
         );
@@ -381,8 +365,8 @@ mod tests {
     #[test]
     fn moi_loi_khai_bao_duoc_bao_cung_luc() {
         let message = error(vec![
-            ModuleMigrations::new("Auth", one),
-            ModuleMigrations::new("notes", duplicated),
+            ModuleMigrations::new("Auth", one()),
+            ModuleMigrations::new("notes", duplicated()),
         ]);
         assert!(message.contains("`Auth`") && message.contains("declared twice"), "{message}");
     }

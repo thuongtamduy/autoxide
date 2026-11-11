@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0 xong; đang ở bước 1**, mục "Hợp đồng module + đăng ký ở một chỗ".
+Trạng thái: **bước 0 xong; đang ở bước 1**, mục "Kiểu lỗi chung, envelope trả về, pagination theo UUIDv7".
 
 ## 0. Khung dự án
 
@@ -20,7 +20,7 @@ Trạng thái: **bước 0 xong; đang ở bước 1**, mục "Hợp đồng mod
 - [x] Kết nối database: tách đọc / ghi, WAL trên SQLite
 - [x] Migration theo module (up, down, status)
 - [x] Kiểm trong gate: tên bảng mang tiền tố module, không foreign key xuyên module
-- [ ] Hợp đồng module + đăng ký ở một chỗ (khi có module đầu tiên: thêm `"modules/*"`
+- [x] Hợp đồng module + đăng ký ở một chỗ (khi có module đầu tiên: thêm `"modules/*"`
       vào `members` của `Cargo.toml` gốc)
 - [ ] Kiểu lỗi chung, envelope trả về, pagination theo UUIDv7
 - [ ] HTTP: `/api/v1`, request id, timeout, giới hạn body, CORS, graceful shutdown

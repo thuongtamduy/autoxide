@@ -7,3 +7,4 @@
 pub mod config;
 pub mod database;
 pub mod migration;
+pub mod module;

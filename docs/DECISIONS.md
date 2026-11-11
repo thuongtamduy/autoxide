@@ -529,3 +529,31 @@ ngoại lệ ở D-033).
 
 Đã cân nhắc: bắt module tạo bảng qua một lớp bọc biết tên module — chặn được từ lúc
 viết nhưng giới hạn cách viết migration và vẫn lọt nếu ai đó gọi thẳng thư viện.
+
+## D-038 · Hình dạng của hợp đồng module — 2026-11-11 — agent quyết
+
+Quyết định: module cài trait `Module` (`autoxide_kernel::module`) và crate của nó mở
+đúng `pub fn module() -> impl Module` cùng `pub mod api`. Binary đăng ký mọi module ở
+một chỗ (`crates/app/src/modules.rs`); kernel giữ chúng trong `Modules` và chỉ làm
+việc qua trait. Hiện hợp đồng gồm `name`, `migrations`, `configure`. Mỗi phần sau
+của core (route, permission, event, job, tool MCP) thêm một hàm vào trait, **luôn
+kèm cài đặt mặc định**. `configure(&mut self, reader)` cho module đọc cấu hình có
+kiểu của riêng nó và giữ trong chính nó.
+
+Tên module: chữ thường, số, `_`; không trùng; không là tiền tố kèm `_` của module
+khác; không là `sqlite` hay `pg` (tiền tố bảng hệ thống của hai database). Tên module
+cũng là tiền tố bảng (`<tên>_`) và tiền tố biến cấu hình (`AUTOXIDE_<TÊN>_`).
+
+Lý do: tiêu chí "thêm module không phải sửa core" (D-019). Trait với cài đặt mặc
+định cho phép hợp đồng lớn dần mà module đã viết không phải sửa. Giữ cấu hình trong
+module (thay vì trả về một giá trị không kiểu cho core giữ hộ) để trình biên dịch
+kiểm kiểu, không phải ép kiểu lúc chạy.
+
+Đã cân nhắc: một struct gồm các con trỏ hàm dựng bằng builder — cấu hình có kiểu
+của module phải đi qua `Any` và ép kiểu lúc chạy; trait có kiểu liên kết cho cấu
+hình — không để chung nhiều module trong một danh sách được; tự phát hiện module
+lúc biên dịch (`inventory`, `linkme`) — bớt một dòng đăng ký nhưng thêm thư viện
+dùng `unsafe` và làm thứ tự đăng ký khó thấy.
+
+Chưa có ở bước này: cách một module lấy trait của module khác lúc khởi động — thêm
+cùng lúc với việc module dựng service và route (mục HTTP).

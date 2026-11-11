@@ -78,8 +78,11 @@ fn broken() -> Vec<Box<dyn MigrationTrait>> {
 }
 
 fn migrator() -> Migrator {
-    Migrator::new(vec![ModuleMigrations::new("notes", notes), ModuleMigrations::new("tags", tags)])
-        .unwrap()
+    Migrator::new(vec![
+        ModuleMigrations::new("notes", notes()),
+        ModuleMigrations::new("tags", tags()),
+    ])
+    .unwrap()
 }
 
 async fn connect(database: &TestDatabase) -> Database {
@@ -178,8 +181,8 @@ async fn migration_hong_giua_chung_khong_de_lai_gi() {
     TestDatabase::run(async |database| {
         let db = connect(database).await;
         let migrator = Migrator::new(vec![
-            ModuleMigrations::new("tags", tags),
-            ModuleMigrations::new("broken", broken),
+            ModuleMigrations::new("tags", tags()),
+            ModuleMigrations::new("broken", broken()),
         ])
         .unwrap();
 
@@ -217,7 +220,8 @@ async fn migration_da_ap_dung_ma_mat_khoi_code_la_loi() {
         migrator().up(&db).await.unwrap();
 
         // Bản code "cũ hơn database": thiếu migration thứ hai đã được áp dụng.
-        let older = Migrator::new(vec![ModuleMigrations::new("notes", notes_first_only)]).unwrap();
+        let older =
+            Migrator::new(vec![ModuleMigrations::new("notes", notes_first_only())]).unwrap();
         let error = older.status(&db).await.unwrap_err().to_string();
 
         assert!(error.contains("module `notes`"), "{error}");

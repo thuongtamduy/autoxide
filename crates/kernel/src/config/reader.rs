@@ -64,6 +64,14 @@ impl ConfigErrors {
     }
 }
 
+// Một lỗi đơn lẻ thành "danh sách lỗi": cho code ngoài kernel báo lỗi lúc khởi
+// động (vd đăng ký module sai) theo cùng một đường với lỗi cấu hình.
+impl From<ConfigError> for ConfigErrors {
+    fn from(error: ConfigError) -> Self {
+        ConfigErrors::single(error)
+    }
+}
+
 impl fmt::Display for ConfigErrors {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let count = self.0.len();

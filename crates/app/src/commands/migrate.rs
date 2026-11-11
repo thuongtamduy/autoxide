@@ -6,7 +6,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::migration::{MigrationState, Migrator};
 
 use super::{block_on, report_failure, report_invalid_configuration};
-use crate::{modules, settings};
+use crate::settings;
 
 #[derive(Debug, clap::Args)]
 pub struct Arguments {
@@ -37,7 +37,7 @@ pub fn run(arguments: &Arguments) -> ExitCode {
     };
     let action = arguments.action.clone();
     let outcome = block_on(async move {
-        let migrator = Migrator::new(modules::migrations()).map_err(|error| error.to_string())?;
+        let migrator = settings.modules.migrator().map_err(|error| error.to_string())?;
         let database = Database::connect(&settings.config.database)
             .await
             .map_err(|error| error.to_string())?;
@@ -163,8 +163,8 @@ mod tests {
 
     fn migrator() -> Migrator {
         Migrator::new(vec![
-            ModuleMigrations::new("notes", notes),
-            ModuleMigrations::new("tags", tags),
+            ModuleMigrations::new("notes", notes()),
+            ModuleMigrations::new("tags", tags()),
         ])
         .unwrap()
     }
