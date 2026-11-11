@@ -1,0 +1,84 @@
+# Workspace Autoxide. Mỗi crate con chỉ khai `<tên>.workspace = true`; phiên bản
+# và feature flag của thư viện ghim ở MỘT chỗ là file này.
+#
+# Bố cục (luật ranh giới do `cargo xtask check` kiểm, xem docs/DECISIONS.md D-031):
+#   crates/kernel   nền mà mọi module dựa vào; không phụ thuộc module nào
+#   crates/testkit  đồ dùng cho test; chỉ được là dev-dependency
+#   crates/app      binary `autoxide`: nơi duy nhất đăng ký module
+#   modules/<tên>   mỗi module một crate
+#   xtask           công cụ cho người phát triển, không nằm trong binary
+[workspace]
+resolver = "3"
+# Khi tạo module đầu tiên: thêm "modules/*" vào danh sách này. Chưa thêm được
+# từ bây giờ vì cargo báo lỗi khi một glob không khớp thư mục nào.
+members = ["crates/*", "xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Luật code trong CLAUDE.md, do trình biên dịch và clippy thực thi.
+# Mỗi crate phải có `[lints] workspace = true` (xtask kiểm).
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+# Ngoài test thì trả lỗi, không làm sập tiến trình. Phần "ngoài test" cấu hình
+# ở clippy.toml (allow-*-in-tests).
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+
+[workspace.dependencies]
+# --- Crate nội bộ ---
+autoxide-kernel = { path = "crates/kernel" }
+autoxide-testkit = { path = "crates/testkit" }
+
+# --- Thư viện nền (STACK.md, bảng "Nền") ---
+tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
+axum = "0.8"
+tower-http = { version = "0.7", features = ["cors", "limit", "request-id", "timeout", "trace"] }
+# Khai rõ từng feature đang dựa vào thay vì nhận bộ mặc định. Không bật
+# `with-rust_decimal` và `with-time`: tiền là số nguyên, thời gian dùng chrono
+# (CLAUDE.md, "Luật dữ liệu") — hai thư viện đó vẫn có trong cây phụ thuộc vì
+# sea-orm-migration bật lại bộ mặc định của sea-orm, nhưng code Autoxide không
+# dùng. TLS dùng rustls để binary không phụ thuộc OpenSSL của hệ điều hành.
+sea-orm = { version = "2.0", default-features = false, features = [
+  "macros",
+  "runtime-tokio-rustls",
+  "sqlite-use-returning-for-3_35",
+  "sqlx-postgres",
+  "sqlx-sqlite",
+  "stream",
+  "with-chrono",
+  "with-json",
+  "with-uuid",
+] }
+# Bỏ feature mặc định `cli`: lệnh migrate nằm trong CLI của Autoxide.
+sea-orm-migration = { version = "2.0", default-features = false, features = [
+  "runtime-tokio-rustls",
+  "sqlx-postgres",
+  "sqlx-sqlite",
+  "with-chrono",
+  "with-json",
+  "with-uuid",
+] }
+utoipa = { version = "6.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-axum = "0.3"
+utoipa-scalar = { version = "0.4", features = ["axum"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+validator = { version = "0.21", features = ["derive"] }
+uuid = { version = "1.29", features = ["serde", "v7"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+clap = { version = "4.6", features = ["derive", "env"] }
+
+# --- Chỉ dùng trong test ---
+# `ServiceExt::oneshot`: gửi một request thẳng vào router, không cần mở port.
+tower = { version = "0.5", features = ["util"] }
