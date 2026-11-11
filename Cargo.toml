@@ -9,9 +9,7 @@
 #   xtask           công cụ cho người phát triển, không nằm trong binary
 [workspace]
 resolver = "3"
-# Khi tạo module đầu tiên: thêm "modules/*" vào danh sách này. Chưa thêm được
-# từ bây giờ vì cargo báo lỗi khi một glob không khớp thư mục nào.
-members = ["crates/*", "xtask"]
+members = ["crates/*", "modules/*", "xtask"]
 
 [workspace.package]
 version = "0.1.0"
@@ -39,6 +37,7 @@ dbg_macro = "deny"
 # --- Crate nội bộ ---
 autoxide-kernel = { path = "crates/kernel" }
 autoxide-testkit = { path = "crates/testkit" }
+autoxide-auth = { path = "modules/auth" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
@@ -78,8 +77,15 @@ validator = { version = "0.21", features = ["derive"] }
 uuid = { version = "1.29", features = ["serde", "v7"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
 clap = { version = "4.6", features = ["derive", "env"] }
+# Trait có hàm `async` dùng được qua `dyn` (hợp đồng giữa các module). Rust chưa
+# hỗ trợ trực tiếp; SeaORM vốn đã kéo thư viện này vào cây phụ thuộc.
+async-trait = "0.1"
 # Đọc file `.env` (chỉ đọc thành cặp tên/giá trị, không sửa môi trường tiến trình).
 dotenvy = "0.15"
+
+# --- Bảo mật (STACK.md, bảng "Bảo mật") ---
+# Bộ feature mặc định: `alloc`, `getrandom` (salt ngẫu nhiên), `password-hash` (chuỗi PHC).
+argon2 = "0.6"
 
 # --- Observability (STACK.md, bảng "Observability") ---
 tracing = "0.1"

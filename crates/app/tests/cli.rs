@@ -142,9 +142,9 @@ fn migrate_voi_cau_hinh_mac_dinh_tu_tao_file_sqlite() {
     let up = autoxide(directory.path(), &["migrate", "up"], &[]);
 
     assert_eq!(status.status.code(), Some(0), "{}", stderr(&status));
-    assert_eq!(stdout(&status), "No migrations: no module declares any.\n");
+    assert_eq!(stdout(&status), "auth  m0001_create_user  pending\n\n0 applied, 1 pending\n");
     assert_eq!(up.status.code(), Some(0), "{}", stderr(&up));
-    assert_eq!(stdout(&up), "Nothing to apply: the database is up to date.\n");
+    assert_eq!(stdout(&up), "Applied 1 migration:\n  auth/m0001_create_user\n");
     // Không cấu hình gì: database là file SQLite trong thư mục `data/`, tự tạo.
     assert!(directory.path().join("data/autoxide.sqlite").exists());
 }
@@ -158,7 +158,7 @@ fn migrate_down_module_khong_ton_tai_thoat_ma_1() {
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(
         stderr(&output),
-        "autoxide: migration: unknown module `nope`; registered modules: (none)\n"
+        "autoxide: migration: unknown module `nope`; registered modules: auth\n"
     );
 }
 
@@ -227,6 +227,13 @@ fn serve_phuc_vu_roi_dung_em_khi_nhan_sigterm() {
     use std::process::Stdio;
 
     let directory = WorkDir::new("serve");
+    // `serve` từ chối chạy khi còn migration chưa áp dụng.
+    let refused = autoxide(directory.path(), &["serve"], &[]);
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(stderr(&refused).contains("run `autoxide migrate up` first"), "{}", stderr(&refused));
+    let up = autoxide(directory.path(), &["migrate", "up"], &[]);
+    assert_eq!(up.status.code(), Some(0), "{}", stderr(&up));
+
     let mut child = Command::new(env!("CARGO_BIN_EXE_autoxide"))
         .arg("serve")
         .current_dir(directory.path())

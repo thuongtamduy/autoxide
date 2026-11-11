@@ -16,8 +16,8 @@ Early development. **Steps 0 and 1 of the roadmap (project skeleton and
 foundation) are done**: the Cargo workspace, the quality gate, configuration,
 database access, per-module migrations, the module contract, the HTTP server
 under `/api/v1` with OpenAPI, health checks, logs, metrics, tracing and the CLI.
-There are no modules yet, so the API has no business endpoints. Step 2 (login,
-roles and permissions) is next.
+Step 2 (login, roles and permissions) is in progress: the `auth` module stores
+users with Argon2id password hashes; it has no HTTP endpoints yet.
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -136,7 +136,7 @@ server instead, set `GATE_POSTGRES_URL` to the same kind of URL.
 | `crates/kernel`  | The foundation every module builds on. Knows no module.                 |
 | `crates/app`     | The `autoxide` binary: the one place where modules are registered.      |
 | `crates/testkit` | Test support: an isolated database per test, on SQLite or PostgreSQL.   |
-| `modules/<name>` | One crate per module (none yet).                                        |
+| `modules/<name>` | One crate per module. `modules/auth`: users and passwords (login, roles and API keys come next). |
 | `xtask`          | Developer tooling: `cargo xtask check` enforces the workspace boundaries. |
 | `gate.sh`        | The quality gate. A change is done only when this is green.             |
 

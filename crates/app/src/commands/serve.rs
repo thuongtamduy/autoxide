@@ -198,7 +198,8 @@ mod tests {
                 ("DATABASE_URL", database.url()),
                 ("AUTOXIDE_HTTP_ADDRESS", address.as_str()),
             ]);
-            let settings = settings::read(&source).unwrap();
+            // Không module nào: không có migration chờ, lỗi duy nhất là port.
+            let settings = settings::read_with(&source, Vec::new()).unwrap();
 
             let error = serve(settings, std::future::ready(())).await.unwrap_err();
 

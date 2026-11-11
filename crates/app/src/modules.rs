@@ -7,9 +7,12 @@ use autoxide_kernel::module::Module;
 
 /// Mọi module của chương trình, theo thứ tự đăng ký.
 pub fn all() -> Vec<Box<dyn Module>> {
-    // Chưa có module nào. Khi có, mỗi module một dòng:
-    //     Box::new(autoxide_<tên>::module()),
-    Vec::new()
+    // Mỗi module một dòng. Module cần trait của module khác đăng ký SAU module đó.
+    vec![
+        // Người dùng, mật khẩu (và sau này đăng nhập, role, permission): mọi module
+        // khác có thể cần, nên đứng đầu.
+        Box::new(autoxide_auth::module()),
+    ]
 }
 
 #[cfg(test)]

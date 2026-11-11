@@ -706,3 +706,41 @@ HTTP client kiểu đồng bộ trên thread riêng); mọi lệnh của CLI đi
 Đã cân nhắc: OTLP qua gRPC (`tonic`) — thêm `tonic` và `prost` đầy đủ cho một việc
 HTTP làm được; bật `/metrics` mặc định — tiện, nhưng lộ số liệu vận hành khi port mở
 ra internet; đọc `RUST_LOG` — trái quy ước mọi cấu hình đi qua `Setting` (D-034).
+
+## D-044 · Người dùng nằm trong module `auth`; mật khẩu hash bằng Argon2id — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- **Phần tài khoản của core là một module**: crate `autoxide-auth` ở `modules/auth`,
+  tên module `auth`, bảng `auth_…`. Kernel không có bảng nào. Các mục còn lại của bước 2
+  và bước 3 (đăng nhập, refresh token, role, permission, API key, MFA) thêm vào chính
+  module này. Module được đăng ký đầu tiên trong `crates/app/src/modules.rs`.
+- **Bảng `auth_user`:** `id` (UUIDv7), `email` (≤ 254 ký tự, index unique),
+  `name` (1–200 ký tự), `password_hash` (chuỗi PHC, có thể `NULL` = chưa đặt mật
+  khẩu), `disabled_at`, `created_at`, `updated_at`. Email chuẩn hoá trước khi lưu: bỏ
+  khoảng trắng hai đầu, chữ thường cả địa chỉ — index thường chặn được trùng không
+  phân biệt hoa thường trên cả hai database.
+- **Argon2id** (thư viện `argon2` 0.6), tham số OWASP: 19 MiB, 2 lượt, 1 luồng. Hash
+  chạy trong `spawn_blocking`, số lần hash cùng lúc giới hạn bằng số nhân CPU. Hash
+  lưu tham số cũ thì hash lại ở lần đăng nhập đúng kế tiếp.
+- **Luật mật khẩu:** chỉ độ dài, 12–128 ký tự. Không luật ghép ký tự (NIST SP
+  800-63B).
+- **Không lộ email nào đã đăng ký:** email lạ và mật khẩu sai trả cùng lỗi
+  `auth.invalid_credentials`, sau cùng một lần kiểm Argon2 (email lạ kiểm với một hash
+  giả cùng tham số). Tài khoản bị khoá chỉ báo `auth.user_disabled` sau khi mật khẩu
+  đúng.
+- **Hợp đồng cho module khác:** `autoxide_auth::api::Users` (`find(id)`), công bố qua
+  `context.provide`. Trait có hàm `async` gọi qua `dyn` nên dùng thư viện
+  `async-trait` (đã có sẵn trong cây phụ thuộc qua SeaORM).
+
+Lý do: luật sở hữu bảng (mọi bảng thuộc một module, gate kiểm) và migration theo
+module đã có sẵn cho module; đặt người dùng trong kernel sẽ phải mở ngoại lệ cho cả
+hai. Gộp đăng nhập, role và MFA vào một module vì chúng đọc ghi chung dữ liệu tài
+khoản trong cùng transaction; tách ra thì phải đi vòng qua trait cho từng câu hỏi
+nhỏ. Tham số Argon2id lấy theo OWASP Password Storage Cheat Sheet thay vì tự chọn.
+
+Đã cân nhắc: bảng người dùng trong kernel — phá luật sở hữu bảng; tách `users`,
+`sessions`, `roles` thành ba module — nhiều trait qua lại mà không được gì vì không
+module nào dùng một phần mà bỏ phần kia; bcrypt — cắt mật khẩu ở 72 byte và không
+tốn bộ nhớ nên dễ bẻ bằng GPU hơn; so sánh email bằng `lower(email)` trong câu truy
+vấn — cần index trên biểu thức, cú pháp khác nhau giữa hai database.

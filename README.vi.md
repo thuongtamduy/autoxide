@@ -15,8 +15,8 @@ core không chứa khái niệm nghiệp vụ — những thứ đó thuộc v�
 Đang ở giai đoạn đầu. **Bước 0 và bước 1 của lộ trình (khung dự án và nền) đã
 xong**: workspace Cargo, gate chất lượng, cấu hình, truy cập database, migration theo
 module, hợp đồng module, máy chủ HTTP dưới `/api/v1` kèm OpenAPI, health check, log,
-metrics, tracing và CLI. Chưa có module nào nên API chưa có endpoint nghiệp vụ. Bước
-tiếp theo là bước 2 (đăng nhập, role và permission).
+metrics, tracing và CLI. Bước 2 (đăng nhập, role và permission) đang làm: module `auth` lưu người dùng
+với mật khẩu hash bằng Argon2id; chưa có endpoint HTTP.
 
 Core sẽ gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -135,7 +135,7 @@ thì đặt `GATE_POSTGRES_URL` bằng một URL cùng dạng.
 | `crates/kernel`  | Nền mà mọi module dựa vào. Không biết module nào.                       |
 | `crates/app`     | Binary `autoxide`: nơi duy nhất đăng ký module.                         |
 | `crates/testkit` | Đồ dùng cho test: mỗi test một database riêng, trên SQLite hoặc PostgreSQL. |
-| `modules/<tên>`  | Mỗi module một crate (chưa có module nào).                              |
+| `modules/<tên>`  | Mỗi module một crate. `modules/auth`: người dùng và mật khẩu (đăng nhập, role và API key làm tiếp). |
 | `xtask`          | Công cụ cho người phát triển: `cargo xtask check` kiểm ranh giới workspace. |
 | `gate.sh`        | Gate chất lượng. Một thay đổi chỉ xong khi lệnh này xanh.               |
 
