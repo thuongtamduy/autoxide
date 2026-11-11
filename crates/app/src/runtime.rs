@@ -5,6 +5,7 @@
 use autoxide_kernel::config::Config;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::http::{self, Api};
+use autoxide_kernel::metrics::Metrics;
 use autoxide_kernel::module::Modules;
 
 use crate::settings::Settings;
@@ -29,6 +30,20 @@ pub async fn start(settings: Settings) -> Result<Runtime, String> {
         let _ = database.close().await;
         return Err(error.to_string());
     }
-    let api = http::build(&config.http, http::health_routes(database.clone()), modules.routes());
+    let mut root = http::health_routes(database.clone());
+    if config.http.metrics {
+        // Bộ thu số đo là toàn tiến trình: bật một lần, ở đây.
+        match Metrics::install() {
+            Ok(metrics) => {
+                metrics.spawn_upkeep();
+                root = root.merge(http::metrics_routes(metrics));
+            }
+            Err(error) => {
+                let _ = database.close().await;
+                return Err(error.to_string());
+            }
+        }
+    }
+    let api = http::build(&config.http, root, modules.routes());
     Ok(Runtime { config, database, modules, api })
 }

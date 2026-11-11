@@ -43,7 +43,7 @@ autoxide-testkit = { path = "crates/testkit" }
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
 axum = "0.8"
-tower-http = { version = "0.7", features = ["catch-panic", "cors", "limit", "request-id", "timeout", "trace"] }
+tower-http = { version = "0.7", features = ["catch-panic", "cors", "limit", "request-id"] }
 # Khai rõ từng feature đang dựa vào thay vì nhận bộ mặc định. Không bật
 # `with-rust_decimal` và `with-time`: tiền là số nguyên, thời gian dùng chrono
 # (CLAUDE.md, "Luật dữ liệu") — hai thư viện đó vẫn có trong cây phụ thuộc vì
@@ -80,6 +80,26 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "serd
 clap = { version = "4.6", features = ["derive", "env"] }
 # Đọc file `.env` (chỉ đọc thành cặp tên/giá trị, không sửa môi trường tiến trình).
 dotenvy = "0.15"
+
+# --- Observability (STACK.md, bảng "Observability") ---
+tracing = "0.1"
+# Không bật `ansi` (màu) và `tracing-log`: log đi vào file hoặc máy thu gom.
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "json", "registry", "std"] }
+
+metrics = "0.24"
+# Không bật máy chủ HTTP riêng và push gateway của thư viện: `/metrics` do máy chủ
+# của Autoxide phục vụ.
+metrics-exporter-prometheus = { version = "0.18", default-features = false }
+
+# Tracing phân tán, xuất theo OTLP qua HTTP. Chỉ bật phần trace; TLS dùng rustls.
+opentelemetry = { version = "0.33", default-features = false, features = ["trace"] }
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace"] }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = [
+  "http-proto",
+  "reqwest-blocking-client",
+  "trace",
+] }
+tracing-opentelemetry = { version = "0.34", default-features = false }
 
 # --- Chỉ dùng trong test ---
 # `ServiceExt::oneshot`: gửi một request thẳng vào router, không cần mở port.

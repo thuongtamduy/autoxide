@@ -45,6 +45,13 @@ pub const API_DOCS: Setting = Setting::new(
 )
 .with_default("false");
 
+pub const METRICS: Setting = Setting::new(
+    "AUTOXIDE_HTTP_METRICS",
+    "Serve Prometheus metrics at `/metrics` (`true` or `false`). The endpoint has no \
+     authentication: enable it only where the port is not reachable from the internet.",
+)
+.with_default("false");
+
 /// Những origin (nguồn trang web) được trình duyệt cho gọi API.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum CorsOrigins {
@@ -82,6 +89,14 @@ impl CorsOrigins {
     }
 }
 
+fn parse_bool(raw: &str) -> Result<bool, String> {
+    match raw {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err("must be `true` or `false`".to_owned()),
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HttpConfig {
     pub address: SocketAddr,
@@ -90,6 +105,7 @@ pub struct HttpConfig {
     pub cors_origins: CorsOrigins,
     pub shutdown_grace: Duration,
     pub api_docs: bool,
+    pub metrics: bool,
 }
 
 impl HttpConfig {
@@ -105,11 +121,8 @@ impl HttpConfig {
         let cors_origins = reader.optional_with(&CORS_ORIGINS, CorsOrigins::parse);
         let shutdown_grace =
             reader.get_with(&SHUTDOWN_SECONDS, |raw| parse_in_range(raw, 0u64, 600));
-        let api_docs = reader.get_with(&API_DOCS, |raw| match raw {
-            "true" => Ok(true),
-            "false" => Ok(false),
-            _ => Err("must be `true` or `false`".to_owned()),
-        });
+        let api_docs = reader.get_with(&API_DOCS, parse_bool);
+        let metrics = reader.get_with(&METRICS, parse_bool);
 
         Ok(HttpConfig {
             address: address?,
@@ -118,6 +131,7 @@ impl HttpConfig {
             cors_origins: cors_origins?.unwrap_or_default(),
             shutdown_grace: Duration::from_secs(shutdown_grace?),
             api_docs: api_docs?,
+            metrics: metrics?,
         })
     }
 }
@@ -143,6 +157,8 @@ mod tests {
         assert_eq!(config.cors_origins, CorsOrigins::None);
         assert_eq!(config.shutdown_grace, Duration::from_secs(30));
         assert!(!config.api_docs);
+        assert!(!config.metrics);
+        assert!(read(&[("AUTOXIDE_HTTP_METRICS", "true")]).unwrap().metrics);
         assert!(read(&[("AUTOXIDE_HTTP_API_DOCS", "true")]).unwrap().api_docs);
         let message = read(&[("AUTOXIDE_HTTP_API_DOCS", "yes")]).unwrap_err();
         assert!(message.contains("must be `true` or `false`"), "{message}");

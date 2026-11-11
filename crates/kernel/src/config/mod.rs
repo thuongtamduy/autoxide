@@ -13,24 +13,30 @@
 mod database;
 mod env_example;
 mod http;
+mod log;
 mod reader;
 mod setting;
 mod source;
+mod trace;
 
 pub use database::{DatabaseBackend, DatabaseConfig, DatabaseUrl, redact_password};
 pub use env_example::render_env_example;
 pub use http::{CorsOrigins, HttpConfig};
+pub use log::{LogConfig, LogFormat, LogLevel};
 pub use reader::{
     ConfigError, ConfigErrors, ConfigReader, Invalid, Origin, SettingValue, parse_in_range,
 };
 pub use setting::Setting;
 pub use source::ConfigSource;
+pub use trace::TraceConfig;
 
 /// Cấu hình của kernel. Mỗi mục của lộ trình thêm nhóm của mình vào đây.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     pub database: DatabaseConfig,
     pub http: HttpConfig,
+    pub log: LogConfig,
+    pub trace: TraceConfig,
 }
 
 impl Config {
@@ -39,7 +45,9 @@ impl Config {
     pub fn read(reader: &mut ConfigReader) -> Result<Self, Invalid> {
         let database = DatabaseConfig::read(reader);
         let http = HttpConfig::read(reader);
-        Ok(Config { database: database?, http: http? })
+        let log = LogConfig::read(reader);
+        let trace = TraceConfig::read(reader);
+        Ok(Config { database: database?, http: http?, log: log?, trace: trace? })
     }
 }
 

@@ -18,8 +18,6 @@
 // Trong `src/` thì KHÔNG được khai dòng này (`cargo xtask check` chặn).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use std::time::Duration;
-
 use autoxide_testkit::TestDatabase;
 use axum::body::Body;
 use axum::extract::State;
@@ -33,8 +31,6 @@ use tower::ServiceExt;
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
-use tower_http::timeout::TimeoutLayer;
-use tower_http::trace::TraceLayer;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -230,8 +226,6 @@ fn app(db: DatabaseConnection) -> (Router, utoipa::openapi::OpenApi) {
         .layer(PropagateRequestIdLayer::x_request_id())
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
         .layer(RequestBodyLimitLayer::new(16 * 1024))
-        .layer(TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(5)))
-        .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::new());
     (router, openapi)
 }

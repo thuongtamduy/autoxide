@@ -31,6 +31,20 @@ pub fn report_failure(error: &str) -> ExitCode {
     ExitCode::from(EXIT_FAILURE)
 }
 
+/// Chạy một lệnh chạm tới hệ thống: bật log và xuất trace, chạy `task` trong runtime
+/// tokio, rồi đẩy nốt trace còn lại. Mọi lệnh như vậy đi qua hàm này để hành vi
+/// giống nhau.
+pub fn run_with_observability<T>(
+    config: &autoxide_kernel::config::Config,
+    task: impl Future<Output = Result<T, String>>,
+) -> Result<T, String> {
+    // Thứ tự quan trọng: xuất trace phải được bật và tắt NGOÀI runtime tokio.
+    let observability = crate::observability::init(config)?;
+    let outcome = block_on(task);
+    observability.shutdown();
+    outcome
+}
+
 /// Chạy một việc `async` tới khi xong, từ hàm thường.
 ///
 /// `main` của chương trình là hàm thường; các lệnh chạm database là `async`. Hàm

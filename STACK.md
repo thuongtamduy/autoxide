@@ -84,11 +84,11 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 
 ### Observability
 
-| Việc     | Thư viện                                    | Ghi chú                            |
-| -------- | ------------------------------------------- | ---------------------------------- |
-| Log      | `tracing` + `tracing-subscriber`            | JSON ở production                  |
-| Metrics  | `metrics` + `metrics-exporter-prometheus`   | Endpoint `/metrics`                |
-| Tracing  | `opentelemetry` 0.33 + `tracing-opentelemetry` | Xuất OTLP; tắt khi không cấu hình |
+| Việc     | Thư viện                                              | Phiên bản     | Ghi chú                                         |
+| -------- | ----------------------------------------------------- | ------------- | ----------------------------------------------- |
+| Log      | `tracing` + `tracing-subscriber`                      | 0.1 / 0.3     | Ra stderr; dạng chữ hoặc JSON (`AUTOXIDE_LOG_FORMAT`) |
+| Metrics  | `metrics` + `metrics-exporter-prometheus`             | 0.24 / 0.18   | Endpoint `/metrics`, bật bằng `AUTOXIDE_HTTP_METRICS` |
+| Tracing  | `opentelemetry` + `opentelemetry_sdk` + `opentelemetry-otlp` + `tracing-opentelemetry` | 0.33 / 0.34 | Xuất OTLP qua HTTP; tắt khi không đặt `OTEL_EXPORTER_OTLP_ENDPOINT` |
 
 Thư viện ở ba bảng sau (bảo mật, dịch vụ của core, observability) được **chốt lại khi tới bước
 dựng tương ứng**: agent kiểm bản mới nhất, độ tương thích với phần đã dựng, rồi

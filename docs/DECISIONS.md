@@ -674,3 +674,35 @@ database thì database tạm mất sẽ khiến mọi bản máy chủ bị kh�
 
 Chưa làm: báo "chưa sẵn sàng" trong một khoảng trước khi tắt (để bộ cân bằng tải rút
 request trước) — cần khi chạy nhiều bản sau bộ cân bằng tải; xem lại ở bước deploy.
+
+## D-043 · Log, metrics, tracing — 2026-11-11 — agent quyết
+
+Quyết định (chốt các thư viện của bảng "Observability" trong `STACK.md`):
+
+- **Log:** `tracing` + `tracing-subscriber`. Ra stderr (stdout dành cho kết quả của
+  lệnh), dạng chữ hoặc JSON theo `AUTOXIDE_LOG_FORMAT`, lọc theo `AUTOXIDE_LOG_LEVEL`.
+  Mỗi request một dòng khi xong, nằm trong span `request` mang request id nên mọi log
+  phát ra trong lúc xử lý cũng mang id đó. Chỉ ghi đường dẫn, không ghi query string
+  hay thân request. Lỗi 5xx ghi cả nguyên nhân gốc. Health check ghi ở mức debug.
+- **Metrics:** `metrics` + `metrics-exporter-prometheus`, phục vụ ở `/metrics` khi
+  `AUTOXIDE_HTTP_METRICS=true` (mặc định tắt vì endpoint không có xác thực). Lớp HTTP
+  ghi `http_requests_total` và `http_request_duration_seconds` với nhãn `route` là
+  **mẫu** route; request không khớp route nào dùng chung nhãn `unmatched`.
+- **Tracing:** `opentelemetry` 0.33 + `tracing-opentelemetry` 0.34, xuất OTLP qua HTTP
+  khi đặt `OTEL_EXPORTER_OTLP_ENDPOINT`; request mang `traceparent` (W3C Trace
+  Context) thì nối vào trace của bên gọi. Chỉ nhận địa chỉ `http://`.
+
+Lý do của giới hạn `http://`: bật TLS cho bộ gửi OTLP kéo vào thư viện mật mã
+`aws-lc-rs`, trong khi kết nối Postgres (sqlx) dùng `ring`. Khi cả hai cùng có mặt,
+`rustls` không tự chọn được thư viện mặc định và panic ở lần dùng TLS đầu tiên — lỗi
+chỉ lộ ở production, nơi mới có TLS. `aws-lc-rs` còn làm bản build nặng hơn. Cách
+chuẩn là chạy một OpenTelemetry collector cạnh máy chủ và để nó chuyển tiếp qua TLS.
+Đã kiểm ngày 11/11/2026: không bật TLS cho bộ gửi thì cây phụ thuộc chỉ có `ring`.
+
+Ràng buộc kèm theo: bộ xuất trace phải được bật và tắt ngoài runtime tokio (nó dùng
+HTTP client kiểu đồng bộ trên thread riêng); mọi lệnh của CLI đi qua
+`run_with_observability` để giữ đúng thứ tự đó.
+
+Đã cân nhắc: OTLP qua gRPC (`tonic`) — thêm `tonic` và `prost` đầy đủ cho một việc
+HTTP làm được; bật `/metrics` mặc định — tiện, nhưng lộ số liệu vận hành khi port mở
+ra internet; đọc `RUST_LOG` — trái quy ước mọi cấu hình đi qua `Setting` (D-034).

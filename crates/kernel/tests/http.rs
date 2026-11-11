@@ -8,7 +8,9 @@
 
 use std::time::{Duration, Instant};
 
-use autoxide_kernel::config::{ConfigReader, ConfigSource, CorsOrigins, HttpConfig};
+use autoxide_kernel::config::{
+    ConfigReader, ConfigSource, CorsOrigins, HttpConfig, LogConfig, LogFormat, LogLevel,
+};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::{self, Api, Shutdown, ValidJson};
 use autoxide_kernel::response::{Data, Problem};
@@ -490,4 +492,87 @@ async fn bo_kiem_tai_lieu_bat_endpoint_thieu_mo_ta() {
             "GET /api/v1/notes/undocumented: no success response — declare what the endpoint returns",
         ]
     );
+}
+
+/// Nơi ghi log vào bộ nhớ, để test đọc lại.
+#[derive(Clone, Default)]
+struct LogBuffer(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl std::io::Write for LogBuffer {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for LogBuffer {
+    type Writer = LogBuffer;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        self.clone()
+    }
+}
+
+/// Gửi `request` với log JSON ở mức `level` được bắt lại; trả về các dòng log.
+async fn logged(level: LogLevel, request: Request<Body>) -> Vec<serde_json::Value> {
+    let buffer = LogBuffer::default();
+    let config = LogConfig { level, format: LogFormat::Json };
+    let subscriber = autoxide_kernel::logging::subscriber(&config, buffer.clone(), Vec::new());
+    // Bộ nhận log này chỉ có hiệu lực trên thread hiện tại, tới khi `_guard` bị drop.
+    let _guard = tracing::subscriber::set_default(subscriber);
+    send(app(), request).await;
+    let text = String::from_utf8(buffer.0.lock().unwrap().clone()).unwrap();
+    text.lines().map(|line| serde_json::from_str(line).unwrap()).collect()
+}
+
+#[tokio::test]
+async fn moi_request_mot_dong_log_kem_request_id() {
+    let request = Request::builder()
+        .uri("/api/v1/notes/7?token=s3cr3t")
+        .header("x-request-id", "trace-1")
+        .body(Body::empty())
+        .unwrap();
+
+    let lines = logged(LogLevel::Info, request).await;
+
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    let line = &lines[0];
+    assert_eq!(line["message"], "request completed");
+    assert_eq!(line["level"], "INFO");
+    assert_eq!(line["status"], 404);
+    assert_eq!(line["route"], "/api/v1/notes/{id}");
+    assert_eq!(line["span"]["request_id"], "trace-1");
+    assert_eq!(line["span"]["method"], "GET");
+    assert_eq!(line["span"]["path"], "/api/v1/notes/7");
+    assert!(line["elapsed_ms"].is_u64(), "{line}");
+    // Query string không bao giờ vào log.
+    assert!(!line.to_string().contains("s3cr3t"), "{line}");
+}
+
+#[tokio::test]
+async fn loi_5xx_duoc_ghi_kem_nguyen_nhan_goc() {
+    let lines = logged(LogLevel::Info, get("/api/v1/notes/panic")).await;
+
+    let line = lines.last().unwrap();
+    assert_eq!(line["level"], "ERROR");
+    assert_eq!(line["message"], "request failed");
+    assert_eq!(line["status"], 500);
+    // Thứ client không được thấy thì người vận hành thấy trong log.
+    assert!(line["error"].as_str().unwrap().contains("secret internal detail"), "{line}");
+}
+
+#[tokio::test]
+async fn request_khong_khop_route_va_health_check_duoc_ghi_dung_muc() {
+    let lines = logged(LogLevel::Info, get("/nowhere")).await;
+    assert_eq!(lines[0]["route"], "unmatched");
+    assert_eq!(lines[0]["status"], 404);
+
+    // Health check ghi ở mức debug: ở mức info thì không có dòng nào.
+    assert!(logged(LogLevel::Info, get("/health/live")).await.is_empty());
+    let lines = logged(LogLevel::Debug, get("/health/live")).await;
+    assert!(lines.iter().any(|line| line["span"]["path"] == "/health/live"), "{lines:?}");
 }

@@ -11,15 +11,18 @@
 //!
 //! 1. **request id** — mỗi request một ID (header `x-request-id`), trả lại trong
 //!    response; client gửi sẵn ID hợp lệ thì dùng ID đó;
-//! 2. **CORS** — trình duyệt ở origin nào được gọi;
-//! 3. **chuẩn hoá lỗi** — mọi response lỗi đều là Problem Details (RFC 9457), kể
+//! 2. **log** — mỗi request một dòng log khi xong; lỗi 5xx kèm nguyên nhân gốc;
+//! 3. **CORS** — trình duyệt ở origin nào được gọi;
+//! 4. **chuẩn hoá lỗi** — mọi response lỗi đều là Problem Details (RFC 9457), kể
 //!    cả lỗi do thư viện sinh ra (404, 405, 413…);
-//! 4. **bắt panic** — handler panic thành lỗi 500 thay vì đứt kết nối;
-//! 5. **timeout** — request chạy quá lâu bị cắt, trả 503;
-//! 6. **giới hạn body** — body quá lớn bị từ chối, trả 413.
+//! 5. **bắt panic** — handler panic thành lỗi 500 thay vì đứt kết nối;
+//! 6. **timeout** — request chạy quá lâu bị cắt, trả 503;
+//! 7. **giới hạn body** — body quá lớn bị từ chối, trả 413.
 
 mod extract;
 mod health;
+mod log;
+mod metrics;
 mod openapi;
 mod problem;
 mod request_id;
@@ -45,6 +48,7 @@ use crate::error::Error;
 
 pub use extract::ValidJson;
 pub use health::{Health, health_routes};
+pub use metrics::metrics_routes;
 pub use openapi::{DOCS_PATH, OPENAPI_PATH, lint};
 pub use request_id::REQUEST_ID_HEADER;
 pub use server::{Shutdown, serve, shutdown_signal};
@@ -102,6 +106,7 @@ pub fn build(
         .layer(CatchPanicLayer::custom(problem::PanicToProblem))
         .layer(middleware::map_response(problem::normalize))
         .layer(cors(&config.cors_origins))
+        .layer(middleware::from_fn(log::log_requests))
         .layer(PropagateRequestIdLayer::new(REQUEST_ID_HEADER))
         .layer(SetRequestIdLayer::new(REQUEST_ID_HEADER, request_id::MakeUuidV7))
         .layer(middleware::from_fn(request_id::drop_untrusted));

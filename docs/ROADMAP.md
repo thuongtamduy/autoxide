@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0 xong; đang ở bước 1**, mục "Log, metrics (`/metrics`), tracing".
+Trạng thái: **bước 0 xong; đang ở bước 1**, mục "CLI: `serve`, `migrate`" (còn `serve`).
 
 ## 0. Khung dự án
 
@@ -26,7 +26,7 @@ Trạng thái: **bước 0 xong; đang ở bước 1**, mục "Log, metrics (`/m
 - [x] HTTP: `/api/v1`, request id, timeout, giới hạn body, CORS, graceful shutdown
 - [x] OpenAPI sinh từ code + kiểm không lệch trong gate
 - [x] Health check (`/health/live`, `/health/ready`)
-- [ ] Log, metrics (`/metrics`), tracing
+- [x] Log, metrics (`/metrics`), tracing
 - [ ] CLI: `serve`, `migrate` (`migrate up | down | status` đã có; còn `serve`, và nó phải
       từ chối chạy khi còn migration chưa áp dụng)
 

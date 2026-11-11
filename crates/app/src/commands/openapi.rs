@@ -4,7 +4,7 @@ use std::process::ExitCode;
 
 use autoxide_kernel::http;
 
-use super::{block_on, report_failure, report_invalid_configuration};
+use super::{report_failure, report_invalid_configuration, run_with_observability};
 use crate::runtime;
 use crate::settings::{self, Settings};
 
@@ -13,7 +13,8 @@ pub fn run() -> ExitCode {
         Ok(settings) => settings,
         Err(errors) => return report_invalid_configuration(&errors),
     };
-    match block_on(render(settings)) {
+    let config = settings.config.clone();
+    match run_with_observability(&config, render(settings)) {
         Ok(document) => {
             print!("{document}");
             ExitCode::SUCCESS

@@ -254,6 +254,10 @@ sẵn lệnh.
 - Doc comment `///` trên kiểu có `ToSchema` / `IntoParams` và trên handler có
   `#[utoipa::path]` được chép vào tài liệu OpenAPI: viết **tiếng Anh**, cho người
   gọi API. Giải thích cho người đọc code thì dùng `//`.
+- Log bằng macro của `tracing` với trường có tên (`tracing::info!(user_id, "…")`),
+  không `println!`. Không ghi secret, token, mật khẩu hay thân request vào log. Số
+  đo ghi bằng macro của `metrics`, tên mang tiền tố `<module>_`, nhãn chỉ nhận giá
+  trị thuộc tập nhỏ cố định (không dùng ID hay đường dẫn thô làm nhãn).
 - Tên trong code và OpenAPI bằng tiếng Anh. Comment, tài liệu, tên test viết tiếng
   Việt được.
 - Secret không vào git: chỉ có `.env.example`, không có `.env`.

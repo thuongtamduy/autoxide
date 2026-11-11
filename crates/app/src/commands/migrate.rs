@@ -5,7 +5,7 @@ use std::process::ExitCode;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::migration::{MigrationState, Migrator};
 
-use super::{block_on, report_failure, report_invalid_configuration};
+use super::{report_failure, report_invalid_configuration, run_with_observability};
 use crate::settings;
 
 #[derive(Debug, clap::Args)]
@@ -36,7 +36,8 @@ pub fn run(arguments: &Arguments) -> ExitCode {
         Err(errors) => return report_invalid_configuration(&errors),
     };
     let action = arguments.action.clone();
-    let outcome = block_on(async move {
+    let config = settings.config.clone();
+    let outcome = run_with_observability(&config, async move {
         let migrator = settings.modules.migrator().map_err(|error| error.to_string())?;
         let database = Database::connect(&settings.config.database)
             .await

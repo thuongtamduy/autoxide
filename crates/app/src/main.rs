@@ -5,6 +5,7 @@
 
 mod commands;
 mod modules;
+mod observability;
 mod runtime;
 mod settings;
 
