@@ -161,6 +161,11 @@ giống nhau dù email có tài khoản hay không. Đặt `AUTOXIDE_AUTH_PASSWO
 dụ `https://app.example.com/reset?token={token}`) để gửi đường dẫn tới trang của bạn
 thay vì token trần.
 
+Người dùng đã đăng nhập tự đổi mật khẩu bằng `POST /api/v1/auth/me/password` (phải
+nhập mật khẩu hiện tại). Quản trị viên đặt được mật khẩu đầu tiên cho tài khoản tạo
+không kèm mật khẩu (`PUT /api/v1/auth/users/{id}/password`), nhưng không thay được
+mật khẩu người khác đã có.
+
 Khi chạy thật (production), đặt `AUTOXIDE_AUTH_TOKEN_SECRET` (khoá ký access token)
 bằng một chuỗi ngẫu nhiên dài, giống nhau trên mọi máy chủ:
 

@@ -18,7 +18,8 @@ pub(crate) const USERS_READ: Permission =
 
 pub(crate) const USERS_MANAGE: Permission = Permission::new(
     "auth.users.manage",
-    "Create user accounts, rename them, and disable or enable them.",
+    "Create user accounts, rename them, disable or enable them, and set the first password \
+     of an account created without one.",
 );
 
 /// Mọi permission module `auth` khai.

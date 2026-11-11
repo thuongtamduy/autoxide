@@ -29,6 +29,15 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
         .routes(routes!(list_users, create_user))
         .routes(routes!(get_user, update_user))
         .routes(routes!(register))
+        .routes(routes!(set_user_password))
+}
+
+/// The first password of an account.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub(crate) struct SetPasswordRequest {
+    /// 12 to 128 characters.
+    #[validate(length(min = 1, max = 128))]
+    password: String,
 }
 
 /// A user account. Never includes the password.
@@ -250,6 +259,38 @@ async fn register(
     Ok((StatusCode::CREATED, Data { data: user.into() }))
 }
 
+/// Set the password of an account created without one.
+///
+/// Requires `auth.users.manage`. Only for an account that has no password yet: an
+/// administrator cannot replace someone else's password. Its owner changes it with
+/// `POST /api/v1/auth/me/password` or resets it by email.
+#[utoipa::path(
+    put,
+    path = "/users/{id}/password",
+    operation_id = "set_user_password",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the user.")),
+    request_body = SetPasswordRequest,
+    responses(
+        (status = 204, description = "The password was set; the user can sign in with it."),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.users.manage`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
+        (status = 409, description = "The account already has a password; code `auth.password_already_set`.", body = Problem),
+        (status = 422, description = "The password breaks the rules; see `errors`.", body = Problem),
+    )
+)]
+async fn set_user_password(
+    State(state): State<Arc<HttpState>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    ValidJson(input): ValidJson<SetPasswordRequest>,
+) -> Result<StatusCode, Error> {
+    principal.require(&USERS_MANAGE)?;
+    state.users.set_initial_password(Actor::from(&principal), id, input.password).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[cfg(test)]
 mod tests {
     use autoxide_testkit::TestDatabase;
@@ -436,6 +477,34 @@ mod event_tests {
             ] {
                 assert!(!everything.contains(secret_value), "a secret leaked into an event");
             }
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn quan_tri_vien_dat_mat_khau_cho_tai_khoan_chua_co() {
+        TestDatabase::run(async |test| {
+            let (app, services) = app(test).await;
+            let root = NewAccount {
+                email: "root@example.com".to_owned(),
+                name: "Root".to_owned(),
+                password: Some(PASSWORD.to_owned()),
+                admin: true,
+            };
+            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            let admin = bearer(&app, "root@example.com", PASSWORD).await;
+            let body = json!({"email": "bob@example.com", "name": "Bob"});
+            let (_, _, created) = call(&app, "POST", "/users", Some(&admin), Some(body)).await;
+            let path = format!("/users/{}/password", created["data"]["id"].as_str().unwrap());
+
+            let body = json!({"password": PASSWORD});
+            let (status, _, _) = call(&app, "PUT", &path, Some(&admin), Some(body.clone())).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+            bearer(&app, "bob@example.com", PASSWORD).await;
+            let (status, _, problem) = call(&app, "PUT", &path, Some(&admin), Some(body)).await;
+            assert_eq!(status, StatusCode::CONFLICT);
+            assert_eq!(problem["code"], "auth.password_already_set");
         })
         .await
         .unwrap();

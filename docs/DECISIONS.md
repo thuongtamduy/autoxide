@@ -1301,3 +1301,26 @@ mới thuộc giao diện riêng.
 
 Đã cân nhắc: JWT có hạn thay cho bảng — không thu hồi được và không bảo đảm dùng một
 lần; mã số 6 chữ — dễ đoán, cần thêm giới hạn số lần thử.
+
+## D-064 · Tự đổi mật khẩu và mật khẩu đầu tiên do quản trị viên đặt — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- `POST /auth/me/password` (`current_password`, `new_password`): chỉ trong phiên đăng
+  nhập bằng mật khẩu, không qua API key. Sai mật khẩu hiện tại trả 400
+  `auth.wrong_password` và được tính vào login throttling của email như một lần đăng
+  nhập sai. Đổi xong thì mọi phiên kết thúc, response trả cặp token của một phiên mới
+  để client đang dùng khỏi đăng nhập lại.
+- `PUT /auth/users/{id}/password` (permission `auth.users.manage`): chỉ cho tài khoản
+  chưa có mật khẩu; đã có thì 409 `auth.password_already_set`. Điều kiện nằm ngay trong
+  câu `UPDATE … WHERE password_hash IS NULL`, nên hai quản trị viên đặt cùng lúc thì
+  đúng một người thắng trên cả hai database.
+
+Lý do: người giữ `auth.users.manage` không được chiếm tài khoản của người khác (kể cả
+của admin) bằng cách thay mật khẩu; người quên mật khẩu đã có đường đặt lại qua mail
+(D-063). Tính lần sai vào throttling để access token bị lộ không thành công cụ dò mật
+khẩu.
+
+Đã cân nhắc: quản trị viên đặt lại mật khẩu bất kỳ — mở đường leo thang quyền; giữ
+phiên hiện tại khi đổi mật khẩu — phải phân biệt phiên nào là "hiện tại" trong access
+token, phức tạp hơn mà không an toàn hơn.

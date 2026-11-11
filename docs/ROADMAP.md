@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–6 xong; đang ở bước 7**, mục "Người dùng tự đổi mật khẩu của mình".
+Trạng thái: **bước 0–6 xong; đang ở bước 7**, mục "Xác minh email khi tạo tài khoản và khi đổi email".
 
 ## 0. Khung dự án
 
@@ -76,7 +76,7 @@ Trạng thái: **bước 0–6 xong; đang ở bước 7**, mục "Người dùn
 - [x] Gửi mail qua SMTP sau một trait; khi chưa cấu hình SMTP thì ghi mail ra file (cho dev và test)
 - [x] Mẫu mail theo i18n key (vi, en)
 - [x] Đặt lại mật khẩu: token dùng một lần, có hạn, không lộ việc email có tồn tại hay không
-- [ ] Người dùng tự đổi mật khẩu của mình (cần nhập mật khẩu cũ); quản trị viên đặt mật khẩu
+- [x] Người dùng tự đổi mật khẩu của mình (cần nhập mật khẩu cũ); quản trị viên đặt mật khẩu
       cho tài khoản tạo không kèm mật khẩu (service `set_password` đã có)
 - [ ] Xác minh email khi tạo tài khoản và khi đổi email
 

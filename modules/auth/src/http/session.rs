@@ -28,6 +28,17 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
         .routes(routes!(refresh))
         .routes(routes!(logout))
         .routes(routes!(me))
+        .routes(routes!(change_password))
+}
+
+/// The current password and the new one.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub(crate) struct ChangePasswordRequest {
+    #[validate(length(min = 1, max = 1024))]
+    current_password: String,
+    /// 12 to 128 characters.
+    #[validate(length(min = 1, max = 128))]
+    new_password: String,
 }
 
 /// Email and password of an account.
@@ -272,6 +283,40 @@ async fn me(
     Ok(Data { data: MeResponse::new(user, &principal) })
 }
 
+/// Change your own password.
+///
+/// Needs the current password and a session signed in with a password (an API key
+/// cannot do this). Every session of the account ends, including this one; the
+/// response carries the tokens of a new session, so this client stays signed in.
+/// Wrong current passwords count towards the sign-in lock of the email.
+#[utoipa::path(
+    post,
+    path = "/me/password",
+    operation_id = "change_password",
+    security(("bearer" = [])),
+    request_body = ChangePasswordRequest,
+    responses(
+        (status = 200, description = "Changed; use these tokens from now on.", body = Data<TokenResponse>),
+        (status = 400, description = "The current password is wrong; code `auth.wrong_password`.", body = Problem),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Called with an API key (code `auth.session_required`), or the account is disabled (code `auth.user_disabled`).", body = Problem),
+        (status = 422, description = "The body is missing a field, or the new password breaks the rules (see `errors`).", body = Problem),
+        (status = 429, description = "Too many wrong passwords for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.", body = Problem),
+    )
+)]
+async fn change_password(
+    State(state): State<Arc<HttpState>>,
+    principal: Principal,
+    ValidJson(input): ValidJson<ChangePasswordRequest>,
+) -> Result<Data<TokenResponse>, Error> {
+    super::require_session(&principal)?;
+    let tokens = state
+        .sessions
+        .change_password(principal.user_id(), &input.current_password, input.new_password)
+        .await?;
+    Ok(Data { data: tokens.into() })
+}
+
 #[cfg(test)]
 mod tests {
     use autoxide_testkit::TestDatabase;
@@ -352,6 +397,30 @@ mod tests {
             let (status, _, problem) = call(&app, "POST", "/login", None, Some(empty)).await;
             assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
             assert_eq!(problem["code"], "validation_failed");
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn tu_doi_mat_khau_qua_api() {
+        TestDatabase::run(async |test| {
+            let (app, _) = crate::http::test_support::app(test).await;
+            let ada = crate::http::test_support::bearer(&app, "ada@example.com", PASSWORD).await;
+            let new = "a brand new passphrase";
+
+            let body = json!({"current_password": "wrong one", "new_password": new});
+            let (status, _, problem) =
+                call(&app, "POST", "/me/password", Some(&ada), Some(body)).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert_eq!(problem["code"], "auth.wrong_password");
+
+            let body = json!({"current_password": PASSWORD, "new_password": new});
+            let (status, _, changed) =
+                call(&app, "POST", "/me/password", Some(&ada), Some(body)).await;
+            assert_eq!(status, StatusCode::OK, "{changed}");
+            assert!(changed["data"]["refresh_token"].is_string());
+            crate::http::test_support::bearer(&app, "ada@example.com", new).await;
         })
         .await
         .unwrap();

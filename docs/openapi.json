@@ -1118,6 +1118,103 @@
         ]
       }
     },
+    "/api/v1/auth/me/password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change your own password.",
+        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). Every session of the account ends, including this one; the\nresponse carries the tokens of a new session, so this client stays signed in.\nWrong current passwords count towards the sign-in lock of the email.",
+        "operationId": "auth_change_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Changed; use these tokens from now on.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The current password is wrong; code `auth.wrong_password`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Called with an API key (code `auth.session_required`), or the account is disabled (code `auth.user_disabled`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is missing a field, or the new password breaks the rules (see `errors`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many wrong passwords for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/password-reset": {
       "post": {
         "tags": [
@@ -2313,6 +2410,108 @@
         ]
       }
     },
+    "/api/v1/auth/users/{id}/password": {
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Set the password of an account created without one.",
+        "description": "Requires `auth.users.manage`. Only for an account that has no password yet: an\nadministrator cannot replace someone else's password. Its owner changes it with\n`POST /api/v1/auth/me/password` or resets it by email.",
+        "operationId": "auth_set_user_password",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the user.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "The password was set; the user can sign in with it."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.users.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No user has this id; code `auth.user_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The account already has a password; code `auth.password_already_set`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The password breaks the rules; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/users/{id}/roles": {
       "get": {
         "tags": [
@@ -2701,6 +2900,23 @@
             ],
             "description": "Record that changed, as `<kind>:<id>`, e.g. `auth.user:0190…`.",
             "example": "auth.user:01936f0e-6c9f-7cc2-8a52-2b2f4d1c1e5a"
+          }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "description": "The current password and the new one.",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "properties": {
+          "current_password": {
+            "type": "string"
+          },
+          "new_password": {
+            "type": "string",
+            "description": "12 to 128 characters."
           }
         }
       },
@@ -4076,6 +4292,19 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "SetPasswordRequest": {
+        "type": "object",
+        "description": "The first password of an account.",
+        "required": [
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "12 to 128 characters."
           }
         }
       },

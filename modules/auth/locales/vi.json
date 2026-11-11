@@ -21,6 +21,7 @@
   "auth.mfa_not_enabled": "Đăng nhập hai bước chưa bật.",
   "auth.mfa_setup_not_started": "Chưa có lượt bật đăng nhập hai bước nào để xác nhận. Hãy bắt đầu bằng `POST /api/v1/auth/me/mfa/totp`.",
   "auth.missing_token": "Endpoint này cần access token: gửi `Authorization: Bearer <access token>`. Lấy token bằng `POST /api/v1/auth/login`.",
+  "auth.password_already_set": "Tài khoản này đã có mật khẩu. Chỉ chủ tài khoản đổi được (`POST /api/v1/auth/me/password`), hoặc đặt lại qua email (`POST /api/v1/auth/password-reset`).",
   "auth.refresh_token_reused": "Refresh token này đã được dùng. Phiên đăng nhập đã bị kết thúc để an toàn; hãy đăng nhập lại. Mỗi refresh token chỉ dùng một lần, và chỉ giữ token mới nhất.",
   "auth.registration_disabled": "Máy chủ này không cho tự tạo tài khoản. Hãy nhờ quản trị viên tạo cho bạn.",
   "auth.role_builtin": "Role `admin` dựng sẵn không sửa hay xoá được. Hãy tạo một role khác.",
@@ -29,5 +30,6 @@
   "auth.session_required": "Việc này cần phiên đăng nhập; API key không làm được. Hãy đăng nhập bằng mật khẩu (`POST /api/v1/auth/login`) và dùng access token đó.",
   "auth.token_expired": "Access token đã hết hạn. Lấy token mới bằng refresh token (`POST /api/v1/auth/refresh`).",
   "auth.user_disabled": "Tài khoản này đã bị khoá. Hãy nhờ quản trị viên mở khoá.",
-  "auth.user_not_found": "Không có người dùng `{id}`."
+  "auth.user_not_found": "Không có người dùng `{id}`.",
+  "auth.wrong_password": "Mật khẩu hiện tại không đúng. Nếu bạn quên, hãy đặt lại qua email (`POST /api/v1/auth/password-reset`)."
 }

@@ -164,6 +164,11 @@ answer is the same whether or not the email has an account. Set
 `https://app.example.com/reset?token={token}`) to send a link to your own page
 instead of the bare token.
 
+Signed-in users change their own password with `POST /api/v1/auth/me/password`
+(the current password is required). An administrator can give the first password to
+an account created without one (`PUT /api/v1/auth/users/{id}/password`), but cannot
+replace a password someone already has.
+
 For production, set `AUTOXIDE_AUTH_TOKEN_SECRET` (the key that signs access tokens)
 to a long random value, the same on every server:
 

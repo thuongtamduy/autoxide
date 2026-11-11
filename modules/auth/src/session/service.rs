@@ -132,6 +132,42 @@ impl SessionService {
         Ok(LoginOutcome::Tokens(self.start_session(user.id, "password").await?))
     }
 
+    /// Người dùng `user_id` (đang đăng nhập) tự đổi mật khẩu, kèm mật khẩu hiện tại.
+    ///
+    /// Mỗi lần nhập sai mật khẩu hiện tại được tính vào login throttling của email như
+    /// một lần đăng nhập sai: ai cầm được access token cũng không đoán mãi được mật
+    /// khẩu. Đổi xong thì mọi phiên cũ kết thúc; trả cặp token của một phiên mới để
+    /// client đang dùng không phải đăng nhập lại.
+    pub(crate) async fn change_password(
+        &self,
+        user_id: Uuid,
+        current: &str,
+        new: String,
+    ) -> Result<Tokens, Error> {
+        if let Some(problem) = crate::password::check_rules("new_password", &new) {
+            return Err(Error::validation(vec![problem]));
+        }
+        let user =
+            self.users.get(user_id).await?.ok_or_else(|| crate::user::user_not_found(user_id))?;
+        self.throttle.check(&user.email).await?;
+        if let Err(error) = self.users.check_credentials(&user.email, current).await {
+            if error.code() != INVALID_CREDENTIALS {
+                return Err(error);
+            }
+            self.throttle.record_failure(&user.email).await?;
+            return Err(Error::bad_request(
+                "auth.wrong_password",
+                "The current password is incorrect. If you forgot it, reset it by email \
+                 (`POST /api/v1/auth/password-reset`).",
+            ));
+        }
+        self.users
+            .write_password(Actor::user(user_id), user_id, "new_password", new, false)
+            .await?;
+        self.throttle.clear(&user.email).await?;
+        self.start_session(user_id, "password_change").await
+    }
+
     /// Bước hai của đăng nhập: `code` là mã TOTP hoặc một recovery code. Mỗi lần sai
     /// được tính vào login throttling của email, như một lần sai mật khẩu.
     pub(crate) async fn complete_mfa(&self, mfa_token: &str, code: &str) -> Result<Tokens, Error> {
@@ -752,6 +788,67 @@ mod mfa_login_tests {
             }
 
             assert_eq!(signed_in, 1);
+        })
+        .await
+        .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod change_password_tests {
+    use super::*;
+    use crate::user::NewUser;
+    use autoxide_testkit::TestDatabase;
+
+    const OLD: &str = "correct horse battery staple";
+    const NEW: &str = "a brand new passphrase";
+
+    async fn setup(test: &TestDatabase) -> (Arc<SessionService>, User) {
+        let (sessions, users) = crate::testing::sessions(test).await;
+        let ada = NewUser {
+            email: "ada@example.com".to_owned(),
+            name: "Ada".to_owned(),
+            password: Some(OLD.to_owned()),
+        };
+        let user = users.create(Actor::system(), ada).await.unwrap();
+        (sessions, user)
+    }
+
+    #[tokio::test]
+    async fn doi_mat_khau_can_mat_khau_cu_va_cap_phien_moi() {
+        TestDatabase::run(async |test| {
+            let (sessions, user) = setup(test).await;
+            let old_session = sessions.login("ada@example.com", OLD).await.unwrap().tokens();
+
+            let wrong = sessions.change_password(user.id, "not my password", NEW.to_owned());
+            assert_eq!(wrong.await.unwrap_err().code(), "auth.wrong_password");
+            let short = sessions.change_password(user.id, OLD, "short".to_owned());
+            assert_eq!(short.await.unwrap_err().code(), "validation_failed");
+
+            let tokens = sessions.change_password(user.id, OLD, NEW.to_owned()).await.unwrap();
+
+            // Phiên cũ kết thúc; phiên mới dùng tiếp được.
+            assert!(sessions.refresh(&old_session.refresh_token).await.is_err());
+            sessions.refresh(&tokens.refresh_token).await.unwrap();
+            assert!(sessions.login("ada@example.com", OLD).await.is_err());
+            sessions.login("ada@example.com", NEW).await.unwrap().tokens();
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn doan_mat_khau_cu_nhieu_lan_bi_khoa() {
+        TestDatabase::run(async |test| {
+            let (sessions, user) = setup(test).await;
+            for _ in 0..5 {
+                let wrong = sessions.change_password(user.id, "guess", NEW.to_owned()).await;
+                assert_eq!(wrong.unwrap_err().code(), "auth.wrong_password");
+            }
+
+            // Đã khoá: kể cả mật khẩu đúng cũng phải chờ.
+            let locked = sessions.change_password(user.id, OLD, NEW.to_owned()).await;
+            assert_eq!(locked.unwrap_err().code(), "auth.login_throttled");
         })
         .await
         .unwrap();

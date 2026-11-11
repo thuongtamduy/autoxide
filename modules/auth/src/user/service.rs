@@ -255,21 +255,52 @@ impl UserService {
         id: Uuid,
         password: String,
     ) -> Result<(), Error> {
-        if let Some(problem) = password::check_rules("password", &password) {
+        self.write_password(actor, id, "password", password, false).await
+    }
+
+    /// Quản trị viên đặt mật khẩu cho tài khoản tạo không kèm mật khẩu. Tài khoản đã
+    /// có mật khẩu thì từ chối (`auth.password_already_set`): người giữ quyền quản lý
+    /// người dùng không được chiếm tài khoản của người khác bằng cách đổi mật khẩu của họ.
+    pub(crate) async fn set_initial_password(
+        &self,
+        actor: Actor,
+        id: Uuid,
+        password: String,
+    ) -> Result<(), Error> {
+        self.write_password(actor, id, "password", password, true).await
+    }
+
+    /// Hash và lưu mật khẩu. `field`: tên trường báo trong lỗi luật mật khẩu.
+    /// `only_if_unset`: chỉ ghi khi tài khoản chưa có mật khẩu — kiểm ngay trong câu
+    /// `UPDATE` nên hai request đồng thời không cùng ghi được.
+    pub(crate) async fn write_password(
+        &self,
+        actor: Actor,
+        id: Uuid,
+        field: &str,
+        password: String,
+        only_if_unset: bool,
+    ) -> Result<(), Error> {
+        if let Some(problem) = password::check_rules(field, &password) {
             return Err(Error::validation(vec![problem]));
         }
         let hash = self.passwords.hash(password).await?;
         // Đổi mật khẩu và thu hồi mọi phiên đăng nhập trong CÙNG một transaction: kẻ
         // giữ mật khẩu cũ (hay refresh token cũ) mất quyền ngay khi mật khẩu đổi.
         let transaction = self.database.begin_write().await?;
-        let updated = Entity::update_many()
+        let mut update = Entity::update_many()
             .col_expr(Column::PasswordHash, Expr::value(Some(hash)))
             .col_expr(Column::UpdatedAt, Expr::value(now()))
-            .filter(Column::Id.eq(id))
-            .exec(&transaction)
-            .await?;
+            .filter(Column::Id.eq(id));
+        if only_if_unset {
+            update = update.filter(Column::PasswordHash.is_null());
+        }
+        let updated = update.exec(&transaction).await?;
         if updated.rows_affected == 0 {
             transaction.rollback().await?;
+            if only_if_unset && self.get(id).await?.is_some() {
+                return Err(password_already_set());
+            }
             return Err(user_not_found(id));
         }
         SessionService::revoke_user(&transaction, id).await?;
@@ -345,6 +376,15 @@ pub(crate) fn user_disabled() -> Error {
 
 fn invalid_credentials() -> Error {
     Error::unauthenticated("auth.invalid_credentials", "The email or password is incorrect.")
+}
+
+fn password_already_set() -> Error {
+    Error::conflict(
+        "auth.password_already_set",
+        "This account already has a password. Only its owner can change it \
+         (`POST /api/v1/auth/me/password`), or reset it by email \
+         (`POST /api/v1/auth/password-reset`).",
+    )
 }
 
 /// Lỗi khi không có người dùng `id`.
@@ -636,6 +676,64 @@ mod tests {
             let users: std::sync::Arc<dyn Users> = service;
 
             assert_eq!(users.find(created.id).await.unwrap(), Some(created));
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn quan_tri_vien_chi_dat_duoc_mat_khau_dau_tien() {
+        TestDatabase::run(async |test| {
+            let users = service(test).await;
+            let bob = NewUser { password: None, ..new_user("bob@example.com") };
+            let bob = users.create(Actor::system(), bob).await.unwrap();
+            let ada = users.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
+
+            let short = users.set_initial_password(Actor::system(), bob.id, "short".to_owned());
+            assert_eq!(short.await.unwrap_err().code(), "validation_failed");
+            users.set_initial_password(Actor::system(), bob.id, PASSWORD.to_owned()).await.unwrap();
+            users.check_credentials("bob@example.com", PASSWORD).await.unwrap();
+
+            for id in [bob.id, ada.id] {
+                let taken = users.set_initial_password(Actor::system(), id, PASSWORD.to_owned());
+                let taken = taken.await.unwrap_err();
+                assert_eq!(taken.kind(), ErrorKind::Conflict);
+                assert_eq!(taken.code(), "auth.password_already_set");
+            }
+            let ghost =
+                users.set_initial_password(Actor::system(), Uuid::now_v7(), PASSWORD.into());
+            assert_eq!(ghost.await.unwrap_err().code(), "auth.user_not_found");
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Hai quản trị viên cùng đặt mật khẩu đầu tiên: đúng một người được — trên cả hai
+    /// database.
+    #[tokio::test]
+    async fn dat_mat_khau_dau_tien_dong_thoi_chi_mot_ben_duoc() {
+        TestDatabase::run(async |test| {
+            let users = std::sync::Arc::new(service(test).await);
+            let bob = NewUser { password: None, ..new_user("bob@example.com") };
+            let bob = users.create(Actor::system(), bob).await.unwrap();
+
+            let attempts: Vec<_> = (0..4)
+                .map(|index| {
+                    let users = users.clone();
+                    tokio::spawn(async move {
+                        let password = format!("{PASSWORD} number {index}");
+                        users.set_initial_password(Actor::system(), bob.id, password).await
+                    })
+                })
+                .collect();
+            let mut succeeded = 0;
+            for attempt in attempts {
+                if attempt.await.unwrap().is_ok() {
+                    succeeded += 1;
+                }
+            }
+
+            assert_eq!(succeeded, 1);
         })
         .await
         .unwrap();
