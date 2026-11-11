@@ -17,8 +17,8 @@ use std::fmt;
 
 use sea_orm::sqlx::sqlite::{SqliteJournalMode, SqliteSynchronous};
 use sea_orm::{
-    ConnectOptions, DatabaseConnection, DatabaseTransaction, DbErr, SqliteTransactionMode,
-    TransactionOptions, TransactionTrait,
+    AccessMode, ConnectOptions, DatabaseConnection, DatabaseTransaction, DbErr, IsolationLevel,
+    SqliteTransactionMode, TransactionOptions, TransactionTrait,
 };
 
 use crate::config::{DatabaseBackend, DatabaseConfig, DatabaseUrl};
@@ -101,6 +101,24 @@ impl Database {
             ..Default::default()
         };
         self.write.begin_with_options(options).await
+    }
+
+    /// Mở một transaction CHỈ ĐỌC thấy database như ở một thời điểm: mọi câu đọc bên
+    /// trong cho cùng một bức ảnh, dù lệnh ghi khác đang chạy (dùng cho backup, chép dữ
+    /// liệu). Postgres: `REPEATABLE READ READ ONLY`; SQLite (WAL): transaction đọc thường
+    /// đã cố định bức ảnh từ câu đọc đầu tiên.
+    pub async fn begin_snapshot(&self) -> Result<DatabaseTransaction, DbErr> {
+        match self.backend {
+            DatabaseBackend::Postgres => {
+                self.read
+                    .begin_with_config(
+                        Some(IsolationLevel::RepeatableRead),
+                        Some(AccessMode::ReadOnly),
+                    )
+                    .await
+            }
+            _ => self.read.begin().await,
+        }
     }
 
     /// Database đang dùng là SQLite hay Postgres.

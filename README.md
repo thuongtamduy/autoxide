@@ -156,6 +156,15 @@ matching REST endpoint, so writes land in the audit log. For example, with Claud
 claude mcp add --transport http autoxide http://127.0.0.1:8080/mcp --header "Authorization: Bearer <api key>"
 ```
 
+Back up everything — the data of every module and every stored file — into a
+directory, and restore it into a new, empty database (with any file storage) later. The
+database is read in one consistent snapshot, so the server may keep running:
+
+```bash
+cargo run -p autoxide -- backup backups/2026-11-11
+cargo run -p autoxide -- restore backups/2026-11-11
+```
+
 To move to PostgreSQL later (or bring data back to SQLite), stop the server and copy
 everything into a new, empty database; it gets every migration first:
 

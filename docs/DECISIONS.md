@@ -1548,3 +1548,30 @@ công cụ gỡ lỗi tối thiểu.
 Đã cân nhắc: image `scratch`/distroless — nhỏ hơn nhưng khó gỡ lỗi và cần build musl;
 chạy migration trong lệnh khởi động của app — nhiều bản app cùng lúc sẽ tranh nhau
 migrate.
+
+## D-073 · Backup là một thư mục trung lập: SQLite + file — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- `autoxide backup <thư mục>` tạo `backup.json` (định dạng 1, phiên bản, lúc tạo, số
+  dòng mỗi bảng, số file), `database.sqlite` (dữ liệu mọi module, chép bằng
+  `transfer::copy_modules` — D-070) và `files/<khoá>` (mọi file từ nơi lưu, qua
+  `Storage::keys` + `get`). Thư mục phải mới hoặc trống.
+- Database nguồn được đọc trong `Database::begin_snapshot()` (Postgres: `REPEATABLE READ
+  READ ONLY`; SQLite/WAL: transaction đọc) nên nhất quán dù máy chủ đang chạy. File chép
+  SAU database: file tải lên trong lúc backup có thể có mặt mà không có dòng (vô hại);
+  file bị xoá trong lúc backup thì thiếu — muốn trọn vẹn tuyệt đối thì dừng máy chủ.
+- `autoxide restore <thư mục>` chỉ nhận database chưa có migration nào, áp dụng
+  migration, áp dụng migration lên một BẢN SAO của `database.sqlite` (backup cũ hơn vẫn
+  khôi phục được, bản gốc không bị đổi), chép vào, rồi đưa file vào nơi lưu đang cấu
+  hình; kiểm số file khớp `backup.json`.
+- Một định dạng cho mọi cách cài: backup từ Postgres khôi phục vào SQLite được, từ ổ đĩa
+  sang S3 được, và ngược lại.
+
+Lý do: không phụ thuộc công cụ ngoài (`pg_dump`, `sqlite3`, `aws s3 sync`) có phiên bản
+khác nhau trên mỗi máy; người lạ chỉ cần một lệnh. Dùng lại đúng cơ chế chép đã kiểm
+kiểu cột trên cả hai database.
+
+Đã cân nhắc: `pg_dump` / sao chép file SQLite — hai cách khác nhau cho hai database và
+không mang file theo; nén thành một file `.tar.gz` — người dùng tự nén được, thêm thư
+viện chỉ để nén thì không đáng.

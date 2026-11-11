@@ -18,9 +18,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use futures_util::TryStreamExt as _;
 use sea_orm::sea_query::{Alias, Expr, Query, SimpleExpr, Value};
-use sea_orm::{
-    ConnectionTrait, DatabaseBackend, DatabaseConnection, QueryResult, Statement, StreamTrait,
-};
+use sea_orm::{ConnectionTrait, DatabaseBackend, QueryResult, Statement, StreamTrait};
 use uuid::Uuid;
 
 use crate::database::Database;
@@ -81,8 +79,11 @@ pub async fn copy_modules(
     target: &Database,
     modules: &[&str],
 ) -> Result<Vec<CopiedTable>, TransferError> {
+    // Đọc nguồn trong một snapshot: mọi bảng như ở cùng một thời điểm, dù máy chủ vẫn
+    // đang ghi.
+    let snapshot = source.begin_snapshot().await?;
     let tables = module_tables(target.write(), modules).await?;
-    let source_tables = module_tables(source.read(), modules).await?;
+    let source_tables = module_tables(&snapshot, modules).await?;
     if let Some(missing) = tables.iter().find(|table| !source_tables.contains(table)) {
         return Err(TransferError(format!(
             "table `{missing}` exists in the target but not in the source: apply the same \
@@ -93,7 +94,7 @@ pub async fn copy_modules(
     // đang giữ transaction thì không hỏi thêm được gì qua kết nối đó.
     let mut plans = Vec::with_capacity(tables.len());
     for table in &tables {
-        let from = columns(source.read(), table).await?;
+        let from = columns(&snapshot, table).await?;
         let to = columns(target.write(), table).await?;
         plans.push((table, from, to));
     }
@@ -106,11 +107,12 @@ pub async fn copy_modules(
     }
     let mut copied = Vec::with_capacity(tables.len());
     for (table, from, to) in plans {
-        let rows = copy_table(source.read(), &transaction, table, &from, &to).await?;
+        let rows = copy_table(&snapshot, &transaction, table, &from, &to).await?;
         tracing::info!(table, rows, "table copied");
         copied.push(CopiedTable { table: table.clone(), rows });
     }
     transaction.commit().await?;
+    snapshot.commit().await?;
     for table in &copied {
         let rows = count(target.read(), &table.table).await?;
         if rows != table.rows {
@@ -124,8 +126,8 @@ pub async fn copy_modules(
 }
 
 /// Bảng của `modules` theo thứ tự tạo, bỏ bảng `<module>_migrations`.
-async fn module_tables(
-    connection: &DatabaseConnection,
+async fn module_tables<C: ConnectionTrait>(
+    connection: &C,
     modules: &[&str],
 ) -> Result<Vec<String>, TransferError> {
     let backend = connection.get_database_backend();
@@ -158,8 +160,8 @@ async fn module_tables(
 }
 
 /// Cột của `table` và kiểu của chúng.
-async fn columns(
-    connection: &DatabaseConnection,
+async fn columns<C: ConnectionTrait>(
+    connection: &C,
     table: &str,
 ) -> Result<Vec<Column>, TransferError> {
     let backend = connection.get_database_backend();
@@ -218,8 +220,8 @@ fn kind_of(declared: &str) -> Option<Kind> {
     })
 }
 
-async fn copy_table<C: ConnectionTrait>(
-    source: &DatabaseConnection,
+async fn copy_table<S: ConnectionTrait + StreamTrait, C: ConnectionTrait>(
+    source: &S,
     target: &C,
     table: &str,
     from: &[Column],
@@ -240,8 +242,10 @@ async fn copy_table<C: ConnectionTrait>(
     for column in from {
         select.column(Alias::new(&column.name));
     }
-    let backend = source.get_database_backend();
-    let mut rows = source.stream_raw(backend.build(&select)).await?;
+    let backend = ConnectionTrait::get_database_backend(source);
+    let rows = source.stream_raw(backend.build(&select)).await?;
+    // `pin!`: luồng của database có thể tự trỏ vào mình; ghim nó tại chỗ để đọc dần.
+    let mut rows = std::pin::pin!(rows);
     let mut batch: Vec<Vec<SimpleExpr>> = Vec::with_capacity(BATCH_ROWS);
     let mut copied = 0;
     while let Some(row) = rows.try_next().await? {

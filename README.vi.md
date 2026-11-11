@@ -153,6 +153,15 @@ audit log. Ví dụ với Claude Code:
 claude mcp add --transport http autoxide http://127.0.0.1:8080/mcp --header "Authorization: Bearer <api key>"
 ```
 
+Backup mọi thứ — dữ liệu của mọi module và mọi file đã lưu — vào một thư mục, rồi về
+sau khôi phục vào một database mới, trống (với nơi lưu file bất kỳ). Database được đọc
+trong một snapshot nhất quán, nên máy chủ vẫn chạy được trong lúc backup:
+
+```bash
+cargo run -p autoxide -- backup backups/2026-11-11
+cargo run -p autoxide -- restore backups/2026-11-11
+```
+
 Muốn chuyển sang PostgreSQL về sau (hay mang dữ liệu về SQLite), dừng máy chủ rồi chép
 mọi thứ sang một database mới, trống; database đó được áp dụng mọi migration trước:
 

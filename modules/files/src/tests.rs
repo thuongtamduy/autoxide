@@ -56,8 +56,12 @@ async fn ghi_doc_ghi_de_va_xoa() {
         storage.put("notes/a.txt", stream(vec![Ok(Bytes::from_static(b"new"))])).await.unwrap();
         assert_eq!(read_all(&storage, "notes/a.txt").await.unwrap(), b"new", "{name}");
 
+        storage.put("notes/b/c.txt", stream(vec![Ok(Bytes::from_static(b"c"))])).await.unwrap();
+        assert_eq!(storage.keys().await.unwrap(), ["notes/a.txt", "notes/b/c.txt"], "{name}");
+        storage.delete("notes/b/c.txt").await.unwrap();
         storage.delete("notes/a.txt").await.unwrap();
         assert!(storage.get("notes/a.txt").await.unwrap().is_none(), "{name}");
+        assert!(storage.keys().await.unwrap().is_empty(), "{name}");
         // Xoá thứ không có: coi như xong.
         storage.delete("notes/a.txt").await.unwrap();
         storage.put("empty", stream(Vec::new())).await.unwrap();

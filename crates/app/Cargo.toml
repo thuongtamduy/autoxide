@@ -15,6 +15,10 @@ autoxide-mail.workspace = true
 autoxide-files.workspace = true
 autoxide-kernel.workspace = true
 base64.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+futures-util.workspace = true
+serde_json.workspace = true
 getrandom.workspace = true
 clap.workspace = true
 tokio.workspace = true
@@ -23,7 +27,6 @@ uuid.workspace = true
 
 [dev-dependencies]
 axum.workspace = true
-chrono.workspace = true
 autoxide-testkit.workspace = true
 # MCP client thật cho test đầu-cuối của endpoint MCP.
 rmcp = { workspace = true, features = [
@@ -32,7 +35,6 @@ rmcp = { workspace = true, features = [
   "reqwest-tls-no-provider",
 ] }
 sea-orm.workspace = true
-serde_json.workspace = true
 tower.workspace = true
 
 [lints]

@@ -133,6 +133,24 @@ impl Storage for ObjectStorage {
         }
     }
 
+    async fn keys(&self) -> Result<Vec<String>, Error> {
+        let prefix = self.prefix.as_deref().map(Path::from);
+        let listed: Vec<_> = match self.store.list(prefix.as_ref()).try_collect().await {
+            Ok(listed) => listed,
+            // Thư mục cục bộ chưa có (chưa ghi file nào): không có file.
+            Err(object_store::Error::NotFound { .. }) => Vec::new(),
+            Err(error) => return Err(storage_error(error)),
+        };
+        let start = self.prefix.as_ref().map_or(0, |prefix| prefix.len() + 1);
+        let mut keys: Vec<String> = listed
+            .into_iter()
+            .map(|object| object.location.as_ref().get(start..).unwrap_or_default().to_owned())
+            .filter(|key| !key.is_empty())
+            .collect();
+        keys.sort();
+        Ok(keys)
+    }
+
     async fn delete(&self, key: &str) -> Result<(), Error> {
         let path = self.path(key)?;
         match self.store.delete(&path).await {

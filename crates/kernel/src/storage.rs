@@ -39,4 +39,7 @@ pub trait Storage: Send + Sync {
 
     /// Xoá file ở `key`. Không có file thì coi như xong.
     async fn delete(&self, key: &str) -> Result<(), Error>;
+
+    /// Khoá của mọi file đang lưu, theo thứ tự tên (dùng cho backup).
+    async fn keys(&self) -> Result<Vec<String>, Error>;
 }

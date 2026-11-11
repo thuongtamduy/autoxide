@@ -24,6 +24,14 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Back up the data of every module and every stored file into a directory.
+    ///
+    /// Works the same for SQLite and PostgreSQL, local disk and S3: the backup holds a
+    /// SQLite copy of the database (read in one consistent snapshot, so the server may
+    /// keep running) and a copy of every stored file. Restore it with
+    /// `autoxide restore`.
+    Backup(commands::backup::BackupArguments),
+
     /// Check the configuration and show every setting with its current value.
     ///
     /// Settings are read from environment variables and from a `.env` file in
@@ -54,6 +62,12 @@ enum Command {
     /// database (modules build their services) but does not need migrations.
     Openapi,
 
+    /// Restore a backup made by `autoxide backup` into a new, empty database.
+    ///
+    /// Restores into the database of `DATABASE_URL` (which gets every migration first)
+    /// and the file storage configured now — they may differ from the backed-up server.
+    Restore(commands::backup::RestoreArguments),
+
     /// Run the HTTP server until it receives Ctrl-C or SIGTERM.
     ///
     /// Refuses to start while a migration has not been applied: run
@@ -71,11 +85,13 @@ fn main() -> ExitCode {
     // `parse` tự xử lý `--help`, `--version` và tham số sai (in thông báo rồi thoát).
     let cli = Cli::parse();
     match cli.command {
+        Command::Backup(arguments) => commands::backup::backup(&arguments),
         Command::Config(arguments) => commands::config::run(&arguments),
         Command::Copy(arguments) => commands::copy::run(&arguments),
         Command::Jobs(arguments) => commands::jobs::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
         Command::Openapi => commands::openapi::run(),
+        Command::Restore(arguments) => commands::backup::restore(&arguments),
         Command::Serve => commands::serve::run(),
         Command::User(arguments) => commands::user::run(&arguments),
     }
