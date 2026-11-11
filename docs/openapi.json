@@ -426,6 +426,293 @@
         ]
       }
     },
+    "/api/v1/auth/me/mfa": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get your two-step sign-in settings.",
+        "operationId": "auth_get_mfa",
+        "responses": {
+          "200": {
+            "description": "Your settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MfaStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/mfa/totp": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Start turning on two-step sign-in with an authenticator app.",
+        "description": "Returns a new secret to add to the app. Nothing changes until you confirm with\na code (`POST /api/v1/auth/me/mfa/totp/confirm`). Calling again replaces an\nunconfirmed secret. Needs a password session, not an API key.",
+        "operationId": "auth_start_totp",
+        "responses": {
+          "200": {
+            "description": "Add this secret to the authenticator app, then confirm.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TotpSetupResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Two-step sign-in is already on; code `auth.mfa_already_enabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/mfa/totp/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Confirm two-step sign-in with the first code from the app.",
+        "description": "From now on, signing in asks for a code. Needs a password session.",
+        "operationId": "auth_confirm_totp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Two-step sign-in is on.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MfaStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No setup was started (`auth.mfa_setup_not_started`), or it is already on (`auth.mfa_already_enabled`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The code is wrong or expired; `errors` names the field `code`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/mfa/totp/disable": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Turn off two-step sign-in.",
+        "description": "Needs a current code, and a password session.",
+        "operationId": "auth_disable_totp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Two-step sign-in is off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MfaStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Two-step sign-in is not on; code `auth.mfa_not_enabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The code is wrong or expired; `errors` names the field `code`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/permissions": {
       "get": {
         "tags": [
@@ -1449,6 +1736,78 @@
         ]
       }
     },
+    "/api/v1/auth/users/{id}/mfa": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Turn off two-step sign-in for a user who lost their device.",
+        "description": "Requires `auth.users.manage`. The user signs in with the password alone and can\nset up a new device. Check who is asking before using this.",
+        "operationId": "auth_reset_user_mfa",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the user.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Two-step sign-in is off for this user (also when it was not on)."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.users.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No user has this id; code `auth.user_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/users/{id}/roles": {
       "get": {
         "tags": [
@@ -1769,6 +2128,20 @@
           }
         }
       },
+      "CodeRequest": {
+        "type": "object",
+        "description": "A code from the authenticator app.",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The 6-digit code currently shown by the app.",
+            "example": "123456"
+          }
+        }
+      },
       "CreateApiKeyRequest": {
         "type": "object",
         "description": "A key to create.",
@@ -1958,6 +2331,28 @@
           }
         }
       },
+      "Data_MfaStatusResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "Your two-step sign-in settings.",
+            "required": [
+              "totp_enabled"
+            ],
+            "properties": {
+              "totp_enabled": {
+                "type": "boolean",
+                "description": "Sign-in asks for a code from an authenticator app."
+              }
+            }
+          }
+        }
+      },
       "Data_RoleResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -2057,6 +2452,35 @@
                 "type": "string",
                 "description": "Always `Bearer`.",
                 "example": "Bearer"
+              }
+            }
+          }
+        }
+      },
+      "Data_TotpSetupResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "What to enter in the authenticator app.",
+            "required": [
+              "secret",
+              "otpauth_url"
+            ],
+            "properties": {
+              "otpauth_url": {
+                "type": "string",
+                "description": "The same secret as an `otpauth://` URI: show it as a QR code to scan.",
+                "example": "otpauth://totp/Autoxide:ada%40example.com?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=Autoxide"
+              },
+              "secret": {
+                "type": "string",
+                "description": "The secret, base32, for typing by hand.",
+                "example": "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
               }
             }
           }
@@ -2281,6 +2705,19 @@
             "example": [
               "auth.roles.read"
             ]
+          }
+        }
+      },
+      "MfaStatusResponse": {
+        "type": "object",
+        "description": "Your two-step sign-in settings.",
+        "required": [
+          "totp_enabled"
+        ],
+        "properties": {
+          "totp_enabled": {
+            "type": "boolean",
+            "description": "Sign-in asks for a code from an authenticator app."
           }
         }
       },
@@ -2745,6 +3182,26 @@
             "type": "string",
             "description": "Always `Bearer`.",
             "example": "Bearer"
+          }
+        }
+      },
+      "TotpSetupResponse": {
+        "type": "object",
+        "description": "What to enter in the authenticator app.",
+        "required": [
+          "secret",
+          "otpauth_url"
+        ],
+        "properties": {
+          "otpauth_url": {
+            "type": "string",
+            "description": "The same secret as an `otpauth://` URI: show it as a QR code to scan.",
+            "example": "otpauth://totp/Autoxide:ada%40example.com?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=Autoxide"
+          },
+          "secret": {
+            "type": "string",
+            "description": "The secret, base32, for typing by hand.",
+            "example": "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
           }
         }
       },

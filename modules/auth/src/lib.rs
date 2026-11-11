@@ -13,6 +13,7 @@ pub mod api;
 mod api_key;
 mod config;
 mod http;
+mod mfa;
 mod migration;
 mod password;
 mod permissions;
@@ -33,6 +34,7 @@ use utoipa_axum::router::OpenApiRouter;
 use crate::access::RequestAuthenticator;
 use crate::api_key::ApiKeyService;
 use crate::config::AuthConfig;
+use crate::mfa::MfaService;
 use crate::password::Passwords;
 use crate::role::RoleService;
 use crate::session::{LoginThrottle, SessionService};
@@ -95,7 +97,8 @@ impl Module for AuthModule {
             throttle,
         )?);
         let roles = Arc::new(RoleService::new(database.clone(), context.permissions().clone()));
-        let api_keys = Arc::new(ApiKeyService::new(database, users.clone(), roles.clone()));
+        let api_keys = Arc::new(ApiKeyService::new(database.clone(), users.clone(), roles.clone()));
+        let mfa = Arc::new(MfaService::new(database, config.totp_issuer.clone()));
         let authenticator = RequestAuthenticator {
             sessions: sessions.clone(),
             roles: roles.clone(),
@@ -110,6 +113,7 @@ impl Module for AuthModule {
             users,
             roles,
             api_keys,
+            mfa,
             self_registration: config.self_registration,
         });
         Ok(())
@@ -166,6 +170,7 @@ pub(crate) mod testing {
         pub sessions: Arc<crate::session::SessionService>,
         pub roles: Arc<crate::role::RoleService>,
         pub api_keys: Arc<crate::api_key::ApiKeyService>,
+        pub mfa: Arc<crate::mfa::MfaService>,
         pub authenticator: Arc<dyn autoxide_kernel::access::Authenticator>,
     }
 
@@ -203,14 +208,18 @@ pub(crate) mod testing {
         ])
         .unwrap();
         let roles = Arc::new(crate::role::RoleService::new(database.clone(), catalog));
-        let api_keys =
-            Arc::new(crate::api_key::ApiKeyService::new(database, users.clone(), roles.clone()));
+        let api_keys = Arc::new(crate::api_key::ApiKeyService::new(
+            database.clone(),
+            users.clone(),
+            roles.clone(),
+        ));
+        let mfa = Arc::new(crate::mfa::MfaService::new(database, "Autoxide".to_owned()));
         let authenticator = Arc::new(crate::access::RequestAuthenticator {
             sessions: sessions.clone(),
             roles: roles.clone(),
             api_keys: api_keys.clone(),
         });
-        Services { users, sessions, roles, api_keys, authenticator }
+        Services { users, sessions, roles, api_keys, mfa, authenticator }
     }
 
     /// Service phiên đăng nhập kèm service người dùng dùng chung database.

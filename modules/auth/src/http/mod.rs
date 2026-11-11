@@ -2,6 +2,7 @@
 //! vào, gọi service và trả envelope; mọi logic nằm ở service.
 
 mod api_keys;
+mod mfa;
 mod roles;
 mod session;
 mod users;
@@ -11,6 +12,7 @@ use std::sync::Arc;
 use utoipa_axum::router::OpenApiRouter;
 
 use crate::api_key::ApiKeyService;
+use crate::mfa::MfaService;
 use crate::role::RoleService;
 use crate::session::SessionService;
 use crate::user::UserService;
@@ -22,6 +24,7 @@ pub(crate) struct HttpState {
     pub users: Arc<UserService>,
     pub roles: Arc<RoleService>,
     pub api_keys: Arc<ApiKeyService>,
+    pub mfa: Arc<MfaService>,
     /// Cho người lạ tự đăng ký (`POST /register`).
     pub self_registration: bool,
 }
@@ -31,7 +34,38 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(roles::routes())
         .merge(users::routes())
         .merge(api_keys::routes())
+        .merge(mfa::routes())
         .with_state(Arc::new(state))
+}
+
+/// Việc chỉ làm được trong phiên đăng nhập bằng mật khẩu, không bằng API key (vd đổi
+/// cài đặt bảo mật của chính tài khoản): key bị lộ không được dùng để chiếm tài khoản.
+fn require_session(
+    principal: &autoxide_kernel::access::Principal,
+) -> Result<(), autoxide_kernel::error::Error> {
+    if principal.api_key_id().is_some() {
+        return Err(autoxide_kernel::error::Error::forbidden(
+            "auth.session_required",
+            "This action needs a signed-in session; an API key cannot do it. Sign in with your \
+             password (`POST /api/v1/auth/login`) and use that access token.",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use autoxide_kernel::access::Principal;
+    use uuid::Uuid;
+
+    #[test]
+    fn api_key_khong_doi_duoc_cai_dat_bao_mat() {
+        let session = Principal::new(Uuid::now_v7(), []);
+        let key = session.clone().via_api_key(Uuid::now_v7());
+
+        assert!(super::require_session(&session).is_ok());
+        assert_eq!(super::require_session(&key).unwrap_err().code(), "auth.session_required");
+    }
 }
 
 #[cfg(test)]
@@ -78,6 +112,7 @@ pub(crate) mod test_support {
             users: services.users.clone(),
             roles: services.roles.clone(),
             api_keys: services.api_keys.clone(),
+            mfa: services.mfa.clone(),
             self_registration,
         };
         let router = autoxide_kernel::http::build(

@@ -942,3 +942,34 @@ thiểu và không tạo đường vòng quanh việc đổi role hay khoá tài
 key của người dùng thật đã đủ; lưu key bằng Argon2 — key đã ngẫu nhiên 256 bit, băm
 chậm chỉ làm mỗi request chậm thêm; quản trị viên thu hồi key của người khác — khoá
 tài khoản đã làm việc đó, thêm khi có nhu cầu.
+
+## D-051 · TOTP — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Thư viện `totp-rs` 6.0 (đã chọn trong `STACK.md`), chỉ bật `std` và `otpauth`; nó
+  dùng đúng `hmac` 0.13 / `sha2` 0.11 đang có, chỉ thêm `sha1`, `base32`,
+  `constant_time_eq`. Tham số mọi ứng dụng authenticator hiểu: SHA-1, 6 chữ số, bước
+  30 giây, nhận lệch một bước mỗi phía. Secret 160 bit sinh bằng `getrandom`.
+- **Bật hai bước:** `POST /api/v1/auth/me/mfa/totp` trả secret (base32) và đường dẫn
+  `otpauth://` để client vẽ QR (core không vẽ QR — D-026: core chỉ có API); `POST
+  …/confirm` với một mã mới có hiệu lực. Tắt (`…/disable`) cần một mã. Các việc này
+  cần phiên đăng nhập bằng mật khẩu, API key không làm được (`auth.session_required`)
+  — key bị lộ không được dùng để chiếm tài khoản.
+- **Mỗi mã dùng một lần** (RFC 6238 mục 5.2 — thư viện không tự làm): lưu số thứ tự
+  bước của mã vừa nhận (`last_used_step`), chỉ nhận bước lớn hơn bằng một `UPDATE` có
+  điều kiện; test sáu request cùng một mã đồng thời: đúng một được nhận, trên hai
+  database.
+- Quản trị viên (`auth.users.manage`) xoá MFA của người mất thiết bị:
+  `DELETE /api/v1/auth/users/{id}/mfa`.
+- Tên hiện trong ứng dụng: `AUTOXIDE_AUTH_TOTP_ISSUER` (mặc định `Autoxide`).
+- **Secret lưu nguyên văn** trong `auth_totp` (máy chủ phải đọc được nó để kiểm mã).
+
+Lý do không mã hoá secret: khoá mã hoá phải ổn định qua các lần khởi động, mà
+`AUTOXIDE_AUTH_TOKEN_SECRET` được phép để trống (khoá ngẫu nhiên mỗi lần chạy) —
+dùng nó thì mọi người dùng mất MFA sau khi khởi động lại. Kẻ đọc được database đã
+đọc được cả hash mật khẩu và mọi dữ liệu khác; mã hoá riêng secret TOTP thêm một biến
+cấu hình bắt buộc mà lợi ích nhỏ. Cân nhắc lại khi có biến khoá mã hoá dữ liệu chung.
+
+Đã cân nhắc: tự viết TOTP — thư viện đã chọn, nhỏ và đúng chuẩn; trả ảnh QR —
+kéo thư viện ảnh vào core trong khi client vẽ QR từ URL dễ dàng.

@@ -51,6 +51,13 @@ pub(crate) const SELF_REGISTRATION: Setting = Setting::new(
 )
 .with_default("false");
 
+pub(crate) const TOTP_ISSUER: Setting = Setting::new(
+    "AUTOXIDE_AUTH_TOTP_ISSUER",
+    "Name shown next to the account in authenticator apps (Google Authenticator, 1Password…) \
+     when a user turns on two-step sign-in. Usually your product name; no `:`.",
+)
+.with_default("Autoxide");
+
 /// Độ dài tối thiểu của khoá ký token: 256 bit, bằng độ dài đầu ra của SHA-256.
 const MIN_SECRET_LENGTH: usize = 32;
 
@@ -66,6 +73,8 @@ pub(crate) struct AuthConfig {
     pub login_lock: Duration,
     /// Cho người lạ tự đăng ký.
     pub self_registration: bool,
+    /// Tên hiện trong ứng dụng authenticator.
+    pub totp_issuer: String,
 }
 
 impl AuthConfig {
@@ -91,6 +100,14 @@ impl AuthConfig {
             "false" => Ok(false),
             _ => Err("must be `true` or `false`".to_owned()),
         });
+        let totp_issuer = reader.get_with(&TOTP_ISSUER, |raw| {
+            let issuer = raw.trim();
+            if issuer.is_empty() || issuer.contains(':') || issuer.chars().count() > 64 {
+                Err("must be 1 to 64 characters, without `:`".to_owned())
+            } else {
+                Ok(issuer.to_owned())
+            }
+        });
         Ok(AuthConfig {
             token_secret: token_secret?,
             access_token_ttl: Duration::from_secs(access?),
@@ -98,6 +115,7 @@ impl AuthConfig {
             login_max_failures: max_failures?,
             login_lock: Duration::from_secs(lock? * 60),
             self_registration: self_registration?,
+            totp_issuer: totp_issuer?,
         })
     }
 }
@@ -124,6 +142,8 @@ mod tests {
         assert_eq!(config.login_max_failures, 5);
         assert_eq!(config.login_lock, Duration::from_secs(15 * 60));
         assert!(!config.self_registration);
+        assert_eq!(config.totp_issuer, "Autoxide");
+        assert!(read(&[("AUTOXIDE_AUTH_TOTP_ISSUER", "A:B")]).is_err());
         assert!(read(&[("AUTOXIDE_AUTH_SELF_REGISTRATION", "true")]).unwrap().self_registration);
     }
 
