@@ -1,0 +1,11 @@
+# Chỉ gửi mã nguồn vào Docker build: không build cũ, không dữ liệu, không secret.
+target/
+data/
+.git/
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+*.db
+.codegraph/

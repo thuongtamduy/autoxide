@@ -1522,3 +1522,29 @@ nhiều phụ thuộc mà ở đây chỉ cần đếm thời gian và lấy ph�
 
 Đã cân nhắc: `criterion` — phân tích thống kê tốt hơn nhưng nặng và đo từng hàm nhỏ;
 đo qua socket thật — cộng thêm thời gian mạng không thuộc core.
+
+## D-072 · Docker: build multi-stage, chạy Debian slim không root; compose có bước migrate — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- `Dockerfile`: stage build từ `rust:<phiên bản ghim>-slim-trixie` (đặt
+  `RUSTUP_TOOLCHAIN` để khỏi tải thành phần chỉ dành cho máy dev), cache registry và
+  `target` bằng BuildKit; stage chạy `debian:trixie-slim` + `ca-certificates`, người dùng
+  `autoxide` (uid 10001), thư mục làm việc `/var/lib/autoxide`, mọi dữ liệu ghi đĩa trong
+  volume `/var/lib/autoxide/data` (SQLite, file tải lên, mail ghi ra file). Mặc định
+  nghe `0.0.0.0:8080`, log JSON, lệnh `serve`. Image ~190 MB.
+- `compose.yml`: `postgres:16-alpine` (phiên bản tối thiểu được hỗ trợ) có healthcheck;
+  service `migrate` chạy `autoxide migrate up` một lần; `app` chỉ khởi động khi migrate
+  xong, chỉ mở cổng trên `127.0.0.1` (reverse proxy TLS đặt phía trước). Secret
+  (`POSTGRES_PASSWORD`, `AUTOXIDE_AUTH_TOKEN_SECRET`) đọc từ `.env` không commit, thiếu thì
+  compose từ chối chạy.
+- Đã thử thật: build image, `compose up`, tạo admin bằng `docker compose run app user
+  create`, đăng nhập, tải file vào volume.
+
+Lý do: migration không bao giờ tự chạy lúc `serve` (D-036), nên compose cần một
+bước riêng; Debian slim thay vì distroless/alpine để có glibc (SQLite đóng gói, ring) và
+công cụ gỡ lỗi tối thiểu.
+
+Đã cân nhắc: image `scratch`/distroless — nhỏ hơn nhưng khó gỡ lỗi và cần build musl;
+chạy migration trong lệnh khởi động của app — nhiều bản app cùng lúc sẽ tranh nhau
+migrate.

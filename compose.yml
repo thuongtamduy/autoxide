@@ -1,0 +1,57 @@
+# Autoxide + PostgreSQL bằng Docker Compose. Xem docs/DEPLOY.md.
+#
+# Đặt secret trong file `.env` cạnh file này (không commit), ví dụ:
+#   POSTGRES_PASSWORD=<openssl rand -hex 24>
+#   AUTOXIDE_AUTH_TOKEN_SECRET=<openssl rand -base64 48>
+# rồi chạy:  docker compose up -d --build
+
+x-autoxide: &autoxide
+  build: .
+  image: autoxide:local
+  environment:
+    DATABASE_URL: postgres://autoxide:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/autoxide
+    AUTOXIDE_AUTH_TOKEN_SECRET: ${AUTOXIDE_AUTH_TOKEN_SECRET:?set AUTOXIDE_AUTH_TOKEN_SECRET in .env}
+    AUTOXIDE_MAIL_SMTP_URL: ${AUTOXIDE_MAIL_SMTP_URL:-}
+    AUTOXIDE_MAIL_FROM: ${AUTOXIDE_MAIL_FROM:-Autoxide <noreply@localhost>}
+  volumes:
+    - data:/var/lib/autoxide/data
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: autoxide
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: autoxide
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autoxide -d autoxide"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # Áp dụng migration rồi thoát; máy chủ chỉ khởi động khi bước này xong.
+  migrate:
+    <<: *autoxide
+    command: ["migrate", "up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    <<: *autoxide
+    command: ["serve"]
+    ports:
+      # Chỉ mở trên máy này; đặt reverse proxy (TLS) phía trước khi ra internet.
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  postgres:
+  data:
