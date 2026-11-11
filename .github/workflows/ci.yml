@@ -1,0 +1,76 @@
+# CI của Autoxide: gate đầy đủ (giống `./gate.sh` trên máy) trên PostgreSQL thấp nhất
+# được hỗ trợ và mới nhất, cộng quét secret trong toàn bộ lịch sử git (D-074).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: gate (PostgreSQL ${{ matrix.postgres }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # Thấp nhất được hỗ trợ (STACK.md) và mới nhất.
+        postgres: ["16", "18"]
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+      # Máy chủ S3 giả lập cho test lưu file (D-066).
+      s3:
+        image: motoserver/moto:5.2.5
+        ports: ["5000:5000"]
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+      # Database và S3 dùng xong bỏ của CI: mật khẩu này không bảo vệ gì.
+      GATE_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+      GATE_S3_ENDPOINT: http://127.0.0.1:5000
+    steps:
+      - uses: actions/checkout@v5
+      # Toolchain theo rust-toolchain.toml: không đối số thì rustup cài đúng bản ghim.
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - name: Create the S3 test bucket
+        run: |
+          for _ in $(seq 1 30); do
+            curl --silent --fail --request PUT "$GATE_S3_ENDPOINT/autoxide-test" && exit 0
+            sleep 1
+          done
+          exit 1
+      - run: ./gate.sh
+
+  secrets:
+    name: secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Toàn bộ lịch sử: secret đã commit rồi xoá vẫn nằm trong git.
+          fetch-depth: 0
+      - name: gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.0 \
+            git /repo --no-banner --redact --config /repo/.gitleaks.toml

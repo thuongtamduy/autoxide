@@ -1,15 +1,12 @@
-# gitleaks: luật mặc định + danh sách file chỉ chứa giá trị mẫu.
-# Chạy tay: gitleaks dir . --no-banner --redact
-title = "autoxide"
+# Cấu hình gitleaks (quét secret trong CI): bộ luật mặc định, cộng một ngoại lệ hẹp.
+title = "Autoxide"
 
 [extend]
 useDefault = true
 
-[allowlist]
-description = "File env mẫu và file sinh ra cục bộ không chứa secret thật"
-paths = [
-  '''^\.env\.example$''',
-  '''^\.codegraph/''',
-  '''^target/''',
-  '''^data/''',
+[[allowlists]]
+description = "Chủ thể event dạng `<module>.<loại>:<UUID>` trong ví dụ là ID, không phải secret"
+regexTarget = "match"
+regexes = [
+  '''[a-z_]+\.[a-z_]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}''',
 ]

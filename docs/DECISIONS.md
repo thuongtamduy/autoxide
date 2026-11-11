@@ -1575,3 +1575,26 @@ kiểu cột trên cả hai database.
 Đã cân nhắc: `pg_dump` / sao chép file SQLite — hai cách khác nhau cho hai database và
 không mang file theo; nén thành một file `.tar.gz` — người dùng tự nén được, thêm thư
 viện chỉ để nén thì không đáng.
+
+## D-074 · CI trên GitHub Actions: gate đầy đủ trên PostgreSQL 16 và 18, quét secret bằng gitleaks — 2026-11-11 — agent quyết
+
+Quyết định: `.github/workflows/ci.yml` chạy khi push lên `main`, khi có pull request và
+khi bấm tay.
+
+- Job `gate`: ma trận PostgreSQL `16` (thấp nhất được hỗ trợ) và `18` (mới nhất lúc
+  viết), mỗi bản là một service container; thêm service `motoserver/moto` cho test lưu
+  file trên S3. Chạy đúng `./gate.sh` với `GATE_POSTGRES_URL` / `GATE_S3_ENDPOINT` — CI và
+  máy dev cùng một định nghĩa "xong". Toolchain theo `rust-toolchain.toml`, cache bằng
+  `Swatinem/rust-cache`, `cargo-deny` cài bằng `taiki-e/install-action`.
+- Job `secrets`: gitleaks (image `ghcr.io/gitleaks/gitleaks`, phiên bản ghim) quét TOÀN
+  BỘ lịch sử git với `.gitleaks.toml`: bộ luật mặc định cộng một ngoại lệ hẹp cho chủ thể
+  event mẫu `<module>.<loại>:<UUID>` (bị luật `generic-api-key` báo nhầm). Chạy image
+  thay vì `gitleaks-action` vì action đó đòi license cho tài khoản tổ chức.
+- Workflow chỉ có quyền đọc (`permissions: contents: read`); đã kiểm bằng actionlint.
+
+Lý do: gate là định nghĩa "xong"; CI chạy lại đúng nó trên hai phiên bản PostgreSQL để
+bắt chỗ khác nhau giữa các phiên bản. Secret không bao giờ vào git — quét lịch sử chặn
+cả secret đã commit rồi xoá.
+
+Đã cân nhắc: chỉ PostgreSQL mới nhất — bỏ sót lỗi trên bản tối thiểu được hỗ trợ;
+`gitleaks-action` — cần license cho tổ chức.

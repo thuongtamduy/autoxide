@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–10 xong; đang ở bước 11**, mục "CI: gate đầy đủ".
+Trạng thái: **bước 0–10 xong; đang ở bước 11**, mục "Thử gỡ ngoại lệ RUSTSEC-2026-0459 trong `deny.toml` (D-032)".
 
 ## 0. Khung dự án
 
@@ -109,7 +109,7 @@ Cho AI agent gọi chức năng của hệ thống như công cụ (Model Contex
 - [x] Bộ đo hiệu năng (đọc, list, ghi, ghi đồng thời) trên cả hai database, có số gốc để so về sau
 - [x] Dockerfile multi-stage + `compose.yml` (ứng dụng + Postgres)
 - [x] Backup và restore
-- [ ] CI: gate đầy đủ (đã gồm `cargo-deny`) trên Postgres tối thiểu và mới nhất; quét
+- [x] CI: gate đầy đủ (đã gồm `cargo-deny`) trên Postgres tối thiểu và mới nhất; quét
       secret bằng gitleaks
 - [ ] Thử gỡ ngoại lệ RUSTSEC-2026-0459 trong `deny.toml` (D-032)
 - [ ] Hướng dẫn cài đặt và deploy (tiếng Anh + tiếng Việt), đủ để người lạ tự làm theo
