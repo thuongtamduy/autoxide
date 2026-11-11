@@ -5,6 +5,7 @@
 use autoxide_kernel::access::Authenticator;
 use autoxide_kernel::config::Config;
 use autoxide_kernel::database::Database;
+use autoxide_kernel::event::Dispatcher;
 use autoxide_kernel::http::{self, Api};
 use autoxide_kernel::metrics::Metrics;
 use autoxide_kernel::module::Modules;
@@ -18,6 +19,8 @@ pub struct Runtime {
     /// Giữ các module sống cùng chương trình: chúng sở hữu service của mình.
     pub modules: Modules,
     pub api: Api,
+    /// Bộ phát event; `serve` chạy nó nền, lệnh khác không cần.
+    pub dispatcher: Dispatcher,
 }
 
 /// Có đòi database đã áp dụng đủ migration trước khi khởi động không.
@@ -45,6 +48,13 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         let _ = database.close().await;
         return Err(error.to_string());
     }
+    let dispatcher = match modules.dispatcher(&database) {
+        Ok(dispatcher) => dispatcher,
+        Err(error) => {
+            let _ = database.close().await;
+            return Err(error.to_string());
+        }
+    };
     let mut root = http::health_routes(database.clone());
     if config.http.metrics {
         // Bộ thu số đo là toàn tiến trình: bật một lần, ở đây.
@@ -62,7 +72,7 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
     // Bộ xác thực (nếu một module công bố) được gắn vào mọi request.
     let authenticator = modules.api::<dyn Authenticator>();
     let api = http::build(&config.http, root, modules.routes(), authenticator);
-    Ok(Runtime { config, database, modules, api })
+    Ok(Runtime { config, database, modules, api, dispatcher })
 }
 
 /// Lỗi nếu database còn migration chưa áp dụng; thông báo nêu từng migration và

@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–3 xong; đang ở bước 4**, mục "Event ghi cùng transaction rồi mới phát".
+Trạng thái: **bước 0–3 xong; đang ở bước 4**, mục "Audit log chỉ thêm: ai, làm gì, bản ghi nào, lúc nào, trước / sau".
 
 ## 0. Khung dự án
 
@@ -47,7 +47,7 @@ Trạng thái: **bước 0–3 xong; đang ở bước 4**, mục "Event ghi cù
 
 ## 4. Event và audit log
 
-- [ ] Event ghi cùng transaction rồi mới phát
+- [x] Event ghi cùng transaction rồi mới phát
 - [ ] Audit log chỉ thêm: ai, làm gì, bản ghi nào, lúc nào, trước / sau
 - [ ] API xem audit log (có permission riêng)
 
@@ -56,7 +56,8 @@ Trạng thái: **bước 0–3 xong; đang ở bước 4**, mục "Event ghi cù
 - [ ] Job lưu trong database; claim job an toàn khi nhiều worker (test đồng thời)
 - [ ] Retry có backoff, dead-letter queue
 - [ ] Lịch chạy định kỳ (job đầu tiên: dọn dòng hết hạn của `auth_login_throttle`,
-      `auth_refresh_token` và `auth_mfa_challenge`)
+      `auth_refresh_token`, `auth_mfa_challenge`, và event đã giao xong trong các bảng
+      `<module>_events`)
 - [ ] Process role: `api`, `worker`, hoặc cả hai
 
 ## 6. i18n và idempotency

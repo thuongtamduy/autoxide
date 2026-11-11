@@ -27,6 +27,7 @@ use crate::access::{Permission, PermissionCatalog};
 use crate::config::{ConfigReader, Invalid};
 use crate::database::Database;
 use crate::error::Error;
+use crate::event::{Dispatcher, EventCatalog, EventInfo, Outbox, Subscription};
 use crate::migration::{MigrationError, Migrator, ModuleMigrations};
 
 /// Những gì một module khai với core.
@@ -100,6 +101,18 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Các event module phát. Có event thì module phải có bảng `<tên>_events` (thêm
+    /// `autoxide_kernel::event::outbox_migration` vào migration) và ghi event bằng
+    /// [`StartContext::outbox`].
+    fn events(&self) -> Vec<EventInfo> {
+        Vec::new()
+    }
+
+    /// Các event module muốn nhận (của mọi module, kể cả chính nó). Gọi sau `start`.
+    fn subscriptions(&self) -> Vec<Subscription> {
+        Vec::new()
+    }
+
     /// Các route REST của module, kèm tài liệu OpenAPI của chúng. Gọi sau `start`.
     /// Core gắn chúng dưới `/api/v1/<tên module>`: route khai là `/` và `/{id}`
     /// của module `notes` thành `/api/v1/notes` và `/api/v1/notes/{id}`.
@@ -113,6 +126,8 @@ pub struct StartContext<'a> {
     module: &'static str,
     database: &'a Database,
     permissions: &'a PermissionCatalog,
+    events: &'a EventCatalog,
+    wake: &'a Arc<tokio::sync::Notify>,
     apis: &'a mut Apis,
 }
 
@@ -127,6 +142,18 @@ impl StartContext<'_> {
     /// có thật).
     pub fn permissions(&self) -> &PermissionCatalog {
         self.permissions
+    }
+
+    /// Nơi module ghi event của mình. Lỗi nếu module không khai event nào
+    /// (`Module::events`).
+    pub fn outbox(&self) -> Result<Outbox, Error> {
+        if !self.events.modules().contains(&self.module) {
+            return Err(Error::internal(format!(
+                "module `{}` asks for an outbox but declares no events in `Module::events`",
+                self.module
+            )));
+        }
+        Ok(Outbox::new(self.module, Arc::clone(self.wake)))
     }
 
     /// Công bố một trait cho module khác dùng. `T` là kiểu `dyn Trait` khai trong
@@ -226,6 +253,9 @@ pub struct Modules {
     // một danh sách và gọi qua trait.
     modules: Vec<Box<dyn Module>>,
     permissions: PermissionCatalog,
+    events: EventCatalog,
+    /// Chuông đánh thức bộ phát event, dùng chung cho mọi `Outbox`.
+    wake: Arc<tokio::sync::Notify>,
     /// Các trait module đã công bố; có sau [`start`](Self::start).
     apis: Apis,
 }
@@ -241,8 +271,19 @@ impl Modules {
             problems.extend(errors);
             PermissionCatalog::default()
         });
+        let declared = modules.iter().map(|module| (module.name(), module.events())).collect();
+        let events = EventCatalog::new(declared).unwrap_or_else(|errors| {
+            problems.extend(errors);
+            EventCatalog::default()
+        });
         if problems.is_empty() {
-            Ok(Modules { modules, permissions, apis: Apis::default() })
+            Ok(Modules {
+                modules,
+                permissions,
+                events,
+                wake: Arc::new(tokio::sync::Notify::new()),
+                apis: Apis::default(),
+            })
         } else {
             Err(ModuleError(problems.join("; ")))
         }
@@ -279,6 +320,8 @@ impl Modules {
                 module: name,
                 database,
                 permissions: &self.permissions,
+                events: &self.events,
+                wake: &self.wake,
                 apis: &mut apis,
             };
             module.start(&mut context).map_err(|error| {
@@ -301,6 +344,40 @@ impl Modules {
     /// Mọi permission của các module đã đăng ký.
     pub fn permissions(&self) -> &PermissionCatalog {
         &self.permissions
+    }
+
+    /// Mọi loại event của các module đã đăng ký.
+    pub fn events(&self) -> &EventCatalog {
+        &self.events
+    }
+
+    /// Bộ phát event: đọc bảng event của mọi module phát event, giao cho các đăng ký
+    /// nhận của mọi module. Gọi sau [`start`](Self::start). Đăng ký nhận một event
+    /// không ai khai là lỗi khởi động.
+    pub fn dispatcher(&self, database: &Database) -> Result<Dispatcher, ModuleError> {
+        let mut subscriptions = Vec::new();
+        let mut problems = Vec::new();
+        for module in &self.modules {
+            for subscription in module.subscriptions() {
+                let event = subscription.event();
+                if event != Subscription::ALL && !self.events.contains(event) {
+                    problems.push(format!(
+                        "module `{}` subscribes to event `{event}`, which no module declares",
+                        module.name()
+                    ));
+                }
+                subscriptions.push((module.name(), subscription));
+            }
+        }
+        if !problems.is_empty() {
+            return Err(ModuleError(problems.join("; ")));
+        }
+        Ok(Dispatcher::new(
+            database.clone(),
+            self.events.modules(),
+            subscriptions,
+            Arc::clone(&self.wake),
+        ))
     }
 
     /// Route của từng module kèm tên module, theo thứ tự đăng ký. Gọi sau

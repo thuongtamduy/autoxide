@@ -1019,3 +1019,41 @@ khoản có bật MFA hay không.
 Đã cân nhắc: `mfa_token` là JWT không lưu database — không đếm được số lần sai và
 không bảo đảm dùng một lần; trả 401 với mã `auth.mfa_required` — 401 nghĩa là chưa
 xác thực được, trong khi mật khẩu đã đúng.
+
+## D-054 · Event: transactional outbox — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- **Mỗi module phát event có bảng `<module>_events` của chính nó**, tạo bằng
+  migration kernel cung cấp (`event::outbox_migration(tên, module)`), module tự đặt vào
+  danh sách migration của mình. Kernel đọc/ghi bảng này như đã làm với bảng lịch sử
+  `<module>_migrations` — luật sở hữu bảng vẫn giữ (bảng mang tiền tố module, không
+  module nào ghi vào bảng của module khác).
+- **Ghi:** `Outbox::record(&transaction, actor, subject, &event)` trong CÙNG transaction
+  với thay đổi. Event là kiểu `Serialize` cài trait `Event` (`NAME = "<module>.<việc>"`);
+  payload lưu JSON dạng chữ (chạy giống nhau trên hai database). Mỗi event mang `actor`
+  (người dùng, API key, hoặc hệ thống) và `subject` (`<loại>:<id>`) — đủ cho audit log.
+- **Hợp đồng module thêm** `events()` (khai báo, kiểm tên lúc khởi động) và
+  `subscriptions()` (nhận một event theo tên, hoặc mọi event với `Subscription::ALL`);
+  đăng ký nhận event không ai khai là lỗi khởi động.
+- **Giao:** `Dispatcher` của kernel chạy nền trong `serve`, hỏi mỗi giây hoặc ngay khi
+  có event mới (chuông `Notify`), theo thứ tự ID trong từng bảng. Nhận việc giao một
+  event bằng `UPDATE … WHERE claimed_until IS NULL OR claimed_until < now` — nhiều tiến
+  trình chạy cùng lúc không giao trùng (test hai bộ phát đồng thời, 30 event, trên hai
+  database), tiến trình chết giữa chừng thì hết hạn giữ (60 giây) và tiến trình khác
+  giao lại. Lỗi thì thử lại với backoff 2, 4, 8… giây (tối đa 1 giờ); sau 10 lần đánh
+  dấu `failed_at`, ghi log lỗi và số đo `events_failed_total`.
+- **Giao ít nhất một lần:** máy chủ tắt giữa lúc giao thì event được giao lại; một bên
+  nhận lỗi thì mọi bên nhận của event đó nhận lại. Bên nhận phải bỏ qua event trùng
+  theo `id`.
+
+Lý do: "việc phụ đi qua event, ghi cùng transaction" là luật kiến trúc 3 của
+`CLAUDE.md`; transactional outbox là cách chuẩn duy nhất bảo đảm không mất và không bịa
+event mà không cần hệ thống thứ hai (message broker). Không dùng `SKIP LOCKED` của
+Postgres để mọi câu lệnh chạy giống nhau trên SQLite; job queue ở bước 5 sẽ đo lại và
+quyết định có cần nhánh riêng không (D-009).
+
+Đã cân nhắc: một bảng event chung của kernel — phá luật mọi bảng thuộc một module;
+phát event trong bộ nhớ ngay sau commit — mất event khi tiến trình chết giữa commit và
+lúc phát; mỗi bên nhận một dòng theo dõi riêng — chính xác hơn khi giao lại nhưng nhân
+số dòng theo số bên nhận, chưa cần.

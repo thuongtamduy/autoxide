@@ -204,7 +204,10 @@ sẵn lệnh.
    công bố trait bằng `context.provide::<dyn Trait>(…)` trong `Module::start`, module
    khác lấy bằng `context.require::<dyn Trait>()`; bên cần đăng ký sau bên cung cấp.
 3. **Việc phụ đi qua event** (audit, thông báo); event ghi vào database cùng
-   transaction với thay đổi.
+   transaction với thay đổi: module khai event qua `Module::events`, thêm
+   `event::outbox_migration` vào migration, ghi bằng `Outbox::record(&transaction, …)`
+   (lấy `Outbox` từ `StartContext::outbox`); module nhận event qua
+   `Module::subscriptions`. Bên nhận phải chịu được việc nhận lại một event (D-054).
 4. **Không foreign key xuyên module** — chỉ giữ ID. Không có ngoại lệ, kể cả với
    bảng người dùng.
 5. **Logic ở service layer.** Handler chỉ: lấy dữ liệu vào → gọi service → trả

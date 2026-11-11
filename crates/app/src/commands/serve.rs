@@ -56,9 +56,17 @@ where
 {
     // Tách `runtime` thành từng phần: router được chuyển hẳn (move) cho máy chủ,
     // còn database phải giữ lại để đóng sau khi máy chủ dừng.
-    let Runtime { config, database, modules, api } = runtime;
+    let Runtime { config, database, modules, api, dispatcher } = runtime;
     let address = listener.local_addr().map_err(|error| format!("http: {error}"))?;
     tracing::info!(%address, modules = ?modules.names(), "listening");
+
+    // Bộ phát event chạy nền cùng máy chủ; dừng SAU máy chủ, để event của các request
+    // cuối cùng vẫn có người giao (event chưa giao nằm lại trong database, lần chạy sau
+    // giao tiếp — không mất).
+    let (stop_events, events_stopped) = tokio::sync::oneshot::channel::<()>();
+    let events = tokio::spawn(dispatcher.run(async {
+        let _ = events_stopped.await;
+    }));
 
     let outcome = http::serve(listener, api.router, shutdown, config.http.shutdown_grace).await;
     match outcome {
@@ -68,6 +76,10 @@ where
             "stopped before every request finished; the remaining requests were cut off"
         ),
         Err(_) => {}
+    }
+    let _ = stop_events.send(());
+    if let Err(error) = events.await {
+        tracing::error!(error = %error, "event dispatcher stopped abnormally");
     }
     // Module sống tới khi máy chủ dừng hẳn: service của chúng nằm trong module.
     drop(modules);

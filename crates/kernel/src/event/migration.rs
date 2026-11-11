@@ -1,0 +1,76 @@
+//! Migration tạo bảng event của một module.
+
+use sea_orm_migration::prelude::*;
+use sea_orm_migration::schema;
+
+/// Migration tạo bảng `<module>_events`. Module phát event thêm nó vào danh sách
+/// migration của mình, ở vị trí cố định như mọi migration khác:
+///
+/// ```ignore
+/// fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
+///     vec![
+///         Box::new(m0001_create_note::Migration),
+///         autoxide_kernel::event::outbox_migration("m0002_create_events", "notes"),
+///     ]
+/// }
+/// ```
+pub fn outbox_migration(name: &'static str, module: &'static str) -> Box<dyn MigrationTrait> {
+    Box::new(OutboxMigration { name, module })
+}
+
+struct OutboxMigration {
+    name: &'static str,
+    module: &'static str,
+}
+
+impl MigrationName for OutboxMigration {
+    fn name(&self) -> &str {
+        self.name
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for OutboxMigration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let table = super::table_name(self.module);
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new(&table))
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::string_len("name", 128))
+                    .col(schema::uuid_null("actor_user_id"))
+                    .col(schema::uuid_null("actor_api_key_id"))
+                    .col(schema::string_len_null("subject", 200))
+                    // JSON dạng chữ: chạy giống nhau trên SQLite và Postgres.
+                    .col(schema::text("payload"))
+                    .col(schema::timestamp_with_time_zone("occurred_at"))
+                    // Phần giao event.
+                    .col(schema::integer("attempts"))
+                    .col(schema::timestamp_with_time_zone("next_attempt_at"))
+                    .col(schema::timestamp_with_time_zone_null("claimed_until"))
+                    .col(schema::timestamp_with_time_zone_null("delivered_at"))
+                    .col(schema::timestamp_with_time_zone_null("failed_at"))
+                    .col(schema::text_null("last_error"))
+                    .to_owned(),
+            )
+            .await?;
+        // Bộ phát tìm event chưa giao theo thời điểm được thử lại.
+        manager
+            .create_index(
+                Index::create()
+                    .name(format!("{table}_pending_idx"))
+                    .table(Alias::new(&table))
+                    .col("delivered_at")
+                    .col("failed_at")
+                    .col("next_attempt_at")
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let table = super::table_name(self.module);
+        manager.drop_table(Table::drop().table(Alias::new(&table)).to_owned()).await
+    }
+}
