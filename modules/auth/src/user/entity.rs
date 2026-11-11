@@ -17,6 +17,7 @@ pub struct Model {
     pub name: String,
     pub password_hash: Option<String>,
     pub disabled_at: Option<DateTimeUtc>,
+    pub email_verified_at: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }
@@ -30,6 +31,7 @@ impl From<Model> for User {
             email: model.email,
             name: model.name,
             disabled_at: model.disabled_at,
+            email_verified_at: model.email_verified_at,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }

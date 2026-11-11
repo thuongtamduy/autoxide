@@ -469,6 +469,78 @@
         ]
       }
     },
+    "/api/v1/auth/email-verification/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Confirm an email address with the token from a verification mail.",
+        "description": "Needs no sign-in: the token proves the mail was received. When the token was sent\nfor a new address (`POST /api/v1/auth/me/email`), the account's email becomes that\naddress; sign in with it from now on. Every other verification token of the\naccount stops working.",
+        "operationId": "auth_confirm_email_verification",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationConfirmation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Verified; the account as it is now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The token is unknown, expired or used; code `auth.invalid_verification_token`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another account took this address meanwhile; code `auth.email_taken`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is missing a field or a value is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "tags": [
@@ -718,6 +790,156 @@
           },
           "403": {
             "description": "The account is disabled; code `auth.user_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/email": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change your email address.",
+        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). A verification mail goes to the NEW address; the email changes\nonly when its token is confirmed with `POST /api/v1/auth/email-verification/confirm`,\nwithin 24 hours. Until then the old address stays in use. Wrong passwords count\ntowards the sign-in lock of the email.",
+        "operationId": "auth_change_email",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "A verification mail is on its way to the new address."
+          },
+          "400": {
+            "description": "The current password is wrong; code `auth.wrong_password`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Called with an API key (code `auth.session_required`), or the account is disabled (code `auth.user_disabled`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another account has this email (code `auth.email_taken`), or it is already your verified address (code `auth.email_already_verified`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is missing a field or the address is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many wrong passwords for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/email/verification": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Send the verification mail for your email address again.",
+        "description": "The mail (in the language of `Accept-Language`) carries a token valid 24 hours;\nconfirm it with `POST /api/v1/auth/email-verification/confirm`. At most one mail\nper minute per address.",
+        "operationId": "auth_resend_email_verification",
+        "responses": {
+          "202": {
+            "description": "A verification mail is on its way."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The address is already verified; code `auth.email_already_verified`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1450,7 +1672,7 @@
           "auth"
         ],
         "summary": "Create your own account.",
-        "description": "Open only when the server enables self-registration; otherwise answers 403. The\nnew account has no role. Then sign in with `POST /api/v1/auth/login`.",
+        "description": "Open only when the server enables self-registration; otherwise answers 403. The\nnew account has no role. A mail asking to confirm the address goes to the email,\nin the language of `Accept-Language`. Then sign in with `POST /api/v1/auth/login`.",
         "operationId": "auth_register",
         "requestBody": {
           "content": {
@@ -2071,7 +2293,7 @@
           "auth"
         ],
         "summary": "Create a user account.",
-        "description": "Requires `auth.users.manage`. The account has no role; give it roles with\n`PUT /api/v1/auth/users/{id}/roles`.",
+        "description": "Requires `auth.users.manage`. The account has no role; give it roles with\n`PUT /api/v1/auth/users/{id}/roles`. A mail asking to confirm the address goes to\nthe new email, in the language of `Accept-Language`.",
         "operationId": "auth_create_user",
         "requestBody": {
           "content": {
@@ -2903,6 +3125,24 @@
           }
         }
       },
+      "ChangeEmailRequest": {
+        "type": "object",
+        "description": "A new email address for the signed-in account.",
+        "required": [
+          "new_email",
+          "current_password"
+        ],
+        "properties": {
+          "current_password": {
+            "type": "string"
+          },
+          "new_email": {
+            "type": "string",
+            "description": "The new address. Case and surrounding spaces do not matter.",
+            "example": "ada@example.org"
+          }
+        }
+      },
       "ChangePasswordRequest": {
         "type": "object",
         "description": "The current password and the new one.",
@@ -3179,6 +3419,14 @@
                 "type": "string",
                 "description": "Normalized email: lower case, no surrounding spaces.",
                 "example": "ada@example.com"
+              },
+              "email_verified_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When the email was confirmed through a verification mail; `null` while it is\nnot verified (ask for a new mail with `POST /api/v1/auth/me/email/verification`)."
               },
               "id": {
                 "type": "string",
@@ -3471,6 +3719,14 @@
                 "description": "Normalized email: lower case, no surrounding spaces. Unique.",
                 "example": "ada@example.com"
               },
+              "email_verified_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When the owner confirmed `email` through a verification mail; `null` while it\nis not verified."
+              },
               "id": {
                 "type": "string",
                 "format": "uuid"
@@ -3655,6 +3911,14 @@
             "type": "string",
             "description": "Normalized email: lower case, no surrounding spaces.",
             "example": "ada@example.com"
+          },
+          "email_verified_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the email was confirmed through a verification mail; `null` while it is\nnot verified (ask for a new mail with `POST /api/v1/auth/me/email/verification`)."
           },
           "id": {
             "type": "string",
@@ -3994,6 +4258,14 @@
                   "type": "string",
                   "description": "Normalized email: lower case, no surrounding spaces. Unique.",
                   "example": "ada@example.com"
+                },
+                "email_verified_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "When the owner confirmed `email` through a verification mail; `null` while it\nis not verified."
                 },
                 "id": {
                   "type": "string",
@@ -4414,6 +4686,14 @@
             "description": "Normalized email: lower case, no surrounding spaces. Unique.",
             "example": "ada@example.com"
           },
+          "email_verified_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the owner confirmed `email` through a verification mail; `null` while it\nis not verified."
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -4443,6 +4723,18 @@
               "format": "uuid"
             },
             "description": "Ids of the roles. Replaces every role the user had; `[]` removes all."
+          }
+        }
+      },
+      "VerificationConfirmation": {
+        "type": "object",
+        "description": "The token from a verification mail.",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
           }
         }
       }

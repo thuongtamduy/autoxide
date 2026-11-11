@@ -4,7 +4,10 @@ pub(crate) mod entity;
 mod service;
 
 pub(crate) use service::NewUser;
-pub(crate) use service::{UserChanges, UserService, user_disabled, user_not_found};
+pub(crate) use service::{
+    UserChanges, UserService, check_email_field, email_taken, normalize_email, user_disabled,
+    user_not_found,
+};
 
 #[cfg(test)]
 pub(crate) mod entity_for_tests {

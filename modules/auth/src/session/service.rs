@@ -147,25 +147,32 @@ impl SessionService {
         if let Some(problem) = crate::password::check_rules("new_password", &new) {
             return Err(Error::validation(vec![problem]));
         }
-        let user =
-            self.users.get(user_id).await?.ok_or_else(|| crate::user::user_not_found(user_id))?;
-        self.throttle.check(&user.email).await?;
-        if let Err(error) = self.users.check_credentials(&user.email, current).await {
-            if error.code() != INVALID_CREDENTIALS {
-                return Err(error);
-            }
-            self.throttle.record_failure(&user.email).await?;
-            return Err(Error::bad_request(
-                "auth.wrong_password",
-                "The current password is incorrect. If you forgot it, reset it by email \
-                 (`POST /api/v1/auth/password-reset`).",
-            ));
-        }
+        let user = self.check_password(user_id, current).await?;
         self.users
             .write_password(Actor::user(user_id), user_id, "new_password", new, false)
             .await?;
         self.throttle.clear(&user.email).await?;
         self.start_session(user_id, "password_change").await
+    }
+
+    /// Kiểm mật khẩu hiện tại của người dùng `user_id` trước một việc nhạy cảm (đổi mật
+    /// khẩu, đổi email). Sai thì `auth.wrong_password` và tính vào login throttling.
+    pub(crate) async fn check_password(&self, user_id: Uuid, current: &str) -> Result<User, Error> {
+        let user =
+            self.users.get(user_id).await?.ok_or_else(|| crate::user::user_not_found(user_id))?;
+        self.throttle.check(&user.email).await?;
+        match self.users.check_credentials(&user.email, current).await {
+            Ok(user) => Ok(user),
+            Err(error) if error.code() == INVALID_CREDENTIALS => {
+                self.throttle.record_failure(&user.email).await?;
+                Err(Error::bad_request(
+                    "auth.wrong_password",
+                    "The current password is incorrect. If you forgot it, reset it by email \
+                     (`POST /api/v1/auth/password-reset`).",
+                ))
+            }
+            Err(error) => Err(error),
+        }
     }
 
     /// Bước hai của đăng nhập: `code` là mã TOTP hoặc một recovery code. Mỗi lần sai

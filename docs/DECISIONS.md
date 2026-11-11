@@ -1324,3 +1324,32 @@ khẩu.
 Đã cân nhắc: quản trị viên đặt lại mật khẩu bất kỳ — mở đường leo thang quyền; giữ
 phiên hiện tại khi đổi mật khẩu — phải phân biệt phiên nào là "hiện tại" trong access
 token, phức tạp hơn mà không an toàn hơn.
+
+## D-065 · Xác minh email và đổi email qua mail — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Cột mới `auth_user.email_verified_at` (cho phép NULL; tài khoản có sẵn coi như chưa
+  xác minh), hiện trong `User` của `api`, trong response người dùng và `/me`.
+- Bảng `auth_email_verification` (user, địa chỉ cần xác minh, SHA-256 của token, hạn
+  24 giờ, đã dùng chưa). Mỗi địa chỉ nhận nhiều nhất một mail mỗi 60 giây.
+- Tạo tài khoản qua REST (tự đăng ký hay quản trị viên tạo) gửi mail xác minh; gửi hỏng
+  chỉ ghi log vì tài khoản đã tạo xong — người dùng xin gửi lại bằng
+  `POST /auth/me/email/verification`. Tài khoản tạo bằng CLI không nhận mail.
+- Đổi email: `POST /auth/me/email` cần phiên đăng nhập bằng mật khẩu và mật khẩu hiện
+  tại (sai thì tính vào login throttling, dùng chung `SessionService::check_password`
+  với đổi mật khẩu). Mail đi tới địa chỉ MỚI; email chỉ đổi khi token được xác nhận.
+- `POST /auth/email-verification/confirm` không cần đăng nhập. Trong MỘT transaction:
+  đánh dấu token đã dùng bằng `UPDATE … WHERE used_at IS NULL` (cùng token đồng thời chỉ
+  một bên thắng), ghi email + `email_verified_at`, vô hiệu mọi token xác minh khác của
+  người đó, ghi event `auth.email_verified`. Địa chỉ đã bị người khác lấy trong lúc chờ
+  thì index unique chặn → 409 `auth.email_taken`, không gì đổi.
+- Chưa xác minh **không** chặn đăng nhập: core chỉ ghi nhận trạng thái; module hay giao
+  diện tự quyết việc nào cần email đã xác minh.
+
+Lý do: không ai đổi email sang địa chỉ không phải của mình (email là tên đăng nhập và
+là nơi nhận mail đặt lại mật khẩu); token một lần, lưu dạng hash như D-063.
+
+Đã cân nhắc: chặn đăng nhập khi chưa xác minh — khoá ngoài người dùng do CLI tạo và
+cài đặt chưa có SMTP; gửi thêm mail báo cho địa chỉ cũ khi email đổi — để sau, khi có
+nhu cầu.

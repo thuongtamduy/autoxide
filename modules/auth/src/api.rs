@@ -23,6 +23,8 @@ pub struct User {
     pub name: String,
     /// Lúc tài khoản bị khoá; `None` là đang hoạt động.
     pub disabled_at: Option<DateTime<Utc>>,
+    /// Lúc chủ tài khoản xác nhận `email` là của mình (qua mail); `None`: chưa xác minh.
+    pub email_verified_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

@@ -126,6 +126,9 @@ pub(crate) struct MeResponse {
     /// Display name.
     #[schema(example = "Ada Lovelace")]
     name: String,
+    /// When the email was confirmed through a verification mail; `null` while it is
+    /// not verified (ask for a new mail with `POST /api/v1/auth/me/email/verification`).
+    email_verified_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
     /// `true` when a role grants every permission (the `admin` role); `permissions`
     /// is then empty.
@@ -141,6 +144,7 @@ impl MeResponse {
             id: user.id,
             email: user.email,
             name: user.name,
+            email_verified_at: user.email_verified_at,
             created_at: user.created_at,
             all_permissions: principal.has_all_permissions(),
             permissions: principal.permissions(),

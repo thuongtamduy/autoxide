@@ -24,6 +24,7 @@ mod role;
 mod session;
 mod token;
 mod user;
+mod verify;
 
 use std::sync::Arc;
 
@@ -102,7 +103,7 @@ impl Module for AuthModule {
         let resets = Arc::new(reset::PasswordResets {
             database: database.clone(),
             users: users.clone(),
-            mailer,
+            mailer: mailer.clone(),
             translations: context.translations().clone(),
             outbox: outbox.clone(),
             url: config.password_reset_url.clone(),
@@ -118,6 +119,15 @@ impl Module for AuthModule {
             mfa.clone(),
             outbox.clone(),
         )?);
+        let verifications = Arc::new(verify::EmailVerifications {
+            database: database.clone(),
+            users: users.clone(),
+            sessions: sessions.clone(),
+            mailer: mailer.clone(),
+            translations: context.translations().clone(),
+            outbox: outbox.clone(),
+            url: config.email_verification_url.clone(),
+        });
         let roles = Arc::new(RoleService::new(
             database.clone(),
             context.permissions().clone(),
@@ -140,6 +150,7 @@ impl Module for AuthModule {
             api_keys,
             mfa,
             resets,
+            verifications,
             self_registration: config.self_registration,
         });
         Ok(())
@@ -217,6 +228,7 @@ pub(crate) mod testing {
         pub api_keys: Arc<crate::api_key::ApiKeyService>,
         pub mfa: Arc<crate::mfa::MfaService>,
         pub resets: Arc<crate::reset::PasswordResets>,
+        pub verifications: Arc<crate::verify::EmailVerifications>,
         pub mails: Arc<FakeMailer>,
         pub database: Database,
         pub authenticator: Arc<dyn autoxide_kernel::access::Authenticator>,
@@ -287,11 +299,44 @@ pub(crate) mod testing {
             database: database.clone(),
             users: users.clone(),
             mailer: mails.clone(),
+            translations: translations.clone(),
+            outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+            url: None,
+        });
+        let verifications = Arc::new(crate::verify::EmailVerifications {
+            database: database.clone(),
+            users: users.clone(),
+            sessions: sessions.clone(),
+            mailer: mails.clone(),
             translations,
             outbox: autoxide_kernel::event::Outbox::standalone("auth"),
             url: None,
         });
-        Services { users, sessions, roles, api_keys, mfa, resets, mails, database, authenticator }
+        Services {
+            users,
+            sessions,
+            roles,
+            api_keys,
+            mfa,
+            resets,
+            verifications,
+            mails,
+            database,
+            authenticator,
+        }
+    }
+
+    /// Token (chuỗi base64url 43 ký tự) trong mail cuối cùng đã gửi.
+    pub fn last_token(services: &Services) -> String {
+        let sent = services.mails.sent.lock().unwrap();
+        let text = &sent.last().unwrap().text;
+        text.split_whitespace()
+            .find(|word| {
+                word.len() == 43
+                    && word.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+            })
+            .unwrap()
+            .to_owned()
     }
 
     /// `Mailer` giả: giữ lại mọi mail để test đọc.

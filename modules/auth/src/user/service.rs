@@ -6,7 +6,9 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set, SqlErr,
+};
 use uuid::Uuid;
 use validator::ValidateEmail;
 
@@ -127,7 +129,7 @@ impl UserService {
         let email = normalize_email(&input.email);
         let name = input.name.trim().to_owned();
         let mut problems = Vec::new();
-        problems.extend(check_email(&email));
+        problems.extend(check_email_field("email", &email));
         problems.extend(check_name(&name));
         if let Some(password) = &input.password {
             problems.extend(password::check_rules("password", password));
@@ -149,6 +151,7 @@ impl UserService {
             name: Set(name),
             password_hash: Set(password_hash),
             disabled_at: Set(None),
+            email_verified_at: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -156,12 +159,7 @@ impl UserService {
         .await
         .map_err(|error| match error.sql_err() {
             // Hai request tạo cùng email đồng thời: index unique quyết bên nào thắng.
-            Some(SqlErr::UniqueConstraintViolation(_)) => Error::conflict(
-                "auth.email_taken",
-                "A user with the email `{email}` already exists. Use another email, or sign in \
-                 with this one.",
-            )
-            .with_param("email", &email),
+            Some(SqlErr::UniqueConstraintViolation(_)) => email_taken(&email),
             _ => Error::from(error),
         })?;
         if admin {
@@ -239,6 +237,32 @@ impl UserService {
             .one(self.database.read())
             .await?;
         Ok(row.map(User::from))
+    }
+
+    /// Ghi nhận người dùng `id` đã xác minh `email`, trong `transaction` của bên gọi.
+    /// `email` khác email hiện tại thì nó thay email hiện tại (đổi email). Trả email cũ.
+    pub(crate) async fn apply_verified_email(
+        &self,
+        transaction: &DatabaseTransaction,
+        id: Uuid,
+        email: &str,
+        at: DateTime<Utc>,
+    ) -> Result<String, Error> {
+        let row =
+            Entity::find_by_id(id).one(transaction).await?.ok_or_else(|| user_not_found(id))?;
+        Entity::update_many()
+            .col_expr(Column::Email, Expr::value(email))
+            .col_expr(Column::EmailVerifiedAt, Expr::value(Some(at)))
+            .col_expr(Column::UpdatedAt, Expr::value(at))
+            .filter(Column::Id.eq(id))
+            .exec(transaction)
+            .await
+            .map_err(|error| match error.sql_err() {
+                // Trong lúc chờ xác minh, người khác đã lấy email này.
+                Some(SqlErr::UniqueConstraintViolation(_)) => email_taken(email),
+                _ => Error::from(error),
+            })?;
+        Ok(row.email)
     }
 
     /// Một trang người dùng, mới tạo trước (mặc định).
@@ -340,15 +364,25 @@ fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
 }
 
-fn normalize_email(email: &str) -> String {
+pub(crate) fn normalize_email(email: &str) -> String {
     email.trim().to_lowercase()
 }
 
-fn check_email(email: &str) -> Option<FieldError> {
+pub(crate) fn email_taken(email: &str) -> Error {
+    Error::conflict(
+        "auth.email_taken",
+        "A user with the email `{email}` already exists. Use another email, or sign in with \
+         this one.",
+    )
+    .with_param("email", email)
+}
+
+/// Lỗi của trường `field` nếu `email` (đã chuẩn hoá) không phải địa chỉ email hợp lệ.
+pub(crate) fn check_email_field(field: &str, email: &str) -> Option<FieldError> {
     let valid = email.chars().count() <= EMAIL_MAX_LENGTH && email.validate_email();
     (!valid).then(|| {
         FieldError::new(
-            "email",
+            field,
             "email",
             format!("must be a valid email address of at most {EMAIL_MAX_LENGTH} characters"),
         )

@@ -7,6 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::i18n::Language;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use axum::extract::{Path, Query, State};
@@ -53,6 +54,9 @@ pub(crate) struct UserResponse {
     /// When the account was disabled; `null` while it is active. A disabled account
     /// cannot sign in or use its tokens.
     disabled_at: Option<DateTime<Utc>>,
+    /// When the owner confirmed `email` through a verification mail; `null` while it
+    /// is not verified.
+    email_verified_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -64,6 +68,7 @@ impl From<User> for UserResponse {
             email: user.email,
             name: user.name,
             disabled_at: user.disabled_at,
+            email_verified_at: user.email_verified_at,
             created_at: user.created_at,
             updated_at: user.updated_at,
         }
@@ -142,7 +147,8 @@ async fn list_users(
 /// Create a user account.
 ///
 /// Requires `auth.users.manage`. The account has no role; give it roles with
-/// `PUT /api/v1/auth/users/{id}/roles`.
+/// `PUT /api/v1/auth/users/{id}/roles`. A mail asking to confirm the address goes to
+/// the new email, in the language of `Accept-Language`.
 #[utoipa::path(
     post,
     path = "/users",
@@ -160,11 +166,14 @@ async fn list_users(
 async fn create_user(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
+    language: Language,
     ValidJson(input): ValidJson<CreateUserRequest>,
 ) -> Result<(StatusCode, Data<UserResponse>), Error> {
     principal.require(&USERS_MANAGE)?;
     let input = NewUser { email: input.email, name: input.name, password: input.password };
-    let user = state.users.create(Actor::from(&principal), input).await?;
+    let actor = Actor::from(&principal);
+    let user = state.users.create(actor, input).await?;
+    state.verifications.after_signup(actor, &user, language).await;
     Ok((StatusCode::CREATED, Data { data: user.into() }))
 }
 
@@ -229,7 +238,8 @@ async fn update_user(
 /// Create your own account.
 ///
 /// Open only when the server enables self-registration; otherwise answers 403. The
-/// new account has no role. Then sign in with `POST /api/v1/auth/login`.
+/// new account has no role. A mail asking to confirm the address goes to the email,
+/// in the language of `Accept-Language`. Then sign in with `POST /api/v1/auth/login`.
 #[utoipa::path(
     post,
     path = "/register",
@@ -244,6 +254,7 @@ async fn update_user(
 )]
 async fn register(
     State(state): State<Arc<HttpState>>,
+    language: Language,
     ValidJson(input): ValidJson<RegisterRequest>,
 ) -> Result<(StatusCode, Data<UserResponse>), Error> {
     if !state.self_registration {
@@ -256,6 +267,7 @@ async fn register(
     let input = NewUser { email: input.email, name: input.name, password: Some(input.password) };
     // Chưa đăng nhập, chưa có tài khoản: "hệ thống" tạo thay người đăng ký.
     let user = state.users.create(Actor::system(), input).await?;
+    state.verifications.after_signup(Actor::system(), &user, language).await;
     Ok((StatusCode::CREATED, Data { data: user.into() }))
 }
 
@@ -451,6 +463,7 @@ mod event_tests {
                     "auth.user_created", // root, bằng CLI
                     "auth.signed_in",
                     "auth.user_created",
+                    "auth.email_verification_requested", // mail xác minh cho bob
                     "auth.role_created",
                     "auth.user_roles_changed",
                     "auth.user_updated",
@@ -462,10 +475,10 @@ mod event_tests {
             assert_eq!(events[1].1, None);
             assert!(events[3..].iter().all(|(_, actor, ..)| *actor == Some(root.id)));
             assert_eq!(events[3].2.as_deref(), Some(format!("auth.user:{bob_id}").as_str()));
-            let disabled: serde_json::Value = serde_json::from_str(&events[6].3).unwrap();
+            let disabled: serde_json::Value = serde_json::from_str(&events[7].3).unwrap();
             assert!(disabled["before"]["disabled_at"].is_null());
             assert!(disabled["after"]["disabled_at"].is_string());
-            let roles: serde_json::Value = serde_json::from_str(&events[5].3).unwrap();
+            let roles: serde_json::Value = serde_json::from_str(&events[6].3).unwrap();
             assert_eq!(roles, json!({"before": [], "after": ["reader"]}));
 
             let everything: String = events.iter().map(|(.., payload)| payload.as_str()).collect();
@@ -474,6 +487,7 @@ mod event_tests {
                 key["data"]["key"].as_str().unwrap(),
                 &secret,
                 codes["data"]["recovery_codes"][0].as_str().unwrap(),
+                &crate::testing::last_token(&services),
             ] {
                 assert!(!everything.contains(secret_value), "a secret leaked into an event");
             }

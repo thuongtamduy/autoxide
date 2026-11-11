@@ -49,6 +49,8 @@ events! {
     MFA_ENABLED, MfaEnabled, "auth.mfa_enabled", "A user turned on two-step sign-in.";
     MFA_DISABLED, MfaDisabled, "auth.mfa_disabled", "Two-step sign-in was turned off, by the user or by an administrator.";
     PASSWORD_RESET_REQUESTED, PasswordResetRequested, "auth.password_reset_requested", "A password-reset mail was sent to a user.";
+    EMAIL_VERIFICATION_REQUESTED, EmailVerificationRequested, "auth.email_verification_requested", "A mail to confirm an email address was sent; `after.email` is that address.";
+    EMAIL_VERIFIED, EmailVerified, "auth.email_verified", "A user confirmed an email address; when it was a new one, it replaced the old (`before.email`).";
     RECOVERY_CODES_REPLACED, RecoveryCodesReplaced, "auth.recovery_codes_replaced", "A user made new recovery codes.";
 }
 

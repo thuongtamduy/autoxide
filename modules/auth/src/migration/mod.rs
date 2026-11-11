@@ -10,6 +10,8 @@ mod m0006_create_totp;
 mod m0007_create_recovery_codes;
 mod m0008_create_mfa_challenge;
 mod m0011_create_password_reset;
+mod m0012_add_email_verified;
+mod m0013_create_email_verification;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -28,5 +30,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         // Bảng `auth_jobs` (job queue), định nghĩa ở kernel.
         autoxide_kernel::job::jobs_migration("m0010_create_jobs", "auth"),
         Box::new(m0011_create_password_reset::Migration),
+        Box::new(m0012_add_email_verified::Migration),
+        Box::new(m0013_create_email_verification::Migration),
     ]
 }

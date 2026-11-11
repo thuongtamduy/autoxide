@@ -66,6 +66,14 @@ pub(crate) const PASSWORD_RESET_URL: Setting = Setting::new(
 )
 .with_example("https://app.example.com/reset-password?token={token}");
 
+pub(crate) const EMAIL_VERIFICATION_URL: Setting = Setting::new(
+    "AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL",
+    "Page of your app that confirms an email address, with `{token}` where the verification \
+     token goes. Verification mail links there. When unset, the mail contains the token and \
+     says to call `POST /api/v1/auth/email-verification/confirm`.",
+)
+.with_example("https://app.example.com/verify-email?token={token}");
+
 /// Độ dài tối thiểu của khoá ký token: 256 bit, bằng độ dài đầu ra của SHA-256.
 const MIN_SECRET_LENGTH: usize = 32;
 
@@ -85,6 +93,8 @@ pub(crate) struct AuthConfig {
     pub totp_issuer: String,
     /// Trang đặt lại mật khẩu của giao diện, có `{token}`.
     pub password_reset_url: Option<String>,
+    /// Trang xác minh email của giao diện, có `{token}`.
+    pub email_verification_url: Option<String>,
 }
 
 impl AuthConfig {
@@ -118,16 +128,8 @@ impl AuthConfig {
                 Ok(issuer.to_owned())
             }
         });
-        let password_reset_url = reader.optional_with(&PASSWORD_RESET_URL, |raw| {
-            let url = raw.trim();
-            if (url.starts_with("https://") || url.starts_with("http://"))
-                && url.contains("{token}")
-            {
-                Ok(url.to_owned())
-            } else {
-                Err("must be an http(s) URL containing `{token}`".to_owned())
-            }
-        });
+        let password_reset_url = reader.optional_with(&PASSWORD_RESET_URL, token_url);
+        let email_verification_url = reader.optional_with(&EMAIL_VERIFICATION_URL, token_url);
         Ok(AuthConfig {
             token_secret: token_secret?,
             access_token_ttl: Duration::from_secs(access?),
@@ -137,7 +139,18 @@ impl AuthConfig {
             self_registration: self_registration?,
             totp_issuer: totp_issuer?,
             password_reset_url: password_reset_url?,
+            email_verification_url: email_verification_url?,
         })
+    }
+}
+
+/// Địa chỉ http(s) có chỗ điền `{token}`.
+fn token_url(raw: &str) -> Result<String, String> {
+    let url = raw.trim();
+    if (url.starts_with("https://") || url.starts_with("http://")) && url.contains("{token}") {
+        Ok(url.to_owned())
+    } else {
+        Err("must be an http(s) URL containing `{token}`".to_owned())
     }
 }
 
@@ -166,6 +179,7 @@ mod tests {
         assert_eq!(config.totp_issuer, "Autoxide");
         assert_eq!(config.password_reset_url, None);
         assert!(read(&[("AUTOXIDE_AUTH_PASSWORD_RESET_URL", "https://app/reset")]).is_err());
+        assert!(read(&[("AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL", "ftp://x/{token}")]).is_err());
         assert!(read(&[("AUTOXIDE_AUTH_TOTP_ISSUER", "A:B")]).is_err());
         assert!(read(&[("AUTOXIDE_AUTH_SELF_REGISTRATION", "true")]).unwrap().self_registration);
     }

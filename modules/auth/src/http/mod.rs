@@ -2,6 +2,7 @@
 //! vào, gọi service và trả envelope; mọi logic nằm ở service.
 
 mod api_keys;
+mod email;
 mod mfa;
 mod reset;
 mod roles;
@@ -18,6 +19,7 @@ use crate::reset::PasswordResets;
 use crate::role::RoleService;
 use crate::session::SessionService;
 use crate::user::UserService;
+use crate::verify::EmailVerifications;
 
 /// Các service mà handler dùng.
 #[derive(Clone)]
@@ -28,6 +30,7 @@ pub(crate) struct HttpState {
     pub api_keys: Arc<ApiKeyService>,
     pub mfa: Arc<MfaService>,
     pub resets: Arc<PasswordResets>,
+    pub verifications: Arc<EmailVerifications>,
     /// Cho người lạ tự đăng ký (`POST /register`).
     pub self_registration: bool,
 }
@@ -39,6 +42,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(api_keys::routes())
         .merge(mfa::routes())
         .merge(reset::routes())
+        .merge(email::routes())
         .with_state(Arc::new(state))
 }
 
@@ -123,6 +127,7 @@ pub(crate) mod test_support {
             api_keys: services.api_keys.clone(),
             mfa: services.mfa.clone(),
             resets: services.resets.clone(),
+            verifications: services.verifications.clone(),
             self_registration,
         };
         let router = autoxide_kernel::http::build(
