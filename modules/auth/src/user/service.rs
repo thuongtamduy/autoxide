@@ -13,6 +13,7 @@ use validator::ValidateEmail;
 use super::entity::{self, Column, Entity};
 use crate::api::{User, Users};
 use crate::password::{self, Passwords, Verification};
+use crate::session::SessionService;
 
 /// Độ dài tối đa của email (RFC 5321) và của tên hiển thị, theo ký tự.
 const EMAIL_MAX_LENGTH: usize = 254;
@@ -41,6 +42,60 @@ impl UserService {
     pub(crate) async fn get(&self, id: Uuid) -> Result<Option<User>, Error> {
         let row = Entity::find_by_id(id).one(self.database.read()).await?;
         Ok(row.map(User::from))
+    }
+
+    /// Kiểm email và mật khẩu; đúng thì trả người dùng.
+    ///
+    /// Email không tồn tại và mật khẩu sai trả CÙNG một lỗi, sau CÙNG một khoảng
+    /// thời gian: không ai dò được email nào đã đăng ký. Hash lưu theo tham số cũ
+    /// được hash lại theo tham số hiện hành.
+    pub(crate) async fn check_credentials(
+        &self,
+        email: &str,
+        password: &str,
+    ) -> Result<User, Error> {
+        if password.chars().count() > password::MAX_LENGTH {
+            return Err(invalid_credentials());
+        }
+        let row = Entity::find()
+            .filter(Column::Email.eq(normalize_email(email)))
+            .one(self.database.read())
+            .await?;
+        let stored = row.as_ref().and_then(|row| row.password_hash.clone());
+        let verification = self.passwords.verify(password.to_owned(), stored.clone()).await?;
+
+        let (row, rehash) = match (row, verification) {
+            (Some(row), Verification::Valid { rehash }) => (row, rehash),
+            _ => return Err(invalid_credentials()),
+        };
+        if row.disabled_at.is_some() {
+            return Err(user_disabled());
+        }
+        if rehash && let Some(stored) = stored {
+            self.upgrade_hash(row.id, &stored, password).await;
+        }
+        Ok(row.into())
+    }
+
+    /// Hash lại mật khẩu theo tham số hiện hành. Hỏng thì chỉ ghi log: người dùng
+    /// đã đăng nhập đúng, lần sau thử lại.
+    async fn upgrade_hash(&self, id: Uuid, stored: &str, password: &str) {
+        let result = async {
+            let hash = self.passwords.hash(password.to_owned()).await?;
+            // Chỉ thay nếu hash vẫn là hash vừa kiểm: không đè mật khẩu vừa được
+            // đổi bởi một request khác.
+            Entity::update_many()
+                .col_expr(Column::PasswordHash, Expr::value(Some(hash)))
+                .filter(Column::Id.eq(id))
+                .filter(Column::PasswordHash.eq(stored))
+                .exec(self.database.write())
+                .await?;
+            Ok::<(), Error>(())
+        }
+        .await;
+        if let Err(error) = result {
+            tracing::warn!(user_id = %id, error = %error, "cannot upgrade the password hash");
+        }
     }
 }
 
@@ -119,74 +174,23 @@ impl UserService {
             return Err(Error::validation(vec![problem]));
         }
         let hash = self.passwords.hash(password).await?;
+        // Đổi mật khẩu và thu hồi mọi phiên đăng nhập trong CÙNG một transaction: kẻ
+        // giữ mật khẩu cũ (hay refresh token cũ) mất quyền ngay khi mật khẩu đổi.
+        let transaction = self.database.begin_write().await?;
         let updated = Entity::update_many()
             .col_expr(Column::PasswordHash, Expr::value(Some(hash)))
             .col_expr(Column::UpdatedAt, Expr::value(now()))
             .filter(Column::Id.eq(id))
-            .exec(self.database.write())
+            .exec(&transaction)
             .await?;
         if updated.rows_affected == 0 {
+            transaction.rollback().await?;
             return Err(user_not_found(id));
         }
+        SessionService::revoke_user(&transaction, id).await?;
+        transaction.commit().await?;
         tracing::info!(user_id = %id, "password changed");
         Ok(())
-    }
-
-    /// Kiểm email và mật khẩu; đúng thì trả người dùng.
-    ///
-    /// Email không tồn tại và mật khẩu sai trả CÙNG một lỗi, sau CÙNG một khoảng
-    /// thời gian: không ai dò được email nào đã đăng ký. Hash lưu theo tham số cũ
-    /// được hash lại theo tham số hiện hành.
-    pub(crate) async fn check_credentials(
-        &self,
-        email: &str,
-        password: &str,
-    ) -> Result<User, Error> {
-        if password.chars().count() > password::MAX_LENGTH {
-            return Err(invalid_credentials());
-        }
-        let row = Entity::find()
-            .filter(Column::Email.eq(normalize_email(email)))
-            .one(self.database.read())
-            .await?;
-        let stored = row.as_ref().and_then(|row| row.password_hash.clone());
-        let verification = self.passwords.verify(password.to_owned(), stored.clone()).await?;
-
-        let (row, rehash) = match (row, verification) {
-            (Some(row), Verification::Valid { rehash }) => (row, rehash),
-            _ => return Err(invalid_credentials()),
-        };
-        if row.disabled_at.is_some() {
-            return Err(Error::forbidden(
-                "auth.user_disabled",
-                "This account is disabled. Ask an administrator to enable it.",
-            ));
-        }
-        if rehash && let Some(stored) = stored {
-            self.upgrade_hash(row.id, &stored, password).await;
-        }
-        Ok(row.into())
-    }
-
-    /// Hash lại mật khẩu theo tham số hiện hành. Hỏng thì chỉ ghi log: người dùng
-    /// đã đăng nhập đúng, lần sau thử lại.
-    async fn upgrade_hash(&self, id: Uuid, stored: &str, password: &str) {
-        let result = async {
-            let hash = self.passwords.hash(password.to_owned()).await?;
-            // Chỉ thay nếu hash vẫn là hash vừa kiểm: không đè mật khẩu vừa được
-            // đổi bởi một request khác.
-            Entity::update_many()
-                .col_expr(Column::PasswordHash, Expr::value(Some(hash)))
-                .filter(Column::Id.eq(id))
-                .filter(Column::PasswordHash.eq(stored))
-                .exec(self.database.write())
-                .await?;
-            Ok::<(), Error>(())
-        }
-        .await;
-        if let Err(error) = result {
-            tracing::warn!(user_id = %id, error = %error, "cannot upgrade the password hash");
-        }
     }
 }
 
@@ -227,6 +231,14 @@ fn check_name(name: &str) -> Option<FieldError> {
             format!("must be between 1 and {NAME_MAX_LENGTH} characters long"),
         )
     })
+}
+
+/// Lỗi khi tài khoản đã bị khoá.
+pub(crate) fn user_disabled() -> Error {
+    Error::forbidden(
+        "auth.user_disabled",
+        "This account is disabled. Ask an administrator to enable it.",
+    )
 }
 
 fn invalid_credentials() -> Error {

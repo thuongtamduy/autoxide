@@ -1,12 +1,12 @@
 ---
 name: check-library-api
-description: Tra API thật của một thư viện Rust ở đúng phiên bản Autoxide đang ghim, trước khi viết code dùng nó. Dùng mỗi khi sắp gọi một hàm, trait, macro hay feature flag của thư viện mà chưa từng dùng trong repo này; khi thêm hoặc nâng phiên bản một thư viện; khi trình biên dịch báo "no method named", "cannot find", "unresolved import", "trait bound not satisfied", "unrecognized feature" ở code gọi thư viện; hoặc khi định viết theo trí nhớ về SeaORM, axum, utoipa, sqlx, tokio, jsonwebtoken, argon2, tower-http. Các thư viện này mới hơn kiến thức có sẵn của model — viết theo trí nhớ là viết sai.
+description: Tra API thật của một thư viện Rust ở đúng phiên bản Autoxide đang ghim, trước khi viết code dùng nó. Dùng mỗi khi sắp gọi một hàm, trait, macro hay feature flag của thư viện mà chưa từng dùng trong repo này; khi thêm hoặc nâng phiên bản một thư viện; khi trình biên dịch báo "no method named", "cannot find", "unresolved import", "trait bound not satisfied", "unrecognized feature" ở code gọi thư viện; hoặc khi định viết theo trí nhớ về SeaORM, axum, utoipa, sqlx, tokio, hmac, sha2, argon2, tower-http. Các thư viện này mới hơn kiến thức có sẵn của model — viết theo trí nhớ là viết sai.
 ---
 
 # Tra API thư viện đúng phiên bản
 
 Phiên bản thư viện trong dự án này mới hơn kiến thức có sẵn của model (SeaORM 2,
-utoipa 6, sqlx 0.9, tower-http 0.7, jsonwebtoken 11, argon2 0.6…). Cú pháp nhớ
+utoipa 6, sqlx 0.9, tower-http 0.7, hmac 0.13, argon2 0.6…). Cú pháp nhớ
 được thường là của phiên bản cũ: trông đúng, không biên dịch được, hoặc tệ hơn là
 biên dịch được nhưng hành vi đã đổi.
 

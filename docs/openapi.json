@@ -2,10 +2,255 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Autoxide API",
-    "description": "REST API of Autoxide.\n\n## Conventions\n\nEvery endpoint follows the same rules, so learning one endpoint teaches all of them.\n\n- **Success**: a single result is `{\"data\": …}`; a list is `{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`.\n- **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the stable `code` field, never on `detail`. Validation problems list every invalid field in `errors`.\n- **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.\n- **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote it when reporting a problem.\n- **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount in the smallest currency unit plus a currency code.",
+    "description": "REST API of Autoxide.\n\n## Conventions\n\nEvery endpoint follows the same rules, so learning one endpoint teaches all of them.\n\n- **Success**: a single result is `{\"data\": …}`; a list is `{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`.\n- **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the stable `code` field, never on `detail`. Validation problems list every invalid field in `errors`.\n- **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.\n- **Authentication**: endpoints that need it list the `bearer` security scheme. Send `Authorization: Bearer <access token>`. A `401` response carries `WWW-Authenticate: Bearer`; its `code` says whether the token is missing, invalid or expired.\n- **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote it when reporting a problem.\n- **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount in the smallest currency unit plus a currency code.",
     "version": "0.1.0"
   },
   "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign in with email and password.",
+        "description": "Returns a short-lived access token and a refresh token. The same error answers\nan unknown email and a wrong password.",
+        "operationId": "auth_login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Wrong email or password; code `auth.invalid_credentials`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The account is disabled; code `auth.user_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is missing a field or a value is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign out: end the session of a refresh token.",
+        "description": "Every refresh token of the session stops working; access tokens already issued\nkeep working until they expire. Safe to repeat.",
+        "operationId": "auth_logout",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Signed out (also when the token was unknown or already revoked)."
+          },
+          "422": {
+            "description": "The body is missing a field or a value is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get the signed-in user.",
+        "operationId": "auth_me",
+        "responses": {
+          "200": {
+            "description": "The user the access token belongs to.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing (code `auth.missing_token`), invalid (`auth.invalid_token`) or expired (`auth.token_expired`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The account is disabled; code `auth.user_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Exchange a refresh token for a new pair of tokens.",
+        "description": "The refresh token sent is used up. Sending a used refresh token again ends the\nwhole session (it may have been stolen): sign in again.",
+        "operationId": "auth_refresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "A new pair of tokens.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The refresh token is unknown, expired or revoked (code `auth.invalid_refresh_token`), or was already used (code `auth.refresh_token_reused`); sign in again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The account is disabled; code `auth.user_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is missing a field or a value is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health/live": {
       "get": {
         "tags": [
@@ -106,6 +351,92 @@
           }
         }
       },
+      "Data_TokenResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A new pair of tokens.",
+            "required": [
+              "access_token",
+              "token_type",
+              "expires_in",
+              "refresh_token",
+              "refresh_token_expires_at"
+            ],
+            "properties": {
+              "access_token": {
+                "type": "string",
+                "description": "Send this with every request: `Authorization: Bearer <access_token>`."
+              },
+              "expires_in": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Seconds until `access_token` expires. Refresh shortly before then.",
+                "example": 900,
+                "minimum": 0
+              },
+              "refresh_token": {
+                "type": "string",
+                "description": "Exchange this for a new pair at `POST /api/v1/auth/refresh`. Each refresh\ntoken works once: always keep only the newest one. Store it securely."
+              },
+              "refresh_token_expires_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When `refresh_token` expires; after that, sign in again."
+              },
+              "token_type": {
+                "type": "string",
+                "description": "Always `Bearer`.",
+                "example": "Bearer"
+              }
+            }
+          }
+        }
+      },
+      "Data_UserResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The signed-in user.",
+            "required": [
+              "id",
+              "email",
+              "name",
+              "created_at"
+            ],
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "email": {
+                "type": "string",
+                "description": "Normalized email: lower case, no surrounding spaces.",
+                "example": "ada@example.com"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name.",
+                "example": "Ada Lovelace"
+              }
+            }
+          }
+        }
+      },
       "Health": {
         "type": "object",
         "description": "Health of the service.",
@@ -117,6 +448,25 @@
             "type": "string",
             "description": "Always `ok`; a service that is not healthy answers with an error instead.",
             "example": "ok"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "description": "Email and password of an account.",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email of the account. Case and surrounding spaces do not matter.",
+            "example": "ada@example.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "correct horse battery staple"
           }
         }
       },
@@ -191,6 +541,94 @@
             "example": "name"
           }
         }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "description": "A refresh token, as returned by sign-in or by the previous refresh.",
+        "required": [
+          "refresh_token"
+        ],
+        "properties": {
+          "refresh_token": {
+            "type": "string"
+          }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "description": "A new pair of tokens.",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in",
+          "refresh_token",
+          "refresh_token_expires_at"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "Send this with every request: `Authorization: Bearer <access_token>`."
+          },
+          "expires_in": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds until `access_token` expires. Refresh shortly before then.",
+            "example": 900,
+            "minimum": 0
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Exchange this for a new pair at `POST /api/v1/auth/refresh`. Each refresh\ntoken works once: always keep only the newest one. Store it securely."
+          },
+          "refresh_token_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When `refresh_token` expires; after that, sign in again."
+          },
+          "token_type": {
+            "type": "string",
+            "description": "Always `Bearer`.",
+            "example": "Bearer"
+          }
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "description": "The signed-in user.",
+        "required": [
+          "id",
+          "email",
+          "name",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email": {
+            "type": "string",
+            "description": "Normalized email: lower case, no surrounding spaces.",
+            "example": "ada@example.com"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name.",
+            "example": "Ada Lovelace"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "A short-lived access token, sent as `Authorization: Bearer <token>`."
       }
     }
   }

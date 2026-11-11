@@ -86,6 +86,12 @@ dotenvy = "0.15"
 # --- Bảo mật (STACK.md, bảng "Bảo mật") ---
 # Bộ feature mặc định: `alloc`, `getrandom` (salt ngẫu nhiên), `password-hash` (chuỗi PHC).
 argon2 = "0.6"
+# Access token: JWT HS256 tự viết theo RFC 7519 bằng các khối RustCrypto dưới đây (D-045).
+# Cả bốn đã có sẵn trong cây phụ thuộc (qua sqlx, uuid, argon2).
+hmac = "0.13"
+sha2 = "0.11"
+base64 = "0.22"
+getrandom = "0.4"
 
 # --- Observability (STACK.md, bảng "Observability") ---
 tracing = "0.1"

@@ -142,9 +142,15 @@ fn migrate_voi_cau_hinh_mac_dinh_tu_tao_file_sqlite() {
     let up = autoxide(directory.path(), &["migrate", "up"], &[]);
 
     assert_eq!(status.status.code(), Some(0), "{}", stderr(&status));
-    assert_eq!(stdout(&status), "auth  m0001_create_user  pending\n\n0 applied, 1 pending\n");
+    // Không ghim danh sách migration ở đây (module thêm migration là đổi): chỉ kiểm
+    // database mới thì mọi migration đều chờ, và `up` áp dụng hết.
+    let listed = stdout(&status);
+    assert!(listed.starts_with("auth  m0001_create_user "), "{listed}");
+    assert!(listed.contains("\n0 applied, "), "{listed}");
     assert_eq!(up.status.code(), Some(0), "{}", stderr(&up));
-    assert_eq!(stdout(&up), "Applied 1 migration:\n  auth/m0001_create_user\n");
+    assert!(stdout(&up).contains("  auth/m0001_create_user\n"), "{}", stdout(&up));
+    let again = autoxide(directory.path(), &["migrate", "up"], &[]);
+    assert_eq!(stdout(&again), "Nothing to apply: the database is up to date.\n");
     // Không cấu hình gì: database là file SQLite trong thư mục `data/`, tự tạo.
     assert!(directory.path().join("data/autoxide.sqlite").exists());
 }

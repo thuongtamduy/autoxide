@@ -13,6 +13,7 @@ use std::collections::BTreeSet;
 
 use utoipa::ToSchema;
 use utoipa::openapi::path::{Operation, PathItem};
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::openapi::{
     ContentBuilder, InfoBuilder, OpenApi, OpenApiBuilder, Ref, RefOr, ResponseBuilder,
 };
@@ -23,6 +24,10 @@ use crate::response::{PROBLEM_CONTENT_TYPE, Problem};
 pub const OPENAPI_PATH: &str = "/api/v1/openapi.json";
 /// Đường dẫn trang xem tài liệu API (khi được bật).
 pub const DOCS_PATH: &str = "/api/docs";
+
+/// Tên cách xác thực "bearer token" trong tài liệu. Handler cần đăng nhập khai
+/// `security((BEARER_AUTH = []))` — viết chữ `"bearer"` trong `#[utoipa::path]`.
+pub const BEARER_AUTH: &str = "bearer";
 
 const DESCRIPTION: &str = "\
 REST API of Autoxide.
@@ -37,6 +42,9 @@ Every endpoint follows the same rules, so learning one endpoint teaches all of t
 stable `code` field, never on `detail`. Validation problems list every invalid field in `errors`.
 - **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and \
 `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.
+- **Authentication**: endpoints that need it list the `bearer` security scheme. Send \
+`Authorization: Bearer <access token>`. A `401` response carries `WWW-Authenticate: Bearer`; \
+its `code` says whether the token is missing, invalid or expired.
 - **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote \
 it when reporting a problem.
 - **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount \
@@ -80,6 +88,17 @@ pub(super) fn finish(openapi: &mut OpenApi) {
     for (name, schema) in schemas {
         components.schemas.entry(name).or_insert(schema);
     }
+    components.security_schemes.entry(BEARER_AUTH.to_owned()).or_insert_with(|| {
+        RefOr::T(SecurityScheme::Http(
+            HttpBuilder::new()
+                .scheme(HttpAuthScheme::Bearer)
+                .bearer_format("JWT")
+                .description(Some(
+                    "A short-lived access token, sent as `Authorization: Bearer <token>`.",
+                ))
+                .build(),
+        ))
+    });
 
     let problem = ResponseBuilder::new()
         .description(

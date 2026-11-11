@@ -744,3 +744,48 @@ nhỏ. Tham số Argon2id lấy theo OWASP Password Storage Cheat Sheet thay vì
 module nào dùng một phần mà bỏ phần kia; bcrypt — cắt mật khẩu ở 72 byte và không
 tốn bộ nhớ nên dễ bẻ bằng GPU hơn; so sánh email bằng `lower(email)` trong câu truy
 vấn — cần index trên biểu thức, cú pháp khác nhau giữa hai database.
+
+## D-045 · Đăng nhập: access token JWT HS256 tự viết, refresh token xoay vòng — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- **Access token** là JWT (RFC 7519) ký HMAC-SHA256, mang `iss`, `sub` (ID người
+  dùng), `iat`, `exp`; sống 15 phút (`AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS`). Máy chủ kiểm
+  chữ ký, không hỏi database về token — nhưng vẫn đọc người dùng để chặn tài khoản
+  đã khoá. Chỉ nhận header `alg = HS256`.
+- **Tự viết JWT** (khoảng 100 dòng, `modules/auth/src/token.rs`) bằng `hmac` 0.13,
+  `sha2` 0.11, `base64` 0.22, `getrandom` 0.4 — cả bốn đã có sẵn trong cây phụ thuộc.
+  **Không dùng `jsonwebtoken` 11** như `STACK.md` ghi trước đây: crate này buộc bật
+  một backend mật mã đầy đủ; backend `rust_crypto` kéo `rsa` 0.9 (RUSTSEC-2023-0071,
+  chưa có bản vá) và `crypto-bigint` 0.5 (RUSTSEC-2026-0387) — `cargo deny` chặn;
+  backend `aws_lc_rs` gây xung đột `rustls` đã ghi ở D-043. Autoxide chỉ cần đúng
+  HS256, nên mở ngoại lệ trong `deny.toml` cho thư viện không dùng tới là sai hướng.
+- **Khoá ký** `AUTOXIDE_AUTH_TOKEN_SECRET`, ≥ 32 ký tự. Không đặt thì sinh khoá ngẫu
+  nhiên khi khởi động và ghi cảnh báo — người lạ chạy thử được ngay; production phải
+  đặt (README hướng dẫn).
+- **Refresh token** là 32 byte ngẫu nhiên (base64url), sống 30 ngày
+  (`AUTOXIDE_AUTH_REFRESH_TOKEN_DAYS`), database chỉ lưu SHA-256 của nó (bảng
+  `auth_refresh_token`). Mỗi lần đổi cấp token mới cùng "họ" (family) với thời hạn
+  mới tính từ lúc đổi.
+- **Phát hiện dùng lại:** token đã đổi bị gửi lại → thu hồi cả họ, trả
+  `auth.refresh_token_reused`. Đánh dấu "đã dùng" bằng `UPDATE … WHERE used_at IS
+  NULL` trong transaction; hai request đổi cùng một token đồng thời thì bên thua cũng
+  bị coi là dùng lại (test đồng thời trên cả hai database).
+- Đổi mật khẩu thu hồi mọi refresh token của người dùng trong cùng transaction. Đăng
+  xuất thu hồi họ của token gửi lên; gọi lại vẫn trả 204.
+- Endpoint: `POST /api/v1/auth/login`, `/refresh`, `/logout`, `GET /api/v1/auth/me`.
+  Kernel thêm security scheme `bearer` vào OpenAPI và header `WWW-Authenticate:
+  Bearer` cho mọi lỗi 401 (RFC 6750, RFC 9110).
+
+Lý do: access token sống ngắn không thu hồi được nhưng kiểm rẻ; refresh token lưu
+database thu hồi được — cặp này là cách làm chuẩn (OAuth 2.0 Security BCP, RFC 9700
+mục 4.14). Thu hồi cả họ khi dùng lại là khuyến nghị của chính tài liệu đó.
+
+Giới hạn đã chấp nhận: access token còn hiệu lực tới 15 phút sau khi đăng xuất, đổi
+mật khẩu hay bị khoá — trừ `/me` và mọi chỗ đọc người dùng, vốn kiểm tài khoản khoá.
+Client gửi đúng một token hai lần do retry mạng sẽ bị đăng xuất; tài liệu API dặn
+"mỗi refresh token dùng một lần".
+
+Đã cân nhắc: `jsonwebtoken` kèm ngoại lệ `cargo deny` — giữ lỗ hổng trong cây chỉ để
+dùng một hàm; session lưu database thay cho JWT — mỗi request một câu truy vấn;
+thời gian ân hạn cho dùng lại — mở lại đúng lỗ hổng mà rotation muốn đóng.

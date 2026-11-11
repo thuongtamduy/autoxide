@@ -49,7 +49,7 @@ use crate::error::Error;
 pub use extract::ValidJson;
 pub use health::{Health, health_routes};
 pub use metrics::metrics_routes;
-pub use openapi::{DOCS_PATH, OPENAPI_PATH, lint};
+pub use openapi::{BEARER_AUTH, DOCS_PATH, OPENAPI_PATH, lint};
 pub use request_id::REQUEST_ID_HEADER;
 pub use server::{Shutdown, serve, shutdown_signal};
 

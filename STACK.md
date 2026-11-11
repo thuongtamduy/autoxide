@@ -66,7 +66,8 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | Việc               | Thư viện          | Phiên bản | Ghi chú                                         |
 | ------------------ | ----------------- | --------- | ----------------------------------------------- |
 | Hash mật khẩu       | `argon2`          | 0.6       | Argon2id                                        |
-| Access token       | `jsonwebtoken`    | 11        | Sống ngắn; refresh token rotation lưu database |
+| Access token       | JWT HS256 tự viết trên `hmac` + `sha2` + `base64` | 0.13 / 0.11 / 0.22 | Sống ngắn; refresh token rotation lưu database. Không dùng `jsonwebtoken` (D-045) |
+| Số ngẫu nhiên      | `getrandom`       | 0.4       | Refresh token, khoá ký tạm thời                 |
 | MFA                | `totp-rs`         | 6.0       | TOTP + recovery code. Passkey để sau             |
 | Rate limiting  | `tower_governor`  | 0.8       | Kèm login throttling ở endpoint đăng nhập            |
 

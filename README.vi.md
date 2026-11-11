@@ -16,7 +16,9 @@ core không chứa khái niệm nghiệp vụ — những thứ đó thuộc v�
 xong**: workspace Cargo, gate chất lượng, cấu hình, truy cập database, migration theo
 module, hợp đồng module, máy chủ HTTP dưới `/api/v1` kèm OpenAPI, health check, log,
 metrics, tracing và CLI. Bước 2 (đăng nhập, role và permission) đang làm: module `auth` lưu người dùng
-với mật khẩu hash bằng Argon2id; chưa có endpoint HTTP.
+với mật khẩu hash bằng Argon2id và cho đăng nhập bằng access token sống ngắn cùng
+refresh token xoay vòng (`/api/v1/auth/login`, `/refresh`, `/logout`, `/me`). Chưa có
+cách tạo người dùng đầu tiên; việc đó đến cùng các lệnh quản lý người dùng của bước 2.
 
 Core sẽ gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -113,6 +115,17 @@ các quy ước mọi endpoint tuân theo (envelope của response, lỗi theo R
 này sinh ra từ code nên không thể lỗi thời. Cấu hình sai được báo đầy đủ — mọi vấn
 đề cùng một lượt, mỗi vấn đề nói rõ phải sửa gì — và lệnh thoát với mã 2. Secret
 không bao giờ bị in ra.
+
+Khi chạy thật (production), đặt `AUTOXIDE_AUTH_TOKEN_SECRET` (khoá ký access token)
+bằng một chuỗi ngẫu nhiên dài, giống nhau trên mọi máy chủ:
+
+```bash
+openssl rand -base64 48
+```
+
+Không đặt thì máy chủ tự sinh khoá lúc khởi động và ghi một cảnh báo vào log: đủ để
+dùng thử Autoxide, nhưng client đã đăng nhập phải đổi access token sau mỗi lần khởi
+động lại.
 
 ### Chạy test trên PostgreSQL của riêng bạn
 

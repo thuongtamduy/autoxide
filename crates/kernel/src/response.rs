@@ -17,7 +17,7 @@ use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::error::Error;
+use crate::error::{Error, ErrorKind};
 
 // Chú ý: doc comment `///` trên kiểu có `ToSchema` (và trên từng trường của nó)
 // được chép nguyên vào tài liệu OpenAPI — nên viết tiếng Anh, cho người gọi API
@@ -115,6 +115,12 @@ impl IntoResponse for Error {
         response
             .headers_mut()
             .insert(header::CONTENT_TYPE, HeaderValue::from_static(PROBLEM_CONTENT_TYPE));
+        if self.kind() == ErrorKind::Unauthenticated {
+            // RFC 9110 bắt 401 phải nói cách xác thực; RFC 6750: cách đó là bearer token.
+            response
+                .headers_mut()
+                .insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
+        }
         // Gửi kèm chính lỗi (có nguyên nhân gốc) trong "extensions" của response:
         // phần này không ra tới client, nhưng middleware ghi log đọc được.
         response.extensions_mut().insert(Arc::new(self));
@@ -139,6 +145,19 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.headers()[header::CONTENT_TYPE], "application/json");
         assert_eq!(body_json(response).await, serde_json::json!({"data": {"id": 1}}));
+    }
+
+    #[tokio::test]
+    async fn loi_401_noi_cach_xac_thuc() {
+        let unauthenticated = Error::unauthenticated("auth.missing_token", "Sign in.");
+        let forbidden = Error::forbidden("auth.forbidden", "No.");
+
+        let unauthenticated = unauthenticated.into_response();
+        let forbidden = forbidden.into_response();
+
+        assert_eq!(unauthenticated.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(unauthenticated.headers()[header::WWW_AUTHENTICATE], "Bearer");
+        assert!(!forbidden.headers().contains_key(header::WWW_AUTHENTICATE));
     }
 
     #[tokio::test]

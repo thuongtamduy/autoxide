@@ -17,7 +17,10 @@ foundation) are done**: the Cargo workspace, the quality gate, configuration,
 database access, per-module migrations, the module contract, the HTTP server
 under `/api/v1` with OpenAPI, health checks, logs, metrics, tracing and the CLI.
 Step 2 (login, roles and permissions) is in progress: the `auth` module stores
-users with Argon2id password hashes; it has no HTTP endpoints yet.
+users with Argon2id password hashes and signs them in with short-lived access
+tokens and rotating refresh tokens (`/api/v1/auth/login`, `/refresh`, `/logout`,
+`/me`). There is no way to create the first user yet; that comes with the user
+commands of step 2.
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -114,6 +117,17 @@ stable `code`, cursor pagination, request ids).
 default. It is generated from the code, so it cannot go out of date. An invalid
 configuration is reported in full — every problem at once, each saying what to
 fix — and the command exits with status 2. Secrets are never printed.
+
+For production, set `AUTOXIDE_AUTH_TOKEN_SECRET` (the key that signs access tokens)
+to a long random value, the same on every server:
+
+```bash
+openssl rand -base64 48
+```
+
+Without it the server makes up a key at startup and logs a warning: fine for trying
+Autoxide out, but signed-in clients must refresh their access token after every
+restart.
 
 ### Running the tests against your own PostgreSQL
 

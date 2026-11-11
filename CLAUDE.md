@@ -136,7 +136,7 @@ cũng được**, tuỳ tài nguyên máy và độ khó của việc. Trước 
 ## Không đoán API thư viện
 
 Phiên bản thư viện ở đây **mới hơn kiến thức có sẵn của model** (SeaORM 2, utoipa
-6, sqlx 0.9, jsonwebtoken 11, argon2 0.6…). Trước khi dùng một API:
+6, sqlx 0.9, hmac 0.13, argon2 0.6…). Trước khi dùng một API:
 
 - đọc tài liệu đúng phiên bản đang ghim: `cargo doc -p <crate> --no-deps` hoặc mã
   nguồn trong `~/.cargo/registry/src/`;
