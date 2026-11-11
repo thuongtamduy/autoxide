@@ -675,3 +675,32 @@ async fn loi_duoc_dich_theo_accept_language() {
     let french = send(app, with_language("/api/v1/notes/7", Some("fr"))).await;
     assert_eq!(french.headers()[header::CONTENT_LANGUAGE], "en");
 }
+
+#[tokio::test]
+async fn endpoint_deprecated_co_header_va_danh_dau_trong_tai_lieu() {
+    let deprecation = http::Deprecation::new(axum::http::Method::GET, "/{id}", "2026-11-01")
+        .sunset("2027-05-01")
+        .successor("/api/v2/notes/{id}");
+    let extras = http::Extras { deprecations: vec![("notes", deprecation)], ..Default::default() };
+    let api = http::build(
+        &default_config(),
+        OpenApiRouter::new(),
+        vec![("notes", notes_routes())],
+        extras,
+    );
+
+    let old = send(api.router.clone(), get("/api/v1/notes/7")).await;
+    assert_eq!(old.headers()["deprecation"], "@1793491200");
+    assert_eq!(old.headers()["sunset"], "Sat, 01 May 2027 00:00:00 GMT");
+    assert_eq!(old.headers()[header::LINK], "</api/v2/notes/{id}>; rel=\"successor-version\"");
+    let current = send(api.router.clone(), get("/api/v1/notes")).await;
+    assert!(!current.headers().contains_key("deprecation"));
+
+    let document = serde_json::to_value(&api.openapi).unwrap();
+    let operation = &document["paths"]["/api/v1/notes/{id}"]["get"];
+    assert_eq!(operation["deprecated"], true);
+    let description = operation["description"].as_str().unwrap();
+    assert!(description.contains("Deprecated** since 2026-11-01"), "{description}");
+    assert!(description.contains("removed on 2027-05-01"), "{description}");
+    assert!(document["paths"]["/api/v1/notes"]["get"].get("deprecated").is_none());
+}

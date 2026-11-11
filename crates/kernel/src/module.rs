@@ -128,6 +128,12 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Endpoint deprecated của module: kernel đánh dấu trong OpenAPI và gắn header
+    /// `Deprecation` / `Sunset` / `Link` vào response (D-059).
+    fn deprecations(&self) -> Vec<crate::http::Deprecation> {
+        Vec::new()
+    }
+
     /// Bản dịch thông báo lỗi của module: `(ngôn ngữ, nội dung JSON)`, thường là
     /// `vec![("vi", include_str!("../locales/vi.json"))]`. Mỗi `code` lỗi của module
     /// phải có bản dịch (`cargo xtask check` kiểm).
@@ -304,6 +310,11 @@ impl Modules {
             problems.extend(errors);
             EventCatalog::default()
         });
+        for module in &modules {
+            for deprecation in module.deprecations() {
+                problems.extend(deprecation.problems(module.name()));
+            }
+        }
         let declared =
             modules.iter().map(|module| (module.name(), module.translations())).collect();
         let translations = Translations::new(declared).unwrap_or_else(|errors| {
@@ -379,6 +390,17 @@ impl Modules {
     /// Mọi permission của các module đã đăng ký.
     pub fn permissions(&self) -> &PermissionCatalog {
         &self.permissions
+    }
+
+    /// Endpoint deprecated của mọi module: `(tên module, khai báo)`.
+    pub fn deprecations(&self) -> Vec<(&'static str, crate::http::Deprecation)> {
+        self.modules
+            .iter()
+            .flat_map(|module| {
+                let name = module.name();
+                module.deprecations().into_iter().map(move |deprecation| (name, deprecation))
+            })
+            .collect()
     }
 
     /// Bản dịch thông báo lỗi của kernel và mọi module.

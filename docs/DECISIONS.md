@@ -1194,3 +1194,26 @@ mọi lệnh ghi — phá client đơn giản, bản nháp IETF để tuỳ ch�
 
 Đã kiểm: sáu request cùng key gửi đồng thời → handler chạy đúng một lần, trên cả hai
 database.
+
+## D-059 · Endpoint deprecated — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Module khai endpoint sắp bỏ qua `Module::deprecations()` (mặc định rỗng — D-038):
+  method, đường dẫn trong module, ngày bắt đầu (`since`), ngày bỏ hẳn (`sunset`, tuỳ
+  chọn), endpoint thay thế (tuỳ chọn). Ngày sai dạng hay `sunset` không sau `since` là
+  lỗi khởi động.
+- Kernel đặt `deprecated: true` cho operation trong OpenAPI và thêm câu "Deprecated
+  since …; removed on …; use … instead" vào mô tả; response của endpoint đó mang
+  `Deprecation: @<unix time>` (RFC 9745), `Sunset: <HTTP-date>` (RFC 8594) và
+  `Link: <thay thế>; rel="successor-version"`. Đếm số lần gọi bằng
+  `http_deprecated_requests_total{route}` để biết khi nào bỏ được.
+- Thay đổi phá vỡ: làm endpoint mới (hoặc `/api/v2`), giữ endpoint cũ chạy y như cũ tới
+  ngày sunset (luật ghi trong `CLAUDE.md`).
+
+Lý do: chuẩn IETF cho việc báo endpoint sắp bỏ — client và AI agent đọc được từ
+response và từ tài liệu, không cần đọc ghi chú phát hành. Một chỗ khai, kernel lo cả
+tài liệu lẫn header, nên hai thứ không lệch nhau.
+
+Đã cân nhắc: dùng `deprecated` của macro utoipa — chỉ đánh dấu tài liệu, không có
+ngày, không có header.

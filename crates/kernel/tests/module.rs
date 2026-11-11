@@ -283,3 +283,26 @@ fn permission_sai_ten_bi_tu_choi_luc_dang_ky() {
 
     assert!(error.contains("permission `tags.read` of module `notes` must be named"), "{error}");
 }
+
+#[test]
+fn khai_deprecated_sai_bi_tu_choi_luc_dang_ky() {
+    struct Old;
+    impl Module for Old {
+        fn name(&self) -> &'static str {
+            "notes"
+        }
+        fn deprecations(&self) -> Vec<autoxide_kernel::http::Deprecation> {
+            use autoxide_kernel::http::Deprecation;
+            use axum::http::Method;
+            vec![
+                Deprecation::new(Method::GET, "/{id}", "01/11/2026"),
+                Deprecation::new(Method::GET, "/", "2026-11-01").sunset("2026-10-01"),
+            ]
+        }
+    }
+
+    let error = Modules::new(vec![Box::new(Old)]).unwrap_err().to_string();
+
+    assert!(error.contains("`since` must be a YYYY-MM-DD date"), "{error}");
+    assert!(error.contains("`sunset` must come after `since`"), "{error}");
+}

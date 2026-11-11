@@ -89,6 +89,7 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         authenticator,
         idempotency: modules.api::<dyn IdempotencyStore>(),
         translations: modules.translations().clone(),
+        deprecations: modules.deprecations(),
     };
     let api = http::build(&config.http, root, routes, extras);
     Ok(Runtime { config, database, modules, api, dispatcher, worker })

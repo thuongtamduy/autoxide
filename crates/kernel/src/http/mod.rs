@@ -23,6 +23,7 @@
 //! 9. **timeout** — request chạy quá lâu bị cắt, trả 503;
 //! 10. **giới hạn body** — body quá lớn bị từ chối, trả 413.
 
+mod deprecation;
 mod extract;
 mod health;
 mod idempotency;
@@ -58,6 +59,7 @@ use crate::error::Error;
 use crate::i18n::Translations;
 use crate::idempotency::IdempotencyStore;
 
+pub use deprecation::Deprecation;
 pub use extract::ValidJson;
 pub use health::{Health, health_routes};
 pub use metrics::metrics_routes;
@@ -88,6 +90,8 @@ pub struct Extras {
     /// Nơi lưu idempotency key (một module cung cấp). `None`: header
     /// `Idempotency-Key` bị bỏ qua.
     pub idempotency: Option<Arc<dyn IdempotencyStore>>,
+    /// Endpoint deprecated do các module khai: `(tên module, khai báo)`.
+    pub deprecations: Vec<(&'static str, Deprecation)>,
     /// Bản dịch thông báo lỗi (mặc định: chỉ bản dịch của kernel thì dùng
     /// `Translations::new(Vec::new())`; rỗng thì mọi lỗi bằng tiếng Anh).
     pub translations: Translations,
@@ -109,6 +113,7 @@ pub fn build(
         .nest(API_PREFIX, api)
         .split_for_parts();
     openapi::finish(&mut openapi);
+    let deprecated = Arc::new(deprecation::apply(&mut openapi, &extras.deprecations));
 
     // Tài liệu không đổi trong lúc chạy: đổi thành JSON một lần rồi trả lại mãi.
     let document = openapi.to_json().unwrap_or_default();
@@ -165,6 +170,9 @@ pub fn build(
             rate_limit::limit(limiter.clone(), request, next)
         }))
         .layer(cors(&config.cors_origins))
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            deprecation::mark(deprecated.clone(), request, next)
+        }))
         .layer(middleware::from_fn(log::log_requests))
         .layer(PropagateRequestIdLayer::new(REQUEST_ID_HEADER))
         .layer(SetRequestIdLayer::new(REQUEST_ID_HEADER, request_id::MakeUuidV7))

@@ -49,6 +49,9 @@ its `code` says whether the token is missing, invalid or expired.
 `DELETE`. Repeating the same request with the same key within 24 hours returns the first result \
 (marked `Idempotent-Replayed: true`) instead of doing it twice; a different request with a used \
 key gets `422`, and a repeat while the first is still running gets `409`.
+- **Deprecation**: an endpoint being retired is marked `deprecated` here and answers with \
+`Deprecation` (RFC 9745), `Sunset` (RFC 8594, the removal date) and `Link: <…>; \
+rel=\"successor-version\"` headers. Move to the successor before the sunset date.
 - **Language**: send `Accept-Language` (e.g. `vi`) to get the `detail` of errors in that \
 language; English (`en`) by default and for unsupported languages. Responses carry \
 `Content-Language`. Codes never change with the language.
