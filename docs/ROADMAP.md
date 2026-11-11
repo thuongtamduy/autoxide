@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–5 xong; đang ở bước 6**, mục "Dịch cả thông báo của từng trường (`errors[].detail`)".
+Trạng thái: **bước 0–6 xong; đang ở bước 7**, mục "Gửi mail qua SMTP sau một trait; khi chưa cấu hình SMTP thì ghi mail ra file".
 
 ## 0. Khung dự án
 
@@ -68,8 +68,6 @@ Trạng thái: **bước 0–5 xong; đang ở bước 6**, mục "Dịch cả t
       `code` đều có bản dịch)
 - [x] Idempotency key cho lệnh ghi (test gửi trùng đồng thời)
 - [x] Đánh dấu endpoint deprecated
-- [ ] Dịch cả thông báo của từng trường (`errors[].detail`): `FieldError` mang chỗ điền như
-      `Error`, bản dịch theo `code` của trường
 
 ## 7. Email
 

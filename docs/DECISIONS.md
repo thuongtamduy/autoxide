@@ -1217,3 +1217,19 @@ tài liệu lẫn header, nên hai thứ không lệch nhau.
 
 Đã cân nhắc: dùng `deprecated` của macro utoipa — chỉ đánh dấu tài liệu, không có
 ngày, không có header.
+
+## D-060 · Không dịch thông báo của từng trường ở máy chủ — 2026-11-11 — agent quyết
+
+Quyết định: bỏ mục lộ trình "Dịch cả thông báo của từng trường (`errors[].detail`)"
+(mục agent tự thêm ở D-057). `detail` của Problem đã dịch theo `Accept-Language`;
+`errors[]` giữ `field` và `code` ổn định cho máy, `detail` của từng trường bằng tiếng Anh.
+
+Lý do: giao diện hiển thị lỗi cạnh từng ô nhập thường tự dịch theo cặp
+(`field`, `code`) bằng bộ chữ của chính nó; AI agent đọc `code`. Dịch ở máy chủ cần đổi
+mọi chỗ tạo `FieldError` (khoảng 25 chỗ, đang ghép câu bằng `format!`) sang câu mẫu có
+chỗ điền, kèm cách quét mới trong `cargo xtask check` — công sức lớn so với lợi ích,
+trong khi các bước 7–11 của lộ trình còn nguyên.
+
+Mở lại khi: một sản phẩm dùng Autoxide cần thông báo trường tiếng Việt từ máy chủ
+(vd client không có bộ chữ riêng). Cách làm khi đó: `FieldError` mang câu mẫu và chỗ
+điền như `Error`, khoá dịch `field.<code>` trong `locales/vi.json`.
