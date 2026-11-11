@@ -194,14 +194,19 @@ TEST_DATABASE_URL=postgres://… cargo test --workspace  # Postgres (gate tự d
 ## Luật kiến trúc
 
 1. **Module sở hữu bảng của mình.** Không đọc, ghi hay join bảng của module khác.
-2. **Gọi module khác qua trait nó công bố**, không import phần bên trong.
+2. **Gọi module khác qua trait nó công bố**, không import phần bên trong. Module
+   công bố trait bằng `context.provide::<dyn Trait>(…)` trong `Module::start`, module
+   khác lấy bằng `context.require::<dyn Trait>()`; bên cần đăng ký sau bên cung cấp.
 3. **Việc phụ đi qua event** (audit, thông báo); event ghi vào database cùng
    transaction với thay đổi.
 4. **Không foreign key xuyên module** — chỉ giữ ID. Không có ngoại lệ, kể cả với
    bảng người dùng.
 5. **Logic ở service layer.** Handler chỉ: lấy dữ liệu vào → gọi service → trả
-   envelope. Không truy vấn database trong handler.
-6. **Mọi route có tài liệu OpenAPI**, đăng ký qua `utoipa-axum` cùng lúc với route.
+   envelope. Không truy vấn database trong handler. Thân JSON nhận bằng
+   `ValidJson<T>` (đã kiểm bằng `validator`), không dùng `Json<T>` trần.
+6. **Mọi route có tài liệu OpenAPI**, đăng ký qua `utoipa-axum` cùng lúc với route
+   (`OpenApiRouter::routes(routes!(…))`, không dùng `.route(…)` trần). Route của
+   module `x` nằm dưới `/api/v1/x`; module chỉ khai phần đuôi (`/`, `/{id}`).
 7. **REST và MCP dùng chung service.** Tool MCP không có logic riêng và không được
    phép làm điều mà REST với cùng permission không làm được.
 8. **Core chỉ có API.** Không có giao diện web hay trang quản trị trong repo này;

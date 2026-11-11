@@ -42,6 +42,10 @@ pub enum ErrorKind {
     NotFound,
     /// Trái với trạng thái hiện tại (trùng giá trị unique, sửa bản đã cũ). HTTP 409.
     Conflict,
+    /// Thân request lớn hơn giới hạn. HTTP 413.
+    PayloadTooLarge,
+    /// Kiểu nội dung của request không được hỗ trợ. HTTP 415.
+    UnsupportedMediaType,
     /// Request đọc được nhưng giá trị không qua kiểm tra. HTTP 422.
     Validation,
     /// Gọi quá nhiều. HTTP 429.
@@ -61,6 +65,8 @@ impl ErrorKind {
             ErrorKind::Forbidden => 403,
             ErrorKind::NotFound => 404,
             ErrorKind::Conflict => 409,
+            ErrorKind::PayloadTooLarge => 413,
+            ErrorKind::UnsupportedMediaType => 415,
             ErrorKind::Validation => 422,
             ErrorKind::TooManyRequests => 429,
             ErrorKind::Internal => 500,
@@ -370,6 +376,8 @@ mod tests {
             (Error::forbidden("c", "m"), 403),
             (Error::not_found("c", "m"), 404),
             (Error::conflict("c", "m"), 409),
+            (Error::new(ErrorKind::PayloadTooLarge, "c", "m"), 413),
+            (Error::new(ErrorKind::UnsupportedMediaType, "c", "m"), 415),
             (Error::validation(Vec::new()), 422),
             (Error::too_many_requests("c", "m"), 429),
             (Error::internal("boom"), 500),

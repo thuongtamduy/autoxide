@@ -12,12 +12,14 @@
 
 mod database;
 mod env_example;
+mod http;
 mod reader;
 mod setting;
 mod source;
 
 pub use database::{DatabaseBackend, DatabaseConfig, DatabaseUrl, redact_password};
 pub use env_example::render_env_example;
+pub use http::{CorsOrigins, HttpConfig};
 pub use reader::{
     ConfigError, ConfigErrors, ConfigReader, Invalid, Origin, SettingValue, parse_in_range,
 };
@@ -28,6 +30,7 @@ pub use source::ConfigSource;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     pub database: DatabaseConfig,
+    pub http: HttpConfig,
 }
 
 impl Config {
@@ -35,7 +38,8 @@ impl Config {
     /// [`ConfigReader::finish`] sau khi mọi phần (kernel và module) đã đọc xong.
     pub fn read(reader: &mut ConfigReader) -> Result<Self, Invalid> {
         let database = DatabaseConfig::read(reader);
-        Ok(Config { database: database? })
+        let http = HttpConfig::read(reader);
+        Ok(Config { database: database?, http: http? })
     }
 }
 

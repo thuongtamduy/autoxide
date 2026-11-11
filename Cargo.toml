@@ -43,7 +43,7 @@ autoxide-testkit = { path = "crates/testkit" }
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
 axum = "0.8"
-tower-http = { version = "0.7", features = ["cors", "limit", "request-id", "timeout", "trace"] }
+tower-http = { version = "0.7", features = ["catch-panic", "cors", "limit", "request-id", "timeout", "trace"] }
 # Khai rõ từng feature đang dựa vào thay vì nhận bộ mặc định. Không bật
 # `with-rust_decimal` và `with-time`: tiền là số nguyên, thời gian dùng chrono
 # (CLAUDE.md, "Luật dữ liệu") — hai thư viện đó vẫn có trong cây phụ thuộc vì

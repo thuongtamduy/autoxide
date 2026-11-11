@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0 xong; đang ở bước 1**, mục "HTTP: `/api/v1`, request id, timeout, giới hạn body, CORS, graceful shutdown".
+Trạng thái: **bước 0 xong; đang ở bước 1**, mục "OpenAPI sinh từ code + kiểm không lệch trong gate".
 
 ## 0. Khung dự án
 
@@ -23,7 +23,7 @@ Trạng thái: **bước 0 xong; đang ở bước 1**, mục "HTTP: `/api/v1`, 
 - [x] Hợp đồng module + đăng ký ở một chỗ (khi có module đầu tiên: thêm `"modules/*"`
       vào `members` của `Cargo.toml` gốc)
 - [x] Kiểu lỗi chung, envelope trả về, pagination theo UUIDv7
-- [ ] HTTP: `/api/v1`, request id, timeout, giới hạn body, CORS, graceful shutdown
+- [x] HTTP: `/api/v1`, request id, timeout, giới hạn body, CORS, graceful shutdown
 - [ ] OpenAPI sinh từ code + kiểm không lệch trong gate
 - [ ] Health check (`/health/live`, `/health/ready`)
 - [ ] Log, metrics (`/metrics`), tracing

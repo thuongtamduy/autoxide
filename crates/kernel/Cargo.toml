@@ -14,7 +14,10 @@ sea-orm.workspace = true
 sea-orm-migration.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tokio.workspace = true
+tower-http.workspace = true
 utoipa.workspace = true
+utoipa-axum.workspace = true
 uuid.workspace = true
 validator.workspace = true
 
@@ -23,10 +26,7 @@ validator.workspace = true
 # nào kernel bắt đầu dùng thì chuyển lên [dependencies].
 autoxide-testkit.workspace = true
 chrono.workspace = true
-tokio.workspace = true
 tower.workspace = true
-tower-http.workspace = true
-utoipa-axum.workspace = true
 utoipa-scalar.workspace = true
 
 [lints]

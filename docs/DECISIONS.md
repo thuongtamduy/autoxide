@@ -595,3 +595,40 @@ mới.
 biết; `type` là URL tới trang mô tả từng lỗi — cần một địa chỉ công khai mà dự án
 chưa có; pagination `page` / `per_page` — quen thuộc nhưng chậm dần theo số trang và
 trùng dòng khi dữ liệu thay đổi; trả tổng số dòng — tốn một câu lệnh đếm mỗi request.
+
+## D-040 · Lớp HTTP và giai đoạn khởi động của module — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- **Hợp đồng module thêm hai hàm** (đều có cài đặt mặc định): `start(context)` —
+  dựng service với database, công bố trait cho module khác (`provide::<dyn Trait>`)
+  và lấy trait của module khác (`require::<dyn Trait>`); `routes()` — route REST kèm
+  tài liệu OpenAPI. Module khởi động theo thứ tự đăng ký; bên cần trait đăng ký sau
+  bên cung cấp; mỗi trait đúng một bên cung cấp.
+- **Route của module `x` nằm dưới `/api/v1/x`**; module chỉ khai phần đuôi. Thay đổi
+  phá vỡ thì mở `/api/v2`.
+- **Mọi response lỗi là Problem Details**, kể cả lỗi do thư viện sinh ra (404, 405,
+  413, query sai kiểu…): một lớp bọc ngoài đổi chúng về cùng dạng, giữ câu mô tả của
+  lỗi 4xx và không bao giờ chép thân của lỗi 5xx ra ngoài.
+- **Request id** ở header `x-request-id`: nhận ID của client nếu nó ngắn (≤ 128 ký
+  tự) và chỉ gồm chữ, số, `-_.:`; còn lại sinh UUIDv7. Luôn trả lại trong response.
+- **Timeout** trả 503 mã `request_timeout`; **body quá lớn** trả 413; **handler
+  panic** thành 500 mã `internal_error`, nội dung panic chỉ vào log.
+- **CORS** mặc định không cho origin nào; cấu hình bằng `AUTOXIDE_HTTP_CORS_ORIGINS`.
+- **Graceful shutdown:** nhận SIGTERM hoặc Ctrl-C thì ngừng nhận kết nối mới, chờ
+  request đang chạy tối đa `AUTOXIDE_HTTP_SHUTDOWN_SECONDS` rồi dừng hẳn.
+- Handler nhận thân JSON qua `ValidJson<T>`: đọc và kiểm trong một bước, mỗi kiểu lỗi
+  đầu vào một mã riêng (`invalid_json`, `invalid_body`, `validation_failed`,
+  `unsupported_media_type`).
+
+Lý do: gắn route theo tên module làm đường dẫn không thể đụng nhau giữa hai module và
+nhìn URL là biết module nào sở hữu. Chuẩn hoá lỗi ở một lớp ngoài cùng là cách duy
+nhất bảo đảm "cùng envelope" mà không phụ thuộc vào việc mọi handler đều viết đúng.
+Timeout trả 503 thay vì 408 vì 408 nghĩa là client gửi request quá chậm; ở đây máy
+chủ mới là bên không kịp. Sổ trait tra theo kiểu (`TypeId`) giữ cho module khác chỉ
+phụ thuộc vào `api` của bên cung cấp, không biết kiểu service cụ thể.
+
+Đã cân nhắc: để module tự chọn đường dẫn đầy đủ — linh hoạt hơn nhưng hai module có
+thể khai trùng đường dẫn, và axum panic khi ghép; tự động sắp thứ tự khởi động theo
+phụ thuộc — thêm một bộ giải phụ thuộc trong khi thứ tự đăng ký đã đủ và lỗi sai thứ
+tự nói rõ cách sửa.

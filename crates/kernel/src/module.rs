@@ -15,12 +15,17 @@
 //! job, tool MCP) thêm một hàm vào [`Module`], luôn kèm cài đặt mặc định "không
 //! có gì" — module cũ không phải sửa khi hợp đồng thêm hàm mới.
 
-use std::collections::BTreeSet;
+use std::any::{Any, TypeId};
+use std::collections::{BTreeSet, HashMap};
 use std::fmt;
+use std::sync::Arc;
 
 use sea_orm_migration::MigrationTrait;
+use utoipa_axum::router::OpenApiRouter;
 
 use crate::config::{ConfigReader, Invalid};
+use crate::database::Database;
+use crate::error::Error;
 use crate::migration::{MigrationError, Migrator, ModuleMigrations};
 
 /// Những gì một module khai với core.
@@ -74,6 +79,104 @@ pub trait Module: Send + Sync {
         // `let _ =`: tham số không dùng tới trong cài đặt mặc định.
         let _ = reader;
         Ok(())
+    }
+
+    /// Khởi động module: dựng service của nó (với database lấy từ `context`),
+    /// công bố trait cho module khác dùng ([`StartContext::provide`]) và lấy trait
+    /// của module khác ([`StartContext::require`]). Gọi một lần, sau `configure`,
+    /// theo thứ tự đăng ký — module phải đăng ký SAU các module nó cần.
+    ///
+    /// Module giữ những gì đã dựng trong chính nó để [`routes`](Self::routes) dùng.
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        let _ = context;
+        Ok(())
+    }
+
+    /// Các route REST của module, kèm tài liệu OpenAPI của chúng. Gọi sau `start`.
+    /// Core gắn chúng dưới `/api/v1/<tên module>`: route khai là `/` và `/{id}`
+    /// của module `notes` thành `/api/v1/notes` và `/api/v1/notes/{id}`.
+    fn routes(&self) -> OpenApiRouter {
+        OpenApiRouter::new()
+    }
+}
+
+/// Những gì một module nhận được lúc khởi động.
+pub struct StartContext<'a> {
+    module: &'static str,
+    database: &'a Database,
+    apis: &'a mut Apis,
+}
+
+impl StartContext<'_> {
+    /// Database của chương trình (hai pool đọc / ghi). `Database` clone rẻ: module
+    /// giữ một bản trong service của mình.
+    pub fn database(&self) -> &Database {
+        self.database
+    }
+
+    /// Công bố một trait cho module khác dùng. `T` là kiểu `dyn Trait` khai trong
+    /// `api` của module: `context.provide::<dyn UserDirectory>(Arc::new(service))?`.
+    ///
+    /// Mỗi trait chỉ có một bên công bố; công bố lần hai là lỗi.
+    //
+    // `T: ?Sized`: cho phép `T` là `dyn Trait` (kiểu không có kích thước cố định).
+    pub fn provide<T>(&mut self, api: Arc<T>) -> Result<(), Error>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.apis.provide(self.module, api)
+    }
+
+    /// Lấy một trait do module đăng ký TRƯỚC công bố:
+    /// `let users = context.require::<dyn UserDirectory>()?;`
+    pub fn require<T>(&self) -> Result<Arc<T>, Error>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.apis.require(self.module)
+    }
+}
+
+/// Sổ các trait đã được công bố, tra theo kiểu của trait.
+#[derive(Default)]
+struct Apis {
+    // Khoá là "danh tính" của kiểu `T` (`TypeId`); giá trị là một `Arc<T>` cất dưới
+    // dạng `dyn Any` vì mỗi mục một kiểu khác nhau. Lấy ra thì ép kiểu ngược lại
+    // có kiểm tra (`downcast_ref`) — sai kiểu trả `None` chứ không hỏng bộ nhớ.
+    provided: HashMap<TypeId, (&'static str, Box<dyn Any + Send + Sync>)>,
+}
+
+impl Apis {
+    fn provide<T>(&mut self, module: &'static str, api: Arc<T>) -> Result<(), Error>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        let contract = std::any::type_name::<T>();
+        if let Some((owner, _)) = self.provided.get(&TypeId::of::<T>()) {
+            return Err(Error::internal(format!(
+                "module `{module}` provides `{contract}`, but module `{owner}` already does; \
+                 a contract has exactly one provider"
+            )));
+        }
+        self.provided.insert(TypeId::of::<T>(), (module, Box::new(api)));
+        Ok(())
+    }
+
+    fn require<T>(&self, module: &'static str) -> Result<Arc<T>, Error>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.provided
+            .get(&TypeId::of::<T>())
+            .and_then(|(_, api)| api.downcast_ref::<Arc<T>>())
+            .cloned()
+            .ok_or_else(|| {
+                Error::internal(format!(
+                    "module `{module}` requires `{}`, which no earlier module provides; register \
+                     the providing module before `{module}` in crates/app/src/modules.rs",
+                    std::any::type_name::<T>()
+                ))
+            })
     }
 }
 
@@ -135,6 +238,26 @@ impl Modules {
             }
         }
         result
+    }
+
+    /// Khởi động từng module theo thứ tự đăng ký. Module nào hỏng thì dừng và báo
+    /// tên module đó.
+    pub fn start(&mut self, database: &Database) -> Result<(), ModuleError> {
+        let mut apis = Apis::default();
+        for module in &mut self.modules {
+            let name = module.name();
+            let mut context = StartContext { module: name, database, apis: &mut apis };
+            module.start(&mut context).map_err(|error| {
+                ModuleError(format!("module `{name}` failed to start: {error}"))
+            })?;
+        }
+        Ok(())
+    }
+
+    /// Route của từng module kèm tên module, theo thứ tự đăng ký. Gọi sau
+    /// [`start`](Self::start).
+    pub fn routes(&self) -> Vec<(&'static str, OpenApiRouter)> {
+        self.modules.iter().map(|module| (module.name(), module.routes())).collect()
     }
 
     /// Migrator chạy migration của mọi module.
