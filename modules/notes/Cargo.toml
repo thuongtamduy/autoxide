@@ -29,8 +29,14 @@ rmcp = { workspace = true, features = [
   "transport-streamable-http-client-reqwest",
   "reqwest-tls-no-provider",
 ] }
+serde_json.workspace = true
 tokio.workspace = true
 tower.workspace = true
+
+# Bộ đo hiệu năng của core (D-071): `cargo bench -p autoxide-notes`.
+[[bench]]
+name = "core"
+harness = false
 
 [lints]
 workspace = true

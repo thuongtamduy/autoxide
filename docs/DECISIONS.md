@@ -1506,3 +1506,19 @@ migration của chương trình nên schema hai bên chắc chắn khớp.
 
 Đã cân nhắc: xuất / nhập JSON — thêm một định dạng phải giữ ổn định; tắt kiểm foreign
 key khi chép — Postgres cần quyền superuser.
+
+## D-071 · Bộ đo hiệu năng tự viết, qua toàn bộ request — 2026-11-11 — agent quyết
+
+Quyết định: bộ đo là bench target `harness = false` của module mẫu
+(`modules/notes/benches/core.rs`, chạy `cargo bench -p autoxide-notes`), đi qua toàn bộ
+lớp HTTP của kernel tới database bằng `tower::oneshot` (không qua socket, để đo code và
+database chứ không đo mạng). Đo write, read, list 50 dòng và write từ 16 task; in số
+việc / giây và p50 / p95 / p99. Database chọn bằng `TEST_DATABASE_URL` như test. Số gốc
+và cách đọc ghi ở `docs/BENCHMARKS.md`. Gate biên dịch bộ đo (`clippy --all-targets`)
+nhưng không chạy nó (thời gian và số đo phụ thuộc máy).
+
+Lý do: đo đúng thứ người dùng gặp (một request), không thêm thư viện (`criterion` kéo
+nhiều phụ thuộc mà ở đây chỉ cần đếm thời gian và lấy phân vị — vài chục dòng).
+
+Đã cân nhắc: `criterion` — phân tích thống kê tốt hơn nhưng nặng và đo từng hàm nhỏ;
+đo qua socket thật — cộng thêm thời gian mạng không thuộc core.
