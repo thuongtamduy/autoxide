@@ -14,8 +14,8 @@ core không chứa khái niệm nghiệp vụ — những thứ đó thuộc v�
 
 Đang ở giai đoạn đầu. **Bước 0 của lộ trình (khung dự án) đã xong**: workspace
 Cargo, bộ luật lint chung, bộ thư viện đã ghim phiên bản và được kiểm trên cả hai
-database, kiểm ranh giới tự động, và gate chất lượng. Chưa có máy chủ để chạy; phần
-đó tới ở bước 1.
+database, kiểm ranh giới tự động, và gate chất lượng. Bước 1 (nền) đang làm: đã có
+cấu hình, truy cập database và migration theo module; chưa có máy chủ HTTP để chạy.
 
 Core sẽ gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -80,6 +80,15 @@ cargo run -p autoxide -- config
 
 # Bắt đầu cấu hình của riêng bạn từ các giá trị mặc định đã ghi sẵn
 cp .env.example .env
+```
+
+Cấu trúc database do migration quản lý, mỗi module một bộ. Migration không bao giờ
+tự chạy — hãy chạy một lần mỗi lần deploy:
+
+```bash
+cargo run -p autoxide -- migrate status          # cái gì đã áp dụng, cái gì còn chờ
+cargo run -p autoxide -- migrate up              # áp dụng mọi thứ còn chờ
+cargo run -p autoxide -- migrate down <module>   # gỡ migration mới nhất của một module
 ```
 
 [`.env.example`](.env.example) liệt kê mọi biến kèm mô tả và giá trị mặc định. File

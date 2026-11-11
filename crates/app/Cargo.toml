@@ -10,6 +10,10 @@ publish.workspace = true
 [dependencies]
 autoxide-kernel.workspace = true
 clap.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+autoxide-testkit.workspace = true
 
 [lints]
 workspace = true

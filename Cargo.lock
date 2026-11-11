@@ -342,7 +342,9 @@ name = "autoxide"
 version = "0.1.0"
 dependencies = [
  "autoxide-kernel",
+ "autoxide-testkit",
  "clap",
+ "tokio",
 ]
 
 [[package]]

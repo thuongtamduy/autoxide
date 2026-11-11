@@ -15,10 +15,6 @@ pub const DOTENV_FILE: &str = ".env";
 /// Cấu hình đã kiểm, kèm danh sách mọi biến đã đọc (để in ra).
 #[derive(Debug)]
 pub struct Settings {
-    // Chưa lệnh nào dùng tới giá trị cấu hình; `serve` và `migrate` (bước 1) sẽ dùng.
-    // `expect` (khác `allow`): khi trường này bắt đầu được dùng, trình biên dịch
-    // báo để gỡ dòng này đi.
-    #[expect(dead_code, reason = "used by `serve` and `migrate` in step 1")]
     pub config: Config,
     pub values: Vec<SettingValue>,
 }

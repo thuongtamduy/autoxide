@@ -14,8 +14,9 @@ the core contains no business concepts — those belong to modules.
 
 Early development. **Step 0 of the roadmap (project skeleton) is done**: the Cargo
 workspace, shared lint rules, the pinned library stack verified on both databases,
-automated boundary checks, and the quality gate. There is no server to run yet;
-that arrives with step 1.
+automated boundary checks, and the quality gate. Step 1 (foundation) is in
+progress: configuration, database access and per-module migrations exist; there
+is no HTTP server to run yet.
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -80,6 +81,15 @@ cargo run -p autoxide -- config
 
 # Start your own configuration from the documented defaults
 cp .env.example .env
+```
+
+The database schema is managed by migrations, one set per module. They are never
+applied automatically — run them once per deployment:
+
+```bash
+cargo run -p autoxide -- migrate status          # what is applied, what is pending
+cargo run -p autoxide -- migrate up              # apply everything that is pending
+cargo run -p autoxide -- migrate down <module>   # revert the newest migration of one module
 ```
 
 [`.env.example`](.env.example) lists every setting with its description and

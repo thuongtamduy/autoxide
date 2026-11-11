@@ -133,3 +133,73 @@ fn khong_co_lenh_thi_in_huong_dan_va_thoat_ma_2() {
     assert_eq!(output.status.code(), Some(2));
     assert!(stderr(&output).contains("Usage: autoxide <COMMAND>"), "{}", stderr(&output));
 }
+
+#[test]
+fn migrate_voi_cau_hinh_mac_dinh_tu_tao_file_sqlite() {
+    let directory = WorkDir::new("migrate-default");
+
+    let status = autoxide(directory.path(), &["migrate", "status"], &[]);
+    let up = autoxide(directory.path(), &["migrate", "up"], &[]);
+
+    assert_eq!(status.status.code(), Some(0), "{}", stderr(&status));
+    assert_eq!(stdout(&status), "No migrations: no module declares any.\n");
+    assert_eq!(up.status.code(), Some(0), "{}", stderr(&up));
+    assert_eq!(stdout(&up), "Nothing to apply: the database is up to date.\n");
+    // Không cấu hình gì: database là file SQLite trong thư mục `data/`, tự tạo.
+    assert!(directory.path().join("data/autoxide.sqlite").exists());
+}
+
+#[test]
+fn migrate_down_module_khong_ton_tai_thoat_ma_1() {
+    let directory = WorkDir::new("migrate-unknown");
+
+    let output = autoxide(directory.path(), &["migrate", "down", "nope"], &[]);
+
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(
+        stderr(&output),
+        "autoxide: migration: unknown module `nope`; registered modules: (none)\n"
+    );
+}
+
+#[test]
+fn khong_ket_noi_duoc_database_thoat_ma_1_va_khong_lo_mat_khau() {
+    let directory = WorkDir::new("migrate-unreachable");
+
+    // Port 1 không có gì nghe: kết nối bị từ chối ngay.
+    let output = autoxide(
+        directory.path(),
+        &["migrate", "status"],
+        &[
+            ("DATABASE_URL", "postgres://app:s3cr3t@127.0.0.1:1/app"),
+            ("AUTOXIDE_DATABASE_WAIT_SECONDS", "1"),
+        ],
+    );
+
+    assert_eq!(output.status.code(), Some(1));
+    let message = stderr(&output);
+    assert!(
+        message.starts_with(
+            "autoxide: database: cannot connect to `postgres://app:***@127.0.0.1:1/app`"
+        ),
+        "{message}"
+    );
+    assert!(!message.contains("s3cr3t"), "{message}");
+}
+
+/// Chạy trên database gate đang chọn (SQLite hoặc Postgres).
+#[tokio::test]
+async fn migrate_chay_tren_database_dang_chon() {
+    autoxide_testkit::TestDatabase::run(async |database| {
+        let directory = WorkDir::new("migrate-selected");
+        let environment = [("DATABASE_URL", database.url())];
+
+        let up = autoxide(directory.path(), &["migrate", "up"], &environment);
+        let status = autoxide(directory.path(), &["migrate", "status"], &environment);
+
+        assert_eq!(up.status.code(), Some(0), "{}", stderr(&up));
+        assert_eq!(status.status.code(), Some(0), "{}", stderr(&status));
+    })
+    .await
+    .unwrap();
+}

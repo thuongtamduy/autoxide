@@ -30,9 +30,12 @@
 //!
 //! Crate này chỉ được khai ở `[dev-dependencies]` (`cargo xtask check` kiểm).
 
+mod ownership;
 mod postgres;
 mod sqlite;
 mod stale;
+
+pub use ownership::schema_ownership_violations;
 
 use std::fmt;
 use std::path::PathBuf;

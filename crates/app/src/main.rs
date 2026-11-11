@@ -4,6 +4,7 @@
 //! này chỉ phân tích dòng lệnh và chuyển cho từng lệnh trong `commands/`.
 
 mod commands;
+mod modules;
 mod settings;
 
 use std::process::ExitCode;
@@ -27,6 +28,12 @@ enum Command {
     /// the current directory; environment variables win. Secrets are never
     /// printed. Exits with status 2 when the configuration is invalid.
     Config(commands::config::Arguments),
+
+    /// Show, apply or revert the database migrations of the modules.
+    ///
+    /// Migrations are never applied automatically: run `autoxide migrate up` once
+    /// per deployment, before starting the server.
+    Migrate(commands::migrate::Arguments),
 }
 
 fn main() -> ExitCode {
@@ -34,6 +41,7 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
         Command::Config(arguments) => commands::config::run(&arguments),
+        Command::Migrate(arguments) => commands::migrate::run(&arguments),
     }
 }
 

@@ -508,3 +508,24 @@ cách làm chuẩn và để người vận hành thấy rõ điều gì sắp �
 Đã cân nhắc: một danh sách migration chung có tên kèm tiền tố module — đơn giản hơn
 nhưng `down` theo module phải nhảy cóc trong lịch sử chung; tự chạy migration lúc
 `serve` — tiện cho người mới nhưng nguy hiểm khi chạy nhiều bản.
+
+## D-037 · Kiểm luật sở hữu bảng bằng cách hỏi chính database — 2026-11-11 — agent quyết
+
+Quyết định: `autoxide_testkit::schema_ownership_violations` đọc danh mục của database
+đã migrate và báo (1) bảng không mang tiền tố `<module>_` của một module đã đăng ký,
+(2) foreign key trỏ sang bảng của module khác. Một test trong binary
+(`crates/app/src/modules.rs`) chạy mọi migration của chương trình trên database
+trống, gọi bộ kiểm này, rồi gỡ hết và áp dụng lại — nên gate chạy nó trên cả SQLite
+và Postgres mỗi lần. Module được đăng ký ở đúng một chỗ: `crates/app/src/modules.rs`.
+
+Lý do: hai luật này (D-005, D-025) nằm trong cấu trúc database, trình biên dịch và
+`cargo xtask check` không thấy được. Hỏi database sau khi migrate bắt được cả
+foreign key thêm bằng `ALTER TABLE` ở một migration về sau.
+
+Ngoại lệ cho D-029 (SQL trực tiếp): bốn câu lệnh đọc danh mục (`sqlite_master`,
+`pragma_foreign_key_list`, `information_schema.tables`, `pg_constraint`) là SQL viết
+tay, mỗi database một nhánh, cả hai nhánh đều có test. Chỉ áp cho đồ test (mở rộng
+ngoại lệ ở D-033).
+
+Đã cân nhắc: bắt module tạo bảng qua một lớp bọc biết tên module — chặn được từ lúc
+viết nhưng giới hạn cách viết migration và vẫn lọt nếu ai đó gọi thẳng thư viện.
