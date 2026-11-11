@@ -4,6 +4,9 @@
 //! Route của module `notes` nằm dưới `/api/v1/notes`. Số `v1` là phiên bản của
 //! API: thay đổi phá vỡ thì mở `/api/v2`, không sửa `v1`.
 //!
+//! Tài liệu OpenAPI của mọi route nằm ở `/api/v1/openapi.json`; trang xem tài liệu
+//! ở `/api/docs` khi được bật bằng cấu hình.
+//!
 //! Mọi request đi qua, theo thứ tự từ ngoài vào:
 //!
 //! 1. **request id** — mỗi request một ID (header `x-request-id`), trả lại trong
@@ -16,6 +19,7 @@
 //! 6. **giới hạn body** — body quá lớn bị từ chối, trả 413.
 
 mod extract;
+mod openapi;
 mod problem;
 mod request_id;
 mod server;
@@ -31,13 +35,15 @@ use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::request_id::{PropagateRequestIdLayer, SetRequestIdLayer};
-use utoipa::openapi::{InfoBuilder, OpenApi, OpenApiBuilder};
+use utoipa::openapi::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
+use utoipa_scalar::{Scalar, Servable};
 
 use crate::config::{CorsOrigins, HttpConfig};
 use crate::error::Error;
 
 pub use extract::ValidJson;
+pub use openapi::{DOCS_PATH, OPENAPI_PATH, lint};
 pub use request_id::REQUEST_ID_HEADER;
 pub use server::{Shutdown, serve, shutdown_signal};
 
@@ -54,11 +60,27 @@ pub struct Api {
 /// lớp xử lý chung.
 pub fn build(config: &HttpConfig, modules: Vec<(&'static str, OpenApiRouter)>) -> Api {
     let mut api = OpenApiRouter::new();
-    for (name, routes) in modules {
+    for (name, mut routes) in modules {
+        openapi::label_module(name, routes.get_openapi_mut());
         api = api.nest(&format!("/{name}"), routes);
     }
-    let (router, openapi) =
-        OpenApiRouter::with_openapi(base_document()).nest(API_PREFIX, api).split_for_parts();
+    let (router, mut openapi) = OpenApiRouter::with_openapi(openapi::base_document())
+        .nest(API_PREFIX, api)
+        .split_for_parts();
+    openapi::finish(&mut openapi);
+
+    // Tài liệu không đổi trong lúc chạy: đổi thành JSON một lần rồi trả lại mãi.
+    let document = openapi.to_json().unwrap_or_default();
+    let mut router = router.route(
+        OPENAPI_PATH,
+        axum::routing::get(move || {
+            let document = document.clone();
+            async move { ([(header::CONTENT_TYPE, "application/json")], document) }
+        }),
+    );
+    if config.api_docs {
+        router = router.merge(Scalar::with_url(DOCS_PATH, openapi.clone()));
+    }
 
     let request_timeout = config.request_timeout;
     // `.layer` bọc thêm một lớp RA NGOÀI các lớp trước đó: lớp khai sau cùng là lớp
@@ -77,13 +99,6 @@ pub fn build(config: &HttpConfig, modules: Vec<(&'static str, OpenApiRouter)>) -
         .layer(middleware::from_fn(request_id::drop_untrusted));
 
     Api { router, openapi }
-}
-
-/// Phần đầu của tài liệu OpenAPI; mục "OpenAPI" của lộ trình bổ sung thêm.
-fn base_document() -> OpenApi {
-    OpenApiBuilder::new()
-        .info(InfoBuilder::new().title("Autoxide API").version(env!("CARGO_PKG_VERSION")).build())
-        .build()
 }
 
 async fn enforce_timeout(limit: Duration, request: Request, next: Next) -> Response {

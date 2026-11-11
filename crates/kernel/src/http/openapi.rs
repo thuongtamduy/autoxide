@@ -1,0 +1,177 @@
+//! Tài liệu OpenAPI: hoàn thiện phần chung, phục vụ qua HTTP, và kiểm chất lượng.
+//!
+//! Tài liệu sinh từ chính khai báo route (`routes!`), nên đường dẫn và method
+//! không thể lệch với code. File này thêm những thứ giống nhau ở mọi endpoint để
+//! người viết module không phải lặp lại:
+//!
+//! - tag = tên module, để tài liệu gom theo module;
+//! - `operationId` mang tiền tố module, để không trùng giữa các module (công cụ
+//!   sinh SDK dùng nó làm tên hàm);
+//! - response `default` = Problem Details: mọi endpoint đều có thể trả lỗi dạng đó.
+
+use std::collections::BTreeSet;
+
+use utoipa::ToSchema;
+use utoipa::openapi::path::{Operation, PathItem};
+use utoipa::openapi::{
+    ContentBuilder, InfoBuilder, OpenApi, OpenApiBuilder, Ref, RefOr, ResponseBuilder,
+};
+
+use crate::response::{PROBLEM_CONTENT_TYPE, Problem};
+
+/// Đường dẫn phục vụ tài liệu OpenAPI dạng JSON.
+pub const OPENAPI_PATH: &str = "/api/v1/openapi.json";
+/// Đường dẫn trang xem tài liệu API (khi được bật).
+pub const DOCS_PATH: &str = "/api/docs";
+
+const DESCRIPTION: &str = "\
+REST API of Autoxide.
+
+## Conventions
+
+Every endpoint follows the same rules, so learning one endpoint teaches all of them.
+
+- **Success**: a single result is `{\"data\": …}`; a list is \
+`{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`.
+- **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the \
+stable `code` field, never on `detail`. Validation problems list every invalid field in `errors`.
+- **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and \
+`cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.
+- **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote \
+it when reporting a problem.
+- **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount \
+in the smallest currency unit plus a currency code.";
+
+/// Phần đầu của tài liệu: tên, phiên bản, và các quy ước chung của API.
+pub(super) fn base_document() -> OpenApi {
+    OpenApiBuilder::new()
+        .info(
+            InfoBuilder::new()
+                .title("Autoxide API")
+                .version(env!("CARGO_PKG_VERSION"))
+                .description(Some(DESCRIPTION))
+                .build(),
+        )
+        .build()
+}
+
+/// Gắn nhãn cho tài liệu của MỘT module trước khi ghép vào tài liệu chung.
+pub(super) fn label_module(module: &str, openapi: &mut OpenApi) {
+    for item in openapi.paths.paths.values_mut() {
+        for (_, operation) in operations_mut(item) {
+            // Module tự đặt tag thì giữ; không thì tag là tên module.
+            if operation.tags.as_ref().is_none_or(Vec::is_empty) {
+                operation.tags = Some(vec![module.to_owned()]);
+            }
+            if let Some(id) = &operation.operation_id {
+                operation.operation_id = Some(format!("{module}_{id}"));
+            }
+        }
+    }
+}
+
+/// Hoàn thiện tài liệu chung sau khi đã ghép mọi module.
+pub(super) fn finish(openapi: &mut OpenApi) {
+    // Schema `Problem` (và các schema nó dùng) phải có mặt để `$ref` bên dưới trỏ tới.
+    let mut schemas =
+        vec![(Problem::name().into_owned(), <Problem as utoipa::PartialSchema>::schema())];
+    Problem::schemas(&mut schemas);
+    let components = openapi.components.get_or_insert_default();
+    for (name, schema) in schemas {
+        components.schemas.entry(name).or_insert(schema);
+    }
+
+    let problem = ResponseBuilder::new()
+        .description(
+            "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+        )
+        .content(
+            PROBLEM_CONTENT_TYPE,
+            ContentBuilder::new()
+                .schema(Some(RefOr::Ref(Ref::from_schema_name(Problem::name()))))
+                .build(),
+        )
+        .build();
+    for item in openapi.paths.paths.values_mut() {
+        for (_, operation) in operations_mut(item) {
+            operation
+                .responses
+                .responses
+                .entry("default".to_owned())
+                .or_insert_with(|| RefOr::T(problem.clone()));
+        }
+    }
+}
+
+/// Kiểm tài liệu có đủ để gọi đúng API mà không cần đọc mã nguồn. Trả về danh sách
+/// vấn đề; rỗng nghĩa là đạt. Gate chạy hàm này trên tài liệu của cả chương trình.
+pub fn lint(openapi: &OpenApi) -> Vec<String> {
+    let mut problems = Vec::new();
+    let mut operation_ids = BTreeSet::new();
+    for (path, item) in &openapi.paths.paths {
+        for (method, operation) in operations(item) {
+            let endpoint = format!("{} {path}", method.to_uppercase());
+            if operation.summary.as_deref().is_none_or(|summary| summary.trim().is_empty()) {
+                problems.push(format!(
+                    "{endpoint}: no summary — add a `///` doc comment to the handler"
+                ));
+            }
+            if operation.tags.as_ref().is_none_or(Vec::is_empty) {
+                problems.push(format!("{endpoint}: no tag"));
+            }
+            match &operation.operation_id {
+                None => problems.push(format!("{endpoint}: no operationId")),
+                Some(id) => {
+                    if !operation_ids.insert(id.clone()) {
+                        problems.push(format!("{endpoint}: operationId `{id}` is used twice"));
+                    }
+                }
+            }
+            let responses = &operation.responses.responses;
+            if !responses.keys().any(|status| status.starts_with('2') || status.starts_with('3')) {
+                problems.push(format!(
+                    "{endpoint}: no success response — declare what the endpoint returns"
+                ));
+            }
+            for (status, response) in responses {
+                if let RefOr::T(response) = response
+                    && response.description.trim().is_empty()
+                {
+                    problems.push(format!("{endpoint}: response {status} has no description"));
+                }
+            }
+        }
+    }
+    problems
+}
+
+/// Các operation của một đường dẫn, kèm tên method.
+fn operations(item: &PathItem) -> impl Iterator<Item = (&'static str, &Operation)> {
+    [
+        ("get", &item.get),
+        ("put", &item.put),
+        ("post", &item.post),
+        ("delete", &item.delete),
+        ("options", &item.options),
+        ("head", &item.head),
+        ("patch", &item.patch),
+        ("trace", &item.trace),
+    ]
+    .into_iter()
+    .filter_map(|(method, operation)| operation.as_ref().map(|operation| (method, operation)))
+}
+
+fn operations_mut(item: &mut PathItem) -> impl Iterator<Item = (&'static str, &mut Operation)> {
+    [
+        ("get", &mut item.get),
+        ("put", &mut item.put),
+        ("post", &mut item.post),
+        ("delete", &mut item.delete),
+        ("options", &mut item.options),
+        ("head", &mut item.head),
+        ("patch", &mut item.patch),
+        ("trace", &mut item.trace),
+    ]
+    .into_iter()
+    .filter_map(|(method, operation)| operation.as_mut().map(|operation| (method, operation)))
+}

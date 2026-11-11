@@ -39,19 +39,22 @@ struct Note {
 }
 
 /// List notes.
-#[utoipa::path(get, path = "/", responses((status = 200, body = Data<Vec<Note>>)))]
+#[utoipa::path(get, path = "/", responses((status = 200, description = "The notes.", body = Data<Vec<Note>>)))]
 async fn list_notes() -> Data<Vec<Note>> {
     Data { data: vec![Note { id: 1, title: "first".to_owned() }] }
 }
 
 /// Create a note.
-#[utoipa::path(post, path = "/", request_body = CreateNote, responses((status = 201, body = Data<Note>)))]
+#[utoipa::path(post, path = "/", request_body = CreateNote, responses((status = 201, description = "The created note.", body = Data<Note>)))]
 async fn create_note(ValidJson(input): ValidJson<CreateNote>) -> (StatusCode, Data<Note>) {
     (StatusCode::CREATED, Data { data: Note { id: 2, title: input.title } })
 }
 
 /// Get one note.
-#[utoipa::path(get, path = "/{id}", responses((status = 200, body = Data<Note>), (status = 404, body = Problem)))]
+#[utoipa::path(get, path = "/{id}", responses(
+        (status = 200, description = "The note.", body = Data<Note>),
+        (status = 404, description = "No note has this id.", body = Problem),
+    ))]
 async fn get_note(Path(id): Path<u32>) -> Result<Data<Note>, Error> {
     Err(Error::not_found("notes.note_not_found", "Note {id} does not exist.").with_param("id", id))
 }
@@ -403,4 +406,84 @@ async fn tat_may_chu_khong_cho_qua_thoi_gian_cho_phep() {
     assert_eq!(server.await.unwrap().unwrap(), Shutdown::TimedOut);
     assert!(started.elapsed() < Duration::from_millis(250), "{:?}", started.elapsed());
     drop(in_flight);
+}
+
+#[tokio::test]
+async fn tai_lieu_openapi_duoc_phuc_vu_va_khop_voi_router() {
+    let api = api_with(&default_config());
+
+    let response = send(api.router, get("/api/v1/openapi.json")).await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()[header::CONTENT_TYPE], "application/json");
+    let served = json(response).await;
+    assert_eq!(served, serde_json::to_value(&api.openapi).unwrap());
+    assert_eq!(served["info"]["title"], "Autoxide API");
+    assert!(served["info"]["description"].as_str().unwrap().contains("RFC 9457"));
+}
+
+#[tokio::test]
+async fn tai_lieu_tu_gan_tag_ma_dinh_danh_va_loi_mac_dinh_cho_moi_endpoint() {
+    let document = serde_json::to_value(api_with(&default_config()).openapi).unwrap();
+
+    let list = &document["paths"]["/api/v1/notes"]["get"];
+    // Tag là tên module; operationId mang tiền tố module nên không trùng giữa các module.
+    assert_eq!(list["tags"], serde_json::json!(["notes"]));
+    assert_eq!(list["operationId"], "notes_list_notes");
+    assert_eq!(list["summary"], "List notes.");
+    // Endpoint nào cũng có response `default` trỏ tới Problem Details, dù module
+    // không tự khai.
+    assert_eq!(
+        list["responses"]["default"]["content"]["application/problem+json"]["schema"]["$ref"],
+        "#/components/schemas/Problem"
+    );
+    let schemas = document["components"]["schemas"].as_object().unwrap();
+    assert!(schemas.contains_key("Problem") && schemas.contains_key("ProblemField"));
+    // Response lỗi module tự khai thì được giữ nguyên.
+    let get_one = &document["paths"]["/api/v1/notes/{id}"]["get"];
+    assert!(get_one["responses"]["404"].is_object());
+    assert_eq!(get_one["operationId"], "notes_get_note");
+}
+
+#[tokio::test]
+async fn trang_xem_tai_lieu_chi_co_khi_duoc_bat() {
+    // Mặc định tắt.
+    problem(send(app(), get("/api/docs")).await, 404, "not_found").await;
+
+    let mut config = default_config();
+    config.api_docs = true;
+    let response = send(api_with(&config).router, get("/api/docs")).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let html = String::from_utf8(bytes.to_vec()).unwrap();
+    assert!(html.contains("/api/v1/notes"), "docs page does not embed the OpenAPI document");
+}
+
+// Handler không có doc comment và không khai response thành công.
+#[utoipa::path(get, path = "/undocumented")]
+async fn undocumented() {}
+
+// Hai handler ở hai nơi nhưng cùng tên hàm sau khi ghép sẽ trùng operationId.
+mod duplicate {
+    /// Same name as another operation.
+    #[utoipa::path(get, path = "/duplicate", operation_id = "list_notes", responses((status = 200, description = "ok")))]
+    pub async fn duplicate() {}
+}
+
+#[tokio::test]
+async fn bo_kiem_tai_lieu_bat_endpoint_thieu_mo_ta() {
+    // Tài liệu của các route mẫu đạt.
+    assert_eq!(http::lint(&api_with(&default_config()).openapi), Vec::<String>::new());
+
+    let routes = notes_routes().routes(routes!(undocumented)).routes(routes!(duplicate::duplicate));
+    let api = http::build(&default_config(), vec![("notes", routes)]);
+
+    assert_eq!(
+        http::lint(&api.openapi),
+        [
+            "GET /api/v1/notes/duplicate: operationId `notes_list_notes` is used twice",
+            "GET /api/v1/notes/undocumented: no summary — add a `///` doc comment to the handler",
+            "GET /api/v1/notes/undocumented: no success response — declare what the endpoint returns",
+        ]
+    );
 }

@@ -2,6 +2,7 @@
 
 pub mod config;
 pub mod migrate;
+pub mod openapi;
 
 use std::future::Future;
 use std::process::ExitCode;

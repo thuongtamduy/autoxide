@@ -203,3 +203,17 @@ async fn migrate_chay_tren_database_dang_chon() {
     .await
     .unwrap();
 }
+
+#[test]
+fn openapi_in_ra_dung_tai_lieu_trong_repo() {
+    let directory = WorkDir::new("openapi");
+
+    let output = autoxide(directory.path(), &["openapi"], &[]);
+
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    let committed = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/openapi.json"),
+    )
+    .unwrap();
+    assert_eq!(stdout(&output), committed);
+}

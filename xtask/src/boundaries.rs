@@ -17,6 +17,8 @@
 //!    truy cập vào phần bên trong, kể cả entity (bảng) của module.
 //! 5. `module-import` — module khác chỉ được dùng `<crate>::api::…`.
 //! 6. `api-self-contained` — `api` không kéo phần bên trong ra ngoài.
+//! 7. `module-routes` — route của module đăng ký qua `.routes(routes!(…))` để luôn
+//!    có tài liệu OpenAPI; không dùng `.route(…)` trần.
 //!
 //! Luật 4–6 đọc mã nguồn theo dòng, dựa vào việc `cargo fmt` đã chuẩn hoá định
 //! dạng (gate chạy fmt trước). Đây là lưới chặn lỗi vô ý, không phải bộ phân
@@ -307,6 +309,16 @@ pub fn check_module_source(
                 );
             }
         }
+        if let Some(call) = UNDOCUMENTED_ROUTE_CALLS.iter().find(|call| line.contains(*call)) {
+            report(
+                "module-routes",
+                format!(
+                    "`{}…)` adds a route without OpenAPI documentation; register handlers with \
+                     `.routes(routes!(handler))`",
+                    call.trim_start_matches('.')
+                ),
+            );
+        }
         if is_api && uses_path_outside(line, "crate", "api") {
             report(
                 "api-self-contained",
@@ -318,6 +330,11 @@ pub fn check_module_source(
     }
     violations
 }
+
+/// Các lời gọi thêm route mà KHÔNG kèm tài liệu OpenAPI. (`.routes(` — có `s` — là
+/// cách đúng và không khớp các chuỗi này.)
+const UNDOCUMENTED_ROUTE_CALLS: [&str; 4] =
+    [".route(", ".route_service(", ".nest_service(", ".fallback("];
 
 /// Một dòng ở cấp cao nhất của `lib.rs` (cột 0, sau khi fmt) mở thứ gì đó ra
 /// ngoài mà không phải hai thứ được phép.
@@ -676,6 +693,32 @@ impl AuthModule {
     fn macro_export_bi_bao_o_moi_file() {
         let text = "#[macro_export]\nmacro_rules! m { () => {}; }\n";
         assert_eq!(rules(&check("src/util.rs", text)), ["module-surface"]);
+    }
+
+    #[test]
+    fn route_khong_co_tai_lieu_trong_module_bi_bao() {
+        for line in [
+            "        .route(\"/export\", get(export))",
+            "let router = OpenApiRouter::new().route(\"/x\", post(create));",
+            "    .route_service(\"/files\", files)",
+            "    .nest_service(\"/static\", files)",
+            "    .fallback(not_found)",
+        ] {
+            assert_eq!(rules(&check("src/routes.rs", line)), ["module-routes"], "{line}");
+        }
+    }
+
+    #[test]
+    fn route_dang_ky_kem_tai_lieu_thi_duoc() {
+        let text = "\
+OpenApiRouter::new()
+    .routes(routes!(list_notes, create_note))
+    .routes(routes!(get_note))
+    .nest(\"/drafts\", drafts::routes())
+    .with_state(state)
+// .route(\"/x\", get(x)) trong chú thích thì không sao
+";
+        assert_eq!(check("src/routes.rs", text), []);
     }
 
     #[test]

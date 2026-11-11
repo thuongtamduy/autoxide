@@ -48,7 +48,7 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | ORM                | `sea-orm`                       | 2.0       | Một bộ code cho SQLite và Postgres                  |
 | Migration          | `sea-orm-migration`             | 2.0       | Viết bằng Rust, chạy được trên cả hai database      |
 | OpenAPI            | `utoipa` + `utoipa-axum`        | 6.0 / 0.3 | Route và tài liệu đăng ký cùng một lệnh, không lệch |
-| Trang xem API      | `utoipa-scalar`                 | 0.4       | Chỉ bật ngoài production                            |
+| Trang xem API      | `utoipa-scalar`                 | 0.4       | Tắt mặc định; bật bằng `AUTOXIDE_HTTP_API_DOCS=true` |
 | JSON               | `serde` + `serde_json`          | 1.0       |                                                     |
 | Validate đầu vào   | `validator`                     | 0.21      |                                                     |
 | ID                 | `uuid` (v7)                     | 1.29      |                                                     |

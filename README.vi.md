@@ -91,6 +91,12 @@ cargo run -p autoxide -- migrate up              # áp dụng mọi thứ còn c
 cargo run -p autoxide -- migrate down <module>   # gỡ migration mới nhất của một module
 ```
 
+Hợp đồng của API là một tài liệu OpenAPI sinh ra từ code. Nó nằm trong repo ở
+[`docs/openapi.json`](docs/openapi.json), in ra được bằng `autoxide openapi`, và máy
+chủ đang chạy phục vụ nó ở `/api/v1/openapi.json`. Phần mô tả của tài liệu liệt kê
+các quy ước mọi endpoint tuân theo (envelope của response, lỗi theo RFC 9457 với
+`code` ổn định, pagination theo con trỏ, request id).
+
 [`.env.example`](.env.example) liệt kê mọi biến kèm mô tả và giá trị mặc định. File
 này sinh ra từ code nên không thể lỗi thời. Cấu hình sai được báo đầy đủ — mọi vấn
 đề cùng một lượt, mỗi vấn đề nói rõ phải sửa gì — và lệnh thoát với mã 2. Secret

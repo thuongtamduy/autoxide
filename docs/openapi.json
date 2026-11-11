@@ -1,0 +1,85 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Autoxide API",
+    "description": "REST API of Autoxide.\n\n## Conventions\n\nEvery endpoint follows the same rules, so learning one endpoint teaches all of them.\n\n- **Success**: a single result is `{\"data\": …}`; a list is `{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`.\n- **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the stable `code` field, never on `detail`. Validation problems list every invalid field in `errors`.\n- **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.\n- **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote it when reporting a problem.\n- **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount in the smallest currency unit plus a currency code.",
+    "version": "0.1.0"
+  },
+  "paths": {},
+  "components": {
+    "schemas": {
+      "Problem": {
+        "type": "object",
+        "description": "An error, as RFC 9457 Problem Details. Branch on `code`; show `detail` to people.",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "detail"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable identifier of the problem. Branch on this, never\non `detail`.",
+            "example": "validation_failed"
+          },
+          "detail": {
+            "type": "string",
+            "description": "Human-readable explanation of what went wrong and how to fix it."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProblemField"
+            },
+            "description": "One entry per invalid input field. Present only for validation problems."
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The HTTP status code, repeated in the body.",
+            "example": 422,
+            "minimum": 0
+          },
+          "title": {
+            "type": "string",
+            "description": "The standard phrase for the HTTP status, e.g. `Not Found`.",
+            "example": "Unprocessable Entity"
+          },
+          "type": {
+            "type": "string",
+            "description": "Always `about:blank`: the problem is identified by `code`, not by a URI.",
+            "example": "about:blank"
+          }
+        }
+      },
+      "ProblemField": {
+        "type": "object",
+        "description": "One invalid field of the request.",
+        "required": [
+          "field",
+          "code",
+          "detail"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable identifier of the kind of problem: `required`, `length`, `range`…",
+            "example": "length"
+          },
+          "detail": {
+            "type": "string",
+            "description": "What the value must look like.",
+            "example": "must be between 1 and 50 characters long"
+          },
+          "field": {
+            "type": "string",
+            "description": "Path to the field: `name`, `address.city`, `items[2].quantity`.",
+            "example": "name"
+          }
+        }
+      }
+    }
+  }
+}

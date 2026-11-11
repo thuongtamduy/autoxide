@@ -37,6 +37,14 @@ pub const SHUTDOWN_SECONDS: Setting = Setting::new(
 )
 .with_default("30");
 
+pub const API_DOCS: Setting = Setting::new(
+    "AUTOXIDE_HTTP_API_DOCS",
+    "Serve an interactive API reference at `/api/docs` (`true` or `false`). The page loads its \
+     viewer script from a public CDN. The OpenAPI document itself is always served at \
+     `/api/v1/openapi.json`.",
+)
+.with_default("false");
+
 /// Những origin (nguồn trang web) được trình duyệt cho gọi API.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum CorsOrigins {
@@ -81,6 +89,7 @@ pub struct HttpConfig {
     pub body_limit: usize,
     pub cors_origins: CorsOrigins,
     pub shutdown_grace: Duration,
+    pub api_docs: bool,
 }
 
 impl HttpConfig {
@@ -96,6 +105,11 @@ impl HttpConfig {
         let cors_origins = reader.optional_with(&CORS_ORIGINS, CorsOrigins::parse);
         let shutdown_grace =
             reader.get_with(&SHUTDOWN_SECONDS, |raw| parse_in_range(raw, 0u64, 600));
+        let api_docs = reader.get_with(&API_DOCS, |raw| match raw {
+            "true" => Ok(true),
+            "false" => Ok(false),
+            _ => Err("must be `true` or `false`".to_owned()),
+        });
 
         Ok(HttpConfig {
             address: address?,
@@ -103,6 +117,7 @@ impl HttpConfig {
             body_limit: body_limit?,
             cors_origins: cors_origins?.unwrap_or_default(),
             shutdown_grace: Duration::from_secs(shutdown_grace?),
+            api_docs: api_docs?,
         })
     }
 }
@@ -127,6 +142,10 @@ mod tests {
         assert_eq!(config.body_limit, 1024 * 1024);
         assert_eq!(config.cors_origins, CorsOrigins::None);
         assert_eq!(config.shutdown_grace, Duration::from_secs(30));
+        assert!(!config.api_docs);
+        assert!(read(&[("AUTOXIDE_HTTP_API_DOCS", "true")]).unwrap().api_docs);
+        let message = read(&[("AUTOXIDE_HTTP_API_DOCS", "yes")]).unwrap_err();
+        assert!(message.contains("must be `true` or `false`"), "{message}");
     }
 
     #[test]

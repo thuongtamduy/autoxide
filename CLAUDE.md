@@ -108,7 +108,9 @@ là hiểu mà không cần lịch sử trò chuyện.
 bởi người:
 
 - OpenAPI là hợp đồng đầy đủ và luôn khớp code; mỗi endpoint có mô tả đủ để gọi
-  đúng mà không cần đọc mã nguồn.
+  đúng mà không cần đọc mã nguồn. Tài liệu nằm ở `docs/openapi.json` (sinh bằng
+  `autoxide openapi`) và được phục vụ ở `/api/v1/openapi.json`. Mỗi handler cần:
+  một dòng `///` (thành summary) và `description` cho từng response.
 - Lỗi trả về có `code` ổn định cho máy và `message` nói rõ phải sửa gì.
 - Hành vi nhất quán giữa các endpoint: cùng envelope, cùng pagination, cùng cách
   lọc — học một endpoint là biết các endpoint còn lại.
@@ -152,8 +154,12 @@ cargo xtask check                                    # ranh giới workspace, li
 cargo deny check                                     # license, lỗ hổng, nguồn thư viện
 cargo test --workspace                               # SQLite
 TEST_DATABASE_URL=postgres://… cargo test --workspace  # Postgres (gate tự dựng bằng Docker)
-# + kiểm OpenAPI không lệch với code (thêm ở bước 1)
 ```
+
+Trong các test đó có ba bài giữ tài liệu khớp code: `.env.example` (cấu hình),
+`docs/openapi.json` (hợp đồng API, kèm kiểm mỗi endpoint đủ mô tả) và luật sở hữu
+bảng. Đổi cấu hình hay API thì sinh lại file tương ứng — thông báo của test ghi
+sẵn lệnh.
 
 - Gate đỏ thì sửa code, **không** nới gate, không tắt lint, không đánh dấu test
   bỏ qua. Ngoại lệ thật sự cần thiết phải ghi vào `docs/DECISIONS.md`.

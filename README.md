@@ -92,6 +92,12 @@ cargo run -p autoxide -- migrate up              # apply everything that is pend
 cargo run -p autoxide -- migrate down <module>   # revert the newest migration of one module
 ```
 
+The API contract is an OpenAPI document generated from the code. It is committed
+as [`docs/openapi.json`](docs/openapi.json), printed by `autoxide openapi`, and
+served by the running server at `/api/v1/openapi.json`. Its description lists the
+conventions every endpoint follows (response envelope, RFC 9457 errors with a
+stable `code`, cursor pagination, request ids).
+
 [`.env.example`](.env.example) lists every setting with its description and
 default. It is generated from the code, so it cannot go out of date. An invalid
 configuration is reported in full — every problem at once, each saying what to

@@ -5,6 +5,7 @@
 
 mod commands;
 mod modules;
+mod runtime;
 mod settings;
 
 use std::process::ExitCode;
@@ -34,6 +35,12 @@ enum Command {
     /// Migrations are never applied automatically: run `autoxide migrate up` once
     /// per deployment, before starting the server.
     Migrate(commands::migrate::Arguments),
+
+    /// Print the OpenAPI document of the whole API as JSON.
+    ///
+    /// The same document is served at `/api/v1/openapi.json`. Connects to the
+    /// database (modules build their services) but does not need migrations.
+    Openapi,
 }
 
 fn main() -> ExitCode {
@@ -42,6 +49,7 @@ fn main() -> ExitCode {
     match cli.command {
         Command::Config(arguments) => commands::config::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
+        Command::Openapi => commands::openapi::run(),
     }
 }
 

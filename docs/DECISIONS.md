@@ -632,3 +632,30 @@ phụ thuộc vào `api` của bên cung cấp, không biết kiểu service c�
 thể khai trùng đường dẫn, và axum panic khi ghép; tự động sắp thứ tự khởi động theo
 phụ thuộc — thêm một bộ giải phụ thuộc trong khi thứ tự đăng ký đã đủ và lỗi sai thứ
 tự nói rõ cách sửa.
+
+## D-041 · OpenAPI: sinh từ code, nằm trong repo, kiểm trong gate — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Tài liệu OpenAPI sinh từ chính khai báo route. Core tự thêm phần giống nhau ở mọi
+  endpoint: tag = tên module, `operationId` mang tiền tố `<module>_`, response
+  `default` là Problem Details, và phần mô tả chung nêu các quy ước của API.
+- Tài liệu được phục vụ ở `/api/v1/openapi.json` (luôn có) và nằm trong repo ở
+  `docs/openapi.json`, sinh bằng `autoxide openapi`. Một test so file trong repo với
+  bản sinh từ code — gate chạy nó trên cả hai database.
+- `http::lint` kiểm mỗi endpoint có summary, tag, `operationId` không trùng, ít nhất
+  một response thành công và mô tả cho từng response. `autoxide openapi` và test
+  trên coi tài liệu thiếu là lỗi.
+- `cargo xtask check` thêm luật `module-routes`: module không được thêm route bằng
+  `.route(…)` trần (route không có tài liệu).
+- Trang xem tài liệu (`/api/docs`, Scalar) tắt mặc định, bật bằng
+  `AUTOXIDE_HTTP_API_DOCS=true`; trang này tải script từ CDN công cộng.
+
+Lý do: đưa `docs/openapi.json` vào repo làm mọi thay đổi của API hiện ra khi xem lại
+thay đổi, và cho AI agent đọc hợp đồng mà không cần chạy máy chủ (D-020). Để
+`autoxide openapi` in được tài liệu, module phải được khởi động (route gắn với
+service của module), nên lệnh này kết nối database nhưng không cần migration.
+
+Đã cân nhắc: chỉ phục vụ tài liệu lúc chạy, không đưa vào repo — thay đổi API không
+ai thấy khi xem lại; bật trang xem tài liệu mặc định — tiện, nhưng mặc định nên là
+không tải script của bên thứ ba.
