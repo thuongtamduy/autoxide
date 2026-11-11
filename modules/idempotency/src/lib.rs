@@ -1,0 +1,60 @@
+//! Module `idempotency`: lưu idempotency key cho kernel (D-058).
+//!
+//! Kernel xử lý header `Idempotency-Key` ở lớp HTTP cho MỌI module; module này chỉ
+//! cung cấp chỗ lưu (`dyn IdempotencyStore`) và dọn key hết hạn mỗi giờ. Không có
+//! module này thì kernel bỏ qua header.
+
+pub mod api;
+mod entity;
+mod migration;
+mod store;
+
+use std::sync::Arc;
+
+use autoxide_kernel::error::Error;
+use autoxide_kernel::idempotency::IdempotencyStore;
+use autoxide_kernel::job::{JobRegistration, Schedule};
+use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::module::{Module, StartContext};
+
+/// Module `idempotency`, để binary đăng ký trong `crates/app/src/modules.rs`.
+pub fn module() -> impl Module {
+    IdempotencyModule::default()
+}
+
+#[derive(Default)]
+struct IdempotencyModule {
+    /// Có sau `start`.
+    cleanup: Option<Arc<store::Cleanup>>,
+}
+
+impl Module for IdempotencyModule {
+    fn name(&self) -> &'static str {
+        "idempotency"
+    }
+
+    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
+        migration::all()
+    }
+
+    fn translations(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("vi", include_str!("../locales/vi.json"))]
+    }
+
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        let database = context.database().clone();
+        self.cleanup = Some(Arc::new(store::Cleanup::new(database.clone())));
+        context.provide::<dyn IdempotencyStore>(Arc::new(store::Store::new(database)))
+    }
+
+    fn jobs(&self) -> Vec<JobRegistration> {
+        match &self.cleanup {
+            Some(cleanup) => vec![JobRegistration::new(store::CLEANUP, cleanup.clone())],
+            None => Vec::new(),
+        }
+    }
+
+    fn schedules(&self) -> Vec<Schedule> {
+        vec![store::cleanup_schedule()]
+    }
+}

@@ -14,15 +14,18 @@
 //! 2. **log** — mỗi request một dòng log khi xong; lỗi 5xx kèm nguyên nhân gốc;
 //! 3. **CORS** — trình duyệt ở origin nào được gọi;
 //! 4. **rate limiting** — mỗi địa chỉ client chỉ được gửi chừng ấy request mỗi phút;
-//! 5. **ngôn ngữ** — `Accept-Language` chọn ngôn ngữ của `detail` trong lỗi;
-//! 6. **chuẩn hoá lỗi** — mọi response lỗi đều là Problem Details (RFC 9457), kể
+//! 5. **idempotency** — lệnh ghi mang `Idempotency-Key` gửi lại thì nhận lại kết quả
+//!    lần đầu, không làm hai lần;
+//! 6. **ngôn ngữ** — `Accept-Language` chọn ngôn ngữ của `detail` trong lỗi;
+//! 7. **chuẩn hoá lỗi** — mọi response lỗi đều là Problem Details (RFC 9457), kể
 //!    cả lỗi do thư viện sinh ra (404, 405, 413…);
-//! 7. **bắt panic** — handler panic thành lỗi 500 thay vì đứt kết nối;
-//! 8. **timeout** — request chạy quá lâu bị cắt, trả 503;
-//! 9. **giới hạn body** — body quá lớn bị từ chối, trả 413.
+//! 8. **bắt panic** — handler panic thành lỗi 500 thay vì đứt kết nối;
+//! 9. **timeout** — request chạy quá lâu bị cắt, trả 503;
+//! 10. **giới hạn body** — body quá lớn bị từ chối, trả 413.
 
 mod extract;
 mod health;
+mod idempotency;
 mod language;
 mod log;
 mod metrics;
@@ -37,7 +40,7 @@ use std::time::Duration;
 use std::sync::Arc;
 
 use axum::extract::{DefaultBodyLimit, Request};
-use axum::http::{HeaderName, HeaderValue, Method, header};
+use axum::http::{HeaderValue, Method, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Router};
@@ -53,6 +56,7 @@ use crate::access::Authenticator;
 use crate::config::{CorsOrigins, HttpConfig};
 use crate::error::Error;
 use crate::i18n::Translations;
+use crate::idempotency::IdempotencyStore;
 
 pub use extract::ValidJson;
 pub use health::{Health, health_routes};
@@ -81,6 +85,9 @@ pub struct Extras {
     /// [`Principal`](crate::access::Principal) dùng nó. `None`: chưa module nào xác
     /// thực — handler cần đăng nhập trả lỗi 500 nói rõ thiếu gì.
     pub authenticator: Option<Arc<dyn Authenticator>>,
+    /// Nơi lưu idempotency key (một module cung cấp). `None`: header
+    /// `Idempotency-Key` bị bỏ qua.
+    pub idempotency: Option<Arc<dyn IdempotencyStore>>,
     /// Bản dịch thông báo lỗi (mặc định: chỉ bản dịch của kernel thì dùng
     /// `Translations::new(Vec::new())`; rỗng thì mọi lỗi bằng tiếng Anh).
     pub translations: Translations,
@@ -124,6 +131,13 @@ pub fn build(
 
     // `None` khi rate limiting bị tắt; lớp vẫn có mặt và cho mọi request đi qua.
     let translations = Arc::new(extras.translations);
+    let idempotency = extras.idempotency.map(|store| {
+        Arc::new(idempotency::Settings {
+            store,
+            body_limit: config.body_limit,
+            request_timeout: config.request_timeout,
+        })
+    });
     let limiter = rate_limit::RateLimiter::new(config.rate_limit, config.client_ip_header.clone())
         .map(Arc::new);
     let request_timeout = config.request_timeout;
@@ -140,6 +154,10 @@ pub fn build(
         // NGOÀI lớp chuẩn hoá: mọi lỗi đã là Problem kèm `Error`, sẵn để dịch.
         .layer(middleware::from_fn(move |request: Request, next: Next| {
             language::localize(translations.clone(), request, next)
+        }))
+        // NGOÀI lớp ngôn ngữ: lưu đúng response client nhận lần đầu.
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            idempotency::idempotency(idempotency.clone(), request, next)
         }))
         // TRONG lớp CORS: request preflight của trình duyệt không bị đếm, còn response
         // 429 vẫn mang header CORS để trang web đọc được lỗi.
@@ -182,10 +200,10 @@ fn cors(origins: &CorsOrigins) -> CorsLayer {
             header::ACCEPT_LANGUAGE,
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
-            HeaderName::from_static("idempotency-key"),
+            idempotency::IDEMPOTENCY_KEY,
             REQUEST_ID_HEADER,
         ])
-        .expose_headers([REQUEST_ID_HEADER])
+        .expose_headers([REQUEST_ID_HEADER, idempotency::IDEMPOTENT_REPLAYED])
         .max_age(Duration::from_secs(3600));
     match origins {
         // Không khai origin nào: không thêm header CORS, trình duyệt tự chặn.

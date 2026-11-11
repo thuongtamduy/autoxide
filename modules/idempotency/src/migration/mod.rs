@@ -1,0 +1,14 @@
+//! Migration của module `idempotency`, theo thứ tự áp dụng. Đã commit thì không sửa —
+//! thêm file mới và một dòng vào cuối [`all`].
+
+mod m0001_create_record;
+
+use autoxide_kernel::migration::prelude::MigrationTrait;
+
+pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
+    vec![
+        Box::new(m0001_create_record::Migration),
+        // Bảng `idempotency_jobs` (job dọn key hết hạn), định nghĩa ở kernel.
+        autoxide_kernel::job::jobs_migration("m0002_create_jobs", "idempotency"),
+    ]
+}

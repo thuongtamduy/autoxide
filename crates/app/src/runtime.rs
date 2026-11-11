@@ -7,6 +7,7 @@ use autoxide_kernel::config::Config;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::event::Dispatcher;
 use autoxide_kernel::http::{self, Api};
+use autoxide_kernel::idempotency::IdempotencyStore;
 use autoxide_kernel::job::Worker;
 use autoxide_kernel::metrics::Metrics;
 use autoxide_kernel::module::Modules;
@@ -84,7 +85,11 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
     } else {
         (Vec::new(), None)
     };
-    let extras = http::Extras { authenticator, translations: modules.translations().clone() };
+    let extras = http::Extras {
+        authenticator,
+        idempotency: modules.api::<dyn IdempotencyStore>(),
+        translations: modules.translations().clone(),
+    };
     let api = http::build(&config.http, root, routes, extras);
     Ok(Runtime { config, database, modules, api, dispatcher, worker })
 }

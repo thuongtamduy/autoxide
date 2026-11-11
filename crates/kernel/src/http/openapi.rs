@@ -45,6 +45,10 @@ stable `code` field, never on `detail`. Validation problems list every invalid f
 - **Authentication**: endpoints that need it list the `bearer` security scheme. Send \
 `Authorization: Bearer <access token>`. A `401` response carries `WWW-Authenticate: Bearer`; \
 its `code` says whether the token is missing, invalid or expired.
+- **Retries**: send `Idempotency-Key: <a random UUID>` with `POST`, `PUT`, `PATCH` and \
+`DELETE`. Repeating the same request with the same key within 24 hours returns the first result \
+(marked `Idempotent-Replayed: true`) instead of doing it twice; a different request with a used \
+key gets `422`, and a repeat while the first is still running gets `409`.
 - **Language**: send `Accept-Language` (e.g. `vi`) to get the `detail` of errors in that \
 language; English (`en`) by default and for unsupported languages. Responses carry \
 `Content-Language`. Codes never change with the language.

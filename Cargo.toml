@@ -39,6 +39,7 @@ autoxide-kernel = { path = "crates/kernel" }
 autoxide-testkit = { path = "crates/testkit" }
 autoxide-audit = { path = "modules/audit" }
 autoxide-auth = { path = "modules/auth" }
+autoxide-idempotency = { path = "modules/idempotency" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }

@@ -34,7 +34,8 @@ what, which record, when, before and after — readable at `/api/v1/audit` with 
 with backoff, kept when they fail for good (`autoxide jobs failed`, `autoxide jobs
 retry`), and run on a schedule when a module asks. `AUTOXIDE_PROCESS_ROLE` splits a
 deployment into API processes and worker processes. Error messages come in English or
-Vietnamese, chosen with the `Accept-Language` header.
+Vietnamese, chosen with the `Accept-Language` header. Write requests sent with an
+`Idempotency-Key` header are safe to retry: a repeat returns the first result.
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -184,7 +185,7 @@ server instead, set `GATE_POSTGRES_URL` to the same kind of URL.
 | `crates/kernel`  | The foundation every module builds on. Knows no module.                 |
 | `crates/app`     | The `autoxide` binary: the one place where modules are registered.      |
 | `crates/testkit` | Test support: an isolated database per test, on SQLite or PostgreSQL.   |
-| `modules/<name>` | One crate per module. `modules/auth`: accounts, sign-in, roles, API keys, two-step sign-in. `modules/audit`: the append-only audit log. |
+| `modules/<name>` | One crate per module. `modules/auth`: accounts, sign-in, roles, API keys, two-step sign-in. `modules/audit`: the append-only audit log. `modules/idempotency`: storage for idempotency keys. |
 | `xtask`          | Developer tooling: `cargo xtask check` enforces the workspace boundaries. |
 | `gate.sh`        | The quality gate. A change is done only when this is green.             |
 

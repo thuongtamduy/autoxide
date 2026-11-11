@@ -32,7 +32,8 @@ permission `audit.read`. Job chạy nền cũng nằm trong database (không c�
 thì thử lại với backoff, hỏng hẳn thì được giữ lại (`autoxide jobs failed`, `autoxide
 jobs retry`), và chạy theo lịch khi module yêu cầu. `AUTOXIDE_PROCESS_ROLE` tách một
 bản triển khai thành tiến trình API và tiến trình worker. Thông báo lỗi có tiếng Anh và
-tiếng Việt, chọn bằng header `Accept-Language`.
+tiếng Việt, chọn bằng header `Accept-Language`. Lệnh ghi gửi kèm header
+`Idempotency-Key` gửi lại an toàn: lần gửi lại nhận đúng kết quả lần đầu.
 
 Core sẽ gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -181,7 +182,7 @@ thì đặt `GATE_POSTGRES_URL` bằng một URL cùng dạng.
 | `crates/kernel`  | Nền mà mọi module dựa vào. Không biết module nào.                       |
 | `crates/app`     | Binary `autoxide`: nơi duy nhất đăng ký module.                         |
 | `crates/testkit` | Đồ dùng cho test: mỗi test một database riêng, trên SQLite hoặc PostgreSQL. |
-| `modules/<tên>`  | Mỗi module một crate. `modules/auth`: tài khoản, đăng nhập, role, API key, đăng nhập hai bước. `modules/audit`: audit log chỉ thêm. |
+| `modules/<tên>`  | Mỗi module một crate. `modules/auth`: tài khoản, đăng nhập, role, API key, đăng nhập hai bước. `modules/audit`: audit log chỉ thêm. `modules/idempotency`: nơi lưu idempotency key. |
 | `xtask`          | Công cụ cho người phát triển: `cargo xtask check` kiểm ranh giới workspace. |
 | `gate.sh`        | Gate chất lượng. Một thay đổi chỉ xong khi lệnh này xanh.               |
 

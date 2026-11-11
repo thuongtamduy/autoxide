@@ -1161,3 +1161,36 @@ của lộ trình; `code` của trường (`length`, `email`…) đã ổn đị
 Đã cân nhắc: dịch ở chỗ tạo lỗi (service biết ngôn ngữ) — mọi service phải nhận thêm
 ngôn ngữ, và lỗi trong log đổi theo ngôn ngữ người gọi; file TOML/YAML — thêm thư viện
 đọc file trong khi JSON đã có `serde_json`.
+
+## D-058 · Idempotency key — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Header `Idempotency-Key` theo bản nháp IETF ("The Idempotency-Key HTTP Header
+  Field"), áp cho `POST`, `PUT`, `PATCH`, `DELETE` của MỌI endpoint, xử lý ở một lớp
+  HTTP của kernel — module không phải làm gì.
+- **Phạm vi key:** người gọi (SHA-256 của header `Authorization`) + key. Hai người dùng
+  chọn trùng key không đụng nhau. **Dấu vân tay request:** SHA-256 của method, đường
+  dẫn và thân request; cùng key mà dấu khác → 422 `idempotency_key_reused`.
+- **Lần đầu:** chèn dòng `(scope, key)` — index unique quyết đúng một request chạy;
+  request trùng đến khi lần đầu chưa xong → 409 `idempotency_key_in_progress` kèm
+  `Retry-After: 1`; đã xong → trả lại đúng status, header (`content-type`, `location`,
+  `retry-after`, `www-authenticate`, `content-language`) và thân đã lưu, kèm
+  `Idempotent-Replayed: true`. Lỗi 5xx không lưu (bỏ dòng) để client gửi lại được. Lần
+  đầu chết giữa chừng thì sau `thời gian tối đa của request + 30 giây` request sau nhận
+  quyền chạy (`UPDATE` có điều kiện). Giữ key 24 giờ; job định kỳ dọn mỗi giờ.
+- **Lưu trữ sau trait** `kernel::idempotency::IdempotencyStore`, do module mới
+  `idempotency` (bảng `idempotency_record`) cung cấp — như `Authenticator` do `auth`
+  cung cấp. Không đăng ký module thì kernel bỏ qua header.
+- Vị trí trong lớp HTTP: trong rate limiting (request bị chặn vì gửi quá nhiều thì
+  không lưu), ngoài lớp ngôn ngữ (lưu đúng response client đã nhận).
+
+Lý do: tiêu chí "lệnh ghi an toàn khi gọi lại, vì agent hay retry" (CLAUDE.md). Làm ở
+lớp HTTP để mọi endpoint của mọi module có ngay, không module nào quên.
+
+Đã cân nhắc: idempotency trong từng service — mỗi module tự làm, dễ sót và mỗi nơi
+một kiểu; khoá bằng lock trong bộ nhớ — sai khi chạy nhiều máy chủ; bắt buộc key cho
+mọi lệnh ghi — phá client đơn giản, bản nháp IETF để tuỳ chọn.
+
+Đã kiểm: sáu request cùng key gửi đồng thời → handler chạy đúng một lần, trên cả hai
+database.

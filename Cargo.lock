@@ -361,6 +361,7 @@ version = "0.1.0"
 dependencies = [
  "autoxide-audit",
  "autoxide-auth",
+ "autoxide-idempotency",
  "autoxide-kernel",
  "autoxide-testkit",
  "base64 0.22.1",
@@ -423,12 +424,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "autoxide-idempotency"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "sea-orm",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+]
+
+[[package]]
 name = "autoxide-kernel"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "autoxide-testkit",
  "axum",
+ "base64 0.22.1",
  "chrono",
  "dotenvy",
  "metrics",
@@ -440,6 +461,7 @@ dependencies = [
  "sea-orm-migration",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
  "tokio",
  "tower",
  "tower-http 0.7.1",
