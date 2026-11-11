@@ -33,7 +33,7 @@ use crate::access::RequestAuthenticator;
 use crate::config::AuthConfig;
 use crate::password::Passwords;
 use crate::role::RoleService;
-use crate::session::SessionService;
+use crate::session::{LoginThrottle, SessionService};
 use crate::token::AccessTokens;
 use crate::user::UserService;
 
@@ -83,11 +83,14 @@ impl Module for AuthModule {
             }
         };
         let access_tokens = AccessTokens::new(secret, config.access_token_ttl);
+        let throttle =
+            LoginThrottle::new(database.clone(), config.login_max_failures, config.login_lock)?;
         let sessions = Arc::new(SessionService::new(
             database.clone(),
             users.clone(),
             access_tokens,
             config.refresh_token_ttl,
+            throttle,
         )?);
         let roles = Arc::new(RoleService::new(database, context.permissions().clone()));
         let authenticator =
@@ -168,6 +171,12 @@ pub(crate) mod testing {
                 users.clone(),
                 tokens,
                 std::time::Duration::from_secs(30 * 24 * 60 * 60),
+                crate::session::LoginThrottle::new(
+                    database.clone(),
+                    5,
+                    std::time::Duration::from_secs(15 * 60),
+                )
+                .unwrap(),
             )
             .unwrap(),
         );

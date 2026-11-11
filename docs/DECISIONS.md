@@ -829,3 +829,42 @@ của họ mà code không đổi (RBAC chuẩn, NIST). Kernel giữ `Principal`
 permission dạng ký tự đại diện (`notes.*`) — khó đoán quyền thật của một role, và
 role `admin` đã phủ nhu cầu "tất cả"; role theo cây kế thừa — phức tạp mà chưa có
 nhu cầu.
+
+## D-047 · Rate limiting và login throttling — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- **Rate limiting** là một lớp HTTP của kernel, tự viết (~100 dòng,
+  `crates/kernel/src/http/rate_limit.rs`) theo thuật toán GCRA: mỗi địa chỉ client
+  nhớ một mốc thời gian, chỉ dùng số nguyên và `Instant`. Mặc định 600 request/phút,
+  gửi dồn 60 (`AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE`, `_BURST`; `0` là tắt). Quá giới
+  hạn trả 429 `rate_limited` kèm `Retry-After`. Đếm trong bộ nhớ từng tiến trình;
+  không đếm `/health/*`; IPv6 gom theo khối /64.
+- **Địa chỉ client:** mặc định là địa chỉ của kết nối (máy chủ chạy với
+  `into_make_service_with_connect_info`). Sau reverse proxy thì đặt
+  `AUTOXIDE_HTTP_CLIENT_IP_HEADER`; lấy phần tử CUỐI của header (phần do proxy của
+  mình thêm), vì các phần trước do client tự viết được.
+- **`Error` mang được `Retry-After`** (`with_retry_after`), dùng chung cho 429 và 503.
+  Lưu dạng `NonZeroU32` để `Error` vẫn ≤ 128 byte (clippy `result_large_err`).
+- **Login throttling** trong module `auth`, đếm trong database (bảng
+  `auth_login_throttle`) nên mọi máy chủ dùng chung: quá 5 lần sai trong 15 phút
+  (`AUTOXIDE_AUTH_LOGIN_MAX_FAILURES`, `_LOCK_MINUTES`) thì khoá đăng nhập của email đó
+  15 phút, kể cả mật khẩu đúng; trả 429 `auth.login_throttled` kèm `Retry-After`. Đếm
+  cả email không tồn tại, lưu SHA-256 của email. Đăng nhập đúng xoá số đếm. Mỗi bước
+  đếm là một `UPDATE` có điều kiện; test 8 lần sai đồng thời đếm đủ 8 trên hai
+  database.
+
+Lý do không dùng `tower_governor` 0.8 (STACK.md ghi trước đây): bộ feature mặc định
+kéo `tonic` (gRPC); tắt đi vẫn thêm `governor`, `dashmap`, `forwarded-header-value`,
+`thiserror` 1 cho việc vài chục dòng làm được (luật "không thêm thư viện khi tự viết
+đủ"), và lỗi của nó không ra dạng Problem kèm `code`.
+
+Giới hạn đã chấp nhận: kẻ xấu biết email có thể cố ý gõ sai để khoá người đó 15
+phút. Cách chuẩn để giảm (CAPTCHA, khoá theo cặp thiết bị–email) cần giao diện, nằm
+ngoài core. Bảng `auth_login_throttle` lớn dần với email lạ — dọn bằng job định kỳ
+ở bước 5 (đã thêm vào lộ trình).
+
+Đã cân nhắc: rate limiting trong database — mỗi request thêm một lần ghi; khoá theo
+địa chỉ IP khi đăng nhập sai — kẻ tấn công đổi IP dễ, người dùng sau NAT bị khoá
+chung; khoá vĩnh viễn tới khi quản trị viên mở — biến lỗi gõ sai thành việc của
+quản trị viên.

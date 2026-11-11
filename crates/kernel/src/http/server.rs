@@ -1,6 +1,7 @@
 //! Chạy máy chủ và tắt cho êm (graceful shutdown).
 
 use std::future::{Future, IntoFuture};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -35,7 +36,10 @@ where
     // thời gian chờ bên dưới biết lúc bắt đầu đếm.
     let shutdown_started = Arc::new(Notify::new());
     let bell = Arc::clone(&shutdown_started);
-    let server = axum::serve(listener, router).with_graceful_shutdown(async move {
+    // `with_connect_info`: mỗi request mang địa chỉ của kết nối, để rate limiting
+    // biết client là ai.
+    let service = router.into_make_service_with_connect_info::<SocketAddr>();
+    let server = axum::serve(listener, service).with_graceful_shutdown(async move {
         shutdown.await;
         bell.notify_one();
     });

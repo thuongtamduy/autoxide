@@ -45,6 +45,8 @@ stable `code` field, never on `detail`. Validation problems list every invalid f
 - **Authentication**: endpoints that need it list the `bearer` security scheme. Send \
 `Authorization: Bearer <access token>`. A `401` response carries `WWW-Authenticate: Bearer`; \
 its `code` says whether the token is missing, invalid or expired.
+- **Rate limits**: too many requests from one address are answered with `429` (code \
+`rate_limited`) and a `Retry-After` header giving the seconds to wait.
 - **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote \
 it when reporting a problem.
 - **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount \

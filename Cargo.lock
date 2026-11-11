@@ -381,6 +381,7 @@ dependencies = [
  "chrono",
  "getrandom 0.4.3",
  "hmac",
+ "metrics",
  "sea-orm",
  "serde",
  "serde_json",

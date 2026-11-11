@@ -120,6 +120,12 @@ default. It is generated from the code, so it cannot go out of date. An invalid
 configuration is reported in full — every problem at once, each saying what to
 fix — and the command exits with status 2. Secrets are never printed.
 
+Each client address may make 600 requests a minute by default
+(`AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE`), and an email is locked for 15 minutes after
+5 failed sign-ins. Behind a reverse proxy, set `AUTOXIDE_HTTP_CLIENT_IP_HEADER` (for
+example to `X-Forwarded-For`) so that clients are told apart by their own address
+rather than the proxy's.
+
 For production, set `AUTOXIDE_AUTH_TOKEN_SECRET` (the key that signs access tokens)
 to a long random value, the same on every server:
 

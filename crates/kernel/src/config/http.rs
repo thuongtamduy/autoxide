@@ -3,6 +3,8 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use axum::http::HeaderName;
+
 use super::{ConfigReader, Invalid, Setting, parse_in_range};
 
 pub const ADDRESS: Setting = Setting::new(
@@ -51,6 +53,29 @@ pub const METRICS: Setting = Setting::new(
      authentication: enable it only where the port is not reachable from the internet.",
 )
 .with_default("false");
+
+pub const RATE_LIMIT_PER_MINUTE: Setting = Setting::new(
+    "AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE",
+    "Requests one client address may make per minute, on average; more are answered with 429 \
+     and a `Retry-After` header. `0` turns rate limiting off. Health checks are not counted. \
+     Counted per server process.",
+)
+.with_default("600");
+
+pub const RATE_LIMIT_BURST: Setting = Setting::new(
+    "AUTOXIDE_HTTP_RATE_LIMIT_BURST",
+    "Requests one client address may make at once before the per-minute rate applies.",
+)
+.with_default("60");
+
+pub const CLIENT_IP_HEADER: Setting = Setting::new(
+    "AUTOXIDE_HTTP_CLIENT_IP_HEADER",
+    "Behind a reverse proxy, the header in which the proxy passes the client's address \
+     (for `X-Forwarded-For`, the last address is used). Set it only when every request goes \
+     through that proxy: clients can forge the header otherwise. When unset, the address of \
+     the connection is used.",
+)
+.with_example("X-Forwarded-For");
 
 /// Những origin (nguồn trang web) được trình duyệt cho gọi API.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -106,6 +131,18 @@ pub struct HttpConfig {
     pub shutdown_grace: Duration,
     pub api_docs: bool,
     pub metrics: bool,
+    pub rate_limit: RateLimit,
+    /// Header chứa địa chỉ client do reverse proxy đặt; `None`: dùng địa chỉ kết nối.
+    pub client_ip_header: Option<HeaderName>,
+}
+
+/// Giới hạn số request của một địa chỉ client.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RateLimit {
+    /// Số request trung bình mỗi phút; `0` là tắt.
+    pub per_minute: u32,
+    /// Số request được gửi dồn một lúc.
+    pub burst: u32,
 }
 
 impl HttpConfig {
@@ -123,6 +160,13 @@ impl HttpConfig {
             reader.get_with(&SHUTDOWN_SECONDS, |raw| parse_in_range(raw, 0u64, 600));
         let api_docs = reader.get_with(&API_DOCS, parse_bool);
         let metrics = reader.get_with(&METRICS, parse_bool);
+        let per_minute =
+            reader.get_with(&RATE_LIMIT_PER_MINUTE, |raw| parse_in_range(raw, 0u32, 1_000_000));
+        let burst = reader.get_with(&RATE_LIMIT_BURST, |raw| parse_in_range(raw, 1u32, 1_000_000));
+        let client_ip_header = reader.optional_with(&CLIENT_IP_HEADER, |raw| {
+            HeaderName::try_from(raw.trim())
+                .map_err(|_| "must be an HTTP header name, like `X-Forwarded-For`".to_owned())
+        });
 
         Ok(HttpConfig {
             address: address?,
@@ -132,6 +176,8 @@ impl HttpConfig {
             shutdown_grace: Duration::from_secs(shutdown_grace?),
             api_docs: api_docs?,
             metrics: metrics?,
+            rate_limit: RateLimit { per_minute: per_minute?, burst: burst? },
+            client_ip_header: client_ip_header?,
         })
     }
 }
@@ -158,6 +204,12 @@ mod tests {
         assert_eq!(config.shutdown_grace, Duration::from_secs(30));
         assert!(!config.api_docs);
         assert!(!config.metrics);
+        assert_eq!(config.rate_limit, RateLimit { per_minute: 600, burst: 60 });
+        assert_eq!(config.client_ip_header, None);
+        let header = read(&[("AUTOXIDE_HTTP_CLIENT_IP_HEADER", "X-Forwarded-For")]).unwrap();
+        assert_eq!(header.client_ip_header.unwrap().as_str(), "x-forwarded-for");
+        let message = read(&[("AUTOXIDE_HTTP_CLIENT_IP_HEADER", "not a header")]).unwrap_err();
+        assert!(message.contains("must be an HTTP header name"), "{message}");
         assert!(read(&[("AUTOXIDE_HTTP_METRICS", "true")]).unwrap().metrics);
         assert!(read(&[("AUTOXIDE_HTTP_API_DOCS", "true")]).unwrap().api_docs);
         let message = read(&[("AUTOXIDE_HTTP_API_DOCS", "yes")]).unwrap_err();

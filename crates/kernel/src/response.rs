@@ -121,6 +121,9 @@ impl IntoResponse for Error {
                 .headers_mut()
                 .insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
         }
+        if let Some(seconds) = self.retry_after() {
+            response.headers_mut().insert(header::RETRY_AFTER, HeaderValue::from(seconds));
+        }
         // Gửi kèm chính lỗi (có nguyên nhân gốc) trong "extensions" của response:
         // phần này không ra tới client, nhưng middleware ghi log đọc được.
         response.extensions_mut().insert(Arc::new(self));
@@ -145,6 +148,18 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.headers()[header::CONTENT_TYPE], "application/json");
         assert_eq!(body_json(response).await, serde_json::json!({"data": {"id": 1}}));
+    }
+
+    #[tokio::test]
+    async fn loi_co_thoi_gian_cho_thi_kem_retry_after() {
+        let error = Error::too_many_requests("rate_limited", "Slow down.").with_retry_after(7);
+
+        let response = error.into_response();
+
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(response.headers()[header::RETRY_AFTER], "7");
+        let plain = Error::too_many_requests("rate_limited", "Slow down.").into_response();
+        assert!(!plain.headers().contains_key(header::RETRY_AFTER));
     }
 
     #[tokio::test]

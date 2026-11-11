@@ -112,7 +112,8 @@ impl MeResponse {
 /// Sign in with email and password.
 ///
 /// Returns a short-lived access token and a refresh token. The same error answers
-/// an unknown email and a wrong password.
+/// an unknown email and a wrong password. After several failed attempts the email
+/// is locked for a while, even for the right password.
 #[utoipa::path(
     post,
     path = "/login",
@@ -123,6 +124,7 @@ impl MeResponse {
         (status = 401, description = "Wrong email or password; code `auth.invalid_credentials`.", body = Problem),
         (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
         (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
+        (status = 429, description = "Too many failed sign-ins for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.", body = Problem),
     )
 )]
 async fn login(

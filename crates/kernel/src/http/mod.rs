@@ -13,11 +13,12 @@
 //!    response; client gửi sẵn ID hợp lệ thì dùng ID đó;
 //! 2. **log** — mỗi request một dòng log khi xong; lỗi 5xx kèm nguyên nhân gốc;
 //! 3. **CORS** — trình duyệt ở origin nào được gọi;
-//! 4. **chuẩn hoá lỗi** — mọi response lỗi đều là Problem Details (RFC 9457), kể
+//! 4. **rate limiting** — mỗi địa chỉ client chỉ được gửi chừng ấy request mỗi phút;
+//! 5. **chuẩn hoá lỗi** — mọi response lỗi đều là Problem Details (RFC 9457), kể
 //!    cả lỗi do thư viện sinh ra (404, 405, 413…);
-//! 5. **bắt panic** — handler panic thành lỗi 500 thay vì đứt kết nối;
-//! 6. **timeout** — request chạy quá lâu bị cắt, trả 503;
-//! 7. **giới hạn body** — body quá lớn bị từ chối, trả 413.
+//! 6. **bắt panic** — handler panic thành lỗi 500 thay vì đứt kết nối;
+//! 7. **timeout** — request chạy quá lâu bị cắt, trả 503;
+//! 8. **giới hạn body** — body quá lớn bị từ chối, trả 413.
 
 mod extract;
 mod health;
@@ -25,6 +26,7 @@ mod log;
 mod metrics;
 mod openapi;
 mod problem;
+mod rate_limit;
 mod request_id;
 mod server;
 
@@ -108,6 +110,9 @@ pub fn build(
         router = router.layer(Extension(authenticator));
     }
 
+    // `None` khi rate limiting bị tắt; lớp vẫn có mặt và cho mọi request đi qua.
+    let limiter = rate_limit::RateLimiter::new(config.rate_limit, config.client_ip_header.clone())
+        .map(Arc::new);
     let request_timeout = config.request_timeout;
     // `.layer` bọc thêm một lớp RA NGOÀI các lớp trước đó: lớp khai sau cùng là lớp
     // request gặp đầu tiên. Đọc từ dưới lên sẽ ra thứ tự ở đầu file.
@@ -119,6 +124,11 @@ pub fn build(
         }))
         .layer(CatchPanicLayer::custom(problem::PanicToProblem))
         .layer(middleware::map_response(problem::normalize))
+        // TRONG lớp CORS: request preflight của trình duyệt không bị đếm, còn response
+        // 429 vẫn mang header CORS để trang web đọc được lỗi.
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            rate_limit::limit(limiter.clone(), request, next)
+        }))
         .layer(cors(&config.cors_origins))
         .layer(middleware::from_fn(log::log_requests))
         .layer(PropagateRequestIdLayer::new(REQUEST_ID_HEADER))

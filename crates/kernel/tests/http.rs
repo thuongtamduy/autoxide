@@ -577,3 +577,48 @@ async fn request_khong_khop_route_va_health_check_duoc_ghi_dung_muc() {
     let lines = logged(LogLevel::Debug, get("/health/live")).await;
     assert!(lines.iter().any(|line| line["span"]["path"] == "/health/live"), "{lines:?}");
 }
+
+/// Request GET `path` đến từ địa chỉ `client` (như khi đi qua socket thật).
+fn from_client(path: &str, client: [u8; 4]) -> Request<Body> {
+    let mut request = Request::builder().uri(path).body(Body::empty()).unwrap();
+    let address = std::net::SocketAddr::from((client, 40000));
+    request.extensions_mut().insert(axum::extract::ConnectInfo(address));
+    request
+}
+
+#[tokio::test]
+async fn qua_gioi_han_thi_429_kem_retry_after() {
+    let mut config = default_config();
+    config.rate_limit.per_minute = 60;
+    config.rate_limit.burst = 2;
+    let app = api_with(&config).router;
+
+    for _ in 0..2 {
+        let response = app.clone().oneshot(from_client("/api/v1/notes", [192, 0, 2, 1])).await;
+        assert_eq!(response.unwrap().status(), StatusCode::OK);
+    }
+    let limited = app.clone().oneshot(from_client("/api/v1/notes", [192, 0, 2, 1])).await.unwrap();
+
+    assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(limited.headers()[header::RETRY_AFTER], "1");
+    assert!(limited.headers().contains_key("x-request-id"));
+    problem(limited, 429, "rate_limited").await;
+    // Client khác vẫn được phục vụ; health check không bị đếm.
+    let other = app.clone().oneshot(from_client("/api/v1/notes", [192, 0, 2, 2])).await;
+    assert_eq!(other.unwrap().status(), StatusCode::OK);
+    let health = app.clone().oneshot(from_client("/health/live", [192, 0, 2, 1])).await;
+    assert_ne!(health.unwrap().status(), StatusCode::TOO_MANY_REQUESTS);
+}
+
+#[tokio::test]
+async fn tat_rate_limiting_thi_khong_gioi_han() {
+    let mut config = default_config();
+    config.rate_limit.per_minute = 0;
+    config.rate_limit.burst = 1;
+    let app = api_with(&config).router;
+
+    for _ in 0..5 {
+        let response = app.clone().oneshot(from_client("/api/v1/notes", [192, 0, 2, 1])).await;
+        assert_eq!(response.unwrap().status(), StatusCode::OK);
+    }
+}

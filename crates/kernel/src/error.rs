@@ -26,6 +26,7 @@
 
 use std::borrow::Cow;
 use std::fmt;
+use std::num::NonZeroU32;
 
 use validator::{ValidationErrors, ValidationErrorsKind};
 
@@ -111,6 +112,10 @@ pub struct Error {
     params: Vec<(Cow<'static, str>, String)>,
     fields: Vec<FieldError>,
     source: Option<Source>,
+    /// Số giây client nên chờ trước khi thử lại (header `Retry-After`). `NonZeroU32`
+    /// thay vì `u64`: `Option` của nó chỉ tốn 4 byte, giữ `Error` đủ nhỏ để trả về
+    /// trong `Result` mà không phải chép nhiều (clippy `result_large_err`).
+    retry_after: Option<NonZeroU32>,
 }
 
 /// Mã và thông báo của lỗi nội bộ. Client chỉ thấy đúng hai thứ này.
@@ -135,6 +140,7 @@ impl Error {
             params: Vec::new(),
             fields: Vec::new(),
             source: None,
+            retry_after: None,
         }
     }
 
@@ -220,6 +226,20 @@ impl Error {
     pub fn with_source(mut self, source: impl Into<Source>) -> Self {
         self.source = Some(source.into());
         self
+    }
+
+    /// Báo client chờ `seconds` giây rồi mới thử lại: response mang header
+    /// `Retry-After` (RFC 9110). Dùng cho 429 và 503.
+    /// Ít nhất 1 giây.
+    pub fn with_retry_after(mut self, seconds: u64) -> Self {
+        let seconds = u32::try_from(seconds).unwrap_or(u32::MAX).max(1);
+        self.retry_after = NonZeroU32::new(seconds);
+        self
+    }
+
+    /// Số giây nên chờ trước khi thử lại, nếu lỗi có nêu.
+    pub fn retry_after(&self) -> Option<u64> {
+        self.retry_after.map(|seconds| u64::from(seconds.get()))
     }
 
     pub fn kind(&self) -> ErrorKind {

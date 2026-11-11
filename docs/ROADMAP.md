@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "Rate limiting; login throttling".
+Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "CLI tạo người dùng đầu tiên".
 
 ## 0. Khung dự án
 
@@ -34,7 +34,7 @@ Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "Rate limiti
 - [x] Người dùng, hash mật khẩu Argon2id
 - [x] Đăng nhập: access token sống ngắn + refresh token rotation, phát hiện reuse
 - [x] Role và permission; module tự khai báo permission của mình
-- [ ] Rate limiting; login throttling
+- [x] Rate limiting; login throttling
 - [ ] CLI tạo người dùng đầu tiên
 - [ ] Tạo người dùng: quản trị viên tạo; tự đăng ký bật tắt bằng cấu hình (mặc định tắt)
 - [ ] API key cho máy và AI agent: tạo, thu hồi, giới hạn theo permission
@@ -55,7 +55,8 @@ Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "Rate limiti
 
 - [ ] Job lưu trong database; claim job an toàn khi nhiều worker (test đồng thời)
 - [ ] Retry có backoff, dead-letter queue
-- [ ] Lịch chạy định kỳ
+- [ ] Lịch chạy định kỳ (job đầu tiên: dọn dòng hết hạn của `auth_login_throttle` và
+      `auth_refresh_token`)
 - [ ] Process role: `api`, `worker`, hoặc cả hai
 
 ## 6. i18n và idempotency

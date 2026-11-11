@@ -21,7 +21,7 @@ mod trace;
 
 pub use database::{DatabaseBackend, DatabaseConfig, DatabaseUrl, redact_password};
 pub use env_example::render_env_example;
-pub use http::{CorsOrigins, HttpConfig};
+pub use http::{CorsOrigins, HttpConfig, RateLimit};
 pub use log::{LogConfig, LogFormat, LogLevel};
 pub use reader::{
     ConfigError, ConfigErrors, ConfigReader, Invalid, Origin, SettingValue, parse_in_range,

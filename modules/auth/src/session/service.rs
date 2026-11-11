@@ -27,6 +27,11 @@ use crate::api::User;
 use crate::token::{self, AccessTokens};
 use crate::user::UserService;
 
+use super::LoginThrottle;
+
+/// Mã lỗi khi sai email hoặc mật khẩu (tạo ở `user::service`).
+const INVALID_CREDENTIALS: &str = "auth.invalid_credentials";
+
 /// Số byte ngẫu nhiên của một refresh token: 256 bit.
 const REFRESH_TOKEN_BYTES: usize = 32;
 
@@ -45,6 +50,7 @@ pub(crate) struct SessionService {
     users: Arc<UserService>,
     access_tokens: AccessTokens,
     refresh_token_ttl: chrono::Duration,
+    throttle: LoginThrottle,
 }
 
 impl SessionService {
@@ -53,15 +59,30 @@ impl SessionService {
         users: Arc<UserService>,
         access_tokens: AccessTokens,
         refresh_token_ttl: std::time::Duration,
+        throttle: LoginThrottle,
     ) -> Result<Self, Error> {
         let refresh_token_ttl = chrono::Duration::from_std(refresh_token_ttl)
             .map_err(|error| Error::internal(format!("refresh token lifetime: {error}")))?;
-        Ok(SessionService { database, users, access_tokens, refresh_token_ttl })
+        Ok(SessionService { database, users, access_tokens, refresh_token_ttl, throttle })
     }
 
     /// Đăng nhập bằng email và mật khẩu: mở một họ refresh token mới.
+    ///
+    /// Email đang bị khoá vì sai quá nhiều lần thì trả 429 ngay, KHÔNG kiểm mật khẩu
+    /// — kẻ đoán không biết được lần đoán nào đúng.
     pub(crate) async fn login(&self, email: &str, password: &str) -> Result<Tokens, Error> {
-        let user = self.users.check_credentials(email, password).await?;
+        self.throttle.check(email).await?;
+        let user = match self.users.check_credentials(email, password).await {
+            Ok(user) => user,
+            Err(error) => {
+                // Chỉ sai mật khẩu mới tính; tài khoản bị khoá hay lỗi máy chủ thì không.
+                if error.code() == INVALID_CREDENTIALS {
+                    self.throttle.record_failure(email).await?;
+                }
+                return Err(error);
+            }
+        };
+        self.throttle.clear(email).await?;
         let now = now();
         let expires_at = now + self.refresh_token_ttl;
         let (refresh_token, row) = new_refresh_token(user.id, Uuid::now_v7(), now, expires_at)?;
@@ -290,6 +311,35 @@ mod tests {
             assert_eq!(sessions.authenticate(Some(&bearer(&tokens))).await.unwrap(), user);
             let wrong = sessions.login("ada@example.com", "wrong password").await.unwrap_err();
             assert_eq!(wrong.code(), "auth.invalid_credentials");
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn doan_sai_nhieu_lan_thi_khoa_ca_mat_khau_dung() {
+        TestDatabase::run(async |test| {
+            let (sessions, _, _) = setup(test).await;
+            // Một lần đúng giữa chừng xoá các lần sai trước.
+            for _ in 0..4 {
+                sessions.login("ada@example.com", "wrong password").await.unwrap_err();
+            }
+            sessions.login("ada@example.com", PASSWORD).await.unwrap();
+
+            for _ in 0..5 {
+                let error = sessions.login("ada@example.com", "wrong password").await.unwrap_err();
+                assert_eq!(error.code(), "auth.invalid_credentials");
+            }
+            let locked = sessions.login("ada@example.com", PASSWORD).await.unwrap_err();
+
+            assert_eq!(locked.kind(), ErrorKind::TooManyRequests);
+            assert_eq!(locked.code(), "auth.login_throttled");
+            // Email không tồn tại cũng bị khoá y hệt: không lộ email nào có thật.
+            for _ in 0..5 {
+                sessions.login("ghost@example.com", "wrong password").await.unwrap_err();
+            }
+            let ghost = sessions.login("ghost@example.com", "wrong password").await.unwrap_err();
+            assert_eq!(ghost.code(), "auth.login_throttled");
         })
         .await
         .unwrap();

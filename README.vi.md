@@ -118,6 +118,11 @@ này sinh ra từ code nên không thể lỗi thời. Cấu hình sai được 
 đề cùng một lượt, mỗi vấn đề nói rõ phải sửa gì — và lệnh thoát với mã 2. Secret
 không bao giờ bị in ra.
 
+Mặc định mỗi địa chỉ client được gửi 600 request mỗi phút
+(`AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE`), và một email bị khoá đăng nhập 15 phút sau 5
+lần sai. Chạy sau reverse proxy thì đặt `AUTOXIDE_HTTP_CLIENT_IP_HEADER` (ví dụ
+`X-Forwarded-For`) để phân biệt client theo địa chỉ của chính họ thay vì của proxy.
+
 Khi chạy thật (production), đặt `AUTOXIDE_AUTH_TOKEN_SECRET` (khoá ký access token)
 bằng một chuỗi ngẫu nhiên dài, giống nhau trên mọi máy chủ:
 

@@ -28,6 +28,21 @@ pub(crate) const REFRESH_TOKEN_DAYS: Setting = Setting::new(
 )
 .with_default("30");
 
+pub(crate) const LOGIN_MAX_FAILURES: Setting = Setting::new(
+    "AUTOXIDE_AUTH_LOGIN_MAX_FAILURES",
+    "Failed sign-ins allowed for one email within AUTOXIDE_AUTH_LOGIN_LOCK_MINUTES (1 to 100). \
+     One more locks sign-in for that email for AUTOXIDE_AUTH_LOGIN_LOCK_MINUTES, even with the \
+     right password. Shared by every server, since it is counted in the database.",
+)
+.with_default("5");
+
+pub(crate) const LOGIN_LOCK_MINUTES: Setting = Setting::new(
+    "AUTOXIDE_AUTH_LOGIN_LOCK_MINUTES",
+    "How long failed sign-ins are remembered, and how long sign-in stays locked after too many \
+     (1 to 1440).",
+)
+.with_default("15");
+
 /// Độ dài tối thiểu của khoá ký token: 256 bit, bằng độ dài đầu ra của SHA-256.
 const MIN_SECRET_LENGTH: usize = 32;
 
@@ -37,6 +52,10 @@ pub(crate) struct AuthConfig {
     pub token_secret: Option<Vec<u8>>,
     pub access_token_ttl: Duration,
     pub refresh_token_ttl: Duration,
+    /// Số lần đăng nhập sai cho phép trong `login_lock`.
+    pub login_max_failures: u32,
+    /// Thời gian nhớ lần sai, và thời gian khoá đăng nhập sau quá nhiều lần sai.
+    pub login_lock: Duration,
 }
 
 impl AuthConfig {
@@ -54,10 +73,15 @@ impl AuthConfig {
         let access =
             reader.get_with(&ACCESS_TOKEN_SECONDS, |raw| parse_in_range(raw, 60u64, 86_400));
         let refresh = reader.get_with(&REFRESH_TOKEN_DAYS, |raw| parse_in_range(raw, 1u64, 365));
+        let max_failures =
+            reader.get_with(&LOGIN_MAX_FAILURES, |raw| parse_in_range(raw, 1u32, 100));
+        let lock = reader.get_with(&LOGIN_LOCK_MINUTES, |raw| parse_in_range(raw, 1u64, 1440));
         Ok(AuthConfig {
             token_secret: token_secret?,
             access_token_ttl: Duration::from_secs(access?),
             refresh_token_ttl: Duration::from_secs(refresh? * 24 * 60 * 60),
+            login_max_failures: max_failures?,
+            login_lock: Duration::from_secs(lock? * 60),
         })
     }
 }
@@ -81,6 +105,8 @@ mod tests {
         assert_eq!(config.token_secret, None);
         assert_eq!(config.access_token_ttl, Duration::from_secs(15 * 60));
         assert_eq!(config.refresh_token_ttl, Duration::from_secs(30 * 24 * 60 * 60));
+        assert_eq!(config.login_max_failures, 5);
+        assert_eq!(config.login_lock, Duration::from_secs(15 * 60));
     }
 
     #[test]

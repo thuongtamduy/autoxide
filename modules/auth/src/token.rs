@@ -143,7 +143,12 @@ pub(crate) fn random_token(bytes: usize) -> Result<String, Error> {
 /// không dùng được token. Không cần Argon2 ở đây — token đã ngẫu nhiên 256 bit,
 /// không đoán thử được như mật khẩu.
 pub(crate) fn hash_refresh_token(token: &str) -> String {
-    URL_SAFE_NO_PAD.encode(Sha256::digest(token.as_bytes()))
+    sha256(token)
+}
+
+/// SHA-256 của `text`, mã hoá base64url (43 ký tự).
+pub(crate) fn sha256(text: &str) -> String {
+    URL_SAFE_NO_PAD.encode(Sha256::digest(text.as_bytes()))
 }
 
 #[cfg(test)]
