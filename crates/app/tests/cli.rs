@@ -418,3 +418,40 @@ async fn jobs_xem_va_chay_lai_job_hong() {
     .await
     .unwrap();
 }
+
+/// `autoxide copy`: dữ liệu tạo trên SQLite sang database gate đang chọn (lượt
+/// Postgres của gate là SQLite → Postgres); đích đã có dữ liệu thì từ chối.
+#[tokio::test]
+async fn copy_chep_du_lieu_sang_database_khac() {
+    autoxide_testkit::TestDatabase::run(async |target| {
+        let directory = WorkDir::new("copy");
+        let source = [("DATABASE_URL", "sqlite://source.sqlite?mode=rwc")];
+        let migrated = autoxide(directory.path(), &["migrate", "up"], &source);
+        assert_eq!(migrated.status.code(), Some(0), "{}", stderr(&migrated));
+        let arguments =
+            ["user", "create", "--email", "ada@example.com", "--name", "Ada", "--admin"];
+        let created = autoxide(directory.path(), &arguments, &source);
+        assert_eq!(created.status.code(), Some(0), "{}", stderr(&created));
+
+        // URL đích qua standard input: không hiện trong danh sách tiến trình.
+        let copied =
+            autoxide_with_input(directory.path(), &["copy", "--to-stdin"], &source, target.url());
+        assert_eq!(copied.status.code(), Some(0), "{}", stderr(&copied));
+        let report = stdout(&copied);
+        assert!(report.lines().any(|line| line.trim() == "1  auth_user"), "{report}");
+        assert!(report.contains("Copied "), "{report}");
+        // Tài khoản đã sang đích: tạo lại cùng email ở đích thì báo trùng.
+        let on_target = [("DATABASE_URL", target.url())];
+        let duplicate = autoxide(directory.path(), &arguments, &on_target);
+        assert_eq!(duplicate.status.code(), Some(1));
+        assert!(stderr(&duplicate).contains("already exists"), "{}", stderr(&duplicate));
+
+        let again = autoxide(directory.path(), &["copy", "--to", target.url()], &source);
+        assert_eq!(again.status.code(), Some(1));
+        assert!(stderr(&again).contains("already has Autoxide tables"), "{}", stderr(&again));
+        let neither = autoxide(directory.path(), &["copy"], &source);
+        assert_eq!(neither.status.code(), Some(2), "clap rejects a missing target");
+    })
+    .await
+    .unwrap();
+}

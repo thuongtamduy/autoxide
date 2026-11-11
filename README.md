@@ -156,6 +156,13 @@ matching REST endpoint, so writes land in the audit log. For example, with Claud
 claude mcp add --transport http autoxide http://127.0.0.1:8080/mcp --header "Authorization: Bearer <api key>"
 ```
 
+To move to PostgreSQL later (or bring data back to SQLite), stop the server and copy
+everything into a new, empty database; it gets every migration first:
+
+```bash
+printf '%s' 'postgres://user:password@host:5432/autoxide' | cargo run -p autoxide -- copy --to-stdin
+```
+
 [`.env.example`](.env.example) lists every setting with its description and
 default. It is generated from the code, so it cannot go out of date. An invalid
 configuration is reported in full — every problem at once, each saying what to

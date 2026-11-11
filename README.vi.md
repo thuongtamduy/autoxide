@@ -153,6 +153,13 @@ audit log. Ví dụ với Claude Code:
 claude mcp add --transport http autoxide http://127.0.0.1:8080/mcp --header "Authorization: Bearer <api key>"
 ```
 
+Muốn chuyển sang PostgreSQL về sau (hay mang dữ liệu về SQLite), dừng máy chủ rồi chép
+mọi thứ sang một database mới, trống; database đó được áp dụng mọi migration trước:
+
+```bash
+printf '%s' 'postgres://user:password@host:5432/autoxide' | cargo run -p autoxide -- copy --to-stdin
+```
+
 [`.env.example`](.env.example) liệt kê mọi biến kèm mô tả và giá trị mặc định. File
 này sinh ra từ code nên không thể lỗi thời. Cấu hình sai được báo đầy đủ — mọi vấn
 đề cùng một lượt, mỗi vấn đề nói rõ phải sửa gì — và lệnh thoát với mã 2. Secret

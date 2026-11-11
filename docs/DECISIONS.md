@@ -1481,3 +1481,28 @@ ai dùng; module đầu tiên do chủ dự án chọn. Ghi chú là ví dụ kh
 Đã cân nhắc: đăng ký sẵn và bật/tắt bằng cấu hình — thêm một cơ chế chỉ để phục vụ
 module mẫu; để module mẫu trong thư mục `examples/` — khi đó gate không kiểm ranh giới
 module của nó như module thật.
+
+## D-070 · Chép dữ liệu giữa SQLite và Postgres bằng `autoxide copy` — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- `kernel::transfer::copy_modules(nguồn, đích, module)` chép mọi bảng `<module>_…` (trừ
+  `<module>_migrations`) theo thứ tự tạo bảng ở đích (`sqlite_master.rowid`,
+  `pg_class.oid`) — tức thứ tự migration, nên foreign key trong module luôn thoả. Kiểu
+  của từng cột lấy từ khai báo của mỗi database (`pragma_table_info` với tên kiểu
+  sea-query đặt như `uuid_text`; `information_schema.columns`), đọc theo kiểu ở nguồn, ghi
+  theo kiểu ở đích (số nguyên SQLite luôn đọc 64 bit, đổi có kiểm sang `integer` 4 byte
+  của Postgres). Đọc theo luồng, ghi 100 dòng mỗi câu, tất cả trong MỘT transaction ở
+  đích; xong thì đếm lại từng bảng.
+- Dữ liệu migration gieo sẵn ở đích (role `admin`) bị xoá trong cùng transaction rồi
+  thay bằng dữ liệu nguồn. Vì vậy lệnh `autoxide copy --to <URL>` (hay `--to-stdin`,
+  để mật khẩu không hiện trong danh sách tiến trình) chỉ nhận database đích chưa từng có
+  migration nào, đòi nguồn đã áp dụng đủ migration, rồi áp dụng migration cho đích.
+- Test: kernel chép SQLite → database của gate → SQLite với đủ kiểu cột, NULL, chữ
+  Unicode và 250 dòng (vượt một lô); binary chép dữ liệu thật của các module.
+
+Lý do: không cần công cụ ngoài (pgloader…) hay định dạng trung gian; dùng đúng
+migration của chương trình nên schema hai bên chắc chắn khớp.
+
+Đã cân nhắc: xuất / nhập JSON — thêm một định dạng phải giữ ổn định; tắt kiểm foreign
+key khi chép — Postgres cần quyền superuser.

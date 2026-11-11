@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–10 xong; đang ở bước 11**, mục "Lệnh CLI chép dữ liệu giữa SQLite và Postgres".
+Trạng thái: **bước 0–10 xong; đang ở bước 11**, mục "Bộ đo hiệu năng".
 
 ## 0. Khung dự án
 
@@ -105,7 +105,7 @@ Cho AI agent gọi chức năng của hệ thống như công cụ (Model Contex
 
 ## 11. Công cụ và deploy
 
-- [ ] Lệnh CLI chép dữ liệu giữa SQLite và Postgres
+- [x] Lệnh CLI chép dữ liệu giữa SQLite và Postgres
 - [ ] Bộ đo hiệu năng (đọc, list, ghi, ghi đồng thời) trên cả hai database, có số gốc để so về sau
 - [ ] Dockerfile multi-stage + `compose.yml` (ứng dụng + Postgres)
 - [ ] Backup và restore

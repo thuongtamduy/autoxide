@@ -31,6 +31,14 @@ enum Command {
     /// printed. Exits with status 2 when the configuration is invalid.
     Config(commands::config::Arguments),
 
+    /// Copy the data of every module into another, empty database.
+    ///
+    /// Copies from this server's database (`DATABASE_URL`) to the target — SQLite to
+    /// PostgreSQL or back. The target gets every migration first, must hold no data,
+    /// and receives everything in one transaction. Stop the server first so that no
+    /// change is missed.
+    Copy(commands::copy::Arguments),
+
     /// Inspect and retry background jobs that failed for good (the dead-letter queue).
     Jobs(commands::jobs::Arguments),
 
@@ -64,6 +72,7 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
         Command::Config(arguments) => commands::config::run(&arguments),
+        Command::Copy(arguments) => commands::copy::run(&arguments),
         Command::Jobs(arguments) => commands::jobs::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
         Command::Openapi => commands::openapi::run(),
