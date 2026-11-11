@@ -99,7 +99,12 @@ impl Module for AuthModule {
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
         context.provide::<dyn api::Users>(users.clone())?;
         context.provide::<dyn api::Accounts>(users.clone())?;
-        self.state = Some(http::HttpState { sessions, users, roles });
+        self.state = Some(http::HttpState {
+            sessions,
+            users,
+            roles,
+            self_registration: config.self_registration,
+        });
         Ok(())
     }
 

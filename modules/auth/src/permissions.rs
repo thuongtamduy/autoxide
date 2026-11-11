@@ -16,7 +16,12 @@ pub(crate) const ROLES_MANAGE: Permission = Permission::new(
 pub(crate) const USERS_READ: Permission =
     Permission::new("auth.users.read", "See user accounts and the roles assigned to them.");
 
+pub(crate) const USERS_MANAGE: Permission = Permission::new(
+    "auth.users.manage",
+    "Create user accounts, rename them, and disable or enable them.",
+);
+
 /// Mọi permission module `auth` khai.
 pub(crate) fn all() -> Vec<Permission> {
-    vec![ROLES_READ, ROLES_MANAGE, USERS_READ]
+    vec![ROLES_READ, ROLES_MANAGE, USERS_READ, USERS_MANAGE]
 }

@@ -886,3 +886,28 @@ Quyết định:
 
 Lý do: người cài cần một cách tạo quản trị viên đầu tiên mà không cần ai đăng nhập
 trước; dòng lệnh là cách chuẩn (Django `createsuperuser`, Keycloak bootstrap admin).
+
+## D-049 · Quản lý người dùng qua API và tự đăng ký — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Permission mới `auth.users.manage`: tạo tài khoản (`POST /api/v1/auth/users`), đổi
+  tên, khoá và mở khoá (`PATCH /api/v1/auth/users/{id}`). Xem danh sách và một tài khoản
+  cần `auth.users.read`. Gán role vẫn cần `auth.roles.manage` (D-046) — tạo tài khoản
+  không kéo theo cấp quyền.
+- **Khoá thay vì xoá:** tài khoản bị khoá giữ nguyên dữ liệu (module khác có thể đang
+  giữ ID của nó — không foreign key xuyên module, D-025), không đăng nhập được, access
+  token mất hiệu lực ngay ở request kế (đã kiểm tài khoản khoá mỗi request), refresh
+  token bị thu hồi trong cùng transaction. Không khoá được admin cuối cùng còn hoạt
+  động; phép đếm admin (cả khi gỡ role) từ nay chỉ tính tài khoản chưa khoá.
+- **Tự đăng ký** `POST /api/v1/auth/register` (không cần đăng nhập) chỉ mở khi
+  `AUTOXIDE_AUTH_SELF_REGISTRATION=true` (mặc định tắt — D-028); tắt thì trả 403
+  `auth.registration_disabled`. Tài khoản tự đăng ký không có role nào; bắt buộc có
+  mật khẩu. Rate limiting chung của kernel chặn tạo hàng loạt.
+
+Giới hạn đã chấp nhận: đăng ký bằng email đã có trả `auth.email_taken`, nên ai đăng
+ký được thì biết một email đã có tài khoản. Cách chặn hoàn toàn là xác minh email
+trước khi tạo tài khoản — làm ở bước 7 (email).
+
+Đã cân nhắc: xoá hẳn tài khoản — mất dấu vết cho audit log và để lại ID mồ côi ở module
+khác; role mặc định cho người tự đăng ký — chưa có nhu cầu, thêm bằng cấu hình khi cần.

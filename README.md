@@ -21,7 +21,9 @@ users with Argon2id password hashes and signs them in with short-lived access
 tokens and rotating refresh tokens (`/api/v1/auth/login`, `/refresh`, `/logout`,
 `/me`). Access is controlled by roles: each module declares its permissions, roles
 group them (`/api/v1/auth/roles`), and a built-in `admin` role has them all. The
-first administrator is created from the command line (`autoxide user create`).
+first administrator is created from the command line (`autoxide user create`);
+after that, administrators manage accounts through `/api/v1/auth/users`. People can
+create their own accounts only when `AUTOXIDE_AUTH_SELF_REGISTRATION=true`.
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 

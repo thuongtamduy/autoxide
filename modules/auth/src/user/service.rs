@@ -5,7 +5,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
-use sea_orm::sea_query::Expr;
+use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use uuid::Uuid;
 use validator::ValidateEmail;
@@ -26,6 +26,14 @@ pub(crate) struct NewUser {
     pub name: String,
     /// `None`: tài khoản chưa có mật khẩu (đặt sau, vd qua đường dẫn đặt lại mật khẩu).
     pub password: Option<String>,
+}
+
+/// Thay đổi cho một người dùng; trường `None` giữ nguyên.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct UserChanges {
+    pub name: Option<String>,
+    /// `true`: khoá; `false`: mở khoá.
+    pub disabled: Option<bool>,
 }
 
 pub(crate) struct UserService {
@@ -97,15 +105,7 @@ impl UserService {
             tracing::warn!(user_id = %id, error = %error, "cannot upgrade the password hash");
         }
     }
-}
 
-// Các hàm dưới đây được đăng nhập, lệnh CLI tạo người dùng và API quản trị dùng — đều
-// là các mục kế tiếp của lộ trình bước 2. Tới lúc đó chỉ test gọi chúng.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "used by login and user management, next items of roadmap step 2")
-)]
-impl UserService {
     /// Tạo người dùng. Email được chuẩn hoá (bỏ khoảng trắng hai đầu, chữ thường)
     /// và phải chưa ai dùng.
     pub(crate) async fn create(&self, input: NewUser) -> Result<User, Error> {
@@ -167,7 +167,55 @@ impl UserService {
         Ok(row.into())
     }
 
+    /// Đổi tên và/hoặc khoá, mở khoá người dùng `id`. Khoá thì đăng xuất người đó ở
+    /// mọi nơi; không khoá được admin cuối cùng còn hoạt động.
+    pub(crate) async fn update(&self, id: Uuid, changes: UserChanges) -> Result<User, Error> {
+        let name = changes.name.map(|name| name.trim().to_owned());
+        if let Some(problem) = name.as_deref().and_then(check_name) {
+            return Err(Error::validation(vec![problem]));
+        }
+        let transaction = self.database.begin_write().await?;
+        let admins_before = crate::role::count_active_admins(&transaction).await?;
+        let now = now();
+        let mut update = Entity::update_many().col_expr(Column::UpdatedAt, Expr::value(now));
+        if let Some(name) = name {
+            update = update.col_expr(Column::Name, Expr::value(name));
+        }
+        match changes.disabled {
+            // Đã khoá rồi thì giữ nguyên thời điểm khoá cũ.
+            Some(true) => {
+                update = update.col_expr(
+                    Column::DisabledAt,
+                    Expr::col(Column::DisabledAt).if_null(Expr::value(now)),
+                );
+            }
+            Some(false) => {
+                update = update.col_expr(Column::DisabledAt, Expr::value(None::<DateTime<Utc>>));
+            }
+            None => {}
+        }
+        // Câu `UPDATE` này cũng khoá dòng người dùng tới hết transaction.
+        let updated = update.filter(Column::Id.eq(id)).exec(&transaction).await?;
+        if updated.rows_affected == 0 {
+            transaction.rollback().await?;
+            return Err(user_not_found(id));
+        }
+        if changes.disabled == Some(true) {
+            SessionService::revoke_user(&transaction, id).await?;
+            if admins_before > 0 && crate::role::count_active_admins(&transaction).await? == 0 {
+                transaction.rollback().await?;
+                return Err(crate::role::last_admin());
+            }
+        }
+        let row =
+            Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| user_not_found(id))?;
+        transaction.commit().await?;
+        tracing::info!(user_id = %id, disabled = ?changes.disabled, "user changed");
+        Ok(row.into())
+    }
+
     /// Người dùng có email `email` (so sánh sau khi chuẩn hoá).
+    #[cfg_attr(not(test), expect(dead_code, reason = "used by password reset, roadmap step 7"))]
     pub(crate) async fn find_by_email(&self, email: &str) -> Result<Option<User>, Error> {
         let row = Entity::find()
             .filter(Column::Email.eq(normalize_email(email)))
@@ -184,6 +232,7 @@ impl UserService {
     }
 
     /// Đặt mật khẩu mới cho người dùng `id`.
+    #[cfg_attr(not(test), expect(dead_code, reason = "used by password reset, roadmap step 7"))]
     pub(crate) async fn set_password(&self, id: Uuid, password: String) -> Result<(), Error> {
         if let Some(problem) = password::check_rules("password", &password) {
             return Err(Error::validation(vec![problem]));
@@ -602,6 +651,90 @@ mod account_tests {
                 .await
                 .unwrap();
             assert_eq!(page.data.len(), 1);
+        })
+        .await
+        .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod update_tests {
+    use super::*;
+    use autoxide_kernel::error::ErrorKind;
+    use autoxide_testkit::TestDatabase;
+
+    const PASSWORD: &str = "correct horse battery staple";
+
+    fn account(email: &str, admin: bool) -> NewAccount {
+        NewAccount {
+            email: email.to_owned(),
+            name: "Ada".to_owned(),
+            password: Some(PASSWORD.to_owned()),
+            admin,
+        }
+    }
+
+    fn disable(disabled: bool) -> UserChanges {
+        UserChanges { name: None, disabled: Some(disabled) }
+    }
+
+    #[tokio::test]
+    async fn doi_ten_khoa_va_mo_khoa() {
+        TestDatabase::run(async |test| {
+            let services = crate::testing::services(test).await;
+            let users = &services.users;
+            Accounts::create(users.as_ref(), account("root@example.com", true)).await.unwrap();
+            let ada =
+                Accounts::create(users.as_ref(), account("ada@example.com", false)).await.unwrap();
+            let tokens = services.sessions.login("ada@example.com", PASSWORD).await.unwrap();
+
+            let renamed = users
+                .update(ada.id, UserChanges { name: Some("  Ada L. ".to_owned()), disabled: None })
+                .await
+                .unwrap();
+            assert_eq!(renamed.name, "Ada L.");
+            assert!(renamed.is_active());
+
+            let disabled = users.update(ada.id, disable(true)).await.unwrap();
+            assert!(!disabled.is_active());
+            // Khoá lần nữa giữ thời điểm khoá cũ.
+            let again = users.update(ada.id, disable(true)).await.unwrap();
+            assert_eq!(again.disabled_at, disabled.disabled_at);
+            // Đăng xuất ở mọi nơi: refresh token cũ hết dùng được.
+            let refresh = services.sessions.refresh(&tokens.refresh_token).await.unwrap_err();
+            assert_eq!(refresh.code(), "auth.invalid_refresh_token");
+            let login = services.sessions.login("ada@example.com", PASSWORD).await.unwrap_err();
+            assert_eq!(login.code(), "auth.user_disabled");
+
+            let enabled = users.update(ada.id, disable(false)).await.unwrap();
+            assert!(enabled.is_active());
+            services.sessions.login("ada@example.com", PASSWORD).await.unwrap();
+
+            let missing = users.update(Uuid::now_v7(), disable(true)).await.unwrap_err();
+            assert_eq!(missing.code(), "auth.user_not_found");
+            let empty = UserChanges { name: Some(" ".to_owned()), disabled: None };
+            assert_eq!(users.update(ada.id, empty).await.unwrap_err().code(), "validation_failed");
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn khong_khoa_duoc_admin_cuoi_cung() {
+        TestDatabase::run(async |test| {
+            let services = crate::testing::services(test).await;
+            let users = &services.users;
+            let root =
+                Accounts::create(users.as_ref(), account("root@example.com", true)).await.unwrap();
+
+            let error = users.update(root.id, disable(true)).await.unwrap_err();
+
+            assert_eq!(error.kind(), ErrorKind::Conflict);
+            assert_eq!(error.code(), "auth.last_admin");
+            assert!(users.get(root.id).await.unwrap().unwrap().is_active());
+            // Có admin khác còn hoạt động thì khoá được.
+            Accounts::create(users.as_ref(), account("second@example.com", true)).await.unwrap();
+            users.update(root.id, disable(true)).await.unwrap();
         })
         .await
         .unwrap();

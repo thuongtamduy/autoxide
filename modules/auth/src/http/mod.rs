@@ -3,6 +3,7 @@
 
 mod roles;
 mod session;
+mod users;
 
 use std::sync::Arc;
 
@@ -18,10 +19,12 @@ pub(crate) struct HttpState {
     pub sessions: Arc<SessionService>,
     pub users: Arc<UserService>,
     pub roles: Arc<RoleService>,
+    /// Cho người lạ tự đăng ký (`POST /register`).
+    pub self_registration: bool,
 }
 
 pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
-    session::routes().merge(roles::routes()).with_state(Arc::new(state))
+    session::routes().merge(roles::routes()).merge(users::routes()).with_state(Arc::new(state))
 }
 
 #[cfg(test)]
@@ -42,8 +45,13 @@ pub(crate) mod test_support {
 
     pub const PASSWORD: &str = "correct horse battery staple";
 
-    /// Router với một người dùng sẵn có, `ada@example.com`.
+    /// Router với một người dùng sẵn có, `ada@example.com`; tự đăng ký tắt.
     pub async fn app(test: &TestDatabase) -> (Router, Services) {
+        app_with(test, false).await
+    }
+
+    /// Như [`app`], chọn bật hay tắt tự đăng ký.
+    pub async fn app_with(test: &TestDatabase, self_registration: bool) -> (Router, Services) {
         let services = crate::testing::services(test).await;
         services
             .users
@@ -62,6 +70,7 @@ pub(crate) mod test_support {
             sessions: services.sessions.clone(),
             users: services.users.clone(),
             roles: services.roles.clone(),
+            self_registration,
         };
         let router = autoxide_kernel::http::build(
             &config.http,

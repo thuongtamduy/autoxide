@@ -20,7 +20,9 @@ với mật khẩu hash bằng Argon2id và cho đăng nhập bằng access toke
 refresh token xoay vòng (`/api/v1/auth/login`, `/refresh`, `/logout`, `/me`). Quyền truy
 cập theo role: mỗi module khai permission của mình, role gom chúng lại
 (`/api/v1/auth/roles`), và role `admin` dựng sẵn có tất cả. Quản trị viên đầu tiên
-được tạo bằng dòng lệnh (`autoxide user create`).
+được tạo bằng dòng lệnh (`autoxide user create`); sau đó quản trị viên quản lý tài
+khoản qua `/api/v1/auth/users`. Người dùng chỉ tự tạo được tài khoản khi đặt
+`AUTOXIDE_AUTH_SELF_REGISTRATION=true`.
 
 Core sẽ gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 

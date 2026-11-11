@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "Tạo người dùng: quản trị viên tạo; tự đăng ký bật tắt bằng cấu hình".
+Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "API key cho máy và AI agent: tạo, thu hồi, giới hạn theo permission".
 
 ## 0. Khung dự án
 
@@ -36,7 +36,7 @@ Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "Tạo ngư�
 - [x] Role và permission; module tự khai báo permission của mình
 - [x] Rate limiting; login throttling
 - [x] CLI tạo người dùng đầu tiên
-- [ ] Tạo người dùng: quản trị viên tạo; tự đăng ký bật tắt bằng cấu hình (mặc định tắt)
+- [x] Tạo người dùng: quản trị viên tạo; tự đăng ký bật tắt bằng cấu hình (mặc định tắt)
 - [ ] API key cho máy và AI agent: tạo, thu hồi, giới hạn theo permission
 
 ## 3. MFA
@@ -75,6 +75,8 @@ Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "Tạo ngư�
 - [ ] Gửi mail qua SMTP sau một trait; khi chưa cấu hình SMTP thì ghi mail ra file (cho dev và test)
 - [ ] Mẫu mail theo i18n key (vi, en)
 - [ ] Đặt lại mật khẩu: token dùng một lần, có hạn, không lộ việc email có tồn tại hay không
+- [ ] Người dùng tự đổi mật khẩu của mình (cần nhập mật khẩu cũ); quản trị viên đặt mật khẩu
+      cho tài khoản tạo không kèm mật khẩu (service `set_password` đã có)
 - [ ] Xác minh email khi tạo tài khoản và khi đổi email
 
 ## 8. Lưu file

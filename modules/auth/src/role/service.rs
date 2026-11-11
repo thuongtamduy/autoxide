@@ -198,7 +198,7 @@ impl RoleService {
                 "every entry must be the id of an existing role",
             )]));
         }
-        let admins_before = count_admins(&transaction).await?;
+        let admins_before = count_active_admins(&transaction).await?;
         user_role::Entity::delete_many()
             .filter(user_role::Column::UserId.eq(user_id))
             .exec(&transaction)
@@ -216,13 +216,9 @@ impl RoleService {
         }
         // Chỉ chặn khi thay đổi này lấy đi admin cuối cùng. Lúc mới cài chưa có admin
         // nào thì việc gán role vẫn được phép.
-        if admins_before > 0 && count_admins(&transaction).await? == 0 {
+        if admins_before > 0 && count_active_admins(&transaction).await? == 0 {
             transaction.rollback().await?;
-            return Err(Error::conflict(
-                "auth.last_admin",
-                "This change would leave no user with the `admin` role, and nobody could manage \
-                 roles any more. Give the `admin` role to another user first.",
-            ));
+            return Err(last_admin());
         }
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, roles = role_ids.len(), "user roles changed");
@@ -394,8 +390,8 @@ async fn roles_of_user<C: ConnectionTrait>(
         .collect())
 }
 
-/// Số người dùng đang có một role mang mọi permission.
-async fn count_admins<C: ConnectionTrait>(connection: &C) -> Result<u64, Error> {
+/// Số người dùng CÒN HOẠT ĐỘNG (chưa bị khoá) đang có một role mang mọi permission.
+pub(crate) async fn count_active_admins<C: ConnectionTrait>(connection: &C) -> Result<u64, Error> {
     let count = user_role::Entity::find()
         .filter(
             user_role::Column::RoleId.in_subquery(
@@ -406,9 +402,27 @@ async fn count_admins<C: ConnectionTrait>(connection: &C) -> Result<u64, Error> 
                     .to_owned(),
             ),
         )
+        .filter(
+            user_role::Column::UserId.in_subquery(
+                Query::select()
+                    .column(user::Column::Id)
+                    .from(user::Entity)
+                    .and_where(user::Column::DisabledAt.is_null())
+                    .to_owned(),
+            ),
+        )
         .count(connection)
         .await?;
     Ok(count)
+}
+
+/// Lỗi khi một thay đổi sẽ để hệ thống không còn admin nào hoạt động.
+pub(crate) fn last_admin() -> Error {
+    Error::conflict(
+        "auth.last_admin",
+        "This change would leave no active user with the `admin` role, and nobody could manage \
+         the system any more. Give the `admin` role to another user first.",
+    )
 }
 
 fn to_role(row: role::Model, permissions: Vec<String>) -> Role {

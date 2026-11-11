@@ -43,6 +43,14 @@ pub(crate) const LOGIN_LOCK_MINUTES: Setting = Setting::new(
 )
 .with_default("15");
 
+pub(crate) const SELF_REGISTRATION: Setting = Setting::new(
+    "AUTOXIDE_AUTH_SELF_REGISTRATION",
+    "Let anyone create an account with `POST /api/v1/auth/register` (`true` or `false`). New \
+     accounts get no role. When `false`, only users with the `auth.users.manage` permission \
+     create accounts.",
+)
+.with_default("false");
+
 /// Độ dài tối thiểu của khoá ký token: 256 bit, bằng độ dài đầu ra của SHA-256.
 const MIN_SECRET_LENGTH: usize = 32;
 
@@ -56,6 +64,8 @@ pub(crate) struct AuthConfig {
     pub login_max_failures: u32,
     /// Thời gian nhớ lần sai, và thời gian khoá đăng nhập sau quá nhiều lần sai.
     pub login_lock: Duration,
+    /// Cho người lạ tự đăng ký.
+    pub self_registration: bool,
 }
 
 impl AuthConfig {
@@ -76,12 +86,18 @@ impl AuthConfig {
         let max_failures =
             reader.get_with(&LOGIN_MAX_FAILURES, |raw| parse_in_range(raw, 1u32, 100));
         let lock = reader.get_with(&LOGIN_LOCK_MINUTES, |raw| parse_in_range(raw, 1u64, 1440));
+        let self_registration = reader.get_with(&SELF_REGISTRATION, |raw| match raw {
+            "true" => Ok(true),
+            "false" => Ok(false),
+            _ => Err("must be `true` or `false`".to_owned()),
+        });
         Ok(AuthConfig {
             token_secret: token_secret?,
             access_token_ttl: Duration::from_secs(access?),
             refresh_token_ttl: Duration::from_secs(refresh? * 24 * 60 * 60),
             login_max_failures: max_failures?,
             login_lock: Duration::from_secs(lock? * 60),
+            self_registration: self_registration?,
         })
     }
 }
@@ -107,6 +123,8 @@ mod tests {
         assert_eq!(config.refresh_token_ttl, Duration::from_secs(30 * 24 * 60 * 60));
         assert_eq!(config.login_max_failures, 5);
         assert_eq!(config.login_lock, Duration::from_secs(15 * 60));
+        assert!(!config.self_registration);
+        assert!(read(&[("AUTOXIDE_AUTH_SELF_REGISTRATION", "true")]).unwrap().self_registration);
     }
 
     #[test]
