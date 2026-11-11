@@ -11,9 +11,11 @@ publish.workspace = true
 autoxide-kernel.workspace = true
 clap.workspace = true
 tokio.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
 autoxide-testkit.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

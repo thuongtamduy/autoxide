@@ -12,10 +12,11 @@ core không chứa khái niệm nghiệp vụ — những thứ đó thuộc v�
 
 ## Trạng thái
 
-Đang ở giai đoạn đầu. **Bước 0 của lộ trình (khung dự án) đã xong**: workspace
-Cargo, bộ luật lint chung, bộ thư viện đã ghim phiên bản và được kiểm trên cả hai
-database, kiểm ranh giới tự động, và gate chất lượng. Bước 1 (nền) đang làm: đã có
-cấu hình, truy cập database và migration theo module; chưa có máy chủ HTTP để chạy.
+Đang ở giai đoạn đầu. **Bước 0 và bước 1 của lộ trình (khung dự án và nền) đã
+xong**: workspace Cargo, gate chất lượng, cấu hình, truy cập database, migration theo
+module, hợp đồng module, máy chủ HTTP dưới `/api/v1` kèm OpenAPI, health check, log,
+metrics, tracing và CLI. Chưa có module nào nên API chưa có endpoint nghiệp vụ. Bước
+tiếp theo là bước 2 (đăng nhập, role và permission).
 
 Core sẽ gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -90,6 +91,17 @@ cargo run -p autoxide -- migrate status          # cái gì đã áp dụng, cá
 cargo run -p autoxide -- migrate up              # áp dụng mọi thứ còn chờ
 cargo run -p autoxide -- migrate down <module>   # gỡ migration mới nhất của một module
 ```
+
+Sau đó chạy máy chủ. Máy chủ từ chối chạy khi còn migration chưa áp dụng, và dừng êm
+khi nhận Ctrl-C hoặc `SIGTERM` (request đang chạy có `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`
+giây để xong):
+
+```bash
+cargo run -p autoxide -- serve
+```
+
+Mặc định máy chủ nghe ở `127.0.0.1:8080`: kiểm bằng
+`curl http://127.0.0.1:8080/health/ready`. Log ghi ra standard error.
 
 Hợp đồng của API là một tài liệu OpenAPI sinh ra từ code. Nó nằm trong repo ở
 [`docs/openapi.json`](docs/openapi.json), in ra được bằng `autoxide openapi`, và máy

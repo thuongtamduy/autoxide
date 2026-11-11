@@ -350,7 +350,9 @@ dependencies = [
  "autoxide-kernel",
  "autoxide-testkit",
  "clap",
+ "serde_json",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

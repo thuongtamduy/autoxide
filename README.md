@@ -12,11 +12,12 @@ the core contains no business concepts — those belong to modules.
 
 ## Status
 
-Early development. **Step 0 of the roadmap (project skeleton) is done**: the Cargo
-workspace, shared lint rules, the pinned library stack verified on both databases,
-automated boundary checks, and the quality gate. Step 1 (foundation) is in
-progress: configuration, database access and per-module migrations exist; there
-is no HTTP server to run yet.
+Early development. **Steps 0 and 1 of the roadmap (project skeleton and
+foundation) are done**: the Cargo workspace, the quality gate, configuration,
+database access, per-module migrations, the module contract, the HTTP server
+under `/api/v1` with OpenAPI, health checks, logs, metrics, tracing and the CLI.
+There are no modules yet, so the API has no business endpoints. Step 2 (login,
+roles and permissions) is next.
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -91,6 +92,17 @@ cargo run -p autoxide -- migrate status          # what is applied, what is pend
 cargo run -p autoxide -- migrate up              # apply everything that is pending
 cargo run -p autoxide -- migrate down <module>   # revert the newest migration of one module
 ```
+
+Then start the server. It refuses to start while a migration is pending, and
+stops gracefully on Ctrl-C or `SIGTERM` (requests in progress get
+`AUTOXIDE_HTTP_SHUTDOWN_SECONDS` to finish):
+
+```bash
+cargo run -p autoxide -- serve
+```
+
+By default it listens on `127.0.0.1:8080`: check it with
+`curl http://127.0.0.1:8080/health/ready`. Logs go to standard error.
 
 The API contract is an OpenAPI document generated from the code. It is committed
 as [`docs/openapi.json`](docs/openapi.json), printed by `autoxide openapi`, and

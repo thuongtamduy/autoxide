@@ -3,6 +3,7 @@
 pub mod config;
 pub mod migrate;
 pub mod openapi;
+pub mod serve;
 
 use std::future::Future;
 use std::process::ExitCode;

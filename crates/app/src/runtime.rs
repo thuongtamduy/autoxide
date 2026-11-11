@@ -12,19 +12,33 @@ use crate::settings::Settings;
 
 /// Chương trình đã khởi động xong, sẵn sàng phục vụ.
 pub struct Runtime {
-    #[expect(dead_code, reason = "used by `serve`, the last item of roadmap step 1")]
     pub config: Config,
     pub database: Database,
     /// Giữ các module sống cùng chương trình: chúng sở hữu service của mình.
-    #[expect(dead_code, reason = "modules will own background work (events, jobs) in later steps")]
     pub modules: Modules,
     pub api: Api,
 }
 
+/// Có đòi database đã áp dụng đủ migration trước khi khởi động không.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Migrations {
+    /// Không kiểm: lệnh không chạm tới bảng của module (vd `openapi`).
+    Ignore,
+    /// Còn migration chưa áp dụng thì từ chối khởi động (vd `serve`): module chạy
+    /// trên bảng chưa có hay bảng cũ sẽ hỏng giữa chừng, khó hiểu hơn nhiều.
+    RequireApplied,
+}
+
 /// Kết nối database, khởi động từng module, rồi ghép router và tài liệu OpenAPI.
-pub async fn start(settings: Settings) -> Result<Runtime, String> {
+pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime, String> {
     let Settings { config, mut modules, .. } = settings;
     let database = Database::connect(&config.database).await.map_err(|error| error.to_string())?;
+    if migrations == Migrations::RequireApplied
+        && let Err(error) = require_applied(&modules, &database).await
+    {
+        let _ = database.close().await;
+        return Err(error);
+    }
     if let Err(error) = modules.start(&database) {
         // Đóng kết nối trước khi báo lỗi; lỗi khởi động quan trọng hơn lỗi lúc đóng.
         let _ = database.close().await;
@@ -46,4 +60,22 @@ pub async fn start(settings: Settings) -> Result<Runtime, String> {
     }
     let api = http::build(&config.http, root, modules.routes());
     Ok(Runtime { config, database, modules, api })
+}
+
+/// Lỗi nếu database còn migration chưa áp dụng; thông báo nêu từng migration và
+/// lệnh cần chạy.
+async fn require_applied(modules: &Modules, database: &Database) -> Result<(), String> {
+    let migrator = modules.migrator().map_err(|error| error.to_string())?;
+    let pending = migrator.pending(database).await.map_err(|error| error.to_string())?;
+    if pending.is_empty() {
+        return Ok(());
+    }
+    let noun = if pending.len() == 1 { "migration has" } else { "migrations have" };
+    let list: Vec<String> =
+        pending.iter().map(|state| format!("{}/{}", state.module, state.name)).collect();
+    Err(format!(
+        "{} {noun} not been applied to the database: {}; run `autoxide migrate up` first",
+        pending.len(),
+        list.join(", ")
+    ))
 }

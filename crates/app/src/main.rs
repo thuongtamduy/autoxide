@@ -42,6 +42,13 @@ enum Command {
     /// The same document is served at `/api/v1/openapi.json`. Connects to the
     /// database (modules build their services) but does not need migrations.
     Openapi,
+
+    /// Run the HTTP server until it receives Ctrl-C or SIGTERM.
+    ///
+    /// Refuses to start while a migration has not been applied: run
+    /// `autoxide migrate up` first. On shutdown, requests in progress get up to
+    /// `AUTOXIDE_HTTP_SHUTDOWN_SECONDS` to finish.
+    Serve,
 }
 
 fn main() -> ExitCode {
@@ -51,6 +58,7 @@ fn main() -> ExitCode {
         Command::Config(arguments) => commands::config::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
         Command::Openapi => commands::openapi::run(),
+        Command::Serve => commands::serve::run(),
     }
 }
 

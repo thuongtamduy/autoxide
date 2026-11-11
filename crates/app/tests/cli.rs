@@ -217,3 +217,56 @@ fn openapi_in_ra_dung_tai_lieu_trong_repo() {
     .unwrap();
     assert_eq!(stdout(&output), committed);
 }
+
+/// Chạy `autoxide serve` thật, gọi một endpoint, rồi gửi SIGTERM như Docker hay
+/// systemd khi dừng dịch vụ: tiến trình phải dừng êm và thoát mã 0.
+#[cfg(unix)]
+#[test]
+fn serve_phuc_vu_roi_dung_em_khi_nhan_sigterm() {
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::process::Stdio;
+
+    let directory = WorkDir::new("serve");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_autoxide"))
+        .arg("serve")
+        .current_dir(directory.path())
+        .env_clear()
+        // Port 0: hệ điều hành chọn port trống; port thật đọc từ dòng log "listening".
+        .envs([("AUTOXIDE_HTTP_ADDRESS", "127.0.0.1:0"), ("AUTOXIDE_LOG_FORMAT", "json")])
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut log = BufReader::new(child.stderr.take().unwrap());
+
+    let mut address = None;
+    let mut line = String::new();
+    while address.is_none() {
+        line.clear();
+        if log.read_line(&mut line).unwrap() == 0 {
+            let _ = child.kill();
+            panic!("`autoxide serve` exited before listening: {:?}", child.wait());
+        }
+        let event: serde_json::Value = serde_json::from_str(&line).unwrap();
+        if event["message"] == "listening" {
+            address = event["address"].as_str().map(str::to_owned);
+        }
+    }
+    let address = address.unwrap();
+
+    let mut stream = std::net::TcpStream::connect(&address).unwrap();
+    stream
+        .write_all(b"GET /health/ready HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n")
+        .unwrap();
+    let mut response = String::new();
+    stream.read_to_string(&mut response).unwrap();
+
+    let sent = Command::new("kill").args(["-TERM", &child.id().to_string()]).status().unwrap();
+    let status = child.wait().unwrap();
+    let mut rest = String::new();
+    log.read_to_string(&mut rest).unwrap();
+
+    assert!(response.starts_with("HTTP/1.1 200 OK\r\n"), "{response}");
+    assert!(sent.success());
+    assert_eq!(status.code(), Some(0), "{rest}");
+    assert!(rest.contains(r#""message":"stopped""#), "{rest}");
+}

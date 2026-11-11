@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0 xong; đang ở bước 1**, mục "CLI: `serve`, `migrate`" (còn `serve`).
+Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "Người dùng, hash mật khẩu Argon2id".
 
 ## 0. Khung dự án
 
@@ -27,8 +27,7 @@ Trạng thái: **bước 0 xong; đang ở bước 1**, mục "CLI: `serve`, `mi
 - [x] OpenAPI sinh từ code + kiểm không lệch trong gate
 - [x] Health check (`/health/live`, `/health/ready`)
 - [x] Log, metrics (`/metrics`), tracing
-- [ ] CLI: `serve`, `migrate` (`migrate up | down | status` đã có; còn `serve`, và nó phải
-      từ chối chạy khi còn migration chưa áp dụng)
+- [x] CLI: `serve`, `migrate` (`serve` từ chối chạy khi còn migration chưa áp dụng)
 
 ## 2. Đăng nhập, role và permission
 
