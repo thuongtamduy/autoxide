@@ -153,6 +153,9 @@ Each client address may make 600 requests a minute by default
 example to `X-Forwarded-For`) so that clients are told apart by their own address
 rather than the proxy's.
 
+Mail is written as `.eml` files to `data/mail` until you set `AUTOXIDE_MAIL_SMTP_URL`
+(for example `smtps://user:password@smtp.example.com:465`) and `AUTOXIDE_MAIL_FROM`.
+
 For production, set `AUTOXIDE_AUTH_TOKEN_SECRET` (the key that signs access tokens)
 to a long random value, the same on every server:
 
@@ -185,7 +188,7 @@ server instead, set `GATE_POSTGRES_URL` to the same kind of URL.
 | `crates/kernel`  | The foundation every module builds on. Knows no module.                 |
 | `crates/app`     | The `autoxide` binary: the one place where modules are registered.      |
 | `crates/testkit` | Test support: an isolated database per test, on SQLite or PostgreSQL.   |
-| `modules/<name>` | One crate per module. `modules/auth`: accounts, sign-in, roles, API keys, two-step sign-in. `modules/audit`: the append-only audit log. `modules/idempotency`: storage for idempotency keys. |
+| `modules/<name>` | One crate per module. `modules/auth`: accounts, sign-in, roles, API keys, two-step sign-in. `modules/audit`: the append-only audit log. `modules/idempotency`: storage for idempotency keys. `modules/mail`: mail delivery. |
 | `xtask`          | Developer tooling: `cargo xtask check` enforces the workspace boundaries. |
 | `gate.sh`        | The quality gate. A change is done only when this is green.             |
 

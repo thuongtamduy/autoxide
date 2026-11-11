@@ -1233,3 +1233,31 @@ trong khi các bước 7–11 của lộ trình còn nguyên.
 Mở lại khi: một sản phẩm dùng Autoxide cần thông báo trường tiếng Việt từ máy chủ
 (vd client không có bộ chữ riêng). Cách làm khi đó: `FieldError` mang câu mẫu và chỗ
 điền như `Error`, khoá dịch `field.<code>` trong `locales/vi.json`.
+
+## D-061 · Gửi mail — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- **Trait `kernel::mail::Mailer`** (`send(Mail)`), như `Authenticator` và
+  `IdempotencyStore`: module cần gửi mail `require::<dyn Mailer>()` mà không phụ thuộc
+  module gửi. Module mới **`mail`** cung cấp nó và phải đăng ký trước module dùng nó.
+- `send` chỉ kiểm địa chỉ rồi đưa mail vào job queue của module `mail` (job
+  `mail.send`); gửi chạy nền, lỗi (máy chủ SMTP tạm hỏng) thì thử lại với backoff, quá
+  10 lần vào dead-letter queue (D-056). Log chỉ ghi ID của job, không ghi địa chỉ hay
+  nội dung. Nội dung mail nằm trong `mail_jobs` tới khi được dọn (7 ngày): không gửi
+  mật khẩu qua mail.
+- **Đường gửi:** `AUTOXIDE_MAIL_SMTP_URL` (secret; `smtps://…` hay
+  `smtp://…?tls=required`) thì gửi bằng `lettre` 0.11; không đặt thì ghi file `.eml`
+  vào `AUTOXIDE_MAIL_FILE_DIR` (mặc định `data/mail`) và cảnh báo lúc khởi động — người
+  lạ chạy thử được mà không cần máy chủ mail. Người gửi: `AUTOXIDE_MAIL_FROM`.
+- `lettre` bỏ bộ feature mặc định (native-tls kéo OpenSSL); TLS dùng `rustls` với
+  `ring` — cùng thư viện mật mã với `sqlx`, tránh xung đột hai provider (D-043).
+- `deny.toml` cho phép license **0BSD** (của `quoted_printable`, bộ mã hoá nội dung mail
+  của `lettre`): thoáng hơn MIT, hợp với MIT OR Apache-2.0 của Autoxide.
+
+Đã kiểm: test gửi qua một máy chủ SMTP giả chạy trong test và qua file, trên hai
+database.
+
+Đã cân nhắc: gửi mail ngay trong request — request chậm theo máy chủ mail và mất mail
+khi máy chủ mail hỏng; gửi bằng event — mail không phải "việc phụ của một thay đổi" mà
+là việc chính được yêu cầu, job queue hợp hơn.

@@ -40,6 +40,7 @@ autoxide-testkit = { path = "crates/testkit" }
 autoxide-audit = { path = "modules/audit" }
 autoxide-auth = { path = "modules/auth" }
 autoxide-idempotency = { path = "modules/idempotency" }
+autoxide-mail = { path = "modules/mail" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
@@ -82,6 +83,15 @@ clap = { version = "4.6", features = ["derive", "env"] }
 # Trait có hàm `async` dùng được qua `dyn` (hợp đồng giữa các module). Rust chưa
 # hỗ trợ trực tiếp; SeaORM vốn đã kéo thư viện này vào cây phụ thuộc.
 async-trait = "0.1"
+# Gửi mail qua SMTP. Bỏ bộ feature mặc định (native-tls kéo OpenSSL); TLS dùng rustls với
+# `ring` — cùng thư viện mật mã sqlx đang dùng, tránh xung đột ở D-043.
+lettre = { version = "0.11", default-features = false, features = [
+  "builder",
+  "hostname",
+  "pool",
+  "smtp-transport",
+  "tokio1-rustls-tls",
+] }
 # Đọc file `.env` (chỉ đọc thành cặp tên/giá trị, không sửa môi trường tiến trình).
 dotenvy = "0.15"
 

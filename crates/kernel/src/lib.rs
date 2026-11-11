@@ -14,6 +14,7 @@ pub mod i18n;
 pub mod idempotency;
 pub mod job;
 pub mod logging;
+pub mod mail;
 pub mod metrics;
 pub mod migration;
 pub mod module;

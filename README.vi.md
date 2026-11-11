@@ -150,6 +150,10 @@ Mặc định mỗi địa chỉ client được gửi 600 request mỗi phút
 lần sai. Chạy sau reverse proxy thì đặt `AUTOXIDE_HTTP_CLIENT_IP_HEADER` (ví dụ
 `X-Forwarded-For`) để phân biệt client theo địa chỉ của chính họ thay vì của proxy.
 
+Mail được ghi thành file `.eml` vào `data/mail` cho tới khi bạn đặt
+`AUTOXIDE_MAIL_SMTP_URL` (ví dụ `smtps://user:password@smtp.example.com:465`) và
+`AUTOXIDE_MAIL_FROM`.
+
 Khi chạy thật (production), đặt `AUTOXIDE_AUTH_TOKEN_SECRET` (khoá ký access token)
 bằng một chuỗi ngẫu nhiên dài, giống nhau trên mọi máy chủ:
 
@@ -182,7 +186,7 @@ thì đặt `GATE_POSTGRES_URL` bằng một URL cùng dạng.
 | `crates/kernel`  | Nền mà mọi module dựa vào. Không biết module nào.                       |
 | `crates/app`     | Binary `autoxide`: nơi duy nhất đăng ký module.                         |
 | `crates/testkit` | Đồ dùng cho test: mỗi test một database riêng, trên SQLite hoặc PostgreSQL. |
-| `modules/<tên>`  | Mỗi module một crate. `modules/auth`: tài khoản, đăng nhập, role, API key, đăng nhập hai bước. `modules/audit`: audit log chỉ thêm. `modules/idempotency`: nơi lưu idempotency key. |
+| `modules/<tên>`  | Mỗi module một crate. `modules/auth`: tài khoản, đăng nhập, role, API key, đăng nhập hai bước. `modules/audit`: audit log chỉ thêm. `modules/idempotency`: nơi lưu idempotency key. `modules/mail`: gửi mail. |
 | `xtask`          | Công cụ cho người phát triển: `cargo xtask check` kiểm ranh giới workspace. |
 | `gate.sh`        | Gate chất lượng. Một thay đổi chỉ xong khi lệnh này xanh.               |
 

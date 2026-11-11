@@ -35,6 +35,9 @@ allow = [
   "Unicode-3.0",
   # Danh sách chứng chỉ gốc của Mozilla (webpki-roots, dùng bởi rustls).
   "CDLA-Permissive-2.0",
+  # BSD Zero Clause: thoáng hơn MIT, không bắt ghi tên tác giả (quoted_printable,
+  # bộ mã hoá nội dung mail của lettre). D-061.
+  "0BSD",
 ]
 confidence-threshold = 0.9
 

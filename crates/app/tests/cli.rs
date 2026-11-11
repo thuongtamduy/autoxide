@@ -169,8 +169,12 @@ fn migrate_voi_cau_hinh_mac_dinh_tu_tao_file_sqlite() {
     // Không ghim danh sách migration ở đây (module thêm migration là đổi): chỉ kiểm
     // database mới thì mọi migration đều chờ, và `up` áp dụng hết.
     let listed = stdout(&status);
-    let first = listed.lines().next().unwrap_or_default();
-    assert!(first.starts_with("auth ") && first.contains(" m0001_create_user "), "{listed}");
+    assert!(
+        listed
+            .lines()
+            .any(|line| line.starts_with("auth ") && line.contains(" m0001_create_user ")),
+        "{listed}"
+    );
     assert!(listed.contains("\n0 applied, "), "{listed}");
     assert_eq!(up.status.code(), Some(0), "{}", stderr(&up));
     assert!(stdout(&up).contains("  auth/m0001_create_user\n"), "{}", stdout(&up));
@@ -189,7 +193,7 @@ fn migrate_down_module_khong_ton_tai_thoat_ma_1() {
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(
         stderr(&output),
-        "autoxide: migration: unknown module `nope`; registered modules: auth, audit, idempotency\n"
+        "autoxide: migration: unknown module `nope`; registered modules: mail, auth, audit, idempotency\n"
     );
 }
 

@@ -1,0 +1,84 @@
+//! Module `mail`: gửi mail cho mọi module (D-061).
+//!
+//! Module khác gọi `dyn Mailer` (`autoxide_kernel::mail`); mail vào job queue của module
+//! này và được gửi nền, lỗi thì thử lại. Có `AUTOXIDE_MAIL_SMTP_URL` thì gửi qua SMTP;
+//! không có thì ghi file `.eml` vào `AUTOXIDE_MAIL_FILE_DIR` (cho dev và test).
+
+pub mod api;
+mod config;
+mod service;
+mod transport;
+
+#[cfg(test)]
+mod tests;
+
+use std::sync::Arc;
+
+use autoxide_kernel::config::{ConfigReader, Invalid};
+use autoxide_kernel::error::Error;
+use autoxide_kernel::job::JobRegistration;
+use autoxide_kernel::mail::Mailer;
+use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::module::{Module, StartContext};
+
+use crate::config::MailConfig;
+use crate::service::{MailService, Sender};
+use crate::transport::Transport;
+
+/// Module `mail`, để binary đăng ký trong `crates/app/src/modules.rs` — TRƯỚC các module
+/// gửi mail.
+pub fn module() -> impl Module {
+    MailModule::default()
+}
+
+#[derive(Default)]
+struct MailModule {
+    /// Có sau `configure`.
+    config: Option<MailConfig>,
+    /// Có sau `start`.
+    sender: Option<Arc<Sender>>,
+}
+
+impl Module for MailModule {
+    fn name(&self) -> &'static str {
+        "mail"
+    }
+
+    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
+        vec![autoxide_kernel::job::jobs_migration("m0001_create_jobs", "mail")]
+    }
+
+    fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
+        self.config = Some(MailConfig::read(reader)?);
+        Ok(())
+    }
+
+    fn translations(&self) -> Vec<(&'static str, &'static str)> {
+        vec![("vi", include_str!("../locales/vi.json"))]
+    }
+
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        let config = self
+            .config
+            .clone()
+            .ok_or_else(|| Error::internal("module `mail` started before it was configured"))?;
+        if config.smtp_url.is_none() {
+            tracing::warn!(
+                directory = %config.file_dir.display(),
+                "AUTOXIDE_MAIL_SMTP_URL is not set: mail is written to files instead of being \
+                 sent; set it for production"
+            );
+        }
+        let transport = Arc::new(Transport::new(config.smtp_url.as_deref(), config.file_dir)?);
+        self.sender = Some(Arc::new(Sender::new(transport, config.from)));
+        let service = MailService::new(context.database().clone(), context.jobs());
+        context.provide::<dyn Mailer>(Arc::new(service))
+    }
+
+    fn jobs(&self) -> Vec<JobRegistration> {
+        match &self.sender {
+            Some(sender) => vec![JobRegistration::new(service::SEND, sender.clone())],
+            None => Vec::new(),
+        }
+    }
+}
