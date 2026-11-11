@@ -245,8 +245,8 @@ fn invalid_credentials() -> Error {
     Error::unauthenticated("auth.invalid_credentials", "The email or password is incorrect.")
 }
 
-#[cfg_attr(not(test), expect(dead_code, reason = "used by `set_password`"))]
-fn user_not_found(id: Uuid) -> Error {
+/// Lỗi khi không có người dùng `id`.
+pub(crate) fn user_not_found(id: Uuid) -> Error {
     Error::not_found("auth.user_not_found", "User `{id}` does not exist.").with_param("id", id)
 }
 

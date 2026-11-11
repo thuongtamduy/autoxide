@@ -2,6 +2,7 @@
 //! các module, ghép router. Mọi lệnh cần "cả hệ thống" (`serve`, `openapi`) đi qua
 //! [`start`], nên chúng thấy đúng cùng một hệ thống.
 
+use autoxide_kernel::access::Authenticator;
 use autoxide_kernel::config::Config;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::http::{self, Api};
@@ -58,7 +59,9 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
             }
         }
     }
-    let api = http::build(&config.http, root, modules.routes());
+    // Bộ xác thực (nếu một module công bố) được gắn vào mọi request.
+    let authenticator = modules.api::<dyn Authenticator>();
+    let api = http::build(&config.http, root, modules.routes(), authenticator);
     Ok(Runtime { config, database, modules, api })
 }
 

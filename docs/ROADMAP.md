@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "Role và permission; module tự khai báo permission của mình".
+Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "Rate limiting; login throttling".
 
 ## 0. Khung dự án
 
@@ -33,7 +33,7 @@ Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "Role và pe
 
 - [x] Người dùng, hash mật khẩu Argon2id
 - [x] Đăng nhập: access token sống ngắn + refresh token rotation, phát hiện reuse
-- [ ] Role và permission; module tự khai báo permission của mình
+- [x] Role và permission; module tự khai báo permission của mình
 - [ ] Rate limiting; login throttling
 - [ ] CLI tạo người dùng đầu tiên
 - [ ] Tạo người dùng: quản trị viên tạo; tự đăng ký bật tắt bằng cấu hình (mặc định tắt)

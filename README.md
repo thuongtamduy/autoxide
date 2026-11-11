@@ -19,8 +19,10 @@ under `/api/v1` with OpenAPI, health checks, logs, metrics, tracing and the CLI.
 Step 2 (login, roles and permissions) is in progress: the `auth` module stores
 users with Argon2id password hashes and signs them in with short-lived access
 tokens and rotating refresh tokens (`/api/v1/auth/login`, `/refresh`, `/logout`,
-`/me`). There is no way to create the first user yet; that comes with the user
-commands of step 2.
+`/me`). Access is controlled by roles: each module declares its permissions, roles
+group them (`/api/v1/auth/roles`), and a built-in `admin` role has them all. There
+is no way to create the first user yet; that comes with the user commands of
+step 2.
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 

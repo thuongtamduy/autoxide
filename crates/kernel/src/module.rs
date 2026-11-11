@@ -23,6 +23,7 @@ use std::sync::Arc;
 use sea_orm_migration::MigrationTrait;
 use utoipa_axum::router::OpenApiRouter;
 
+use crate::access::{Permission, PermissionCatalog};
 use crate::config::{ConfigReader, Invalid};
 use crate::database::Database;
 use crate::error::Error;
@@ -92,6 +93,13 @@ pub trait Module: Send + Sync {
         Ok(())
     }
 
+    /// Các permission của module. Tên viết `<tên module>.<việc>`; core kiểm lúc
+    /// khởi động. Permission đã phát hành là hợp đồng: đổi tên thì role đang có
+    /// permission cũ mất quyền.
+    fn permissions(&self) -> Vec<Permission> {
+        Vec::new()
+    }
+
     /// Các route REST của module, kèm tài liệu OpenAPI của chúng. Gọi sau `start`.
     /// Core gắn chúng dưới `/api/v1/<tên module>`: route khai là `/` và `/{id}`
     /// của module `notes` thành `/api/v1/notes` và `/api/v1/notes/{id}`.
@@ -104,6 +112,7 @@ pub trait Module: Send + Sync {
 pub struct StartContext<'a> {
     module: &'static str,
     database: &'a Database,
+    permissions: &'a PermissionCatalog,
     apis: &'a mut Apis,
 }
 
@@ -112,6 +121,12 @@ impl StartContext<'_> {
     /// giữ một bản trong service của mình.
     pub fn database(&self) -> &Database {
         self.database
+    }
+
+    /// Mọi permission của mọi module đã đăng ký (vd để kiểm role chỉ cấp permission
+    /// có thật).
+    pub fn permissions(&self) -> &PermissionCatalog {
+        self.permissions
     }
 
     /// Công bố một trait cho module khác dùng. `T` là kiểu `dyn Trait` khai trong
@@ -162,7 +177,7 @@ impl Apis {
         Ok(())
     }
 
-    fn require<T>(&self, module: &'static str) -> Result<Arc<T>, Error>
+    fn get<T>(&self) -> Option<Arc<T>>
     where
         T: ?Sized + Send + Sync + 'static,
     {
@@ -170,13 +185,19 @@ impl Apis {
             .get(&TypeId::of::<T>())
             .and_then(|(_, api)| api.downcast_ref::<Arc<T>>())
             .cloned()
-            .ok_or_else(|| {
-                Error::internal(format!(
-                    "module `{module}` requires `{}`, which no earlier module provides; register \
+    }
+
+    fn require<T>(&self, module: &'static str) -> Result<Arc<T>, Error>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.get().ok_or_else(|| {
+            Error::internal(format!(
+                "module `{module}` requires `{}`, which no earlier module provides; register \
                      the providing module before `{module}` in crates/app/src/modules.rs",
-                    std::any::type_name::<T>()
-                ))
-            })
+                std::any::type_name::<T>()
+            ))
+        })
     }
 }
 
@@ -204,6 +225,9 @@ pub struct Modules {
     // `Box<dyn Module>`: mỗi module là một kiểu khác nhau; `dyn` cho phép để chung
     // một danh sách và gọi qua trait.
     modules: Vec<Box<dyn Module>>,
+    permissions: PermissionCatalog,
+    /// Các trait module đã công bố; có sau [`start`](Self::start).
+    apis: Apis,
 }
 
 impl Modules {
@@ -211,9 +235,14 @@ impl Modules {
     /// ngay lúc khởi động.
     pub fn new(modules: Vec<Box<dyn Module>>) -> Result<Self, ModuleError> {
         let names: Vec<&str> = modules.iter().map(|module| module.name()).collect();
-        let problems = module_name_problems(&names);
+        let mut problems = module_name_problems(&names);
+        let declared = modules.iter().map(|module| (module.name(), module.permissions())).collect();
+        let permissions = PermissionCatalog::new(declared).unwrap_or_else(|errors| {
+            problems.extend(errors);
+            PermissionCatalog::default()
+        });
         if problems.is_empty() {
-            Ok(Modules { modules })
+            Ok(Modules { modules, permissions, apis: Apis::default() })
         } else {
             Err(ModuleError(problems.join("; ")))
         }
@@ -246,12 +275,32 @@ impl Modules {
         let mut apis = Apis::default();
         for module in &mut self.modules {
             let name = module.name();
-            let mut context = StartContext { module: name, database, apis: &mut apis };
+            let mut context = StartContext {
+                module: name,
+                database,
+                permissions: &self.permissions,
+                apis: &mut apis,
+            };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
             })?;
         }
+        self.apis = apis;
         Ok(())
+    }
+
+    /// Trait `T` mà một module đã công bố lúc khởi động, nếu có. Dùng ở binary để
+    /// lấy những trait core cần (vd `dyn Authenticator`). Gọi sau [`start`](Self::start).
+    pub fn api<T>(&self) -> Option<Arc<T>>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.apis.get()
+    }
+
+    /// Mọi permission của các module đã đăng ký.
+    pub fn permissions(&self) -> &PermissionCatalog {
+        &self.permissions
     }
 
     /// Route của từng module kèm tên module, theo thứ tự đăng ký. Gọi sau

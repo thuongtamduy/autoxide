@@ -213,9 +213,14 @@ sẵn lệnh.
 6. **Mọi route có tài liệu OpenAPI**, đăng ký qua `utoipa-axum` cùng lúc với route
    (`OpenApiRouter::routes(routes!(…))`, không dùng `.route(…)` trần). Route của
    module `x` nằm dưới `/api/v1/x`; module chỉ khai phần đuôi (`/`, `/{id}`).
-7. **REST và MCP dùng chung service.** Tool MCP không có logic riêng và không được
+7. **Kiểm quyền bằng permission, không bằng tên role.** Module khai permission
+   của mình qua `Module::permissions` (`<module>.<việc>`, vd `notes.write`). Handler
+   cần đăng nhập nhận `principal: Principal` (`autoxide_kernel::access`) rồi gọi
+   `principal.require(&NOTES_WRITE)?`; tài liệu của handler nêu permission cần có.
+   Module nghiệp vụ không phụ thuộc module `auth` (D-046).
+8. **REST và MCP dùng chung service.** Tool MCP không có logic riêng và không được
    phép làm điều mà REST với cùng permission không làm được.
-8. **Core chỉ có API.** Không có giao diện web hay trang quản trị trong repo này;
+9. **Core chỉ có API.** Không có giao diện web hay trang quản trị trong repo này;
    giao diện là dự án riêng dùng API. (Trang xem tài liệu API sinh tự động thì được.)
 
 ## Luật dữ liệu

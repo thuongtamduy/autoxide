@@ -128,15 +128,15 @@
         "tags": [
           "auth"
         ],
-        "summary": "Get the signed-in user.",
+        "summary": "Get the signed-in user and their permissions.",
         "operationId": "auth_me",
         "responses": {
           "200": {
-            "description": "The user the access token belongs to.",
+            "description": "The user the access token belongs to, with the permissions of their roles.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Data_UserResponse"
+                  "$ref": "#/components/schemas/Data_MeResponse"
                 }
               }
             }
@@ -153,6 +153,63 @@
           },
           "403": {
             "description": "The account is disabled; code `auth.user_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/permissions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List every permission that roles can grant.",
+        "description": "Requires `auth.roles.read`. Each module declares its own permissions; the list\ngrows when modules are added.",
+        "operationId": "auth_list_permissions",
+        "responses": {
+          "200": {
+            "description": "Every permission, sorted by name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_PermissionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.roles.read`; code `permission_denied`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -249,6 +306,643 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/auth/roles": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List roles.",
+        "description": "Requires `auth.roles.read`. Newest first unless `order=asc`.",
+        "operationId": "auth_list_roles",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Order"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of roles.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RoleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.roles.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create a role.",
+        "description": "Requires `auth.roles.manage`.",
+        "operationId": "auth_create_role",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The role was created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RoleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.roles.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another role has this name; code `auth.role_name_taken`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is invalid, e.g. an unknown permission; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/roles/{id}": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get a role.",
+        "description": "Requires `auth.roles.read`.",
+        "operationId": "auth_get_role",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the role.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RoleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.roles.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No role has this id; code `auth.role_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Replace a role: its name, description and permissions.",
+        "description": "Requires `auth.roles.manage`. Users with the role get the new permissions on\ntheir next request.",
+        "operationId": "auth_replace_role",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the role.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The role after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RoleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.roles.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No role has this id; code `auth.role_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another role has this name (`auth.role_name_taken`), or the role is the built-in `admin` (`auth.role_builtin`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is invalid, e.g. an unknown permission; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Delete a role.",
+        "description": "Requires `auth.roles.manage`. Users who had the role lose it.",
+        "operationId": "auth_delete_role",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the role.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The role was deleted."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.roles.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No role has this id; code `auth.role_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The role is the built-in `admin`; code `auth.role_builtin`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/users/{id}/roles": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List the roles of a user.",
+        "description": "Requires `auth.users.read`.",
+        "operationId": "auth_get_user_roles",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the user.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The user's roles, sorted by name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_RoleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.users.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No user has this id; code `auth.user_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Replace the roles of a user.",
+        "description": "Requires `auth.roles.manage`. Takes effect on the user's next request. The last\nuser with the `admin` role cannot lose it.",
+        "operationId": "auth_replace_user_roles",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the user.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserRolesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The user's roles after the change, sorted by name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_RoleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.roles.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No user has this id; code `auth.user_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No user would keep the `admin` role; code `auth.last_admin`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A role id does not exist, or the list is too long; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
       }
     },
     "/health/live": {
@@ -351,6 +1045,118 @@
           }
         }
       },
+      "Data_MeResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The signed-in user and what they may do.",
+            "required": [
+              "id",
+              "email",
+              "name",
+              "created_at",
+              "all_permissions",
+              "permissions"
+            ],
+            "properties": {
+              "all_permissions": {
+                "type": "boolean",
+                "description": "`true` when a role grants every permission (the `admin` role); `permissions`\nis then empty."
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "email": {
+                "type": "string",
+                "description": "Normalized email: lower case, no surrounding spaces.",
+                "example": "ada@example.com"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name.",
+                "example": "Ada Lovelace"
+              },
+              "permissions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Permissions granted by the user's roles, sorted by name.",
+                "example": [
+                  "auth.roles.read"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Data_RoleResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A role: a named set of permissions given to users.",
+            "required": [
+              "id",
+              "name",
+              "description",
+              "all_permissions",
+              "permissions",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "all_permissions": {
+                "type": "boolean",
+                "description": "`true` only for the built-in `admin` role: it grants every permission,\nincluding permissions added later, and cannot be changed or deleted."
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "example": "editor"
+              },
+              "permissions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Permissions the role grants, sorted by name. Empty when `all_permissions`.",
+                "example": [
+                  "auth.roles.read"
+                ]
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      },
       "Data_TokenResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -398,7 +1204,7 @@
           }
         }
       },
-      "Data_UserResponse": {
+      "Data_Vec_PermissionResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
         "required": [
@@ -406,32 +1212,84 @@
         ],
         "properties": {
           "data": {
-            "type": "object",
-            "description": "The signed-in user.",
-            "required": [
-              "id",
-              "email",
-              "name",
-              "created_at"
-            ],
-            "properties": {
-              "created_at": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "email": {
-                "type": "string",
-                "description": "Normalized email: lower case, no surrounding spaces.",
-                "example": "ada@example.com"
-              },
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "name": {
-                "type": "string",
-                "description": "Display name.",
-                "example": "Ada Lovelace"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A permission that roles can grant.",
+              "required": [
+                "name",
+                "description"
+              ],
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "description": "What the permission allows."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "`<module>.<action>`.",
+                  "example": "auth.roles.read"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Data_Vec_RoleResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A role: a named set of permissions given to users.",
+              "required": [
+                "id",
+                "name",
+                "description",
+                "all_permissions",
+                "permissions",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "all_permissions": {
+                  "type": "boolean",
+                  "description": "`true` only for the built-in `admin` role: it grants every permission,\nincluding permissions added later, and cannot be changed or deleted."
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "example": "editor"
+                },
+                "permissions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Permissions the role grants, sorted by name. Empty when `all_permissions`.",
+                  "example": [
+                    "auth.roles.read"
+                  ]
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
               }
             }
           }
@@ -467,6 +1325,159 @@
           "password": {
             "type": "string",
             "example": "correct horse battery staple"
+          }
+        }
+      },
+      "MeResponse": {
+        "type": "object",
+        "description": "The signed-in user and what they may do.",
+        "required": [
+          "id",
+          "email",
+          "name",
+          "created_at",
+          "all_permissions",
+          "permissions"
+        ],
+        "properties": {
+          "all_permissions": {
+            "type": "boolean",
+            "description": "`true` when a role grants every permission (the `admin` role); `permissions`\nis then empty."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email": {
+            "type": "string",
+            "description": "Normalized email: lower case, no surrounding spaces.",
+            "example": "ada@example.com"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name.",
+            "example": "Ada Lovelace"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Permissions granted by the user's roles, sorted by name.",
+            "example": [
+              "auth.roles.read"
+            ]
+          }
+        }
+      },
+      "Page_RoleResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A role: a named set of permissions given to users.",
+              "required": [
+                "id",
+                "name",
+                "description",
+                "all_permissions",
+                "permissions",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "all_permissions": {
+                  "type": "boolean",
+                  "description": "`true` only for the built-in `admin` role: it grants every permission,\nincluding permissions added later, and cannot be changed or deleted."
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "example": "editor"
+                },
+                "permissions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Permissions the role grants, sorted by name. Empty when `all_permissions`.",
+                  "example": [
+                    "auth.roles.read"
+                  ]
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "description": "How to get the next page.",
+        "required": [
+          "limit"
+        ],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The limit that was applied to this page.",
+            "example": 50,
+            "minimum": 0
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass this as `cursor` to get the next page. `null` means this is the last\npage."
+          }
+        }
+      },
+      "PermissionResponse": {
+        "type": "object",
+        "description": "A permission that roles can grant.",
+        "required": [
+          "name",
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "What the permission allows."
+          },
+          "name": {
+            "type": "string",
+            "description": "`<module>.<action>`.",
+            "example": "auth.roles.read"
           }
         }
       },
@@ -554,6 +1565,82 @@
           }
         }
       },
+      "RoleRequest": {
+        "type": "object",
+        "description": "The full content of a role.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "What the role is for. Optional."
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique. Lowercase letters, digits, `_` and `-`, starting with a letter.",
+            "example": "editor"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Permissions to grant; each must be listed by `GET /api/v1/auth/permissions`.\nDuplicates are ignored.",
+            "example": [
+              "auth.roles.read"
+            ]
+          }
+        }
+      },
+      "RoleResponse": {
+        "type": "object",
+        "description": "A role: a named set of permissions given to users.",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "all_permissions",
+          "permissions",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "all_permissions": {
+            "type": "boolean",
+            "description": "`true` only for the built-in `admin` role: it grants every permission,\nincluding permissions added later, and cannot be changed or deleted."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "editor"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Permissions the role grants, sorted by name. Empty when `all_permissions`.",
+            "example": [
+              "auth.roles.read"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "TokenResponse": {
         "type": "object",
         "description": "A new pair of tokens.",
@@ -592,33 +1679,20 @@
           }
         }
       },
-      "UserResponse": {
+      "UserRolesRequest": {
         "type": "object",
-        "description": "The signed-in user.",
+        "description": "The complete list of roles a user should have.",
         "required": [
-          "id",
-          "email",
-          "name",
-          "created_at"
+          "role_ids"
         ],
         "properties": {
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "email": {
-            "type": "string",
-            "description": "Normalized email: lower case, no surrounding spaces.",
-            "example": "ada@example.com"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string",
-            "description": "Display name.",
-            "example": "Ada Lovelace"
+          "role_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Ids of the roles. Replaces every role the user had; `[]` removes all."
           }
         }
       }

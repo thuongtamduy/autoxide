@@ -4,6 +4,7 @@
 //!
 //! Nội dung được dựng dần ở bước 1 của `docs/ROADMAP.md`.
 
+pub mod access;
 pub mod config;
 pub mod database;
 pub mod error;

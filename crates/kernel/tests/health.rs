@@ -19,7 +19,7 @@ async fn start(database: &TestDatabase) -> (Api, Database) {
     let config = Config::read(&mut reader);
     let config = reader.finish(config).unwrap().0;
     let db = Database::connect(&config.database).await.unwrap();
-    let api = http::build(&config.http, http::health_routes(db.clone()), Vec::new());
+    let api = http::build(&config.http, http::health_routes(db.clone()), Vec::new(), None);
     (api, db)
 }
 

@@ -41,7 +41,7 @@ async fn so_do_cua_request_duoc_thu_va_phuc_vu_o_metrics() {
     let config = HttpConfig::read(&mut reader);
     let config = reader.finish(config).unwrap().0;
     let notes = OpenApiRouter::new().routes(routes!(get_note));
-    let api = http::build(&config, http::metrics_routes(metrics), vec![("notes", notes)]);
+    let api = http::build(&config, http::metrics_routes(metrics), vec![("notes", notes)], None);
     let send = async |path: &str| {
         let request = Request::builder().uri(path).body(Body::empty()).unwrap();
         api.router.clone().oneshot(request).await.unwrap()

@@ -1,0 +1,111 @@
+//! Endpoint REST của module `auth`, dưới `/api/v1/auth`. Handler chỉ lấy dữ liệu
+//! vào, gọi service và trả envelope; mọi logic nằm ở service.
+
+mod roles;
+mod session;
+
+use std::sync::Arc;
+
+use utoipa_axum::router::OpenApiRouter;
+
+use crate::role::RoleService;
+use crate::session::SessionService;
+use crate::user::UserService;
+
+/// Các service mà handler dùng.
+#[derive(Clone)]
+pub(crate) struct HttpState {
+    pub sessions: Arc<SessionService>,
+    pub users: Arc<UserService>,
+    pub roles: Arc<RoleService>,
+}
+
+pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
+    session::routes().merge(roles::routes()).with_state(Arc::new(state))
+}
+
+#[cfg(test)]
+pub(crate) mod test_support {
+    //! Router đầy đủ (qua mọi lớp chung của kernel) và cách gọi nó trong test.
+
+    use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
+    use autoxide_testkit::TestDatabase;
+    use axum::Router;
+    use axum::body::Body;
+    use axum::http::{HeaderMap, Request, StatusCode, header};
+    use serde_json::Value;
+    use tower::ServiceExt as _;
+    use utoipa_axum::router::OpenApiRouter;
+
+    use crate::testing::Services;
+    use crate::user::NewUser;
+
+    pub const PASSWORD: &str = "correct horse battery staple";
+
+    /// Router với một người dùng sẵn có, `ada@example.com`.
+    pub async fn app(test: &TestDatabase) -> (Router, Services) {
+        let services = crate::testing::services(test).await;
+        services
+            .users
+            .create(NewUser {
+                email: "ada@example.com".to_owned(),
+                name: "Ada".to_owned(),
+                password: Some(PASSWORD.to_owned()),
+            })
+            .await
+            .unwrap();
+        let source = ConfigSource::default();
+        let mut reader = ConfigReader::new(&source);
+        let config = Config::read(&mut reader);
+        let (config, _) = reader.finish(config).unwrap();
+        let state = super::HttpState {
+            sessions: services.sessions.clone(),
+            users: services.users.clone(),
+            roles: services.roles.clone(),
+        };
+        let router = autoxide_kernel::http::build(
+            &config.http,
+            OpenApiRouter::new(),
+            vec![("auth", super::routes(state))],
+            Some(services.authenticator.clone()),
+        )
+        .router;
+        (router, services)
+    }
+
+    /// Gọi `method /api/v1/auth{path}`; trả trạng thái, header và thân JSON (`Null`
+    /// khi thân rỗng).
+    pub async fn call(
+        app: &Router,
+        method: &str,
+        path: &str,
+        authorization: Option<&str>,
+        body: Option<Value>,
+    ) -> (StatusCode, HeaderMap, Value) {
+        let mut request = Request::builder().method(method).uri(format!("/api/v1/auth{path}"));
+        if let Some(authorization) = authorization {
+            request = request.header(header::AUTHORIZATION, authorization);
+        }
+        let request = match body {
+            Some(body) => request
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(body.to_string())),
+            None => request.body(Body::empty()),
+        }
+        .unwrap();
+        let response = app.clone().oneshot(request).await.unwrap();
+        let (parts, body) = response.into_parts();
+        let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
+        let json =
+            if bytes.is_empty() { Value::Null } else { serde_json::from_slice(&bytes).unwrap() };
+        (parts.status, parts.headers, json)
+    }
+
+    /// Đăng nhập `email` và trả header `Authorization` dùng được ngay.
+    pub async fn bearer(app: &Router, email: &str, password: &str) -> String {
+        let body = serde_json::json!({"email": email, "password": password});
+        let (status, _, login) = call(app, "POST", "/login", None, Some(body)).await;
+        assert_eq!(status, StatusCode::OK, "{login}");
+        format!("Bearer {}", login["data"]["access_token"].as_str().unwrap())
+    }
+}

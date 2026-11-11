@@ -17,8 +17,10 @@ xong**: workspace Cargo, gate chất lượng, cấu hình, truy cập database,
 module, hợp đồng module, máy chủ HTTP dưới `/api/v1` kèm OpenAPI, health check, log,
 metrics, tracing và CLI. Bước 2 (đăng nhập, role và permission) đang làm: module `auth` lưu người dùng
 với mật khẩu hash bằng Argon2id và cho đăng nhập bằng access token sống ngắn cùng
-refresh token xoay vòng (`/api/v1/auth/login`, `/refresh`, `/logout`, `/me`). Chưa có
-cách tạo người dùng đầu tiên; việc đó đến cùng các lệnh quản lý người dùng của bước 2.
+refresh token xoay vòng (`/api/v1/auth/login`, `/refresh`, `/logout`, `/me`). Quyền truy
+cập theo role: mỗi module khai permission của mình, role gom chúng lại
+(`/api/v1/auth/roles`), và role `admin` dựng sẵn có tất cả. Chưa có cách tạo người
+dùng đầu tiên; việc đó đến cùng các lệnh quản lý người dùng của bước 2.
 
 Core sẽ gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 

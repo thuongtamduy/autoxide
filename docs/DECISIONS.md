@@ -789,3 +789,43 @@ Client gửi đúng một token hai lần do retry mạng sẽ bị đăng xuấ
 Đã cân nhắc: `jsonwebtoken` kèm ngoại lệ `cargo deny` — giữ lỗ hổng trong cây chỉ để
 dùng một hàm; session lưu database thay cho JWT — mỗi request một câu truy vấn;
 thời gian ân hạn cho dùng lại — mở lại đúng lỗ hổng mà rotation muốn đóng.
+
+## D-046 · Role và permission — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- **Permission do module khai** qua hàm mới `Module::permissions()` (mặc định rỗng —
+  D-038). Tên `<module>.<việc>`, các đoạn chữ thường, số, `_`; core kiểm lúc đăng ký
+  module (tên sai, trùng, thiếu mô tả là lỗi khởi động) và gom thành
+  `PermissionCatalog`, đưa cho mọi module qua `StartContext::permissions()`.
+- **Kernel có khái niệm "ai đang gọi"** (`autoxide_kernel::access`): `Principal` (ID
+  người dùng + tập permission, hoặc "mọi permission"), trait `Authenticator` (đọc
+  header `Authorization` → `Principal`), và extractor: handler viết `principal:
+  Principal` rồi `principal.require(&PERM)?`; thiếu quyền trả 403 `permission_denied`
+  nêu tên permission. Module `auth` công bố `dyn Authenticator`; binary lấy nó bằng
+  `Modules::api()` và `http::build` gắn vào mọi request. Module nghiệp vụ chỉ phụ
+  thuộc kernel, không phụ thuộc `auth`.
+- **Role lưu trong module `auth`:** `auth_role`, `auth_role_permission`,
+  `auth_user_role`. Người dùng có hợp các permission của mọi role của mình. Tính
+  permission ở mỗi request bằng hai câu truy vấn (có role "mọi permission" không;
+  các permission), không phụ thuộc số role — đổi role có hiệu lực ngay ở request kế,
+  không chờ access token hết hạn.
+- **Role `admin` dựng sẵn** (migration tạo), cờ `all_permissions`: có mọi permission,
+  kể cả permission của module thêm sau. Không sửa, không xoá được; API không đặt
+  được cờ này cho role khác. Không gỡ được role `admin` khỏi người cuối cùng đang có
+  nó (`auth.last_admin`) — tránh khoá cả hệ thống.
+- Permission của `auth`: `auth.roles.read`, `auth.roles.manage` (tạo/sửa/xoá role
+  và gán role — tương đương toàn quyền, mô tả nói rõ), `auth.users.read`.
+- Endpoint: `GET /api/v1/auth/permissions`, CRUD `/api/v1/auth/roles`,
+  `GET|PUT /api/v1/auth/users/{id}/roles`; `/me` trả thêm permission.
+- Gán role cho một người: transaction cập nhật dòng người dùng trước để khoá nó, nên
+  các request đồng thời chạy lần lượt (test đồng thời trên hai database).
+
+Lý do: kiểm theo permission thay vì tên role để người cài tự đặt role theo tổ chức
+của họ mà code không đổi (RBAC chuẩn, NIST). Kernel giữ `Principal` để mọi module
+— và sau này API key, MCP — dùng chung một cách kiểm quyền.
+
+Đã cân nhắc: nhét permission vào access token — đổi role phải chờ token hết hạn;
+permission dạng ký tự đại diện (`notes.*`) — khó đoán quyền thật của một role, và
+role `admin` đã phủ nhu cầu "tất cả"; role theo cây kế thừa — phức tạp mà chưa có
+nhu cầu.

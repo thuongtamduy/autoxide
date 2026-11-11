@@ -1,0 +1,7 @@
+//! Role: một nhóm permission đặt tên, gán cho người dùng. Người dùng có hợp các
+//! permission của mọi role của mình.
+
+mod entity;
+mod service;
+
+pub(crate) use service::{Role, RoleInput, RoleService};

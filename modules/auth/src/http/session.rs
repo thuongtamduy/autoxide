@@ -1,13 +1,13 @@
-//! Endpoint REST của module `auth`, dưới `/api/v1/auth`. Handler chỉ lấy dữ liệu
-//! vào, gọi service và trả envelope; mọi logic nằm ở `session` và `user`.
+//! Endpoint đăng nhập: `/login`, `/refresh`, `/logout`, `/me`.
 
 use std::sync::Arc;
 
+use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
 use axum::extract::State;
-use axum::http::{HeaderMap, StatusCode, header};
+use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -16,16 +16,16 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 use validator::Validate;
 
+use super::HttpState;
 use crate::api::User;
-use crate::session::{SessionService, Tokens};
+use crate::session::Tokens;
 
-pub(crate) fn routes(sessions: Arc<SessionService>) -> OpenApiRouter {
+pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
         .routes(routes!(login))
         .routes(routes!(refresh))
         .routes(routes!(logout))
         .routes(routes!(me))
-        .with_state(sessions)
 }
 
 /// Email and password of an account.
@@ -77,9 +77,9 @@ impl From<Tokens> for TokenResponse {
     }
 }
 
-/// The signed-in user.
+/// The signed-in user and what they may do.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub(crate) struct UserResponse {
+pub(crate) struct MeResponse {
     id: Uuid,
     /// Normalized email: lower case, no surrounding spaces.
     #[schema(example = "ada@example.com")]
@@ -88,15 +88,23 @@ pub(crate) struct UserResponse {
     #[schema(example = "Ada Lovelace")]
     name: String,
     created_at: DateTime<Utc>,
+    /// `true` when a role grants every permission (the `admin` role); `permissions`
+    /// is then empty.
+    all_permissions: bool,
+    /// Permissions granted by the user's roles, sorted by name.
+    #[schema(example = json!(["auth.roles.read"]))]
+    permissions: Vec<String>,
 }
 
-impl From<User> for UserResponse {
-    fn from(user: User) -> Self {
-        UserResponse {
+impl MeResponse {
+    fn new(user: User, principal: &Principal) -> Self {
+        MeResponse {
             id: user.id,
             email: user.email,
             name: user.name,
             created_at: user.created_at,
+            all_permissions: principal.has_all_permissions(),
+            permissions: principal.permissions(),
         }
     }
 }
@@ -118,10 +126,10 @@ impl From<User> for UserResponse {
     )
 )]
 async fn login(
-    State(sessions): State<Arc<SessionService>>,
+    State(state): State<Arc<HttpState>>,
     ValidJson(input): ValidJson<LoginRequest>,
 ) -> Result<Data<TokenResponse>, Error> {
-    let tokens = sessions.login(&input.email, &input.password).await?;
+    let tokens = state.sessions.login(&input.email, &input.password).await?;
     Ok(Data { data: tokens.into() })
 }
 
@@ -142,10 +150,10 @@ async fn login(
     )
 )]
 async fn refresh(
-    State(sessions): State<Arc<SessionService>>,
+    State(state): State<Arc<HttpState>>,
     ValidJson(input): ValidJson<RefreshRequest>,
 ) -> Result<Data<TokenResponse>, Error> {
-    let tokens = sessions.refresh(&input.refresh_token).await?;
+    let tokens = state.sessions.refresh(&input.refresh_token).await?;
     Ok(Data { data: tokens.into() })
 }
 
@@ -164,102 +172,46 @@ async fn refresh(
     )
 )]
 async fn logout(
-    State(sessions): State<Arc<SessionService>>,
+    State(state): State<Arc<HttpState>>,
     ValidJson(input): ValidJson<RefreshRequest>,
 ) -> Result<StatusCode, Error> {
-    sessions.logout(&input.refresh_token).await?;
+    state.sessions.logout(&input.refresh_token).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Get the signed-in user.
+/// Get the signed-in user and their permissions.
 #[utoipa::path(
     get,
     path = "/me",
     operation_id = "me",
     security(("bearer" = [])),
     responses(
-        (status = 200, description = "The user the access token belongs to.", body = Data<UserResponse>),
+        (status = 200, description = "The user the access token belongs to, with the permissions of their roles.", body = Data<MeResponse>),
         (status = 401, description = "The access token is missing (code `auth.missing_token`), invalid (`auth.invalid_token`) or expired (`auth.token_expired`).", body = Problem),
         (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
     )
 )]
 async fn me(
-    State(sessions): State<Arc<SessionService>>,
-    headers: HeaderMap,
-) -> Result<Data<UserResponse>, Error> {
-    let authorization = headers.get(header::AUTHORIZATION).and_then(|value| value.to_str().ok());
-    let user = sessions.authenticate(authorization).await?;
-    Ok(Data { data: user.into() })
+    State(state): State<Arc<HttpState>>,
+    principal: Principal,
+) -> Result<Data<MeResponse>, Error> {
+    let user =
+        state.users.get(principal.user_id()).await?.ok_or_else(crate::token::invalid_token)?;
+    Ok(Data { data: MeResponse::new(user, &principal) })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
     use autoxide_testkit::TestDatabase;
-    use axum::Router;
-    use axum::body::Body;
-    use axum::http::Request;
+    use axum::http::{StatusCode, header};
     use serde_json::{Value, json};
-    use tower::ServiceExt as _;
 
-    use crate::user::NewUser;
-
-    const PASSWORD: &str = "correct horse battery staple";
-
-    /// Router đầy đủ (qua mọi lớp chung của kernel) với một người dùng sẵn có.
-    async fn app(test: &TestDatabase) -> Router {
-        let (sessions, users) = crate::testing::sessions(test).await;
-        users
-            .create(NewUser {
-                email: "ada@example.com".to_owned(),
-                name: "Ada".to_owned(),
-                password: Some(PASSWORD.to_owned()),
-            })
-            .await
-            .unwrap();
-        let source = ConfigSource::default();
-        let mut reader = ConfigReader::new(&source);
-        let config = Config::read(&mut reader);
-        let (config, _) = reader.finish(config).unwrap();
-        autoxide_kernel::http::build(
-            &config.http,
-            OpenApiRouter::new(),
-            vec![("auth", routes(sessions))],
-        )
-        .router
-    }
-
-    async fn call(
-        app: &Router,
-        method: &str,
-        path: &str,
-        authorization: Option<&str>,
-        body: Option<Value>,
-    ) -> (StatusCode, HeaderMap, Value) {
-        let mut request = Request::builder().method(method).uri(format!("/api/v1/auth{path}"));
-        if let Some(authorization) = authorization {
-            request = request.header(header::AUTHORIZATION, authorization);
-        }
-        let request = match body {
-            Some(body) => request
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body.to_string())),
-            None => request.body(Body::empty()),
-        }
-        .unwrap();
-        let response = app.clone().oneshot(request).await.unwrap();
-        let (parts, body) = response.into_parts();
-        let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-        let json =
-            if bytes.is_empty() { Value::Null } else { serde_json::from_slice(&bytes).unwrap() };
-        (parts.status, parts.headers, json)
-    }
+    use crate::http::test_support::{PASSWORD, app, call};
 
     #[tokio::test]
     async fn dang_nhap_xem_minh_doi_token_dang_xuat() {
         TestDatabase::run(async |test| {
-            let app = app(test).await;
+            let (app, _) = app(test).await;
             let credentials = json!({"email": "ada@example.com", "password": PASSWORD});
 
             let (status, _, login) = call(&app, "POST", "/login", None, Some(credentials)).await;
@@ -295,7 +247,7 @@ mod tests {
     #[tokio::test]
     async fn loi_xac_thuc_la_problem_kem_www_authenticate() {
         TestDatabase::run(async |test| {
-            let app = app(test).await;
+            let (app, _) = app(test).await;
             let wrong = json!({"email": "ada@example.com", "password": "wrong password"});
 
             let (status, headers, problem) = call(&app, "POST", "/login", None, Some(wrong)).await;

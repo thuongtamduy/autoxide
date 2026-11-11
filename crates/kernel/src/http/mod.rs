@@ -30,11 +30,13 @@ mod server;
 
 use std::time::Duration;
 
-use axum::Router;
+use std::sync::Arc;
+
 use axum::extract::{DefaultBodyLimit, Request};
 use axum::http::{HeaderName, HeaderValue, Method, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
+use axum::{Extension, Router};
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::limit::RequestBodyLimitLayer;
@@ -43,6 +45,7 @@ use utoipa::openapi::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_scalar::{Scalar, Servable};
 
+use crate::access::Authenticator;
 use crate::config::{CorsOrigins, HttpConfig};
 use crate::error::Error;
 
@@ -65,10 +68,15 @@ pub struct Api {
 /// Ghép route của các module (tên module, router) dưới [`API_PREFIX`], thêm các
 /// route `root` ở gốc (ngoài `/api/v1`, vd [`health_routes`]), và bọc các lớp xử lý
 /// chung quanh tất cả.
+///
+/// `authenticator`: bộ xác thực một module đã công bố; handler nhận
+/// [`Principal`](crate::access::Principal) dùng nó. `None`: chưa module nào xác
+/// thực — handler cần đăng nhập trả lỗi 500 nói rõ thiếu gì.
 pub fn build(
     config: &HttpConfig,
     root: OpenApiRouter,
     modules: Vec<(&'static str, OpenApiRouter)>,
+    authenticator: Option<Arc<dyn Authenticator>>,
 ) -> Api {
     let mut api = OpenApiRouter::new();
     for (name, mut routes) in modules {
@@ -92,6 +100,12 @@ pub fn build(
     );
     if config.api_docs {
         router = router.merge(Scalar::with_url(DOCS_PATH, openapi.clone()));
+    }
+
+    if let Some(authenticator) = authenticator {
+        // Đặt bộ xác thực vào "extensions" của mọi request, nơi extractor
+        // `Principal` tìm nó.
+        router = router.layer(Extension(authenticator));
     }
 
     let request_timeout = config.request_timeout;

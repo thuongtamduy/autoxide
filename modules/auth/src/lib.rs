@@ -8,25 +8,31 @@
 //! Module khác KHÔNG đọc bảng `auth_…`; chúng lấy người dùng qua trait
 //! [`api::Users`] mà module này công bố lúc khởi động.
 
+mod access;
 pub mod api;
 mod config;
 mod http;
 mod migration;
 mod password;
+mod permissions;
+mod role;
 mod session;
 mod token;
 mod user;
 
 use std::sync::Arc;
 
+use autoxide_kernel::access::{Authenticator, Permission};
 use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
 use utoipa_axum::router::OpenApiRouter;
 
+use crate::access::RequestAuthenticator;
 use crate::config::AuthConfig;
 use crate::password::Passwords;
+use crate::role::RoleService;
 use crate::session::SessionService;
 use crate::token::AccessTokens;
 use crate::user::UserService;
@@ -41,7 +47,7 @@ struct AuthModule {
     /// Có sau `configure`.
     config: Option<AuthConfig>,
     /// Có sau `start`.
-    sessions: Option<Arc<SessionService>>,
+    state: Option<http::HttpState>,
 }
 
 impl Module for AuthModule {
@@ -77,18 +83,30 @@ impl Module for AuthModule {
             }
         };
         let access_tokens = AccessTokens::new(secret, config.access_token_ttl);
-        let sessions =
-            SessionService::new(database, users.clone(), access_tokens, config.refresh_token_ttl)?;
-        self.sessions = Some(Arc::new(sessions));
-        // `Arc<UserService>` tự đổi thành `Arc<dyn Users>`: module khác chỉ thấy trait.
-        context.provide::<dyn api::Users>(users)
+        let sessions = Arc::new(SessionService::new(
+            database.clone(),
+            users.clone(),
+            access_tokens,
+            config.refresh_token_ttl,
+        )?);
+        let roles = Arc::new(RoleService::new(database, context.permissions().clone()));
+        let authenticator =
+            RequestAuthenticator { sessions: sessions.clone(), roles: roles.clone() };
+        // `Arc<X>` tự đổi thành `Arc<dyn Trait>`: bên dùng chỉ thấy trait.
+        context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
+        context.provide::<dyn api::Users>(users.clone())?;
+        self.state = Some(http::HttpState { sessions, users, roles });
+        Ok(())
+    }
+
+    fn permissions(&self) -> Vec<Permission> {
+        permissions::all()
     }
 
     fn routes(&self) -> OpenApiRouter {
-        match &self.sessions {
-            Some(sessions) => http::routes(sessions.clone()),
-            None => OpenApiRouter::new(),
-        }
+        // Clone trạng thái chỉ là clone vài `Arc`: tăng bộ đếm tham chiếu, không chép
+        // service.
+        self.state.clone().map_or_else(OpenApiRouter::new, http::routes)
     }
 }
 
@@ -103,6 +121,8 @@ fn random_secret() -> Result<Vec<u8>, Error> {
 #[cfg(test)]
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
+
+    use std::sync::Arc;
 
     use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
     use autoxide_kernel::database::Database;
@@ -124,14 +144,17 @@ pub(crate) mod testing {
         database
     }
 
-    /// Service phiên đăng nhập trên database của test, với khoá cố định, kèm
-    /// service người dùng dùng chung database đó.
-    pub async fn sessions(
-        test: &TestDatabase,
-    ) -> (std::sync::Arc<crate::session::SessionService>, std::sync::Arc<crate::user::UserService>)
-    {
+    /// Mọi service của module trên database của test, với khoá ký cố định.
+    pub struct Services {
+        pub users: Arc<crate::user::UserService>,
+        pub sessions: Arc<crate::session::SessionService>,
+        pub roles: Arc<crate::role::RoleService>,
+        pub authenticator: Arc<dyn autoxide_kernel::access::Authenticator>,
+    }
+
+    pub async fn services(test: &TestDatabase) -> Services {
         let database = database(test).await;
-        let users = std::sync::Arc::new(crate::user::UserService::new(
+        let users = Arc::new(crate::user::UserService::new(
             database.clone(),
             crate::password::Passwords::new(),
         ));
@@ -139,13 +162,36 @@ pub(crate) mod testing {
             b"test-key-test-key-test-key-test-key".to_vec(),
             std::time::Duration::from_secs(900),
         );
-        let sessions = crate::session::SessionService::new(
-            database,
-            users.clone(),
-            tokens,
-            std::time::Duration::from_secs(30 * 24 * 60 * 60),
-        )
+        let sessions = Arc::new(
+            crate::session::SessionService::new(
+                database.clone(),
+                users.clone(),
+                tokens,
+                std::time::Duration::from_secs(30 * 24 * 60 * 60),
+            )
+            .unwrap(),
+        );
+        let catalog = autoxide_kernel::access::PermissionCatalog::new(vec![
+            ("auth", crate::permissions::all()),
+            (
+                "notes",
+                vec![autoxide_kernel::access::Permission::new("notes.write", "Write notes.")],
+            ),
+        ])
         .unwrap();
-        (std::sync::Arc::new(sessions), users)
+        let roles = Arc::new(crate::role::RoleService::new(database, catalog));
+        let authenticator = Arc::new(crate::access::RequestAuthenticator {
+            sessions: sessions.clone(),
+            roles: roles.clone(),
+        });
+        Services { users, sessions, roles, authenticator }
+    }
+
+    /// Service phiên đăng nhập kèm service người dùng dùng chung database.
+    pub async fn sessions(
+        test: &TestDatabase,
+    ) -> (Arc<crate::session::SessionService>, Arc<crate::user::UserService>) {
+        let services = services(test).await;
+        (services.sessions, services.users)
     }
 }

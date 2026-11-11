@@ -8,6 +8,7 @@
 
 use std::sync::{Arc, Mutex};
 
+use autoxide_kernel::access::Permission;
 use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
@@ -124,9 +125,14 @@ async fn module_lay_duoc_trait_cua_module_dang_ky_truoc() {
         let seen = seen();
         let mut modules = Modules::new(vec![Box::new(Users), Box::new(Notes::new(&seen))]).unwrap();
 
+        assert!(modules.api::<dyn UserDirectory>().is_none());
+
         modules.start(&db).unwrap();
 
         assert_eq!(*seen.lock().unwrap(), ["user-7"]);
+        // Sau khởi động, binary lấy được trait module đã công bố.
+        let users = modules.api::<dyn UserDirectory>().unwrap();
+        assert_eq!(users.display_name(1), "user-1");
     })
     .await
     .unwrap();
@@ -223,4 +229,57 @@ async fn module_nhan_database_va_khai_route() {
     })
     .await
     .unwrap();
+}
+
+/// Module khai permission; tên permission do test chọn.
+struct Declares(&'static str, Vec<Permission>);
+
+impl Module for Declares {
+    fn name(&self) -> &'static str {
+        self.0
+    }
+
+    fn permissions(&self) -> Vec<Permission> {
+        self.1.clone()
+    }
+}
+
+#[tokio::test]
+async fn module_thay_danh_muc_permission_cua_moi_module() {
+    struct Reader(Arc<Mutex<Vec<String>>>);
+    impl Module for Reader {
+        fn name(&self) -> &'static str {
+            "reader"
+        }
+        fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+            let names = context.permissions().iter().map(|p| p.name().to_owned());
+            self.0.lock().unwrap().extend(names);
+            Ok(())
+        }
+    }
+
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let seen = seen();
+        let notes = Declares("notes", vec![Permission::new("notes.write", "Write notes.")]);
+        let mut modules =
+            Modules::new(vec![Box::new(Reader(seen.clone())), Box::new(notes)]).unwrap();
+
+        modules.start(&db).unwrap();
+
+        // Module đăng ký trước vẫn thấy permission của module đăng ký sau.
+        assert_eq!(*seen.lock().unwrap(), ["notes.write"]);
+        assert!(modules.permissions().contains("notes.write"));
+    })
+    .await
+    .unwrap();
+}
+
+#[test]
+fn permission_sai_ten_bi_tu_choi_luc_dang_ky() {
+    let wrong = Declares("notes", vec![Permission::new("tags.read", "Read tags.")]);
+
+    let error = Modules::new(vec![Box::new(wrong)]).unwrap_err().to_string();
+
+    assert!(error.contains("permission `tags.read` of module `notes` must be named"), "{error}");
 }
