@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–4 xong; đang ở bước 5**, mục "Job lưu trong database; claim job an toàn khi nhiều worker (test đồng thời)".
+Trạng thái: **bước 0–5 xong; đang ở bước 6**, mục "Thông báo lỗi và hệ thống theo i18n key (vi, en), chọn theo header; mặc định tiếng Anh".
 
 ## 0. Khung dự án
 
@@ -53,12 +53,12 @@ Trạng thái: **bước 0–4 xong; đang ở bước 5**, mục "Job lưu tron
 
 ## 5. Job queue
 
-- [ ] Job lưu trong database; claim job an toàn khi nhiều worker (test đồng thời)
-- [ ] Retry có backoff, dead-letter queue
-- [ ] Lịch chạy định kỳ (job đầu tiên: dọn dòng hết hạn của `auth_login_throttle`,
+- [x] Job lưu trong database; claim job an toàn khi nhiều worker (test đồng thời)
+- [x] Retry có backoff, dead-letter queue
+- [x] Lịch chạy định kỳ (job đầu tiên: dọn dòng hết hạn của `auth_login_throttle`,
       `auth_refresh_token`, `auth_mfa_challenge`, và event đã giao xong trong các bảng
       `<module>_events`)
-- [ ] Process role: `api`, `worker`, hoặc cả hai
+- [x] Process role: `api`, `worker`, hoặc cả hai
 
 ## 6. i18n và idempotency
 

@@ -31,6 +31,9 @@ enum Command {
     /// printed. Exits with status 2 when the configuration is invalid.
     Config(commands::config::Arguments),
 
+    /// Inspect and retry background jobs that failed for good (the dead-letter queue).
+    Jobs(commands::jobs::Arguments),
+
     /// Show, apply or revert the database migrations of the modules.
     ///
     /// Migrations are never applied automatically: run `autoxide migrate up` once
@@ -61,6 +64,7 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
         Command::Config(arguments) => commands::config::run(&arguments),
+        Command::Jobs(arguments) => commands::jobs::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
         Command::Openapi => commands::openapi::run(),
         Command::Serve => commands::serve::run(),

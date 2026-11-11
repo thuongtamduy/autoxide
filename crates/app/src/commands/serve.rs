@@ -56,17 +56,26 @@ where
 {
     // Tách `runtime` thành từng phần: router được chuyển hẳn (move) cho máy chủ,
     // còn database phải giữ lại để đóng sau khi máy chủ dừng.
-    let Runtime { config, database, modules, api, dispatcher } = runtime;
+    let Runtime { config, database, modules, api, dispatcher, worker } = runtime;
     let address = listener.local_addr().map_err(|error| format!("http: {error}"))?;
-    tracing::info!(%address, modules = ?modules.names(), "listening");
+    let role = config.process.role;
+    tracing::info!(%address, modules = ?modules.names(), ?role, "listening");
 
-    // Bộ phát event chạy nền cùng máy chủ; dừng SAU máy chủ, để event của các request
-    // cuối cùng vẫn có người giao (event chưa giao nằm lại trong database, lần chạy sau
-    // giao tiếp — không mất).
-    let (stop_events, events_stopped) = tokio::sync::oneshot::channel::<()>();
-    let events = tokio::spawn(dispatcher.run(async {
-        let _ = events_stopped.await;
-    }));
+    // Việc nền (giao event, chạy job) chạy cùng máy chủ; dừng SAU máy chủ, để việc của
+    // các request cuối cùng vẫn được làm. Việc chưa làm nằm lại trong database, lần
+    // chạy sau làm tiếp — không mất.
+    let (stop_background, background_stopped) = tokio::sync::watch::channel(false);
+    let mut background = tokio::task::JoinSet::new();
+    if role.runs_background_work() {
+        let mut stopped = background_stopped.clone();
+        background.spawn(dispatcher.run(async move {
+            let _ = stopped.wait_for(|stop| *stop).await;
+        }));
+        let mut stopped = background_stopped;
+        background.spawn(worker.run(async move {
+            let _ = stopped.wait_for(|stop| *stop).await;
+        }));
+    }
 
     let outcome = http::serve(listener, api.router, shutdown, config.http.shutdown_grace).await;
     match outcome {
@@ -77,9 +86,11 @@ where
         ),
         Err(_) => {}
     }
-    let _ = stop_events.send(());
-    if let Err(error) = events.await {
-        tracing::error!(error = %error, "event dispatcher stopped abnormally");
+    let _ = stop_background.send(true);
+    while let Some(result) = background.join_next().await {
+        if let Err(error) = result {
+            tracing::error!(error = %error, "background work stopped abnormally");
+        }
     }
     // Module sống tới khi máy chủ dừng hẳn: service của chúng nằm trong module.
     drop(modules);
@@ -195,6 +206,39 @@ mod tests {
 
             assert!(live.starts_with("HTTP/1.1 200 OK\r\n"), "{live}");
             assert!(ready.starts_with("HTTP/1.1 200 OK\r\n"), "{ready}");
+            assert_eq!(server.await.unwrap(), Ok(()));
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Tiến trình chỉ làm việc nền: không phục vụ API của module, vẫn trả health check.
+    #[tokio::test]
+    async fn vai_tro_worker_chi_co_health_check() {
+        TestDatabase::run(async |database| {
+            let source = ConfigSource::from_pairs([
+                ("DATABASE_URL", database.url()),
+                ("AUTOXIDE_HTTP_ADDRESS", "127.0.0.1:0"),
+                ("AUTOXIDE_PROCESS_ROLE", "worker"),
+            ]);
+            let settings = settings::read_with(&source, vec![Box::new(Notes)]).unwrap();
+            let db = Database::connect(&settings.config.database).await.unwrap();
+            settings.modules.migrator().unwrap().up(&db).await.unwrap();
+            db.close().await.unwrap();
+
+            let (runtime, listener) = prepare(settings).await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+            let server = tokio::spawn(run_server(runtime, listener, async {
+                let _ = stopped.await;
+            }));
+
+            let live = get(address, "/health/live").await;
+            let docs = get(address, "/api/v1/openapi.json").await;
+            stop.send(()).unwrap();
+
+            assert!(live.starts_with("HTTP/1.1 200 OK\r\n"), "{live}");
+            assert!(!docs.contains("/api/v1/notes"), "{docs}");
             assert_eq!(server.await.unwrap(), Ok(()));
         })
         .await

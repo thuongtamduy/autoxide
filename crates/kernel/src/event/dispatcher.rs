@@ -30,6 +30,10 @@ const CLAIM_SECONDS: i64 = 60;
 const IDLE_POLL: Duration = Duration::from_secs(1);
 /// Độ dài tối đa của lỗi lưu lại.
 const MAX_ERROR_LENGTH: usize = 2000;
+/// Giữ event đã giao chừng này rồi xoá (audit log đã có bản của nó).
+const KEEP_DELIVERED: chrono::Duration = chrono::Duration::days(7);
+/// Dọn event đã giao mỗi chừng này.
+const CLEANUP_EVERY: Duration = Duration::from_secs(3600);
 
 /// Bộ phát event của chương trình.
 pub struct Dispatcher {
@@ -39,6 +43,7 @@ pub struct Dispatcher {
     /// (module nhận, đăng ký).
     subscriptions: Vec<(&'static str, Subscription)>,
     wake: Arc<Notify>,
+    last_cleanup: std::sync::Mutex<Option<std::time::Instant>>,
 }
 
 impl Dispatcher {
@@ -48,12 +53,19 @@ impl Dispatcher {
         subscriptions: Vec<(&'static str, Subscription)>,
         wake: Arc<Notify>,
     ) -> Self {
-        Dispatcher { database, modules, subscriptions, wake }
+        Dispatcher {
+            database,
+            modules,
+            subscriptions,
+            wake,
+            last_cleanup: std::sync::Mutex::new(None),
+        }
     }
 
     /// Giao một lượt mọi event đang chờ; trả về số event đã xử lý (giao xong hoặc
     /// hẹn lại).
     pub async fn run_once(&self) -> Result<usize, Error> {
+        self.cleanup().await?;
         let mut handled = 0;
         for module in &self.modules {
             handled += self.run_table(module).await?;
@@ -82,6 +94,27 @@ impl Dispatcher {
                 () = tokio::time::sleep(IDLE_POLL) => {}
             }
         }
+    }
+
+    /// Xoá event đã giao hơn [`KEEP_DELIVERED`], mỗi giờ một lần. Event hỏng hẳn được
+    /// giữ lại để người vận hành xem.
+    async fn cleanup(&self) -> Result<(), Error> {
+        {
+            let mut last = self.last_cleanup.lock().map_err(|_| Error::internal("cleanup lock"))?;
+            if last.is_some_and(|at| at.elapsed() < CLEANUP_EVERY) {
+                return Ok(());
+            }
+            *last = Some(std::time::Instant::now());
+        }
+        let before = now() - KEEP_DELIVERED;
+        for module in &self.modules {
+            let mut delete = Query::delete();
+            delete
+                .from_table(Alias::new(table_name(module)))
+                .and_where(Expr::col(Alias::new("delivered_at")).lt(before));
+            self.database.write().execute(&delete).await?;
+        }
+        Ok(())
     }
 
     async fn run_table(&self, module: &'static str) -> Result<usize, Error> {

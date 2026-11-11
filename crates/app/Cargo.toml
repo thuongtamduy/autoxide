@@ -16,11 +16,12 @@ getrandom.workspace = true
 clap.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
+chrono.workspace = true
 autoxide-testkit.workspace = true
 sea-orm.workspace = true
-uuid.workspace = true
 serde_json.workspace = true
 
 [lints]

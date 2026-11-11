@@ -24,5 +24,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0008_create_mfa_challenge::Migration),
         // Bảng `auth_events` (transactional outbox), định nghĩa ở kernel.
         autoxide_kernel::event::outbox_migration("m0009_create_events", "auth"),
+        // Bảng `auth_jobs` (job queue), định nghĩa ở kernel.
+        autoxide_kernel::job::jobs_migration("m0010_create_jobs", "auth"),
     ]
 }

@@ -1091,3 +1091,44 @@ transaction với thay đổi.
 
 Đã cân nhắc: mỗi module tự ghi audit — lặp code ở mọi module và dễ quên; audit trong
 kernel — phá luật mọi bảng thuộc một module.
+
+## D-056 · Job queue — 2026-11-11 — agent quyết
+
+Quyết định (thực hiện D-008 và D-009 — chủ dự án quyết):
+
+- **Bảng job riêng của từng module** (`<module>_jobs`, tạo bằng
+  `job::jobs_migration`), như bảng event (D-054). Module đưa job vào hàng đợi bằng
+  `JobQueue::enqueue` (lấy từ `StartContext::jobs()`), trong transaction của thay đổi
+  nếu có. Loại job tên `<module>.<việc>`; module khai bộ chạy qua `Module::jobs` và
+  lịch qua `Module::schedules` (mặc định rỗng — D-038).
+- **Hai cách claim sau trait `Claim`** (D-009): Postgres `UPDATE … WHERE id IN
+  (SELECT … FOR UPDATE SKIP LOCKED) RETURNING`; SQLite cùng câu đó không có khoá (SQLite
+  chỉ một bên ghi nên câu lệnh đã nguyên tử). Dựng bằng `sea_query`, không viết SQL
+  tay. Gate chạy test claim đồng thời (3 worker × 40 job; 5 task gọi thẳng `Claim`) trên
+  cả hai database, nên cả hai nhánh đều được test.
+- **Chạy:** claim tăng `attempts`, giữ job 5 phút; mỗi module tối đa
+  `AUTOXIDE_JOBS_CONCURRENCY` job cùng lúc (mặc định 4); bộ chạy quá 4,5 phút bị coi là
+  lỗi. Ghi kết quả chỉ khi job còn là của worker đó. Lỗi thì thử lại sau 2, 4, 8…
+  giây (tối đa 1 giờ); quá `max_attempts` (mặc định 10) thì đặt `failed_at` —
+  **dead-letter queue** nằm ngay trong bảng, xem bằng `autoxide jobs failed`, chạy lại
+  bằng `autoxide jobs retry <module> <id>`. Job xong được xoá sau 7 ngày.
+- **Lịch định kỳ:** mỗi lịch có khoảng `every`; mỗi khoảng sinh một job với
+  `unique_key = schedule:<tên>:<số thứ tự khoảng>` — index unique bảo đảm nhiều worker
+  chạy cùng lúc chỉ sinh một job (có test). Chỉ hỗ trợ "mỗi N giây", chưa có cú pháp
+  cron. Lịch đầu tiên: `auth.cleanup` mỗi giờ dọn số đếm đăng nhập sai cũ, refresh
+  token hết hạn hay đã thu hồi, lượt MFA hết hạn. Bộ phát event cũng tự xoá event đã
+  giao quá 7 ngày.
+- **Process role** `AUTOXIDE_PROCESS_ROLE`: `all` (mặc định), `api` (chỉ API), `worker`
+  (chỉ việc nền — job, lịch, giao event — kèm health check). Cùng một binary, cùng lệnh
+  `serve`.
+- Chạy **ít nhất một lần**: worker chết giữa chừng thì job được chạy lại khi hết hạn
+  giữ; bộ chạy phải chịu được việc chạy lại.
+
+Lý do: D-008 (job queue trong database, không Redis; retry, lịch, dead-letter queue)
+và D-009 (hai cách claim sau một trait, test đồng thời trên hai database). Dead-letter
+queue nằm chung bảng thay vì bảng riêng: chuyển job sang bảng khác là thêm một bước có
+thể hỏng giữa chừng, mà `failed_at` đã đủ để lọc.
+
+Đã cân nhắc: cú pháp cron cho lịch — cần thêm thư viện hoặc tự viết bộ phân tích,
+chưa có nhu cầu (thêm khi có lịch "3 giờ sáng mỗi ngày"); API REST cho dead-letter
+queue — core chưa có permission cho người vận hành hệ thống, CLI đủ cho người cài.

@@ -95,4 +95,30 @@ mod tests {
         .await
         .unwrap();
     }
+
+    /// Lịch định kỳ của `auth` được worker đưa vào hàng đợi và chạy — đúng một lần dù
+    /// hai worker cùng chạy.
+    #[tokio::test]
+    async fn worker_chay_lich_dinh_ky_cua_module() {
+        TestDatabase::run(async |database| {
+            let source = ConfigSource::from_pairs([("DATABASE_URL", database.url())]);
+            let mut settings = crate::settings::read(&source).unwrap();
+            let db = Database::connect(&settings.config.database).await.unwrap();
+            settings.modules.migrator().unwrap().up(&db).await.unwrap();
+            settings.modules.start(&db).unwrap();
+            let first = settings.modules.worker(&db, 4).unwrap();
+            let second = settings.modules.worker(&db, 4).unwrap();
+
+            let (a, b) = tokio::join!(first.run_once(), second.run_once());
+
+            assert_eq!(a.unwrap() + b.unwrap(), 1);
+            let done =
+                first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
+            assert_eq!(done.len(), 1);
+            assert_eq!(done[0].kind, "auth.cleanup");
+            db.close().await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
 }

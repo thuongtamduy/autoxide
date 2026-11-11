@@ -364,6 +364,7 @@ dependencies = [
  "autoxide-kernel",
  "autoxide-testkit",
  "base64 0.22.1",
+ "chrono",
  "clap",
  "getrandom 0.4.3",
  "sea-orm",

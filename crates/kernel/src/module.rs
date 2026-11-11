@@ -28,6 +28,7 @@ use crate::config::{ConfigReader, Invalid};
 use crate::database::Database;
 use crate::error::Error;
 use crate::event::{Dispatcher, EventCatalog, EventInfo, Outbox, Subscription};
+use crate::job::{JobHandler, JobQueue, JobRegistration, Schedule, Worker};
 use crate::migration::{MigrationError, Migrator, ModuleMigrations};
 
 /// Những gì một module khai với core.
@@ -113,6 +114,19 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Bộ chạy cho các loại job của module (`<tên>.<việc>`). Có job thì module phải có
+    /// bảng `<tên>_jobs` (thêm `autoxide_kernel::job::jobs_migration` vào migration).
+    /// Gọi sau `start`.
+    fn jobs(&self) -> Vec<JobRegistration> {
+        Vec::new()
+    }
+
+    /// Lịch định kỳ của module: mỗi lịch đưa một job (loại do chính module chạy) vào
+    /// hàng đợi sau mỗi khoảng. Gọi sau `start`.
+    fn schedules(&self) -> Vec<Schedule> {
+        Vec::new()
+    }
+
     /// Các route REST của module, kèm tài liệu OpenAPI của chúng. Gọi sau `start`.
     /// Core gắn chúng dưới `/api/v1/<tên module>`: route khai là `/` và `/{id}`
     /// của module `notes` thành `/api/v1/notes` và `/api/v1/notes/{id}`.
@@ -142,6 +156,11 @@ impl StartContext<'_> {
     /// có thật).
     pub fn permissions(&self) -> &PermissionCatalog {
         self.permissions
+    }
+
+    /// Hàng đợi job của module (bảng `<tên>_jobs`).
+    pub fn jobs(&self) -> JobQueue {
+        JobQueue::new(self.module)
     }
 
     /// Nơi module ghi event của mình. Lỗi nếu module không khai event nào
@@ -349,6 +368,63 @@ impl Modules {
     /// Mọi loại event của các module đã đăng ký.
     pub fn events(&self) -> &EventCatalog {
         &self.events
+    }
+
+    /// Worker chạy job của mọi module, `concurrency` job cùng lúc mỗi module. Gọi sau
+    /// [`start`](Self::start). Khai báo sai (loại job không thuộc module khai, hai bộ chạy
+    /// cho một loại, lịch cho loại job không ai chạy) là lỗi khởi động.
+    pub fn worker(&self, database: &Database, concurrency: u64) -> Result<Worker, ModuleError> {
+        let mut handlers: HashMap<&'static str, Arc<dyn JobHandler>> = HashMap::new();
+        let mut modules = Vec::new();
+        let mut schedules = Vec::new();
+        let mut problems = Vec::new();
+        for module in &self.modules {
+            let name = module.name();
+            let registrations = module.jobs();
+            if !registrations.is_empty() {
+                modules.push(name);
+            }
+            for registration in registrations {
+                let kind = registration.kind();
+                if crate::job::module_of(kind) != Some(name) {
+                    problems.push(format!(
+                        "module `{name}` registers job kind `{kind}`; its job kinds must start \
+                         with `{name}.`"
+                    ));
+                }
+                if handlers.insert(kind, registration.handler()).is_some() {
+                    problems.push(format!("job kind `{kind}` has two handlers"));
+                }
+            }
+            for schedule in module.schedules() {
+                if crate::job::module_of(schedule.name) != Some(name)
+                    || crate::job::module_of(schedule.kind) != Some(name)
+                {
+                    problems.push(format!(
+                        "schedule `{}` of module `{name}` must be named `{name}.<name>` and run \
+                         a job kind of `{name}`",
+                        schedule.name
+                    ));
+                }
+                schedules.push(schedule);
+            }
+        }
+        let mut names = BTreeSet::new();
+        for schedule in &schedules {
+            if !handlers.contains_key(schedule.kind) {
+                problems.push(format!(
+                    "schedule `{}` runs job kind `{}`, which has no handler",
+                    schedule.name, schedule.kind
+                ));
+            }
+            if !names.insert(schedule.name) {
+                problems.push(format!("schedule `{}` is declared twice", schedule.name));
+            }
+        }
+        if !problems.is_empty() {
+            return Err(ModuleError(problems.join("; ")));
+        }
+        Ok(Worker::new(database.clone(), modules, handlers, schedules, concurrency))
     }
 
     /// Bộ phát event: đọc bảng event của mọi module phát event, giao cho các đăng ký

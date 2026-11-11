@@ -1,6 +1,7 @@
 //! Mỗi lệnh của CLI một file. Hàm `run` của lệnh trả mã thoát của tiến trình.
 
 pub mod config;
+pub mod jobs;
 pub mod migrate;
 pub mod openapi;
 pub mod serve;

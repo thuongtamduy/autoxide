@@ -11,6 +11,7 @@
 mod access;
 pub mod api;
 mod api_key;
+mod cleanup;
 mod config;
 mod events;
 mod http;
@@ -29,6 +30,7 @@ use autoxide_kernel::access::{Authenticator, Permission};
 use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::EventInfo;
+use autoxide_kernel::job::{JobRegistration, Schedule};
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
 use utoipa_axum::router::OpenApiRouter;
@@ -54,6 +56,7 @@ struct AuthModule {
     config: Option<AuthConfig>,
     /// Có sau `start`.
     state: Option<http::HttpState>,
+    cleanup: Option<Arc<cleanup::Cleanup>>,
 }
 
 impl Module for AuthModule {
@@ -77,6 +80,7 @@ impl Module for AuthModule {
             .ok_or_else(|| Error::internal("module `auth` started before it was configured"))?;
         let database = context.database().clone();
         let outbox = context.outbox()?;
+        self.cleanup = Some(Arc::new(cleanup::Cleanup::new(database.clone())));
         let users = Arc::new(UserService::new(database.clone(), Passwords::new(), outbox.clone()));
         let secret = match config.token_secret {
             Some(secret) => secret,
@@ -135,6 +139,17 @@ impl Module for AuthModule {
 
     fn events(&self) -> Vec<EventInfo> {
         events::all()
+    }
+
+    fn jobs(&self) -> Vec<JobRegistration> {
+        match &self.cleanup {
+            Some(cleanup) => vec![JobRegistration::new(cleanup::KIND, cleanup.clone())],
+            None => Vec::new(),
+        }
+    }
+
+    fn schedules(&self) -> Vec<Schedule> {
+        vec![cleanup::schedule()]
     }
 
     fn routes(&self) -> OpenApiRouter {

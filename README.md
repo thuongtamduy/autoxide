@@ -13,7 +13,7 @@ the core contains no business concepts — those belong to modules.
 ## Status
 
 Early development. **Steps 0 to 4 of the roadmap (project skeleton, foundation,
-login with roles and permissions, two-step sign-in, events and audit log) are done**: the Cargo workspace, the quality gate, configuration,
+login with roles and permissions, two-step sign-in, events and audit log, job queue) are done**: the Cargo workspace, the quality gate, configuration,
 database access, per-module migrations, the module contract, the HTTP server
 under `/api/v1` with OpenAPI, health checks, logs, metrics, tracing and the CLI.
 The `auth` module stores
@@ -30,7 +30,10 @@ access token (`Authorization: Bearer axk_…`). Users can turn on two-step sign-
 with an authenticator app (TOTP) and get one-time recovery codes
 (`/api/v1/auth/me/mfa`). Every change is kept in an append-only audit log — who,
 what, which record, when, before and after — readable at `/api/v1/audit` with the
-`audit.read` permission.
+`audit.read` permission. Background jobs live in the database too (no Redis): retried
+with backoff, kept when they fail for good (`autoxide jobs failed`, `autoxide jobs
+retry`), and run on a schedule when a module asks. `AUTOXIDE_PROCESS_ROLE` splits a
+deployment into API processes and worker processes.
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 

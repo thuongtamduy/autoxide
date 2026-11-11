@@ -7,6 +7,7 @@ use autoxide_kernel::config::Config;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::event::Dispatcher;
 use autoxide_kernel::http::{self, Api};
+use autoxide_kernel::job::Worker;
 use autoxide_kernel::metrics::Metrics;
 use autoxide_kernel::module::Modules;
 
@@ -21,6 +22,8 @@ pub struct Runtime {
     pub api: Api,
     /// Bộ phát event; `serve` chạy nó nền, lệnh khác không cần.
     pub dispatcher: Dispatcher,
+    /// Worker chạy job; `serve` chạy nó nền; `autoxide jobs` dùng nó để xem, chạy lại.
+    pub worker: Worker,
 }
 
 /// Có đòi database đã áp dụng đủ migration trước khi khởi động không.
@@ -48,8 +51,12 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         let _ = database.close().await;
         return Err(error.to_string());
     }
-    let dispatcher = match modules.dispatcher(&database) {
-        Ok(dispatcher) => dispatcher,
+    let background = modules.dispatcher(&database).and_then(|dispatcher| {
+        let worker = modules.worker(&database, config.process.job_concurrency)?;
+        Ok((dispatcher, worker))
+    });
+    let (dispatcher, worker) = match background {
+        Ok(background) => background,
         Err(error) => {
             let _ = database.close().await;
             return Err(error.to_string());
@@ -69,10 +76,16 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
             }
         }
     }
-    // Bộ xác thực (nếu một module công bố) được gắn vào mọi request.
-    let authenticator = modules.api::<dyn Authenticator>();
-    let api = http::build(&config.http, root, modules.routes(), authenticator);
-    Ok(Runtime { config, database, modules, api, dispatcher })
+    // Tiến trình chỉ làm việc nền (`worker`) không phục vụ API của module, chỉ health
+    // check (và số đo) để hệ thống vận hành theo dõi.
+    let (routes, authenticator) = if config.process.role.serves_api() {
+        // Bộ xác thực (nếu một module công bố) được gắn vào mọi request.
+        (modules.routes(), modules.api::<dyn Authenticator>())
+    } else {
+        (Vec::new(), None)
+    };
+    let api = http::build(&config.http, root, routes, authenticator);
+    Ok(Runtime { config, database, modules, api, dispatcher, worker })
 }
 
 /// Lỗi nếu database còn migration chưa áp dụng; thông báo nêu từng migration và

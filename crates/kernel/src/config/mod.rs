@@ -14,6 +14,7 @@ mod database;
 mod env_example;
 mod http;
 mod log;
+mod process;
 mod reader;
 mod setting;
 mod source;
@@ -23,6 +24,7 @@ pub use database::{DatabaseBackend, DatabaseConfig, DatabaseUrl, redact_password
 pub use env_example::render_env_example;
 pub use http::{CorsOrigins, HttpConfig, RateLimit};
 pub use log::{LogConfig, LogFormat, LogLevel};
+pub use process::{ProcessConfig, ProcessRole};
 pub use reader::{
     ConfigError, ConfigErrors, ConfigReader, Invalid, Origin, SettingValue, parse_in_range,
 };
@@ -37,6 +39,7 @@ pub struct Config {
     pub http: HttpConfig,
     pub log: LogConfig,
     pub trace: TraceConfig,
+    pub process: ProcessConfig,
 }
 
 impl Config {
@@ -47,7 +50,8 @@ impl Config {
         let http = HttpConfig::read(reader);
         let log = LogConfig::read(reader);
         let trace = TraceConfig::read(reader);
-        Ok(Config { database: database?, http: http?, log: log?, trace: trace? })
+        let process = ProcessConfig::read(reader);
+        Ok(Config { database: database?, http: http?, log: log?, trace: trace?, process: process? })
     }
 }
 

@@ -384,3 +384,33 @@ async fn user_create_tao_admin_va_bao_loi_ro() {
     .await
     .unwrap();
 }
+
+/// Lệnh xem và chạy lại job hỏng, trên database gate đang chọn.
+#[tokio::test]
+async fn jobs_xem_va_chay_lai_job_hong() {
+    autoxide_testkit::TestDatabase::run(async |database| {
+        let directory = WorkDir::new("jobs");
+        let environment = [("DATABASE_URL", database.url())];
+        let up = autoxide(directory.path(), &["migrate", "up"], &environment);
+        assert_eq!(up.status.code(), Some(0), "{}", stderr(&up));
+
+        let failed = autoxide(directory.path(), &["jobs", "failed"], &environment);
+        assert_eq!(failed.status.code(), Some(0), "{}", stderr(&failed));
+        assert_eq!(stdout(&failed), "No failed jobs.\n");
+
+        let id = "01936f0e-6c9f-7cc2-8a52-2b2f4d1c1e5a";
+        let retry = autoxide(directory.path(), &["jobs", "retry", "auth", id], &environment);
+        assert_eq!(retry.status.code(), Some(1));
+        assert!(stderr(&retry).contains("has no failed job with id"), "{}", stderr(&retry));
+        let unknown =
+            autoxide(directory.path(), &["jobs", "failed", "--module", "nope"], &environment);
+        assert_eq!(unknown.status.code(), Some(1));
+        assert!(
+            stderr(&unknown).contains("Module `nope` has no job queue"),
+            "{}",
+            stderr(&unknown)
+        );
+    })
+    .await
+    .unwrap();
+}
