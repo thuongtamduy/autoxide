@@ -213,8 +213,10 @@ TEST_DATABASE_URL=postgres://… cargo test --workspace  # Postgres (gate tự d
 - **Hai database:** không dùng tính năng chỉ SQLite hoặc chỉ Postgres có. Chỗ buộc
   phải rẽ nhánh theo database (vd claim job) thì giấu sau một trait và test cả
   hai nhánh.
-- **Đọc và ghi tách kết nối.** Transaction ghi phải ngắn: không gọi mạng, không
-  hash mật khẩu bên trong.
+- **Đọc và ghi tách kết nối.** Đọc qua `Database::read()`, ghi qua
+  `Database::write()`; nhiều lệnh ghi đi cùng nhau thì `Database::begin_write()`
+  (không tự gọi `begin()` trên kết nối). Kết nối đọc bị cấm ghi trên cả hai
+  database. Transaction ghi phải ngắn: không gọi mạng, không hash mật khẩu bên trong.
 - **Migration đã commit thì không sửa** — thêm migration mới.
 - **SeaORM là mặc định.** Chỉ viết SQL trực tiếp ở chỗ đã **đo được** là chậm, câu
   SQL đó phải chạy trên cả hai database, và ghi lý do bằng skill `record-decision`.

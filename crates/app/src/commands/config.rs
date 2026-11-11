@@ -63,8 +63,7 @@ mod tests {
         let rendered = render_values(&values(&[]));
         assert!(rendered.starts_with("Configuration is valid.\n"));
         assert!(
-            rendered
-                .contains("\nDATABASE_URL = sqlite://data/autoxide.sqlite?mode=rwc  [default]\n"),
+            rendered.contains("\nDATABASE_URL = sqlite://data/autoxide.sqlite  [default]\n"),
             "{rendered}"
         );
     }

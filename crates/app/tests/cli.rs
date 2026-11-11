@@ -62,7 +62,7 @@ fn config_voi_mac_dinh_thi_hop_le() {
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let printed = stdout(&output);
     assert!(printed.starts_with("Configuration is valid.\n"), "{printed}");
-    assert!(printed.contains("DATABASE_URL = sqlite://data/autoxide.sqlite?mode=rwc  [default]"));
+    assert!(printed.contains("DATABASE_URL = sqlite://data/autoxide.sqlite  [default]"));
 }
 
 #[test]

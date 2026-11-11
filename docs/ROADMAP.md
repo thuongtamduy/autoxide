@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0 xong; đang ở bước 1**, mục "Kết nối database: tách đọc / ghi, WAL trên SQLite".
+Trạng thái: **bước 0 xong; đang ở bước 1**, mục "Migration theo module (up, down, status)".
 
 ## 0. Khung dự án
 
@@ -17,7 +17,7 @@ Trạng thái: **bước 0 xong; đang ở bước 1**, mục "Kết nối datab
 ## 1. Nền
 
 - [x] Cấu hình từ env, kiểm lúc khởi động
-- [ ] Kết nối database: tách đọc / ghi, WAL trên SQLite
+- [x] Kết nối database: tách đọc / ghi, WAL trên SQLite
 - [ ] Migration theo module (up, down, status)
 - [ ] Kiểm trong gate: tên bảng mang tiền tố module, không foreign key xuyên module
 - [ ] Hợp đồng module + đăng ký ở một chỗ (khi có module đầu tiên: thêm `"modules/*"`

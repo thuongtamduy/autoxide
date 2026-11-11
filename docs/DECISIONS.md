@@ -451,3 +451,33 @@ nhất còn để test truyền cấu hình vào mà không sửa môi trường
 Đã cân nhắc: thư viện `config` / `figment` (nhiều nguồn, nhiều định dạng) — thừa so
 với nhu cầu, và không cho danh sách biến tự mô tả; tự viết bộ đọc `.env` — `dotenvy`
 đã nằm sẵn trong cây phụ thuộc và xử lý đúng dấu nháy, ký tự thoát.
+
+## D-035 · Chi tiết kết nối database tách đọc / ghi — 2026-11-11 — agent quyết
+
+Quyết định (cài đặt cho D-009, trong `autoxide_kernel::database::Database`):
+
+- Kết nối đọc bị cấm ghi trên **cả hai** database: SQLite mở read-only, Postgres đặt
+  `default_transaction_read_only=on`. Lỡ ghi qua phía đọc thì hỏng giống nhau ở cả
+  hai bên, ngay ở test.
+- Transaction ghi mở qua `Database::begin_write()`; trên SQLite nó dùng
+  `BEGIN IMMEDIATE`.
+- SQLite: phía ghi đúng một kết nối, bật WAL, `synchronous=NORMAL`, bật foreign key
+  trên mọi kết nối, tự tạo thư mục và file. SQLite trong bộ nhớ bị từ chối ở bước
+  kiểm cấu hình.
+- `DATABASE_READ_URL` (read replica) chỉ dành cho Postgres.
+- Một biến `AUTOXIDE_DATABASE_WAIT_SECONDS` cho cả thời gian chờ kết nối rảnh và
+  thời gian chờ lock của tiến trình ghi khác.
+
+Lý do: luật số một đòi hành vi giống nhau trên hai database; cấm ghi ở phía đọc
+biến một quy ước ("đọc và ghi tách kết nối") thành thứ database tự kiểm. Về
+`BEGIN IMMEDIATE`: đo ngày 11/11/2026 bằng test `hai_tien_trinh_cung_ghi_mot_database`
+(hai `Database` cùng ghi một file, mỗi transaction đọc rồi ghi) — với kiểu mặc định
+của SQLite (`DEFERRED`) test hỏng 3 trên 3 lượt với lỗi "database is locked"; với
+`IMMEDIATE` thì xanh. `synchronous=NORMAL` là mức khuyến nghị cho WAL: file không
+hỏng khi mất điện, chỉ có thể mất vài transaction cuối; ai cần bền tuyệt đối thì
+dùng Postgres. Không bật foreign key thì SQLite lặng lẽ nhận dữ liệu sai mà Postgres
+từ chối (test `foreign_key_duoc_kiem` bắt được khi tắt thử).
+
+Đã cân nhắc: để phía đọc ghi được và chỉ dựa vào quy ước — rẻ hơn nhưng lỗi chỉ lộ
+khi chạy SQLite dưới tải hoặc khi bật read replica; `synchronous=FULL` — bền hơn
+nhưng mỗi commit thêm một lần fsync, trái mục tiêu của WAL.

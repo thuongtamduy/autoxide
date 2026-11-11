@@ -174,6 +174,16 @@ impl<'a> ConfigReader<'a> {
         }
     }
 
+    /// Ghi một lỗi cho `setting` khi giá trị đúng kiểu nhưng không hợp với biến
+    /// khác (vd hai biến mâu thuẫn nhau). `problem` nói rõ phải sửa gì.
+    pub fn reject<T>(
+        &mut self,
+        setting: &Setting,
+        problem: impl Into<String>,
+    ) -> Result<T, Invalid> {
+        self.fail(setting, problem.into())
+    }
+
     /// Kết thúc việc đọc. Có lỗi nào thì trả toàn bộ lỗi; không thì trả giá trị đã
     /// dựng kèm danh sách biến đã đọc (để in ra hoặc sinh `.env.example`).
     pub fn finish<T>(
@@ -230,9 +240,44 @@ impl<'a> ConfigReader<'a> {
     }
 }
 
+/// Đổi `raw` thành số nguyên nằm trong `[min, max]`; dùng với
+/// [`ConfigReader::get_with`]. Thông báo lỗi nói rõ khoảng hợp lệ.
+pub fn parse_in_range<T>(raw: &str, min: T, max: T) -> Result<T, String>
+where
+    T: FromStr + PartialOrd + fmt::Display,
+{
+    match raw.parse::<T>() {
+        Ok(value) if value >= min && value <= max => Ok(value),
+        _ => Err(format!("must be a whole number between {min} and {max}")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn so_ngoai_khoang_hoac_khong_phai_so_bi_tu_choi() {
+        assert_eq!(parse_in_range("5", 1u32, 10), Ok(5));
+        assert_eq!(parse_in_range("1", 1u32, 10), Ok(1));
+        assert_eq!(parse_in_range("10", 1u32, 10), Ok(10));
+        for raw in ["0", "11", "-1", "abc", "1.5", ""] {
+            assert_eq!(
+                parse_in_range(raw, 1u32, 10),
+                Err("must be a whole number between 1 and 10".to_owned()),
+                "{raw}"
+            );
+        }
+    }
+
+    #[test]
+    fn reject_ghi_loi_cho_dung_bien() {
+        let source = source(&[]);
+        let mut reader = ConfigReader::new(&source);
+        assert_eq!(reader.reject::<()>(&PORT, "conflicts with NAME"), Err(Invalid));
+        let errors = reader.finish::<()>(Err(Invalid)).unwrap_err();
+        assert_eq!(errors.errors()[0].to_string(), "PORT: conflicts with NAME");
+    }
 
     const PORT: Setting = Setting::new("PORT", "Port to listen on.").with_default("8080");
     const NAME: Setting = Setting::new("NAME", "Name of the thing.");

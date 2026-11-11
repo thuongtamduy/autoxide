@@ -16,9 +16,11 @@ mod reader;
 mod setting;
 mod source;
 
-pub use database::{DATABASE_URL, DatabaseBackend, DatabaseConfig, DatabaseUrl, redact_password};
+pub use database::{DatabaseBackend, DatabaseConfig, DatabaseUrl, redact_password};
 pub use env_example::render_env_example;
-pub use reader::{ConfigError, ConfigErrors, ConfigReader, Invalid, Origin, SettingValue};
+pub use reader::{
+    ConfigError, ConfigErrors, ConfigReader, Invalid, Origin, SettingValue, parse_in_range,
+};
 pub use setting::Setting;
 pub use source::ConfigSource;
 
@@ -51,6 +53,6 @@ mod tests {
         let (config, values) = reader.finish(config).unwrap();
 
         assert_eq!(config.database.url.backend(), DatabaseBackend::Sqlite);
-        assert!(values.iter().all(|value| value.origin == Origin::Default));
+        assert!(values.iter().all(|value| value.origin != Origin::Configured));
     }
 }
