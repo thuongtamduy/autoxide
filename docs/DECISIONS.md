@@ -1261,3 +1261,22 @@ database.
 Đã cân nhắc: gửi mail ngay trong request — request chậm theo máy chủ mail và mất mail
 khi máy chủ mail hỏng; gửi bằng event — mail không phải "việc phụ của một thay đổi" mà
 là việc chính được yêu cầu, job queue hợp hơn.
+
+## D-062 · Mẫu mail theo i18n key — 2026-11-11 — agent quyết
+
+Quyết định: `kernel::mail::MailTemplate::new(key, subject, text)` — tiêu đề và nội dung
+tiếng Anh nằm trong code (có chỗ điền `{tên}`), như câu của lỗi (D-039); bản dịch nằm
+trong `locales/vi.json` của crate với khoá `<key>.subject` và `<key>.text`, khoá đặt
+`<module>.mail.<tên>`. `render` / `mail` điền theo ngôn ngữ; thiếu bản dịch, hay bản
+dịch dùng chỗ điền không có giá trị, thì dùng tiếng Anh. Ngôn ngữ của mail là ngôn ngữ
+của request gây ra mail (extractor `Language` đọc `Accept-Language`); module lấy bản
+dịch lúc khởi động qua `StartContext::translations`. `cargo xtask check` thấy
+`MailTemplate::new("…")` và đòi đủ hai bản dịch. Mail chỉ có nội dung chữ; HTML thêm khi
+có mẫu cần.
+
+Lý do: một cách dịch duy nhất cho mọi thông báo (D-057); người lạ đọc code thấy ngay
+câu tiếng Anh, bản dịch nằm cạnh bản dịch lỗi của cùng module.
+
+Đã cân nhắc: lưu ngôn ngữ ưa thích của người dùng — cần thêm cột và API; ngôn ngữ
+theo request đủ cho các mail hiện có (đặt lại mật khẩu, xác minh email đều do chính
+người nhận yêu cầu).

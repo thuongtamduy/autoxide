@@ -13,6 +13,21 @@ use crate::error::Error;
 use crate::i18n::{Language, Translations};
 use crate::response::Problem;
 
+// Handler viết `language: Language` để biết ngôn ngữ client muốn (vd để gửi mail đúng
+// ngôn ngữ); không bao giờ lỗi — thiếu header thì tiếng Anh.
+impl<S: Send + Sync> axum::extract::FromRequestParts<S> for Language {
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        Ok(Language::negotiate(
+            parts.headers.get(header::ACCEPT_LANGUAGE).and_then(|value| value.to_str().ok()),
+        ))
+    }
+}
+
 pub(super) async fn localize(
     translations: Arc<Translations>,
     request: Request,

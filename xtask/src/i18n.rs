@@ -119,9 +119,15 @@ pub fn error_codes(text: &str) -> Vec<(usize, String)> {
         };
         let end = start + 1 + length;
         let literal = &source[start + 1..end];
-        if is_code(literal) && is_error_site(&source[..start]) {
+        if is_code(literal) {
             let line = bytes[..start].iter().filter(|byte| **byte == b'\n').count() + 1;
-            codes.push((line, literal.to_owned()));
+            if is_error_site(&source[..start]) {
+                codes.push((line, literal.to_owned()));
+            } else if is_mail_template(&source[..start]) {
+                // Mẫu mail cần bản dịch của tiêu đề và nội dung.
+                codes.push((line, format!("{literal}.subject")));
+                codes.push((line, format!("{literal}.text")));
+            }
         }
         index = end + 1;
     }
@@ -135,6 +141,13 @@ fn is_code(text: &str) -> bool {
             part.chars().next().is_some_and(|c| c.is_ascii_lowercase())
                 && part.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
         })
+}
+
+/// Văn bản `before` kết thúc bằng `MailTemplate::new(`.
+fn is_mail_template(before: &str) -> bool {
+    let tail: String =
+        before.chars().rev().take(60).collect::<Vec<_>>().into_iter().rev().collect();
+    tail.split_whitespace().collect::<Vec<_>>().join(" ").trim_end().ends_with("MailTemplate::new(")
 }
 
 /// Văn bản `before` (ngay trước một chuỗi) kết thúc bằng một chỗ tạo lỗi.
@@ -244,6 +257,11 @@ fn e(status: u16) -> &'static str {
 }
 const INTERNAL_CODE: &str = "internal_error";
 fn f() { let message = "not a code site"; tracing::info!("signed_in"); }
+const WELCOME: MailTemplate = MailTemplate::new(
+    "notes.mail.welcome",
+    "Welcome",
+    "Hello.",
+);
 "#;
         assert_eq!(
             codes(text),
@@ -253,7 +271,9 @@ fn f() { let message = "not a code site"; tracing::info!("signed_in"); }
                 "validation_failed",
                 "invalid_json",
                 "not_found",
-                "internal_error"
+                "internal_error",
+                "notes.mail.welcome.subject",
+                "notes.mail.welcome.text"
             ]
         );
     }

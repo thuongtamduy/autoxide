@@ -155,6 +155,7 @@ pub struct StartContext<'a> {
     database: &'a Database,
     permissions: &'a PermissionCatalog,
     events: &'a EventCatalog,
+    translations: &'a Translations,
     wake: &'a Arc<tokio::sync::Notify>,
     apis: &'a mut Apis,
 }
@@ -170,6 +171,11 @@ impl StartContext<'_> {
     /// có thật).
     pub fn permissions(&self) -> &PermissionCatalog {
         self.permissions
+    }
+
+    /// Bản dịch của kernel và mọi module (vd để điền mẫu mail theo ngôn ngữ).
+    pub fn translations(&self) -> &Translations {
+        self.translations
     }
 
     /// Hàng đợi job của module (bảng `<tên>_jobs`).
@@ -367,6 +373,7 @@ impl Modules {
                 database,
                 permissions: &self.permissions,
                 events: &self.events,
+                translations: &self.translations,
                 wake: &self.wake,
                 apis: &mut apis,
             };

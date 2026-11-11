@@ -148,10 +148,28 @@ impl Translations {
         if has_placeholder(&text) { error.message() } else { text }
     }
 
+    /// Câu đã dịch của khoá `key` bằng `language`, nếu có (tiếng Anh: luôn `None`, câu
+    /// nằm trong code).
+    pub fn text(&self, key: &str, language: Language) -> Option<&str> {
+        match language {
+            Language::En => None,
+            Language::Vi => self.vi.get(key).map(String::as_str),
+        }
+    }
+
     /// Có bản dịch tiếng Việt cho `code` không.
     pub fn has(&self, code: &str) -> bool {
         self.vi.contains_key(code)
     }
+}
+
+/// Điền mọi `{tên}` của `template` bằng `params`; `None` nếu còn chỗ điền không có giá trị.
+pub(crate) fn fill_all(template: &str, params: &[(&str, &str)]) -> Option<String> {
+    let mut text = template.to_owned();
+    for (name, value) in params {
+        text = text.replace(&format!("{{{name}}}"), value);
+    }
+    (!has_placeholder(&text)).then_some(text)
 }
 
 /// Còn chỗ điền `{tên}` chưa có giá trị.
