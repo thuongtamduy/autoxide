@@ -301,6 +301,30 @@ impl RoleService {
     }
 }
 
+/// Gán role `admin` (role có mọi permission) cho người dùng `user_id`, trong
+/// transaction của bên gọi.
+pub(crate) async fn grant_admin<C: ConnectionTrait>(
+    connection: &C,
+    user_id: Uuid,
+) -> Result<(), Error> {
+    let admin = role::Entity::find()
+        .filter(role::Column::AllPermissions.eq(true))
+        .one(connection)
+        .await?
+        .ok_or_else(|| {
+            Error::internal("the built-in `admin` role is missing; run the migrations")
+        })?;
+    user_role::ActiveModel {
+        id: Set(Uuid::now_v7()),
+        user_id: Set(user_id),
+        role_id: Set(admin.id),
+        created_at: Set(now()),
+    }
+    .insert(connection)
+    .await?;
+    Ok(())
+}
+
 fn is_role_name(name: &str) -> bool {
     name.chars().count() <= NAME_MAX_LENGTH
         && name.chars().next().is_some_and(|first| first.is_ascii_lowercase())

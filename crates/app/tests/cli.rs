@@ -45,6 +45,30 @@ fn autoxide(directory: &Path, arguments: &[&str], environment: &[(&str, &str)]) 
         .unwrap()
 }
 
+/// Như [`autoxide`], gửi `input` vào standard input của lệnh.
+fn autoxide_with_input(
+    directory: &Path,
+    arguments: &[&str],
+    environment: &[(&str, &str)],
+    input: &str,
+) -> Output {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_autoxide"))
+        .args(arguments)
+        .current_dir(directory)
+        .env_clear()
+        .envs(environment.iter().copied())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+    child.wait_with_output().unwrap()
+}
+
 fn stdout(output: &Output) -> String {
     String::from_utf8(output.stdout.clone()).unwrap()
 }
@@ -239,6 +263,19 @@ fn serve_phuc_vu_roi_dung_em_khi_nhan_sigterm() {
     assert!(stderr(&refused).contains("run `autoxide migrate up` first"), "{}", stderr(&refused));
     let up = autoxide(directory.path(), &["migrate", "up"], &[]);
     assert_eq!(up.status.code(), Some(0), "{}", stderr(&up));
+    // Người dùng đầu tiên, tạo bằng CLI như hướng dẫn cài đặt.
+    let created = autoxide_with_input(
+        directory.path(),
+        &["user", "create", "--email", "ada@example.com", "--name", "Ada", "--admin"],
+        &[],
+        "",
+    );
+    assert_eq!(created.status.code(), Some(0), "{}", stderr(&created));
+    let password = stdout(&created)
+        .lines()
+        .find_map(|line| line.strip_prefix("Password: "))
+        .unwrap()
+        .to_owned();
 
     let mut child = Command::new(env!("CARGO_BIN_EXE_autoxide"))
         .arg("serve")
@@ -266,12 +303,26 @@ fn serve_phuc_vu_roi_dung_em_khi_nhan_sigterm() {
     }
     let address = address.unwrap();
 
-    let mut stream = std::net::TcpStream::connect(&address).unwrap();
-    stream
-        .write_all(b"GET /health/ready HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n")
-        .unwrap();
-    let mut response = String::new();
-    stream.read_to_string(&mut response).unwrap();
+    let http = |method: &str, path: &str, authorization: &str, body: &str| {
+        let mut stream = std::net::TcpStream::connect(&address).unwrap();
+        let request = format!(
+            "{method} {path} HTTP/1.1\r\nHost: test\r\nConnection: close\r\n{authorization}\
+             Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        );
+        stream.write_all(request.as_bytes()).unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).unwrap();
+        response
+    };
+    let response = http("GET", "/health/ready", "", "");
+    // Đăng nhập bằng tài khoản vừa tạo, rồi xem quyền của mình.
+    let credentials = serde_json::json!({"email": "ada@example.com", "password": password});
+    let login = http("POST", "/api/v1/auth/login", "", &credentials.to_string());
+    let (_, body) = login.split_once("\r\n\r\n").unwrap();
+    let login_body: serde_json::Value = serde_json::from_str(body).unwrap();
+    let token = login_body["data"]["access_token"].as_str().unwrap_or_default().to_owned();
+    let me = http("GET", "/api/v1/auth/me", &format!("Authorization: Bearer {token}\r\n"), "");
 
     let sent = Command::new("kill").args(["-TERM", &child.id().to_string()]).status().unwrap();
     let status = child.wait().unwrap();
@@ -279,7 +330,56 @@ fn serve_phuc_vu_roi_dung_em_khi_nhan_sigterm() {
     log.read_to_string(&mut rest).unwrap();
 
     assert!(response.starts_with("HTTP/1.1 200 OK\r\n"), "{response}");
+    assert!(login.starts_with("HTTP/1.1 200 OK\r\n"), "{login}");
+    assert!(me.starts_with("HTTP/1.1 200 OK\r\n"), "{me}");
+    assert!(me.contains(r#""all_permissions":true"#), "{me}");
     assert!(sent.success());
     assert_eq!(status.code(), Some(0), "{rest}");
     assert!(rest.contains(r#""message":"stopped""#), "{rest}");
+}
+
+/// Tạo người dùng bằng CLI trên database gate đang chọn (SQLite hoặc Postgres).
+#[tokio::test]
+async fn user_create_tao_admin_va_bao_loi_ro() {
+    autoxide_testkit::TestDatabase::run(async |database| {
+        let directory = WorkDir::new("user-create");
+        let environment = [("DATABASE_URL", database.url())];
+        let create = |email: &str, input: &str| {
+            let arguments = [
+                "user",
+                "create",
+                "--email",
+                email,
+                "--name",
+                "Ada",
+                "--admin",
+                "--password-stdin",
+            ];
+            autoxide_with_input(directory.path(), &arguments, &environment, input)
+        };
+
+        let before = create("ada@example.com", "correct horse battery staple\n");
+        assert_eq!(before.status.code(), Some(1));
+        assert!(stderr(&before).contains("run `autoxide migrate up` first"), "{}", stderr(&before));
+
+        let up = autoxide(directory.path(), &["migrate", "up"], &environment);
+        assert_eq!(up.status.code(), Some(0), "{}", stderr(&up));
+        let created = create("Ada@Example.com", "correct horse battery staple\n");
+        assert_eq!(created.status.code(), Some(0), "{}", stderr(&created));
+        let printed = stdout(&created);
+        assert!(printed.starts_with("Created user ada@example.com (id "), "{printed}");
+        assert!(printed.contains("with the `admin` role"), "{printed}");
+        // Mật khẩu do người dùng đưa vào thì không in lại.
+        assert!(!printed.contains("correct horse"), "{printed}");
+
+        let taken = create("ada@example.com", "correct horse battery staple\n");
+        assert_eq!(taken.status.code(), Some(1));
+        assert!(stderr(&taken).contains("(auth.email_taken)"), "{}", stderr(&taken));
+
+        let short = create("bob@example.com", "short\n");
+        assert_eq!(short.status.code(), Some(1));
+        assert!(stderr(&short).contains("  - password: must be between 12"), "{}", stderr(&short));
+    })
+    .await
+    .unwrap();
 }

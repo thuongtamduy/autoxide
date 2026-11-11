@@ -44,3 +44,24 @@ pub trait Users: Send + Sync {
     /// Người dùng có ID `id`, hoặc `None` nếu không có.
     async fn find(&self, id: Uuid) -> Result<Option<User>, Error>;
 }
+
+/// Dữ liệu để tạo một tài khoản.
+#[derive(Debug, Clone)]
+pub struct NewAccount {
+    pub email: String,
+    pub name: String,
+    /// `None`: tài khoản chưa có mật khẩu, chưa đăng nhập bằng mật khẩu được.
+    pub password: Option<String>,
+    /// Gán role `admin` (mọi permission).
+    pub admin: bool,
+}
+
+/// Tạo tài khoản. Binary dùng trait này cho lệnh `autoxide user create`; nó không
+/// kiểm permission — bên gọi chịu trách nhiệm (lệnh CLI chạy với quyền của người
+/// vận hành máy chủ).
+#[async_trait::async_trait]
+pub trait Accounts: Send + Sync {
+    /// Tạo tài khoản. Lỗi: email sai hoặc đã có (`auth.email_taken`), mật khẩu không
+    /// đạt luật độ dài (`validation_failed`).
+    async fn create(&self, account: NewAccount) -> Result<User, Error>;
+}

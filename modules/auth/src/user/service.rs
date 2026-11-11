@@ -11,7 +11,7 @@ use uuid::Uuid;
 use validator::ValidateEmail;
 
 use super::entity::{self, Column, Entity};
-use crate::api::{User, Users};
+use crate::api::{Accounts, NewAccount, User, Users};
 use crate::password::{self, Passwords, Verification};
 use crate::session::SessionService;
 
@@ -109,6 +109,16 @@ impl UserService {
     /// Tạo người dùng. Email được chuẩn hoá (bỏ khoảng trắng hai đầu, chữ thường)
     /// và phải chưa ai dùng.
     pub(crate) async fn create(&self, input: NewUser) -> Result<User, Error> {
+        self.create_with_roles(input, false).await
+    }
+
+    /// Như [`create`](Self::create); `admin` thì gán luôn role `admin` trong CÙNG
+    /// transaction — không bao giờ có người dùng "admin dở dang" khi một bước hỏng.
+    pub(crate) async fn create_with_roles(
+        &self,
+        input: NewUser,
+        admin: bool,
+    ) -> Result<User, Error> {
         let email = normalize_email(&input.email);
         let name = input.name.trim().to_owned();
         let mut problems = Vec::new();
@@ -127,6 +137,7 @@ impl UserService {
             None => None,
         };
         let now = now();
+        let transaction = self.database.begin_write().await?;
         let row = entity::ActiveModel {
             id: Set(Uuid::now_v7()),
             email: Set(email.clone()),
@@ -136,7 +147,7 @@ impl UserService {
             created_at: Set(now),
             updated_at: Set(now),
         }
-        .insert(self.database.write())
+        .insert(&transaction)
         .await
         .map_err(|error| match error.sql_err() {
             // Hai request tạo cùng email đồng thời: index unique quyết bên nào thắng.
@@ -148,7 +159,11 @@ impl UserService {
             .with_param("email", &email),
             _ => Error::from(error),
         })?;
-        tracing::info!(user_id = %row.id, "user created");
+        if admin {
+            crate::role::grant_admin(&transaction, row.id).await?;
+        }
+        transaction.commit().await?;
+        tracing::info!(user_id = %row.id, admin, "user created");
         Ok(row.into())
     }
 
@@ -191,6 +206,15 @@ impl UserService {
         transaction.commit().await?;
         tracing::info!(user_id = %id, "password changed");
         Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl Accounts for UserService {
+    async fn create(&self, account: NewAccount) -> Result<User, Error> {
+        let input =
+            NewUser { email: account.email, name: account.name, password: account.password };
+        self.create_with_roles(input, account.admin).await
     }
 }
 
@@ -524,6 +548,60 @@ mod tests {
             let users: std::sync::Arc<dyn Users> = service;
 
             assert_eq!(users.find(created.id).await.unwrap(), Some(created));
+        })
+        .await
+        .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod account_tests {
+    use super::*;
+    use autoxide_testkit::TestDatabase;
+
+    fn account(email: &str, admin: bool) -> NewAccount {
+        NewAccount {
+            email: email.to_owned(),
+            name: "Ada".to_owned(),
+            password: Some("correct horse battery staple".to_owned()),
+            admin,
+        }
+    }
+
+    #[tokio::test]
+    async fn tao_tai_khoan_admin_co_moi_quyen() {
+        TestDatabase::run(async |test| {
+            let services = crate::testing::services(test).await;
+            let accounts: &dyn Accounts = services.users.as_ref();
+
+            let admin = accounts.create(account("ada@example.com", true)).await.unwrap();
+            let plain = accounts.create(account("bob@example.com", false)).await.unwrap();
+
+            assert!(services.roles.principal(admin.id).await.unwrap().has_all_permissions());
+            let bob = services.roles.principal(plain.id).await.unwrap();
+            assert!(!bob.has_all_permissions());
+            assert!(bob.permissions().is_empty());
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn tao_hong_thi_khong_de_lai_gi() {
+        TestDatabase::run(async |test| {
+            let services = crate::testing::services(test).await;
+            let accounts: &dyn Accounts = services.users.as_ref();
+            accounts.create(account("ada@example.com", true)).await.unwrap();
+
+            let error = accounts.create(account("ADA@example.com", true)).await.unwrap_err();
+
+            assert_eq!(error.code(), "auth.email_taken");
+            let page = services
+                .users
+                .list(&PageRequest::first(10, autoxide_kernel::pagination::Order::Asc))
+                .await
+                .unwrap();
+            assert_eq!(page.data.len(), 1);
         })
         .await
         .unwrap();

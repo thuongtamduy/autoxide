@@ -19,8 +19,8 @@ metrics, tracing và CLI. Bước 2 (đăng nhập, role và permission) đang l
 với mật khẩu hash bằng Argon2id và cho đăng nhập bằng access token sống ngắn cùng
 refresh token xoay vòng (`/api/v1/auth/login`, `/refresh`, `/logout`, `/me`). Quyền truy
 cập theo role: mỗi module khai permission của mình, role gom chúng lại
-(`/api/v1/auth/roles`), và role `admin` dựng sẵn có tất cả. Chưa có cách tạo người
-dùng đầu tiên; việc đó đến cùng các lệnh quản lý người dùng của bước 2.
+(`/api/v1/auth/roles`), và role `admin` dựng sẵn có tất cả. Quản trị viên đầu tiên
+được tạo bằng dòng lệnh (`autoxide user create`).
 
 Core sẽ gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -96,6 +96,13 @@ cargo run -p autoxide -- migrate up              # áp dụng mọi thứ còn c
 cargo run -p autoxide -- migrate down <module>   # gỡ migration mới nhất của một module
 ```
 
+Tạo quản trị viên đầu tiên. Lệnh tự sinh một mật khẩu mạnh và in ra đúng một lần;
+muốn tự chọn mật khẩu thì đưa nó vào standard input và thêm `--password-stdin`:
+
+```bash
+cargo run -p autoxide -- user create --email you@example.com --name "Your Name" --admin
+```
+
 Sau đó chạy máy chủ. Máy chủ từ chối chạy khi còn migration chưa áp dụng, và dừng êm
 khi nhận Ctrl-C hoặc `SIGTERM` (request đang chạy có `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`
 giây để xong):
@@ -105,7 +112,14 @@ cargo run -p autoxide -- serve
 ```
 
 Mặc định máy chủ nghe ở `127.0.0.1:8080`: kiểm bằng
-`curl http://127.0.0.1:8080/health/ready`. Log ghi ra standard error.
+`curl http://127.0.0.1:8080/health/ready`. Log ghi ra standard error. Đăng nhập và
+xem tài khoản của mình:
+
+```bash
+curl -s http://127.0.0.1:8080/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"email": "you@example.com", "password": "<mật khẩu>"}'
+curl -s http://127.0.0.1:8080/api/v1/auth/me -H 'Authorization: Bearer <access_token>'
+```
 
 Hợp đồng của API là một tài liệu OpenAPI sinh ra từ code. Nó nằm trong repo ở
 [`docs/openapi.json`](docs/openapi.json), in ra được bằng `autoxide openapi`, và máy

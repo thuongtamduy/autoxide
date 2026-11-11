@@ -98,6 +98,7 @@ impl Module for AuthModule {
         // `Arc<X>` tự đổi thành `Arc<dyn Trait>`: bên dùng chỉ thấy trait.
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
         context.provide::<dyn api::Users>(users.clone())?;
+        context.provide::<dyn api::Accounts>(users.clone())?;
         self.state = Some(http::HttpState { sessions, users, roles });
         Ok(())
     }

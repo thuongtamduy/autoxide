@@ -4,4 +4,4 @@
 mod entity;
 mod service;
 
-pub(crate) use service::{Role, RoleInput, RoleService};
+pub(crate) use service::{Role, RoleInput, RoleService, grant_admin};

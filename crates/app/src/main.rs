@@ -49,6 +49,11 @@ enum Command {
     /// `autoxide migrate up` first. On shutdown, requests in progress get up to
     /// `AUTOXIDE_HTTP_SHUTDOWN_SECONDS` to finish.
     Serve,
+
+    /// Manage user accounts, e.g. create the first administrator.
+    ///
+    /// Runs with the rights of whoever operates the server: no sign-in needed.
+    User(commands::user::Arguments),
 }
 
 fn main() -> ExitCode {
@@ -59,6 +64,7 @@ fn main() -> ExitCode {
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
         Command::Openapi => commands::openapi::run(),
         Command::Serve => commands::serve::run(),
+        Command::User(arguments) => commands::user::run(&arguments),
     }
 }
 

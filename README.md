@@ -20,9 +20,8 @@ Step 2 (login, roles and permissions) is in progress: the `auth` module stores
 users with Argon2id password hashes and signs them in with short-lived access
 tokens and rotating refresh tokens (`/api/v1/auth/login`, `/refresh`, `/logout`,
 `/me`). Access is controlled by roles: each module declares its permissions, roles
-group them (`/api/v1/auth/roles`), and a built-in `admin` role has them all. There
-is no way to create the first user yet; that comes with the user commands of
-step 2.
+group them (`/api/v1/auth/roles`), and a built-in `admin` role has them all. The
+first administrator is created from the command line (`autoxide user create`).
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
@@ -98,6 +97,13 @@ cargo run -p autoxide -- migrate up              # apply everything that is pend
 cargo run -p autoxide -- migrate down <module>   # revert the newest migration of one module
 ```
 
+Create the first administrator. A strong password is generated and printed once;
+to choose your own, pipe it in and add `--password-stdin`:
+
+```bash
+cargo run -p autoxide -- user create --email you@example.com --name "Your Name" --admin
+```
+
 Then start the server. It refuses to start while a migration is pending, and
 stops gracefully on Ctrl-C or `SIGTERM` (requests in progress get
 `AUTOXIDE_HTTP_SHUTDOWN_SECONDS` to finish):
@@ -107,7 +113,14 @@ cargo run -p autoxide -- serve
 ```
 
 By default it listens on `127.0.0.1:8080`: check it with
-`curl http://127.0.0.1:8080/health/ready`. Logs go to standard error.
+`curl http://127.0.0.1:8080/health/ready`. Logs go to standard error. Sign in and
+look at your account:
+
+```bash
+curl -s http://127.0.0.1:8080/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"email": "you@example.com", "password": "<the password>"}'
+curl -s http://127.0.0.1:8080/api/v1/auth/me -H 'Authorization: Bearer <access_token>'
+```
 
 The API contract is an OpenAPI document generated from the code. It is committed
 as [`docs/openapi.json`](docs/openapi.json), printed by `autoxide openapi`, and

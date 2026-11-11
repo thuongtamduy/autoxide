@@ -868,3 +868,21 @@ ngoài core. Bảng `auth_login_throttle` lớn dần với email lạ — dọn
 địa chỉ IP khi đăng nhập sai — kẻ tấn công đổi IP dễ, người dùng sau NAT bị khoá
 chung; khoá vĩnh viễn tới khi quản trị viên mở — biến lỗi gõ sai thành việc của
 quản trị viên.
+
+## D-048 · Lệnh `autoxide user create` — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Lệnh `autoxide user create --email … --name … [--admin] [--password-stdin]` tạo tài
+  khoản, chạy với quyền của người vận hành máy chủ (không đăng nhập, không kiểm
+  permission). `--admin` gán role `admin` trong cùng transaction với việc tạo.
+- Mật khẩu: không có `--password-stdin` thì sinh 18 byte ngẫu nhiên (24 ký tự
+  base64url) và in ra đúng một lần; có thì đọc dòng đầu của standard input. Không
+  nhận mật khẩu qua tham số dòng lệnh (lộ trong lịch sử shell và danh sách tiến
+  trình) và không hỏi kiểu ẩn ký tự (cần thêm thư viện, và AI agent không gõ được).
+- Binary gọi module `auth` qua trait mới `autoxide_auth::api::Accounts` (lấy bằng
+  `Modules::api()`), không chạm phần bên trong module. Lệnh từ chối chạy khi còn
+  migration chưa áp dụng, như `serve`.
+
+Lý do: người cài cần một cách tạo quản trị viên đầu tiên mà không cần ai đăng nhập
+trước; dòng lệnh là cách chuẩn (Django `createsuperuser`, Keycloak bootstrap admin).
