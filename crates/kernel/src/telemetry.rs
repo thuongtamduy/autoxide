@@ -55,6 +55,7 @@ impl TraceExport {
         let Some(endpoint) = &config.otlp_endpoint else {
             return Ok(None);
         };
+        crate::tls::install_crypto_provider();
         // Địa chỉ đưa vào bằng code được dùng nguyên văn, nên tự nối đường dẫn chuẩn
         // của tín hiệu trace.
         let exporter = SpanExporter::builder()

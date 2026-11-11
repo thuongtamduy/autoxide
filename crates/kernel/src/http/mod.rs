@@ -23,6 +23,7 @@
 //! 9. **timeout** — request chạy quá lâu bị cắt, trả 503;
 //! 10. **giới hạn body** — body quá lớn bị từ chối, trả 413.
 
+mod body_limit;
 mod deprecation;
 mod extract;
 mod health;
@@ -47,7 +48,6 @@ use axum::response::{IntoResponse, Response};
 use axum::{Extension, Router};
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::{AllowOrigin, CorsLayer};
-use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::request_id::{PropagateRequestIdLayer, SetRequestIdLayer};
 use utoipa::openapi::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
@@ -59,6 +59,7 @@ use crate::error::Error;
 use crate::i18n::Translations;
 use crate::idempotency::IdempotencyStore;
 
+pub use body_limit::{BodyLimit, is_too_large};
 pub use deprecation::Deprecation;
 pub use extract::ValidJson;
 pub use health::{Health, health_routes};
@@ -92,6 +93,8 @@ pub struct Extras {
     pub idempotency: Option<Arc<dyn IdempotencyStore>>,
     /// Endpoint deprecated do các module khai: `(tên module, khai báo)`.
     pub deprecations: Vec<(&'static str, Deprecation)>,
+    /// Giới hạn thân request riêng của route do module khai: `(tên module, khai báo)`.
+    pub body_limits: Vec<(&'static str, BodyLimit)>,
     /// Bản dịch thông báo lỗi (mặc định: chỉ bản dịch của kernel thì dùng
     /// `Translations::new(Vec::new())`; rỗng thì mọi lỗi bằng tiếng Anh).
     pub translations: Translations,
@@ -136,10 +139,11 @@ pub fn build(
 
     // `None` khi rate limiting bị tắt; lớp vẫn có mặt và cho mọi request đi qua.
     let translations = Arc::new(extras.translations);
+    let body_limits = Arc::new(body_limit::BodyLimits::new(config.body_limit, &extras.body_limits));
     let idempotency = extras.idempotency.map(|store| {
         Arc::new(idempotency::Settings {
             store,
-            body_limit: config.body_limit,
+            body_limits: body_limits.clone(),
             request_timeout: config.request_timeout,
         })
     });
@@ -149,8 +153,12 @@ pub fn build(
     // `.layer` bọc thêm một lớp RA NGOÀI các lớp trước đó: lớp khai sau cùng là lớp
     // request gặp đầu tiên. Đọc từ dưới lên sẽ ra thứ tự ở đầu file.
     let router = router
-        .layer(DefaultBodyLimit::max(config.body_limit))
-        .layer(RequestBodyLimitLayer::new(config.body_limit))
+        // Giới hạn mặc định của axum (2 MiB cho extractor) tắt đi: lớp `body_limit`
+        // đã giới hạn theo từng route.
+        .layer(DefaultBodyLimit::disable())
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            body_limit::limit(body_limits.clone(), request, next)
+        }))
         .layer(middleware::from_fn(move |request: Request, next: Next| {
             enforce_timeout(request_timeout, request, next)
         }))

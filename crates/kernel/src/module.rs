@@ -134,6 +134,12 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Route cần thân request lớn hơn giới hạn chung (`AUTOXIDE_HTTP_BODY_LIMIT_BYTES`),
+    /// vd tải file lên. Gọi sau `configure` (giới hạn có thể lấy từ cấu hình của module).
+    fn body_limits(&self) -> Vec<crate::http::BodyLimit> {
+        Vec::new()
+    }
+
     /// Bản dịch thông báo lỗi của module: `(ngôn ngữ, nội dung JSON)`, thường là
     /// `vec![("vi", include_str!("../locales/vi.json"))]`. Mỗi `code` lỗi của module
     /// phải có bản dịch (`cargo xtask check` kiểm).
@@ -406,6 +412,17 @@ impl Modules {
             .flat_map(|module| {
                 let name = module.name();
                 module.deprecations().into_iter().map(move |deprecation| (name, deprecation))
+            })
+            .collect()
+    }
+
+    /// Giới hạn thân request riêng của mọi module: `(tên module, khai báo)`.
+    pub fn body_limits(&self) -> Vec<(&'static str, crate::http::BodyLimit)> {
+        self.modules
+            .iter()
+            .flat_map(|module| {
+                let name = module.name();
+                module.body_limits().into_iter().map(move |limit| (name, limit))
             })
             .collect()
     }

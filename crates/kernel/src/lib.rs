@@ -20,4 +20,6 @@ pub mod migration;
 pub mod module;
 pub mod pagination;
 pub mod response;
+pub mod storage;
 pub mod telemetry;
+pub mod tls;

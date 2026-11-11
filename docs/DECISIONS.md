@@ -1353,3 +1353,40 @@ là nơi nhận mail đặt lại mật khẩu); token một lần, lưu dạng 
 Đã cân nhắc: chặn đăng nhập khi chưa xác minh — khoá ngoài người dùng do CLI tạo và
 cài đặt chưa có SMTP; gửi thêm mail báo cho địa chỉ cũ khi email đổi — để sau, khi có
 nhu cầu.
+
+## D-066 · Lưu file: trait `Storage` của kernel, module `files` trên `object_store` — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Kernel có trait `storage::Storage` (`put` / `get` / `delete` theo khoá, nội dung là
+  luồng byte `ByteStream` — file lớn không nằm trọn trong bộ nhớ), như `Mailer`: module
+  `files` công bố `dyn Storage`, module khác lấy bằng `context.require` (đăng ký sau
+  `files`).
+- Module `files` cài trait bằng `object_store` 0.14: thư mục `AUTOXIDE_FILES_DIR`
+  (mặc định `data/files`, tạo khi ghi file đầu tiên, có fsync) hoặc S3 khi đặt
+  `AUTOXIDE_FILES_S3_BUCKET`. Thông tin S3 dùng tên chuẩn của AWS (`AWS_REGION`,
+  `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`), đọc qua
+  `ConfigReader` như mọi biến khác (không để thư viện tự đọc môi trường). Ghi qua
+  `BufWriter` của `object_store`: file nhỏ ghi một lần, file lớn ghi multipart từng
+  phần 8 MiB; luồng lỗi giữa chừng thì huỷ multipart, không để lại file dở.
+- Một thư viện mật mã: feature `aws-base` + `ring` thay cho `aws` (kéo aws-lc-rs);
+  `reqwest` dùng rustls không kèm provider. Vì `reqwest` là một bản dùng chung (exporter
+  OTLP cũng dùng), kernel có `tls::install_crypto_provider()` cài `ring` cho cả tiến
+  trình; chỗ nào dựng HTTP client (exporter OTLP, kho S3) gọi nó trước (D-043).
+- Giới hạn thân request theo route: `Module::body_limits` (mặc định rỗng — D-038) khai
+  `BodyLimit { method, path, max_bytes }`; lớp `body_limit` của kernel (chạy sau khi
+  chọn route, như lớp deprecated) dùng giới hạn đó thay cho `AUTOXIDE_HTTP_BODY_LIMIT_BYTES`.
+  Lớp idempotency đọc thân theo cùng giới hạn. `DefaultBodyLimit` của axum tắt đi vì
+  lớp này đã giới hạn mọi route.
+- Test của nơi lưu chạy trên ổ đĩa, và trên S3 khi `TEST_S3_ENDPOINT` được đặt
+  (testkit đọc biến, `s3_settings()`). Gate dựng máy chủ S3 giả lập `moto`
+  (`motoserver/moto`) trong Docker — hoặc dùng `GATE_S3_ENDPOINT` — và đặt biến đó cho
+  cả hai lượt test.
+
+Lý do: `object_store` (Apache Arrow) là thư viện chuẩn, một API cho mọi nơi lưu, có
+sẵn multipart và huỷ multipart; trait ở kernel giữ module nghiệp vụ không phụ thuộc
+thư viện đó. Test S3 trên máy chủ giả lập chạy được ở mọi máy mà không cần secret thật.
+
+Đã cân nhắc: `aws-sdk-s3` — rất nặng, chỉ S3; MinIO để test — bản mã nguồn mở đã ngừng
+phát hành (dl.min.io trả 410, ngày 11/11/2026); `LocalFileSystem::new_with_prefix` —
+đòi thư mục có sẵn lúc khởi động (test và lệnh CLI sẽ tạo thư mục rác).

@@ -150,6 +150,11 @@ Mặc định mỗi địa chỉ client được gửi 600 request mỗi phút
 lần sai. Chạy sau reverse proxy thì đặt `AUTOXIDE_HTTP_CLIENT_IP_HEADER` (ví dụ
 `X-Forwarded-For`) để phân biệt client theo địa chỉ của chính họ thay vì của proxy.
 
+File tải lên được lưu trong `data/files` cho tới khi bạn đặt `AUTOXIDE_FILES_S3_BUCKET`
+(kèm `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, và `AWS_ENDPOINT_URL`
+cho dịch vụ tương thích S3 như Cloudflare R2). Backup `data/files` cùng lúc với
+database.
+
 Mail được ghi thành file `.eml` vào `data/mail` cho tới khi bạn đặt
 `AUTOXIDE_MAIL_SMTP_URL` (ví dụ `smtps://user:password@smtp.example.com:465`) và
 `AUTOXIDE_MAIL_FROM`.
@@ -197,6 +202,11 @@ TEST_DATABASE_URL=postgres://user:password@localhost:5432/postgres cargo test --
 
 `./gate.sh` làm việc này giúp bạn bằng Docker. Muốn gate dùng một máy chủ có sẵn
 thì đặt `GATE_POSTGRES_URL` bằng một URL cùng dạng.
+
+Test lưu file chạy thêm trên S3 khi `TEST_S3_ENDPOINT` trỏ tới một dịch vụ tương thích
+S3 có bucket tên `autoxide-test`. Gate tự dựng một máy chủ S3 giả lập dùng xong bỏ
+([moto](https://github.com/getmoto/moto)) bằng Docker; muốn dùng dịch vụ có sẵn thì
+đặt `GATE_S3_ENDPOINT`.
 
 ## Bố cục dự án
 

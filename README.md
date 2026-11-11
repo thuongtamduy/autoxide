@@ -153,6 +153,11 @@ Each client address may make 600 requests a minute by default
 example to `X-Forwarded-For`) so that clients are told apart by their own address
 rather than the proxy's.
 
+Uploaded files are stored in `data/files` until you set `AUTOXIDE_FILES_S3_BUCKET`
+(with `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_ENDPOINT_URL`
+for an S3-compatible service such as Cloudflare R2). Back up `data/files` together with
+the database.
+
 Mail is written as `.eml` files to `data/mail` until you set `AUTOXIDE_MAIL_SMTP_URL`
 (for example `smtps://user:password@smtp.example.com:465`) and `AUTOXIDE_MAIL_FROM`.
 
@@ -200,6 +205,11 @@ TEST_DATABASE_URL=postgres://user:password@localhost:5432/postgres cargo test --
 
 `./gate.sh` does this for you with Docker. To make the gate use an existing
 server instead, set `GATE_POSTGRES_URL` to the same kind of URL.
+
+File storage tests also run against S3 when `TEST_S3_ENDPOINT` points at an
+S3-compatible service with a bucket named `autoxide-test`. The gate starts a throwaway
+S3 emulator ([moto](https://github.com/getmoto/moto)) in Docker for this; set
+`GATE_S3_ENDPOINT` to use an existing service instead.
 
 ## Project layout
 

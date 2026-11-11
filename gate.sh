@@ -9,6 +9,8 @@
 #   4. thư viện             cargo deny check (license, lỗ hổng, nguồn)
 #   5. test trên SQLite
 #   6. test trên Postgres   (tự dựng một container Docker dùng xong bỏ)
+#   Bước 5 và 6 chạy thêm test lưu file trên S3: gate dựng một máy chủ S3 giả lập
+#   (moto) trong Docker, dùng xong bỏ.
 #
 # Cần có: toolchain Rust (rustup tự cài đúng bản ghim), cargo-deny, Docker.
 # Cần mạng ở lần chạy đầu (tải thư viện, image Postgres) và mỗi lần cargo-deny
@@ -20,6 +22,11 @@
 #                        phải có quyền CREATE DATABASE. CI dùng biến này.
 #   GATE_POSTGRES_IMAGE  image cho container (mặc định là phiên bản Postgres tối
 #                        thiểu được hỗ trợ, xem STACK.md).
+#   GATE_S3_ENDPOINT     dùng dịch vụ tương thích S3 có sẵn thay vì dựng container,
+#                        dạng http://host:port — phải có sẵn bucket `autoxide-test` (hoặc
+#                        TEST_S3_BUCKET) và nhận TEST_S3_ACCESS_KEY_ID /
+#                        TEST_S3_SECRET_ACCESS_KEY (mặc định `test` / `test`).
+#   GATE_S3_IMAGE        image cho container S3 giả lập (mặc định motoserver/moto).
 #
 # Gate đỏ thì sửa code. Không nới gate, không tắt lint, không bỏ qua test
 # (CLAUDE.md, mục "Gate").
@@ -28,7 +35,9 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 POSTGRES_IMAGE="${GATE_POSTGRES_IMAGE:-postgres:16-alpine}"
+S3_IMAGE="${GATE_S3_IMAGE:-motoserver/moto:5.2.5}"
 CONTAINER=""
+S3_CONTAINER=""
 
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 fail() {
@@ -37,9 +46,12 @@ fail() {
 }
 
 cleanup() {
-  if [ -n "$CONTAINER" ]; then
-    docker rm --force --volumes "$CONTAINER" >/dev/null 2>&1 || true
-  fi
+  local container
+  for container in "$CONTAINER" "$S3_CONTAINER"; do
+    if [ -n "$container" ]; then
+      docker rm --force --volumes "$container" >/dev/null 2>&1 || true
+    fi
+  done
 }
 # Chạy cleanup dù gate xanh, đỏ hay bị Ctrl-C.
 trap cleanup EXIT
@@ -66,6 +78,36 @@ step "dependencies (cargo deny)"
 # -D ...-not-detected / -not-encountered: ngoại lệ trong deny.toml không còn cần
 # thì thành lỗi, để ngoại lệ tự hết hạn.
 cargo deny check -D advisory-not-detected -D license-not-encountered
+
+# --- S3 cho test lưu file (dùng ở bước 5 và 6) -------------------------------------
+
+start_s3() {
+  require docker "Install Docker, or point GATE_S3_ENDPOINT at an existing S3-compatible service."
+  docker info >/dev/null 2>&1 || fail "Docker is installed but not running (or not accessible to this user)."
+  S3_CONTAINER="autoxide-gate-s3-$$"
+  docker run --detach --name "$S3_CONTAINER" --publish 127.0.0.1::5000 "$S3_IMAGE" >/dev/null
+  local port
+  port="$(docker port "$S3_CONTAINER" 5000/tcp | head -n 1 | sed 's/.*://')"
+  S3_ENDPOINT="http://127.0.0.1:${port}"
+  local attempt
+  for attempt in $(seq 1 60); do
+    # Máy chủ giả lập nhận request không ký: tạo bucket là đủ để biết nó đã sẵn sàng.
+    if curl --silent --fail --request PUT "$S3_ENDPOINT/autoxide-test" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  docker logs "$S3_CONTAINER" >&2 || true
+  fail "S3 container did not become ready within 30 seconds."
+}
+
+S3_ENDPOINT="${GATE_S3_ENDPOINT:-}"
+if [ -z "$S3_ENDPOINT" ]; then
+  require curl "Install curl."
+  step "S3 for file storage tests ($S3_IMAGE in Docker)"
+  start_s3
+fi
+export TEST_S3_ENDPOINT="$S3_ENDPOINT"
 
 # --- 5: SQLite ------------------------------------------------------------------
 
@@ -119,4 +161,4 @@ else
 fi
 TEST_DATABASE_URL="$POSTGRES_URL" cargo test --workspace --locked
 
-printf '\n\033[32mgate: green — fmt, clippy, boundaries, dependencies, tests on SQLite and Postgres\033[0m\n'
+printf '\n\033[32mgate: green — fmt, clippy, boundaries, dependencies, tests on SQLite and Postgres (files also on S3)\033[0m\n'

@@ -20,7 +20,7 @@
   "not_found": "Không có endpoint này. Hãy đối chiếu đường dẫn với tài liệu OpenAPI.",
   "not_implemented": "Máy chủ chưa hỗ trợ việc này.",
   "not_ready": "Máy chủ chưa xử lý được request: database không trả lời.",
-  "payload_too_large": "Thân request lớn hơn mức máy chủ nhận.",
+  "payload_too_large": "Thân request lớn hơn mức endpoint này nhận ({limit} byte).",
   "permission_denied": "Việc này cần permission `{permission}`. Hãy nhờ quản trị viên cấp cho bạn một role có permission đó.",
   "rate_limited": "Quá nhiều request từ địa chỉ của bạn. Hãy chờ {seconds} giây rồi thử lại, và gửi chậm hơn để tránh lỗi này.",
   "request_timeout": "Máy chủ không xử lý xong request trong {seconds} giây. Hãy thử lại sau.",

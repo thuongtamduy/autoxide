@@ -294,6 +294,37 @@ async fn body_qua_lon_bi_tu_choi() {
     assert_eq!(send(api_with(&config).router, request).await.status(), StatusCode::OK);
 }
 
+/// Route được module khai giới hạn riêng nhận thân lớn hơn giới hạn chung; route khác
+/// thì không.
+#[tokio::test]
+async fn route_khai_gioi_han_rieng() {
+    let mut config = default_config();
+    config.body_limit = 1024;
+    let extras = http::Extras {
+        body_limits: vec![("notes", http::BodyLimit::new(axum::http::Method::POST, "/echo", 4096))],
+        ..Default::default()
+    };
+    let api = http::build(&config, OpenApiRouter::new(), vec![("notes", notes_routes())], extras);
+    let echo = |body: String| {
+        Request::builder()
+            .method("POST")
+            .uri("/api/v1/notes/echo")
+            .header(header::CONTENT_LENGTH, body.len())
+            .body(Body::from(body))
+            .unwrap()
+    };
+
+    assert_eq!(send(api.router.clone(), echo("x".repeat(2000))).await.status(), StatusCode::OK);
+    let response = send(api.router.clone(), echo("x".repeat(5000))).await;
+    let rejected = problem(response, 413, "payload_too_large").await;
+    assert!(rejected.detail.contains("4096 bytes"), "{}", rejected.detail);
+    let other = send(
+        api.router,
+        post_json("/api/v1/notes", &format!(r#"{{"title": "{}"}}"#, "x".repeat(2000))),
+    );
+    problem(other.await, 413, "payload_too_large").await;
+}
+
 #[tokio::test]
 async fn request_chay_qua_lau_bi_cat() {
     let mut config = default_config();

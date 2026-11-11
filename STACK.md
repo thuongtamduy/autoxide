@@ -78,7 +78,7 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | Job queue   | Tự viết, lưu trong database (không Redis): retry, lịch định kỳ, dead-letter queue   |
 | Event        | Tự viết: ghi vào database cùng transaction với thay đổi rồi mới phát        |
 | Audit log      | Tự viết: bảng chỉ thêm — ai, làm gì, bản ghi nào, lúc nào, trước / sau      |
-| Lưu file       | `object_store` 0.14 — một trait chung cho ổ đĩa cục bộ và S3 / R2 / MinIO     |
+| Lưu file       | `object_store` 0.14 (feature `aws-base` + `ring`, không `aws` để khỏi kéo aws-lc-rs) — một trait chung cho ổ đĩa cục bộ và S3 / R2 / dịch vụ tương thích S3, sau trait `Storage` của kernel. Kèm `reqwest` 0.13 (`rustls-no-provider`) và `rustls` 0.23 (`ring`) chỉ để chọn TLS; `bytes`, `futures-util`, `http-body-util` cho luồng byte (đều đã có sẵn qua axum). Test S3 chạy trên máy chủ giả lập `moto` trong Docker (D-066) |
 | i18n    | Tự viết: `locales/<ngôn ngữ>.json` mỗi crate, dịch theo `code` lỗi ở lớp HTTP, chọn theo `Accept-Language`; không dùng `rust-i18n` (D-057) |
 | Idempotency    | Tự viết: key do client gửi, lưu kết quả lệnh ghi để gửi lại không tạo trùng |
 | MCP endpoint   | `rmcp` 3.9 (SDK chính thức của Model Context Protocol) — module khai báo tool, gắn permission |

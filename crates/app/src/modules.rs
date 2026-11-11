@@ -11,6 +11,8 @@ pub fn all() -> Vec<Box<dyn Module>> {
     vec![
         // Gửi mail: các module gửi mail cần nó, nên đứng trước chúng.
         Box::new(autoxide_mail::module()),
+        // Lưu file: các module lưu file cần nó, nên đứng trước chúng.
+        Box::new(autoxide_files::module()),
         // Người dùng, mật khẩu (và sau này đăng nhập, role, permission): mọi module
         // khác có thể cần, nên đứng đầu.
         Box::new(autoxide_auth::module()),

@@ -41,6 +41,7 @@ autoxide-audit = { path = "modules/audit" }
 autoxide-auth = { path = "modules/auth" }
 autoxide-idempotency = { path = "modules/idempotency" }
 autoxide-mail = { path = "modules/mail" }
+autoxide-files = { path = "modules/files" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
@@ -83,6 +84,25 @@ clap = { version = "4.6", features = ["derive", "env"] }
 # Trait có hàm `async` dùng được qua `dyn` (hợp đồng giữa các module). Rust chưa
 # hỗ trợ trực tiếp; SeaORM vốn đã kéo thư viện này vào cây phụ thuộc.
 async-trait = "0.1"
+# Luồng byte (tải file lên / xuống mà không giữ cả file trong bộ nhớ). Đều đã có sẵn
+# trong cây phụ thuộc (qua axum, hyper): khai ra để dùng thẳng.
+bytes = "1.12"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+http-body-util = "0.1"
+# Lưu file: một trait chung cho ổ đĩa cục bộ và S3 / dịch vụ tương thích S3. S3 dùng
+# `aws-base` + `ring` thay vì feature `aws` (kéo aws-lc-rs): một thư viện mật mã duy
+# nhất cho cả chương trình (D-043).
+object_store = { version = "0.14", default-features = false, features = [
+  "fs",
+  "aws-base",
+  "reqwest",
+  "ring",
+] }
+# Chỉ để chọn TLS cho HTTP client của `object_store`: rustls không kèm provider, dùng
+# provider `ring` sẵn có trong chương trình (feature `rustls` của reqwest kéo aws-lc-rs).
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+# Để kernel cài provider `ring` cho rustls (reqwest không tự chọn khi không kèm provider).
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 # Gửi mail qua SMTP. Bỏ bộ feature mặc định (native-tls kéo OpenSSL); TLS dùng rustls với
 # `ring` — cùng thư viện mật mã sqlx đang dùng, tránh xung đột ở D-043.
 lettre = { version = "0.11", default-features = false, features = [

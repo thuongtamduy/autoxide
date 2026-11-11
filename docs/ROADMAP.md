@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–7 xong; đang ở bước 8**, mục "Trait chung; cài đặt ổ đĩa cục bộ và S3".
+Trạng thái: **bước 0–7 xong; đang ở bước 8**, mục "Tải lên, tải xuống, xoá; metadata trong database".
 
 ## 0. Khung dự án
 
@@ -82,7 +82,7 @@ Trạng thái: **bước 0–7 xong; đang ở bước 8**, mục "Trait chung; 
 
 ## 8. Lưu file
 
-- [ ] Trait chung; cài đặt ổ đĩa cục bộ và S3
+- [x] Trait chung; cài đặt ổ đĩa cục bộ và S3
 - [ ] Tải lên, tải xuống, xoá; metadata trong database
 - [ ] Giới hạn kích thước và loại file
 

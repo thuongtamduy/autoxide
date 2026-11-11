@@ -33,7 +33,7 @@ const KEPT_HEADERS: [HeaderName; 5] = [
 pub(super) struct Settings {
     pub store: Arc<dyn IdempotencyStore>,
     /// Giới hạn thân request (đọc trước để băm).
-    pub body_limit: usize,
+    pub body_limits: Arc<super::body_limit::BodyLimits>,
     /// Thời gian tối đa của một request: hết thì lần đầu coi như đã chết.
     pub request_timeout: Duration,
 }
@@ -83,14 +83,10 @@ async fn run(
     let authorization =
         request.headers().get(header::AUTHORIZATION).map(HeaderValue::as_bytes).unwrap_or_default();
     let scope = hash(&[authorization]);
+    let limit = settings.body_limits.for_request(&request);
     let (parts, body) = request.into_parts();
-    let bytes = axum::body::to_bytes(body, settings.body_limit).await.map_err(|_| {
-        Error::new(
-            crate::error::ErrorKind::PayloadTooLarge,
-            "payload_too_large",
-            "The request body is larger than the server accepts.",
-        )
-    })?;
+    let bytes =
+        axum::body::to_bytes(body, limit).await.map_err(|_| super::body_limit::too_large(limit))?;
     let fingerprint =
         hash(&[parts.method.as_str().as_bytes(), parts.uri.path().as_bytes(), bytes.as_ref()]);
     let lock = chrono::Duration::from_std(settings.request_timeout + Duration::from_secs(30))

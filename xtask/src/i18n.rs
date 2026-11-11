@@ -37,7 +37,7 @@ pub fn check_translations(workspace: &Workspace) -> Result<Vec<Violation>, Strin
             let text = fs::read_to_string(&path)
                 .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
             for (line, code) in error_codes(&text) {
-                codes.entry(code).or_insert_with(|| format!("{}/src/{file}:{line}", package.dir));
+                codes.entry(code).or_insert_with(|| format!("{}/{file}:{line}", package.dir));
             }
         }
         violations.extend(check_package(package, &codes, &read_translations(workspace, package)?));
