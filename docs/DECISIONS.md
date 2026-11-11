@@ -481,3 +481,30 @@ từ chối (test `foreign_key_duoc_kiem` bắt được khi tắt thử).
 Đã cân nhắc: để phía đọc ghi được và chỉ dựa vào quy ước — rẻ hơn nhưng lỗi chỉ lộ
 khi chạy SQLite dưới tải hoặc khi bật read replica; `synchronous=FULL` — bền hơn
 nhưng mỗi commit thêm một lần fsync, trái mục tiêu của WAL.
+
+## D-036 · Migration theo module — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Mỗi module khai migration của mình bằng `ModuleMigrations` và có bảng lịch sử
+  riêng `<module>_migrations`. `Migrator` của kernel chạy `up` cho mọi module theo
+  thứ tự đăng ký; `down` gỡ từng module một; `status` chỉ đọc, không tạo bảng nào.
+- Mọi bảng của module `x` mang tiền tố `x_`. Tên module không được là tiền tố kèm
+  `_` của tên module khác (`auth` và `auth_keys` không cùng tồn tại).
+- Mọi migration chạy trong một transaction trên cả hai database; migration phải có
+  `down`.
+- Migration không tự chạy khi khởi động máy chủ: người vận hành chạy `autoxide
+  migrate up`; `serve` từ chối chạy khi còn migration chưa áp dụng.
+
+Lý do: một bảng lịch sử chung cho mọi module (cách mặc định của sea-orm-migration)
+buộc các module vào một thứ tự chung và làm việc gỡ hay tách một module thành
+service riêng phải đụng tới bảng dùng chung — trái D-005. Thư viện mặc định không
+dùng transaction trên SQLite; ép dùng để migration hỏng giữa chừng không để lại gì
+ở cả hai bên (test `migration_hong_giua_chung_khong_de_lai_gi` đỏ trên SQLite khi
+bỏ phần ép này). Không tự migrate lúc khởi động vì nhiều bản máy chủ khởi động cùng
+lúc sẽ tranh nhau chạy migration; một lệnh riêng chạy một lần mỗi lần deploy là
+cách làm chuẩn và để người vận hành thấy rõ điều gì sắp đổi.
+
+Đã cân nhắc: một danh sách migration chung có tên kèm tiền tố module — đơn giản hơn
+nhưng `down` theo module phải nhảy cóc trong lịch sử chung; tự chạy migration lúc
+`serve` — tiện cho người mới nhưng nguy hiểm khi chạy nhiều bản.
