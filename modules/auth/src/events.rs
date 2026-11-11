@@ -48,6 +48,7 @@ events! {
     API_KEY_REVOKED, ApiKeyRevoked, "auth.api_key_revoked", "An API key was revoked.";
     MFA_ENABLED, MfaEnabled, "auth.mfa_enabled", "A user turned on two-step sign-in.";
     MFA_DISABLED, MfaDisabled, "auth.mfa_disabled", "Two-step sign-in was turned off, by the user or by an administrator.";
+    PASSWORD_RESET_REQUESTED, PasswordResetRequested, "auth.password_reset_requested", "A password-reset mail was sent to a user.";
     RECOVERY_CODES_REPLACED, RecoveryCodesReplaced, "auth.recovery_codes_replaced", "A user made new recovery codes.";
 }
 

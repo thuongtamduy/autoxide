@@ -19,6 +19,7 @@ mod mfa;
 mod migration;
 mod password;
 mod permissions;
+mod reset;
 mod role;
 mod session;
 mod token;
@@ -31,6 +32,7 @@ use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::EventInfo;
 use autoxide_kernel::job::{JobRegistration, Schedule};
+use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
 use utoipa_axum::router::OpenApiRouter;
@@ -96,6 +98,15 @@ impl Module for AuthModule {
         let access_tokens = AccessTokens::new(secret, config.access_token_ttl);
         let throttle =
             LoginThrottle::new(database.clone(), config.login_max_failures, config.login_lock)?;
+        let mailer = context.require::<dyn Mailer>()?;
+        let resets = Arc::new(reset::PasswordResets {
+            database: database.clone(),
+            users: users.clone(),
+            mailer,
+            translations: context.translations().clone(),
+            outbox: outbox.clone(),
+            url: config.password_reset_url.clone(),
+        });
         let mfa =
             Arc::new(MfaService::new(database.clone(), config.totp_issuer.clone(), outbox.clone()));
         let sessions = Arc::new(SessionService::new(
@@ -128,6 +139,7 @@ impl Module for AuthModule {
             roles,
             api_keys,
             mfa,
+            resets,
             self_registration: config.self_registration,
         });
         Ok(())
@@ -204,6 +216,8 @@ pub(crate) mod testing {
         pub roles: Arc<crate::role::RoleService>,
         pub api_keys: Arc<crate::api_key::ApiKeyService>,
         pub mfa: Arc<crate::mfa::MfaService>,
+        pub resets: Arc<crate::reset::PasswordResets>,
+        pub mails: Arc<FakeMailer>,
         pub database: Database,
         pub authenticator: Arc<dyn autoxide_kernel::access::Authenticator>,
     }
@@ -263,7 +277,38 @@ pub(crate) mod testing {
             roles: roles.clone(),
             api_keys: api_keys.clone(),
         });
-        Services { users, sessions, roles, api_keys, mfa, database, authenticator }
+        let mails = Arc::new(FakeMailer::default());
+        let translations = autoxide_kernel::i18n::Translations::new(vec![(
+            "auth",
+            vec![("vi", include_str!("../locales/vi.json"))],
+        )])
+        .unwrap();
+        let resets = Arc::new(crate::reset::PasswordResets {
+            database: database.clone(),
+            users: users.clone(),
+            mailer: mails.clone(),
+            translations,
+            outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+            url: None,
+        });
+        Services { users, sessions, roles, api_keys, mfa, resets, mails, database, authenticator }
+    }
+
+    /// `Mailer` giả: giữ lại mọi mail để test đọc.
+    #[derive(Default)]
+    pub struct FakeMailer {
+        pub sent: std::sync::Mutex<Vec<autoxide_kernel::mail::Mail>>,
+    }
+
+    #[async_trait::async_trait]
+    impl autoxide_kernel::mail::Mailer for FakeMailer {
+        async fn send(
+            &self,
+            mail: autoxide_kernel::mail::Mail,
+        ) -> Result<(), autoxide_kernel::error::Error> {
+            self.sent.lock().unwrap().push(mail);
+            Ok(())
+        }
     }
 
     /// Service phiên đăng nhập kèm service người dùng dùng chung database.

@@ -233,7 +233,6 @@ impl UserService {
     }
 
     /// Người dùng có email `email` (so sánh sau khi chuẩn hoá).
-    #[cfg_attr(not(test), expect(dead_code, reason = "used by password reset, roadmap step 7"))]
     pub(crate) async fn find_by_email(&self, email: &str) -> Result<Option<User>, Error> {
         let row = Entity::find()
             .filter(Column::Email.eq(normalize_email(email)))
@@ -250,7 +249,6 @@ impl UserService {
     }
 
     /// Đặt mật khẩu mới cho người dùng `id`.
-    #[cfg_attr(not(test), expect(dead_code, reason = "used by password reset, roadmap step 7"))]
     pub(crate) async fn set_password(
         &self,
         actor: Actor,

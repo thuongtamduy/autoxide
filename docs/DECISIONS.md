@@ -1280,3 +1280,24 @@ câu tiếng Anh, bản dịch nằm cạnh bản dịch lỗi của cùng modul
 Đã cân nhắc: lưu ngôn ngữ ưa thích của người dùng — cần thêm cột và API; ngôn ngữ
 theo request đủ cho các mail hiện có (đặt lại mật khẩu, xác minh email đều do chính
 người nhận yêu cầu).
+
+## D-063 · Đặt lại mật khẩu bằng token một lần qua mail — 2026-11-11 — agent quyết
+
+Quyết định: `POST /auth/password-reset` luôn trả 202, không nói email có tài khoản hay
+không; email có thật và chưa bị khoá thì nhận mail chứa token ngẫu nhiên 32 byte
+(base64url). Database chỉ giữ SHA-256 của token (bảng `auth_password_reset`), hạn 30
+phút, mỗi email tối đa một mail mỗi 60 giây. `POST /auth/password-reset/confirm` kiểm
+luật mật khẩu trước (sai luật không đốt token), rồi đánh dấu token đã dùng bằng một câu
+`UPDATE … WHERE used_at IS NULL` có điều kiện — nhiều request cùng token thì đúng một
+bên thắng trên cả hai database; đặt mật khẩu qua `UserService::set_password` (huỷ mọi
+phiên), rồi vô hiệu các token còn lại của người đó. Token sai, đã dùng hay hết hạn
+cùng một lỗi `auth.invalid_reset_token`. `AUTOXIDE_AUTH_PASSWORD_RESET_URL` (chứa
+`{token}`) cho phép gửi đường dẫn tới giao diện riêng; không đặt thì mail chứa token trần.
+Ghi event `auth.password_reset_requested`.
+
+Lý do: chuẩn OWASP cho quên mật khẩu; token lưu dạng hash như refresh token và API key
+(lộ database không lộ token); core chỉ có API (luật kiến trúc 9) nên trang nhập mật khẩu
+mới thuộc giao diện riêng.
+
+Đã cân nhắc: JWT có hạn thay cho bảng — không thu hồi được và không bảo đảm dùng một
+lần; mã số 6 chữ — dễ đoán, cần thêm giới hạn số lần thử.

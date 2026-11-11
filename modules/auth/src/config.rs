@@ -58,6 +58,14 @@ pub(crate) const TOTP_ISSUER: Setting = Setting::new(
 )
 .with_default("Autoxide");
 
+pub(crate) const PASSWORD_RESET_URL: Setting = Setting::new(
+    "AUTOXIDE_AUTH_PASSWORD_RESET_URL",
+    "Page of your app where people choose a new password, with `{token}` where the reset \
+     token goes. Password-reset mail links there. When unset, the mail contains the token and \
+     says to call `POST /api/v1/auth/password-reset/confirm`.",
+)
+.with_example("https://app.example.com/reset-password?token={token}");
+
 /// Độ dài tối thiểu của khoá ký token: 256 bit, bằng độ dài đầu ra của SHA-256.
 const MIN_SECRET_LENGTH: usize = 32;
 
@@ -75,6 +83,8 @@ pub(crate) struct AuthConfig {
     pub self_registration: bool,
     /// Tên hiện trong ứng dụng authenticator.
     pub totp_issuer: String,
+    /// Trang đặt lại mật khẩu của giao diện, có `{token}`.
+    pub password_reset_url: Option<String>,
 }
 
 impl AuthConfig {
@@ -108,6 +118,16 @@ impl AuthConfig {
                 Ok(issuer.to_owned())
             }
         });
+        let password_reset_url = reader.optional_with(&PASSWORD_RESET_URL, |raw| {
+            let url = raw.trim();
+            if (url.starts_with("https://") || url.starts_with("http://"))
+                && url.contains("{token}")
+            {
+                Ok(url.to_owned())
+            } else {
+                Err("must be an http(s) URL containing `{token}`".to_owned())
+            }
+        });
         Ok(AuthConfig {
             token_secret: token_secret?,
             access_token_ttl: Duration::from_secs(access?),
@@ -116,6 +136,7 @@ impl AuthConfig {
             login_lock: Duration::from_secs(lock? * 60),
             self_registration: self_registration?,
             totp_issuer: totp_issuer?,
+            password_reset_url: password_reset_url?,
         })
     }
 }
@@ -143,6 +164,8 @@ mod tests {
         assert_eq!(config.login_lock, Duration::from_secs(15 * 60));
         assert!(!config.self_registration);
         assert_eq!(config.totp_issuer, "Autoxide");
+        assert_eq!(config.password_reset_url, None);
+        assert!(read(&[("AUTOXIDE_AUTH_PASSWORD_RESET_URL", "https://app/reset")]).is_err());
         assert!(read(&[("AUTOXIDE_AUTH_TOTP_ISSUER", "A:B")]).is_err());
         assert!(read(&[("AUTOXIDE_AUTH_SELF_REGISTRATION", "true")]).unwrap().self_registration);
     }

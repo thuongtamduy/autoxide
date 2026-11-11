@@ -156,6 +156,14 @@ rather than the proxy's.
 Mail is written as `.eml` files to `data/mail` until you set `AUTOXIDE_MAIL_SMTP_URL`
 (for example `smtps://user:password@smtp.example.com:465`) and `AUTOXIDE_MAIL_FROM`.
 
+A user who forgot their password calls `POST /api/v1/auth/password-reset` with their
+email and receives a one-time token by mail, valid for 30 minutes; they then call
+`POST /api/v1/auth/password-reset/confirm` with the token and a new password. The
+answer is the same whether or not the email has an account. Set
+`AUTOXIDE_AUTH_PASSWORD_RESET_URL` (for example
+`https://app.example.com/reset?token={token}`) to send a link to your own page
+instead of the bare token.
+
 For production, set `AUTOXIDE_AUTH_TOKEN_SECRET` (the key that signs access tokens)
 to a long random value, the same on every server:
 

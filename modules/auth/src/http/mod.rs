@@ -3,6 +3,7 @@
 
 mod api_keys;
 mod mfa;
+mod reset;
 mod roles;
 mod session;
 mod users;
@@ -13,6 +14,7 @@ use utoipa_axum::router::OpenApiRouter;
 
 use crate::api_key::ApiKeyService;
 use crate::mfa::MfaService;
+use crate::reset::PasswordResets;
 use crate::role::RoleService;
 use crate::session::SessionService;
 use crate::user::UserService;
@@ -25,6 +27,7 @@ pub(crate) struct HttpState {
     pub roles: Arc<RoleService>,
     pub api_keys: Arc<ApiKeyService>,
     pub mfa: Arc<MfaService>,
+    pub resets: Arc<PasswordResets>,
     /// Cho người lạ tự đăng ký (`POST /register`).
     pub self_registration: bool,
 }
@@ -35,6 +38,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(users::routes())
         .merge(api_keys::routes())
         .merge(mfa::routes())
+        .merge(reset::routes())
         .with_state(Arc::new(state))
 }
 
@@ -118,6 +122,7 @@ pub(crate) mod test_support {
             roles: services.roles.clone(),
             api_keys: services.api_keys.clone(),
             mfa: services.mfa.clone(),
+            resets: services.resets.clone(),
             self_registration,
         };
         let router = autoxide_kernel::http::build(

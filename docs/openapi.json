@@ -1118,6 +1118,106 @@
         ]
       }
     },
+    "/api/v1/auth/password-reset": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Ask for a password-reset mail.",
+        "description": "Always answers 202, whether or not an account has this email, so the answer does\nnot reveal who has an account. When one does, a mail with a reset token (valid 30\nminutes) is sent in the language of `Accept-Language`. At most one mail per minute\nper account.",
+        "operationId": "auth_request_password_reset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "If an active account has this email, a reset mail is on its way."
+          },
+          "422": {
+            "description": "The body is missing a field or a value is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password-reset/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Choose a new password with the token from the reset mail.",
+        "description": "Signs the account out everywhere; every other reset token of the account stops\nworking. Then sign in with the new password.",
+        "operationId": "auth_confirm_password_reset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetConfirmation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "The password was changed."
+          },
+          "400": {
+            "description": "The token is unknown, expired or used; code `auth.invalid_reset_token`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The password does not follow the rules (12 to 128 characters); see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/permissions": {
       "get": {
         "tags": [
@@ -3869,6 +3969,37 @@
           "password": {
             "type": "string",
             "description": "12 to 128 characters."
+          }
+        }
+      },
+      "ResetConfirmation": {
+        "type": "object",
+        "description": "A new password, with the token from the reset mail.",
+        "required": [
+          "token",
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "12 to 128 characters."
+          },
+          "token": {
+            "type": "string",
+            "description": "The token from the reset mail."
+          }
+        }
+      },
+      "ResetRequest": {
+        "type": "object",
+        "description": "The account whose password to reset.",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "ada@example.com"
           }
         }
       },

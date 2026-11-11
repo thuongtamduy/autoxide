@@ -154,6 +154,13 @@ Mail được ghi thành file `.eml` vào `data/mail` cho tới khi bạn đặt
 `AUTOXIDE_MAIL_SMTP_URL` (ví dụ `smtps://user:password@smtp.example.com:465`) và
 `AUTOXIDE_MAIL_FROM`.
 
+Người dùng quên mật khẩu gọi `POST /api/v1/auth/password-reset` kèm email và nhận qua
+mail một token dùng một lần, có hạn 30 phút; rồi gọi
+`POST /api/v1/auth/password-reset/confirm` kèm token và mật khẩu mới. Câu trả lời
+giống nhau dù email có tài khoản hay không. Đặt `AUTOXIDE_AUTH_PASSWORD_RESET_URL` (ví
+dụ `https://app.example.com/reset?token={token}`) để gửi đường dẫn tới trang của bạn
+thay vì token trần.
+
 Khi chạy thật (production), đặt `AUTOXIDE_AUTH_TOKEN_SECRET` (khoá ký access token)
 bằng một chuỗi ngẫu nhiên dài, giống nhau trên mọi máy chủ:
 
