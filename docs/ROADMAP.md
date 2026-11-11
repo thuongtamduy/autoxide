@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–10 xong; đang ở bước 11**, mục "Hướng dẫn cài đặt và deploy".
+Trạng thái: **bước 0–11 xong — core xong** (mọi bước xanh trên cả SQLite và Postgres). Việc tiếp theo do chủ dự án chọn: module nghiệp vụ đầu tiên, hoặc mở một mục ở "Sau core".
 
 ## 0. Khung dự án
 
@@ -112,7 +112,7 @@ Cho AI agent gọi chức năng của hệ thống như công cụ (Model Contex
 - [x] CI: gate đầy đủ (đã gồm `cargo-deny`) trên Postgres tối thiểu và mới nhất; quét
       secret bằng gitleaks
 - [x] Thử gỡ ngoại lệ RUSTSEC-2026-0459 trong `deny.toml` (D-032) — chưa gỡ được, xem D-075
-- [ ] Hướng dẫn cài đặt và deploy (tiếng Anh + tiếng Việt), đủ để người lạ tự làm theo
+- [x] Hướng dẫn cài đặt và deploy (tiếng Anh + tiếng Việt), đủ để người lạ tự làm theo
 
 ## Sau core (chưa mở)
 

@@ -12,9 +12,10 @@ the core contains no business concepts — those belong to modules.
 
 ## Status
 
-Early development. **Steps 0 to 10 of the roadmap (project skeleton, foundation,
-login with roles and permissions, two-step sign-in, events and audit log, job queue,
-i18n and idempotency, email, file storage, MCP endpoint, sample module) are done**: the Cargo workspace, the quality gate, configuration,
+The core is complete: **every step of the roadmap is done** — project skeleton,
+foundation, login with roles and permissions, two-step sign-in, events and audit log,
+job queue, i18n and idempotency, email, file storage, MCP endpoint, sample module,
+tooling and deployment. Business modules come next. The core has the Cargo workspace, the quality gate, configuration,
 database access, per-module migrations, the module contract, the HTTP server
 under `/api/v1` with OpenAPI, health checks, logs, metrics, tracing and the CLI.
 The `auth` module stores
@@ -41,7 +42,7 @@ goes out through SMTP from the job queue (password reset, email verification). F
 are stored on local disk or in S3. AI agents call the system as tools over MCP at
 `/mcp`.
 
-What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
+What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 
 1. Foundation: configuration, database access, migrations per module, the module
    contract, one error type, HTTP under `/api/v1`, OpenAPI, health checks, logs,
@@ -270,6 +271,8 @@ never share foreign keys. These rules are checked automatically by the gate.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — what is built, in what order
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — the decision log
 - [`CLAUDE.md`](CLAUDE.md) — the rules for contributors, human or AI agent
+- [`docs/DEPLOY.md`](docs/DEPLOY.md) — installing and deploying: Docker Compose with
+  PostgreSQL or one binary with SQLite, reverse proxy, updates, backups
 - [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) — how to write a module, starting
   from the sample module [`modules/notes`](modules/notes) (not registered by default)
 
