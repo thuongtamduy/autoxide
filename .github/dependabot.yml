@@ -1,0 +1,23 @@
+# Dependabot đề xuất nâng cấp bằng pull request; CI chạy gate trên từng đề xuất, agent
+# hoặc người duyệt mới merge (D-078). Gom theo nhóm để mỗi tuần một PR mỗi loại.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      rust-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly

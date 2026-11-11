@@ -280,6 +280,8 @@ never share foreign keys. These rules are checked automatically by the gate.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — what is built, in what order
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — the decision log
 - [`CLAUDE.md`](CLAUDE.md) — the rules for contributors, human or AI agent
+- [`CHANGELOG.md`](CHANGELOG.md) — what changed in each release; released Docker images
+  are at `ghcr.io/<owner>/autoxide`
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — installing and deploying: Docker Compose with
   PostgreSQL or one binary with SQLite, reverse proxy, updates, backups
 - [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) — how to write a module, starting

@@ -142,7 +142,7 @@ Phát hành và nâng cấp:
 
 - [ ] Số phiên bản, `CHANGELOG`, bản phát hành trên GitHub
 - [ ] CI build và đăng image Docker lên GitHub Container Registry
-- [ ] Dependabot đề xuất nâng cấp; kiểm lỗ hổng thư viện hằng ngày
+- [x] Dependabot đề xuất nâng cấp; kiểm lỗ hổng thư viện hằng ngày
 
 Tích hợp:
 

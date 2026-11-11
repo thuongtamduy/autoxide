@@ -1684,3 +1684,29 @@ khoá riêng ở đâu khác. Tự hết hạn: gate chạy `-D advisory-not-det
 tiêu chí "theo chuẩn ngành thay vì tự chế"; lưu nghi thức trong bộ nhớ — hỏng khi chạy
 nhiều máy chủ; quản trị viên xoá passkey của người khác — để sau, khi có nhu cầu (tài
 khoản bị khoá thì passkey cũng không đăng nhập được).
+
+## D-078 · Phát hành: SemVer một số cho cả workspace, CHANGELOG, image trên GHCR, Dependabot — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Một số phiên bản cho cả workspace (`[workspace.package] version`), theo Semantic
+  Versioning; `0.x` cho tới khi chủ dự án tuyên bố ổn định. API HTTP `/api/v1` không phá
+  vỡ trong mọi trường hợp (deprecation, D-059); phiên bản nói về cấu hình, CLI, hợp đồng
+  module.
+- `CHANGELOG.md` (tiếng Anh, chuẩn Keep a Changelog): mỗi thay đổi người dùng thấy thêm
+  một dòng vào `[Unreleased]`. Quy trình phát hành ở `docs/RELEASING.md`.
+- Workflow `Release` chạy khi đẩy tag `vX.Y.Z`: kiểm tag khớp `Cargo.toml` và có mục
+  trong CHANGELOG, chạy lại gate, build image bằng `Dockerfile` và đăng
+  `ghcr.io/<owner>/autoxide:X.Y.Z` + `:X.Y` lên GitHub Container Registry, tạo bản phát hành
+  GitHub với ghi chú từ CHANGELOG. Chỉ `linux/amd64`: build arm64 qua giả lập mất hàng giờ;
+  thêm khi có người cần (runner arm64 thật).
+- `compose.yml` nhận `AUTOXIDE_IMAGE` để dùng image đã phát hành thay vì tự build.
+- Dependabot mỗi tuần cho thư viện Rust (gom minor/patch thành một PR), GitHub Actions và
+  image Docker; workflow `Security audit` chạy `cargo deny check advisories` mỗi ngày.
+
+Lý do: người lạ cài được mà không cần toolchain Rust; nâng cấp có nhịp đều, mỗi đề xuất
+qua đúng gate; lỗ hổng mới công bố được biết ngay cả khi repo không có commit.
+
+Đã cân nhắc: `cargo-release` / `release-plz` — tự động hơn nhưng thêm công cụ và quy ước
+cho một việc làm vài lần mỗi năm; phát hành binary cho từng hệ điều hành — Docker và
+`cargo build` đã đủ cho máy chủ.

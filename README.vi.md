@@ -277,6 +277,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — dựng gì, theo thứ tự nào
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — nhật ký quyết định
 - [`CLAUDE.md`](CLAUDE.md) — luật cho người đóng góp, là người hay AI agent
+- [`CHANGELOG.md`](CHANGELOG.md) — thay đổi của từng bản phát hành (tiếng Anh); image
+  Docker đã phát hành ở `ghcr.io/<owner>/autoxide`
 - [`docs/DEPLOY.vi.md`](docs/DEPLOY.vi.md) — cài đặt và deploy: Docker Compose với
   PostgreSQL hoặc một binary với SQLite, reverse proxy, cập nhật, backup
 - [`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md) — cách viết một module, bắt đầu
