@@ -242,7 +242,7 @@ fn new_refresh_token(
 
 /// Lấy token từ giá trị header `Authorization: Bearer <token>` (RFC 6750). Chữ
 /// `Bearer` không phân biệt hoa thường.
-fn bearer_token(authorization: Option<&str>) -> Result<&str, Error> {
+pub(crate) fn bearer_token(authorization: Option<&str>) -> Result<&str, Error> {
     let missing = || {
         Error::unauthenticated(
             "auth.missing_token",

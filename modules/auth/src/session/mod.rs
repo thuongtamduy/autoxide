@@ -5,5 +5,5 @@ pub(crate) mod entity;
 mod service;
 mod throttle;
 
-pub(crate) use service::{SessionService, Tokens};
+pub(crate) use service::{SessionService, Tokens, bearer_token};
 pub(crate) use throttle::LoginThrottle;

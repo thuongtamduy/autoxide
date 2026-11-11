@@ -12,11 +12,11 @@ the core contains no business concepts — those belong to modules.
 
 ## Status
 
-Early development. **Steps 0 and 1 of the roadmap (project skeleton and
-foundation) are done**: the Cargo workspace, the quality gate, configuration,
+Early development. **Steps 0 to 2 of the roadmap (project skeleton, foundation,
+and login with roles and permissions) are done**: the Cargo workspace, the quality gate, configuration,
 database access, per-module migrations, the module contract, the HTTP server
 under `/api/v1` with OpenAPI, health checks, logs, metrics, tracing and the CLI.
-Step 2 (login, roles and permissions) is in progress: the `auth` module stores
+The `auth` module stores
 users with Argon2id password hashes and signs them in with short-lived access
 tokens and rotating refresh tokens (`/api/v1/auth/login`, `/refresh`, `/logout`,
 `/me`). Access is controlled by roles: each module declares its permissions, roles
@@ -24,6 +24,9 @@ group them (`/api/v1/auth/roles`), and a built-in `admin` role has them all. The
 first administrator is created from the command line (`autoxide user create`);
 after that, administrators manage accounts through `/api/v1/auth/users`. People can
 create their own accounts only when `AUTOXIDE_AUTH_SELF_REGISTRATION=true`.
+Programs and AI agents use API keys (`/api/v1/auth/api-keys`): a key acts as the
+user who created it, limited to the permissions listed on it, and is sent like an
+access token (`Authorization: Bearer axk_…`).
 
 What the core will contain, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)):
 

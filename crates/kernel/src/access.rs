@@ -118,6 +118,8 @@ fn name_problem(module: &str, name: &str) -> Option<String> {
 pub struct Principal {
     user_id: Uuid,
     grants: Grants,
+    /// ID của API key, khi request đến bằng API key thay vì phiên đăng nhập.
+    api_key: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -130,12 +132,27 @@ enum Grants {
 impl Principal {
     /// Người dùng `user_id` với đúng các permission `permissions`.
     pub fn new(user_id: Uuid, permissions: impl IntoIterator<Item = String>) -> Self {
-        Principal { user_id, grants: Grants::Only(Arc::new(permissions.into_iter().collect())) }
+        Principal {
+            user_id,
+            grants: Grants::Only(Arc::new(permissions.into_iter().collect())),
+            api_key: None,
+        }
     }
 
     /// Người dùng `user_id` có mọi permission.
     pub fn with_all_permissions(user_id: Uuid) -> Self {
-        Principal { user_id, grants: Grants::All }
+        Principal { user_id, grants: Grants::All, api_key: None }
+    }
+
+    /// Đánh dấu request đến bằng API key `id`.
+    pub fn via_api_key(mut self, id: Uuid) -> Self {
+        self.api_key = Some(id);
+        self
+    }
+
+    /// ID của API key nếu request đến bằng API key.
+    pub fn api_key_id(&self) -> Option<Uuid> {
+        self.api_key
     }
 
     pub fn user_id(&self) -> Uuid {
@@ -157,9 +174,14 @@ impl Principal {
     }
 
     pub fn has(&self, permission: &Permission) -> bool {
+        self.allows(permission.name)
+    }
+
+    /// Như [`has`](Self::has), theo tên permission (vd tên do client gửi lên).
+    pub fn allows(&self, permission: &str) -> bool {
         match &self.grants {
             Grants::All => true,
-            Grants::Only(set) => set.contains(permission.name),
+            Grants::Only(set) => set.contains(permission),
         }
     }
 
@@ -269,6 +291,10 @@ mod tests {
         assert!(admin.require(&WRITE).is_ok());
         assert!(admin.has_all_permissions());
         assert_eq!(reader.permissions(), ["notes.read"]);
+        assert!(reader.allows("notes.read") && !reader.allows("notes.write"));
+        assert_eq!(reader.api_key_id(), None);
+        let key = Uuid::now_v7();
+        assert_eq!(reader.clone().via_api_key(key).api_key_id(), Some(key));
         assert_eq!(reader.user_id(), user);
     }
 }

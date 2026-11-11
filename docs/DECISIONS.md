@@ -911,3 +911,34 @@ trước khi tạo tài khoản — làm ở bước 7 (email).
 
 Đã cân nhắc: xoá hẳn tài khoản — mất dấu vết cho audit log và để lại ID mồ côi ở module
 khác; role mặc định cho người tự đăng ký — chưa có nhu cầu, thêm bằng cấu hình khi cần.
+
+## D-050 · API key cho máy và AI agent — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- **Dạng key:** `axk_` + 32 byte ngẫu nhiên base64url. Tiền tố cố định để công cụ quét
+  secret nhận ra key lỡ bị commit, và để bộ xác thực phân biệt với access token. Gửi
+  như access token: `Authorization: Bearer axk_…`. Database lưu SHA-256 của key (bảng
+  `auth_api_key`) và 12 ký tự đầu để người dùng nhận ra key.
+- **Quyền:** mỗi key ghi một danh sách permission (bảng `auth_api_key_permission`),
+  chỉ chọn được trong số permission người tạo đang có (`not_granted` nếu không). Mỗi
+  request, quyền thật = permission của key ∩ permission HIỆN TẠI của chủ key — chủ key
+  mất quyền hay bị khoá thì key mất theo ngay. Không có key "mọi permission", kể cả
+  khi chủ key là admin: key nên chỉ có đúng thứ việc của nó cần.
+- **Không dùng API key để tạo API key** (`auth.api_key_cannot_create_keys`): key bị lộ
+  không tự đẻ thêm key. Kernel thêm `Principal::via_api_key` / `api_key_id` để biết
+  request đến bằng key.
+- Hạn dùng tuỳ chọn (`expires_at`); hết hạn trả `auth.api_key_expired`. Thu hồi =
+  xoá dòng, có hiệu lực ngay. Mỗi người tối đa 100 key. `last_used_at` ghi nhiều nhất
+  một lần mỗi phút mỗi key (`UPDATE` có điều kiện).
+- Endpoint: `GET|POST /api/v1/auth/api-keys`, `DELETE /api/v1/auth/api-keys/{id}` —
+  mỗi người chỉ thấy và thu hồi key của mình.
+
+Lý do: tiêu chí "có cách xác thực cho máy, không buộc qua bước đăng nhập tương tác"
+(CLAUDE.md). Giao cắt với quyền hiện tại của chủ key giữ đúng nguyên tắc quyền tối
+thiểu và không tạo đường vòng quanh việc đổi role hay khoá tài khoản.
+
+Đã cân nhắc: tài khoản máy riêng (service account) — thêm một loại người dùng mà
+key của người dùng thật đã đủ; lưu key bằng Argon2 — key đã ngẫu nhiên 256 bit, băm
+chậm chỉ làm mỗi request chậm thêm; quản trị viên thu hồi key của người khác — khoá
+tài khoản đã làm việc đó, thêm khi có nhu cầu.

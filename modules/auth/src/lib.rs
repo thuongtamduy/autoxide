@@ -10,6 +10,7 @@
 
 mod access;
 pub mod api;
+mod api_key;
 mod config;
 mod http;
 mod migration;
@@ -30,6 +31,7 @@ use autoxide_kernel::module::{Module, StartContext};
 use utoipa_axum::router::OpenApiRouter;
 
 use crate::access::RequestAuthenticator;
+use crate::api_key::ApiKeyService;
 use crate::config::AuthConfig;
 use crate::password::Passwords;
 use crate::role::RoleService;
@@ -92,9 +94,13 @@ impl Module for AuthModule {
             config.refresh_token_ttl,
             throttle,
         )?);
-        let roles = Arc::new(RoleService::new(database, context.permissions().clone()));
-        let authenticator =
-            RequestAuthenticator { sessions: sessions.clone(), roles: roles.clone() };
+        let roles = Arc::new(RoleService::new(database.clone(), context.permissions().clone()));
+        let api_keys = Arc::new(ApiKeyService::new(database, users.clone(), roles.clone()));
+        let authenticator = RequestAuthenticator {
+            sessions: sessions.clone(),
+            roles: roles.clone(),
+            api_keys: api_keys.clone(),
+        };
         // `Arc<X>` tự đổi thành `Arc<dyn Trait>`: bên dùng chỉ thấy trait.
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
         context.provide::<dyn api::Users>(users.clone())?;
@@ -103,6 +109,7 @@ impl Module for AuthModule {
             sessions,
             users,
             roles,
+            api_keys,
             self_registration: config.self_registration,
         });
         Ok(())
@@ -158,6 +165,7 @@ pub(crate) mod testing {
         pub users: Arc<crate::user::UserService>,
         pub sessions: Arc<crate::session::SessionService>,
         pub roles: Arc<crate::role::RoleService>,
+        pub api_keys: Arc<crate::api_key::ApiKeyService>,
         pub authenticator: Arc<dyn autoxide_kernel::access::Authenticator>,
     }
 
@@ -194,12 +202,15 @@ pub(crate) mod testing {
             ),
         ])
         .unwrap();
-        let roles = Arc::new(crate::role::RoleService::new(database, catalog));
+        let roles = Arc::new(crate::role::RoleService::new(database.clone(), catalog));
+        let api_keys =
+            Arc::new(crate::api_key::ApiKeyService::new(database, users.clone(), roles.clone()));
         let authenticator = Arc::new(crate::access::RequestAuthenticator {
             sessions: sessions.clone(),
             roles: roles.clone(),
+            api_keys: api_keys.clone(),
         });
-        Services { users, sessions, roles, authenticator }
+        Services { users, sessions, roles, api_keys, authenticator }
     }
 
     /// Service phiên đăng nhập kèm service người dùng dùng chung database.

@@ -1,6 +1,7 @@
 //! Endpoint REST của module `auth`, dưới `/api/v1/auth`. Handler chỉ lấy dữ liệu
 //! vào, gọi service và trả envelope; mọi logic nằm ở service.
 
+mod api_keys;
 mod roles;
 mod session;
 mod users;
@@ -9,6 +10,7 @@ use std::sync::Arc;
 
 use utoipa_axum::router::OpenApiRouter;
 
+use crate::api_key::ApiKeyService;
 use crate::role::RoleService;
 use crate::session::SessionService;
 use crate::user::UserService;
@@ -19,12 +21,17 @@ pub(crate) struct HttpState {
     pub sessions: Arc<SessionService>,
     pub users: Arc<UserService>,
     pub roles: Arc<RoleService>,
+    pub api_keys: Arc<ApiKeyService>,
     /// Cho người lạ tự đăng ký (`POST /register`).
     pub self_registration: bool,
 }
 
 pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
-    session::routes().merge(roles::routes()).merge(users::routes()).with_state(Arc::new(state))
+    session::routes()
+        .merge(roles::routes())
+        .merge(users::routes())
+        .merge(api_keys::routes())
+        .with_state(Arc::new(state))
 }
 
 #[cfg(test)]
@@ -70,6 +77,7 @@ pub(crate) mod test_support {
             sessions: services.sessions.clone(),
             users: services.users.clone(),
             roles: services.roles.clone(),
+            api_keys: services.api_keys.clone(),
             self_registration,
         };
         let router = autoxide_kernel::http::build(

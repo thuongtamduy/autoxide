@@ -6,6 +6,243 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/v1/auth/api-keys": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List your API keys.",
+        "description": "Any signed-in user. Newest first unless `order=asc`. Secrets are never listed.",
+        "operationId": "auth_list_api_keys",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Order"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of your keys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ApiKeyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create an API key for a program or an AI agent.",
+        "description": "Signed in with a password session only: an API key cannot create keys. The key\nacts as you, limited to the permissions listed. The response carries the key\nitself, shown only once.",
+        "operationId": "auth_create_api_key",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApiKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The key was created; `key` holds the secret.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CreatedApiKeyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.api_key_cannot_create_keys`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "You have too many keys; code `auth.api_key_limit`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is invalid, e.g. a permission you do not have (`not_granted`); see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/api-keys/{id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke one of your API keys.",
+        "description": "The key stops working at once.",
+        "operationId": "auth_revoke_api_key",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the key.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The key was revoked."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "You have no key with this id; code `auth.api_key_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "tags": [
@@ -1475,6 +1712,96 @@
   },
   "components": {
     "schemas": {
+      "ApiKeyResponse": {
+        "type": "object",
+        "description": "An API key, without its secret.",
+        "required": [
+          "id",
+          "name",
+          "prefix",
+          "permissions",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the key stops working; `null`: never."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Last time the key was used, to the minute; `null`: never used."
+          },
+          "name": {
+            "type": "string",
+            "description": "What the key is for.",
+            "example": "nightly report agent"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Permissions the key may use, sorted by name. The key never has more than its\nowner has at the moment of the request.",
+            "example": [
+              "auth.users.read"
+            ]
+          },
+          "prefix": {
+            "type": "string",
+            "description": "The first characters of the key, to recognize it.",
+            "example": "axk_3q9ZbXcV"
+          }
+        }
+      },
+      "CreateApiKeyRequest": {
+        "type": "object",
+        "description": "A key to create.",
+        "required": [
+          "name",
+          "permissions"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the key stops working (RFC 3339, in the future). Omit for a key that does\nnot expire."
+          },
+          "name": {
+            "type": "string",
+            "description": "What the key is for, 1 to 100 characters.",
+            "example": "nightly report agent"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Permissions the key may use: at least one, each one you have yourself (see\n`GET /api/v1/auth/me`). Give a key only what its job needs.",
+            "example": [
+              "auth.users.read"
+            ]
+          }
+        }
+      },
       "CreateUserRequest": {
         "type": "object",
         "description": "A new account.",
@@ -1499,6 +1826,57 @@
               "null"
             ],
             "description": "12 to 128 characters. When omitted, the account cannot sign in with a password\nuntil one is set."
+          }
+        }
+      },
+      "CreatedApiKeyResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ApiKeyResponse"
+          },
+          {
+            "type": "object",
+            "required": [
+              "key"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "The key. Send it as `Authorization: Bearer <key>`. Store it now: it cannot be\nshown again.",
+                "example": "axk_3q9ZbXcV…"
+              }
+            }
+          }
+        ],
+        "description": "A new API key, with its secret. The secret is shown only here."
+      },
+      "Data_CreatedApiKeyResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ApiKeyResponse"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "key"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "The key. Send it as `Authorization: Bearer <key>`. Store it now: it cannot be\nshown again.",
+                    "example": "axk_3q9ZbXcV…"
+                  }
+                }
+              }
+            ],
+            "description": "A new API key, with its secret. The secret is shown only here."
           }
         }
       },
@@ -1903,6 +2281,80 @@
             "example": [
               "auth.roles.read"
             ]
+          }
+        }
+      },
+      "Page_ApiKeyResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "An API key, without its secret.",
+              "required": [
+                "id",
+                "name",
+                "prefix",
+                "permissions",
+                "created_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "expires_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "When the key stops working; `null`: never."
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "last_used_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "Last time the key was used, to the minute; `null`: never used."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "What the key is for.",
+                  "example": "nightly report agent"
+                },
+                "permissions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Permissions the key may use, sorted by name. The key never has more than its\nowner has at the moment of the request.",
+                  "example": [
+                    "auth.users.read"
+                  ]
+                },
+                "prefix": {
+                  "type": "string",
+                  "description": "The first characters of the key, to recognize it.",
+                  "example": "axk_3q9ZbXcV"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
           }
         }
       },

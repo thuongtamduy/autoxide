@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "API key cho máy và AI agent: tạo, thu hồi, giới hạn theo permission".
+Trạng thái: **bước 0, 1 và 2 xong; đang ở bước 3**, mục "TOTP: bật, xác nhận, tắt".
 
 ## 0. Khung dự án
 
@@ -37,7 +37,7 @@ Trạng thái: **bước 0 và 1 xong; đang ở bước 2**, mục "API key cho
 - [x] Rate limiting; login throttling
 - [x] CLI tạo người dùng đầu tiên
 - [x] Tạo người dùng: quản trị viên tạo; tự đăng ký bật tắt bằng cấu hình (mặc định tắt)
-- [ ] API key cho máy và AI agent: tạo, thu hồi, giới hạn theo permission
+- [x] API key cho máy và AI agent: tạo, thu hồi, giới hạn theo permission
 
 ## 3. MFA
 
