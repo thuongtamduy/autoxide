@@ -11,6 +11,18 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Content (`/api/v1/content`, guide in `docs/CONTENT.md`): posts and pages with a draft kept
+  apart from the published version, a JSON body (ProseMirror / Tiptap) checked against an
+  allowlist, slugs made from titles (`Đường đến Đà Lạt` → `duong-den-da-lat`), revisions with
+  restore, scheduled publish and take-down, nested pages with addresses computed by the
+  server and automatic `301` redirects when they change (`410` once removed), manual
+  redirects, translations (one entry per language, no fallback), categories, tags, author
+  profiles, menus, SEO fields. Public endpoints for the website (`/public/resolve`, posts,
+  menus, terms, authors, sitemap, feed) never return drafts and answer `304` to a matching
+  `ETag`; signed draft preview links. `If-Match` is required on every change. Events carry
+  the addresses to purge from a website cache. Permissions `content.read`, `content.write`,
+  `content.publish`, `content.manage`; nine MCP tools (`content.list` … `content.resolve`)
+  that take the entry `version`. New settings `AUTOXIDE_CONTENT_*`.
 - Text search ignores accents as well as case: `da lat` finds `Đà Lạt` (users, media items,
   media tags), the same on SQLite and PostgreSQL.
 - Media library (`/api/v1/media`, guide in `docs/MEDIA.md`): images, video, audio and

@@ -2328,3 +2328,52 @@ database cho cùng kết quả; `unaccent` chỉ Postgres có, `LOWER` của SQL
 Đã cân nhắc: full-text search riêng của từng database (FTS5, `tsvector`) — mạnh hơn nhưng phải rẽ
 nhánh theo database, và cấu hình tiếng Việt của Postgres không có sẵn; để khi bảng lớn tới mức
 `LIKE '%…%'` chậm thật (đo trước). Bỏ dấu cả ở khoá chặn trùng — gộp nhầm hai từ khác nghĩa.
+
+## D-105 · Module `content`: những chỗ đề bài chưa nói hoặc làm khác — 2026-11-12 — agent quyết
+
+Bối cảnh: làm bước 17 theo `docs/prompts/step-17-content.md` và D-102. Các chỗ dưới đây đề bài
+không nói rõ, hoặc làm khác một chút; ghi lại để phiên sau không đảo nhầm.
+
+Quyết định:
+
+- **Không foreign key cả bên trong module.** Service tự xoá dòng con (liên kết term, tác giả,
+  revision, lịch, mục menu) trong cùng transaction. Lý do: hành vi xoá giống hệt trên hai
+  database (SQLite chỉ thi hành foreign key khi bật `PRAGMA`), và luật "chỉ giữ ID" đã áp cho
+  ID của `media` và người dùng — một cách làm cho mọi ID.
+- **Endpoint công khai nằm dưới `/api/v1/content/public/…`** (`resolve`, `posts`, `menus`,
+  `terms`, `authors`, `sitemap`, `feed`, `preview`): một tiền tố cho mọi thứ không cần đăng nhập,
+  dễ đặt cache và rate limiting ở proxy. Mọi endpoint này trả `Cache-Control: public, no-cache`
+  (cache được, hỏi lại rẻ nhờ `ETag` + 304); `preview` trả `no-store`.
+- **Phạm vi `If-Match` bắt buộc:** sửa, xoá và đổi trạng thái mục (đăng, gỡ, lưu trữ, `move`,
+  khôi phục, hẹn giờ); sửa chuyển hướng, term, tác giả; thay menu (`*` để tạo menu mới). Xoá
+  term, tác giả, chuyển hướng không cần: không có nội dung nào bị ghi đè.
+- **Gắn term và tác giả bằng endpoint riêng** (`PUT /entries/{id}/terms`, `/authors`), có hiệu
+  lực ngay cho cả nháp lẫn bản công khai, không nằm trong revision: đó là phân loại, không phải
+  nội dung; website lọc theo danh mục phải thấy ngay.
+- **Lỗi của một trường là `errors[].code`, không phải mã riêng của response:**
+  `locale_not_supported`, `parent_not_found`, `tree_too_deep`, `not_allowed`… nằm trong
+  `validation_failed` để báo mọi lỗi một lần (D-083). Mã riêng `content.invalid_body`,
+  `content.media_not_found`, `content.media_not_public` chỉ dùng khi mọi lỗi cùng một loại.
+- **Lịch thất bại không retry.** Lỗi nghiệp vụ lúc chạy (bản công khai đã mới hơn lúc đặt lịch,
+  trang cha chưa đăng, slug trùng…) đánh dấu lịch `failed` kèm mã lỗi và ghi event
+  `content.schedule_failed`; chạy lại không đổi kết quả. Chỉ lỗi hạ tầng (database) mới để job
+  queue retry.
+- **Preview token:** `base64url(ID 16 byte + hạn dùng 8 byte) . base64url(HMAC-SHA256)`, ký
+  bằng `AUTOXIDE_CONTENT_PREVIEW_SECRET` (ít nhất 32 ký tự). Token luôn cho xem bản nháp mới
+  nhất; mục bị xoá thì token hết dùng được. Đổi secret là thu hồi mọi token.
+- **Tool MCP:** 9 tool (`list`, `get`, `create_draft`, `update`, `publish`, `unpublish`,
+  `list_revisions`, `restore_revision`, `resolve`). Kết quả có mục kèm `version` (giá trị
+  `ETag`); tool sửa và đổi trạng thái bắt buộc `version`, đọc y như `If-Match` qua hàm mới
+  `IfMatch::from_value` của kernel. Đầu vào là kiểu riêng của MCP, không `$ref` (thân bài khai
+  là object chung, máy chủ vẫn kiểm đủ).
+- **Xoá tài khoản** xoá hồ sơ tác giả gắn với người đó và liên kết của hồ sơ với bài, huỷ lịch
+  người đó đặt, bỏ trống `created_by` ở mục, revision, lịch, chuyển hướng; bài vẫn giữ.
+- **Kernel:** `pagination::SortValue` thêm loại `Time` để danh sách bài công khai sắp theo
+  ngày đăng (`published_at`) với con trỏ ổn định.
+
+Lý do: mỗi điểm chọn cách đơn giản nhất chạy như nhau trên SQLite và Postgres và giữ "một cách
+làm cho mỗi việc".
+
+Đã cân nhắc: foreign key `ON DELETE CASCADE` trong module — hành vi phụ thuộc cấu hình kết nối
+SQLite; lưu preview token vào bảng để thu hồi từng cái — thêm bảng và dọn dẹp cho một tính năng
+token sống 10 phút; retry lịch thất bại — lỗi nghiệp vụ không tự hết, retry chỉ làm ồn log.

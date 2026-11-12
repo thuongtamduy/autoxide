@@ -25,6 +25,8 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Thư viện media: cần nơi lưu của `files` (đứng sau nó); module nội dung sau này
         // cần trait `Media` của nó.
         Box::new(autoxide_media::module()),
+        // Sau `media`: `content` cần `dyn Media` mà `media` công bố.
+        Box::new(autoxide_content::module()),
     ]
 }
 
@@ -122,8 +124,9 @@ mod tests {
 
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
-            // Mỗi lịch (của `auth`, `idempotency`, `webhooks` và hai của `media`) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 5);
+            // Mỗi lịch (của `auth`, `idempotency`, `webhooks`, hai của `media` và một của
+            // `content`) đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 6);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

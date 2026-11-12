@@ -580,6 +580,13 @@ async fn logged(level: LogLevel, request: Request<Body>) -> Vec<serde_json::Valu
     let config = LogConfig { level, format: LogFormat::Json };
     let subscriber = autoxide_kernel::logging::subscriber(&config, buffer.clone(), Vec::new());
     // Bộ nhận log này chỉ có hiệu lực trên thread hiện tại, tới khi `_guard` bị drop.
+    // `tracing` nhớ, cho cả process, "dòng log này có ai nghe không". Khi chỉ một bộ nhận
+    // đang sống, nó hỏi bộ nhận mặc định của THREAD vừa chạm dòng log lần đầu — có thể là
+    // thread của một test khác chạy song song, không có bộ nhận nào — rồi nhớ "không ai
+    // nghe", và log của test này bị bỏ. Giữ sống thêm một bộ nhận rỗng suốt process thì
+    // `tracing` luôn hỏi mọi bộ nhận đang sống, kể cả bộ nhận dưới đây.
+    static KEEP_MANY: std::sync::OnceLock<tracing::Dispatch> = std::sync::OnceLock::new();
+    KEEP_MANY.get_or_init(|| tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default()));
     let _guard = tracing::subscriber::set_default(subscriber);
     send(app(), request).await;
     let text = String::from_utf8(buffer.0.lock().unwrap().clone()).unwrap();

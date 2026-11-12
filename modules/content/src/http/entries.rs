@@ -1,0 +1,393 @@
+//! Endpoint quản trị của mục: danh sách, tạo, đọc, sửa bản nháp.
+
+use std::sync::Arc;
+
+use autoxide_kernel::access::Principal;
+use autoxide_kernel::error::Error;
+use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::version::{IfMatch, Tagged};
+use axum::extract::{Path, Query, State};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use utoipa::{IntoParams, ToSchema};
+use uuid::Uuid;
+use validator::Validate;
+
+use super::{BodyNode, choice, page_request, parent_filter, present};
+use crate::entries::{Entry, EntryFields, EntryFilter, EntrySort, Kind, NewEntry, Status};
+use crate::service::ContentService;
+
+/// A post or page — its working draft.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct EntryResponse {
+    id: Uuid,
+    kind: Kind,
+    /// Language, a BCP 47 code.
+    #[schema(example = "vi")]
+    locale: String,
+    /// Shared by the translations of the same entry.
+    translation_group_id: Uuid,
+    /// The parent page (pages only); `null` at the root.
+    parent_id: Option<Uuid>,
+    status: Status,
+    /// `true` when the draft has changes not yet published.
+    has_unpublished_changes: bool,
+    #[schema(example = "Đường đến Đà Lạt")]
+    title: String,
+    /// Last part of the address.
+    #[schema(example = "duong-den-da-lat")]
+    slug: String,
+    /// Short summary.
+    excerpt: String,
+    /// The body, a ProseMirror / Tiptap JSON document.
+    #[schema(value_type = BodyNode)]
+    body: Value,
+    /// Version of the list of allowed body nodes (currently 1).
+    body_schema_version: i32,
+    /// Words in the body (for Vietnamese: syllables).
+    word_count: i32,
+    reading_time_minutes: i32,
+    /// Main image (a media item id).
+    featured_media_id: Option<Uuid>,
+    featured_media_alt: String,
+    meta_title: String,
+    meta_description: String,
+    /// Image for social sharing (a media item id).
+    og_media_id: Option<Uuid>,
+    canonical_url: String,
+    noindex: bool,
+    created_by: Option<Uuid>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    /// Categories and tags, in order (the first category is the main one). Set with
+    /// `PUT /api/v1/content/entries/{id}/terms`; takes effect at once.
+    term_ids: Vec<Uuid>,
+    /// Authors, in order (the first is the main one). Set with
+    /// `PUT /api/v1/content/entries/{id}/authors`; takes effect at once.
+    author_ids: Vec<Uuid>,
+}
+
+/// Mục như API trả, kèm term và tác giả (đọc chung một lần cho mọi mục).
+pub(crate) async fn describe(
+    service: &ContentService,
+    entries: Vec<Entry>,
+) -> Result<Vec<EntryResponse>, Error> {
+    let ids: Vec<Uuid> = entries.iter().map(|entry| entry.id).collect();
+    let read = service.database.read();
+    let mut terms = crate::terms::term_ids_of(read, &ids).await?;
+    let mut authors = crate::authors::author_ids_of(read, &ids).await?;
+    Ok(entries
+        .into_iter()
+        .map(|entry| {
+            let (term_ids, author_ids) = (
+                terms.remove(&entry.id).unwrap_or_default(),
+                authors.remove(&entry.id).unwrap_or_default(),
+            );
+            entry_response(entry, term_ids, author_ids)
+        })
+        .collect())
+}
+
+/// API trả mục như thế nào.
+fn entry_response(entry: Entry, term_ids: Vec<Uuid>, author_ids: Vec<Uuid>) -> EntryResponse {
+    EntryResponse {
+        term_ids,
+        author_ids,
+        kind: Kind::parse(&entry.kind).unwrap_or(Kind::Post),
+        status: Status::of(&entry),
+        body: serde_json::from_str(&entry.body).unwrap_or(Value::Null),
+        id: entry.id,
+        locale: entry.locale,
+        translation_group_id: entry.translation_group_id,
+        parent_id: entry.parent_id,
+        has_unpublished_changes: entry.has_unpublished_changes,
+        title: entry.title,
+        slug: entry.slug,
+        excerpt: entry.excerpt,
+        body_schema_version: entry.body_schema_version,
+        word_count: entry.word_count,
+        reading_time_minutes: entry.reading_time_minutes,
+        featured_media_id: entry.featured_media_id,
+        featured_media_alt: entry.featured_media_alt,
+        meta_title: entry.meta_title,
+        meta_description: entry.meta_description,
+        og_media_id: entry.og_media_id,
+        canonical_url: entry.canonical_url,
+        noindex: entry.noindex,
+        created_by: entry.created_by,
+        created_at: entry.created_at,
+        updated_at: entry.updated_at,
+    }
+}
+
+/// Một mục kèm `ETag`.
+pub(crate) async fn tagged(
+    service: &ContentService,
+    entry: Entry,
+) -> Result<Tagged<EntryResponse>, Error> {
+    let version = entry.updated_at;
+    let data = describe(service, vec![entry])
+        .await?
+        .into_iter()
+        .next()
+        .ok_or_else(|| Error::internal("describe returned nothing"))?;
+    Ok(Tagged { version, data })
+}
+
+/// Filters and order of the entry list.
+#[derive(Debug, Clone, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct EntriesQuery {
+    /// `post` or `page`.
+    #[param(value_type = Option<Kind>, inline)]
+    pub kind: Option<String>,
+    /// Only this language.
+    #[param(example = "vi")]
+    pub locale: Option<String>,
+    /// `draft`, `published` or `archived`.
+    #[param(value_type = Option<Status>, inline)]
+    pub status: Option<String>,
+    /// Only entries directly under this page: an entry id, or `root` (every post and the
+    /// top-level pages).
+    pub parent_id: Option<String>,
+    /// Only entries whose title, summary or body contains this text, ignoring case and accents.
+    pub q: Option<String>,
+    /// Only entries with this category or tag.
+    pub term_id: Option<Uuid>,
+    /// Only entries by this author.
+    pub author_id: Option<Uuid>,
+    /// Only the translations of one entry (its `translation_group_id`).
+    pub translation_group_id: Option<Uuid>,
+    /// `created_at` (the default) or `updated_at`; the direction is `order`.
+    #[param(value_type = Option<EntrySort>, inline)]
+    pub sort: Option<String>,
+}
+
+impl EntriesQuery {
+    pub(crate) fn filter(
+        self,
+        problems: &mut Vec<autoxide_kernel::error::FieldError>,
+    ) -> EntryFilter {
+        EntryFilter {
+            kind: choice(self.kind.as_deref(), "kind", "`post`, `page`", problems),
+            locale: self
+                .locale
+                .map(|locale| locale.trim().to_owned())
+                .filter(|locale| !locale.is_empty()),
+            status: choice(
+                self.status.as_deref(),
+                "status",
+                "`draft`, `published`, `archived`",
+                problems,
+            ),
+            parent: parent_filter(self.parent_id.as_deref(), problems),
+            search: self.q,
+            term_id: self.term_id,
+            author_id: self.author_id,
+            translation_group_id: self.translation_group_id,
+            sort: choice(self.sort.as_deref(), "sort", "`created_at`, `updated_at`", problems)
+                .unwrap_or_default(),
+        }
+    }
+}
+
+/// The editable fields of an entry. Omitted fields stay as they are.
+#[derive(Debug, Clone, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct EntryFieldsInput {
+    /// 1 to 300 characters.
+    pub title: Option<String>,
+    /// Lower-case letters and digits joined by `-`, at most 100 characters; unique among the
+    /// entries of the same kind, language and parent. `""` makes one from the title.
+    pub slug: Option<String>,
+    /// Up to 1000 characters.
+    pub excerpt: Option<String>,
+    /// A ProseMirror / Tiptap JSON document (see `BodyNode`); checked by the server.
+    #[schema(value_type = Option<BodyNode>)]
+    pub body: Option<Value>,
+    /// Main image: a media item id; `null` removes it.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<Uuid>, nullable)]
+    pub featured_media_id: Option<Option<Uuid>>,
+    /// Text alternative of the main image, up to 1000 characters.
+    pub featured_media_alt: Option<String>,
+    /// Title for search engines, up to 300 characters; empty: the title.
+    pub meta_title: Option<String>,
+    /// Description for search engines, up to 1000 characters.
+    pub meta_description: Option<String>,
+    /// Image for social sharing: a media item id; `null` removes it.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<Uuid>, nullable)]
+    pub og_media_id: Option<Option<Uuid>>,
+    /// Canonical address, when the content first appeared elsewhere; empty: none.
+    pub canonical_url: Option<String>,
+    /// Ask search engines not to index it.
+    pub noindex: Option<bool>,
+}
+
+impl From<EntryFieldsInput> for EntryFields {
+    fn from(input: EntryFieldsInput) -> Self {
+        EntryFields {
+            title: input.title,
+            slug: input.slug,
+            excerpt: input.excerpt,
+            body: input.body,
+            featured_media_id: input.featured_media_id,
+            featured_media_alt: input.featured_media_alt,
+            meta_title: input.meta_title,
+            meta_description: input.meta_description,
+            og_media_id: input.og_media_id,
+            canonical_url: input.canonical_url,
+            noindex: input.noindex,
+        }
+    }
+}
+
+/// A new post or page, created as a draft.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub(crate) struct CreateEntryRequest {
+    pub kind: Kind,
+    /// Language; omitted: the default language.
+    pub locale: Option<String>,
+    /// Parent page (pages only).
+    pub parent_id: Option<Uuid>,
+    #[serde(flatten)]
+    pub fields: EntryFieldsInput,
+}
+
+/// Changes to the draft of an entry.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub(crate) struct UpdateEntryRequest {
+    #[serde(flatten)]
+    pub fields: EntryFieldsInput,
+    /// Keep a revision of the draft after this change (one is also kept automatically when
+    /// the last one is more than 10 minutes old).
+    #[serde(default)]
+    pub save_revision: bool,
+}
+
+/// List posts and pages (drafts included).
+///
+/// Requires `content.read`. Newest first unless `order=asc`.
+#[utoipa::path(
+    get,
+    path = "/entries",
+    operation_id = "list_content_entries",
+    security(("bearer" = [])),
+    params(EntriesQuery, PageQuery),
+    responses(
+        (status = 200, description = "One page of entries.", body = Page<EntryResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A filter or paging parameter is invalid; see `errors`.", body = Problem),
+    )
+)]
+pub(crate) async fn list_entries(
+    State(service): State<Arc<ContentService>>,
+    principal: Principal,
+    Query(query): Query<EntriesQuery>,
+    Query(paging): Query<PageQuery>,
+) -> Result<Page<EntryResponse>, Error> {
+    let mut problems = Vec::new();
+    let filter = query.filter(&mut problems);
+    let page = page_request(paging, problems)?;
+    let page = service.list(&principal, &filter, &page).await?;
+    let autoxide_kernel::pagination::Page { data, pagination } = page;
+    Ok(Page { data: describe(&service, data).await?, pagination })
+}
+
+/// Create a post or page as a draft.
+///
+/// Requires `content.write`. An empty or missing `slug` is made from the title (`-2`, `-3`…
+/// are added when taken). Retry safely with an `Idempotency-Key` header.
+#[utoipa::path(
+    post,
+    path = "/entries",
+    operation_id = "create_content_entry",
+    security(("bearer" = [])),
+    request_body = CreateEntryRequest,
+    responses(
+        (status = 201, description = "Created.", body = Data<EntryResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.write`; code `permission_denied`.", body = Problem),
+        (status = 409, description = "The slug is taken; code `content.slug_taken`.", body = Problem),
+        (status = 422, description = "A value is invalid: see `errors` (code `content.invalid_body` when only the body is, `content.media_not_found` when only media items are missing).", body = Problem),
+    )
+)]
+pub(crate) async fn create_entry(
+    State(service): State<Arc<ContentService>>,
+    principal: Principal,
+    ValidJson(input): ValidJson<CreateEntryRequest>,
+) -> Result<Created<EntryResponse>, Error> {
+    let new = NewEntry {
+        kind: input.kind,
+        locale: input.locale,
+        parent_id: input.parent_id,
+        fields: input.fields.into(),
+    };
+    let entry = service.create(&principal, new).await?;
+    let location = format!("/content/entries/{}", entry.id);
+    Ok(Created::new(location, tagged(&service, entry).await?.data))
+}
+
+/// Get a post or page (its draft).
+///
+/// Requires `content.read`.
+#[utoipa::path(
+    get,
+    path = "/entries/{id}",
+    operation_id = "get_content_entry",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the entry.")),
+    responses(
+        (status = 200, description = "The entry.", body = Data<EntryResponse>, headers(("ETag" = String, description = "Version of the entry: send it back in `If-Match` when changing it."))),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.read`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
+    )
+)]
+pub(crate) async fn get_entry(
+    State(service): State<Arc<ContentService>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<Tagged<EntryResponse>, Error> {
+    tagged(&service, service.get(&principal, id).await?).await
+}
+
+/// Change the draft of a post or page.
+///
+/// Requires `content.write`. A published entry keeps showing its published version until it
+/// is published again (`has_unpublished_changes` turns `true`). `If-Match` is required.
+#[utoipa::path(
+    patch,
+    path = "/entries/{id}",
+    operation_id = "update_content_entry",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the entry since; otherwise `412`.")),
+    request_body = UpdateEntryRequest,
+    responses(
+        (status = 200, description = "The entry after the change.", body = Data<EntryResponse>, headers(("ETag" = String, description = "Version of the entry: send it back in `If-Match` when changing it."))),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.write`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
+        (status = 409, description = "The slug is taken; code `content.slug_taken`.", body = Problem),
+        (status = 412, description = "`If-Match` does not match: the entry changed since you read it; code `precondition_failed`.", body = Problem),
+        (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
+        (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
+    )
+)]
+pub(crate) async fn update_entry(
+    State(service): State<Arc<ContentService>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    if_match: IfMatch,
+    ValidJson(input): ValidJson<UpdateEntryRequest>,
+) -> Result<Tagged<EntryResponse>, Error> {
+    let expected = if_match.required()?;
+    let entry =
+        service.update(&principal, id, input.fields.into(), input.save_revision, expected).await?;
+    tagged(&service, entry).await
+}

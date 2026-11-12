@@ -203,26 +203,26 @@ Chỉ nội dung và những gì liên quan đến nội dung; không thương m
 Thiết kế: D-102; đề bài đầy đủ: [`docs/prompts/step-17-content.md`](prompts/step-17-content.md);
 khảo sát: [`docs/research/content.md`](research/content.md).
 
-- [ ] Bài viết và trang chung một mô hình: tiêu đề, slug, tóm tắt, thân bài JSON (máy chủ kiểm
+- [x] Bài viết và trang chung một mô hình: tiêu đề, slug, tóm tắt, thân bài JSON (máy chủ kiểm
       theo danh sách node được phép, chặn link độc), ảnh đại diện và ảnh trong bài (ID của
       `media`, kiểm qua `api` của `media`); số chữ, thời gian đọc, văn bản thuần để tìm kiếm
-- [ ] Nháp tách khỏi bản công khai; đăng, gỡ, lưu trữ; hẹn giờ đăng và gỡ qua job queue (ghim
+- [x] Nháp tách khỏi bản công khai; đăng, gỡ, lưu trữ; hẹn giờ đăng và gỡ qua job queue (ghim
       một revision)
-- [ ] Lịch sử phiên bản: xem và khôi phục
-- [ ] Trang có cấp cha con, đường dẫn lồng nhau, chuyển trang sang nhánh khác (D-101)
-- [ ] Đường dẫn do backend tính; endpoint `resolve`; tự tạo chuyển hướng khi đường dẫn công khai
+- [x] Lịch sử phiên bản: xem và khôi phục
+- [x] Trang có cấp cha con, đường dẫn lồng nhau, chuyển trang sang nhánh khác (D-101)
+- [x] Đường dẫn do backend tính; endpoint `resolve`; tự tạo chuyển hướng khi đường dẫn công khai
       đổi (cả cây con), chuyển hướng làm tay, 410 cho nội dung đã gỡ
-- [ ] Danh mục (cha con) và thẻ; tác giả là hồ sơ của `content`, một bài nhiều tác giả
-- [ ] Menu điều hướng nhiều tầng, theo ngôn ngữ, trỏ tới ID nội dung hoặc URL
-- [ ] Đa ngôn ngữ (vi, en): mỗi bản dịch một bản ghi, slug riêng, liên kết với nhau
-- [ ] SEO: meta title, meta description, ảnh chia sẻ, canonical, `noindex`; dữ liệu cho sitemap
+- [x] Danh mục (cha con) và thẻ; tác giả là hồ sơ của `content`, một bài nhiều tác giả
+- [x] Menu điều hướng nhiều tầng, theo ngôn ngữ, trỏ tới ID nội dung hoặc URL
+- [x] Đa ngôn ngữ (vi, en): mỗi bản dịch một bản ghi, slug riêng, liên kết với nhau
+- [x] SEO: meta title, meta description, ảnh chia sẻ, canonical, `noindex`; dữ liệu cho sitemap
       (kèm bản dịch cho hreflang) và feed
-- [ ] Xem trước bản nháp bằng token ký, có hạn
-- [ ] Permission: đọc nháp, viết, đăng, quản lý; người đọc công khai chỉ thấy bản đã đăng
+- [x] Xem trước bản nháp bằng token ký, có hạn
+- [x] Permission: đọc nháp, viết, đăng, quản lý; người đọc công khai chỉ thấy bản đã đăng
       (endpoint công khai, tìm kiếm và cache của bước 15); `If-Match` bắt buộc (D-102)
-- [ ] Event và audit cho mọi thay đổi, đủ dữ liệu để website làm mới cache qua webhook; tool MCP
+- [x] Event và audit cho mọi thay đổi, đủ dữ liệu để website làm mới cache qua webhook; tool MCP
       gọi cùng service; dọn và xuất dữ liệu cá nhân
-- [ ] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database (kể cả test đồng
+- [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database (kể cả test đồng
       thời); hướng dẫn dùng (tiếng Anh + tiếng Việt)
 
 ## Sau core (chưa mở)

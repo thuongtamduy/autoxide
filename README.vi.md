@@ -60,6 +60,9 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
 12. Passkey; 13–14. quản lý tài khoản, webhook, hợp đồng API chặt hơn
 15. Thư viện media: ảnh, video, âm thanh, tài liệu trong thư mục lồng nhau, phục vụ
     công khai hay riêng tư ([`docs/MEDIA.vi.md`](docs/MEDIA.vi.md))
+16. Nội dung: bài viết và trang nhiều ngôn ngữ, bản nháp và lịch sử, hẹn giờ, danh mục,
+    thẻ, tác giả, menu, chuyển hướng, và endpoint công khai cho website
+    ([`docs/CONTENT.vi.md`](docs/CONTENT.vi.md))
 
 ## Yêu cầu
 
@@ -307,6 +310,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   PostgreSQL hoặc một binary với SQLite, reverse proxy, cập nhật, backup
 - [`docs/MEDIA.vi.md`](docs/MEDIA.vi.md) — dùng thư viện media: tải lên, thư mục, link
   công khai, cache, thùng rác
+- [`docs/CONTENT.vi.md`](docs/CONTENT.vi.md) — dùng module nội dung: bản nháp, đăng, trang
+  và địa chỉ, ngôn ngữ, endpoint công khai cho website, xem trước
 - [`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md) — cách viết một module, bắt đầu
   từ module mẫu [`modules/notes`](modules/notes) (mặc định không đăng ký)
 

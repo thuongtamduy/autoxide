@@ -1,0 +1,384 @@
+//! Tool MCP của module `content` (D-102). Mỗi tool: một kiểu đầu vào, permission như endpoint
+//! REST tương ứng (service tự kiểm), thân là lời gọi service như REST (luật kiến trúc 8).
+//!
+//! Tool sửa và đổi trạng thái nhận `version` — giá trị `ETag` mà tool đọc trả về — và kiểm y
+//! như header `If-Match` của REST: thiếu thì không chạy, lệch thì `precondition_failed`.
+//! Kết quả có mục thì kèm `version` của mục sau thay đổi.
+//!
+//! Kiểu đầu vào riêng cho MCP (không dùng lại kiểu của REST): JSON Schema của tool phải tự
+//! đủ, không `$ref` — thân bài khai là object chung (máy chủ vẫn kiểm đầy đủ).
+
+use std::sync::Arc;
+
+use autoxide_kernel::access::Principal;
+use autoxide_kernel::error::Error;
+use autoxide_kernel::mcp::{PageInput, Tool};
+use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::version::{IfMatch, etag};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use utoipa::ToSchema;
+use uuid::Uuid;
+use validator::Validate;
+
+use crate::entries::{Entry, EntryFields, Kind, NewEntry};
+use crate::http::{
+    EntriesQuery, EntryResponse, Resolution, RevisionResponse, choice, describe, page_request,
+    resolution, revision,
+};
+use crate::permissions::{CONTENT_PUBLISH, CONTENT_READ, CONTENT_WRITE};
+use crate::service::ContentService;
+
+/// Mục kèm `version` (giá trị `ETag`) để gửi lại khi sửa.
+#[derive(Debug, Serialize)]
+struct Versioned {
+    /// Gửi lại trong `version` của tool sửa / đổi trạng thái.
+    version: String,
+    #[serde(flatten)]
+    entry: EntryResponse,
+}
+
+async fn versioned(service: &ContentService, entry: Entry) -> Result<Versioned, Error> {
+    let version = etag(entry.updated_at);
+    let entry = describe(service, vec![entry])
+        .await?
+        .into_iter()
+        .next()
+        .ok_or_else(|| Error::internal("describe returned nothing"))?;
+    Ok(Versioned { version, entry })
+}
+
+/// Phiên bản mong đợi từ tham số `version` (bắt buộc, như `If-Match` của REST).
+fn expected(version: &str) -> Result<Option<DateTime<Utc>>, Error> {
+    IfMatch::from_value(version).expected()
+}
+
+/// Filters and paging of the entry list; omitted fields do not filter.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListEntriesInput {
+    /// `post` or `page`.
+    kind: Option<String>,
+    /// Only this language, e.g. `vi`.
+    locale: Option<String>,
+    /// `draft`, `published` or `archived`.
+    status: Option<String>,
+    /// Only entries directly under this page: an entry id, or `root`.
+    parent_id: Option<String>,
+    /// Only entries whose title, summary or body contains this text, ignoring case and accents.
+    q: Option<String>,
+    /// Only entries with this category or tag (its id).
+    term_id: Option<Uuid>,
+    /// Only entries by this author (its id).
+    author_id: Option<Uuid>,
+    /// Maximum number of entries to return, 1 to 200. Defaults to 50.
+    #[schema(minimum = 1, maximum = 200)]
+    limit: Option<u32>,
+    /// Where to continue: the `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `desc` (newest first, the default) or `asc`.
+    order: Option<String>,
+}
+
+/// An entry to read.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct EntryId {
+    /// Id of the entry.
+    id: Uuid,
+}
+
+/// A new post or page, created as a draft.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CreateDraftInput {
+    /// `post` or `page`.
+    kind: String,
+    /// Language, e.g. `vi`; omitted: the default language.
+    locale: Option<String>,
+    /// Parent page (pages only).
+    parent_id: Option<Uuid>,
+    /// 1 to 300 characters.
+    title: String,
+    /// Omitted: made from the title.
+    slug: Option<String>,
+    /// Short summary, up to 1000 characters.
+    excerpt: Option<String>,
+    /// The body: a ProseMirror / Tiptap JSON document (see the `update` tool).
+    #[schema(value_type = Option<Object>)]
+    body: Option<Value>,
+}
+
+/// Changes to the draft of an entry; omitted fields stay as they are.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UpdateDraftInput {
+    /// Id of the entry.
+    id: Uuid,
+    /// The `version` you read (or `*` to change it whatever its version). Refused with
+    /// `precondition_failed` if the entry changed since: read it again and retry.
+    version: String,
+    /// Keep a revision of the draft after this change.
+    #[serde(default)]
+    save_revision: bool,
+    /// 1 to 300 characters.
+    title: Option<String>,
+    /// Lower-case letters and digits joined by `-`, at most 100 characters. `""` makes one
+    /// from the title.
+    slug: Option<String>,
+    /// Short summary, up to 1000 characters.
+    excerpt: Option<String>,
+    /// The body: a ProseMirror / Tiptap JSON document, e.g. `{"type": "doc", "content":
+    /// [{"type": "paragraph", "content": [{"type": "text", "text": "Hello"}]}]}`. Allowed
+    /// nodes: paragraph, heading (level 2–4), bulletList, orderedList, listItem, blockquote,
+    /// codeBlock, horizontalRule, hardBreak, table, tableRow, tableHeader, tableCell,
+    /// image (attrs `mediaId`, `alt`, `caption`), embed (attrs `url`), text; marks: bold,
+    /// italic, code, strike, underline, link (attrs `href`).
+    #[schema(value_type = Option<Object>)]
+    body: Option<Value>,
+    /// Main image: a media item id.
+    featured_media_id: Option<Uuid>,
+    /// Text alternative of the main image.
+    featured_media_alt: Option<String>,
+    /// Title for search engines, up to 300 characters.
+    meta_title: Option<String>,
+    /// Description for search engines, up to 1000 characters.
+    meta_description: Option<String>,
+}
+
+impl UpdateDraftInput {
+    fn fields(&mut self) -> EntryFields {
+        EntryFields {
+            title: self.title.take(),
+            slug: self.slug.take(),
+            excerpt: self.excerpt.take(),
+            body: self.body.take(),
+            featured_media_id: self.featured_media_id.map(Some),
+            featured_media_alt: self.featured_media_alt.take(),
+            meta_title: self.meta_title.take(),
+            meta_description: self.meta_description.take(),
+            ..Default::default()
+        }
+    }
+}
+
+/// An entry to publish or take down.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ChangeStateInput {
+    /// Id of the entry.
+    id: Uuid,
+    /// The `version` you read (or `*`). Refused with `precondition_failed` if the entry
+    /// changed since.
+    version: String,
+}
+
+/// Revisions of an entry.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListRevisionsInput {
+    /// Id of the entry.
+    id: Uuid,
+    /// Maximum number of revisions to return, 1 to 200. Defaults to 50.
+    #[schema(minimum = 1, maximum = 200)]
+    limit: Option<u32>,
+    /// Where to continue: the `next_cursor` of the previous page.
+    cursor: Option<String>,
+}
+
+/// A revision to copy back into the draft.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RestoreInput {
+    /// Id of the entry.
+    id: Uuid,
+    /// Id of the revision.
+    revision_id: Uuid,
+    /// The `version` of the entry you read (or `*`).
+    version: String,
+}
+
+/// An address to look up.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ResolveInput {
+    /// Language of the address, e.g. `vi`.
+    locale: String,
+    /// The address, without domain or language prefix, e.g. `/blog/my-post`.
+    path: String,
+}
+
+pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
+    // Mỗi tool giữ một bản `Arc` của service (clone `Arc` chỉ tăng bộ đếm tham chiếu).
+    let (list, get, create, update, publish) =
+        (service.clone(), service.clone(), service.clone(), service.clone(), service.clone());
+    let (unpublish, revisions, restore, resolve) =
+        (service.clone(), service.clone(), service.clone(), service.clone());
+    vec![
+        Tool::new(
+            "list",
+            "List posts and pages, drafts included, newest first. Filter by kind, language, \
+             status, parent page, text, category/tag or author. Follow `pagination.next_cursor` \
+             with the same filters for more.",
+            move |principal: Principal, input: ListEntriesInput| {
+                let service = list.clone();
+                async move {
+                    let query = EntriesQuery {
+                        kind: input.kind,
+                        locale: input.locale,
+                        status: input.status,
+                        parent_id: input.parent_id,
+                        q: input.q,
+                        term_id: input.term_id,
+                        author_id: input.author_id,
+                        ..Default::default()
+                    };
+                    let paging = PageQuery {
+                        limit: input.limit.map(|limit| limit.to_string()),
+                        cursor: input.cursor,
+                        order: input.order,
+                    };
+                    let mut problems = Vec::new();
+                    let filter = query.filter(&mut problems);
+                    let page = page_request(paging, problems)?;
+                    let Page { data, pagination } =
+                        service.list(&principal, &filter, &page).await?;
+                    Ok::<_, Error>(Page { data: describe(&service, data).await?, pagination })
+                }
+            },
+        )
+        .requires(CONTENT_READ)
+        .read_only(),
+        Tool::new(
+            "get",
+            "Get a post or page: its draft (title, slug, summary, body, images, SEO fields, \
+             status) and its `version`, needed to change it.",
+            move |principal: Principal, input: EntryId| {
+                let service = get.clone();
+                async move { versioned(&service, service.get(&principal, input.id).await?).await }
+            },
+        )
+        .requires(CONTENT_READ)
+        .read_only(),
+        Tool::new(
+            "create_draft",
+            "Create a post or page as a draft (not visible to readers until published). The \
+             slug is made from the title unless given.",
+            move |principal: Principal, input: CreateDraftInput| {
+                let service = create.clone();
+                async move {
+                    let mut problems = Vec::new();
+                    let kind =
+                        choice::<Kind>(Some(&input.kind), "kind", "`post`, `page`", &mut problems);
+                    let Some(kind) = kind.filter(|_| problems.is_empty()) else {
+                        return Err(Error::validation(problems));
+                    };
+                    let fields = EntryFields {
+                        title: Some(input.title),
+                        slug: input.slug,
+                        excerpt: input.excerpt,
+                        body: input.body,
+                        ..Default::default()
+                    };
+                    let new =
+                        NewEntry { kind, locale: input.locale, parent_id: input.parent_id, fields };
+                    versioned(&service, service.create(&principal, new).await?).await
+                }
+            },
+        )
+        .requires(CONTENT_WRITE),
+        Tool::new(
+            "update",
+            "Change the draft of a post or page; omitted fields stay as they are. A published \
+             entry keeps showing its published version until published again. Pass the \
+             `version` you read.",
+            move |principal: Principal, mut input: UpdateDraftInput| {
+                let service = update.clone();
+                async move {
+                    let expected = expected(&input.version)?;
+                    let fields = input.fields();
+                    let entry = service
+                        .update(&principal, input.id, fields, input.save_revision, expected)
+                        .await?;
+                    versioned(&service, entry).await
+                }
+            },
+        )
+        .requires(CONTENT_WRITE),
+        Tool::new(
+            "publish",
+            "Publish the current draft of a post or page: readers see it at its address. \
+             Pass the `version` you read.",
+            move |principal: Principal, input: ChangeStateInput| {
+                let service = publish.clone();
+                async move {
+                    let entry = service
+                        .publish(&principal, input.id, expected(&input.version)?, None)
+                        .await?;
+                    versioned(&service, entry).await
+                }
+            },
+        )
+        .requires(CONTENT_PUBLISH),
+        Tool::new(
+            "unpublish",
+            "Take a published post or page down; it goes back to draft and its address \
+             answers 404. Pass the `version` you read.",
+            move |principal: Principal, input: ChangeStateInput| {
+                let service = unpublish.clone();
+                async move {
+                    let entry =
+                        service.unpublish(&principal, input.id, expected(&input.version)?).await?;
+                    versioned(&service, entry).await
+                }
+            },
+        )
+        .requires(CONTENT_PUBLISH)
+        .destructive(),
+        Tool::new(
+            "list_revisions",
+            "List the saved revisions of an entry, newest first (without their fields).",
+            move |principal: Principal, input: ListRevisionsInput| {
+                let service = revisions.clone();
+                async move {
+                    let page = PageInput { limit: input.limit, cursor: input.cursor, order: None }
+                        .page()?;
+                    let found = service.list_revisions(&principal, input.id, &page).await?;
+                    Ok::<Page<RevisionResponse>, Error>(found.map(|row| revision(row, false)))
+                }
+            },
+        )
+        .requires(CONTENT_READ)
+        .read_only(),
+        Tool::new(
+            "restore_revision",
+            "Copy a revision back into the draft of its entry (the published version does \
+             not change until published again). Pass the entry's `version`.",
+            move |principal: Principal, input: RestoreInput| {
+                let service = restore.clone();
+                async move {
+                    let entry = service
+                        .restore(&principal, input.id, input.revision_id, expected(&input.version)?)
+                        .await?;
+                    versioned(&service, entry).await
+                }
+            },
+        )
+        .requires(CONTENT_WRITE),
+        Tool::new(
+            "resolve",
+            "Look up a public address in a language, as the website does: the published entry \
+             there, a redirect, or `gone`. Drafts are never returned.",
+            move |_principal: Principal, input: ResolveInput| {
+                let service = resolve.clone();
+                async move {
+                    let (found, _) = resolution(&service, &input.locale, &input.path).await?;
+                    Ok::<Resolution, Error>(found)
+                }
+            },
+        )
+        .requires(CONTENT_READ)
+        .read_only(),
+    ]
+}

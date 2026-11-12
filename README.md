@@ -64,6 +64,9 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
 12. Passkeys; 13–14. account management, webhooks, a hardened API contract
 15. A media library: images, video, audio and documents in nested folders, served
     publicly or privately ([`docs/MEDIA.md`](docs/MEDIA.md))
+16. Content: posts and pages in several languages, drafts and history, scheduling,
+    categories, tags, authors, menus, redirects, and public endpoints for the website
+    ([`docs/CONTENT.md`](docs/CONTENT.md))
 
 ## Requirements
 
@@ -311,6 +314,8 @@ never share foreign keys. These rules are checked automatically by the gate.
   PostgreSQL or one binary with SQLite, reverse proxy, updates, backups
 - [`docs/MEDIA.md`](docs/MEDIA.md) — using the media library: upload, folders, public
   links, caching, trash
+- [`docs/CONTENT.md`](docs/CONTENT.md) — using the content module: drafts, publishing,
+  pages and addresses, languages, public endpoints for the website, preview
 - [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) — how to write a module, starting
   from the sample module [`modules/notes`](modules/notes) (not registered by default)
 

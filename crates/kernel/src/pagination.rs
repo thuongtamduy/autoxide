@@ -91,12 +91,16 @@ enum Position {
     Key(KeyCursor),
 }
 
-/// Giá trị của cột sắp xếp (ngoài ID) mà con trỏ mang theo.
+/// Giá trị của cột sắp xếp (ngoài ID) mà con trỏ mang theo. Con trỏ ghi kèm loại giá trị
+/// (`{"i": …}`, `{"s": …}`, `{"t": …}`), để một chuỗi trông như ngày không bị đọc nhầm.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
 pub enum SortValue {
+    #[serde(rename = "i")]
     Integer(i64),
+    #[serde(rename = "s")]
     Text(String),
+    #[serde(rename = "t")]
+    Time(chrono::DateTime<chrono::Utc>),
 }
 
 impl From<SortValue> for sea_orm::Value {
@@ -104,6 +108,7 @@ impl From<SortValue> for sea_orm::Value {
         match value {
             SortValue::Integer(number) => number.into(),
             SortValue::Text(text) => text.into(),
+            SortValue::Time(time) => time.into(),
         }
     }
 }
@@ -402,6 +407,14 @@ mod tests {
         let number =
             KeyCursor { column: "size".to_owned(), value: SortValue::Integer(-5), id: Uuid::nil() };
         assert_eq!(KeyCursor::decode(&number.encode()), Some(number));
+        let time = chrono::DateTime::from_timestamp_micros(1_700_000_000_123_456).unwrap();
+        let time =
+            KeyCursor { column: "at".to_owned(), value: SortValue::Time(time), id: Uuid::nil() };
+        assert_eq!(KeyCursor::decode(&time.encode()), Some(time));
+        // Chuỗi trông như ngày vẫn là chuỗi.
+        let text = SortValue::Text("2024-01-01T00:00:00Z".to_owned());
+        let text = KeyCursor { column: "name".to_owned(), value: text, id: Uuid::nil() };
+        assert_eq!(KeyCursor::decode(&text.encode()), Some(text));
         assert!(PageRequest::try_from(query(None, Some("e30"), None)).is_err());
     }
 

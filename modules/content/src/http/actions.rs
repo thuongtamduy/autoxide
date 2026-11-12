@@ -1,0 +1,213 @@
+//! Thao tác đổi trạng thái của mục: đăng, gỡ, lưu trữ, chuyển trang, xoá. Mọi thao tác bắt
+//! buộc `If-Match` (D-102).
+
+use std::sync::Arc;
+
+use autoxide_kernel::access::Principal;
+use autoxide_kernel::error::Error;
+use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::version::{IfMatch, Tagged};
+use axum::extract::{Path, State};
+use axum::http::StatusCode;
+use chrono::{DateTime, Utc};
+use serde::Deserialize;
+use utoipa::ToSchema;
+use uuid::Uuid;
+use validator::Validate;
+
+use super::entries::{EntryResponse, tagged};
+use crate::service::ContentService;
+
+/// Options of a publish.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PublishRequest {
+    /// The date shown as the publication date. Default: unchanged, or now on first publish.
+    pub published_at: Option<DateTime<Utc>>,
+}
+
+/// Where to move a page.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MoveRequest {
+    /// The new parent page; `null` moves it to the top level.
+    pub parent_id: Option<Uuid>,
+}
+
+const IF_MATCH: &str = "Required: the `ETag` of the entry (or `*`). Done only if nobody changed the entry since; otherwise `412`.";
+
+/// Publish a post or page.
+///
+/// Requires `content.publish`. Copies the current draft to the published version, at an
+/// address computed by the server (`/<post prefix>/<slug>` for posts, the parent's address
+/// plus the slug for pages). If the address changed, the old one (and those of published
+/// subpages) redirect with 301. Every media item it uses must be public. `If-Match` is
+/// required. Retry safely with an `Idempotency-Key` header.
+#[utoipa::path(
+    post,
+    path = "/entries/{id}/publish",
+    operation_id = "publish_content_entry",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),
+    request_body(content = PublishRequest, description = "Optional; may be omitted."),
+    responses(
+        (status = 200, description = "Published.", body = Data<EntryResponse>, headers(("ETag" = String, description = "New version of the entry."))),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.publish`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
+        (status = 409, description = "The address is used by another published entry (code `content.path_taken`), or the parent page is not published (code `content.parent_not_published`).", body = Problem),
+        (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
+        (status = 422, description = "A media item is missing (code `content.media_not_found`) or not public (code `content.media_not_public`); see `errors`.", body = Problem),
+        (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
+    )
+)]
+pub(crate) async fn publish_entry(
+    State(service): State<Arc<ContentService>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    if_match: IfMatch,
+    body: axum::body::Bytes,
+) -> Result<Tagged<EntryResponse>, Error> {
+    let expected = if_match.required()?;
+    // Thân không bắt buộc: rỗng thì dùng mặc định.
+    let input: PublishRequest = if body.iter().all(u8::is_ascii_whitespace) {
+        PublishRequest::default()
+    } else {
+        serde_json::from_slice(&body).map_err(|error| {
+            Error::validation(vec![autoxide_kernel::error::FieldError::new(
+                "body",
+                "invalid",
+                error.to_string(),
+            )])
+        })?
+    };
+    let published_at = input.published_at;
+    tagged(&service, service.publish(&principal, id, expected, published_at).await?).await
+}
+
+/// Take a post or page down.
+///
+/// Requires `content.publish`. Readers no longer see it (its address answers 404); it is a
+/// draft again and may be published later. A page with published subpages cannot be taken
+/// down. `If-Match` is required.
+#[utoipa::path(
+    post,
+    path = "/entries/{id}/unpublish",
+    operation_id = "unpublish_content_entry",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),
+    responses(
+        (status = 200, description = "Taken down.", body = Data<EntryResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.publish`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
+        (status = 409, description = "Not published (code `content.not_published`), or a page with published subpages (code `content.page_has_published_children`).", body = Problem),
+        (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
+        (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
+    )
+)]
+pub(crate) async fn unpublish_entry(
+    State(service): State<Arc<ContentService>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    if_match: IfMatch,
+) -> Result<Tagged<EntryResponse>, Error> {
+    let expected = if_match.required()?;
+    tagged(&service, service.unpublish(&principal, id, expected).await?).await
+}
+
+/// Archive a post or page.
+///
+/// Requires `content.publish`. Takes it down for good: its address answers 410 (gone) so
+/// search engines drop it. It can still be published again. `If-Match` is required.
+#[utoipa::path(
+    post,
+    path = "/entries/{id}/archive",
+    operation_id = "archive_content_entry",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),
+    responses(
+        (status = 200, description = "Archived.", body = Data<EntryResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.publish`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
+        (status = 409, description = "A page with published subpages; code `content.page_has_published_children`.", body = Problem),
+        (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
+        (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
+    )
+)]
+pub(crate) async fn archive_entry(
+    State(service): State<Arc<ContentService>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    if_match: IfMatch,
+) -> Result<Tagged<EntryResponse>, Error> {
+    let expected = if_match.required()?;
+    tagged(&service, service.archive(&principal, id, expected).await?).await
+}
+
+/// Move a page under another parent.
+///
+/// Requires `content.write`, and `content.publish` when the page is published. Takes effect
+/// at once for the draft and the published version: the page's address and those of its
+/// subpages change, and the old ones redirect with 301. `If-Match` is required.
+#[utoipa::path(
+    post,
+    path = "/entries/{id}/move",
+    operation_id = "move_content_page",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the page."), ("If-Match" = String, Header, description = IF_MATCH)),
+    request_body = MoveRequest,
+    responses(
+        (status = 200, description = "Moved.", body = Data<EntryResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
+        (status = 409, description = "Under itself or a subpage (code `content.tree_cycle`), slug taken at the new place (code `content.slug_taken`), address taken (code `content.path_taken`), or the new parent is not published (code `content.parent_not_published`).", body = Problem),
+        (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
+        (status = 422, description = "Not a page, or the parent is invalid or too deep (`tree_too_deep`); see `errors`.", body = Problem),
+        (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
+    )
+)]
+pub(crate) async fn move_entry(
+    State(service): State<Arc<ContentService>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    if_match: IfMatch,
+    ValidJson(input): ValidJson<MoveRequest>,
+) -> Result<Tagged<EntryResponse>, Error> {
+    let expected = if_match.required()?;
+    tagged(&service, service.move_page(&principal, id, input.parent_id, expected).await?).await
+}
+
+/// Delete a post or page.
+///
+/// Requires `content.publish`. Its revisions and schedules go too. A page with subpages
+/// cannot be deleted. If it was published, its address answers 410. `If-Match` is required.
+#[utoipa::path(
+    delete,
+    path = "/entries/{id}",
+    operation_id = "delete_content_entry",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),
+    responses(
+        (status = 204, description = "Deleted."),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.publish`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
+        (status = 409, description = "The page has subpages; code `content.page_has_children`.", body = Problem),
+        (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
+        (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
+    )
+)]
+pub(crate) async fn delete_entry(
+    State(service): State<Arc<ContentService>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    if_match: IfMatch,
+) -> Result<StatusCode, Error> {
+    let expected = if_match.required()?;
+    service.delete(&principal, id, expected).await?;
+    Ok(StatusCode::NO_CONTENT)
+}

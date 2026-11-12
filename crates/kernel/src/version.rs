@@ -85,6 +85,12 @@ impl IfMatch {
         }
     }
 
+    /// Đọc một giá trị `ETag` (hoặc `*`) nhận qua kênh khác header — vd tham số `version` của
+    /// tool MCP — y như header `If-Match`.
+    pub fn from_value(value: &str) -> IfMatch {
+        IfMatch::parse(Some(value))
+    }
+
     fn parse(value: Option<&str>) -> IfMatch {
         let Some(value) = value.map(str::trim) else {
             return IfMatch::Missing;

@@ -83,6 +83,7 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | Kích thước ảnh | `imagesize` 0.15 (MIT, không phụ thuộc gì; chỉ bật `jpeg`, `png`, `gif`, `webp`, `heif`) — đọc chiều rộng / cao từ header ảnh, không giải mã ảnh; module `media` dùng. Nhận loại thật theo chữ ký đầu file thì tự viết (D-089) |
 | Ảnh thu nhỏ | `image` 0.25 (MIT / Apache-2.0, thuần Rust; chỉ bật `jpeg`, `png`, `gif`, `webp`, không `rayon`) — giải mã, xoay theo EXIF, đổi cỡ, mã hoá JPEG / PNG cho ảnh thu nhỏ của module `media`, chạy trong job nền (D-093) |
 | Tìm không dấu | `unicode-normalization` 0.1 (MIT / Apache-2.0; đã có sẵn trong cây phụ thuộc qua `webauthn_rp`) — tách chữ khỏi dấu (NFD) để `search::fold` của kernel bỏ dấu: "da lat" tìm ra "Đà Lạt" (D-104) |
+| Slug | `slug` 0.1 (MIT / Apache-2.0; kéo theo `deunicode`) — tạo slug từ tiêu đề: bỏ dấu, `đ` → `d`, chữ thường nối bằng `-` ("Đường đến Đà Lạt" → `duong-den-da-lat`); module `content` dùng (D-102, D-105) |
 | i18n    | Tự viết: `locales/<ngôn ngữ>.json` mỗi crate, dịch theo `code` lỗi ở lớp HTTP, chọn theo `Accept-Language`; không dùng `rust-i18n` (D-057) |
 | Idempotency    | Tự viết: key do client gửi, lưu kết quả lệnh ghi để gửi lại không tạo trùng |
 | MCP endpoint   | `rmcp` 3.9 (SDK chính thức của Model Context Protocol) — module khai báo tool, gắn permission |

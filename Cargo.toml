@@ -45,6 +45,7 @@ autoxide-files = { path = "modules/files" }
 autoxide-notes = { path = "modules/notes" }
 autoxide-webhooks = { path = "modules/webhooks" }
 autoxide-media = { path = "modules/media" }
+autoxide-content = { path = "modules/content" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
@@ -95,6 +96,8 @@ http-body-util = "0.1"
 # Tạo ảnh thu nhỏ trong module `media` (D-093): giải mã JPEG / PNG / GIF / WebP, đổi cỡ,
 # mã hoá JPEG / PNG. Thuần Rust, chỉ bật đúng các định dạng cần, không `rayon`.
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+# Slug của module `content` (D-102): chuyển chữ Unicode sang ASCII ("Đà Lạt" → "da-lat").
+slug = "0.1"
 # Bỏ dấu khi tìm theo chữ ("da lat" ra "Đà Lạt"): tách chữ và dấu (NFD) rồi bỏ dấu
 # (`search::fold` của kernel). Đã có sẵn trong cây phụ thuộc (qua `webauthn_rp`).
 unicode-normalization = "0.1"
