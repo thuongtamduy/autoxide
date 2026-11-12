@@ -1,0 +1,22 @@
+{
+  "newsletter.list_not_found": "Không có danh sách nào có id này.",
+  "newsletter.subscriber_not_found": "Không có người đăng ký nào có id này.",
+  "newsletter.campaign_not_found": "Không có chiến dịch nào có id này.",
+  "newsletter.suppression_not_found": "Không có địa chỉ bị chặn nào có id `{id}`.",
+  "newsletter.list_key_taken": "Key `{key}` đã có danh sách khác dùng. Hãy chọn key khác.",
+  "newsletter.list_in_use": "Danh sách này còn chiến dịch chưa xong (nháp, hẹn giờ, đang gửi hay tạm dừng). Hãy xoá hoặc huỷ chúng trước.",
+  "newsletter.campaign_not_editable": "Chiến dịch đang ở trạng thái `{status}`; chỉ sửa được chiến dịch nháp hay đang hẹn giờ.",
+  "newsletter.campaign_not_deletable": "Chỉ xoá được chiến dịch chưa từng gửi. Mail đã gửi có link trỏ về chiến dịch này.",
+  "newsletter.campaign_invalid_transition": "Chiến dịch đang ở trạng thái `{status}`; không thể chuyển sang {action}.",
+  "newsletter.postal_address_missing": "Thư quảng cáo phải ghi địa chỉ của người gửi: đặt AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS rồi khởi động lại.",
+  "newsletter.preferences_url_missing": "Mail chiến dịch có link tới trang lựa chọn bản tin của website: đặt AUTOXIDE_NEWSLETTER_PREFERENCES_URL (ví dụ `https://www.example.com/newsletter/preferences?token={token}`) rồi khởi động lại.",
+  "newsletter.confirm_url_missing": "Danh sách bật xác nhận hai bước gửi link xác nhận tới website: đặt AUTOXIDE_NEWSLETTER_CONFIRM_URL (ví dụ `https://www.example.com/newsletter/confirm?token={token}`) rồi khởi động lại.",
+  "newsletter.confirmation_invalid": "Link xác nhận này sai, đã hết hạn hoặc đã được dùng. Hãy đăng ký lại để nhận link mới.",
+  "newsletter.link_invalid": "Link này không khớp với đăng ký nào. Hãy dùng link trong một bản tin gần đây hơn.",
+  "newsletter.mail.confirm.subject": "Xác nhận đăng ký nhận bản tin",
+  "newsletter.mail.confirm.text": "Có người, có lẽ là bạn, đã xin nhận các bản tin sau ở địa chỉ này:\n\n{lists}\n\nĐể xác nhận, hãy mở link này trong vòng {hours} giờ:\n{link}\n\nNếu bạn không xin, hãy bỏ qua mail này: bạn sẽ không nhận gì cả.\n",
+  "newsletter.mail.footer.subject": "Bản tin",
+  "newsletter.mail.footer.text": "Bạn nhận mail này vì đã đăng ký \"{list}\".\nHuỷ đăng ký hoặc chọn bản tin: {link}\n{address}",
+  "newsletter.mail.new_post.subject": "{title}",
+  "newsletter.mail.new_post.text": "{summary}\n\nĐọc bài tại: {url}\n"
+}

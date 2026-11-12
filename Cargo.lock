@@ -374,6 +374,7 @@ dependencies = [
  "autoxide-kernel",
  "autoxide-mail",
  "autoxide-media",
+ "autoxide-newsletter",
  "autoxide-testkit",
  "autoxide-webhooks",
  "axum",
@@ -618,6 +619,28 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.1",
+ "tokio",
+ "tower",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "autoxide-newsletter"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "rmcp",
+ "sea-orm",
+ "serde",
+ "serde_json",
  "tokio",
  "tower",
  "tracing",
