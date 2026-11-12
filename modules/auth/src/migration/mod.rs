@@ -17,6 +17,7 @@ mod m0015_add_session_details;
 mod m0016_add_user_search;
 mod m0017_fold_user_search;
 mod m0018_move_login_throttle;
+mod m0019_move_tokens;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -42,5 +43,6 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0016_add_user_search::Migration),
         Box::new(m0017_fold_user_search::Migration),
         Box::new(m0018_move_login_throttle::Migration),
+        Box::new(m0019_move_tokens::Migration),
     ]
 }

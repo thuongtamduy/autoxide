@@ -238,7 +238,7 @@ Mỗi mục một commit, gate xanh trên cả hai database.
       `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`
 - [x] Băm IP (gộp tiền tố rồi HMAC; dạng `bucket` theo ngày và `fingerprint`)
 - [x] `Throttle` lưu trong database, dùng chung; `auth` chuyển sang dùng
-- [ ] Token dùng một lần trong kernel; `auth` chuyển sang dùng, hành vi không đổi
+- [x] Token dùng một lần trong kernel; `auth` chuyển sang dùng, hành vi không đổi
 - [ ] Chống spam hai pha: nhận / cách ly / từ chối; trường bẫy, token form ký, giới hạn theo IP
       và email băm, phát hiện trùng; nonce của token form làm idempotency cho người lạ
 - [ ] ALTCHA v2 tự viết (mặc định tắt)

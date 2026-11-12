@@ -16,23 +16,27 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::mail::{MailTemplate, Mailer};
+use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
-use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::json;
 use uuid::Uuid;
 
-use self::entity::{Column, Entity};
 use crate::api::User;
 use crate::events;
 use crate::session::SessionService;
-use crate::token;
 use crate::user::{self, UserService};
 
 /// Token sống chừng này: mail xác minh hay bị đọc muộn hơn mail đặt lại mật khẩu.
 const TOKEN_HOURS: i64 = 24;
 /// Mỗi địa chỉ nhận nhiều nhất một mail mỗi chừng này giây (chống dùng API để spam).
 const COOLDOWN_SECONDS: i64 = 60;
+/// Mục đích của token trong bảng `auth_tokens` (kernel, D-111): `subject` là ID người dùng,
+/// `data` là địa chỉ email đang xác minh.
+const PURPOSE: &str = "email_verification";
+
+fn tokens() -> OneTimeTokens {
+    OneTimeTokens::new("auth")
+}
 
 const VERIFY_LINK: MailTemplate = MailTemplate::new(
     "auth.mail.verify_email_link",
@@ -48,28 +52,6 @@ const VERIFY_CODE: MailTemplate = MailTemplate::new(
      hours (`POST /api/v1/auth/email-verification/confirm`):\n\n{token}\n\nIf you did not ask \
      for this, ignore this mail.",
 );
-
-/// Entity của bảng `auth_email_verification` (SeaORM).
-mod entity {
-    use sea_orm::entity::prelude::*;
-
-    #[sea_orm::model]
-    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-    #[sea_orm(table_name = "auth_email_verification")]
-    pub struct Model {
-        #[sea_orm(primary_key, auto_increment = false)]
-        pub id: Uuid,
-        pub user_id: Uuid,
-        pub email: String,
-        #[sea_orm(unique)]
-        pub token_hash: String,
-        pub expires_at: DateTimeUtc,
-        pub used_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
-    }
-
-    impl ActiveModelBehavior for ActiveModel {}
-}
 
 pub(crate) struct EmailVerifications {
     pub database: Database,
@@ -134,42 +116,25 @@ impl EmailVerifications {
     /// Xác nhận email bằng `token` lấy từ mail. Trả tài khoản sau khi xác minh.
     pub(crate) async fn confirm(&self, token: &str) -> Result<User, Error> {
         let now = now();
-        let row = Entity::find()
-            .filter(Column::TokenHash.eq(token::sha256(token)))
-            .one(self.database.write())
-            .await?
-            .filter(|row| row.used_at.is_none() && row.expires_at > now)
-            .ok_or_else(invalid_token)?;
-        // Mọi bước trong MỘT transaction: email đã bị người khác lấy thì không gì đổi,
-        // token vẫn còn (người dùng biết lý do và chọn email khác).
         let transaction = self.database.begin_write().await?;
-        // Có điều kiện: hai request cùng dùng một token thì chỉ một bên được.
-        let claimed = Entity::update_many()
-            .col_expr(Column::UsedAt, Expr::value(Some(now)))
-            .filter(Column::Id.eq(row.id))
-            .filter(Column::UsedAt.is_null())
-            .exec(&transaction)
-            .await?;
-        if claimed.rows_affected == 0 {
+        let consumed = tokens().consume(&transaction, PURPOSE, token).await?;
+        let found = consumed
+            .and_then(|consumed| Some((consumed.subject.parse::<Uuid>().ok()?, consumed.data?)));
+        let Some((user_id, email)) = found else {
             transaction.rollback().await?;
             return Err(invalid_token());
-        }
-        let old =
-            self.users.apply_verified_email(&transaction, row.user_id, &row.email, now).await?;
+        };
+        let old = self.users.apply_verified_email(&transaction, user_id, &email, now).await?;
         // Token khác của người này (mail cũ hơn, hay cho địa chỉ khác) hết dùng được.
-        Entity::update_many()
-            .col_expr(Column::UsedAt, Expr::value(Some(now)))
-            .filter(Column::UserId.eq(row.user_id))
-            .filter(Column::UsedAt.is_null())
-            .exec(&transaction)
-            .await?;
-        let before = (old != row.email).then(|| json!({"email": old}));
-        let event = events::EmailVerified { before, after: Some(json!({"email": row.email})) };
-        let subject = events::user_subject(row.user_id);
-        self.outbox.record(&transaction, Actor::user(row.user_id), subject, &event).await?;
+        // Mọi token xác minh khác của người này hết hiệu lực.
+        tokens().revoke(&transaction, PURPOSE, &user_id.to_string()).await?;
+        let before = (old != email).then(|| json!({"email": old}));
+        let event = events::EmailVerified { before, after: Some(json!({"email": email})) };
+        let subject = events::user_subject(user_id);
+        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
         transaction.commit().await?;
-        tracing::info!(user_id = %row.user_id, changed = old != row.email, "email verified");
-        self.users.get(row.user_id).await?.ok_or_else(|| user::user_not_found(row.user_id))
+        tracing::info!(user_id = %user_id, changed = old != email, "email verified");
+        self.users.get(user_id).await?.ok_or_else(|| user::user_not_found(user_id))
     }
 
     /// Tạo token cho (`user`, `email`) và gửi mail tới `email`. Vừa gửi cho địa chỉ đó
@@ -182,29 +147,16 @@ impl EmailVerifications {
         language: Language,
     ) -> Result<(), Error> {
         let now = now();
-        let recent = Entity::find()
-            .filter(Column::UserId.eq(user.id))
-            .filter(Column::Email.eq(email))
-            .filter(Column::CreatedAt.gt(now - chrono::Duration::seconds(COOLDOWN_SECONDS)))
-            .one(self.database.write())
-            .await?;
-        if recent.is_some() {
+        let subject = user.id.to_string();
+        let since = now - chrono::Duration::seconds(COOLDOWN_SECONDS);
+        let recent = tokens().recent(self.database.write(), PURPOSE, &subject, since).await?;
+        if recent.iter().any(|token| token.data.as_deref() == Some(email)) {
             return Ok(());
         }
 
-        let token = token::random_token(32)?;
         let transaction = self.database.begin_write().await?;
-        entity::ActiveModel {
-            id: Set(Uuid::now_v7()),
-            user_id: Set(user.id),
-            email: Set(email.to_owned()),
-            token_hash: Set(token::sha256(&token)),
-            expires_at: Set(now + chrono::Duration::hours(TOKEN_HOURS)),
-            used_at: Set(None),
-            created_at: Set(now),
-        }
-        .insert(&transaction)
-        .await?;
+        let ttl = chrono::Duration::hours(TOKEN_HOURS);
+        let token = tokens().issue(&transaction, PURPOSE, &subject, Some(email), ttl).await?.token;
         let event = events::EmailVerificationRequested {
             before: None,
             after: Some(json!({"email": email})),
@@ -287,12 +239,14 @@ mod tests {
 
     /// Cho thời gian trôi qua: lượt chặn gửi dồn hết, token gần hết hạn hơn.
     async fn time_passes(services: &Services, hours: i64) {
-        Entity::update_many()
-            .col_expr(Column::CreatedAt, Expr::value(now() - chrono::Duration::minutes(2)))
-            .col_expr(Column::ExpiresAt, Expr::value(now() + chrono::Duration::hours(24 - hours)))
-            .exec(services.database.write())
-            .await
-            .unwrap();
+        use sea_orm::ConnectionTrait as _;
+        use sea_orm::sea_query::{Alias, Query};
+        let update = Query::update()
+            .table(Alias::new("auth_tokens"))
+            .value(Alias::new("created_at"), now() - chrono::Duration::minutes(2))
+            .value(Alias::new("expires_at"), now() + chrono::Duration::hours(24 - hours))
+            .to_owned();
+        services.database.write().execute(&update).await.unwrap();
     }
 
     #[tokio::test]

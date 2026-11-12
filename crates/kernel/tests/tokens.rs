@@ -108,6 +108,9 @@ async fn gan_day_thu_hoi_va_don_dep() {
         );
 
         assert_eq!(tokens.revoke(write, "verify", "user-1").await.unwrap(), 2);
+        let other = tokens.issue(write, "other", "user-3", None, Duration::hours(1)).await.unwrap();
+        assert_eq!(tokens.forget(write, "user-3").await.unwrap(), 1);
+        assert!(tokens.consume(write, "other", &other.token).await.unwrap().is_none());
         assert!(tokens.consume(write, "verify", &first.token).await.unwrap().is_none());
         // Dọn: hai token đã dùng (thu hồi) trước mốc tương lai; token của user-2 còn hạn.
         assert_eq!(tokens.purge(write, Utc::now() + Duration::minutes(1)).await.unwrap(), 2);

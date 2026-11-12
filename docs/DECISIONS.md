@@ -2500,3 +2500,14 @@ là chuỗi tuỳ chọn (vd địa chỉ email đang xác minh).
 
 Lý do: `newsletter` (xác nhận hai bước), `comments` (xác minh email khách) cần đúng luồng mà
 `auth` đang có; module nghiệp vụ không được phụ thuộc `auth` (D-046).
+
+## D-112 · `auth` dùng token và hàm băm của kernel; token xoá cùng tài khoản — 2026-11-12 — agent quyết
+
+Quyết định: đặt lại mật khẩu (`password_reset`) và xác minh email (`email_verification`, `data`
+là địa chỉ đang xác minh) chuyển sang `OneTimeTokens` (D-111) trên bảng `auth_tokens`.
+Migration m0019 chép các token còn hạn, chưa dùng từ hai bảng cũ (link trong mail đã gửi vẫn
+dùng được) rồi bỏ hai bảng đó. Hai bảng cũ có foreign key `ON DELETE CASCADE` tới `auth_user`;
+`auth_tokens` thì không (bảng của kernel, `subject` là chuỗi), nên `UserService::delete` gọi
+`OneTimeTokens::forget` trong cùng transaction — xoá tài khoản vẫn xoá token như trước.
+`random_token` / `sha256` của `auth` là bản của kernel (`autoxide_kernel::secret`), không còn bản
+riêng. Thời gian chờ gửi lại, thời hạn token, mã lỗi giữ nguyên.

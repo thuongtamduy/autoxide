@@ -172,6 +172,20 @@ impl OneTimeTokens {
         Ok(connection.execute(&update).await?.rows_affected())
     }
 
+    /// Xoá mọi token của `subject`, mọi mục đích (vd khi xoá tài khoản hay xoá dữ liệu theo yêu
+    /// cầu của chủ dữ liệu). Trả số dòng đã xoá.
+    pub async fn forget<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        subject: &str,
+    ) -> Result<u64, Error> {
+        let delete = Query::delete()
+            .from_table(Alias::new(&self.table))
+            .and_where(Expr::col(Alias::new("subject")).eq(subject))
+            .to_owned();
+        Ok(connection.execute(&delete).await?.rows_affected())
+    }
+
     /// Xoá token đã hết hạn hay đã dùng trước `before` (job dọn dẹp của module). Trả số dòng
     /// đã xoá.
     pub async fn purge<C: ConnectionTrait>(
