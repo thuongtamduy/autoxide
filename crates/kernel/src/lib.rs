@@ -30,5 +30,6 @@ pub mod storage;
 pub mod telemetry;
 pub mod throttle;
 pub mod tls;
+pub mod tokens;
 pub mod transfer;
 pub mod version;

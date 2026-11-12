@@ -2484,3 +2484,19 @@ cũ không chép vì chỉ sống một cửa sổ). Mã lỗi `auth.login_throt
 Đã cân nhắc: rate limiter trong bộ nhớ (GCRA) cho việc này — mất khi khởi động lại, mỗi máy chủ
 đếm riêng; cửa sổ trượt — cần lưu từng lần, tốn bảng hơn mà lợi ích nhỏ ở các giới hạn thô
 (số lần gửi form mỗi giờ).
+
+## D-111 · Token dùng một lần trong kernel (`OneTimeTokens`) — 2026-11-12 — agent quyết
+
+Quyết định: `autoxide_kernel::tokens::OneTimeTokens` trên bảng `<module>_tokens(id, purpose,
+subject, data, token_hash UNIQUE, expires_at, used_at, created_at)` sinh bằng
+`tokens_migration`. `issue` (32 byte ngẫu nhiên, chỉ lưu SHA-256), `recent` (token đã phát cho
+một đối tượng từ một mốc — bên gọi tự quyết thời gian chờ gửi lại, kể cả theo `data`),
+`consume` (một câu `UPDATE … WHERE token_hash = ? AND purpose = ? AND used_at IS NULL AND
+expires_at > now`, đúng một bên thắng khi đua), `revoke`, `purge`. Mọi hàm nhận kết nối, để phát
+token cùng transaction với thay đổi. `subject` là chuỗi (ID của bất kỳ đối tượng nào), `data`
+là chuỗi tuỳ chọn (vd địa chỉ email đang xác minh).
+
+`auth` (đặt lại mật khẩu, xác minh email) chuyển sang ở commit sau, hành vi không đổi.
+
+Lý do: `newsletter` (xác nhận hai bước), `comments` (xác minh email khách) cần đúng luồng mà
+`auth` đang có; module nghiệp vụ không được phụ thuộc `auth` (D-046).
