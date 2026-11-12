@@ -1,0 +1,5 @@
+{
+  "webhooks.endpoint_not_found": "Không có webhook `{id}`.",
+  "webhooks.insecure_url": "Địa chỉ webhook phải dùng `https://`. Chỉ khi phát triển trên máy mới đặt `AUTOXIDE_WEBHOOKS_ALLOW_HTTP=true` để dùng `http://`.",
+  "webhooks.unknown_event": "Không có event nào tên `{event}`. Xem danh sách event ở `GET /api/v1/webhooks/events`."
+}

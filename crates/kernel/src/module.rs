@@ -31,6 +31,7 @@ use crate::event::{Dispatcher, EventCatalog, EventInfo, Outbox, Subscription};
 use crate::i18n::Translations;
 use crate::job::{JobHandler, JobQueue, JobRegistration, Schedule, Worker};
 use crate::migration::{MigrationError, Migrator, ModuleMigrations};
+use crate::privacy::{PersonalData, PersonalDataExport};
 
 /// Những gì một module khai với core.
 ///
@@ -170,6 +171,7 @@ pub struct StartContext<'a> {
     translations: &'a Translations,
     wake: &'a Arc<tokio::sync::Notify>,
     apis: &'a mut Apis,
+    personal_data: &'a PersonalDataExport,
 }
 
 impl StartContext<'_> {
@@ -190,6 +192,11 @@ impl StartContext<'_> {
         self.translations
     }
 
+    /// Mọi loại event của mọi module đã đăng ký (vd để kiểm tên event client gửi lên).
+    pub fn events(&self) -> &EventCatalog {
+        self.events
+    }
+
     /// Hàng đợi job của module (bảng `<tên>_jobs`).
     pub fn jobs(&self) -> JobQueue {
         JobQueue::new(self.module)
@@ -205,6 +212,18 @@ impl StartContext<'_> {
             )));
         }
         Ok(Outbox::with_wake(self.module, Arc::clone(self.wake)))
+    }
+
+    /// Đăng ký phần dữ liệu cá nhân module giữ, để có trong bản xuất dữ liệu của người
+    /// dùng (xem [`crate::privacy`]). Mỗi module đăng ký nhiều nhất một lần.
+    pub fn personal_data(&mut self, exporter: Arc<dyn PersonalData>) -> Result<(), Error> {
+        self.personal_data.register(self.module, exporter)
+    }
+
+    /// Sổ dữ liệu cá nhân của mọi module, cho module quản lý tài khoản xuất dữ liệu. Sổ
+    /// có cả phần các module khởi động sau đăng ký.
+    pub fn personal_data_export(&self) -> PersonalDataExport {
+        self.personal_data.clone()
     }
 
     /// Công bố một trait cho module khác dùng. `T` là kiểu `dyn Trait` khai trong
@@ -310,6 +329,8 @@ pub struct Modules {
     wake: Arc<tokio::sync::Notify>,
     /// Các trait module đã công bố; có sau [`start`](Self::start).
     apis: Apis,
+    /// Phần dữ liệu cá nhân các module đăng ký lúc khởi động.
+    personal_data: PersonalDataExport,
 }
 
 impl Modules {
@@ -346,6 +367,7 @@ impl Modules {
                 events,
                 translations,
                 wake: Arc::new(tokio::sync::Notify::new()),
+                personal_data: PersonalDataExport::default(),
                 apis: Apis::default(),
             })
         } else {
@@ -388,6 +410,7 @@ impl Modules {
                 translations: &self.translations,
                 wake: &self.wake,
                 apis: &mut apis,
+                personal_data: &self.personal_data,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
@@ -404,6 +427,11 @@ impl Modules {
         T: ?Sized + Send + Sync + 'static,
     {
         self.apis.get()
+    }
+
+    /// Sổ dữ liệu cá nhân các module đã đăng ký lúc [`start`](Self::start).
+    pub fn personal_data(&self) -> PersonalDataExport {
+        self.personal_data.clone()
     }
 
     /// Mọi permission của các module đã đăng ký.
@@ -539,7 +567,12 @@ impl Modules {
         for module in &self.modules {
             for subscription in module.subscriptions() {
                 let event = subscription.event();
-                if event != Subscription::ALL && !self.events.contains(event) {
+                // `privacy::USER_DELETED` là hợp đồng của kernel: module dọn dữ liệu được
+                // đăng ký nhận nó kể cả khi chưa cài module quản lý tài khoản nào.
+                let known = event == Subscription::ALL
+                    || event == crate::privacy::USER_DELETED
+                    || self.events.contains(event);
+                if !known {
                     problems.push(format!(
                         "module `{}` subscribes to event `{event}`, which no module declares",
                         module.name()

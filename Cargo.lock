@@ -366,6 +366,7 @@ dependencies = [
  "autoxide-kernel",
  "autoxide-mail",
  "autoxide-testkit",
+ "autoxide-webhooks",
  "axum",
  "base64 0.23.1",
  "bytes",
@@ -560,6 +561,33 @@ dependencies = [
  "sea-orm",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "autoxide-webhooks"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "base64 0.23.1",
+ "chrono",
+ "getrandom 0.4.3",
+ "hmac 0.13.0",
+ "metrics",
+ "reqwest",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tokio",
+ "tower",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
 ]
 
 [[package]]

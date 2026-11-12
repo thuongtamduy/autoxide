@@ -305,3 +305,57 @@ async fn tai_lieu_openapi_du_mo_ta() {
     .await
     .unwrap();
 }
+
+/// Xuất dữ liệu cá nhân có ghi chú của người dùng; tài khoản bị xoá thì ghi chú của
+/// người đó bị xoá theo (nhận lại event cũng không sao) — trên cả hai database.
+#[tokio::test]
+async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
+    use autoxide_kernel::event::{Delivered, EventHandler, Outbox};
+
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        for (who, title) in [("ada", "one"), ("ada", "two"), ("bob", "three")] {
+            let body = json!({"title": title, "body": "…"});
+            let (status, _) = rest(&app, "POST", "", who, Some(body)).await;
+            // bob chỉ đọc được: tạo ghi chú cho bob thẳng qua service.
+            if who == "bob" {
+                assert_eq!(status, StatusCode::FORBIDDEN);
+                let service = crate::service::NoteService::new(
+                    app.database.clone(),
+                    Outbox::standalone("notes"),
+                );
+                let note = NewNote { title: title.to_owned(), body: String::new() };
+                service.create(Actor::user(BOB), note).await.unwrap();
+            } else {
+                assert_eq!(status, StatusCode::CREATED);
+            }
+        }
+        // Bộ phát event dựng được dù chưa có module tài khoản nào khai event xoá.
+        app.modules.dispatcher(&app.database).unwrap();
+
+        let exported = app.modules.personal_data().export(ADA).await.unwrap();
+        let titles: Vec<_> =
+            exported["notes"].as_array().unwrap().iter().map(|n| n["title"].clone()).collect();
+        assert_eq!(titles, vec![json!("one"), json!("two")]);
+
+        let service =
+            crate::service::NoteService::new(app.database.clone(), Outbox::standalone("notes"));
+        let deleted = Delivered {
+            id: Uuid::now_v7(),
+            module: "auth",
+            name: autoxide_kernel::privacy::USER_DELETED.to_owned(),
+            actor: Actor::system(),
+            subject: None,
+            payload: json!({"before": {"id": ADA}}),
+            occurred_at: chrono::Utc::now(),
+        };
+        service.handle(&deleted).await.unwrap();
+        service.handle(&deleted).await.unwrap();
+        let exported = app.modules.personal_data().export(ADA).await.unwrap();
+        assert_eq!(exported["notes"], json!([]));
+        let exported = app.modules.personal_data().export(BOB).await.unwrap();
+        assert_eq!(exported["notes"].as_array().unwrap().len(), 1);
+    })
+    .await
+    .unwrap();
+}

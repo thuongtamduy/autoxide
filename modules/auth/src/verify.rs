@@ -375,8 +375,8 @@ mod tests {
             let changed = verifications.confirm(&token).await.unwrap();
             assert_eq!(changed.email, "ada@new.example");
             assert!(changed.email_verified_at.is_some());
-            services.sessions.login("ada@new.example", PASSWORD).await.unwrap();
-            assert!(services.sessions.login("ada@example.com", PASSWORD).await.is_err());
+            services.sessions.login("ada@new.example", PASSWORD, None).await.unwrap();
+            assert!(services.sessions.login("ada@example.com", PASSWORD, None).await.is_err());
             // Token cũ (cho địa chỉ cũ) hết dùng được: không quay email về được.
             let stale = verifications.confirm(&old_token).await.unwrap_err();
             assert_eq!(stale.code(), "auth.invalid_verification_token");

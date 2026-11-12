@@ -22,7 +22,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Permission;
 use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::EventInfo;
+use autoxide_kernel::event::{EventInfo, Subscription};
 use autoxide_kernel::http::BodyLimit;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
@@ -95,9 +95,17 @@ impl Module for FilesModule {
         let storage: Arc<dyn Storage> = Arc::new(ObjectStorage::open(&config.backend)?);
         let outbox = context.outbox()?;
         let database = context.database().clone();
-        self.service =
-            Some(Arc::new(FileService::new(database, storage.clone(), outbox, config.limits)));
+        let service = Arc::new(FileService::new(database, storage.clone(), outbox, config.limits));
+        self.service = Some(service.clone());
+        context.personal_data(service)?;
         context.provide::<dyn Storage>(storage)
+    }
+
+    fn subscriptions(&self) -> Vec<Subscription> {
+        // Tài khoản bị xoá: xoá file của người đó.
+        self.service.clone().map_or_else(Vec::new, |service| {
+            vec![Subscription::new(autoxide_kernel::privacy::USER_DELETED, service)]
+        })
     }
 
     fn routes(&self) -> OpenApiRouter {

@@ -56,7 +56,7 @@ async fn dang_ky_roi_dang_nhap_bang_passkey() {
         assert_eq!((added.name.as_str(), added.last_used_at), ("Phone", None));
 
         let (ceremony, response) = sign_in(&services.passkeys, &mut phone).await;
-        let tokens = services.passkeys.finish_login(ceremony, &response).await.unwrap();
+        let tokens = services.passkeys.finish_login(ceremony, &response, None).await.unwrap();
 
         let bearer = format!("Bearer {}", tokens.access_token);
         assert_eq!(services.sessions.authenticate(Some(&bearer)).await.unwrap().id, ada);
@@ -64,7 +64,7 @@ async fn dang_ky_roi_dang_nhap_bang_passkey() {
         assert!(stored[0].last_used_at.is_some());
         // Bộ đếm chữ ký đã lưu: lần sau vẫn đăng nhập được (bộ đếm tăng tiếp).
         let (ceremony, response) = sign_in(&services.passkeys, &mut phone).await;
-        services.passkeys.finish_login(ceremony, &response).await.unwrap();
+        services.passkeys.finish_login(ceremony, &response, None).await.unwrap();
     })
     .await
     .unwrap();
@@ -87,11 +87,11 @@ async fn nghi_thuc_dung_mot_lan_va_khong_gui_lai_duoc() {
 
         // Đăng nhập: gửi lại câu trả lời cũ cho nghi thức mới (challenge khác) thì hỏng.
         let (first, response) = sign_in(passkeys, &mut phone).await;
-        passkeys.finish_login(first, &response).await.unwrap();
-        let replayed = passkeys.finish_login(first, &response).await.unwrap_err();
+        passkeys.finish_login(first, &response, None).await.unwrap();
+        let replayed = passkeys.finish_login(first, &response, None).await.unwrap_err();
         assert_eq!(replayed.code(), "auth.invalid_passkey_ceremony");
         let fresh = passkeys.start_login().await.unwrap();
-        let stolen = passkeys.finish_login(fresh.id, &response).await.unwrap_err();
+        let stolen = passkeys.finish_login(fresh.id, &response, None).await.unwrap_err();
         assert_eq!(
             (stolen.kind(), stolen.code()),
             (ErrorKind::Unauthenticated, "auth.passkey_sign_in_failed")
@@ -130,7 +130,7 @@ async fn cau_tra_loi_sai_bi_tu_choi() {
         let mut stranger = SoftAuthenticator::new(3);
         stranger.user_handle = vec![7; 64];
         let (ceremony, response) = sign_in(passkeys, &mut stranger).await;
-        let unknown = passkeys.finish_login(ceremony, &response).await.unwrap_err();
+        let unknown = passkeys.finish_login(ceremony, &response, None).await.unwrap_err();
         assert_eq!(unknown.code(), "auth.passkey_sign_in_failed");
 
         // Đúng credential nhưng tự nhận là người khác (user handle khác).
@@ -138,12 +138,12 @@ async fn cau_tra_loi_sai_bi_tu_choi() {
         register(&services, ada, &mut phone).await;
         phone.user_handle = vec![9; 64];
         let (ceremony, response) = sign_in(passkeys, &mut phone).await;
-        let impostor = passkeys.finish_login(ceremony, &response).await.unwrap_err();
+        let impostor = passkeys.finish_login(ceremony, &response, None).await.unwrap_err();
         assert_eq!(impostor.code(), "auth.passkey_sign_in_failed");
 
         // JSON không phải câu trả lời WebAuthn: lỗi đầu vào, nghi thức còn nguyên.
         let ceremony = passkeys.start_login().await.unwrap();
-        let invalid = passkeys.finish_login(ceremony.id, &serde_json::json!({"x": 1})).await;
+        let invalid = passkeys.finish_login(ceremony.id, &serde_json::json!({"x": 1}), None).await;
         assert_eq!(invalid.unwrap_err().code(), "validation_failed");
         let name = passkeys.finish_registration(ada, Uuid::now_v7(), " ", &credential).await;
         assert_eq!(name.unwrap_err().code(), "validation_failed");
@@ -173,14 +173,14 @@ async fn nhieu_passkey_xoa_va_tai_khoan_bi_khoa() {
         let gone = services.passkeys.delete(ada, first.id).await.unwrap_err();
         assert_eq!(gone.code(), "auth.passkey_not_found");
         let (ceremony, response) = sign_in(&services.passkeys, &mut phone).await;
-        let removed = services.passkeys.finish_login(ceremony, &response).await.unwrap_err();
+        let removed = services.passkeys.finish_login(ceremony, &response, None).await.unwrap_err();
         assert_eq!(removed.code(), "auth.passkey_sign_in_failed");
 
         // Tài khoản bị khoá: passkey còn đó nhưng không đăng nhập được.
         let disable = UserChanges { name: None, disabled: Some(true) };
         services.users.update(Actor::system(), ada, disable).await.unwrap();
         let (ceremony, response) = sign_in(&services.passkeys, &mut key).await;
-        let disabled = services.passkeys.finish_login(ceremony, &response).await.unwrap_err();
+        let disabled = services.passkeys.finish_login(ceremony, &response, None).await.unwrap_err();
         assert_eq!(disabled.code(), "auth.user_disabled");
         // Người khác không xoá được passkey của Ada.
         let bob = user(&services, "bob@example.com").await;
@@ -228,7 +228,7 @@ async fn can_mat_khau_va_dat_lai_mat_khau_thu_hoi_passkey() {
         let keys = services.api_keys.list(ada, &PageRequest::first(10, Order::Asc)).await.unwrap();
         assert!(keys.data.is_empty());
         let (ceremony, response) = sign_in(&services.passkeys, &mut attacker).await;
-        let refused = services.passkeys.finish_login(ceremony, &response).await.unwrap_err();
+        let refused = services.passkeys.finish_login(ceremony, &response, None).await.unwrap_err();
         assert_eq!(refused.code(), "auth.passkey_sign_in_failed");
     })
     .await
@@ -272,7 +272,7 @@ async fn dung_dong_thoi_mot_nghi_thuc_chi_mot_ben_duoc() {
         let attempts: Vec<_> = (0..5)
             .map(|_| {
                 let (passkeys, response) = (passkeys.clone(), response.clone());
-                tokio::spawn(async move { passkeys.finish_login(ceremony, &response).await })
+                tokio::spawn(async move { passkeys.finish_login(ceremony, &response, None).await })
             })
             .collect();
         let mut succeeded = 0;

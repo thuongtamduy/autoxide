@@ -20,6 +20,7 @@ mod migration;
 mod passkey;
 mod password;
 mod permissions;
+mod privacy;
 mod reset;
 mod role;
 mod session;
@@ -165,7 +166,16 @@ impl Module for AuthModule {
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
         context.provide::<dyn api::Users>(users.clone())?;
         context.provide::<dyn api::Accounts>(users.clone())?;
+        context.personal_data(Arc::new(privacy::AuthPersonalData {
+            users: users.clone(),
+            roles: roles.clone(),
+            sessions: sessions.clone(),
+            api_keys: api_keys.clone(),
+            passkeys: passkeys.clone(),
+            mfa: mfa.clone(),
+        }))?;
         self.state = Some(http::HttpState {
+            personal_data: context.personal_data_export(),
             sessions,
             users,
             roles,
@@ -260,6 +270,7 @@ pub(crate) mod testing {
         pub mails: Arc<FakeMailer>,
         pub database: Database,
         pub authenticator: Arc<dyn autoxide_kernel::access::Authenticator>,
+        pub personal_data: autoxide_kernel::privacy::PersonalDataExport,
     }
 
     pub async fn services(test: &TestDatabase) -> Services {
@@ -364,7 +375,22 @@ pub(crate) mod testing {
             api_keys: api_keys.clone(),
             url: None,
         });
+        let personal_data = autoxide_kernel::privacy::PersonalDataExport::default();
+        personal_data
+            .register(
+                "auth",
+                Arc::new(crate::privacy::AuthPersonalData {
+                    users: users.clone(),
+                    roles: roles.clone(),
+                    sessions: sessions.clone(),
+                    api_keys: api_keys.clone(),
+                    passkeys: passkeys.clone(),
+                    mfa: mfa.clone(),
+                }),
+            )
+            .unwrap();
         Services {
+            personal_data,
             passkeys,
             users,
             sessions,

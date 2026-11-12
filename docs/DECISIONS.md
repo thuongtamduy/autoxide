@@ -1741,3 +1741,65 @@ liệu. Sửa đều chạy trên cả hai database và có test (kể cả test
 
 Đã cân nhắc: khoá `SELECT … FOR UPDATE` cho throttle — SQLite không có; mã hoá payload job
 thay vì xoá — thêm key cần quản lý mà không ai cần đọc lại payload của job đã xong.
+
+## D-080 · Tài khoản: quản lý phiên, xoá tài khoản + xuất dữ liệu xuyên module, tìm người dùng — 2026-11-12 — agent quyết
+
+Quyết định:
+
+- **Phiên = một họ refresh token.** Refresh token mang thêm `user_agent` và
+  `session_started_at` (m0015), chép sang token mới mỗi lần refresh. Response token có
+  `session_id` (id của họ) để client nhận ra phiên của mình. Người dùng xem
+  (`GET /me/sessions`), đăng xuất một phiên (`DELETE /me/sessions/{id}`) hoặc mọi phiên trừ
+  một (`DELETE /me/sessions?keep=…`); quản trị viên đăng xuất mọi phiên của một người
+  (`DELETE /users/{id}/sessions`). Access token đã cấp vẫn chạy tới hết hạn (15 phút) —
+  muốn chặn ngay thì khoá tài khoản.
+- **Xoá tài khoản là xoá hẳn** (`DELETE /me` kèm mật khẩu, `DELETE /users/{id}`): dữ liệu
+  của `auth` đi theo foreign key trong module; module khác nhận event
+  `auth.user_deleted` (tên là hằng `privacy::USER_DELETED` của kernel, payload chỉ có id)
+  và tự xoá phần của mình. Module dọn dữ liệu đăng ký nhận event này được kể cả khi không
+  cài module tài khoản (dispatcher coi nó là hợp đồng của kernel). Audit log giữ event
+  (chỉ id, không email). Không xoá được admin cuối cùng.
+- **Xuất dữ liệu cá nhân xuyên module:** kernel có trait `privacy::PersonalData`; module
+  đăng ký bằng `StartContext::personal_data`, `auth` gom lại ở `GET /me/export`
+  (`{"data": {"<module>": …}}`). Sổ đăng ký dùng chung nên module khởi động sau `auth` vẫn
+  có mặt. Không xuất secret.
+- **Tìm người dùng** bằng `search` ở `GET /users` (và tool MCP `list_users`): chứa chuỗi,
+  không phân biệt hoa thường. Cột `auth_user.search_text` (m0016) giữ email + tên viết
+  thường **tính trong Rust**: `LOWER` của SQLite chỉ đổi chữ ASCII, của Postgres đổi mọi
+  chữ — dùng `LOWER` trong SQL sẽ cho hai kết quả khác nhau (vd tên tiếng Việt). `LIKE` có
+  `ESCAPE` để `%`/`_` người dùng gõ là chữ thường. Tìm "chứa" quét bảng người dùng — chấp
+  nhận được với kích thước bảng này; cần nhanh hơn thì thêm full-text sau, khi đo thấy chậm.
+
+Lý do: ba việc của bước 13 nhóm 2; chạy như nhau trên hai database, không module nào
+phụ thuộc module `auth` (D-046).
+
+Đã cân nhắc: xoá mềm (đánh dấu) — giữ dữ liệu cá nhân trái mục đích của việc xoá; job
+xuất dữ liệu ra file — thêm hạ tầng lưu file tạm cho một việc hiếm, JSON trả thẳng là đủ
+ở cỡ dữ liệu của core; ghi `sid` vào access token để đánh dấu phiên hiện tại — client đã
+có `session_id` từ response token.
+
+## D-081 · Webhook: module `webhooks`, chuẩn Standard Webhooks, gửi qua job queue — 2026-11-12 — agent quyết
+
+Quyết định:
+
+- Module riêng `webhooks` (đăng ký trong binary), nhận mọi event bằng đăng ký `*` như
+  audit. Quản trị viên (permission `webhooks.manage`) khai endpoint: địa chỉ `https://`
+  (`http://` chỉ khi `AUTOXIDE_WEBHOOKS_ALLOW_HTTP=true`), danh sách tên event (kiểm theo
+  danh mục event) hoặc `*`.
+- Chữ ký theo **Standard Webhooks** (header `webhook-id`, `webhook-timestamp`,
+  `webhook-signature: v1,<HMAC-SHA256 base64>`, secret `whsec_…`) — bên nhận dùng thư viện
+  có sẵn của chuẩn. Test khớp ví dụ chính thức của chuẩn. Secret lưu nguyên (cần để ký),
+  chỉ hiện một lần lúc tạo hoặc thay.
+- Mỗi (event, endpoint) một dòng `webhooks_delivery` (unique — event giao lại không gửi
+  trùng) và một job, cùng transaction. Job thử tối đa 12 lần với backoff của job queue
+  (khoảng hai giờ); `webhook-id` giữ nguyên qua các lần thử để bên nhận bỏ bản trùng.
+  Không theo chuyển hướng; thời gian chờ `AUTOXIDE_WEBHOOKS_TIMEOUT_SECONDS` (10 giây).
+- Lịch sử gửi xem ở `GET /webhooks/{id}/deliveries`, giữ 30 ngày (job dọn hằng ngày); số
+  đo `webhooks_delivered_total`, `webhooks_failed_total`.
+
+Lý do: tích hợp với hệ thống khác mà không phải sửa core; chuẩn ngành thay vì tự chế;
+dùng lại job queue (retry, dead-letter queue) đã có trên cả hai database.
+
+Đã cân nhắc: webhook theo từng người dùng — cần lọc event theo quyền xem dữ liệu của từng
+người, để sau khi có nhu cầu; chặn địa chỉ mạng nội bộ (SSRF) — chỉ quản trị viên tạo được
+endpoint và không theo chuyển hướng; thêm khi mở cho người dùng thường.

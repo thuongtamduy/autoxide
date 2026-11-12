@@ -20,6 +20,8 @@ pub fn all() -> Vec<Box<dyn Module>> {
         Box::new(autoxide_audit::module()),
         // Chỗ lưu idempotency key cho lớp HTTP của kernel.
         Box::new(autoxide_idempotency::module()),
+        // Webhook: gửi event của mọi module ra ngoài; không module nào cần trait của nó.
+        Box::new(autoxide_webhooks::module()),
     ]
 }
 
@@ -117,8 +119,8 @@ mod tests {
 
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
-            // Mỗi lịch (của `auth` và của `idempotency`) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 2);
+            // Mỗi lịch (của `auth`, `idempotency` và `webhooks`) đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 3);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

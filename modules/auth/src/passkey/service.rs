@@ -222,6 +222,7 @@ impl PasskeyService {
         &self,
         ceremony_id: Uuid,
         credential: &Value,
+        user_agent: Option<&str>,
     ) -> Result<Tokens, Error> {
         let engine = self.engine()?;
         // Đọc câu trả lời trước khi dùng nghi thức: JSON hỏng thì nghi thức còn dùng được.
@@ -258,7 +259,7 @@ impl PasskeyService {
             update = update.col_expr(passkey::Column::DynamicState, Expr::value(dynamic));
         }
         update.exec(self.database.write()).await?;
-        self.sessions.login_with_passkey(stored.user_id).await
+        self.sessions.login_with_passkey(stored.user_id, user_agent).await
     }
 
     async fn save_ceremony(

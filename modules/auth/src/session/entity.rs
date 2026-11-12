@@ -16,6 +16,10 @@ pub struct Model {
     pub used_at: Option<DateTimeUtc>,
     pub revoked_at: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
+    /// Header `User-Agent` lúc đăng nhập (cắt ở 255 ký tự); `None` với phiên cũ.
+    pub user_agent: Option<String>,
+    /// Lúc phiên (họ token) bắt đầu; `None` với phiên tạo trước m0015.
+    pub session_started_at: Option<DateTimeUtc>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

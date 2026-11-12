@@ -14,12 +14,15 @@ use std::sync::{Arc, Mutex};
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
-use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::storage::{ByteStream, Storage};
 use chrono::{DateTime, SubsecRound, Utc};
 use futures_util::StreamExt as _;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -251,6 +254,69 @@ fn check_name(name: &str) -> Result<String, Error> {
     )]))
 }
 
+/// Số file xoá mỗi lượt khi dọn file của một tài khoản đã xoá.
+const ERASE_BATCH: u64 = 100;
+
+/// Thông tin mọi file của người dùng (không kèm nội dung), cho bản xuất dữ liệu cá
+/// nhân. Nội dung tải từng file bằng `GET /api/v1/files/{id}/content`.
+#[async_trait::async_trait]
+impl PersonalData for FileService {
+    async fn export(&self, user_id: Uuid) -> Result<serde_json::Value, Error> {
+        let files = Entity::find()
+            .filter(Column::OwnerId.eq(user_id))
+            .order_by_asc(Column::Id)
+            .all(self.database.read())
+            .await?;
+        let files: Vec<serde_json::Value> = files
+            .iter()
+            .map(|file| {
+                json!({
+                    "id": file.id,
+                    "name": file.name,
+                    "content_type": file.content_type,
+                    "size": file.size,
+                    "sha256": file.sha256,
+                    "created_at": file.created_at,
+                })
+            })
+            .collect();
+        Ok(serde_json::Value::Array(files))
+    }
+}
+
+/// Tài khoản bị xoá thì xoá mọi file của người đó, từng lượt: dòng trước, nội dung sau
+/// (như [`FileService::delete`]). Nhận lại event thì làm tiếp phần còn lại.
+#[async_trait::async_trait]
+impl EventHandler for FileService {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        let Some(user_id) = deleted_user(event) else {
+            return Ok(());
+        };
+        let mut removed: u64 = 0;
+        loop {
+            let files = Entity::find()
+                .filter(Column::OwnerId.eq(user_id))
+                .order_by_asc(Column::Id)
+                .limit(ERASE_BATCH)
+                .all(self.database.write())
+                .await?;
+            if files.is_empty() {
+                break;
+            }
+            let ids: Vec<Uuid> = files.iter().map(|file| file.id).collect();
+            Entity::delete_many().filter(Column::Id.is_in(ids)).exec(self.database.write()).await?;
+            for file in &files {
+                if let Err(error) = self.storage.delete(&file.storage_key()).await {
+                    tracing::warn!(file_id = %file.id, error = %error, "file deleted but its content remains");
+                }
+            }
+            removed += files.len() as u64;
+        }
+        tracing::info!(user_id = %user_id, files = removed, "files of a deleted user removed");
+        Ok(())
+    }
+}
+
 fn details(file: &FileRecord) -> serde_json::Value {
     json!({
         "name": file.name,
@@ -342,6 +408,42 @@ mod tests {
             assert_eq!(gone.code(), "files.file_not_found");
             assert!(files.storage.get(&file.storage_key()).await.unwrap().is_none());
             assert_eq!(events(&database).await, ["files.file_uploaded", "files.file_deleted"]);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Xuất dữ liệu có thông tin file của người dùng; tài khoản bị xoá thì cả dòng lẫn
+    /// nội dung file của người đó bị xoá (nhận lại event cũng không sao).
+    #[tokio::test]
+    async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
+        use autoxide_kernel::event::Actor;
+
+        TestDatabase::run(async |test| {
+            let (files, _) = service(test, no_limits()).await;
+            let (ada, bob) = (uploader(Uuid::now_v7()), uploader(Uuid::now_v7()));
+            let mine = files.upload(&ada, "a.txt", None, body("a")).await.unwrap();
+            files.upload(&ada, "b.txt", None, body("b")).await.unwrap();
+            files.upload(&bob, "c.txt", None, body("c")).await.unwrap();
+
+            let exported = files.export(ada.user_id()).await.unwrap();
+            assert_eq!(exported.as_array().unwrap().len(), 2);
+            assert_eq!(exported[0]["name"], "a.txt");
+
+            let deleted = Delivered {
+                id: Uuid::now_v7(),
+                module: "auth",
+                name: autoxide_kernel::privacy::USER_DELETED.to_owned(),
+                actor: Actor::system(),
+                subject: None,
+                payload: json!({"before": {"id": ada.user_id()}}),
+                occurred_at: Utc::now(),
+            };
+            files.handle(&deleted).await.unwrap();
+            files.handle(&deleted).await.unwrap();
+            assert_eq!(files.export(ada.user_id()).await.unwrap(), json!([]));
+            assert!(files.storage.get(&mine.storage_key()).await.unwrap().is_none());
+            assert_eq!(files.export(bob.user_id()).await.unwrap().as_array().unwrap().len(), 1);
         })
         .await
         .unwrap();

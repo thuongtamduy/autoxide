@@ -9,6 +9,22 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- Session management: `GET /api/v1/auth/me/sessions` lists your signed-in devices,
+  `DELETE /api/v1/auth/me/sessions/{id}` signs one out, `DELETE /api/v1/auth/me/sessions`
+  signs out all (or all but `keep`); administrators use
+  `DELETE /api/v1/auth/users/{id}/sessions`. Token responses carry `session_id`.
+- Account deletion (`DELETE /api/v1/auth/me`, `DELETE /api/v1/auth/users/{id}`) and personal
+  data export (`GET /api/v1/auth/me/export`) across every module. Modules join through
+  `autoxide_kernel::privacy` (`PersonalData`, the `auth.user_deleted` event).
+- User search: `GET /api/v1/auth/users?search=…` (and `search` in the `list_users` MCP
+  tool) finds users by email or name, in any case.
+- Webhooks (`/api/v1/webhooks`, permission `webhooks.manage`): events are sent to your
+  `https://` endpoints, signed following Standard Webhooks, retried for about two hours,
+  with a delivery log. New settings `AUTOXIDE_WEBHOOKS_ALLOW_HTTP` and
+  `AUTOXIDE_WEBHOOKS_TIMEOUT_SECONDS`.
+
 ### Changed
 
 - Creating an API key (`POST /api/v1/auth/api-keys`) and starting a passkey registration
@@ -23,9 +39,9 @@ endpoints are marked deprecated with a sunset date first.
 - Concurrent wrong passwords or codes can no longer go past the login throttle; wrong
   codes when turning off two-step sign-in or replacing recovery codes are counted too.
 - A refresh racing with disabling the account can no longer issue a new token.
-- `auth.users.manage` no longer lets someone reset two-step sign-in, disable or set the
-  first password of a user who has permissions they lack (code
-  `auth.target_has_more_permissions`).
+- `auth.users.manage` no longer lets someone reset two-step sign-in, disable, delete, sign
+  out or set the first password of a user who has permissions they lack (code
+  `auth.target_has_more_permissions`), through REST or MCP.
 - Finished jobs drop their payload, so links with tokens do not stay in the database.
 - The rate limiter reads only the last value of the client IP header, as added by your
   proxy; `autoxide restore` refuses backups that contain symbolic links; idempotency waits

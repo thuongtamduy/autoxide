@@ -279,7 +279,8 @@ mod tests {
     async fn dat_mat_khau_moi_bang_token_mot_lan() {
         TestDatabase::run(async |test| {
             let services = setup(test).await;
-            let session = services.sessions.login("ada@example.com", OLD).await.unwrap().tokens();
+            let session =
+                services.sessions.login("ada@example.com", OLD, None).await.unwrap().tokens();
             services.resets.request("ada@example.com", Language::En).await.unwrap();
             let token = last_token(&services);
 
@@ -291,8 +292,8 @@ mod tests {
             let again = services.resets.confirm(&token, NEW.to_owned()).await.unwrap_err();
             assert_eq!(again.kind(), ErrorKind::BadRequest);
             assert_eq!(again.code(), "auth.invalid_reset_token");
-            assert!(services.sessions.login("ada@example.com", OLD).await.is_err());
-            let login = services.sessions.login("ada@example.com", NEW).await.unwrap();
+            assert!(services.sessions.login("ada@example.com", OLD, None).await.is_err());
+            let login = services.sessions.login("ada@example.com", NEW, None).await.unwrap();
             assert!(matches!(login, LoginOutcome::Tokens(_)));
             // Phiên cũ đã bị huỷ.
             assert!(services.sessions.refresh(&session.refresh_token).await.is_err());

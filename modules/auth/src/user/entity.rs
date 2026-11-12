@@ -20,6 +20,8 @@ pub struct Model {
     pub email_verified_at: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
+    /// Email và tên viết thường, để tìm (`user::service::search_text`).
+    pub search_text: String,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

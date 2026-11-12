@@ -7,7 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -102,6 +102,9 @@ pub(crate) struct TokenResponse {
     refresh_token: String,
     /// When `refresh_token` expires; after that, sign in again.
     refresh_token_expires_at: DateTime<Utc>,
+    /// The session these tokens belong to. It stays the same across refreshes; keep it
+    /// to recognize this client in `GET /api/v1/auth/me/sessions`.
+    session_id: Uuid,
 }
 
 impl From<Tokens> for TokenResponse {
@@ -112,6 +115,7 @@ impl From<Tokens> for TokenResponse {
             expires_in: tokens.expires_in,
             refresh_token: tokens.refresh_token,
             refresh_token_expires_at: tokens.refresh_token_expires_at,
+            session_id: tokens.session_id,
         }
     }
 }
@@ -175,10 +179,12 @@ impl MeResponse {
 )]
 async fn login(
     State(state): State<Arc<HttpState>>,
+    headers: HeaderMap,
     ValidJson(input): ValidJson<LoginRequest>,
 ) -> Result<Response, Error> {
+    let user_agent = super::user_agent(&headers);
     // Hai kết quả, hai hình dạng: `Response` là kiểu chung của mọi response.
-    Ok(match state.sessions.login(&input.email, &input.password).await? {
+    Ok(match state.sessions.login(&input.email, &input.password, user_agent).await? {
         LoginOutcome::Tokens(tokens) => Data { data: TokenResponse::from(tokens) }.into_response(),
         LoginOutcome::MfaRequired { mfa_token, expires_in } => {
             let data = MfaChallengeResponse {
@@ -214,9 +220,11 @@ const METHODS: [&str; 2] = ["totp", "recovery_code"];
 )]
 async fn login_mfa(
     State(state): State<Arc<HttpState>>,
+    headers: HeaderMap,
     ValidJson(input): ValidJson<LoginMfaRequest>,
 ) -> Result<Data<TokenResponse>, Error> {
-    let tokens = state.sessions.complete_mfa(&input.mfa_token, &input.code).await?;
+    let user_agent = super::user_agent(&headers);
+    let tokens = state.sessions.complete_mfa(&input.mfa_token, &input.code, user_agent).await?;
     Ok(Data { data: tokens.into() })
 }
 
@@ -311,12 +319,19 @@ async fn me(
 async fn change_password(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
+    headers: HeaderMap,
     ValidJson(input): ValidJson<ChangePasswordRequest>,
 ) -> Result<Data<TokenResponse>, Error> {
     super::require_session(&principal)?;
+    let user_agent = super::user_agent(&headers);
     let tokens = state
         .sessions
-        .change_password(principal.user_id(), &input.current_password, input.new_password)
+        .change_password(
+            principal.user_id(),
+            &input.current_password,
+            input.new_password,
+            user_agent,
+        )
         .await?;
     Ok(Data { data: tokens.into() })
 }

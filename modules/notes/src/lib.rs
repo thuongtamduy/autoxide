@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Permission;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::EventInfo;
+use autoxide_kernel::event::{EventInfo, Subscription};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
@@ -65,7 +65,15 @@ impl Module for NotesModule {
         let service = Arc::new(NoteService::new(context.database().clone(), context.outbox()?));
         self.service = Some(service.clone());
         // `Arc<NoteService>` tự đổi thành `Arc<dyn Notes>`: module khác chỉ thấy trait.
+        context.personal_data(service.clone())?;
         context.provide::<dyn api::Notes>(service)
+    }
+
+    fn subscriptions(&self) -> Vec<Subscription> {
+        // Tài khoản bị xoá: xoá ghi chú của người đó.
+        self.service.clone().map_or_else(Vec::new, |service| {
+            vec![Subscription::new(autoxide_kernel::privacy::USER_DELETED, service)]
+        })
     }
 
     fn routes(&self) -> OpenApiRouter {

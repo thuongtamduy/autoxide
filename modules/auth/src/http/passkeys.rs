@@ -255,9 +255,12 @@ async fn start_login(State(state): State<Arc<HttpState>>) -> Result<Data<Ceremon
 )]
 async fn login(
     State(state): State<Arc<HttpState>>,
+    headers: axum::http::HeaderMap,
     ValidJson(input): ValidJson<PasskeyLoginRequest>,
 ) -> Result<Data<TokenResponse>, Error> {
-    let tokens = state.passkeys.finish_login(input.ceremony_id, &input.credential).await?;
+    let user_agent = super::user_agent(&headers);
+    let tokens =
+        state.passkeys.finish_login(input.ceremony_id, &input.credential, user_agent).await?;
     Ok(Data { data: tokens.into() })
 }
 

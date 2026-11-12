@@ -938,6 +938,104 @@
             "bearer": []
           }
         ]
+      },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Delete your own account and everything it owns.",
+        "description": "Signed in with a password session only, and needs your current password (an account\nwithout a password must set one first). The account, its sessions, keys and passkeys\ngo at once; data kept by other modules (notes, files…) is deleted shortly after.\nThis cannot be undone: download your data first with `GET /api/v1/auth/me/export`.",
+        "operationId": "auth_delete_own_account",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "The account was deleted."
+          },
+          "400": {
+            "description": "The current password is wrong; code `auth.wrong_password`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "You are the last active administrator; give the `admin` role to someone else first. Code `auth.last_admin`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is missing a field or a value is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many wrong passwords for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
       }
     },
     "/api/v1/auth/me/email": {
@@ -1064,6 +1162,63 @@
           },
           "409": {
             "description": "The address is already verified; code `auth.email_already_verified`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/export": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Download everything the server keeps about you.",
+        "description": "Signed in with a password session only (an API key cannot do this). The answer has\none entry per module that keeps personal data, named after the module (`auth` holds\nyour profile, roles, sessions, API keys, passkeys and two-step sign-in status).\nSecrets — password, tokens, keys — are never included.",
+        "operationId": "auth_export_personal_data",
+        "responses": {
+          "200": {
+            "description": "Your data, by module.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PersonalDataResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1905,6 +2060,255 @@
         ]
       }
     },
+    "/api/v1/auth/me/sessions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List your signed-in sessions.",
+        "description": "Signed in with a password session only (an API key cannot do this). One entry per\ndevice or client; newest first unless `order=asc`.",
+        "operationId": "auth_list_sessions",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Order"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of your sessions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign out all your sessions, or all but one.",
+        "description": "Signed in with a password session only. Pass `keep` with your own `session_id` to\nsign out every other device and stay signed in here. Safe to repeat.",
+        "operationId": "auth_end_sessions",
+        "parameters": [
+          {
+            "name": "keep",
+            "in": "query",
+            "description": "Id of a session to keep signed in, usually your own (`session_id` from the token\nresponse). Omit it to end every session, including this one.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The sessions were ended.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EndedSessionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`keep` is not a valid id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/sessions/{id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign out one of your sessions, e.g. a lost device.",
+        "description": "Signed in with a password session only. Its refresh token stops working at once;\nan access token already issued to it keeps working until it expires (15 minutes by\ndefault).",
+        "operationId": "auth_end_session",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the session.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The session was ended."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "You have no active session with this id; code `auth.session_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/password-reset": {
       "post": {
         "tags": [
@@ -2662,10 +3066,19 @@
         "tags": [
           "auth"
         ],
-        "summary": "List user accounts.",
-        "description": "Requires `auth.users.read`. Newest first unless `order=asc`.",
+        "summary": "List or search user accounts.",
+        "description": "Requires `auth.users.read`. Newest first unless `order=asc`. Add `search` to find\nusers by email or name.",
         "operationId": "auth_list_users",
         "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Only users whose email or name contains this text, in any case (`ada` finds\n`Ada Lovelace` and `ada@example.com`). Up to 200 characters.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "limit",
             "in": "query",
@@ -2895,6 +3308,86 @@
           },
           "404": {
             "description": "No user has this id; code `auth.user_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Delete a user account and everything it owns.",
+        "description": "Requires `auth.users.manage`, and every permission the user has. Data kept by other\nmodules is deleted shortly after. This cannot be undone; to only stop someone from\nsigning in, disable the account with `PATCH /api/v1/auth/users/{id}` instead.",
+        "operationId": "auth_delete_user",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the user.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The account was deleted."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No user has this id; code `auth.user_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This is the last active administrator; code `auth.last_admin`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3388,6 +3881,85 @@
         ]
       }
     },
+    "/api/v1/auth/users/{id}/sessions": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign a user out everywhere.",
+        "description": "Requires `auth.users.manage`, and every permission the user has. Ends all their\nsessions; their access tokens keep working until they expire (15 minutes by\ndefault). To keep them out for good, disable the account instead.",
+        "operationId": "auth_end_user_sessions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the user.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The user's sessions were ended.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EndedSessionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No user has this id; code `auth.user_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/files": {
       "get": {
         "tags": [
@@ -3844,6 +4416,703 @@
         ]
       }
     },
+    "/api/v1/webhooks": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "List webhook endpoints.",
+        "description": "Requires `webhooks.manage`. Newest first unless `order=asc`.",
+        "operationId": "webhooks_list_webhook_endpoints",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Order"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of endpoints.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_EndpointResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Create a webhook endpoint.",
+        "description": "Requires `webhooks.manage`. From now on, every event it subscribes to is sent to\n`url` as a signed `POST` (Standard Webhooks headers `webhook-id`,\n`webhook-timestamp`, `webhook-signature`); answer with any 2xx within 10 seconds\n(`AUTOXIDE_WEBHOOKS_TIMEOUT_SECONDS`).\nOther answers are retried with growing delays for about two hours. The response\ncarries the signing secret, shown only once.",
+        "operationId": "webhooks_create_webhook_endpoint",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEndpointRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created; store `secret` now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CreatedEndpointResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The address is not `https://` (code `webhooks.insecure_url`) or an event name is unknown (code `webhooks.unknown_event`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/webhooks/events": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "List the kinds of events endpoints can receive.",
+        "description": "Requires `webhooks.manage`. Sorted by name.",
+        "operationId": "webhooks_list_webhook_event_types",
+        "responses": {
+          "200": {
+            "description": "Every event kind.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_EventTypeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/webhooks/{id}": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Get a webhook endpoint.",
+        "description": "Requires `webhooks.manage`.",
+        "operationId": "webhooks_get_webhook_endpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EndpointResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No endpoint has this id; code `webhooks.endpoint_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Delete a webhook endpoint and its delivery history.",
+        "description": "Requires `webhooks.manage`. Pending retries are dropped.",
+        "operationId": "webhooks_delete_webhook_endpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No endpoint has this id; code `webhooks.endpoint_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Change a webhook endpoint, or turn it off and on.",
+        "description": "Requires `webhooks.manage`.",
+        "operationId": "webhooks_update_webhook_endpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEndpointRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The changed endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EndpointResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The address is not `https://` (code `webhooks.insecure_url`) or an event name is unknown (code `webhooks.unknown_event`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No endpoint has this id; code `webhooks.endpoint_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/webhooks/{id}/deliveries": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "List the deliveries of an endpoint, to see what was sent and what failed.",
+        "description": "Requires `webhooks.manage`. Newest first unless `order=asc`. Kept for 30 days.",
+        "operationId": "webhooks_list_webhook_deliveries",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Order"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of deliveries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_DeliveryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No endpoint has this id; code `webhooks.endpoint_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/webhooks/{id}/secret": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Replace the signing secret of an endpoint.",
+        "description": "Requires `webhooks.manage`. The old secret stops working at once: update the\nreceiver right after. The new secret is shown only once.",
+        "operationId": "webhooks_rotate_webhook_secret",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new secret.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SecretResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No endpoint has this id; code `webhooks.endpoint_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "tags": [
@@ -4180,6 +5449,36 @@
           }
         }
       },
+      "CreateEndpointRequest": {
+        "type": "object",
+        "description": "A new endpoint.",
+        "required": [
+          "url",
+          "events"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "What the endpoint is for, up to 200 characters."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Event names to receive (see `GET /api/v1/webhooks/events`), or `[\"*\"]` for every\nevent.",
+            "example": [
+              "auth.user_created"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "description": "Where to send events: an `https://` address, up to 2048 characters.",
+            "example": "https://example.com/hooks/autoxide"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateUserRequest": {
         "type": "object",
         "description": "A new account.",
@@ -4227,6 +5526,27 @@
           }
         ],
         "description": "A new API key, with its secret. The secret is shown only here."
+      },
+      "CreatedEndpointResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EndpointResponse"
+          },
+          {
+            "type": "object",
+            "required": [
+              "secret"
+            ],
+            "properties": {
+              "secret": {
+                "type": "string",
+                "description": "Verify the `webhook-signature` header of each request with this secret (Standard\nWebhooks). Store it now: it cannot be shown again, only replaced.",
+                "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+              }
+            }
+          }
+        ],
+        "description": "A new endpoint and its signing secret, shown only once."
       },
       "Data_AuditEntryResponse": {
         "type": "object",
@@ -4363,6 +5683,122 @@
               }
             ],
             "description": "A new API key, with its secret. The secret is shown only here."
+          }
+        }
+      },
+      "Data_CreatedEndpointResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EndpointResponse"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "secret"
+                ],
+                "properties": {
+                  "secret": {
+                    "type": "string",
+                    "description": "Verify the `webhook-signature` header of each request with this secret (Standard\nWebhooks). Store it now: it cannot be shown again, only replaced.",
+                    "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+                  }
+                }
+              }
+            ],
+            "description": "A new endpoint and its signing secret, shown only once."
+          }
+        }
+      },
+      "Data_EndedSessionsResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "How many sessions were ended.",
+            "required": [
+              "ended"
+            ],
+            "properties": {
+              "ended": {
+                "type": "integer",
+                "format": "int64",
+                "example": 3,
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
+      "Data_EndpointResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A webhook endpoint: an address that receives events. Its secret is never listed.",
+            "required": [
+              "id",
+              "url",
+              "description",
+              "events",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "description": {
+                "type": "string",
+                "example": "Sync users to the CRM"
+              },
+              "disabled_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When it was turned off; `null` while it receives events."
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Event names it receives; `*` means every event.",
+                "example": [
+                  "auth.user_created",
+                  "auth.user_deleted"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "url": {
+                "type": "string",
+                "example": "https://example.com/hooks/autoxide"
+              }
+            }
           }
         }
       },
@@ -4622,6 +6058,44 @@
           }
         }
       },
+      "Data_PersonalDataResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "type": "object",
+                "description": "The parts of the other modules, by module name."
+              },
+              {
+                "type": "object",
+                "required": [
+                  "auth"
+                ],
+                "properties": {
+                  "auth": {
+                    "type": "object",
+                    "description": "Your profile, roles, sessions, API keys, passkeys and two-step sign-in status."
+                  }
+                }
+              }
+            ],
+            "description": "Everything the server keeps about you: one entry per module that keeps personal\ndata, named after the module.",
+            "example": {
+              "auth": {
+                "profile": {
+                  "email": "ada@example.com"
+                }
+              },
+              "files": []
+            }
+          }
+        }
+      },
       "Data_RecoveryCodesResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -4708,6 +6182,28 @@
           }
         }
       },
+      "Data_SecretResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A new signing secret, shown only once.",
+            "required": [
+              "secret"
+            ],
+            "properties": {
+              "secret": {
+                "type": "string",
+                "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+              }
+            }
+          }
+        }
+      },
       "Data_TokenResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -4723,7 +6219,8 @@
               "token_type",
               "expires_in",
               "refresh_token",
-              "refresh_token_expires_at"
+              "refresh_token_expires_at",
+              "session_id"
             ],
             "properties": {
               "access_token": {
@@ -4745,6 +6242,11 @@
                 "type": "string",
                 "format": "date-time",
                 "description": "When `refresh_token` expires; after that, sign in again."
+              },
+              "session_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The session these tokens belong to. It stays the same across refreshes; keep it\nto recognize this client in `GET /api/v1/auth/me/sessions`."
               },
               "token_type": {
                 "type": "string",
@@ -4844,6 +6346,35 @@
           }
         }
       },
+      "Data_Vec_EventTypeResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A kind of event that endpoints can subscribe to.",
+              "required": [
+                "name",
+                "description"
+              ],
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string",
+                  "example": "auth.user_created"
+                }
+              }
+            }
+          }
+        }
+      },
       "Data_Vec_PermissionResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -4932,6 +6463,175 @@
                 }
               }
             }
+          }
+        }
+      },
+      "DeleteAccountRequest": {
+        "type": "object",
+        "description": "Confirms deleting your own account.",
+        "required": [
+          "current_password"
+        ],
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "description": "Your current password."
+          }
+        }
+      },
+      "DeliveryResponse": {
+        "type": "object",
+        "description": "One attempt to deliver one event to one endpoint, with its retries.",
+        "required": [
+          "id",
+          "event_id",
+          "event_name",
+          "status",
+          "attempts",
+          "created_at"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id of the event (`data.id` in the body)."
+          },
+          "event_name": {
+            "type": "string",
+            "example": "auth.user_created"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Also the `webhook-id` header: the same on every retry, to drop duplicates."
+          },
+          "last_attempt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the last attempt failed."
+          },
+          "response_status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "HTTP status of the last answer; `null` when there was none.",
+            "example": 200
+          },
+          "status": {
+            "type": "string",
+            "description": "`pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up).",
+            "example": "succeeded"
+          }
+        }
+      },
+      "EndedSessionsResponse": {
+        "type": "object",
+        "description": "How many sessions were ended.",
+        "required": [
+          "ended"
+        ],
+        "properties": {
+          "ended": {
+            "type": "integer",
+            "format": "int64",
+            "example": 3,
+            "minimum": 0
+          }
+        }
+      },
+      "EndpointResponse": {
+        "type": "object",
+        "description": "A webhook endpoint: an address that receives events. Its secret is never listed.",
+        "required": [
+          "id",
+          "url",
+          "description",
+          "events",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string",
+            "example": "Sync users to the CRM"
+          },
+          "disabled_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was turned off; `null` while it receives events."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Event names it receives; `*` means every event.",
+            "example": [
+              "auth.user_created",
+              "auth.user_deleted"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "example": "https://example.com/hooks/autoxide"
+          }
+        }
+      },
+      "EventTypeResponse": {
+        "type": "object",
+        "description": "A kind of event that endpoints can subscribe to.",
+        "required": [
+          "name",
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "auth.user_created"
           }
         }
       },
@@ -5305,6 +7005,164 @@
           }
         }
       },
+      "Page_DeliveryResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "One attempt to deliver one event to one endpoint, with its retries.",
+              "required": [
+                "id",
+                "event_id",
+                "event_name",
+                "status",
+                "attempts",
+                "created_at"
+              ],
+              "properties": {
+                "attempts": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "delivered_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "event_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Id of the event (`data.id` in the body)."
+                },
+                "event_name": {
+                  "type": "string",
+                  "example": "auth.user_created"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Also the `webhook-id` header: the same on every retry, to drop duplicates."
+                },
+                "last_attempt_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "last_error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Why the last attempt failed."
+                },
+                "response_status": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int32",
+                  "description": "HTTP status of the last answer; `null` when there was none.",
+                  "example": 200
+                },
+                "status": {
+                  "type": "string",
+                  "description": "`pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up).",
+                  "example": "succeeded"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Page_EndpointResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A webhook endpoint: an address that receives events. Its secret is never listed.",
+              "required": [
+                "id",
+                "url",
+                "description",
+                "events",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": {
+                  "type": "string",
+                  "example": "Sync users to the CRM"
+                },
+                "disabled_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "When it was turned off; `null` while it receives events."
+                },
+                "events": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Event names it receives; `*` means every event.",
+                  "example": [
+                    "auth.user_created",
+                    "auth.user_deleted"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "url": {
+                  "type": "string",
+                  "example": "https://example.com/hooks/autoxide"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
       "Page_FileResponse": {
         "type": "object",
         "description": "One page of a list.",
@@ -5485,6 +7343,63 @@
           }
         }
       },
+      "Page_SessionResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A signed-in session: one device or client that stays signed in by refreshing its\ntokens.",
+              "required": [
+                "id",
+                "started_at",
+                "last_active_at",
+                "expires_at"
+              ],
+              "properties": {
+                "expires_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the session ends unless refreshed before."
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Same as `session_id` in the token response of the client that holds it."
+                },
+                "last_active_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Last time the session got tokens (sign-in or refresh)."
+                },
+                "started_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the session was signed in."
+                },
+                "user_agent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The `User-Agent` header sent when signing in (up to 255 characters); `null` when\nnone was sent.",
+                  "example": "Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
       "Page_UserResponse": {
         "type": "object",
         "description": "One page of a list.",
@@ -5644,6 +7559,35 @@
             "description": "`<module>.<action>`.",
             "example": "auth.roles.read"
           }
+        }
+      },
+      "PersonalDataResponse": {
+        "allOf": [
+          {
+            "type": "object",
+            "description": "The parts of the other modules, by module name."
+          },
+          {
+            "type": "object",
+            "required": [
+              "auth"
+            ],
+            "properties": {
+              "auth": {
+                "type": "object",
+                "description": "Your profile, roles, sessions, API keys, passkeys and two-step sign-in status."
+              }
+            }
+          }
+        ],
+        "description": "Everything the server keeps about you: one entry per module that keeps personal\ndata, named after the module.",
+        "example": {
+          "auth": {
+            "profile": {
+              "email": "ada@example.com"
+            }
+          },
+          "files": []
         }
       },
       "Problem": {
@@ -5882,6 +7826,59 @@
           }
         }
       },
+      "SecretResponse": {
+        "type": "object",
+        "description": "A new signing secret, shown only once.",
+        "required": [
+          "secret"
+        ],
+        "properties": {
+          "secret": {
+            "type": "string",
+            "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+          }
+        }
+      },
+      "SessionResponse": {
+        "type": "object",
+        "description": "A signed-in session: one device or client that stays signed in by refreshing its\ntokens.",
+        "required": [
+          "id",
+          "started_at",
+          "last_active_at",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the session ends unless refreshed before."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Same as `session_id` in the token response of the client that holds it."
+          },
+          "last_active_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last time the session got tokens (sign-in or refresh)."
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the session was signed in."
+          },
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `User-Agent` header sent when signing in (up to 255 characters); `null` when\nnone was sent.",
+            "example": "Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0"
+          }
+        }
+      },
       "SetPasswordRequest": {
         "type": "object",
         "description": "The first password of an account.",
@@ -5916,7 +7913,8 @@
           "token_type",
           "expires_in",
           "refresh_token",
-          "refresh_token_expires_at"
+          "refresh_token_expires_at",
+          "session_id"
         ],
         "properties": {
           "access_token": {
@@ -5938,6 +7936,11 @@
             "type": "string",
             "format": "date-time",
             "description": "When `refresh_token` expires; after that, sign in again."
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The session these tokens belong to. It stays the same across refreshes; keep it\nto recognize this client in `GET /api/v1/auth/me/sessions`."
           },
           "token_type": {
             "type": "string",
@@ -5965,6 +7968,41 @@
             "example": "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
           }
         }
+      },
+      "UpdateEndpointRequest": {
+        "type": "object",
+        "description": "Changes to an endpoint. Omitted fields stay as they are.",
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "disabled": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "`true` stops sending to it (pending retries are dropped); `false` starts again."
+          },
+          "events": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "UpdateUserRequest": {
         "type": "object",

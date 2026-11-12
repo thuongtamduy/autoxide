@@ -14,7 +14,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
@@ -28,7 +28,7 @@ use crate::user::{NewUser, UserChanges};
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
         .routes(routes!(list_users, create_user))
-        .routes(routes!(get_user, update_user))
+        .routes(routes!(get_user, update_user, delete_user))
         .routes(routes!(register))
         .routes(routes!(set_user_password))
 }
@@ -118,15 +118,26 @@ pub(crate) struct UpdateUserRequest {
     disabled: Option<bool>,
 }
 
-/// List user accounts.
+/// Which users to list.
+#[derive(Debug, Default, Deserialize, Validate, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct UserSearchQuery {
+    /// Only users whose email or name contains this text, in any case (`ada` finds
+    /// `Ada Lovelace` and `ada@example.com`). Up to 200 characters.
+    #[validate(length(max = 200))]
+    search: Option<String>,
+}
+
+/// List or search user accounts.
 ///
-/// Requires `auth.users.read`. Newest first unless `order=asc`.
+/// Requires `auth.users.read`. Newest first unless `order=asc`. Add `search` to find
+/// users by email or name.
 #[utoipa::path(
     get,
     path = "/users",
     operation_id = "list_users",
     security(("bearer" = [])),
-    params(PageQuery),
+    params(UserSearchQuery, PageQuery),
     responses(
         (status = 200, description = "One page of users.", body = Page<UserResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
@@ -137,10 +148,12 @@ pub(crate) struct UpdateUserRequest {
 async fn list_users(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
+    Query(search): Query<UserSearchQuery>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<UserResponse>, Error> {
     principal.require(&USERS_READ)?;
-    let page = state.users.list(&PageRequest::try_from(query)?).await?;
+    search.validate().map_err(Error::from)?;
+    let page = state.users.list(search.search.as_deref(), &PageRequest::try_from(query)?).await?;
     Ok(page.map(UserResponse::from))
 }
 
@@ -236,6 +249,36 @@ async fn update_user(
     Ok(Data { data: state.users.update(Actor::from(&principal), id, changes).await?.into() })
 }
 
+/// Delete a user account and everything it owns.
+///
+/// Requires `auth.users.manage`, and every permission the user has. Data kept by other
+/// modules is deleted shortly after. This cannot be undone; to only stop someone from
+/// signing in, disable the account with `PATCH /api/v1/auth/users/{id}` instead.
+#[utoipa::path(
+    delete,
+    path = "/users/{id}",
+    operation_id = "delete_user",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the user.")),
+    responses(
+        (status = 204, description = "The account was deleted."),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).", body = Problem),
+        (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
+        (status = 409, description = "This is the last active administrator; code `auth.last_admin`.", body = Problem),
+    )
+)]
+async fn delete_user(
+    State(state): State<Arc<HttpState>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, Error> {
+    principal.require(&USERS_MANAGE)?;
+    state.roles.require_covers(&principal, id).await?;
+    state.users.delete(Actor::from(&principal), id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Create your own account.
 ///
 /// Open only when the server enables self-registration; otherwise answers 403. The
@@ -315,6 +358,69 @@ mod tests {
 
     use crate::api::{Accounts, NewAccount};
     use crate::http::test_support::{PASSWORD, app, app_with, bearer, call};
+
+    /// Tìm theo email hoặc tên, không phân biệt hoa thường — kể cả chữ có dấu, và cho
+    /// cùng kết quả trên hai database; `%` và `_` là chữ thường, không phải ký tự đại diện.
+    #[tokio::test]
+    async fn tim_nguoi_dung_theo_email_hoac_ten() {
+        TestDatabase::run(async |test| {
+            let (app, services) = app(test).await;
+            let root = NewAccount {
+                email: "root@example.com".to_owned(),
+                name: "Root".to_owned(),
+                password: Some(PASSWORD.to_owned()),
+                admin: true,
+            };
+            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            for (email, name) in [("dat@example.vn", "Trần Đạt"), ("x_y@example.com", "100% Bob")]
+            {
+                let account = NewAccount {
+                    email: email.to_owned(),
+                    name: name.to_owned(),
+                    password: None,
+                    admin: false,
+                };
+                Accounts::create(services.users.as_ref(), account).await.unwrap();
+            }
+            let admin = bearer(&app, "root@example.com", PASSWORD).await;
+            let emails = async |search: &str| {
+                let path = format!("/users?order=asc&search={search}");
+                let (status, _, page) = call(&app, "GET", &path, Some(&admin), None).await;
+                assert_eq!(status, StatusCode::OK, "{page}");
+                page["data"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|user| user["email"].as_str().unwrap().to_owned())
+                    .collect::<Vec<_>>()
+            };
+
+            assert_eq!(emails("EXAMPLE.VN").await, ["dat@example.vn"]);
+            // "đạt" viết thường, tìm "ĐẠT" viết hoa (đã mã hoá cho URL).
+            assert_eq!(emails("%C4%90%E1%BA%A0T").await, ["dat@example.vn"]);
+            assert_eq!(emails("100%25").await, ["x_y@example.com"]);
+            assert_eq!(emails("x_y").await, ["x_y@example.com"]);
+            assert!(emails("x%25y").await.is_empty());
+            assert!(emails("a_a").await.is_empty());
+            assert_eq!(emails("%20").await.len(), 4);
+
+            // Đổi tên thì tìm theo tên mới.
+            let dat = services.users.find_by_email("dat@example.vn").await.unwrap().unwrap();
+            let body = json!({"name": "Grace"});
+            let path = format!("/users/{}", dat.id);
+            let (status, _, _) = call(&app, "PATCH", &path, Some(&admin), Some(body)).await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(emails("grace").await, ["dat@example.vn"]);
+            assert!(emails("%C4%91%E1%BA%A1t").await.is_empty());
+
+            let long = "a".repeat(201);
+            let path = format!("/users?search={long}");
+            let (status, _, _) = call(&app, "GET", &path, Some(&admin), None).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        })
+        .await
+        .unwrap();
+    }
 
     /// Người chỉ có `auth.users.manage` không gỡ MFA, không khoá, không đặt mật khẩu
     /// cho người có quyền cao hơn mình; với người ngang hoặc thấp hơn thì được (D-079).

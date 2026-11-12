@@ -123,6 +123,17 @@ Publish a trait in `src/api.rs` and provide it in `Module::start` with
 services work the same way: `dyn Mailer` (send mail; module `mail`) and `dyn Storage`
 (store files; module `files`).
 
+### Personal data
+
+A module that keeps data about users takes part in data export and account deletion
+(see `autoxide_kernel::privacy`):
+
+- implement `PersonalData` (return the user's data as JSON, without secrets) and register
+  it in `Module::start` with `context.personal_data(…)`; it then appears in
+  `GET /api/v1/auth/me/export` under the module's name;
+- subscribe to `privacy::USER_DELETED` in `Module::subscriptions` and delete the user's
+  rows when it arrives (`privacy::deleted_user(event)` gives the id). It may arrive twice.
+
 ### 9. Configuration, jobs, limits
 
 - Settings: declare each with `Setting` and read it in `Module::configure` through
@@ -164,5 +175,6 @@ a concurrency test.
 - [ ] Every route documented (summary, permission, every response)
 - [ ] MCP tools for what agents should be able to do
 - [ ] Error codes prefixed and translated
+- [ ] Data about users exported (`PersonalData`) and deleted on `USER_DELETED`
 - [ ] Tests on both databases, including concurrent writes
 - [ ] `docs/openapi.json` and `.env.example` regenerated; gate green

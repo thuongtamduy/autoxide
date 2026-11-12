@@ -20,6 +20,7 @@ pub mod metrics;
 pub mod migration;
 pub mod module;
 pub mod pagination;
+pub mod privacy;
 pub mod response;
 pub mod storage;
 pub mod telemetry;

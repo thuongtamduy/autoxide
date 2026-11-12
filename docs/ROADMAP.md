@@ -134,9 +134,9 @@ Kiểm lại phần đã có:
 
 Hệ thống tài khoản:
 
-- [ ] Quản lý phiên đăng nhập: người dùng xem và đăng xuất từng thiết bị; quản trị viên thu hồi mọi phiên của một người
-- [ ] Xoá tài khoản (event cho mọi module dọn dữ liệu của người đó) và xuất dữ liệu cá nhân
-- [ ] Tìm người dùng theo email hoặc tên
+- [x] Quản lý phiên đăng nhập: người dùng xem và đăng xuất từng thiết bị; quản trị viên thu hồi mọi phiên của một người (D-080)
+- [x] Xoá tài khoản (event cho mọi module dọn dữ liệu của người đó) và xuất dữ liệu cá nhân (D-080)
+- [x] Tìm người dùng theo email hoặc tên (D-080)
 
 Phát hành và nâng cấp:
 
@@ -146,7 +146,7 @@ Phát hành và nâng cấp:
 
 Tích hợp:
 
-- [ ] Webhook: gửi event ra hệ thống bên ngoài, có chữ ký, thử lại, theo dõi được
+- [x] Webhook: gửi event ra hệ thống bên ngoài, có chữ ký, thử lại, theo dõi được (D-081)
 
 ## Sau core (chưa mở)
 

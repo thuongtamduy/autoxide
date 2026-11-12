@@ -123,6 +123,17 @@ Công bố một trait trong `src/api.rs` và cung cấp nó trong `Module::star
 theo cách đó: `dyn Mailer` (gửi mail; module `mail`) và `dyn Storage` (lưu file; module
 `files`).
 
+### Dữ liệu cá nhân
+
+Module giữ dữ liệu về người dùng tham gia việc xuất dữ liệu và xoá tài khoản (xem
+`autoxide_kernel::privacy`):
+
+- cài `PersonalData` (trả dữ liệu của người dùng dạng JSON, không có secret) và đăng ký
+  trong `Module::start` bằng `context.personal_data(…)`; phần đó có mặt trong
+  `GET /api/v1/auth/me/export` dưới tên module;
+- đăng ký nhận `privacy::USER_DELETED` trong `Module::subscriptions` và xoá các dòng của
+  người đó khi nhận (`privacy::deleted_user(event)` cho id). Có thể nhận hai lần.
+
 ### 9. Cấu hình, job, giới hạn
 
 - Cấu hình: khai mỗi biến bằng `Setting` và đọc trong `Module::configure` qua
@@ -162,5 +173,6 @@ dựng module như binary dựng và gọi nó qua REST và qua một client MCP
 - [ ] Mọi route có tài liệu (summary, permission, mọi response)
 - [ ] Tool MCP cho những gì agent cần làm được
 - [ ] Mã lỗi có tiền tố và có bản dịch
+- [ ] Dữ liệu về người dùng được xuất (`PersonalData`) và xoá khi nhận `USER_DELETED`
 - [ ] Test trên cả hai database, kể cả ghi đồng thời
 - [ ] Đã sinh lại `docs/openapi.json` và `.env.example`; gate xanh

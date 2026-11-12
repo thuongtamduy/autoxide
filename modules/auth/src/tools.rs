@@ -34,6 +34,22 @@ pub(crate) struct UpdateUserInput {
     disabled: Option<bool>,
 }
 
+/// Which users to list; paging as for every list.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListUsersInput {
+    /// Only users whose email or name contains this text, in any case.
+    #[validate(length(max = 200))]
+    search: Option<String>,
+    /// Maximum number of users to return, 1 to 200. Defaults to 50.
+    #[schema(minimum = 1, maximum = 200)]
+    limit: Option<u32>,
+    /// Where to continue: the `next_cursor` of the previous page. Omit for the first page.
+    cursor: Option<String>,
+    /// `desc` (newest first, the default) or `asc` (oldest first).
+    order: Option<String>,
+}
+
 pub(crate) fn all(state: &Arc<HttpState>) -> Vec<Tool> {
     let (me, catalog, list, update) = (state.clone(), state.clone(), state.clone(), state.clone());
     vec![
@@ -63,11 +79,14 @@ pub(crate) fn all(state: &Arc<HttpState>) -> Vec<Tool> {
         .read_only(),
         Tool::new(
             "list_users",
-            "List user accounts, newest first; follow `pagination.next_cursor` for more.",
-            move |_: Principal, input: PageInput| {
+            "List user accounts, newest first; `search` finds users by email or name. Follow \
+             `pagination.next_cursor` for more.",
+            move |_: Principal, input: ListUsersInput| {
                 let state = list.clone();
                 async move {
-                    let page = state.users.list(&input.page()?).await?;
+                    let page =
+                        PageInput { limit: input.limit, cursor: input.cursor, order: input.order };
+                    let page = state.users.list(input.search.as_deref(), &page.page()?).await?;
                     Ok::<Page<UserResponse>, Error>(page.map(UserResponse::from))
                 }
             },
@@ -81,6 +100,8 @@ pub(crate) fn all(state: &Arc<HttpState>) -> Vec<Tool> {
             move |principal: Principal, input: UpdateUserInput| {
                 let state = update.clone();
                 async move {
+                    // Như REST: không tác động lên người có permission mà mình không có.
+                    state.roles.require_covers(&principal, input.id).await?;
                     let changes = UserChanges { name: input.name, disabled: input.disabled };
                     let user =
                         state.users.update(Actor::from(&principal), input.id, changes).await?;
@@ -110,6 +131,7 @@ mod tests {
             resets: services.resets.clone(),
             verifications: services.verifications.clone(),
             passkeys: services.passkeys.clone(),
+            personal_data: services.personal_data.clone(),
             self_registration: false,
         })
     }
@@ -156,6 +178,12 @@ mod tests {
                 call(&tools, "list_users", admin.clone(), json!({"limit": 1})).await.unwrap();
             assert_eq!(page["data"][0]["email"], "ada@example.com");
             assert!(page["pagination"].is_object());
+            let found = json!({"search": "ADA@"});
+            let page = call(&tools, "list_users", admin.clone(), found).await.unwrap();
+            assert_eq!(page["data"].as_array().unwrap().len(), 1);
+            let none = json!({"search": "nobody"});
+            let page = call(&tools, "list_users", admin.clone(), none).await.unwrap();
+            assert_eq!(page["data"], json!([]));
             let bad = call(&tools, "list_users", admin.clone(), json!({"order": "sideways"})).await;
             assert_eq!(bad.unwrap_err().code(), "validation_failed");
 

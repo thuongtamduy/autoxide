@@ -6,11 +6,13 @@
 
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set, SqlErr,
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set,
+    SqlErr,
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -133,6 +135,48 @@ impl NoteService {
         let event = events::NoteDeleted(Change { before: Some(snapshot(&note)), after: None });
         self.outbox.record(&transaction, actor, events::note_subject(id), &event).await?;
         transaction.commit().await?;
+        Ok(())
+    }
+}
+
+/// Mọi ghi chú của người dùng, cho bản xuất dữ liệu cá nhân.
+#[async_trait::async_trait]
+impl PersonalData for NoteService {
+    async fn export(&self, user_id: Uuid) -> Result<Value, Error> {
+        let notes = Entity::find()
+            .filter(Column::OwnerId.eq(user_id))
+            .order_by_asc(Column::Id)
+            .all(self.database.read())
+            .await?;
+        let notes: Vec<Value> = notes
+            .iter()
+            .map(|note| {
+                json!({
+                    "id": note.id,
+                    "title": note.title,
+                    "body": note.body,
+                    "created_at": note.created_at,
+                    "updated_at": note.updated_at,
+                })
+            })
+            .collect();
+        Ok(Value::Array(notes))
+    }
+}
+
+/// Tài khoản bị xoá thì xoá mọi ghi chú của người đó. Nhận lại event cũng không sao:
+/// lần sau không còn gì để xoá.
+#[async_trait::async_trait]
+impl EventHandler for NoteService {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        let Some(user_id) = deleted_user(event) else {
+            return Ok(());
+        };
+        let deleted = Entity::delete_many()
+            .filter(Column::OwnerId.eq(user_id))
+            .exec(self.database.write())
+            .await?;
+        tracing::info!(user_id = %user_id, notes = deleted.rows_affected, "notes of a deleted user removed");
         Ok(())
     }
 }

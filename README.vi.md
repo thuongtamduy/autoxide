@@ -14,7 +14,7 @@ core không chứa khái niệm nghiệp vụ — những thứ đó thuộc v�
 
 Core đã hoàn chỉnh: **mọi bước của lộ trình đã xong** — khung dự án, nền, đăng nhập
 cùng role và permission, đăng nhập hai bước, event và audit log, job queue, i18n và
-idempotency, email, lưu file, MCP endpoint, module mẫu, công cụ và deploy, passkey. Kế tiếp là
+idempotency, email, lưu file, MCP endpoint, module mẫu, công cụ và deploy, passkey, quản lý phiên, xoá tài khoản và xuất dữ liệu, webhook. Kế tiếp là
 các module nghiệp vụ. Core có workspace Cargo, gate chất lượng, cấu hình, truy cập database, migration theo
 module, hợp đồng module, máy chủ HTTP dưới `/api/v1` kèm OpenAPI, health check, log,
 metrics, tracing và CLI. Module `auth` lưu người dùng
@@ -222,6 +222,25 @@ nhập mật khẩu hiện tại). Quản trị viên đặt được mật kh�
 không kèm mật khẩu (`PUT /api/v1/auth/users/{id}/password`), nhưng không thay được
 mật khẩu người khác đã có.
 
+Mỗi lần đăng nhập là một phiên, có tên là `session_id` trong response token. Người dùng
+xem các phiên của mình — thiết bị và lần hoạt động gần nhất — ở
+`GET /api/v1/auth/me/sessions`, đăng xuất một phiên bằng
+`DELETE /api/v1/auth/me/sessions/{id}`, hoặc mọi phiên khác bằng
+`DELETE /api/v1/auth/me/sessions?keep={session_id của mình}`. Người dùng tải mọi dữ liệu
+máy chủ giữ về mình bằng `GET /api/v1/auth/me/export` và xoá tài khoản bằng
+`DELETE /api/v1/auth/me` (phải nhập mật khẩu hiện tại); sau đó mọi module tự xoá dữ liệu
+về người đó. Quản trị viên tìm người dùng bằng `GET /api/v1/auth/users?search=ada`, đăng
+xuất một người ở mọi nơi (`DELETE /api/v1/auth/users/{id}/sessions`) và xoá tài khoản
+(`DELETE /api/v1/auth/users/{id}`). Quản trị viên không làm được những việc này với người
+có permission mà mình không có.
+
+Hệ thống khác nhận event qua webhook: có permission `webhooks.manage` thì đăng ký một địa
+chỉ `https://` cùng các event muốn nhận ở `POST /api/v1/webhooks` (danh sách event ở
+`GET /api/v1/webhooks/events`). Mỗi event được gửi bằng một request `POST` có chữ ký theo
+[Standard Webhooks](https://www.standardwebhooks.com), nên bên nhận kiểm được bằng thư
+viện có sẵn và secret nhận lúc tạo. Lần gửi lỗi được thử lại trong khoảng hai giờ;
+`GET /api/v1/webhooks/{id}/deliveries` cho biết đã gửi gì và cái gì lỗi.
+
 Tài khoản mới nhận một mail đề nghị xác nhận địa chỉ; token trong đó (hạn 24 giờ)
 được xác nhận bằng `POST /api/v1/auth/email-verification/confirm`, sau đó
 `email_verified_at` cho biết lúc xác minh. Muốn đổi email, người dùng gọi
@@ -266,7 +285,7 @@ S3 có bucket tên `autoxide-test`. Gate tự dựng một máy chủ S3 giả l
 | `crates/kernel`  | Nền mà mọi module dựa vào. Không biết module nào.                       |
 | `crates/app`     | Binary `autoxide`: nơi duy nhất đăng ký module.                         |
 | `crates/testkit` | Đồ dùng cho test: mỗi test một database riêng, trên SQLite hoặc PostgreSQL. |
-| `modules/<tên>`  | Mỗi module một crate. `modules/auth`: tài khoản, đăng nhập, role, API key, đăng nhập hai bước. `modules/audit`: audit log chỉ thêm. `modules/idempotency`: nơi lưu idempotency key. `modules/mail`: gửi mail. |
+| `modules/<tên>`  | Mỗi module một crate. `modules/auth`: tài khoản, đăng nhập, role, API key, đăng nhập hai bước. `modules/audit`: audit log chỉ thêm. `modules/idempotency`: nơi lưu idempotency key. `modules/mail`: gửi mail. `modules/files`: lưu file. `modules/webhooks`: webhook. |
 | `xtask`          | Công cụ cho người phát triển: `cargo xtask check` kiểm ranh giới workspace. |
 | `gate.sh`        | Gate chất lượng. Một thay đổi chỉ xong khi lệnh này xanh.               |
 

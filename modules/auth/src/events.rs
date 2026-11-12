@@ -36,9 +36,11 @@ macro_rules! events {
 events! {
     USER_CREATED, UserCreated, "auth.user_created", "A user account was created.";
     USER_UPDATED, UserUpdated, "auth.user_updated", "A user account was renamed, disabled or enabled.";
+    USER_DELETED, UserDeleted, "auth.user_deleted", "A user account was deleted; `before.id` is its id. Modules that keep data about users delete theirs when they receive it.";
     PASSWORD_CHANGED, PasswordChanged, "auth.password_changed", "A user's password was changed; their sessions were ended.";
     SIGNED_IN, SignedIn, "auth.signed_in", "A user signed in.";
-    SIGNED_OUT, SignedOut, "auth.signed_out", "A user signed out of one session.";
+    SIGNED_OUT, SignedOut, "auth.signed_out", "A user signed out of one session; `after.session_id` names it when it was ended from the session list.";
+    SESSIONS_REVOKED, SessionsRevoked, "auth.sessions_revoked", "Several sessions of a user were ended at once: by the user (`after.kept` is the session they kept) or by an administrator; `after.count` is how many.";
     REFRESH_TOKEN_REUSED, RefreshTokenReused, "auth.refresh_token_reused", "A used refresh token was sent again; the session was ended in case it was stolen.";
     ROLE_CREATED, RoleCreated, "auth.role_created", "A role was created.";
     ROLE_UPDATED, RoleUpdated, "auth.role_updated", "A role's name, description or permissions changed.";
@@ -59,4 +61,13 @@ events! {
 /// Chủ thể (subject) của event về người dùng `id`.
 pub(crate) fn user_subject(id: uuid::Uuid) -> Option<String> {
     Some(format!("auth.user:{id}"))
+}
+
+#[cfg(test)]
+mod tests {
+    /// Tên event xoá người dùng là hợp đồng với mọi module (kernel giữ hằng của nó).
+    #[test]
+    fn ten_event_xoa_nguoi_dung_khop_kernel() {
+        assert_eq!(super::USER_DELETED.name(), autoxide_kernel::privacy::USER_DELETED);
+    }
 }
