@@ -24,6 +24,7 @@ pub mod migration;
 pub mod module;
 pub mod pagination;
 pub mod privacy;
+pub mod resource;
 pub mod response;
 pub mod search;
 pub mod secret;

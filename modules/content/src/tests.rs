@@ -1336,3 +1336,34 @@ mod privacy {
         .unwrap();
     }
 }
+
+/// Sổ đối tượng: bài nháp có nhưng không công khai; bài đã đăng có tiêu đề, tóm tắt, đường dẫn,
+/// ngôn ngữ của bản công khai; ID lạ thì không có.
+#[tokio::test]
+async fn so_doi_tuong_content_entry() {
+    use autoxide_kernel::resource::ResourceResolver;
+    TestDatabase::run(async |test| {
+        let (content, _, _) = service(test, config(&[])).await;
+        let resolver = crate::resource::EntryResolver(content.clone());
+        let ada = editor();
+        let mut new = post("Hello");
+        new.fields.excerpt = Some("Short".into());
+        let entry = content.create(&ada, new).await.unwrap();
+        let draft = resolver.resolve(&entry.id.to_string()).await.unwrap().unwrap();
+        assert_eq!(
+            (draft.public, draft.title.as_str(), draft.url.as_deref()),
+            (false, "Hello", None)
+        );
+        assert_eq!(draft.owner_user_ids, [ada.user_id()]);
+        content.publish(&ada, entry.id, None, None).await.unwrap();
+        let live = resolver.resolve(&entry.id.to_string()).await.unwrap().unwrap();
+        assert_eq!(
+            (live.public, live.summary.as_str(), live.url.as_deref(), live.locale.as_deref()),
+            (true, "Short", Some("/blog/hello"), Some("en"))
+        );
+        assert!(resolver.resolve(&Uuid::now_v7().to_string()).await.unwrap().is_none());
+        assert!(resolver.resolve("not-a-uuid").await.unwrap().is_none());
+    })
+    .await
+    .unwrap();
+}

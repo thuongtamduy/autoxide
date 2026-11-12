@@ -172,6 +172,7 @@ pub struct StartContext<'a> {
     wake: &'a Arc<tokio::sync::Notify>,
     apis: &'a mut Apis,
     personal_data: &'a PersonalDataExport,
+    resources: &'a crate::resource::ResourceDirectory,
 }
 
 impl StartContext<'_> {
@@ -224,6 +225,22 @@ impl StartContext<'_> {
     /// có cả phần các module khởi động sau đăng ký.
     pub fn personal_data_export(&self) -> PersonalDataExport {
         self.personal_data.clone()
+    }
+
+    /// Đăng ký loại đối tượng `kind` (`<module>.<loại>`) của module này, kèm bộ tra (xem
+    /// [`crate::resource`]).
+    pub fn resource_type(
+        &mut self,
+        kind: &'static str,
+        resolver: Arc<dyn crate::resource::ResourceResolver>,
+    ) -> Result<(), Error> {
+        self.resources.register(self.module, kind, resolver)
+    }
+
+    /// Sổ đối tượng của mọi module, để tra đối tượng của module khác. Sổ có cả các loại do
+    /// module khởi động sau đăng ký.
+    pub fn resources(&self) -> crate::resource::ResourceDirectory {
+        self.resources.clone()
     }
 
     /// Công bố một trait cho module khác dùng. `T` là kiểu `dyn Trait` khai trong
@@ -331,6 +348,8 @@ pub struct Modules {
     apis: Apis,
     /// Phần dữ liệu cá nhân các module đăng ký lúc khởi động.
     personal_data: PersonalDataExport,
+    /// Loại đối tượng các module đăng ký lúc khởi động.
+    resources: crate::resource::ResourceDirectory,
 }
 
 impl Modules {
@@ -384,6 +403,7 @@ impl Modules {
                 translations,
                 wake: Arc::new(tokio::sync::Notify::new()),
                 personal_data: PersonalDataExport::default(),
+                resources: crate::resource::ResourceDirectory::default(),
                 apis: Apis::default(),
             })
         } else {
@@ -428,6 +448,7 @@ impl Modules {
                 wake: &self.wake,
                 apis: &mut apis,
                 personal_data: &self.personal_data,
+                resources: &self.resources,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
@@ -449,6 +470,11 @@ impl Modules {
     /// Sổ dữ liệu cá nhân các module đã đăng ký lúc [`start`](Self::start).
     pub fn personal_data(&self) -> PersonalDataExport {
         self.personal_data.clone()
+    }
+
+    /// Sổ đối tượng các module đã đăng ký (gọi sau [`start`](Self::start)).
+    pub fn resources(&self) -> crate::resource::ResourceDirectory {
+        self.resources.clone()
     }
 
     /// Mọi permission của các module đã đăng ký.

@@ -2613,3 +2613,19 @@ Quyết định:
 
 Đã cân nhắc: một UUID đặc biệt trong `actor_user_id` thay cho cột mới — rẻ hơn nhưng là giá trị
 "thần kỳ", người đọc audit dễ hiểu nhầm là một người dùng.
+
+## D-117 · Sổ đối tượng trung lập `ResourceDirectory`; `content` đăng ký `content.entry` — 2026-11-12 — agent quyết
+
+Quyết định: `autoxide_kernel::resource` — sổ giống sổ dữ liệu cá nhân. Module đăng ký loại đối
+tượng `<module>.<loại>` kèm `ResourceResolver` bằng `StartContext::resource_type`; module khác lấy
+sổ bằng `StartContext::resources()` và gọi `resolve(loại, id)` → `Option<Resource { public,
+title, summary, url, locale, owner_user_ids }>` (`url` là đường dẫn không có tên miền). Kernel
+chỉ biết chuỗi loại, nên vẫn trung lập nghiệp vụ; không module nào phụ thuộc thẳng `content`
+hay đọc bảng của nó.
+
+`content` đăng ký `content.entry` (ID là UUID của mục): đang công khai thì trả tiêu đề, tóm tắt,
+đường dẫn, ngôn ngữ của bản công khai (`public: true`); chỉ có nháp thì `public: false`, không
+đường dẫn; `owner_user_ids` là người tạo mục.
+
+Đã cân nhắc: để `comments` / `newsletter` phụ thuộc `autoxide_content::api` — gắn chặt hai module
+vào `content`, trong khi bình luận gắn được vào đích bất kỳ.

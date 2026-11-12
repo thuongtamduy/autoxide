@@ -245,7 +245,7 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 - [x] `Mail` / `Mailer`: `reply_to`, header theo danh sách cho phép, lỗi vĩnh viễn / tạm thời,
       khoá chống trùng; event thất bại vĩnh viễn
 - [x] `Actor` cho người lạ trên outbox
-- [ ] `ResourceDirectory` trung lập; `content` đăng ký resolver
+- [x] `ResourceDirectory` trung lập; `content` đăng ký resolver
 - [ ] `AUTOXIDE_HTTP_PUBLIC_URL`
 - [ ] Hợp đồng chung cho ba module: `docs/prompts/reader-input-contract.md`
 
