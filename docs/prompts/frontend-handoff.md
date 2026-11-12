@@ -101,11 +101,31 @@ xoá hẳn); công khai / riêng tư; ảnh thu nhỏ lấy bằng `?w=`; video 
   lấy từ query string (tránh open redirect).
 - Làm mới cache: route nhận webhook của core, **kiểm chữ ký Standard Webhooks**, gọi
   `revalidateTag` / `revalidatePath` theo `path` mới **và mọi `path` cũ** trong payload (đổi slug
-  trang cha thì trang con cũng đổi).
+  trang cha thì trang con cũng đổi). Gắn thêm tag `term:<id>` / `author:<id>` cho mỗi trang và làm
+  mới chúng khi nhận `content.term_changed` / `content.author_changed` (event này không kèm danh
+  sách trang — D-106).
 - SEO: meta title / description, Open Graph (ảnh từ `media`), canonical, `noindex`, JSON-LD
   `Article` / `BreadcrumbList`; sitemap có `alternates.languages` (hreflang) từ endpoint dữ liệu
   sitemap; RSS 2.0 / Atom / JSON Feed từ endpoint feed (render thân JSON ra HTML phía máy chủ
   Next.js bằng Tiptap; ID của item là UUID, không phải URL).
+
+### AI (làm được ngay — hướng dẫn `docs/AI.md`, D-109)
+
+- Gọi `GET /api/v1/ai/status` (permission `ai.view`) để ẩn hay hiện nút AI: sinh chữ, đọc ảnh,
+  embedding có bật không; hạn mức token hôm nay.
+- Gợi ý (SEO, alt text) **không lưu gì**: hiện gợi ý cạnh trường, người bấm nhận thì gửi `PATCH`
+  như sửa tay (kèm `If-Match`). Lỗi `ai.*` có `code` ổn định — hiện câu của máy chủ (đã dịch theo
+  `Accept-Language`); `429 ai.quota_exceeded` / `503 ai.provider_unavailable` có `Retry-After`.
+- Kiểm SEO (`GET /entries/{id}/seo-check`) chạy không cần AI: hiện danh sách phát hiện, nhảy tới
+  `field` (vị trí trong JSON thân bài theo dạng `body.content[2].attrs.alt`).
+- Dịch: `POST /entries/{id}/translate` trả `202` + `Location`; theo dõi
+  `GET /translation-requests/{id}` (hay webhook `content.translation_succeeded` / `_failed`). Bản
+  dịch là nháp mang `ai_generated`; hiện `translation_outdated` và nút "dịch lại".
+- Tìm: `GET /search` (quản trị) gộp ý nghĩa và chữ; mỗi kết quả có `matched_by`, `snippet`.
+- Nhãn cho người đọc: endpoint công khai trả `ai_generated` và `ai_reviewed` — website tự quyết
+  cách hiện. Khi người biên tập đăng bài `ai_generated` sau khi duyệt, gửi
+  `{"ai_reviewed": true}` cùng lệnh đăng (chỉ phiên đăng nhập, không phải API key).
+- Xin duyệt: hiện danh sách bài có `review_requested_at` (agent đã viết xong, chờ người đăng).
 
 ### `forms`, `newsletter`, `comments` (sau `content`)
 

@@ -2378,6 +2378,260 @@ làm cho mỗi việc".
 SQLite; lưu preview token vào bảng để thu hồi từng cái — thêm bảng và dọn dẹp cho một tính năng
 token sống 10 phút; retry lịch thất bại — lỗi nghiệp vụ không tự hết, retry chỉ làm ồn log.
 
+## D-106 · Sửa lỗi sau lượt rà soát độc lập module `content` — 2026-11-12 — agent quyết
+
+Một lượt rà soát độc lập (đọc code, ba phần song song) tìm ra các lỗi dưới đây; mỗi lỗi có test
+riêng chạy trên cả SQLite và Postgres (`tests::ra_soat`, `http::tests::etag_resolve_…`, test của
+`body` và `paths`).
+
+Quyết định:
+
+- **Chuyển trang tính đường dẫn công khai từ slug đã đăng**, không từ slug của nháp (trước đây
+  `move` làm lộ slug nháp chưa duyệt lên địa chỉ công khai).
+- **Đường dẫn mới của trang con trùng** một bản công khai khác (khi đổi slug trang cha hay chuyển
+  trang) báo `content.path_taken` như với chính trang được đổi, thay vì lỗi 500; lịch hẹn giờ gặp
+  lỗi này thì thất bại thay vì thử lại mãi.
+- **Từ chối `\`** trong URL nhúng, link "trong site" và mọi đường dẫn chuẩn hoá: trình duyệt coi
+  `\` như `/` (chuẩn WHATWG URL), nên `https://evil.com\.youtube.com/x` lọt danh sách host được
+  phép và `/\evil.com` là link ra ngoài.
+- **`ETag` của `resolve` là dấu vân tay nội dung** (SHA-256 của câu trả lời JSON, 16 byte đầu,
+  base64url) thay vì `updated_at` của bản công khai: câu trả lời gộp danh mục, thẻ, tác giả, bản
+  dịch và ảnh, mà đổi những thứ đó không chạm `updated_at` — website từng nhận 304 với nội dung cũ.
+- **Gắn danh mục / tác giả cho mục đang công khai cần thêm `content.publish`**: thay đổi có hiệu
+  lực ngay với người đọc, như mọi thay đổi bản công khai khác.
+- **Khoá thêm:** tạo trang con (kể cả bản dịch) lấy khoá cây của ngôn ngữ rồi kiểm lại trang cha
+  và độ sâu trong transaction (không còn trang con mồ côi khi xoá cha cùng lúc; bản dịch không
+  vượt 5 cấp); tạo / sửa chuyển hướng lấy cùng khoá trước khi kiểm vòng lặp; tạo / đổi cha / xoá
+  danh mục lấy khoá cây danh mục (dòng `#categories` của bảng khoá cây — không trùng được mã ngôn
+  ngữ BCP 47) và kiểm lại cha trong transaction.
+- **Chuyển hướng làm tay chỉ trỏ tới mục cùng ngôn ngữ** (`to_entry_id`, lỗi `other_locale`).
+  Chuyển hướng trỏ tới mục đã lưu trữ trả 410 (không phải 404), khớp tài liệu.
+- **Lịch:** đăng theo lịch lấy vị trí trong cây từ bản đọc sau khi khoá (nội dung vẫn từ revision
+  đã ghim); gỡ theo lịch ghi revision `unpublished` như gỡ tay; xoá tài khoản huỷ lịch từng cái,
+  kèm event `content.schedule_canceled`; dọn revision không bao giờ xoá revision đang là bản công
+  khai, kể cả khi một lịch vừa chạy.
+- **Ảnh đại diện riêng tư của tác giả** không lộ cả ID trong bài công khai.
+- **Làm mới cache khi thẻ / tác giả đổi:** event `content.term_changed` / `content.author_changed`
+  không kèm danh sách trang (một thẻ có thể trên hàng nghìn bài); website gắn tag cache theo ID
+  term / tác giả và làm mới khi nhận event — ghi trong `docs/CONTENT.md`.
+- `docs/CONTENT.md` sửa phạm vi `If-Match` cho khớp D-105 (xoá term, tác giả, chuyển hướng và gắn
+  term / tác giả không cần).
+
+Lý do: các lỗi trên hoặc lộ nội dung chưa duyệt, hoặc mở đường nhúng trang lạ, hoặc làm website
+giữ nội dung cũ, hoặc chỉ hiện ra khi ghi đồng thời trên Postgres — đều trái tiêu chí "đầy đủ" và
+luật hai database.
+
+Đã cân nhắc: phát event "mục đổi" cho từng bài khi xoá / đổi tên thẻ, tác giả — có thể hàng nghìn
+event một lần, nặng hơn quy ước tag cache; `ETag` từ thời điểm lớn nhất của mọi thứ gộp vào — phải
+thêm cột thời gian cho bảng liên kết và vẫn sót ảnh (thuộc module `media`); khoá danh mục bằng
+bảng riêng — thêm migration chỉ để có một dòng khoá.
+
+## D-107 · Tắt CI trên GitHub; gate cục bộ là gate duy nhất — 2026-11-12 — chủ dự án quyết
+
+Quyết định:
+
+- Ba workflow trong `.github/workflows` (`CI`, `Security audit`, `Release`) **không tự chạy
+  nữa** (không theo push, pull request, lịch hay tag); chỉ còn `workflow_dispatch` (bấm tay). File
+  giữ nguyên để bật lại dễ.
+- `./gate.sh` trên máy là gate duy nhất, như CLAUDE.md đã quy định: fmt, clippy, kiểm ranh giới,
+  `cargo deny` (gồm lỗ hổng thư viện), test trên SQLite và Postgres.
+- Phát hành làm tay theo `docs/RELEASING.md`: tag, bản phát hành GitHub tạo trên trang web,
+  image Docker build trên máy và chỉ đăng khi chủ dự án cấp token.
+- Dependabot vẫn mở PR nâng thư viện Rust và Docker (chạy trên hạ tầng riêng của GitHub, không
+  cần runner trả phí); người duyệt chạy `./gate.sh` trên nhánh PR trước khi merge. Bỏ phần nâng
+  phiên bản GitHub Actions vì workflow không còn tự chạy.
+
+Lý do: chủ dự án không gắn thẻ thanh toán cho tài khoản GitHub; mọi lần chạy CI đều dừng sau vài
+giây mà không khởi động job, chỉ sinh báo đỏ vô nghĩa trên mỗi commit.
+
+Đã cân nhắc: xoá hẳn các workflow — mất công dựng lại khi có runner (ví dụ runner tự host); runner
+tự host — cần một máy chạy liên tục, chủ dự án chưa có.
+
+Hệ quả: mất quét secret bằng gitleaks trong CI (D-074). Thay thế: bật "Secret scanning" và "Push
+protection" của GitHub (miễn phí cho repo công khai, Settings → Code security) — việc của chủ dự
+án; agent vẫn giữ luật "secret không vào git".
+
+Thay: phần "chạy trên GitHub Actions" của D-074 và phần workflow tự động của D-078; mục "CI chạy
+xanh trên GitHub" và "CI build và đăng image" của bước 13.
+
+## D-108 · Quét secret bằng gitleaks trong gate — 2026-11-12 — chủ dự án quyết, agent quyết cách làm
+
+Quyết định: `./gate.sh` có thêm bước 5 "secrets": gitleaks quét toàn bộ lịch sử git, rồi thay
+đổi đã stage và chưa stage, theo `.gitleaks.toml`. Máy có `gitleaks` thì dùng nó; không thì chạy
+image Docker ghim `zricethezav/gitleaks:v8.30.0` (Docker vốn đã cần cho Postgres của gate; đổi
+bằng `GATE_GITLEAKS_IMAGE`). Có secret thì gate đỏ, không commit được.
+
+Lý do: chủ dự án giữ repo riêng tư (chọn hướng B): GitHub không cho secret scanning miễn phí với
+repo riêng tư, và CI đã tắt (D-107) nên bước gitleaks trong CI (D-074) không còn chạy. Đưa vào
+gate thì mỗi lần "xong" đều được quét, không cần dịch vụ ngoài.
+
+Ngoại lệ: lần quét đầu tìm một chỗ trong lịch sử — khoá ví dụ **công khai** của bộ test chính
+thức Standard Webhooks (`modules/webhooks`, test khớp chữ ký), không phải secret. `.gitleaks.toml`
+thêm một ngoại lệ đúng chuỗi đó, không nới luật nào khác. Đã thử ngược: một khoá giả chưa commit
+làm bước này đỏ.
+
+Đã cân nhắc: chuyển repo sang công khai để dùng secret scanning và CI miễn phí của GitHub (hướng A)
+— chủ dự án chưa muốn; image `ghcr.io/gitleaks/gitleaks` như CI cũ — cùng phiên bản nhưng tải từ
+GHCR không ổn định ở mọi mạng, Docker Hub phổ biến hơn.
+
+Thay: phần quét secret trong CI của D-074; phần "Hệ quả" của D-107 (bật secret scanning của GitHub).
+
+## D-109 · Tính năng AI: tầng kết nối trung lập, hai adapter, quyền cho agent, mặc định tắt — 2026-11-12 — chủ dự án quyết, agent quyết cách làm
+
+Chủ dự án đề xuất bốn tính năng AI (tìm theo ý nghĩa, AI dịch bài vi ↔ en, gợi ý SEO và alt
+text, giới hạn quyền cho agent tự viết và đăng bài) và đồng ý hướng làm dưới đây. Đề bài đầy đủ:
+`docs/prompts/ai.md`; khảo sát và số đo: `docs/research/ai.md`. Thành bước 18 của lộ trình.
+
+Quyết định (chủ dự án):
+
+- Làm cả bốn tính năng, theo thứ tự: quyền cho agent → tầng kết nối AI → gợi ý SEO / alt →
+  dịch → tìm theo ý nghĩa.
+- **Hỗ trợ nhiều nhà cung cấp ngay từ đầu**, không chỉ Anthropic: adapter `anthropic`
+  (Messages API gốc) và adapter `openai` (Chat Completions — dùng được với OpenAI, Gemini qua
+  endpoint tương thích OpenAI, Ollama, vLLM, LM Studio, OpenRouter… bằng cách đổi base URL).
+  Embedding là client riêng theo dạng `/v1/embeddings`.
+- **Mặc định tắt.** Người cài tự chọn nhà cung cấp và tự đặt key; không gửi dữ liệu cho bên nào
+  khi chưa cấu hình.
+
+Quyết định (agent, cách làm):
+
+- Trait `TextModel` và `Embedder` trong kernel (trung lập với nhà cung cấp và nghiệp vụ); module
+  hạ tầng `ai` công bố cài đặt — cùng khuôn với `Mailer` / module `mail`. Module khác không gọi
+  nhà cung cấp trực tiếp.
+- Mỗi lời gọi sinh chữ trả JSON theo schema, và luôn được kiểm lại trong Rust.
+- Không gọi AI trong transaction ghi. Việc có ghi chạy bằng job; gợi ý chạy ngay trong request.
+  Kết quả AI chỉ thành nháp hoặc gợi ý, không bao giờ tự đăng.
+- Dịch tách thân bài thành mẩu có thẻ giữ chỗ, ráp lại theo cấu trúc gốc. Mô hình không bao giờ
+  thấy hay sửa link, ID ảnh, cấu trúc node.
+- Tìm theo ý nghĩa: vector lưu nhị phân trong bảng thường, cosine duyệt hết trong bộ nhớ, gộp
+  với tìm theo chữ bằng Reciprocal Rank Fusion; endpoint công khai tắt mặc định. Đo trước khi
+  tính tới index ANN.
+- Quyền mới: `content.delete` (tách khỏi `content.publish`), `content.write_own`,
+  `content.publish_own`; xin duyệt; `ai_generated` / `ai_reviewed`; rate limiting theo API key.
+- Không thêm thư viện.
+
+Lý do: OpenAI, Gemini và phần mềm chạy tại máy đều nói được Chat Completions. Vì vậy hai adapter
+phủ gần hết lựa chọn mà người cài có, không phải giữ một adapter cho mỗi hãng. Anthropic giữ
+adapter gốc vì lớp tương thích OpenAI làm mất fallback khi bị từ chối và `stop_reason` đầy đủ.
+
+Về hai database: `pgvector` chỉ Postgres có. `sqlite-vec` là extension C; với sqlx 0.9, nạp
+extension phải gọi API `unsafe`, mà repo cấm `unsafe`. Vector trong bảng thường với cosine tính
+trong Rust chạy như nhau trên hai database. Ước tính dưới 50 ms với 100.000 đoạn — số đo thật
+ghi khi làm.
+
+Về quyền: tách quyền và bắt người duyệt các việc có tác động lớn là cách chống prompt injection
+mà OWASP khuyên (LLM01, LLM06). `ai_reviewed` ghi lại sự thật để người vận hành làm đúng EU AI
+Act Điều 50.
+
+Đã cân nhắc:
+
+- **Chỉ Anthropic:** trái mục tiêu "ai cũng dùng được".
+- **Một adapter riêng cho mỗi hãng**, gồm cả Gemini gốc và Responses API của OpenAI: nhiều code
+  phải giữ hơn. Chỉ thêm khi đo được Chat Completions thiếu thứ cần.
+- **Thư viện nhiều nhà cung cấp** (`genai`, `rig`, `async-openai`): kéo theo phụ thuộc và thay
+  đổi API thường xuyên, trong khi phần cần dùng chỉ vài trăm dòng HTTP.
+- **Chạy mô hình trong binary** (ONNX, candle): binary nặng, trái "không thêm thư viện thừa".
+- **Gửi nguyên HTML / JSON của bài cho mô hình dịch:** module AI Translate của Drupal làm vậy và
+  có nhiều lỗi mở về thẻ bị mất hoặc sửa.
+- **Để AI tự ghi thẳng vào bản công khai:** mọi CMS đã khảo sát đều đưa kết quả về nháp hoặc gợi
+  ý.
+
+## D-110 · Bước 18 (AI): những chỗ đề bài chưa nói hoặc làm khác — 2026-11-12 — agent quyết
+
+Bối cảnh: làm bước 18 theo `docs/prompts/ai.md` và D-109. Ghi lại để phiên sau không đảo nhầm.
+
+Quyết định:
+
+- **Tên biến cấu hình theo module đọc nó.** `AUTOXIDE_AI_SEND_PRIVATE_MEDIA` của đề bài thành
+  `AUTOXIDE_MEDIA_AI_SEND_PRIVATE`, `AUTOXIDE_AI_TRANSLATE_BATCH_TOKENS` thành
+  `AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS`. Lý do: mỗi biến khai một lần, ở module dùng nó;
+  module `ai` không biết ảnh hay bài viết. Thêm `AUTOXIDE_AI_IMAGES` (mô hình có đọc ảnh không),
+  vì Chat Completions không cho biết điều đó.
+- **`TextModel::ready()` / `Embedder::ready()`** trong trait của kernel. Module dùng AI kiểm "đã
+  bật chưa" trước việc tốn kém (đọc và thu nhỏ ảnh, xếp job dịch). Lỗi là chính lỗi `ai.*` của
+  module `ai`, nên không module nào phải tự chế mã riêng.
+- **Mã lỗi của `content` cho phần dịch.** Bản dịch sai cấu trúc là `content.translation_invalid`,
+  không phải `ai.output_invalid`: mã lỗi mang tiền tố module tạo ra nó (`cargo xtask check`).
+  Ngôn ngữ đích trùng ngôn ngữ nguồn là lỗi trường `locale` (`validation_failed`), như khi tạo
+  bản dịch bằng tay, không có mã riêng `translation_same_locale`. Tài khoản đã yêu cầu bị xoá thì
+  yêu cầu dừng với `error_code` `content.translation_canceled`; đây là giá trị lưu trong bảng,
+  không phải lỗi API.
+- **Chặn hai yêu cầu dịch cùng lúc bằng cột `active_key`** (`<nhóm bản dịch>:<ngôn ngữ>` khi đang
+  chờ hay đang chạy, `NULL` khi xong) có unique index. Cả SQLite và Postgres coi hai `NULL` là
+  khác nhau, nên không cần partial index. Khoá theo nhóm bản dịch, không theo bản gốc: hai bản gốc
+  của cùng nhóm không cùng ghi một bản dịch.
+- **Bản dịch mới lấy slug từ tiêu đề đã dịch.** Gửi `slug: ""` khi tạo bản dịch nghĩa là "sinh từ
+  tiêu đề, trùng thì thêm hậu tố", như khi không gửi slug. Bản dịch có sẵn giữ slug, để địa chỉ
+  không đổi.
+- **Tìm công khai: ngân sách chung mỗi phút, hết thì chỉ tìm theo chữ.** Đề bài viết "rate
+  limiting theo địa chỉ client". Đổi lại vì điều cần chặn là chi phí embedding, không phải số
+  request (rate limiting theo địa chỉ của kernel đã có). Hết ngân sách thì vẫn trả kết quả theo
+  chữ, không trả 429. Đếm trong tiến trình. `AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE` mặc
+  định 30.
+- **Lập index còn thiếu bằng lịch chạy mỗi giờ** (`content.catch_up_embeddings`, mỗi lần tối đa
+  500 mục), không bằng lệnh CLI. Bật embedding hay đổi mô hình là tự lập lại, không ai phải nhớ
+  chạy lệnh.
+- **Job lập index không dùng `unique_key`.** Khoá chống trùng của job queue giữ cả job đã xong
+  cho tới khi bị dọn, nên sẽ chặn lần lập index sau. Job lập index tự nhận ra khi không có gì
+  đổi: đoạn có cùng SHA-256 và cùng mô hình thì không gọi embedding.
+- **Ngưỡng thời gian tìm chấp nhận được: dưới 50 ms cho phần tính toán.** Đo được 8,3 ms với
+  10.000 đoạn và 107 ms với 100.000 đoạn × 1.024 chiều, một nhân 2,1 GHz (`docs/BENCHMARKS.md`).
+  Tức khoảng 40.000 đoạn mỗi ngôn ngữ, cỡ 7.000–8.000 bài. Vượt ngưỡng đó mới là lý do cho bước
+  sau (vector `f16` / `int8`, nhiều nhân, ANN hay `pgvector` sau trait).
+- **Máy chủ HTTP giả trong test của module `ai` là một handler không có router.** Luật
+  `module-routes` cấm `.route(…)` và `.fallback(…)` trong module, kể cả trong test.
+
+Đã cân nhắc:
+
+- **Đặt biến AI của `media` và `content` dưới `AUTOXIDE_AI_`:** module `ai` phải biết nghiệp
+  vụ.
+- **Partial unique index cho yêu cầu dịch đang chạy:** cú pháp tạo khác nhau qua SeaORM, trong
+  khi cột `active_key` đơn giản và đã kiểm trên cả hai database.
+- **Trả 429 khi hết ngân sách tìm công khai:** người đọc không có kết quả nào.
+
+## D-111 · Bước 18: sửa sau lượt rà soát độc lập — 2026-11-12 — agent quyết
+
+Một agent khác đọc độc lập toàn bộ code bước 18. Mọi phát hiện đều kiểm lại với code và sửa,
+mỗi cái kèm test khi kiểm được:
+
+- **Yêu cầu dịch kẹt ở `running` mãi** (nặng). Worker cắt job sau 270 giây, còn một lần gọi AI
+  được phép tới 600 giây, nên job bị cắt ngang mà không ai ghi kết quả. Sửa:
+  - mỗi lần chạy job dịch tự giới hạn 240 giây; quá thì là lỗi tạm thời
+    `content.translation_timed_out`, được thử lại;
+  - yêu cầu đứng yên ở `running` quá 15 phút bị yêu cầu mới cùng ngôn ngữ thay chỗ
+    (`error_code` `content.translation_stale`);
+  - bước đánh dấu xong chỉ ghi khi yêu cầu còn `queued` / `running`, nên không ghi đè yêu cầu đã
+    huỷ hay đã bị thay.
+- **HTTP 400 / 413 / 422 của nhà cung cấp** thành `ai.request_rejected` (503), không còn là
+  `internal_error`, và không bị thử lại như lỗi tạm thời. Không ghi thông báo của 401 / 403 vào
+  log, vì có nhà cung cấp nhắc lại một phần key.
+- **`translation_outdated`** so nội dung (snapshot) của bản gốc với revision đã dịch, không so
+  `updated_at`. Đăng, gỡ hay xin duyệt không làm bản dịch thành "cũ".
+- **Lập index:**
+  - job kiểm lại dấu thời gian của mục trong transaction ghi; mục đã đổi thì không ghi vector
+    của chữ cũ;
+  - dòng `version` được tạo trước transaction, vì trên Postgres lỗi trùng khoá làm hỏng cả
+    transaction;
+  - job lập bù có `unique_key` theo ngày (mỗi mục tối đa một job mỗi ngày). Đây là điều chỉnh
+    một phần D-110: job lập index thường vẫn không có khoá.
+- **Mô tả `AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`** nói đúng là một ngân sách chung, đếm
+  trong từng tiến trình.
+- **Quyền:**
+  - publish, unpublish, move, xin duyệt kiểm quyền sở hữu **trước** phiên bản (`If-Match`), để
+    người chỉ có `_own` không dò được mục của người khác qua 412;
+  - khôi phục revision không cần `content.read` nữa: quyền sửa mục, kể cả `content.write_own`,
+    là đủ, khớp với tool MCP.
+- **Dịch:**
+  - tài khoản đã yêu cầu bị xoá thì `error_code` là `content.translation_canceled`;
+  - thẻ rỗng `<mN></mN>` bị từ chối, để không mất link.
+
+Để lại, ghi rõ:
+
+- **Job dịch chết đúng giữa lúc ghi xong bản dịch có sẵn và lúc đánh dấu xong:** lần chạy lại
+  báo `content.translation_conflict` dù bản dịch đã được ghi. Hiếm, và không mất dữ liệu.
+- **Tool MCP `get_translation_request`** hiện với `content.read` hay `content.write_own`. Người
+  chỉ có `content.write` dùng REST.
+
 ## D-112 · Ba module `forms`, `newsletter`, `comments`, sau phần nền chung trong core — 2026-11-12 — chủ dự án quyết
 
 Bối cảnh: đề bài `docs/prompts/forms-newsletter-comments.md` và khảo sát

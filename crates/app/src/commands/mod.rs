@@ -1,5 +1,6 @@
 //! Mỗi lệnh của CLI một file. Hàm `run` của lệnh trả mã thoát của tiến trình.
 
+pub mod ai;
 pub mod backup;
 pub mod config;
 pub mod copy;

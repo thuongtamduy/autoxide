@@ -51,8 +51,39 @@ endpoints are marked deprecated with a sunset date first.
   administrators with `Reply-To` set to the sender, export and erasure by email, automatic
   deletion after a retention period, consent proof. Permissions `forms.read`,
   `forms.manage`, `forms.review`, `forms.export`; seven MCP tools, including creating and
-  changing forms. New settings
-  `AUTOXIDE_FORMS_*`.
+  changing forms. New settings `AUTOXIDE_FORMS_*`.
+- AI helpers (guide in `docs/AI.md`): an SEO check without AI
+  (`GET /api/v1/content/entries/{id}/seo-check`); SEO suggestions
+  (`POST …/seo-suggestions`) and alt text suggestions (`POST /api/v1/media/{id}/alt-suggestions`,
+  from a small copy; private images only with `AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true`) that save
+  nothing; translation into the draft of a translation (`POST …/translate` → `202`, a
+  background job that keeps structure, links and images, never overwrites a translation
+  changed meanwhile and never publishes; `GET /api/v1/content/translation-requests/{id}`,
+  events `content.translation_*`, `translation_outdated`); search by meaning combined with
+  word search (`GET /api/v1/content/search`, `GET /api/v1/content/public/search` off by
+  default), same results on SQLite and PostgreSQL. MCP tools `content.seo_check`,
+  `content.suggest_seo`, `content.translate`, `content.get_translation_request`,
+  `content.search`, `media.suggest_alt`. New settings `AUTOXIDE_MEDIA_AI_SEND_PRIVATE`,
+  `AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS`, `AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH`,
+  `AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`.
+
+- AI connection (module `ai`, off by default): one interface for every module to generate
+  structured answers and embeddings, with two adapters — `anthropic` (Claude, Messages API)
+  and `openai` (the Chat Completions format: OpenAI, Google Gemini, Ollama, vLLM, LM Studio,
+  OpenRouter…) — plus an `/embeddings` client. Every answer follows a JSON Schema and is
+  checked again by the server; a daily token limit is kept in the database
+  (`AUTOXIDE_AI_DAILY_TOKEN_LIMIT`). `GET /api/v1/ai/status` and the MCP tool `ai.status`
+  (permission `ai.view`) tell what is on; `autoxide ai check` tries the settings against the
+  provider. New settings `AUTOXIDE_AI_*` and `AUTOXIDE_EMBEDDING_*`.
+
+- AI agents may be limited to their own work: permissions `content.write_own` and
+  `content.publish_own` (only entries created by the same user with the same API key), review
+  requests (`POST/DELETE /api/v1/content/entries/{id}/request-review`, events
+  `content.review_requested` / `content.review_withdrawn`, MCP tool `content.request_review`),
+  `ai_generated` on entries and `ai_reviewed` on the published version (only a signed-in person
+  can confirm a review), `created_via` in the admin API. MCP tools may accept an alternative
+  permission. Requests made with an API key are rate limited per key
+  (`AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE`, `…_BURST`).
 - Content (`/api/v1/content`, guide in `docs/CONTENT.md`): posts and pages with a draft kept
   apart from the published version, a JSON body (ProseMirror / Tiptap) checked against an
   allowlist, slugs made from titles (`Đường đến Đà Lạt` → `duong-den-da-lat`), revisions with
@@ -107,6 +138,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Changed
 
+- Deleting a post or page needs the new permission `content.delete`; `content.publish` no
+  longer includes it. The `admin` role has every permission, as before; give
+  `content.delete` to other roles that should delete.
 - Validation reports every problem of a request at once (for example a bad email and an
   empty name together). Webhook endpoints report a non-`https` address or an unknown event
   as field errors (`url`, `events[i]`) like roles and API keys do.

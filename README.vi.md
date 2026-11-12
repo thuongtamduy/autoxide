@@ -56,18 +56,21 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
 9. MCP endpoint để AI agent gọi hệ thống như công cụ
 10. Một module mẫu và hướng dẫn viết module
 11. Công cụ và deploy: chép dữ liệu giữa SQLite và PostgreSQL, đo hiệu năng, Docker,
-    backup và restore, CI
+    backup và restore, một lệnh kiểm tra (`./gate.sh`)
 12. Passkey; 13–14. quản lý tài khoản, webhook, hợp đồng API chặt hơn
 15. Thư viện media: ảnh, video, âm thanh, tài liệu trong thư mục lồng nhau, phục vụ
     công khai hay riêng tư ([`docs/MEDIA.vi.md`](docs/MEDIA.vi.md))
 16. Nội dung: bài viết và trang nhiều ngôn ngữ, bản nháp và lịch sử, hẹn giờ, danh mục,
     thẻ, tác giả, menu, chuyển hướng, và endpoint công khai cho website
     ([`docs/CONTENT.vi.md`](docs/CONTENT.vi.md))
-17. Biểu mẫu: form liên hệ, form đăng ký định nghĩa qua API, máy chủ kiểm câu trả lời,
+17. Tính năng AI, mặc định tắt, với nhà cung cấp bạn chọn (Claude, OpenAI, Gemini,
+    Ollama…): gợi ý SEO và alt text, dịch bài vào bản nháp, tìm theo ý nghĩa, và permission
+    giữ AI agent trong phần việc của nó ([`docs/AI.vi.md`](docs/AI.vi.md))
+18. Biểu mẫu: form liên hệ, form đăng ký định nghĩa qua API, máy chủ kiểm câu trả lời,
     giữ lại spam, hộp thư có xuất CSV ([`docs/FORMS.vi.md`](docs/FORMS.vi.md))
-18. Bản tin email: danh sách, xác nhận hai bước, huỷ một chạm, chiến dịch gửi theo lô có
+19. Bản tin email: danh sách, xác nhận hai bước, huỷ một chạm, chiến dịch gửi theo lô có
     tạm dừng và tiếp tục, bounce, mail cho bài mới ([`docs/NEWSLETTER.vi.md`](docs/NEWSLETTER.vi.md))
-19. Bình luận: bình luận hai cấp gắn vào đích bất kỳ, cho người dùng đăng nhập hoặc khách,
+20. Bình luận: bình luận hai cấp gắn vào đích bất kỳ, cho người dùng đăng nhập hoặc khách,
     kiểm duyệt theo pipeline cố định, báo cáo, cấm, mail báo trả lời ([`docs/COMMENTS.vi.md`](docs/COMMENTS.vi.md))
 
 ## Yêu cầu
@@ -318,6 +321,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   công khai, cache, thùng rác
 - [`docs/CONTENT.vi.md`](docs/CONTENT.vi.md) — dùng module nội dung: bản nháp, đăng, trang
   và địa chỉ, ngôn ngữ, endpoint công khai cho website, xem trước
+- [`docs/AI.vi.md`](docs/AI.vi.md) — tính năng AI: bật với từng nhà cung cấp, embedding, chi
+  phí và giới hạn, gửi gì đi, giới hạn cho AI agent
 - [`docs/FORMS.vi.md`](docs/FORMS.vi.md) — dùng module biểu mẫu: định nghĩa form, hiện
   trên website, chống spam, hộp thư, yêu cầu dữ liệu theo email
 - [`docs/NEWSLETTER.vi.md`](docs/NEWSLETTER.vi.md) — dùng module bản tin: danh sách, ô đăng ký,

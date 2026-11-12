@@ -60,18 +60,21 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
 9. An MCP endpoint so AI agents can call the system as tools
 10. A sample module and a guide for writing modules
 11. Tooling and deployment: data copy between SQLite and PostgreSQL, benchmarks,
-    Docker, backup and restore, CI
+    Docker, backup and restore, a one-command check (`./gate.sh`)
 12. Passkeys; 13–14. account management, webhooks, a hardened API contract
 15. A media library: images, video, audio and documents in nested folders, served
     publicly or privately ([`docs/MEDIA.md`](docs/MEDIA.md))
 16. Content: posts and pages in several languages, drafts and history, scheduling,
     categories, tags, authors, menus, redirects, and public endpoints for the website
     ([`docs/CONTENT.md`](docs/CONTENT.md))
-17. Forms: contact and sign-up forms defined through the API, answers checked on the
+17. AI features, off by default, with the provider you choose (Claude, OpenAI, Gemini,
+    Ollama…): SEO and alt text suggestions, translation into drafts, search by meaning,
+    and permissions that keep AI agents to their own work ([`docs/AI.md`](docs/AI.md))
+18. Forms: contact and sign-up forms defined through the API, answers checked on the
     server, spam held back, an inbox with CSV export ([`docs/FORMS.md`](docs/FORMS.md))
-18. Newsletters: lists, double opt-in, one-click unsubscribe, campaigns sent in batches
+19. Newsletters: lists, double opt-in, one-click unsubscribe, campaigns sent in batches
     with pause and resume, bounces, mail for new posts ([`docs/NEWSLETTER.md`](docs/NEWSLETTER.md))
-19. Comments: two-level comments on any target for signed-in users or guests, a fixed
+20. Comments: two-level comments on any target for signed-in users or guests, a fixed
     moderation pipeline, reports, bans, reply mails ([`docs/COMMENTS.md`](docs/COMMENTS.md))
 
 ## Requirements
@@ -322,6 +325,8 @@ never share foreign keys. These rules are checked automatically by the gate.
   links, caching, trash
 - [`docs/CONTENT.md`](docs/CONTENT.md) — using the content module: drafts, publishing,
   pages and addresses, languages, public endpoints for the website, preview
+- [`docs/AI.md`](docs/AI.md) — the AI features: turning them on with each provider,
+  embeddings, costs and limits, what is sent, limits for AI agents
 - [`docs/FORMS.md`](docs/FORMS.md) — using the forms module: defining a form, showing it
   on a website, anti-spam, the inbox, data requests by email
 - [`docs/NEWSLETTER.md`](docs/NEWSLETTER.md) — using the newsletter module: lists, the

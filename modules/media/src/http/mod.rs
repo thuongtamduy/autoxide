@@ -2,6 +2,7 @@
 //! gọi service và trả kết quả; mọi logic (kể cả kiểm permission) nằm ở service. Mọi route
 //! đăng ký qua `routes!` để có tài liệu OpenAPI (luật kiến trúc 6).
 
+mod assist;
 mod content;
 mod folders;
 mod items;
@@ -23,6 +24,7 @@ use crate::folders::Folder;
 use crate::service::{FolderFilter, Item, ItemDetails, MediaService, Visibility, content_url};
 use crate::variants::Variant;
 
+pub(crate) use assist::AltSuggestionResponse;
 pub(crate) use folders::FolderResponse;
 pub(crate) use items::{DuplicateItem, ItemsQuery, UploadedResponse};
 pub(crate) use tags::TagResponse;
@@ -37,6 +39,7 @@ pub(crate) fn routes(service: Arc<MediaService>) -> OpenApiRouter {
         .routes(routes!(items::get_item, items::update_item, items::trash_item))
         .routes(routes!(items::restore_item))
         .routes(routes!(items::purge_item))
+        .routes(routes!(assist::suggest_alt))
         .routes(routes!(content::get_content, content::head_content, content::replace_content))
         .with_state(service)
 }

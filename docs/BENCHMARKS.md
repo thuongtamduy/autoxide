@@ -187,3 +187,27 @@ Kết luận: **không thấy rò rỉ** bộ nhớ, file hay kết nối databa
 trong phút đầu (bộ nhớ đệm, pool ấm lên) rồi gần như phẳng (nửa sau so với nửa đầu: +4%
 SQLite, +0,4% PostgreSQL); số kết nối PostgreSQL giữ nguyên 21 suốt bài. Máy chủ vẫn sẵn
 sàng sau tải.
+
+## Tìm theo ý nghĩa: duyệt hết vector — 12/11/2026
+
+Bước 18 (D-109) tìm theo ý nghĩa bằng cách so câu tìm với **mọi** vector của một ngôn ngữ
+trong bộ nhớ (tích vô hướng trên vector đã chuẩn hoá, giữ 50 kết quả tốt nhất), không dùng
+index ANN hay `pgvector` — để chạy như nhau trên SQLite và Postgres. Đo phần tính toán đó
+bằng đúng phép tính của `autoxide_kernel::ai::vector` (`dot`, `normalize`), build tối ưu
+(`-C opt-level=3`, không `target-cpu=native`), **một nhân** Intel Xeon 2,1 GHz của máy 4
+nhân dùng chung; mỗi cỡ 7 lần, lấy trung vị. Không gồm lần gọi embedding cho câu tìm (một
+request tới nhà cung cấp, có bộ nhớ đệm) và lần đọc một dòng `version`.
+
+| Số đoạn × chiều | Trung vị | Nhanh nhất – chậm nhất | Bộ nhớ vector |
+| --------------- | -------: | ---------------------: | ------------: |
+| 10.000 × 1.024  | 8,3 ms   | 8,1 – 11,4 ms          | ~41 MB        |
+| 100.000 × 1.024 | 107 ms   | 94 – 115 ms            | ~410 MB       |
+
+Thời gian tăng tuyến tính theo số đoạn; một bài ~1.500 chữ là 5–6 đoạn, nên 10.000 đoạn
+≈ 2.000 bài một ngôn ngữ. **Ngưỡng chấp nhận được** (D-110): dưới 50 ms cho phần tính toán,
+tức khoảng 40.000 đoạn mỗi ngôn ngữ trên máy cỡ này. Vượt ngưỡng đó mới là lý do cho một bước
+sau (vector `f16` / `int8` để giảm bộ nhớ và băng thông, chia việc ra nhiều nhân, hay index
+ANN / nhánh `pgvector` sau một trait) — không làm trước khi đo được cần.
+
+Nạp lại vector vào bộ nhớ (sau khi index đổi) đọc mọi dòng của ngôn ngữ đó một lần; với trang
+sửa bài liên tục mà có nhiều đoạn, đó là chi phí đáng theo dõi trước tiên.

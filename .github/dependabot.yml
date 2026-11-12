@@ -1,5 +1,5 @@
-# Dependabot đề xuất nâng cấp bằng pull request; CI chạy gate trên từng đề xuất, agent
-# hoặc người duyệt mới merge (D-078). Gom theo nhóm để mỗi tuần một PR mỗi loại.
+# Dependabot đề xuất nâng cấp bằng pull request; CI trên GitHub đã tắt (D-107), nên người
+# duyệt (hoặc agent) chạy `./gate.sh` trên nhánh của PR trước khi merge (D-078). Gom theo nhóm để mỗi tuần một PR mỗi loại.
 version: 2
 updates:
   - package-ecosystem: cargo
@@ -15,13 +15,6 @@ updates:
       # Bỏ dòng này khi nâng `webauthn_rp` lên bản dùng `p256` 0.14 (D-092).
       - dependency-name: p256
         versions: [">= 0.14"]
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
-    groups:
-      actions:
-        patterns: ["*"]
   - package-ecosystem: docker
     directory: /
     schedule:

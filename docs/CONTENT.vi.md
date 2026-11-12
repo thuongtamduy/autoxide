@@ -13,12 +13,15 @@ chính website là các dự án riêng gọi vào nó. Module nằm dưới `/a
 
 ## Permission
 
-| Permission        | Cho phép                                                                          |
-| ----------------- | --------------------------------------------------------------------------------- |
-| `content.read`    | Đọc bản nháp, revision và lịch                                                    |
-| `content.write`   | Tạo và sửa bản nháp, bản dịch, khôi phục revision, tạo link xem trước             |
-| `content.publish` | Đăng, gỡ, lưu trữ, xoá, chuyển trang, hẹn giờ                                     |
-| `content.manage`  | Danh mục, thẻ, tác giả, menu, chuyển hướng                                        |
+| Permission            | Cho phép                                                                     |
+| --------------------- | ---------------------------------------------------------------------------- |
+| `content.read`        | Đọc bản nháp, revision và lịch                                               |
+| `content.write`       | Tạo và sửa bản nháp, bản dịch, khôi phục revision, tạo link xem trước, xin duyệt |
+| `content.write_own`   | Như `content.write`, nhưng chỉ trên mục do chính bên gọi tạo (cùng người dùng **và** cùng API key) |
+| `content.publish`     | Đăng, gỡ, lưu trữ, chuyển trang, hẹn giờ; danh mục và tác giả của mục đang công khai |
+| `content.publish_own` | Chỉ đăng và gỡ mục do chính bên gọi tạo; không lưu trữ, chuyển trang hay hẹn giờ |
+| `content.delete`      | Xoá hẳn mục                                                                  |
+| `content.manage`      | Danh mục, thẻ, tác giả, menu, chuyển hướng                                   |
 
 Gán cho một role bằng `PUT /api/v1/auth/roles/{id}`. Role `admin` có đủ. Người đọc website
 không cần permission nào: mọi thứ dưới `/api/v1/content/public/` đều mở.
@@ -69,10 +72,12 @@ curl -X POST http://localhost:8080/api/v1/content/entries/$ID/publish \
   -H "Authorization: Bearer $TOKEN" -H 'If-Match: "1731400000000001"'
 ```
 
-- **Bắt buộc `If-Match`** cho mọi thay đổi trên mục, menu, danh mục / thẻ, tác giả và chuyển
-  hướng: gửi `ETag` vừa đọc (`*` để sửa bất kể phiên bản). Thiếu: `428 precondition_required`;
-  có người sửa trước: `412 precondition_failed` — đọc lại rồi sửa lại. Nhờ vậy hai người biên
-  tập (hay hai AI agent) không ghi đè lên nhau.
+- **Bắt buộc `If-Match`** khi sửa hay xoá mục, khi đổi trạng thái mục (đăng, gỡ, lưu trữ,
+  chuyển, khôi phục, hẹn giờ), khi sửa danh mục / thẻ, tác giả, chuyển hướng, và khi thay menu:
+  gửi `ETag` vừa đọc (`*` để sửa bất kể phiên bản). Thiếu: `428 precondition_required`; có người
+  sửa trước: `412 precondition_failed` — đọc lại rồi sửa lại. Nhờ vậy hai người biên tập (hay hai
+  AI agent) không ghi đè lên nhau. Xoá danh mục / thẻ, tác giả, chuyển hướng và gắn danh mục / tác
+  giả cho mục thì không cần: không có gì bị ghi đè.
 - `POST …/unpublish` gỡ mục (về lại bản nháp, địa chỉ trả 404); `POST …/archive` gỡ hẳn (địa
   chỉ trả 410); `DELETE` xoá mục (mục đang công khai được gỡ trước, địa chỉ trả 410).
 - Không đăng được trang trước trang cha của nó; không gỡ hay xoá được trang còn trang con đang
@@ -131,7 +136,8 @@ Permission `content.manage`.
 - **Term** (`/api/v1/content/terms`): `category` (có thể có cha) hoặc `tag`, có tên, slug, mô tả
   và chữ SEO theo từng ngôn ngữ. Gắn vào mục bằng `PUT /api/v1/content/entries/{id}/terms`
   (`{"term_ids": [...]}`, danh mục đầu tiên là danh mục chính). Có hiệu lực ngay, cả với bản
-  công khai.
+  công khai — nên với mục đang công khai cần thêm `content.publish` ngoài `content.write` (gắn
+  tác giả cũng vậy).
 - **Tác giả** (`/api/v1/content/authors`): hồ sơ của module content — tên hiển thị, slug, giới
   thiệu, ảnh đại diện (ID media), website — có thể gắn với một tài khoản (`user_id`). Một mục có
   thể có nhiều tác giả, theo thứ tự: `PUT /api/v1/content/entries/{id}/authors`.
@@ -184,7 +190,10 @@ trong [README](../README.vi.md)) cho `content.entry_published`, `content.entry_u
 
 `path` là địa chỉ mới (`null` khi không còn công khai), `stale_paths` là mọi địa chỉ đã đổi, kể
 cả của trang con. Menu, term và tác giả phát `content.menu_changed`, `content.term_changed` và
-`content.author_changed`.
+`content.author_changed`; các event này không kèm danh sách trang bị ảnh hưởng (một thẻ có thể
+nằm trên hàng nghìn bài). Hãy gắn cho mỗi trang đã cache tag theo ID term và tác giả của nó (ví dụ
+`term:<id>`, `author:<id>`) rồi làm mới các tag đó khi nhận event — đổi tên hay xoá thẻ, tác
+giả (kể cả khi xoá tài khoản) sẽ làm mới mọi trang đang hiện nó.
 
 **Sitemap và feed.** Dựng `sitemap.xml` từ `/public/sitemap` (đi theo `next_cursor`; bỏ mục có
 `noindex: true`; `content_modified_at` là `lastmod`; `translations` cho các `hreflang`). Dựng
@@ -203,12 +212,48 @@ Người biên tập có thể cho một người không có tài khoản xem b�
    nháp. Câu trả lời có `Cache-Control: no-store`, luôn là bản nháp mới nhất. Token sai hay hết
    hạn trả `404` (`content.preview_token_invalid`). Đổi secret là thu hồi mọi token.
 
-## AI agent (MCP)
+## AI agent
 
-Tool `content.list`, `content.get`, `content.create_draft`, `content.update`,
-`content.publish`, `content.unpublish`, `content.list_revisions`, `content.restore_revision` và
-`content.resolve`, cùng permission với endpoint REST. Kết quả có mục thì kèm `version` của mục;
-tool thay đổi mục bắt buộc gửi lại giá trị đó trong tham số `version`, y như `If-Match`.
+**Công cụ AI** (hướng dẫn: [`AI.vi.md`](AI.vi.md)): `GET /entries/{id}/seo-check` (không AI),
+`POST /entries/{id}/seo-suggestions`, `POST /entries/{id}/translate` (vào bản nháp của bản dịch,
+không bao giờ tự đăng; theo dõi bằng `GET /translation-requests/{id}`), và `GET /search` /
+`GET /public/search` (theo ý nghĩa và theo chữ). Mục do máy chủ dịch mang
+`translated_from_revision_id`, và `translation_outdated` khi bản gốc đổi.
+
+**Tool MCP.** `content.list`, `content.get`, `content.create_draft`, `content.update`,
+`content.publish`, `content.unpublish`, `content.list_revisions`, `content.restore_revision`,
+`content.request_review`, `content.seo_check`, `content.suggest_seo`, `content.translate`,
+`content.get_translation_request`, `content.search` và `content.resolve`, cùng permission với
+endpoint REST. Kết quả có
+mục thì kèm `version` của mục; tool thay đổi mục bắt buộc gửi lại giá trị đó trong tham số
+`version`, y như `If-Match`.
+
+**Cấp cho agent một API key riêng** (`POST /api/v1/auth/api-keys`), `expires_at` ngắn và chỉ
+những permission nó cần:
+
+| Agent được…                            | Permission                                             |
+| -------------------------------------- | ------------------------------------------------------ |
+| viết nháp, người đăng                  | `content.read`, `content.write_own`                    |
+| viết và tự đăng bài của mình           | `content.read`, `content.write_own`, `content.publish_own` |
+
+Với các permission `_own`, agent chỉ đụng tới mục nó tạo bằng chính key đó: key khác — kể cả
+của cùng người dùng — nhận `403 content.not_owner`. Agent không bao giờ lưu trữ, chuyển trang,
+hẹn giờ hay xoá được (xoá cần `content.delete`). Mọi thay đổi nằm trong audit log kèm API key
+đã làm, và request bằng API key bị rate limiting theo từng key
+(`AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE`, mặc định 120).
+
+**Xin duyệt.** Viết xong, agent gọi `POST /entries/{id}/request-review` (tool
+`content.request_review`): bản nháp có `review_requested_at` và event
+`content.review_requested` được phát — đăng ký webhook để báo người biên tập.
+`DELETE /entries/{id}/request-review` rút lại; đăng mục thì cờ tự xoá.
+
+**Nội dung do AI tạo.** Gửi `"ai_generated": true` khi tạo hay sửa nội dung do AI viết (agent
+nên luôn gửi). Khi **một người** — đăng nhập, không phải API key — đăng mục đó sau khi đã duyệt,
+họ gửi `{"ai_reviewed": true}` tới `POST /entries/{id}/publish`; bản công khai ghi ai duyệt và
+lúc nào. Endpoint công khai trả `ai_generated` và `ai_reviewed`, để website hiện thông báo cho
+người đọc khi luật yêu cầu (ví dụ Điều 50 của EU AI Act, áp dụng từ 2/8/2026; ngoại lệ "đã qua
+người duyệt" được hiểu hẹp). Autoxide chỉ ghi lại sự thật, không đưa ra lời khuyên pháp lý. API
+quản trị cũng cho biết mục được tạo thế nào: `created_via` là `session` hoặc `api_key`.
 
 ## Khi một tài khoản bị xoá
 

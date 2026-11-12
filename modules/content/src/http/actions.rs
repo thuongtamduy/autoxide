@@ -25,6 +25,12 @@ use crate::service::ContentService;
 pub(crate) struct PublishRequest {
     /// The date shown as the publication date. Default: unchanged, or now on first publish.
     pub published_at: Option<DateTime<Utc>>,
+    /// For an entry marked `ai_generated`: you, a person, reviewed the content and take
+    /// editorial responsibility for it. Recorded on the published version (readers see
+    /// `ai_reviewed`). Only a signed-in person may send `true`; an API key gets 403
+    /// `content.ai_review_requires_human`.
+    #[serde(default)]
+    pub ai_reviewed: bool,
 }
 
 /// Where to move a page.
@@ -39,7 +45,8 @@ const IF_MATCH: &str = "Required: the `ETag` of the entry (or `*`). Done only if
 
 /// Publish a post or page.
 ///
-/// Requires `content.publish`. Copies the current draft to the published version, at an
+/// Requires `content.publish`, or `content.publish_own` for an entry you created. Copies the
+/// current draft to the published version, at an
 /// address computed by the server (`/<post prefix>/<slug>` for posts, the parent's address
 /// plus the slug for pages). If the address changed, the old one (and those of published
 /// subpages) redirect with 301. Every media item it uses must be public. `If-Match` is
@@ -54,7 +61,7 @@ const IF_MATCH: &str = "Required: the `ETag` of the entry (or `*`). Done only if
     responses(
         (status = 200, description = "Published.", body = Data<EntryResponse>, headers(("ETag" = String, description = "New version of the entry."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.publish`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `content.publish` (or `content.publish_own`; code `permission_denied`), the entry is not yours and you only have `content.publish_own` (code `content.not_owner`), or an API key sent `ai_reviewed` (code `content.ai_review_requires_human`).", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
         (status = 409, description = "The address is used by another published entry (code `content.path_taken`), or the parent page is not published (code `content.parent_not_published`).", body = Problem),
         (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
@@ -82,15 +89,16 @@ pub(crate) async fn publish_entry(
             )])
         })?
     };
-    let published_at = input.published_at;
-    tagged(&service, service.publish(&principal, id, expected, published_at).await?).await
+    let entry =
+        service.publish(&principal, id, expected, input.published_at, input.ai_reviewed).await?;
+    tagged(&service, entry).await
 }
 
 /// Take a post or page down.
 ///
-/// Requires `content.publish`. Readers no longer see it (its address answers 404); it is a
-/// draft again and may be published later. A page with published subpages cannot be taken
-/// down. `If-Match` is required.
+/// Requires `content.publish`, or `content.publish_own` for an entry you created. Readers no longer
+/// see it (its address answers 404); it is a draft again and may be published later. A page with
+/// published subpages cannot be taken down. `If-Match` is required.
 #[utoipa::path(
     post,
     path = "/entries/{id}/unpublish",
@@ -100,7 +108,7 @@ pub(crate) async fn publish_entry(
     responses(
         (status = 200, description = "Taken down.", body = Data<EntryResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.publish`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `content.publish` or `content.publish_own` (code `permission_denied`), or the entry is not yours and you only have `content.publish_own` (code `content.not_owner`).", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
         (status = 409, description = "Not published (code `content.not_published`), or a page with published subpages (code `content.page_has_published_children`).", body = Problem),
         (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
@@ -149,9 +157,10 @@ pub(crate) async fn archive_entry(
 
 /// Move a page under another parent.
 ///
-/// Requires `content.write`, and `content.publish` when the page is published. Takes effect
-/// at once for the draft and the published version: the page's address and those of its
-/// subpages change, and the old ones redirect with 301. `If-Match` is required.
+/// Requires `content.write` (or `content.write_own` for a page you created), and `content.publish`
+/// when the page is published. Takes effect at once for the draft and the published version: the
+/// page's address and those of its subpages change, and the old ones redirect with 301. `If-Match`
+/// is required.
 #[utoipa::path(
     post,
     path = "/entries/{id}/move",
@@ -162,7 +171,7 @@ pub(crate) async fn archive_entry(
     responses(
         (status = 200, description = "Moved.", body = Data<EntryResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`); or the page is published and you lack `content.publish`.", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
         (status = 409, description = "Under itself or a subpage (code `content.tree_cycle`), slug taken at the new place (code `content.slug_taken`), address taken (code `content.path_taken`), or the new parent is not published (code `content.parent_not_published`).", body = Problem),
         (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
@@ -183,7 +192,7 @@ pub(crate) async fn move_entry(
 
 /// Delete a post or page.
 ///
-/// Requires `content.publish`. Its revisions and schedules go too. A page with subpages
+/// Requires `content.delete`. Its revisions and schedules go too. A page with subpages
 /// cannot be deleted. If it was published, its address answers 410. `If-Match` is required.
 #[utoipa::path(
     delete,
@@ -194,7 +203,7 @@ pub(crate) async fn move_entry(
     responses(
         (status = 204, description = "Deleted."),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.publish`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `content.delete`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
         (status = 409, description = "The page has subpages; code `content.page_has_children`.", body = Problem),
         (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
@@ -210,4 +219,65 @@ pub(crate) async fn delete_entry(
     let expected = if_match.required()?;
     service.delete(&principal, id, expected).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Ask for a review of the draft.
+///
+/// Requires `content.write`, or `content.write_own` for an entry you created. Marks the draft as
+/// ready for a person to review and publish (`review_requested_at`) and emits the event
+/// `content.review_requested`, which webhooks can forward to editors. The mark is cleared when
+/// the entry is published or the request is withdrawn. Meant for AI agents that may write but
+/// not publish. `If-Match` is required.
+#[utoipa::path(
+    post,
+    path = "/entries/{id}/request-review",
+    operation_id = "request_content_review",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),
+    responses(
+        (status = 200, description = "Review requested.", body = Data<EntryResponse>, headers(("ETag" = String, description = "New version of the entry."))),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).", body = Problem),
+        (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
+        (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
+        (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
+    )
+)]
+pub(crate) async fn request_review(
+    State(service): State<Arc<ContentService>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    if_match: IfMatch,
+) -> Result<Tagged<EntryResponse>, Error> {
+    let expected = if_match.required()?;
+    tagged(&service, service.set_review_request(&principal, id, expected, false).await?).await
+}
+
+/// Withdraw a review request.
+///
+/// Requires `content.write`, or `content.write_own` for an entry you created. Clears
+/// `review_requested_at` and emits `content.review_withdrawn`. `If-Match` is required.
+#[utoipa::path(
+    delete,
+    path = "/entries/{id}/request-review",
+    operation_id = "withdraw_content_review",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),
+    responses(
+        (status = 200, description = "Review request withdrawn.", body = Data<EntryResponse>, headers(("ETag" = String, description = "New version of the entry."))),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).", body = Problem),
+        (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
+        (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
+        (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
+    )
+)]
+pub(crate) async fn withdraw_review(
+    State(service): State<Arc<ContentService>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    if_match: IfMatch,
+) -> Result<Tagged<EntryResponse>, Error> {
+    let expected = if_match.required()?;
+    tagged(&service, service.set_review_request(&principal, id, expected, true).await?).await
 }

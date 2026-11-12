@@ -19,6 +19,7 @@ sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+tokio.workspace = true
 slug.workspace = true
 tracing.workspace = true
 utoipa.workspace = true
@@ -34,7 +35,6 @@ rmcp = { workspace = true, features = [
   "transport-streamable-http-client-reqwest",
   "reqwest-tls-no-provider",
 ] }
-tokio.workspace = true
 tower.workspace = true
 
 [lints]

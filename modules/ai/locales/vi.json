@@ -1,0 +1,12 @@
+{
+  "ai.disabled": "Máy chủ này chưa bật tính năng AI. Người vận hành bật bằng AUTOXIDE_AI_PROVIDER và AUTOXIDE_AI_API_KEY.",
+  "ai.embedding_disabled": "Máy chủ này chưa bật embedding. Người vận hành bật bằng AUTOXIDE_EMBEDDING_PROVIDER.",
+  "ai.misconfigured": "Nhà cung cấp AI từ chối key hay cấu hình của máy chủ. Người vận hành cần kiểm các biến AUTOXIDE_AI_* (hoặc AUTOXIDE_EMBEDDING_*), ví dụ bằng lệnh `autoxide ai check`.",
+  "ai.quota_exceeded": "Đã dùng hết hạn mức token AI của hôm nay (AUTOXIDE_AI_DAILY_TOKEN_LIMIT). Thử lại sau nửa đêm UTC, hoặc nhờ người vận hành nâng hạn mức.",
+  "ai.provider_unavailable": "Nhà cung cấp AI đang bận hoặc không kết nối được. Thử lại sau giây lát.",
+  "ai.refused": "Mô hình AI từ chối nội dung này. Hãy sửa nội dung hoặc làm bước này bằng tay.",
+  "ai.output_truncated": "Câu trả lời của AI bị cắt vì quá dài. Hãy gửi ít nội dung hơn mỗi lần.",
+  "ai.output_invalid": "Mô hình AI trả lời sai dạng hai lần liền. Thử lại sau, hoặc dùng mô hình mạnh hơn.",
+  "ai.unsupported_input": "Mô hình AI đang cấu hình không đọc được ảnh (AUTOXIDE_AI_IMAGES là `false`).",
+  "ai.request_rejected": "Nhà cung cấp AI từ chối request, ví dụ vì nội dung quá dài so với mô hình hoặc mô hình không nhận một thiết lập. Log máy chủ ghi lý do của nhà cung cấp."
+}

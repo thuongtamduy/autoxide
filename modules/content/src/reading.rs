@@ -34,10 +34,15 @@ impl ContentService {
         &self,
         rows: Vec<Published>,
     ) -> Result<Vec<PublicView>, Error> {
+        let ids: Vec<Uuid> = rows.iter().map(|row| row.entry_id).collect();
+        let mut authors = crate::authors::authors_of(self.database.read(), &ids).await?;
+        // Ảnh đại diện của tác giả cũng tra qua `media`: ảnh riêng tư thì không lộ cả ID.
+        let avatars = authors.values().flatten().filter_map(|author| author.avatar_media_id);
         let media_ids: Vec<Uuid> = rows
             .iter()
             .flat_map(|row| [row.featured_media_id, row.og_media_id])
             .flatten()
+            .chain(avatars)
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
@@ -63,11 +68,14 @@ impl ContentService {
                 .all(self.database.read())
                 .await?
         };
-        let ids: Vec<Uuid> = rows.iter().map(|row| row.entry_id).collect();
         let mut terms =
             crate::terms::terms_of(self.database.read(), &ids, &self.config.default_locale, &rows)
                 .await?;
-        let mut authors = crate::authors::authors_of(self.database.read(), &ids).await?;
+        for author in authors.values_mut().flatten() {
+            if author.avatar_media_id.is_some_and(|id| !media.contains_key(&id)) {
+                author.avatar_media_id = None;
+            }
+        }
         Ok(rows
             .into_iter()
             .map(|row| {

@@ -44,9 +44,10 @@ pub(crate) struct EntryAuthors {
 
 /// Translate a post or page.
 ///
-/// Requires `content.write`. Creates a new draft entry in `locale`, linked to this one
-/// (same `translation_group_id`), with its own slug and publishing. Fields not given are
-/// copied from this entry. A page's translation goes under the translation of its parent.
+/// Requires `content.write`, or `content.write_own` when you created the original. Creates a new
+/// draft entry in `locale`, linked to this one (same `translation_group_id`), with its own slug and
+/// publishing. Fields not given are copied from this entry. A page's translation goes under the
+/// translation of its parent.
 #[utoipa::path(
     post,
     path = "/entries/{id}/translations",
@@ -57,7 +58,7 @@ pub(crate) struct EntryAuthors {
     responses(
         (status = 201, description = "The new translation (a draft).", body = Data<EntryResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.write`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`).", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
         (status = 409, description = "A translation in this language exists (code `content.translation_exists`), the parent page is not translated (code `content.parent_not_translated`), or the slug is taken (code `content.slug_taken`).", body = Problem),
         (status = 422, description = "The language is not supported or a value is invalid; see `errors`.", body = Problem),
@@ -77,7 +78,9 @@ pub(crate) async fn create_translation(
 
 /// Set the categories and tags of an entry.
 ///
-/// Requires `content.write`. Takes effect at once, also for the published version.
+/// Requires `content.read` and `content.write` (or `content.write_own` for an entry you created),
+/// and `content.publish` (or `content.publish_own`) when the entry is published. Takes effect at
+/// once, also for the published version.
 #[utoipa::path(
     put,
     path = "/entries/{id}/terms",
@@ -88,7 +91,7 @@ pub(crate) async fn create_translation(
     responses(
         (status = 200, description = "The terms now set.", body = Data<EntryTerms>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.write`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`).", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
         (status = 422, description = "An id is not a category or tag, or too many; see `errors`.", body = Problem),
     )
@@ -105,7 +108,9 @@ pub(crate) async fn set_terms(
 
 /// Set the authors of an entry.
 ///
-/// Requires `content.write`. Takes effect at once, also for the published version.
+/// Requires `content.read` and `content.write` (or `content.write_own` for an entry you created),
+/// and `content.publish` (or `content.publish_own`) when the entry is published. Takes effect at
+/// once, also for the published version.
 #[utoipa::path(
     put,
     path = "/entries/{id}/authors",
@@ -116,7 +121,7 @@ pub(crate) async fn set_terms(
     responses(
         (status = 200, description = "The authors now set.", body = Data<EntryAuthors>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.write`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`).", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
         (status = 422, description = "An id is not an author, or too many; see `errors`.", body = Problem),
     )

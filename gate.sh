@@ -7,12 +7,14 @@
 #   2. lint                 cargo clippy, cảnh báo tính là lỗi
 #   3. ranh giới workspace  cargo xtask check
 #   4. thư viện             cargo deny check (license, lỗ hổng, nguồn)
-#   5. test trên SQLite
-#   6. test trên Postgres   (tự dựng một container Docker dùng xong bỏ)
-#   Bước 5 và 6 chạy thêm test lưu file trên S3: gate dựng một máy chủ S3 giả lập
+#   5. secret               gitleaks: toàn bộ lịch sử git và thay đổi chưa commit
+#   6. test trên SQLite
+#   7. test trên Postgres   (tự dựng một container Docker dùng xong bỏ)
+#   Bước 6 và 7 chạy thêm test lưu file trên S3: gate dựng một máy chủ S3 giả lập
 #   (moto) trong Docker, dùng xong bỏ.
 #
-# Cần có: toolchain Rust (rustup tự cài đúng bản ghim), cargo-deny, Docker.
+# Cần có: toolchain Rust (rustup tự cài đúng bản ghim), cargo-deny, Docker (gitleaks cài
+# sẵn trên máy thì dùng nó, không thì chạy image Docker ghim phiên bản).
 # Cần mạng ở lần chạy đầu (tải thư viện, image Postgres) và mỗi lần cargo-deny
 # cập nhật danh sách lỗ hổng.
 #
@@ -27,6 +29,7 @@
 #                        TEST_S3_BUCKET) và nhận TEST_S3_ACCESS_KEY_ID /
 #                        TEST_S3_SECRET_ACCESS_KEY (mặc định `test` / `test`).
 #   GATE_S3_IMAGE        image cho container S3 giả lập (mặc định motoserver/moto).
+#   GATE_GITLEAKS_IMAGE  image gitleaks khi máy không cài gitleaks.
 #
 # Gate đỏ thì sửa code. Không nới gate, không tắt lint, không bỏ qua test
 # (CLAUDE.md, mục "Gate").
@@ -36,6 +39,7 @@ cd "$(dirname "$0")"
 
 POSTGRES_IMAGE="${GATE_POSTGRES_IMAGE:-postgres:16-alpine}"
 S3_IMAGE="${GATE_S3_IMAGE:-motoserver/moto:5.2.5}"
+GITLEAKS_IMAGE="${GATE_GITLEAKS_IMAGE:-zricethezav/gitleaks:v8.30.0}"
 CONTAINER=""
 S3_CONTAINER=""
 
@@ -79,7 +83,28 @@ step "dependencies (cargo deny)"
 # thì thành lỗi, để ngoại lệ tự hết hạn.
 cargo deny check -D advisory-not-detected -D license-not-encountered
 
-# --- S3 cho test lưu file (dùng ở bước 5 và 6) -------------------------------------
+# --- 5: secret --------------------------------------------------------------------
+
+gitleaks_run() {
+  if command -v gitleaks >/dev/null 2>&1; then
+    gitleaks "$@"
+  else
+    require docker "Install gitleaks (https://github.com/gitleaks/gitleaks) or Docker."
+    docker info >/dev/null 2>&1 || fail "Docker is installed but not running (or not accessible to this user)."
+    docker run --rm --volume "$PWD:/repo" --workdir /repo "$GITLEAKS_IMAGE" "$@"
+  fi
+}
+
+step "secrets (gitleaks)"
+# Thay cho bước quét trong CI (CI trên GitHub đã tắt, D-107; repo riêng tư nên không có
+# secret scanning miễn phí của GitHub — D-108). Quét toàn bộ lịch sử (secret đã commit rồi
+# xoá vẫn nằm trong git), rồi thay đổi đã stage và chưa stage (bắt trước khi commit).
+leaks=(--no-banner --redact --config .gitleaks.toml)
+gitleaks_run git . "${leaks[@]}"
+gitleaks_run git . "${leaks[@]}" --pre-commit --staged
+gitleaks_run git . "${leaks[@]}" --pre-commit
+
+# --- S3 cho test lưu file (dùng ở bước 6 và 7) -------------------------------------
 
 start_s3() {
   require docker "Install Docker, or point GATE_S3_ENDPOINT at an existing S3-compatible service."
@@ -109,13 +134,13 @@ if [ -z "$S3_ENDPOINT" ]; then
 fi
 export TEST_S3_ENDPOINT="$S3_ENDPOINT"
 
-# --- 5: SQLite ------------------------------------------------------------------
+# --- 6: SQLite ------------------------------------------------------------------
 
 step "tests on SQLite"
 # `env -u`: bỏ biến nếu người chạy lỡ đặt sẵn, để bước này chắc chắn là SQLite.
 env -u TEST_DATABASE_URL cargo test --workspace --locked
 
-# --- 6: Postgres ----------------------------------------------------------------
+# --- 7: Postgres ----------------------------------------------------------------
 
 start_postgres() {
   require docker "Install Docker, or point GATE_POSTGRES_URL at an existing Postgres."
@@ -161,4 +186,4 @@ else
 fi
 TEST_DATABASE_URL="$POSTGRES_URL" cargo test --workspace --locked
 
-printf '\n\033[32mgate: green — fmt, clippy, boundaries, dependencies, tests on SQLite and Postgres (files also on S3)\033[0m\n'
+printf '\n\033[32mgate: green — fmt, clippy, boundaries, dependencies, secrets, tests on SQLite and Postgres (files also on S3)\033[0m\n'

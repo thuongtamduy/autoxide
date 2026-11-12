@@ -36,10 +36,19 @@ mod fake {
     impl Authenticator for FakeAuthenticator {
         async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
             let permissions: &[&str] = match authorization {
-                Some("Bearer admin") => {
-                    &["content.read", "content.write", "content.publish", "content.manage"]
-                }
+                Some("Bearer admin") => &[
+                    "content.read",
+                    "content.write",
+                    "content.publish",
+                    "content.delete",
+                    "content.manage",
+                ],
                 Some("Bearer reader") => &["content.read"],
+                Some("Bearer agent") => {
+                    let permissions = ["content.read", "content.write_own"];
+                    return Ok(Principal::new(Uuid::from_u128(2), permissions.map(str::to_owned))
+                        .via_api_key(Uuid::from_u128(3)));
+                }
                 _ => {
                     return Err(Error::unauthenticated(
                         "auth.invalid_token",
@@ -64,7 +73,14 @@ impl Module for TestMedia {
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         let media: Arc<dyn Media> = self.0.clone();
-        context.provide::<dyn Media>(media)
+        context.provide::<dyn Media>(media)?;
+        // Module `ai` giả (đã tắt): `content` cần `dyn TextModel` và `dyn Embedder`.
+        let ai: Arc<dyn autoxide_kernel::ai::TextModel> =
+            Arc::new(autoxide_testkit::ai::FakeTextModel::disabled());
+        context.provide::<dyn autoxide_kernel::ai::TextModel>(ai)?;
+        let embedder: Arc<dyn autoxide_kernel::ai::Embedder> =
+            Arc::new(autoxide_testkit::ai::FakeEmbedder::disabled());
+        context.provide::<dyn autoxide_kernel::ai::Embedder>(embedder)
     }
 }
 
@@ -240,12 +256,21 @@ async fn tool_mcp_voi_version() {
         let reader = client("reader").await;
         let mut names: Vec<String> = reader.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name.to_string()).collect();
         names.sort();
-        assert_eq!(names, ["content.get", "content.list", "content.list_revisions", "content.resolve"]);
+        assert_eq!(names, ["content.get", "content.get_translation_request", "content.list", "content.list_revisions", "content.resolve", "content.search", "content.seo_check"]);
         reader.cancel().await.unwrap();
+
+        // Agent chỉ có `content.write_own`: thấy tool viết, không thấy tool đăng.
+        let agent = client("agent").await;
+        let mut names: Vec<String> = agent.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name.to_string()).collect();
+        names.sort();
+        assert_eq!(names, ["content.create_draft", "content.get", "content.get_translation_request", "content.list", "content.list_revisions", "content.request_review", "content.resolve", "content.restore_revision", "content.search", "content.seo_check", "content.suggest_seo", "content.translate", "content.update"]);
+        agent.cancel().await.unwrap();
 
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 9);
+        assert_eq!(tools.len(), 15);
+        let publish = tools.iter().find(|tool| tool.name == "content.publish").unwrap();
+        assert!(publish.description.as_deref().unwrap_or_default().contains("Requires permission `content.publish` or `content.publish_own`."));
         for tool in &tools {
             assert!(!serde_json::to_string(&tool.input_schema).unwrap().contains("$ref"), "{} has a $ref", tool.name);
         }
@@ -290,6 +315,79 @@ async fn tool_mcp_voi_version() {
         let (_, listed) = call("content.list", json!({"status": "draft", "q": "xin chao"})).await;
         assert_eq!(listed["data"][0]["id"], id);
         admin.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// ETag của `resolve` đổi khi thứ gộp vào câu trả lời đổi (ở đây: gắn thẻ), dù bản công khai
+/// không đổi — website không được nhận 304 với nội dung cũ.
+#[tokio::test]
+async fn etag_resolve_theo_ca_cau_tra_loi() {
+    TestDatabase::run(async |test| {
+        let router = app(test).await;
+        let created = send(
+            &router,
+            "POST",
+            "/entries",
+            Some("admin"),
+            &[],
+            Some(json!({"kind": "post", "title": "Tagged"})),
+        )
+        .await;
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let read = send(&router, "GET", &format!("/entries/{id}"), Some("admin"), &[], None).await;
+        let etag = read.header(header::ETAG).to_owned();
+        let published = send(
+            &router,
+            "POST",
+            &format!("/entries/{id}/publish"),
+            Some("admin"),
+            &[("if-match", &etag)],
+            None,
+        )
+        .await;
+        assert_eq!(published.status, StatusCode::OK, "{}", published.json());
+        let path = "/public/resolve?locale=en&path=/blog/tagged";
+        let first = send(&router, "GET", path, None, &[], None).await;
+        let first_etag = first.header(header::ETAG).to_owned();
+        assert!(!first_etag.is_empty());
+
+        let tag = send(
+            &router,
+            "POST",
+            "/terms",
+            Some("admin"),
+            &[],
+            Some(json!({"taxonomy": "tag", "locale": "en", "name": "Food"})),
+        )
+        .await;
+        assert_eq!(tag.status, StatusCode::CREATED, "{}", tag.json());
+        let tag_id = tag.json()["data"]["id"].as_str().unwrap().to_owned();
+        let linked = send(
+            &router,
+            "PUT",
+            &format!("/entries/{id}/terms"),
+            Some("admin"),
+            &[],
+            Some(json!({"term_ids": [tag_id]})),
+        )
+        .await;
+        assert_eq!(linked.status, StatusCode::OK, "{}", linked.json());
+
+        let again = send(&router, "GET", path, None, &[("if-none-match", &first_etag)], None).await;
+        assert_eq!(again.status, StatusCode::OK, "the tag changed the answer");
+        assert_ne!(again.header(header::ETAG), first_etag);
+        let same = send(
+            &router,
+            "GET",
+            path,
+            None,
+            &[("if-none-match", again.header(header::ETAG))],
+            None,
+        )
+        .await;
+        assert_eq!(same.status, StatusCode::NOT_MODIFIED);
     })
     .await
     .unwrap();

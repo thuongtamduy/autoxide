@@ -22,7 +22,7 @@ use crate::body;
 use crate::entity::ROOT;
 use crate::entity::entry::{self, Column, Entity};
 use crate::events::{self, Change};
-use crate::permissions::{CONTENT_READ, CONTENT_WRITE};
+use crate::permissions::{self, CONTENT_READ};
 use crate::revisions::{self, Reason};
 use crate::service::{ContentService, check_length, check_url, entry_not_found, invalid, now};
 
@@ -111,6 +111,10 @@ pub(crate) struct EntryFields {
     pub og_media_id: Option<Option<Uuid>>,
     pub canonical_url: Option<String>,
     pub noindex: Option<bool>,
+    /// Nội dung do AI tạo (D-109). Agent nên luôn đặt `true`.
+    pub ai_generated: Option<bool>,
+    /// Chỉ máy chủ đặt (khi tự dịch): revision của bản gốc đã dịch. Không có trong API.
+    pub translated_from: Option<Uuid>,
 }
 
 /// Một mục mới.
@@ -161,14 +165,14 @@ pub(crate) struct EntryFilter {
 }
 
 impl ContentService {
-    /// Tạo một mục nháp. Cần `content.write`. Slug để trống thì sinh từ tiêu đề (trùng thì
-    /// thêm `-2`, `-3`…).
+    /// Tạo một mục nháp. Cần `content.write` hoặc `content.write_own`. Slug để trống thì sinh
+    /// từ tiêu đề (trùng thì thêm `-2`, `-3`…).
     pub(crate) async fn create(
         &self,
         principal: &Principal,
         input: NewEntry,
     ) -> Result<Entry, Error> {
-        principal.require(&CONTENT_WRITE)?;
+        permissions::require_create(principal)?;
         let mut problems = Vec::new();
         let locale = self.check_locale(input.locale.as_deref(), "locale", &mut problems);
         if input.fields.title.as_deref().is_none_or(|title| title.trim().is_empty()) {
@@ -185,6 +189,7 @@ impl ContentService {
         let now = now();
         let mut candidate =
             blank(id, input.kind, &locale, input.parent_id, principal.user_id(), now);
+        candidate.created_by_api_key_id = principal.api_key_id();
         let auto_slug = input.fields.slug.is_none();
         self.apply(&mut candidate, input.fields, &mut problems).await?;
         if let Some(parent) = input.parent_id {
@@ -209,7 +214,17 @@ impl ContentService {
         for _ in 0..5 {
             let transaction = self.database.begin_write().await?;
             if let Some(parent) = candidate.parent_id {
-                // Khoá trang cha tới hết transaction: lệnh xoá nó phải chờ rồi thấy trang con.
+                // Khoá cây của ngôn ngữ (cùng khoá với xoá, chuyển, đăng) rồi kiểm lại trang cha
+                // trong transaction: không tạo được trang con dưới một trang đang bị xoá, và độ
+                // sâu tính trên cây hiện tại (một lệnh `move` vừa xong có thể đã đổi nó; bản dịch
+                // lấy cha trong ngôn ngữ khác, có thể đã sâu hơn).
+                crate::paths::lock_tree(&transaction, &candidate.locale).await?;
+                let mut problems = Vec::new();
+                self.check_parent(&transaction, &candidate, parent, &mut problems).await?;
+                if !problems.is_empty() {
+                    transaction.rollback().await?;
+                    return Err(invalid(problems));
+                }
                 if !touch(&transaction, parent).await? {
                     return Err(invalid(vec![FieldError::new(
                         "parent_id",
@@ -254,6 +269,7 @@ impl ContentService {
             if let (Some(source), Some(object)) = (source, after.as_object_mut()) {
                 object.insert("translation_of".to_owned(), json!(source));
             }
+            self.enqueue_index(&transaction, entry.id).await?;
             let event =
                 events::EntryCreated(Change { before: None, after: Some(after), published: None });
             self.outbox
@@ -348,11 +364,12 @@ impl ContentService {
         expected: Option<DateTime<Utc>>,
         restored_from: Option<Uuid>,
     ) -> Result<Entry, Error> {
-        principal.require(&CONTENT_WRITE)?;
+        permissions::require_create(principal)?;
         let before = Entity::find_by_id(id)
             .one(self.database.read())
             .await?
             .ok_or_else(|| entry_not_found(id))?;
+        permissions::require_write(principal, &before)?;
         if expected.is_some_and(|expected| expected != before.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
@@ -405,6 +422,7 @@ impl ContentService {
         }
         let change =
             Change { before: Some(summary(&before)), after: Some(after_summary), published: None };
+        self.enqueue_index(&transaction, id).await?;
         let actor = Actor::from(principal);
         let subject = events::entry_subject(id);
         if restored_from.is_some() {
@@ -485,6 +503,12 @@ impl ContentService {
         }
         if let Some(noindex) = fields.noindex {
             candidate.noindex = noindex;
+        }
+        if let Some(ai_generated) = fields.ai_generated {
+            candidate.ai_generated = ai_generated;
+        }
+        if let Some(revision) = fields.translated_from {
+            candidate.translated_from_revision_id = Some(revision);
         }
         if let Some(featured) = fields.featured_media_id {
             candidate.featured_media_id = featured;
@@ -600,7 +624,8 @@ impl ContentService {
 
     /// Tạo bản dịch của mục `source_id` sang ngôn ngữ `locale`: một mục mới (nháp) cùng nhóm
     /// bản dịch, chép nội dung từ bản gốc rồi áp `fields`. Bản dịch của trang có cha là bản
-    /// dịch của trang cha trong ngôn ngữ đó. Cần `content.write`.
+    /// dịch của trang cha trong ngôn ngữ đó. Cần `content.write`, hoặc `content.write_own` khi
+    /// bản gốc là của mình.
     pub(crate) async fn create_translation(
         &self,
         principal: &Principal,
@@ -608,11 +633,12 @@ impl ContentService {
         locale: &str,
         fields: EntryFields,
     ) -> Result<Entry, Error> {
-        principal.require(&CONTENT_WRITE)?;
+        permissions::require_create(principal)?;
         let source = Entity::find_by_id(source_id)
             .one(self.database.read())
             .await?
             .ok_or_else(|| entry_not_found(source_id))?;
+        permissions::require_write(principal, &source)?;
         let mut problems = Vec::new();
         let target = self.check_locale(Some(locale), "locale", &mut problems);
         if problems.is_empty() && target == source.locale {
@@ -670,10 +696,19 @@ impl ContentService {
         candidate.status = Status::Draft.as_str().to_owned();
         candidate.has_unpublished_changes = false;
         candidate.created_by = Some(principal.user_id());
+        candidate.created_by_api_key_id = principal.api_key_id();
+        // Bản dịch là mục mới: không mang cờ của bản gốc; ai tạo bằng AI thì tự khai (hay máy
+        // chủ đặt khi nó dịch).
+        candidate.ai_generated = false;
+        candidate.review_requested_at = None;
+        candidate.review_requested_by = None;
+        candidate.translated_from_revision_id = None;
         candidate.created_at = now;
         candidate.updated_at = now;
         candidate.revised_at = now;
-        let auto_slug = fields.slug.is_none();
+        // Không gửi slug: lấy slug của bản gốc; gửi `""`: sinh từ tiêu đề (đã dịch). Cả hai tự
+        // thêm `-2`, `-3`… khi trùng.
+        let auto_slug = fields.slug.as_deref().is_none_or(|slug| slug.trim().is_empty());
         self.apply(&mut candidate, fields, &mut problems).await?;
         if !problems.is_empty() {
             return Err(invalid(problems));
@@ -726,6 +761,11 @@ pub(crate) fn blank(
         canonical_url: String::new(),
         noindex: false,
         created_by: Some(by),
+        created_by_api_key_id: None,
+        ai_generated: false,
+        review_requested_at: None,
+        review_requested_by: None,
+        translated_from_revision_id: None,
         created_at: now,
         updated_at: now,
         revised_at: now,
@@ -762,6 +802,11 @@ pub(crate) fn changed_columns(before: &Entry, after: &Entry) -> entry::ActiveMod
         canonical_url,
         noindex,
         created_by,
+        created_by_api_key_id,
+        ai_generated,
+        review_requested_at,
+        review_requested_by,
+        translated_from_revision_id,
         updated_at,
         revised_at,
         translation_group_id
@@ -784,6 +829,7 @@ pub(crate) fn summary(entry: &Entry) -> Value {
         "meta_title": entry.meta_title,
         "meta_description": entry.meta_description,
         "noindex": entry.noindex,
+        "ai_generated": entry.ai_generated,
     })
 }
 

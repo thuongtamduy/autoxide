@@ -21,25 +21,46 @@ use crate::entity::{
 use crate::entries::{Entry, Kind, Status, changed_columns, is_unique_violation, summary};
 use crate::events::{self, Change};
 use crate::paths::{self, Generated, Moved};
-use crate::permissions::{CONTENT_PUBLISH, CONTENT_WRITE};
+use crate::permissions::{self, CONTENT_DELETE, CONTENT_PUBLISH};
 use crate::revisions::{self, Reason};
 use crate::service::{ContentService, entry_not_found, invalid, now};
 
 /// Bản công khai của một mục.
 pub(crate) type Published = published::Model;
 
+/// Ai đăng, lúc nào, với ngày hiển thị nào, và ai xác nhận đã duyệt nội dung do AI tạo.
+pub(crate) struct PublishStamp {
+    /// Ngày hiển thị; `None`: giữ ngày cũ, hay `now` khi đăng lần đầu.
+    pub published_at: Option<DateTime<Utc>>,
+    pub now: DateTime<Utc>,
+    pub by: Option<Uuid>,
+    pub ai_reviewed_by: Option<Uuid>,
+}
+
 impl ContentService {
-    /// Đăng bản nháp hiện tại của mục `id`. Cần `content.publish`. `published_at`: ngày hiển
-    /// thị (mặc định: giữ ngày cũ, hay bây giờ nếu đăng lần đầu).
+    /// Đăng bản nháp hiện tại của mục `id`. Cần `content.publish`, hoặc `content.publish_own`
+    /// trên mục của mình. `published_at`: ngày hiển thị (mặc định: giữ ngày cũ, hay bây giờ nếu
+    /// đăng lần đầu). `ai_reviewed`: người đăng xác nhận đã duyệt nội dung do AI tạo — chỉ một
+    /// người (phiên đăng nhập) xác nhận được, API key thì bị từ chối.
     pub(crate) async fn publish(
         &self,
         principal: &Principal,
         id: Uuid,
         expected: Option<DateTime<Utc>>,
         published_at: Option<DateTime<Utc>>,
+        ai_reviewed: bool,
     ) -> Result<Entry, Error> {
-        principal.require(&CONTENT_PUBLISH)?;
-        let entry = self.load_checked(id, expected).await?;
+        permissions::require_some_publish(principal)?;
+        if ai_reviewed && principal.api_key_id().is_some() {
+            return Err(Error::forbidden(
+                "content.ai_review_requires_human",
+                "Only a person signed in (not an API key) can confirm that AI-generated content was reviewed.",
+            ));
+        }
+        // Quyền trước, phiên bản sau: người không có quyền không biết được mục có đổi hay không.
+        let entry = self.load_checked(id, None).await?;
+        permissions::require_publish(principal, &entry)?;
+        check_version(&entry, expected)?;
         // Ảnh phải tồn tại và công khai; hỏi `media` TRƯỚC transaction.
         self.check_publishable(&entry).await?;
         let now = now();
@@ -49,11 +70,21 @@ impl ContentService {
         let current = self.reload(&transaction, id, expected.unwrap_or(entry.updated_at)).await?;
         let revision =
             revisions::record(&transaction, &current, Reason::Published, by, now).await?;
-        let (path, moved) =
-            self.put_published(&transaction, &current, revision.id, published_at, now, by).await?;
+        let reviewed_by = (ai_reviewed && current.ai_generated).then(|| principal.user_id());
+        let (path, moved) = self
+            .put_published(
+                &transaction,
+                &current,
+                revision.id,
+                PublishStamp { published_at, now, by, ai_reviewed_by: reviewed_by },
+            )
+            .await?;
         let mut after = current.clone();
         after.status = Status::Published.as_str().to_owned();
         after.has_unpublished_changes = false;
+        // Đã đăng thì không còn chờ duyệt.
+        after.review_requested_at = None;
+        after.review_requested_by = None;
         after.updated_at = now;
         let after = self.save_state(&transaction, &current, &after).await?;
         let change = Change {
@@ -61,6 +92,7 @@ impl ContentService {
             after: Some(summary(&after)),
             published: Some(published_payload(&after, Some(&path), &moved)),
         };
+        self.enqueue_index(&transaction, id).await?;
         self.outbox
             .record(
                 &transaction,
@@ -102,8 +134,18 @@ impl ContentService {
         expected: Option<DateTime<Utc>>,
         to: Status,
     ) -> Result<Entry, Error> {
-        principal.require(&CONTENT_PUBLISH)?;
-        let entry = self.load_checked(id, expected).await?;
+        // Gỡ: `content.publish`, hay `content.publish_own` trên mục của mình. Lưu trữ (410, gỡ
+        // hẳn) chỉ `content.publish`.
+        if to == Status::Draft {
+            permissions::require_some_publish(principal)?;
+        } else {
+            principal.require(&CONTENT_PUBLISH)?;
+        }
+        let entry = self.load_checked(id, None).await?;
+        if to == Status::Draft {
+            permissions::require_publish(principal, &entry)?;
+        }
+        check_version(&entry, expected)?;
         if to == Status::Draft && Status::of(&entry) != Status::Published {
             return Err(Error::conflict("content.not_published", "The entry is not published."));
         }
@@ -129,6 +171,7 @@ impl ContentService {
             after: Some(summary(&after)),
             published: removed.as_ref().map(|_| published_payload(&after, None, &stale)),
         };
+        self.enqueue_index(&transaction, id).await?;
         let actor = Actor::from(principal);
         let subject = events::entry_subject(id);
         if to == Status::Archived {
@@ -145,14 +188,14 @@ impl ContentService {
     }
 
     /// Xoá hẳn mục `id` (chỉ khi không còn trang con); đang công khai thì đường dẫn trả 410.
-    /// Cần `content.publish`.
+    /// Cần `content.delete` (tách khỏi `content.publish`, D-109).
     pub(crate) async fn delete(
         &self,
         principal: &Principal,
         id: Uuid,
         expected: Option<DateTime<Utc>>,
     ) -> Result<(), Error> {
-        principal.require(&CONTENT_PUBLISH)?;
+        principal.require(&CONTENT_DELETE)?;
         let entry = self.load_checked(id, expected).await?;
         let now = now();
         let by = Some(principal.user_id());
@@ -205,6 +248,7 @@ impl ContentService {
             after: None,
             published: removed.as_ref().map(|_| published_payload(&current, None, &stale)),
         };
+        self.enqueue_index(&transaction, id).await?;
         self.outbox
             .record(
                 &transaction,
@@ -220,7 +264,8 @@ impl ContentService {
 
     /// Chuyển trang `id` sang cha `parent` (`None`: gốc). Có hiệu lực ngay cho cả nháp lẫn
     /// bản công khai: đường dẫn của nó và mọi trang con đổi, kèm chuyển hướng từ đường dẫn cũ.
-    /// Cần `content.write`, và `content.publish` nếu trang đang công khai.
+    /// Cần `content.write` (hay `content.write_own` trên trang của mình), và `content.publish`
+    /// nếu trang đang công khai.
     pub(crate) async fn move_page(
         &self,
         principal: &Principal,
@@ -228,8 +273,10 @@ impl ContentService {
         parent: Option<Uuid>,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Entry, Error> {
-        principal.require(&CONTENT_WRITE)?;
-        let entry = self.load_checked(id, expected).await?;
+        permissions::require_create(principal)?;
+        let entry = self.load_checked(id, None).await?;
+        permissions::require_write(principal, &entry)?;
+        check_version(&entry, expected)?;
         if entry.kind != Kind::Page.as_str() {
             return Err(invalid(vec![FieldError::new(
                 "parent_id",
@@ -269,7 +316,10 @@ impl ContentService {
         let mut moved = Vec::new();
         let mut path = None;
         if let Some(old) = published::Entity::find_by_id(id).one(&transaction).await? {
-            let new = paths::path_of(&transaction, &after, &self.config.post_path_prefix)
+            // Đường dẫn công khai mới tính từ slug ĐÃ ĐĂNG: slug của nháp chỉ ra ngoài khi đăng.
+            let mut moved_entry = after.clone();
+            moved_entry.slug.clone_from(&old.slug);
+            let new = paths::path_of(&transaction, &moved_entry, &self.config.post_path_prefix)
                 .await?
                 .map_err(|()| parent_not_published())?;
             if paths::path_used(&transaction, &after.locale, &new, id).await? {
@@ -313,10 +363,9 @@ impl ContentService {
         transaction: &C,
         version: &Entry,
         revision_id: Uuid,
-        published_at: Option<DateTime<Utc>>,
-        now: DateTime<Utc>,
-        by: Option<Uuid>,
+        stamp: PublishStamp,
     ) -> Result<(String, Vec<Moved>), Error> {
+        let PublishStamp { published_at, now, by, ai_reviewed_by } = stamp;
         let path = paths::path_of(transaction, version, &self.config.post_path_prefix)
             .await?
             .map_err(|()| parent_not_published())?;
@@ -348,6 +397,9 @@ impl ContentService {
             og_media_id: version.og_media_id,
             canonical_url: version.canonical_url.clone(),
             noindex: version.noindex,
+            ai_generated: version.ai_generated,
+            ai_reviewed_by,
+            ai_reviewed_at: ai_reviewed_by.map(|_| now),
             published_at: published_at.or(old.as_ref().map(|old| old.published_at)).unwrap_or(now),
             first_published_at: old.as_ref().map_or(now, |old| old.first_published_at),
             content_modified_at: now,
@@ -527,6 +579,14 @@ pub(crate) fn published_payload(entry: &Entry, path: Option<&str>, moved: &[Move
         "stale_paths": stale,
         "moved_subpages": changed,
     })
+}
+
+/// `expected` (`If-Match`) khác phiên bản của `entry`: 412.
+pub(crate) fn check_version(entry: &Entry, expected: Option<DateTime<Utc>>) -> Result<(), Error> {
+    if expected.is_some_and(|expected| expected != entry.updated_at) {
+        return Err(autoxide_kernel::version::changed());
+    }
+    Ok(())
 }
 
 fn parent_not_published() -> Error {

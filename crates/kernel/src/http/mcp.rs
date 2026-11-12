@@ -123,8 +123,16 @@ fn caller(context: &RequestContext<RoleServer>) -> Result<(Principal, Language),
 
 fn describe(tool: &Tool) -> rmcp::model::Tool {
     let mut description = tool.description().to_owned();
-    if let Some(permission) = tool.permission() {
-        description.push_str(&format!(" Requires permission `{}`.", permission.name()));
+    match (tool.permission(), tool.alternative()) {
+        (Some(permission), Some(alternative)) => description.push_str(&format!(
+            " Requires permission `{}` or `{}`.",
+            permission.name(),
+            alternative.name()
+        )),
+        (Some(permission), None) => {
+            description.push_str(&format!(" Requires permission `{}`.", permission.name()));
+        }
+        _ => {}
     }
     let schema = match tool.input_schema() {
         Value::Object(object) => object.clone(),

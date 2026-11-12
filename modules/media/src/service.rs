@@ -140,6 +140,8 @@ pub(crate) struct MediaService {
     pub(crate) storage: Arc<dyn Storage>,
     pub(crate) outbox: Outbox,
     pub(crate) jobs: JobQueue,
+    /// Mô hình AI của module `ai` (bản "đã tắt" khi chưa cấu hình): gợi ý alt text (D-109).
+    pub(crate) ai: Arc<dyn autoxide_kernel::ai::TextModel>,
     pub(crate) config: MediaConfig,
 }
 
@@ -149,9 +151,10 @@ impl MediaService {
         storage: Arc<dyn Storage>,
         outbox: Outbox,
         jobs: JobQueue,
+        ai: Arc<dyn autoxide_kernel::ai::TextModel>,
         config: MediaConfig,
     ) -> Self {
-        MediaService { database, storage, outbox, jobs, config }
+        MediaService { database, storage, outbox, jobs, ai, config }
     }
 
     /// Một trang item theo bộ lọc. Cần `media.read`.

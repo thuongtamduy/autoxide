@@ -30,6 +30,7 @@
 //!
 //! Crate này chỉ được khai ở `[dev-dependencies]` (`cargo xtask check` kiểm).
 
+pub mod ai;
 mod ownership;
 mod postgres;
 mod s3;

@@ -5,6 +5,7 @@
 
 use std::sync::Arc;
 
+use autoxide_kernel::ai::{Embedder, TextModel};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Outbox;
@@ -19,7 +20,20 @@ pub(crate) struct ContentService {
     pub(crate) outbox: Outbox,
     pub(crate) jobs: JobQueue,
     pub(crate) media: Arc<dyn Media>,
+    /// Mô hình AI của module `ai` (bản "đã tắt" khi chưa cấu hình): gợi ý SEO, dịch (D-109).
+    pub(crate) ai: Arc<dyn TextModel>,
+    /// Embedding của module `ai`: tìm theo ý nghĩa.
+    pub(crate) embedder: Arc<dyn Embedder>,
     pub(crate) config: ContentConfig,
+    /// Vector và câu tìm giữ trong bộ nhớ của tiến trình (tìm theo ý nghĩa).
+    pub(crate) search_cache: crate::semantic::SearchCache,
+}
+
+/// Những gì service dùng từ module khác.
+pub(crate) struct Dependencies {
+    pub media: Arc<dyn Media>,
+    pub ai: Arc<dyn TextModel>,
+    pub embedder: Arc<dyn Embedder>,
 }
 
 impl ContentService {
@@ -27,10 +41,12 @@ impl ContentService {
         database: Database,
         outbox: Outbox,
         jobs: JobQueue,
-        media: Arc<dyn Media>,
+        dependencies: Dependencies,
         config: ContentConfig,
     ) -> Self {
-        ContentService { database, outbox, jobs, media, config }
+        let Dependencies { media, ai, embedder } = dependencies;
+        let search_cache = crate::semantic::SearchCache::default();
+        ContentService { database, outbox, jobs, media, ai, embedder, config, search_cache }
     }
 
     /// `locale` đã chuẩn hoá nếu được hỗ trợ; không thì thêm lỗi `field`.

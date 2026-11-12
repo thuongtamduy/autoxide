@@ -1,11 +1,12 @@
+# TẮT tự chạy (D-107): tài khoản GitHub không dùng runner có tính phí; gate cục bộ
+# (`./gate.sh`) là gate duy nhất. Muốn bật lại: trả các trigger cũ (xem git log) và ghi
+# quyết định mới.
 # CI của Autoxide: gate đầy đủ (giống `./gate.sh` trên máy) trên PostgreSQL thấp nhất
 # được hỗ trợ và mới nhất, cộng quét secret trong toàn bộ lịch sử git (D-074).
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  # Chỉ chạy khi bấm tay (Actions → Run workflow).
   workflow_dispatch:
 
 permissions:

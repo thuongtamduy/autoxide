@@ -151,17 +151,20 @@ pub fn build(
         router = router.merge(Scalar::with_url(DOCS_PATH, openapi.clone()));
     }
 
+    // REST và MCP xác thực qua bộ có giới hạn theo API key; lớp idempotency giữ bộ gốc (nó chỉ
+    // xác thực để biết khoá thuộc về ai, không được đếm thêm một lần).
+    let limited = extras
+        .authenticator
+        .clone()
+        .map(|inner| rate_limit::ApiKeyLimited::wrap(inner, config.api_key_rate_limit));
     let translations = Arc::new(extras.translations);
-    if let Some(mcp) = mcp::router(
-        extras.tools,
-        translations.clone(),
-        extras.authenticator.clone(),
-        &config.cors_origins,
-    ) {
+    if let Some(mcp) =
+        mcp::router(extras.tools, translations.clone(), limited.clone(), &config.cors_origins)
+    {
         router = router.merge(mcp);
     }
 
-    if let Some(authenticator) = extras.authenticator.clone() {
+    if let Some(authenticator) = limited {
         // Đặt bộ xác thực vào "extensions" của mọi request, nơi extractor
         // `Principal` tìm nó.
         router = router.layer(Extension(authenticator));

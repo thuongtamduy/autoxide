@@ -14,22 +14,23 @@ use sha2::Sha256;
 use uuid::Uuid;
 
 use crate::entries::Entry;
-use crate::permissions::CONTENT_WRITE;
+use crate::permissions;
 use crate::service::{ContentService, now};
 
 type HmacSha256 = Hmac<Sha256>;
 
 impl ContentService {
     /// Token xem trước mục `id`, hết hạn sau `AUTOXIDE_CONTENT_PREVIEW_TTL_SECONDS`. Cần
-    /// `content.write`.
+    /// `content.read` và `content.write` (hay `content.write_own` trên mục của mình).
     pub(crate) async fn preview_token(
         &self,
         principal: &Principal,
         id: Uuid,
     ) -> Result<(String, DateTime<Utc>), Error> {
-        principal.require(&CONTENT_WRITE)?;
+        permissions::require_create(principal)?;
         let secret = self.preview_secret()?;
         let entry = self.get(principal, id).await?;
+        permissions::require_write(principal, &entry)?;
         let expires = now() + chrono::Duration::seconds(i64::from(self.config.preview_ttl_seconds));
         Ok((sign(secret, entry.id, expires)?, expires))
     }

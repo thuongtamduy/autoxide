@@ -5,6 +5,7 @@
 //! Nội dung được dựng dần ở bước 1 của `docs/ROADMAP.md`.
 
 pub mod access;
+pub mod ai;
 pub mod antispam;
 mod builtin;
 pub mod config;

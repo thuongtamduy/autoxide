@@ -36,6 +36,16 @@ pub struct Model {
     pub canonical_url: String,
     pub noindex: bool,
     pub created_by: Option<Uuid>,
+    /// API key đã tạo mục (`NULL`: tạo bằng phiên đăng nhập). Cùng `created_by` quyết định
+    /// "mục của chính bên gọi" cho `content.write_own` / `content.publish_own`.
+    pub created_by_api_key_id: Option<Uuid>,
+    /// Nội dung do AI tạo (máy chủ dịch, hay bên gọi tự khai).
+    pub ai_generated: bool,
+    /// Lúc bên viết xin duyệt (`NULL`: không xin, hay đã đăng / rút lại).
+    pub review_requested_at: Option<DateTimeUtc>,
+    pub review_requested_by: Option<Uuid>,
+    /// Bản dịch do máy chủ dịch từ revision này của bản gốc (D-109); `NULL`: không phải.
+    pub translated_from_revision_id: Option<Uuid>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
     pub revised_at: DateTimeUtc,

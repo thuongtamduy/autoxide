@@ -59,6 +59,8 @@ impl EventHandler for ContentService {
         };
         // Huỷ lịch trước khi bỏ `created_by`: sau đó không còn biết lịch nào của người này.
         let canceled = self.cancel_schedules_of(user_id).await?;
+        // Yêu cầu dịch đang chờ của người này: huỷ (job chạy tới sẽ thấy đã xong và thôi).
+        let translations = self.cancel_translations_of(user_id).await?;
         let profiles = author::Entity::find()
             .filter(author::Column::UserId.eq(user_id))
             .all(self.database.read())
@@ -89,7 +91,12 @@ impl EventHandler for ContentService {
             .filter(redirect::Column::CreatedBy.eq(user_id))
             .exec(write)
             .await?;
-        tracing::info!(user_id = %user_id, authors = profiles.len(), schedules = canceled, "content of a deleted user unlinked");
+        crate::entity::translation_request::Entity::update_many()
+            .col_expr(crate::entity::translation_request::Column::CreatedBy, none())
+            .filter(crate::entity::translation_request::Column::CreatedBy.eq(user_id))
+            .exec(write)
+            .await?;
+        tracing::info!(user_id = %user_id, authors = profiles.len(), schedules = canceled, translations, "content of a deleted user unlinked");
         Ok(())
     }
 }

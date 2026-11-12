@@ -146,7 +146,8 @@ pub(crate) async fn get_revision(
 
 /// Copy a revision back into the draft.
 ///
-/// Requires `content.write`. Does not publish. Categories, tags, authors and the parent page
+/// Requires `content.read`, and `content.write` (or `content.write_own` for an entry you
+/// created). Does not publish. Categories, tags, authors and the parent page
 /// are not part of revisions and stay as they are. `If-Match` is required.
 #[utoipa::path(
     post,
@@ -157,7 +158,7 @@ pub(crate) async fn get_revision(
     responses(
         (status = 200, description = "The draft, now with the revision's fields.", body = Data<EntryResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.write`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).", body = Problem),
         (status = 404, description = "No such entry or revision; code `content.not_found` or `content.revision_not_found`.", body = Problem),
         (status = 409, description = "The revision's slug is now taken; code `content.slug_taken`.", body = Problem),
         (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),

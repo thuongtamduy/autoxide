@@ -68,6 +68,21 @@ pub const RATE_LIMIT_BURST: Setting = Setting::new(
 )
 .with_default("60");
 
+pub const API_KEY_RATE_LIMIT_PER_MINUTE: Setting = Setting::new(
+    "AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE",
+    "Requests one API key may make per minute, on average (REST and MCP), on top of the limit \
+     per client address; more are answered with 429 and a `Retry-After` header. AI agents often \
+     retry in loops: this keeps one key from crowding out the others. `0` turns it off. \
+     Counted per server process.",
+)
+.with_default("120");
+
+pub const API_KEY_RATE_LIMIT_BURST: Setting = Setting::new(
+    "AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_BURST",
+    "Requests one API key may make at once before the per-minute rate applies.",
+)
+.with_default("30");
+
 pub const CLIENT_IP_HEADER: Setting = Setting::new(
     "AUTOXIDE_HTTP_CLIENT_IP_HEADER",
     "Behind a reverse proxy, the header in which the proxy passes the client's address, \
@@ -144,6 +159,8 @@ pub struct HttpConfig {
     pub rate_limit: RateLimit,
     /// Số proxy tin cậy đứng trước API (đọc địa chỉ thứ chừng này từ cuối header).
     pub trusted_proxy_count: usize,
+    /// Giới hạn số request của một API key (D-109).
+    pub api_key_rate_limit: RateLimit,
     /// Header chứa địa chỉ client do reverse proxy đặt; `None`: dùng địa chỉ kết nối.
     pub client_ip_header: Option<HeaderName>,
 }
@@ -177,6 +194,10 @@ impl HttpConfig {
         let burst = reader.get_with(&RATE_LIMIT_BURST, |raw| parse_in_range(raw, 1u32, 1_000_000));
         let trusted_proxy_count =
             reader.get_with(&TRUSTED_PROXY_COUNT, |raw| parse_in_range(raw, 1usize, 10));
+        let key_per_minute = reader
+            .get_with(&API_KEY_RATE_LIMIT_PER_MINUTE, |raw| parse_in_range(raw, 0u32, 1_000_000));
+        let key_burst =
+            reader.get_with(&API_KEY_RATE_LIMIT_BURST, |raw| parse_in_range(raw, 1u32, 1_000_000));
         let client_ip_header = reader.optional_with(&CLIENT_IP_HEADER, |raw| {
             HeaderName::try_from(raw.trim())
                 .map_err(|_| "must be an HTTP header name, like `X-Forwarded-For`".to_owned())
@@ -192,6 +213,7 @@ impl HttpConfig {
             metrics: metrics?,
             rate_limit: RateLimit { per_minute: per_minute?, burst: burst? },
             trusted_proxy_count: trusted_proxy_count?,
+            api_key_rate_limit: RateLimit { per_minute: key_per_minute?, burst: key_burst? },
             client_ip_header: client_ip_header?,
         })
     }
@@ -220,6 +242,7 @@ mod tests {
         assert!(!config.api_docs);
         assert!(!config.metrics);
         assert_eq!(config.rate_limit, RateLimit { per_minute: 600, burst: 60 });
+        assert_eq!(config.api_key_rate_limit, RateLimit { per_minute: 120, burst: 30 });
         assert_eq!(config.client_ip_header, None);
         let header = read(&[("AUTOXIDE_HTTP_CLIENT_IP_HEADER", "X-Forwarded-For")]).unwrap();
         assert_eq!(header.client_ip_header.unwrap().as_str(), "x-forwarded-for");

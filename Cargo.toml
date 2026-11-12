@@ -41,6 +41,7 @@ autoxide-audit = { path = "modules/audit" }
 autoxide-auth = { path = "modules/auth" }
 autoxide-idempotency = { path = "modules/idempotency" }
 autoxide-mail = { path = "modules/mail" }
+autoxide-ai = { path = "modules/ai" }
 autoxide-files = { path = "modules/files" }
 autoxide-notes = { path = "modules/notes" }
 autoxide-webhooks = { path = "modules/webhooks" }

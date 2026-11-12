@@ -261,7 +261,7 @@ mod publishing {
                 "content.not_found"
             );
             let published =
-                content.publish(&ada, entry.id, Some(entry.updated_at), None).await.unwrap();
+                content.publish(&ada, entry.id, Some(entry.updated_at), None, false).await.unwrap();
             assert_eq!(
                 (published.status.as_str(), published.has_unpublished_changes),
                 ("published", false)
@@ -281,8 +281,10 @@ mod publishing {
                 other => panic!("{other:?}"),
             }
             // Phiên bản cũ: 412.
-            let stale =
-                content.publish(&ada, entry.id, Some(entry.updated_at), None).await.unwrap_err();
+            let stale = content
+                .publish(&ada, entry.id, Some(entry.updated_at), None, false)
+                .await
+                .unwrap_err();
             assert_eq!(stale.kind(), ErrorKind::PreconditionFailed);
 
             let down = content.unpublish(&ada, entry.id, None).await.unwrap();
@@ -295,14 +297,14 @@ mod publishing {
                 content.unpublish(&ada, entry.id, None).await.unwrap_err().code(),
                 "content.not_published"
             );
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             content.archive(&ada, entry.id, None).await.unwrap();
             assert!(matches!(
                 resolve(&content, "/blog/hello-world").await.unwrap(),
                 Resolved::Gone
             ));
             // Đăng lại sau khi lưu trữ: đường dẫn sống lại.
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             assert_eq!(
                 entry_path(resolve(&content, "/blog/hello-world").await.unwrap()),
                 "/blog/hello-world"
@@ -315,7 +317,7 @@ mod publishing {
             }
             let writer = user(&["read", "write"]);
             assert_eq!(
-                content.publish(&writer, entry.id, None, None).await.unwrap_err().code(),
+                content.publish(&writer, entry.id, None, None, false).await.unwrap_err().code(),
                 "permission_denied"
             );
         })
@@ -335,11 +337,11 @@ mod publishing {
             let team = content.create(&ada, page("Team", Some(about.id))).await.unwrap();
             let lead = content.create(&ada, page("Lead", Some(team.id))).await.unwrap();
             assert_eq!(
-                content.publish(&ada, team.id, None, None).await.unwrap_err().code(),
+                content.publish(&ada, team.id, None, None, false).await.unwrap_err().code(),
                 "content.parent_not_published"
             );
             for id in [about.id, team.id, lead.id] {
-                content.publish(&ada, id, None, None).await.unwrap();
+                content.publish(&ada, id, None, None, false).await.unwrap();
             }
             assert_eq!(
                 entry_path(resolve(&content, "/about/team/lead").await.unwrap()),
@@ -351,7 +353,7 @@ mod publishing {
 
             let rename = EntryFields { slug: Some("company".into()), ..Default::default() };
             content.update(&ada, about.id, rename, false, None).await.unwrap();
-            content.publish(&ada, about.id, None, None).await.unwrap();
+            content.publish(&ada, about.id, None, None, false).await.unwrap();
             assert_eq!(
                 entry_path(resolve(&content, "/company/team/lead").await.unwrap()),
                 "/company/team/lead"
@@ -371,7 +373,7 @@ mod publishing {
             // Đổi lại tên cũ: chuyển hướng tự động ở đường dẫn đó bị bỏ, trang sống lại ở đó.
             let back = EntryFields { slug: Some("about".into()), ..Default::default() };
             content.update(&ada, about.id, back, false, None).await.unwrap();
-            content.publish(&ada, about.id, None, None).await.unwrap();
+            content.publish(&ada, about.id, None, None, false).await.unwrap();
             assert_eq!(entry_path(resolve(&content, "/about/team").await.unwrap()), "/about/team");
             assert!(matches!(
                 resolve(&content, "/company/team").await.unwrap(),
@@ -406,7 +408,7 @@ mod publishing {
             let b = content.create(&ada, page("B", None)).await.unwrap();
             let child = content.create(&ada, page("Child", Some(a.id))).await.unwrap();
             for id in [a.id, b.id, child.id] {
-                content.publish(&ada, id, None, None).await.unwrap();
+                content.publish(&ada, id, None, None, false).await.unwrap();
             }
             let moved = content.move_page(&ada, a.id, Some(b.id), None).await.unwrap();
             assert_eq!(moved.parent_id, Some(b.id));
@@ -459,7 +461,9 @@ mod publishing {
                 .map(|_| {
                     let content = content.clone();
                     tokio::spawn(async move {
-                        content.publish(&editor(), entry.id, Some(entry.updated_at), None).await
+                        content
+                            .publish(&editor(), entry.id, Some(entry.updated_at), None, false)
+                            .await
                     })
                 })
                 .collect();
@@ -485,12 +489,12 @@ mod publishing {
             let (content, media, _) = service(test, config(&[])).await;
             let ada = editor();
             let a_post = content.create(&ada, post("News")).await.unwrap();
-            content.publish(&ada, a_post.id, None, None).await.unwrap();
+            content.publish(&ada, a_post.id, None, None, false).await.unwrap();
             let blog = content.create(&ada, page("Blog", None)).await.unwrap();
-            content.publish(&ada, blog.id, None, None).await.unwrap();
+            content.publish(&ada, blog.id, None, None, false).await.unwrap();
             let clash = content.create(&ada, page("News", Some(blog.id))).await.unwrap();
             assert_eq!(
-                content.publish(&ada, clash.id, None, None).await.unwrap_err().code(),
+                content.publish(&ada, clash.id, None, None, false).await.unwrap_err().code(),
                 "content.path_taken"
             );
 
@@ -498,13 +502,13 @@ mod publishing {
             let mut with_image = post("Photo");
             with_image.fields.featured_media_id = Some(Some(private));
             let photo = content.create(&ada, with_image).await.unwrap();
-            let error = content.publish(&ada, photo.id, None, None).await.unwrap_err();
+            let error = content.publish(&ada, photo.id, None, None, false).await.unwrap_err();
             assert_eq!(
                 (error.code(), error.fields()[0].field.as_str()),
                 ("content.media_not_public", "featured_media_id")
             );
             media.0.lock().unwrap().insert(private, autoxide_media::api::MediaVisibility::Public);
-            content.publish(&ada, photo.id, None, None).await.unwrap();
+            content.publish(&ada, photo.id, None, None, false).await.unwrap();
         })
         .await
         .unwrap();
@@ -517,7 +521,7 @@ mod publishing {
             let (content, _, _) = service(test, config(&[])).await;
             let ada = editor();
             let target = content.create(&ada, page("Contact", None)).await.unwrap();
-            content.publish(&ada, target.id, None, None).await.unwrap();
+            content.publish(&ada, target.id, None, None, false).await.unwrap();
             let input = |from: &str, to_entry: Option<Uuid>, to_url: Option<&str>, status: i32| {
                 RedirectInput {
                     locale: None,
@@ -602,7 +606,7 @@ mod history {
                 service(test, config(&[("AUTOXIDE_CONTENT_MAX_REVISIONS", "10")])).await;
             let ada = editor();
             let entry = content.create(&ada, post("Version 0")).await.unwrap();
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             for n in 1..=14 {
                 let changes =
                     EntryFields { title: Some(format!("Version {n}")), ..Default::default() };
@@ -721,7 +725,7 @@ mod history {
                 content.create_schedule(&ada, entry.id, Action::Publish, at, None).await.unwrap();
             let manual = EntryFields { title: Some("Manual".into()), ..Default::default() };
             content.update(&ada, entry.id, manual, false, None).await.unwrap();
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             content.run_schedule(schedule.id, Utc::now()).await.unwrap();
             let rows = content.list_schedules(&ada, entry.id).await.unwrap();
             assert_eq!(
@@ -743,7 +747,8 @@ mod history {
                     (
                         tokio::spawn(async move { a.run_schedule(schedule.id, Utc::now()).await }),
                         tokio::spawn(async move {
-                            b.publish(&editor(), entry.id, Some(entry.updated_at), None).await
+                            b.publish(&editor(), entry.id, Some(entry.updated_at), None, false)
+                                .await
                         }),
                     )
                 };
@@ -818,7 +823,7 @@ mod library {
                 .unwrap_err();
             assert_eq!(same.fields()[0].field, "locale");
 
-            content.publish(&ada, about.id, None, None).await.unwrap();
+            content.publish(&ada, about.id, None, None, false).await.unwrap();
             assert_eq!(
                 content.resolve("vi", "/gioi-thieu").await.unwrap_err().code(),
                 "content.not_found"
@@ -828,7 +833,7 @@ mod library {
                 "content.not_found",
                 "no fallback"
             );
-            content.publish(&ada, gioi_thieu.id, None, None).await.unwrap();
+            content.publish(&ada, gioi_thieu.id, None, None, false).await.unwrap();
             let Resolved::Entry(row) = content.resolve("en", "/about").await.unwrap() else {
                 panic!()
             };
@@ -903,7 +908,7 @@ mod library {
                     .len(),
                 1
             );
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             let Resolved::Entry(row) = content.resolve("vi", "/blog/pho-ha-noi").await.unwrap()
             else {
                 panic!()
@@ -993,7 +998,7 @@ mod library {
             let ada = editor();
             let about = content.create(&ada, page("About", None)).await.unwrap();
             let hidden = content.create(&ada, page("Hidden", None)).await.unwrap();
-            content.publish(&ada, about.id, None, None).await.unwrap();
+            content.publish(&ada, about.id, None, None, false).await.unwrap();
             let item = |label: &str,
                         entry: Option<Uuid>,
                         url: Option<&str>,
@@ -1079,17 +1084,17 @@ mod public {
             {
                 let entry = content.create(&ada, post(title)).await.unwrap();
                 let at = chrono::Utc::now() - chrono::Duration::days(10 - index as i64);
-                content.publish(&ada, entry.id, None, Some(at)).await.unwrap();
+                content.publish(&ada, entry.id, None, Some(at), false).await.unwrap();
                 published.push(entry);
             }
             let draft = content.create(&ada, post("Bản nháp bí mật")).await.unwrap();
             let about = content.create(&ada, page("About", None)).await.unwrap();
-            content.publish(&ada, about.id, None, None).await.unwrap();
+            content.publish(&ada, about.id, None, None, false).await.unwrap();
             let vi = content
                 .create_translation(&ada, published[0].id, "vi", fields("Phở"))
                 .await
                 .unwrap();
-            content.publish(&ada, vi.id, None, None).await.unwrap();
+            content.publish(&ada, vi.id, None, None, false).await.unwrap();
             let travel = content
                 .create_term(
                     &ada,
@@ -1355,7 +1360,7 @@ async fn so_doi_tuong_content_entry() {
             (false, "Hello", None)
         );
         assert_eq!(draft.owner_user_ids, [ada.user_id()]);
-        content.publish(&ada, entry.id, None, None).await.unwrap();
+        content.publish(&ada, entry.id, None, None, false).await.unwrap();
         let live = resolver.resolve(&entry.id.to_string()).await.unwrap().unwrap();
         assert_eq!(
             (live.public, live.summary.as_str(), live.url.as_deref(), live.locale.as_deref()),
@@ -1366,4 +1371,1107 @@ async fn so_doi_tuong_content_entry() {
     })
     .await
     .unwrap();
+}
+
+/// Các lỗi tìm thấy ở lượt rà soát độc lập sau khi gộp module (ngày 12/11/2026). Mỗi test giữ
+/// một lỗi không quay lại.
+mod ra_soat {
+    use chrono::{Duration, Utc};
+
+    use super::*;
+    use crate::authors::AuthorInput;
+    use crate::reading::PostFilter;
+    use crate::redirects::{RedirectInput, Resolved};
+    use crate::schedules::Action;
+    use crate::terms::{Taxonomy, TermInput};
+
+    fn redirect(locale: &str, from: &str, to: Uuid) -> RedirectInput {
+        RedirectInput {
+            locale: Some(locale.into()),
+            from_path: from.into(),
+            to_entry_id: Some(to),
+            to_url: None,
+            status_code: 301,
+        }
+    }
+
+    /// Chuyển trang tính đường dẫn công khai từ slug đã đăng, không lộ slug của nháp.
+    #[tokio::test]
+    async fn chuyen_trang_dung_slug_da_dang() {
+        TestDatabase::run(async |test| {
+            let (content, _, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let parent = content.create(&ada, page("Parent", None)).await.unwrap();
+            let about = content.create(&ada, page("About", None)).await.unwrap();
+            content.publish(&ada, parent.id, None, None, false).await.unwrap();
+            content.publish(&ada, about.id, None, None, false).await.unwrap();
+            let draft = EntryFields { slug: Some("secret-draft".into()), ..Default::default() };
+            content.update(&ada, about.id, draft, false, None).await.unwrap();
+            content.move_page(&ada, about.id, Some(parent.id), None).await.unwrap();
+            assert!(content.resolve("en", "/parent/secret-draft").await.is_err());
+            assert!(matches!(
+                content.resolve("en", "/parent/about").await.unwrap(),
+                Resolved::Entry(_)
+            ));
+            assert!(matches!(
+                content.resolve("en", "/about").await.unwrap(),
+                Resolved::Redirect { .. }
+            ));
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Đường dẫn mới của trang con trùng một bài: `content.path_taken`, không phải lỗi 500, và
+    /// không có gì đổi.
+    #[tokio::test]
+    async fn trang_con_trung_duong_dan() {
+        TestDatabase::run(async |test| {
+            let (content, _, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let hello = content.create(&ada, post("Hello")).await.unwrap();
+            content.publish(&ada, hello.id, None, None, false).await.unwrap();
+            let news = content.create(&ada, page("News", None)).await.unwrap();
+            let child = content.create(&ada, page("Hello", Some(news.id))).await.unwrap();
+            content.publish(&ada, news.id, None, None, false).await.unwrap();
+            content.publish(&ada, child.id, None, None, false).await.unwrap();
+            let rename = EntryFields { slug: Some("blog".into()), ..Default::default() };
+            content.update(&ada, news.id, rename, false, None).await.unwrap();
+            let error = content.publish(&ada, news.id, None, None, false).await.unwrap_err();
+            assert_eq!(error.code(), "content.path_taken", "{error:?}");
+            assert!(matches!(
+                content.resolve("en", "/news/hello").await.unwrap(),
+                Resolved::Entry(_)
+            ));
+
+            // Chuyển trang cũng vậy: trang `blog` gốc có con `hello` → `/blog/hello` trùng bài.
+            // (Trả slug nháp của `News` về như cũ để `blog` còn trống.)
+            let back = EntryFields { slug: Some("news".into()), ..Default::default() };
+            content.update(&ada, news.id, back, false, None).await.unwrap();
+            let blog = content.create(&ada, page("Blog", None)).await.unwrap();
+            assert_eq!(blog.slug, "blog");
+            content.publish(&ada, blog.id, None, None, false).await.unwrap();
+            let error = content.move_page(&ada, child.id, Some(blog.id), None).await.unwrap_err();
+            assert_eq!(error.code(), "content.path_taken", "{error:?}");
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Bản dịch của trang không được vượt độ sâu tối đa (cha trong ngôn ngữ kia đã sâu hơn).
+    #[tokio::test]
+    async fn ban_dich_khong_vuot_do_sau() {
+        TestDatabase::run(async |test| {
+            let (content, _, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let root = content.create(&ada, page("Root", None)).await.unwrap();
+            let child = content.create(&ada, page("Child", Some(root.id))).await.unwrap();
+            let root_vi =
+                content.create_translation(&ada, root.id, "vi", fields("Gốc")).await.unwrap();
+            // Cây tiếng Việt: bốn cấp, rồi đưa bản dịch của `Root` xuống cấp 5.
+            let mut parent = None;
+            for level in 1..=4 {
+                let mut input = page(&format!("Cấp {level}"), parent);
+                input.locale = Some("vi".into());
+                parent = Some(content.create(&ada, input).await.unwrap().id);
+            }
+            content.move_page(&ada, root_vi.id, parent, None).await.unwrap();
+            let error =
+                content.create_translation(&ada, child.id, "vi", fields("Con")).await.unwrap_err();
+            assert_eq!(error.fields()[0].code, "tree_too_deep", "{error:?}");
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Xoá trang cha và tạo trang con dưới nó cùng lúc: không bao giờ còn trang con mồ côi.
+    #[tokio::test]
+    async fn xoa_cha_va_tao_con_dong_thoi() {
+        TestDatabase::run(async |test| {
+            let (content, _, database) = service(test, config(&[])).await;
+            let ada = editor();
+            for _ in 0..5 {
+                let parent = content.create(&ada, page("Parent", None)).await.unwrap();
+                let (deleted, created) = tokio::join!(
+                    content.delete(&ada, parent.id, None),
+                    content.create(&ada, page("Child", Some(parent.id)))
+                );
+                assert!(deleted.is_ok() != created.is_ok(), "exactly one wins");
+                if let Ok(child) = created {
+                    content.delete(&ada, child.id, None).await.unwrap();
+                    content.delete(&ada, parent.id, None).await.unwrap();
+                }
+            }
+            let orphans = count(
+                &database,
+                "SELECT COUNT(*) FROM content_entries c WHERE c.parent_id IS NOT NULL \
+                 AND NOT EXISTS (SELECT 1 FROM content_entries p WHERE p.id = c.parent_id)",
+            )
+            .await;
+            assert_eq!(orphans, 0);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Chuyển hướng làm tay chỉ trỏ tới mục cùng ngôn ngữ; đích đã lưu trữ thì đường dẫn cũ 410.
+    #[tokio::test]
+    async fn chuyen_huong_cung_ngon_ngu_va_luu_tru() {
+        TestDatabase::run(async |test| {
+            let (content, _, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let english = content.create(&ada, post("English")).await.unwrap();
+            content.publish(&ada, english.id, None, None, false).await.unwrap();
+            let error =
+                content.create_redirect(&ada, redirect("vi", "/cu", english.id)).await.unwrap_err();
+            assert_eq!(error.fields()[0].code, "other_locale");
+
+            content.create_redirect(&ada, redirect("en", "/old", english.id)).await.unwrap();
+            let rename = EntryFields { slug: Some("renamed".into()), ..Default::default() };
+            content.update(&ada, english.id, rename, false, None).await.unwrap();
+            content.publish(&ada, english.id, None, None, false).await.unwrap();
+            content.archive(&ada, english.id, None).await.unwrap();
+            for old in ["/old", "/blog/english", "/blog/renamed"] {
+                assert!(
+                    matches!(content.resolve("en", old).await.unwrap(), Resolved::Gone),
+                    "{old}"
+                );
+            }
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Đổi danh mục / tác giả của mục đang công khai cần quyền đăng; nháp thì quyền viết đủ.
+    #[tokio::test]
+    async fn gan_the_bai_cong_khai_can_quyen_dang() {
+        TestDatabase::run(async |test| {
+            let (content, _, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let writer = user(&["read", "write"]);
+            let tag = TermInput {
+                locale: Some("en".into()),
+                name: Some("Food".into()),
+                ..Default::default()
+            };
+            let tag = content.create_term(&ada, Taxonomy::Tag, tag).await.unwrap();
+            let author = AuthorInput { display_name: Some("Ada".into()), ..Default::default() };
+            let author = content.create_author(&ada, author).await.unwrap();
+            let entry = content.create(&ada, post("Live")).await.unwrap();
+            content.set_entry_terms(&writer, entry.id, vec![tag.term.id]).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
+            let denied = content.set_entry_terms(&writer, entry.id, vec![]).await.unwrap_err();
+            assert_eq!(denied.kind(), ErrorKind::Forbidden);
+            let denied =
+                content.set_entry_authors(&writer, entry.id, vec![author.id]).await.unwrap_err();
+            assert_eq!(denied.kind(), ErrorKind::Forbidden);
+            content.set_entry_authors(&ada, entry.id, vec![author.id]).await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Hai lệnh đổi cha chéo nhau của danh mục chạy cùng lúc: không tạo vòng.
+    #[tokio::test]
+    async fn doi_cha_danh_muc_cheo_dong_thoi() {
+        TestDatabase::run(async |test| {
+            let (content, _, _) = service(test, config(&[])).await;
+            let ada = editor();
+            for round in 0..5 {
+                let name = |n: &str| TermInput {
+                    locale: Some("en".into()),
+                    name: Some(format!("{n} {round}")),
+                    ..Default::default()
+                };
+                let a = content.create_term(&ada, Taxonomy::Category, name("A")).await.unwrap();
+                let b = content.create_term(&ada, Taxonomy::Category, name("B")).await.unwrap();
+                let under = |parent: Uuid| TermInput {
+                    parent_id: Some(Some(parent)),
+                    ..Default::default()
+                };
+                let (first, second) = tokio::join!(
+                    content.update_term(&ada, a.term.id, under(b.term.id), None),
+                    content.update_term(&ada, b.term.id, under(a.term.id), None)
+                );
+                assert!(first.is_err() || second.is_err(), "round {round}: both moved");
+            }
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Gỡ theo lịch ghi revision như gỡ bằng tay; xoá tài khoản huỷ lịch kèm event.
+    #[tokio::test]
+    async fn lich_go_ghi_revision_va_huy_lich_co_event() {
+        TestDatabase::run(async |test| {
+            let (content, _, database) = service(test, config(&[])).await;
+            let ada = editor();
+            let entry = content.create(&ada, post("Planned")).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
+            let at = Utc::now() + Duration::hours(1);
+            let down =
+                content.create_schedule(&ada, entry.id, Action::Unpublish, at, None).await.unwrap();
+            let before = content.revision_count(entry.id).await;
+            content.run_schedule(down.id, Utc::now()).await.unwrap();
+            assert_eq!(content.revision_count(entry.id).await, before + 1);
+
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
+            content.create_schedule(&ada, entry.id, Action::Unpublish, at, None).await.unwrap();
+            assert_eq!(content.cancel_schedules_of(ada.user_id()).await.unwrap(), 1);
+            assert_eq!(content.cancel_schedules_of(ada.user_id()).await.unwrap(), 0);
+            let canceled = events(&database)
+                .await
+                .iter()
+                .filter(|name| *name == "content.schedule_canceled")
+                .count();
+            assert_eq!(canceled, 1);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Bài công khai không lộ ID ảnh đại diện riêng tư của tác giả.
+    #[tokio::test]
+    async fn anh_tac_gia_rieng_tu_khong_lo() {
+        TestDatabase::run(async |test| {
+            let (content, media, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let private = media.add(false);
+            let input = AuthorInput {
+                display_name: Some("Ada".into()),
+                avatar_media_id: Some(Some(private)),
+                ..Default::default()
+            };
+            let author = content.create_author(&ada, input).await.unwrap();
+            let entry = content.create(&ada, post("By Ada")).await.unwrap();
+            content.set_entry_authors(&ada, entry.id, vec![author.id]).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
+            let filter = PostFilter { locale: "en".into(), ..Default::default() };
+            let page = content.public_posts(&filter, &PageRequest::first(10, Order::Desc)).await;
+            let mut views = content.public_views(page.unwrap().data).await.unwrap();
+            let view = views.remove(0);
+            assert_eq!(view.authors[0].avatar_media_id, None);
+        })
+        .await
+        .unwrap();
+    }
+}
+
+/// Quyền cho AI agent (D-109): `write_own` / `publish_own`, quyền xoá riêng, xin duyệt,
+/// `ai_generated` / `ai_reviewed`.
+mod agent {
+    use autoxide_kernel::access::Principal;
+    use sea_orm::EntityTrait;
+
+    use super::*;
+    use crate::revisions::Snapshot;
+
+    /// Agent dùng API key `key` của người dùng `user_id`.
+    fn agent(user_id: Uuid, key: Uuid) -> Principal {
+        Principal::new(
+            user_id,
+            ["read", "write_own", "publish_own"].iter().map(|p| format!("content.{p}")),
+        )
+        .via_api_key(key)
+    }
+
+    /// Chỉ sửa, đăng, gỡ mục do chính mình (cùng người, cùng key) tạo; không lưu trữ, không
+    /// xoá; xoá cần `content.delete` (kể cả người có `content.publish`).
+    #[tokio::test]
+    async fn chi_lam_tren_muc_cua_minh() {
+        TestDatabase::run(async |test| {
+            let (content, _, _) = service(test, config(&[])).await;
+            let owner = Uuid::now_v7();
+            let bot = agent(owner, Uuid::now_v7());
+            let other_key = agent(owner, Uuid::now_v7());
+            let ada = editor();
+
+            let mine = content.create(&bot, post("Mine")).await.unwrap();
+            assert_eq!(mine.created_by_api_key_id, bot.api_key_id());
+            let theirs = content.create(&ada, post("Theirs")).await.unwrap();
+
+            let mine = content
+                .update(&bot, mine.id, fields("Mine, edited"), false, Some(mine.updated_at))
+                .await
+                .unwrap();
+            for (who, id) in [(&other_key, mine.id), (&bot, theirs.id)] {
+                let error = content.update(who, id, fields("x"), false, None).await.unwrap_err();
+                assert_eq!(
+                    (error.kind(), error.code()),
+                    (ErrorKind::Forbidden, "content.not_owner")
+                );
+                assert_eq!(
+                    content.publish(who, id, None, None, false).await.unwrap_err().code(),
+                    "content.not_owner"
+                );
+            }
+            // Bản dịch: chỉ từ bản gốc của mình; bản dịch cũng là của mình.
+            let vi = content.create_translation(&bot, mine.id, "vi", fields("Của tôi")).await;
+            let vi = vi.unwrap();
+            assert_eq!(vi.created_by_api_key_id, bot.api_key_id());
+            assert_eq!(
+                content
+                    .create_translation(&bot, theirs.id, "vi", fields("x"))
+                    .await
+                    .unwrap_err()
+                    .code(),
+                "content.not_owner"
+            );
+
+            let mine = content.publish(&bot, mine.id, None, None, false).await.unwrap();
+            assert_eq!(mine.status, "published");
+            let mine = content.unpublish(&bot, mine.id, None).await.unwrap();
+            for error in [
+                content.archive(&bot, mine.id, None).await.unwrap_err(),
+                content.delete(&bot, mine.id, None).await.unwrap_err(),
+            ] {
+                assert_eq!(error.code(), "permission_denied");
+            }
+            // Người có `content.publish` mà không có `content.delete` không xoá được.
+            let publisher = user(&["read", "write", "publish"]);
+            assert_eq!(
+                content.delete(&publisher, theirs.id, None).await.unwrap_err().code(),
+                "permission_denied"
+            );
+            content.delete(&ada, theirs.id, None).await.unwrap();
+            // Không có quyền viết nào: 403 trước khi biết mục có tồn tại không.
+            let reader = user(&["read"]);
+            assert_eq!(
+                content
+                    .update(&reader, Uuid::now_v7(), fields("x"), false, None)
+                    .await
+                    .unwrap_err()
+                    .code(),
+                "permission_denied"
+            );
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Xin duyệt rồi rút lại; người đăng xác nhận đã duyệt nội dung do AI tạo; API key không
+    /// xác nhận được; `ai_generated` đi qua revision và khôi phục.
+    #[tokio::test]
+    async fn xin_duyet_va_xac_nhan_da_duyet() {
+        TestDatabase::run(async |test| {
+            let (content, _, database) = service(test, config(&[])).await;
+            let bot = agent(Uuid::now_v7(), Uuid::now_v7());
+            let ada = editor();
+            let mut input = post("Written by a bot");
+            input.fields.ai_generated = Some(true);
+            let entry = content.create(&bot, input).await.unwrap();
+            assert!(entry.ai_generated);
+
+            let entry =
+                content.set_review_request(&bot, entry.id, Some(entry.updated_at), false).await;
+            let entry = entry.unwrap();
+            assert!(entry.review_requested_at.is_some());
+            assert_eq!(entry.review_requested_by, Some(bot.user_id()));
+            let entry = content.set_review_request(&bot, entry.id, None, true).await.unwrap();
+            assert_eq!(entry.review_requested_at, None);
+            let entry = content.set_review_request(&bot, entry.id, None, false).await.unwrap();
+            let names = events(&database).await;
+            assert!(names.contains(&"content.review_requested".to_owned()));
+            assert!(names.contains(&"content.review_withdrawn".to_owned()));
+
+            assert_eq!(
+                content.publish(&bot, entry.id, None, None, true).await.unwrap_err().code(),
+                "content.ai_review_requires_human"
+            );
+            let entry = content.publish(&ada, entry.id, None, None, true).await.unwrap();
+            assert_eq!(entry.review_requested_at, None);
+            let published = crate::entity::published::Entity::find_by_id(entry.id)
+                .one(database.read())
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(published.ai_generated);
+            assert_eq!(published.ai_reviewed_by, Some(ada.user_id()));
+            assert!(published.ai_reviewed_at.is_some());
+            // Đăng lại mà không xác nhận: không còn ghi là đã duyệt.
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
+            let published = crate::entity::published::Entity::find_by_id(entry.id)
+                .one(database.read())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(published.ai_reviewed_by, None);
+
+            // Revision giữ cờ; khôi phục đưa cờ về nháp.
+            let revisions = content
+                .list_revisions(&ada, entry.id, &PageRequest::first(50, Order::Asc))
+                .await
+                .unwrap();
+            let first = &revisions.data[0];
+            let snapshot: Snapshot = serde_json::from_str(&first.snapshot).unwrap();
+            assert!(snapshot.ai_generated);
+            let entry = content
+                .update(
+                    &ada,
+                    entry.id,
+                    EntryFields { ai_generated: Some(false), ..Default::default() },
+                    false,
+                    None,
+                )
+                .await
+                .unwrap();
+            assert!(!entry.ai_generated);
+            let entry = content.restore(&ada, entry.id, first.id, None).await.unwrap();
+            assert!(entry.ai_generated);
+            // Revision cũ (trước D-109) không có trường: đọc được, coi là `false`.
+            let old: Snapshot = serde_json::from_value(json!({
+                "title": "t", "slug": "t", "excerpt": "", "body": paragraph("x"),
+                "featured_media_id": null, "featured_media_alt": "", "meta_title": "",
+                "meta_description": "", "og_media_id": null, "canonical_url": "", "noindex": false
+            }))
+            .unwrap();
+            assert!(!old.ai_generated);
+        })
+        .await
+        .unwrap();
+    }
+}
+
+/// SEO (D-109): kiểm không dùng AI; gợi ý bằng AI chỉ trả gợi ý, chỉ giữ term có thật.
+mod seo {
+    use std::sync::Arc;
+
+    use autoxide_kernel::access::Principal;
+    use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
+
+    use super::*;
+    use crate::terms::{Taxonomy, TermInput};
+    use crate::testing::service_with;
+
+    #[tokio::test]
+    async fn kiem_seo_khong_dung_ai() {
+        TestDatabase::run(async |test| {
+            let (content, media, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let image = media.add(true);
+            let mut input = post("Hello");
+            input.fields.featured_media_id = Some(Some(image));
+            input.fields.meta_title = Some("x".repeat(70));
+            input.fields.body = Some(json!({"type": "doc", "content": [
+                {"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "A"}]},
+                {"type": "heading", "attrs": {"level": 4}, "content": [{"type": "text", "text": "B"}]},
+                {"type": "image", "attrs": {"mediaId": image.to_string(), "alt": "", "caption": ""}}
+            ]}));
+            let entry = content.create(&ada, input).await.unwrap();
+            content.create(&ada, post("Hello")).await.unwrap();
+            let findings = content.seo_check(&ada, entry.id).await.unwrap();
+            let found: Vec<(&str, &str)> =
+                findings.iter().map(|finding| (finding.code, finding.field.as_str())).collect();
+            for expected in [
+                ("seo.meta_title_too_long", "meta_title"),
+                ("seo.meta_description_missing", "meta_description"),
+                ("seo.excerpt_missing", "excerpt"),
+                ("seo.image_alt_missing", "featured_media_alt"),
+                ("seo.heading_skipped", "body.content[1].attrs.level"),
+                ("seo.image_alt_missing", "body.content[2].attrs.alt"),
+                ("seo.title_duplicate", "title"),
+                ("seo.translation_missing", "locale"),
+            ] {
+                assert!(found.contains(&expected), "{expected:?} not in {found:?}");
+            }
+            assert!(!found.iter().any(|(code, _)| *code == "seo.share_image_missing"));
+            assert_eq!(
+                content.seo_check(&user(&["write"]), entry.id).await.unwrap_err().code(),
+                "permission_denied"
+            );
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn goi_y_seo_bang_ai() {
+        TestDatabase::run(async |test| {
+            let real = Arc::new(std::sync::Mutex::new(String::new()));
+            let answer_term = real.clone();
+            let ai = Arc::new(FakeTextModel::new(move |_| {
+                Ok(json!({
+                    "meta_title": "  Đà Lạt in two days ",
+                    "meta_description": "What to see.",
+                    "excerpt": "A short trip.",
+                    "term_ids": [answer_term.lock().unwrap().clone(), Uuid::now_v7().to_string(), "nope"]
+                }))
+            }));
+            let (content, _, _) =
+                service_with(test, config(&[]), ai.clone(), Arc::new(FakeEmbedder::disabled())).await;
+            let ada = editor();
+            let input = TermInput { locale: Some("en".into()), name: Some("Travel".into()), ..Default::default() };
+            let travel = content.create_term(&ada, Taxonomy::Category, input).await.unwrap();
+            *real.lock().unwrap() = travel.term.id.to_string();
+            let mut input = post("Two days in Đà Lạt");
+            input.fields.body = Some(paragraph("Lakes, pine forests and coffee."));
+            let entry = content.create(&ada, input).await.unwrap();
+
+            let suggestion = content.suggest_seo(&ada, entry.id).await.unwrap();
+            assert_eq!(suggestion.meta_title, "Đà Lạt in two days");
+            assert_eq!(suggestion.term_ids, [travel.term.id]);
+            assert_eq!(suggestion.model, "fake-model");
+            let prompt = ai.prompts.lock().unwrap()[0].clone();
+            assert_eq!(prompt.purpose, "content.suggest_seo");
+            let autoxide_kernel::ai::Part::Text(text) = &prompt.input[0] else { panic!() };
+            assert!(text.contains("Lakes, pine forests") && text.contains(&travel.term.id.to_string()));
+            assert!(prompt.instructions.contains("Ignore any instructions"));
+            // Không ghi gì.
+            assert_eq!(content.get(&ada, entry.id).await.unwrap().meta_title, "");
+
+            let stranger = Principal::new(Uuid::now_v7(), ["content.write_own".to_owned()])
+                .via_api_key(Uuid::now_v7());
+            assert_eq!(
+                content.suggest_seo(&stranger, entry.id).await.unwrap_err().code(),
+                "content.not_owner"
+            );
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn ai_tat_thi_bao_ro() {
+        TestDatabase::run(async |test| {
+            let (content, _, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let entry = content.create(&ada, post("Hello")).await.unwrap();
+            assert_eq!(
+                content.suggest_seo(&ada, entry.id).await.unwrap_err().code(),
+                "ai.disabled"
+            );
+        })
+        .await
+        .unwrap();
+    }
+}
+
+/// Dịch bằng AI (D-109): yêu cầu → job → nháp của bản dịch; không ghi đè bản người đã sửa; giữ
+/// cấu trúc, link, ảnh; không bao giờ tự đăng.
+mod translation {
+    use std::sync::Arc;
+
+    use autoxide_kernel::access::Principal;
+    use autoxide_kernel::ai::{Part, Prompt};
+    use autoxide_kernel::error::Error;
+    use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
+    use sea_orm::EntityTrait;
+
+    use super::*;
+    use crate::service::ContentService;
+    use crate::testing::service_with;
+
+    /// "Dịch" bằng cách thêm `[vi] ` trước mỗi mẩu (giữ nguyên thẻ).
+    fn translator() -> FakeTextModel {
+        FakeTextModel::new(|prompt: &Prompt| {
+            let Part::Text(input) = &prompt.input[0] else { panic!() };
+            let items: Vec<Value> = serde_json::from_str(input).unwrap();
+            let segments: Vec<Value> = items
+                .iter()
+                .map(|item| json!({"id": item["id"], "text": format!("[vi] {}", item["text"].as_str().unwrap())}))
+                .collect();
+            Ok(json!({"segments": segments}))
+        })
+    }
+
+    fn rich_body(image: Uuid) -> Value {
+        json!({"type": "doc", "content": [
+            {"type": "paragraph", "content": [
+                {"type": "text", "text": "See the "},
+                {"type": "text", "text": "map", "marks": [{"type": "link", "attrs": {"href": "https://example.com/map"}}]}
+            ]},
+            {"type": "codeBlock", "content": [{"type": "text", "text": "let x = 1;"}]},
+            {"type": "image", "attrs": {"mediaId": image.to_string(), "alt": "A lake", "caption": ""}}
+        ]})
+    }
+
+    async fn setup(
+        test: &TestDatabase,
+        ai: FakeTextModel,
+        pairs: &[(&str, &str)],
+    ) -> (Arc<ContentService>, Arc<crate::testing::FakeMedia>, Database, Arc<FakeTextModel>) {
+        let ai = Arc::new(ai);
+        let (content, media, database) =
+            service_with(test, config(pairs), ai.clone(), Arc::new(FakeEmbedder::disabled())).await;
+        (content, media, database, ai)
+    }
+
+    async fn request(database: &Database, id: Uuid) -> crate::translate::TranslationRequest {
+        crate::entity::translation_request::Entity::find_by_id(id)
+            .one(database.read())
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn dich_moi_giu_cau_truc_va_khong_tu_dang() {
+        TestDatabase::run(async |test| {
+            let (content, media, database, ai) = setup(test, translator(), &[]).await;
+            let ada = editor();
+            let image = media.add(true);
+            let mut input = post("Two days in Da Lat");
+            input.fields.excerpt = Some("A short trip.".into());
+            input.fields.body = Some(rich_body(image));
+            let source = content.create(&ada, input).await.unwrap();
+            content.publish(&ada, source.id, None, None, false).await.unwrap();
+
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            assert_eq!((queued.status.as_str(), queued.target_entry_id), ("queued", None));
+            content.run_translation(queued.id, 1).await.unwrap();
+            let done = request(&database, queued.id).await;
+            assert_eq!(done.status, "succeeded");
+            assert_eq!(done.active_key, None);
+            let vi = content.get(&ada, done.result_entry_id.unwrap()).await.unwrap();
+            assert_eq!((vi.locale.as_str(), vi.status.as_str()), ("vi", "draft"));
+            assert_eq!(
+                (vi.title.as_str(), vi.excerpt.as_str()),
+                ("[vi] Two days in Da Lat", "[vi] A short trip.")
+            );
+            assert_eq!(vi.slug, "vi-two-days-in-da-lat");
+            assert!(vi.ai_generated);
+            assert_eq!(vi.translated_from_revision_id, Some(done.source_revision_id));
+            assert_eq!(vi.translation_group_id, source.translation_group_id);
+            let body: Value = serde_json::from_str(&vi.body).unwrap();
+            assert_eq!(body["content"][0]["content"][0]["text"], "[vi] See the ");
+            assert_eq!(
+                body["content"][0]["content"][1]["marks"][0]["attrs"]["href"],
+                "https://example.com/map"
+            );
+            assert_eq!(body["content"][1]["content"][0]["text"], "let x = 1;");
+            assert_eq!(body["content"][2]["attrs"]["alt"], "[vi] A lake");
+            assert_eq!(body["content"][2]["attrs"]["mediaId"], image.to_string());
+            let prompt = ai.prompts.lock().unwrap()[0].clone();
+            assert!(prompt.instructions.contains("`en`") && prompt.instructions.contains("`vi`"));
+            let Part::Text(sent) = &prompt.input[0] else { panic!() };
+            assert!(!sent.contains("example.com"), "the model never sees links");
+            let names = events(&database).await;
+            for name in ["content.translation_requested", "content.translation_succeeded"] {
+                assert!(names.contains(&name.to_owned()), "{name}");
+            }
+            // Chạy lại job (thử lại): không làm gì thêm.
+            content.run_translation(queued.id, 2).await.unwrap();
+            assert_eq!(ai.calls(), 1);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn cap_nhat_ban_dich_co_san_va_bao_da_cu() {
+        TestDatabase::run(async |test| {
+            let (content, _, database, _) = setup(test, translator(), &[]).await;
+            let ada = editor();
+            let source = content.create(&ada, post("Hello")).await.unwrap();
+            let vi = content
+                .create_translation(&ada, source.id, "vi", fields("Xin chào"))
+                .await
+                .unwrap();
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            assert_eq!(queued.target_entry_id, Some(vi.id));
+            content.run_translation(queued.id, 1).await.unwrap();
+            let updated = content.get(&ada, vi.id).await.unwrap();
+            assert_eq!(
+                (updated.title.as_str(), updated.slug.as_str()),
+                ("[vi] Hello", vi.slug.as_str())
+            );
+            let view = |entry| {
+                let content = content.clone();
+                async move {
+                    let described = crate::http::describe(&content, vec![entry]).await.unwrap();
+                    serde_json::to_value(&described[0]).unwrap()
+                }
+            };
+            assert_eq!(view(updated.clone()).await["translation_outdated"], false);
+            // Đăng bản gốc đổi `updated_at` nhưng không đổi chữ: chưa cũ.
+            content.publish(&ada, source.id, None, None, false).await.unwrap();
+            assert_eq!(view(updated.clone()).await["translation_outdated"], false);
+            content.update(&ada, source.id, fields("Hello again"), false, None).await.unwrap();
+            assert_eq!(view(updated).await["translation_outdated"], true);
+
+            // Có người sửa bản dịch trong lúc chờ: không ghi đè.
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            content.update(&ada, vi.id, fields("Sửa tay"), false, None).await.unwrap();
+            content.run_translation(queued.id, 1).await.unwrap();
+            let failed = request(&database, queued.id).await;
+            assert_eq!(
+                (failed.status.as_str(), failed.error_code.as_deref()),
+                ("failed", Some("content.translation_conflict"))
+            );
+            assert_eq!(content.get(&ada, vi.id).await.unwrap().title, "Sửa tay");
+            assert!(events(&database).await.contains(&"content.translation_failed".to_owned()));
+
+            // Bản gốc không đổi (cùng revision với lần dịch trước), người sửa bản dịch sau khi
+            // yêu cầu: vẫn là xung đột, không báo nhầm "thành công".
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            content.run_translation(queued.id, 1).await.unwrap();
+            assert_eq!(request(&database, queued.id).await.status, "succeeded");
+            let again = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            assert_eq!(again.source_revision_id, queued.source_revision_id);
+            content.update(&ada, vi.id, fields("Sửa tay lần hai"), false, None).await.unwrap();
+            content.run_translation(again.id, 1).await.unwrap();
+            assert_eq!(
+                request(&database, again.id).await.error_code.as_deref(),
+                Some("content.translation_conflict")
+            );
+            assert_eq!(content.get(&ada, vi.id).await.unwrap().title, "Sửa tay lần hai");
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn sai_cau_truc_loi_tam_thoi_va_chia_lo() {
+        TestDatabase::run(async |test| {
+            // Bỏ mất thẻ: bị từ chối hai lần → thất bại, không ghi gì.
+            let broken = FakeTextModel::new(|prompt: &Prompt| {
+                let Part::Text(input) = &prompt.input[0] else { panic!() };
+                let items: Vec<Value> = serde_json::from_str(input).unwrap();
+                let segments: Vec<Value> =
+                    items.iter().map(|item| json!({"id": item["id"], "text": "no tags"})).collect();
+                Ok(json!({"segments": segments}))
+            });
+            let (content, media, database, ai) = setup(test, broken, &[]).await;
+            let ada = editor();
+            let mut input = post("Hello");
+            input.fields.body = Some(rich_body(media.add(true)));
+            let source = content.create(&ada, input).await.unwrap();
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            content.run_translation(queued.id, 1).await.unwrap();
+            let failed = request(&database, queued.id).await;
+            assert_eq!(failed.error_code.as_deref(), Some("content.translation_invalid"));
+            assert_eq!(ai.calls(), 2);
+
+            // Nhà cung cấp bận: thử lại (lỗi trả về cho job queue), lần cuối thì thất bại.
+            // Mã của module `ai` (không phải của `content`): để trong biến cho `cargo xtask check`.
+            let code = "ai.provider_unavailable";
+            let busy = FakeTextModel::new(move |_| Err(Error::unavailable(code, "busy")));
+            let (content, _, database, _) = setup(test, busy, &[]).await;
+            let source = content.create(&ada, post("Hello")).await.unwrap();
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            assert_eq!(content.run_translation(queued.id, 1).await.unwrap_err().code(), "ai.provider_unavailable");
+            assert_eq!(request(&database, queued.id).await.status, "running");
+            content.run_translation(queued.id, 8).await.unwrap();
+            let failed = request(&database, queued.id).await;
+            assert_eq!((failed.status.as_str(), failed.error_code.as_deref()), ("failed", Some("ai.provider_unavailable")));
+
+            // Bài dài: chia nhiều lô.
+            let (content, _, _, ai) =
+                setup(test, translator(), &[("AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS", "500")]).await;
+            let paragraphs: Vec<Value> = (0..6)
+                .map(|i| json!({"type": "paragraph", "content": [{"type": "text", "text": format!("{i} {}", "word ".repeat(80))}]}))
+                .collect();
+            let mut input = post("Long");
+            input.fields.body = Some(json!({"type": "doc", "content": paragraphs}));
+            let source = content.create(&ada, input).await.unwrap();
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            content.run_translation(queued.id, 1).await.unwrap();
+            assert!(ai.calls() > 1, "{} calls", ai.calls());
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn dong_thoi_quyen_va_ai_tat() {
+        TestDatabase::run(async |test| {
+            let (content, _, _, _) = setup(test, translator(), &[]).await;
+            let ada = editor();
+            let source = content.create(&ada, post("Hello")).await.unwrap();
+            // Hai yêu cầu cùng lúc cho cùng một ngôn ngữ: đúng một được nhận.
+            let attempts: Vec<_> = (0..4)
+                .map(|_| {
+                    let content = content.clone();
+                    tokio::spawn(async move {
+                        content.request_translation(&editor(), source.id, "vi").await
+                    })
+                })
+                .collect();
+            let mut accepted = Vec::new();
+            for attempt in attempts {
+                match attempt.await.unwrap() {
+                    Ok(request) => accepted.push(request),
+                    Err(error) => assert_eq!(error.code(), "content.translation_in_progress"),
+                }
+            }
+            assert_eq!(accepted.len(), 1);
+            content.run_translation(accepted[0].id, 1).await.unwrap();
+            // Xong rồi thì xin dịch lại được.
+            content.request_translation(&ada, source.id, "vi").await.unwrap();
+            let bad = content.request_translation(&ada, source.id, "en").await.unwrap_err();
+            assert_eq!(bad.fields()[0].field, "locale");
+
+            let stranger = Principal::new(Uuid::now_v7(), ["content.write_own".to_owned()])
+                .via_api_key(Uuid::now_v7());
+            assert_eq!(
+                content.request_translation(&stranger, source.id, "vi").await.unwrap_err().code(),
+                "content.not_owner"
+            );
+
+            let (off, _, _) = service(test, config(&[])).await;
+            let source = off.create(&ada, post("Hello")).await.unwrap();
+            assert_eq!(
+                off.request_translation(&ada, source.id, "vi").await.unwrap_err().code(),
+                "ai.disabled"
+            );
+        })
+        .await
+        .unwrap();
+    }
+}
+
+/// Tìm theo ý nghĩa (D-109): index theo đoạn, không tính lại đoạn không đổi, gộp với tìm theo
+/// chữ, nhiều máy chủ cùng database, đổi mô hình, embedding tắt.
+mod search {
+    use std::sync::Arc;
+
+    use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
+
+    use super::*;
+    use crate::semantic::SearchQuery;
+    use crate::testing::service_with;
+
+    async fn rows_of(database: &Database, entry_id: Uuid) -> u64 {
+        use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
+        crate::entity::embedding::Entity::find()
+            .filter(crate::entity::embedding::Column::EntryId.eq(entry_id))
+            .count(database.read())
+            .await
+            .unwrap()
+    }
+
+    fn query(q: &str) -> SearchQuery {
+        SearchQuery { q: q.into(), locale: Some("vi".into()), ..Default::default() }
+    }
+
+    fn vi_post(title: &str, text: &str) -> NewEntry {
+        let mut input = post(title);
+        input.locale = Some("vi".into());
+        input.fields.body = Some(paragraph(text));
+        input
+    }
+
+    #[tokio::test]
+    async fn tim_theo_y_nghia_va_theo_chu() {
+        TestDatabase::run(async |test| {
+            let embedder = Arc::new(FakeEmbedder::new(256));
+            let (content, _, database) = service_with(
+                test,
+                config(&[("AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH", "true")]),
+                Arc::new(FakeTextModel::disabled()),
+                embedder.clone(),
+            )
+            .await;
+            let ada = editor();
+            let dalat = content
+                .create(&ada, vi_post("Đà Lạt mùa hoa", "Hoa dã quỳ nở vàng đồi thông."))
+                .await
+                .unwrap();
+            let rust =
+                content.create(&ada, vi_post("Học Rust", "Ownership và lifetime.")).await.unwrap();
+            for id in [dalat.id, rust.id] {
+                content.index_entry(id).await.unwrap();
+            }
+            let calls = embedder.calls();
+            // Không đổi gì: không gọi lại embedding.
+            content.index_entry(dalat.id).await.unwrap();
+            assert_eq!(embedder.calls(), calls);
+
+            // Khớp cả ý nghĩa lẫn chữ.
+            let hits = content.search(Some(&ada), &query("đà lạt"), false).await.unwrap();
+            assert_eq!(hits[0].entry_id, dalat.id);
+            assert_eq!(hits[0].matched_by, ["meaning", "text"]);
+            assert!(hits[0].similarity.unwrap() > 0.0);
+            assert_eq!(hits[0].status.as_deref(), Some("draft"));
+            // Không chứa nguyên cụm chữ, nhưng gần về ý nghĩa.
+            let hits = content.search(Some(&ada), &query("hoa nở ở đà lạt"), false).await.unwrap();
+            assert_eq!((hits[0].entry_id, hits[0].matched_by.clone()), (dalat.id, vec!["meaning"]));
+            assert!(hits[0].snippet.contains("dã quỳ"));
+
+            // Công khai: chỉ bản đã đăng, kèm đường dẫn.
+            assert!(content.search(None, &query("đà lạt"), true).await.unwrap().is_empty());
+            content.publish(&ada, dalat.id, None, None, false).await.unwrap();
+            content.index_entry(dalat.id).await.unwrap();
+            let public = content.search(None, &query("đà lạt"), true).await.unwrap();
+            assert_eq!(public.len(), 1);
+            assert_eq!(
+                (public[0].path.as_deref(), public[0].status.clone()),
+                (Some("/blog/da-lat-mua-hoa"), None)
+            );
+
+            // Kiểm đầu vào; cần quyền đọc.
+            let bad = SearchQuery { q: " ".into(), limit: Some(51), ..Default::default() };
+            let error = content.search(Some(&ada), &bad, false).await.unwrap_err();
+            assert_eq!(
+                error.fields().iter().map(|f| f.field.as_str()).collect::<Vec<_>>(),
+                ["q", "limit"]
+            );
+            assert_eq!(
+                content
+                    .search(Some(&user(&["write"])), &query("x"), false)
+                    .await
+                    .unwrap_err()
+                    .code(),
+                "permission_denied"
+            );
+
+            // Xoá mục: index của nó biến mất.
+            content.delete(&ada, rust.id, None).await.unwrap();
+            assert_eq!(rows_of(&database, rust.id).await, 1);
+            content.index_entry(rust.id).await.unwrap();
+            assert_eq!(rows_of(&database, rust.id).await, 0);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn nhieu_may_chu_va_doi_mo_hinh() {
+        TestDatabase::run(async |test| {
+            let embedder = Arc::new(FakeEmbedder::new(128));
+            let ai = Arc::new(FakeTextModel::disabled());
+            let (first, _, database) =
+                service_with(test, config(&[]), ai.clone(), embedder.clone()).await;
+            let (second, _, _) =
+                service_with(test, config(&[]), ai.clone(), embedder.clone()).await;
+            let ada = editor();
+            let a = first.create(&ada, vi_post("Phở Hà Nội", "Nước dùng trong.")).await.unwrap();
+            first.index_entry(a.id).await.unwrap();
+            assert_eq!(second.search(Some(&ada), &query("phở"), false).await.unwrap().len(), 1);
+            // Máy chủ thứ nhất thêm mục: máy thứ hai (đã nạp vào bộ nhớ) thấy nhờ `version`.
+            let b = first
+                .create(&ada, vi_post("Bún chả", "Phở và bún chả là món Hà Nội."))
+                .await
+                .unwrap();
+            first.index_entry(b.id).await.unwrap();
+            let hits = second.search(Some(&ada), &query("phở hà nội"), false).await.unwrap();
+            assert_eq!(hits.iter().filter(|hit| hit.matched_by.contains(&"meaning")).count(), 2);
+
+            // Hai job lập index cùng mục chạy cùng lúc: cuối cùng mỗi đoạn một dòng.
+            let (x, y) = tokio::join!(first.index_entry(b.id), second.index_entry(b.id));
+            if x.is_err() || y.is_err() {
+                first.index_entry(b.id).await.unwrap();
+            }
+            assert_eq!(rows_of(&database, b.id).await, 1, "one row per chunk (draft only)");
+
+            // Đổi mô hình: job định kỳ xếp lập lại mọi mục.
+            let other = Arc::new(FakeEmbedder::new(128).with_model("another-model"));
+            let (third, _, _) = service_with(test, config(&[]), ai, other).await;
+            assert_eq!(third.catch_up_embeddings().await.unwrap(), 2);
+            third.index_entry(a.id).await.unwrap();
+            assert_eq!(third.catch_up_embeddings().await.unwrap(), 1);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn embedding_tat_chi_tim_theo_chu() {
+        TestDatabase::run(async |test| {
+            let (content, _, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let dalat = content.create(&ada, vi_post("Đà Lạt mùa hoa", "Hoa.")).await.unwrap();
+            content.index_entry(dalat.id).await.unwrap();
+            assert_eq!(content.catch_up_embeddings().await.unwrap(), 0);
+            let hits = content.search(Some(&ada), &query("da lat"), false).await.unwrap();
+            assert_eq!(
+                (hits.len(), hits[0].matched_by.clone(), hits[0].similarity),
+                (1, vec!["text"], None)
+            );
+            assert_eq!(
+                content.search(None, &query("da lat"), true).await.unwrap_err().code(),
+                "content.semantic_search_disabled"
+            );
+        })
+        .await
+        .unwrap();
+    }
+}
+
+/// Sửa sau rà soát (D-111): yêu cầu dịch kẹt ở `running` bị yêu cầu mới thay chỗ; yêu cầu đã
+/// huỷ không bị job đang chạy ghi đè thành "thành công".
+mod translation_recovery {
+    use std::sync::Arc;
+
+    use autoxide_kernel::ai::{Part, Prompt};
+    use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
+    use sea_orm::sea_query::Expr;
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    use super::*;
+    use crate::entity::translation_request;
+    use crate::testing::service_with;
+
+    fn translator() -> FakeTextModel {
+        FakeTextModel::new(|prompt: &Prompt| {
+            let Part::Text(input) = &prompt.input[0] else { panic!() };
+            let items: Vec<Value> = serde_json::from_str(input).unwrap();
+            let segments: Vec<Value> =
+                items.iter().map(|item| json!({"id": item["id"], "text": "dịch"})).collect();
+            Ok(json!({"segments": segments}))
+        })
+    }
+
+    #[tokio::test]
+    async fn yeu_cau_ket_bi_thay_va_huy_khong_bi_ghi_de() {
+        TestDatabase::run(async |test| {
+            let (content, _, database) = service_with(
+                test,
+                config(&[]),
+                Arc::new(translator()),
+                Arc::new(FakeEmbedder::disabled()),
+            )
+            .await;
+            let ada = editor();
+            let source = content.create(&ada, post("Hello")).await.unwrap();
+            let stuck = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            // Như một job bị worker cắt ngang ở lần cuối: `running`, đứng yên 20 phút.
+            translation_request::Entity::update_many()
+                .col_expr(translation_request::Column::Status, Expr::value("running"))
+                .col_expr(
+                    translation_request::Column::UpdatedAt,
+                    Expr::value(chrono::Utc::now() - chrono::Duration::minutes(20)),
+                )
+                .filter(translation_request::Column::Id.eq(stuck.id))
+                .exec(database.write())
+                .await
+                .unwrap();
+            let fresh = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            let old = translation_request::Entity::find_by_id(stuck.id)
+                .one(database.read())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                (old.status.as_str(), old.error_code.as_deref(), old.active_key),
+                ("failed", Some("content.translation_stale"), None)
+            );
+            // Job cũ chạy tới: thấy đã xong, không làm gì.
+            content.run_translation(stuck.id, 8).await.unwrap();
+            assert_eq!(
+                translation_request::Entity::find_by_id(stuck.id)
+                    .one(database.read())
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .status,
+                "failed"
+            );
+
+            // Huỷ (tài khoản bị xoá) rồi job chạy: vẫn là huỷ.
+            assert_eq!(content.cancel_translations_of(ada.user_id()).await.unwrap(), 1);
+            content.run_translation(fresh.id, 1).await.unwrap();
+            let canceled = translation_request::Entity::find_by_id(fresh.id)
+                .one(database.read())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                (canceled.status.as_str(), canceled.error_code.as_deref()),
+                ("failed", Some("content.translation_canceled"))
+            );
+        })
+        .await
+        .unwrap();
+    }
 }

@@ -1,6 +1,8 @@
 //! Entity (SeaORM) của các bảng `content_…`. Chỉ dùng trong module này.
 
 pub(crate) mod author;
+pub(crate) mod embedding;
+pub(crate) mod embedding_state;
 pub(crate) mod entry;
 pub(crate) mod entry_author;
 pub(crate) mod entry_term;
@@ -12,6 +14,7 @@ pub(crate) mod revision;
 pub(crate) mod schedule;
 pub(crate) mod term;
 pub(crate) mod term_translation;
+pub(crate) mod translation_request;
 pub(crate) mod tree_lock;
 
 use uuid::Uuid;

@@ -67,7 +67,11 @@ impl Module for TestStorage {
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         let storage: Arc<dyn Storage> = self.0.clone();
-        context.provide::<dyn Storage>(storage)
+        context.provide::<dyn Storage>(storage)?;
+        // Module `ai` giả (đã tắt): `media` cần `dyn TextModel` cho gợi ý alt text.
+        let ai: Arc<dyn autoxide_kernel::ai::TextModel> =
+            Arc::new(autoxide_testkit::ai::FakeTextModel::disabled());
+        context.provide::<dyn autoxide_kernel::ai::TextModel>(ai)
     }
 }
 
@@ -543,6 +547,7 @@ async fn tool_mcp_theo_permission() {
                 "media.get",
                 "media.list",
                 "media.list_tags",
+                "media.suggest_alt",
                 "media.trash",
                 "media.update",
                 "media.upload"

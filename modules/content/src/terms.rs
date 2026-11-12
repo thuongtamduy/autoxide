@@ -11,8 +11,8 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Query;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
-    QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
+    IntoActiveModel, PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -218,7 +218,7 @@ impl ContentService {
             ));
         }
         let parent = input.parent_id.flatten();
-        self.check_term_parent(taxonomy, None, parent, &mut problems).await?;
+        self.check_term_parent(self.database.read(), taxonomy, None, parent, &mut problems).await?;
         let id = Uuid::now_v7();
         let text = self.term_text(id, taxonomy, &locale, None, &input, &mut problems)?;
         if !problems.is_empty() {
@@ -226,6 +226,7 @@ impl ContentService {
         }
         let now = now();
         let transaction = self.database.begin_write().await?;
+        self.recheck_term_parent(&transaction, taxonomy, None, parent).await?;
         let row = term::ActiveModel {
             id: Set(id),
             taxonomy: Set(taxonomy.as_str().to_owned()),
@@ -271,7 +272,8 @@ impl ContentService {
             if before.term.taxonomy == "category" { Taxonomy::Category } else { Taxonomy::Tag };
         let mut problems = Vec::new();
         if let Some(parent) = input.parent_id {
-            self.check_term_parent(taxonomy, Some(id), parent, &mut problems).await?;
+            self.check_term_parent(self.database.read(), taxonomy, Some(id), parent, &mut problems)
+                .await?;
         }
         let text = match &input.locale {
             None if input.name.is_some() || input.slug.is_some() || input.description.is_some() => {
@@ -303,6 +305,9 @@ impl ContentService {
         }
         let now = now();
         let transaction = self.database.begin_write().await?;
+        if let Some(parent) = input.parent_id {
+            self.recheck_term_parent(&transaction, taxonomy, Some(id), parent).await?;
+        }
         let mut row = before.term.clone().into_active_model();
         if let Some(parent) = input.parent_id {
             row.parent_id = Set(parent);
@@ -354,6 +359,9 @@ impl ContentService {
         principal.require(&CONTENT_MANAGE)?;
         let before = self.term_with_texts(id).await?;
         let transaction = self.database.begin_write().await?;
+        // Cùng khoá với tạo / đổi cha của danh mục: không tạo được danh mục con dưới một danh
+        // mục đang bị xoá.
+        lock_categories(&transaction).await?;
         let deleted = term::Entity::delete_by_id(id).exec(&transaction).await?;
         if deleted.rows_affected == 0 {
             transaction.rollback().await?;
@@ -402,8 +410,14 @@ impl ContentService {
         entry_id: Uuid,
         term_ids: Vec<Uuid>,
     ) -> Result<Vec<Uuid>, Error> {
-        principal.require(&crate::permissions::CONTENT_WRITE)?;
+        crate::permissions::require_create(principal)?;
         let entry = self.get(principal, entry_id).await?;
+        crate::permissions::require_write(principal, &entry)?;
+        // Gắn có hiệu lực ngay cả trên bản công khai: như mọi thay đổi người đọc thấy, mục
+        // đang công khai thì cần quyền đăng.
+        if crate::entries::Status::of(&entry) == crate::entries::Status::Published {
+            crate::permissions::require_publish(principal, &entry)?;
+        }
         let mut ids: Vec<Uuid> = Vec::new();
         for id in term_ids {
             if !ids.contains(&id) {
@@ -539,9 +553,29 @@ impl ContentService {
         Ok(found)
     }
 
-    /// Cha của danh mục: là danh mục, có thật, không tạo vòng. Thẻ không có cha.
-    async fn check_term_parent(
+    /// Kiểm lại cha của danh mục TRONG transaction ghi, sau khi khoá cây danh mục: hai lệnh
+    /// đổi cha chéo nhau (A vào B, B vào A) không thể cùng qua bước kiểm vòng lặp, và cha không
+    /// thể vừa bị xoá. Lần kiểm trước transaction chỉ để gom lỗi báo một lần.
+    async fn recheck_term_parent(
         &self,
+        transaction: &DatabaseTransaction,
+        taxonomy: Taxonomy,
+        id: Option<Uuid>,
+        parent: Option<Uuid>,
+    ) -> Result<(), Error> {
+        if parent.is_none() {
+            return Ok(());
+        }
+        lock_categories(transaction).await?;
+        let mut problems = Vec::new();
+        self.check_term_parent(transaction, taxonomy, id, parent, &mut problems).await?;
+        if problems.is_empty() { Ok(()) } else { Err(invalid(problems)) }
+    }
+
+    /// Cha của danh mục: là danh mục, có thật, không tạo vòng. Thẻ không có cha.
+    async fn check_term_parent<C: ConnectionTrait>(
+        &self,
+        connection: &C,
         taxonomy: Taxonomy,
         id: Option<Uuid>,
         parent: Option<Uuid>,
@@ -567,7 +601,7 @@ impl ContentService {
                 ));
                 return Ok(());
             }
-            match term::Entity::find_by_id(here).one(self.database.read()).await? {
+            match term::Entity::find_by_id(here).one(connection).await? {
                 Some(row) if row.taxonomy == "category" => current = row.parent_id,
                 _ => {
                     problems.push(FieldError::new(
@@ -659,4 +693,10 @@ fn slug_conflict(error: sea_orm::DbErr, input: &TermInput) -> Error {
 pub(crate) fn term_not_found(id: Uuid) -> Error {
     Error::not_found("content.term_not_found", "No category or tag has the id `{id}`.")
         .with_param("id", id)
+}
+
+/// Khoá chung cho cây danh mục (mọi ngôn ngữ dùng một cây): dùng lại bảng khoá cây trang với
+/// một khoá không thể trùng mã ngôn ngữ BCP 47.
+async fn lock_categories(transaction: &DatabaseTransaction) -> Result<(), Error> {
+    crate::paths::lock_tree(transaction, "#categories").await
 }

@@ -505,14 +505,14 @@ impl Modules {
             for tool in module.tools() {
                 let tool = tool.qualify(name);
                 problems.extend(tool.problems(name));
-                if let Some(permission) = tool.permission()
-                    && !self.permissions.contains(permission.name())
-                {
-                    problems.push(format!(
-                        "tool `{}` requires permission `{}`, which no module declares",
-                        tool.name(),
-                        permission.name()
-                    ));
+                for permission in tool.permission().into_iter().chain(tool.alternative()) {
+                    if !self.permissions.contains(permission.name()) {
+                        problems.push(format!(
+                            "tool `{}` requires permission `{}`, which no module declares",
+                            tool.name(),
+                            permission.name()
+                        ));
+                    }
                 }
                 if !seen.insert(tool.name().to_owned()) {
                     problems.push(format!("tool `{}` is declared twice", tool.name()));

@@ -14,6 +14,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::entity::{entry, published, redirect};
+use crate::entries::Status;
 use crate::events::{self, Change};
 use crate::paths;
 use crate::permissions::CONTENT_MANAGE;
@@ -85,6 +86,9 @@ impl ContentService {
         let now = now();
         let row = self.check_redirect(Uuid::now_v7(), input, principal.user_id(), now).await?;
         let transaction = self.database.begin_write().await?;
+        // Khoá chung của ngôn ngữ: hai chuyển hướng trỏ vào nhau ghi cùng lúc không thể cùng
+        // qua bước kiểm vòng lặp (Postgres); cùng khoá với mọi thay đổi đường dẫn.
+        paths::lock_tree(&transaction, &row.locale).await?;
         self.check_loop(&transaction, &row).await?;
         let saved = row.into_active_model().insert(&transaction).await.map_err(|error| {
             if crate::entries::is_unique_violation(&error) {
@@ -124,6 +128,9 @@ impl ContentService {
         let mut row = self.check_redirect(id, input, principal.user_id(), now).await?;
         row.created_at = before.created_at;
         let transaction = self.database.begin_write().await?;
+        // Khoá chung của ngôn ngữ: hai chuyển hướng trỏ vào nhau ghi cùng lúc không thể cùng
+        // qua bước kiểm vòng lặp (Postgres); cùng khoá với mọi thay đổi đường dẫn.
+        paths::lock_tree(&transaction, &row.locale).await?;
         self.check_loop(&transaction, &row).await?;
         let mut active = row.into_active_model().reset_all();
         active.id = sea_orm::ActiveValue::Unchanged(id);
@@ -237,10 +244,22 @@ impl ContentService {
                 ));
             }
         }
-        if let Some(target) = input.to_entry_id
-            && entry::Entity::find_by_id(target).one(self.database.read()).await?.is_none()
-        {
-            problems.push(FieldError::new("to_entry_id", "not_found", "no entry has this id"));
+        if let Some(target) = input.to_entry_id {
+            match entry::Entity::find_by_id(target).one(self.database.read()).await? {
+                None => problems.push(FieldError::new(
+                    "to_entry_id",
+                    "not_found",
+                    "no entry has this id",
+                )),
+                // Website ghép tiền tố ngôn ngữ của chuyển hướng vào đường dẫn đích: đích khác
+                // ngôn ngữ sẽ dẫn người đọc tới một trang không có.
+                Some(found) if found.locale != locale => problems.push(FieldError::new(
+                    "to_entry_id",
+                    "other_locale",
+                    "the entry is in another language; point to its translation in this language",
+                )),
+                Some(_) => {}
+            }
         }
         let Some(from) = from.filter(|_| problems.is_empty()) else {
             return Err(invalid(problems));
@@ -349,7 +368,18 @@ impl ContentService {
             return Ok(Resolved::Gone);
         }
         let location = match (found.to_entry_id, found.to_url) {
-            (Some(id), _) => published::Entity::find_by_id(id).one(read).await?.map(|row| row.path),
+            (Some(id), _) => match published::Entity::find_by_id(id).one(read).await? {
+                Some(row) => Some(row.path),
+                // Đích đã lưu trữ: gỡ hẳn, đường dẫn cũ cũng "đã gỡ" như đường dẫn của nó.
+                None if entry::Entity::find_by_id(id)
+                    .one(read)
+                    .await?
+                    .is_some_and(|entry| entry.status == Status::Archived.as_str()) =>
+                {
+                    return Ok(Resolved::Gone);
+                }
+                None => None,
+            },
             (None, url) => url,
         };
         match location {

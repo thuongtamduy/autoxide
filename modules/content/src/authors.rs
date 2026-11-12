@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use crate::entity::{author, entry, entry_author, published};
 use crate::events::{self, Change};
-use crate::permissions::{CONTENT_MANAGE, CONTENT_READ, CONTENT_WRITE};
+use crate::permissions::{CONTENT_MANAGE, CONTENT_READ};
 use crate::service::{ContentService, check_length, check_url, invalid, now};
 
 pub(crate) type Author = author::Model;
@@ -275,8 +275,14 @@ impl ContentService {
         entry_id: Uuid,
         author_ids: Vec<Uuid>,
     ) -> Result<Vec<Uuid>, Error> {
-        principal.require(&CONTENT_WRITE)?;
+        crate::permissions::require_create(principal)?;
         let entry = self.get(principal, entry_id).await?;
+        crate::permissions::require_write(principal, &entry)?;
+        // Gắn có hiệu lực ngay cả trên bản công khai: như mọi thay đổi người đọc thấy, mục
+        // đang công khai thì cần quyền đăng.
+        if crate::entries::Status::of(&entry) == crate::entries::Status::Published {
+            crate::permissions::require_publish(principal, &entry)?;
+        }
         let mut ids: Vec<Uuid> = Vec::new();
         for id in author_ids {
             if !ids.contains(&id) {

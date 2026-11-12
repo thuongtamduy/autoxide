@@ -32,6 +32,10 @@ pub struct Model {
     pub og_media_id: Option<Uuid>,
     pub canonical_url: String,
     pub noindex: bool,
+    pub ai_generated: bool,
+    /// Người (phiên đăng nhập, không phải API key) đã xác nhận duyệt nội dung do AI tạo khi đăng.
+    pub ai_reviewed_by: Option<Uuid>,
+    pub ai_reviewed_at: Option<DateTimeUtc>,
     /// Ngày hiển thị là ngày đăng (sửa được).
     pub published_at: DateTimeUtc,
     pub first_published_at: DateTimeUtc,

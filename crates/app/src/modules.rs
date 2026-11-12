@@ -11,6 +11,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
     vec![
         // Gửi mail: các module gửi mail cần nó, nên đứng trước chúng.
         Box::new(autoxide_mail::module()),
+        // AI (D-109): công bố `dyn TextModel` và `dyn Embedder` (bản "đã tắt" khi chưa cấu
+        // hình); `media` và `content` cần, nên đứng trước chúng.
+        Box::new(autoxide_ai::module()),
         // Lưu file: các module lưu file cần nó, nên đứng trước chúng.
         Box::new(autoxide_files::module()),
         // Người dùng, mật khẩu (và sau này đăng nhập, role, permission): mọi module
@@ -132,10 +135,10 @@ mod tests {
 
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
-            // Mỗi lịch (của `auth`, `idempotency`, `webhooks`, hai của `media`, một của
+            // Mỗi lịch (của `ai`, `auth`, `idempotency`, `webhooks`, hai của `media`, hai của
             // `content`, một của `forms`, một của `newsletter` và một của `comments`) đúng một
             // job.
-            assert_eq!(a.unwrap() + b.unwrap(), 9);
+            assert_eq!(a.unwrap() + b.unwrap(), 11);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

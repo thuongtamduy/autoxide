@@ -12,6 +12,77 @@
     }
   ],
   "paths": {
+    "/api/v1/ai/status": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "See what the AI features can do.",
+        "description": "Requires `ai.view`. Tells whether text generation and embeddings are on, the provider and\nmodels, whether images are read, and today's token use against the daily limit. Use it to\nshow or hide AI actions in a user interface. The operator turns AI on with the\n`AUTOXIDE_AI_*` and `AUTOXIDE_EMBEDDING_*` settings.",
+        "operationId": "ai_get_ai_status",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The AI status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AiStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `ai.view`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/antispam/token": {
       "get": {
         "tags": [
@@ -8866,7 +8937,7 @@
           "content"
         ],
         "summary": "Create a post or page as a draft.",
-        "description": "Requires `content.write`. An empty or missing `slug` is made from the title (`-2`, `-3`…\nare added when taken). Retry safely with an `Idempotency-Key` header.",
+        "description": "Requires `content.write` or `content.write_own`. An empty or missing `slug` is made from the\ntitle (`-2`, `-3`… are added when taken). Retry safely with an `Idempotency-Key` header.",
         "operationId": "content_create_content_entry",
         "parameters": [
           {
@@ -8935,7 +9006,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -9085,7 +9156,7 @@
           "content"
         ],
         "summary": "Delete a post or page.",
-        "description": "Requires `content.publish`. Its revisions and schedules go too. A page with subpages\ncannot be deleted. If it was published, its address answers 410. `If-Match` is required.",
+        "description": "Requires `content.delete`. Its revisions and schedules go too. A page with subpages\ncannot be deleted. If it was published, its address answers 410. `If-Match` is required.",
         "operationId": "content_delete_content_entry",
         "parameters": [
           {
@@ -9148,7 +9219,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.publish`; code `permission_denied`.",
+            "description": "Missing permission `content.delete`; code `permission_denied`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9219,7 +9290,7 @@
           "content"
         ],
         "summary": "Change the draft of a post or page.",
-        "description": "Requires `content.write`. A published entry keeps showing its published version until it\nis published again (`has_unpublished_changes` turns `true`). `If-Match` is required.",
+        "description": "Requires `content.write`, or `content.write_own` for an entry you created. A published entry\nkeeps showing its published version until it\nis published again (`has_unpublished_changes` turns `true`). `If-Match` is required.",
         "operationId": "content_update_content_entry",
         "parameters": [
           {
@@ -9307,7 +9378,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -9533,7 +9604,7 @@
           "content"
         ],
         "summary": "Set the authors of an entry.",
-        "description": "Requires `content.write`. Takes effect at once, also for the published version.",
+        "description": "Requires `content.read` and `content.write` (or `content.write_own` for an entry you created),\nand `content.publish` (or `content.publish_own`) when the entry is published. Takes effect at\nonce, also for the published version.",
         "operationId": "content_set_content_entry_authors",
         "parameters": [
           {
@@ -9604,7 +9675,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -9657,7 +9728,7 @@
           "content"
         ],
         "summary": "Move a page under another parent.",
-        "description": "Requires `content.write`, and `content.publish` when the page is published. Takes effect\nat once for the draft and the published version: the page's address and those of its\nsubpages change, and the old ones redirect with 301. `If-Match` is required.",
+        "description": "Requires `content.write` (or `content.write_own` for a page you created), and `content.publish`\nwhen the page is published. Takes effect at once for the draft and the published version: the\npage's address and those of its subpages change, and the old ones redirect with 301. `If-Match`\nis required.",
         "operationId": "content_move_content_page",
         "parameters": [
           {
@@ -9737,7 +9808,7 @@
             }
           },
           "403": {
-            "description": "Missing permission; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`); or the page is published and you lack `content.publish`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9820,7 +9891,7 @@
           "content"
         ],
         "summary": "Make a preview link for the draft of an entry.",
-        "description": "Requires `content.write`. Anyone with the token can read the draft until it expires (10\nminutes by default).",
+        "description": "Requires `content.read` and `content.write` (or `content.write_own` for an entry you\ncreated). Anyone with the token can read the draft until it expires (10\nminutes by default).",
         "operationId": "content_create_content_preview_token",
         "parameters": [
           {
@@ -9881,7 +9952,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -9934,7 +10005,7 @@
           "content"
         ],
         "summary": "Publish a post or page.",
-        "description": "Requires `content.publish`. Copies the current draft to the published version, at an\naddress computed by the server (`/<post prefix>/<slug>` for posts, the parent's address\nplus the slug for pages). If the address changed, the old one (and those of published\nsubpages) redirect with 301. Every media item it uses must be public. `If-Match` is\nrequired. Retry safely with an `Idempotency-Key` header.",
+        "description": "Requires `content.publish`, or `content.publish_own` for an entry you created. Copies the\ncurrent draft to the published version, at an\naddress computed by the server (`/<post prefix>/<slug>` for posts, the parent's address\nplus the slug for pages). If the address changed, the old one (and those of published\nsubpages) redirect with 301. Every media item it uses must be public. `If-Match` is\nrequired. Retry safely with an `Idempotency-Key` header.",
         "operationId": "content_publish_content_entry",
         "parameters": [
           {
@@ -10023,7 +10094,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.publish`; code `permission_denied`.",
+            "description": "Missing permission `content.publish` (or `content.publish_own`; code `permission_denied`), the entry is not yours and you only have `content.publish_own` (code `content.not_owner`), or an API key sent `ai_reviewed` (code `content.ai_review_requires_human`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -10064,6 +10135,286 @@
           },
           "422": {
             "description": "A media item is missing (code `content.media_not_found`) or not public (code `content.media_not_public`); see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/content/entries/{id}/request-review": {
+      "post": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Ask for a review of the draft.",
+        "description": "Requires `content.write`, or `content.write_own` for an entry you created. Marks the draft as\nready for a person to review and publish (`review_requested_at`) and emits the event\n`content.review_requested`, which webhooks can forward to editors. The mark is cleared when\nthe entry is published or the request is withdrawn. Meant for AI agents that may write but\nnot publish. `If-Match` is required.",
+        "operationId": "content_request_content_review",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the entry.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` of the entry (or `*`). Done only if nobody changed the entry since; otherwise `412`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Review requested.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "New version of the entry."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EntryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No entry has this id; code `content.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The entry changed since you read it; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Withdraw a review request.",
+        "description": "Requires `content.write`, or `content.write_own` for an entry you created. Clears\n`review_requested_at` and emits `content.review_withdrawn`. `If-Match` is required.",
+        "operationId": "content_withdraw_content_review",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the entry.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` of the entry (or `*`). Done only if nobody changed the entry since; otherwise `412`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Review request withdrawn.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "New version of the entry."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EntryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No entry has this id; code `content.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The entry changed since you read it; code `precondition_failed`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10334,7 +10685,7 @@
           "content"
         ],
         "summary": "Copy a revision back into the draft.",
-        "description": "Requires `content.write`. Does not publish. Categories, tags, authors and the parent page\nare not part of revisions and stay as they are. `If-Match` is required.",
+        "description": "Requires `content.read`, and `content.write` (or `content.write_own` for an entry you\ncreated). Does not publish. Categories, tags, authors and the parent page\nare not part of revisions and stay as they are. `If-Match` is required.",
         "operationId": "content_restore_content_revision",
         "parameters": [
           {
@@ -10414,7 +10765,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -10741,13 +11092,238 @@
         ]
       }
     },
+    "/api/v1/content/entries/{id}/seo-check": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Check the SEO of a draft.",
+        "description": "Requires `content.read`. Works without AI: missing or too long title and description for\nsearch engines, missing summary or sharing image, images without a text alternative (in the\nbody and the main image), skipped heading levels, the same title as another entry of the\nlanguage, `noindex` on a published entry, missing translations. Changes nothing.",
+        "operationId": "content_check_content_seo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the entry.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The findings; an empty list when there is nothing to fix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SeoReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `content.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No entry has this id; code `content.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/content/entries/{id}/seo-suggestions": {
+      "post": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Suggest SEO fields with AI.",
+        "description": "Requires `content.write`, or `content.write_own` for an entry you created. The AI model\nreads the draft (title, summary, text) and the categories and tags of its language, and\nsuggests a title and description for search engines, a summary and up to 5 existing terms.\nNothing is saved: show the suggestions, then apply the ones a person accepts with\n`PATCH /entries/{id}` (and `PUT /entries/{id}/terms`). Uses AI tokens; see\n`GET /api/v1/ai/status`.",
+        "operationId": "content_suggest_content_seo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the entry.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The suggestions; nothing was changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SeoSuggestion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No entry has this id; code `content.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The AI model declined the content (code `ai.refused`) or its answer was cut off (code `ai.output_truncated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Today's AI token limit is used up; code `ai.quota_exceeded`, with `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "AI is off (code `ai.disabled`), misconfigured (code `ai.misconfigured`), the provider is busy (code `ai.provider_unavailable`, maybe with `Retry-After`), or its answer had the wrong shape twice (code `ai.output_invalid`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/content/entries/{id}/terms": {
       "put": {
         "tags": [
           "content"
         ],
         "summary": "Set the categories and tags of an entry.",
-        "description": "Requires `content.write`. Takes effect at once, also for the published version.",
+        "description": "Requires `content.read` and `content.write` (or `content.write_own` for an entry you created),\nand `content.publish` (or `content.publish_own`) when the entry is published. Takes effect at\nonce, also for the published version.",
         "operationId": "content_set_content_entry_terms",
         "parameters": [
           {
@@ -10818,7 +11394,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -10865,13 +11441,292 @@
         ]
       }
     },
+    "/api/v1/content/entries/{id}/translate": {
+      "post": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Translate an entry with AI.",
+        "description": "Requires `content.write`, or `content.write_own` when you created the entry (and the\nexisting translation, if any). Answers at once with a request (`202`, `Location`); a\nbackground job translates the entry as it is now — title, summary, SEO fields, image alt\ntexts and the body, keeping its structure, links and images — into the draft of the\ntranslation in `locale`: a new translation, or the existing one if nobody changes it\nmeanwhile (otherwise the request fails with `content.translation_conflict` and nothing is\noverwritten). The translation is never published automatically and is marked\n`ai_generated`. Follow the request with `GET /api/v1/content/translation-requests/{id}`, or\nsubscribe a webhook to `content.translation_succeeded` / `content.translation_failed`.\nRetry safely with an `Idempotency-Key` header. Uses AI tokens.",
+        "operationId": "content_translate_content_entry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the entry to translate.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Queued; `Location` is the request.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Address of the translation request."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TranslationRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry (or its translation) is not yours and you only have `content.write_own` (code `content.not_owner`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No entry has this id; code `content.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A translation into this language is already queued or running (code `content.translation_in_progress`), or the parent page has no translation yet (code `content.parent_not_translated`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The language is not supported or is the entry's own; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "AI is off on this server; code `ai.disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/content/entries/{id}/translation-requests": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "List the AI translation requests of an entry.",
+        "description": "Requires `content.read`. The requests in which this entry is the source, newest first.",
+        "operationId": "content_list_content_translation_requests",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the source entry.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TranslationRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `content.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/content/entries/{id}/translations": {
       "post": {
         "tags": [
           "content"
         ],
         "summary": "Translate a post or page.",
-        "description": "Requires `content.write`. Creates a new draft entry in `locale`, linked to this one\n(same `translation_group_id`), with its own slug and publishing. Fields not given are\ncopied from this entry. A page's translation goes under the translation of its parent.",
+        "description": "Requires `content.write`, or `content.write_own` when you created the original. Creates a new\ndraft entry in `locale`, linked to this one (same `translation_group_id`), with its own slug and\npublishing. Fields not given are copied from this entry. A page's translation goes under the\ntranslation of its parent.",
         "operationId": "content_create_content_translation",
         "parameters": [
           {
@@ -10950,7 +11805,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -11013,7 +11868,7 @@
           "content"
         ],
         "summary": "Take a post or page down.",
-        "description": "Requires `content.publish`. Readers no longer see it (its address answers 404); it is a\ndraft again and may be published later. A page with published subpages cannot be taken\ndown. `If-Match` is required.",
+        "description": "Requires `content.publish`, or `content.publish_own` for an entry you created. Readers no longer\nsee it (its address answers 404); it is a draft again and may be published later. A page with\npublished subpages cannot be taken down. `If-Match` is required.",
         "operationId": "content_unpublish_content_entry",
         "parameters": [
           {
@@ -11083,7 +11938,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.publish`; code `permission_denied`.",
+            "description": "Missing permission `content.publish` or `content.publish_own` (code `permission_denied`), or the entry is not yours and you only have `content.publish_own` (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -11997,7 +12852,7 @@
                 "schema": {
                   "type": "string"
                 },
-                "description": "Version (for an entry); send it in `If-None-Match` to get 304."
+                "description": "Fingerprint of the whole answer (for an entry, including its terms, authors and translations); send it in `If-None-Match` to get 304."
               }
             },
             "content": {
@@ -12020,6 +12875,123 @@
           },
           "422": {
             "description": "The language is not supported or the path is malformed; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/content/public/search": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Search published posts and pages by meaning and words (public).",
+        "description": "No sign-in needed; off unless the server sets `AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true`\n(then `404` with code `content.semantic_search_disabled`). Like `GET /search`, but only\npublished entries, each with its `path`. Searches by meaning have a budget per minute\n(`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`); past it, results match words only.",
+        "operationId": "content_search_public_content",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Words or a question, 1 to 200 characters. Matches by meaning (when embeddings are on) and\nby words, ignoring case and accents.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "đi đâu ở Đà Lạt"
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "Language to search in; omitted: the default language.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "vi"
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "`post` or `page`; omitted: both.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "What an entry is.",
+              "enum": [
+                "post",
+                "page"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Results to return, 1 to 50. Defaults to 10.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The best results, best first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SearchHit"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Public search is off on this server; code `content.semantic_search_disabled`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A parameter is invalid; see `errors`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12977,6 +13949,132 @@
         ]
       }
     },
+    "/api/v1/content/search": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Search posts and pages by meaning and words.",
+        "description": "Requires `content.read`. Searches the drafts of one language: by meaning (when the server has\nembeddings on) and by words (ignoring case and accents), combined into one ranking. Each\nresult tells how it matched and gives the best passage. The best `limit` results come in one\npage (`next_cursor` is always `null`).",
+        "operationId": "content_search_content",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Words or a question, 1 to 200 characters. Matches by meaning (when embeddings are on) and\nby words, ignoring case and accents.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "đi đâu ở Đà Lạt"
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "Language to search in; omitted: the default language.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "vi"
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "`post` or `page`; omitted: both.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "What an entry is.",
+              "enum": [
+                "post",
+                "page"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Results to return, 1 to 50. Defaults to 10.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The best results, best first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SearchHit"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `content.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/content/terms": {
       "get": {
         "tags": [
@@ -13567,6 +14665,97 @@
           },
           "428": {
             "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/content/translation-requests/{id}": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Get an AI translation request.",
+        "description": "Requires `content.read`, or being the one who made the request.",
+        "operationId": "content_get_content_translation_request",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the translation request.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TranslationRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `content.read` (or `content.write` / `content.write_own`); code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No translation request you may see has this id; code `content.translation_request_not_found`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -17771,6 +18960,160 @@
           },
           "428": {
             "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/media/{id}/alt-suggestions": {
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Suggest alt text with AI.",
+        "description": "Requires `media.write`. The AI model looks at a small copy of the image (at most 1280\npixels, never the original file) and suggests a text alternative in `locale`. Nothing is\nsaved: show it, then store what a person accepts with `PATCH /api/v1/media/{id}` (or in the\n`alt` of the image node of a post body, which is per language). Private images are sent\nonly when the server allows it (`AUTOXIDE_MEDIA_AI_SEND_PRIVATE`). Uses AI tokens; see\n`GET /api/v1/ai/status`.",
+        "operationId": "media_suggest_media_alt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the media item.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AltRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The suggestion; nothing was saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AltSuggestionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write` (code `permission_denied`), or the image is private and may not be sent (code `media.ai_private_not_allowed`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No media item has this id; code `media.item_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item is in the trash; code `media.item_in_trash`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is invalid (see `errors`), the item is not a readable JPEG, PNG, GIF or WebP image (code `media.ai_unsupported_image`), the model reads no images (code `ai.unsupported_input`), or it declined the image (code `ai.refused`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Today's AI token limit is used up; code `ai.quota_exceeded`, with `Retry-After`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "AI is off (code `ai.disabled`), misconfigured (code `ai.misconfigured`), the provider is busy (code `ai.provider_unavailable`, maybe with `Retry-After`), or its answer had the wrong shape twice (code `ai.output_invalid`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -23494,6 +24837,112 @@
           }
         }
       },
+      "AiStatus": {
+        "type": "object",
+        "description": "What the AI features of this server can do now.",
+        "required": [
+          "enabled",
+          "provider",
+          "model",
+          "images",
+          "embeddings_enabled",
+          "embedding_model",
+          "embedding_dimensions",
+          "tokens_today",
+          "daily_token_limit"
+        ],
+        "properties": {
+          "daily_token_limit": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Daily token limit; 0 means no limit.",
+            "minimum": 0
+          },
+          "embedding_dimensions": {
+            "type": "integer",
+            "description": "Length of each embedding vector; 0 when off.",
+            "minimum": 0
+          },
+          "embedding_model": {
+            "type": "string",
+            "description": "Embedding model; empty when off."
+          },
+          "embeddings_enabled": {
+            "type": "boolean",
+            "description": "Embeddings are on (search by meaning)."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Text generation is on (suggestions, translation)."
+          },
+          "images": {
+            "type": "boolean",
+            "description": "The model reads images (alt text suggestions work)."
+          },
+          "model": {
+            "type": "string",
+            "description": "Model used for text; empty when off.",
+            "example": "claude-opus-5-5"
+          },
+          "provider": {
+            "type": "string",
+            "description": "`anthropic` or `openai` (the Chat Completions format); empty when off.",
+            "example": "anthropic"
+          },
+          "tokens_today": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Tokens used today (UTC), text and embeddings together.",
+            "minimum": 0
+          }
+        }
+      },
+      "AltRequest": {
+        "type": "object",
+        "description": "What the alt text is for.",
+        "required": [
+          "locale"
+        ],
+        "properties": {
+          "context": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where the image is used (for example the title of the post), up to 500 characters; helps\nthe model say what matters."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Language of the alt text, a BCP 47 code.",
+            "example": "vi"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AltSuggestionResponse": {
+        "type": "object",
+        "description": "A suggested alt text; nothing was saved.",
+        "required": [
+          "alt",
+          "decorative",
+          "model"
+        ],
+        "properties": {
+          "alt": {
+            "type": "string",
+            "description": "Up to 250 characters; empty when `decorative`.",
+            "example": "Xuan Huong lake in Da Lat at sunrise, with pine trees on the far shore."
+          },
+          "decorative": {
+            "type": "boolean",
+            "description": "The model thinks the image is purely decorative: leave its alt text empty."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model that answered."
+          }
+        }
+      },
       "AnswerResponse": {
         "type": "object",
         "description": "One answer, with the field as it was when the submission was sent.",
@@ -25268,6 +26717,108 @@
         ],
         "description": "A new endpoint and its signing secret, shown only once."
       },
+      "Data_AiStatus": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "What the AI features of this server can do now.",
+            "required": [
+              "enabled",
+              "provider",
+              "model",
+              "images",
+              "embeddings_enabled",
+              "embedding_model",
+              "embedding_dimensions",
+              "tokens_today",
+              "daily_token_limit"
+            ],
+            "properties": {
+              "daily_token_limit": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Daily token limit; 0 means no limit.",
+                "minimum": 0
+              },
+              "embedding_dimensions": {
+                "type": "integer",
+                "description": "Length of each embedding vector; 0 when off.",
+                "minimum": 0
+              },
+              "embedding_model": {
+                "type": "string",
+                "description": "Embedding model; empty when off."
+              },
+              "embeddings_enabled": {
+                "type": "boolean",
+                "description": "Embeddings are on (search by meaning)."
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Text generation is on (suggestions, translation)."
+              },
+              "images": {
+                "type": "boolean",
+                "description": "The model reads images (alt text suggestions work)."
+              },
+              "model": {
+                "type": "string",
+                "description": "Model used for text; empty when off.",
+                "example": "claude-opus-5-5"
+              },
+              "provider": {
+                "type": "string",
+                "description": "`anthropic` or `openai` (the Chat Completions format); empty when off.",
+                "example": "anthropic"
+              },
+              "tokens_today": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Tokens used today (UTC), text and embeddings together.",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
+      "Data_AltSuggestionResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A suggested alt text; nothing was saved.",
+            "required": [
+              "alt",
+              "decorative",
+              "model"
+            ],
+            "properties": {
+              "alt": {
+                "type": "string",
+                "description": "Up to 250 characters; empty when `decorative`.",
+                "example": "Xuan Huong lake in Da Lat at sunrise, with pine trees on the far shore."
+              },
+              "decorative": {
+                "type": "boolean",
+                "description": "The model thinks the image is purely decorative: leave its alt text empty."
+              },
+              "model": {
+                "type": "string",
+                "description": "The model that answered."
+              }
+            }
+          }
+        }
+      },
       "Data_AuditEntryResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -26364,12 +27915,19 @@
               "meta_description",
               "canonical_url",
               "noindex",
+              "ai_generated",
+              "translation_outdated",
+              "created_via",
               "created_at",
               "updated_at",
               "term_ids",
               "author_ids"
             ],
             "properties": {
+              "ai_generated": {
+                "type": "boolean",
+                "description": "The content was generated by AI (set by the writer, or by the server when it translated\nthe entry). Shown to readers by the public endpoints."
+              },
               "author_ids": {
                 "type": "array",
                 "items": {
@@ -26400,6 +27958,11 @@
                   "null"
                 ],
                 "format": "uuid"
+              },
+              "created_via": {
+                "type": "string",
+                "description": "How the entry was created: `session` (a person signed in) or `api_key` (a machine or an\nAI agent).",
+                "example": "api_key"
               },
               "excerpt": {
                 "type": "string",
@@ -26461,6 +28024,22 @@
                 "type": "integer",
                 "format": "int32"
               },
+              "review_requested_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no\nreview pending. Cleared when the entry is published."
+              },
+              "review_requested_by": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "Who asked for the review."
+              },
               "slug": {
                 "type": "string",
                 "description": "Last part of the address.",
@@ -26481,10 +28060,22 @@
                 "type": "string",
                 "example": "Đường đến Đà Lạt"
               },
+              "translated_from_revision_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "For a translation made by the server's AI: the revision of the source it was translated\nfrom; `null` otherwise."
+              },
               "translation_group_id": {
                 "type": "string",
                 "format": "uuid",
                 "description": "Shared by the translations of the same entry."
+              },
+              "translation_outdated": {
+                "type": "boolean",
+                "description": "`true` when the source changed after this AI translation was made: translate it again\n(`POST /entries/{source}/translate`) or update it by hand."
               },
               "updated_at": {
                 "type": "string",
@@ -28249,6 +29840,77 @@
           }
         }
       },
+      "Data_SeoReport": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The SEO findings of a draft.",
+            "required": [
+              "findings"
+            ],
+            "properties": {
+              "findings": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SeoFinding"
+                },
+                "description": "Empty when there is nothing to fix."
+              }
+            }
+          }
+        }
+      },
+      "Data_SeoSuggestion": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "Suggestions of the AI model; nothing was changed.",
+            "required": [
+              "meta_title",
+              "meta_description",
+              "excerpt",
+              "term_ids",
+              "model"
+            ],
+            "properties": {
+              "excerpt": {
+                "type": "string",
+                "description": "A short summary."
+              },
+              "meta_description": {
+                "type": "string",
+                "description": "Description for search engines (aims at 120 to 160 characters)."
+              },
+              "meta_title": {
+                "type": "string",
+                "description": "Title for search engines (aims at 60 characters or fewer)."
+              },
+              "model": {
+                "type": "string",
+                "description": "The model that answered."
+              },
+              "term_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Up to 5 existing categories or tags of the entry's language that fit; never new ones."
+              }
+            }
+          }
+        }
+      },
       "Data_SubmissionResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -28725,6 +30387,89 @@
           }
         }
       },
+      "Data_TranslationRequestResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "An AI translation request.",
+            "required": [
+              "id",
+              "source_entry_id",
+              "source_revision_id",
+              "target_locale",
+              "status",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "created_by": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "error_code": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Why it failed, e.g. `content.translation_conflict` (someone changed the translation\nmeanwhile; it was not overwritten), `content.translation_invalid`, `ai.refused`,\n`ai.output_truncated`, `ai.misconfigured`, `content.translation_canceled`."
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "result_entry_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The translation's draft, once `succeeded`. It is never published automatically and is\nmarked `ai_generated`."
+              },
+              "source_entry_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The entry being translated."
+              },
+              "source_revision_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The revision of the source that is translated (its content when the request was made)."
+              },
+              "status": {
+                "$ref": "#/components/schemas/TranslationStatus"
+              },
+              "target_entry_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The translation that existed when the request was made and will be updated; `null`: a new\ntranslation is created."
+              },
+              "target_locale": {
+                "type": "string",
+                "example": "vi"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      },
       "Data_UnsubscribeResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -28998,9 +30743,19 @@
                 "content_modified_at",
                 "translations",
                 "terms",
-                "authors"
+                "authors",
+                "ai_generated",
+                "ai_reviewed"
               ],
               "properties": {
+                "ai_generated": {
+                  "type": "boolean",
+                  "description": "The content was generated by AI. Show readers a notice when your rules (for example\nArticle 50 of the EU AI Act) ask for one."
+                },
+                "ai_reviewed": {
+                  "type": "boolean",
+                  "description": "A person reviewed the AI-generated content and took editorial responsibility when it\nwas published. Always `false` when `ai_generated` is `false`."
+                },
                 "authors": {
                   "type": "array",
                   "items": {
@@ -29564,6 +31319,13 @@
         "type": "object",
         "description": "The editable fields of an entry. Omitted fields stay as they are.",
         "properties": {
+          "ai_generated": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "The content was generated by AI. AI agents should always send `true`; readers may be\ntold (public endpoints return it)."
+          },
           "body": {
             "oneOf": [
               {
@@ -29672,12 +31434,19 @@
           "meta_description",
           "canonical_url",
           "noindex",
+          "ai_generated",
+          "translation_outdated",
+          "created_via",
           "created_at",
           "updated_at",
           "term_ids",
           "author_ids"
         ],
         "properties": {
+          "ai_generated": {
+            "type": "boolean",
+            "description": "The content was generated by AI (set by the writer, or by the server when it translated\nthe entry). Shown to readers by the public endpoints."
+          },
           "author_ids": {
             "type": "array",
             "items": {
@@ -29708,6 +31477,11 @@
               "null"
             ],
             "format": "uuid"
+          },
+          "created_via": {
+            "type": "string",
+            "description": "How the entry was created: `session` (a person signed in) or `api_key` (a machine or an\nAI agent).",
+            "example": "api_key"
           },
           "excerpt": {
             "type": "string",
@@ -29769,6 +31543,22 @@
             "type": "integer",
             "format": "int32"
           },
+          "review_requested_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no\nreview pending. Cleared when the entry is published."
+          },
+          "review_requested_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Who asked for the review."
+          },
           "slug": {
             "type": "string",
             "description": "Last part of the address.",
@@ -29789,10 +31579,22 @@
             "type": "string",
             "example": "Đường đến Đà Lạt"
           },
+          "translated_from_revision_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "For a translation made by the server's AI: the revision of the source it was translated\nfrom; `null` otherwise."
+          },
           "translation_group_id": {
             "type": "string",
             "format": "uuid",
             "description": "Shared by the translations of the same entry."
+          },
+          "translation_outdated": {
+            "type": "boolean",
+            "description": "`true` when the source changed after this AI translation was made: translate it again\n(`POST /entries/{source}/translate`) or update it by hand."
           },
           "updated_at": {
             "type": "string",
@@ -30029,6 +31831,14 @@
             "minimum": 0
           }
         }
+      },
+      "FindingLevel": {
+        "type": "string",
+        "description": "How serious a finding is.",
+        "enum": [
+          "error",
+          "warning"
+        ]
       },
       "FolderResponse": {
         "type": "object",
@@ -30510,6 +32320,14 @@
             "example": "correct horse battery staple"
           }
         }
+      },
+      "MatchedBy": {
+        "type": "string",
+        "description": "How a result matched.",
+        "enum": [
+          "meaning",
+          "text"
+        ]
       },
       "MeResponse": {
         "type": "object",
@@ -31901,12 +33719,19 @@
                 "meta_description",
                 "canonical_url",
                 "noindex",
+                "ai_generated",
+                "translation_outdated",
+                "created_via",
                 "created_at",
                 "updated_at",
                 "term_ids",
                 "author_ids"
               ],
               "properties": {
+                "ai_generated": {
+                  "type": "boolean",
+                  "description": "The content was generated by AI (set by the writer, or by the server when it translated\nthe entry). Shown to readers by the public endpoints."
+                },
                 "author_ids": {
                   "type": "array",
                   "items": {
@@ -31937,6 +33762,11 @@
                     "null"
                   ],
                   "format": "uuid"
+                },
+                "created_via": {
+                  "type": "string",
+                  "description": "How the entry was created: `session` (a person signed in) or `api_key` (a machine or an\nAI agent).",
+                  "example": "api_key"
                 },
                 "excerpt": {
                   "type": "string",
@@ -31998,6 +33828,22 @@
                   "type": "integer",
                   "format": "int32"
                 },
+                "review_requested_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no\nreview pending. Cleared when the entry is published."
+                },
+                "review_requested_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "Who asked for the review."
+                },
                 "slug": {
                   "type": "string",
                   "description": "Last part of the address.",
@@ -32018,10 +33864,22 @@
                   "type": "string",
                   "example": "Đường đến Đà Lạt"
                 },
+                "translated_from_revision_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "For a translation made by the server's AI: the revision of the source it was translated\nfrom; `null` otherwise."
+                },
                 "translation_group_id": {
                   "type": "string",
                   "format": "uuid",
                   "description": "Shared by the translations of the same entry."
+                },
+                "translation_outdated": {
+                  "type": "boolean",
+                  "description": "`true` when the source changed after this AI translation was made: translate it again\n(`POST /entries/{source}/translate`) or update it by hand."
                 },
                 "updated_at": {
                   "type": "string",
@@ -32709,9 +34567,19 @@
                 "content_modified_at",
                 "translations",
                 "terms",
-                "authors"
+                "authors",
+                "ai_generated",
+                "ai_reviewed"
               ],
               "properties": {
+                "ai_generated": {
+                  "type": "boolean",
+                  "description": "The content was generated by AI. Show readers a notice when your rules (for example\nArticle 50 of the EU AI Act) ask for one."
+                },
+                "ai_reviewed": {
+                  "type": "boolean",
+                  "description": "A person reviewed the AI-generated content and took editorial responsibility when it\nwas published. Always `false` when `ai_generated` is `false`."
+                },
                 "authors": {
                   "type": "array",
                   "items": {
@@ -33017,6 +34885,93 @@
                 "updated_at": {
                   "type": "string",
                   "format": "date-time"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Page_SearchHit": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A search result.",
+              "required": [
+                "entry_id",
+                "kind",
+                "locale",
+                "title",
+                "score",
+                "snippet",
+                "matched_by"
+              ],
+              "properties": {
+                "entry_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "kind": {
+                  "$ref": "#/components/schemas/Kind"
+                },
+                "locale": {
+                  "type": "string"
+                },
+                "matched_by": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MatchedBy"
+                  },
+                  "description": "`meaning`, `text` or both. Only `text` when embeddings are off."
+                },
+                "path": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Public search: the address of the published entry. Admin search: absent."
+                },
+                "score": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Combined rank score (Reciprocal Rank Fusion of meaning and words); compare only within\none search."
+                },
+                "similarity": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "format": "float",
+                  "description": "Similarity in meaning (cosine, -1 to 1) of the best matching passage; `null` when only\nthe words matched."
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "The best matching passage, or the summary, up to 300 characters."
+                },
+                "status": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Status",
+                      "description": "Admin search: the entry's status. Public search: absent."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "title": {
+                  "type": "string"
                 }
               }
             },
@@ -33561,6 +35516,97 @@
                 }
               ],
               "description": "A top-level comment with its first replies."
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Page_TranslationRequestResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "An AI translation request.",
+              "required": [
+                "id",
+                "source_entry_id",
+                "source_revision_id",
+                "target_locale",
+                "status",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "created_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "error_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Why it failed, e.g. `content.translation_conflict` (someone changed the translation\nmeanwhile; it was not overwritten), `content.translation_invalid`, `ai.refused`,\n`ai.output_truncated`, `ai.misconfigured`, `content.translation_canceled`."
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "result_entry_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "The translation's draft, once `succeeded`. It is never published automatically and is\nmarked `ai_generated`."
+                },
+                "source_entry_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "The entry being translated."
+                },
+                "source_revision_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "The revision of the source that is translated (its content when the request was made)."
+                },
+                "status": {
+                  "$ref": "#/components/schemas/TranslationStatus"
+                },
+                "target_entry_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "The translation that existed when the request was made and will be updated; `null`: a new\ntranslation is created."
+                },
+                "target_locale": {
+                  "type": "string",
+                  "example": "vi"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
             },
             "description": "The items of this page, in the requested order."
           },
@@ -34177,9 +36223,19 @@
           "content_modified_at",
           "translations",
           "terms",
-          "authors"
+          "authors",
+          "ai_generated",
+          "ai_reviewed"
         ],
         "properties": {
+          "ai_generated": {
+            "type": "boolean",
+            "description": "The content was generated by AI. Show readers a notice when your rules (for example\nArticle 50 of the EU AI Act) ask for one."
+          },
+          "ai_reviewed": {
+            "type": "boolean",
+            "description": "A person reviewed the AI-generated content and took editorial responsibility when it\nwas published. Always `false` when `ai_generated` is `false`."
+          },
           "authors": {
             "type": "array",
             "items": {
@@ -34743,6 +36799,10 @@
         "type": "object",
         "description": "Options of a publish.",
         "properties": {
+          "ai_reviewed": {
+            "type": "boolean",
+            "description": "For an entry marked `ai_generated`: you, a person, reviewed the content and take\neditorial responsibility for it. Recorded on the published version (readers see\n`ai_reviewed`). Only a signed-in person may send `true`; an API key gets 403\n`content.ai_review_requires_human`."
+          },
           "published_at": {
             "type": [
               "string",
@@ -35265,6 +37325,76 @@
           }
         }
       },
+      "SearchHit": {
+        "type": "object",
+        "description": "A search result.",
+        "required": [
+          "entry_id",
+          "kind",
+          "locale",
+          "title",
+          "score",
+          "snippet",
+          "matched_by"
+        ],
+        "properties": {
+          "entry_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/Kind"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "matched_by": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatchedBy"
+            },
+            "description": "`meaning`, `text` or both. Only `text` when embeddings are off."
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Public search: the address of the published entry. Admin search: absent."
+          },
+          "score": {
+            "type": "number",
+            "format": "float",
+            "description": "Combined rank score (Reciprocal Rank Fusion of meaning and words); compare only within\none search."
+          },
+          "similarity": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float",
+            "description": "Similarity in meaning (cosine, -1 to 1) of the best matching passage; `null` when only\nthe words matched."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The best matching passage, or the summary, up to 300 characters."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Status",
+                "description": "Admin search: the entry's status. Public search: absent."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "SecretResponse": {
         "type": "object",
         "description": "A new signing secret, shown only once.",
@@ -35275,6 +37405,88 @@
           "secret": {
             "type": "string",
             "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+          }
+        }
+      },
+      "SeoFinding": {
+        "type": "object",
+        "description": "Something to fix or review.",
+        "required": [
+          "code",
+          "level",
+          "field",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable code for machines, e.g. `seo.meta_title_too_long`, `seo.image_alt_missing`,\n`seo.heading_skipped`, `seo.title_duplicate`, `seo.translation_missing`.",
+            "example": "seo.image_alt_missing"
+          },
+          "field": {
+            "type": "string",
+            "description": "The field, or the place in the body JSON (e.g. `body.content[2].attrs.alt`).",
+            "example": "body.content[2].attrs.alt"
+          },
+          "level": {
+            "$ref": "#/components/schemas/FindingLevel"
+          },
+          "message": {
+            "type": "string",
+            "description": "What to fix, in English."
+          }
+        }
+      },
+      "SeoReport": {
+        "type": "object",
+        "description": "The SEO findings of a draft.",
+        "required": [
+          "findings"
+        ],
+        "properties": {
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SeoFinding"
+            },
+            "description": "Empty when there is nothing to fix."
+          }
+        }
+      },
+      "SeoSuggestion": {
+        "type": "object",
+        "description": "Suggestions of the AI model; nothing was changed.",
+        "required": [
+          "meta_title",
+          "meta_description",
+          "excerpt",
+          "term_ids",
+          "model"
+        ],
+        "properties": {
+          "excerpt": {
+            "type": "string",
+            "description": "A short summary."
+          },
+          "meta_description": {
+            "type": "string",
+            "description": "Description for search engines (aims at 120 to 160 characters)."
+          },
+          "meta_title": {
+            "type": "string",
+            "description": "Title for search engines (aims at 60 characters or fewer)."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model that answered."
+          },
+          "term_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Up to 5 existing categories or tags of the entry's language that fit; never new ones."
           }
         }
       },
@@ -36200,6 +38412,21 @@
           }
         }
       },
+      "TranslateRequest": {
+        "type": "object",
+        "description": "The language to translate into.",
+        "required": [
+          "locale"
+        ],
+        "properties": {
+          "locale": {
+            "type": "string",
+            "description": "One of the languages of `AUTOXIDE_CONTENT_LOCALES`, other than the entry's.",
+            "example": "vi"
+          }
+        },
+        "additionalProperties": false
+      },
       "TranslationRequest": {
         "allOf": [
           {
@@ -36221,6 +38448,90 @@
           }
         ],
         "description": "A new translation."
+      },
+      "TranslationRequestResponse": {
+        "type": "object",
+        "description": "An AI translation request.",
+        "required": [
+          "id",
+          "source_entry_id",
+          "source_revision_id",
+          "target_locale",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it failed, e.g. `content.translation_conflict` (someone changed the translation\nmeanwhile; it was not overwritten), `content.translation_invalid`, `ai.refused`,\n`ai.output_truncated`, `ai.misconfigured`, `content.translation_canceled`."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "result_entry_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The translation's draft, once `succeeded`. It is never published automatically and is\nmarked `ai_generated`."
+          },
+          "source_entry_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The entry being translated."
+          },
+          "source_revision_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The revision of the source that is translated (its content when the request was made)."
+          },
+          "status": {
+            "$ref": "#/components/schemas/TranslationStatus"
+          },
+          "target_entry_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The translation that existed when the request was made and will be updated; `null`: a new\ntranslation is created."
+          },
+          "target_locale": {
+            "type": "string",
+            "example": "vi"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TranslationStatus": {
+        "type": "string",
+        "description": "Where an AI translation is.",
+        "enum": [
+          "queued",
+          "running",
+          "succeeded",
+          "failed"
+        ]
       },
       "UnsubscribeRequest": {
         "type": "object",
