@@ -10,3 +10,6 @@
 *.db-shm
 *.db-wal
 .codegraph/
+
+# Bản sao làm việc tạm của subagent (Claude Code)
+.claude/worktrees/
