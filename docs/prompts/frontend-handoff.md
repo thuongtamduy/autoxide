@@ -101,7 +101,9 @@ xoá hẳn); công khai / riêng tư; ảnh thu nhỏ lấy bằng `?w=`; video 
   lấy từ query string (tránh open redirect).
 - Làm mới cache: route nhận webhook của core, **kiểm chữ ký Standard Webhooks**, gọi
   `revalidateTag` / `revalidatePath` theo `path` mới **và mọi `path` cũ** trong payload (đổi slug
-  trang cha thì trang con cũng đổi).
+  trang cha thì trang con cũng đổi). Gắn thêm tag `term:<id>` / `author:<id>` cho mỗi trang và làm
+  mới chúng khi nhận `content.term_changed` / `content.author_changed` (event này không kèm danh
+  sách trang — D-106).
 - SEO: meta title / description, Open Graph (ảnh từ `media`), canonical, `noindex`, JSON-LD
   `Article` / `BreadcrumbList`; sitemap có `alternates.languages` (hreflang) từ endpoint dữ liệu
   sitemap; RSS 2.0 / Atom / JSON Feed từ endpoint feed (render thân JSON ra HTML phía máy chủ

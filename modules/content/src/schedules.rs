@@ -291,7 +291,11 @@ impl ContentService {
             .ok_or_else(|| entry_not_found(row.entry_id))?;
         let actor = row.created_by.map_or_else(Actor::system, Actor::user);
         match version {
-            Some((version, revision_id)) => {
+            Some((mut version, revision_id)) => {
+                // Nội dung lấy từ revision đã ghim; còn vị trí trong cây lấy từ bản đọc SAU khi
+                // khoá: một lệnh `move` có thể vừa xong giữa lúc đọc `entry` và lúc khoá.
+                version.parent_id = current.parent_id;
+                version.parent_key = current.parent_key;
                 if let Some(live) =
                     published::Entity::find_by_id(row.entry_id).one(&transaction).await?
                     && live.content_modified_at > row.created_at
@@ -338,6 +342,9 @@ impl ContentService {
                     .remove_published(&transaction, &current, false, row.created_by, now)
                     .await?
                     .unwrap_or_default();
+                // Như gỡ bằng tay: ghi revision `unpublished`.
+                revisions::record(&transaction, &current, Reason::Unpublished, row.created_by, now)
+                    .await?;
                 let mut after = current.clone();
                 after.status = Status::Draft.as_str().to_owned();
                 after.has_unpublished_changes = false;
@@ -387,14 +394,39 @@ impl ContentService {
 
     /// Huỷ mọi lịch đang chờ do người `user_id` đặt (tài khoản bị xoá). Trả số lịch đã huỷ.
     pub(crate) async fn cancel_schedules_of(&self, user_id: Uuid) -> Result<u64, Error> {
-        let updated = schedule::Entity::update_many()
-            .col_expr(schedule::Column::Status, Expr::value("canceled"))
-            .col_expr(schedule::Column::UpdatedAt, Expr::value(now()))
+        let pending = schedule::Entity::find()
             .filter(schedule::Column::CreatedBy.eq(user_id))
             .filter(schedule::Column::Status.eq("scheduled"))
-            .exec(self.database.write())
+            .all(self.database.read())
             .await?;
-        Ok(updated.rows_affected)
+        let mut canceled = 0;
+        // Mỗi lịch một transaction ngắn, kèm event như huỷ bằng tay (audit, webhook). Lịch vừa
+        // chạy hay vừa bị huỷ ở nơi khác thì bỏ qua: nhận lại event xoá tài khoản cũng an toàn.
+        for before in pending {
+            let transaction = self.database.begin_write().await?;
+            let Some(after) =
+                self.set_schedule_status(&transaction, before.id, "canceled", None).await?
+            else {
+                transaction.rollback().await?;
+                continue;
+            };
+            let change = Change {
+                before: Some(schedule_summary(&before)),
+                after: Some(schedule_summary(&after)),
+                published: None,
+            };
+            self.outbox
+                .record(
+                    &transaction,
+                    Actor::system(),
+                    events::entry_subject(before.entry_id),
+                    &events::ScheduleCanceled(change),
+                )
+                .await?;
+            transaction.commit().await?;
+            canceled += 1;
+        }
+        Ok(canceled)
     }
 }
 

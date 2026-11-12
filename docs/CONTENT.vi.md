@@ -17,7 +17,7 @@ chính website là các dự án riêng gọi vào nó. Module nằm dưới `/a
 | ----------------- | --------------------------------------------------------------------------------- |
 | `content.read`    | Đọc bản nháp, revision và lịch                                                    |
 | `content.write`   | Tạo và sửa bản nháp, bản dịch, khôi phục revision, tạo link xem trước             |
-| `content.publish` | Đăng, gỡ, lưu trữ, xoá, chuyển trang, hẹn giờ                                     |
+| `content.publish` | Đăng, gỡ, lưu trữ, xoá, chuyển trang, hẹn giờ; danh mục và tác giả của mục đang công khai |
 | `content.manage`  | Danh mục, thẻ, tác giả, menu, chuyển hướng                                        |
 
 Gán cho một role bằng `PUT /api/v1/auth/roles/{id}`. Role `admin` có đủ. Người đọc website
@@ -69,10 +69,12 @@ curl -X POST http://localhost:8080/api/v1/content/entries/$ID/publish \
   -H "Authorization: Bearer $TOKEN" -H 'If-Match: "1731400000000001"'
 ```
 
-- **Bắt buộc `If-Match`** cho mọi thay đổi trên mục, menu, danh mục / thẻ, tác giả và chuyển
-  hướng: gửi `ETag` vừa đọc (`*` để sửa bất kể phiên bản). Thiếu: `428 precondition_required`;
-  có người sửa trước: `412 precondition_failed` — đọc lại rồi sửa lại. Nhờ vậy hai người biên
-  tập (hay hai AI agent) không ghi đè lên nhau.
+- **Bắt buộc `If-Match`** khi sửa hay xoá mục, khi đổi trạng thái mục (đăng, gỡ, lưu trữ,
+  chuyển, khôi phục, hẹn giờ), khi sửa danh mục / thẻ, tác giả, chuyển hướng, và khi thay menu:
+  gửi `ETag` vừa đọc (`*` để sửa bất kể phiên bản). Thiếu: `428 precondition_required`; có người
+  sửa trước: `412 precondition_failed` — đọc lại rồi sửa lại. Nhờ vậy hai người biên tập (hay hai
+  AI agent) không ghi đè lên nhau. Xoá danh mục / thẻ, tác giả, chuyển hướng và gắn danh mục / tác
+  giả cho mục thì không cần: không có gì bị ghi đè.
 - `POST …/unpublish` gỡ mục (về lại bản nháp, địa chỉ trả 404); `POST …/archive` gỡ hẳn (địa
   chỉ trả 410); `DELETE` xoá mục (mục đang công khai được gỡ trước, địa chỉ trả 410).
 - Không đăng được trang trước trang cha của nó; không gỡ hay xoá được trang còn trang con đang
@@ -131,7 +133,8 @@ Permission `content.manage`.
 - **Term** (`/api/v1/content/terms`): `category` (có thể có cha) hoặc `tag`, có tên, slug, mô tả
   và chữ SEO theo từng ngôn ngữ. Gắn vào mục bằng `PUT /api/v1/content/entries/{id}/terms`
   (`{"term_ids": [...]}`, danh mục đầu tiên là danh mục chính). Có hiệu lực ngay, cả với bản
-  công khai.
+  công khai — nên với mục đang công khai cần thêm `content.publish` ngoài `content.write` (gắn
+  tác giả cũng vậy).
 - **Tác giả** (`/api/v1/content/authors`): hồ sơ của module content — tên hiển thị, slug, giới
   thiệu, ảnh đại diện (ID media), website — có thể gắn với một tài khoản (`user_id`). Một mục có
   thể có nhiều tác giả, theo thứ tự: `PUT /api/v1/content/entries/{id}/authors`.
@@ -184,7 +187,10 @@ trong [README](../README.vi.md)) cho `content.entry_published`, `content.entry_u
 
 `path` là địa chỉ mới (`null` khi không còn công khai), `stale_paths` là mọi địa chỉ đã đổi, kể
 cả của trang con. Menu, term và tác giả phát `content.menu_changed`, `content.term_changed` và
-`content.author_changed`.
+`content.author_changed`; các event này không kèm danh sách trang bị ảnh hưởng (một thẻ có thể
+nằm trên hàng nghìn bài). Hãy gắn cho mỗi trang đã cache tag theo ID term và tác giả của nó (ví dụ
+`term:<id>`, `author:<id>`) rồi làm mới các tag đó khi nhận event — đổi tên hay xoá thẻ, tác
+giả (kể cả khi xoá tài khoản) sẽ làm mới mọi trang đang hiện nó.
 
 **Sitemap và feed.** Dựng `sitemap.xml` từ `/public/sitemap` (đi theo `next_cursor`; bỏ mục có
 `noindex: true`; `content_modified_at` là `lastmod`; `translations` cho các `hreflang`). Dựng

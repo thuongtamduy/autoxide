@@ -10,7 +10,8 @@ pub(crate) const CONTENT_WRITE: Permission = Permission::new(
 );
 pub(crate) const CONTENT_PUBLISH: Permission = Permission::new(
     "content.publish",
-    "Publish, unpublish, archive, delete and schedule posts and pages; move published pages.",
+    "Publish, unpublish, archive, delete and schedule posts and pages; move published pages; \
+     change the terms and authors of published entries.",
 );
 pub(crate) const CONTENT_MANAGE: Permission =
     Permission::new("content.manage", "Manage categories, tags, authors, menus and redirects.");

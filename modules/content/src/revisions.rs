@@ -217,6 +217,15 @@ impl ContentService {
                             .to_owned(),
                     ),
                 )
+                // Một lịch có thể vừa chạy xong: revision nó ghim giờ là bản công khai.
+                .filter(
+                    revision::Column::Id.not_in_subquery(
+                        sea_orm::sea_query::Query::select()
+                            .column(crate::entity::published::Column::RevisionId)
+                            .from(crate::entity::published::Entity)
+                            .to_owned(),
+                    ),
+                )
                 .exec(self.database.write())
                 .await?;
             removed += deleted.rows_affected;

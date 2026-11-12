@@ -209,7 +209,17 @@ impl ContentService {
         for _ in 0..5 {
             let transaction = self.database.begin_write().await?;
             if let Some(parent) = candidate.parent_id {
-                // Khoá trang cha tới hết transaction: lệnh xoá nó phải chờ rồi thấy trang con.
+                // Khoá cây của ngôn ngữ (cùng khoá với xoá, chuyển, đăng) rồi kiểm lại trang cha
+                // trong transaction: không tạo được trang con dưới một trang đang bị xoá, và độ
+                // sâu tính trên cây hiện tại (một lệnh `move` vừa xong có thể đã đổi nó; bản dịch
+                // lấy cha trong ngôn ngữ khác, có thể đã sâu hơn).
+                crate::paths::lock_tree(&transaction, &candidate.locale).await?;
+                let mut problems = Vec::new();
+                self.check_parent(&transaction, &candidate, parent, &mut problems).await?;
+                if !problems.is_empty() {
+                    transaction.rollback().await?;
+                    return Err(invalid(problems));
+                }
                 if !touch(&transaction, parent).await? {
                     return Err(invalid(vec![FieldError::new(
                         "parent_id",

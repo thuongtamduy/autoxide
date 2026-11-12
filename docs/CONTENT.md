@@ -17,7 +17,7 @@ ids, and they must be public before the entry can be published.
 | ----------------- | -------------------------------------------------------------------------------- |
 | `content.read`    | Reading drafts, revisions and schedules                                          |
 | `content.write`   | Creating and changing drafts, translations, restoring revisions, preview links    |
-| `content.publish` | Publishing, taking down, archiving, deleting, moving pages, scheduling           |
+| `content.publish` | Publishing, taking down, archiving, deleting, moving pages, scheduling; the terms and authors of a published entry |
 | `content.manage`  | Categories, tags, authors, menus, redirects                                      |
 
 Give them to a role with `PUT /api/v1/auth/roles/{id}`. The `admin` role has them all.
@@ -70,10 +70,13 @@ curl -X POST http://localhost:8080/api/v1/content/entries/$ID/publish \
   -H "Authorization: Bearer $TOKEN" -H 'If-Match: "1731400000000001"'
 ```
 
-- **`If-Match` is required** on every change of an entry, menu, term, author and redirect:
-  send the `ETag` you read (`*` to change it whatever its version). Missing: `428
-  precondition_required`; someone changed it since: `412 precondition_failed` — read it again
-  and reapply your change. This keeps two editors (or AI agents) from overwriting each other.
+- **`If-Match` is required** to change or delete an entry, to change its state (publish,
+  unpublish, archive, move, restore, schedule), to change a term, author or redirect, and to
+  replace a menu: send the `ETag` you read (`*` to change it whatever its version). Missing:
+  `428 precondition_required`; someone changed it since: `412 precondition_failed` — read it
+  again and reapply your change. This keeps two editors (or AI agents) from overwriting each
+  other. Deleting a term, author or redirect and setting an entry's terms or authors do not
+  need it: nothing is overwritten.
 - `POST …/unpublish` takes an entry down (it is a draft again, its address answers 404);
   `POST …/archive` takes it down for good (its address answers 410); `DELETE` deletes it
   (published entries are taken down first, their address answers 410).
@@ -134,7 +137,8 @@ Permission `content.manage`.
 - **Terms** (`/api/v1/content/terms`): `category` (can have a parent) or `tag`, with a name,
   slug, description and SEO texts per language. Attach them with
   `PUT /api/v1/content/entries/{id}/terms` (`{"term_ids": [...]}`, the first category is the
-  main one). This takes effect at once, also on the published version.
+  main one). This takes effect at once, also on the published version — so for a published
+  entry it needs `content.publish` as well as `content.write` (the same for its authors).
 - **Authors** (`/api/v1/content/authors`): profiles of the content module — display name, slug,
   bio, avatar (a media id), website — optionally linked to a user account (`user_id`). An
   entry can have several, in order: `PUT /api/v1/content/entries/{id}/authors`.
@@ -188,7 +192,11 @@ to purge:
 
 `path` is the new address (`null` when no longer published), `stale_paths` every address
 that changed, subpages included. Menus, terms and authors send `content.menu_changed`,
-`content.term_changed` and `content.author_changed`.
+`content.term_changed` and `content.author_changed`; these carry no list of affected pages
+(a tag can be on thousands). Tag each cached page with its term and author ids (for example
+`term:<id>`, `author:<id>`) and revalidate those tags when such an event arrives — renaming or
+deleting a tag or an author, including when an account is deleted, then refreshes every page
+that shows it.
 
 **Sitemap and feed.** Build `sitemap.xml` from `/public/sitemap` (follow `next_cursor`; skip
 items with `noindex: true`; `content_modified_at` is `lastmod`; `translations` gives the

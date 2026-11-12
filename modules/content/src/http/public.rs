@@ -256,7 +256,7 @@ pub(crate) async fn resolution(
     security((), ("bearer" = [])),
     params(ResolveQuery),
     responses(
-        (status = 200, description = "What lives at the address: `type` is `entry`, `redirect` or `gone`.", body = Data<Resolution>, headers(("ETag" = String, description = "Version (for an entry); send it in `If-None-Match` to get 304."))),
+        (status = 200, description = "What lives at the address: `type` is `entry`, `redirect` or `gone`.", body = Data<Resolution>, headers(("ETag" = String, description = "Fingerprint of the whole answer (for an entry, including its terms, authors and translations); send it in `If-None-Match` to get 304."))),
         (status = 404, description = "Nothing at this address; code `content.not_found`.", body = Problem),
         (status = 422, description = "The language is not supported or the path is malformed; see `errors`.", body = Problem),
     )
@@ -267,13 +267,29 @@ pub(crate) async fn resolve(
     Query(query): Query<ResolveQuery>,
 ) -> Result<Response, Error> {
     let (resolution, version) = resolution(&service, &query.locale, &query.path).await?;
-    let mut response = Data { data: resolution }.into_response();
-    if let Some(version) = version
-        && let Ok(value) = HeaderValue::from_str(&autoxide_kernel::version::etag(version))
+    let data = Data { data: resolution };
+    // ETag là dấu vân tay của CẢ câu trả lời, không phải `updated_at` của bản công khai: câu
+    // trả lời còn gộp danh mục, thẻ, tác giả, bản dịch, ảnh — đổi những thứ đó không chạm
+    // `updated_at`, và một ETag theo thời gian sẽ làm website nhận 304 với nội dung cũ.
+    let etag = version.map(|_| fingerprint(&data)).transpose()?;
+    let mut response = data.into_response();
+    if let Some(etag) = etag
+        && let Ok(value) = HeaderValue::from_str(&etag)
     {
         response.headers_mut().insert(header::ETAG, value);
     }
     Ok(public_cache(response))
+}
+
+/// `ETag` mạnh từ nội dung: SHA-256 của JSON, 16 byte đầu, base64url, trong ngoặc kép.
+fn fingerprint<T: Serialize>(value: &T) -> Result<String, Error> {
+    use base64::Engine;
+    use sha2::{Digest, Sha256};
+    let bytes = serde_json::to_vec(value)
+        .map_err(|error| Error::internal(format!("cannot serialize the answer: {error}")))?;
+    let digest = Sha256::digest(&bytes);
+    let short = digest.get(..16).unwrap_or_default();
+    Ok(format!("\"{}\"", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(short)))
 }
 
 use autoxide_kernel::pagination::{Page, PageQuery};

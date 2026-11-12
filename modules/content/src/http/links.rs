@@ -57,7 +57,7 @@ pub(crate) struct EntryAuthors {
     responses(
         (status = 201, description = "The new translation (a draft).", body = Data<EntryResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.write`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `content.write` (or `content.publish` for a published entry); code `permission_denied`.", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
         (status = 409, description = "A translation in this language exists (code `content.translation_exists`), the parent page is not translated (code `content.parent_not_translated`), or the slug is taken (code `content.slug_taken`).", body = Problem),
         (status = 422, description = "The language is not supported or a value is invalid; see `errors`.", body = Problem),
@@ -77,7 +77,8 @@ pub(crate) async fn create_translation(
 
 /// Set the categories and tags of an entry.
 ///
-/// Requires `content.write`. Takes effect at once, also for the published version.
+/// Requires `content.write`, and `content.publish` when the entry is published. Takes effect at
+/// once, also for the published version.
 #[utoipa::path(
     put,
     path = "/entries/{id}/terms",
@@ -88,7 +89,7 @@ pub(crate) async fn create_translation(
     responses(
         (status = 200, description = "The terms now set.", body = Data<EntryTerms>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.write`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `content.write` (or `content.publish` for a published entry); code `permission_denied`.", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
         (status = 422, description = "An id is not a category or tag, or too many; see `errors`.", body = Problem),
     )
@@ -105,7 +106,8 @@ pub(crate) async fn set_terms(
 
 /// Set the authors of an entry.
 ///
-/// Requires `content.write`. Takes effect at once, also for the published version.
+/// Requires `content.write`, and `content.publish` when the entry is published. Takes effect at
+/// once, also for the published version.
 #[utoipa::path(
     put,
     path = "/entries/{id}/authors",
@@ -116,7 +118,7 @@ pub(crate) async fn set_terms(
     responses(
         (status = 200, description = "The authors now set.", body = Data<EntryAuthors>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.write`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `content.write` (or `content.publish` for a published entry); code `permission_denied`.", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
         (status = 422, description = "An id is not an author, or too many; see `errors`.", body = Problem),
     )

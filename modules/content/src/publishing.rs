@@ -269,7 +269,10 @@ impl ContentService {
         let mut moved = Vec::new();
         let mut path = None;
         if let Some(old) = published::Entity::find_by_id(id).one(&transaction).await? {
-            let new = paths::path_of(&transaction, &after, &self.config.post_path_prefix)
+            // Đường dẫn công khai mới tính từ slug ĐÃ ĐĂNG: slug của nháp chỉ ra ngoài khi đăng.
+            let mut moved_entry = after.clone();
+            moved_entry.slug.clone_from(&old.slug);
+            let new = paths::path_of(&transaction, &moved_entry, &self.config.post_path_prefix)
                 .await?
                 .map_err(|()| parent_not_published())?;
             if paths::path_used(&transaction, &after.locale, &new, id).await? {

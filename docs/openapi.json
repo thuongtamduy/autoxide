@@ -6560,7 +6560,7 @@
           "content"
         ],
         "summary": "Set the authors of an entry.",
-        "description": "Requires `content.write`. Takes effect at once, also for the published version.",
+        "description": "Requires `content.write`, and `content.publish` when the entry is published. Takes effect at\nonce, also for the published version.",
         "operationId": "content_set_content_entry_authors",
         "parameters": [
           {
@@ -6631,7 +6631,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` (or `content.publish` for a published entry); code `permission_denied`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7774,7 +7774,7 @@
           "content"
         ],
         "summary": "Set the categories and tags of an entry.",
-        "description": "Requires `content.write`. Takes effect at once, also for the published version.",
+        "description": "Requires `content.write`, and `content.publish` when the entry is published. Takes effect at\nonce, also for the published version.",
         "operationId": "content_set_content_entry_terms",
         "parameters": [
           {
@@ -7845,7 +7845,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` (or `content.publish` for a published entry); code `permission_denied`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7977,7 +7977,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` (or `content.publish` for a published entry); code `permission_denied`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9024,7 +9024,7 @@
                 "schema": {
                   "type": "string"
                 },
-                "description": "Version (for an entry); send it in `If-None-Match` to get 304."
+                "description": "Fingerprint of the whole answer (for an entry, including its terms, authors and translations); send it in `If-None-Match` to get 304."
               }
             },
             "content": {

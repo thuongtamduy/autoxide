@@ -415,8 +415,13 @@ impl Checker<'_> {
         self.keys(node, path, &["type", "attrs"]);
         let attrs = self.attrs(node, path, &["url"]).unwrap_or_default();
         let url = attrs.get("url").and_then(Value::as_str).unwrap_or_default();
-        let host = url
-            .strip_prefix("https://")
+        // Trình duyệt coi `\` như `/` trong địa chỉ `https:` (chuẩn WHATWG URL):
+        // `https://evil.com\.youtube.com/x` mở `evil.com`. Có `\`, khoảng trắng hay ký tự
+        // điều khiển là từ chối, trước khi tách host.
+        let clean = !url.chars().any(|c| c == '\\' || c.is_whitespace() || c.is_control());
+        let host = clean
+            .then_some(url)
+            .and_then(|url| url.strip_prefix("https://"))
             .and_then(|rest| rest.split(['/', '?', '#']).next())
             .map(|host| host.trim_start_matches("www.").to_ascii_lowercase());
         let allowed = host.as_deref().is_some_and(|host| {
@@ -440,7 +445,9 @@ impl Checker<'_> {
 /// Link an toàn: `http`, `https`, `mailto`, hoặc đường dẫn trong site (`/…`, không `//`).
 fn safe_link(href: &str) -> bool {
     let lower = href.trim().to_ascii_lowercase();
-    if href.chars().any(char::is_control) || href.len() > 2048 {
+    // `\` thành `/` trong trình duyệt: `/\evil.com` là `//evil.com` — link ra ngoài trá hình
+    // đường dẫn trong site.
+    if href.chars().any(|c| c.is_control() || c == '\\') || href.len() > 2048 {
         return false;
     }
     lower.starts_with("https://")
@@ -465,6 +472,28 @@ mod tests {
             .into_iter()
             .map(|error| (error.field, error.code))
             .collect()
+    }
+
+    /// `\` là `/` với trình duyệt: không lọt kiểm host của embed hay link "trong site".
+    #[test]
+    fn dau_gach_nguoc_khong_lot() {
+        for url in [
+            "https://evil.com\\.youtube.com/x",
+            "https://youtube.com\\@evil.com/x",
+            "https://www.youtube.com/watch?v=a b",
+        ] {
+            let body =
+                json!({"type": "doc", "content": [{"type": "embed", "attrs": {"url": url}}]});
+            assert_eq!(
+                fields(body),
+                [("body.content[0].attrs.url".to_owned(), "host_not_allowed".to_owned())],
+                "{url}"
+            );
+        }
+        let ok = json!({"type": "doc", "content": [{"type": "embed", "attrs": {"url": "https://www.youtube.com/watch?v=abc"}}]});
+        assert!(check(&ok, 100_000, &hosts()).is_ok());
+        assert!(!safe_link("/\\evil.com"));
+        assert!(safe_link("/blog/hello"));
     }
 
     #[test]

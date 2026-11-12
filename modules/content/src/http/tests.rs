@@ -294,3 +294,76 @@ async fn tool_mcp_voi_version() {
     .await
     .unwrap();
 }
+
+/// ETag của `resolve` đổi khi thứ gộp vào câu trả lời đổi (ở đây: gắn thẻ), dù bản công khai
+/// không đổi — website không được nhận 304 với nội dung cũ.
+#[tokio::test]
+async fn etag_resolve_theo_ca_cau_tra_loi() {
+    TestDatabase::run(async |test| {
+        let router = app(test).await;
+        let created = send(
+            &router,
+            "POST",
+            "/entries",
+            Some("admin"),
+            &[],
+            Some(json!({"kind": "post", "title": "Tagged"})),
+        )
+        .await;
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let read = send(&router, "GET", &format!("/entries/{id}"), Some("admin"), &[], None).await;
+        let etag = read.header(header::ETAG).to_owned();
+        let published = send(
+            &router,
+            "POST",
+            &format!("/entries/{id}/publish"),
+            Some("admin"),
+            &[("if-match", &etag)],
+            None,
+        )
+        .await;
+        assert_eq!(published.status, StatusCode::OK, "{}", published.json());
+        let path = "/public/resolve?locale=en&path=/blog/tagged";
+        let first = send(&router, "GET", path, None, &[], None).await;
+        let first_etag = first.header(header::ETAG).to_owned();
+        assert!(!first_etag.is_empty());
+
+        let tag = send(
+            &router,
+            "POST",
+            "/terms",
+            Some("admin"),
+            &[],
+            Some(json!({"taxonomy": "tag", "locale": "en", "name": "Food"})),
+        )
+        .await;
+        assert_eq!(tag.status, StatusCode::CREATED, "{}", tag.json());
+        let tag_id = tag.json()["data"]["id"].as_str().unwrap().to_owned();
+        let linked = send(
+            &router,
+            "PUT",
+            &format!("/entries/{id}/terms"),
+            Some("admin"),
+            &[],
+            Some(json!({"term_ids": [tag_id]})),
+        )
+        .await;
+        assert_eq!(linked.status, StatusCode::OK, "{}", linked.json());
+
+        let again = send(&router, "GET", path, None, &[("if-none-match", &first_etag)], None).await;
+        assert_eq!(again.status, StatusCode::OK, "the tag changed the answer");
+        assert_ne!(again.header(header::ETAG), first_etag);
+        let same = send(
+            &router,
+            "GET",
+            path,
+            None,
+            &[("if-none-match", again.header(header::ETAG))],
+            None,
+        )
+        .await;
+        assert_eq!(same.status, StatusCode::NOT_MODIFIED);
+    })
+    .await
+    .unwrap();
+}

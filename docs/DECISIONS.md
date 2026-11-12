@@ -2377,3 +2377,51 @@ làm cho mỗi việc".
 Đã cân nhắc: foreign key `ON DELETE CASCADE` trong module — hành vi phụ thuộc cấu hình kết nối
 SQLite; lưu preview token vào bảng để thu hồi từng cái — thêm bảng và dọn dẹp cho một tính năng
 token sống 10 phút; retry lịch thất bại — lỗi nghiệp vụ không tự hết, retry chỉ làm ồn log.
+
+## D-106 · Sửa lỗi sau lượt rà soát độc lập module `content` — 2026-11-12 — agent quyết
+
+Một lượt rà soát độc lập (đọc code, ba phần song song) tìm ra các lỗi dưới đây; mỗi lỗi có test
+riêng chạy trên cả SQLite và Postgres (`tests::ra_soat`, `http::tests::etag_resolve_…`, test của
+`body` và `paths`).
+
+Quyết định:
+
+- **Chuyển trang tính đường dẫn công khai từ slug đã đăng**, không từ slug của nháp (trước đây
+  `move` làm lộ slug nháp chưa duyệt lên địa chỉ công khai).
+- **Đường dẫn mới của trang con trùng** một bản công khai khác (khi đổi slug trang cha hay chuyển
+  trang) báo `content.path_taken` như với chính trang được đổi, thay vì lỗi 500; lịch hẹn giờ gặp
+  lỗi này thì thất bại thay vì thử lại mãi.
+- **Từ chối `\`** trong URL nhúng, link "trong site" và mọi đường dẫn chuẩn hoá: trình duyệt coi
+  `\` như `/` (chuẩn WHATWG URL), nên `https://evil.com\.youtube.com/x` lọt danh sách host được
+  phép và `/\evil.com` là link ra ngoài.
+- **`ETag` của `resolve` là dấu vân tay nội dung** (SHA-256 của câu trả lời JSON, 16 byte đầu,
+  base64url) thay vì `updated_at` của bản công khai: câu trả lời gộp danh mục, thẻ, tác giả, bản
+  dịch và ảnh, mà đổi những thứ đó không chạm `updated_at` — website từng nhận 304 với nội dung cũ.
+- **Gắn danh mục / tác giả cho mục đang công khai cần thêm `content.publish`**: thay đổi có hiệu
+  lực ngay với người đọc, như mọi thay đổi bản công khai khác.
+- **Khoá thêm:** tạo trang con (kể cả bản dịch) lấy khoá cây của ngôn ngữ rồi kiểm lại trang cha
+  và độ sâu trong transaction (không còn trang con mồ côi khi xoá cha cùng lúc; bản dịch không
+  vượt 5 cấp); tạo / sửa chuyển hướng lấy cùng khoá trước khi kiểm vòng lặp; tạo / đổi cha / xoá
+  danh mục lấy khoá cây danh mục (dòng `#categories` của bảng khoá cây — không trùng được mã ngôn
+  ngữ BCP 47) và kiểm lại cha trong transaction.
+- **Chuyển hướng làm tay chỉ trỏ tới mục cùng ngôn ngữ** (`to_entry_id`, lỗi `other_locale`).
+  Chuyển hướng trỏ tới mục đã lưu trữ trả 410 (không phải 404), khớp tài liệu.
+- **Lịch:** đăng theo lịch lấy vị trí trong cây từ bản đọc sau khi khoá (nội dung vẫn từ revision
+  đã ghim); gỡ theo lịch ghi revision `unpublished` như gỡ tay; xoá tài khoản huỷ lịch từng cái,
+  kèm event `content.schedule_canceled`; dọn revision không bao giờ xoá revision đang là bản công
+  khai, kể cả khi một lịch vừa chạy.
+- **Ảnh đại diện riêng tư của tác giả** không lộ cả ID trong bài công khai.
+- **Làm mới cache khi thẻ / tác giả đổi:** event `content.term_changed` / `content.author_changed`
+  không kèm danh sách trang (một thẻ có thể trên hàng nghìn bài); website gắn tag cache theo ID
+  term / tác giả và làm mới khi nhận event — ghi trong `docs/CONTENT.md`.
+- `docs/CONTENT.md` sửa phạm vi `If-Match` cho khớp D-105 (xoá term, tác giả, chuyển hướng và gắn
+  term / tác giả không cần).
+
+Lý do: các lỗi trên hoặc lộ nội dung chưa duyệt, hoặc mở đường nhúng trang lạ, hoặc làm website
+giữ nội dung cũ, hoặc chỉ hiện ra khi ghi đồng thời trên Postgres — đều trái tiêu chí "đầy đủ" và
+luật hai database.
+
+Đã cân nhắc: phát event "mục đổi" cho từng bài khi xoá / đổi tên thẻ, tác giả — có thể hàng nghìn
+event một lần, nặng hơn quy ước tag cache; `ETag` từ thời điểm lớn nhất của mọi thứ gộp vào — phải
+thêm cột thời gian cho bảng liên kết và vẫn sót ảnh (thuộc module `media`); khoá danh mục bằng
+bảng riêng — thêm migration chỉ để có một dòng khoá.

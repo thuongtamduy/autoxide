@@ -94,6 +94,12 @@ pub(crate) async fn repath_descendants<C: ConnectionTrait>(
     for child in published_descendants(connection, id).await? {
         let Some(rest) = child.path.strip_prefix(old) else { continue };
         let path = format!("{new}{rest}");
+        // Đường dẫn mới của trang con có thể trùng một bản công khai khác (vd bài viết ở
+        // `/blog/x`): báo `content.path_taken` như với chính trang được đổi, không để câu
+        // `UPDATE` vấp unique rồi thành lỗi 500.
+        if path_used(connection, &child.locale, &path, child.entry_id).await? {
+            return Err(crate::publishing::path_taken(&path));
+        }
         published::Entity::update_many()
             .col_expr(published::Column::Path, Expr::value(path.clone()))
             .col_expr(published::Column::UpdatedAt, Expr::value(at))
@@ -206,7 +212,8 @@ pub(crate) fn normalize(raw: &str) -> Option<String> {
     let raw = raw.trim();
     if !raw.starts_with('/')
         || raw.len() > 2048
-        || raw.chars().any(|c| c.is_control() || c == '?' || c == '#')
+        // `\` thành `/` trong trình duyệt: `/\evil.com` là địa chỉ ngoài site.
+        || raw.chars().any(|c| c.is_control() || c == '?' || c == '#' || c == '\\')
     {
         return None;
     }
@@ -243,7 +250,7 @@ mod tests {
         assert_eq!(normalize("/a/b/").as_deref(), Some("/a/b"));
         assert_eq!(normalize("/").as_deref(), Some("/"));
         assert_eq!(normalize("//a//b").as_deref(), Some("/a/b"));
-        for bad in ["a/b", "/a/../b", "/a?x=1", ""] {
+        for bad in ["a/b", "/a/../b", "/a?x=1", "", "/\\evil.com", "/a\\b"] {
             assert_eq!(normalize(bad), None, "{bad}");
         }
     }
