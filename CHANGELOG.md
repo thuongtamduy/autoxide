@@ -11,6 +11,15 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- AI connection (module `ai`, off by default): one interface for every module to generate
+  structured answers and embeddings, with two adapters — `anthropic` (Claude, Messages API)
+  and `openai` (the Chat Completions format: OpenAI, Google Gemini, Ollama, vLLM, LM Studio,
+  OpenRouter…) — plus an `/embeddings` client. Every answer follows a JSON Schema and is
+  checked again by the server; a daily token limit is kept in the database
+  (`AUTOXIDE_AI_DAILY_TOKEN_LIMIT`). `GET /api/v1/ai/status` and the MCP tool `ai.status`
+  (permission `ai.view`) tell what is on; `autoxide ai check` tries the settings against the
+  provider. New settings `AUTOXIDE_AI_*` and `AUTOXIDE_EMBEDDING_*`.
+
 - AI agents may be limited to their own work: permissions `content.write_own` and
   `content.publish_own` (only entries created by the same user with the same API key), review
   requests (`POST/DELETE /api/v1/content/entries/{id}/request-review`, events

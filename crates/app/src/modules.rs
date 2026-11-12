@@ -11,6 +11,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
     vec![
         // Gửi mail: các module gửi mail cần nó, nên đứng trước chúng.
         Box::new(autoxide_mail::module()),
+        // AI (D-109): công bố `dyn TextModel` và `dyn Embedder` (bản "đã tắt" khi chưa cấu
+        // hình); `media` và `content` cần, nên đứng trước chúng.
+        Box::new(autoxide_ai::module()),
         // Lưu file: các module lưu file cần nó, nên đứng trước chúng.
         Box::new(autoxide_files::module()),
         // Người dùng, mật khẩu (và sau này đăng nhập, role, permission): mọi module

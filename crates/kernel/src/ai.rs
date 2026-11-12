@@ -254,12 +254,8 @@ pub mod vector {
         if !bytes.len().is_multiple_of(4) {
             return None;
         }
-        Some(
-            bytes
-                .chunks_exact(4)
-                .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
-                .collect(),
-        )
+        // `as_chunks::<4>()`: cắt thành các mảng đúng 4 byte (phần dư rỗng vì đã kiểm ở trên).
+        Some(bytes.as_chunks::<4>().0.iter().map(|chunk| f32::from_le_bytes(*chunk)).collect())
     }
 
     /// Chia cho độ dài để vector dài 1: khi đó cosine chỉ còn là tích vô hướng ([`dot`]).

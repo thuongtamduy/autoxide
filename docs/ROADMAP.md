@@ -232,9 +232,9 @@ Tầng kết nối AI trung lập (nhiều nhà cung cấp, mặc định tắt)
 alt text, dịch bài, tìm theo ý nghĩa. Đề bài: [`docs/prompts/ai.md`](prompts/ai.md); khảo sát:
 [`docs/research/ai.md`](research/ai.md).
 
-- [ ] Quyền cho agent: `content.delete` tách riêng, `content.write_own`, `content.publish_own`, xin
+- [x] Quyền cho agent: `content.delete` tách riêng, `content.write_own`, `content.publish_own`, xin
       duyệt, `ai_generated` / `ai_reviewed`, rate limiting theo API key
-- [ ] Tầng kết nối: trait `TextModel` / `Embedder` ở kernel, module `ai` (adapter `anthropic` và
+- [x] Tầng kết nối: trait `TextModel` / `Embedder` ở kernel, module `ai` (adapter `anthropic` và
       `openai`, client embedding, hạn mức token mỗi ngày, metrics, `/ai/status`, `autoxide ai check`)
 - [ ] Kiểm SEO không dùng AI; gợi ý SEO bằng AI (chỉ gợi ý, không ghi)
 - [ ] Gợi ý alt text cho ảnh của `media` (ảnh riêng tư chỉ gửi khi bật)

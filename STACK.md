@@ -89,6 +89,7 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | MCP endpoint   | `rmcp` 3.9 (SDK chính thức của Model Context Protocol) — module khai báo tool, gắn permission |
 | Email          | `lettre` 0.11 (rustls + ring, không native-tls) — SMTP sau trait `Mailer` của kernel, gửi qua job queue; chưa cấu hình SMTP thì ghi file `.eml` (D-061) |
 | Webhook        | Module `webhooks`: chữ ký theo chuẩn Standard Webhooks (`hmac` + `sha2` + `base64` sẵn có), gửi bằng `reqwest` 0.13 sẵn có qua job queue; không thêm thư viện (D-081) |
+| AI | Module `ai` (D-109): trait `TextModel` / `Embedder` ở kernel; hai adapter sinh chữ tự viết trên `reqwest` sẵn có — `anthropic` (Messages API) và `openai` (Chat Completions: OpenAI, Gemini, Ollama, vLLM…) — và client embedding dạng `/embeddings`; kết quả luôn theo JSON Schema và được kiểm lại; hạn mức token mỗi ngày trong database; mặc định tắt. Không thêm thư viện |
 | Dữ liệu cá nhân | Tự viết: trait `PersonalData` của kernel để xuất, event `auth.user_deleted` để mọi module xoá (D-080) |
 
 ### Observability

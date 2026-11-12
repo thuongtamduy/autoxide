@@ -26,6 +26,12 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Check the AI settings against the provider (`autoxide ai check`).
+    ///
+    /// Sends one tiny request to the configured AI provider and embeddings service and says
+    /// whether they work. Uses a few tokens.
+    Ai(commands::ai::Arguments),
+
     /// Back up the data of every module and every stored file into a directory.
     ///
     /// Works the same for SQLite and PostgreSQL, local disk and S3: the backup holds a
@@ -87,6 +93,7 @@ fn main() -> ExitCode {
     // `parse` tự xử lý `--help`, `--version` và tham số sai (in thông báo rồi thoát).
     let cli = Cli::parse();
     match cli.command {
+        Command::Ai(arguments) => commands::ai::run(&arguments),
         Command::Backup(arguments) => commands::backup::backup(&arguments),
         Command::Config(arguments) => commands::config::run(&arguments),
         Command::Copy(arguments) => commands::copy::run(&arguments),

@@ -12,6 +12,77 @@
     }
   ],
   "paths": {
+    "/api/v1/ai/status": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "See what the AI features can do.",
+        "description": "Requires `ai.view`. Tells whether text generation and embeddings are on, the provider and\nmodels, whether images are read, and today's token use against the daily limit. Use it to\nshow or hide AI actions in a user interface. The operator turns AI on with the\n`AUTOXIDE_AI_*` and `AUTOXIDE_EMBEDDING_*` settings.",
+        "operationId": "ai_get_ai_status",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The AI status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AiStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `ai.view`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/audit": {
       "get": {
         "tags": [
@@ -15062,6 +15133,66 @@
           }
         }
       },
+      "AiStatus": {
+        "type": "object",
+        "description": "What the AI features of this server can do now.",
+        "required": [
+          "enabled",
+          "provider",
+          "model",
+          "images",
+          "embeddings_enabled",
+          "embedding_model",
+          "embedding_dimensions",
+          "tokens_today",
+          "daily_token_limit"
+        ],
+        "properties": {
+          "daily_token_limit": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Daily token limit; 0 means no limit.",
+            "minimum": 0
+          },
+          "embedding_dimensions": {
+            "type": "integer",
+            "description": "Length of each embedding vector; 0 when off.",
+            "minimum": 0
+          },
+          "embedding_model": {
+            "type": "string",
+            "description": "Embedding model; empty when off."
+          },
+          "embeddings_enabled": {
+            "type": "boolean",
+            "description": "Embeddings are on (search by meaning)."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Text generation is on (suggestions, translation)."
+          },
+          "images": {
+            "type": "boolean",
+            "description": "The model reads images (alt text suggestions work)."
+          },
+          "model": {
+            "type": "string",
+            "description": "Model used for text; empty when off.",
+            "example": "claude-opus-5-5"
+          },
+          "provider": {
+            "type": "string",
+            "description": "`anthropic` or `openai` (the Chat Completions format); empty when off.",
+            "example": "anthropic"
+          },
+          "tokens_today": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Tokens used today (UTC), text and embeddings together.",
+            "minimum": 0
+          }
+        }
+      },
       "ApiKeyResponse": {
         "type": "object",
         "description": "An API key, without its secret.",
@@ -15651,6 +15782,75 @@
           }
         ],
         "description": "A new endpoint and its signing secret, shown only once."
+      },
+      "Data_AiStatus": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "What the AI features of this server can do now.",
+            "required": [
+              "enabled",
+              "provider",
+              "model",
+              "images",
+              "embeddings_enabled",
+              "embedding_model",
+              "embedding_dimensions",
+              "tokens_today",
+              "daily_token_limit"
+            ],
+            "properties": {
+              "daily_token_limit": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Daily token limit; 0 means no limit.",
+                "minimum": 0
+              },
+              "embedding_dimensions": {
+                "type": "integer",
+                "description": "Length of each embedding vector; 0 when off.",
+                "minimum": 0
+              },
+              "embedding_model": {
+                "type": "string",
+                "description": "Embedding model; empty when off."
+              },
+              "embeddings_enabled": {
+                "type": "boolean",
+                "description": "Embeddings are on (search by meaning)."
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Text generation is on (suggestions, translation)."
+              },
+              "images": {
+                "type": "boolean",
+                "description": "The model reads images (alt text suggestions work)."
+              },
+              "model": {
+                "type": "string",
+                "description": "Model used for text; empty when off.",
+                "example": "claude-opus-5-5"
+              },
+              "provider": {
+                "type": "string",
+                "description": "`anthropic` or `openai` (the Chat Completions format); empty when off.",
+                "example": "anthropic"
+              },
+              "tokens_today": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Tokens used today (UTC), text and embeddings together.",
+                "minimum": 0
+              }
+            }
+          }
+        }
       },
       "Data_AuditEntryResponse": {
         "type": "object",
