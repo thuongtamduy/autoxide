@@ -29,10 +29,14 @@ endpoints are marked deprecated with a sunset date first.
   (retried later) instead of stopping event delivery; an unreadable event row is marked failed
   instead of blocking every later event; a claim is taken with the current time, so a slow
   batch can no longer let a second server deliver the same event.
-- Files: an upload cut off midway (timeout, client gone) aborts the partial S3 multipart upload.
-- Audit: filtering by `module` uses an index (new migration).
+- Files: an upload cut off midway (timeout, client gone) aborts the partial S3 multipart upload;
+  a download the client already has (`If-None-Match`) answers 304 without reading the stored
+  content.
 - Content: several entries created at the same moment with the same title (automatic slug) no
   longer fail with `content.slug_taken` on Postgres.
+- Faster cleanup and filtering: the hourly sign-in cleanup uses indexes and deletes in batches of
+  1,000 rows; the audit log filters by `module` through an index (new migrations in `auth` and
+  `audit`, applied by `autoxide migrate`).
 
 ### Security
 
@@ -63,16 +67,13 @@ endpoints are marked deprecated with a sunset date first.
   tokens); more IPv6 forms that embed private IPv4 addresses (6to4, IPv4-compatible) and the
   remaining special ranges are refused as targets.
 - Files: names with invisible formatting characters (such as right-to-left override) are
-  refused; a download the client already has (`If-None-Match`) answers 304 without reading the
-  stored content.
+  refused.
 - Mail: only a permanent SMTP refusal that blames the recipient address (enhanced status
   `5.1.x` / `5.2.x`) emits `mail.delivery_failed`; other permanent errors (wrong SMTP password,
   sender not allowed, sending quota) are retried and then land in the dead-letter queue, so a
   misconfigured SMTP server no longer gets every newsletter subscriber blocked.
 - Backups and the scratch copy made during a restore are created readable by their owner only
   (`0700` directories, on Unix).
-- The hourly sign-in cleanup uses indexes and deletes in batches of 1,000 rows (a new migration
-  adds the indexes).
 
 ## [0.5.0] - 2026-11-12
 
