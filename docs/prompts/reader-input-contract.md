@@ -66,8 +66,9 @@ autoxide_kernel::tokens::tokens_migration("m00f_create_tokens", "newsletter"),
   module bằng job hằng ngày. Không lưu IP thô ở đâu, kể cả log.
 - **Bằng chứng đồng ý** (ô đồng ý của form, đăng ký bản tin): cột JSON `consent` =
   `{"text": "<đúng chữ đã hiện>", "version": "<phiên bản>", "at": "<thời điểm UTC>", "source":
-  "<nơi đăng ký>", "ip_fingerprint": "<…>"}`. Chữ đồng ý do client gửi kèm, máy chủ lưu nguyên
-  văn; không có ô đồng ý thì `null`.
+  "<nơi đăng ký>", "ip_fingerprint": "<…>"}`. Module có định nghĩa
+  ô đồng ý (`forms`) lấy chữ từ định nghĩa theo ngôn ngữ đã hiện (D-120); module khác nhận chữ
+  do client gửi kèm và lưu nguyên văn. Không có ô đồng ý thì `null`.
 - **Xuất / xoá theo email** (quyền của chủ dữ liệu, người không có tài khoản):
   `GET /api/v1/<module>/data?email=` và `DELETE /api/v1/<module>/data?email=`, permission
   `<module>.export`, trả `Data`. Xoá là xoá hẳn (hoặc xoá mềm giữ cấu trúc, với bình luận); ghi
@@ -101,7 +102,8 @@ autoxide_kernel::tokens::tokens_migration("m00f_create_tokens", "newsletter"),
 
 Mọi test chạm database qua `TestDatabase::run`, chạy trên cả SQLite và Postgres:
 
-- bẫy, token thiếu / sai, gửi quá nhanh, quá nhiều lần → câu trả lời công khai giống hệt bài nhận;
+- bẫy, gửi quá nhanh, quá nhiều lần → câu trả lời công khai giống hệt bài nhận; token thiếu /
+  sai / hết hạn → lỗi 400 của `SpamGuard` (D-113: website cần biết để tải lại form);
 - gửi lại cùng token → cùng một bản ghi, kể cả gửi đồng thời;
 - xoá / xuất theo email; `USER_DELETED`; event không có email trong payload;
 - endpoint công khai qua router thật (HTTP), tool MCP qua client thật.

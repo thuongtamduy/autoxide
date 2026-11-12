@@ -11,6 +11,19 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Forms (`/api/v1/forms`, guide in `docs/FORMS.md`): forms defined through the API with a
+  closed list of field types (text, email, phone, textarea, number, select, radio, checkbox,
+  date, hidden, consent), labels in English and Vietnamese, and versions so old submissions
+  keep their labels. Public endpoints show a form and take submissions: every answer is
+  checked on the server and every problem reported at once; a trap field, a signed form
+  token, an optional ALTCHA challenge and rate limits by hashed IP and email hold spam back,
+  and the answer is the same whether a submission is accepted, held or dropped. Sending the
+  same form token again returns the first answer. An inbox with statuses, accent-insensitive
+  search and CSV export (guarded against formula injection), notification mail to
+  administrators with `Reply-To` set to the sender, export and erasure by email, automatic
+  deletion after a retention period, consent proof. Permissions `forms.read`,
+  `forms.manage`, `forms.review`, `forms.export`; five MCP tools. New settings
+  `AUTOXIDE_FORMS_*`.
 - Content (`/api/v1/content`, guide in `docs/CONTENT.md`): posts and pages with a draft kept
   apart from the published version, a JSON body (ProseMirror / Tiptap) checked against an
   allowlist, slugs made from titles (`Đường đến Đà Lạt` → `duong-den-da-lat`), revisions with

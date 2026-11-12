@@ -67,6 +67,8 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
 16. Content: posts and pages in several languages, drafts and history, scheduling,
     categories, tags, authors, menus, redirects, and public endpoints for the website
     ([`docs/CONTENT.md`](docs/CONTENT.md))
+17. Forms: contact and sign-up forms defined through the API, answers checked on the
+    server, spam held back, an inbox with CSV export ([`docs/FORMS.md`](docs/FORMS.md))
 
 ## Requirements
 
@@ -316,6 +318,8 @@ never share foreign keys. These rules are checked automatically by the gate.
   links, caching, trash
 - [`docs/CONTENT.md`](docs/CONTENT.md) — using the content module: drafts, publishing,
   pages and addresses, languages, public endpoints for the website, preview
+- [`docs/FORMS.md`](docs/FORMS.md) — using the forms module: defining a form, showing it
+  on a website, anti-spam, the inbox, data requests by email
 - [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) — how to write a module, starting
   from the sample module [`modules/notes`](modules/notes) (not registered by default)
 

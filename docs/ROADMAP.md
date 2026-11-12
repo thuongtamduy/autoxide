@@ -251,11 +251,11 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 
 ## 19. Module `forms` — biểu mẫu (chủ dự án giao ngày 12/11/2026, D-106)
 
-- [ ] Định nghĩa form có phiên bản, trường theo danh sách đóng, nhãn theo ngôn ngữ
-- [ ] Nhận bài gửi công khai qua chống spam; máy chủ kiểm mọi trường, báo mọi lỗi một lần
-- [ ] Hộp thư quản trị, email báo quản trị viên, xuất CSV (chặn CSV injection)
-- [ ] Xoá và xuất theo email; tự xoá theo thời hạn; event không mang câu trả lời; tool MCP
-- [ ] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
+- [x] Định nghĩa form có phiên bản, trường theo danh sách đóng, nhãn theo ngôn ngữ
+- [x] Nhận bài gửi công khai qua chống spam; máy chủ kiểm mọi trường, báo mọi lỗi một lần
+- [x] Hộp thư quản trị, email báo quản trị viên, xuất CSV (chặn CSV injection)
+- [x] Xoá và xuất theo email; tự xoá theo thời hạn; event không mang câu trả lời; tool MCP
+- [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
 
 ## 20. Module `newsletter` — bản tin email (chủ dự án giao ngày 12/11/2026, D-106)
 
