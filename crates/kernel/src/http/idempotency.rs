@@ -198,12 +198,12 @@ async fn settle(
     if response.extensions().get::<OutcomeUnknown>().is_some() {
         // Hết giờ hay panic: việc có thể đã xong. Không bỏ (chạy lại có thể làm hai lần),
         // không lưu lỗi 5xx như kết quả: lần gửi lại nhận lời giải thích (D-156).
-        let refusal = not_kept(
+        let refusal = not_kept(Error::conflict(
             "idempotency_result_unknown",
             "The first request with this `Idempotency-Key` did not finish in time, so the \
              server cannot tell whether it took effect. Look the result up before repeating \
              it, then use a new key.",
-        );
+        ));
         let outcome = keep(settings, id, refusal).await;
         return (response, outcome);
     }
@@ -215,12 +215,12 @@ async fn settle(
     if status.is_success() && no_store(response.headers()) {
         // Response chứa secret chỉ trả một lần (API key mới, token, mã khôi phục): không lưu
         // nó vào database. Lần gửi lại nhận lời giải thích thay vì chạy lại việc (D-149).
-        let refusal = not_kept(
+        let refusal = not_kept(Error::conflict(
             "idempotency_result_not_kept",
             "The first request with this `Idempotency-Key` succeeded, but its response held \
              a secret that the server does not keep. Do not repeat it: look the result up \
              instead (for example list your API keys), or use a new key to do it again.",
-        );
+        ));
         let outcome = keep(settings, id, refusal).await;
         return (response, outcome);
     }
@@ -234,12 +234,12 @@ async fn settle(
         }
     };
     let outcome = if body.len() > MAX_STORED_BODY {
-        let refusal = not_kept(
+        let refusal = not_kept(Error::conflict(
             "idempotency_result_too_large",
             "The first request with this `Idempotency-Key` succeeded, but its response was \
              too large to keep. Do not repeat it: look the result up instead, or use a new \
              key to do it again.",
-        );
+        ));
         keep(settings, id, refusal).await
     } else {
         settings.store.complete(id, stored(&response_parts, &body)).await
@@ -255,9 +255,9 @@ fn is_temporary(status: StatusCode) -> bool {
     )
 }
 
-/// Response 409 thay cho kết quả không lưu được.
-fn not_kept(code: &'static str, message: &'static str) -> Response {
-    Error::conflict(code, message).into_response()
+/// Response (409) thay cho kết quả không lưu được.
+fn not_kept(error: Error) -> Response {
+    error.into_response()
 }
 
 /// Lưu `refusal` làm kết quả của lần chạy `id`.
