@@ -61,7 +61,7 @@ fn is_public_v6(ip: Ipv6Addr) -> bool {
             && !ip.is_loopback()
             && is_public_v4(embedded(segments[6], segments[7]));
     }
-    // 6to4 `2002::/16`: IPv4 ở bit 16–47 (D-156).
+    // 6to4 `2002::/16`: IPv4 ở bit 16–47 (D-157).
     if segments[0] == 0x2002 {
         return is_public_v4(embedded(segments[1], segments[2]));
     }
@@ -160,7 +160,7 @@ mod tests {
             "::ffff:127.0.0.1",
             "::ffff:169.254.169.254",
             "64:ff9b::a9fe:a9fe",
-            // D-156: IPv4 nằm trong IPv6 theo các cách khác, và các dải nội bộ còn lại.
+            // D-157: IPv4 nằm trong IPv6 theo các cách khác, và các dải nội bộ còn lại.
             "::a9fe:a9fe",
             "::7f00:1",
             "2002:a9fe:a9fe::1",

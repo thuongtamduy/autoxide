@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–24 xong**; bản phát hành mới nhất `v0.4.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–25 xong**; bản phát hành mới nhất `v0.5.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -305,7 +305,14 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 - [x] `newsletter`: đăng ký công khai trả lời trong cùng một khoảng thời gian dù địa chỉ ở trạng
       thái nào (việc ghi và gửi mail chạy trong job)
 
-## 24. Rà soát bảo mật và hiệu năng toàn core (chủ dự án giao ngày 12/11/2026)
+## 24. Sổ module cho màn hình quản lý module (chủ dự án giao ngày 12/11/2026, D-155)
+
+Giao diện quản trị ở repo riêng (D-096, D-097); bước này chỉ làm API trong core.
+
+- [x] `GET /api/v1/kernel/modules` và `GET /api/v1/kernel/modules/{name}` (kèm trạng thái
+      migration); permission `kernel.modules.read`; tool MCP; test trên cả hai database
+
+## 25. Rà soát bảo mật và hiệu năng toàn core (chủ dự án giao ngày 12/11/2026)
 
 - [x] Rà soát độc lập (bốn vùng: HTTP / MCP / quyền; `auth`; lưu trữ, job, event, webhook, mail;
       hiệu năng đường nóng và index)

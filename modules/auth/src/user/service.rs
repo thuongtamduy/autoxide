@@ -228,7 +228,7 @@ impl UserService {
         // Chỉ việc khoá mới có thể làm mất admin cuối. Khoá dòng người dùng TRƯỚC rồi mới khoá
         // các role toàn quyền (trong `count_active_admins`) — cùng thứ tự với
         // `RoleService::set_user_roles`, nên hai việc chạy cùng lúc trên Postgres chờ nhau thay
-        // vì deadlock (D-155).
+        // vì deadlock (D-156).
         let admins_before = if changes.disabled == Some(true) {
             lock_row(&transaction, id).await?;
             crate::role::count_active_admins(&transaction).await?
@@ -383,7 +383,7 @@ impl UserService {
 
     /// Chủ tài khoản lấy lại tài khoản bằng mail đặt lại mật khẩu: đặt mật khẩu mới, và trong
     /// CÙNG transaction xoá mọi passkey, API key, token đặt lại khác — kẻ chiếm phiên không
-    /// giữ lại được cửa nào (D-079, D-155).
+    /// giữ lại được cửa nào (D-079, D-156).
     pub(crate) async fn recover_password(
         &self,
         actor: Actor,
@@ -410,7 +410,7 @@ impl UserService {
     /// `UPDATE` nên hai request đồng thời không cùng ghi được.
     ///
     /// Cùng transaction với việc đổi mật khẩu, mọi thứ đã mở bằng mật khẩu cũ hết dùng được
-    /// (D-155): phiên đăng nhập, lượt chờ mã MFA, nghi thức thêm passkey đang dở, token đổi
+    /// (D-156): phiên đăng nhập, lượt chờ mã MFA, nghi thức thêm passkey đang dở, token đổi
     /// email đang chờ.
     pub(crate) async fn write_password(
         &self,

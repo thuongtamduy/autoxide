@@ -3661,9 +3661,40 @@ sau khi xoá.
 lâu hơn; luôn phát token / luôn xếp mail giả — ghi rác vào database và vẫn khác nhau ở phần
 đổi đăng ký.
 
-## D-155 · Bước 24 — `auth`: mật khẩu đổi thì mọi thứ mở bằng mật khẩu cũ đóng cùng lúc; cấp quyền kiểm lại trong transaction — 2026-11-12 — agent quyết
+## D-155 · Sổ module đã cài: API chỉ đọc trong module nội bộ `kernel` — 2026-11-12 — chủ dự án quyết hướng, agent quyết cách làm
 
-Rà soát độc lập module `auth` (bước 24). Các phát hiện được kiểm lại với code; sửa kèm test
+Bối cảnh: chủ dự án muốn "một CMS quản lý module". Theo D-096 / D-097 và luật kiến trúc 9,
+giao diện quản trị là repo riêng; chủ dự án chọn làm trước phần API trong core mà màn hình đó
+cần.
+
+Quyết định:
+
+- Module nội bộ `kernel` phục vụ sổ module: `GET /api/v1/kernel/modules` (mọi module theo thứ tự
+  đăng ký, không chạm database) và `GET /api/v1/kernel/modules/{name}` (một module, kèm trạng thái
+  từng migration đọc từ bảng `<tên>_migrations` của riêng module đó). Mỗi module nêu: tên, nội bộ
+  hay không, vị trí khởi động, permission, event, event nhận, loại job, lịch, tool MCP, endpoint
+  deprecated, ngôn ngữ có bản dịch, migration.
+- Permission mới `kernel.modules.read`; tool MCP `kernel.list_modules`, `kernel.get_module` gọi cùng
+  hàm với REST. Mã lỗi `kernel.module_not_found` (404).
+- Danh sách trả `Data<Vec<…>>`, không phân trang — như `GET /api/v1/auth/permissions`: số module
+  nhỏ, cố định lúc biên dịch.
+- Sổ được điền ở cuối `Modules::start` (tool, job, lịch chỉ có sau `start`), cất trong
+  `OnceLock` dùng chung giữa `Modules` và module `kernel`. Không thêm hàm nào vào trait `Module`:
+  module cũ không phải sửa.
+- **Chỉ đọc.** Không bật / tắt module lúc chạy: module đăng ký lúc biên dịch ở
+  `crates/app/src/modules.rs`; muốn bật / tắt lúc chạy là thay đổi thiết kế lớn, cần chủ dự án mở.
+
+Lý do: màn hình quản lý module (và AI agent) cần biết máy chủ có gì mà không phải đọc mã nguồn;
+gom vào `kernel` vì đây là thông tin của cả chương trình, không của module nghiệp vụ nào, và
+`kernel` đã là module nội bộ có sẵn (không phải dành thêm tên).
+
+Đã cân nhắc: module nội bộ thứ ba tên `system` — thêm một tên cấm dùng mà không được gì; đặt trong
+module `auth` — module nghiệp vụ không được biết các module khác; trả trạng thái migration ngay
+trong danh sách — mỗi lần gọi đọc bảng lịch sử của mọi module (N query thừa trên đường hay gọi).
+
+## D-156 · Bước 25 — `auth`: mật khẩu đổi thì mọi thứ mở bằng mật khẩu cũ đóng cùng lúc; cấp quyền kiểm lại trong transaction — 2026-11-12 — agent quyết
+
+Rà soát độc lập module `auth` (bước 25). Các phát hiện được kiểm lại với code; sửa kèm test
 chạy trên cả hai database.
 
 Quyết định:
@@ -3708,9 +3739,9 @@ Quyết định:
 - Truy vấn tuần tự khi xác thực mỗi request (2 với phiên, 4 với API key): cần đo bằng
   `scripts/loadtest.sh` trước khi gộp.
 
-## D-156 · Bước 24 — lớp HTTP, idempotency, webhooks, files: các phát hiện của lượt rà soát — 2026-11-12 — agent quyết
+## D-157 · Bước 25 — lớp HTTP, idempotency, webhooks, files: các phát hiện của lượt rà soát — 2026-11-12 — agent quyết
 
-Rà soát độc lập lớp HTTP / MCP / quyền và phần dữ liệu, I/O của core (bước 24). Không có lỗi
+Rà soát độc lập lớp HTTP / MCP / quyền và phần dữ liệu, I/O của core (bước 25). Không có lỗi
 vượt quyền hay lộ dữ liệu giữa người gọi; sửa các lỗi sau, kèm test chạy trên cả hai database.
 
 Quyết định:
@@ -3754,9 +3785,9 @@ Quyết định:
   tối đa 24 giờ.
 - `/metrics` chạy trên cùng cổng với API: DEPLOY phải chặn đường dẫn này ở proxy khi bật.
 
-## D-157 · Bước 24 — job queue, event, mail, lưu trữ, backup: các phát hiện của lượt rà soát — 2026-11-12 — agent quyết
+## D-158 · Bước 25 — job queue, event, mail, lưu trữ, backup: các phát hiện của lượt rà soát — 2026-11-12 — agent quyết
 
-Rà soát độc lập phần chạy nền và lưu trữ của core, và hiệu năng đường nóng (bước 24). Sửa kèm
+Rà soát độc lập phần chạy nền và lưu trữ của core, và hiệu năng đường nóng (bước 25). Sửa kèm
 test chạy trên cả hai database.
 
 Quyết định:
@@ -3795,7 +3826,7 @@ Quyết định:
 Để lại, ghi rõ (cần đo trước, theo luật "đo trước rồi mới tối ưu"):
 
 - Xác thực hai lần cho request ghi có `Idempotency-Key` (lớp idempotency và handler); truy vấn
-  tuần tự khi xác thực (D-155); `Throttle::hit` nhiều lệnh; mỗi event ba lệnh ghi; worker và
+  tuần tự khi xác thực (D-156); `Throttle::hit` nhiều lệnh; mỗi event ba lệnh ghi; worker và
   dispatcher hỏi mỗi module mỗi giây khi rảnh; rate limiter một mutex; log ghi thẳng stderr.
   Đo bằng `scripts/loadtest.sh` trên Postgres trước khi đổi.
 - `files` chưa có lượt quét nội dung mồ côi trong nơi lưu (như `media`); DEPLOY nên khuyên đặt

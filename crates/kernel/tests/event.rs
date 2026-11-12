@@ -312,7 +312,7 @@ async fn khai_sai_thi_bao_ro() {
 }
 
 /// Bên nhận panic, hay dòng event không đọc được: tính là giao lỗi / hỏng hẳn, các event sau
-/// vẫn được giao — dispatcher không chết, không bị chặn (D-157).
+/// vẫn được giao — dispatcher không chết, không bị chặn (D-158).
 #[tokio::test]
 async fn ben_nhan_panic_hay_dong_hong_khong_chan_event_sau() {
     TestDatabase::run(async |test| {

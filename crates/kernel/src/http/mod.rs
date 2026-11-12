@@ -140,7 +140,7 @@ pub fn build(
     let deprecated = Arc::new(deprecation::apply(&mut openapi, &extras.deprecations));
 
     // Tài liệu không đổi trong lúc chạy: đổi thành JSON một lần rồi trả lại mãi. `Bytes` clone
-    // chỉ tăng bộ đếm tham chiếu, không chép cả tài liệu (hơn 1 MB) mỗi request (D-157).
+    // chỉ tăng bộ đếm tham chiếu, không chép cả tài liệu (hơn 1 MB) mỗi request (D-158).
     let document = axum::body::Bytes::from(openapi.to_json().unwrap_or_default());
     let mut router = router.route(
         OPENAPI_PATH,
@@ -235,7 +235,7 @@ pub fn build(
 }
 
 /// Từ chối request có ký tự NUL (`%00`) trong đường dẫn hay query: giá trị đó tới database thì
-/// Postgres lỗi 500, SQLite thì không (D-156). Một lớp cho mọi route, thay vì từng extractor.
+/// Postgres lỗi 500, SQLite thì không (D-157). Một lớp cho mọi route, thay vì từng extractor.
 async fn refuse_nul_in_url(request: Request, next: Next) -> Response {
     let target = request.uri().path_and_query().map(|target| target.as_str()).unwrap_or_default();
     if target.contains("%00") {

@@ -350,6 +350,8 @@ pub struct Modules {
     personal_data: PersonalDataExport,
     /// Loại đối tượng các module đăng ký lúc khởi động.
     resources: crate::resource::ResourceDirectory,
+    /// Sổ module đã cài (module `kernel` phục vụ); điền ở cuối [`start`](Self::start).
+    catalog: crate::module_catalog::ModuleCatalog,
 }
 
 impl Modules {
@@ -366,8 +368,9 @@ impl Modules {
                 problems.push(format!("module name `{reserved}` is reserved for the kernel"));
             }
         }
+        let catalog = crate::module_catalog::ModuleCatalog::default();
         let mut all: Vec<Box<dyn Module>> = vec![
-            Box::new(crate::builtin::KernelModule::default()),
+            Box::new(crate::builtin::KernelModule::new(catalog.clone())),
             Box::new(crate::antispam::module::AntispamModule::default()),
         ];
         all.extend(modules);
@@ -405,6 +408,7 @@ impl Modules {
                 personal_data: PersonalDataExport::default(),
                 resources: crate::resource::ResourceDirectory::default(),
                 apis: Apis::default(),
+                catalog,
             })
         } else {
             Err(ModuleError(problems.join("; ")))
@@ -455,6 +459,8 @@ impl Modules {
             })?;
         }
         self.apis = apis;
+        // Sau khi MỌI module đã khởi động: tool, job, lịch của module chỉ có từ lúc này.
+        self.catalog.fill(&self.modules);
         Ok(())
     }
 

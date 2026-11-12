@@ -92,7 +92,7 @@ impl JobQueue {
             .map_err(|error| Error::internal(format!("job insert: {error}")))?
             // Trùng `unique_key` thì không chèn — bằng `ON CONFLICT DO NOTHING`, KHÔNG để lệnh
             // lỗi rồi bắt lỗi: trong transaction, Postgres đánh dấu cả transaction là hỏng sau
-            // một lệnh lỗi (lệnh sau lỗi, `COMMIT` thành `ROLLBACK`), SQLite thì không (D-157).
+            // một lệnh lỗi (lệnh sau lỗi, `COMMIT` thành `ROLLBACK`), SQLite thì không (D-158).
             .on_conflict(OnConflict::column(Alias::new("unique_key")).do_nothing().to_owned());
         let inserted = connection.execute(&insert).await?.rows_affected();
         Ok((inserted == 1).then_some(id))

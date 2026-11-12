@@ -112,7 +112,7 @@ async fn gan_day_thu_hoi_va_don_dep() {
         assert_eq!(tokens.forget(write, "user-3").await.unwrap(), 1);
         assert!(tokens.consume(write, "other", &other.token).await.unwrap().is_none());
         assert!(tokens.consume(write, "verify", &first.token).await.unwrap().is_none());
-        // Dọn theo hạn (cột có index, D-157): chưa token nào hết hạn thì không xoá gì; qua hạn
+        // Dọn theo hạn (cột có index, D-158): chưa token nào hết hạn thì không xoá gì; qua hạn
         // thì xoá cả token đã dùng (thu hồi) lẫn token chưa dùng.
         assert_eq!(tokens.purge(write, Utc::now() + Duration::minutes(1)).await.unwrap(), 0);
         assert_eq!(tokens.purge(write, Utc::now() + Duration::hours(2)).await.unwrap(), 3);

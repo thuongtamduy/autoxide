@@ -255,7 +255,7 @@ async fn valid_json_tu_choi_dau_vao_sai_voi_ma_loi_rieng() {
     assert!(missing.detail.contains("title"), "{missing:?}");
 
     // Ký tự NUL trong thân hay trong URL: Postgres không lưu được, nên từ chối ở mọi database
-    // bằng cùng một lỗi (D-156). `\\u0000` (dấu `\` rồi chữ) thì vẫn là chữ thường.
+    // bằng cùng một lỗi (D-157). `\\u0000` (dấu `\` rồi chữ) thì vẫn là chữ thường.
     let response = send(app(), post_json("/api/v1/notes", r#"{"title": "a\u0000b"}"#)).await;
     problem(response, 400, "invalid_character").await;
     let response = send(app(), post_json("/api/v1/notes", r#"{"title": "a\\u0000b"}"#)).await;

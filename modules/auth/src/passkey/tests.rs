@@ -290,7 +290,7 @@ async fn dung_dong_thoi_mot_nghi_thuc_chi_mot_ben_duoc() {
 }
 
 /// Kẻ gian giữ mật khẩu cũ mở sẵn ba thứ rồi chờ: nghi thức thêm passkey, mail đổi email về địa
-/// chỉ của nó, lượt chờ mã MFA. Chủ tài khoản đặt lại mật khẩu: cả ba hết dùng được (D-155). Đổi
+/// chỉ của nó, lượt chờ mã MFA. Chủ tài khoản đặt lại mật khẩu: cả ba hết dùng được (D-156). Đổi
 /// email thì mail đặt lại gửi tới địa chỉ cũ hết dùng được.
 #[tokio::test]
 async fn dat_lai_mat_khau_dong_moi_cua_mo_bang_mat_khau_cu() {

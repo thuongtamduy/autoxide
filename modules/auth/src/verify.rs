@@ -128,7 +128,7 @@ impl EmailVerifications {
         // Token khác của người này (mail cũ hơn, hay cho địa chỉ khác) hết dùng được.
         // Mọi token xác minh khác của người này hết hiệu lực.
         tokens().revoke(&transaction, PURPOSE, &user_id.to_string()).await?;
-        // Email đổi: mail đặt lại mật khẩu đã gửi tới địa chỉ cũ hết dùng được (D-155).
+        // Email đổi: mail đặt lại mật khẩu đã gửi tới địa chỉ cũ hết dùng được (D-156).
         if old != email {
             tokens().revoke(&transaction, "password_reset", &user_id.to_string()).await?;
         }

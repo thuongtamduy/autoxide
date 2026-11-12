@@ -12,7 +12,7 @@
 //!                                              N = 2 ─────────────────────▲
 //! ```
 //!
-//! Địa chỉ trả ra luôn ở dạng chuẩn: IPv4 viết dạng IPv6 (`::ffff:a.b.c.d`) thành IPv4 (D-156).
+//! Địa chỉ trả ra luôn ở dạng chuẩn: IPv4 viết dạng IPv6 (`::ffff:a.b.c.d`) thành IPv4 (D-157).
 //!
 //! Nhiều dòng header được gộp thành một danh sách theo thứ tự (RFC 9110). Danh sách ngắn hơn
 //! `N` (request không đi qua đủ proxy) thì lấy phần tử đầu. Giá trị không phải địa chỉ IP thì

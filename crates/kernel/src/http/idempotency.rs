@@ -33,7 +33,7 @@ const KEPT_HEADERS: [HeaderName; 6] = [
 
 /// Đánh dấu trên response: request có thể đã làm xong việc dù trả lỗi (hết giờ, panic giữa
 /// chừng — transaction có thể đã commit). Lớp idempotency không cho chạy lại bằng cùng key
-/// (D-156).
+/// (D-157).
 #[derive(Debug, Clone, Copy)]
 pub(super) struct OutcomeUnknown;
 
@@ -197,7 +197,7 @@ async fn settle(
     let status = response.status();
     if response.extensions().get::<OutcomeUnknown>().is_some() {
         // Hết giờ hay panic: việc có thể đã xong. Không bỏ (chạy lại có thể làm hai lần),
-        // không lưu lỗi 5xx như kết quả: lần gửi lại nhận lời giải thích (D-156).
+        // không lưu lỗi 5xx như kết quả: lần gửi lại nhận lời giải thích (D-157).
         let refusal = not_kept(Error::conflict(
             "idempotency_result_unknown",
             "The first request with this `Idempotency-Key` did not finish in time, so the \
@@ -209,7 +209,7 @@ async fn settle(
     }
     if status.is_server_error() || is_temporary(status) {
         // Lỗi phía máy chủ, hay lỗi tạm (429 vượt giới hạn, 408): không lưu, để client gửi lại
-        // được với cùng key khi hết giới hạn (D-156).
+        // được với cùng key khi hết giới hạn (D-157).
         return (response, settings.store.abandon(id).await);
     }
     if status.is_success() && no_store(response.headers()) {

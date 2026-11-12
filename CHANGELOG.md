@@ -70,6 +70,14 @@ endpoints are marked deprecated with a sunset date first.
 - The hourly sign-in cleanup uses indexes and deletes in batches of 1,000 rows (a new migration
   adds the indexes).
 
+## [0.5.0] - 2026-11-12
+
+### Added
+
+- Installed-module catalog for admin screens and AI agents: `GET /api/v1/kernel/modules` and
+  `GET /api/v1/kernel/modules/{name}` (with migration status), MCP tools `kernel.list_modules` and
+  `kernel.get_module`, permission `kernel.modules.read`.
+
 ## [0.4.0] - 2026-11-12
 
 ### Added
@@ -375,7 +383,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/thuongtamduy/autoxide/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/thuongtamduy/autoxide/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/thuongtamduy/autoxide/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/thuongtamduy/autoxide/compare/v0.1.0...v0.2.0

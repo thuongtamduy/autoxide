@@ -162,7 +162,7 @@ async fn hen_gio_va_chong_trung() {
 }
 
 /// Job trùng `unique_key` GIỮA một transaction: các lệnh sau vẫn chạy và commit giữ mọi thứ.
-/// Trước đây Postgres hỏng cả transaction sau lệnh chèn lỗi (D-157).
+/// Trước đây Postgres hỏng cả transaction sau lệnh chèn lỗi (D-158).
 #[tokio::test]
 async fn trung_khoa_giua_transaction_khong_hong_transaction() {
     TestDatabase::run(async |test| {
@@ -333,7 +333,7 @@ async fn khai_bao_sai_bi_tu_choi_luc_khoi_dong() {
 }
 
 /// Worker chạy liên tục: job chậm chỉ giữ chỗ của chính nó, job khác được nhận ngay khi có chỗ
-/// — không chờ cả lượt xong (D-157).
+/// — không chờ cả lượt xong (D-158).
 #[tokio::test]
 async fn job_cham_khong_giu_cac_job_khac() {
     TestDatabase::run(async |test| {
@@ -369,7 +369,7 @@ async fn job_cham_khong_giu_cac_job_khac() {
 
 /// Handler panic: ghi như một lần lỗi rồi vào dead-letter queue. Job đã chạy đủ số lần mà lần
 /// cuối không ghi được kết quả (tiến trình chết): không lấy lại nữa, lượt dọn đưa vào
-/// dead-letter queue (D-157).
+/// dead-letter queue (D-158).
 #[tokio::test]
 async fn panic_va_tien_trinh_chet_vao_dead_letter_queue() {
     TestDatabase::run(async |test| {

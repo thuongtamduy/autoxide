@@ -245,7 +245,7 @@ impl SessionService {
 
     /// Bắt đầu bật TOTP cho người dùng `user_id`, kèm mật khẩu hiện tại (sai thì tính vào login
     /// throttling như [`check_password`](Self::check_password)): access token bị lộ không đủ để
-    /// gắn ứng dụng authenticator của kẻ gian vào tài khoản rồi khoá chủ thật ở ngoài (D-155).
+    /// gắn ứng dụng authenticator của kẻ gian vào tài khoản rồi khoá chủ thật ở ngoài (D-156).
     pub(crate) async fn start_totp(
         &self,
         user_id: Uuid,
@@ -297,7 +297,7 @@ impl SessionService {
     /// Mở một họ refresh token mới và cấp cặp token đầu tiên.
     /// `method`: cách đã xác thực (`password`, `password_and_mfa`), ghi vào audit.
     ///
-    /// `proof`: điều đã chứng minh người dùng, kiểm lại TRONG transaction cấp phiên (D-155).
+    /// `proof`: điều đã chứng minh người dùng, kiểm lại TRONG transaction cấp phiên (D-156).
     /// Đổi / đặt lại mật khẩu ghi dòng người dùng, xoá lượt chờ MFA và passkey trong
     /// transaction của nó, nên một trong hai bên chờ bên kia: mật khẩu đổi giữa lúc kiểm và
     /// lúc cấp thì không cấp; cấp trước thì phiên bị thu hồi cùng các phiên khác.
@@ -626,7 +626,7 @@ enum Proof {
 /// Khoá dòng người dùng `user_id` trong `connection` trước khi cấp quyền mới (phiên, API key):
 /// `true` nếu tài khoản còn hoạt động và — khi có `password_hash` — mật khẩu vẫn là mật khẩu
 /// vừa kiểm. Một câu `UPDATE` có điều kiện: chạy như nhau trên SQLite và Postgres, và chờ
-/// transaction đang đổi mật khẩu / khoá tài khoản xong rồi mới xét (D-155).
+/// transaction đang đổi mật khẩu / khoá tài khoản xong rồi mới xét (D-156).
 pub(crate) async fn lock_grant<C: ConnectionTrait>(
     connection: &C,
     user_id: Uuid,
@@ -995,7 +995,7 @@ mod tests {
     }
 
     /// Kiểm mật khẩu rồi mới cấp: mật khẩu đổi xen giữa (đặt lại, khoá tài khoản) thì không cấp
-    /// được — `lock_grant` so hash vừa kiểm trong transaction cấp (D-155).
+    /// được — `lock_grant` so hash vừa kiểm trong transaction cấp (D-156).
     #[tokio::test]
     async fn mat_khau_doi_giua_luc_kiem_va_luc_cap_thi_khong_cap() {
         TestDatabase::run(async |test| {

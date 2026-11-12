@@ -28,7 +28,7 @@ where
     type Rejection = Error;
 
     async fn from_request(request: Request, state: &S) -> Result<Self, Self::Rejection> {
-        // Đọc thân một lần để từ chối ký tự NUL trước khi đọc thành `T` (D-156); rồi để `Json`
+        // Đọc thân một lần để từ chối ký tự NUL trước khi đọc thành `T` (D-157); rồi để `Json`
         // của axum làm phần còn lại như cũ (kiểm `content-type`, lỗi cú pháp, lỗi dữ liệu).
         let (parts, body) = request.into_parts();
         let bytes =
@@ -74,7 +74,7 @@ fn from_rejection(rejection: JsonRejection) -> Error {
 
 /// Ký tự NUL (U+0000): Postgres không lưu được trong cột chữ (lỗi 500), SQLite thì lưu — hai
 /// database khác nhau. Kernel từ chối nó ở mọi cửa vào (thân JSON, tham số tool MCP, query,
-/// đường dẫn, con trỏ trang) bằng cùng một lỗi (D-156).
+/// đường dẫn, con trỏ trang) bằng cùng một lỗi (D-157).
 pub(crate) fn nul_refused() -> Error {
     Error::bad_request(
         "invalid_character",

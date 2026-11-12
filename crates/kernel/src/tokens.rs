@@ -188,7 +188,7 @@ impl OneTimeTokens {
 
     /// Xoá token đã hết hạn trước `before` (job dọn dẹp của module) — token đã dùng cũng đi
     /// theo khi tới hạn của nó (vài phút tới một ngày). Một điều kiện trên cột có index thay vì
-    /// `OR` với `used_at` (không index, buộc duyệt cả bảng — D-157). Trả số dòng đã xoá.
+    /// `OR` với `used_at` (không index, buộc duyệt cả bảng — D-158). Trả số dòng đã xoá.
     pub async fn purge<C: ConnectionTrait>(
         &self,
         connection: &C,

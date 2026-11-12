@@ -267,7 +267,7 @@ mod tests {
             let (app, _) = app(test).await;
             let ada = bearer(&app, "ada@example.com", PASSWORD).await;
 
-            // Thiếu hay sai mật khẩu hiện tại: không bắt đầu được (D-155).
+            // Thiếu hay sai mật khẩu hiện tại: không bắt đầu được (D-156).
             let (status, _, _) = call(&app, "POST", "/me/mfa/totp", Some(&ada), None).await;
             assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
             let wrong = json!({"current_password": "not it"});

@@ -202,7 +202,7 @@ fn prepare_directory(directory: &Path) -> Result<(), String> {
 
 /// Tạo thư mục `path` (và các thư mục cha) rồi, trên Unix, chỉ để chủ của nó đọc / ghi / mở
 /// (`0700`). Backup chứa hash mật khẩu, secret webhook, MFA, và khoá ký khi nó nằm trong
-/// database: người dùng khác trên cùng máy không được đọc (D-157). Khoá thư mục là đủ — file bên
+/// database: người dùng khác trên cùng máy không được đọc (D-158). Khoá thư mục là đủ — file bên
 /// trong không mở được qua thư mục đã khoá.
 fn private_dir(path: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(path)?;
@@ -415,7 +415,7 @@ mod tests {
     }
 
     /// Nguồn là database gate đang chọn; khôi phục vào một file SQLite mới.
-    /// Thư mục backup chỉ chủ của nó mở được (D-157).
+    /// Thư mục backup chỉ chủ của nó mở được (D-158).
     #[cfg(unix)]
     #[test]
     fn thu_muc_backup_chi_chu_mo_duoc() {

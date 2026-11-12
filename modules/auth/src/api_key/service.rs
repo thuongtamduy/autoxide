@@ -141,7 +141,7 @@ impl ApiKeyService {
         let id = Uuid::now_v7();
         let transaction = self.database.begin_write().await?;
         // Mật khẩu vừa kiểm phải còn là mật khẩu hiện tại: đặt lại mật khẩu xen giữa thì không
-        // tạo key (D-155).
+        // tạo key (D-156).
         if !crate::session::lock_grant(&transaction, user_id, Some(&verified_hash)).await? {
             transaction.rollback().await?;
             return Err(crate::user::invalid_credentials());

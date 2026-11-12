@@ -26,7 +26,7 @@ use crate::response::{Data, Problem};
 const READY_TIMEOUT: Duration = Duration::from_secs(2);
 /// Kết quả hỏi database dùng lại trong chừng này: endpoint công khai, không bị rate limit, mà
 /// mỗi lần hỏi chiếm kết nối ghi duy nhất của SQLite — một người gọi dồn dập không được làm
-/// chậm các lệnh ghi thật (D-156).
+/// chậm các lệnh ghi thật (D-157).
 const READY_CACHE: Duration = Duration::from_secs(1);
 
 /// Database, kèm lần hỏi gần nhất (lúc hỏi, có trả lời không).

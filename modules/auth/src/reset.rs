@@ -117,7 +117,7 @@ impl PasswordResets {
             .ok_or_else(invalid_token)?;
         let actor = Actor::user(user_id);
         // Một transaction: mật khẩu mới, thu hồi phiên, passkey, API key, token đặt lại và
-        // đổi email khác (D-155).
+        // đổi email khác (D-156).
         self.users.recover_password(actor, user_id, new_password).await
     }
 }

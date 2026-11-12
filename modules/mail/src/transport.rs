@@ -47,7 +47,7 @@ impl Transport {
                 // Lỗi 5xx khác (sai mật khẩu SMTP 535, địa chỉ gửi không được phép, hết hạn mức
                 // 5.4.5, nội dung bị chặn…) là lỗi của BÊN GỬI: thử lại theo job queue rồi vào
                 // dead-letter queue — không báo người nhận hỏng, không để bản tin chặn cả danh
-                // sách khi SMTP cấu hình sai (D-157).
+                // sách khi SMTP cấu hình sai (D-158).
                 Err(error) => return Err(Error::internal(format!("smtp: {error}"))),
             },
             Transport::File(directory) => {

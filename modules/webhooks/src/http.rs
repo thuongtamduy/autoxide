@@ -34,7 +34,7 @@ pub(crate) fn routes(service: Arc<WebhookService>) -> OpenApiRouter {
 }
 
 /// `Cache-Control: no-store` cho response chứa secret chỉ trả một lần: proxy không giữ, lớp
-/// idempotency không lưu vào database (D-149, D-156).
+/// idempotency không lưu vào database (D-149, D-157).
 type NoStore = [(axum::http::HeaderName, &'static str); 1];
 const NO_STORE: NoStore = [(axum::http::header::CACHE_CONTROL, "no-store")];
 

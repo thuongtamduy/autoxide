@@ -365,7 +365,7 @@ impl WebhookService {
 
 /// Những gì audit cần biết về một endpoint (không có secret). URL chỉ giữ scheme, host,
 /// port: đường dẫn và query của URL webhook thường chính là secret (Slack, Discord…), mà event
-/// đi tới audit log (người có `audit.read`) và tới webhook khác nhận `*` (D-156).
+/// đi tới audit log (người có `audit.read`) và tới webhook khác nhận `*` (D-157).
 fn snapshot(endpoint: &Endpoint) -> Value {
     json!({
         "url": origin(&endpoint.url),
@@ -396,7 +396,7 @@ pub(crate) fn now() -> DateTime<Utc> {
 mod tests {
     use super::origin;
 
-    /// Event về endpoint chỉ mang scheme, host, port của URL (D-156).
+    /// Event về endpoint chỉ mang scheme, host, port của URL (D-157).
     #[test]
     fn url_trong_event_bo_duong_dan_va_query() {
         assert_eq!(

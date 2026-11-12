@@ -25,6 +25,7 @@
   "invalid_request": "Request có giá trị không hợp lệ.",
   "job_module_not_found": "Module `{module}` không có job queue. Các module có job queue: {modules}.",
   "job_not_found": "Module `{module}` không có job hỏng nào mang id `{id}`. Xem các job hỏng bằng `autoxide jobs failed`.",
+  "kernel.module_not_found": "Không có module nào tên `{name}` được cài. `GET /api/v1/kernel/modules` liệt kê các module đã cài.",
   "length_required": "Request cần header `content-length`.",
   "method_not_allowed": "Endpoint này không hỗ trợ HTTP method này. Xem header `allow`.",
   "not_acceptable": "Máy chủ không trả được nội dung theo kiểu bạn yêu cầu.",

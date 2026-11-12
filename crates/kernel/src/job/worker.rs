@@ -101,7 +101,7 @@ impl Worker {
     ///
     /// Mỗi module tối đa `concurrency` job cùng lúc, độc lập với nhau: một job chậm (gọi AI,
     /// webhook tới máy chủ chậm) chỉ giữ chỗ của chính nó — job khác, của module khác (mail đặt
-    /// lại mật khẩu) vẫn được nhận ngay khi có chỗ (D-157).
+    /// lại mật khẩu) vẫn được nhận ngay khi có chỗ (D-158).
     pub async fn run(self, shutdown: impl Future<Output = ()>) {
         tokio::pin!(shutdown);
         let slots: HashMap<&'static str, Arc<Semaphore>> = self
@@ -295,7 +295,7 @@ impl Worker {
                 .and_where(Expr::col(Alias::new("completed_at")).lt(before));
             self.database.write().execute(&delete).await?;
             // Job đã chạy đủ số lần mà lần cuối không ghi được kết quả (tiến trình chết giữa
-            // chừng) và đã hết hạn giữ: vào dead-letter queue (D-157).
+            // chừng) và đã hết hạn giữ: vào dead-letter queue (D-158).
             let mut exhausted = Query::update();
             exhausted
                 .table(Alias::new(table_name(module)))
@@ -354,7 +354,7 @@ async fn run_job(
                 // Dừng trước khi hết hạn giữ, để không worker nào khác chạy chồng.
                 let limit = LEASE - Duration::from_secs(30);
                 // Handler panic: ghi như một lần lỗi (thử lại, rồi vào dead-letter queue) thay
-                // vì để job nằm đó tới hết hạn giữ rồi chạy lại mãi (D-157).
+                // vì để job nằm đó tới hết hạn giữ rồi chạy lại mãi (D-158).
                 let run = AssertUnwindSafe(handler.run(&context)).catch_unwind();
                 match tokio::time::timeout(limit, run).await {
                     Ok(Ok(Ok(()))) => Ok(()),

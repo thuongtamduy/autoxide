@@ -92,7 +92,7 @@ impl Storage for ObjectStorage {
         let path = self.path(key)?;
         // `BufWriter`: file nhỏ ghi một lần; file lớn tự chuyển sang ghi từng phần, không
         // giữ cả file trong bộ nhớ. Bọc trong `Upload`: request bị huỷ giữa chừng (hết giờ,
-        // client ngắt) thì phần đã gửi lên S3 cũng được huỷ (D-157).
+        // client ngắt) thì phần đã gửi lên S3 cũng được huỷ (D-158).
         let mut upload =
             Upload(Some(BufWriter::with_capacity(self.store.clone(), path, PART_SIZE)));
         let mut written: u64 = 0;
@@ -186,7 +186,7 @@ impl ObjectStorage {
 
 /// Một lần ghi đang dở. Bị bỏ trước [`finish`](Self::finish) — lỗi, hay future của request bị
 /// huỷ (hết giờ, client ngắt) — thì huỷ phần đã ghi: `object_store` không tự huỷ multipart
-/// upload của S3 khi bị bỏ, các phần đã gửi nằm lại (vô hình, vẫn tính tiền) (D-157).
+/// upload của S3 khi bị bỏ, các phần đã gửi nằm lại (vô hình, vẫn tính tiền) (D-158).
 struct Upload(Option<BufWriter>);
 
 impl Upload {

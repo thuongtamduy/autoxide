@@ -30,7 +30,7 @@ const BATCH: u64 = 100;
 /// Một tiến trình giữ việc giao một event tối đa chừng này.
 const CLAIM_SECONDS: i64 = 60;
 /// Một lần giao (mọi bên nhận của một event) tối đa chừng này — ngắn hơn thời gian giữ, nên
-/// không tiến trình nào khác nhận lại event đang giao (D-157). Bên nhận cần lâu hơn thì làm
+/// không tiến trình nào khác nhận lại event đang giao (D-158). Bên nhận cần lâu hơn thì làm
 /// từng phần (lần sau làm tiếp) hoặc chuyển việc vào job.
 const DELIVERY_TIMEOUT: Duration = Duration::from_secs(50);
 /// Không có event mới thì hỏi lại sau chừng này.
@@ -152,7 +152,7 @@ impl Dispatcher {
                 Ok(event) => event,
                 Err(error) => {
                     // Dòng hỏng (sửa tay, dữ liệu lỗi): đánh dấu hỏng hẳn rồi đi tiếp — không để
-                    // nó chặn mọi event sau nó mỗi giây (D-157).
+                    // nó chặn mọi event sau nó mỗi giây (D-158).
                     self.mark_unreadable(&table, id, &error).await?;
                     continue;
                 }
@@ -182,7 +182,7 @@ impl Dispatcher {
 
     /// Giao cho mọi bên nhận khớp tên event, lần lượt; bên đầu tiên lỗi thì dừng. Bên nhận
     /// panic hay chạy quá [`DELIVERY_TIMEOUT`] tính là một lần giao lỗi (thử lại theo backoff),
-    /// không làm chết dispatcher của cả tiến trình (D-157).
+    /// không làm chết dispatcher của cả tiến trình (D-158).
     async fn deliver(&self, event: &Delivered) -> Result<(), Error> {
         let all = async {
             for (subscriber, subscription) in &self.subscriptions {

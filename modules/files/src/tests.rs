@@ -137,7 +137,7 @@ async fn doc_theo_khoang_va_liet_ke_theo_tien_to() {
 }
 
 /// Request bị huỷ giữa lúc ghi (hết giờ, client ngắt): không để lại file dở. Trên S3, phần đã
-/// gửi của multipart upload được huỷ (D-157).
+/// gửi của multipart upload được huỷ (D-158).
 #[tokio::test]
 async fn ghi_bi_huy_giua_chung_khong_de_lai_gi() {
     for (name, storage) in backends() {

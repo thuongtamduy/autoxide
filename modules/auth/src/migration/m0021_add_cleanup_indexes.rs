@@ -1,4 +1,4 @@
-//! Index cho job dọn dẹp (D-155): `auth_refresh_token(expires_at)` và `(revoked_at)`. Job dọn
+//! Index cho job dọn dẹp (D-156): `auth_refresh_token(expires_at)` và `(revoked_at)`. Job dọn
 //! hằng giờ xoá theo hai cột này; thiếu index thì mỗi lần quét cả bảng (mỗi lần refresh thêm
 //! một dòng, bảng lớn nhanh) và, trên SQLite, giữ kết nối ghi duy nhất suốt lúc quét.
 

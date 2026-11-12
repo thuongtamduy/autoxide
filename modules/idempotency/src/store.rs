@@ -449,7 +449,7 @@ mod tests {
 
     /// Lỗi tạm (429) không được lưu: gửi lại cùng key khi hết giới hạn thì việc chạy thật.
     /// Handler chết giữa chừng (có thể đã commit): gửi lại không chạy lại việc mà nhận 409
-    /// giải thích. Response quá lớn không được lưu (D-156).
+    /// giải thích. Response quá lớn không được lưu (D-157).
     #[tokio::test]
     async fn loi_tam_khong_luu_ket_qua_khong_ro_khong_chay_lai() {
         TestDatabase::run(async |test| {

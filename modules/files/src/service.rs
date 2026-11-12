@@ -120,7 +120,7 @@ impl FileService {
 
     /// Thông tin và nội dung của file `id`. `unchanged(etag)` trả `true` (client đã có đúng bản
     /// này, `If-None-Match`) thì trả `None` mà KHÔNG mở nội dung — với S3, mở là một lần GET tính
-    /// tiền rồi bỏ dở (D-156).
+    /// tiền rồi bỏ dở (D-157).
     pub(crate) async fn download(
         &self,
         principal: &Principal,
@@ -263,7 +263,7 @@ fn check_name(name: &str) -> Result<String, Error> {
 }
 
 /// Ký tự định dạng vô hình đổi cách tên hiện ra: đảo chiều chữ (`invoice\u{202E}fdp.exe` hiện
-/// thành `invoiceexe.pdf`), chữ rộng 0, gạch nối mềm (D-156).
+/// thành `invoiceexe.pdf`), chữ rộng 0, gạch nối mềm (D-157).
 fn is_invisible(c: char) -> bool {
     matches!(
         c,
@@ -427,7 +427,7 @@ mod tests {
             assert_eq!(page.data, vec![file.clone()]);
             let download = files.download(&ada, file.id, |_| false).await.unwrap().unwrap();
             assert_eq!(content(download).await, b"hello");
-            // Client đã có đúng bản này: không mở nội dung (D-156).
+            // Client đã có đúng bản này: không mở nội dung (D-157).
             let etag = file.etag();
             let known = files.download(&ada, file.id, |current| current == etag).await.unwrap();
             assert!(known.is_none());
