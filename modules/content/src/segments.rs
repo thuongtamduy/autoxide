@@ -232,6 +232,10 @@ fn decode_inline(text: &str, tags: &BTreeMap<u32, Tag>) -> Result<Vec<Value>, St
             if inner.contains('<') {
                 return Err(format!("tag `<m{number}>` contains another tag"));
             }
+            if inner.is_empty() {
+                // Thẻ rỗng sẽ làm mất node (vd một link): từ chối.
+                return Err(format!("tag `<m{number}>` is empty"));
+            }
             match tags.get(&number) {
                 Some(Tag::Marks(marks)) if !seen.contains(&number) => {
                     seen.push(number);
@@ -367,6 +371,7 @@ mod tests {
             ("<m1>a <m2>b</m2></m1><br3/>", "contains another tag"),
             ("<m1>a</m1><m2>b</m2><br3/><img src=x>", "unknown tag"),
             ("<m1>a<m2>b</m2><br3/>", "not closed"),
+            ("<m1></m1><m2>b</m2><br3/>", "is empty"),
         ] {
             let error = split.check(&ids, &good(b2)).unwrap_err();
             assert!(error.0.contains(problem), "{b2}: {error:?}");

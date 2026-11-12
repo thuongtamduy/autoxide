@@ -7,5 +7,6 @@
   "ai.refused": "Mô hình AI từ chối nội dung này. Hãy sửa nội dung hoặc làm bước này bằng tay.",
   "ai.output_truncated": "Câu trả lời của AI bị cắt vì quá dài. Hãy gửi ít nội dung hơn mỗi lần.",
   "ai.output_invalid": "Mô hình AI trả lời sai dạng hai lần liền. Thử lại sau, hoặc dùng mô hình mạnh hơn.",
-  "ai.unsupported_input": "Mô hình AI đang cấu hình không đọc được ảnh (AUTOXIDE_AI_IMAGES là `false`)."
+  "ai.unsupported_input": "Mô hình AI đang cấu hình không đọc được ảnh (AUTOXIDE_AI_IMAGES là `false`).",
+  "ai.request_rejected": "Nhà cung cấp AI từ chối request, ví dụ vì nội dung quá dài so với mô hình hoặc mô hình không nhận một thiết lập. Log máy chủ ghi lý do của nhà cung cấp."
 }

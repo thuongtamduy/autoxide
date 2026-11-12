@@ -57,8 +57,10 @@ impl ContentService {
                 "Only a person signed in (not an API key) can confirm that AI-generated content was reviewed.",
             ));
         }
-        let entry = self.load_checked(id, expected).await?;
+        // Quyền trước, phiên bản sau: người không có quyền không biết được mục có đổi hay không.
+        let entry = self.load_checked(id, None).await?;
         permissions::require_publish(principal, &entry)?;
+        check_version(&entry, expected)?;
         // Ảnh phải tồn tại và công khai; hỏi `media` TRƯỚC transaction.
         self.check_publishable(&entry).await?;
         let now = now();
@@ -139,10 +141,11 @@ impl ContentService {
         } else {
             principal.require(&CONTENT_PUBLISH)?;
         }
-        let entry = self.load_checked(id, expected).await?;
+        let entry = self.load_checked(id, None).await?;
         if to == Status::Draft {
             permissions::require_publish(principal, &entry)?;
         }
+        check_version(&entry, expected)?;
         if to == Status::Draft && Status::of(&entry) != Status::Published {
             return Err(Error::conflict("content.not_published", "The entry is not published."));
         }
@@ -271,8 +274,9 @@ impl ContentService {
         expected: Option<DateTime<Utc>>,
     ) -> Result<Entry, Error> {
         permissions::require_create(principal)?;
-        let entry = self.load_checked(id, expected).await?;
+        let entry = self.load_checked(id, None).await?;
         permissions::require_write(principal, &entry)?;
+        check_version(&entry, expected)?;
         if entry.kind != Kind::Page.as_str() {
             return Err(invalid(vec![FieldError::new(
                 "parent_id",
@@ -575,6 +579,14 @@ pub(crate) fn published_payload(entry: &Entry, path: Option<&str>, moved: &[Move
         "stale_paths": stale,
         "moved_subpages": changed,
     })
+}
+
+/// `expected` (`If-Match`) khác phiên bản của `entry`: 412.
+pub(crate) fn check_version(entry: &Entry, expected: Option<DateTime<Utc>>) -> Result<(), Error> {
+    if expected.is_some_and(|expected| expected != entry.updated_at) {
+        return Err(autoxide_kernel::version::changed());
+    }
+    Ok(())
 }
 
 fn parent_not_published() -> Error {

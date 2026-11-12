@@ -109,7 +109,8 @@ cách nào (`matched_by`) và kèm đoạn khớp nhất. Embedding tắt thì c
 `/api/v1/content/public/search` (cho người đọc không đăng nhập) tắt, trừ khi
 `AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true`; mỗi lần tìm công khai tốn một request
 embedding, nên tìm theo ý nghĩa có ngân sách mỗi phút
-(`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`, mặc định 30) — vượt thì chỉ tìm theo chữ.
+(`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`, mặc định 30, một ngân sách chung cho mọi người
+đọc, đếm trong từng tiến trình) — vượt thì chỉ tìm theo chữ.
 
 ## Chi phí và giới hạn
 
@@ -139,7 +140,8 @@ prompt, nội dung, ảnh hay key — chỉ việc gì, mô hình, số token v�
 ## Dịch bài, chi tiết
 
 `POST /api/v1/content/entries/{id}/translate` với `{"locale": "vi"}` trả `202` kèm một yêu
-cầu; một job nền làm việc:
+cầu; một job nền làm việc (mỗi lần chạy tối đa 4 phút rồi thử lại; yêu cầu đứng yên ở `running`
+quá 15 phút thì yêu cầu mới cùng ngôn ngữ thay chỗ):
 
 1. Ghim mục như hiện tại (một revision): sửa sau đó không đổi bản dịch này.
 2. Chữ được cắt thành mẩu; định dạng trong đoạn thành thẻ có số (`<m1>chữ đậm</m1>`,
@@ -195,6 +197,7 @@ lời khuyên pháp lý.
 | `ai.misconfigured` | nhà cung cấp từ chối key hay cấu hình | chạy `autoxide ai check`; log máy chủ ghi mã HTTP |
 | `ai.provider_unavailable` | bận, bị rate limit hay không kết nối được | thử lại sau `Retry-After`; dịch bài tự thử lại |
 | `ai.quota_exceeded` | hết hạn mức token của ngày | đợi tới nửa đêm UTC hay nâng hạn mức |
+| `ai.request_rejected` | nhà cung cấp từ chối request (nội dung quá dài so với mô hình, thiết lập mô hình không nhận) | xem lý do trong log máy chủ; giảm `AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS` hay đổi mô hình |
 | `ai.refused` | mô hình từ chối nội dung | sửa nội dung hay làm bằng tay |
 | `ai.output_truncated` | câu trả lời quá dài | giảm `AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS` |
 | `ai.output_invalid`, `content.translation_invalid` | sai dạng hai lần | thử lại, hay dùng mô hình mạnh hơn |

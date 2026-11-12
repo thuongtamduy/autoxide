@@ -149,7 +149,13 @@ impl ContentService {
         expected: Option<DateTime<Utc>>,
     ) -> Result<Entry, Error> {
         permissions::require_create(principal)?;
-        let revision = self.get_revision(principal, entry_id, id).await?;
+        // Không cần `content.read`: khôi phục là sửa mục, quyền sửa (kể cả `content.write_own`
+        // trên mục của mình) kiểm ở `update_inner`; ở đây chỉ kiểm revision thuộc mục.
+        let revision = revision::Entity::find_by_id(id)
+            .one(self.database.read())
+            .await?
+            .filter(|row| row.entry_id == entry_id)
+            .ok_or_else(|| revision_not_found(id))?;
         // Quyền sửa mục (kể cả `content.write_own` trên mục của mình) kiểm ở `update_inner`.
         let snapshot: Snapshot =
             serde_json::from_str(&revision.snapshot).map_err(Error::internal)?;

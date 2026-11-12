@@ -33,5 +33,7 @@
   "content.translation_invalid": "Bản dịch của AI không giữ được cấu trúc bài, hai lần liền. Thử lại sau, hoặc dùng mô hình mạnh hơn.",
   "content.translation_request_not_found": "Không có yêu cầu dịch `{id}`.",
   "content.semantic_search_disabled": "Máy chủ này không mở tìm theo ý nghĩa cho người đọc (AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH). Hãy dùng `GET /api/v1/content/public/posts?q=`.",
-  "content.sign_in_required": "Cần đăng nhập để tìm trong bản nháp."
+  "content.sign_in_required": "Cần đăng nhập để tìm trong bản nháp.",
+  "content.translation_timed_out": "Dịch bằng AI mất quá lâu. Việc dịch sẽ được thử lại; giảm AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS hoặc dùng mô hình nhanh hơn sẽ giúp.",
+  "content.translation_canceled": "Tài khoản đã yêu cầu bản dịch này đã bị xoá."
 }

@@ -98,7 +98,12 @@ pub(crate) async fn post_json(
         .take(300)
         .collect::<String>();
     match status {
-        401..=404 => {
+        // Không ghi thông báo của 401 / 403: có nhà cung cấp nhắc lại một phần key.
+        401 | 403 => {
+            tracing::warn!(purpose, status, "AI provider refused the server's key");
+            Err(errors::misconfigured())
+        }
+        402 | 404 => {
             tracing::warn!(purpose, status, message, "AI provider refused the server's settings");
             Err(errors::misconfigured())
         }
@@ -106,9 +111,12 @@ pub(crate) async fn post_json(
             tracing::warn!(purpose, status, message, "AI provider busy or failing");
             Err(errors::provider_unavailable(retry_after))
         }
-        _ => Err(Error::internal(format!(
-            "AI provider rejected the request for `{purpose}` (HTTP {status}): {message}"
-        ))),
+        // 400, 413, 422…: request bị từ chối hẳn (nội dung quá dài so với mô hình, tham số mô
+        // hình không nhận…). Thử lại không giúp gì.
+        _ => {
+            tracing::warn!(purpose, status, message, "AI provider rejected the request");
+            Err(errors::request_rejected())
+        }
     }
 }
 

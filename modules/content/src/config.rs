@@ -79,8 +79,9 @@ pub(crate) const PUBLIC_SEMANTIC_SEARCH: Setting = Setting::new(
 
 pub(crate) const PUBLIC_SEARCH_PER_MINUTE: Setting = Setting::new(
     "AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE",
-    "Public searches one client address may make per minute (1 to 10000), on top of the \
-     general rate limit. Counted per server process.",
+    "Public searches by meaning per minute (1 to 10000), one budget shared by every reader and \
+     counted per server process; past it, public searches match words only until the next \
+     minute. It bounds the embeddings cost; the general rate limit per address still applies.",
 )
 .with_default("30");
 

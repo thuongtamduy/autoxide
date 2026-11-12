@@ -17,9 +17,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use sea_orm::sea_query::Expr;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -35,6 +33,12 @@ use crate::service::{ContentService, entry_not_found, invalid, now};
 pub(crate) const TRANSLATE: &str = "content.translate";
 /// Lần chạy tối đa của job dịch: lỗi tạm thời (nhà cung cấp bận, hết hạn mức) được thử lại.
 const MAX_ATTEMPTS: i32 = 8;
+/// Thời gian tối đa của một lần chạy job dịch: dưới giới hạn worker cắt job (270 giây), để job
+/// tự đánh dấu kết quả thay vì bị cắt ngang mà không ai ghi lại.
+const RUN_BUDGET: std::time::Duration = std::time::Duration::from_secs(240);
+/// Yêu cầu "đang chạy" mà không đổi trong chừng này coi như đã chết (worker bị cắt, tiến trình
+/// chết ở lần chạy cuối): yêu cầu mới cùng ngôn ngữ được thay nó.
+const STALE_AFTER: chrono::Duration = chrono::Duration::minutes(15);
 /// Ước lượng ký tự mỗi token (thấp, cho chữ có dấu) để chia lô.
 const CHARS_PER_TOKEN: usize = 3;
 
@@ -142,6 +146,24 @@ impl ContentService {
             created_at: Set(now),
             updated_at: Set(now),
         };
+        // Yêu cầu cũ cùng ngôn ngữ đã chết (đứng yên quá lâu ở `running`): đánh dấu thất bại và
+        // nhả khoá để yêu cầu này thay chỗ. Job cũ nếu còn chạy tới sẽ thấy đã xong và thôi.
+        translation_request::Entity::update_many()
+            .col_expr(translation_request::Column::Status, Expr::value(status::FAILED))
+            .col_expr(
+                translation_request::Column::ErrorCode,
+                Expr::value("content.translation_stale"),
+            )
+            .col_expr(translation_request::Column::ActiveKey, Expr::value(Option::<String>::None))
+            .col_expr(translation_request::Column::UpdatedAt, Expr::value(now))
+            .filter(
+                translation_request::Column::ActiveKey
+                    .eq(format!("{}:{target_locale}", source.translation_group_id)),
+            )
+            .filter(translation_request::Column::Status.eq(status::RUNNING))
+            .filter(translation_request::Column::UpdatedAt.lt(now - STALE_AFTER))
+            .exec(&transaction)
+            .await?;
         let request = match row.insert(&transaction).await {
             Ok(request) => request,
             Err(error) if is_unique_violation(&error) => {
@@ -254,13 +276,25 @@ impl ContentService {
         if request.status == status::SUCCEEDED || request.status == status::FAILED {
             return Ok(());
         }
+        if request.created_by.is_none() {
+            // Tài khoản đã yêu cầu bị xoá (huỷ ở `privacy.rs`; đây là lưới an toàn).
+            return self.finish(&request, Err("content.translation_canceled".to_owned())).await;
+        }
         translation_request::Entity::update_many()
             .col_expr(translation_request::Column::Status, Expr::value(status::RUNNING))
             .col_expr(translation_request::Column::UpdatedAt, Expr::value(now()))
             .filter(translation_request::Column::Id.eq(request.id))
             .exec(self.database.write())
             .await?;
-        match self.translate(&request).await {
+        let outcome = match tokio::time::timeout(RUN_BUDGET, self.translate(&request)).await {
+            Ok(outcome) => outcome,
+            Err(_) => Err(Error::unavailable(
+                "content.translation_timed_out",
+                "The AI translation took too long. It is retried; a smaller \
+                 AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS or a faster model helps.",
+            )),
+        };
+        match outcome {
             Ok(entry_id) => self.finish(&request, Ok(entry_id)).await,
             Err(error) if transient(&error) && attempt < MAX_ATTEMPTS => {
                 tracing::warn!(request_id = %request.id, attempt, code = error.code(), "content translation will be retried");
@@ -299,7 +333,7 @@ impl ContentService {
         }
         let Some(by) = request.created_by else {
             return Err(Error::conflict(
-                "content.translation_conflict",
+                "content.translation_canceled",
                 "The account that asked for this translation was deleted.",
             ));
         };
@@ -417,20 +451,29 @@ impl ContentService {
     ) -> Result<(), Error> {
         let now = now();
         let transaction = self.database.begin_write().await?;
-        let mut row = request.clone().into_active_model();
-        row.active_key = Set(None);
-        row.updated_at = Set(now);
-        match &outcome {
-            Ok(entry_id) => {
-                row.status = Set(status::SUCCEEDED.to_owned());
-                row.result_entry_id = Set(Some(*entry_id));
-            }
-            Err(code) => {
-                row.status = Set(status::FAILED.to_owned());
-                row.error_code = Set(Some(code.clone()));
-            }
+        let (state, result, code) = match &outcome {
+            Ok(entry_id) => (status::SUCCEEDED, Some(*entry_id), None),
+            Err(code) => (status::FAILED, None, Some(code.clone())),
+        };
+        // Chỉ ghi khi yêu cầu còn đang chờ hay đang chạy: đã bị huỷ (tài khoản bị xoá) hay đã
+        // được thay (yêu cầu cũ chết) thì giữ nguyên.
+        let updated = translation_request::Entity::update_many()
+            .col_expr(translation_request::Column::Status, Expr::value(state))
+            .col_expr(translation_request::Column::ResultEntryId, Expr::value(result))
+            .col_expr(translation_request::Column::ErrorCode, Expr::value(code))
+            .col_expr(translation_request::Column::ActiveKey, Expr::value(Option::<String>::None))
+            .col_expr(translation_request::Column::UpdatedAt, Expr::value(now))
+            .filter(translation_request::Column::Id.eq(request.id))
+            .filter(translation_request::Column::Status.is_in([status::QUEUED, status::RUNNING]))
+            .exec(&transaction)
+            .await?;
+        if updated.rows_affected == 0 {
+            return Ok(());
         }
-        let done = row.update(&transaction).await?;
+        let done = translation_request::Entity::find_by_id(request.id)
+            .one(&transaction)
+            .await?
+            .ok_or_else(|| request_not_found(request.id))?;
         let change = Change { before: None, after: Some(describe(&done)), published: None };
         let subject = events::entry_subject(done.source_entry_id);
         if outcome.is_ok() {
@@ -469,8 +512,9 @@ impl ContentService {
     }
 }
 
-/// Trong `entries`, những bản dịch AI đã cũ: bản gốc đổi (`updated_at`) sau lúc tạo revision đã
-/// dịch. Hai câu query cho cả danh sách.
+/// Trong `entries`, những bản dịch AI đã cũ: nội dung bản gốc (các trường sửa được, như lưu
+/// trong revision) đã khác revision đã dịch. So nội dung, không so `updated_at` — đăng, gỡ hay
+/// xin duyệt cũng đổi `updated_at` mà không đổi chữ. Hai câu query cho cả danh sách.
 pub(crate) async fn outdated<C: sea_orm::ConnectionTrait>(
     connection: &C,
     entries: &[crate::entries::Entry],
@@ -484,12 +528,12 @@ pub(crate) async fn outdated<C: sea_orm::ConnectionTrait>(
     let revisions =
         revision::Entity::find().filter(revision::Column::Id.is_in(pinned)).all(connection).await?;
     let sources: Vec<Uuid> = revisions.iter().map(|row| row.entry_id).collect();
-    let changed: BTreeMap<Uuid, chrono::DateTime<chrono::Utc>> = entry::Entity::find()
+    let current: BTreeMap<Uuid, Snapshot> = entry::Entity::find()
         .filter(entry::Column::Id.is_in(sources))
         .all(connection)
         .await?
-        .into_iter()
-        .map(|row| (row.id, row.updated_at))
+        .iter()
+        .map(|row| (row.id, Snapshot::of(row)))
         .collect();
     for entry in entries {
         let Some(revision) = entry
@@ -498,7 +542,10 @@ pub(crate) async fn outdated<C: sea_orm::ConnectionTrait>(
         else {
             continue;
         };
-        if changed.get(&revision.entry_id).is_some_and(|updated| *updated > revision.created_at) {
+        let translated: Option<Snapshot> = serde_json::from_str(&revision.snapshot).ok();
+        if let (Some(source), Some(translated)) = (current.get(&revision.entry_id), translated)
+            && *source != translated
+        {
             stale.insert(entry.id);
         }
     }
@@ -507,7 +554,13 @@ pub(crate) async fn outdated<C: sea_orm::ConnectionTrait>(
 
 /// Lỗi tạm thời: thử lại sau thay vì đánh dấu thất bại.
 fn transient(error: &Error) -> bool {
-    matches!(error.code(), "ai.provider_unavailable" | "ai.quota_exceeded" | "internal_error")
+    matches!(
+        error.code(),
+        "ai.provider_unavailable"
+            | "ai.quota_exceeded"
+            | "internal_error"
+            | "content.translation_timed_out"
+    )
 }
 
 fn invalid_translation() -> Error {

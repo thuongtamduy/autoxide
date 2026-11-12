@@ -140,6 +140,7 @@ fn count(purpose: &'static str, outcome: &str) {
         "ai.provider_unavailable" => "unavailable",
         "ai.misconfigured" => "misconfigured",
         "ai.quota_exceeded" => "quota_exceeded",
+        "ai.request_rejected" => "rejected",
         _ => "error",
     };
     metrics::counter!("ai_requests_total", "purpose" => purpose, "outcome" => outcome).increment(1);

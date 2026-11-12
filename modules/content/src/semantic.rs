@@ -153,14 +153,12 @@ impl ContentService {
             return Ok(());
         }
         let read = self.database.read();
-        let draft = entry::Entity::find_by_id(entry_id)
-            .one(read)
-            .await?
-            .map(|row| (row.locale, chunks(&row.title, &row.excerpt, &row.plain_text)));
-        let public = published::Entity::find_by_id(entry_id)
-            .one(read)
-            .await?
-            .map(|row| (row.locale, chunks(&row.title, &row.excerpt, &row.plain_text)));
+        let draft = entry::Entity::find_by_id(entry_id).one(read).await?.map(|row| {
+            (row.locale.clone(), chunks(&row.title, &row.excerpt, &row.plain_text), row.updated_at)
+        });
+        let public = published::Entity::find_by_id(entry_id).one(read).await?.map(|row| {
+            (row.locale.clone(), chunks(&row.title, &row.excerpt, &row.plain_text), row.updated_at)
+        });
         self.index_scope(entry_id, Scope::Draft, draft).await?;
         self.index_scope(entry_id, Scope::Published, public).await
     }
@@ -169,9 +167,10 @@ impl ContentService {
         &self,
         entry_id: Uuid,
         scope: Scope,
-        source: Option<(String, Vec<String>)>,
+        source: Option<(String, Vec<String>, chrono::DateTime<chrono::Utc>)>,
     ) -> Result<(), Error> {
         let model = self.embedder.model_id().to_owned();
+        let read_stamp = source.as_ref().map(|(_, _, stamp)| *stamp);
         let dimensions = i32::try_from(self.embedder.dimensions()).unwrap_or(0);
         let existing = embedding::Entity::find()
             .filter(embedding::Column::EntryId.eq(entry_id))
@@ -179,9 +178,14 @@ impl ContentService {
             .order_by_asc(embedding::Column::ChunkIndex)
             .all(self.database.read())
             .await?;
-        let Some((locale, texts)) = source else {
+        let Some((locale, texts, _)) = source else {
             if let Some(first) = existing.first() {
+                ensure_state(self.database.write(), scope, &first.locale).await?;
                 let transaction = self.database.begin_write().await?;
+                if stamp(&transaction, entry_id, scope).await?.is_some() {
+                    // Mục vừa có lại (vd đăng lại) sau lúc đọc: để job mới hơn lo.
+                    return Ok(());
+                }
                 delete_rows(&transaction, entry_id, scope).await?;
                 bump(&transaction, scope, &first.locale).await?;
                 transaction.commit().await?;
@@ -215,7 +219,13 @@ impl ContentService {
         }
         let mut fresh = fresh.into_iter();
         let now = now();
+        ensure_state(self.database.write(), scope, &locale).await?;
         let transaction = self.database.begin_write().await?;
+        // Mục đổi trong lúc tính embedding (job khác sẽ chạy với chữ mới): không ghi đè bằng
+        // vector của chữ cũ.
+        if stamp(&transaction, entry_id, scope).await? != read_stamp {
+            return Ok(());
+        }
         delete_rows(&transaction, entry_id, scope).await?;
         for (index, hash) in hashes.iter().enumerate() {
             let bytes = match known.get(hash.as_str()) {
@@ -275,10 +285,15 @@ impl ContentService {
             return Ok(0);
         }
         let transaction = self.database.begin_write().await?;
+        // Mỗi mục tối đa một job lập bù mỗi ngày: nhà cung cấp hỏng hay hết hạn mức thì không
+        // xếp chồng job mỗi giờ.
+        let day = chrono::Utc::now().format("%Y-%m-%d");
         for entry_id in &missing {
-            self.jobs
-                .enqueue(&transaction, &IndexJob { entry_id: *entry_id }, EnqueueOptions::default())
-                .await?;
+            let options = EnqueueOptions {
+                unique_key: Some(format!("content.index:{entry_id}:{day}")),
+                ..Default::default()
+            };
+            self.jobs.enqueue(&transaction, &IndexJob { entry_id: *entry_id }, options).await?;
         }
         transaction.commit().await?;
         tracing::info!(entries = missing.len(), "content entries queued for the search index");
@@ -652,35 +667,65 @@ async fn delete_rows<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Tăng `version` của (`scope`, `locale`) để mọi tiến trình nạp lại vector. Cộng bằng một câu
-/// `UPDATE` (`version = version + 1`); chưa có dòng thì thêm, thêm trùng thì cộng lại.
-async fn bump<C: ConnectionTrait>(connection: &C, scope: Scope, locale: &str) -> Result<(), Error> {
-    for _ in 0..3 {
-        let updated = embedding_state::Entity::update_many()
-            .col_expr(
-                embedding_state::Column::Version,
-                Expr::col(embedding_state::Column::Version).add(1),
-            )
-            .filter(embedding_state::Column::Scope.eq(scope.as_str()))
-            .filter(embedding_state::Column::Locale.eq(locale))
-            .exec(connection)
-            .await?;
-        if updated.rows_affected > 0 {
-            return Ok(());
-        }
-        let row = embedding_state::ActiveModel {
-            id: Set(Uuid::now_v7()),
-            scope: Set(scope.as_str().to_owned()),
-            locale: Set(locale.to_owned()),
-            version: Set(1),
-        };
-        match row.insert(connection).await {
-            Ok(_) => return Ok(()),
-            Err(error) if is_unique_violation(&error) => {}
-            Err(error) => return Err(error.into()),
-        }
+/// Bảo đảm có dòng `version` của (`scope`, `locale`) — gọi NGOÀI transaction: trên Postgres,
+/// một lỗi trùng khoá trong transaction làm hỏng cả transaction đó.
+async fn ensure_state<C: ConnectionTrait>(
+    connection: &C,
+    scope: Scope,
+    locale: &str,
+) -> Result<(), Error> {
+    let exists = embedding_state::Entity::find()
+        .filter(embedding_state::Column::Scope.eq(scope.as_str()))
+        .filter(embedding_state::Column::Locale.eq(locale))
+        .one(connection)
+        .await?
+        .is_some();
+    if exists {
+        return Ok(());
     }
-    Err(Error::internal("could not bump the search index version"))
+    let row = embedding_state::ActiveModel {
+        id: Set(Uuid::now_v7()),
+        scope: Set(scope.as_str().to_owned()),
+        locale: Set(locale.to_owned()),
+        version: Set(0),
+    };
+    match row.insert(connection).await {
+        Ok(_) => Ok(()),
+        // Một tiến trình khác vừa thêm: đã có dòng.
+        Err(error) if is_unique_violation(&error) => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+/// Tăng `version` của (`scope`, `locale`) để mọi tiến trình nạp lại vector. Một câu `UPDATE`
+/// (`version = version + 1`); dòng đã có nhờ [`ensure_state`].
+async fn bump<C: ConnectionTrait>(connection: &C, scope: Scope, locale: &str) -> Result<(), Error> {
+    embedding_state::Entity::update_many()
+        .col_expr(
+            embedding_state::Column::Version,
+            Expr::col(embedding_state::Column::Version).add(1),
+        )
+        .filter(embedding_state::Column::Scope.eq(scope.as_str()))
+        .filter(embedding_state::Column::Locale.eq(locale))
+        .exec(connection)
+        .await?;
+    Ok(())
+}
+
+/// Dấu thời gian hiện tại của bản (`scope`) của mục, đọc trong `connection`; `None`: không có.
+async fn stamp<C: ConnectionTrait>(
+    connection: &C,
+    entry_id: Uuid,
+    scope: Scope,
+) -> Result<Option<chrono::DateTime<chrono::Utc>>, Error> {
+    Ok(match scope {
+        Scope::Draft => {
+            entry::Entity::find_by_id(entry_id).one(connection).await?.map(|row| row.updated_at)
+        }
+        Scope::Published => {
+            published::Entity::find_by_id(entry_id).one(connection).await?.map(|row| row.updated_at)
+        }
+    })
 }
 
 /// Bộ chạy job lập index của một mục.

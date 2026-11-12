@@ -25,8 +25,9 @@ impl ContentService {
         withdraw: bool,
     ) -> Result<Entry, Error> {
         permissions::require_create(principal)?;
-        let entry = self.load_checked(id, expected).await?;
+        let entry = self.load_checked(id, None).await?;
         permissions::require_write(principal, &entry)?;
+        crate::publishing::check_version(&entry, expected)?;
         let now = now();
         let transaction = self.database.begin_write().await?;
         let current = self.reload(&transaction, id, expected.unwrap_or(entry.updated_at)).await?;

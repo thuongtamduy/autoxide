@@ -223,6 +223,7 @@ async fn anthropic_cac_nhanh_loi() {
             failing(401, None),
             failing(429, Some("7")),
             failing(529, None),
+            failing(400, None),
             Canned { delay: Duration::from_secs(3), ..ok(anthropic_answer("{}", "end_turn")) },
         ];
         let (url, fake) = server(answers).await;
@@ -239,6 +240,7 @@ async fn anthropic_cac_nhanh_loi() {
         let busy = run().await.unwrap_err();
         assert_eq!((busy.code(), busy.retry_after()), ("ai.provider_unavailable", Some(7)));
         assert_eq!(run().await.unwrap_err().code(), "ai.provider_unavailable");
+        assert_eq!(run().await.unwrap_err().code(), "ai.request_rejected");
         assert_eq!(run().await.unwrap_err().code(), "ai.provider_unavailable");
         // Không có header beta khi tắt fallback.
         assert!(fake.seen.lock().unwrap()[0].headers.get("anthropic-beta").is_none());

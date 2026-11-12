@@ -2588,3 +2588,46 @@ Quyết định:
 - **Partial unique index cho yêu cầu dịch đang chạy:** cú pháp tạo khác nhau qua SeaORM, trong
   khi cột `active_key` đơn giản và đã kiểm trên cả hai database.
 - **Trả 429 khi hết ngân sách tìm công khai:** người đọc không có kết quả nào.
+
+## D-111 · Bước 18: sửa sau lượt rà soát độc lập — 2026-11-12 — agent quyết
+
+Một agent khác đọc độc lập toàn bộ code bước 18. Mọi phát hiện đều kiểm lại với code và sửa,
+mỗi cái kèm test khi kiểm được:
+
+- **Yêu cầu dịch kẹt ở `running` mãi** (nặng). Worker cắt job sau 270 giây, còn một lần gọi AI
+  được phép tới 600 giây, nên job bị cắt ngang mà không ai ghi kết quả. Sửa:
+  - mỗi lần chạy job dịch tự giới hạn 240 giây; quá thì là lỗi tạm thời
+    `content.translation_timed_out`, được thử lại;
+  - yêu cầu đứng yên ở `running` quá 15 phút bị yêu cầu mới cùng ngôn ngữ thay chỗ
+    (`error_code` `content.translation_stale`);
+  - bước đánh dấu xong chỉ ghi khi yêu cầu còn `queued` / `running`, nên không ghi đè yêu cầu đã
+    huỷ hay đã bị thay.
+- **HTTP 400 / 413 / 422 của nhà cung cấp** thành `ai.request_rejected` (503), không còn là
+  `internal_error`, và không bị thử lại như lỗi tạm thời. Không ghi thông báo của 401 / 403 vào
+  log, vì có nhà cung cấp nhắc lại một phần key.
+- **`translation_outdated`** so nội dung (snapshot) của bản gốc với revision đã dịch, không so
+  `updated_at`. Đăng, gỡ hay xin duyệt không làm bản dịch thành "cũ".
+- **Lập index:**
+  - job kiểm lại dấu thời gian của mục trong transaction ghi; mục đã đổi thì không ghi vector
+    của chữ cũ;
+  - dòng `version` được tạo trước transaction, vì trên Postgres lỗi trùng khoá làm hỏng cả
+    transaction;
+  - job lập bù có `unique_key` theo ngày (mỗi mục tối đa một job mỗi ngày). Đây là điều chỉnh
+    một phần D-110: job lập index thường vẫn không có khoá.
+- **Mô tả `AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`** nói đúng là một ngân sách chung, đếm
+  trong từng tiến trình.
+- **Quyền:**
+  - publish, unpublish, move, xin duyệt kiểm quyền sở hữu **trước** phiên bản (`If-Match`), để
+    người chỉ có `_own` không dò được mục của người khác qua 412;
+  - khôi phục revision không cần `content.read` nữa: quyền sửa mục, kể cả `content.write_own`,
+    là đủ, khớp với tool MCP.
+- **Dịch:**
+  - tài khoản đã yêu cầu bị xoá thì `error_code` là `content.translation_canceled`;
+  - thẻ rỗng `<mN></mN>` bị từ chối, để không mất link.
+
+Để lại, ghi rõ:
+
+- **Job dịch chết đúng giữa lúc ghi xong bản dịch có sẵn và lúc đánh dấu xong:** lần chạy lại
+  báo `content.translation_conflict` dù bản dịch đã được ghi. Hiếm, và không mất dữ liệu.
+- **Tool MCP `get_translation_request`** hiện với `content.read` hay `content.write_own`. Người
+  chỉ có `content.write` dùng REST.

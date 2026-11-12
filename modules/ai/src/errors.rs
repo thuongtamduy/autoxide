@@ -85,3 +85,12 @@ pub(crate) fn unsupported_input() -> Error {
         "The configured AI model does not read images (AUTOXIDE_AI_IMAGES is `false`).",
     )
 }
+
+/// Nhà cung cấp từ chối hẳn request (400, 413, 422…): thử lại không giúp.
+pub(crate) fn request_rejected() -> Error {
+    Error::unavailable(
+        "ai.request_rejected",
+        "The AI provider rejected the request, for example because the content is too long for \
+         the model or a setting is not accepted by it. The server log has the provider's reason.",
+    )
+}

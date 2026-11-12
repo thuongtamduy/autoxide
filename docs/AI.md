@@ -110,7 +110,8 @@ Search combines meaning and words (accents and case ignored): each result says h
 `/api/v1/content/public/search` (for anonymous readers) is off unless
 `AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true`; each public search costs an embeddings
 request, so searches by meaning have a budget per minute
-(`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`, default 30) — past it, they match words only.
+(`AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`, default 30, one budget shared by every reader
+and counted per server process) — past it, they match words only.
 
 ## Costs and limits
 
@@ -140,7 +141,8 @@ prompts, content, images or keys — only the task, the model, token counts and 
 ## Translation in detail
 
 `POST /api/v1/content/entries/{id}/translate` with `{"locale": "vi"}` answers `202` with a
-request; a background job does the work:
+request; a background job does the work (each run is cut off after 4 minutes and retried; a
+request left `running` for 15 minutes is replaced by a new request for the same language):
 
 1. It pins the entry as it is now (a revision): later edits do not change this translation.
 2. The text is cut into pieces; formatting inside a paragraph becomes numbered tags
@@ -200,6 +202,7 @@ records the facts; it does not give legal advice.
 | `ai.misconfigured` | the provider refused the key or settings | run `autoxide ai check`; the server log names the HTTP status |
 | `ai.provider_unavailable` | busy, rate limited or unreachable | retry after `Retry-After`; translations retry by themselves |
 | `ai.quota_exceeded` | daily token limit reached | wait for midnight UTC or raise the limit |
+| `ai.request_rejected` | the provider rejected the request (content too long for the model, a setting it does not accept) | read the reason in the server log; lower `AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS` or change the model |
 | `ai.refused` | the model declined the content | change the content or do it by hand |
 | `ai.output_truncated` | the answer was too long | lower `AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS` |
 | `ai.output_invalid`, `content.translation_invalid` | wrong shape twice | retry, or use a more capable model |
