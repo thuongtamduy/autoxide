@@ -9,7 +9,8 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     pub comment_id: Uuid,
-    /// `user:<id>` hoặc `ip:<dấu vết IP>`; unique cùng `comment_id`.
+    /// `user:<id>`, `ip:<dấu vết IP của khối /24 hay /48>`, `expired:<id báo cáo>` (dấu vết IP quá
+    /// hạn) hoặc `deleted:<id báo cáo>` (tài khoản bị xoá); unique cùng `comment_id`.
     pub reporter_key: String,
     pub reporter_user_id: Option<Uuid>,
     /// `spam`, `abuse`, `illegal` hoặc `other`.

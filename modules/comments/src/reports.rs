@@ -1,12 +1,16 @@
 //! Báo cáo vi phạm (công khai). Mỗi người báo một bình luận một lần: người dùng theo `user_id`,
-//! khách theo dấu vết IP (unique `(comment_id, reporter_key)`, chèn `ON CONFLICT DO NOTHING`).
+//! khách theo dấu vết IP — khối /24 (IPv4) hay /48 (IPv6) — (unique `(comment_id, reporter_key)`,
+//! chèn `ON CONFLICT DO NOTHING`). Dấu vết trong `reporter_key` bị bỏ sau
+//! `AUTOXIDE_COMMENTS_IP_RETENTION_DAYS` (`retention.rs`).
 //!
 //! Đủ `AUTOXIDE_COMMENTS_REPORT_THRESHOLD` báo cáo thì bình luận đang hiện về chờ duyệt (lý do
 //! `reported`) — ĐÚNG MỘT LẦN, kể cả khi nhiều báo cáo tới cùng lúc: bộ đếm tăng bằng
 //! `UPDATE … SET report_count = report_count + 1`, rồi một `UPDATE` có điều kiện (`status =
 //! 'published' AND reports_held_at IS NULL AND report_count >= ngưỡng`) — chỉ một transaction
-//! thắng, trên cả hai database. Người kiểm duyệt duyệt lại thì báo cáo sau không ẩn nó nữa.
+//! thắng, trên cả hai database. Người kiểm duyệt duyệt lại thì báo cáo sau không ẩn nó nữa. Bình
+//! luận bị giữ vì báo cáo đã từng hiện nên job dọn không bao giờ tự xoá nó (`retention.rs`).
 
+use std::net::{IpAddr, Ipv6Addr};
 use std::time::Duration;
 
 use autoxide_kernel::access::Principal;
@@ -24,6 +28,7 @@ use uuid::Uuid;
 use crate::entity::{comment, report};
 use crate::events::{self, Change};
 use crate::permissions::COMMENTS_READ;
+use crate::retention::GUEST_REPORTER;
 use crate::service::{
     CommentsService, MODULE, Status, comment_not_found, now, shift_counts, summary,
 };
@@ -56,6 +61,20 @@ impl ReportReason {
     }
 }
 
+/// Khối địa chỉ gom khách khi đếm báo cáo: IPv6 theo /48 (một nhà mạng thường cấp cho mỗi khách
+/// cả một /48 hay /56, nên một người đổi /64 trong khối của mình là có "người báo" mới); IPv4 giữ
+/// nguyên (`ip_hash` gom theo /24). Đưa địa chỉ đầu khối /48 vào `ip_hash::fingerprint` (gom /64)
+/// thì mọi địa chỉ trong cùng /48 ra cùng một bản băm.
+fn reporter_block(ip: IpAddr) -> IpAddr {
+    match ip {
+        IpAddr::V6(v6) if v6.to_ipv4_mapped().is_none() => {
+            let s = v6.segments();
+            IpAddr::V6(Ipv6Addr::new(s[0], s[1], s[2], 0, 0, 0, 0, 0))
+        }
+        other => other,
+    }
+}
+
 impl CommentsService {
     /// Báo cáo bình luận `id` (đang hiện). Báo lại, hay vượt giới hạn số lần, trả lời như thường
     /// mà không lưu gì.
@@ -84,10 +103,11 @@ impl CommentsService {
         }
         let reporter_key = match (principal, client.ip) {
             (Some(principal), _) => format!("user:{}", principal.user_id()),
-            (None, Some(ip)) => {
-                format!("ip:{}", autoxide_kernel::ip_hash::fingerprint(&self.secret, ip).await?)
-            }
-            (None, None) => "ip:unknown".to_owned(),
+            (None, Some(ip)) => format!(
+                "{GUEST_REPORTER}{}",
+                autoxide_kernel::ip_hash::fingerprint(&self.secret, reporter_block(ip)).await?
+            ),
+            (None, None) => format!("{GUEST_REPORTER}unknown"),
         };
         let throttle =
             Throttle::new(self.database.clone(), MODULE, self.config.reports_per_hour, HOUR)?;

@@ -139,15 +139,16 @@ pub(crate) const REPORTS_PER_HOUR: Setting = Setting::new(
 
 pub(crate) const RETENTION_DAYS: Setting = Setting::new(
     "AUTOXIDE_COMMENTS_RETENTION_DAYS",
-    "Days a comment waiting for approval or marked as spam is kept before a daily job deletes \
-     it (1 to 3650).",
+    "Days a comment that was never shown (waiting for approval or marked as spam) is kept \
+     before a daily job deletes it (1 to 3650). Comments that were shown once are never deleted \
+     on their own: a moderator decides.",
 )
 .with_default("30");
 
 pub(crate) const IP_RETENTION_DAYS: Setting = Setting::new(
     "AUTOXIDE_COMMENTS_IP_RETENTION_DAYS",
-    "Days the hashed network address of a comment is kept before the daily job clears it (1 to \
-     3650). Raw addresses are never stored.",
+    "Days the hashed network address of a comment (and of a guest's report) is kept before the \
+     daily job clears it (1 to 3650). Raw addresses are never stored.",
 )
 .with_default("90");
 

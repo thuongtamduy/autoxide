@@ -15,7 +15,8 @@
 //! bị bỏ đều là `pending` — bot không phân biệt được.
 //!
 //! "Đã từng được duyệt" (chế độ `first_time`) chỉ tính theo TÀI KHOẢN: khách gõ email nào cũng
-//! được (kể cả email người khác đã xác minh), nên email không bao giờ giúp vượt kiểm duyệt.
+//! được (kể cả email người khác đã xác minh), nên email không bao giờ giúp vượt kiểm duyệt. Chỉ
+//! bình luận ĐANG hiện mới tính (bình luận về sau bị đánh spam / từ chối thì không).
 
 use std::time::Duration;
 
@@ -26,6 +27,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::secret::{random_token, sha256};
 use autoxide_kernel::throttle::Throttle;
+use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set,
 };
@@ -37,8 +39,8 @@ use crate::events::{self, Change};
 use crate::notify::VERIFY;
 use crate::permissions::{COMMENTS_MODERATE, COMMENTS_POST};
 use crate::service::{
-    Comment, CommentsService, MODULE, Status, comment_not_found, ensure_target, now, shift_counts,
-    summary,
+    Comment, CommentsService, MODULE, Status, comment_not_found, delta, ensure_target, now,
+    shift_counts, shift_target_counts, summary,
 };
 use crate::targets::target_closed;
 use crate::text;
@@ -394,7 +396,36 @@ impl CommentsService {
         let transaction = self.database.begin_write().await?;
         ensure_target(&transaction, &self.config, &kind, &target_id, now).await?;
         let row = row.into_active_model().insert(&transaction).await?;
-        shift_counts(&transaction, &row, None, Some(status)).await?;
+        if row.depth == 0 {
+            shift_counts(&transaction, &row, None, Some(status)).await?;
+        } else {
+            // Bình luận gốc được kiểm ở trên, NGOÀI transaction: nó có thể vừa bị xoá hẳn (cả
+            // luồng) hay bị giữ lại. Kiểm lại bằng chính câu tăng `reply_count`, có điều kiện
+            // trạng thái: câu này khoá dòng gốc (Postgres) nên xoá hẳn đang chạy phải chờ (và
+            // sau đó thấy trả lời này), hay đã xong thì không khớp dòng nào → rollback.
+            let touched = comment::Entity::update_many()
+                .col_expr(
+                    comment::Column::ReplyCount,
+                    Expr::col(comment::Column::ReplyCount).add(delta(
+                        None,
+                        Some(status),
+                        Status::Published,
+                    )),
+                )
+                .filter(comment::Column::Id.eq(row.root_id))
+                .filter(
+                    comment::Column::Status
+                        .is_in([Status::Published.as_str(), Status::Deleted.as_str()]),
+                )
+                .exec(&transaction)
+                .await?
+                .rows_affected;
+            if touched == 0 {
+                transaction.rollback().await?;
+                return Err(parent_not_found());
+            }
+            shift_target_counts(&transaction, &row, None, Some(status)).await?;
+        }
         let actor = principal.map_or_else(Actor::public, Actor::from);
         let subject = events::comment_subject(row.id);
         let created = Change { before: None, after: Some(summary(&row)) };
@@ -463,8 +494,9 @@ impl CommentsService {
         Ok(Posted { comment: found, shown, edit_token })
     }
 
-    /// Chế độ duyệt cho bình luận mới: `None` = hiện ngay, không thì lý do giữ lại.
-    async fn mode_hold(
+    /// Chế độ duyệt cho bình luận mới (và cho bản sửa của bình luận đang hiện): `None` = hiện
+    /// ngay, không thì lý do giữ lại.
+    pub(crate) async fn mode_hold(
         &self,
         kind: &str,
         principal: Option<&Principal>,
@@ -479,9 +511,11 @@ impl CommentsService {
             // Khách không có tài khoản để nhớ: email tự khai không bao giờ được tính.
             (Mode::FirstTime, None) => Some("first_comment"),
             (Mode::FirstTime, Some(principal)) => {
+                // Chỉ bình luận ĐANG hiện: bình luận từng hiện rồi bị đánh spam / từ chối / giữ
+                // lại không còn là bằng chứng đáng tin.
                 let approved = comment::Entity::find()
                     .filter(comment::Column::UserId.eq(principal.user_id()))
-                    .filter(comment::Column::PublishedAt.is_not_null())
+                    .filter(comment::Column::Status.eq(Status::Published.as_str()))
                     .count(self.database.read())
                     .await?;
                 (approved == 0).then_some("first_comment")

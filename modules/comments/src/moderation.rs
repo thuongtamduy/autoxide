@@ -8,7 +8,10 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, Utc};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
+    QuerySelect, Set,
+};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -173,10 +176,26 @@ impl CommentsService {
         principal.require(&COMMENTS_MODERATE)?;
         let row = self.find(id).await?;
         let transaction = self.database.begin_write().await?;
+        // Khoá (`FOR UPDATE` trên Postgres; SQLite chỉ một transaction ghi một lúc) rồi mới đọc
+        // trạng thái để đổi số đếm — không đổi số đếm theo trạng thái cũ khi ai đó vừa duyệt /
+        // giữ lại một bình luận trong luồng. Thứ tự khoá như mọi lệnh ghi khác (trả lời → gốc →
+        // đích, xem `shift_counts`): trước các trả lời đang có, rồi bình luận gốc — trả lời mới
+        // phải khoá gốc trước khi được lưu (`post`), nên sau bước này không còn trả lời mới nào
+        // chen vào; cuối cùng đọc lại cả luồng (có cả trả lời vừa lưu trước khi gốc bị khoá).
+        let thread = || comment::Entity::find().filter(comment::Column::RootId.eq(id));
         let rows = if row.depth == 0 {
-            comment::Entity::find().filter(comment::Column::RootId.eq(id)).all(&transaction).await?
+            thread()
+                .filter(comment::Column::Id.ne(id))
+                .order_by_asc(comment::Column::Id)
+                .lock_exclusive()
+                .all(&transaction)
+                .await?;
+            if comment::Entity::find_by_id(id).lock_exclusive().one(&transaction).await?.is_none() {
+                return Err(comment_not_found(id));
+            }
+            thread().order_by_asc(comment::Column::Id).lock_exclusive().all(&transaction).await?
         } else {
-            comment::Entity::find_by_id(id).all(&transaction).await?
+            comment::Entity::find_by_id(id).lock_exclusive().all(&transaction).await?
         };
         if rows.is_empty() {
             return Err(comment_not_found(id));

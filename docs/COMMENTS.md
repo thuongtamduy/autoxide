@@ -71,20 +71,33 @@ after their first comment.
   first one stops working) and stores nothing new.
 - Signed-in users send their access token instead of a form token, need `comments.post`, and
   first choose a display name with `PUT /api/v1/comments/profile {"display_name": "…"}`.
+- Names (a guest's `author_name`, a display name) take 1 to 50 characters, without control
+  characters, invisible formatting characters (soft hyphen, direction marks, tag characters…),
+  blank-looking letters (Hangul fillers and the like), or a word mixing Latin, Greek and
+  Cyrillic letters (`аdmin` with a Cyrillic `а`). Letters that look alike across scripts in
+  whole words (a name written entirely in Cyrillic) are not caught.
 - Change: `PATCH /api/v1/comments/public/comments/{id} {"body": "…", "edit_token": "…"}` within
-  `AUTOXIDE_COMMENTS_EDIT_MINUTES` (the text is checked again; a shown comment with suspect
-  words or too many links waits for approval again). Delete: `POST
+  `AUTOXIDE_COMMENTS_EDIT_MINUTES`. The text is checked again, and the answer's `status` says
+  whether the comment is still shown: a shown comment waits for approval again when it now has
+  suspect words or too many links, or when a new comment of the same author on that target
+  would wait (mode `pre`, or `first_time` while the account has no shown comment) — so by
+  default a guest's change always waits for approval again. Delete: `POST
   /api/v1/comments/public/comments/{id}/delete {"edit_token": "…"}` (signed-in authors send
-  `{}`) — text, name and email go, the place in the thread stays.
+  `{}`) — text, name and email go, the place in the thread stays. An id that does not exist
+  also answers `200`, so a dropped comment cannot be told from a held one by deleting it.
+  Changing one can: `PATCH` with the fake id of a dropped comment answers `404
+  comments.not_found` (a known limit; it tells a bot only that this one comment was dropped).
 - Report: `POST /api/v1/comments/public/comments/{id}/reports {"reason": "spam" | "abuse" |
-  "illegal" | "other", "note": "…"}`.
+  "illegal" | "other", "note": "…"}`. Each account reports a comment once; guests are counted
+  by network block (`/24` for IPv4, `/48` for IPv6).
 
 ## Moderation
 
 The checks run in this order: target closed → length → content (control and invisible
 characters refused) → duplicate → bans → banned words (refused) / suspect words (held) → too
 many links (held) → anti-spam → approval mode. Modes are `pre` (every comment waits),
-`first_time` (until one comment of the **account** was approved) and `post` (shown at once);
+`first_time` (until the **account** has a comment that is shown now — one approved and later
+marked as spam or rejected does not count) and `post` (shown at once);
 defaults are `pre` for guests and `first_time` for users, and both can be set per target kind
 (`AUTOXIDE_COMMENTS_MODERATION_BY_TYPE`). A guest's email is never proof of who they are — anyone
 can type any address — so it never lets a comment skip approval, even once confirmed.
@@ -96,7 +109,9 @@ can type any address — so it never lets a comment skip approval, even once con
   `If-Match`. `DELETE /api/v1/comments/{id}` deletes for good (a top-level comment with its
   thread).
 - Reaching `AUTOXIDE_COMMENTS_REPORT_THRESHOLD` reports holds a shown comment once; after a
-  moderator approves it, more reports do not hide it. `GET /api/v1/comments/{id}/reports`.
+  moderator approves it, more reports do not hide it. A comment held this way stays in the
+  queue until a moderator decides: the cleanup never deletes a comment that was once shown.
+  `GET /api/v1/comments/{id}/reports`.
 - `POST /api/v1/comments/bans {"kind": "user" | "email" | "ip", "value": "…", "reason": "…",
   "until": null}` (`ip` takes the comment's `ip_fingerprint`), `GET`, `DELETE
   /api/v1/comments/bans/{id}`.
@@ -125,8 +140,12 @@ address).
   network fingerprint go, the place in the thread stays, reply mails stop. Bans of the address
   are kept (they exist to keep it out); lift them by hand if asked.
 - Network addresses are never stored: only a keyed hash of the network block, cleared after
-  `AUTOXIDE_COMMENTS_IP_RETENTION_DAYS`. Comments waiting for approval or spam are deleted after
-  `AUTOXIDE_COMMENTS_RETENTION_DAYS`.
+  `AUTOXIDE_COMMENTS_IP_RETENTION_DAYS` — from comments and from guests' reports (the report
+  stays, its `reporter_key` becomes `expired:<report id>`).
+- Comments waiting for approval or spam that were **never shown** are deleted
+  `AUTOXIDE_COMMENTS_RETENTION_DAYS` after they were posted. A comment that was shown once and
+  went back to waiting (held after reports, changed by its author, held again or marked as spam
+  by a moderator) is never deleted on its own: a moderator approves, rejects or deletes it.
 - Events (and so webhooks) carry ids, targets and statuses only, never text, names or addresses.
 - When an account is deleted, its comments are cleared the same way, its display name is
   deleted and its reports no longer point to it. The account's data export includes its

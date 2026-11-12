@@ -17,7 +17,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::page_request;
-use super::views::{PostedComment, PublicComment, TargetResponse, ThreadComment};
+use super::views::{EditedComment, PostedComment, PublicComment, TargetResponse, ThreadComment};
 use crate::posting::NewComment;
 use crate::reports::ReportReason;
 use crate::service::CommentsService;
@@ -302,8 +302,10 @@ pub(crate) struct EditCommentRequest {
 /// Change one's comment (public).
 ///
 /// The author only — signed in as the same user (with `comments.post`), or a guest sending
-/// `edit_token` — within `edit_minutes` of posting. The text is checked again; a shown comment
-/// that now has suspect words or too many links waits for approval again.
+/// `edit_token` — within `edit_minutes` of posting. The text is checked again. A shown comment
+/// waits for approval again (`status: pending`) when it now has suspect words or too many links,
+/// or when a new comment of the same author on the same target would wait (approval mode `pre`,
+/// or `first_time` without a shown comment).
 #[utoipa::path(
     patch,
     path = "/public/comments/{id}",
@@ -312,7 +314,7 @@ pub(crate) struct EditCommentRequest {
     params(("id" = Uuid, Path, description = "Id of the comment.")),
     request_body = EditCommentRequest,
     responses(
-        (status = 200, description = "The comment after the change.", body = Data<PublicComment>),
+        (status = 200, description = "The comment after the change, and whether it is shown.", body = Data<EditedComment>),
         (status = 403, description = "Not the author (`comments.not_author`), or banned (`comments.banned`).", body = Problem),
         (status = 404, description = "No comment has this id; code `comments.not_found`.", body = Problem),
         (status = 409, description = "Too late (`comments.edit_window_passed`), the comment was rejected or deleted (`comments.not_editable`).", body = Problem),
@@ -325,7 +327,7 @@ pub(crate) async fn edit_comment(
     principal: Option<Principal>,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<EditCommentRequest>,
-) -> Result<Data<PublicComment>, Error> {
+) -> Result<Data<EditedComment>, Error> {
     let found =
         service.edit(principal.as_ref(), id, input.edit_token.as_deref(), &input.body).await?;
     Ok(Data { data: found.into() })
@@ -343,7 +345,9 @@ pub(crate) struct DeleteOwnRequest {
 ///
 /// The author only (signed in as the same user, or a guest sending `edit_token`), at any time.
 /// The text, name and email are removed; the comment keeps its place in the thread so replies
-/// stay. A body is used (not `DELETE`) because the token must not travel in the address.
+/// stay. A body is used (not `DELETE`) because the token must not travel in the address. An id
+/// that does not exist (deleted for good, or a comment dropped by the anti-spam checks) also
+/// answers `200`, so the answer tells nothing about what happened to a comment.
 #[utoipa::path(
     post,
     path = "/public/comments/{id}/delete",
@@ -352,9 +356,8 @@ pub(crate) struct DeleteOwnRequest {
     params(("id" = Uuid, Path, description = "Id of the comment.")),
     request_body = DeleteOwnRequest,
     responses(
-        (status = 200, description = "Deleted (also when it already was).", body = Data<DeletedResponse>),
+        (status = 200, description = "Deleted (also when it already was, or no comment has this id).", body = Data<DeletedResponse>),
         (status = 403, description = "Not the author; code `comments.not_author`.", body = Problem),
-        (status = 404, description = "No comment has this id; code `comments.not_found`.", body = Problem),
         (status = 412, description = "A moderator changed it at the same time; code `precondition_failed`.", body = Problem),
     )
 )]

@@ -8,7 +8,7 @@ use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::pagination::Order;
 use autoxide_kernel::privacy::{PersonalData, USER_DELETED};
 use autoxide_testkit::TestDatabase;
-use sea_orm::{EntityTrait, PaginatorTrait};
+use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, PaginatorTrait, Set};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -59,13 +59,20 @@ async fn bao_cao_dong_thoi_toi_nguong_chi_giu_mot_lan() {
                     .await
             }));
         }
+        // Báo cáo tới SAU khi bình luận đã bị giữ thì không thấy nó nữa (`comments.not_found`), như
+        // người lạ — tuỳ thứ tự chạy, có thể vài báo cáo cuối rơi vào trường hợp đó.
+        let mut accepted: i32 = 0;
         for task in tasks {
-            task.await.unwrap().unwrap();
+            match task.await.unwrap() {
+                Ok(()) => accepted += 1,
+                Err(error) => assert_eq!(error.code(), "comments.not_found"),
+            }
         }
+        assert!(accepted >= 3, "{accepted}");
         let row = h.service.find(id).await.unwrap();
         assert_eq!(
             (row.status.as_str(), row.hold_reason.as_deref(), row.report_count),
-            ("pending", Some("reported"), 6)
+            ("pending", Some("reported"), accepted)
         );
         assert_eq!(counts(&h.database, POST).await, (0, 1));
         let held = events(&h.database)
@@ -75,7 +82,7 @@ async fn bao_cao_dong_thoi_toi_nguong_chi_giu_mot_lan() {
             .count();
         assert_eq!(held, 1);
         let reports = h.service.reports_of(&admin(), id, &all_oldest()).await.unwrap();
-        assert_eq!(reports.data.len(), 6);
+        assert_eq!(reports.data.len(), usize::try_from(accepted).unwrap());
         assert_eq!(reports.data[0].note.as_deref(), Some("rude"));
 
         // Bị giữ thì không còn báo cáo được (người lạ không thấy nó).
@@ -103,7 +110,7 @@ async fn bao_cao_dong_thoi_toi_nguong_chi_giu_mot_lan() {
                 .unwrap();
         }
         let row = h.service.find(id).await.unwrap();
-        assert_eq!((row.status.as_str(), row.report_count), ("published", 10));
+        assert_eq!((row.status.as_str(), row.report_count), ("published", accepted + 4));
         assert_eq!(counts(&h.database, POST).await, (1, 0));
     })
     .await
@@ -403,8 +410,8 @@ async fn du_lieu_ca_nhan() {
     .unwrap();
 }
 
-/// Job dọn: chờ duyệt / spam quá hạn bị xoá (gốc còn trả lời thì xoá mềm), dấu vết IP quá hạn bị
-/// xoá, số đếm đúng; chạy lại không đổi gì.
+/// Job dọn: chờ duyệt / spam chưa từng hiện quá hạn bị xoá (gốc còn trả lời thì xoá mềm); đã
+/// từng hiện thì không; dấu vết IP quá hạn bị xoá, số đếm đúng; chạy lại không đổi gì.
 #[tokio::test]
 async fn don_theo_thoi_han() {
     TestDatabase::run(async |test| {
@@ -424,6 +431,16 @@ async fn don_theo_thoi_han() {
         let now = crate::service::now();
         let early = h.service.cleanup(now).await.unwrap();
         assert_eq!((early.deleted, early.cleared, early.fingerprints), (0, 0, 0));
+        // Cả hai từng hiện (rồi bị giữ lại / đánh spam): không bao giờ tự bị xoá.
+        let shown_once = h.service.cleanup(now + chrono::Duration::days(31)).await.unwrap();
+        assert_eq!((shown_once.deleted, shown_once.cleared), (0, 0));
+        // Coi như chưa từng hiện (gốc có trả lời mà chưa từng hiện không xảy ra qua API; đặt
+        // thẳng để thử nhánh xoá mềm).
+        for id in [root, lonely] {
+            let mut row = h.service.find(id).await.unwrap().into_active_model();
+            row.published_at = Set(None);
+            row.update(h.database.write()).await.unwrap();
+        }
         let later = h.service.cleanup(now + chrono::Duration::days(31)).await.unwrap();
         assert_eq!((later.deleted, later.cleared), (1, 1));
         assert!(
@@ -512,6 +529,126 @@ async fn event_cua_chu_dich_dong_va_an() {
             as_guest(&h.service, &client, guest("Ada", "Quá hạn")).await.unwrap_err().code(),
             "comments.target_closed"
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// Ba báo cáo vô danh không xoá được bình luận cũ: bình luận đã hiện bị giữ vì báo cáo thì job dọn
+/// không bao giờ tự xoá nó; bình luận chờ duyệt chưa từng hiện thì bị xoá. Khách báo cáo gom theo
+/// khối /48 (IPv6). Khoá người báo của khách bỏ dấu vết IP sau `IP_RETENTION_DAYS`.
+#[tokio::test]
+async fn bao_cao_khong_lam_binh_luan_da_hien_bi_xoa() {
+    TestDatabase::run(async |test| {
+        let config = CommentsConfig {
+            report_threshold: 3,
+            guest_mode: crate::config::Mode::Pre,
+            user_mode: crate::config::Mode::Post,
+            ..config()
+        };
+        let h = service(test, config).await;
+        let bob = member(&h.service, "Bob", &[]).await;
+        let shown =
+            h.service.post(Some(&bob), &ClientInfo::default(), signed("Ý kiến cũ")).await.unwrap();
+        assert_eq!(shown.shown, Status::Published);
+        let shown = shown.comment.row.id;
+        let waiting =
+            as_guest(&h.service, &visitor("203.0.113.40"), guest("Ada", "Chưa ai duyệt")).await;
+        let waiting = waiting.unwrap().comment.row.id;
+        assert_eq!(counts(&h.database, POST).await, (1, 1));
+
+        // Hai địa chỉ trong cùng /48 là một người báo; khối /48 khác, IPv4 là người khác.
+        for ip in ["2001:db8:1:1::1", "2001:db8:1:2::9", "2001:db8:2::1"] {
+            h.service.report(None, &visitor(ip), shown, ReportReason::Abuse, None).await.unwrap();
+        }
+        assert_eq!(h.service.find(shown).await.unwrap().report_count, 2);
+        let user = crate::testing::user(&[]);
+        h.service
+            .report(Some(&user), &ClientInfo::default(), shown, ReportReason::Abuse, None)
+            .await
+            .unwrap();
+        let held = h.service.find(shown).await.unwrap();
+        assert_eq!(
+            (held.status.as_str(), held.hold_reason.as_deref()),
+            ("pending", Some("reported"))
+        );
+        assert_eq!(counts(&h.database, POST).await, (0, 2));
+
+        let now = crate::service::now();
+        let cleaned = h.service.cleanup(now + chrono::Duration::days(31)).await.unwrap();
+        assert_eq!((cleaned.deleted, cleaned.cleared), (1, 0));
+        assert!(
+            comment::Entity::find_by_id(waiting).one(h.database.read()).await.unwrap().is_none()
+        );
+        let kept = h.service.find(shown).await.unwrap();
+        assert_eq!((kept.status.as_str(), kept.body.as_str()), ("pending", "Ý kiến cũ"));
+        assert_eq!(counts(&h.database, POST).await, (0, 1));
+        // Người kiểm duyệt quyết: duyệt lại thì hiện như cũ.
+        h.service.set_status(&admin(), shown, Status::Published, None).await.unwrap();
+        assert_eq!(counts(&h.database, POST).await, (1, 0));
+
+        // Quá hạn giữ dấu vết IP: khoá người báo của khách thành `expired:<id>`, của người dùng
+        // giữ nguyên; chạy lại không đổi gì.
+        let before = h.service.reports_of(&admin(), shown, &all_oldest()).await.unwrap().data;
+        assert_eq!(before.iter().filter(|r| r.reporter_key.starts_with("ip:")).count(), 2);
+        let later = h.service.cleanup(now + chrono::Duration::days(91)).await.unwrap();
+        assert_eq!(later.reporters, 2);
+        let after = h.service.reports_of(&admin(), shown, &all_oldest()).await.unwrap().data;
+        let keys: Vec<String> = after.iter().map(|r| r.reporter_key.clone()).collect();
+        let expected: Vec<String> = before
+            .iter()
+            .map(|r| {
+                if r.reporter_key.starts_with("ip:") {
+                    format!("expired:{}", r.id)
+                } else {
+                    r.reporter_key.clone()
+                }
+            })
+            .collect();
+        assert_eq!(keys, expected);
+        assert_eq!(keys.iter().filter(|key| key.starts_with("user:")).count(), 1);
+        assert_eq!(h.service.cleanup(now + chrono::Duration::days(91)).await.unwrap().reporters, 0);
+    })
+    .await
+    .unwrap();
+}
+
+/// Job dọn đọc một lô rồi mới xoá từng dòng: bình luận được duyệt (hay đổi trạng thái) giữa hai
+/// bước thì không bị xoá, số đếm không lệch; lần dọn sau xét lại theo trạng thái mới.
+#[tokio::test]
+async fn duyet_trong_luc_don_thi_khong_xoa() {
+    TestDatabase::run(async |test| {
+        let h = service(test, config()).await;
+        let moderator = admin();
+        let client = visitor("203.0.113.41");
+        let approved =
+            as_guest(&h.service, &client, guest("Ada", "Sẽ được duyệt")).await.unwrap().comment.row;
+        let marked = as_guest(&h.service, &client, guest("Bea", "Sẽ bị đánh spam"))
+            .await
+            .unwrap()
+            .comment
+            .row;
+        assert_eq!(counts(&h.database, POST).await, (0, 2));
+        let stale_approved = h.service.find(approved.id).await.unwrap();
+        let stale_marked = h.service.find(marked.id).await.unwrap();
+
+        h.service.set_status(&moderator, approved.id, Status::Published, None).await.unwrap();
+        h.service.set_status(&moderator, marked.id, Status::Spam, None).await.unwrap();
+        assert_eq!(h.service.expire(&stale_approved).await.unwrap(), None);
+        assert_eq!(h.service.expire(&stale_marked).await.unwrap(), None);
+        assert_eq!(h.service.find(approved.id).await.unwrap().status, "published");
+        assert_eq!(h.service.find(marked.id).await.unwrap().status, "spam");
+        assert_eq!(counts(&h.database, POST).await, (1, 0));
+
+        // Lần dọn sau (đọc mới): spam chưa từng hiện bị xoá, bình luận đã duyệt thì không.
+        let later = crate::service::now() + chrono::Duration::days(31);
+        let cleaned = h.service.cleanup(later).await.unwrap();
+        assert_eq!((cleaned.deleted, cleaned.cleared), (1, 0));
+        assert!(
+            comment::Entity::find_by_id(marked.id).one(h.database.read()).await.unwrap().is_none()
+        );
+        assert_eq!(h.service.find(approved.id).await.unwrap().status, "published");
+        assert_eq!(counts(&h.database, POST).await, (1, 0));
     })
     .await
     .unwrap();

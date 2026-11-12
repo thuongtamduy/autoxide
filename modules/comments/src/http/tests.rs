@@ -245,7 +245,8 @@ async fn vong_doi_qua_http() {
         let edit_token = again.json()["data"]["edit_token"].as_str().unwrap().to_owned();
         assert_ne!(Some(edit_token.as_str()), held.json()["data"]["edit_token"].as_str());
 
-        // Dính bẫy, quá nhiều lần với một email (giới hạn 3/giờ, gửi lại cũng đếm): câu trả lời y hệt.
+        // Dính bẫy, quá nhiều lần với một email (giới hạn 3/giờ; gửi lại cùng token KHÔNG đếm,
+        // để không ai khoá được email của người khác — D-150): câu trả lời y hệt.
         let mut trapped = comment(&form_token(&router).await, "Bot", "bot@example.com", "spam");
         trapped["trap"] = json!("http://spam.example");
         let trapped = send(&router, "POST", "/comments/public/comments", None, &[], Some(trapped)).await;
@@ -253,7 +254,9 @@ async fn vong_doi_qua_http() {
         assert_eq!(trapped.header(header::LOCATION).len(), held.header(header::LOCATION).len());
         let second = send(&router, "POST", "/comments/public/comments", None, &[], Some(comment(&form_token(&router).await, "Ada", "ada@example.com", "Lần hai"))).await;
         assert_eq!(second.status, StatusCode::CREATED);
-        let limited = send(&router, "POST", "/comments/public/comments", None, &[], Some(comment(&form_token(&router).await, "Ada", "ada@example.com", "Lần ba"))).await;
+        let third = send(&router, "POST", "/comments/public/comments", None, &[], Some(comment(&form_token(&router).await, "Ada", "ada@example.com", "Lần ba"))).await;
+        assert_eq!(third.status, StatusCode::CREATED);
+        let limited = send(&router, "POST", "/comments/public/comments", None, &[], Some(comment(&form_token(&router).await, "Ada", "ada@example.com", "Lần bốn"))).await;
         assert_eq!((limited.status, shape(&limited), &limited.json()["data"]["status"]), (held.status, shape(&held), &held.json()["data"]["status"]));
 
         // Lỗi thật thì rõ ràng.
@@ -305,7 +308,10 @@ async fn vong_doi_qua_http() {
 
         // Sửa và xoá bằng token sửa; báo cáo.
         let edit = send(&router, "PATCH", &format!("/comments/public/comments/{id}"), None, &[], Some(json!({"body": "Đã sửa", "edit_token": edit_token}))).await;
-        assert_eq!((edit.status, edit.json()["data"]["body"].as_str()), (StatusCode::OK, Some("Đã sửa")));
+        assert_eq!((edit.status, edit.json()["data"]["body"].as_str(), edit.json()["data"]["status"].as_str()), (StatusCode::OK, Some("Đã sửa"), Some("pending")));
+        // Khách ở chế độ `pre`: bản sửa chờ duyệt lại.
+        let etag = send(&router, "GET", &format!("/comments/{id}"), Some("reader"), &[], None).await.header(header::ETAG).to_owned();
+        assert_eq!(send(&router, "PATCH", &format!("/comments/{id}"), Some("admin"), &[("if-match", &etag)], Some(approve.clone())).await.status, StatusCode::OK);
         let wrong = send(&router, "PATCH", &format!("/comments/public/comments/{id}"), None, &[], Some(json!({"body": "x", "edit_token": "nope"}))).await;
         assert_eq!((wrong.status, wrong.code().as_deref()), (StatusCode::FORBIDDEN, Some("comments.not_author")));
         let report = send(&router, "POST", &format!("/comments/public/comments/{id}/reports"), None, &[], Some(json!({"reason": "abuse", "note": "rude"}))).await;
@@ -355,10 +361,10 @@ async fn vong_doi_qua_http() {
         // Xuất / xoá theo email; xoá hẳn.
         let data = send(&router, "GET", "/comments/data?email=ADA@example.com", Some("admin"), &[], None).await;
         assert_eq!(data.status, StatusCode::OK, "{}", data.json());
-        assert_eq!(data.json()["data"]["comments"].as_array().unwrap().len(), 2);
+        assert_eq!(data.json()["data"]["comments"].as_array().unwrap().len(), 3);
         assert_eq!(send(&router, "GET", "/comments/data?email=ada@example.com", Some("reader"), &[], None).await.status, StatusCode::FORBIDDEN);
         let erased = send(&router, "DELETE", "/comments/data?email=ada@example.com", Some("admin"), &[], None).await;
-        assert_eq!(erased.json()["data"]["cleared"], 2);
+        assert_eq!(erased.json()["data"]["cleared"], 3);
         let purged = send(&router, "DELETE", &format!("/comments/{id}"), Some("admin"), &[], None).await;
         assert_eq!(purged.json()["data"]["deleted"], 1);
         assert_eq!(send(&router, "GET", &format!("/comments/{id}"), Some("admin"), &[], None).await.status, StatusCode::NOT_FOUND);

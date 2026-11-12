@@ -68,20 +68,32 @@ lưu trữ một bài, bình luận của bài đóng lại; khi xoá bài, bìn
   dùng được), không lưu thêm gì.
 - Người dùng đăng nhập gửi access token thay cho token form, cần `comments.post`, và trước hết chọn
   tên hiển thị bằng `PUT /api/v1/comments/profile {"display_name": "…"}`.
+- Tên (`author_name` của khách, tên hiển thị) dài 1 tới 50 ký tự, không có ký tự điều khiển, ký tự
+  định dạng vô hình (gạch nối mềm, dấu hướng chữ, ký tự thẻ…), chữ trông như khoảng trống (chữ đệm
+  Hangul và tương tự), hay một từ trộn chữ Latin, Hy Lạp và Kirin (`аdmin` với `а` Kirin). Chữ
+  trông giống nhau giữa các bảng chữ trong cả một từ (tên viết trọn bằng chữ Kirin) thì không bắt
+  được.
 - Sửa: `PATCH /api/v1/comments/public/comments/{id} {"body": "…", "edit_token": "…"}` trong
-  `AUTOXIDE_COMMENTS_EDIT_MINUTES` (chữ được kiểm lại; bình luận đang hiện mà có từ nghi ngờ hay
-  quá nhiều link thì chờ duyệt lại). Xoá: `POST /api/v1/comments/public/comments/{id}/delete
-  {"edit_token": "…"}` (tác giả đăng nhập gửi `{}`) — chữ, tên, email mất, chỗ trong luồng giữ
-  lại.
+  `AUTOXIDE_COMMENTS_EDIT_MINUTES`. Chữ được kiểm lại, và `status` của câu trả lời cho biết bình
+  luận còn hiện không: bình luận đang hiện chờ duyệt lại khi giờ có từ nghi ngờ hay quá nhiều link,
+  hoặc khi một bình luận mới của cùng tác giả trên đích đó sẽ phải chờ (chế độ `pre`, hay
+  `first_time` khi tài khoản chưa có bình luận nào đang hiện) — nên mặc định bản sửa của khách luôn
+  chờ duyệt lại. Xoá: `POST /api/v1/comments/public/comments/{id}/delete {"edit_token": "…"}` (tác
+  giả đăng nhập gửi `{}`) — chữ, tên, email mất, chỗ trong luồng giữ lại. ID không tồn tại cũng trả
+  `200`, nên không thể xoá thử để phân biệt bình luận bị bỏ với bình luận bị giữ. Sửa thử thì được:
+  `PATCH` với ID giả của bình luận bị bỏ trả `404 comments.not_found` (giới hạn đã biết; bot chỉ
+  biết đúng một bình luận đó bị bỏ).
 - Báo cáo: `POST /api/v1/comments/public/comments/{id}/reports {"reason": "spam" | "abuse" |
-  "illegal" | "other", "note": "…"}`.
+  "illegal" | "other", "note": "…"}`. Mỗi tài khoản báo một bình luận một lần; khách được đếm theo
+  khối mạng (`/24` với IPv4, `/48` với IPv6).
 
 ## Kiểm duyệt
 
 Thứ tự kiểm: đích đóng → độ dài → nội dung (ký tự điều khiển và ký tự vô hình bị từ chối) → trùng
 → bị cấm → từ cấm (từ chối) / từ nghi ngờ (giữ lại) → quá nhiều link (giữ lại) → chống spam → chế
-độ duyệt. Chế độ: `pre` (mọi bình luận chờ duyệt), `first_time` (tới khi một bình luận của **tài
-khoản** được duyệt) và `post` (hiện ngay); mặc định `pre` cho khách và `first_time` cho người dùng,
+độ duyệt. Chế độ: `pre` (mọi bình luận chờ duyệt), `first_time` (tới khi **tài
+khoản** có một bình luận đang hiện — bình luận được duyệt rồi bị đánh spam hay bị từ chối không
+tính) và `post` (hiện ngay); mặc định `pre` cho khách và `first_time` cho người dùng,
 chỉnh được theo loại đích (`AUTOXIDE_COMMENTS_MODERATION_BY_TYPE`). Email của khách không bao giờ
 là bằng chứng danh tính — ai cũng gõ được địa chỉ bất kỳ — nên nó không bao giờ giúp bình luận
 vượt duyệt, kể cả khi đã xác nhận.
@@ -91,7 +103,9 @@ vượt duyệt, kể cả khi đã xác nhận.
 - `PATCH /api/v1/comments/{id} {"status": "published" | "rejected" | "spam" | "pending"}` kèm
   `If-Match`. `DELETE /api/v1/comments/{id}` xoá hẳn (bình luận gốc thì xoá cả luồng).
 - Đủ `AUTOXIDE_COMMENTS_REPORT_THRESHOLD` báo cáo thì bình luận đang hiện bị giữ lại một lần; người
-  kiểm duyệt duyệt lại rồi thì báo cáo sau không ẩn nó nữa. `GET /api/v1/comments/{id}/reports`.
+  kiểm duyệt duyệt lại rồi thì báo cáo sau không ẩn nó nữa. Bình luận bị giữ như vậy nằm trong hàng
+  chờ tới khi người kiểm duyệt quyết: job dọn không bao giờ xoá bình luận đã từng hiện.
+  `GET /api/v1/comments/{id}/reports`.
 - `POST /api/v1/comments/bans {"kind": "user" | "email" | "ip", "value": "…", "reason": "…",
   "until": null}` (`ip` nhận `ip_fingerprint` của bình luận), `GET`, `DELETE
   /api/v1/comments/bans/{id}`.
@@ -119,8 +133,11 @@ lời, để tính năng này không thành công cụ gửi spam — và một 
   mất, chỗ trong luồng giữ lại, mail báo dừng. Lệnh cấm địa chỉ đó được giữ (nó có để chặn địa chỉ
   đó); bỏ bằng tay nếu được yêu cầu.
 - Địa chỉ mạng không bao giờ được lưu: chỉ lưu bản băm có khoá của khối mạng, xoá sau
-  `AUTOXIDE_COMMENTS_IP_RETENTION_DAYS`. Bình luận chờ duyệt hay spam bị xoá sau
-  `AUTOXIDE_COMMENTS_RETENTION_DAYS`.
+  `AUTOXIDE_COMMENTS_IP_RETENTION_DAYS` — ở bình luận và ở báo cáo của khách (báo cáo giữ lại,
+  `reporter_key` thành `expired:<id báo cáo>`).
+- Bình luận chờ duyệt hay spam **chưa từng hiện** bị xoá sau `AUTOXIDE_COMMENTS_RETENTION_DAYS` kể
+  từ lúc gửi. Bình luận đã từng hiện rồi quay về chờ (bị giữ vì báo cáo, tác giả sửa, người kiểm
+  duyệt giữ lại hay đánh spam) không bao giờ tự bị xoá: người kiểm duyệt duyệt, từ chối hay xoá nó.
 - Event (và vì thế webhook) chỉ mang id, đích và trạng thái, không bao giờ có chữ, tên hay địa chỉ.
 - Khi một tài khoản bị xoá, bình luận của nó được xoá theo cùng cách, tên hiển thị bị xoá và báo
   cáo của nó không còn chỉ về nó. Bản xuất dữ liệu của tài khoản có bình luận, tên hiển thị và báo

@@ -7,7 +7,9 @@ use autoxide_kernel::error::ErrorKind;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::pagination::{Order, PageRequest};
 use autoxide_testkit::TestDatabase;
-use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, PaginatorTrait, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set,
+};
 
 use super::{
     KIND, POST, as_guest, counts, events, guest, member, open_config, page, signed, token, visitor,
@@ -111,11 +113,16 @@ async fn chong_spam_cung_mot_cau_tra_loi_token_hong_la_loi() {
         assert_eq!(trapped.shown, held.shown);
         assert!(trapped.edit_token.is_some());
         assert_eq!(trapped.comment.row.id.get_version_num(), 7);
+        // Xoá thử bằng ID / token giả: trả lời như xoá bài thật đang chờ duyệt.
+        let fake_token = trapped.edit_token.as_deref();
+        h.service.delete_own(None, trapped.comment.row.id, fake_token).await.unwrap();
+        h.service.delete_own(None, held.comment.row.id, held.edit_token.as_deref()).await.unwrap();
 
         as_guest(&h.service, &client, guest("Ada", "Lần hai")).await.unwrap();
         let limited = as_guest(&h.service, &client, guest("Ada", "Lần ba")).await.unwrap();
         assert_eq!(limited.shown, Status::Pending);
         assert_eq!(comment::Entity::find().count(h.database.read()).await.unwrap(), 2);
+        assert_eq!(h.service.find(held.comment.row.id).await.unwrap().status, "deleted");
 
         // Token thiếu, sai, của phạm vi khác.
         let mut missing = guest("Ada", "Không token");
@@ -145,8 +152,8 @@ async fn chong_spam_cung_mot_cau_tra_loi_token_hong_la_loi() {
             (stored.status.as_str(), stored.hold_reason.as_deref()),
             ("spam", Some("too_fast"))
         );
-        // Bài spam không tính vào số chờ duyệt (hai bài chờ là của khách đầu).
-        assert_eq!(counts(&h2.database, POST).await, (0, 2));
+        // Bài spam không tính vào số chờ duyệt (bài chờ là của khách đầu; bài đầu đã xoá).
+        assert_eq!(counts(&h2.database, POST).await, (0, 1));
     })
     .await
     .unwrap();
@@ -646,6 +653,115 @@ async fn cursor_cua_luong() {
             held.service.thread(KIND, POST, &page(Order::Desc), 3).await.unwrap().data.len(),
             5
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// Sửa bình luận đã được duyệt: chế độ `pre` (khách) giữ lại bản sửa, số đếm theo trong cùng
+/// transaction; người dùng `first_time` còn bình luận đang hiện thì sửa vẫn hiện. "Đã từng được
+/// duyệt" chỉ tính bình luận ĐANG hiện: bình luận được duyệt rồi bị đánh spam không còn tính.
+#[tokio::test]
+async fn sua_sau_khi_duyet_va_tin_tuong_chi_theo_binh_luan_dang_hien() {
+    TestDatabase::run(async |test| {
+        let h = service(test, config()).await;
+        let moderator = admin();
+        let client = visitor("203.0.113.30");
+
+        let posted = as_guest(&h.service, &client, guest("Ada", "Bản sạch")).await.unwrap();
+        let id = posted.comment.row.id;
+        let token = posted.edit_token.clone().unwrap();
+        h.service.set_status(&moderator, id, Status::Published, None).await.unwrap();
+        assert_eq!(counts(&h.database, POST).await, (1, 0));
+        let edited = h.service.edit(None, id, Some(&token), "Bản bẩn mà không có từ cấm").await;
+        let edited = edited.unwrap();
+        assert_eq!(
+            (edited.status(), edited.row.hold_reason.as_deref()),
+            (Status::Pending, Some("moderation"))
+        );
+        assert!(edited.row.published_at.is_some());
+        assert_eq!(counts(&h.database, POST).await, (0, 1));
+        // Bình luận đang chờ duyệt mà sửa thì vẫn chờ.
+        let again = h.service.edit(None, id, Some(&token), "Bản ba").await.unwrap();
+        assert_eq!(again.status(), Status::Pending);
+        assert_eq!(counts(&h.database, POST).await, (0, 1));
+
+        // Người dùng `first_time`: lần đầu chờ, được duyệt, sửa vẫn hiện.
+        let bob = member(&h.service, "Bob", &[]).await;
+        let first = h.service.post(Some(&bob), &client, signed("Lần đầu")).await.unwrap();
+        assert_eq!(first.shown, Status::Pending);
+        let first = first.comment.row.id;
+        h.service.set_status(&moderator, first, Status::Published, None).await.unwrap();
+        let edited = h.service.edit(Some(&bob), first, None, "Lần đầu, sửa").await.unwrap();
+        assert_eq!(edited.status(), Status::Published);
+        assert_eq!(
+            h.service.post(Some(&bob), &client, signed("Lần hai")).await.unwrap().shown,
+            Status::Published
+        );
+
+        // Cara được duyệt một lần, rồi bình luận đó bị đánh spam: lần sau lại chờ duyệt.
+        let cara = member(&h.service, "Cara", &[]).await;
+        let only = h.service.post(Some(&cara), &client, signed("Một")).await.unwrap();
+        let only = only.comment.row.id;
+        h.service.set_status(&moderator, only, Status::Published, None).await.unwrap();
+        h.service.set_status(&moderator, only, Status::Spam, None).await.unwrap();
+        let next = h.service.post(Some(&cara), &client, signed("Hai")).await.unwrap();
+        assert_eq!(next.shown, Status::Pending);
+        assert_eq!(
+            h.service.find(next.comment.row.id).await.unwrap().hold_reason.as_deref(),
+            Some("first_comment")
+        );
+    })
+    .await
+    .unwrap();
+}
+
+/// Trả lời gửi cùng lúc với lệnh xoá hẳn cả luồng: không trả lời nào sống sót mồ côi, trả lời
+/// thua thì nhận `comments.parent_not_found`, số đếm của đích khớp với dòng còn lại.
+#[tokio::test]
+async fn tra_loi_dong_thoi_voi_xoa_han_luong() {
+    TestDatabase::run(async |test| {
+        let h = service(test, open_config()).await;
+        let moderator = admin();
+        let mut members = Vec::new();
+        for index in 0..12u8 {
+            members.push(member(&h.service, &format!("Replier {index}"), &[]).await);
+        }
+        for (round, group) in members.chunks(4).enumerate() {
+            let root = as_guest(
+                &h.service,
+                &visitor("203.0.113.31"),
+                guest("Ada", &format!("Gốc {round}")),
+            )
+            .await
+            .unwrap();
+            assert_eq!(root.shown, Status::Published);
+            let root = root.comment.row.id;
+            let mut tasks = Vec::new();
+            for principal in group {
+                let (service, principal) = (h.service.clone(), principal.clone());
+                let mut input = signed(&format!("Trả lời {round} của {}", principal.user_id()));
+                input.parent_id = Some(root);
+                tasks.push(tokio::spawn(async move {
+                    service.post(Some(&principal), &ClientInfo::default(), input).await.map(|_| ())
+                }));
+            }
+            let (service, moderator) = (h.service.clone(), moderator.clone());
+            let deleting = tokio::spawn(async move { service.hard_delete(&moderator, root).await });
+            for task in tasks {
+                if let Err(error) = task.await.unwrap() {
+                    assert_eq!(error.code(), "comments.parent_not_found");
+                }
+            }
+            deleting.await.unwrap().unwrap();
+            let left = comment::Entity::find()
+                .filter(comment::Column::RootId.eq(root))
+                .count(h.database.read())
+                .await
+                .unwrap();
+            assert_eq!(left, 0, "round {round}");
+            assert_eq!(counts(&h.database, POST).await, (0, 0), "round {round}");
+        }
     })
     .await
     .unwrap();

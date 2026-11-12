@@ -4,7 +4,8 @@
 //! Tác giả là người dùng có cùng `user_id`, hay khách gửi đúng token sửa nhận lúc tạo (máy chủ chỉ
 //! giữ bản băm SHA-256). Sửa chạy lại phần kiểm nội dung của pipeline (lọc, độ dài, bị cấm, từ
 //! cấm, từ nghi ngờ, link) — chặn trò "đăng chữ sạch rồi sửa thành quảng cáo": bình luận đang hiện
-//! mà dính từ nghi ngờ / quá nhiều link thì về chờ duyệt.
+//! mà dính từ nghi ngờ / quá nhiều link, hay chế độ duyệt của tác giả trên đích đó (`pre`,
+//! `first_time` khi chưa có bình luận nào đang hiện) sẽ giữ một bình luận mới, thì về chờ duyệt.
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
@@ -122,8 +123,20 @@ impl CommentsService {
         if text::link_count(&body) > self.config.max_links {
             holds.push("too_many_links");
         }
-        let to =
-            if from == Status::Published && !holds.is_empty() { Status::Pending } else { from };
+        // Bình luận đang hiện mà sửa: dính từ nghi ngờ / quá nhiều link thì giữ lại; không thì
+        // xét lại chế độ duyệt như một bình luận mới của cùng tác giả trên cùng đích — chế độ
+        // `pre` (hay `first_time` khi tác giả chưa có bình luận nào đang hiện) giữ lại bản sửa,
+        // để "được duyệt rồi sửa thành chữ khác" không vượt kiểm duyệt.
+        let hold = if from != Status::Published {
+            None
+        } else if !holds.is_empty() {
+            Some(holds.join(","))
+        } else {
+            let author = principal.filter(|principal| before.user_id == Some(principal.user_id()));
+            let moderator = author.is_some_and(|principal| principal.has(&COMMENTS_MODERATE));
+            self.mode_hold(&before.target_type, author, moderator).await?.map(str::to_owned)
+        };
+        let to = if hold.is_some() { Status::Pending } else { from };
 
         let mut row = before.clone().into_active_model();
         row.search_key = Set(autoxide_kernel::search::fold(&format!(
@@ -136,7 +149,7 @@ impl CommentsService {
         row.updated_at = Set(now);
         if to != from {
             row.status = Set(to.as_str().to_owned());
-            row.hold_reason = Set(Some(holds.join(",")));
+            row.hold_reason = Set(hold);
         }
         let transaction = self.database.begin_write().await?;
         let after = update_if_unchanged(&transaction, row, &before).await?;
@@ -155,14 +168,18 @@ impl CommentsService {
         self.named(vec![after]).await?.into_iter().next().ok_or_else(|| Error::internal("named"))
     }
 
-    /// Tác giả xoá bình luận `id` (xoá mềm). Đã xoá rồi thì thôi.
+    /// Tác giả xoá bình luận `id` (xoá mềm). Đã xoá rồi thì thôi. Không có bình luận `id` (đã
+    /// xoá hẳn, hay là ID giả của bài bị chống spam bỏ đi) cũng trả lời như đã xoá: bot không
+    /// phân biệt được bài bị bỏ với bài bị giữ chờ duyệt bằng cách xoá thử.
     pub(crate) async fn delete_own(
         &self,
         principal: Option<&Principal>,
         id: Uuid,
         edit_token: Option<&str>,
     ) -> Result<(), Error> {
-        let before = self.find(id).await?;
+        let Some(before) = comment::Entity::find_by_id(id).one(self.database.read()).await? else {
+            return Ok(());
+        };
         self.check_author(&before, principal, edit_token)?;
         if Status::of(&before) == Status::Deleted {
             return Ok(());

@@ -147,6 +147,28 @@ impl PostedComment {
     }
 }
 
+/// A comment just changed, for its author.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct EditedComment {
+    #[serde(flatten)]
+    pub comment: PublicComment,
+    /// `pending` when the change waits for approval (show "your change awaits approval").
+    pub status: Visibility,
+}
+
+impl From<Comment> for EditedComment {
+    fn from(found: Comment) -> Self {
+        EditedComment {
+            status: if found.status() == Status::Published {
+                Visibility::Published
+            } else {
+                Visibility::Pending
+            },
+            comment: found.into(),
+        }
+    }
+}
+
 /// A comment with everything moderators see.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct CommentDetail {

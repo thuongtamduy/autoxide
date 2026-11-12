@@ -78,14 +78,15 @@ impl CommentsService {
 #[serde(rename_all = "snake_case")]
 #[schema(as = CommentStatus)]
 pub(crate) enum Status {
-    /// Waiting for approval; deleted after `AUTOXIDE_COMMENTS_RETENTION_DAYS`.
+    /// Waiting for approval; deleted after `AUTOXIDE_COMMENTS_RETENTION_DAYS` if it was never
+    /// shown.
     Pending,
     /// Shown.
     Published,
     /// Refused by a moderator; not shown.
     Rejected,
     /// Held by the anti-spam checks or marked by a moderator; deleted after
-    /// `AUTOXIDE_COMMENTS_RETENTION_DAYS`.
+    /// `AUTOXIDE_COMMENTS_RETENTION_DAYS` if it was never shown.
     Spam,
     /// Deleted by its author (or after an erasure request): text and name are gone, its place in
     /// the thread stays.
@@ -184,14 +185,44 @@ pub(crate) async fn ensure_target<C: ConnectionTrait>(
 
 /// Đổi số đếm khi bình luận `row` chuyển từ `from` sang `to` (`None`: chưa có / đã xoá hẳn).
 /// Gọi trong transaction của thay đổi.
+///
+/// Thứ tự khoá cố định trong cả module: dòng bình luận đang đổi → dòng bình luận gốc
+/// (`reply_count`) → dòng đích. Mọi lệnh ghi đi cùng một thứ tự thì Postgres không gặp
+/// deadlock (hai transaction giữ khoá của nhau rồi chờ nhau).
 pub(crate) async fn shift_counts<C: ConnectionTrait>(
     connection: &C,
     row: &comment::Model,
     from: Option<Status>,
     to: Option<Status>,
 ) -> Result<(), Error> {
-    let delta = |status: Status| i32::from(to == Some(status)) - i32::from(from == Some(status));
-    let (published, pending) = (delta(Status::Published), delta(Status::Pending));
+    let published = delta(from, to, Status::Published);
+    if published != 0 && row.depth > 0 {
+        comment::Entity::update_many()
+            .col_expr(
+                comment::Column::ReplyCount,
+                Expr::col(comment::Column::ReplyCount).add(published),
+            )
+            .filter(comment::Column::Id.eq(row.root_id))
+            .exec(connection)
+            .await?;
+    }
+    shift_target_counts(connection, row, from, to).await
+}
+
+/// `+1` / `-1` / `0`: bình luận vào hay ra khỏi trạng thái `status`.
+pub(crate) fn delta(from: Option<Status>, to: Option<Status>, status: Status) -> i32 {
+    i32::from(to == Some(status)) - i32::from(from == Some(status))
+}
+
+/// Phần số đếm của đích trong [`shift_counts`] (không đụng `reply_count`).
+pub(crate) async fn shift_target_counts<C: ConnectionTrait>(
+    connection: &C,
+    row: &comment::Model,
+    from: Option<Status>,
+    to: Option<Status>,
+) -> Result<(), Error> {
+    let (published, pending) =
+        (delta(from, to, Status::Published), delta(from, to, Status::Pending));
     if published != 0 || pending != 0 {
         target::Entity::update_many()
             .col_expr(
@@ -204,16 +235,6 @@ pub(crate) async fn shift_counts<C: ConnectionTrait>(
             )
             .filter(target::Column::TargetType.eq(row.target_type.as_str()))
             .filter(target::Column::TargetId.eq(row.target_id.as_str()))
-            .exec(connection)
-            .await?;
-    }
-    if published != 0 && row.depth > 0 {
-        comment::Entity::update_many()
-            .col_expr(
-                comment::Column::ReplyCount,
-                Expr::col(comment::Column::ReplyCount).add(published),
-            )
-            .filter(comment::Column::Id.eq(row.root_id))
             .exec(connection)
             .await?;
     }
