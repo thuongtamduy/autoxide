@@ -356,7 +356,7 @@ async fn tool_mcp() {
 
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 5);
+        assert_eq!(tools.len(), 7);
         for tool in &tools {
             assert!(
                 !serde_json::to_string(&tool.input_schema).unwrap().contains("$ref"),
@@ -405,6 +405,55 @@ async fn tool_mcp() {
         )
         .await;
         assert!(stale, "an old version is refused");
+
+        // Tạo form qua MCP: hình dạng trường sai báo theo đường dẫn, cùng lỗi trạng thái.
+        let (failed, refused) = call(
+            "forms.create",
+            json!({"key": "survey", "name": "Survey", "status": "draft",
+                   "fields": [{"key": "q", "type": "text", "label": {"en": "Q"}}, {"key": "x", "type": "slider"}]}),
+        )
+        .await;
+        assert!(failed, "{refused}");
+        let (failed, created) = call(
+            "forms.create",
+            json!({"key": "survey", "name": "Survey",
+                   "fields": [{"key": "q", "type": "text", "label": {"en": "Question", "vi": "Câu hỏi"}, "required": true}],
+                   "success_message": {"en": "Thanks"}, "retention_days": 30}),
+        )
+        .await;
+        assert!(!failed, "{created}");
+        let survey = created["data"]["id"].as_str().unwrap().to_owned();
+        let etag = created["data"]["etag"].as_str().unwrap().to_owned();
+        assert_eq!(created["data"]["version"], 1);
+        assert_eq!(created["data"]["status"], "open");
+        assert_eq!(created["data"]["retention_days"], 30);
+        let (failed, taken) = call(
+            "forms.create",
+            json!({"key": "survey", "name": "Again", "fields": [{"key": "q", "type": "text", "label": {"en": "Q"}}]}),
+        )
+        .await;
+        assert!(failed, "{taken}");
+
+        // Sửa: cần `etag`; đóng form, xoá thời hạn giữ bằng `null`; bản cũ bị từ chối.
+        let (missing, _) = call("forms.update", json!({"id": survey, "status": "closed"})).await;
+        assert!(missing, "`etag` is required");
+        let (failed, closed) = call(
+            "forms.update",
+            json!({"id": survey, "etag": etag, "status": "closed", "retention_days": null,
+                   "fields": [{"key": "q", "type": "textarea", "label": {"en": "Question"}}]}),
+        )
+        .await;
+        assert!(!failed, "{closed}");
+        assert_eq!(closed["data"]["status"], "closed");
+        assert_eq!(closed["data"]["retention_days"], Value::Null);
+        assert_eq!(closed["data"]["fields"][0]["type"], "textarea");
+        assert_eq!(closed["data"]["version"], 2, "the fields changed");
+        assert_ne!(closed["data"]["etag"], etag.as_str());
+        let (stale, _) =
+            call("forms.update", json!({"id": survey, "etag": etag, "name": "Late"})).await;
+        assert!(stale, "an old version is refused");
+        let (_, read) = call("forms.get", json!({"id": survey})).await;
+        assert_eq!(read["data"]["etag"], closed["data"]["etag"]);
         admin.cancel().await.unwrap();
     })
     .await

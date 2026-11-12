@@ -112,9 +112,17 @@ từng form) cho phù hợp.
 
 ## AI agent (MCP)
 
-Tool `forms.list`, `forms.get`, `forms.list_submissions`, `forms.get_submission` và
-`forms.set_submission_status` (truyền `version` đã đọc, như `If-Match`), cùng permission với REST.
-Không có tool gửi form.
+Các tool, cùng permission và cùng cách kiểm với REST:
+
+- `forms.list`, `forms.get` (`forms.read`); `forms.create` và `forms.update` (`forms.manage`).
+  `forms.get` trả form kèm `etag`; truyền lại vào `etag` của `forms.update`, như `If-Match` (không
+  phải `version` của form — số đó đếm số lần đổi danh sách trường). Đóng form bằng `forms.update`
+  với `status: closed`.
+- `forms.list_submissions`, `forms.get_submission` (`forms.read`) và
+  `forms.set_submission_status` (`forms.review`; truyền `version` của bài gửi đã đọc).
+
+Không có tool xoá form (xoá form xoá luôn mọi bài gửi, không hoàn tác được; dùng REST) và không có
+tool gửi form.
 
 ## Cấu hình
 

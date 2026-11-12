@@ -117,9 +117,17 @@ Decree 356/2025): **check the original texts for your case** and set
 
 ## AI agents (MCP)
 
-Tools `forms.list`, `forms.get`, `forms.list_submissions`, `forms.get_submission` and
-`forms.set_submission_status` (pass the `version` you read, like `If-Match`), with the same
-permissions as REST. There is no tool to send a form.
+Tools, with the same permissions and checks as REST:
+
+- `forms.list`, `forms.get` (`forms.read`); `forms.create` and `forms.update` (`forms.manage`).
+  `forms.get` returns the form with an `etag`; pass it back as `etag` to `forms.update`, like
+  `If-Match` (it is not the form's `version`, which counts changes to the fields). Close a
+  form with `forms.update` and `status: closed`.
+- `forms.list_submissions`, `forms.get_submission` (`forms.read`) and
+  `forms.set_submission_status` (`forms.review`; pass the submission's `version` you read).
+
+There is no tool to delete a form (that also deletes its submissions, and cannot be undone;
+use REST) and no tool to send a form.
 
 ## Settings
 

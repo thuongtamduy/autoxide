@@ -2758,3 +2758,22 @@ Quyết định:
 
 Lý do: event ghi cùng transaction với bài nên mail không sót; `dedupe_key` của D-115 chống mail
 trùng khi event giao lại (D-054). CSV vài chục dòng tự viết đủ, không thêm thư viện.
+
+## D-122 · Tool MCP tạo / sửa form; không có tool xoá form; khoá phiên bản tên `etag` — 2026-11-12 — agent quyết
+
+Quyết định:
+
+- Thêm `forms.create` và `forms.update` (permission `forms.manage`), gọi đúng `create_form` /
+  `update_form` của service như REST. Danh sách trường và `success_message` khai trong JSON Schema
+  là object chung (tool MCP không có `$ref`); tool đọc thành kiểu thật, sai hình dạng thì báo
+  `validation_failed` theo đường dẫn (`fields[1]`), mô tả của tool nêu đủ hình dạng một trường.
+- Khoá chống ghi đè của form trong MCP tên `etag` (đầu ra của `forms.get` / `create` / `update`,
+  đầu vào bắt buộc của `update`), không phải `version` như tool của `content` và tool đổi trạng
+  thái bài gửi: form đã có trường `version` (đếm số lần đổi danh sách trường), hai khoá cùng tên
+  thì một khoá bị đè.
+- Không có tool xoá form: xoá form xoá luôn mọi bài gửi, không hoàn tác được. Agent đóng form bằng
+  `forms.update` (`status: closed`); xoá vẫn làm được qua REST. MCP làm ít hơn REST là được, luật
+  kiến trúc 8 chỉ cấm làm nhiều hơn.
+
+Lý do: chủ dự án yêu cầu agent quản lý được form qua MCP (12/11/2026); việc phá huỷ hàng loạt thì
+giữ cho người làm qua REST.

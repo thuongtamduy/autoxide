@@ -22,7 +22,8 @@ endpoints are marked deprecated with a sunset date first.
   search and CSV export (guarded against formula injection), notification mail to
   administrators with `Reply-To` set to the sender, export and erasure by email, automatic
   deletion after a retention period, consent proof. Permissions `forms.read`,
-  `forms.manage`, `forms.review`, `forms.export`; five MCP tools. New settings
+  `forms.manage`, `forms.review`, `forms.export`; seven MCP tools, including creating and
+  changing forms. New settings
   `AUTOXIDE_FORMS_*`.
 - Content (`/api/v1/content`, guide in `docs/CONTENT.md`): posts and pages with a draft kept
   apart from the published version, a JSON body (ProseMirror / Tiptap) checked against an
