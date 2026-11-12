@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–12 xong** (core + passkey), mọi bước xanh trên cả SQLite và Postgres. Việc tiếp theo: bước 13 — module `cms` (D-078).
+Trạng thái: **bước 0–12 xong** (core + passkey), mọi bước xanh trên cả SQLite và Postgres. Việc tiếp theo: bước 13 — module `content` (D-078, D-080).
 
 ## 0. Khung dự án
 
@@ -124,7 +124,7 @@ Cho AI agent gọi chức năng của hệ thống như công cụ (Model Contex
 - [x] Cấu hình RP ID và origin; không cấu hình thì tính năng tắt, báo lỗi rõ
 - [x] Test bằng authenticator phần mềm trên cả hai database, kể cả dùng đồng thời một nghi thức
 
-## 13. Module `cms` — nội dung (chủ dự án chọn ngày 12/11/2026, D-078)
+## 13. Module `content` — nội dung (chủ dự án chọn ngày 12/11/2026, D-078, D-080)
 
 Chỉ nội dung và những gì liên quan đến nội dung; không thương mại điện tử. Giao diện (trang
 quản trị, website) là repo riêng (D-079) — bước này chỉ làm API.
@@ -137,7 +137,7 @@ Core thêm trước — trung lập với nghiệp vụ, module nào cũng dùng
 - [ ] Endpoint đọc công khai (không cần đăng nhập) có `ETag` / `If-None-Match` và `Cache-Control`
 - [ ] Chống ghi đè khi hai người cùng sửa: `ETag` + `If-Match`, sai thì `412`
 
-Module `cms`:
+Module `content`:
 
 - [ ] Bài viết và trang: tiêu đề, slug duy nhất, tóm tắt, nội dung JSON có cấu trúc (core không
       phụ thuộc trình soạn thảo), ảnh đại diện (ID file của module `files`), tác giả (ID người dùng)

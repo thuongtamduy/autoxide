@@ -1731,3 +1731,19 @@ dung tĩnh nhưng thêm một framework thứ hai; `@hey-api/openapi-ts` — sin
 nhưng chưa tới 1.0; Flutter / Expo cho app — chưa làm app (D-078).
 
 Ghi chú: phiên bản cụ thể ghim trong repo giao diện khi tạo; mục này chỉ chốt lựa chọn.
+
+## D-080 · Module nội dung tên là `content`, không phải `cms` — 2026-11-12 — chủ dự án quyết
+
+Quyết định: module nội dung của D-078 tên là `content` (thư mục `modules/content`, crate
+`autoxide-content`; bảng `content_…`; route `/api/v1/content/…`; permission, mã lỗi và event
+mang tiền tố `content.`; cấu hình `AUTOXIDE_CONTENT_…`). Phạm vi giữ nguyên như D-078.
+
+Lý do: chủ dự án thấy `cms` quá chung chung. "CMS" là tên một ứng dụng (màn hình quản trị +
+nội dung), còn module được đặt theo dữ liệu nó sở hữu. Nội dung còn được nơi khác dùng —
+website, storefront nếu sau này có (trang giới thiệu, blog, banner), AI agent qua MCP — nên
+tên phải nói về dữ liệu, không về một màn hình. Sản phẩm, đơn hàng nếu có sau này là module
+riêng; `content` không biết về chúng.
+
+Đã cân nhắc: `posts` — hẹp, nội dung còn có trang và menu; `publishing` — dài, mơ hồ.
+
+Thay: tên `cms` trong D-078.
