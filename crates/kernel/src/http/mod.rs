@@ -146,7 +146,7 @@ pub fn build(
         router = router.merge(mcp);
     }
 
-    if let Some(authenticator) = extras.authenticator {
+    if let Some(authenticator) = extras.authenticator.clone() {
         // Đặt bộ xác thực vào "extensions" của mọi request, nơi extractor
         // `Principal` tìm nó.
         router = router.layer(Extension(authenticator));
@@ -157,6 +157,7 @@ pub fn build(
     let idempotency = extras.idempotency.map(|store| {
         Arc::new(idempotency::Settings {
             store,
+            authenticator: extras.authenticator.clone(),
             body_limits: body_limits.clone(),
             request_timeout: config.request_timeout,
         })
@@ -206,13 +207,17 @@ pub fn build(
 async fn enforce_timeout(limit: Duration, request: Request, next: Next) -> Response {
     match tokio::time::timeout(limit, next.run(request)).await {
         Ok(response) => response,
-        Err(_) => Error::unavailable(
-            "request_timeout",
-            "The server did not finish handling the request within {seconds} seconds. Retry later.",
-        )
-        .with_param("seconds", limit.as_secs())
-        .into_response(),
+        Err(_) => timed_out(limit).into_response(),
     }
+}
+
+/// Lỗi khi request chạy quá `limit`.
+fn timed_out(limit: Duration) -> Error {
+    Error::unavailable(
+        "request_timeout",
+        "The server did not finish handling the request within {seconds} seconds. Retry later.",
+    )
+    .with_param("seconds", limit.as_secs())
 }
 
 fn cors(origins: &CorsOrigins) -> CorsLayer {

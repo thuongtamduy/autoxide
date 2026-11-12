@@ -58,8 +58,10 @@ pub(crate) async fn open<C: ConnectionTrait>(
     Ok(mfa_token)
 }
 
-/// Lượt còn hiệu lực của `mfa_token`: (ID lượt, người dùng).
-pub(crate) async fn find<C: ConnectionTrait>(
+/// Xin một lượt nhập mã của `mfa_token`, TRƯỚC khi kiểm mã: (ID lượt, người dùng). Câu
+/// `UPDATE` có điều kiện đếm lượt này; hết lượt hay hết hạn thì từ chối — nhiều request
+/// cùng lúc không vượt được [`MAX_ATTEMPTS`] lần đoán (D-079).
+pub(crate) async fn claim_attempt<C: ConnectionTrait>(
     connection: &C,
     mfa_token: &str,
     now: DateTime<Utc>,
@@ -68,22 +70,18 @@ pub(crate) async fn find<C: ConnectionTrait>(
         .filter(Column::TokenHash.eq(token::sha256(mfa_token)))
         .one(connection)
         .await?
-        .filter(|row| row.expires_at > now && row.attempts < MAX_ATTEMPTS)
         .ok_or_else(invalid_mfa_token)?;
-    Ok((row.id, row.user_id))
-}
-
-/// Ghi một lần nhập sai.
-pub(crate) async fn record_attempt<C: ConnectionTrait>(
-    connection: &C,
-    id: Uuid,
-) -> Result<(), Error> {
-    Entity::update_many()
+    let claimed = Entity::update_many()
         .col_expr(Column::Attempts, Expr::col(Column::Attempts).add(1))
-        .filter(Column::Id.eq(id))
+        .filter(Column::Id.eq(row.id))
+        .filter(Column::Attempts.lt(MAX_ATTEMPTS))
+        .filter(Column::ExpiresAt.gt(now))
         .exec(connection)
         .await?;
-    Ok(())
+    if claimed.rows_affected == 0 {
+        return Err(invalid_mfa_token());
+    }
+    Ok((row.id, row.user_id))
 }
 
 /// Dùng hết lượt (đã nhập đúng). `false` nếu request khác vừa dùng nó: mỗi lượt cấp

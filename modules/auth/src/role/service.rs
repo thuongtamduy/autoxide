@@ -287,6 +287,31 @@ impl RoleService {
         Ok(Principal::new(user_id, permissions))
     }
 
+    /// `Ok` nếu `actor` có mọi permission người dùng `target` có. Dùng trước khi một
+    /// quản trị viên tác động lên tài khoản người khác (gỡ MFA, khoá, đặt mật khẩu đầu):
+    /// người chỉ có `auth.users.manage` không được làm yếu tài khoản của người quyền cao
+    /// hơn mình, rồi chiếm nó (D-079).
+    pub(crate) async fn require_covers(
+        &self,
+        actor: &Principal,
+        target: Uuid,
+    ) -> Result<(), Error> {
+        let target = self.principal(target).await?;
+        let covered = if target.has_all_permissions() {
+            actor.has_all_permissions()
+        } else {
+            target.permissions().iter().all(|permission| actor.allows(permission))
+        };
+        if covered {
+            return Ok(());
+        }
+        Err(Error::forbidden(
+            "auth.target_has_more_permissions",
+            "This user has permissions that you do not have, so you cannot change their \
+             account this way. Ask someone who has all of their permissions.",
+        ))
+    }
+
     /// Kiểm và chuẩn hoá dữ liệu vào; báo mọi trường sai cùng lúc.
     fn check(&self, input: RoleInput) -> Result<(String, String, Vec<String>), Error> {
         let name = input.name.trim().to_owned();

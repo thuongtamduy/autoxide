@@ -218,7 +218,7 @@ async fn get_user(
     responses(
         (status = 200, description = "The account after the change.", body = Data<UserResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.users.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
         (status = 409, description = "No active user would keep the `admin` role; code `auth.last_admin`.", body = Problem),
         (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
@@ -231,6 +231,7 @@ async fn update_user(
     ValidJson(input): ValidJson<UpdateUserRequest>,
 ) -> Result<Data<UserResponse>, Error> {
     principal.require(&USERS_MANAGE)?;
+    state.roles.require_covers(&principal, id).await?;
     let changes = UserChanges { name: input.name, disabled: input.disabled };
     Ok(Data { data: state.users.update(Actor::from(&principal), id, changes).await?.into() })
 }
@@ -286,7 +287,7 @@ async fn register(
     responses(
         (status = 204, description = "The password was set; the user can sign in with it."),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.users.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
         (status = 409, description = "The account already has a password; code `auth.password_already_set`.", body = Problem),
         (status = 422, description = "The password breaks the rules; see `errors`.", body = Problem),
@@ -299,6 +300,7 @@ async fn set_user_password(
     ValidJson(input): ValidJson<SetPasswordRequest>,
 ) -> Result<StatusCode, Error> {
     principal.require(&USERS_MANAGE)?;
+    state.roles.require_covers(&principal, id).await?;
     state.users.set_initial_password(Actor::from(&principal), id, input.password).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -309,8 +311,71 @@ mod tests {
     use axum::http::StatusCode;
     use serde_json::json;
 
+    use autoxide_kernel::event::Actor;
+
     use crate::api::{Accounts, NewAccount};
     use crate::http::test_support::{PASSWORD, app, app_with, bearer, call};
+
+    /// Người chỉ có `auth.users.manage` không gỡ MFA, không khoá, không đặt mật khẩu
+    /// cho người có quyền cao hơn mình; với người ngang hoặc thấp hơn thì được (D-079).
+    #[tokio::test]
+    async fn khong_tac_dong_len_nguoi_quyen_cao_hon() {
+        TestDatabase::run(async |test| {
+            let (app, services) = app(test).await;
+            let root = NewAccount {
+                email: "root@example.com".to_owned(),
+                name: "Root".to_owned(),
+                password: None,
+                admin: true,
+            };
+            let root = Accounts::create(services.users.as_ref(), root).await.unwrap();
+            let bob = NewAccount {
+                email: "bob@example.com".to_owned(),
+                name: "Bob".to_owned(),
+                password: None,
+                admin: false,
+            };
+            let bob = Accounts::create(services.users.as_ref(), bob).await.unwrap();
+            let helpdesk = crate::role::RoleInput {
+                name: "helpdesk".to_owned(),
+                description: String::new(),
+                permissions: vec!["auth.users.manage".to_owned()],
+            };
+            let helpdesk = services.roles.create(Actor::system(), helpdesk).await.unwrap();
+            let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
+            services
+                .roles
+                .set_user_roles(Actor::system(), ada.id, vec![helpdesk.id])
+                .await
+                .unwrap();
+            let ada = bearer(&app, "ada@example.com", PASSWORD).await;
+
+            let password = json!({"password": "a brand new password"});
+            let disable = json!({"disabled": true});
+            let requests = [
+                ("DELETE", format!("/users/{}/mfa", root.id), None),
+                ("PATCH", format!("/users/{}", root.id), Some(disable.clone())),
+                ("PUT", format!("/users/{}/password", root.id), Some(password.clone())),
+            ];
+            for (method, path, body) in requests {
+                let (status, _, problem) = call(&app, method, &path, Some(&ada), body).await;
+                assert_eq!(status, StatusCode::FORBIDDEN, "{method} {path}: {problem}");
+                assert_eq!(problem["code"], "auth.target_has_more_permissions");
+            }
+
+            let path = format!("/users/{}/mfa", bob.id);
+            let (status, _, _) = call(&app, "DELETE", &path, Some(&ada), None).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+            let path = format!("/users/{}/password", bob.id);
+            let (status, _, _) = call(&app, "PUT", &path, Some(&ada), Some(password)).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+            let path = format!("/users/{}", bob.id);
+            let (status, _, body) = call(&app, "PATCH", &path, Some(&ada), Some(disable)).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+        })
+        .await
+        .unwrap();
+    }
 
     #[tokio::test]
     async fn quan_tri_vien_tao_xem_va_khoa_nguoi_dung() {
@@ -445,7 +510,7 @@ mod event_tests {
             let body = json!({"disabled": true});
             let path = format!("/users/{bob_id}");
             call(&app, "PATCH", &path, Some(&admin), Some(body)).await;
-            let body = json!({"name": "agent", "permissions": ["auth.users.read"]});
+            let body = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": PASSWORD});
             let (_, _, key) = call(&app, "POST", "/api-keys", Some(&admin), Some(body)).await;
             let (_, _, setup) = call(&app, "POST", "/me/mfa/totp", Some(&admin), None).await;
             let secret = setup["data"]["secret"].as_str().unwrap().to_owned();

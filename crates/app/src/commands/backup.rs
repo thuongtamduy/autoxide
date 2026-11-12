@@ -271,7 +271,16 @@ async fn load_files(storage: Arc<dyn Storage>, directory: &Path) -> Result<u64, 
         };
         while let Some(entry) = entries.next_entry().await.map_err(|error| error.to_string())? {
             let path = entry.path();
-            if entry.file_type().await.map_err(|error| error.to_string())?.is_dir() {
+            let kind = entry.file_type().await.map_err(|error| error.to_string())?;
+            // Bản backup chỉ chứa file thường và thư mục. Symlink có thể trỏ ra ngoài (vd
+            // một file hệ thống) và đưa nó vào kho lưu, nên từ chối (D-079).
+            if kind.is_symlink() {
+                return Err(format!(
+                    "{} is a symbolic link; a backup made by `autoxide backup` has none",
+                    path.display()
+                ));
+            }
+            if kind.is_dir() {
                 pending.push(path);
                 continue;
             }
@@ -442,6 +451,18 @@ mod tests {
             run_restore(settings(test.url(), &files), backup.clone()).await.unwrap();
 
             check(test.url(), &files).await;
+            // Bản backup bị cài symlink trỏ ra ngoài: từ chối, không đọc file đó.
+            let tampered = scratch.0.join("tampered");
+            std::fs::create_dir_all(&tampered).unwrap();
+            for entry in ["backup.json", "database.sqlite"] {
+                std::fs::copy(backup.join(entry), tampered.join(entry)).unwrap();
+            }
+            std::fs::create_dir_all(tampered.join("files/files")).unwrap();
+            std::os::unix::fs::symlink("/etc/hostname", tampered.join("files/files/x")).unwrap();
+            let target = format!("sqlite://{}?mode=rwc", scratch.0.join("t.sqlite").display());
+            let refused =
+                run_restore(settings(&target, &scratch.0.join("files-c")), tampered).await;
+            assert!(refused.unwrap_err().contains("is a symbolic link"));
             // Thư mục không phải bản backup: báo rõ.
             let wrong = run_restore(settings(test.url(), &files), scratch.0.clone()).await;
             assert!(wrong.unwrap_err().contains("is not a backup made by `autoxide backup`"));

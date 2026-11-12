@@ -32,6 +32,9 @@ const KEPT_HEADERS: [HeaderName; 5] = [
 
 pub(super) struct Settings {
     pub store: Arc<dyn IdempotencyStore>,
+    /// Xác thực người gọi TRƯỚC khi đọc thân request: người lạ không làm máy chủ giữ thân
+    /// request trong bộ nhớ hay ghi dòng nào vào kho (đo được khi rà soát, D-079).
+    pub authenticator: Option<Arc<dyn crate::access::Authenticator>>,
     /// Giới hạn thân request (đọc trước để băm).
     pub body_limits: Arc<super::body_limit::BodyLimits>,
     /// Thời gian tối đa của một request: hết thì lần đầu coi như đã chết.
@@ -79,16 +82,38 @@ async fn run(
             .with_param("max", MAX_KEY_LENGTH)
         })?
         .to_owned();
-    // Người gọi = thông tin xác thực đã băm: key của hai người khác nhau không đụng nhau.
+    // Người gọi = danh tính đã xác thực (người dùng, và API key nếu có) — không phải chuỗi
+    // token: access token đổi mỗi lần làm mới, lần gửi lại sau đó vẫn phải nhận ra. Không
+    // xác thực được thì bỏ qua idempotency: handler tự trả lỗi, không đọc, không lưu gì.
     let authorization =
-        request.headers().get(header::AUTHORIZATION).map(HeaderValue::as_bytes).unwrap_or_default();
-    let scope = hash(&[authorization]);
+        request.headers().get(header::AUTHORIZATION).and_then(|value| value.to_str().ok());
+    let principal = match &settings.authenticator {
+        Some(authenticator) => authenticator.authenticate(authorization).await.ok(),
+        None => None,
+    };
+    let Some(principal) = principal else {
+        return Ok(next.run(request).await);
+    };
+    let api_key = principal.api_key_id().map(|id| id.as_bytes().to_vec()).unwrap_or_default();
+    let scope = hash(&[principal.user_id().as_bytes(), &api_key]);
     let limit = settings.body_limits.for_request(&request);
     let (parts, body) = request.into_parts();
+    // Đọc thân trong giới hạn thời gian của request: client gửi nhỏ giọt không giữ được
+    // kết nối và bộ nhớ mãi.
     let bytes =
-        axum::body::to_bytes(body, limit).await.map_err(|_| super::body_limit::too_large(limit))?;
+        match tokio::time::timeout(settings.request_timeout, axum::body::to_bytes(body, limit))
+            .await
+        {
+            Ok(Ok(bytes)) => bytes,
+            Ok(Err(_)) => return Err(super::body_limit::too_large(limit)),
+            Err(_) => return Err(super::timed_out(settings.request_timeout)),
+        };
+    let content_type =
+        parts.headers.get(header::CONTENT_TYPE).map(HeaderValue::as_bytes).unwrap_or_default();
+    let target = parts.uri.path_and_query().map(|target| target.as_str()).unwrap_or_default();
+    // Cùng key mà khác đường dẫn, query, loại nội dung hay thân: là request khác.
     let fingerprint =
-        hash(&[parts.method.as_str().as_bytes(), parts.uri.path().as_bytes(), bytes.as_ref()]);
+        hash(&[parts.method.as_str().as_bytes(), target.as_bytes(), content_type, bytes.as_ref()]);
     let lock = chrono::Duration::from_std(settings.request_timeout + Duration::from_secs(30))
         .map_err(Error::internal)?;
     let begin = settings.store.begin(&scope, &key, &fingerprint, chrono::Utc::now() + lock).await?;

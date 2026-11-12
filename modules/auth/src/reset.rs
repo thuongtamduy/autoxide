@@ -73,6 +73,10 @@ pub(crate) struct PasswordResets {
     pub mailer: Arc<dyn Mailer>,
     pub translations: Translations,
     pub outbox: Outbox,
+    /// Đặt lại mật khẩu là lúc chủ thật lấy lại tài khoản: passkey và API key gắn vào trước
+    /// đó (có thể bởi kẻ gian) bị thu hồi (D-079).
+    pub passkeys: Arc<crate::passkey::PasskeyService>,
+    pub api_keys: Arc<crate::api_key::ApiKeyService>,
     /// Trang của giao diện, có `{token}`; `None`: mail chứa token.
     pub url: Option<String>,
 }
@@ -155,7 +159,10 @@ impl PasswordResets {
         if claimed.rows_affected == 0 {
             return Err(invalid_token());
         }
-        self.users.set_password(Actor::user(row.user_id), row.user_id, new_password).await?;
+        let actor = Actor::user(row.user_id);
+        self.users.set_password(actor, row.user_id, new_password).await?;
+        self.passkeys.remove_all(actor, row.user_id).await?;
+        self.api_keys.revoke_all(actor, row.user_id).await?;
         // Các token đặt lại khác của người này (mail cũ hơn) cũng hết dùng được.
         Entity::update_many()
             .col_expr(Column::UsedAt, Expr::value(Some(now)))

@@ -215,6 +215,25 @@ mod tests {
         (StatusCode::CREATED, format!("run {run}: {body}"))
     }
 
+    /// `Bearer ada` và `Bearer ada-renewed` là cùng một người (token vừa làm mới);
+    /// `Bearer bob` là người khác; không token thì không xác thực được.
+    struct FakeAuthenticator;
+
+    #[async_trait::async_trait]
+    impl autoxide_kernel::access::Authenticator for FakeAuthenticator {
+        async fn authenticate(
+            &self,
+            authorization: Option<&str>,
+        ) -> Result<autoxide_kernel::access::Principal, autoxide_kernel::error::Error> {
+            let user = match authorization {
+                Some("Bearer ada" | "Bearer ada-renewed") => 1,
+                Some("Bearer bob") => 2,
+                _ => return Err(autoxide_kernel::error::Error::internal("unknown test token")),
+            };
+            Ok(autoxide_kernel::access::Principal::new(uuid::Uuid::from_u128(user), []))
+        }
+    }
+
     async fn setup(test: &TestDatabase) -> (Router, Arc<Counter>, Database) {
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
@@ -229,8 +248,11 @@ mod tests {
         let counter = Arc::new(Counter::default());
         let routes = OpenApiRouter::new().routes(routes!(create)).with_state(counter.clone());
         let store: Arc<dyn IdempotencyStore> = Arc::new(Store::new(database.clone()));
-        let extras =
-            autoxide_kernel::http::Extras { idempotency: Some(store), ..Default::default() };
+        let extras = autoxide_kernel::http::Extras {
+            idempotency: Some(store),
+            authenticator: Some(Arc::new(FakeAuthenticator)),
+            ..Default::default()
+        };
         let router = autoxide_kernel::http::build(
             &config.http,
             OpenApiRouter::new(),
@@ -246,7 +268,20 @@ mod tests {
         key: Option<&str>,
         body: &str,
     ) -> (StatusCode, Option<String>, String) {
-        let mut request = Request::builder().method("POST").uri("/api/v1/notes");
+        post_as(app, Some("Bearer ada"), "/api/v1/notes", key, body).await
+    }
+
+    async fn post_as(
+        app: &Router,
+        authorization: Option<&str>,
+        uri: &str,
+        key: Option<&str>,
+        body: &str,
+    ) -> (StatusCode, Option<String>, String) {
+        let mut request = Request::builder().method("POST").uri(uri);
+        if let Some(authorization) = authorization {
+            request = request.header("authorization", authorization);
+        }
         if let Some(key) = key {
             request = request.header("idempotency-key", key);
         }
@@ -289,6 +324,51 @@ mod tests {
             let (status, _, body) = post(&app, Some(&long), "hello").await;
             assert_eq!(status, StatusCode::BAD_REQUEST);
             assert!(body.contains("idempotency_key_invalid"), "{body}");
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Theo danh tính, không theo chuỗi token; người lạ không được lưu gì (D-079).
+    #[tokio::test]
+    async fn pham_vi_theo_nguoi_goi_va_nguoi_la_khong_duoc_luu() {
+        use sea_orm::ConnectionTrait as _;
+        TestDatabase::run(async |test| {
+            let (app, counter, database) = setup(test).await;
+            let notes = "/api/v1/notes";
+
+            post_as(&app, Some("Bearer ada"), notes, Some("k"), "hello").await;
+            // Client vừa làm mới token rồi gửi lại: vẫn là gửi lại.
+            let renewed =
+                post_as(&app, Some("Bearer ada-renewed"), notes, Some("k"), "hello").await;
+            assert_eq!(renewed.1.as_deref(), Some("true"));
+            // Người khác dùng trùng key: là việc riêng của họ.
+            let bob = post_as(&app, Some("Bearer bob"), notes, Some("k"), "hello").await;
+            assert_eq!(bob.1, None);
+            // Cùng key, khác query: request khác, bị từ chối.
+            let other =
+                post_as(&app, Some("Bearer ada"), "/api/v1/notes?draft=1", Some("k"), "hello")
+                    .await;
+            assert_eq!(other.0, StatusCode::UNPROCESSABLE_ENTITY, "{}", other.2);
+            assert_eq!(counter.runs.load(Ordering::SeqCst), 2);
+
+            // Không xác thực được: handler chạy như thường, không ghi dòng nào.
+            let backend = database.read().get_database_backend();
+            let count = || async {
+                let sql = "SELECT COUNT(*) AS n FROM idempotency_record";
+                let row = database
+                    .read()
+                    .query_one_raw(sea_orm::Statement::from_string(backend, sql))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                row.try_get::<i64>("", "n").unwrap()
+            };
+            let before = count().await;
+            post_as(&app, None, notes, Some("anon"), "hello").await;
+            post_as(&app, None, notes, Some("anon"), "hello").await;
+            assert_eq!(count().await, before);
+            assert_eq!(counter.runs.load(Ordering::SeqCst), 4);
         })
         .await
         .unwrap();

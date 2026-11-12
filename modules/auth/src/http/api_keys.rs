@@ -87,6 +87,10 @@ pub(crate) struct CreateApiKeyRequest {
     /// When the key stops working (RFC 3339, in the future). Omit for a key that does
     /// not expire.
     expires_at: Option<DateTime<Utc>>,
+    /// Your current password: a stolen access token alone must not create a key that
+    /// outlives it.
+    #[validate(length(min = 1, max = 1024))]
+    current_password: String,
 }
 
 /// List your API keys.
@@ -141,6 +145,7 @@ async fn create_api_key(
         name: input.name,
         permissions: input.permissions,
         expires_at: input.expires_at,
+        current_password: input.current_password,
     };
     let created = state.api_keys.create(&principal, input).await?;
     let data = CreatedApiKeyResponse { key: created.secret, details: created.key.into() };
@@ -193,7 +198,15 @@ mod tests {
             Accounts::create(services.users.as_ref(), root).await.unwrap();
             let session = bearer(&app, "root@example.com", PASSWORD).await;
 
-            let body = json!({"name": "agent", "permissions": ["auth.users.read"]});
+            // Thiếu hay sai mật khẩu hiện tại: không tạo được (token lộ không đủ).
+            let wrong = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": "wrong one"});
+            let (status, _, problem) = call(&app, "POST", "/api-keys", Some(&session), Some(wrong)).await;
+            assert_eq!((status, problem["code"].as_str()), (StatusCode::BAD_REQUEST, Some("auth.wrong_password")));
+            let missing = json!({"name": "agent", "permissions": ["auth.users.read"]});
+            let (status, _, _) = call(&app, "POST", "/api-keys", Some(&session), Some(missing)).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+            let body = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": PASSWORD});
             let (status, _, created) =
                 call(&app, "POST", "/api-keys", Some(&session), Some(body.clone())).await;
             assert_eq!(status, StatusCode::CREATED, "{created}");

@@ -129,7 +129,7 @@ Cho AI agent gọi chức năng của hệ thống như công cụ (Model Contex
 Kiểm lại phần đã có:
 
 - [ ] CI chạy xanh trên GitHub
-- [ ] Rà soát bảo mật toàn repo bằng một lượt đọc độc lập; sửa mọi lỗi tìm thấy
+- [x] Rà soát bảo mật toàn repo bằng một lượt đọc độc lập; sửa mọi lỗi tìm thấy (D-079)
 - [ ] Thử tải dài hạn: không rò bộ nhớ, không rò kết nối database
 
 Hệ thống tài khoản:

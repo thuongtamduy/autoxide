@@ -41,6 +41,7 @@
   "auth.role_name_taken": "Đã có role tên `{name}`. Hãy chọn tên khác.",
   "auth.role_not_found": "Không có role `{id}`.",
   "auth.session_required": "Việc này cần phiên đăng nhập; API key không làm được. Hãy đăng nhập bằng mật khẩu (`POST /api/v1/auth/login`) và dùng access token đó.",
+  "auth.target_has_more_permissions": "Người dùng này có permission mà bạn không có, nên bạn không thay đổi tài khoản của họ theo cách này được. Hãy nhờ người có đủ mọi permission của họ.",
   "auth.token_expired": "Access token đã hết hạn. Lấy token mới bằng refresh token (`POST /api/v1/auth/refresh`).",
   "auth.user_disabled": "Tài khoản này đã bị khoá. Hãy nhờ quản trị viên mở khoá.",
   "auth.user_not_found": "Không có người dùng `{id}`.",

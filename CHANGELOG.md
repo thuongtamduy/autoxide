@@ -9,6 +9,28 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Changed
+
+- Creating an API key (`POST /api/v1/auth/api-keys`) and starting a passkey registration
+  (`POST /api/v1/auth/me/passkeys/registration`) now need `current_password` in the body.
+- Resetting a password by email also removes the account's passkeys and API keys, so
+  whoever had taken over the account loses every way back in.
+- Idempotency keys are scoped to the caller: a request that is not signed in is never
+  stored, and two users using the same key do not see each other's answers.
+
+### Security
+
+- Concurrent wrong passwords or codes can no longer go past the login throttle; wrong
+  codes when turning off two-step sign-in or replacing recovery codes are counted too.
+- A refresh racing with disabling the account can no longer issue a new token.
+- `auth.users.manage` no longer lets someone reset two-step sign-in, disable or set the
+  first password of a user who has permissions they lack (code
+  `auth.target_has_more_permissions`).
+- Finished jobs drop their payload, so links with tokens do not stay in the database.
+- The rate limiter reads only the last value of the client IP header, as added by your
+  proxy; `autoxide restore` refuses backups that contain symbolic links; idempotency waits
+  for a request body no longer than the request timeout.
+
 ## [0.1.0] - 2026-11-11
 
 First release: the complete core.

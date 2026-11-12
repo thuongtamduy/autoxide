@@ -15,15 +15,21 @@ use super::{Passkey, PasskeyService};
 use crate::testing::Services;
 use crate::user::{NewUser, UserChanges};
 
+const PASSWORD: &str = "correct horse battery staple";
+
 async fn user(services: &Services, email: &str) -> Uuid {
-    let input = NewUser { email: email.to_owned(), name: "Ada".to_owned(), password: None };
+    let input = NewUser {
+        email: email.to_owned(),
+        name: "Ada".to_owned(),
+        password: Some(PASSWORD.to_owned()),
+    };
     services.users.create(Actor::system(), input).await.unwrap().id
 }
 
 /// Đăng ký passkey của `device` cho `user_id`.
 async fn register(services: &Services, user_id: Uuid, device: &mut SoftAuthenticator) -> Passkey {
     let passkeys = &services.passkeys;
-    let ceremony = passkeys.start_registration(user_id).await.unwrap();
+    let ceremony = passkeys.start_registration(user_id, PASSWORD).await.unwrap();
     let credential = device.register(&ceremony.options);
     passkeys.finish_registration(user_id, ceremony.id, "Phone", &credential).await.unwrap()
 }
@@ -73,7 +79,7 @@ async fn nghi_thuc_dung_mot_lan_va_khong_gui_lai_duoc() {
         let passkeys = &services.passkeys;
 
         // Đăng ký: dùng lại cùng nghi thức thì bị từ chối.
-        let ceremony = passkeys.start_registration(ada).await.unwrap();
+        let ceremony = passkeys.start_registration(ada, PASSWORD).await.unwrap();
         let credential = phone.register(&ceremony.options);
         passkeys.finish_registration(ada, ceremony.id, "Phone", &credential).await.unwrap();
         let again = passkeys.finish_registration(ada, ceremony.id, "Phone", &credential).await;
@@ -93,7 +99,7 @@ async fn nghi_thuc_dung_mot_lan_va_khong_gui_lai_duoc() {
 
         // Nghi thức đăng ký của người khác không dùng được.
         let bob = user(&services, "bob@example.com").await;
-        let theirs = passkeys.start_registration(ada).await.unwrap();
+        let theirs = passkeys.start_registration(ada, PASSWORD).await.unwrap();
         let wrong = passkeys.finish_registration(bob, theirs.id, "Phone", &credential).await;
         assert_eq!(wrong.unwrap_err().code(), "auth.invalid_passkey_ceremony");
     })
@@ -111,7 +117,7 @@ async fn cau_tra_loi_sai_bi_tu_choi() {
         // Trang web lạ (origin không được phép) không đăng ký được.
         let mut phishing = SoftAuthenticator::new(2);
         phishing.origin = "https://evil.example.net".to_owned();
-        let ceremony = passkeys.start_registration(ada).await.unwrap();
+        let ceremony = passkeys.start_registration(ada, PASSWORD).await.unwrap();
         let credential = phishing.register(&ceremony.options);
         let rejected = passkeys.finish_registration(ada, ceremony.id, "x", &credential).await;
         let rejected = rejected.unwrap_err();
@@ -154,7 +160,7 @@ async fn nhieu_passkey_xoa_va_tai_khoan_bi_khoa() {
         let (mut phone, mut key) = (SoftAuthenticator::new(5), SoftAuthenticator::new(6));
 
         let first = register(&services, ada, &mut phone).await;
-        let ceremony = services.passkeys.start_registration(ada).await.unwrap();
+        let ceremony = services.passkeys.start_registration(ada, PASSWORD).await.unwrap();
         // Passkey đã có được báo cho trình duyệt (không tạo trùng trên cùng thiết bị), và
         // mọi passkey của một người dùng chung một user handle.
         assert_eq!(ceremony.options["excludeCredentials"].as_array().unwrap().len(), 1);
@@ -188,6 +194,47 @@ async fn nhieu_passkey_xoa_va_tai_khoan_bi_khoa() {
     .unwrap();
 }
 
+/// Access token bị lộ không đủ để gắn passkey; chủ thật đặt lại mật khẩu qua email thì
+/// passkey và API key gắn trước đó bị thu hồi (D-079).
+#[tokio::test]
+async fn can_mat_khau_va_dat_lai_mat_khau_thu_hoi_passkey() {
+    TestDatabase::run(async |test| {
+        let services = crate::testing::services(test).await;
+        let ada = user(&services, "ada@example.com").await;
+        let wrong = services.passkeys.start_registration(ada, "guess").await.err().unwrap();
+        assert_eq!(wrong.code(), "auth.wrong_password");
+
+        let mut attacker = SoftAuthenticator::new(9);
+        register(&services, ada, &mut attacker).await;
+        let key = crate::api_key::NewApiKey {
+            name: "agent".to_owned(),
+            permissions: vec!["auth.users.read".to_owned()],
+            expires_at: None,
+            current_password: PASSWORD.to_owned(),
+        };
+        // Ada chưa có role nào: thử với quyền admin để key tạo được.
+        let admin = autoxide_kernel::access::Principal::with_all_permissions(ada);
+        services.api_keys.create(&admin, key).await.unwrap();
+
+        services
+            .resets
+            .request("ada@example.com", autoxide_kernel::i18n::Language::En)
+            .await
+            .unwrap();
+        let token = crate::testing::last_token(&services);
+        services.resets.confirm(&token, "a brand new passphrase".to_owned()).await.unwrap();
+
+        assert!(list(&services, ada).await.is_empty());
+        let keys = services.api_keys.list(ada, &PageRequest::first(10, Order::Asc)).await.unwrap();
+        assert!(keys.data.is_empty());
+        let (ceremony, response) = sign_in(&services.passkeys, &mut attacker).await;
+        let refused = services.passkeys.finish_login(ceremony, &response).await.unwrap_err();
+        assert_eq!(refused.code(), "auth.passkey_sign_in_failed");
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn chua_cau_hinh_thi_passkey_tat() {
     TestDatabase::run(async |test| {
@@ -204,7 +251,7 @@ async fn chua_cau_hinh_thi_passkey_tat() {
         let error = off.start_login().await.err().unwrap();
 
         assert_eq!((error.kind(), error.code()), (ErrorKind::Forbidden, "auth.passkeys_disabled"));
-        assert!(off.start_registration(Uuid::now_v7()).await.is_err());
+        assert!(off.start_registration(Uuid::now_v7(), PASSWORD).await.is_err());
     })
     .await
     .unwrap();

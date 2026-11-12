@@ -1710,3 +1710,34 @@ qua đúng gate; lỗ hổng mới công bố được biết ngay cả khi repo
 Đã cân nhắc: `cargo-release` / `release-plz` — tự động hơn nhưng thêm công cụ và quy ước
 cho một việc làm vài lần mỗi năm; phát hành binary cho từng hệ điều hành — Docker và
 `cargo build` đã đủ cho máy chủ.
+
+## D-079 · Rà soát bảo mật bước 13: đếm lượt trước khi kiểm, xác nhận lại mật khẩu, không tác động lên người quyền cao hơn — 2026-11-12 — agent quyết
+
+Hai agent đọc độc lập toàn repo (kernel/CLI và module `auth`); mọi lỗi tìm thấy đã sửa:
+
+- **Login throttling đếm trước rồi mới kiểm** (`LoginThrottle::reserve`): nhiều request bắn
+  cùng lúc không vượt được `max_failures`. Mật khẩu đúng mà còn chờ mã MFA thì trả lại lượt
+  (`refund`), đúng hẳn thì xoá (`clear`). Mã MFA của một lần đăng nhập được claim bằng một
+  câu `UPDATE` có điều kiện. Tắt TOTP và tạo lại recovery code cũng đếm mã sai, theo
+  người dùng (`mfa:<user_id>`).
+- **Refresh token** khoá dòng người dùng trước (`UPDATE … WHERE disabled_at IS NULL`) trong
+  cùng transaction: refresh không lọt qua lúc tài khoản đang bị khoá.
+- **Xác nhận lại mật khẩu** khi tạo API key và khi bắt đầu thêm passkey; đặt lại mật khẩu
+  qua email xoá mọi passkey và API key — kẻ chiếm phiên không cài được cửa sau.
+- **Người có `auth.users.manage` không tác động lên người có permission mà mình không có**
+  (gỡ MFA, khoá, đặt mật khẩu đầu): `RoleService::require_covers`, lỗi
+  `auth.target_has_more_permissions`.
+- **Idempotency** xác thực trước: request chưa đăng nhập không được lưu; key thuộc phạm vi
+  (người dùng, API key); dấu vân tay gồm method, đường dẫn kèm query, content-type và thân;
+  đọc thân có giới hạn thời gian `request_timeout`.
+- **Rate limiting** chỉ đọc giá trị cuối của header IP (giá trị proxy tin cậy thêm vào), nhận
+  cả dạng `ip:port`.
+- **Job xong thì xoá payload** (ghi `null`): link chứa token không nằm lại trong bảng job.
+  Job trong dead-letter queue giữ payload để chạy lại được; token trong đó đã có hạn.
+- **`autoxide restore`** từ chối bản backup chứa symbolic link.
+
+Lý do: mỗi điểm là một cách chiếm hoặc giữ tài khoản, hay vượt giới hạn đã hứa trong tài
+liệu. Sửa đều chạy trên cả hai database và có test (kể cả test đồng thời).
+
+Đã cân nhắc: khoá `SELECT … FOR UPDATE` cho throttle — SQLite không có; mã hoá payload job
+thay vì xoá — thêm key cần quản lý mà không ai cần đọc lại payload của job đã xong.

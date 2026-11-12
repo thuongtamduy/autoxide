@@ -1655,8 +1655,18 @@
           "auth"
         ],
         "summary": "Start adding a passkey to your account.",
-        "description": "Needs a session signed in with a password (an API key cannot do this). Answers 403\nwith code `auth.passkeys_disabled` when the server has passkeys off.",
+        "description": "Needs your current password and a session signed in with a password (an API key cannot do this). Answers 403\nwith code `auth.passkeys_disabled` when the server has passkeys off.",
         "operationId": "auth_start_passkey_registration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartPasskeyRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Options for the browser, and the ceremony to finish with `POST /api/v1/auth/me/passkeys`.",
@@ -1664,6 +1674,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Data_CeremonyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The current password is wrong; code `auth.wrong_password`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -2951,7 +2971,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `auth.users.manage`; code `permission_denied`.",
+            "description": "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3043,7 +3063,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `auth.users.manage`; code `permission_denied`.",
+            "description": "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3125,7 +3145,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `auth.users.manage`; code `permission_denied`.",
+            "description": "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -4127,9 +4147,14 @@
         "description": "A key to create.",
         "required": [
           "name",
-          "permissions"
+          "permissions",
+          "current_password"
         ],
         "properties": {
+          "current_password": {
+            "type": "string",
+            "description": "Your current password: a stolen access token alone must not create a key that\noutlives it."
+          },
           "expires_at": {
             "type": [
               "string",
@@ -5867,6 +5892,19 @@
           "password": {
             "type": "string",
             "description": "12 to 128 characters."
+          }
+        }
+      },
+      "StartPasskeyRegistrationRequest": {
+        "type": "object",
+        "description": "Proof that you are the account owner.",
+        "required": [
+          "current_password"
+        ],
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "description": "Your current password: a stolen access token alone must not add a passkey."
           }
         }
       },

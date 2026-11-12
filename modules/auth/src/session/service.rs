@@ -109,19 +109,13 @@ impl SessionService {
     /// Email đang bị khoá vì sai quá nhiều lần thì trả 429 ngay, KHÔNG kiểm mật khẩu
     /// — kẻ đoán không biết được lần đoán nào đúng.
     pub(crate) async fn login(&self, email: &str, password: &str) -> Result<LoginOutcome, Error> {
-        self.throttle.check(email).await?;
-        let user = match self.users.check_credentials(email, password).await {
-            Ok(user) => user,
-            Err(error) => {
-                // Chỉ sai mật khẩu mới tính; tài khoản bị khoá hay lỗi máy chủ thì không.
-                if error.code() == INVALID_CREDENTIALS {
-                    self.throttle.record_failure(email).await?;
-                }
-                return Err(error);
-            }
-        };
+        // Lượt thử được đếm TRƯỚC khi kiểm mật khẩu; đúng thì xoá bộ đếm bên dưới.
+        self.throttle.reserve(email).await?;
+        let user = self.users.check_credentials(email, password).await?;
         if self.mfa.status(user.id).await?.totp_enabled {
-            // Chưa xoá số lần sai: đúng mật khẩu mới là nửa đường.
+            // Mật khẩu đúng: trả lại lượt vừa xin, nhưng chưa xoá các lần sai trước — đúng
+            // mật khẩu mới là nửa đường.
+            self.throttle.refund(email).await?;
             let mfa_token = challenge::open(self.database.write(), user.id, now()).await?;
             return Ok(LoginOutcome::MfaRequired {
                 mfa_token,
@@ -171,17 +165,17 @@ impl SessionService {
     pub(crate) async fn check_password(&self, user_id: Uuid, current: &str) -> Result<User, Error> {
         let user =
             self.users.get(user_id).await?.ok_or_else(|| crate::user::user_not_found(user_id))?;
-        self.throttle.check(&user.email).await?;
+        self.throttle.reserve(&user.email).await?;
         match self.users.check_credentials(&user.email, current).await {
-            Ok(user) => Ok(user),
-            Err(error) if error.code() == INVALID_CREDENTIALS => {
-                self.throttle.record_failure(&user.email).await?;
-                Err(Error::bad_request(
-                    "auth.wrong_password",
-                    "The current password is incorrect. If you forgot it, reset it by email \
-                     (`POST /api/v1/auth/password-reset`).",
-                ))
+            Ok(user) => {
+                self.throttle.clear(&user.email).await?;
+                Ok(user)
             }
+            Err(error) if error.code() == INVALID_CREDENTIALS => Err(Error::bad_request(
+                "auth.wrong_password",
+                "The current password is incorrect. If you forgot it, reset it by email \
+                     (`POST /api/v1/auth/password-reset`).",
+            )),
             Err(error) => Err(error),
         }
     }
@@ -190,12 +184,10 @@ impl SessionService {
     /// được tính vào login throttling của email, như một lần sai mật khẩu.
     pub(crate) async fn complete_mfa(&self, mfa_token: &str, code: &str) -> Result<Tokens, Error> {
         let (challenge_id, user_id) =
-            challenge::find(self.database.write(), mfa_token, now()).await?;
+            challenge::claim_attempt(self.database.write(), mfa_token, now()).await?;
         let user = self.users.get(user_id).await?.ok_or_else(challenge::invalid_mfa_token)?;
-        self.throttle.check(&user.email).await?;
+        self.throttle.reserve(&user.email).await?;
         if !self.mfa.verify_second_factor(user.id, code).await? {
-            challenge::record_attempt(self.database.write(), challenge_id).await?;
-            self.throttle.record_failure(&user.email).await?;
             return Err(Error::unauthenticated(
                 "auth.invalid_mfa_code",
                 "The code is wrong, expired or already used. Enter the current code from your \
@@ -255,6 +247,24 @@ impl SessionService {
         let expires_at = now + self.refresh_token_ttl;
         let (new_token, new_row) = new_refresh_token(user.id, row.family_id, now, expires_at)?;
         let transaction = self.database.begin_write().await?;
+        // Chạm dòng người dùng TRƯỚC (Postgres khoá dòng này tới hết transaction): đổi mật
+        // khẩu hay khoá tài khoản cũng ghi dòng này trước khi thu hồi phiên, nên hai việc
+        // nối đuôi nhau — token mới không lọt qua lệnh thu hồi (D-079). Tài khoản vừa bị
+        // khoá thì dừng ở đây.
+        let active = crate::user::entity::Entity::update_many()
+            .col_expr(
+                crate::user::entity::Column::UpdatedAt,
+                Expr::col(crate::user::entity::Column::UpdatedAt),
+            )
+            .filter(crate::user::entity::Column::Id.eq(user.id))
+            .filter(crate::user::entity::Column::DisabledAt.is_null())
+            .exec(&transaction)
+            .await?;
+        if active.rows_affected == 0 {
+            transaction.rollback().await?;
+            revoke_family(self.database.write(), row.family_id).await?;
+            return Err(crate::user::user_disabled());
+        }
         // Đánh dấu "đã dùng" CÓ ĐIỀU KIỆN: hai request cùng đổi một token thì chỉ một
         // bên cập nhật được dòng này (database khoá dòng), bên kia thấy 0 dòng.
         let claimed = Entity::update_many()
