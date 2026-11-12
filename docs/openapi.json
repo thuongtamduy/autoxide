@@ -2,9 +2,15 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Autoxide API",
-    "description": "REST API of Autoxide.\n\n## Conventions\n\nEvery endpoint follows the same rules, so learning one endpoint teaches all of them.\n\n- **Success**: a single result is `{\"data\": …}`; a list is `{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`.\n- **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the stable `code` field, never on `detail`. Validation problems list every invalid field in `errors`.\n- **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.\n- **Authentication**: endpoints that need it list the `bearer` security scheme. Send `Authorization: Bearer <access token>`. A `401` response carries `WWW-Authenticate: Bearer`; its `code` says whether the token is missing, invalid or expired.\n- **Retries**: send `Idempotency-Key: <a random UUID>` with `POST`, `PUT`, `PATCH` and `DELETE`. Repeating the same request with the same key within 24 hours returns the first result (marked `Idempotent-Replayed: true`) instead of doing it twice; a different request with a used key gets `422`, and a repeat while the first is still running gets `409`.\n- **Deprecation**: an endpoint being retired is marked `deprecated` here and answers with `Deprecation` (RFC 9745), `Sunset` (RFC 8594, the removal date) and `Link: <…>; rel=\"successor-version\"` headers. Move to the successor before the sunset date.\n- **Language**: send `Accept-Language` (e.g. `vi`) to get the `detail` of errors in that language; English (`en`) by default and for unsupported languages. Responses carry `Content-Language`. Codes never change with the language.\n- **Rate limits**: too many requests from one address are answered with `429` (code `rate_limited`) and a `Retry-After` header giving the seconds to wait.\n- **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote it when reporting a problem.\n- **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount in the smallest currency unit plus a currency code.",
+    "description": "REST API of Autoxide.\n\n## Conventions\n\nEvery endpoint follows the same rules, so learning one endpoint teaches all of them.\n\n- **Success**: a single result is `{\"data\": …}`; a list is `{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`. Creating a record answers `201` with a `Location` header pointing to it.\n- **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the stable `code` field, never on `detail`. Validation problems list every invalid field of the request in `errors`, all at once.\n- **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.\n- **Authentication**: endpoints that need it list the `bearer` security scheme. Send `Authorization: Bearer <access token>`. A `401` response carries `WWW-Authenticate: Bearer`; its `code` says whether the token is missing, invalid or expired.\n- **Retries**: send `Idempotency-Key: <a random UUID>` with `POST`, `PUT`, `PATCH` and `DELETE`. Repeating the same request with the same key within 24 hours returns the first result (marked `Idempotent-Replayed: true`) instead of doing it twice; a different request with a used key gets `422`, and a repeat while the first is still running gets `409`.\n- **Concurrent edits**: reading a single record returns its version in `ETag`. Send it back in `If-Match` when changing the record: if someone changed it in between, the answer is `412` (code `precondition_failed`) instead of silently overwriting their change. Without `If-Match` the change is made anyway.\n- **Deprecation**: an endpoint being retired is marked `deprecated` here and answers with `Deprecation` (RFC 9745), `Sunset` (RFC 8594, the removal date) and `Link: <…>; rel=\"successor-version\"` headers. Move to the successor before the sunset date.\n- **Language**: send `Accept-Language` (e.g. `vi`) to get the `detail` of errors in that language; English (`en`) by default and for unsupported languages. Responses carry `Content-Language`. Codes never change with the language.\n- **Rate limits**: too many requests from one address are answered with `429` (code `rate_limited`) and a `Retry-After` header giving the seconds to wait.\n- **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote it when reporting a problem.\n- **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount in the smallest currency unit plus a currency code.",
     "version": "0.1.0"
   },
+  "servers": [
+    {
+      "url": "/",
+      "description": "The server that serves this document. When generating a client from a saved copy, use your deployment's address instead, e.g. `https://api.example.com`."
+    }
+  ],
   "paths": {
     "/api/v1/audit": {
       "get": {
@@ -80,7 +86,24 @@
             "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/Order"
+              "type": "string",
+              "description": "Sort direction of a list. Items are always ordered by creation time.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
             }
           }
         ],
@@ -170,6 +193,18 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
             }
           }
         ],
@@ -269,7 +304,24 @@
             "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/Order"
+              "type": "string",
+              "description": "Sort direction of a list. Items are always ordered by creation time.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
             }
           }
         ],
@@ -328,6 +380,33 @@
         "summary": "Create an API key for a program or an AI agent.",
         "description": "Signed in with a password session only: an API key cannot create keys. The key\nacts as you, limited to the permissions listed. The response carries the key\nitself, shown only once.",
         "operationId": "auth_create_api_key",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -341,6 +420,14 @@
         "responses": {
           "201": {
             "description": "The key was created; `key` holds the secret.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -425,6 +512,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "responses": {
@@ -477,6 +589,20 @@
         "summary": "Confirm an email address with the token from a verification mail.",
         "description": "Needs no sign-in: the token proves the mail was received. When the token was sent\nfor a new address (`POST /api/v1/auth/me/email`), the account's email becomes that\naddress; sign in with it from now on. Every other verification token of the\naccount stops working.",
         "operationId": "auth_confirm_email_verification",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -549,6 +675,20 @@
         "summary": "Sign in with email and password.",
         "description": "Returns a short-lived access token and a refresh token. When the account has\ntwo-step sign-in on, answers 202 instead: send the `mfa_token` and a code to\n`POST /api/v1/auth/login/mfa`. The same error answers an unknown email and a\nwrong password. After several failed attempts the email is locked for a while,\neven for the right password.",
         "operationId": "auth_login",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -641,6 +781,20 @@
         "summary": "Finish signing in with a code from the authenticator app or a recovery code.",
         "description": "Send the `mfa_token` from `POST /api/v1/auth/login` within its `expires_in`\nseconds. Each `mfa_token` allows five wrong codes; wrong codes also count\ntowards the sign-in lock of the email.",
         "operationId": "auth_login_mfa",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -723,6 +877,20 @@
         "summary": "Sign in with a passkey: finish the ceremony from `POST /api/v1/auth/login/passkey/options`.",
         "description": "Returns the same tokens as `POST /api/v1/auth/login`. A passkey verifies the user\nitself, so no two-step code is asked for.",
         "operationId": "auth_passkey_login",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -805,6 +973,20 @@
         "summary": "Start signing in with a passkey.",
         "description": "Needs no email: the browser lets the user pick one of their passkeys for this site.",
         "operationId": "auth_start_passkey_login",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Options for the browser, and the ceremony to finish with `POST /api/v1/auth/login/passkey`.",
@@ -847,6 +1029,20 @@
         "summary": "Sign out: end the session of a refresh token.",
         "description": "Every refresh token of the session stops working; access tokens already issued\nkeep working until they expire. Safe to repeat.",
         "operationId": "auth_logout",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -891,6 +1087,20 @@
         ],
         "summary": "Get the signed-in user and their permissions.",
         "operationId": "auth_me",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "The user the access token belongs to, with the permissions of their roles.",
@@ -938,6 +1148,131 @@
             "bearer": []
           }
         ]
+      },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Delete your own account and everything it owns.",
+        "description": "Signed in with a password session only, and needs your current password (an account\nwithout a password must set one first). The account, its sessions, keys and passkeys\ngo at once; data kept by other modules (notes, files…) is deleted shortly after.\nThis cannot be undone: download your data first with `GET /api/v1/auth/me/export`.",
+        "operationId": "auth_delete_own_account",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "The account was deleted."
+          },
+          "400": {
+            "description": "The current password is wrong; code `auth.wrong_password`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "You are the last active administrator; give the `admin` role to someone else first. Code `auth.last_admin`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is missing a field or a value is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many wrong passwords for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
       }
     },
     "/api/v1/auth/me/email": {
@@ -948,6 +1283,33 @@
         "summary": "Change your email address.",
         "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). A verification mail goes to the NEW address; the email changes\nonly when its token is confirmed with `POST /api/v1/auth/email-verification/confirm`,\nwithin 24 hours. Until then the old address stays in use. Wrong passwords count\ntowards the sign-in lock of the email.",
         "operationId": "auth_change_email",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1048,6 +1410,33 @@
         "summary": "Send the verification mail for your email address again.",
         "description": "The mail (in the language of `Accept-Language`) carries a token valid 24 hours;\nconfirm it with `POST /api/v1/auth/email-verification/confirm`. At most one mail\nper minute per address.",
         "operationId": "auth_resend_email_verification",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "responses": {
           "202": {
             "description": "A verification mail is on its way."
@@ -1090,6 +1479,77 @@
         ]
       }
     },
+    "/api/v1/auth/me/export": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Download everything the server keeps about you.",
+        "description": "Signed in with a password session only (an API key cannot do this). The answer has\none entry per module that keeps personal data, named after the module (`auth` holds\nyour profile, roles, sessions, API keys, passkeys and two-step sign-in status).\nSecrets — password, tokens, keys — are never included.",
+        "operationId": "auth_export_personal_data",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your data, by module.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PersonalDataResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/me/mfa": {
       "get": {
         "tags": [
@@ -1097,6 +1557,20 @@
         ],
         "summary": "Get your two-step sign-in settings.",
         "operationId": "auth_get_mfa",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Your settings.",
@@ -1144,6 +1618,33 @@
         "summary": "Replace your recovery codes with ten new ones.",
         "description": "The old codes stop working. Needs a current authenticator code (not a recovery\ncode) and a password session.",
         "operationId": "auth_regenerate_recovery_codes",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1231,6 +1732,33 @@
         "summary": "Start turning on two-step sign-in with an authenticator app.",
         "description": "Returns a new secret to add to the app. Nothing changes until you confirm with\na code (`POST /api/v1/auth/me/mfa/totp/confirm`). Calling again replaces an\nunconfirmed secret. Needs a password session, not an API key.",
         "operationId": "auth_start_totp",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Add this secret to the authenticator app, then confirm.",
@@ -1298,6 +1826,33 @@
         "summary": "Confirm two-step sign-in with the first code from the app.",
         "description": "From now on, signing in asks for a code. The response holds ten one-time\nrecovery codes, shown only this once. Needs a password session.",
         "operationId": "auth_confirm_totp",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1385,6 +1940,33 @@
         "summary": "Turn off two-step sign-in.",
         "description": "Needs a current authenticator code or an unused recovery code, and a password\nsession. Remaining recovery codes are deleted.",
         "operationId": "auth_disable_totp",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1501,7 +2083,24 @@
             "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/Order"
+              "type": "string",
+              "description": "Sort direction of a list. Items are always ordered by creation time.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
             }
           }
         ],
@@ -1560,6 +2159,33 @@
         "summary": "Add a passkey: finish the ceremony started with `POST /api/v1/auth/me/passkeys/registration`.",
         "description": "Needs a session signed in with a password. Afterwards the passkey signs in with\n`POST /api/v1/auth/login/passkey`.",
         "operationId": "auth_add_passkey",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1573,6 +2199,14 @@
         "responses": {
           "201": {
             "description": "The passkey was added.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -1655,8 +2289,45 @@
           "auth"
         ],
         "summary": "Start adding a passkey to your account.",
-        "description": "Needs a session signed in with a password (an API key cannot do this). Answers 403\nwith code `auth.passkeys_disabled` when the server has passkeys off.",
+        "description": "Needs your current password and a session signed in with a password (an API key cannot do this). Answers 403\nwith code `auth.passkeys_disabled` when the server has passkeys off.",
         "operationId": "auth_start_passkey_registration",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartPasskeyRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Options for the browser, and the ceremony to finish with `POST /api/v1/auth/me/passkeys`.",
@@ -1664,6 +2335,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Data_CeremonyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The current password is wrong; code `auth.wrong_password`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -1734,6 +2415,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "responses": {
@@ -1796,6 +2502,33 @@
         "summary": "Change your own password.",
         "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). Every session of the account ends, including this one; the\nresponse carries the tokens of a new session, so this client stays signed in.\nWrong current passwords count towards the sign-in lock of the email.",
         "operationId": "auth_change_password",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1885,6 +2618,322 @@
         ]
       }
     },
+    "/api/v1/auth/me/sessions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List your signed-in sessions.",
+        "description": "Signed in with a password session only (an API key cannot do this). One entry per\ndevice or client; newest first unless `order=asc`.",
+        "operationId": "auth_list_sessions",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Items are always ordered by creation time.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of your sessions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign out all your sessions, or all but one.",
+        "description": "Signed in with a password session only. Pass `keep` with your own `session_id` to\nsign out every other device and stay signed in here. Safe to repeat.",
+        "operationId": "auth_end_sessions",
+        "parameters": [
+          {
+            "name": "keep",
+            "in": "query",
+            "description": "Id of a session to keep signed in, usually your own (`session_id` from the token\nresponse). Omit it to end every session, including this one.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The sessions were ended.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EndedSessionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`keep` is not a valid id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/sessions/{id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign out one of your sessions, e.g. a lost device.",
+        "description": "Signed in with a password session only. Its refresh token stops working at once;\nan access token already issued to it keeps working until it expires (15 minutes by\ndefault).",
+        "operationId": "auth_end_session",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the session.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The session was ended."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The request used an API key; code `auth.session_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "You have no active session with this id; code `auth.session_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/password-reset": {
       "post": {
         "tags": [
@@ -1893,6 +2942,20 @@
         "summary": "Ask for a password-reset mail.",
         "description": "Always answers 202, whether or not an account has this email, so the answer does\nnot reveal who has an account. When one does, a mail with a reset token (valid 30\nminutes) is sent in the language of `Accept-Language`. At most one mail per minute\nper account.",
         "operationId": "auth_request_password_reset",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1938,6 +3001,20 @@
         "summary": "Choose a new password with the token from the reset mail.",
         "description": "Signs the account out everywhere; every other reset token of the account stops\nworking. Then sign in with the new password.",
         "operationId": "auth_confirm_password_reset",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1993,6 +3070,20 @@
         "summary": "List every permission that roles can grant.",
         "description": "Requires `auth.roles.read`. Each module declares its own permissions; the list\ngrows when modules are added.",
         "operationId": "auth_list_permissions",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Every permission, sorted by name.",
@@ -2050,6 +3141,20 @@
         "summary": "Exchange a refresh token for a new pair of tokens.",
         "description": "The refresh token sent is used up. Sending a used refresh token again ends the\nwhole session (it may have been stolen): sign in again.",
         "operationId": "auth_refresh",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2122,6 +3227,20 @@
         "summary": "Create your own account.",
         "description": "Open only when the server enables self-registration; otherwise answers 403. The\nnew account has no role. A mail asking to confirm the address goes to the email,\nin the language of `Accept-Language`. Then sign in with `POST /api/v1/auth/login`.",
         "operationId": "auth_register",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2135,6 +3254,14 @@
         "responses": {
           "201": {
             "description": "The account was created.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -2223,7 +3350,24 @@
             "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/Order"
+              "type": "string",
+              "description": "Sort direction of a list. Items are always ordered by creation time.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
             }
           }
         ],
@@ -2292,6 +3436,33 @@
         "summary": "Create a role.",
         "description": "Requires `auth.roles.manage`.",
         "operationId": "auth_create_role",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2305,6 +3476,14 @@
         "responses": {
           "201": {
             "description": "The role was created.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -2389,11 +3568,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "The role.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -2466,6 +3665,43 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "requestBody": {
@@ -2481,6 +3717,14 @@
         "responses": {
           "200": {
             "description": "The role after the change.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -2521,6 +3765,16 @@
           },
           "409": {
             "description": "Another role has this name (`auth.role_name_taken`), or the role is the built-in `admin` (`auth.role_builtin`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2572,6 +3826,31 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
             }
           }
         ],
@@ -2642,10 +3921,19 @@
         "tags": [
           "auth"
         ],
-        "summary": "List user accounts.",
-        "description": "Requires `auth.users.read`. Newest first unless `order=asc`.",
+        "summary": "List or search user accounts.",
+        "description": "Requires `auth.users.read`. Newest first unless `order=asc`. Add `search` to find\nusers by email or name.",
         "operationId": "auth_list_users",
         "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Only users whose email or name contains this text, in any case (`ada` finds\n`Ada Lovelace` and `ada@example.com`). Up to 200 characters.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "limit",
             "in": "query",
@@ -2674,7 +3962,24 @@
             "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/Order"
+              "type": "string",
+              "description": "Sort direction of a list. Items are always ordered by creation time.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
             }
           }
         ],
@@ -2743,6 +4048,33 @@
         "summary": "Create a user account.",
         "description": "Requires `auth.users.manage`. The account has no role; give it roles with\n`PUT /api/v1/auth/users/{id}/roles`. A mail asking to confirm the address goes to\nthe new email, in the language of `Accept-Language`.",
         "operationId": "auth_create_user",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2756,6 +4088,14 @@
         "responses": {
           "201": {
             "description": "The account was created.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -2840,11 +4180,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "The account.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -2900,6 +4260,111 @@
           }
         ]
       },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Delete a user account and everything it owns.",
+        "description": "Requires `auth.users.manage`, and every permission the user has. Data kept by other\nmodules is deleted shortly after. This cannot be undone; to only stop someone from\nsigning in, disable the account with `PATCH /api/v1/auth/users/{id}` instead.",
+        "operationId": "auth_delete_user",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the user.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The account was deleted."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No user has this id; code `auth.user_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This is the last active administrator; code `auth.last_admin`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
       "patch": {
         "tags": [
           "auth"
@@ -2917,6 +4382,43 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "requestBody": {
@@ -2932,6 +4434,14 @@
         "responses": {
           "200": {
             "description": "The account after the change.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -2951,7 +4461,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `auth.users.manage`; code `permission_denied`.",
+            "description": "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2972,6 +4482,16 @@
           },
           "409": {
             "description": "No active user would keep the `admin` role; code `auth.last_admin`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3026,6 +4546,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "responses": {
@@ -3043,7 +4588,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `auth.users.manage`; code `permission_denied`.",
+            "description": "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3098,6 +4643,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "requestBody": {
@@ -3125,7 +4695,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `auth.users.manage`; code `permission_denied`.",
+            "description": "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3199,6 +4769,18 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
             }
           }
         ],
@@ -3276,6 +4858,31 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
             }
           }
         ],
@@ -3368,6 +4975,110 @@
         ]
       }
     },
+    "/api/v1/auth/users/{id}/sessions": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sign a user out everywhere.",
+        "description": "Requires `auth.users.manage`, and every permission the user has. Ends all their\nsessions; their access tokens keep working until they expire (15 minutes by\ndefault). To keep them out for good, disable the account instead.",
+        "operationId": "auth_end_user_sessions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the user.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The user's sessions were ended.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EndedSessionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No user has this id; code `auth.user_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/files": {
       "get": {
         "tags": [
@@ -3405,7 +5116,24 @@
             "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/Order"
+              "type": "string",
+              "description": "Sort direction of a list. Items are always ordered by creation time.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
             }
           }
         ],
@@ -3484,6 +5212,31 @@
               "type": "string"
             },
             "example": "report.pdf"
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "requestBody": {
@@ -3505,6 +5258,14 @@
         "responses": {
           "201": {
             "description": "Uploaded.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -3609,6 +5370,18 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -3686,6 +5459,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "responses": {
@@ -3758,6 +5556,18 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -3824,6 +5634,891 @@
         ]
       }
     },
+    "/api/v1/webhooks": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "List webhook endpoints.",
+        "description": "Requires `webhooks.manage`. Newest first unless `order=asc`.",
+        "operationId": "webhooks_list_webhook_endpoints",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Items are always ordered by creation time.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of endpoints.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_EndpointResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Create a webhook endpoint.",
+        "description": "Requires `webhooks.manage`. From now on, every event it subscribes to is sent to\n`url` as a signed `POST` (Standard Webhooks headers `webhook-id`,\n`webhook-timestamp`, `webhook-signature`); answer with any 2xx within 10 seconds\n(`AUTOXIDE_WEBHOOKS_TIMEOUT_SECONDS`).\nOther answers are retried with growing delays for about two hours. The response\ncarries the signing secret, shown only once.",
+        "operationId": "webhooks_create_webhook_endpoint",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEndpointRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created; store `secret` now.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CreatedEndpointResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is invalid — e.g. the address is not `https://` or an event name is unknown; `errors` lists every problem.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/webhooks/events": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "List the kinds of events endpoints can receive.",
+        "description": "Requires `webhooks.manage`. Sorted by name.",
+        "operationId": "webhooks_list_webhook_event_types",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every event kind.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_EventTypeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/webhooks/{id}": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Get a webhook endpoint.",
+        "description": "Requires `webhooks.manage`.",
+        "operationId": "webhooks_get_webhook_endpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The endpoint.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EndpointResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No endpoint has this id; code `webhooks.endpoint_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Delete a webhook endpoint and its delivery history.",
+        "description": "Requires `webhooks.manage`. Pending retries are dropped.",
+        "operationId": "webhooks_delete_webhook_endpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No endpoint has this id; code `webhooks.endpoint_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Change a webhook endpoint, or turn it off and on.",
+        "description": "Requires `webhooks.manage`.",
+        "operationId": "webhooks_update_webhook_endpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEndpointRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The changed endpoint.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EndpointResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No endpoint has this id; code `webhooks.endpoint_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is invalid — e.g. the address is not `https://` or an event name is unknown; `errors` lists every problem.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/webhooks/{id}/deliveries": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "List the deliveries of an endpoint, to see what was sent and what failed.",
+        "description": "Requires `webhooks.manage`. Newest first unless `order=asc`. Kept for 30 days.",
+        "operationId": "webhooks_list_webhook_deliveries",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Items are always ordered by creation time.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of deliveries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_DeliveryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No endpoint has this id; code `webhooks.endpoint_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/webhooks/{id}/secret": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Replace the signing secret of an endpoint.",
+        "description": "Requires `webhooks.manage`. The old secret stops working at once: update the\nreceiver right after. The new secret is shown only once.",
+        "operationId": "webhooks_rotate_webhook_secret",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the endpoint.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new secret.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SecretResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `webhooks.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No endpoint has this id; code `webhooks.endpoint_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "tags": [
@@ -3832,6 +6527,20 @@
         "summary": "Liveness probe: is the process running?",
         "description": "Never touches the database. Restart the process when this fails.",
         "operationId": "health_live",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "The process is running.",
@@ -3864,6 +6573,20 @@
         "summary": "Readiness probe: can the service handle requests?",
         "description": "Checks that the database answers. Stop sending traffic when this fails.",
         "operationId": "health_ready",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Ready to handle requests.",
@@ -4127,9 +6850,14 @@
         "description": "A key to create.",
         "required": [
           "name",
-          "permissions"
+          "permissions",
+          "current_password"
         ],
         "properties": {
+          "current_password": {
+            "type": "string",
+            "description": "Your current password: a stolen access token alone must not create a key that\noutlives it."
+          },
           "expires_at": {
             "type": [
               "string",
@@ -4154,6 +6882,36 @@
             ]
           }
         }
+      },
+      "CreateEndpointRequest": {
+        "type": "object",
+        "description": "A new endpoint.",
+        "required": [
+          "url",
+          "events"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "What the endpoint is for, up to 200 characters."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Event names to receive (see `GET /api/v1/webhooks/events`), or `[\"*\"]` for every\nevent.",
+            "example": [
+              "auth.user_created"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "description": "Where to send events: an `https://` address, up to 2048 characters.",
+            "example": "https://example.com/hooks/autoxide"
+          }
+        },
+        "additionalProperties": false
       },
       "CreateUserRequest": {
         "type": "object",
@@ -4202,6 +6960,27 @@
           }
         ],
         "description": "A new API key, with its secret. The secret is shown only here."
+      },
+      "CreatedEndpointResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EndpointResponse"
+          },
+          {
+            "type": "object",
+            "required": [
+              "secret"
+            ],
+            "properties": {
+              "secret": {
+                "type": "string",
+                "description": "Verify the `webhook-signature` header of each request with this secret (Standard\nWebhooks). Store it now: it cannot be shown again, only replaced.",
+                "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+              }
+            }
+          }
+        ],
+        "description": "A new endpoint and its signing secret, shown only once."
       },
       "Data_AuditEntryResponse": {
         "type": "object",
@@ -4338,6 +7117,122 @@
               }
             ],
             "description": "A new API key, with its secret. The secret is shown only here."
+          }
+        }
+      },
+      "Data_CreatedEndpointResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EndpointResponse"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "secret"
+                ],
+                "properties": {
+                  "secret": {
+                    "type": "string",
+                    "description": "Verify the `webhook-signature` header of each request with this secret (Standard\nWebhooks). Store it now: it cannot be shown again, only replaced.",
+                    "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+                  }
+                }
+              }
+            ],
+            "description": "A new endpoint and its signing secret, shown only once."
+          }
+        }
+      },
+      "Data_EndedSessionsResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "How many sessions were ended.",
+            "required": [
+              "ended"
+            ],
+            "properties": {
+              "ended": {
+                "type": "integer",
+                "format": "int64",
+                "example": 3,
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
+      "Data_EndpointResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A webhook endpoint: an address that receives events. Its secret is never listed.",
+            "required": [
+              "id",
+              "url",
+              "description",
+              "events",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "description": {
+                "type": "string",
+                "example": "Sync users to the CRM"
+              },
+              "disabled_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When it was turned off; `null` while it receives events."
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Event names it receives; `*` means every event.",
+                "example": [
+                  "auth.user_created",
+                  "auth.user_deleted"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "url": {
+                "type": "string",
+                "example": "https://example.com/hooks/autoxide"
+              }
+            }
           }
         }
       },
@@ -4597,6 +7492,44 @@
           }
         }
       },
+      "Data_PersonalDataResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "type": "object",
+                "description": "The parts of the other modules, by module name."
+              },
+              {
+                "type": "object",
+                "required": [
+                  "auth"
+                ],
+                "properties": {
+                  "auth": {
+                    "type": "object",
+                    "description": "Your profile, roles, sessions, API keys, passkeys and two-step sign-in status."
+                  }
+                }
+              }
+            ],
+            "description": "Everything the server keeps about you: one entry per module that keeps personal\ndata, named after the module.",
+            "example": {
+              "auth": {
+                "profile": {
+                  "email": "ada@example.com"
+                }
+              },
+              "files": []
+            }
+          }
+        }
+      },
       "Data_RecoveryCodesResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -4683,6 +7616,28 @@
           }
         }
       },
+      "Data_SecretResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A new signing secret, shown only once.",
+            "required": [
+              "secret"
+            ],
+            "properties": {
+              "secret": {
+                "type": "string",
+                "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+              }
+            }
+          }
+        }
+      },
       "Data_TokenResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -4698,7 +7653,8 @@
               "token_type",
               "expires_in",
               "refresh_token",
-              "refresh_token_expires_at"
+              "refresh_token_expires_at",
+              "session_id"
             ],
             "properties": {
               "access_token": {
@@ -4720,6 +7676,11 @@
                 "type": "string",
                 "format": "date-time",
                 "description": "When `refresh_token` expires; after that, sign in again."
+              },
+              "session_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The session these tokens belong to. It stays the same across refreshes; keep it\nto recognize this client in `GET /api/v1/auth/me/sessions`."
               },
               "token_type": {
                 "type": "string",
@@ -4819,6 +7780,35 @@
           }
         }
       },
+      "Data_Vec_EventTypeResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A kind of event that endpoints can subscribe to.",
+              "required": [
+                "name",
+                "description"
+              ],
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string",
+                  "example": "auth.user_created"
+                }
+              }
+            }
+          }
+        }
+      },
       "Data_Vec_PermissionResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -4907,6 +7897,175 @@
                 }
               }
             }
+          }
+        }
+      },
+      "DeleteAccountRequest": {
+        "type": "object",
+        "description": "Confirms deleting your own account.",
+        "required": [
+          "current_password"
+        ],
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "description": "Your current password."
+          }
+        }
+      },
+      "DeliveryResponse": {
+        "type": "object",
+        "description": "One attempt to deliver one event to one endpoint, with its retries.",
+        "required": [
+          "id",
+          "event_id",
+          "event_name",
+          "status",
+          "attempts",
+          "created_at"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id of the event (`data.id` in the body)."
+          },
+          "event_name": {
+            "type": "string",
+            "example": "auth.user_created"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Also the `webhook-id` header: the same on every retry, to drop duplicates."
+          },
+          "last_attempt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the last attempt failed."
+          },
+          "response_status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "HTTP status of the last answer; `null` when there was none.",
+            "example": 200
+          },
+          "status": {
+            "type": "string",
+            "description": "`pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up).",
+            "example": "succeeded"
+          }
+        }
+      },
+      "EndedSessionsResponse": {
+        "type": "object",
+        "description": "How many sessions were ended.",
+        "required": [
+          "ended"
+        ],
+        "properties": {
+          "ended": {
+            "type": "integer",
+            "format": "int64",
+            "example": 3,
+            "minimum": 0
+          }
+        }
+      },
+      "EndpointResponse": {
+        "type": "object",
+        "description": "A webhook endpoint: an address that receives events. Its secret is never listed.",
+        "required": [
+          "id",
+          "url",
+          "description",
+          "events",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string",
+            "example": "Sync users to the CRM"
+          },
+          "disabled_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was turned off; `null` while it receives events."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Event names it receives; `*` means every event.",
+            "example": [
+              "auth.user_created",
+              "auth.user_deleted"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "example": "https://example.com/hooks/autoxide"
+          }
+        }
+      },
+      "EventTypeResponse": {
+        "type": "object",
+        "description": "A kind of event that endpoints can subscribe to.",
+        "required": [
+          "name",
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "auth.user_created"
           }
         }
       },
@@ -5280,6 +8439,164 @@
           }
         }
       },
+      "Page_DeliveryResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "One attempt to deliver one event to one endpoint, with its retries.",
+              "required": [
+                "id",
+                "event_id",
+                "event_name",
+                "status",
+                "attempts",
+                "created_at"
+              ],
+              "properties": {
+                "attempts": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "delivered_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "event_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Id of the event (`data.id` in the body)."
+                },
+                "event_name": {
+                  "type": "string",
+                  "example": "auth.user_created"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Also the `webhook-id` header: the same on every retry, to drop duplicates."
+                },
+                "last_attempt_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "last_error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Why the last attempt failed."
+                },
+                "response_status": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int32",
+                  "description": "HTTP status of the last answer; `null` when there was none.",
+                  "example": 200
+                },
+                "status": {
+                  "type": "string",
+                  "description": "`pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up).",
+                  "example": "succeeded"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Page_EndpointResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A webhook endpoint: an address that receives events. Its secret is never listed.",
+              "required": [
+                "id",
+                "url",
+                "description",
+                "events",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": {
+                  "type": "string",
+                  "example": "Sync users to the CRM"
+                },
+                "disabled_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "When it was turned off; `null` while it receives events."
+                },
+                "events": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Event names it receives; `*` means every event.",
+                  "example": [
+                    "auth.user_created",
+                    "auth.user_deleted"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "url": {
+                  "type": "string",
+                  "example": "https://example.com/hooks/autoxide"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
       "Page_FileResponse": {
         "type": "object",
         "description": "One page of a list.",
@@ -5460,6 +8777,63 @@
           }
         }
       },
+      "Page_SessionResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A signed-in session: one device or client that stays signed in by refreshing its\ntokens.",
+              "required": [
+                "id",
+                "started_at",
+                "last_active_at",
+                "expires_at"
+              ],
+              "properties": {
+                "expires_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the session ends unless refreshed before."
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Same as `session_id` in the token response of the client that holds it."
+                },
+                "last_active_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Last time the session got tokens (sign-in or refresh)."
+                },
+                "started_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the session was signed in."
+                },
+                "user_agent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The `User-Agent` header sent when signing in (up to 255 characters); `null` when\nnone was sent.",
+                  "example": "Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
       "Page_UserResponse": {
         "type": "object",
         "description": "One page of a list.",
@@ -5619,6 +8993,35 @@
             "description": "`<module>.<action>`.",
             "example": "auth.roles.read"
           }
+        }
+      },
+      "PersonalDataResponse": {
+        "allOf": [
+          {
+            "type": "object",
+            "description": "The parts of the other modules, by module name."
+          },
+          {
+            "type": "object",
+            "required": [
+              "auth"
+            ],
+            "properties": {
+              "auth": {
+                "type": "object",
+                "description": "Your profile, roles, sessions, API keys, passkeys and two-step sign-in status."
+              }
+            }
+          }
+        ],
+        "description": "Everything the server keeps about you: one entry per module that keeps personal\ndata, named after the module.",
+        "example": {
+          "auth": {
+            "profile": {
+              "email": "ada@example.com"
+            }
+          },
+          "files": []
         }
       },
       "Problem": {
@@ -5857,6 +9260,59 @@
           }
         }
       },
+      "SecretResponse": {
+        "type": "object",
+        "description": "A new signing secret, shown only once.",
+        "required": [
+          "secret"
+        ],
+        "properties": {
+          "secret": {
+            "type": "string",
+            "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+          }
+        }
+      },
+      "SessionResponse": {
+        "type": "object",
+        "description": "A signed-in session: one device or client that stays signed in by refreshing its\ntokens.",
+        "required": [
+          "id",
+          "started_at",
+          "last_active_at",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the session ends unless refreshed before."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Same as `session_id` in the token response of the client that holds it."
+          },
+          "last_active_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last time the session got tokens (sign-in or refresh)."
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the session was signed in."
+          },
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `User-Agent` header sent when signing in (up to 255 characters); `null` when\nnone was sent.",
+            "example": "Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0"
+          }
+        }
+      },
       "SetPasswordRequest": {
         "type": "object",
         "description": "The first password of an account.",
@@ -5870,6 +9326,19 @@
           }
         }
       },
+      "StartPasskeyRegistrationRequest": {
+        "type": "object",
+        "description": "Proof that you are the account owner.",
+        "required": [
+          "current_password"
+        ],
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "description": "Your current password: a stolen access token alone must not add a passkey."
+          }
+        }
+      },
       "TokenResponse": {
         "type": "object",
         "description": "A new pair of tokens.",
@@ -5878,7 +9347,8 @@
           "token_type",
           "expires_in",
           "refresh_token",
-          "refresh_token_expires_at"
+          "refresh_token_expires_at",
+          "session_id"
         ],
         "properties": {
           "access_token": {
@@ -5900,6 +9370,11 @@
             "type": "string",
             "format": "date-time",
             "description": "When `refresh_token` expires; after that, sign in again."
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The session these tokens belong to. It stays the same across refreshes; keep it\nto recognize this client in `GET /api/v1/auth/me/sessions`."
           },
           "token_type": {
             "type": "string",
@@ -5927,6 +9402,41 @@
             "example": "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
           }
         }
+      },
+      "UpdateEndpointRequest": {
+        "type": "object",
+        "description": "Changes to an endpoint. Omitted fields stay as they are.",
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "disabled": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "`true` stops sending to it (pending retries are dropped); `false` starts again."
+          },
+          "events": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "UpdateUserRequest": {
         "type": "object",

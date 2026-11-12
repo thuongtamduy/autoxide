@@ -87,13 +87,33 @@ impl RateLimiter {
     /// (phần tử cuối — do proxy của mình thêm vào), không thì từ kết nối.
     fn client(&self, request: &Request) -> Option<IpAddr> {
         let from_header = self.client_ip_header.as_ref().and_then(|name| {
-            let value = request.headers().get(name)?.to_str().ok()?;
-            value.rsplit(',').next()?.trim().parse::<IpAddr>().ok()
+            // DÒNG CUỐI của header (proxy có thể thêm dòng mới thay vì nối vào dòng client
+            // gửi), phần tử cuối của dòng đó — phần do proxy của mình ghi (D-079).
+            let line = request.headers().get_all(name).iter().next_back()?.to_str().ok()?;
+            let last = line.rsplit(',').next()?.trim();
+            let parsed = parse_address(last);
+            if parsed.is_none() {
+                tracing::warn!(
+                    header = %name,
+                    value = last,
+                    "cannot read the client address from the configured header; using the \
+                     connection address"
+                );
+            }
+            parsed
         });
         let from_connection =
             || request.extensions().get::<ConnectInfo<SocketAddr>>().map(|info| info.0.ip());
         from_header.or_else(from_connection).map(group)
     }
+}
+
+/// Địa chỉ IP trong header của proxy: `203.0.113.9`, `203.0.113.9:4711`, `2001:db8::1`
+/// hoặc `[2001:db8::1]:4711` (vài load balancer ghi kèm port).
+fn parse_address(text: &str) -> Option<IpAddr> {
+    text.parse::<IpAddr>()
+        .ok()
+        .or_else(|| text.parse::<SocketAddr>().ok().map(|address| address.ip()))
 }
 
 /// Gom địa chỉ IPv6 theo khối /64: một máy thường có cả khối, đổi địa chỉ trong khối
@@ -224,5 +244,22 @@ mod tests {
 
         assert_eq!(behind_proxy.client(&request), Some(ip("203.0.113.9")));
         assert_eq!(direct.client(&request), Some(ip("10.0.0.1")));
+
+        // Client tự gửi một dòng giả, proxy thêm dòng mới: lấy dòng của proxy (dòng cuối).
+        let mut forged = Request::builder()
+            .header("x-forwarded-for", "1.2.3.4")
+            .header("x-forwarded-for", "203.0.113.10")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        forged.extensions_mut().insert(ConnectInfo(SocketAddr::from(([10, 0, 0, 1], 4000))));
+        assert_eq!(behind_proxy.client(&forged), Some(ip("203.0.113.10")));
+    }
+
+    #[test]
+    fn dia_chi_kem_port_van_doc_duoc() {
+        assert_eq!(parse_address("203.0.113.9:4711"), Some(ip("203.0.113.9")));
+        assert_eq!(parse_address("[2001:db8::1]:4711"), Some(ip("2001:db8::1")));
+        assert_eq!(parse_address("2001:db8::1"), Some(ip("2001:db8::1")));
+        assert_eq!(parse_address("unknown"), None);
     }
 }

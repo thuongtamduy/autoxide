@@ -73,8 +73,15 @@ impl PasskeyService {
     }
 
     /// Bắt đầu đăng ký một passkey cho người dùng `user_id` (đã đăng nhập).
-    pub(crate) async fn start_registration(&self, user_id: Uuid) -> Result<Ceremony, Error> {
+    /// Đòi mật khẩu hiện tại: access token bị lộ không đủ để gắn passkey của kẻ gian vào
+    /// tài khoản (D-079).
+    pub(crate) async fn start_registration(
+        &self,
+        user_id: Uuid,
+        current_password: &str,
+    ) -> Result<Ceremony, Error> {
         let engine = self.engine()?;
+        self.sessions.check_password(user_id, current_password).await?;
         let user =
             self.users.get(user_id).await?.ok_or_else(|| crate::user::user_not_found(user_id))?;
         let existing = passkey::Entity::find()
@@ -181,6 +188,24 @@ impl PasskeyService {
         Ok(())
     }
 
+    /// Xoá mọi passkey của người dùng `user_id` (vd khi chủ tài khoản lấy lại tài khoản bằng
+    /// cách đặt lại mật khẩu). Trả số passkey đã xoá.
+    pub(crate) async fn remove_all(&self, actor: Actor, user_id: Uuid) -> Result<u64, Error> {
+        let transaction = self.database.begin_write().await?;
+        let rows = passkey::Entity::find()
+            .filter(passkey::Column::UserId.eq(user_id))
+            .all(&transaction)
+            .await?;
+        for row in &rows {
+            passkey::Entity::delete_by_id(row.id).exec(&transaction).await?;
+            let event =
+                events::PasskeyRemoved { before: Some(json!({"name": row.name})), after: None };
+            self.outbox.record(&transaction, actor, events::user_subject(user_id), &event).await?;
+        }
+        transaction.commit().await?;
+        Ok(rows.len() as u64)
+    }
+
     /// Bắt đầu đăng nhập bằng passkey (chưa biết là ai).
     pub(crate) async fn start_login(&self) -> Result<Ceremony, Error> {
         let started = self
@@ -197,6 +222,7 @@ impl PasskeyService {
         &self,
         ceremony_id: Uuid,
         credential: &Value,
+        user_agent: Option<&str>,
     ) -> Result<Tokens, Error> {
         let engine = self.engine()?;
         // Đọc câu trả lời trước khi dùng nghi thức: JSON hỏng thì nghi thức còn dùng được.
@@ -233,7 +259,7 @@ impl PasskeyService {
             update = update.col_expr(passkey::Column::DynamicState, Expr::value(dynamic));
         }
         update.exec(self.database.write()).await?;
-        self.sessions.login_with_passkey(stored.user_id).await
+        self.sessions.login_with_passkey(stored.user_id, user_agent).await
     }
 
     async fn save_ceremony(

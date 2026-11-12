@@ -41,6 +41,13 @@ chmod 600 .env
 docker compose up -d --build
 ```
 
+Hoặc khỏi build, dùng image đã phát hành (xem các bản phát hành trên GitHub của dự án):
+
+```bash
+echo 'AUTOXIDE_IMAGE=ghcr.io/<owner>/autoxide:0.1' >> .env
+docker compose up -d --no-build
+```
+
 Compose khởi động PostgreSQL, áp dụng mọi migration một lần (service `migrate`), rồi
 khởi động máy chủ ở `127.0.0.1:8080`. Kiểm tra:
 

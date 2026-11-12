@@ -16,10 +16,13 @@
 use std::sync::Arc;
 
 use autoxide_kernel::database::Database;
-use autoxide_kernel::error::Error;
+use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, Set,
+};
 use uuid::Uuid;
 
 use super::entity::{self, Column, Entity};
@@ -47,7 +50,36 @@ pub(crate) struct Tokens {
     pub expires_in: u64,
     pub refresh_token: String,
     pub refresh_token_expires_at: DateTime<Utc>,
+    /// Phiên mà cặp token này thuộc về (họ refresh token): client giữ lại để nhận ra
+    /// phiên của chính mình trong danh sách phiên.
+    pub session_id: Uuid,
 }
+
+/// Một phiên đăng nhập còn hiệu lực: một họ refresh token, nhìn từ phía người dùng.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Session {
+    pub id: Uuid,
+    pub user_agent: Option<String>,
+    pub started_at: DateTime<Utc>,
+    /// Lần cấp token gần nhất (đăng nhập hoặc refresh).
+    pub last_active_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+}
+
+impl From<entity::Model> for Session {
+    fn from(row: entity::Model) -> Self {
+        Session {
+            id: row.family_id,
+            user_agent: row.user_agent,
+            started_at: row.session_started_at.unwrap_or(row.created_at),
+            last_active_at: row.created_at,
+            expires_at: row.expires_at,
+        }
+    }
+}
+
+/// Độ dài tối đa của `User-Agent` được lưu (khớp cột của m0015).
+const USER_AGENT_MAX_CHARS: usize = 255;
 
 pub(crate) struct SessionService {
     database: Database,
@@ -108,20 +140,20 @@ impl SessionService {
     ///
     /// Email đang bị khoá vì sai quá nhiều lần thì trả 429 ngay, KHÔNG kiểm mật khẩu
     /// — kẻ đoán không biết được lần đoán nào đúng.
-    pub(crate) async fn login(&self, email: &str, password: &str) -> Result<LoginOutcome, Error> {
-        self.throttle.check(email).await?;
-        let user = match self.users.check_credentials(email, password).await {
-            Ok(user) => user,
-            Err(error) => {
-                // Chỉ sai mật khẩu mới tính; tài khoản bị khoá hay lỗi máy chủ thì không.
-                if error.code() == INVALID_CREDENTIALS {
-                    self.throttle.record_failure(email).await?;
-                }
-                return Err(error);
-            }
-        };
+    /// `user_agent`: header `User-Agent` của client, để người dùng nhận ra phiên này.
+    pub(crate) async fn login(
+        &self,
+        email: &str,
+        password: &str,
+        user_agent: Option<&str>,
+    ) -> Result<LoginOutcome, Error> {
+        // Lượt thử được đếm TRƯỚC khi kiểm mật khẩu; đúng thì xoá bộ đếm bên dưới.
+        self.throttle.reserve(email).await?;
+        let user = self.users.check_credentials(email, password).await?;
         if self.mfa.status(user.id).await?.totp_enabled {
-            // Chưa xoá số lần sai: đúng mật khẩu mới là nửa đường.
+            // Mật khẩu đúng: trả lại lượt vừa xin, nhưng chưa xoá các lần sai trước — đúng
+            // mật khẩu mới là nửa đường.
+            self.throttle.refund(email).await?;
             let mfa_token = challenge::open(self.database.write(), user.id, now()).await?;
             return Ok(LoginOutcome::MfaRequired {
                 mfa_token,
@@ -129,7 +161,7 @@ impl SessionService {
             });
         }
         self.throttle.clear(email).await?;
-        Ok(LoginOutcome::Tokens(self.start_session(user.id, "password").await?))
+        Ok(LoginOutcome::Tokens(self.start_session(user.id, "password", user_agent).await?))
     }
 
     /// Người dùng `user_id` (đang đăng nhập) tự đổi mật khẩu, kèm mật khẩu hiện tại.
@@ -143,27 +175,37 @@ impl SessionService {
         user_id: Uuid,
         current: &str,
         new: String,
+        user_agent: Option<&str>,
     ) -> Result<Tokens, Error> {
-        if let Some(problem) = crate::password::check_rules("new_password", &new) {
-            return Err(Error::validation(vec![problem]));
+        // Mọi lỗi của đầu vào báo một lần.
+        let problems: Vec<FieldError> = FieldError::blank("current_password", current)
+            .into_iter()
+            .chain(crate::password::check_rules("new_password", &new))
+            .collect();
+        if !problems.is_empty() {
+            return Err(Error::validation(problems));
         }
         let user = self.check_password(user_id, current).await?;
         self.users
             .write_password(Actor::user(user_id), user_id, "new_password", new, false)
             .await?;
         self.throttle.clear(&user.email).await?;
-        self.start_session(user_id, "password_change").await
+        self.start_session(user_id, "password_change", user_agent).await
     }
 
     /// Mở phiên cho người dùng `user_id` vừa chứng minh bằng passkey (đã kiểm ở
     /// `PasskeyService`). Tài khoản bị khoá thì từ chối.
-    pub(crate) async fn login_with_passkey(&self, user_id: Uuid) -> Result<Tokens, Error> {
+    pub(crate) async fn login_with_passkey(
+        &self,
+        user_id: Uuid,
+        user_agent: Option<&str>,
+    ) -> Result<Tokens, Error> {
         let user =
             self.users.get(user_id).await?.ok_or_else(|| crate::user::user_not_found(user_id))?;
         if !user.is_active() {
             return Err(crate::user::user_disabled());
         }
-        self.start_session(user_id, "passkey").await
+        self.start_session(user_id, "passkey", user_agent).await
     }
 
     /// Kiểm mật khẩu hiện tại của người dùng `user_id` trước một việc nhạy cảm (đổi mật
@@ -171,31 +213,45 @@ impl SessionService {
     pub(crate) async fn check_password(&self, user_id: Uuid, current: &str) -> Result<User, Error> {
         let user =
             self.users.get(user_id).await?.ok_or_else(|| crate::user::user_not_found(user_id))?;
-        self.throttle.check(&user.email).await?;
+        self.throttle.reserve(&user.email).await?;
         match self.users.check_credentials(&user.email, current).await {
-            Ok(user) => Ok(user),
-            Err(error) if error.code() == INVALID_CREDENTIALS => {
-                self.throttle.record_failure(&user.email).await?;
-                Err(Error::bad_request(
-                    "auth.wrong_password",
-                    "The current password is incorrect. If you forgot it, reset it by email \
-                     (`POST /api/v1/auth/password-reset`).",
-                ))
+            Ok(user) => {
+                self.throttle.clear(&user.email).await?;
+                Ok(user)
             }
+            Err(error) if error.code() == INVALID_CREDENTIALS => Err(Error::bad_request(
+                "auth.wrong_password",
+                "The current password is incorrect. If you forgot it, reset it by email \
+                     (`POST /api/v1/auth/password-reset`).",
+            )),
             Err(error) => Err(error),
         }
     }
 
+    /// Người dùng `user_id` tự xoá tài khoản của mình, kèm mật khẩu hiện tại (sai thì
+    /// tính vào login throttling như [`check_password`](Self::check_password)).
+    pub(crate) async fn delete_own_account(
+        &self,
+        user_id: Uuid,
+        current_password: &str,
+    ) -> Result<(), Error> {
+        self.check_password(user_id, current_password).await?;
+        self.users.delete(Actor::user(user_id), user_id).await
+    }
+
     /// Bước hai của đăng nhập: `code` là mã TOTP hoặc một recovery code. Mỗi lần sai
     /// được tính vào login throttling của email, như một lần sai mật khẩu.
-    pub(crate) async fn complete_mfa(&self, mfa_token: &str, code: &str) -> Result<Tokens, Error> {
+    pub(crate) async fn complete_mfa(
+        &self,
+        mfa_token: &str,
+        code: &str,
+        user_agent: Option<&str>,
+    ) -> Result<Tokens, Error> {
         let (challenge_id, user_id) =
-            challenge::find(self.database.write(), mfa_token, now()).await?;
+            challenge::claim_attempt(self.database.write(), mfa_token, now()).await?;
         let user = self.users.get(user_id).await?.ok_or_else(challenge::invalid_mfa_token)?;
-        self.throttle.check(&user.email).await?;
+        self.throttle.reserve(&user.email).await?;
         if !self.mfa.verify_second_factor(user.id, code).await? {
-            challenge::record_attempt(self.database.write(), challenge_id).await?;
-            self.throttle.record_failure(&user.email).await?;
             return Err(Error::unauthenticated(
                 "auth.invalid_mfa_code",
                 "The code is wrong, expired or already used. Enter the current code from your \
@@ -209,15 +265,26 @@ impl SessionService {
             return Err(crate::user::user_disabled());
         }
         self.throttle.clear(&user.email).await?;
-        self.start_session(user.id, "password_and_mfa").await
+        self.start_session(user.id, "password_and_mfa", user_agent).await
     }
 
     /// Mở một họ refresh token mới và cấp cặp token đầu tiên.
     /// `method`: cách đã xác thực (`password`, `password_and_mfa`), ghi vào audit.
-    async fn start_session(&self, user_id: Uuid, method: &str) -> Result<Tokens, Error> {
+    async fn start_session(
+        &self,
+        user_id: Uuid,
+        method: &str,
+        user_agent: Option<&str>,
+    ) -> Result<Tokens, Error> {
         let now = now();
         let expires_at = now + self.refresh_token_ttl;
-        let (refresh_token, row) = new_refresh_token(user_id, Uuid::now_v7(), now, expires_at)?;
+        let user_agent = user_agent
+            .map(str::trim)
+            .filter(|agent| !agent.is_empty())
+            .map(|agent| agent.chars().take(USER_AGENT_MAX_CHARS).collect());
+        let family_id = Uuid::now_v7();
+        let session = SessionDetails { started_at: now, user_agent };
+        let (refresh_token, row) = new_refresh_token(user_id, family_id, now, expires_at, session)?;
         let transaction = self.database.begin_write().await?;
         row.insert(&transaction).await?;
         let event = events::SignedIn { before: None, after: Some(json!({"method": method})) };
@@ -225,7 +292,7 @@ impl SessionService {
         self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "signed in");
-        self.tokens(user_id, refresh_token, expires_at, now)
+        self.tokens(user_id, family_id, refresh_token, expires_at, now)
     }
 
     /// Đổi refresh token lấy cặp token mới. Refresh token cũ hết dùng được.
@@ -253,8 +320,23 @@ impl SessionService {
         }
 
         let expires_at = now + self.refresh_token_ttl;
-        let (new_token, new_row) = new_refresh_token(user.id, row.family_id, now, expires_at)?;
+        // Token mới mang theo thông tin của phiên.
+        let session = SessionDetails {
+            started_at: row.session_started_at.unwrap_or(row.created_at),
+            user_agent: row.user_agent.clone(),
+        };
+        let (new_token, new_row) =
+            new_refresh_token(user.id, row.family_id, now, expires_at, session)?;
         let transaction = self.database.begin_write().await?;
+        // Chạm dòng người dùng TRƯỚC (Postgres khoá dòng này tới hết transaction): đổi mật
+        // khẩu hay khoá tài khoản cũng ghi dòng này trước khi thu hồi phiên, nên hai việc
+        // nối đuôi nhau — token mới không lọt qua lệnh thu hồi (D-079). Tài khoản vừa bị
+        // khoá thì dừng ở đây.
+        if !lock_active_user(&transaction, user.id).await? {
+            transaction.rollback().await?;
+            revoke_family(self.database.write(), row.family_id).await?;
+            return Err(crate::user::user_disabled());
+        }
         // Đánh dấu "đã dùng" CÓ ĐIỀU KIỆN: hai request cùng đổi một token thì chỉ một
         // bên cập nhật được dòng này (database khoá dòng), bên kia thấy 0 dòng.
         let claimed = Entity::update_many()
@@ -270,7 +352,7 @@ impl SessionService {
         }
         new_row.insert(&transaction).await?;
         transaction.commit().await?;
-        self.tokens(user.id, new_token, expires_at, now)
+        self.tokens(user.id, row.family_id, new_token, expires_at, now)
     }
 
     /// Đăng xuất: thu hồi họ của `refresh_token`. Token lạ hay đã thu hồi cũng coi
@@ -318,6 +400,88 @@ impl SessionService {
         Ok(())
     }
 
+    /// Một trang phiên còn hiệu lực của người dùng `user_id`, mới bắt đầu trước (mặc
+    /// định). Mỗi phiên là refresh token còn dùng được của một họ.
+    pub(crate) async fn list_sessions(
+        &self,
+        user_id: Uuid,
+        page: &PageRequest,
+    ) -> Result<Page<Session>, Error> {
+        let select = live_tokens(user_id, now());
+        // Họ token sinh bằng UUIDv7 lúc đăng nhập: xếp theo `family_id` là xếp theo lúc
+        // phiên bắt đầu, và mỗi họ chỉ có một token còn sống — cursor ổn định.
+        let page =
+            fetch_page(select, Column::FamilyId, |row| row.family_id, page, self.database.read())
+                .await?;
+        Ok(page.map(Session::from))
+    }
+
+    /// Kết thúc phiên `session_id` của người dùng `user_id` (đăng xuất một thiết bị).
+    /// Access token đã cấp cho phiên đó vẫn chạy tới khi hết hạn (mặc định 15 phút).
+    pub(crate) async fn revoke_session(
+        &self,
+        user_id: Uuid,
+        session_id: Uuid,
+    ) -> Result<(), Error> {
+        let transaction = self.database.begin_write().await?;
+        // Khoá dòng người dùng trước, như refresh: refresh đang chạy dở xong hẳn rồi mới
+        // tới lượt thu hồi, nên token nó vừa cấp cũng bị thu hồi.
+        lock_user(&transaction, user_id).await?;
+        let revoked = Entity::update_many()
+            .col_expr(Column::RevokedAt, Expr::value(Some(now())))
+            .filter(Column::UserId.eq(user_id))
+            .filter(Column::FamilyId.eq(session_id))
+            .filter(Column::RevokedAt.is_null())
+            .exec(&transaction)
+            .await?;
+        if revoked.rows_affected == 0 {
+            transaction.rollback().await?;
+            return Err(session_not_found(session_id));
+        }
+        let event =
+            events::SignedOut { before: None, after: Some(json!({"session_id": session_id})) };
+        let subject = events::user_subject(user_id);
+        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
+        transaction.commit().await?;
+        tracing::info!(user_id = %user_id, "session ended");
+        Ok(())
+    }
+
+    /// Kết thúc mọi phiên của người dùng `user_id`, trừ phiên `keep` (nếu có). Trả số
+    /// phiên đã kết thúc. Dùng cho "đăng xuất mọi thiết bị khác" và cho quản trị viên.
+    pub(crate) async fn revoke_sessions(
+        &self,
+        actor: Actor,
+        user_id: Uuid,
+        keep: Option<Uuid>,
+    ) -> Result<u64, Error> {
+        let now = now();
+        let transaction = self.database.begin_write().await?;
+        lock_user(&transaction, user_id).await?;
+        let mut live = live_tokens(user_id, now);
+        let mut revoke = Entity::update_many()
+            .col_expr(Column::RevokedAt, Expr::value(Some(now)))
+            .filter(Column::UserId.eq(user_id))
+            .filter(Column::RevokedAt.is_null());
+        if let Some(keep) = keep {
+            live = live.filter(Column::FamilyId.ne(keep));
+            revoke = revoke.filter(Column::FamilyId.ne(keep));
+        }
+        let ended = live.count(&transaction).await?;
+        revoke.exec(&transaction).await?;
+        if ended > 0 {
+            let event = events::SessionsRevoked {
+                before: None,
+                after: Some(json!({"count": ended, "kept": keep})),
+            };
+            let subject = events::user_subject(user_id);
+            self.outbox.record(&transaction, actor, subject, &event).await?;
+        }
+        transaction.commit().await?;
+        tracing::info!(user_id = %user_id, sessions = ended, "sessions ended");
+        Ok(ended)
+    }
+
     /// Thu hồi cả họ của `row` và trả lỗi báo token bị dùng lại.
     async fn reuse_detected(&self, row: &entity::Model) -> Error {
         tracing::warn!(
@@ -348,6 +512,7 @@ impl SessionService {
     fn tokens(
         &self,
         user_id: Uuid,
+        session_id: Uuid,
         refresh_token: String,
         refresh_token_expires_at: DateTime<Utc>,
         now: DateTime<Utc>,
@@ -357,8 +522,60 @@ impl SessionService {
             expires_in: self.access_tokens.ttl().as_secs(),
             refresh_token,
             refresh_token_expires_at,
+            session_id,
         })
     }
+}
+
+/// Ghi "không đổi gì" lên dòng người dùng `user_id`: trên Postgres dòng bị khoá tới hết
+/// transaction, nên refresh, thu hồi phiên, khoá tài khoản hay đổi mật khẩu của cùng người
+/// dùng nối đuôi nhau thay vì chen nhau (D-079). SQLite chỉ có một bên ghi tại một lúc nên
+/// vốn đã nối đuôi. Trả số dòng đã chạm.
+async fn touch_user<C: ConnectionTrait>(
+    connection: &C,
+    user_id: Uuid,
+    only_active: bool,
+) -> Result<u64, Error> {
+    use crate::user::entity::{Column as User, Entity as Users};
+    let mut update = Users::update_many()
+        .col_expr(User::UpdatedAt, Expr::col(User::UpdatedAt))
+        .filter(User::Id.eq(user_id));
+    if only_active {
+        update = update.filter(User::DisabledAt.is_null());
+    }
+    Ok(update.exec(connection).await?.rows_affected)
+}
+
+/// Khoá dòng người dùng `user_id` (xem [`touch_user`]).
+async fn lock_user<C: ConnectionTrait>(connection: &C, user_id: Uuid) -> Result<(), Error> {
+    touch_user(connection, user_id, false).await.map(|_| ())
+}
+
+/// Khoá dòng người dùng `user_id` nếu tài khoản còn hoạt động; `false` nếu đã bị khoá
+/// (hoặc không còn).
+async fn lock_active_user<C: ConnectionTrait>(
+    connection: &C,
+    user_id: Uuid,
+) -> Result<bool, Error> {
+    Ok(touch_user(connection, user_id, true).await? > 0)
+}
+
+/// Refresh token còn dùng được của người dùng `user_id`: mỗi phiên đúng một dòng.
+fn live_tokens(user_id: Uuid, now: DateTime<Utc>) -> sea_orm::Select<Entity> {
+    Entity::find()
+        .filter(Column::UserId.eq(user_id))
+        .filter(Column::UsedAt.is_null())
+        .filter(Column::RevokedAt.is_null())
+        .filter(Column::ExpiresAt.gt(now))
+}
+
+fn session_not_found(id: Uuid) -> Error {
+    Error::not_found(
+        "auth.session_not_found",
+        "You have no active session `{id}`. List your sessions with \
+         `GET /api/v1/auth/me/sessions`.",
+    )
+    .with_param("id", id)
 }
 
 /// Thu hồi mọi refresh token của họ `family_id`.
@@ -372,12 +589,19 @@ async fn revoke_family<C: ConnectionTrait>(connection: &C, family_id: Uuid) -> R
     Ok(())
 }
 
+/// Thông tin của một phiên, chép sang mỗi refresh token của nó.
+struct SessionDetails {
+    started_at: DateTime<Utc>,
+    user_agent: Option<String>,
+}
+
 /// Sinh một refresh token mới và dòng database tương ứng (chưa ghi).
 fn new_refresh_token(
     user_id: Uuid,
     family_id: Uuid,
     now: DateTime<Utc>,
     expires_at: DateTime<Utc>,
+    session: SessionDetails,
 ) -> Result<(String, entity::ActiveModel), Error> {
     let token = token::random_token(REFRESH_TOKEN_BYTES)?;
     let row = entity::ActiveModel {
@@ -389,6 +613,8 @@ fn new_refresh_token(
         used_at: Set(None),
         revoked_at: Set(None),
         created_at: Set(now),
+        user_agent: Set(session.user_agent),
+        session_started_at: Set(Some(session.started_at)),
     };
     Ok((token, row))
 }
@@ -455,17 +681,53 @@ mod tests {
         format!("Bearer {}", tokens.access_token)
     }
 
+    /// Đăng xuất mọi phiên chạy cùng lúc với refresh của các phiên đó: không token mới
+    /// nào lọt qua — trên cả hai database.
+    #[tokio::test]
+    async fn dang_xuat_moi_phien_trong_luc_refresh() {
+        TestDatabase::run(async |test| {
+            let (sessions, _, user) = setup(test).await;
+            let mut refresh_tokens = Vec::new();
+            for _ in 0..4 {
+                let tokens = sessions.login("ada@example.com", PASSWORD, None).await.unwrap();
+                refresh_tokens.push(tokens.tokens().refresh_token);
+            }
+            sessions.throttle.clear("ada@example.com").await.unwrap();
+
+            let mut tasks = Vec::new();
+            for token in refresh_tokens {
+                let sessions = sessions.clone();
+                tasks.push(tokio::spawn(async move { sessions.refresh(&token).await.map(|_| ()) }));
+            }
+            let revoker = sessions.clone();
+            let revoke = tokio::spawn(async move {
+                revoker.revoke_sessions(Actor::user(user.id), user.id, None).await.map(|_| ())
+            });
+            for task in tasks {
+                let _ = task.await.unwrap();
+            }
+            revoke.await.unwrap().unwrap();
+
+            let page = PageRequest::first(10, Default::default());
+            let live = sessions.list_sessions(user.id, &page).await.unwrap();
+            assert!(live.data.is_empty(), "{} sessions survived", live.data.len());
+        })
+        .await
+        .unwrap();
+    }
+
     #[tokio::test]
     async fn dang_nhap_roi_dung_access_token() {
         TestDatabase::run(async |test| {
             let (sessions, _, user) = setup(test).await;
 
-            let tokens = sessions.login("ADA@example.com", PASSWORD).await.unwrap().tokens();
+            let tokens = sessions.login("ADA@example.com", PASSWORD, None).await.unwrap().tokens();
 
             assert_eq!(tokens.expires_in, 900);
             assert_ne!(tokens.refresh_token, tokens.access_token);
             assert_eq!(sessions.authenticate(Some(&bearer(&tokens))).await.unwrap(), user);
-            let wrong = sessions.login("ada@example.com", "wrong password").await.unwrap_err();
+            let wrong =
+                sessions.login("ada@example.com", "wrong password", None).await.unwrap_err();
             assert_eq!(wrong.code(), "auth.invalid_credentials");
         })
         .await
@@ -478,23 +740,25 @@ mod tests {
             let (sessions, _, _) = setup(test).await;
             // Một lần đúng giữa chừng xoá các lần sai trước.
             for _ in 0..4 {
-                sessions.login("ada@example.com", "wrong password").await.unwrap_err();
+                sessions.login("ada@example.com", "wrong password", None).await.unwrap_err();
             }
-            sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
+            sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
             for _ in 0..5 {
-                let error = sessions.login("ada@example.com", "wrong password").await.unwrap_err();
+                let error =
+                    sessions.login("ada@example.com", "wrong password", None).await.unwrap_err();
                 assert_eq!(error.code(), "auth.invalid_credentials");
             }
-            let locked = sessions.login("ada@example.com", PASSWORD).await.unwrap_err();
+            let locked = sessions.login("ada@example.com", PASSWORD, None).await.unwrap_err();
 
             assert_eq!(locked.kind(), ErrorKind::TooManyRequests);
             assert_eq!(locked.code(), "auth.login_throttled");
             // Email không tồn tại cũng bị khoá y hệt: không lộ email nào có thật.
             for _ in 0..5 {
-                sessions.login("ghost@example.com", "wrong password").await.unwrap_err();
+                sessions.login("ghost@example.com", "wrong password", None).await.unwrap_err();
             }
-            let ghost = sessions.login("ghost@example.com", "wrong password").await.unwrap_err();
+            let ghost =
+                sessions.login("ghost@example.com", "wrong password", None).await.unwrap_err();
             assert_eq!(ghost.code(), "auth.login_throttled");
         })
         .await
@@ -505,7 +769,7 @@ mod tests {
     async fn header_authorization_sai_hoac_thieu() {
         TestDatabase::run(async |test| {
             let (sessions, _, _) = setup(test).await;
-            let tokens = sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
+            let tokens = sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
             let lower = format!("bearer {}", tokens.access_token);
             assert!(sessions.authenticate(Some(&lower)).await.is_ok());
@@ -528,7 +792,7 @@ mod tests {
     async fn refresh_xoay_vong_token() {
         TestDatabase::run(async |test| {
             let (sessions, _, user) = setup(test).await;
-            let first = sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
+            let first = sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
             let second = sessions.refresh(&first.refresh_token).await.unwrap();
             let third = sessions.refresh(&second.refresh_token).await.unwrap();
@@ -547,10 +811,10 @@ mod tests {
     async fn dung_lai_refresh_token_thu_hoi_ca_phien() {
         TestDatabase::run(async |test| {
             let (sessions, _, _) = setup(test).await;
-            let first = sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
+            let first = sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
             let second = sessions.refresh(&first.refresh_token).await.unwrap();
             // Một phiên khác của cùng người dùng không bị ảnh hưởng.
-            let other = sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
+            let other = sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
             let reused = sessions.refresh(&first.refresh_token).await.unwrap_err();
 
@@ -571,7 +835,7 @@ mod tests {
     async fn refresh_dong_thoi_chi_mot_ben_thang() {
         TestDatabase::run(async |test| {
             let (sessions, _, _) = setup(test).await;
-            let tokens = sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
+            let tokens = sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
             let attempts: Vec<_> = (0..6)
                 .map(|_| {
@@ -600,7 +864,7 @@ mod tests {
     async fn dang_xuat_thu_hoi_phien_va_goi_lai_van_on() {
         TestDatabase::run(async |test| {
             let (sessions, _, _) = setup(test).await;
-            let first = sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
+            let first = sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
             let second = sessions.refresh(&first.refresh_token).await.unwrap();
 
             sessions.logout(&first.refresh_token).await.unwrap();
@@ -618,7 +882,7 @@ mod tests {
     async fn refresh_token_het_han_khong_dung_duoc() {
         TestDatabase::run(async |test| {
             let (sessions, _, _) = setup(test).await;
-            let tokens = sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
+            let tokens = sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
             Entity::update_many()
                 .col_expr(Column::ExpiresAt, Expr::value(now()))
                 .exec(sessions.database.write())
@@ -637,8 +901,8 @@ mod tests {
     async fn doi_mat_khau_thu_hoi_moi_phien() {
         TestDatabase::run(async |test| {
             let (sessions, users, user) = setup(test).await;
-            let first = sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
-            let second = sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
+            let first = sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
+            let second = sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
             users
                 .set_password(Actor::system(), user.id, "a brand new passphrase".to_owned())
@@ -658,7 +922,7 @@ mod tests {
     async fn tai_khoan_bi_khoa_mat_quyen() {
         TestDatabase::run(async |test| {
             let (sessions, _, user) = setup(test).await;
-            let tokens = sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
+            let tokens = sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
             crate::user::entity_for_tests::disable(sessions.database.write(), user.id).await;
 
             let me = sessions.authenticate(Some(&bearer(&tokens))).await.unwrap_err();
@@ -709,7 +973,7 @@ mod mfa_login_tests {
     }
 
     async fn challenge(sessions: &SessionService) -> String {
-        match sessions.login("ada@example.com", PASSWORD).await.unwrap() {
+        match sessions.login("ada@example.com", PASSWORD, None).await.unwrap() {
             LoginOutcome::MfaRequired { mfa_token, expires_in } => {
                 assert_eq!(expires_in, 300);
                 mfa_token
@@ -725,7 +989,7 @@ mod mfa_login_tests {
 
             let mfa_token = challenge(&sessions).await;
             let code = code_at(&secret, unix_now() + 30);
-            let tokens = sessions.complete_mfa(&mfa_token, &code).await.unwrap();
+            let tokens = sessions.complete_mfa(&mfa_token, &code, None).await.unwrap();
 
             assert!(
                 sessions
@@ -734,9 +998,9 @@ mod mfa_login_tests {
                     .is_ok()
             );
             // Mỗi lượt chỉ cấp token một lần.
-            let again = sessions.complete_mfa(&mfa_token, &code).await.unwrap_err();
+            let again = sessions.complete_mfa(&mfa_token, &code, None).await.unwrap_err();
             assert_eq!(again.code(), "auth.invalid_mfa_token");
-            let unknown = sessions.complete_mfa("nope", &code).await.unwrap_err();
+            let unknown = sessions.complete_mfa("nope", &code, None).await.unwrap_err();
             assert_eq!(unknown.code(), "auth.invalid_mfa_token");
         })
         .await
@@ -749,10 +1013,10 @@ mod mfa_login_tests {
             let (sessions, _, codes) = setup(test).await;
 
             let mfa_token = challenge(&sessions).await;
-            sessions.complete_mfa(&mfa_token, &codes[0]).await.unwrap();
+            sessions.complete_mfa(&mfa_token, &codes[0], None).await.unwrap();
 
             let mfa_token = challenge(&sessions).await;
-            let reused = sessions.complete_mfa(&mfa_token, &codes[0]).await.unwrap_err();
+            let reused = sessions.complete_mfa(&mfa_token, &codes[0], None).await.unwrap_err();
             assert_eq!(reused.code(), "auth.invalid_mfa_code");
         })
         .await
@@ -766,16 +1030,16 @@ mod mfa_login_tests {
             let mfa_token = challenge(&sessions).await;
 
             for _ in 0..5 {
-                let error = sessions.complete_mfa(&mfa_token, "000000").await.unwrap_err();
+                let error = sessions.complete_mfa(&mfa_token, "000000", None).await.unwrap_err();
                 assert_eq!(error.kind(), ErrorKind::Unauthenticated);
                 assert_eq!(error.code(), "auth.invalid_mfa_code");
             }
 
             // Hết lượt nhập sai của token này…
-            let used_up = sessions.complete_mfa(&mfa_token, "000000").await.unwrap_err();
+            let used_up = sessions.complete_mfa(&mfa_token, "000000", None).await.unwrap_err();
             assert_eq!(used_up.code(), "auth.invalid_mfa_token");
             // …và các lần sai đã khoá đăng nhập của email, kể cả đúng mật khẩu.
-            let locked = sessions.login("ada@example.com", PASSWORD).await.unwrap_err();
+            let locked = sessions.login("ada@example.com", PASSWORD, None).await.unwrap_err();
             assert_eq!(locked.code(), "auth.login_throttled");
         })
         .await
@@ -795,7 +1059,9 @@ mod mfa_login_tests {
                 .map(|_| {
                     let sessions = sessions.clone();
                     let (mfa_token, code) = (mfa_token.clone(), code.clone());
-                    tokio::spawn(async move { sessions.complete_mfa(&mfa_token, &code).await })
+                    tokio::spawn(
+                        async move { sessions.complete_mfa(&mfa_token, &code, None).await },
+                    )
                 })
                 .collect();
             let mut signed_in = 0;
@@ -836,20 +1102,21 @@ mod change_password_tests {
     async fn doi_mat_khau_can_mat_khau_cu_va_cap_phien_moi() {
         TestDatabase::run(async |test| {
             let (sessions, user) = setup(test).await;
-            let old_session = sessions.login("ada@example.com", OLD).await.unwrap().tokens();
+            let old_session = sessions.login("ada@example.com", OLD, None).await.unwrap().tokens();
 
-            let wrong = sessions.change_password(user.id, "not my password", NEW.to_owned());
+            let wrong = sessions.change_password(user.id, "not my password", NEW.to_owned(), None);
             assert_eq!(wrong.await.unwrap_err().code(), "auth.wrong_password");
-            let short = sessions.change_password(user.id, OLD, "short".to_owned());
+            let short = sessions.change_password(user.id, OLD, "short".to_owned(), None);
             assert_eq!(short.await.unwrap_err().code(), "validation_failed");
 
-            let tokens = sessions.change_password(user.id, OLD, NEW.to_owned()).await.unwrap();
+            let tokens =
+                sessions.change_password(user.id, OLD, NEW.to_owned(), None).await.unwrap();
 
             // Phiên cũ kết thúc; phiên mới dùng tiếp được.
             assert!(sessions.refresh(&old_session.refresh_token).await.is_err());
             sessions.refresh(&tokens.refresh_token).await.unwrap();
-            assert!(sessions.login("ada@example.com", OLD).await.is_err());
-            sessions.login("ada@example.com", NEW).await.unwrap().tokens();
+            assert!(sessions.login("ada@example.com", OLD, None).await.is_err());
+            sessions.login("ada@example.com", NEW, None).await.unwrap().tokens();
         })
         .await
         .unwrap();
@@ -860,12 +1127,12 @@ mod change_password_tests {
         TestDatabase::run(async |test| {
             let (sessions, user) = setup(test).await;
             for _ in 0..5 {
-                let wrong = sessions.change_password(user.id, "guess", NEW.to_owned()).await;
+                let wrong = sessions.change_password(user.id, "guess", NEW.to_owned(), None).await;
                 assert_eq!(wrong.unwrap_err().code(), "auth.wrong_password");
             }
 
             // Đã khoá: kể cả mật khẩu đúng cũng phải chờ.
-            let locked = sessions.change_password(user.id, OLD, NEW.to_owned()).await;
+            let locked = sessions.change_password(user.id, OLD, NEW.to_owned(), None).await;
             assert_eq!(locked.unwrap_err().code(), "auth.login_throttled");
         })
         .await

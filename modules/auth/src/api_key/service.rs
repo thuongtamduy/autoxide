@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::database::Database;
-use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
@@ -70,12 +70,16 @@ pub(crate) struct NewApiKey {
     pub permissions: Vec<String>,
     /// `None`: không hết hạn.
     pub expires_at: Option<DateTime<Utc>>,
+    /// Mật khẩu hiện tại của người tạo: access token bị lộ không đủ để tạo key sống lâu
+    /// hơn nó (D-079).
+    pub current_password: String,
 }
 
 pub(crate) struct ApiKeyService {
     database: Database,
     users: Arc<UserService>,
     roles: Arc<RoleService>,
+    sessions: Arc<crate::session::SessionService>,
     outbox: Outbox,
 }
 
@@ -84,9 +88,10 @@ impl ApiKeyService {
         database: Database,
         users: Arc<UserService>,
         roles: Arc<RoleService>,
+        sessions: Arc<crate::session::SessionService>,
         outbox: Outbox,
     ) -> Self {
-        ApiKeyService { database, users, roles, outbox }
+        ApiKeyService { database, users, roles, sessions, outbox }
     }
 
     /// Tạo key cho `creator`, với permission nằm trong số permission `creator` đang có.
@@ -103,8 +108,20 @@ impl ApiKeyService {
             ));
         }
         let now = now();
-        let (name, permissions) =
-            self.check(creator, input.name, input.permissions, input.expires_at, now)?;
+        // Kiểm đầu vào (gom mọi lỗi, kể cả thiếu mật khẩu) TRƯỚC khi kiểm mật khẩu.
+        let blank = FieldError::blank("current_password", &input.current_password);
+        let checked = self.check(creator, input.name, input.permissions, input.expires_at, now);
+        let (name, permissions) = match (checked, blank) {
+            (Ok(checked), None) => checked,
+            (Ok(_), Some(problem)) => return Err(Error::validation(vec![problem])),
+            (Err(error), Some(problem)) if error.kind() == ErrorKind::Validation => {
+                let mut problems = error.fields().to_vec();
+                problems.push(problem);
+                return Err(Error::validation(problems));
+            }
+            (Err(error), _) => return Err(error),
+        };
+        self.sessions.check_password(creator.user_id(), &input.current_password).await?;
         let user_id = creator.user_id();
         let existing = api_key::Entity::find()
             .filter(api_key::Column::UserId.eq(user_id))
@@ -206,6 +223,24 @@ impl ApiKeyService {
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, api_key_id = %id, "API key revoked");
         Ok(())
+    }
+
+    /// Thu hồi mọi API key của người dùng `user_id` (vd khi chủ tài khoản lấy lại tài khoản
+    /// bằng cách đặt lại mật khẩu). Trả số key đã thu hồi.
+    pub(crate) async fn revoke_all(&self, actor: Actor, user_id: Uuid) -> Result<u64, Error> {
+        let transaction = self.database.begin_write().await?;
+        let rows = api_key::Entity::find()
+            .filter(api_key::Column::UserId.eq(user_id))
+            .all(&transaction)
+            .await?;
+        for row in &rows {
+            api_key::Entity::delete_by_id(row.id).exec(&transaction).await?;
+            let before = json!({"user_id": user_id, "name": row.name, "prefix": row.prefix});
+            let event = events::ApiKeyRevoked { before: Some(before), after: None };
+            self.outbox.record(&transaction, actor, key_subject(row.id), &event).await?;
+        }
+        transaction.commit().await?;
+        Ok(rows.len() as u64)
     }
 
     /// Bên gọi của một request mang API key `secret`.
@@ -378,7 +413,7 @@ mod tests {
         let ada = NewAccount {
             email: "ada@example.com".to_owned(),
             name: "Ada".to_owned(),
-            password: None,
+            password: Some(PASSWORD.to_owned()),
             admin: false,
         };
         let ada = Accounts::create(services.users.as_ref(), ada).await.unwrap();
@@ -404,8 +439,11 @@ mod tests {
             name: "agent".to_owned(),
             permissions: permissions.iter().map(|p| (*p).to_owned()).collect(),
             expires_at: None,
+            current_password: PASSWORD.to_owned(),
         }
     }
+
+    const PASSWORD: &str = "correct horse battery staple";
 
     #[tokio::test]
     async fn tao_key_roi_xac_thuc_bang_no() {
@@ -451,6 +489,7 @@ mod tests {
                     "nope.read".to_owned(),
                 ],
                 expires_at: Some(past),
+                current_password: PASSWORD.to_owned(),
             };
 
             let error = services.api_keys.create(&ada, input).await.unwrap_err();
@@ -485,7 +524,7 @@ mod tests {
             assert!(!after_role.allows("auth.users.read"));
 
             let disable = UserChanges { name: None, disabled: Some(true) };
-            services.users.update(Actor::system(), ada.user_id(), disable).await.unwrap();
+            services.users.update(Actor::system(), ada.user_id(), disable, None).await.unwrap();
             let error = services.api_keys.authenticate(&created.secret).await.unwrap_err();
             assert_eq!(error.code(), "auth.user_disabled");
         })

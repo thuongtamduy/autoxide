@@ -1685,7 +1685,199 @@ tiêu chí "theo chuẩn ngành thay vì tự chế"; lưu nghi thức trong b�
 nhiều máy chủ; quản trị viên xoá passkey của người khác — để sau, khi có nhu cầu (tài
 khoản bị khoá thì passkey cũng không đăng nhập được).
 
-## D-078 · Module đầu tiên là `cms` (nội dung); giao diện là dự án riêng, công khai; chưa làm app — 2026-11-12 — chủ dự án quyết
+## D-078 · Phát hành: SemVer một số cho cả workspace, CHANGELOG, image trên GHCR, Dependabot — 2026-11-11 — agent quyết
+
+Quyết định:
+
+- Một số phiên bản cho cả workspace (`[workspace.package] version`), theo Semantic
+  Versioning; `0.x` cho tới khi chủ dự án tuyên bố ổn định. API HTTP `/api/v1` không phá
+  vỡ trong mọi trường hợp (deprecation, D-059); phiên bản nói về cấu hình, CLI, hợp đồng
+  module.
+- `CHANGELOG.md` (tiếng Anh, chuẩn Keep a Changelog): mỗi thay đổi người dùng thấy thêm
+  một dòng vào `[Unreleased]`. Quy trình phát hành ở `docs/RELEASING.md`.
+- Workflow `Release` chạy khi đẩy tag `vX.Y.Z`: kiểm tag khớp `Cargo.toml` và có mục
+  trong CHANGELOG, chạy lại gate, build image bằng `Dockerfile` và đăng
+  `ghcr.io/<owner>/autoxide:X.Y.Z` + `:X.Y` lên GitHub Container Registry, tạo bản phát hành
+  GitHub với ghi chú từ CHANGELOG. Chỉ `linux/amd64`: build arm64 qua giả lập mất hàng giờ;
+  thêm khi có người cần (runner arm64 thật).
+- `compose.yml` nhận `AUTOXIDE_IMAGE` để dùng image đã phát hành thay vì tự build.
+- Dependabot mỗi tuần cho thư viện Rust (gom minor/patch thành một PR), GitHub Actions và
+  image Docker; workflow `Security audit` chạy `cargo deny check advisories` mỗi ngày.
+
+Lý do: người lạ cài được mà không cần toolchain Rust; nâng cấp có nhịp đều, mỗi đề xuất
+qua đúng gate; lỗ hổng mới công bố được biết ngay cả khi repo không có commit.
+
+Đã cân nhắc: `cargo-release` / `release-plz` — tự động hơn nhưng thêm công cụ và quy ước
+cho một việc làm vài lần mỗi năm; phát hành binary cho từng hệ điều hành — Docker và
+`cargo build` đã đủ cho máy chủ.
+
+## D-079 · Rà soát bảo mật bước 13: đếm lượt trước khi kiểm, xác nhận lại mật khẩu, không tác động lên người quyền cao hơn — 2026-11-12 — agent quyết
+
+Hai agent đọc độc lập toàn repo (kernel/CLI và module `auth`); mọi lỗi tìm thấy đã sửa:
+
+- **Login throttling đếm trước rồi mới kiểm** (`LoginThrottle::reserve`): nhiều request bắn
+  cùng lúc không vượt được `max_failures`. Mật khẩu đúng mà còn chờ mã MFA thì trả lại lượt
+  (`refund`), đúng hẳn thì xoá (`clear`). Mã MFA của một lần đăng nhập được claim bằng một
+  câu `UPDATE` có điều kiện. Tắt TOTP và tạo lại recovery code cũng đếm mã sai, theo
+  người dùng (`mfa:<user_id>`).
+- **Refresh token** khoá dòng người dùng trước (`UPDATE … WHERE disabled_at IS NULL`) trong
+  cùng transaction: refresh không lọt qua lúc tài khoản đang bị khoá.
+- **Xác nhận lại mật khẩu** khi tạo API key và khi bắt đầu thêm passkey; đặt lại mật khẩu
+  qua email xoá mọi passkey và API key — kẻ chiếm phiên không cài được cửa sau.
+- **Người có `auth.users.manage` không tác động lên người có permission mà mình không có**
+  (gỡ MFA, khoá, đặt mật khẩu đầu): `RoleService::require_covers`, lỗi
+  `auth.target_has_more_permissions`.
+- **Idempotency** xác thực trước: request chưa đăng nhập không được lưu; key thuộc phạm vi
+  (người dùng, API key); dấu vân tay gồm method, đường dẫn kèm query, content-type và thân;
+  đọc thân có giới hạn thời gian `request_timeout`.
+- **Rate limiting** chỉ đọc giá trị cuối của header IP (giá trị proxy tin cậy thêm vào), nhận
+  cả dạng `ip:port`.
+- **Job xong thì xoá payload** (ghi `null`): link chứa token không nằm lại trong bảng job.
+  Job trong dead-letter queue giữ payload để chạy lại được; token trong đó đã có hạn.
+- **`autoxide restore`** từ chối bản backup chứa symbolic link.
+
+Lý do: mỗi điểm là một cách chiếm hoặc giữ tài khoản, hay vượt giới hạn đã hứa trong tài
+liệu. Sửa đều chạy trên cả hai database và có test (kể cả test đồng thời).
+
+Đã cân nhắc: khoá `SELECT … FOR UPDATE` cho throttle — SQLite không có; mã hoá payload job
+thay vì xoá — thêm key cần quản lý mà không ai cần đọc lại payload của job đã xong.
+
+## D-080 · Tài khoản: quản lý phiên, xoá tài khoản + xuất dữ liệu xuyên module, tìm người dùng — 2026-11-12 — agent quyết
+
+Quyết định:
+
+- **Phiên = một họ refresh token.** Refresh token mang thêm `user_agent` và
+  `session_started_at` (m0015), chép sang token mới mỗi lần refresh. Response token có
+  `session_id` (id của họ) để client nhận ra phiên của mình. Người dùng xem
+  (`GET /me/sessions`), đăng xuất một phiên (`DELETE /me/sessions/{id}`) hoặc mọi phiên trừ
+  một (`DELETE /me/sessions?keep=…`); quản trị viên đăng xuất mọi phiên của một người
+  (`DELETE /users/{id}/sessions`). Access token đã cấp vẫn chạy tới hết hạn (15 phút) —
+  muốn chặn ngay thì khoá tài khoản.
+- **Xoá tài khoản là xoá hẳn** (`DELETE /me` kèm mật khẩu, `DELETE /users/{id}`): dữ liệu
+  của `auth` đi theo foreign key trong module; module khác nhận event
+  `auth.user_deleted` (tên là hằng `privacy::USER_DELETED` của kernel, payload chỉ có id)
+  và tự xoá phần của mình. Module dọn dữ liệu đăng ký nhận event này được kể cả khi không
+  cài module tài khoản (dispatcher coi nó là hợp đồng của kernel). Audit log giữ event
+  (chỉ id, không email). Không xoá được admin cuối cùng.
+- **Xuất dữ liệu cá nhân xuyên module:** kernel có trait `privacy::PersonalData`; module
+  đăng ký bằng `StartContext::personal_data`, `auth` gom lại ở `GET /me/export`
+  (`{"data": {"<module>": …}}`). Sổ đăng ký dùng chung nên module khởi động sau `auth` vẫn
+  có mặt. Không xuất secret.
+- **Tìm người dùng** bằng `search` ở `GET /users` (và tool MCP `list_users`): chứa chuỗi,
+  không phân biệt hoa thường. Cột `auth_user.search_text` (m0016) giữ email + tên viết
+  thường **tính trong Rust**: `LOWER` của SQLite chỉ đổi chữ ASCII, của Postgres đổi mọi
+  chữ — dùng `LOWER` trong SQL sẽ cho hai kết quả khác nhau (vd tên tiếng Việt). `LIKE` có
+  `ESCAPE` để `%`/`_` người dùng gõ là chữ thường. Tìm "chứa" quét bảng người dùng — chấp
+  nhận được với kích thước bảng này; cần nhanh hơn thì thêm full-text sau, khi đo thấy chậm.
+
+Lý do: ba việc của bước 13 nhóm 2; chạy như nhau trên hai database, không module nào
+phụ thuộc module `auth` (D-046).
+
+Đã cân nhắc: xoá mềm (đánh dấu) — giữ dữ liệu cá nhân trái mục đích của việc xoá; job
+xuất dữ liệu ra file — thêm hạ tầng lưu file tạm cho một việc hiếm, JSON trả thẳng là đủ
+ở cỡ dữ liệu của core; ghi `sid` vào access token để đánh dấu phiên hiện tại — client đã
+có `session_id` từ response token.
+
+## D-081 · Webhook: module `webhooks`, chuẩn Standard Webhooks, gửi qua job queue — 2026-11-12 — agent quyết
+
+Quyết định:
+
+- Module riêng `webhooks` (đăng ký trong binary), nhận mọi event bằng đăng ký `*` như
+  audit. Quản trị viên (permission `webhooks.manage`) khai endpoint: địa chỉ `https://`
+  (`http://` chỉ khi `AUTOXIDE_WEBHOOKS_ALLOW_HTTP=true`), danh sách tên event (kiểm theo
+  danh mục event) hoặc `*`.
+- Chữ ký theo **Standard Webhooks** (header `webhook-id`, `webhook-timestamp`,
+  `webhook-signature: v1,<HMAC-SHA256 base64>`, secret `whsec_…`) — bên nhận dùng thư viện
+  có sẵn của chuẩn. Test khớp ví dụ chính thức của chuẩn. Secret lưu nguyên (cần để ký),
+  chỉ hiện một lần lúc tạo hoặc thay.
+- Mỗi (event, endpoint) một dòng `webhooks_delivery` (unique — event giao lại không gửi
+  trùng) và một job, cùng transaction. Job thử tối đa 12 lần với backoff của job queue
+  (khoảng hai giờ); `webhook-id` giữ nguyên qua các lần thử để bên nhận bỏ bản trùng.
+  Không theo chuyển hướng; thời gian chờ `AUTOXIDE_WEBHOOKS_TIMEOUT_SECONDS` (10 giây).
+- Lịch sử gửi xem ở `GET /webhooks/{id}/deliveries`, giữ 30 ngày (job dọn hằng ngày); số
+  đo `webhooks_delivered_total`, `webhooks_failed_total`.
+
+Lý do: tích hợp với hệ thống khác mà không phải sửa core; chuẩn ngành thay vì tự chế;
+dùng lại job queue (retry, dead-letter queue) đã có trên cả hai database.
+
+Đã cân nhắc: webhook theo từng người dùng — cần lọc event theo quyền xem dữ liệu của từng
+người, để sau khi có nhu cầu; chặn địa chỉ mạng nội bộ (SSRF) — chỉ quản trị viên tạo được
+endpoint và không theo chuyển hướng; thêm khi mở cho người dùng thường.
+
+## D-082 · Gate kiểm tài liệu OpenAPI hợp lệ và mô tả gửi ra ngoài là tiếng Anh — 2026-11-12 — agent quyết
+
+Bối cảnh: chủ dự án kiểm `docs/openapi.json` bằng trình kiểm chuẩn và thấy file không hợp
+lệ — tham số `order` của mọi endpoint danh sách trỏ tới `#/components/schemas/Order` không
+có trong file (trình kiểm chuẩn và công cụ sinh SDK từ chối cả file). Tool MCP mang mô tả
+tiếng Việt (`///` trên `NoInput`, `PageInput`). Gate cũ chỉ kiểm "có mô tả hay không".
+
+Quyết định:
+
+- `Order` khai `inline` trong `PageQuery`.
+- `http::lint` (chạy khi sinh `docs/openapi.json` và trong test của gate) kiểm thêm: mọi
+  `$ref` trỏ tới một mục có thật; không `summary` / `description` / `title` nào có chữ tiếng
+  Việt. Kiểm tiếng Việt cũng chạy cho mô tả và schema đầu vào của mọi tool MCP lúc khởi
+  động.
+- Đã xác nhận bằng `openapi-spec-validator`: file cũ bị từ chối, file mới hợp lệ.
+
+Lý do: OpenAPI là hợp đồng để dùng Autoxide từ ngôn ngữ khác; một `$ref` treo làm hỏng cả
+hợp đồng. Kiểm trong Rust, không thêm công cụ ngoài vào gate (người lạ không cần Python
+hay Node để chạy gate).
+
+Đã cân nhắc: chạy trình kiểm chuẩn đầy đủ (Python / Node) trong gate — thêm phụ thuộc
+ngoài cho mọi người phát triển; kiểm theo JSON Schema chính thức của OpenAPI 3.1 bằng thư
+viện Rust — thêm thư viện lớn trong khi lỗi thực tế gặp là `$ref` treo, đã kiểm trực tiếp.
+
+## D-083 · Bước 14: kiểm đầu vào ở service và báo mọi lỗi một lần; `Created`; header chung trong OpenAPI; MCP cùng envelope với REST — 2026-11-12 — agent quyết
+
+Quyết định:
+
+- **Mỗi trường được kiểm ở đúng một chỗ.** Trường service kiểm thì không gắn `#[validate]`
+  trên kiểu nhận JSON; service gom mọi lỗi của đầu vào (kể cả "thiếu mật khẩu hiện tại" —
+  `FieldError::blank`) thành một `Error::validation`. Trước đây `ValidJson` dừng ở lỗi độ
+  dài nên lỗi định dạng email chỉ hiện ở lần gửi sau. `#[validate]` chỉ còn ở trường không
+  service nào kiểm (token, mã đăng nhập…). Lợi thêm: REST và MCP kiểm như nhau. Webhook báo
+  địa chỉ sai và tên event lạ bằng lỗi theo trường (`url`, `events[i]`) như role và API key,
+  thay cho mã riêng `webhooks.insecure_url` / `webhooks.unknown_event` (chưa phát hành).
+- **`response::Created`**: mọi endpoint tạo mới trả 201 + `Location` (đường dẫn tới bản ghi);
+  idempotency đã giữ header này khi trả lại. OpenAPI tự khai `Location` cho mọi response 201.
+- **OpenAPI khai header chung trên từng operation**: `Accept-Language` ở mọi nơi;
+  `Idempotency-Key` ở lệnh ghi cần đăng nhập khi có nơi lưu key. Có mục `servers` (`/`, địa
+  chỉ tương đối — bản trong repo không biết tên miền người triển khai).
+- **MCP**: kết quả dạng trang giữ nguyên `{"data", "pagination"}` như REST, giá trị khác bọc
+  `{"data": …}`. Thêm tool cho role, API key (auth), audit log và file (nội dung base64, tới
+  1 MiB; file lớn dùng REST — mã `files.too_large_for_tool`).
+
+Lý do: các điểm chủ dự án tìm thấy khi kiểm hợp đồng API (bước 14); giữ "học một endpoint là
+biết mọi endpoint" cho cả người lẫn agent.
+
+Đã cân nhắc: để `ValidJson` gom lỗi rồi cho handler chạy tiếp — handler phải xử lý dữ liệu
+chưa hợp lệ, dễ sai; gắn `#[validate(custom)]` gọi lại luật của service — luật cần ngữ cảnh
+(danh mục permission, cấu hình) không chạy được ở đó, vẫn thành hai đợt.
+
+## D-084 · Chống ghi đè: `ETag` từ `updated_at`, `If-Match` kiểm trong câu `UPDATE` — 2026-11-12 — agent quyết
+
+Quyết định:
+
+- Phiên bản của bản ghi là cột `updated_at` sẵn có (cắt tới micro giây, hai database lưu như
+  nhau); `ETag` = `"<số micro giây>"`. Không thêm cột `version`, không migration.
+- `GET` một bản ghi sửa được và lệnh sửa của nó trả `ETag` (`version::Tagged`). Lệnh sửa nhận
+  `If-Match` (`version::IfMatch`): service thêm `updated_at = <phiên bản>` vào chính câu
+  `UPDATE`, không dòng nào khớp thì 412 `precondition_failed` (`ErrorKind::PreconditionFailed`).
+  Trên Postgres, câu `UPDATE` chờ khoá dòng rồi kiểm lại điều kiện, nên hai người cùng sửa thì
+  chỉ một người thắng — có test đồng thời trên cả hai database.
+- Không gửi `If-Match` thì sửa như cũ (client đã có không hỏng). `*` coi như không kiểm; `ETag`
+  yếu (`W/…`), sai dạng hay nhiều giá trị thì không bao giờ khớp.
+- Áp cho người dùng (`PATCH /auth/users/{id}`), role (`PUT /auth/roles/{id}`), ghi chú và
+  endpoint webhook. Tool MCP sửa không kiểm phiên bản (như REST không gửi `If-Match`).
+
+Lý do: mục cuối của bước 14; theo chuẩn HTTP (RFC 9110) thay vì tự chế cơ chế khoá.
+
+Đã cân nhắc: cột `version` số nguyên tăng dần — chắc hơn khi hai lần sửa rơi vào cùng một micro
+giây, nhưng phải thêm migration cho mọi bảng; khả năng đó gần như không xảy ra với một bản ghi.
+Bắt buộc `If-Match` (428) — phá client đang có.
+
+## D-085 · Module đầu tiên là `cms` (nội dung); giao diện là dự án riêng, công khai; chưa làm app — 2026-11-12 — chủ dự án quyết
 
 Quyết định:
 
@@ -1700,12 +1892,12 @@ Lý do: chủ dự án chọn.
 
 Hệ quả: các khái niệm của `cms` (bài viết, trang, slug…) chỉ nằm trong `modules/cms`; thứ
 `cms` cần mà module khác cũng dùng được (lọc và sắp xếp danh sách, tìm kiếm văn bản, đọc
-công khai có cache) thì thêm vào core ở dạng trung lập với nghiệp vụ. Việc cụ thể ở bước 13
+công khai có cache) thì thêm vào core ở dạng trung lập với nghiệp vụ. Việc cụ thể ở bước 15
 của `docs/ROADMAP.md`.
 
 Thay: phần "Module đầu tiên chưa quyết" của D-016.
 
-## D-079 · Stack của dự án giao diện — 2026-11-12 — agent quyết
+## D-086 · Stack của dự án giao diện — 2026-11-12 — agent quyết
 
 Quyết định: dự án giao diện (repo riêng, gợi ý tên `autoxide-web`) dùng:
 
@@ -1728,15 +1920,15 @@ biên dịch báo ngay; các thư viện trên phổ biến nhất trong hệ Re
 Đã cân nhắc: Vite SPA cho trang quản trị — phải tự giải quyết chỗ cất refresh token và có
 hai cách làm web; Nuxt, SvelteKit — hệ sinh thái nhỏ hơn; Astro cho website — tốt cho nội
 dung tĩnh nhưng thêm một framework thứ hai; `@hey-api/openapi-ts` — sinh SDK đầy đủ hơn
-nhưng chưa tới 1.0; Flutter / Expo cho app — chưa làm app (D-078).
+nhưng chưa tới 1.0; Flutter / Expo cho app — chưa làm app (D-085).
 
 Ghi chú: phiên bản cụ thể ghim trong repo giao diện khi tạo; mục này chỉ chốt lựa chọn.
 
-## D-080 · Module nội dung tên là `content`, không phải `cms` — 2026-11-12 — chủ dự án quyết
+## D-087 · Module nội dung tên là `content`, không phải `cms` — 2026-11-12 — chủ dự án quyết
 
-Quyết định: module nội dung của D-078 tên là `content` (thư mục `modules/content`, crate
+Quyết định: module nội dung của D-085 tên là `content` (thư mục `modules/content`, crate
 `autoxide-content`; bảng `content_…`; route `/api/v1/content/…`; permission, mã lỗi và event
-mang tiền tố `content.`; cấu hình `AUTOXIDE_CONTENT_…`). Phạm vi giữ nguyên như D-078.
+mang tiền tố `content.`; cấu hình `AUTOXIDE_CONTENT_…`). Phạm vi giữ nguyên như D-085.
 
 Lý do: chủ dự án thấy `cms` quá chung chung. "CMS" là tên một ứng dụng (màn hình quản trị +
 nội dung), còn module được đặt theo dữ liệu nó sở hữu. Nội dung còn được nơi khác dùng —
@@ -1746,14 +1938,14 @@ riêng; `content` không biết về chúng.
 
 Đã cân nhắc: `posts` — hẹp, nội dung còn có trang và menu; `publishing` — dài, mơ hồ.
 
-Thay: tên `cms` trong D-078.
+Thay: tên `cms` trong D-085.
 
-## D-081 · Nâng `files` thành thư viện media trước khi làm `content` — 2026-11-12 — chủ dự án quyết
+## D-088 · Nâng `files` thành thư viện media trước khi làm `content` — 2026-11-12 — chủ dự án quyết
 
-Quyết định: thứ tự là bước 13 (nền chung trong core: lọc và sắp xếp, tìm kiếm, đọc công khai,
-cache, `If-Match`) → bước 14 (module `files` thành thư viện media dùng chung: file công khai,
+Quyết định: thứ tự là bước 15 (nền chung trong core: lọc và sắp xếp, tìm kiếm, đọc công khai,
+cache, `If-Match`) → bước 16 (module `files` thành thư viện media dùng chung: file công khai,
 hiển thị ảnh inline an toàn, metadata ảnh, thư mục hoặc nhãn, thùng rác, `api` cho module
-khác, tool MCP) → bước 15 (module `content`). Tên module vẫn là `files`.
+khác, tool MCP) → bước 17 (module `content`). Tên module vẫn là `files`.
 
 Lý do: chủ dự án chọn. `content` dựa vào ảnh (ảnh đại diện, ảnh trong bài, ảnh chia sẻ), và
 website phải hiển thị được ảnh cho người đọc không đăng nhập — hiện `files` chỉ là kho file
@@ -1763,15 +1955,15 @@ file và gọi `api` của `files`.
 Đã cân nhắc: đổi tên `files` thành `media` — tên module là hợp đồng (bảng, route, permission,
 mã lỗi), đổi làm vỡ client đang dùng mà không thêm giá trị; dữ liệu vẫn là file.
 
-Thay: thứ tự "module `content` ngay sau bước 12" của D-078.
+Thay: thứ tự "module `content` ngay sau bước 12" của D-085.
 
-## D-082 · `files` giữ nguyên; thư viện media là module riêng `media` — 2026-11-12 — chủ dự án quyết
+## D-089 · `files` giữ nguyên; thư viện media là module riêng `media` — 2026-11-12 — chủ dự án quyết
 
-Quyết định: không nâng `files` thành thư viện media như D-081 viết. `files` giữ nguyên vai kho
+Quyết định: không nâng `files` thành thư viện media như D-088 viết. `files` giữ nguyên vai kho
 file thô, riêng tư theo người sở hữu, dùng cho mọi module. Thư viện media cho xuất bản là
-module mới `media` (bước 14 của lộ trình): lưu nội dung qua trait `Storage` của kernel (do
+module mới `media` (bước 16 của lộ trình): lưu nội dung qua trait `Storage` của kernel (do
 `files` cung cấp) dưới khoá `media/<id>`, metadata ở bảng `media_…`, không tham chiếu bảng của
-`files`. `content` giữ ID của `media`. Thứ tự giữ như D-081: nền chung → `media` → `content`.
+`files`. `content` giữ ID của `media`. Thứ tự giữ như D-088: nền chung → `media` → `content`.
 
 Lý do: chủ dự án đề xuất. Hai việc khác nhau: cất file (đính kèm, xuất báo cáo…) cần đơn giản
 và riêng tư; xuất bản cần công khai, hiển thị inline, alt text, thư mục, thùng rác. Tách ra thì
@@ -1779,7 +1971,7 @@ và riêng tư; xuất bản cần công khai, hiển thị inline, alt text, th
 không cùng bảng với item công khai. Trait `Storage` ở kernel có sẵn cho đúng việc này (D-066).
 
 Đã cân nhắc: `media` chỉ trỏ tới dòng của `files` rồi thêm metadata — tải lên hai bước, xoá
-phải phối hợp hai module, dữ liệu một tấm ảnh nằm ở hai nơi; nâng `files` (D-081) — trộn hai
+phải phối hợp hai module, dữ liệu một tấm ảnh nằm ở hai nơi; nâng `files` (D-088) — trộn hai
 vai vào một module.
 
-Thay: phần "nâng `files` thành thư viện media" của D-081.
+Thay: phần "nâng `files` thành thư viện media" của D-088.

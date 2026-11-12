@@ -33,10 +33,8 @@ pub(crate) struct UpdateNoteInput {
     /// Id of the note.
     id: Uuid,
     /// New title, 1 to 200 characters.
-    #[validate(length(min = 1, max = 200))]
     title: Option<String>,
     /// New text, up to 10000 characters.
-    #[validate(length(max = 10000))]
     body: Option<String>,
 }
 
@@ -90,7 +88,8 @@ pub(crate) fn all(service: &Arc<NoteService>) -> Vec<Tool> {
                 let service = update.clone();
                 async move {
                     let changes = NoteChanges { title: input.title, body: input.body };
-                    let note = service.update(Actor::from(&principal), input.id, changes).await?;
+                    let note =
+                        service.update(Actor::from(&principal), input.id, changes, None).await?;
                     Ok::<_, Error>(NoteResponse::from(note))
                 }
             },

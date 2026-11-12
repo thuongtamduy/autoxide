@@ -19,6 +19,7 @@ tracing.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
 uuid.workspace = true
+validator.workspace = true
 
 [dev-dependencies]
 autoxide-testkit.workspace = true

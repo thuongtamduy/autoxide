@@ -6,7 +6,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
-use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::response::{Created, Data, Problem};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -18,7 +18,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::HttpState;
-use crate::api_key::{ApiKey, NewApiKey};
+use crate::api_key::{ApiKey, CreatedApiKey, NewApiKey};
 
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
@@ -76,17 +76,35 @@ pub(crate) struct CreatedApiKeyResponse {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct CreateApiKeyRequest {
     /// What the key is for, 1 to 100 characters.
-    #[validate(length(min = 1, max = 100))]
     #[schema(example = "nightly report agent")]
     name: String,
     /// Permissions the key may use: at least one, each one you have yourself (see
     /// `GET /api/v1/auth/me`). Give a key only what its job needs.
-    #[validate(length(min = 1, max = 200))]
     #[schema(example = json!(["auth.users.read"]))]
     permissions: Vec<String>,
     /// When the key stops working (RFC 3339, in the future). Omit for a key that does
     /// not expire.
     expires_at: Option<DateTime<Utc>>,
+    /// Your current password: a stolen access token alone must not create a key that
+    /// outlives it.
+    current_password: String,
+}
+
+impl From<CreateApiKeyRequest> for NewApiKey {
+    fn from(input: CreateApiKeyRequest) -> Self {
+        NewApiKey {
+            name: input.name,
+            permissions: input.permissions,
+            expires_at: input.expires_at,
+            current_password: input.current_password,
+        }
+    }
+}
+
+impl From<CreatedApiKey> for CreatedApiKeyResponse {
+    fn from(created: CreatedApiKey) -> Self {
+        CreatedApiKeyResponse { key: created.secret, details: created.key.into() }
+    }
 }
 
 /// List your API keys.
@@ -136,15 +154,9 @@ async fn create_api_key(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
     ValidJson(input): ValidJson<CreateApiKeyRequest>,
-) -> Result<(StatusCode, Data<CreatedApiKeyResponse>), Error> {
-    let input = NewApiKey {
-        name: input.name,
-        permissions: input.permissions,
-        expires_at: input.expires_at,
-    };
-    let created = state.api_keys.create(&principal, input).await?;
-    let data = CreatedApiKeyResponse { key: created.secret, details: created.key.into() };
-    Ok((StatusCode::CREATED, Data { data }))
+) -> Result<Created<CreatedApiKeyResponse>, Error> {
+    let created = state.api_keys.create(&principal, input.into()).await?;
+    Ok(Created::new(format!("/auth/api-keys/{}", created.key.id), created.into()))
 }
 
 /// Revoke one of your API keys.
@@ -193,7 +205,15 @@ mod tests {
             Accounts::create(services.users.as_ref(), root).await.unwrap();
             let session = bearer(&app, "root@example.com", PASSWORD).await;
 
-            let body = json!({"name": "agent", "permissions": ["auth.users.read"]});
+            // Thiếu hay sai mật khẩu hiện tại: không tạo được (token lộ không đủ).
+            let wrong = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": "wrong one"});
+            let (status, _, problem) = call(&app, "POST", "/api-keys", Some(&session), Some(wrong)).await;
+            assert_eq!((status, problem["code"].as_str()), (StatusCode::BAD_REQUEST, Some("auth.wrong_password")));
+            let missing = json!({"name": "agent", "permissions": ["auth.users.read"]});
+            let (status, _, _) = call(&app, "POST", "/api-keys", Some(&session), Some(missing)).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+            let body = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": PASSWORD});
             let (status, _, created) =
                 call(&app, "POST", "/api-keys", Some(&session), Some(body.clone())).await;
             assert_eq!(status, StatusCode::CREATED, "{created}");

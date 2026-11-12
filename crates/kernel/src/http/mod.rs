@@ -66,6 +66,7 @@ pub use extract::ValidJson;
 pub use health::{Health, health_routes};
 pub use mcp::MCP_PATH;
 pub use metrics::metrics_routes;
+pub(crate) use openapi::untranslated_text;
 pub use openapi::{BEARER_AUTH, DOCS_PATH, OPENAPI_PATH, lint};
 pub use request_id::REQUEST_ID_HEADER;
 pub use server::{Shutdown, serve, shutdown_signal};
@@ -120,7 +121,7 @@ pub fn build(
         .merge(root)
         .nest(API_PREFIX, api)
         .split_for_parts();
-    openapi::finish(&mut openapi);
+    openapi::finish(&mut openapi, extras.idempotency.is_some());
     let deprecated = Arc::new(deprecation::apply(&mut openapi, &extras.deprecations));
 
     // Tài liệu không đổi trong lúc chạy: đổi thành JSON một lần rồi trả lại mãi.
@@ -146,7 +147,7 @@ pub fn build(
         router = router.merge(mcp);
     }
 
-    if let Some(authenticator) = extras.authenticator {
+    if let Some(authenticator) = extras.authenticator.clone() {
         // Đặt bộ xác thực vào "extensions" của mọi request, nơi extractor
         // `Principal` tìm nó.
         router = router.layer(Extension(authenticator));
@@ -157,6 +158,7 @@ pub fn build(
     let idempotency = extras.idempotency.map(|store| {
         Arc::new(idempotency::Settings {
             store,
+            authenticator: extras.authenticator.clone(),
             body_limits: body_limits.clone(),
             request_timeout: config.request_timeout,
         })
@@ -206,13 +208,17 @@ pub fn build(
 async fn enforce_timeout(limit: Duration, request: Request, next: Next) -> Response {
     match tokio::time::timeout(limit, next.run(request)).await {
         Ok(response) => response,
-        Err(_) => Error::unavailable(
-            "request_timeout",
-            "The server did not finish handling the request within {seconds} seconds. Retry later.",
-        )
-        .with_param("seconds", limit.as_secs())
-        .into_response(),
+        Err(_) => timed_out(limit).into_response(),
     }
+}
+
+/// Lỗi khi request chạy quá `limit`.
+fn timed_out(limit: Duration) -> Error {
+    Error::unavailable(
+        "request_timeout",
+        "The server did not finish handling the request within {seconds} seconds. Retry later.",
+    )
+    .with_param("seconds", limit.as_secs())
 }
 
 fn cors(origins: &CorsOrigins) -> CorsLayer {
@@ -230,6 +236,7 @@ fn cors(origins: &CorsOrigins) -> CorsLayer {
             header::ACCEPT_LANGUAGE,
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
+            header::IF_MATCH,
             idempotency::IDEMPOTENCY_KEY,
             REQUEST_ID_HEADER,
             // Header của giao thức MCP (endpoint `/mcp`).
@@ -237,7 +244,14 @@ fn cors(origins: &CorsOrigins) -> CorsLayer {
             HeaderName::from_static("mcp-session-id"),
             HeaderName::from_static("last-event-id"),
         ])
+        // Header trình duyệt mặc định giấu khỏi JavaScript mà client cần đọc.
         .expose_headers([
+            header::ETAG,
+            header::LOCATION,
+            header::RETRY_AFTER,
+            header::LINK,
+            HeaderName::from_static("deprecation"),
+            HeaderName::from_static("sunset"),
             REQUEST_ID_HEADER,
             idempotency::IDEMPOTENT_REPLAYED,
             HeaderName::from_static("mcp-session-id"),

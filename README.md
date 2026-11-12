@@ -15,7 +15,8 @@ the core contains no business concepts — those belong to modules.
 The core is complete: **every step of the roadmap is done** — project skeleton,
 foundation, login with roles and permissions, two-step sign-in, events and audit log,
 job queue, i18n and idempotency, email, file storage, MCP endpoint, sample module,
-tooling and deployment, passkeys. Business modules come next. The core has the Cargo workspace, the quality gate, configuration,
+tooling and deployment, passkeys, session management, account deletion and data
+export, webhooks. Business modules come next. The core has the Cargo workspace, the quality gate, configuration,
 database access, per-module migrations, the module contract, the HTTP server
 under `/api/v1` with OpenAPI, health checks, logs, metrics, tracing and the CLI.
 The `auth` module stores
@@ -28,7 +29,9 @@ after that, administrators manage accounts through `/api/v1/auth/users`. People 
 create their own accounts only when `AUTOXIDE_AUTH_SELF_REGISTRATION=true`.
 Programs and AI agents use API keys (`/api/v1/auth/api-keys`): a key acts as the
 user who created it, limited to the permissions listed on it, and is sent like an
-access token (`Authorization: Bearer axk_…`). Users can turn on two-step sign-in
+access token (`Authorization: Bearer axk_…`). Creating a key, like adding a passkey, asks
+for the user's current password, and resetting a password removes every key and passkey
+of that account. Users can turn on two-step sign-in
 with an authenticator app (TOTP) and get one-time recovery codes
 (`/api/v1/auth/me/mfa`). Every change is kept in an append-only audit log — who,
 what, which record, when, before and after — readable at `/api/v1/audit` with the
@@ -223,6 +226,25 @@ Signed-in users change their own password with `POST /api/v1/auth/me/password`
 an account created without one (`PUT /api/v1/auth/users/{id}/password`), but cannot
 replace a password someone already has.
 
+Each sign-in is a session, named by the `session_id` in the token response. Users see
+their sessions — device and last activity — at `GET /api/v1/auth/me/sessions`, sign one
+out with `DELETE /api/v1/auth/me/sessions/{id}`, or every other one with
+`DELETE /api/v1/auth/me/sessions?keep={their session_id}`. Users download everything the
+server keeps about them with `GET /api/v1/auth/me/export` and delete their account with
+`DELETE /api/v1/auth/me` (current password required); every module then deletes its data
+about them. Administrators find users with `GET /api/v1/auth/users?search=ada`, sign a
+user out everywhere (`DELETE /api/v1/auth/users/{id}/sessions`) and delete accounts
+(`DELETE /api/v1/auth/users/{id}`). An administrator cannot act this way on someone who
+holds permissions they lack.
+
+Other systems receive events through webhooks: with the `webhooks.manage` permission,
+register an `https://` address and the events it wants at `POST /api/v1/webhooks` (the
+list of events is at `GET /api/v1/webhooks/events`). Each event is sent as a signed
+`POST` following [Standard Webhooks](https://www.standardwebhooks.com), so the receiver
+can check it with an existing library and the secret returned at creation. Failed
+deliveries are retried for about two hours; `GET /api/v1/webhooks/{id}/deliveries` shows
+what was sent and what failed.
+
 New accounts receive a mail asking to confirm their address; the token in it (valid
 24 hours) is confirmed with `POST /api/v1/auth/email-verification/confirm`, and
 `email_verified_at` then shows when. To change their email, users call
@@ -267,7 +289,7 @@ S3 emulator ([moto](https://github.com/getmoto/moto)) in Docker for this; set
 | `crates/kernel`  | The foundation every module builds on. Knows no module.                 |
 | `crates/app`     | The `autoxide` binary: the one place where modules are registered.      |
 | `crates/testkit` | Test support: an isolated database per test, on SQLite or PostgreSQL.   |
-| `modules/<name>` | One crate per module. `modules/auth`: accounts, sign-in, roles, API keys, two-step sign-in. `modules/audit`: the append-only audit log. `modules/idempotency`: storage for idempotency keys. `modules/mail`: mail delivery. |
+| `modules/<name>` | One crate per module. `modules/auth`: accounts, sign-in, roles, API keys, two-step sign-in. `modules/audit`: the append-only audit log. `modules/idempotency`: storage for idempotency keys. `modules/mail`: mail delivery. `modules/files`: file storage. `modules/webhooks`: webhooks. |
 | `xtask`          | Developer tooling: `cargo xtask check` enforces the workspace boundaries. |
 | `gate.sh`        | The quality gate. A change is done only when this is green.             |
 
@@ -280,6 +302,8 @@ never share foreign keys. These rules are checked automatically by the gate.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — what is built, in what order
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — the decision log
 - [`CLAUDE.md`](CLAUDE.md) — the rules for contributors, human or AI agent
+- [`CHANGELOG.md`](CHANGELOG.md) — what changed in each release; released Docker images
+  are at `ghcr.io/<owner>/autoxide`
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — installing and deploying: Docker Compose with
   PostgreSQL or one binary with SQLite, reverse proxy, updates, backups
 - [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) — how to write a module, starting

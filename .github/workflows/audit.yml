@@ -1,0 +1,23 @@
+# Kiểm lỗ hổng thư viện mỗi ngày, kể cả khi không ai commit: lỗ hổng mới được công bố
+# cho thư viện đang dùng thì job đỏ (D-078).
+name: Security audit
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  advisories:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      # Chỉ phần lỗ hổng: license và nguồn không đổi khi không có commit.
+      - run: cargo deny check advisories

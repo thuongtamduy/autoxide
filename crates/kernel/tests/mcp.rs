@@ -28,10 +28,10 @@ use validator::Validate;
 
 const NOTES_WRITE: Permission = Permission::new("notes.write", "Write notes.");
 
-/// Hai số cần cộng.
+/// Two numbers to add.
 #[derive(Deserialize, Validate, ToSchema)]
 struct AddInput {
-    /// Số thứ nhất, 0 tới 100.
+    /// The first number, 0 to 100.
     #[validate(range(min = 0, max = 100))]
     a: i64,
     b: i64,

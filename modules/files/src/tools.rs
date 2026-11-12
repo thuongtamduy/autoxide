@@ -1,0 +1,214 @@
+//! Tool MCP của module `files`: cùng service và permission với `/api/v1/files`. Nội dung
+//! file đi qua MCP dạng base64, nên tool chỉ dành cho file nhỏ; file lớn dùng REST.
+
+use std::sync::Arc;
+
+use autoxide_kernel::access::Principal;
+use autoxide_kernel::error::{Error, ErrorKind};
+use autoxide_kernel::mcp::{PageInput, Tool};
+use autoxide_kernel::pagination::Page;
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
+use bytes::Bytes;
+use futures_util::StreamExt as _;
+use futures_util::TryStreamExt as _;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+use uuid::Uuid;
+use validator::Validate;
+
+use crate::http::FileResponse;
+use crate::permissions::FILES_UPLOAD;
+use crate::service::FileService;
+
+/// Lớn nhất mà `read_file` trả (base64 to hơn khoảng một phần ba).
+const MAX_TOOL_BYTES: u64 = 1024 * 1024;
+
+/// A file to act on.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FileId {
+    /// Id of the file.
+    id: Uuid,
+}
+
+/// A small file to upload.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UploadInput {
+    /// File name, 1 to 255 characters.
+    name: String,
+    /// Media type, e.g. `text/plain`. Omit for `application/octet-stream`.
+    content_type: Option<String>,
+    /// The content, base64-encoded (standard alphabet, with padding).
+    content_base64: String,
+}
+
+/// A file with its content.
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct FileContent {
+    #[serde(flatten)]
+    file: FileResponse,
+    /// The content, base64-encoded.
+    content_base64: String,
+}
+
+pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
+    let (list, get, read, upload, delete) =
+        (service.clone(), service.clone(), service.clone(), service.clone(), service.clone());
+    vec![
+        Tool::new(
+            "list_files",
+            "List the files you uploaded, newest first; follow `pagination.next_cursor` for more.",
+            move |principal: Principal, input: PageInput| {
+                let service = list.clone();
+                async move {
+                    let page = service.list(&principal, &input.page()?).await?;
+                    Ok::<Page<FileResponse>, Error>(page.map(FileResponse::from))
+                }
+            },
+        )
+        .requires(FILES_UPLOAD)
+        .read_only(),
+        Tool::new(
+            "get_file",
+            "Get the details of a file (name, type, size, SHA-256). Your own files need \
+             `files.upload`; anyone's need `files.manage`.",
+            move |principal: Principal, input: FileId| {
+                let service = get.clone();
+                async move {
+                    Ok::<_, Error>(FileResponse::from(service.get(&principal, input.id).await?))
+                }
+            },
+        )
+        .read_only(),
+        Tool::new(
+            "read_file",
+            "Get a file with its content as base64, for files up to 1 MiB; download larger ones \
+             with `GET /api/v1/files/{id}/content`. Same access as `get_file`.",
+            move |principal: Principal, input: FileId| {
+                let service = read.clone();
+                async move {
+                    let file = service.get(&principal, input.id).await?;
+                    if u64::try_from(file.size).unwrap_or(u64::MAX) > MAX_TOOL_BYTES {
+                        return Err(too_large_for_tool(input.id));
+                    }
+                    let download = service.download(&principal, input.id).await?;
+                    let chunks: Vec<Bytes> = download.content.try_collect().await?;
+                    let content_base64 = STANDARD.encode(chunks.concat());
+                    Ok(FileContent { file: download.file.into(), content_base64 })
+                }
+            },
+        )
+        .read_only(),
+        Tool::new(
+            "upload_file",
+            "Upload a small file, its content base64-encoded (the size and type limits of the \
+             server apply). Upload large files with `POST /api/v1/files`.",
+            move |principal: Principal, input: UploadInput| {
+                let service = upload.clone();
+                async move {
+                    let content = STANDARD.decode(input.content_base64.trim()).map_err(|_| {
+                        Error::bad_request(
+                            "files.invalid_base64",
+                            "`content_base64` is not valid base64.",
+                        )
+                    })?;
+                    let stream = futures_util::stream::iter([Ok(Bytes::from(content))]).boxed();
+                    let file = service
+                        .upload(&principal, &input.name, input.content_type.as_deref(), stream)
+                        .await?;
+                    Ok::<_, Error>(FileResponse::from(file))
+                }
+            },
+        )
+        .requires(FILES_UPLOAD),
+        Tool::new(
+            "delete_file",
+            "Delete a file and its content; it cannot be restored. Same access as `get_file`.",
+            move |principal: Principal, input: FileId| {
+                let service = delete.clone();
+                async move {
+                    service.delete(&principal, input.id).await?;
+                    Ok::<_, Error>(serde_json::json!({ "deleted": input.id }))
+                }
+            },
+        )
+        .destructive(),
+    ]
+}
+
+fn too_large_for_tool(id: Uuid) -> Error {
+    Error::new(
+        ErrorKind::PayloadTooLarge,
+        "files.too_large_for_tool",
+        "This file is larger than {max} bytes, the most a tool returns. Download it with \
+         `GET /api/v1/files/{id}/content`.",
+    )
+    .with_param("max", MAX_TOOL_BYTES)
+    .with_param("id", id)
+}
+
+#[cfg(test)]
+mod tests {
+    use autoxide_kernel::access::Principal;
+    use autoxide_testkit::TestDatabase;
+    use serde_json::json;
+
+    use super::*;
+    use crate::testing::{no_limits, service};
+
+    #[tokio::test]
+    async fn tai_len_doc_va_xoa_file_qua_tool() {
+        TestDatabase::run(async |test| {
+            let (files, _) = service(test, no_limits()).await;
+            let tools = all(&files);
+            let tool = |name: &str| tools.iter().find(|tool| tool.name() == name).unwrap();
+            let ada = Principal::new(Uuid::now_v7(), ["files.upload".to_owned()]);
+            let bob = Principal::new(Uuid::now_v7(), ["files.upload".to_owned()]);
+
+            let input = json!({"name": "a.txt", "content_type": "text/plain", "content_base64": "aGVsbG8="});
+            let file = tool("upload_file").call(ada.clone(), input).await.unwrap();
+            assert_eq!((file["name"].as_str(), file["size"].as_u64()), (Some("a.txt"), Some(5)));
+            let id = file["id"].clone();
+
+            let read = tool("read_file").call(ada.clone(), json!({"id": id})).await.unwrap();
+            assert_eq!(read["content_base64"], "aGVsbG8=");
+            assert_eq!(read["sha256"], file["sha256"]);
+            let page = tool("list_files").call(ada.clone(), json!({})).await.unwrap();
+            assert_eq!(page["data"][0]["id"], id);
+            // File của người khác: như không có, giống REST.
+            let theirs = tool("get_file").call(bob, json!({"id": id})).await.unwrap_err();
+            assert_eq!(theirs.code(), "files.file_not_found");
+            let bad = json!({"name": "b.txt", "content_base64": "%%%"});
+            let bad = tool("upload_file").call(ada.clone(), bad).await.unwrap_err();
+            assert_eq!(bad.code(), "files.invalid_base64");
+
+            tool("delete_file").call(ada.clone(), json!({"id": id})).await.unwrap();
+            let gone = tool("read_file").call(ada, json!({"id": id})).await.unwrap_err();
+            assert_eq!(gone.code(), "files.file_not_found");
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn file_lon_thi_tool_bao_dung_rest() {
+        TestDatabase::run(async |test| {
+            let limits =
+                crate::config::Limits { max_bytes: 4 * MAX_TOOL_BYTES, allowed_types: None };
+            let (files, _) = service(test, limits).await;
+            let ada = Principal::new(Uuid::now_v7(), ["files.upload".to_owned()]);
+            let big = Bytes::from(vec![b'x'; usize::try_from(MAX_TOOL_BYTES).unwrap() + 1]);
+            let stream = futures_util::stream::iter([Ok(big)]).boxed();
+            let file = files.upload(&ada, "big.bin", None, stream).await.unwrap();
+            let tools = all(&files);
+            let read = tools.iter().find(|tool| tool.name() == "read_file").unwrap();
+            let error = read.call(ada, json!({"id": file.id})).await.unwrap_err();
+            assert_eq!(error.code(), "files.too_large_for_tool");
+            assert!(error.to_string().contains(&format!("/api/v1/files/{}/content", file.id)));
+        })
+        .await
+        .unwrap();
+    }
+}

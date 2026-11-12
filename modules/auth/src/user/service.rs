@@ -5,7 +5,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
-use sea_orm::sea_query::{Expr, ExprTrait as _};
+use sea_orm::sea_query::{Expr, ExprTrait as _, LikeExpr};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set, SqlErr,
 };
@@ -148,6 +148,7 @@ impl UserService {
         let row = entity::ActiveModel {
             id: Set(Uuid::now_v7()),
             email: Set(email.clone()),
+            search_text: Set(search_text(&email, &name)),
             name: Set(name),
             password_hash: Set(password_hash),
             disabled_at: Set(None),
@@ -175,11 +176,13 @@ impl UserService {
 
     /// Đổi tên và/hoặc khoá, mở khoá người dùng `id`. Khoá thì đăng xuất người đó ở
     /// mọi nơi; không khoá được admin cuối cùng còn hoạt động.
+    /// `expected`: phiên bản (`updated_at`) người gọi đã đọc; khác thì lỗi 412 (D-084).
     pub(crate) async fn update(
         &self,
         actor: Actor,
         id: Uuid,
         changes: UserChanges,
+        expected: Option<DateTime<Utc>>,
     ) -> Result<User, Error> {
         let name = changes.name.map(|name| name.trim().to_owned());
         if let Some(problem) = name.as_deref().and_then(check_name) {
@@ -188,10 +191,16 @@ impl UserService {
         let transaction = self.database.begin_write().await?;
         let before =
             Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| user_not_found(id))?;
+        if expected.is_some_and(|expected| expected != before.updated_at) {
+            transaction.rollback().await?;
+            return Err(autoxide_kernel::version::changed());
+        }
         let admins_before = crate::role::count_active_admins(&transaction).await?;
         let now = now();
         let mut update = Entity::update_many().col_expr(Column::UpdatedAt, Expr::value(now));
         if let Some(name) = name {
+            update =
+                update.col_expr(Column::SearchText, Expr::value(search_text(&before.email, &name)));
             update = update.col_expr(Column::Name, Expr::value(name));
         }
         match changes.disabled {
@@ -207,11 +216,18 @@ impl UserService {
             }
             None => {}
         }
+        if let Some(expected) = expected {
+            // Kiểm phiên bản ngay trong câu `UPDATE`: người khác vừa sửa thì 0 dòng.
+            update = update.filter(Column::UpdatedAt.eq(expected));
+        }
         // Câu `UPDATE` này cũng khoá dòng người dùng tới hết transaction.
         let updated = update.filter(Column::Id.eq(id)).exec(&transaction).await?;
         if updated.rows_affected == 0 {
             transaction.rollback().await?;
-            return Err(user_not_found(id));
+            return Err(match expected {
+                Some(_) => autoxide_kernel::version::changed(),
+                None => user_not_found(id),
+            });
         }
         if changes.disabled == Some(true) {
             SessionService::revoke_user(&transaction, id).await?;
@@ -228,6 +244,33 @@ impl UserService {
         transaction.commit().await?;
         tracing::info!(user_id = %id, disabled = ?changes.disabled, "user changed");
         Ok(row.into())
+    }
+
+    /// Xoá hẳn tài khoản `id` cùng mọi dữ liệu của nó trong module `auth` (phiên, key,
+    /// passkey, MFA… xoá theo foreign key). Phát event [`USER_DELETED`] trong cùng
+    /// transaction để các module khác xoá phần dữ liệu của người đó. Không xoá được
+    /// admin cuối cùng còn hoạt động.
+    ///
+    /// [`USER_DELETED`]: autoxide_kernel::privacy::USER_DELETED
+    pub(crate) async fn delete(&self, actor: Actor, id: Uuid) -> Result<(), Error> {
+        let transaction = self.database.begin_write().await?;
+        let admins_before = crate::role::count_active_admins(&transaction).await?;
+        let deleted = Entity::delete_by_id(id).exec(&transaction).await?;
+        if deleted.rows_affected == 0 {
+            transaction.rollback().await?;
+            return Err(user_not_found(id));
+        }
+        if admins_before > 0 && crate::role::count_active_admins(&transaction).await? == 0 {
+            transaction.rollback().await?;
+            return Err(crate::role::last_admin());
+        }
+        // Chỉ ghi id: audit log không giữ lại email hay tên của người đã xin xoá.
+        let event =
+            events::UserDeleted { before: Some(serde_json::json!({"id": id})), after: None };
+        self.outbox.record(&transaction, actor, events::user_subject(id), &event).await?;
+        transaction.commit().await?;
+        tracing::info!(user_id = %id, "user deleted");
+        Ok(())
     }
 
     /// Người dùng có email `email` (so sánh sau khi chuẩn hoá).
@@ -252,6 +295,7 @@ impl UserService {
             Entity::find_by_id(id).one(transaction).await?.ok_or_else(|| user_not_found(id))?;
         Entity::update_many()
             .col_expr(Column::Email, Expr::value(email))
+            .col_expr(Column::SearchText, Expr::value(search_text(email, &row.name)))
             .col_expr(Column::EmailVerifiedAt, Expr::value(Some(at)))
             .col_expr(Column::UpdatedAt, Expr::value(at))
             .filter(Column::Id.eq(id))
@@ -265,10 +309,21 @@ impl UserService {
         Ok(row.email)
     }
 
-    /// Một trang người dùng, mới tạo trước (mặc định).
-    pub(crate) async fn list(&self, page: &PageRequest) -> Result<Page<User>, Error> {
-        let page = fetch_page(Entity::find(), Column::Id, |row| row.id, page, self.database.read())
-            .await?;
+    /// Một trang người dùng, mới tạo trước (mặc định). `search`: chỉ những người có
+    /// email hoặc tên chứa chuỗi đó (không phân biệt hoa thường).
+    pub(crate) async fn list(
+        &self,
+        search: Option<&str>,
+        page: &PageRequest,
+    ) -> Result<Page<User>, Error> {
+        let mut select = Entity::find();
+        if let Some(search) = search.map(str::trim).filter(|search| !search.is_empty()) {
+            // `LIKE` có `ESCAPE`: `%` hay `_` người dùng gõ là chữ thường, không phải ký
+            // tự đại diện. Không có index nào giúp được tìm "chứa": quét bảng người dùng.
+            let pattern = format!("%{}%", escape_like(&search.to_lowercase()));
+            select = select.filter(Column::SearchText.like(LikeExpr::new(pattern).escape('\\')));
+        }
+        let page = fetch_page(select, Column::Id, |row| row.id, page, self.database.read()).await?;
         Ok(page.map(User::from))
     }
 
@@ -360,6 +415,24 @@ fn snapshot(row: &entity::Model) -> serde_json::Value {
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên.
 /// Cắt trước để hai database trả về cùng một giá trị.
+/// Email và tên viết thường, lưu ở `auth_user.search_text` để tìm. Viết thường trong
+/// Rust cho cùng một kết quả trên hai database (m0016).
+fn search_text(email: &str, name: &str) -> String {
+    format!("{email} {name}").to_lowercase()
+}
+
+/// Thoát `\`, `%` và `_` để dùng trong mẫu `LIKE … ESCAPE '\'`.
+fn escape_like(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for character in text.chars() {
+        if matches!(character, '\\' | '%' | '_') {
+            escaped.push('\\');
+        }
+        escaped.push(character);
+    }
+    escaped
+}
+
 fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
 }
@@ -687,10 +760,10 @@ mod tests {
                 created.push(users.create(Actor::system(), input).await.unwrap().id);
             }
 
-            let first = users.list(&PageRequest::first(2, Order::Asc)).await.unwrap();
+            let first = users.list(None, &PageRequest::first(2, Order::Asc)).await.unwrap();
             let cursor: Uuid = first.pagination.next_cursor.as_deref().unwrap().parse().unwrap();
             let second =
-                users.list(&PageRequest::first(2, Order::Asc).after(cursor)).await.unwrap();
+                users.list(None, &PageRequest::first(2, Order::Asc).after(cursor)).await.unwrap();
 
             let ids: Vec<Uuid> =
                 first.data.iter().chain(&second.data).map(|user| user.id).collect();
@@ -818,7 +891,7 @@ mod account_tests {
             assert_eq!(error.code(), "auth.email_taken");
             let page = services
                 .users
-                .list(&PageRequest::first(10, autoxide_kernel::pagination::Order::Asc))
+                .list(None, &PageRequest::first(10, autoxide_kernel::pagination::Order::Asc))
                 .await
                 .unwrap();
             assert_eq!(page.data.len(), 1);
@@ -858,40 +931,46 @@ mod update_tests {
             let ada =
                 Accounts::create(users.as_ref(), account("ada@example.com", false)).await.unwrap();
             let tokens =
-                services.sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
+                services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
             let renamed = users
                 .update(
                     Actor::system(),
                     ada.id,
                     UserChanges { name: Some("  Ada L. ".to_owned()), disabled: None },
+                    None,
                 )
                 .await
                 .unwrap();
             assert_eq!(renamed.name, "Ada L.");
             assert!(renamed.is_active());
 
-            let disabled = users.update(Actor::system(), ada.id, disable(true)).await.unwrap();
+            let disabled =
+                users.update(Actor::system(), ada.id, disable(true), None).await.unwrap();
             assert!(!disabled.is_active());
             // Khoá lần nữa giữ thời điểm khoá cũ.
-            let again = users.update(Actor::system(), ada.id, disable(true)).await.unwrap();
+            let again = users.update(Actor::system(), ada.id, disable(true), None).await.unwrap();
             assert_eq!(again.disabled_at, disabled.disabled_at);
             // Đăng xuất ở mọi nơi: refresh token cũ hết dùng được.
             let refresh = services.sessions.refresh(&tokens.refresh_token).await.unwrap_err();
             assert_eq!(refresh.code(), "auth.invalid_refresh_token");
-            let login = services.sessions.login("ada@example.com", PASSWORD).await.unwrap_err();
+            let login =
+                services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap_err();
             assert_eq!(login.code(), "auth.user_disabled");
 
-            let enabled = users.update(Actor::system(), ada.id, disable(false)).await.unwrap();
+            let enabled =
+                users.update(Actor::system(), ada.id, disable(false), None).await.unwrap();
             assert!(enabled.is_active());
-            services.sessions.login("ada@example.com", PASSWORD).await.unwrap().tokens();
+            services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
-            let missing =
-                users.update(Actor::system(), Uuid::now_v7(), disable(true)).await.unwrap_err();
+            let missing = users
+                .update(Actor::system(), Uuid::now_v7(), disable(true), None)
+                .await
+                .unwrap_err();
             assert_eq!(missing.code(), "auth.user_not_found");
             let empty = UserChanges { name: Some(" ".to_owned()), disabled: None };
             assert_eq!(
-                users.update(Actor::system(), ada.id, empty).await.unwrap_err().code(),
+                users.update(Actor::system(), ada.id, empty, None).await.unwrap_err().code(),
                 "validation_failed"
             );
         })
@@ -907,14 +986,15 @@ mod update_tests {
             let root =
                 Accounts::create(users.as_ref(), account("root@example.com", true)).await.unwrap();
 
-            let error = users.update(Actor::system(), root.id, disable(true)).await.unwrap_err();
+            let error =
+                users.update(Actor::system(), root.id, disable(true), None).await.unwrap_err();
 
             assert_eq!(error.kind(), ErrorKind::Conflict);
             assert_eq!(error.code(), "auth.last_admin");
             assert!(users.get(root.id).await.unwrap().unwrap().is_active());
             // Có admin khác còn hoạt động thì khoá được.
             Accounts::create(users.as_ref(), account("second@example.com", true)).await.unwrap();
-            users.update(Actor::system(), root.id, disable(true)).await.unwrap();
+            users.update(Actor::system(), root.id, disable(true), None).await.unwrap();
         })
         .await
         .unwrap();

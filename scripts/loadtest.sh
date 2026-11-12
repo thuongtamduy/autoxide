@@ -9,6 +9,10 @@
 # Biến (không bắt buộc): LOADTEST_DURATION (mặc định 10s), LOADTEST_CONNECTIONS (64),
 # LOADTEST_RAMP ("1 16 64 256 1024"), LOADTEST_PORT (18080).
 #
+# Chế độ chạy dài (soak): LOADTEST_SOAK=15m chạy hỗn hợp đọc / ghi / file / MCP liên tục
+# trong thời gian đó, đo bộ nhớ (RSS), số file đang mở của máy chủ và số kết nối
+# PostgreSQL mỗi 30 giây, rồi kết luận có rò rỉ hay không — thay cho các bài đo ngắn.
+#
 # Máy tạo tải và máy chủ chạy chung một máy nên tranh CPU: số đo là cận dưới, dùng để so
 # trước / sau một thay đổi trên cùng máy.
 
@@ -59,7 +63,7 @@ post() { curl -sf "$BASE$1" -H "authorization: Bearer $TOKEN" -H 'content-type: 
 
 TOKEN="$(curl -sf "$BASE/api/v1/auth/login" -H 'content-type: application/json' \
   -d "{\"email\":\"admin@example.com\",\"password\":\"$PASSWORD\"}" | json '["data"]["access_token"]')"
-API_KEY="$(post /api/v1/auth/api-keys '{"name":"loadtest","permissions":["auth.users.read"]}' \
+API_KEY="$(post /api/v1/auth/api-keys "{\"name\":\"loadtest\",\"permissions\":[\"auth.users.read\"],\"current_password\":\"$PASSWORD\"}" \
   | json '["data"]["key"]')"
 # Dữ liệu cho list: 120 người dùng (mỗi người tạo một event → audit log có dữ liệu).
 for i in $(seq 1 120); do
@@ -99,6 +103,68 @@ PY
 }
 
 backend="SQLite"; [[ "$DATABASE_URL" == postgres* ]] && backend="PostgreSQL"
+
+soak() {
+  local duration="$1" pids=() samples=soak.csv
+  echo "## Soak $backend — $duration, $(nproc) CPU"
+  # Hỗn hợp chạy song song. Ghi có giới hạn tốc độ (-q) để đĩa không đầy sau vài phút.
+  oha --no-tui -z "$duration" -c 16 --output-format json -H "$AUTH" "$BASE/api/v1/auth/me" >soak-read.json & pids+=($!)
+  oha --no-tui -z "$duration" -c 8 --output-format json -H "$AUTH" "$BASE/api/v1/auth/users?limit=50" >soak-list.json & pids+=($!)
+  oha --no-tui -z "$duration" -c 8 --output-format json -m POST -H "$AUTH" -H 'accept: application/json, text/event-stream' -T application/json -d "$MCP_BODY" "$BASE/mcp" >soak-mcp.json & pids+=($!)
+  oha --no-tui -z "$duration" -c 8 --output-format json -H "$AUTH" "$BASE/api/v1/files/$FILE/content" >soak-download.json & pids+=($!)
+  oha --no-tui -z "$duration" -c 8 -q 200 --output-format json -m PATCH -H "$AUTH" -T application/json -d '{"name":"Robert"}' "$BASE/api/v1/auth/users/$BOB" >soak-write.json & pids+=($!)
+  oha --no-tui -z "$duration" -c 4 -q 20 --output-format json -m POST -H "$AUTH" -T application/octet-stream -D small.bin "$BASE/api/v1/files?name=soak.bin" >soak-upload.json & pids+=($!)
+  echo "seconds,rss_mib,open_fds,db_connections" >"$samples"
+  local start=$SECONDS
+  while kill -0 "${pids[0]}" 2>/dev/null; do
+    local rss fds db=""
+    rss=$(awk '/VmRSS/ {printf "%.1f", $2 / 1024}' "/proc/$SERVER/status")
+    fds=$(ls "/proc/$SERVER/fd" | wc -l)
+    if [[ "$DATABASE_URL" == postgres* ]] && command -v psql >/dev/null; then
+      db=$(psql "$DATABASE_URL" -tAc "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()" 2>/dev/null || true)
+    fi
+    echo "$((SECONDS - start)),$rss,$fds,$db" >>"$samples"
+    sleep 30
+  done
+  wait "${pids[@]}"
+  python3 - "$samples" <<'PY'
+import csv, glob, json, sys
+rows = list(csv.DictReader(open(sys.argv[1])))
+print("\n| Giây | RSS MiB | File mở | Kết nối DB |\n| ---: | ---: | ---: | ---: |")
+for r in rows:
+    print(f"| {r['seconds']} | {r['rss_mib']} | {r['open_fds']} | {r['db_connections'] or '-'} |")
+total = ok = 0
+print("\n| Luồng | Request | Request/s | p99 ms | Thành công |\n| --- | ---: | ---: | ---: | ---: |")
+for path in sorted(glob.glob("soak-*.json")):
+    r = json.load(open(path))
+    codes = r.get("statusCodeDistribution", {})
+    errors = {k: v for k, v in r.get("errorDistribution", {}).items() if k != "aborted due to deadline"}
+    n = sum(codes.values()) + sum(errors.values())
+    good = sum(v for k, v in codes.items() if k.startswith("2"))
+    total += n; ok += good
+    print(f"| {path[5:-5]} | {n} | {r['summary']['requestsPerSec']:.0f} | {r['latencyPercentiles']['p99'] * 1000:.1f} | {100 * good / max(n, 1):.3f}% |")
+# Bỏ 2 phút đầu (bộ nhớ đệm, pool đang ấm lên); so nửa sau với nửa đầu của phần còn lại.
+steady = [r for r in rows if int(r["seconds"]) >= 120] or rows
+half = len(steady) // 2 or 1
+first = max(float(r["rss_mib"]) for r in steady[:half])
+last = max(float(r["rss_mib"]) for r in steady[half:]) if steady[half:] else first
+growth = 100 * (last - first) / first
+# File mở cũng so đỉnh nửa sau với đỉnh nửa đầu: số kết nối dao động theo tải là bình
+# thường, chỉ tăng dần mãi mới là rò.
+fds = [int(r["open_fds"]) for r in steady]
+fds_first = max(fds[:half])
+fds_last = max(fds[half:]) if fds[half:] else fds_first
+print(f"\nTổng {total} request, thành công {100 * ok / max(total, 1):.3f}%. RSS đỉnh nửa đầu {first:.1f} MiB, nửa sau {last:.1f} MiB ({growth:+.1f}%). File mở đỉnh nửa đầu {fds_first}, nửa sau {fds_last}.")
+print("Kết luận:", "không thấy rò rỉ" if growth < 10 and fds_last - fds_first < 20 else "CẦN XEM: bộ nhớ hoặc file mở tăng dần")
+PY
+}
+
+if [ -n "${LOADTEST_SOAK:-}" ]; then
+  soak "$LOADTEST_SOAK"
+  curl -sf "$BASE/health/ready" >/dev/null && echo "Máy chủ vẫn sẵn sàng sau tải."
+  echo "Dòng ERROR trong log máy chủ: $(grep -c 'ERROR' serve.log || true)"
+  exit 0
+fi
 echo "## $backend — $(nproc) CPU, ${DURATION} mỗi bài"
 echo
 echo "| Bài đo                             | Kết nối |  Request/s |   p50 ms |   p95 ms |   p99 ms |  Thành công |"

@@ -169,3 +169,21 @@ Dòng ERROR trong log máy chủ: 0
 
 Cùng lúc: thư viện MCP ghi mức ERROR mỗi khi client ngắt kết nối giữa chừng (một việc
 bình thường) — đã lọc đúng thông điệp đó để không làm nhiễu cảnh báo vận hành.
+
+## Thử tải dài hạn (soak) — 12/11/2026
+
+`LOADTEST_SOAK=15m scripts/loadtest.sh` chạy song song suốt 15 phút: đọc `/auth/me`, list
+50 người dùng, MCP `tools/call`, tải file 16 KiB, ghi `PATCH` (200/s) và tải file lên
+(20/s); đo bộ nhớ (RSS), số file đang mở và số kết nối PostgreSQL của máy chủ mỗi 30
+giây. Cùng máy 4 nhân với máy tạo tải. Bản PostgreSQL chồng với một lượt gate chạy ở vài
+phút cuối, nên số request/s của nó thấp hơn thật — kết luận về rò rỉ không đổi.
+
+| Database   | Request    | Thành công | RSS (MiB) đầu → cuối | File mở | Kết nối DB | Dòng ERROR |
+| ---------- | ---------: | ---------: | -------------------: | ------: | ---------: | ---------: |
+| SQLite     | 3.834.543  | 100,000%   | 64,5 → 69,6          | 85–88   | —          | 0          |
+| PostgreSQL | 2.374.901  | 100,000%   | 63,3 → 67,8          | 82–84   | 21 (đứng yên) | 0       |
+
+Kết luận: **không thấy rò rỉ** bộ nhớ, file hay kết nối database. Bộ nhớ chỉ tăng vài MiB
+trong phút đầu (bộ nhớ đệm, pool ấm lên) rồi gần như phẳng (nửa sau so với nửa đầu: +4%
+SQLite, +0,4% PostgreSQL); số kết nối PostgreSQL giữ nguyên 21 suốt bài. Máy chủ vẫn sẵn
+sàng sau tải.

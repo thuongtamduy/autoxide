@@ -225,7 +225,7 @@ async fn disable_totp(
     responses(
         (status = 204, description = "Two-step sign-in is off for this user (also when it was not on)."),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `auth.users.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
     )
 )]
@@ -236,6 +236,7 @@ async fn reset_user_mfa(
 ) -> Result<StatusCode, Error> {
     principal.require(&USERS_MANAGE)?;
     state.users.get(id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
+    state.roles.require_covers(&principal, id).await?;
     state.mfa.reset(Actor::from(&principal), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

@@ -9,7 +9,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
-use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::response::{Created, Data, Problem};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -76,13 +76,20 @@ impl From<Passkey> for PasskeyResponse {
     }
 }
 
+/// Proof that you are the account owner.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub(crate) struct StartPasskeyRegistrationRequest {
+    /// Your current password: a stolen access token alone must not add a passkey.
+    #[validate(length(min = 1, max = 1024))]
+    current_password: String,
+}
+
 /// The authenticator's answer to an add-passkey ceremony.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct AddPasskeyRequest {
     /// The `ceremony_id` from `POST /api/v1/auth/me/passkeys/registration`.
     ceremony_id: Uuid,
     /// A name to recognize the passkey by, 1 to 100 characters.
-    #[validate(length(min = 1, max = 100))]
     #[schema(example = "Ada's phone")]
     name: String,
     /// The created credential as JSON (`credential.toJSON()` in the browser).
@@ -102,15 +109,17 @@ pub(crate) struct PasskeyLoginRequest {
 
 /// Start adding a passkey to your account.
 ///
-/// Needs a session signed in with a password (an API key cannot do this). Answers 403
+/// Needs your current password and a session signed in with a password (an API key cannot do this). Answers 403
 /// with code `auth.passkeys_disabled` when the server has passkeys off.
 #[utoipa::path(
     post,
     path = "/me/passkeys/registration",
     operation_id = "start_passkey_registration",
     security(("bearer" = [])),
+    request_body = StartPasskeyRegistrationRequest,
     responses(
         (status = 200, description = "Options for the browser, and the ceremony to finish with `POST /api/v1/auth/me/passkeys`.", body = Data<CeremonyResponse>),
+        (status = 400, description = "The current password is wrong; code `auth.wrong_password`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Called with an API key (`auth.session_required`), or passkeys are off (`auth.passkeys_disabled`).", body = Problem),
         (status = 409, description = "You already have the most passkeys allowed; code `auth.passkey_limit`.", body = Problem),
@@ -119,9 +128,11 @@ pub(crate) struct PasskeyLoginRequest {
 async fn start_registration(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
+    ValidJson(input): ValidJson<StartPasskeyRegistrationRequest>,
 ) -> Result<Data<CeremonyResponse>, Error> {
     require_session(&principal)?;
-    let ceremony = state.passkeys.start_registration(principal.user_id()).await?;
+    let ceremony =
+        state.passkeys.start_registration(principal.user_id(), &input.current_password).await?;
     Ok(Data { data: ceremony.into() })
 }
 
@@ -148,13 +159,13 @@ async fn add_passkey(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
     ValidJson(input): ValidJson<AddPasskeyRequest>,
-) -> Result<(StatusCode, Data<PasskeyResponse>), Error> {
+) -> Result<Created<PasskeyResponse>, Error> {
     require_session(&principal)?;
     let passkey = state
         .passkeys
         .finish_registration(principal.user_id(), input.ceremony_id, &input.name, &input.credential)
         .await?;
-    Ok((StatusCode::CREATED, Data { data: passkey.into() }))
+    Ok(Created::new(format!("/auth/me/passkeys/{}", passkey.id), passkey.into()))
 }
 
 /// List your passkeys.
@@ -243,9 +254,12 @@ async fn start_login(State(state): State<Arc<HttpState>>) -> Result<Data<Ceremon
 )]
 async fn login(
     State(state): State<Arc<HttpState>>,
+    headers: axum::http::HeaderMap,
     ValidJson(input): ValidJson<PasskeyLoginRequest>,
 ) -> Result<Data<TokenResponse>, Error> {
-    let tokens = state.passkeys.finish_login(input.ceremony_id, &input.credential).await?;
+    let user_agent = super::user_agent(&headers);
+    let tokens =
+        state.passkeys.finish_login(input.ceremony_id, &input.credential, user_agent).await?;
     Ok(Data { data: tokens.into() })
 }
 
@@ -265,8 +279,14 @@ mod tests {
             let ada = bearer(&app, "ada@example.com", PASSWORD).await;
             let mut phone = SoftAuthenticator::new(1);
 
-            let (status, _, started) =
-                call(&app, "POST", "/me/passkeys/registration", Some(&ada), None).await;
+            let (status, _, started) = call(
+                &app,
+                "POST",
+                "/me/passkeys/registration",
+                Some(&ada),
+                Some(json!({"current_password": PASSWORD})),
+            )
+            .await;
             assert_eq!(status, StatusCode::OK, "{started}");
             let credential = phone.register(&started["data"]["options"]);
             let body = json!({
@@ -319,13 +339,13 @@ mod tests {
             };
             crate::api::Accounts::create(services.users.as_ref(), root).await.unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
-            let body = json!({"name": "agent", "permissions": ["auth.users.read"]});
+            let body = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": PASSWORD});
             let (status, _, key) = call(&app, "POST", "/api-keys", Some(&admin), Some(body)).await;
             assert_eq!(status, StatusCode::CREATED, "{key}");
             let key = format!("Bearer {}", key["data"]["key"].as_str().unwrap());
 
             let (status, _, problem) =
-                call(&app, "POST", "/me/passkeys/registration", Some(&key), None).await;
+                call(&app, "POST", "/me/passkeys/registration", Some(&key), Some(json!({"current_password": PASSWORD}))).await;
 
             assert_eq!(status, StatusCode::FORBIDDEN);
             assert_eq!(problem["code"], "auth.session_required");

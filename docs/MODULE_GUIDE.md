@@ -78,9 +78,18 @@ event in the same transaction with `Outbox::record(&transaction, actor, subject,
 Routes live in `src/http.rs`, are registered with `OpenApiRouter::routes(routes!(…))`,
 and are mounted under `/api/v1/<name>`; a module declares only the tail (`/`, `/{id}`).
 
-- Read JSON bodies with `ValidJson<T>` (`T: Deserialize + Validate + ToSchema`).
-- Answer with `Data<T>`, `Page<T>` (lists, via `fetch_page` with
+- Read JSON bodies with `ValidJson<T>` (`T: Deserialize + Validate + ToSchema`). A field
+  the service checks is checked only there (no `#[validate]` on it), and the service
+  collects every problem of the input into one `Error::validation(…)`: callers see all
+  their mistakes at once.
+- Answer with `Data<T>`, `Created::new("/<name>/<id>", …)` (201 with a `Location` header)
+  for a new record, `Page<T>` (lists, via `fetch_page` with
   `limit`/`cursor`/`order`) or an `Error` (sent as RFC 9457 Problem Details).
+- A record that can be changed carries `updated_at`. Return it with
+  `Tagged { version: row.updated_at, data }` (adds `ETag`) from its `GET` and its update;
+  the update handler takes `if_match: IfMatch` and passes `if_match.expected()?` to the
+  service, which adds `updated_at = <expected>` to its `UPDATE` and answers
+  `version::changed()` (412) when no row matched (see `autoxide_kernel::version`).
 - A handler that needs a signed-in caller takes `principal: Principal` and calls
   `principal.require(&PERMISSION)?`.
 - Document every handler: a `///` line (the summary), the required permission, and a
@@ -123,6 +132,17 @@ Publish a trait in `src/api.rs` and provide it in `Module::start` with
 services work the same way: `dyn Mailer` (send mail; module `mail`) and `dyn Storage`
 (store files; module `files`).
 
+### Personal data
+
+A module that keeps data about users takes part in data export and account deletion
+(see `autoxide_kernel::privacy`):
+
+- implement `PersonalData` (return the user's data as JSON, without secrets) and register
+  it in `Module::start` with `context.personal_data(…)`; it then appears in
+  `GET /api/v1/auth/me/export` under the module's name;
+- subscribe to `privacy::USER_DELETED` in `Module::subscriptions` and delete the user's
+  rows when it arrives (`privacy::deleted_user(event)` gives the id). It may arrive twice.
+
 ### 9. Configuration, jobs, limits
 
 - Settings: declare each with `Setting` and read it in `Module::configure` through
@@ -164,5 +184,6 @@ a concurrency test.
 - [ ] Every route documented (summary, permission, every response)
 - [ ] MCP tools for what agents should be able to do
 - [ ] Error codes prefixed and translated
+- [ ] Data about users exported (`PersonalData`) and deleted on `USER_DELETED`
 - [ ] Tests on both databases, including concurrent writes
 - [ ] `docs/openapi.json` and `.env.example` regenerated; gate green

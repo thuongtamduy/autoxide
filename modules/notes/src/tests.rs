@@ -131,7 +131,9 @@ async fn rest_va_mcp_dung_chung_service() {
         assert_eq!(status, StatusCode::CREATED, "{created}");
         let listed = ada.call_tool(tool("notes.list_notes", json!({}))).await.unwrap();
         let listed = listed.structured_content.unwrap();
-        assert_eq!(listed["data"]["data"][0]["id"], created["data"]["id"]);
+        // Cùng hình dạng với REST: `data` + `pagination`, không lồng thêm.
+        assert_eq!(listed["data"][0]["id"], created["data"]["id"]);
+        assert!(listed["pagination"].is_object(), "{listed}");
 
         let made = ada.call_tool(tool("notes.create_note", json!({"title": "Ideas"}))).await;
         let made = made.unwrap().structured_content.unwrap();
@@ -267,7 +269,7 @@ async fn tao_trung_ten_dong_thoi_chi_mot_thanh_cong() {
         let second = NewNote { title: "Second".to_owned(), body: String::new() };
         let second = service.create(Actor::user(ADA), second).await.unwrap();
         let rename = NoteChanges { title: Some("Same".to_owned()), body: None };
-        let taken = service.update(Actor::user(ADA), second.id, rename).await.unwrap_err();
+        let taken = service.update(Actor::user(ADA), second.id, rename, None).await.unwrap_err();
         assert_eq!(taken.code(), "notes.title_taken");
     })
     .await
@@ -301,6 +303,98 @@ async fn tai_lieu_openapi_du_mo_ta() {
 
         assert_eq!(autoxide_kernel::http::lint(&app.openapi), Vec::<String>::new());
         assert!(app.openapi.paths.paths.contains_key("/api/v1/notes/{id}"));
+    })
+    .await
+    .unwrap();
+}
+
+/// Xuất dữ liệu cá nhân có ghi chú của người dùng; tài khoản bị xoá thì ghi chú của
+/// người đó bị xoá theo (nhận lại event cũng không sao) — trên cả hai database.
+#[tokio::test]
+async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
+    use autoxide_kernel::event::{Delivered, EventHandler, Outbox};
+
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        for (who, title) in [("ada", "one"), ("ada", "two"), ("bob", "three")] {
+            let body = json!({"title": title, "body": "…"});
+            let (status, _) = rest(&app, "POST", "", who, Some(body)).await;
+            // bob chỉ đọc được: tạo ghi chú cho bob thẳng qua service.
+            if who == "bob" {
+                assert_eq!(status, StatusCode::FORBIDDEN);
+                let service = crate::service::NoteService::new(
+                    app.database.clone(),
+                    Outbox::standalone("notes"),
+                );
+                let note = NewNote { title: title.to_owned(), body: String::new() };
+                service.create(Actor::user(BOB), note).await.unwrap();
+            } else {
+                assert_eq!(status, StatusCode::CREATED);
+            }
+        }
+        // Bộ phát event dựng được dù chưa có module tài khoản nào khai event xoá.
+        app.modules.dispatcher(&app.database).unwrap();
+
+        let exported = app.modules.personal_data().export(ADA).await.unwrap();
+        let titles: Vec<_> =
+            exported["notes"].as_array().unwrap().iter().map(|n| n["title"].clone()).collect();
+        assert_eq!(titles, vec![json!("one"), json!("two")]);
+
+        let service =
+            crate::service::NoteService::new(app.database.clone(), Outbox::standalone("notes"));
+        let deleted = Delivered {
+            id: Uuid::now_v7(),
+            module: "auth",
+            name: autoxide_kernel::privacy::USER_DELETED.to_owned(),
+            actor: Actor::system(),
+            subject: None,
+            payload: json!({"before": {"id": ADA}}),
+            occurred_at: chrono::Utc::now(),
+        };
+        service.handle(&deleted).await.unwrap();
+        service.handle(&deleted).await.unwrap();
+        let exported = app.modules.personal_data().export(ADA).await.unwrap();
+        assert_eq!(exported["notes"], json!([]));
+        let exported = app.modules.personal_data().export(BOB).await.unwrap();
+        assert_eq!(exported["notes"].as_array().unwrap().len(), 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// Nhiều người cùng sửa một ghi chú với cùng một phiên bản (`If-Match`): đúng một người
+/// thành công, những người khác nhận 412 — trên cả hai database (D-084).
+#[tokio::test]
+async fn sua_dong_thoi_cung_phien_ban_chi_mot_nguoi_thang() {
+    use autoxide_kernel::event::Outbox;
+
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let service = Arc::new(crate::service::NoteService::new(
+            app.database.clone(),
+            Outbox::standalone("notes"),
+        ));
+        let note = NewNote { title: "Shared".to_owned(), body: String::new() };
+        let note = service.create(Actor::user(ADA), note).await.unwrap();
+
+        let attempts: Vec<_> = (0..8)
+            .map(|index| {
+                let service = service.clone();
+                let changes = NoteChanges { title: None, body: Some(format!("edit {index}")) };
+                let version = Some(note.updated_at);
+                tokio::spawn(async move {
+                    service.update(Actor::user(ADA), note.id, changes, version).await
+                })
+            })
+            .collect();
+        let mut won = 0;
+        for attempt in attempts {
+            match attempt.await.unwrap() {
+                Ok(_) => won += 1,
+                Err(error) => assert_eq!(error.code(), "precondition_failed"),
+            }
+        }
+        assert_eq!(won, 1);
     })
     .await
     .unwrap();

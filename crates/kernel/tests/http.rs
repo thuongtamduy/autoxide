@@ -381,6 +381,20 @@ async fn cors_chi_cho_origin_da_cau_hinh() {
     config.cors_origins = CorsOrigins::Any;
     let response = send(api_with(&config).router, preflight("https://anything.example.com")).await;
     assert_eq!(allow_origin(&response).as_deref(), Some("*"));
+
+    // Trình duyệt gửi được `If-Match` và đọc được `ETag`, `Location`.
+    let allowed = response.headers()[header::ACCESS_CONTROL_ALLOW_HEADERS].to_str().unwrap();
+    assert!(allowed.contains("if-match"), "{allowed}");
+    let request = Request::builder()
+        .uri("/api/v1/notes")
+        .header(header::ORIGIN, "https://anything.example.com")
+        .body(Body::empty())
+        .unwrap();
+    let response = send(api_with(&config).router, request).await;
+    let exposed = response.headers()[header::ACCESS_CONTROL_EXPOSE_HEADERS].to_str().unwrap();
+    for name in ["etag", "location", "retry-after", "x-request-id"] {
+        assert!(exposed.contains(name), "{name} not in {exposed}");
+    }
 }
 
 /// Gửi một request GET qua kết nối TCP thật; trả về toàn bộ response dạng chữ.
@@ -734,4 +748,21 @@ async fn endpoint_deprecated_co_header_va_danh_dau_trong_tai_lieu() {
     assert!(description.contains("Deprecated** since 2026-11-01"), "{description}");
     assert!(description.contains("removed on 2027-05-01"), "{description}");
     assert!(document["paths"]["/api/v1/notes"]["get"].get("deprecated").is_none());
+}
+
+/// Header chung được khai trên từng operation để SDK sinh tự động có sẵn tham số:
+/// `Accept-Language` ở mọi nơi; `Idempotency-Key` chỉ khi có nơi lưu key (và chỉ ở lệnh
+/// ghi cần đăng nhập — route mẫu ở đây không cần đăng nhập).
+#[tokio::test]
+async fn tai_lieu_khai_header_chung_tren_tung_endpoint() {
+    let document = serde_json::to_value(api_with(&default_config()).openapi).unwrap();
+    let operation = &document["paths"]["/api/v1/notes"]["post"];
+    let headers: Vec<&str> = operation["parameters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|parameter| parameter["in"] == "header")
+        .map(|parameter| parameter["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(headers, ["Accept-Language"]);
 }

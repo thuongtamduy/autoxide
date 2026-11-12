@@ -16,6 +16,7 @@ use uuid::Uuid;
 use super::entity::totp::{self, Column, Entity};
 use super::recovery;
 use crate::events;
+use crate::session::LoginThrottle;
 use autoxide_kernel::event::{Actor, Outbox};
 use serde_json::json;
 
@@ -47,12 +48,41 @@ pub(crate) struct TotpSetup {
 pub(crate) struct MfaService {
     database: Database,
     issuer: String,
+    // Đếm mã sai khi tắt TOTP / tạo lại recovery code, theo người dùng (D-079): người
+    // cầm access token bị lộ không đoán mã vô hạn được.
+    throttle: LoginThrottle,
     outbox: Outbox,
 }
 
 impl MfaService {
-    pub(crate) fn new(database: Database, issuer: String, outbox: Outbox) -> Self {
-        MfaService { database, issuer, outbox }
+    pub(crate) fn new(
+        database: Database,
+        issuer: String,
+        throttle: LoginThrottle,
+        outbox: Outbox,
+    ) -> Self {
+        MfaService { database, issuer, throttle, outbox }
+    }
+
+    /// Kiểm mã cho một thao tác của chính người dùng, có giới hạn số lần sai: xin lượt
+    /// trước, mã đúng thì quên các lần sai.
+    async fn check_code_limited(
+        &self,
+        user_id: Uuid,
+        code: &str,
+        allow_recovery: bool,
+    ) -> Result<(), Error> {
+        let key = format!("mfa:{user_id}");
+        self.throttle.reserve(&key).await?;
+        let valid = if allow_recovery {
+            self.verify_second_factor(user_id, code).await?
+        } else {
+            self.verify_totp(user_id, code).await?
+        };
+        if !valid {
+            return Err(invalid_code());
+        }
+        self.throttle.clear(&key).await
     }
 
     pub(crate) async fn status(&self, user_id: Uuid) -> Result<MfaStatus, Error> {
@@ -168,9 +198,7 @@ impl MfaService {
         if !self.status(user_id).await?.totp_enabled {
             return Err(not_enabled());
         }
-        if !self.verify_totp(user_id, code).await? {
-            return Err(invalid_code());
-        }
+        self.check_code_limited(user_id, code, false).await?;
         let transaction = self.database.begin_write().await?;
         let codes = recovery::replace(&transaction, user_id, now()).await?;
         let event = events::RecoveryCodesReplaced::default();
@@ -213,9 +241,7 @@ impl MfaService {
         if !self.status(user_id).await?.totp_enabled {
             return Err(not_enabled());
         }
-        if !self.verify_second_factor(user_id, code).await? {
-            return Err(invalid_code());
-        }
+        self.check_code_limited(user_id, code, true).await?;
         self.remove(Actor::user(user_id), user_id, false).await
     }
 
@@ -361,6 +387,30 @@ pub(crate) mod tests {
             assert!(!mfa.status(user).await.unwrap().totp_enabled);
             let off = mfa.disable_totp(user, &next).await.unwrap_err();
             assert_eq!(off.code(), "auth.mfa_not_enabled");
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Đoán mã để tắt TOTP: sau 5 lần sai thì bị khoá, kể cả khi gửi mã đúng (D-079).
+    #[tokio::test]
+    async fn doan_ma_tat_totp_bi_khoa() {
+        TestDatabase::run(async |test| {
+            let (mfa, user) = setup(test).await;
+            let setup = mfa.start_totp(user, "ada@example.com").await.unwrap();
+            let start = unix_now();
+            mfa.confirm_totp(user, &code_at(&setup.secret, start)).await.unwrap();
+
+            for _ in 0..5 {
+                let wrong = mfa.disable_totp(user, "000000").await.unwrap_err();
+                assert_eq!(wrong.fields()[0].field, "code");
+            }
+            let right = code_at(&setup.secret, start + STEP_SECONDS);
+            let locked = mfa.disable_totp(user, &right).await.unwrap_err();
+            assert_eq!(locked.code(), "auth.login_throttled");
+            let locked = mfa.regenerate_recovery_codes(user, &right).await.unwrap_err();
+            assert_eq!(locked.code(), "auth.login_throttled");
+            assert!(mfa.status(user).await.unwrap().totp_enabled);
         })
         .await
         .unwrap();

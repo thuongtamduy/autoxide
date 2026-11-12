@@ -43,6 +43,7 @@ autoxide-idempotency = { path = "modules/idempotency" }
 autoxide-mail = { path = "modules/mail" }
 autoxide-files = { path = "modules/files" }
 autoxide-notes = { path = "modules/notes" }
+autoxide-webhooks = { path = "modules/webhooks" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
@@ -131,7 +132,7 @@ argon2 = "0.6"
 # Cả bốn đã có sẵn trong cây phụ thuộc (qua sqlx, uuid, argon2).
 hmac = "0.13"
 sha2 = "0.11"
-base64 = "0.22"
+base64 = "0.23"
 getrandom = "0.4"
 # TOTP (RFC 6238). Chỉ bật `std` và `otpauth` (đường dẫn `otpauth://` cho ứng dụng
 # authenticator); không bật `qr` (kéo thư viện ảnh) và `gen_secret` (secret tự sinh

@@ -78,9 +78,17 @@ thay đổi và dòng audit log cùng có, hoặc cùng không.
 Route nằm trong `src/http.rs`, đăng ký bằng `OpenApiRouter::routes(routes!(…))`, và
 được gắn dưới `/api/v1/<tên>`; module chỉ khai phần đuôi (`/`, `/{id}`).
 
-- Đọc thân JSON bằng `ValidJson<T>` (`T: Deserialize + Validate + ToSchema`).
-- Trả `Data<T>`, `Page<T>` (danh sách, qua `fetch_page` với `limit`/`cursor`/`order`)
+- Đọc thân JSON bằng `ValidJson<T>` (`T: Deserialize + Validate + ToSchema`). Trường
+  nào service kiểm thì chỉ kiểm ở service (không gắn `#[validate]`), và service gom mọi
+  lỗi của đầu vào vào một `Error::validation(…)`: người gọi thấy hết lỗi trong một lần.
+- Trả `Data<T>`, `Created::new("/<tên>/<id>", …)` (201 kèm header `Location`) cho bản ghi
+  mới, `Page<T>` (danh sách, qua `fetch_page` với `limit`/`cursor`/`order`)
   hoặc một `Error` (gửi đi dạng RFC 9457 Problem Details).
+- Bản ghi sửa được thì có `updated_at`. `GET` và lệnh sửa của nó trả
+  `Tagged { version: row.updated_at, data }` (thêm `ETag`); handler sửa nhận
+  `if_match: IfMatch` và đưa `if_match.expected()?` cho service, service thêm
+  `updated_at = <phiên bản mong đợi>` vào câu `UPDATE` và trả `version::changed()` (412)
+  khi không dòng nào khớp (xem `autoxide_kernel::version`).
 - Handler cần người gọi đã đăng nhập nhận `principal: Principal` và gọi
   `principal.require(&PERMISSION)?`.
 - Viết tài liệu cho mọi handler: một dòng `///` (thành summary), permission cần có, và
@@ -123,6 +131,17 @@ Công bố một trait trong `src/api.rs` và cung cấp nó trong `Module::star
 theo cách đó: `dyn Mailer` (gửi mail; module `mail`) và `dyn Storage` (lưu file; module
 `files`).
 
+### Dữ liệu cá nhân
+
+Module giữ dữ liệu về người dùng tham gia việc xuất dữ liệu và xoá tài khoản (xem
+`autoxide_kernel::privacy`):
+
+- cài `PersonalData` (trả dữ liệu của người dùng dạng JSON, không có secret) và đăng ký
+  trong `Module::start` bằng `context.personal_data(…)`; phần đó có mặt trong
+  `GET /api/v1/auth/me/export` dưới tên module;
+- đăng ký nhận `privacy::USER_DELETED` trong `Module::subscriptions` và xoá các dòng của
+  người đó khi nhận (`privacy::deleted_user(event)` cho id). Có thể nhận hai lần.
+
 ### 9. Cấu hình, job, giới hạn
 
 - Cấu hình: khai mỗi biến bằng `Setting` và đọc trong `Module::configure` qua
@@ -162,5 +181,6 @@ dựng module như binary dựng và gọi nó qua REST và qua một client MCP
 - [ ] Mọi route có tài liệu (summary, permission, mọi response)
 - [ ] Tool MCP cho những gì agent cần làm được
 - [ ] Mã lỗi có tiền tố và có bản dịch
+- [ ] Dữ liệu về người dùng được xuất (`PersonalData`) và xoá khi nhận `USER_DELETED`
 - [ ] Test trên cả hai database, kể cả ghi đồng thời
 - [ ] Đã sinh lại `docs/openapi.json` và `.env.example`; gate xanh

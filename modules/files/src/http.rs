@@ -6,7 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
-use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::storage::ByteStream;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
@@ -131,7 +131,7 @@ async fn upload_file(
     Query(query): Query<UploadQuery>,
     headers: HeaderMap,
     body: Body,
-) -> Result<(StatusCode, Data<FileResponse>), Error> {
+) -> Result<Created<FileResponse>, Error> {
     let content_type = headers.get(header::CONTENT_TYPE).map(HeaderValue::to_str).transpose();
     let content_type = content_type.map_err(|_| {
         Error::bad_request(
@@ -154,7 +154,7 @@ async fn upload_file(
         })
         .boxed();
     let file = service.upload(&principal, &query.name, content_type, content).await?;
-    Ok((StatusCode::CREATED, Data { data: file.into() }))
+    Ok(Created::new(format!("/files/{}", file.id), file.into()))
 }
 
 /// Get the details of a file.

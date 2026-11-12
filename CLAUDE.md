@@ -44,7 +44,7 @@ Thấy đang lạc thì dừng việc đó, quay lại lộ trình và nói rõ 
 **Autoxide dùng để làm gì:** làm nền cho một **sản phẩm mới** (không phải bản viết
 lại của hệ thống nào có sẵn). **Ai dùng:** mọi người đều dùng được — không gắn với
 một công ty hay một ngành. **Mã nguồn mở, công khai toàn bộ.** **Module đầu
-tiên:** `content` — chỉ nội dung (D-078, D-080). Giao diện là repo riêng, công khai.
+tiên:** `content` — chỉ nội dung (D-085, D-087). Giao diện là repo riêng, công khai.
 
 Hệ quả cho agent:
 
@@ -212,7 +212,9 @@ sẵn lệnh.
    bảng người dùng.
 5. **Logic ở service layer.** Handler chỉ: lấy dữ liệu vào → gọi service → trả
    envelope. Không truy vấn database trong handler. Thân JSON nhận bằng
-   `ValidJson<T>` (đã kiểm bằng `validator`), không dùng `Json<T>` trần.
+   `ValidJson<T>` (đã kiểm bằng `validator`), không dùng `Json<T>` trần. Trường nào
+   service kiểm thì chỉ service kiểm (không thêm `#[validate]`), và service gom mọi lỗi
+   của đầu vào để báo **một lần** (D-083). Tạo mới trả `Created` (201 + `Location`).
 6. **Mọi route có tài liệu OpenAPI**, đăng ký qua `utoipa-axum` cùng lúc với route
    (`OpenApiRouter::routes(routes!(…))`, không dùng `.route(…)` trần). Route của
    module `x` nằm dưới `/api/v1/x`; module chỉ khai phần đuôi (`/`, `/{id}`). Thay

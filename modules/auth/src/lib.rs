@@ -20,6 +20,7 @@ mod migration;
 mod passkey;
 mod password;
 mod permissions;
+mod privacy;
 mod reset;
 mod role;
 mod session;
@@ -102,16 +103,13 @@ impl Module for AuthModule {
         let throttle =
             LoginThrottle::new(database.clone(), config.login_max_failures, config.login_lock)?;
         let mailer = context.require::<dyn Mailer>()?;
-        let resets = Arc::new(reset::PasswordResets {
-            database: database.clone(),
-            users: users.clone(),
-            mailer: mailer.clone(),
-            translations: context.translations().clone(),
-            outbox: outbox.clone(),
-            url: config.password_reset_url.clone(),
-        });
-        let mfa =
-            Arc::new(MfaService::new(database.clone(), config.totp_issuer.clone(), outbox.clone()));
+
+        let mfa = Arc::new(MfaService::new(
+            database.clone(),
+            config.totp_issuer.clone(),
+            LoginThrottle::new(database.clone(), config.login_max_failures, config.login_lock)?,
+            outbox.clone(),
+        ));
         let sessions = Arc::new(SessionService::new(
             database.clone(),
             users.clone(),
@@ -142,7 +140,23 @@ impl Module for AuthModule {
             context.permissions().clone(),
             outbox.clone(),
         ));
-        let api_keys = Arc::new(ApiKeyService::new(database, users.clone(), roles.clone(), outbox));
+        let api_keys = Arc::new(ApiKeyService::new(
+            database.clone(),
+            users.clone(),
+            roles.clone(),
+            sessions.clone(),
+            outbox.clone(),
+        ));
+        let resets = Arc::new(reset::PasswordResets {
+            database: database.clone(),
+            users: users.clone(),
+            mailer: mailer.clone(),
+            translations: context.translations().clone(),
+            outbox: outbox.clone(),
+            passkeys: passkeys.clone(),
+            api_keys: api_keys.clone(),
+            url: config.password_reset_url.clone(),
+        });
         let authenticator = RequestAuthenticator {
             sessions: sessions.clone(),
             roles: roles.clone(),
@@ -152,7 +166,16 @@ impl Module for AuthModule {
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
         context.provide::<dyn api::Users>(users.clone())?;
         context.provide::<dyn api::Accounts>(users.clone())?;
+        context.personal_data(Arc::new(privacy::AuthPersonalData {
+            users: users.clone(),
+            roles: roles.clone(),
+            sessions: sessions.clone(),
+            api_keys: api_keys.clone(),
+            passkeys: passkeys.clone(),
+            mfa: mfa.clone(),
+        }))?;
         self.state = Some(http::HttpState {
+            personal_data: context.personal_data_export(),
             sessions,
             users,
             roles,
@@ -247,6 +270,7 @@ pub(crate) mod testing {
         pub mails: Arc<FakeMailer>,
         pub database: Database,
         pub authenticator: Arc<dyn autoxide_kernel::access::Authenticator>,
+        pub personal_data: autoxide_kernel::privacy::PersonalDataExport,
     }
 
     pub async fn services(test: &TestDatabase) -> Services {
@@ -264,6 +288,12 @@ pub(crate) mod testing {
         let mfa = Arc::new(crate::mfa::MfaService::new(
             database.clone(),
             "Autoxide".to_owned(),
+            crate::session::LoginThrottle::new(
+                database.clone(),
+                5,
+                std::time::Duration::from_secs(15 * 60),
+            )
+            .unwrap(),
             outbox.clone(),
         ));
         let sessions = Arc::new(
@@ -297,6 +327,7 @@ pub(crate) mod testing {
             database.clone(),
             users.clone(),
             roles.clone(),
+            sessions.clone(),
             outbox,
         ));
         let authenticator = Arc::new(crate::access::RequestAuthenticator {
@@ -310,20 +341,13 @@ pub(crate) mod testing {
             vec![("vi", include_str!("../locales/vi.json"))],
         )])
         .unwrap();
-        let resets = Arc::new(crate::reset::PasswordResets {
-            database: database.clone(),
-            users: users.clone(),
-            mailer: mails.clone(),
-            translations: translations.clone(),
-            outbox: autoxide_kernel::event::Outbox::standalone("auth"),
-            url: None,
-        });
+
         let verifications = Arc::new(crate::verify::EmailVerifications {
             database: database.clone(),
             users: users.clone(),
             sessions: sessions.clone(),
             mailer: mails.clone(),
-            translations,
+            translations: translations.clone(),
             outbox: autoxide_kernel::event::Outbox::standalone("auth"),
             url: None,
         });
@@ -341,7 +365,32 @@ pub(crate) mod testing {
             )
             .unwrap(),
         );
+        let resets = Arc::new(crate::reset::PasswordResets {
+            database: database.clone(),
+            users: users.clone(),
+            mailer: mails.clone(),
+            translations: translations.clone(),
+            outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+            passkeys: passkeys.clone(),
+            api_keys: api_keys.clone(),
+            url: None,
+        });
+        let personal_data = autoxide_kernel::privacy::PersonalDataExport::default();
+        personal_data
+            .register(
+                "auth",
+                Arc::new(crate::privacy::AuthPersonalData {
+                    users: users.clone(),
+                    roles: roles.clone(),
+                    sessions: sessions.clone(),
+                    api_keys: api_keys.clone(),
+                    passkeys: passkeys.clone(),
+                    mfa: mfa.clone(),
+                }),
+            )
+            .unwrap();
         Services {
+            personal_data,
             passkeys,
             users,
             sessions,

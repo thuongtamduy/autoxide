@@ -6,11 +6,13 @@
 
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set, SqlErr,
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set,
+    SqlErr,
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -50,7 +52,7 @@ impl NoteService {
     /// `notes.title_taken`.
     pub(crate) async fn create(&self, actor: Actor, input: NewNote) -> Result<Note, Error> {
         let owner = owner(actor)?;
-        let title = check_title(&input.title)?;
+        let title = check(Some(&input.title), Some(&input.body))?.unwrap_or_default();
         let now = now();
         let transaction = self.database.begin_write().await?;
         let note = entity::ActiveModel {
@@ -89,8 +91,9 @@ impl NoteService {
         actor: Actor,
         id: Uuid,
         changes: NoteChanges,
+        expected: Option<DateTime<Utc>>,
     ) -> Result<Note, Error> {
-        let title = changes.title.as_deref().map(check_title).transpose()?;
+        let title = check(changes.title.as_deref(), changes.body.as_deref())?;
         let transaction = self.database.begin_write().await?;
         let before = Entity::find_by_id(id)
             .one(&transaction)
@@ -105,10 +108,15 @@ impl NoteService {
             row.body = Set(body);
         }
         row.updated_at = Set(now());
-        let after = row
-            .update(&transaction)
-            .await
-            .map_err(|error| title_conflict(error, title.as_deref().unwrap_or_default()))?;
+        let mut update = Entity::update(row).validate()?;
+        if let Some(expected) = expected {
+            // Kiểm phiên bản ngay trong câu `UPDATE`: người khác vừa sửa thì 0 dòng (D-084).
+            update = update.filter(Column::UpdatedAt.eq(expected));
+        }
+        let after = update.exec(&transaction).await.map_err(|error| match error {
+            sea_orm::DbErr::RecordNotUpdated => autoxide_kernel::version::changed(),
+            error => title_conflict(error, title.as_deref().unwrap_or_default()),
+        })?;
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::NoteUpdated(change);
         self.outbox.record(&transaction, actor, events::note_subject(id), &event).await?;
@@ -137,6 +145,48 @@ impl NoteService {
     }
 }
 
+/// Mọi ghi chú của người dùng, cho bản xuất dữ liệu cá nhân.
+#[async_trait::async_trait]
+impl PersonalData for NoteService {
+    async fn export(&self, user_id: Uuid) -> Result<Value, Error> {
+        let notes = Entity::find()
+            .filter(Column::OwnerId.eq(user_id))
+            .order_by_asc(Column::Id)
+            .all(self.database.read())
+            .await?;
+        let notes: Vec<Value> = notes
+            .iter()
+            .map(|note| {
+                json!({
+                    "id": note.id,
+                    "title": note.title,
+                    "body": note.body,
+                    "created_at": note.created_at,
+                    "updated_at": note.updated_at,
+                })
+            })
+            .collect();
+        Ok(Value::Array(notes))
+    }
+}
+
+/// Tài khoản bị xoá thì xoá mọi ghi chú của người đó. Nhận lại event cũng không sao:
+/// lần sau không còn gì để xoá.
+#[async_trait::async_trait]
+impl EventHandler for NoteService {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        let Some(user_id) = deleted_user(event) else {
+            return Ok(());
+        };
+        let deleted = Entity::delete_many()
+            .filter(Column::OwnerId.eq(user_id))
+            .exec(self.database.write())
+            .await?;
+        tracing::info!(user_id = %user_id, notes = deleted.rows_affected, "notes of a deleted user removed");
+        Ok(())
+    }
+}
+
 #[async_trait::async_trait]
 impl Notes for NoteService {
     async fn find(&self, id: Uuid) -> Result<Option<NoteSummary>, Error> {
@@ -150,17 +200,33 @@ fn owner(actor: Actor) -> Result<Uuid, Error> {
     actor.user_id.ok_or_else(|| Error::internal("notes need a signed-in user"))
 }
 
-/// Tên: bỏ khoảng trắng hai đầu, không rỗng.
-fn check_title(title: &str) -> Result<String, Error> {
-    let title = title.trim();
-    if title.is_empty() {
-        return Err(Error::validation(vec![FieldError::new(
+/// Độ dài tối đa của tên và nội dung, theo ký tự.
+const TITLE_MAX_LENGTH: usize = 200;
+const BODY_MAX_LENGTH: usize = 10_000;
+
+/// Kiểm tên (bỏ khoảng trắng hai đầu, 1 tới 200 ký tự) và nội dung (tối đa 10000 ký
+/// tự) — trường `None` bỏ qua. Mọi lỗi báo một lần. Trả tên đã chuẩn hoá.
+fn check(title: Option<&str>, body: Option<&str>) -> Result<Option<String>, Error> {
+    let title = title.map(str::trim);
+    let mut problems = Vec::new();
+    if title.is_some_and(|title| !(1..=TITLE_MAX_LENGTH).contains(&title.chars().count())) {
+        problems.push(FieldError::new(
             "title",
             "length",
-            "must not be empty or only spaces",
-        )]));
+            format!("must be 1 to {TITLE_MAX_LENGTH} characters, not only spaces"),
+        ));
     }
-    Ok(title.to_owned())
+    if body.is_some_and(|body| body.chars().count() > BODY_MAX_LENGTH) {
+        problems.push(FieldError::new(
+            "body",
+            "length",
+            format!("must be at most {BODY_MAX_LENGTH} characters long"),
+        ));
+    }
+    if !problems.is_empty() {
+        return Err(Error::validation(problems));
+    }
+    Ok(title.map(str::to_owned))
 }
 
 /// Vi phạm index unique (chủ, tên) thành lỗi 409 dễ hiểu; lỗi khác giữ nguyên.

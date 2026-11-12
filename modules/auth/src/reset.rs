@@ -9,7 +9,7 @@
 use std::sync::Arc;
 
 use autoxide_kernel::database::Database;
-use autoxide_kernel::error::Error;
+use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::mail::{MailTemplate, Mailer};
@@ -73,6 +73,10 @@ pub(crate) struct PasswordResets {
     pub mailer: Arc<dyn Mailer>,
     pub translations: Translations,
     pub outbox: Outbox,
+    /// Đặt lại mật khẩu là lúc chủ thật lấy lại tài khoản: passkey và API key gắn vào trước
+    /// đó (có thể bởi kẻ gian) bị thu hồi (D-079).
+    pub passkeys: Arc<crate::passkey::PasskeyService>,
+    pub api_keys: Arc<crate::api_key::ApiKeyService>,
     /// Trang của giao diện, có `{token}`; `None`: mail chứa token.
     pub url: Option<String>,
 }
@@ -135,8 +139,12 @@ impl PasswordResets {
     /// Đặt mật khẩu mới bằng `token` lấy từ mail.
     pub(crate) async fn confirm(&self, token: &str, new_password: String) -> Result<(), Error> {
         // Kiểm luật mật khẩu TRƯỚC khi dùng token: mật khẩu sai thì token còn dùng lại được.
-        if let Some(problem) = password::check_rules("password", &new_password) {
-            return Err(Error::validation(vec![problem]));
+        let problems: Vec<FieldError> = FieldError::blank("token", token)
+            .into_iter()
+            .chain(password::check_rules("password", &new_password))
+            .collect();
+        if !problems.is_empty() {
+            return Err(Error::validation(problems));
         }
         let now = now();
         let row = Entity::find()
@@ -155,7 +163,10 @@ impl PasswordResets {
         if claimed.rows_affected == 0 {
             return Err(invalid_token());
         }
-        self.users.set_password(Actor::user(row.user_id), row.user_id, new_password).await?;
+        let actor = Actor::user(row.user_id);
+        self.users.set_password(actor, row.user_id, new_password).await?;
+        self.passkeys.remove_all(actor, row.user_id).await?;
+        self.api_keys.revoke_all(actor, row.user_id).await?;
         // Các token đặt lại khác của người này (mail cũ hơn) cũng hết dùng được.
         Entity::update_many()
             .col_expr(Column::UsedAt, Expr::value(Some(now)))
@@ -259,7 +270,7 @@ mod tests {
             // Tài khoản bị khoá: không gửi.
             let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
             let disable = UserChanges { name: None, disabled: Some(true) };
-            services.users.update(Actor::system(), ada.id, disable).await.unwrap();
+            services.users.update(Actor::system(), ada.id, disable, None).await.unwrap();
             time_passes(&services, 2).await;
             services.resets.request("ada@example.com", Language::En).await.unwrap();
             assert_eq!(sent(&services), 2);
@@ -272,7 +283,8 @@ mod tests {
     async fn dat_mat_khau_moi_bang_token_mot_lan() {
         TestDatabase::run(async |test| {
             let services = setup(test).await;
-            let session = services.sessions.login("ada@example.com", OLD).await.unwrap().tokens();
+            let session =
+                services.sessions.login("ada@example.com", OLD, None).await.unwrap().tokens();
             services.resets.request("ada@example.com", Language::En).await.unwrap();
             let token = last_token(&services);
 
@@ -284,8 +296,8 @@ mod tests {
             let again = services.resets.confirm(&token, NEW.to_owned()).await.unwrap_err();
             assert_eq!(again.kind(), ErrorKind::BadRequest);
             assert_eq!(again.code(), "auth.invalid_reset_token");
-            assert!(services.sessions.login("ada@example.com", OLD).await.is_err());
-            let login = services.sessions.login("ada@example.com", NEW).await.unwrap();
+            assert!(services.sessions.login("ada@example.com", OLD, None).await.is_err());
+            let login = services.sessions.login("ada@example.com", NEW, None).await.unwrap();
             assert!(matches!(login, LoginOutcome::Tokens(_)));
             // Phiên cũ đã bị huỷ.
             assert!(services.sessions.refresh(&session.refresh_token).await.is_err());

@@ -7,7 +7,9 @@
 
 x-autoxide: &autoxide
   build: .
-  image: autoxide:local
+  # Dùng image đã phát hành thay vì tự build: đặt AUTOXIDE_IMAGE (vd
+  # ghcr.io/<owner>/autoxide:0.1) rồi chạy `docker compose up -d --no-build`.
+  image: ${AUTOXIDE_IMAGE:-autoxide:local}
   environment:
     DATABASE_URL: postgres://autoxide:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/autoxide
     AUTOXIDE_AUTH_TOKEN_SECRET: ${AUTOXIDE_AUTH_TOKEN_SECRET:?set AUTOXIDE_AUTH_TOKEN_SECRET in .env}

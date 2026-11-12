@@ -278,6 +278,9 @@ async fn run_job(
     match &outcome {
         Ok(()) => {
             update.value(Alias::new("completed_at"), now);
+            // Xong rồi thì không cần dữ liệu nữa: xoá đi, để link chứa token (đặt lại mật
+            // khẩu, xác minh email…) không nằm lại trong bảng job thêm nhiều ngày (D-079).
+            update.value(Alias::new("payload"), "null");
             metrics::counter!("jobs_completed_total").increment(1);
         }
         Err(error) => {

@@ -41,6 +41,13 @@ chmod 600 .env
 docker compose up -d --build
 ```
 
+Or skip building and use a released image (see the project's GitHub releases):
+
+```bash
+echo 'AUTOXIDE_IMAGE=ghcr.io/<owner>/autoxide:0.1' >> .env
+docker compose up -d --no-build
+```
+
 Compose starts PostgreSQL, applies every migration once (the `migrate` service), then
 starts the server on `127.0.0.1:8080`. Check it:
 

@@ -125,7 +125,7 @@ mod tests {
             services.users.create(Actor::system(), input).await.unwrap();
             let old = match services
                 .sessions
-                .login("ada@example.com", "correct horse battery staple")
+                .login("ada@example.com", "correct horse battery staple", None)
                 .await
                 .unwrap()
             {
@@ -134,16 +134,16 @@ mod tests {
             };
             services
                 .sessions
-                .login("ada@example.com", "correct horse battery staple")
+                .login("ada@example.com", "correct horse battery staple", None)
                 .await
                 .unwrap();
-            services.sessions.login("bob@example.com", "wrong").await.unwrap_err();
-            services.sessions.login("eve@example.com", "wrong").await.unwrap_err();
+            services.sessions.login("bob@example.com", "wrong", None).await.unwrap_err();
+            services.sessions.login("eve@example.com", "wrong", None).await.unwrap_err();
             // Một token và một số đếm đã cũ.
             age(&database, "UPDATE auth_refresh_token SET expires_at = created_at").await;
             services
                 .sessions
-                .login("ada@example.com", "correct horse battery staple")
+                .login("ada@example.com", "correct horse battery staple", None)
                 .await
                 .unwrap();
             age(
@@ -151,7 +151,7 @@ mod tests {
                 "UPDATE auth_login_throttle SET window_started_at = '2000-01-01 00:00:00+00:00'",
             )
             .await;
-            services.sessions.login("bob@example.com", "wrong").await.unwrap_err();
+            services.sessions.login("bob@example.com", "wrong", None).await.unwrap_err();
             assert_eq!(count(&database, "auth_refresh_token").await, 3);
 
             let context = JobContext {

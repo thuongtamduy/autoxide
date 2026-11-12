@@ -61,7 +61,7 @@ pub struct PageQuery {
     pub cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc` (oldest first). Keep the same
     /// order while following `next_cursor`.
-    #[param(value_type = Option<Order>)]
+    #[param(value_type = Option<Order>, inline)]
     pub order: Option<String>,
 }
 

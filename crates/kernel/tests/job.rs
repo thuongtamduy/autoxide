@@ -125,6 +125,12 @@ async fn job_trong_transaction_bi_huy_thi_khong_ton_tai() {
         assert_eq!(runs[0].attempt, 1);
         let done = worker.list("reports", JobStatus::Completed, 10).await.unwrap();
         assert_eq!(done.len(), 1);
+        // Job xong thì dữ liệu của nó bị xoá (có thể chứa token).
+        let backend = database.read().get_database_backend();
+        let sql = "SELECT payload FROM reports_jobs";
+        let row = database.read().query_one_raw(Statement::from_string(backend, sql));
+        let payload: String = row.await.unwrap().unwrap().try_get("", "payload").unwrap();
+        assert_eq!(payload, "null");
     })
     .await
     .unwrap();

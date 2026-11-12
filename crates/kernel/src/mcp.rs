@@ -39,13 +39,16 @@ use crate::access::{Permission, Principal};
 use crate::error::{Error, FieldError};
 use crate::pagination::{PageQuery, PageRequest};
 
-/// Đầu vào của tool không nhận tham số nào.
+// Đầu vào của tool không nhận tham số nào.
+/// The tool takes no arguments.
 #[derive(Debug, Default, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NoInput {}
 
-/// Phân trang của tool liệt kê — cùng ý nghĩa với tham số `limit` / `cursor` / `order`
-/// của endpoint danh sách REST.
+// Phân trang của tool liệt kê — cùng ý nghĩa với tham số `limit` / `cursor` / `order`
+// của endpoint danh sách REST.
+/// Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of
+/// the REST list endpoints.
 #[derive(Debug, Default, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PageInput {
@@ -195,6 +198,10 @@ impl Tool {
                 self.name
             ));
         }
+        let described =
+            serde_json::json!({"description": self.description, "input": self.input_schema});
+        problems
+            .extend(crate::http::untranslated_text(&described, &format!("tool `{}`", self.name)));
         if self.input_schema.to_string().contains("\"$ref\"") {
             problems.push(format!(
                 "tool `{}`: the input type must not nest other schema types (MCP clients cannot \

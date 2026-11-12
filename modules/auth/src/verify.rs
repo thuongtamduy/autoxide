@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use autoxide_kernel::database::Database;
-use autoxide_kernel::error::Error;
+use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::mail::{MailTemplate, Mailer};
@@ -114,8 +114,12 @@ impl EmailVerifications {
         language: Language,
     ) -> Result<(), Error> {
         let email = user::normalize_email(new_email);
-        if let Some(problem) = user::check_email_field("new_email", &email) {
-            return Err(Error::validation(vec![problem]));
+        let problems: Vec<FieldError> = user::check_email_field("new_email", &email)
+            .into_iter()
+            .chain(FieldError::blank("current_password", current_password))
+            .collect();
+        if !problems.is_empty() {
+            return Err(Error::validation(problems));
         }
         let user = self.sessions.check_password(user_id, current_password).await?;
         if email == user.email && user.email_verified_at.is_some() {
@@ -375,8 +379,8 @@ mod tests {
             let changed = verifications.confirm(&token).await.unwrap();
             assert_eq!(changed.email, "ada@new.example");
             assert!(changed.email_verified_at.is_some());
-            services.sessions.login("ada@new.example", PASSWORD).await.unwrap();
-            assert!(services.sessions.login("ada@example.com", PASSWORD).await.is_err());
+            services.sessions.login("ada@new.example", PASSWORD, None).await.unwrap();
+            assert!(services.sessions.login("ada@example.com", PASSWORD, None).await.is_err());
             // Token cũ (cho địa chỉ cũ) hết dùng được: không quay email về được.
             let stale = verifications.confirm(&old_token).await.unwrap_err();
             assert_eq!(stale.code(), "auth.invalid_verification_token");

@@ -17,7 +17,7 @@ nghiệp vụ cắm vào sau. Core xong khi mọi bước trong lộ trình xanh
 trên cả hai database.
 
 Autoxide là nền cho một **sản phẩm mới**, **mã nguồn mở**, ai cũng dùng được, không
-gắn với một công ty hay một ngành. Module đầu tiên là `content` (nội dung, D-078, D-080); core vẫn trung lập với nghiệp vụ.
+gắn với một công ty hay một ngành. Module đầu tiên là `content` (nội dung, D-085, D-087); core vẫn trung lập với nghiệp vụ.
 
 ## Tóm tắt
 
@@ -66,7 +66,7 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | Việc               | Thư viện          | Phiên bản | Ghi chú                                         |
 | ------------------ | ----------------- | --------- | ----------------------------------------------- |
 | Hash mật khẩu       | `argon2`          | 0.6       | Argon2id                                        |
-| Access token       | JWT HS256 tự viết trên `hmac` + `sha2` + `base64` | 0.13 / 0.11 / 0.22 | Sống ngắn; refresh token rotation lưu database. Không dùng `jsonwebtoken` (D-045) |
+| Access token       | JWT HS256 tự viết trên `hmac` + `sha2` + `base64` | 0.13 / 0.11 / 0.23 | Sống ngắn; refresh token rotation lưu database. Không dùng `jsonwebtoken` (D-045) |
 | Số ngẫu nhiên      | `getrandom`       | 0.4       | Refresh token, khoá ký tạm thời                 |
 | MFA                | `totp-rs`         | 6.0       | TOTP + recovery code                             |
 | Passkey            | `webauthn_rp`     | 0.3       | WebAuthn phía máy chủ, thuần Rust (RustCrypto: p256, p384, ed25519, rsa — chỉ kiểm chữ ký bằng khoá công khai), không OpenSSL. Test dùng `p256` làm authenticator phần mềm (D-077) |
@@ -84,6 +84,8 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | Idempotency    | Tự viết: key do client gửi, lưu kết quả lệnh ghi để gửi lại không tạo trùng |
 | MCP endpoint   | `rmcp` 3.9 (SDK chính thức của Model Context Protocol) — module khai báo tool, gắn permission |
 | Email          | `lettre` 0.11 (rustls + ring, không native-tls) — SMTP sau trait `Mailer` của kernel, gửi qua job queue; chưa cấu hình SMTP thì ghi file `.eml` (D-061) |
+| Webhook        | Module `webhooks`: chữ ký theo chuẩn Standard Webhooks (`hmac` + `sha2` + `base64` sẵn có), gửi bằng `reqwest` 0.13 sẵn có qua job queue; không thêm thư viện (D-081) |
+| Dữ liệu cá nhân | Tự viết: trait `PersonalData` của kernel để xuất, event `auth.user_deleted` để mọi module xoá (D-080) |
 
 ### Observability
 

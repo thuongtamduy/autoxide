@@ -11,11 +11,15 @@
 
 use std::collections::BTreeSet;
 
+use serde_json::json;
 use utoipa::ToSchema;
-use utoipa::openapi::path::{Operation, PathItem};
+use utoipa::openapi::header::HeaderBuilder;
+use utoipa::openapi::path::{Operation, Parameter, ParameterBuilder, ParameterIn, PathItem};
+use utoipa::openapi::schema::{ObjectBuilder, Type};
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::openapi::server::ServerBuilder;
 use utoipa::openapi::{
-    ContentBuilder, InfoBuilder, OpenApi, OpenApiBuilder, Ref, RefOr, ResponseBuilder,
+    ContentBuilder, InfoBuilder, OpenApi, OpenApiBuilder, Ref, RefOr, Required, ResponseBuilder,
 };
 
 use crate::response::{PROBLEM_CONTENT_TYPE, Problem};
@@ -37,9 +41,11 @@ REST API of Autoxide.
 Every endpoint follows the same rules, so learning one endpoint teaches all of them.
 
 - **Success**: a single result is `{\"data\": …}`; a list is \
-`{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`.
+`{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`. Creating a record answers \
+`201` with a `Location` header pointing to it.
 - **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the \
-stable `code` field, never on `detail`. Validation problems list every invalid field in `errors`.
+stable `code` field, never on `detail`. Validation problems list every invalid field of the \
+request in `errors`, all at once.
 - **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and \
 `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.
 - **Authentication**: endpoints that need it list the `bearer` security scheme. Send \
@@ -49,6 +55,10 @@ its `code` says whether the token is missing, invalid or expired.
 `DELETE`. Repeating the same request with the same key within 24 hours returns the first result \
 (marked `Idempotent-Replayed: true`) instead of doing it twice; a different request with a used \
 key gets `422`, and a repeat while the first is still running gets `409`.
+- **Concurrent edits**: reading a single record returns its version in `ETag`. Send it back \
+in `If-Match` when changing the record: if someone changed it in between, the answer is `412` \
+(code `precondition_failed`) instead of silently overwriting their change. Without `If-Match` \
+the change is made anyway.
 - **Deprecation**: an endpoint being retired is marked `deprecated` here and answers with \
 `Deprecation` (RFC 9745), `Sunset` (RFC 8594, the removal date) and `Link: <…>; \
 rel=\"successor-version\"` headers. Move to the successor before the sunset date.
@@ -72,6 +82,15 @@ pub(super) fn base_document() -> OpenApi {
                 .description(Some(DESCRIPTION))
                 .build(),
         )
+        // Địa chỉ tương đối: tài liệu được phục vụ từ chính máy chủ (`/api/v1/openapi.json`)
+        // nên `/` là máy chủ đó; bản trong repo không biết tên miền của người triển khai.
+        .servers(Some([ServerBuilder::new()
+            .url("/")
+            .description(Some(
+                "The server that serves this document. When generating a client from a saved \
+                 copy, use your deployment's address instead, e.g. `https://api.example.com`.",
+            ))
+            .build()]))
         .build()
 }
 
@@ -91,7 +110,10 @@ pub(super) fn label_module(module: &str, openapi: &mut OpenApi) {
 }
 
 /// Hoàn thiện tài liệu chung sau khi đã ghép mọi module.
-pub(super) fn finish(openapi: &mut OpenApi) {
+/// Hoàn tất tài liệu: schema `Problem`, cách xác thực, response lỗi mặc định, và các
+/// header chung khai trên từng operation (để SDK sinh tự động có sẵn tham số).
+/// `idempotency`: có nơi lưu idempotency key (header `Idempotency-Key` có tác dụng).
+pub(super) fn finish(openapi: &mut OpenApi, idempotency: bool) {
     // Schema `Problem` (và các schema nó dùng) phải có mặt để `$ref` bên dưới trỏ tới.
     let mut schemas =
         vec![(Problem::name().into_owned(), <Problem as utoipa::PartialSchema>::schema())];
@@ -130,6 +152,32 @@ pub(super) fn finish(openapi: &mut OpenApi) {
                 .responses
                 .entry("default".to_owned())
                 .or_insert_with(|| RefOr::T(problem.clone()));
+        }
+    }
+    for item in openapi.paths.paths.values_mut() {
+        for (method, operation) in operations_mut(item) {
+            // Mọi response 201 đến từ `response::Created`, luôn có `Location`.
+            if let Some(RefOr::T(created)) = operation.responses.responses.get_mut("201") {
+                created.headers.entry("Location".to_owned()).or_insert_with(|| {
+                    RefOr::T(
+                        HeaderBuilder::new()
+                            .schema(Some(ObjectBuilder::new().schema_type(Type::String)))
+                            .description(Some(
+                                "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                            ))
+                            .build(),
+                    )
+                });
+            }
+            let parameters = operation.parameters.get_or_insert_default();
+            parameters.push(RefOr::T(accept_language()));
+            // Lớp idempotency chỉ lưu lệnh ghi của người đã đăng nhập.
+            let writes = matches!(method, "post" | "put" | "patch" | "delete");
+            let signed_in =
+                operation.security.as_ref().is_some_and(|security| !security.is_empty());
+            if idempotency && writes && signed_in {
+                parameters.push(RefOr::T(idempotency_key()));
+            }
         }
     }
 }
@@ -173,7 +221,129 @@ pub fn lint(openapi: &OpenApi) -> Vec<String> {
             }
         }
     }
+    match serde_json::to_value(openapi) {
+        Ok(document) => {
+            problems.extend(dangling_refs(&document));
+            problems.extend(untranslated_text(&document, "OpenAPI"));
+        }
+        Err(error) => problems.push(format!("the document cannot be serialized: {error}")),
+    }
     problems
+}
+
+/// Mọi `$ref` phải trỏ tới một mục có thật trong chính tài liệu: thiếu một mục là tài
+/// liệu không hợp lệ — trình kiểm chuẩn và công cụ sinh SDK từ chối cả file.
+fn dangling_refs(document: &serde_json::Value) -> Vec<String> {
+    let mut refs = BTreeSet::new();
+    collect_refs(document, &mut refs);
+    refs.into_iter()
+        .filter(|reference| {
+            let target = reference
+                .strip_prefix("#/")
+                .map(|path| path.split('/').try_fold(document, |node, key| node.get(key)));
+            !matches!(target, Some(Some(_)))
+        })
+        .map(|reference| {
+            format!(
+                "`$ref` `{reference}` points to nothing in the document — the type is used but \
+                 not registered (derive `ToSchema` and list it, or mark the field `inline`)"
+            )
+        })
+        .collect()
+}
+
+fn collect_refs(node: &serde_json::Value, refs: &mut BTreeSet<String>) {
+    match node {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                match value {
+                    serde_json::Value::String(reference) if key == "$ref" => {
+                        refs.insert(reference.clone());
+                    }
+                    _ => collect_refs(value, refs),
+                }
+            }
+        }
+        serde_json::Value::Array(items) => items.iter().for_each(|item| collect_refs(item, refs)),
+        _ => {}
+    }
+}
+
+/// Mô tả gửi ra ngoài (OpenAPI, tool MCP) phải là tiếng Anh: `///` trên kiểu có
+/// `ToSchema` / `IntoParams` được chép thẳng vào đó. Báo mọi `summary` / `description`
+/// có chữ tiếng Việt; `what` là tên tài liệu trong thông báo.
+pub(crate) fn untranslated_text(document: &serde_json::Value, what: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    collect_untranslated(document, what, &mut problems);
+    problems
+}
+
+fn collect_untranslated(node: &serde_json::Value, what: &str, problems: &mut Vec<String>) {
+    match node {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                match value {
+                    serde_json::Value::String(text)
+                        if matches!(key.as_str(), "summary" | "description" | "title")
+                            && looks_vietnamese(text) =>
+                    {
+                        problems.push(format!(
+                            "{what}: `{text}` is not English — `///` comments on handlers and on \
+                             types with `ToSchema`/`IntoParams` are published; write them in \
+                             English and keep notes for readers of the code in `//` comments"
+                        ));
+                    }
+                    _ => collect_untranslated(value, what, problems),
+                }
+            }
+        }
+        serde_json::Value::Array(items) => {
+            items.iter().for_each(|item| collect_untranslated(item, what, problems));
+        }
+        _ => {}
+    }
+}
+
+/// Có chữ cái riêng của tiếng Việt (ă â đ ê ô ơ ư, hoặc nguyên âm mang dấu thanh).
+pub(crate) fn looks_vietnamese(text: &str) -> bool {
+    text.chars().any(|c| {
+        matches!(c, 'ă' | 'Ă' | 'đ' | 'Đ' | 'ơ' | 'Ơ' | 'ư' | 'Ư')
+            || ('\u{1EA0}'..='\u{1EF9}').contains(&c)
+    })
+}
+
+/// Header `Accept-Language`, có ở mọi operation.
+fn accept_language() -> Parameter {
+    ParameterBuilder::new()
+        .name("Accept-Language")
+        .parameter_in(ParameterIn::Header)
+        .required(Required::False)
+        .description(Some(
+            "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change \
+             with the language.",
+        ))
+        .schema(Some(ObjectBuilder::new().schema_type(Type::String).examples([json!("vi")])))
+        .build()
+}
+
+/// Header `Idempotency-Key`, có ở mọi lệnh ghi cần đăng nhập.
+fn idempotency_key() -> Parameter {
+    ParameterBuilder::new()
+        .name("Idempotency-Key")
+        .parameter_in(ParameterIn::Header)
+        .required(Required::False)
+        .description(Some(
+            "A random UUID that makes this request safe to retry: a repeat with the same key \
+             within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead \
+             of doing it twice.",
+        ))
+        .schema(Some(
+            ObjectBuilder::new()
+                .schema_type(Type::String)
+                .max_length(Some(255))
+                .examples([json!("0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11")]),
+        ))
+        .build()
 }
 
 /// Các operation của một đường dẫn, kèm tên method.
@@ -205,4 +375,37 @@ fn operations_mut(item: &mut PathItem) -> impl Iterator<Item = (&'static str, &m
     ]
     .into_iter()
     .filter_map(|(method, operation)| operation.as_mut().map(|operation| (method, operation)))
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn bat_ref_tro_vao_khoang_khong() {
+        let document = json!({
+            "paths": {"/x": {"get": {"parameters": [
+                {"schema": {"$ref": "#/components/schemas/Order"}},
+                {"schema": {"$ref": "#/components/schemas/Page"}},
+            ]}}},
+            "components": {"schemas": {"Page": {"type": "object"}}},
+        });
+        let problems = dangling_refs(&document);
+        assert_eq!(problems.len(), 1);
+        assert!(problems[0].contains("#/components/schemas/Order"), "{problems:?}");
+    }
+
+    #[test]
+    fn bat_mo_ta_tieng_viet() {
+        let document = json!({"description": "Đầu vào của tool", "properties": {
+            "a": {"description": "Maximum number of items, café"},
+            "b": {"title": "Tên người dùng"},
+            "description": {"type": "string"},
+        }});
+        let problems = untranslated_text(&document, "tool `x`");
+        assert_eq!(problems.len(), 2, "{problems:?}");
+        assert!(!looks_vietnamese("Resume naïve café über"));
+    }
 }

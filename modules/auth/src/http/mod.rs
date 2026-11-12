@@ -1,13 +1,15 @@
 //! Endpoint REST của module `auth`, dưới `/api/v1/auth`. Handler chỉ lấy dữ liệu
 //! vào, gọi service và trả envelope; mọi logic nằm ở service.
 
-mod api_keys;
+mod account;
+pub(crate) mod api_keys;
 mod email;
 mod mfa;
 mod passkeys;
 mod reset;
 pub(crate) mod roles;
 pub(crate) mod session;
+mod sessions;
 pub(crate) mod users;
 
 use std::sync::Arc;
@@ -33,12 +35,15 @@ pub(crate) struct HttpState {
     pub resets: Arc<PasswordResets>,
     pub verifications: Arc<EmailVerifications>,
     pub passkeys: Arc<crate::passkey::PasskeyService>,
+    /// Dữ liệu cá nhân của mọi module, cho `GET /me/export`.
+    pub personal_data: autoxide_kernel::privacy::PersonalDataExport,
     /// Cho người lạ tự đăng ký (`POST /register`).
     pub self_registration: bool,
 }
 
 pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
     session::routes()
+        .merge(account::routes())
         .merge(roles::routes())
         .merge(users::routes())
         .merge(api_keys::routes())
@@ -46,6 +51,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(reset::routes())
         .merge(email::routes())
         .merge(passkeys::routes())
+        .merge(sessions::routes())
         .with_state(Arc::new(state))
 }
 
@@ -62,6 +68,11 @@ fn require_session(
         ));
     }
     Ok(())
+}
+
+/// Header `User-Agent` của request, để người dùng nhận ra thiết bị trong danh sách phiên.
+pub(super) fn user_agent(headers: &axum::http::HeaderMap) -> Option<&str> {
+    headers.get(axum::http::header::USER_AGENT).and_then(|value| value.to_str().ok())
 }
 
 #[cfg(test)]
@@ -132,6 +143,7 @@ pub(crate) mod test_support {
             resets: services.resets.clone(),
             verifications: services.verifications.clone(),
             passkeys: services.passkeys.clone(),
+            personal_data: services.personal_data.clone(),
             self_registration,
         };
         let router = autoxide_kernel::http::build(
@@ -161,9 +173,24 @@ pub(crate) mod test_support {
         authorization: Option<&str>,
         body: Option<Value>,
     ) -> (StatusCode, HeaderMap, Value) {
+        let headers: Vec<_> = authorization
+            .map(|value| (header::AUTHORIZATION.as_str(), value))
+            .into_iter()
+            .collect();
+        call_with(app, method, path, &headers, body).await
+    }
+
+    /// Như [`call`], với các header tuỳ ý.
+    pub async fn call_with(
+        app: &Router,
+        method: &str,
+        path: &str,
+        headers: &[(&str, &str)],
+        body: Option<Value>,
+    ) -> (StatusCode, HeaderMap, Value) {
         let mut request = Request::builder().method(method).uri(format!("/api/v1/auth{path}"));
-        if let Some(authorization) = authorization {
-            request = request.header(header::AUTHORIZATION, authorization);
+        for (name, value) in headers {
+            request = request.header(*name, *value);
         }
         let request = match body {
             Some(body) => request

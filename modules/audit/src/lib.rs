@@ -11,6 +11,7 @@ mod http;
 mod migration;
 mod recorder;
 mod service;
+mod tools;
 
 use std::sync::Arc;
 
@@ -61,6 +62,10 @@ impl Module for AuditModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    }
+
+    fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {
+        self.service.as_ref().map_or_else(Vec::new, tools::all)
     }
 
     fn subscriptions(&self) -> Vec<Subscription> {
