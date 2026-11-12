@@ -48,6 +48,7 @@ autoxide-media = { path = "modules/media" }
 autoxide-content = { path = "modules/content" }
 autoxide-forms = { path = "modules/forms" }
 autoxide-newsletter = { path = "modules/newsletter" }
+autoxide-comments = { path = "modules/comments" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }

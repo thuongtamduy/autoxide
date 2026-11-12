@@ -1,0 +1,36 @@
+[package]
+name = "autoxide-comments"
+description = "Autoxide comments: two-level comment threads on any target, for signed-in users and guests, behind the shared anti-spam guard, with moderation, reports, bans, an edit window, soft delete, counts and opt-in reply mails."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+autoxide-kernel.workspace = true
+axum.workspace = true
+chrono.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
+validator.workspace = true
+
+[dev-dependencies]
+autoxide-testkit.workspace = true
+# MCP client thật cho test tool của module.
+rmcp = { workspace = true, features = [
+  "client",
+  "transport-streamable-http-client-reqwest",
+  "reqwest-tls-no-provider",
+] }
+tokio.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true

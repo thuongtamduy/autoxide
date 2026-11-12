@@ -5151,6 +5151,2907 @@
         ]
       }
     },
+    "/api/v1/comments": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "List comments for moderation.",
+        "description": "Requires `comments.read`. By default the comments waiting for approval, newest first; filter\nby status, target and text. Follow `pagination.next_cursor` with the same filters for more.",
+        "operationId": "comments_list_comments",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "`pending` (the default: the moderation queue), `published`, `rejected`, `spam` or\n`deleted`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Where a comment stands.",
+              "enum": [
+                "pending",
+                "published",
+                "rejected",
+                "spam",
+                "deleted"
+              ]
+            }
+          },
+          {
+            "name": "target_type",
+            "in": "query",
+            "description": "Only comments on targets of this kind.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "description": "Only comments on this target (with `target_type`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only comments whose text or author name contains this, ignoring case and accents.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of comments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CommentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/bans": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "List bans.",
+        "description": "Requires `comments.manage`. Newest first.",
+        "operationId": "comments_list_comment_bans",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "`user`, `email` or `ip`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "description": "`true`: only bans still in force.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of bans.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CommentBan"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Ban someone from commenting.",
+        "description": "Requires `comments.manage`. Their new comments (and changes) are refused with\n`comments.banned` until `until`. Recorded as `comments.ban_created` (without the value).",
+        "operationId": "comments_create_comment_ban",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Banned.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentBan"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/bans/{id}": {
+      "delete": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Lift a ban.",
+        "description": "Requires `comments.manage`. Recorded as `comments.ban_deleted`.",
+        "operationId": "comments_delete_comment_ban",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the ban.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Lifted."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No ban has this id; code `comments.ban_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/data": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Export the data of an email address.",
+        "description": "Requires `comments.export`. For a request of the person the data is about: every comment\nwritten with this address, the comments it follows, and bans of it.",
+        "operationId": "comments_export_comments_email_data",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "description": "The email address of the person (any case).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "ada@example.com"
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentsEmailData"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.export`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`email` is missing or not an email address; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Erase the data of an email address.",
+        "description": "Requires `comments.export`. Every comment written with this address loses its text, name,\nemail and network fingerprint (its place in the thread stays), and reply mails to it stop.\nBans of the address are kept. Recorded as `comments.comments_erased`, without the address.",
+        "operationId": "comments_erase_comments_email_data",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "description": "The email address of the person (any case).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "ada@example.com"
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How many comments were cleared.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentsErasedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.export`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`email` is missing or not an email address; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/profile": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Get one's display name.",
+        "description": "Requires `comments.post`. The name shown on one's comments; `null` until chosen.",
+        "operationId": "comments_get_comment_profile",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.post`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Set one's display name.",
+        "description": "Requires `comments.post`. Needed before commenting while signed in; shown on all one's\ncomments, also the earlier ones.",
+        "operationId": "comments_set_comment_profile",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.post`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another user shows this name; code `comments.name_taken`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid or reserved name; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/public/comments": {
+      "post": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Post a comment (public).",
+        "description": "Guests need no sign-in (unless the server or the target kind asks for it); signed-in users\nneed `comments.post` and a display name (`PUT /api/v1/comments/profile`). Checks run in a\nfixed order: target open, length, content, duplicate, bans, banned words (refused) and\nsuspect words or too many links (held), anti-spam, approval mode. Every input problem is\nreported at once. The answer says `published` or `pending` (waiting for approval — held\nor dropped comments look the same). Guests get an `edit_token`, shown only here. Sending the\nsame `form_token` again returns the same comment (with a new `edit_token`).",
+        "operationId": "comments_create_comment",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Received.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PostedComment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The form token or challenge is missing, invalid or expired (codes `antispam.token_missing`, `antispam.token_invalid`, `antispam.token_expired`, `antispam.challenge_required`, `antispam.challenge_failed`): reload the form.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Comments are off (`comments.disabled`), guests may not comment here (`comments.guests_not_allowed`), the author is banned (`comments.banned`), or a signed-in caller lacks `comments.post` (`permission_denied`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The target takes no comments (`comments.target_not_found`), or the comment to reply to is not shown (`comments.parent_not_found`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The target is closed (`comments.target_closed`), or a signed-in user has no display name yet (`comments.profile_required`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The body is too large; code `payload_too_large`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input (see `errors`), or a banned word (`comments.banned_word`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "A signed-in user posted too many; code `antispam.rate_limited`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The anti-spam check cannot run; code `antispam.verifier_unavailable`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/public/comments/{id}": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Get a comment (public).",
+        "description": "No sign-in needed. Only shown comments (and deleted top-level comments that still have\nreplies).",
+        "operationId": "comments_get_public_comment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the comment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The comment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PublicComment"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No shown comment has this id; code `comments.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Change one's comment (public).",
+        "description": "The author only — signed in as the same user (with `comments.post`), or a guest sending\n`edit_token` — within `edit_minutes` of posting. The text is checked again; a shown comment\nthat now has suspect words or too many links waits for approval again.",
+        "operationId": "comments_edit_comment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the comment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditCommentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The comment after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PublicComment"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not the author (`comments.not_author`), or banned (`comments.banned`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No comment has this id; code `comments.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Too late (`comments.edit_window_passed`), the comment was rejected or deleted (`comments.not_editable`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "A moderator changed it at the same time; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid text (see `errors`), or a banned word (`comments.banned_word`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/public/comments/{id}/delete": {
+      "post": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Delete one's comment (public).",
+        "description": "The author only (signed in as the same user, or a guest sending `edit_token`), at any time.\nThe text, name and email are removed; the comment keeps its place in the thread so replies\nstay. A body is used (not `DELETE`) because the token must not travel in the address.",
+        "operationId": "comments_delete_own_comment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the comment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteOwnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Deleted (also when it already was).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentDeleted"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not the author; code `comments.not_author`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No comment has this id; code `comments.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "A moderator changed it at the same time; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/public/comments/{id}/replies": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "List the replies of a comment (public).",
+        "description": "No sign-in needed. Shown replies of the thread the comment starts, oldest first\n(`order=desc`: newest first). Follow `pagination.next_cursor` for more.",
+        "operationId": "comments_list_comment_replies",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the top-level comment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of replies.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PublicComment"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No shown comment has this id; code `comments.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/public/comments/{id}/reports": {
+      "post": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Report a comment (public).",
+        "description": "No sign-in needed. One report per person per comment (signed-in user, or network block for\nguests); reporting again answers the same. When `AUTOXIDE_COMMENTS_REPORT_THRESHOLD`\nreports are reached the comment waits for a moderator again (once).",
+        "operationId": "comments_report_comment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the comment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Received.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentReported"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No shown comment has this id; code `comments.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/public/counts": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Count the comments of many targets (public).",
+        "description": "No sign-in needed. Shown comments of up to 100 targets of one kind, in the order asked;\nunknown targets count 0.",
+        "operationId": "comments_count_comments",
+        "parameters": [
+          {
+            "name": "target_type",
+            "in": "query",
+            "description": "Kind of the targets, e.g. `content.entry`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "content.entry"
+          },
+          {
+            "name": "target_ids",
+            "in": "query",
+            "description": "1 to 100 target ids, separated by commas.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The counts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CommentCount"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "This kind of target takes no comments; code `comments.target_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A parameter is missing or invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/public/settings": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Get the comment settings (public).",
+        "description": "No sign-in needed. Limits and switches a website needs to show the comment box.",
+        "operationId": "comments_get_comment_settings",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/public/targets/{target_type}/{target_id}": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Get the comment state of a target (public).",
+        "description": "No sign-in needed. Whether it takes comments now, when it closes, how many are shown.",
+        "operationId": "comments_get_public_comment_target",
+        "parameters": [
+          {
+            "name": "target_type",
+            "in": "path",
+            "description": "Kind of the target, e.g. `content.entry`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "target_id",
+            "in": "path",
+            "description": "Id of the target in its module.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentTarget"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "This kind of target takes no comments; code `comments.target_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/public/threads": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "List the comments of a target (public).",
+        "description": "No sign-in needed. Shown top-level comments, newest first (`order=asc`: oldest first), each\nwith its first replies (oldest first) and `reply_count`. A top-level comment deleted by its\nauthor stays (with `deleted: true`, no text) while it has replies. Follow\n`pagination.next_cursor` with the same parameters for more.",
+        "operationId": "comments_list_comment_thread",
+        "parameters": [
+          {
+            "name": "target_type",
+            "in": "query",
+            "description": "Kind of the target, e.g. `content.entry`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "content.entry"
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "description": "Id of the target in its module.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "replies_limit",
+            "in": "query",
+            "description": "Replies to include with each top-level comment, 0 to 10. Defaults to 3.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 10,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of top-level comments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ThreadComment"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "This kind of target takes no comments; code `comments.target_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A parameter is missing or invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/public/unsubscribe": {
+      "post": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Stop reply mails (public).",
+        "description": "The page at `AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL` sends the token of the link in a reply mail\nhere. Takes effect at once.",
+        "operationId": "comments_unsubscribe_comment_replies",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnsubscribeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentsUnsubscribed"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/public/verify": {
+      "post": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Confirm an address for reply mails (public).",
+        "description": "The page at `AUTOXIDE_COMMENTS_VERIFY_URL` sends the token of the mail link here (a `POST`,\nso mail scanners opening the link change nothing). From then on, the address gets a mail\nwhen that comment receives a shown reply.",
+        "operationId": "comments_verify_comment_email",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentMailToken"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Confirmed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_VerifiedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The link is invalid, expired or used; code `comments.link_invalid`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/targets/{target_type}/{target_id}": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Get the comment state of a target, with its pending count.",
+        "description": "Requires `comments.read`.",
+        "operationId": "comments_get_comment_target",
+        "parameters": [
+          {
+            "name": "target_type",
+            "in": "path",
+            "description": "Kind of the target, e.g. `content.entry`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "target_id",
+            "in": "path",
+            "description": "Id of the target in its module.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The state.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version (when the target has a row); send it in `If-Match` to change it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentTarget"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "This kind of target takes no comments; code `comments.target_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Open, close or hide the comments of a target.",
+        "description": "Requires `comments.manage`. `If-Match` is optional (send the `ETag` you read to make sure\nnobody changed it since). Recorded as `comments.target_opened` / `comments.target_closed`.",
+        "operationId": "comments_set_comment_target",
+        "parameters": [
+          {
+            "name": "target_type",
+            "in": "path",
+            "description": "Kind of the target, e.g. `content.entry`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "target_id",
+            "in": "path",
+            "description": "Id of the target in its module.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Optional: the `ETag` you read.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The state after the change.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "New version."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentTarget"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "This kind of target takes no comments; code `comments.target_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The target changed since you read it; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/{id}": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Get a comment with its moderation details.",
+        "description": "Requires `comments.read`. Any status; includes the author's email and network fingerprint.",
+        "operationId": "comments_get_comment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the comment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The comment.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version; send it in `If-Match` to change the status."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No comment has this id; code `comments.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Delete a comment for good.",
+        "description": "Requires `comments.moderate`. Deleting a top-level comment deletes its whole thread. Use it\nfor takedown requests; the decision is recorded (`comments.comment_deleted`, `hard: true`).",
+        "operationId": "comments_delete_comment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the comment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How many comments were deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentsPurged"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.moderate`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No comment has this id; code `comments.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Approve, reject, mark as spam or hold a comment.",
+        "description": "Requires `comments.moderate`. `If-Match` is required. Approving sends reply mails to people\nfollowing the comment answered (`comments.comment_published`). Every decision is recorded\n(`comments.comment_status_changed`, in the audit log).",
+        "operationId": "comments_update_comment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the comment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` you read (or `*`).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCommentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The comment after the change.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "New version."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CommentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.moderate`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No comment has this id; code `comments.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The author deleted it; code `comments.deleted`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The comment changed since you read it; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The status is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/comments/{id}/reports": {
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "List the reports of a comment.",
+        "description": "Requires `comments.read`. Newest first.",
+        "operationId": "comments_list_comment_reports",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the comment.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of reports.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CommentReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `comments.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No comment has this id; code `comments.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/content/authors": {
       "get": {
         "tags": [
@@ -20861,6 +23762,38 @@
           }
         }
       },
+      "BanRequest": {
+        "type": "object",
+        "description": "A new ban.",
+        "required": [
+          "kind",
+          "value",
+          "reason"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "`user` (an account), `email` (an address) or `ip` (a network fingerprint)."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why (required, 1 to 500 characters; for the records)."
+          },
+          "until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it ends; omit for ever."
+          },
+          "value": {
+            "type": "string",
+            "description": "The user id, the email address, or the `ip_fingerprint` shown on a comment."
+          }
+        },
+        "additionalProperties": false
+      },
       "BodyMark": {
         "type": "object",
         "description": "A mark of a `text` node: `bold`, `italic`, `underline`, `strike`, `code`, or `link`\n(`attrs.href`: `http://`, `https://`, `mailto:` or a path starting with `/`).",
@@ -21166,6 +24099,588 @@
           }
         }
       },
+      "CommentAuthor": {
+        "type": "object",
+        "description": "The author of a comment, as shown to everyone.",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/CommentAuthorKind"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`null` when the comment or the account was deleted."
+          }
+        }
+      },
+      "CommentAuthorKind": {
+        "type": "string",
+        "description": "Who wrote a comment.",
+        "enum": [
+          "user",
+          "guest"
+        ]
+      },
+      "CommentBan": {
+        "type": "object",
+        "description": "A ban.",
+        "required": [
+          "id",
+          "kind",
+          "value",
+          "reason",
+          "active",
+          "created_at"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "Still in force."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`user`, `email` or `ip`."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it ends; `null`: never."
+          },
+          "value": {
+            "type": "string",
+            "description": "User id, email address or `ip_fingerprint`."
+          }
+        }
+      },
+      "CommentCount": {
+        "type": "object",
+        "description": "The comment count of a target.",
+        "required": [
+          "target_id",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Shown comments (top-level and replies)."
+          },
+          "target_id": {
+            "type": "string"
+          }
+        }
+      },
+      "CommentDeleted": {
+        "type": "object",
+        "description": "The answer to a delete.",
+        "required": [
+          "deleted"
+        ],
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CommentDetail": {
+        "type": "object",
+        "description": "A comment with everything moderators see.",
+        "required": [
+          "id",
+          "target_type",
+          "target_id",
+          "root_id",
+          "status",
+          "author_kind",
+          "email_verified",
+          "body",
+          "body_html",
+          "reply_count",
+          "report_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "author_email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Address given for reply mails (lower case)."
+          },
+          "author_kind": {
+            "$ref": "#/components/schemas/CommentAuthorKind"
+          },
+          "author_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Guest name or the user's display name."
+          },
+          "body": {
+            "type": "string"
+          },
+          "body_html": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "edited_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "email_verified": {
+            "type": "boolean"
+          },
+          "hold_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it is held: `moderation`, `first_comment`, `reported`, `suspect_word`,\n`too_many_links`, or the anti-spam reasons (`too_fast`, `duplicate`, `classifier`…),\njoined by commas."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ip_fingerprint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Keyed hash of the author's network block (never the address itself); use it to ban;\ncleared after `AUTOXIDE_COMMENTS_IP_RETENTION_DAYS`."
+          },
+          "locale": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`en` or `vi`."
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "reply_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reply_to_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "report_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "root_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CommentStatus"
+          },
+          "target_id": {
+            "type": "string"
+          },
+          "target_type": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The account, for a signed-in author."
+          }
+        }
+      },
+      "CommentFollow": {
+        "type": "object",
+        "description": "A followed comment.",
+        "required": [
+          "comment_id",
+          "created_at"
+        ],
+        "properties": {
+          "comment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CommentMailToken": {
+        "type": "object",
+        "description": "A token from a mail link.",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The `token` of the link."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommentProfile": {
+        "type": "object",
+        "description": "The display name of a signed-in user.",
+        "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`null` until chosen."
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "CommentReport": {
+        "type": "object",
+        "description": "A report of a comment.",
+        "required": [
+          "id",
+          "comment_id",
+          "reason",
+          "created_at"
+        ],
+        "properties": {
+          "comment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "`spam`, `abuse`, `illegal` or `other`."
+          },
+          "reporter_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The reporting account, when signed in."
+          }
+        }
+      },
+      "CommentReportReason": {
+        "type": "string",
+        "description": "Why a comment is reported.",
+        "enum": [
+          "spam",
+          "abuse",
+          "illegal",
+          "other"
+        ]
+      },
+      "CommentReported": {
+        "type": "object",
+        "description": "The answer to a report.",
+        "required": [
+          "received"
+        ],
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "description": "Always `true`: reporting twice, or too often, answers the same."
+          }
+        }
+      },
+      "CommentSettings": {
+        "type": "object",
+        "description": "What a website needs to know to show the comment box.",
+        "required": [
+          "enabled",
+          "target_types",
+          "guests_allowed",
+          "signed_in_only_types",
+          "max_length",
+          "max_links",
+          "edit_minutes",
+          "reply_mails",
+          "token_scope"
+        ],
+        "properties": {
+          "edit_minutes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Minutes during which authors may change their comment (0: never).",
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "New comments are taken at all."
+          },
+          "guests_allowed": {
+            "type": "boolean",
+            "description": "Guests (no account) may comment."
+          },
+          "max_length": {
+            "type": "integer",
+            "description": "Longest comment, in characters.",
+            "minimum": 0
+          },
+          "max_links": {
+            "type": "integer",
+            "description": "More links than this hold a comment for approval.",
+            "minimum": 0
+          },
+          "reply_mails": {
+            "type": "boolean",
+            "description": "The server can mail people about replies (show the \"notify me\" box)."
+          },
+          "signed_in_only_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Kinds where only signed-in users may comment."
+          },
+          "target_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Kinds of targets that take comments."
+          },
+          "token_scope": {
+            "type": "string",
+            "description": "Ask `GET /api/v1/antispam/token?scope=comments:<target_type>` for a form token each\ntime the comment box is shown.",
+            "example": "comments:{target_type}"
+          }
+        }
+      },
+      "CommentStatus": {
+        "type": "string",
+        "description": "Where a comment stands.",
+        "enum": [
+          "pending",
+          "published",
+          "rejected",
+          "spam",
+          "deleted"
+        ]
+      },
+      "CommentTarget": {
+        "type": "object",
+        "description": "A target's comment state and counts.",
+        "required": [
+          "target_type",
+          "target_id",
+          "state",
+          "hidden",
+          "comment_count"
+        ],
+        "properties": {
+          "closes_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it closes by itself, if set."
+          },
+          "comment_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Shown comments (0 when hidden)."
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "The comments are hidden from everyone (e.g. the target was deleted)."
+          },
+          "pending_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Comments waiting for approval (`null` in the public answer)."
+          },
+          "state": {
+            "$ref": "#/components/schemas/CommentTargetState",
+            "description": "What applies now."
+          },
+          "target_id": {
+            "type": "string"
+          },
+          "target_type": {
+            "type": "string"
+          }
+        }
+      },
+      "CommentTargetState": {
+        "type": "string",
+        "description": "Whether a target takes comments.",
+        "enum": [
+          "open",
+          "closed"
+        ]
+      },
+      "CommentVisibility": {
+        "type": "string",
+        "description": "Whether a new comment is shown.",
+        "enum": [
+          "published",
+          "pending"
+        ]
+      },
+      "CommentsEmailData": {
+        "type": "object",
+        "description": "Everything the comments hold about one email address.",
+        "required": [
+          "email",
+          "comments",
+          "follows",
+          "bans"
+        ],
+        "properties": {
+          "bans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommentBan"
+            },
+            "description": "Bans of this address (kept after an erasure, so the ban still works)."
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommentDetail"
+            },
+            "description": "Every comment written with this address, oldest first, any status."
+          },
+          "email": {
+            "type": "string",
+            "description": "The address, as matched (lower case)."
+          },
+          "follows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommentFollow"
+            },
+            "description": "Comments whose replies are mailed to this address."
+          }
+        }
+      },
+      "CommentsErasedResponse": {
+        "type": "object",
+        "description": "The result of erasing an email address.",
+        "required": [
+          "cleared"
+        ],
+        "properties": {
+          "cleared": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Comments cleared.",
+            "minimum": 0
+          }
+        }
+      },
+      "CommentsPurged": {
+        "type": "object",
+        "description": "The answer to a delete for good.",
+        "required": [
+          "deleted"
+        ],
+        "properties": {
+          "deleted": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Comments deleted: the comment, and its replies when it starts a thread.",
+            "minimum": 0
+          }
+        }
+      },
+      "CommentsUnsubscribed": {
+        "type": "object",
+        "description": "The answer to an unsubscription.",
+        "required": [
+          "unsubscribed"
+        ],
+        "properties": {
+          "unsubscribed": {
+            "type": "boolean",
+            "description": "Always `true`, even for an unknown or used token (nothing is revealed)."
+          }
+        }
+      },
       "ConfirmBody": {
         "type": "object",
         "description": "The token of a confirmation link.",
@@ -21302,6 +24817,85 @@
           "subject": {
             "type": "string",
             "description": "1 to 200 characters, one line."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateCommentRequest": {
+        "type": "object",
+        "description": "A new comment.",
+        "required": [
+          "target_type",
+          "target_id",
+          "body"
+        ],
+        "properties": {
+          "author_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Guests: the name to show (required). Signed-in users show the name of their profile."
+          },
+          "body": {
+            "type": "string",
+            "description": "Plain text; line breaks are kept, `http(s)` addresses become links."
+          },
+          "challenge": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The value of the `altcha` widget, when the server uses a challenge."
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Address for reply mails (never shown). Required with `notify_replies`."
+          },
+          "form_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Token from `GET /api/v1/antispam/token?scope=comments:<target_type>`; needed unless\nsigned in."
+          },
+          "locale": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Language of the author: `en` or `vi` (for the mails)."
+          },
+          "notify_replies": {
+            "type": "boolean",
+            "description": "Mail me when someone replies (a confirmation mail is sent to `email` first)."
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Reply to this comment (a top-level comment or a reply in its thread); omit for a new\nthread."
+          },
+          "target_id": {
+            "type": "string",
+            "description": "Id of the target in its module."
+          },
+          "target_type": {
+            "type": "string",
+            "description": "Kind of the target, e.g. `content.entry`.",
+            "example": "content.entry"
+          },
+          "trap": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The hidden trap field: people leave it empty."
           }
         },
         "additionalProperties": false
@@ -21984,6 +25578,531 @@
               "options": {
                 "type": "object",
                 "description": "WebAuthn options as JSON: pass them to\n`PublicKeyCredential.parseCreationOptionsFromJSON()` (adding a passkey) or\n`PublicKeyCredential.parseRequestOptionsFromJSON()` (signing in), then to\n`navigator.credentials.create()` / `.get()`."
+              }
+            }
+          }
+        }
+      },
+      "Data_CommentBan": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A ban.",
+            "required": [
+              "id",
+              "kind",
+              "value",
+              "reason",
+              "active",
+              "created_at"
+            ],
+            "properties": {
+              "active": {
+                "type": "boolean",
+                "description": "Still in force."
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "created_by": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "kind": {
+                "type": "string",
+                "description": "`user`, `email` or `ip`."
+              },
+              "reason": {
+                "type": "string"
+              },
+              "until": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When it ends; `null`: never."
+              },
+              "value": {
+                "type": "string",
+                "description": "User id, email address or `ip_fingerprint`."
+              }
+            }
+          }
+        }
+      },
+      "Data_CommentDeleted": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The answer to a delete.",
+            "required": [
+              "deleted"
+            ],
+            "properties": {
+              "deleted": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "Data_CommentDetail": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A comment with everything moderators see.",
+            "required": [
+              "id",
+              "target_type",
+              "target_id",
+              "root_id",
+              "status",
+              "author_kind",
+              "email_verified",
+              "body",
+              "body_html",
+              "reply_count",
+              "report_count",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "author_email": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Address given for reply mails (lower case)."
+              },
+              "author_kind": {
+                "$ref": "#/components/schemas/CommentAuthorKind"
+              },
+              "author_name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Guest name or the user's display name."
+              },
+              "body": {
+                "type": "string"
+              },
+              "body_html": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "edited_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "email_verified": {
+                "type": "boolean"
+              },
+              "hold_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Why it is held: `moderation`, `first_comment`, `reported`, `suspect_word`,\n`too_many_links`, or the anti-spam reasons (`too_fast`, `duplicate`, `classifier`…),\njoined by commas."
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "ip_fingerprint": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Keyed hash of the author's network block (never the address itself); use it to ban;\ncleared after `AUTOXIDE_COMMENTS_IP_RETENTION_DAYS`."
+              },
+              "locale": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "`en` or `vi`."
+              },
+              "parent_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "published_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "reply_count": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "reply_to_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "report_count": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "root_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "$ref": "#/components/schemas/CommentStatus"
+              },
+              "target_id": {
+                "type": "string"
+              },
+              "target_type": {
+                "type": "string"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "user_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The account, for a signed-in author."
+              }
+            }
+          }
+        }
+      },
+      "Data_CommentProfile": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The display name of a signed-in user.",
+            "properties": {
+              "display_name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "`null` until chosen."
+              },
+              "updated_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      },
+      "Data_CommentReported": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The answer to a report.",
+            "required": [
+              "received"
+            ],
+            "properties": {
+              "received": {
+                "type": "boolean",
+                "description": "Always `true`: reporting twice, or too often, answers the same."
+              }
+            }
+          }
+        }
+      },
+      "Data_CommentSettings": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "What a website needs to know to show the comment box.",
+            "required": [
+              "enabled",
+              "target_types",
+              "guests_allowed",
+              "signed_in_only_types",
+              "max_length",
+              "max_links",
+              "edit_minutes",
+              "reply_mails",
+              "token_scope"
+            ],
+            "properties": {
+              "edit_minutes": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Minutes during which authors may change their comment (0: never).",
+                "minimum": 0
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "New comments are taken at all."
+              },
+              "guests_allowed": {
+                "type": "boolean",
+                "description": "Guests (no account) may comment."
+              },
+              "max_length": {
+                "type": "integer",
+                "description": "Longest comment, in characters.",
+                "minimum": 0
+              },
+              "max_links": {
+                "type": "integer",
+                "description": "More links than this hold a comment for approval.",
+                "minimum": 0
+              },
+              "reply_mails": {
+                "type": "boolean",
+                "description": "The server can mail people about replies (show the \"notify me\" box)."
+              },
+              "signed_in_only_types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Kinds where only signed-in users may comment."
+              },
+              "target_types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Kinds of targets that take comments."
+              },
+              "token_scope": {
+                "type": "string",
+                "description": "Ask `GET /api/v1/antispam/token?scope=comments:<target_type>` for a form token each\ntime the comment box is shown.",
+                "example": "comments:{target_type}"
+              }
+            }
+          }
+        }
+      },
+      "Data_CommentTarget": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A target's comment state and counts.",
+            "required": [
+              "target_type",
+              "target_id",
+              "state",
+              "hidden",
+              "comment_count"
+            ],
+            "properties": {
+              "closes_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When it closes by itself, if set."
+              },
+              "comment_count": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Shown comments (0 when hidden)."
+              },
+              "hidden": {
+                "type": "boolean",
+                "description": "The comments are hidden from everyone (e.g. the target was deleted)."
+              },
+              "pending_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32",
+                "description": "Comments waiting for approval (`null` in the public answer)."
+              },
+              "state": {
+                "$ref": "#/components/schemas/CommentTargetState",
+                "description": "What applies now."
+              },
+              "target_id": {
+                "type": "string"
+              },
+              "target_type": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Data_CommentsEmailData": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "Everything the comments hold about one email address.",
+            "required": [
+              "email",
+              "comments",
+              "follows",
+              "bans"
+            ],
+            "properties": {
+              "bans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CommentBan"
+                },
+                "description": "Bans of this address (kept after an erasure, so the ban still works)."
+              },
+              "comments": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CommentDetail"
+                },
+                "description": "Every comment written with this address, oldest first, any status."
+              },
+              "email": {
+                "type": "string",
+                "description": "The address, as matched (lower case)."
+              },
+              "follows": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CommentFollow"
+                },
+                "description": "Comments whose replies are mailed to this address."
+              }
+            }
+          }
+        }
+      },
+      "Data_CommentsErasedResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The result of erasing an email address.",
+            "required": [
+              "cleared"
+            ],
+            "properties": {
+              "cleared": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Comments cleared.",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
+      "Data_CommentsPurged": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The answer to a delete for good.",
+            "required": [
+              "deleted"
+            ],
+            "properties": {
+              "deleted": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Comments deleted: the comment, and its replies when it starts a thread.",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
+      "Data_CommentsUnsubscribed": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The answer to an unsubscription.",
+            "required": [
+              "unsubscribed"
+            ],
+            "properties": {
+              "unsubscribed": {
+                "type": "boolean",
+                "description": "Always `true`, even for an unknown or used token (nothing is revealed)."
               }
             }
           }
@@ -23323,6 +27442,49 @@
           }
         }
       },
+      "Data_PostedComment": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicComment"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "edit_token": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Guests only: keep it (e.g. in the browser) to change or delete the comment; it is shown\nonly here. Posting again with the same `form_token` returns a new one."
+                  },
+                  "editable_until": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time",
+                    "description": "Until when the author may change it (`null`: never)."
+                  },
+                  "status": {
+                    "$ref": "#/components/schemas/CommentVisibility"
+                  }
+                }
+              }
+            ],
+            "description": "A comment just posted, for its author."
+          }
+        }
+      },
       "Data_PreferencesResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -23432,6 +27594,96 @@
                 "type": "string"
               },
               "website_url": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Data_PublicComment": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A comment, as shown to everyone.",
+            "required": [
+              "id",
+              "target_type",
+              "target_id",
+              "root_id",
+              "author",
+              "body",
+              "body_html",
+              "deleted",
+              "created_at",
+              "reply_count"
+            ],
+            "properties": {
+              "author": {
+                "$ref": "#/components/schemas/CommentAuthor"
+              },
+              "body": {
+                "type": "string",
+                "description": "The text as written (plain text, line breaks kept). Never insert it as HTML."
+              },
+              "body_html": {
+                "type": "string",
+                "description": "The text as safe HTML: everything escaped, line breaks as `<br>`, `http(s)` addresses as\nlinks with `rel=\"nofollow ugc noopener\"`."
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "deleted": {
+                "type": "boolean",
+                "description": "Deleted by its author: no text or name, kept so its replies stay in place."
+              },
+              "edited_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When the author last changed it."
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "parent_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The top-level comment, for a reply; `null` for a top-level comment."
+              },
+              "reply_count": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Shown replies (top-level comments only)."
+              },
+              "reply_to_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The comment this one answers (the top-level comment or another reply in the thread)."
+              },
+              "root_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The comment that starts the thread (itself for a top-level comment)."
+              },
+              "target_id": {
+                "type": "string"
+              },
+              "target_type": {
                 "type": "string"
               }
             }
@@ -24587,6 +28839,36 @@
           }
         }
       },
+      "Data_Vec_CommentCount": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "The comment count of a target.",
+              "required": [
+                "target_id",
+                "count"
+              ],
+              "properties": {
+                "count": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "Shown comments (top-level and replies)."
+                },
+                "target_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
       "Data_Vec_EventTypeResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -24959,6 +29241,27 @@
           }
         }
       },
+      "Data_VerifiedResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The answer to an address confirmation.",
+            "required": [
+              "verified"
+            ],
+            "properties": {
+              "verified": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
       "DeleteAccountRequest": {
         "type": "object",
         "description": "Confirms deleting your own account.",
@@ -24971,6 +29274,20 @@
             "description": "Your current password."
           }
         }
+      },
+      "DeleteOwnRequest": {
+        "type": "object",
+        "description": "Proof of authorship.",
+        "properties": {
+          "edit_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Guests: the `edit_token` received when posting. Signed-in authors send `{}`."
+          }
+        },
+        "additionalProperties": false
       },
       "DeliveryCounts": {
         "type": "object",
@@ -25114,6 +29431,27 @@
             "type": "string"
           }
         }
+      },
+      "EditCommentRequest": {
+        "type": "object",
+        "description": "A change by the author.",
+        "required": [
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "The new text."
+          },
+          "edit_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Guests: the `edit_token` received when posting. Signed-in authors omit it."
+          }
+        },
+        "additionalProperties": false
       },
       "EmailDataResponse": {
         "type": "object",
@@ -27091,6 +31429,288 @@
           }
         }
       },
+      "Page_CommentBan": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A ban.",
+              "required": [
+                "id",
+                "kind",
+                "value",
+                "reason",
+                "active",
+                "created_at"
+              ],
+              "properties": {
+                "active": {
+                  "type": "boolean",
+                  "description": "Still in force."
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "created_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "kind": {
+                  "type": "string",
+                  "description": "`user`, `email` or `ip`."
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "until": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "When it ends; `null`: never."
+                },
+                "value": {
+                  "type": "string",
+                  "description": "User id, email address or `ip_fingerprint`."
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Page_CommentDetail": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A comment with everything moderators see.",
+              "required": [
+                "id",
+                "target_type",
+                "target_id",
+                "root_id",
+                "status",
+                "author_kind",
+                "email_verified",
+                "body",
+                "body_html",
+                "reply_count",
+                "report_count",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "author_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Address given for reply mails (lower case)."
+                },
+                "author_kind": {
+                  "$ref": "#/components/schemas/CommentAuthorKind"
+                },
+                "author_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Guest name or the user's display name."
+                },
+                "body": {
+                  "type": "string"
+                },
+                "body_html": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "edited_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "email_verified": {
+                  "type": "boolean"
+                },
+                "hold_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Why it is held: `moderation`, `first_comment`, `reported`, `suspect_word`,\n`too_many_links`, or the anti-spam reasons (`too_fast`, `duplicate`, `classifier`…),\njoined by commas."
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "ip_fingerprint": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Keyed hash of the author's network block (never the address itself); use it to ban;\ncleared after `AUTOXIDE_COMMENTS_IP_RETENTION_DAYS`."
+                },
+                "locale": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "`en` or `vi`."
+                },
+                "parent_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "published_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "reply_count": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "reply_to_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "report_count": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "root_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/CommentStatus"
+                },
+                "target_id": {
+                  "type": "string"
+                },
+                "target_type": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "user_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "The account, for a signed-in author."
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Page_CommentReport": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A report of a comment.",
+              "required": [
+                "id",
+                "comment_id",
+                "reason",
+                "created_at"
+              ],
+              "properties": {
+                "comment_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "`spam`, `abuse`, `illegal` or `other`."
+                },
+                "reporter_user_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "The reporting account, when signed in."
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
       "Page_DeliveryResponse": {
         "type": "object",
         "description": "One page of a list.",
@@ -27959,6 +32579,104 @@
           }
         }
       },
+      "Page_PublicComment": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A comment, as shown to everyone.",
+              "required": [
+                "id",
+                "target_type",
+                "target_id",
+                "root_id",
+                "author",
+                "body",
+                "body_html",
+                "deleted",
+                "created_at",
+                "reply_count"
+              ],
+              "properties": {
+                "author": {
+                  "$ref": "#/components/schemas/CommentAuthor"
+                },
+                "body": {
+                  "type": "string",
+                  "description": "The text as written (plain text, line breaks kept). Never insert it as HTML."
+                },
+                "body_html": {
+                  "type": "string",
+                  "description": "The text as safe HTML: everything escaped, line breaks as `<br>`, `http(s)` addresses as\nlinks with `rel=\"nofollow ugc noopener\"`."
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "deleted": {
+                  "type": "boolean",
+                  "description": "Deleted by its author: no text or name, kept so its replies stay in place."
+                },
+                "edited_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "When the author last changed it."
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "parent_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "The top-level comment, for a reply; `null` for a top-level comment."
+                },
+                "reply_count": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "Shown replies (top-level comments only)."
+                },
+                "reply_to_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "The comment this one answers (the top-level comment or another reply in the thread)."
+                },
+                "root_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "The comment that starts the thread (itself for a top-level comment)."
+                },
+                "target_id": {
+                  "type": "string"
+                },
+                "target_type": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
       "Page_PublicEntryResponse": {
         "type": "object",
         "description": "One page of a list.",
@@ -28811,6 +33529,46 @@
           }
         }
       },
+      "Page_ThreadComment": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/PublicComment"
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "replies"
+                  ],
+                  "properties": {
+                    "replies": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PublicComment"
+                      },
+                      "description": "The first shown replies, oldest first (at most `replies_limit`); get the rest from\n`GET /api/v1/comments/public/comments/{id}/replies`."
+                    }
+                  }
+                }
+              ],
+              "description": "A top-level comment with its first replies."
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
       "Page_UserResponse": {
         "type": "object",
         "description": "One page of a list.",
@@ -29000,6 +33758,40 @@
           },
           "files": []
         }
+      },
+      "PostedComment": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PublicComment"
+          },
+          {
+            "type": "object",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "edit_token": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Guests only: keep it (e.g. in the browser) to change or delete the comment; it is shown\nonly here. Posting again with the same `form_token` returns a new one."
+              },
+              "editable_until": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "Until when the author may change it (`null`: never)."
+              },
+              "status": {
+                "$ref": "#/components/schemas/CommentVisibility"
+              }
+            }
+          }
+        ],
+        "description": "A comment just posted, for its author."
       },
       "PreferenceList": {
         "type": "object",
@@ -29201,6 +33993,20 @@
           }
         }
       },
+      "ProfileRequest": {
+        "type": "object",
+        "description": "A display name.",
+        "required": [
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "description": "1 to 50 characters; reserved names (`AUTOXIDE_COMMENTS_RESERVED_NAMES`) are for\nmoderators; no two users share a name."
+          }
+        },
+        "additionalProperties": false
+      },
       "PublicAuthor": {
         "type": "object",
         "description": "An author of an entry.",
@@ -29264,6 +34070,87 @@
             "type": "string"
           },
           "website_url": {
+            "type": "string"
+          }
+        }
+      },
+      "PublicComment": {
+        "type": "object",
+        "description": "A comment, as shown to everyone.",
+        "required": [
+          "id",
+          "target_type",
+          "target_id",
+          "root_id",
+          "author",
+          "body",
+          "body_html",
+          "deleted",
+          "created_at",
+          "reply_count"
+        ],
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/CommentAuthor"
+          },
+          "body": {
+            "type": "string",
+            "description": "The text as written (plain text, line breaks kept). Never insert it as HTML."
+          },
+          "body_html": {
+            "type": "string",
+            "description": "The text as safe HTML: everything escaped, line breaks as `<br>`, `http(s)` addresses as\nlinks with `rel=\"nofollow ugc noopener\"`."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Deleted by its author: no text or name, kept so its replies stay in place."
+          },
+          "edited_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the author last changed it."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The top-level comment, for a reply; `null` for a top-level comment."
+          },
+          "reply_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Shown replies (top-level comments only)."
+          },
+          "reply_to_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The comment this one answers (the top-level comment or another reply in the thread)."
+          },
+          "root_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The comment that starts the thread (itself for a top-level comment)."
+          },
+          "target_id": {
+            "type": "string"
+          },
+          "target_type": {
             "type": "string"
           }
         }
@@ -30059,6 +34946,26 @@
             "type": "string",
             "description": "1 to 50 characters, without `,`; unique, ignoring case.",
             "example": "brand"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportRequest": {
+        "type": "object",
+        "description": "A report.",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What is wrong, for the moderators (at most 500 characters)."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/CommentReportReason"
           }
         },
         "additionalProperties": false
@@ -31025,6 +35932,35 @@
           }
         }
       },
+      "TargetRequest": {
+        "type": "object",
+        "description": "A new comment state for a target. Omitted fields stay as they are.",
+        "properties": {
+          "closes_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Close by itself from then on; `null` removes it."
+          },
+          "hidden": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "`true` hides every comment of the target from everyone (and closes it)."
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`open` or `closed`."
+          }
+        },
+        "additionalProperties": false
+      },
       "Taxonomy": {
         "type": "string",
         "description": "What a term groups.",
@@ -31177,6 +36113,29 @@
         },
         "additionalProperties": false
       },
+      "ThreadComment": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PublicComment"
+          },
+          {
+            "type": "object",
+            "required": [
+              "replies"
+            ],
+            "properties": {
+              "replies": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PublicComment"
+                },
+                "description": "The first shown replies, oldest first (at most `replies_limit`); get the rest from\n`GET /api/v1/comments/public/comments/{id}/replies`."
+              }
+            }
+          }
+        ],
+        "description": "A top-level comment with its first replies."
+      },
       "TokenResponse": {
         "type": "object",
         "description": "A new pair of tokens.",
@@ -31263,6 +36222,24 @@
         ],
         "description": "A new translation."
       },
+      "UnsubscribeRequest": {
+        "type": "object",
+        "description": "Stop reply mails.",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "all": {
+            "type": "boolean",
+            "description": "Stop mails about every comment followed with this address, not just this one."
+          },
+          "token": {
+            "type": "string",
+            "description": "The `token` of the link in a reply mail."
+          }
+        },
+        "additionalProperties": false
+      },
       "UnsubscribeResponse": {
         "type": "object",
         "description": "The answer to an unsubscription: always the same.",
@@ -31326,6 +36303,20 @@
               "string",
               "null"
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateCommentRequest": {
+        "type": "object",
+        "description": "A moderation decision.",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CommentStatus",
+            "description": "`published` (approve, or restore), `rejected`, `spam`, or `pending` (hold again)."
           }
         },
         "additionalProperties": false
@@ -31862,6 +36853,18 @@
         "properties": {
           "token": {
             "type": "string"
+          }
+        }
+      },
+      "VerifiedResponse": {
+        "type": "object",
+        "description": "The answer to an address confirmation.",
+        "required": [
+          "verified"
+        ],
+        "properties": {
+          "verified": {
+            "type": "boolean"
           }
         }
       },

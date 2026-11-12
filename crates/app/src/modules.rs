@@ -32,6 +32,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Bản tin: cần `dyn Mailer` (sau `mail`), nghe bài mới của `content` qua sổ đối tượng của
         // kernel (sau `content`).
         Box::new(autoxide_newsletter::module()),
+        // Bình luận: cần `dyn Mailer` (sau `mail`), kiểm đích qua sổ đối tượng của kernel và nghe
+        // event lưu trữ / xoá của `content` (sau `content`).
+        Box::new(autoxide_comments::module()),
     ]
 }
 
@@ -130,8 +133,9 @@ mod tests {
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
             // Mỗi lịch (của `auth`, `idempotency`, `webhooks`, hai của `media`, một của
-            // `content`, một của `forms` và một của `newsletter`) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 8);
+            // `content`, một của `forms`, một của `newsletter` và một của `comments`) đúng một
+            // job.
+            assert_eq!(a.unwrap() + b.unwrap(), 9);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

@@ -367,6 +367,7 @@ version = "0.1.0"
 dependencies = [
  "autoxide-audit",
  "autoxide-auth",
+ "autoxide-comments",
  "autoxide-content",
  "autoxide-files",
  "autoxide-forms",
@@ -442,6 +443,28 @@ dependencies = [
  "uuid",
  "validator",
  "webauthn_rp",
+]
+
+[[package]]
+name = "autoxide-comments"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "rmcp",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
 ]
 
 [[package]]
