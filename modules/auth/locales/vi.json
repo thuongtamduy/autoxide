@@ -1,4 +1,5 @@
 {
+  "auth.account_not_found": "Không có tài khoản nào có email {email}.",
   "auth.api_key_cannot_create_keys": "API key không tạo được API key: key bị lộ không được phép tạo thêm key. Hãy đăng nhập bằng mật khẩu để tạo key.",
   "auth.api_key_expired": "API key này đã hết hạn. Tạo key mới bằng `POST /api/v1/auth/api-keys`.",
   "auth.api_key_limit": "Bạn đã có {limit} API key. Hãy thu hồi các key không còn dùng trước.",

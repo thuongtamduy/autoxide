@@ -67,3 +67,14 @@ pub trait Accounts: Send + Sync {
     /// đạt luật độ dài (`validation_failed`).
     async fn create(&self, account: NewAccount) -> Result<User, Error>;
 }
+
+/// Việc của người vận hành máy chủ khi không ai đăng nhập được để làm qua API. Binary dùng cho
+/// lệnh `autoxide user reset-mfa`; không kiểm permission — lệnh CLI chạy với quyền của người
+/// vận hành (D-159).
+#[async_trait::async_trait]
+pub trait AccountRecovery: Send + Sync {
+    /// Tắt xác thực hai bước (TOTP và recovery code) của tài khoản có email `email`, như quản
+    /// trị viên làm qua `DELETE /api/v1/auth/users/{id}/mfa`: cho admin duy nhất mất thiết bị.
+    /// Lỗi: không có tài khoản này (`auth.account_not_found`).
+    async fn reset_mfa(&self, email: &str) -> Result<User, Error>;
+}

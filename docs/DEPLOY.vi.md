@@ -186,6 +186,13 @@ sudo -u autoxide autoxide migrate up
 sudo -u autoxide autoxide user create --email you@example.com --name "Tên của bạn" --admin
 ```
 
+Mất thiết bị của tài khoản quản trị duy nhất đang bật xác thực hai bước? Tắt nó ngay trên máy
+chủ, rồi đăng nhập bằng mật khẩu và bật lại:
+
+```bash
+sudo -u autoxide autoxide user reset-mfa --email you@example.com
+```
+
 ### 4. Chạy như một service
 
 `/etc/systemd/system/autoxide.service`:

@@ -186,6 +186,13 @@ sudo -u autoxide autoxide migrate up
 sudo -u autoxide autoxide user create --email you@example.com --name "Your Name" --admin
 ```
 
+Lost the device of your only administrator account with two-step sign-in on? Turn it off from
+the server, then sign in with the password and turn it on again:
+
+```bash
+sudo -u autoxide autoxide user reset-mfa --email you@example.com
+```
+
 ### 4. Run as a service
 
 `/etc/systemd/system/autoxide.service`:

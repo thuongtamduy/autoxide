@@ -21,6 +21,7 @@ mod passkey;
 mod password;
 mod permissions;
 mod privacy;
+mod recovery;
 mod reset;
 mod role;
 mod session;
@@ -164,6 +165,10 @@ impl Module for AuthModule {
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
         context.provide::<dyn api::Users>(users.clone())?;
         context.provide::<dyn api::Accounts>(users.clone())?;
+        context.provide::<dyn api::AccountRecovery>(Arc::new(recovery::OperatorRecovery {
+            users: users.clone(),
+            mfa: mfa.clone(),
+        }))?;
         context.personal_data(Arc::new(privacy::AuthPersonalData {
             users: users.clone(),
             roles: roles.clone(),

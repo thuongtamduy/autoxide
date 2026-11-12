@@ -384,6 +384,18 @@ async fn user_create_tao_admin_va_bao_loi_ro() {
         let short = create("bob@example.com", "short\n");
         assert_eq!(short.status.code(), Some(1));
         assert!(stderr(&short).contains("  - password: must be between 12"), "{}", stderr(&short));
+
+        // Gỡ xác thực hai bước (D-159): tài khoản có thật thì xong (kể cả khi chưa bật), không
+        // có thì báo rõ.
+        let reset = |email: &str| {
+            autoxide(directory.path(), &["user", "reset-mfa", "--email", email], &environment)
+        };
+        let done = reset("ada@example.com");
+        assert_eq!(done.status.code(), Some(0), "{}", stderr(&done));
+        assert!(stdout(&done).contains("Two-step sign-in of ada@example.com"), "{}", stdout(&done));
+        let missing = reset("ghost@example.com");
+        assert_eq!(missing.status.code(), Some(1));
+        assert!(stderr(&missing).contains("(auth.account_not_found)"), "{}", stderr(&missing));
     })
     .await
     .unwrap();

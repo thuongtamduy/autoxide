@@ -5,7 +5,7 @@
 use std::io::BufRead;
 use std::process::ExitCode;
 
-use autoxide_auth::api::{Accounts, NewAccount};
+use autoxide_auth::api::{AccountRecovery, Accounts, NewAccount};
 use autoxide_kernel::error::Error;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -42,10 +42,25 @@ pub enum Action {
         #[arg(long)]
         password_stdin: bool,
     },
+    /// Turn off two-step sign-in (authenticator app and recovery codes) of an account.
+    ///
+    /// For an administrator who lost their device when no other administrator can do it
+    /// through the API (`DELETE /api/v1/auth/users/{id}/mfa`). The account signs in with its
+    /// password alone until it turns two-step sign-in on again.
+    ResetMfa {
+        /// Email of the account.
+        #[arg(long)]
+        email: String,
+    },
 }
 
 pub fn run(arguments: &Arguments) -> ExitCode {
-    let Action::Create { email, name, admin, password_stdin } = arguments.action.clone();
+    let (email, name, admin, password_stdin) = match arguments.action.clone() {
+        Action::Create { email, name, admin, password_stdin } => {
+            (email, name, admin, password_stdin)
+        }
+        Action::ResetMfa { email } => return reset_mfa_command(&email),
+    };
     let settings = match settings::load() {
         Ok(settings) => settings,
         Err(errors) => return report_invalid_configuration(&errors),
@@ -92,6 +107,38 @@ async fn create(settings: Settings, account: NewAccount) -> Result<String, Strin
     let role = if admin { " with the `admin` role" } else { " without any role" };
     Ok(format!(
         "Created user {} (id {}){role}.\nSign in with `POST /api/v1/auth/login`.\n",
+        user.email, user.id
+    ))
+}
+
+/// `autoxide user reset-mfa`.
+fn reset_mfa_command(email: &str) -> ExitCode {
+    let settings = match settings::load() {
+        Ok(settings) => settings,
+        Err(errors) => return report_invalid_configuration(&errors),
+    };
+    let config = settings.config.clone();
+    match run_with_observability(&config, reset_mfa(settings, email.to_owned())) {
+        Ok(report) => {
+            print!("{report}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => report_failure(&error),
+    }
+}
+
+/// Khởi động chương trình, tắt xác thực hai bước của tài khoản `email`.
+async fn reset_mfa(settings: Settings, email: String) -> Result<String, String> {
+    let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
+    let outcome = match runtime.modules.api::<dyn AccountRecovery>() {
+        Some(recovery) => recovery.reset_mfa(&email).await.map_err(|error| describe(&error)),
+        None => Err("no registered module manages user accounts (`auth`)".to_owned()),
+    };
+    let closed = runtime.database.close().await.map_err(|error| format!("database: {error}"));
+    let user = outcome?;
+    closed?;
+    Ok(format!(
+        "Two-step sign-in of {} (id {}) is off. Sign in with the password, then turn it on again.\n",
         user.email, user.id
     ))
 }

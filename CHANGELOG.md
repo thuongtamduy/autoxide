@@ -9,6 +9,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- `autoxide user reset-mfa --email …`: the server operator turns off two-step sign-in of an
+  account, for an only administrator who lost their device.
+
 ## [0.6.0] - 2026-11-12
 
 ### Changed

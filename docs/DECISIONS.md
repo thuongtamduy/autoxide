@@ -3832,3 +3832,15 @@ Quyết định:
 - `files` chưa có lượt quét nội dung mồ côi trong nơi lưu (như `media`); DEPLOY nên khuyên đặt
   lifecycle rule của S3 cho multipart upload dở.
 - `autoxide jobs retry` một job `webhooks.send` đã hỏng không gửi lại (lượt gửi đã `failed`).
+
+## D-159 · Lệnh `autoxide user reset-mfa`: người vận hành tắt xác thực hai bước — 2026-11-12 — agent quyết
+
+Đóng một việc để lại của D-156: admin duy nhất mất thiết bị thì không ai tắt được xác thực hai
+bước của họ qua API (`DELETE /users/{id}/mfa` cần một admin khác), chỉ còn sửa database.
+
+Quyết định: `autoxide user reset-mfa --email …`, như `user create`, chạy với quyền của người vận
+hành máy chủ (ai chạy được lệnh trên máy đã đọc được database). `auth` công bố trait mới
+`api::AccountRecovery` (không gộp vào `Accounts` — việc khác, service khác), cài bằng
+`MfaService::reset` với `Actor::system()`; event `auth.mfa_disabled` ghi `by_administrator`. Tài
+khoản không có thì `auth.account_not_found`. Không đổi mật khẩu, không đăng xuất phiên: người dùng
+đăng nhập bằng mật khẩu rồi bật lại.
