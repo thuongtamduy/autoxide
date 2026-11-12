@@ -1764,3 +1764,22 @@ file và gọi `api` của `files`.
 mã lỗi), đổi làm vỡ client đang dùng mà không thêm giá trị; dữ liệu vẫn là file.
 
 Thay: thứ tự "module `content` ngay sau bước 12" của D-078.
+
+## D-082 · `files` giữ nguyên; thư viện media là module riêng `media` — 2026-11-12 — chủ dự án quyết
+
+Quyết định: không nâng `files` thành thư viện media như D-081 viết. `files` giữ nguyên vai kho
+file thô, riêng tư theo người sở hữu, dùng cho mọi module. Thư viện media cho xuất bản là
+module mới `media` (bước 14 của lộ trình): lưu nội dung qua trait `Storage` của kernel (do
+`files` cung cấp) dưới khoá `media/<id>`, metadata ở bảng `media_…`, không tham chiếu bảng của
+`files`. `content` giữ ID của `media`. Thứ tự giữ như D-081: nền chung → `media` → `content`.
+
+Lý do: chủ dự án đề xuất. Hai việc khác nhau: cất file (đính kèm, xuất báo cáo…) cần đơn giản
+và riêng tư; xuất bản cần công khai, hiển thị inline, alt text, thư mục, thùng rác. Tách ra thì
+`files` không phải mang khái niệm của xuất bản, và file riêng tư không thể lỡ bị công khai vì
+không cùng bảng với item công khai. Trait `Storage` ở kernel có sẵn cho đúng việc này (D-066).
+
+Đã cân nhắc: `media` chỉ trỏ tới dòng của `files` rồi thêm metadata — tải lên hai bước, xoá
+phải phối hợp hai module, dữ liệu một tấm ảnh nằm ở hai nơi; nâng `files` (D-081) — trộn hai
+vai vào một module.
+
+Thay: phần "nâng `files` thành thư viện media" của D-081.

@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–12 xong** (core + passkey), mọi bước xanh trên cả SQLite và Postgres. Việc tiếp theo: bước 13 (nền chung) → 14 (`files` thành thư viện media) → 15 (`content`) — D-078, D-080, D-081.
+Trạng thái: **bước 0–12 xong** (core + passkey), mọi bước xanh trên cả SQLite và Postgres. Việc tiếp theo: bước 13 (nền chung) → 14 (module `media`) → 15 (`content`) — D-078, D-080, D-081, D-082.
 
 ## 0. Khung dự án
 
@@ -126,7 +126,7 @@ Cho AI agent gọi chức năng của hệ thống như công cụ (Model Contex
 
 ## 13. Nền chung cho media và nội dung (core)
 
-Thứ `files` và `content` cùng cần, viết trung lập với nghiệp vụ để module nào cũng dùng được
+Thứ `media` và `content` cùng cần, viết trung lập với nghiệp vụ để module nào cũng dùng được
 (D-081):
 
 - [ ] Danh sách lọc theo trường và sắp xếp theo trường khác thời gian tạo (vd tên, kích thước,
@@ -137,19 +137,23 @@ Thứ `files` và `content` cùng cần, viết trung lập với nghiệp vụ 
 - [ ] Cache: `ETag` + `If-None-Match` → `304`, `Cache-Control` do endpoint khai
 - [ ] Chống ghi đè khi hai người cùng sửa: `ETag` + `If-Match`, sai thì `412`
 
-## 14. Module `files` — thư viện media (chủ dự án chọn ngày 12/11/2026, D-081)
+## 14. Module `media` — thư viện media (chủ dự án chọn ngày 12/11/2026, D-082)
 
-Hiện `files` là kho file riêng của từng người, luôn tải về dạng attachment (D-067). Bước này
-nâng nó thành thư viện media dùng chung, đủ cho website hiển thị ảnh. Tên module giữ là `files`.
+Module mới, tách khỏi `files`. `files` giữ nguyên: kho file thô, riêng tư theo người sở hữu,
+dùng cho mọi module (D-067). `media` là thư viện ảnh, video, tài liệu để **xuất bản** (website,
+`content`, storefront nếu có sau này). Nội dung lưu qua trait `Storage` của kernel (do `files`
+cung cấp, D-066) dưới khoá `media/<id>`; metadata ở bảng `media_…`; không tham chiếu bảng của
+`files`. Đăng ký sau `files`.
 
-- [ ] Thư viện chung: permission xem toàn bộ thư viện tách khỏi permission quản lý; file cá
-      nhân vẫn chạy như cũ
-- [ ] File công khai / riêng tư: file công khai tải được không cần đăng nhập qua URL ổn định;
-      file riêng tư giữ như hiện nay
-- [ ] Hiển thị inline an toàn: chỉ ảnh raster (JPEG, PNG, WebP, AVIF, GIF) được hiển thị
-      inline; loại khác (SVG, HTML…) luôn là attachment; kiểm loại thật theo nội dung (magic
-      bytes), khai sai thì từ chối
-- [ ] Tải về hỗ trợ `Range` (video, PDF lớn) và cache của bước 13 (`304`; file công khai có
+- [ ] Tải lên, xem, tải về, đổi tên, xoá; giới hạn kích thước và loại bằng cấu hình
+      `AUTOXIDE_MEDIA_…`; thân request là nội dung thô như `files` (D-067)
+- [ ] Thư viện chung của hệ thống (không theo người tải lên); permission xem, tải lên, quản lý
+      tách riêng
+- [ ] Công khai / riêng tư: item công khai tải được không cần đăng nhập qua URL ổn định
+- [ ] Hiển thị inline an toàn: chỉ ảnh raster (JPEG, PNG, WebP, AVIF, GIF) hiển thị inline; loại
+      khác (SVG, HTML…) luôn là attachment; kiểm loại thật theo nội dung (magic bytes), khai sai
+      thì từ chối
+- [ ] Tải về hỗ trợ `Range` (video, PDF lớn) và cache của bước 13 (`304`; item công khai có
       `Cache-Control` dài)
 - [ ] Metadata: chiều rộng và chiều cao của ảnh (đọc lúc tải lên); alt text, tiêu đề, chú thích
       sửa được
@@ -157,28 +161,28 @@ nâng nó thành thư viện media dùng chung, đủ cho website hiển thị �
       tự tối ưu; ghi quyết định trước khi làm
 - [ ] Sắp xếp thư viện bằng thư mục **hoặc** nhãn (chọn một, ghi quyết định); lọc theo loại,
       tìm theo tên, sắp xếp theo tên / kích thước / ngày
-- [ ] Đổi tên; thay nội dung mà giữ nguyên ID (nơi đang dùng file không phải sửa), cache cũ
-      phải hết hiệu lực
-- [ ] Xoá an toàn: thùng rác khôi phục được trong một thời hạn; job xoá hẳn và dọn file mồ côi
-      ở nơi lưu
-- [ ] Báo file trùng (cùng SHA-256) khi tải lên
-- [ ] `api` cho module khác: kiểm một file có tồn tại, có công khai không, và lấy URL công khai
+- [ ] Thay nội dung mà giữ nguyên ID (nơi đang dùng không phải sửa), cache cũ phải hết hiệu lực
+- [ ] Xoá an toàn: thùng rác khôi phục được trong một thời hạn; job xoá hẳn và dọn nội dung mồ
+      côi ở nơi lưu
+- [ ] Báo item trùng (cùng SHA-256) khi tải lên
+- [ ] `api` cho module khác: kiểm một item có tồn tại, có công khai không, và lấy URL công khai
       (`content` dùng cho ảnh đại diện và ảnh trong bài)
 - [ ] Event cho mọi thay đổi (vào audit log); tool MCP: liệt kê, xem, sửa metadata, xoá
-- [ ] Test trên cả hai database, nơi lưu là ổ đĩa và S3; cập nhật hướng dẫn (tiếng Anh +
-      tiếng Việt)
+- [ ] Backup và restore (`autoxide backup`) gồm cả nội dung của `media`
+- [ ] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database, nơi lưu là ổ đĩa và
+      S3; hướng dẫn dùng (tiếng Anh + tiếng Việt)
 
 Chưa làm, đã cân nhắc: tải lên thẳng S3 bằng URL ký sẵn, hạn mức dung lượng, quét virus — thêm
 khi có nhu cầu.
 
 ## 15. Module `content` — nội dung (chủ dự án chọn ngày 12/11/2026, D-078, D-080)
 
-Chỉ nội dung và những gì liên quan đến nội dung; không thương mại điện tử. Làm sau `files`
-(D-081). Giao diện (trang quản trị, website) là repo riêng (D-079) — bước này chỉ làm API.
+Chỉ nội dung và những gì liên quan đến nội dung; không thương mại điện tử. Làm sau `media`
+(D-081, D-082). Giao diện (trang quản trị, website) là repo riêng (D-079) — bước này chỉ làm API.
 
 - [ ] Bài viết và trang: tiêu đề, slug duy nhất, tóm tắt, nội dung JSON có cấu trúc (core không
-      phụ thuộc trình soạn thảo), ảnh đại diện và ảnh trong bài (ID file, kiểm qua `api` của
-      `files`), tác giả (ID người dùng)
+      phụ thuộc trình soạn thảo), ảnh đại diện và ảnh trong bài (ID của `media`, kiểm qua `api`
+      của `media`), tác giả (ID người dùng)
 - [ ] Trạng thái nháp / đã đăng / lưu trữ; lên lịch đăng qua job queue
 - [ ] Lịch sử phiên bản: xem và khôi phục
 - [ ] Danh mục và thẻ
