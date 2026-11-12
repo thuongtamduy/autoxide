@@ -1,4 +1,4 @@
-//! Khoá ký dùng chung của kernel (D-107): một khoá gốc, dẫn ra khoá riêng cho từng mục đích.
+//! Khoá ký dùng chung của kernel (D-113): một khoá gốc, dẫn ra khoá riêng cho từng mục đích.
 //!
 //! - Đặt `AUTOXIDE_SECRET_KEY` thì khoá gốc là giá trị đó.
 //! - Không đặt thì kernel **sinh một lần và lưu trong database** (bảng `kernel_secrets` của

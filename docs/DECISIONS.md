@@ -2378,7 +2378,7 @@ làm cho mỗi việc".
 SQLite; lưu preview token vào bảng để thu hồi từng cái — thêm bảng và dọn dẹp cho một tính năng
 token sống 10 phút; retry lịch thất bại — lỗi nghiệp vụ không tự hết, retry chỉ làm ồn log.
 
-## D-106 · Ba module `forms`, `newsletter`, `comments`, sau phần nền chung trong core — 2026-11-12 — chủ dự án quyết
+## D-112 · Ba module `forms`, `newsletter`, `comments`, sau phần nền chung trong core — 2026-11-12 — chủ dự án quyết
 
 Bối cảnh: đề bài `docs/prompts/forms-newsletter-comments.md` và khảo sát
 `docs/research/forms-newsletter-comments.md`. Cả ba module nhận dữ liệu từ người lạ không đăng
@@ -2392,8 +2392,8 @@ Quyết định (chủ dự án, ngày 12/11/2026):
    `newsletter` → `comments`.
 2. Thứ dùng chung cho cả ba làm trong core, ở dạng trung lập, trước khi làm ba module — không
    module nào tự chế cách riêng.
-3. Làm theo ba giai đoạn: nền chung tuần tự (bước 18); ba module song song, mỗi module một
-   subagent; agent chính gộp (bước 19–21).
+3. Làm theo ba giai đoạn: nền chung tuần tự (bước 19); ba module song song, mỗi module một
+   subagent; agent chính gộp (bước 20–22).
 4. Yêu cầu pháp lý chưa chắc chắn (Nghị định 91/2020 về thư rác, Nghị định 147/2024 về bình
    luận, Luật Bảo vệ dữ liệu cá nhân 2025) làm thành cấu hình, không cài cứng; tài liệu nói rõ
    người cài phải tự kiểm văn bản gốc.
@@ -2404,7 +2404,7 @@ Không làm ở đợt này: tải file kèm bài gửi form, email tự trả l
 bước, thanh toán, đo lượt mở / bấm link, trình soạn email kéo thả, reaction / vote, đăng nhập
 mạng xã hội, phát hiện nội dung độc hại bằng AI, kết nối riêng từng nhà cung cấp email.
 
-## D-107 · Khoá ký của kernel: `AUTOXIDE_SECRET_KEY`, không đặt thì sinh một lần và lưu database; module nội bộ `kernel` — 2026-11-12 — agent quyết
+## D-113 · Khoá ký của kernel: `AUTOXIDE_SECRET_KEY`, không đặt thì sinh một lần và lưu database; module nội bộ `kernel` — 2026-11-12 — agent quyết
 
 Bối cảnh: token form, đề chống spam, băm IP cần một khoá HMAC mà module nghiệp vụ lấy được
 không qua `auth` (D-046). Khảo sát đề xuất "không đặt thì sinh ngẫu nhiên lúc khởi động" như
@@ -2433,7 +2433,7 @@ khoá riêng cho từng module (endpoint chống spam trung lập của core và
 chung một khoá); thêm tham số khoá vào `Modules::start` (đổi chữ ký mọi chỗ gọi, trong khi
 `provide` đã có sẵn).
 
-## D-108 · Địa chỉ client: đếm proxy tin cậy (`AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`), `ClientInfo` dùng chung — 2026-11-12 — agent quyết
+## D-114 · Địa chỉ client: đếm proxy tin cậy (`AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`), `ClientInfo` dùng chung — 2026-11-12 — agent quyết
 
 Bổ sung D-079. Bối cảnh: hàm lấy địa chỉ client nằm riêng trong rate limiter; chỉ đúng khi có
 đúng một proxy. Website server-side (Next.js) đứng sau CDN gọi API thì có hai, ba proxy, và
@@ -2454,10 +2454,10 @@ Quyết định:
 CDN đổi dải địa chỉ thường xuyên; để sau. Tin header do website gửi kèm khi gọi bằng API key —
 hai cách cho cùng một việc (khảo sát 0.15), không làm.
 
-## D-109 · Băm IP: gộp /24 – /64 rồi HMAC; `bucket` theo ngày, `fingerprint` cố định — 2026-11-12 — agent quyết
+## D-115 · Băm IP: gộp /24 – /64 rồi HMAC; `bucket` theo ngày, `fingerprint` cố định — 2026-11-12 — agent quyết
 
 Quyết định: `autoxide_kernel::ip_hash`. Gộp địa chỉ theo khối (IPv4 /24, IPv6 /64; IPv4 viết
-dạng `::ffff:` tính như IPv4) rồi HMAC-SHA256 bằng khoá dẫn từ `SecretKey` (D-107), giữ 16 byte,
+dạng `::ffff:` tính như IPv4) rồi HMAC-SHA256 bằng khoá dẫn từ `SecretKey` (D-113), giữ 16 byte,
 base64url 22 ký tự. `bucket(secret, ip, now)` dùng khoá đổi theo ngày UTC, cho bộ đếm;
 `fingerprint(secret, ip)` dùng khoá cố định, lưu cùng bản ghi, module tự xoá sau thời hạn của
 mình. Không module nào lưu IP thô.
@@ -2468,7 +2468,7 @@ không nối được với nhau. Gộp khối vì một nhà mạng cấp cả 
 Đã cân nhắc: cắt bớt octet cuối mà không băm (Isso) — vẫn lộ khối địa chỉ; băm từng địa chỉ
 không gộp — đổi địa chỉ trong khối IPv6 là thoát bộ đếm.
 
-## D-110 · `Throttle` dùng chung trong kernel, đếm trong database; `auth` chuyển sang — 2026-11-12 — agent quyết
+## D-116 · `Throttle` dùng chung trong kernel, đếm trong database; `auth` chuyển sang — 2026-11-12 — agent quyết
 
 Quyết định: `autoxide_kernel::throttle::Throttle` tổng quát từ `LoginThrottle` của `auth`:
 `check` (không đếm), `hit` (đếm trước rồi xét — D-079), `record`, `refund`, `clear`, `purge`.
@@ -2485,7 +2485,7 @@ cũ không chép vì chỉ sống một cửa sổ). Mã lỗi `auth.login_throt
 đếm riêng; cửa sổ trượt — cần lưu từng lần, tốn bảng hơn mà lợi ích nhỏ ở các giới hạn thô
 (số lần gửi form mỗi giờ).
 
-## D-111 · Token dùng một lần trong kernel (`OneTimeTokens`) — 2026-11-12 — agent quyết
+## D-117 · Token dùng một lần trong kernel (`OneTimeTokens`) — 2026-11-12 — agent quyết
 
 Quyết định: `autoxide_kernel::tokens::OneTimeTokens` trên bảng `<module>_tokens(id, purpose,
 subject, data, token_hash UNIQUE, expires_at, used_at, created_at)` sinh bằng
@@ -2501,10 +2501,10 @@ là chuỗi tuỳ chọn (vd địa chỉ email đang xác minh).
 Lý do: `newsletter` (xác nhận hai bước), `comments` (xác minh email khách) cần đúng luồng mà
 `auth` đang có; module nghiệp vụ không được phụ thuộc `auth` (D-046).
 
-## D-112 · `auth` dùng token và hàm băm của kernel; token xoá cùng tài khoản — 2026-11-12 — agent quyết
+## D-118 · `auth` dùng token và hàm băm của kernel; token xoá cùng tài khoản — 2026-11-12 — agent quyết
 
 Quyết định: đặt lại mật khẩu (`password_reset`) và xác minh email (`email_verification`, `data`
-là địa chỉ đang xác minh) chuyển sang `OneTimeTokens` (D-111) trên bảng `auth_tokens`.
+là địa chỉ đang xác minh) chuyển sang `OneTimeTokens` (D-117) trên bảng `auth_tokens`.
 Migration m0019 chép các token còn hạn, chưa dùng từ hai bảng cũ (link trong mail đã gửi vẫn
 dùng được) rồi bỏ hai bảng đó. Hai bảng cũ có foreign key `ON DELETE CASCADE` tới `auth_user`;
 `auth_tokens` thì không (bảng của kernel, `subject` là chuỗi), nên `UserService::delete` gọi
@@ -2512,7 +2512,7 @@ dùng được) rồi bỏ hai bảng đó. Hai bảng cũ có foreign key `ON D
 `random_token` / `sha256` của `auth` là bản của kernel (`autoxide_kernel::secret`), không còn bản
 riêng. Thời gian chờ gửi lại, thời hạn token, mã lỗi giữ nguyên.
 
-## D-113 · Chống spam hai pha trong core: module nội bộ `antispam`, `SpamGuard`, nonce là idempotency cho người lạ — 2026-11-12 — agent quyết
+## D-119 · Chống spam hai pha trong core: module nội bộ `antispam`, `SpamGuard`, nonce là idempotency cho người lạ — 2026-11-12 — agent quyết
 
 Bối cảnh: `forms`, `newsletter`, `comments` nhận dữ liệu từ người lạ; core bỏ qua
 `Idempotency-Key` khi request không xác thực. Đề bài: ba kết luận nhận / cách ly / từ chối, hai
@@ -2523,12 +2523,12 @@ Quyết định:
 - Module nội bộ thứ hai **`antispam`** (luôn đăng ký, sau `kernel`; tên dành riêng): đọc
   `AUTOXIDE_ANTISPAM_*`, công bố `SpamGuard`, phục vụ `GET /api/v1/antispam/token?scope=` (công
   khai, `Cache-Control: no-store`). Không có bảng: bảng nằm ở module dùng nó.
-- **Token form** ký HMAC bằng khoá dẫn từ khoá kernel (D-107): phạm vi, lúc phát, nonce 16 byte.
+- **Token form** ký HMAC bằng khoá dẫn từ khoá kernel (D-113): phạm vi, lúc phát, nonce 16 byte.
   Tuổi tối đa `AUTOXIDE_ANTISPAM_TOKEN_MAX_AGE_MINUTES` (120), tối thiểu
   `AUTOXIDE_ANTISPAM_MIN_FILL_SECONDS` (3).
 - **Pha một** `SpamGuard::check` (trước transaction, mọi việc gọi mạng ở đây): trường bẫy, token,
-  đề (`ChallengeVerifier`, mặc định `NoChallenge`), giới hạn theo khối IP băm theo ngày (D-109),
-  theo email, theo người dùng (`Limits`, bảng `<module>_throttle`, D-110), trùng (module tự dò
+  đề (`ChallengeVerifier`, mặc định `NoChallenge`), giới hạn theo khối IP băm theo ngày (D-115),
+  theo email, theo người dùng (`Limits`, bảng `<module>_throttle`, D-116), trùng (module tự dò
   bằng `content_hash` trên bảng của mình rồi báo cờ `duplicate`), bộ phân loại
   (`ContentClassifier`, mặc định `NoClassifier`).
 - **Kết luận** (`Verdict`) có thêm `Discard` bên cạnh `Accept` / `Quarantine`, và "từ chối" là
@@ -2550,7 +2550,7 @@ Quyết định:
 ghép thẳng vào `http::build` (endpoint không thuộc module nào, cấu hình đọc ở chỗ khác); trả
 429 / mã lỗi cho người lạ (bot đọc được và né); lưu bài trúng bẫy (bảng phình vì rác).
 
-## D-114 · ALTCHA v2 tự viết, phiên bản giao thức và widget được ghim — 2026-11-12 — agent quyết
+## D-120 · ALTCHA v2 tự viết, phiên bản giao thức và widget được ghim — 2026-11-12 — agent quyết
 
 Quyết định: `autoxide_kernel::antispam::Altcha` (bật bằng `AUTOXIDE_ANTISPAM_CHALLENGE=altcha`,
 mặc định tắt) cài phần kiểm của giao thức ALTCHA Proof-of-Work v2 bằng `hmac` / `sha2` đang có
@@ -2563,9 +2563,9 @@ mã hoá thứ hai. Ghim:
   đầu khoá của bộ đếm đó; không dùng chữ ký khoá (đường kiểm nhanh) — máy chủ dựng lại khoá từ
   bộ đếm (chi phí bằng một lần thử);
 - chữ ký HMAC-SHA256 (hex) trên JSON của `parameters` sắp khoá ở mọi tầng; khoá ký dẫn từ khoá
-  kernel (D-107); đề sống 10 phút;
+  kernel (D-113); đề sống 10 phút;
 - `data` mang phạm vi form và `binding` = nonce của token form: lời giải chỉ dùng được với đúng
-  token đó, mà token chỉ được nhận một lần (D-113) — đây là cách chống dùng lại đề mà thư viện
+  token đó, mà token chỉ được nhận một lần (D-119) — đây là cách chống dùng lại đề mà thư viện
   chính thức không có;
 - widget: `altcha@3.5.0` (npm); website đưa `challenge` từ `GET /api/v1/antispam/token` cho
   widget (`widget.configure({ challenge })`) và gửi giá trị ô ẩn `altcha` (base64) kèm form.
@@ -2574,7 +2574,7 @@ Kiểm: vector sinh một lần bằng thư viện chính thức `altcha` 1.1.0 
 `solve_challenge`, commit ở `crates/kernel/src/antispam/fixtures/altcha_v2.json`): chữ ký và lời
 giải khớp; cộng test từ chối khi hết hạn, sai khoá, sai bộ đếm, đổi tham số, sai form, sai token.
 
-## D-115 · `Mail` có `reply_to`, header theo danh sách cho phép, khoá chống trùng; lỗi vĩnh viễn thành event — 2026-11-12 — agent quyết
+## D-121 · `Mail` có `reply_to`, header theo danh sách cho phép, khoá chống trùng; lỗi vĩnh viễn thành event — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -2594,7 +2594,7 @@ Quyết định:
 - Không làm `send_batch` (khảo sát gợi ý): chưa module nào cần gửi một lần nhiều mail; bản tin
   xếp từng mail vào hàng đợi theo lô của nó.
 
-## D-116 · Người thực hiện "người lạ" (`Actor::public`), cột `actor_kind` trong outbox và audit — 2026-11-12 — agent quyết
+## D-122 · Người thực hiện "người lạ" (`Actor::public`), cột `actor_kind` trong outbox và audit — 2026-11-12 — agent quyết
 
 Bối cảnh: event do người lạ gây ra (gửi form, đăng ký bản tin, bình luận của khách) trước đây
 chỉ ghi được như hệ thống (`actor_user_id` trống) — audit không phân biệt được.
@@ -2605,7 +2605,7 @@ Quyết định:
   `system` / `user` / `public`.
 - Kernel thêm `event::outbox_actor_migration(name, module)`: cột `actor_kind` (chữ, có thể
   trống) trong `<module>_events`; outbox ghi nó, bộ phát đọc lại. Mọi module có outbox thêm
-  migration này (auth m0020, notes m0003, mail m0003, media m0006, content m0004, files m0003,
+  migration này (auth m0020, notes m0003, mail m0003, media m0006, content m0007 (sau m0004–m0006 của `main`), files m0003,
   webhooks m0004); module mới thêm ngay sau `outbox_migration`. Không sửa `outbox_migration` vì
   migration đã chạy thì không đổi được.
 - `audit_entry` thêm cột `actor_kind` (m0002); `GET /api/v1/audit` trả `actor_kind` (dòng cũ hiểu
@@ -2614,7 +2614,7 @@ Quyết định:
 Đã cân nhắc: một UUID đặc biệt trong `actor_user_id` thay cho cột mới — rẻ hơn nhưng là giá trị
 "thần kỳ", người đọc audit dễ hiểu nhầm là một người dùng.
 
-## D-117 · Sổ đối tượng trung lập `ResourceDirectory`; `content` đăng ký `content.entry` — 2026-11-12 — agent quyết
+## D-123 · Sổ đối tượng trung lập `ResourceDirectory`; `content` đăng ký `content.entry` — 2026-11-12 — agent quyết
 
 Quyết định: `autoxide_kernel::resource` — sổ giống sổ dữ liệu cá nhân. Module đăng ký loại đối
 tượng `<module>.<loại>` kèm `ResourceResolver` bằng `StartContext::resource_type`; module khác lấy
@@ -2630,7 +2630,7 @@ hay đọc bảng của nó.
 Đã cân nhắc: để `comments` / `newsletter` phụ thuộc `autoxide_content::api` — gắn chặt hai module
 vào `content`, trong khi bình luận gắn được vào đích bất kỳ.
 
-## D-118 · `AUTOXIDE_HTTP_PUBLIC_URL`, công bố bởi module nội bộ `kernel` — 2026-11-12 — agent quyết
+## D-124 · `AUTOXIDE_HTTP_PUBLIC_URL`, công bố bởi module nội bộ `kernel` — 2026-11-12 — agent quyết
 
 Quyết định: URL công khai của API (không bắt buộc) do module nội bộ `kernel` đọc và công bố
 `autoxide_kernel::public_url::PublicUrl` (`context.require::<PublicUrl>()`). `link(path)` ghép
@@ -2642,7 +2642,7 @@ fragment; dấu `/` cuối bị bỏ.
 Lý do: module không đọc cấu hình HTTP của binary; công bố qua `provide` như `SecretKey` là một
 cách làm sẵn có.
 
-## D-119 · Module `forms`: bảng, trường có phiên bản, đường dẫn, permission — 2026-11-12 — agent quyết
+## D-125 · Module `forms`: bảng, trường có phiên bản, đường dẫn, permission — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -2691,7 +2691,7 @@ Quyết định:
 Lý do: đề bài (mục D) và hợp đồng chung là nguồn chính; chỗ khảo sát khác đề bài thì theo đề bài.
 Ảnh chụp phiên bản giữ bài cũ đọc được mà không phải khoá trường.
 
-## D-120 · Bài gửi công khai của `forms`: `Origin`, email người gửi, bằng chứng đồng ý, trùng, giới hạn — 2026-11-12 — agent quyết
+## D-126 · Bài gửi công khai của `forms`: `Origin`, email người gửi, bằng chứng đồng ý, trùng, giới hạn — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -2711,7 +2711,7 @@ Quyết định:
 - `page_url` lấy từ thân; không gửi thì lấy header `Referer` nếu là địa chỉ `http(s)` (header lạ
   không thành lỗi 422). `referrer` chỉ từ thân (`document.referrer`).
 - Câu trả lời công khai: 201 `Data{id, message}` + `Location: /api/v1/forms/submissions/{id}` cho
-  nhận, giữ lại và bỏ đi (bỏ đi thì ID giả UUIDv7). Theo D-113, token thiếu / sai / hết hạn vẫn là lỗi
+  nhận, giữ lại và bỏ đi (bỏ đi thì ID giả UUIDv7). Theo D-119, token thiếu / sai / hết hạn vẫn là lỗi
   400 của `SpamGuard` (hợp đồng chung §6 liệt "token thiếu / sai" vào nhóm trả lời giống bài nhận,
   nhưng §2 và kernel coi đó là lỗi — giữ theo kernel; test chỉ kiểm bẫy / quá nhanh / quá nhiều).
 - Giới hạn mặc định (cấu hình, form ghi đè được hai cái đầu): 10 bài / giờ / khối IP / form, 5 bài
@@ -2721,11 +2721,11 @@ Quyết định:
 - Kích thước thân của `POST /public/{key}/submissions` giới hạn bằng `Module::body_limits` theo
   `AUTOXIDE_FORMS_MAX_SUBMISSION_BYTES` (mặc định 64 KiB); service kiểm thêm cỡ JSON của câu trả lời.
 
-Lý do: hợp đồng chung §2–§3 và D-113. Máy chủ biết chính xác chữ đồng ý đã phát ra nên lấy từ định
+Lý do: hợp đồng chung §2–§3 và D-119. Máy chủ biết chính xác chữ đồng ý đã phát ra nên lấy từ định
 nghĩa đáng tin hơn chữ do client gửi; hợp đồng chung được sửa cho khớp (forms lấy từ định nghĩa,
 module không có định nghĩa form thì nhận từ client).
 
-## D-121 · `forms`: mail báo quản trị viên qua event, event không mang câu trả lời, thời hạn giữ, CSV tự viết — 2026-11-12 — agent quyết
+## D-127 · `forms`: mail báo quản trị viên qua event, event không mang câu trả lời, thời hạn giữ, CSV tự viết — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -2756,10 +2756,10 @@ Quyết định:
   tab, CR thêm `'`, BOM UTF-8, CRLF. Không thêm thư viện. Xuất đồng bộ (đọc theo trang 200 dòng);
   xuất bằng job ghi vào `Storage` để sau (báo cáo cũng để sau).
 
-Lý do: event ghi cùng transaction với bài nên mail không sót; `dedupe_key` của D-115 chống mail
+Lý do: event ghi cùng transaction với bài nên mail không sót; `dedupe_key` của D-121 chống mail
 trùng khi event giao lại (D-054). CSV vài chục dòng tự viết đủ, không thêm thư viện.
 
-## D-122 · Tool MCP tạo / sửa form; không có tool xoá form; khoá phiên bản tên `etag` — 2026-11-12 — agent quyết
+## D-128 · Tool MCP tạo / sửa form; không có tool xoá form; khoá phiên bản tên `etag` — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -2778,7 +2778,7 @@ Quyết định:
 Lý do: chủ dự án yêu cầu agent quản lý được form qua MCP (12/11/2026); việc phá huỷ hàng loạt thì
 giữ cho người làm qua REST.
 
-## D-123 · `newsletter`: bảng, trạng thái, không foreign key — 2026-11-12 — agent quyết
+## D-129 · `newsletter`: bảng, trạng thái, không foreign key — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -2796,8 +2796,8 @@ Quyết định:
   để không ghi sai thành `hard_bounce`.
 - Thêm cột ngoài bảng của đề bài: `subscriptions.hold_reason` (lý do `Quarantine`, như
   `hold_reason` của comments — hợp đồng §4), `subscribers.soft_bounces`,
-  `campaigns.locale` (ngôn ngữ chân thư), `campaigns.run` và `prepared_at` (D-126),
-  `deliveries.claimed_at`, `lists.new_post_locale` (D-129).
+  `campaigns.locale` (ngôn ngữ chân thư), `campaigns.run` và `prepared_at` (D-132),
+  `deliveries.claimed_at`, `lists.new_post_locale` (D-135).
 - Số đếm của chiến dịch **không lưu** trong `newsletter_campaigns` mà đếm từ
   `newsletter_deliveries` khi đọc (`GROUP BY status`, có index `(campaign_id, status, id)`):
   lưu bộ đếm thì mỗi lượt gửi thêm một lần ghi tranh nhau trên cùng một dòng (SQLite một người
@@ -2806,7 +2806,7 @@ Quyết định:
 Đã cân nhắc: bảng nhật ký đồng ý chỉ thêm và bảng `feedback_events` của khảo sát — đề bài E không
 có; bằng chứng đồng ý nằm ở cột `consent` của đăng ký (hợp đồng §3), bounce ghi vào danh sách chặn.
 
-## D-124 · `newsletter`: token huỷ đăng ký: riêng cho từng mail, không phải từng đăng ký — 2026-11-12 — agent quyết
+## D-130 · `newsletter`: token huỷ đăng ký: riêng cho từng mail, không phải từng đăng ký — 2026-11-12 — agent quyết
 
 Bối cảnh: đề bài E nói "token ngẫu nhiên riêng của từng đăng ký, lưu băm, không hết hạn (không
 phụ thuộc khoá ký)". Nếu chỉ lưu bản băm thì máy chủ không có lại token gốc để đặt vào các mail
@@ -2825,7 +2825,7 @@ Quyết định:
   xoá dữ liệu của một người thì token trong mail cũ của họ hết tác dụng (dữ liệu đã xoá).
 - Mail gửi thử dùng token ngẫu nhiên không lưu: link không làm gì.
 
-## D-125 · `newsletter`: huỷ một chạm nhận thân form-urlencoded — ngoại lệ của `ValidJson` — 2026-11-12 — agent quyết
+## D-131 · `newsletter`: huỷ một chạm nhận thân form-urlencoded — ngoại lệ của `ValidJson` — 2026-11-12 — agent quyết
 
 Quyết định: `POST /api/v1/newsletter/public/unsubscribe?token=…` nhận thân bất kỳ (thường là
 `List-Unsubscribe=One-Click`, `application/x-www-form-urlencoded`, RFC 8058) và bỏ qua nó — token
@@ -2838,7 +2838,7 @@ lộ gì). Có hiệu lực ngay trong request. `GET` không đổi dữ liệu:
 lặng lẽ); đặt token trong đường dẫn (`/unsubscribe/{token}`) — log của kernel ghi đường dẫn
 nhưng không ghi query string, nên token để ở query.
 
-## D-126 · `newsletter`: gửi chiến dịch: hai loại job, nhận dòng bằng `UPDATE` có điều kiện, nhiều nhất một lần — 2026-11-12 — agent quyết
+## D-132 · `newsletter`: gửi chiến dịch: hai loại job, nhận dòng bằng `UPDATE` có điều kiện, nhiều nhất một lần — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -2857,7 +2857,7 @@ Quyết định:
 - `dedupe_key` có tiền tố `newsletter.delivery:` (đề bài: "= ID delivery") vì khoá chống trùng của
   module `mail` dùng chung mọi module, và để nhận ra mail của mình trong `mail.delivery_failed`.
 - `sent` nghĩa là "đã giao cho hàng đợi mail"; mail bị máy chủ nhận từ chối hẳn sau đó thì event
-  `mail.delivery_failed` đổi lượt gửi sang `failed` (D-128).
+  `mail.delivery_failed` đổi lượt gửi sang `failed` (D-134).
 - Khe hở "worker chết sau khi xếp mail, trước khi đánh `sent`": dòng đã nhận quá 300 giây (thời
   hạn giữ job) mà vẫn `pending` thành `failed` / `interrupted` — **nhiều nhất một lần**, không gửi
   lại vì token trong mail có thể đã đi mà bản băm đã bị ghi đè. Ghi rõ trong hướng dẫn.
@@ -2870,7 +2870,7 @@ Quyết định:
 "đã nhận" thể hiện bằng `unsubscribe_token_hash` khác `NULL`. Một job cho mỗi người nhận (Keila)
 — quá nhiều dòng job cho danh sách lớn.
 
-## D-127 · `newsletter`: đăng ký công khai: một câu trả lời, giữ lại thì buộc xác nhận, giới hạn mail xác nhận — 2026-11-12 — agent quyết
+## D-133 · `newsletter`: đăng ký công khai: một câu trả lời, giữ lại thì buộc xác nhận, giới hạn mail xác nhận — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -2891,7 +2891,7 @@ Quyết định:
   sau khi xin.
 - Nonce của token form lưu ID người đăng ký làm kết quả; `Claim::Replay` → rollback, trả cùng câu.
 
-## D-128 · `newsletter`: bounce và danh sách chặn — 2026-11-12 — agent quyết
+## D-134 · `newsletter`: bounce và danh sách chặn — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -2906,7 +2906,7 @@ Quyết định:
   từ 0.
 - Danh sách chặn theo email (đề bài E), không theo hash như khảo sát.
 
-## D-129 · `newsletter`: chiến dịch cho bài mới — 2026-11-12 — agent quyết
+## D-135 · `newsletter`: chiến dịch cho bài mới — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -2914,7 +2914,7 @@ Quyết định:
   động nếu đăng ký nhận event không module nào khai, nên module chỉ đăng ký khi
   `context.events().contains(…)` (tương tự cho `mail.delivery_failed`) — chương trình không có
   `content` vẫn chạy.
-- Chỉ bài viết (`published.kind = post`), đang công khai (`ResourceDirectory`, D-117); trang
+- Chỉ bài viết (`published.kind = post`), đang công khai (`ResourceDirectory`, D-123); trang
   (`page`) không sinh bản tin. Tiêu đề, tóm tắt, đường dẫn lấy qua `resolve("content.entry", id)`.
 - `source = "content.entry"`, `source_ref = "<entry_id>:<list_id>"`, unique, chèn `ON CONFLICT DO
   NOTHING`: một bài sinh nhiều nhất một chiến dịch cho mỗi danh sách, mãi mãi — event đăng lại
@@ -2928,7 +2928,7 @@ Quyết định:
 Đã cân nhắc: `AUTOXIDE_NEWSLETTER_AUTO_POST_MAX_AGE_HOURS` của khảo sát (bỏ qua bài cũ khi nhập
 hàng loạt) — đề bài không có; chế độ mặc định `off` và `draft` đủ an toàn. Ghi trong hướng dẫn.
 
-## D-130 · `newsletter`: thư quảng cáo — 2026-11-12 — agent quyết
+## D-136 · `newsletter`: thư quảng cáo — 2026-11-12 — agent quyết
 
 Quyết định: cờ `advertising` theo chiến dịch (đề bài E). Tiêu đề thêm
 `AUTOXIDE_NEWSLETTER_ADVERTISING_LABEL` (mặc định `[QC]`, `none` để bỏ). Mỗi địa chỉ nhận tối đa
@@ -2936,9 +2936,9 @@ Quyết định: cờ `advertising` theo chiến dịch (đề bài E). Tiêu đ
 trong 24 giờ, đếm từ lượt gửi `sent` của các chiến dịch quảng cáo; vượt thì lượt gửi `skipped` /
 `advertising_limit` (không dời sang hôm sau — đơn giản, dễ đoán). Chiến dịch quảng cáo cần
 `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` (503 `newsletter.postal_address_missing` khi gửi / hẹn giờ /
-gửi thử). Mọi giá trị là cấu hình, chưa đối chiếu Nghị định 91/2020 bản gốc (D-106 mục 4).
+gửi thử). Mọi giá trị là cấu hình, chưa đối chiếu Nghị định 91/2020 bản gốc (D-112 mục 4).
 
-## D-131 · `newsletter`: permission, `If-Match`, đường dẫn, MCP — 2026-11-12 — agent quyết
+## D-137 · `newsletter`: permission, `If-Match`, đường dẫn, MCP — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -2965,7 +2965,7 @@ Quyết định:
   `EmailDataResponse`, `ErasedResponse`, `ScheduleRequest`) được đổi bằng `#[schema(as =
   Newsletter…)]`: kernel ghép component theo tên và bản sau ghi đè bản trước **không báo lỗi**.
 
-## D-132 · `newsletter`: dữ liệu cá nhân — 2026-11-12 — agent quyết
+## D-138 · `newsletter`: dữ liệu cá nhân — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -2978,12 +2978,12 @@ Quyết định:
   nại / bị chặn tay cần giữ địa chỉ. Đây là ngoại lệ có lý do của quyền xoá; người cài xoá dòng đó
   bằng `DELETE /suppressions/{id}` nếu người đó yêu cầu. Bản xuất có dòng chặn.
 - IP chỉ lưu dạng `ip_hash::fingerprint` bên trong bằng chứng đồng ý (giữ cùng bằng chứng, như
-  D-121); không có cột IP riêng nên không cần cấu hình thời hạn xoá IP.
+  D-127); không có cột IP riêng nên không cần cấu hình thời hạn xoá IP.
 - Event không mang email; webhook nhận ID và `key` danh sách.
 - Lượt gửi giữ mãi (link huỷ trong mail không hết hạn); job hằng ngày chỉ xoá đăng ký chưa xác
   nhận quá `AUTOXIDE_NEWSLETTER_UNCONFIRMED_DAYS` (30) và người không còn gì.
 
-## D-133 · `newsletter`: cấu hình — 2026-11-12 — agent quyết
+## D-139 · `newsletter`: cấu hình — 2026-11-12 — agent quyết
 
 Quyết định: `AUTOXIDE_NEWSLETTER_CONFIRM_URL`, `…_PREFERENCES_URL` (có `{token}`, như
 `AUTOXIDE_AUTH_*_URL`), `…_SITE_URL`, `…_CONFIRM_HOURS` (168), `…_CONFIRM_MAILS_PER_DAY` (3),
@@ -2994,7 +2994,7 @@ Quyết định: `AUTOXIDE_NEWSLETTER_CONFIRM_URL`, `…_PREFERENCES_URL` (có `
 503 rõ ràng: trang xác nhận (đăng ký vào danh sách double opt-in), `AUTOXIDE_HTTP_PUBLIC_URL` và
 trang lựa chọn (gửi, hẹn giờ, tiếp tục, gửi thử), địa chỉ người gửi (thư quảng cáo).
 
-## D-134 · Kernel báo tên schema OpenAPI trùng nhau giữa các module — 2026-11-12 — agent quyết
+## D-140 · Kernel báo tên schema OpenAPI trùng nhau giữa các module — 2026-11-12 — agent quyết
 
 Bối cảnh: khi ghép tài liệu OpenAPI của các module, utoipa gộp component theo tên — hai module khai
 cùng tên kiểu (vd `Locale`) với nội dung khác nhau thì bản sau lặng lẽ thay bản trước, endpoint
@@ -3008,7 +3008,7 @@ nội dung (vd `Problem`) không sao. Module đặt tên riêng bằng `#[schema
 Đã cân nhắc: tự thêm tiền tố tên module vào mọi schema — đổi tên mọi kiểu đang có trong
 `docs/openapi.json` (thay đổi phá vỡ với SDK đã sinh).
 
-## D-135 · `comments`: bảng, trạng thái, hai cấp, số đếm — 2026-11-12 — agent quyết
+## D-141 · `comments`: bảng, trạng thái, hai cấp, số đếm — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -3037,7 +3037,7 @@ Quyết định:
 là đủ chặn trò "đăng sạch rồi sửa bẩn". Đếm trả lời bằng `GROUP BY` khi đọc — bộ đếm cùng
 transaction rẻ hơn và cho lọc "gốc đã xoá còn trả lời".
 
-## D-136 · `comments`: pipeline kiểm duyệt và chế độ duyệt; "đã từng được duyệt" chỉ theo tài khoản — 2026-11-12 — agent quyết
+## D-142 · `comments`: pipeline kiểm duyệt và chế độ duyệt; "đã từng được duyệt" chỉ theo tài khoản — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -3067,7 +3067,7 @@ Quyết định:
 cho khách đã xác minh một "khoá khách" giữ ở trình duyệt — thực chất là một kiểu tài khoản mới, để
 sau nếu chủ dự án muốn.
 
-## D-137 · `comments`: endpoint công khai và câu trả lời giống nhau — 2026-11-12 — agent quyết
+## D-143 · `comments`: endpoint công khai và câu trả lời giống nhau — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -3090,7 +3090,7 @@ Quyết định:
   `AUTOXIDE_COMMENTS_REPORTS_PER_HOUR`, vượt thì trả lời như thường mà không lưu.
 - Thân `POST /public/comments` và `PATCH /public/comments/{id}` tối đa 128 KiB (`Module::body_limits`).
 
-## D-138 · `comments`: kiểm duyệt, cấm, đích, MCP, permission — 2026-11-12 — agent quyết
+## D-144 · `comments`: kiểm duyệt, cấm, đích, MCP, permission — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -3117,9 +3117,9 @@ Quyết định:
 - Tool MCP: `comments.queue`, `comments.get` (`comments.read`), `comments.moderate`
   (`comments.moderate`, nhận `version` như `If-Match`), `comments.set_target_state`
   (`comments.manage`). Không có tool viết bình luận hay xoá hẳn.
-- Tên schema OpenAPI mang tiền tố `Comment…` / `Comments…` (D-134).
+- Tên schema OpenAPI mang tiền tố `Comment…` / `Comments…` (D-140).
 
-## D-139 · `comments`: chữ thường, HTML an toàn tự viết — 2026-11-12 — agent quyết
+## D-145 · `comments`: chữ thường, HTML an toàn tự viết — 2026-11-12 — agent quyết
 
 Quyết định: lưu chữ người viết (đã lọc); trả cả `body` lẫn `body_html` dựng khi đọc: escape `& < >
 " '`, xuống dòng thành `<br>`, chỉ `http://` / `https://` thành link `rel="nofollow ugc noopener"`
@@ -3127,7 +3127,7 @@ Quyết định: lưu chữ người viết (đã lọc); trả cả `body` lẫ
 viết, có test XSS (`<script>`, `on…`, `javascript:`, `data:`, chèn thuộc tính qua `"`). Không thêm
 thư viện; Markdown (`pulldown-cmark` + `ammonia`) để sau.
 
-## D-140 · `comments`: mail báo trả lời — 2026-11-12 — agent quyết
+## D-146 · `comments`: mail báo trả lời — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -3141,7 +3141,7 @@ Quyết định:
   lời. Mail không có chữ do người lạ gõ (hợp đồng §5): chỉ tiêu đề và đường dẫn của đích lấy qua sổ
   đối tượng (đích không có bộ tra thì một từ chung, không dùng `target_id` do client gửi),
   `AUTOXIDE_COMMENTS_SITE_URL` + đường dẫn, và link huỷ.
-- Token huỷ RIÊNG CHO TỪNG MAIL (như D-124 của newsletter): 32 byte ngẫu nhiên, chỉ lưu băm trong
+- Token huỷ RIÊNG CHO TỪNG MAIL (như D-130 của newsletter): 32 byte ngẫu nhiên, chỉ lưu băm trong
   `comments_tokens` (mục đích `unsubscribe`, `subject` = ID dòng theo dõi, sống 365 ngày) — bảng
   `comments_reply_subscriptions` vì vậy không có cột token (khác bảng của đề bài F: một token
   cho mỗi dòng mà chỉ lưu bản băm thì không đặt lại được vào mail sau). `POST /public/unsubscribe`
@@ -3150,7 +3150,7 @@ Quyết định:
 - Thiếu `AUTOXIDE_COMMENTS_VERIFY_URL` hoặc `AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL` thì tính năng tắt
   (không lỗi khởi động, `GET /public/settings` báo `reply_mails: false`).
 
-## D-141 · `comments`: dữ liệu cá nhân và thời hạn giữ — 2026-11-12 — agent quyết
+## D-147 · `comments`: dữ liệu cá nhân và thời hạn giữ — 2026-11-12 — agent quyết
 
 Quyết định:
 
@@ -3159,7 +3159,7 @@ Quyết định:
   `comments.comments_erased` cho cả lô, chỉ có ID. Hồ sơ tên bị xoá; báo cáo của người đó giữ lại
   nhưng `reporter_key` thành `deleted:<id báo cáo>`.
 - Lệnh cấm theo email GIỮ LẠI khi xoá theo email (để còn chặn được) — ngoại lệ có lý do, như danh
-  sách chặn của newsletter (D-132); bản xuất có nó.
+  sách chặn của newsletter (D-138); bản xuất có nó.
 - Tác giả tự xoá thì dấu vết IP giữ tới hạn thường (để còn cấm được kẻ phá).
 - Job hằng ngày `comments.cleanup`: `pending` / `spam` quá `AUTOXIDE_COMMENTS_RETENTION_DAYS`
   (30) bị xoá hẳn — bình luận gốc còn bình luận khác trong luồng thì xoá mềm; dấu vết IP quá
@@ -3167,7 +3167,7 @@ Quyết định:
   `rejected` giữ lại (đề bài chỉ nói chờ duyệt / spam; quyết định của người kiểm duyệt là hồ sơ).
 - `PersonalData` xuất hồ sơ, bình luận, báo cáo của tài khoản.
 
-## D-142 · `comments`: cấu hình — 2026-11-12 — agent quyết
+## D-148 · `comments`: cấu hình — 2026-11-12 — agent quyết
 
 Quyết định: `AUTOXIDE_COMMENTS_ENABLED` (true), `…_TARGET_TYPES` (`content.entry`),
 `…_ALLOW_GUESTS` (true), `…_SIGNED_IN_ONLY_TYPES`, `…_GUEST_MODERATION` (`pre`),

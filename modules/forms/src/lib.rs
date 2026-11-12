@@ -1,5 +1,5 @@
 //! Module `forms`: định nghĩa form với danh sách kiểu trường đóng, nhận bài gửi công khai qua bộ
-//! chống spam chung của kernel (hai pha, D-113), hộp thư quản trị, xuất CSV, mail báo quản trị
+//! chống spam chung của kernel (hai pha, D-119), hộp thư quản trị, xuất CSV, mail báo quản trị
 //! viên, xuất / xoá theo email, tự xoá theo thời hạn.
 //!
 //! Chỉ API: website hiển thị form và gửi bài (repo giao diện riêng). Mail báo đi qua `dyn

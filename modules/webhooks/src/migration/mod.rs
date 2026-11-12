@@ -12,7 +12,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::event::outbox_migration("m0002_create_events", "webhooks"),
         // Bảng `webhooks_jobs` (job queue): mỗi lần gửi là một job, có retry.
         autoxide_kernel::job::jobs_migration("m0003_create_jobs", "webhooks"),
-        // Cột `actor_kind` của bảng `webhooks_events` (người lạ khác hệ thống, D-116).
+        // Cột `actor_kind` của bảng `webhooks_events` (người lạ khác hệ thống, D-122).
         autoxide_kernel::event::outbox_actor_migration("m0004_add_event_actor", "webhooks"),
     ]
 }

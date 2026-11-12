@@ -1,5 +1,5 @@
 //! Token đặt lại mật khẩu và xác minh email chuyển sang bảng chung của kernel (`auth_tokens`,
-//! D-111). Token còn hạn, chưa dùng được chép sang (link trong mail đã gửi vẫn dùng được); hai
+//! D-117). Token còn hạn, chưa dùng được chép sang (link trong mail đã gửi vẫn dùng được); hai
 //! bảng cũ bị bỏ.
 
 use autoxide_kernel::migration::prelude::*;

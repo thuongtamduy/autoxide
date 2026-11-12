@@ -1,10 +1,10 @@
 //! Module `comments`: bình luận hai cấp gắn vào đích bất kỳ (`target_type`, `target_id`), của
 //! người dùng đăng nhập hoặc khách; pipeline kiểm duyệt có thứ tự qua bộ chống spam chung của
-//! kernel (hai pha, D-113); báo cáo vi phạm, cấm, sửa trong thời hạn, xoá mềm giữ luồng; số đếm
+//! kernel (hai pha, D-119); báo cáo vi phạm, cấm, sửa trong thời hạn, xoá mềm giữ luồng; số đếm
 //! theo đích; mở / đóng / ẩn đích; mail báo trả lời (chọn nhận, email đã xác minh).
 //!
 //! Chỉ API: website hiển thị khung bình luận (repo giao diện riêng). Mail đi qua `dyn Mailer` nên
-//! module đăng ký SAU module `mail`; đích được kiểm qua sổ đối tượng của kernel (D-117) nên đăng
+//! module đăng ký SAU module `mail`; đích được kiểm qua sổ đối tượng của kernel (D-123) nên đăng
 //! ký SAU module sở hữu đích (`content`). Hướng dẫn dùng: `docs/COMMENTS.md`.
 
 mod authoring;

@@ -357,7 +357,7 @@ impl Modules {
     /// ngay lúc khởi động.
     ///
     /// Hai module nội bộ luôn được thêm vào đầu danh sách: `kernel` (bảng dùng chung của
-    /// chương trình, vd khoá ký) và `antispam` (chống spam, D-113). Module nào cũng `require`
+    /// chương trình, vd khoá ký) và `antispam` (chống spam, D-119). Module nào cũng `require`
     /// được thứ chúng công bố.
     pub fn new(modules: Vec<Box<dyn Module>>) -> Result<Self, ModuleError> {
         let mut problems = Vec::new();

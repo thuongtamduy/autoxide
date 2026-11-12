@@ -1,6 +1,6 @@
 //! Chiến dịch cho bài mới: nghe event `content.entry_published` **bằng tên** (không phụ thuộc
 //! crate `content`), lấy tiêu đề, tóm tắt, đường dẫn qua sổ đối tượng của kernel
-//! (`resolve("content.entry", id)`, D-117), rồi với mỗi danh sách bật chế độ "bài mới":
+//! (`resolve("content.entry", id)`, D-123), rồi với mỗi danh sách bật chế độ "bài mới":
 //!
 //! - `draft`: tạo chiến dịch nháp chờ người duyệt;
 //! - `send`: tạo và gửi ngay (thiếu cấu hình cần cho gửi thì chỉ tạo nháp, ghi cảnh báo).

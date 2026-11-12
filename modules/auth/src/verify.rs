@@ -30,7 +30,7 @@ use crate::user::{self, UserService};
 const TOKEN_HOURS: i64 = 24;
 /// Mỗi địa chỉ nhận nhiều nhất một mail mỗi chừng này giây (chống dùng API để spam).
 const COOLDOWN_SECONDS: i64 = 60;
-/// Mục đích của token trong bảng `auth_tokens` (kernel, D-111): `subject` là ID người dùng,
+/// Mục đích của token trong bảng `auth_tokens` (kernel, D-117): `subject` là ID người dùng,
 /// `data` là địa chỉ email đang xác minh.
 const PURPOSE: &str = "email_verification";
 

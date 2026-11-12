@@ -1,6 +1,6 @@
 //! Chữ của bình luận: lọc, đếm link, dựng HTML an toàn, so từ cấm, email, tên.
 //!
-//! Bản đầu chỉ có **chữ thường** (D-106 mục 11 của khảo sát): máy chủ lưu đúng chữ người viết
+//! Bản đầu chỉ có **chữ thường** (D-112 mục 11 của khảo sát): máy chủ lưu đúng chữ người viết
 //! (đã lọc ký tự điều khiển) và dựng HTML khi trả về: escape mọi ký tự đặc biệt, xuống dòng thành
 //! `<br>`, chỉ địa chỉ `http://` / `https://` thành link, có `rel="nofollow ugc noopener"`. Tự
 //! viết vài chục dòng thay vì thêm thư viện (Markdown + sanitizer để sau).

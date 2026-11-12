@@ -1,4 +1,4 @@
-//! URL công khai của API (`AUTOXIDE_HTTP_PUBLIC_URL`, D-118): cần cho link tuyệt đối trỏ về API
+//! URL công khai của API (`AUTOXIDE_HTTP_PUBLIC_URL`, D-124): cần cho link tuyệt đối trỏ về API
 //! mà người nhận mở từ nơi khác — vd header `List-Unsubscribe` của bản tin (RFC 8058 đòi URL
 //! `https` tuyệt đối). Module lấy bằng `context.require::<PublicUrl>()`.
 

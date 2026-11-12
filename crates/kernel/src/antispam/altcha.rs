@@ -1,5 +1,5 @@
 //! Đề proof-of-work theo giao thức ALTCHA v2 (MIT), tự viết bằng `hmac` / `sha2` đang có — không
-//! dùng crate `altcha` vì nó kéo theo bản cũ của hai thư viện đó (D-114). Mặc định tắt
+//! dùng crate `altcha` vì nó kéo theo bản cũ của hai thư viện đó (D-120). Mặc định tắt
 //! (`AUTOXIDE_ANTISPAM_CHALLENGE=altcha` để bật).
 //!
 //! Cố định phần giao thức (widget, bộ giải và bộ kiểm phải khớp nhau):

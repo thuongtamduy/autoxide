@@ -1,4 +1,4 @@
-//! Giới hạn số lần theo khoá, đếm trong database (D-110): đúng khi chạy nhiều máy chủ và khi
+//! Giới hạn số lần theo khoá, đếm trong database (D-116): đúng khi chạy nhiều máy chủ và khi
 //! nhiều request cùng lúc, trên cả SQLite và Postgres.
 //!
 //! Dùng cho: khoá đăng nhập theo email (`auth`), giới hạn gửi form theo IP băm hay theo email

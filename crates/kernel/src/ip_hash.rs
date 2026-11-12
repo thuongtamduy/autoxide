@@ -1,4 +1,4 @@
-//! Băm địa chỉ IP để đếm và lưu mà không giữ IP thô (D-109).
+//! Băm địa chỉ IP để đếm và lưu mà không giữ IP thô (D-115).
 //!
 //! 1. Gộp theo tiền tố: IPv4 theo khối /24, IPv6 theo khối /64 (một nhà, một máy thường giữ cả
 //!    khối và đổi địa chỉ trong khối) — cũng là cách rate limiter gộp IPv6.

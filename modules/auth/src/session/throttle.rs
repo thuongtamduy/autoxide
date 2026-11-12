@@ -3,7 +3,7 @@
 //! Đếm lần đăng nhập sai theo email (kể cả email không tồn tại — để không lộ email
 //! nào có thật). Quá `max_failures` lần trong một `period` thì khoá đăng nhập của email
 //! đó trong `period`, kể cả khi mật khẩu đúng. Đếm trong database (bảng `auth_throttle`,
-//! bằng `Throttle` của kernel, D-110) nên mọi máy chủ dùng chung một con số, và nhiều lần thử
+//! bằng `Throttle` của kernel, D-116) nên mọi máy chủ dùng chung một con số, và nhiều lần thử
 //! cùng lúc không vượt được số lần cho phép (D-079).
 
 use std::time::Duration;

@@ -2,24 +2,24 @@
 
 Viết sau giai đoạn 0 của [`forms-newsletter-comments.md`](forms-newsletter-comments.md). Ba module
 phải làm GIỐNG NHAU ở mọi điểm dưới đây; chỗ nào hợp đồng không nói thì theo `CLAUDE.md` và đề bài
-của module. Phần nền nằm trong kernel (D-107 … D-118) — đọc doc comment của từng mục trước khi
+của module. Phần nền nằm trong kernel (D-113 … D-124) — đọc doc comment của từng mục trước khi
 dùng, đừng tự chế cách khác.
 
 ## 1. Đồ nghề của kernel
 
 | Cần | Dùng | Quyết định |
 |---|---|---|
-| Khoá HMAC cho việc của module | `context.require::<SecretKey>()?` → `derive("autoxide/<module>/<việc>/v1")` | D-107 |
-| IP, user agent, `Origin`, `Referer` | extractor `autoxide_kernel::http::ClientInfo` | D-108 |
-| Lưu dấu vết IP | `ip_hash::fingerprint(&secret, ip)` (không bao giờ lưu IP thô) | D-109 |
-| Giới hạn số lần | `Throttle::new(db, "<module>", limit, window)`, bảng `throttle_migration` | D-110 |
-| Token dùng một lần (xác nhận email…) | `OneTimeTokens::new("<module>")`, bảng `tokens_migration` | D-111 |
-| Chống spam bài gửi công khai | `context.require::<SpamGuard>()?`, bảng `antispam_migration` | D-113, D-114 |
-| Gửi mail | `dyn Mailer`, `Mail { …, reply_to, headers, dedupe_key, ..Mail::default() }` | D-115 |
-| Mail bị từ chối hẳn | nghe event `autoxide_kernel::mail::DELIVERY_FAILED` | D-115 |
-| Event do người lạ gây ra | `Actor::public()`; bảng event thêm `outbox_actor_migration` | D-116 |
-| Tra đối tượng của module khác | `context.resources()` → `resolve("content.entry", id)` | D-117 |
-| Link tuyệt đối về API | `context.require::<PublicUrl>()?` → `link("/api/v1/…")` | D-118 |
+| Khoá HMAC cho việc của module | `context.require::<SecretKey>()?` → `derive("autoxide/<module>/<việc>/v1")` | D-113 |
+| IP, user agent, `Origin`, `Referer` | extractor `autoxide_kernel::http::ClientInfo` | D-114 |
+| Lưu dấu vết IP | `ip_hash::fingerprint(&secret, ip)` (không bao giờ lưu IP thô) | D-115 |
+| Giới hạn số lần | `Throttle::new(db, "<module>", limit, window)`, bảng `throttle_migration` | D-116 |
+| Token dùng một lần (xác nhận email…) | `OneTimeTokens::new("<module>")`, bảng `tokens_migration` | D-117 |
+| Chống spam bài gửi công khai | `context.require::<SpamGuard>()?`, bảng `antispam_migration` | D-119, D-120 |
+| Gửi mail | `dyn Mailer`, `Mail { …, reply_to, headers, dedupe_key, ..Mail::default() }` | D-121 |
+| Mail bị từ chối hẳn | nghe event `autoxide_kernel::mail::DELIVERY_FAILED` | D-121 |
+| Event do người lạ gây ra | `Actor::public()`; bảng event thêm `outbox_actor_migration` | D-122 |
+| Tra đối tượng của module khác | `context.resources()` → `resolve("content.entry", id)` | D-123 |
+| Link tuyệt đối về API | `context.require::<PublicUrl>()?` → `link("/api/v1/…")` | D-124 |
 
 Thứ tự migration của module mới (sau các bảng của module):
 
@@ -67,7 +67,7 @@ autoxide_kernel::tokens::tokens_migration("m00f_create_tokens", "newsletter"),
 - **Bằng chứng đồng ý** (ô đồng ý của form, đăng ký bản tin): cột JSON `consent` =
   `{"text": "<đúng chữ đã hiện>", "version": "<phiên bản>", "at": "<thời điểm UTC>", "source":
   "<nơi đăng ký>", "ip_fingerprint": "<…>"}`. Module có định nghĩa
-  ô đồng ý (`forms`) lấy chữ từ định nghĩa theo ngôn ngữ đã hiện (D-120); module khác nhận chữ
+  ô đồng ý (`forms`) lấy chữ từ định nghĩa theo ngôn ngữ đã hiện (D-126); module khác nhận chữ
   do client gửi kèm và lưu nguyên văn. Không có ô đồng ý thì `null`.
 - **Xuất / xoá theo email** (quyền của chủ dữ liệu, người không có tài khoản):
   `GET /api/v1/<module>/data?email=` và `DELETE /api/v1/<module>/data?email=`, permission
@@ -103,7 +103,7 @@ autoxide_kernel::tokens::tokens_migration("m00f_create_tokens", "newsletter"),
 Mọi test chạm database qua `TestDatabase::run`, chạy trên cả SQLite và Postgres:
 
 - bẫy, gửi quá nhanh, quá nhiều lần → câu trả lời công khai giống hệt bài nhận; token thiếu /
-  sai / hết hạn → lỗi 400 của `SpamGuard` (D-113: website cần biết để tải lại form);
+  sai / hết hạn → lỗi 400 của `SpamGuard` (D-119: website cần biết để tải lại form);
 - gửi lại cùng token → cùng một bản ghi, kể cả gửi đồng thời;
 - xoá / xuất theo email; `USER_DELETED`; event không có email trong payload;
 - endpoint công khai qua router thật (HTTP), tool MCP qua client thật.

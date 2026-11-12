@@ -4,8 +4,8 @@ Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQL
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
 Trạng thái: **bước 0–12, 14–17 xong**; bước 13 còn CI trên GitHub và phát hành; đang làm
-bước 18 (nền chung cho dữ liệu người đọc gửi lên) rồi 19–21 (`forms`, `newsletter`,
-`comments`) — D-106.
+bước 19 (nền chung cho dữ liệu người đọc gửi lên) rồi 20–22 (`forms`, `newsletter`,
+`comments`) — D-112.
 
 ## 0. Khung dự án
 
@@ -226,7 +226,7 @@ khảo sát: [`docs/research/content.md`](research/content.md).
 - [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database (kể cả test đồng
       thời); hướng dẫn dùng (tiếng Anh + tiếng Việt)
 
-## 18. Nền chung cho dữ liệu người đọc gửi lên (core, chủ dự án giao ngày 12/11/2026, D-106)
+## 19. Nền chung cho dữ liệu người đọc gửi lên (core, chủ dự án giao ngày 12/11/2026, D-112)
 
 Đề bài: [`docs/prompts/forms-newsletter-comments.md`](prompts/forms-newsletter-comments.md),
 giai đoạn 0; khảo sát: [`docs/research/forms-newsletter-comments.md`](research/forms-newsletter-comments.md).
@@ -249,7 +249,7 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 - [x] `AUTOXIDE_HTTP_PUBLIC_URL`
 - [x] Hợp đồng chung cho ba module: `docs/prompts/reader-input-contract.md`
 
-## 19. Module `forms` — biểu mẫu (chủ dự án giao ngày 12/11/2026, D-106)
+## 20. Module `forms` — biểu mẫu (chủ dự án giao ngày 12/11/2026, D-112)
 
 - [x] Định nghĩa form có phiên bản, trường theo danh sách đóng, nhãn theo ngôn ngữ
 - [x] Nhận bài gửi công khai qua chống spam; máy chủ kiểm mọi trường, báo mọi lỗi một lần
@@ -257,7 +257,7 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 - [x] Xoá và xuất theo email; tự xoá theo thời hạn; event không mang câu trả lời; tool MCP
 - [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
 
-## 20. Module `newsletter` — bản tin email (chủ dự án giao ngày 12/11/2026, D-106)
+## 21. Module `newsletter` — bản tin email (chủ dự án giao ngày 12/11/2026, D-112)
 
 - [x] Danh sách, người đăng ký, xác nhận hai bước (`POST`, không `GET`)
 - [x] Huỷ đăng ký một chạm (RFC 8058) và trang chọn danh sách bằng token
@@ -267,7 +267,7 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 - [x] Tự tạo bản tin khi `content` đăng bài (tuỳ chọn); tool MCP
 - [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
 
-## 21. Module `comments` — bình luận (chủ dự án giao ngày 12/11/2026, D-106)
+## 22. Module `comments` — bình luận (chủ dự án giao ngày 12/11/2026, D-112)
 
 - [x] Bình luận theo đích bất kỳ, hai cấp; người dùng đăng nhập hoặc khách
 - [x] Kiểm duyệt theo pipeline cố định; báo cáo vi phạm; cấm theo người dùng / email / IP băm

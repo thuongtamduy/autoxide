@@ -1,4 +1,4 @@
-//! Số đếm đăng nhập sai chuyển sang bảng chung của kernel (`auth_throttle`, D-110). Số đếm
+//! Số đếm đăng nhập sai chuyển sang bảng chung của kernel (`auth_throttle`, D-116). Số đếm
 //! cũ không được chép: chúng sống tối đa một cửa sổ (mặc định 15 phút).
 
 use autoxide_kernel::migration::prelude::*;

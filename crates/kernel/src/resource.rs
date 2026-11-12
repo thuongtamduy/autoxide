@@ -1,4 +1,4 @@
-//! Sổ đối tượng trung lập (D-117): module đăng ký một loại đối tượng (`<module>.<loại>`, vd
+//! Sổ đối tượng trung lập (D-123): module đăng ký một loại đối tượng (`<module>.<loại>`, vd
 //! `content.entry`) kèm bộ tra; module khác hỏi "đối tượng này có không, có công khai không, tên
 //! và đường dẫn là gì" mà không phụ thuộc module sở hữu và không đọc bảng của nó.
 //!

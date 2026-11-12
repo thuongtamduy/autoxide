@@ -1,5 +1,5 @@
 //! Cột `actor_kind` (`system` / `user` / `public`): ai gây ra thay đổi, kể cả người lạ chưa đăng
-//! nhập (D-116). Dòng cũ để trống: hiểu theo `actor_user_id`.
+//! nhập (D-122). Dòng cũ để trống: hiểu theo `actor_user_id`.
 
 use autoxide_kernel::migration::prelude::*;
 

@@ -45,7 +45,7 @@ Thấy đang lạc thì dừng việc đó, quay lại lộ trình và nói rõ 
 lại của hệ thống nào có sẵn). **Ai dùng:** mọi người đều dùng được — không gắn với
 một công ty hay một ngành. **Mã nguồn mở, công khai toàn bộ.** **Module đầu
 tiên:** `media` (thư viện media, D-091) rồi `content` (nội dung, D-096, D-098) — chủ dự án
-chọn cả hai. Tiếp theo: `forms`, `newsletter`, `comments` (D-106), sau phần nền chung cho dữ
+chọn cả hai. Tiếp theo: `forms`, `newsletter`, `comments` (D-112), sau phần nền chung cho dữ
 liệu người đọc gửi lên. Giao diện là repo riêng, công khai (D-096, D-097).
 
 Hệ quả cho agent:

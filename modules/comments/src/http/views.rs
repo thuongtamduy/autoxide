@@ -1,6 +1,6 @@
 //! Hình dạng trả về của module, dùng chung cho REST và tool MCP. Kiểu công khai (`PublicComment`…)
 //! KHÔNG BAO GIỜ có email, dấu vết IP, lý do giữ lại hay trạng thái thật của bình luận chưa hiện.
-//! Tên schema mang tiền tố `Comment…` để không trùng module khác (D-134).
+//! Tên schema mang tiền tố `Comment…` để không trùng module khác (D-140).
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -1,5 +1,5 @@
 //! Bảng `comments_reply_subscriptions`: email đã xác minh muốn nhận mail khi bình luận có trả
-//! lời. Token huỷ của từng mail nằm ở `comments_tokens` (mục đích `unsubscribe`, D-124 của
+//! lời. Token huỷ của từng mail nằm ở `comments_tokens` (mục đích `unsubscribe`, D-130 của
 //! `newsletter`: token riêng cho từng mail, chỉ lưu bản băm).
 
 use sea_orm::entity::prelude::*;

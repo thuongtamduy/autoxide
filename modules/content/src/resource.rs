@@ -1,4 +1,4 @@
-//! Loại đối tượng `content.entry` trong sổ đối tượng của kernel (D-117): module khác (bình luận,
+//! Loại đối tượng `content.entry` trong sổ đối tượng của kernel (D-123): module khác (bình luận,
 //! bản tin) hỏi một bài / trang có không, có công khai không, tiêu đề, tóm tắt, đường dẫn — mà
 //! không phụ thuộc crate `content` và không đọc bảng của nó.
 

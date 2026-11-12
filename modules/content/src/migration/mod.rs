@@ -12,7 +12,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::event::outbox_migration("m0002_create_events", "content"),
         // Bảng `content_jobs` (job queue): hẹn giờ, dọn revision.
         autoxide_kernel::job::jobs_migration("m0003_create_jobs", "content"),
-        // Cột `actor_kind` của bảng `content_events` (người lạ khác hệ thống, D-116).
-        autoxide_kernel::event::outbox_actor_migration("m0004_add_event_actor", "content"),
+        // Cột `actor_kind` của bảng `content_events` (người lạ khác hệ thống, D-122).
+        autoxide_kernel::event::outbox_actor_migration("m0007_add_event_actor", "content"),
     ]
 }

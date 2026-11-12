@@ -25,7 +25,7 @@ use crate::user::UserService;
 const TOKEN_MINUTES: i64 = 30;
 /// Mỗi email nhận nhiều nhất một mail mỗi chừng này giây (chống dùng API để spam).
 const COOLDOWN_SECONDS: i64 = 60;
-/// Mục đích của token trong bảng `auth_tokens` (kernel, D-111); `subject` là ID người dùng.
+/// Mục đích của token trong bảng `auth_tokens` (kernel, D-117); `subject` là ID người dùng.
 const PURPOSE: &str = "password_reset";
 
 fn tokens() -> OneTimeTokens {

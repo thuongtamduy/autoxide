@@ -4,7 +4,7 @@
 //! `context.require::<dyn Mailer>()` (đăng ký SAU module `mail`). `send` chỉ đưa mail vào
 //! hàng đợi rồi trả về ngay: việc gửi chạy nền, lỗi tạm thời thì thử lại (D-061). Máy chủ nhận
 //! từ chối hẳn (SMTP 5xx: địa chỉ không có…) thì không thử lại mà phát event
-//! [`DELIVERY_FAILED`] (D-115).
+//! [`DELIVERY_FAILED`] (D-121).
 
 use crate::error::{Error, FieldError};
 use crate::i18n::{Language, Translations};

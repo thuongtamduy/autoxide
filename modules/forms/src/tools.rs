@@ -9,7 +9,7 @@
 //! REST.
 //!
 //! Không có tool xoá form: xoá form xoá luôn mọi bài gửi, không hoàn tác được — agent đóng form
-//! bằng `forms.update` (`status: closed`); xoá vẫn làm được qua REST (D-122).
+//! bằng `forms.update` (`status: closed`); xoá vẫn làm được qua REST (D-128).
 
 use std::sync::Arc;
 

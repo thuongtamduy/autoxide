@@ -10,7 +10,7 @@
 //!   dẫn của đích (do module sở hữu cấp, qua sổ đối tượng) và link — không chữ bình luận, không
 //!   tên người trả lời, không ID đích do client gửi.
 //! - Mỗi mail báo có token huỷ riêng (32 byte ngẫu nhiên, chỉ lưu bản băm, mục đích
-//!   `unsubscribe`, sống 365 ngày) — như D-124 của `newsletter`.
+//!   `unsubscribe`, sống 365 ngày) — như D-130 của `newsletter`.
 //! - Event được giao lại (D-054): mail mang `dedupe_key` = trả lời + dòng theo dõi.
 //! - Giới hạn số mail xác minh tới một địa chỉ mỗi ngày bằng `Throttle` (`posting.rs`).
 

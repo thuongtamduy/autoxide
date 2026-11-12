@@ -1,6 +1,6 @@
 //! Đích của bình luận: cặp (`target_type`, `target_id`) — không foreign key, không đọc bảng của
 //! module sở hữu. Loại đích phải nằm trong `AUTOXIDE_COMMENTS_TARGET_TYPES`; loại có bộ tra trong
-//! sổ đối tượng của kernel (D-117, vd `content.entry`) thì đích phải có và công khai.
+//! sổ đối tượng của kernel (D-123, vd `content.entry`) thì đích phải có và công khai.
 //!
 //! Mở / đóng / ẩn theo đích (quản trị viên, tool MCP), tự đóng sau `closes_at`, và nghe event
 //! "đã lưu trữ / đã xoá" của module sở hữu **bằng tên** (chỉ khi module đó có trong chương trình)

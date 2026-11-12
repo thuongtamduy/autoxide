@@ -1,4 +1,4 @@
-//! Chống spam cho dữ liệu người lạ gửi lên (form, đăng ký bản tin, bình luận) — D-113.
+//! Chống spam cho dữ liệu người lạ gửi lên (form, đăng ký bản tin, bình luận) — D-119.
 //!
 //! Module lấy [`SpamGuard`] lúc khởi động (`context.require::<SpamGuard>()`) và chạy **hai pha**:
 //!
