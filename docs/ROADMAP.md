@@ -3,8 +3,9 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–12, 14–16 xong**; bước 13 còn CI trên GitHub và phát hành; đang làm
-bước 17 (`content`) — D-096, D-098, D-101, D-102.
+Trạng thái: **bước 0–12, 14–17 xong**; bước 13 còn CI trên GitHub và phát hành; đang làm
+bước 18 (nền chung cho dữ liệu người đọc gửi lên) rồi 19–21 (`forms`, `newsletter`,
+`comments`) — D-106.
 
 ## 0. Khung dự án
 
@@ -224,6 +225,56 @@ khảo sát: [`docs/research/content.md`](research/content.md).
       gọi cùng service; dọn và xuất dữ liệu cá nhân
 - [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database (kể cả test đồng
       thời); hướng dẫn dùng (tiếng Anh + tiếng Việt)
+
+## 18. Nền chung cho dữ liệu người đọc gửi lên (core, chủ dự án giao ngày 12/11/2026, D-106)
+
+Đề bài: [`docs/prompts/forms-newsletter-comments.md`](prompts/forms-newsletter-comments.md),
+giai đoạn 0; khảo sát: [`docs/research/forms-newsletter-comments.md`](research/forms-newsletter-comments.md).
+Mỗi mục một commit, gate xanh trên cả hai database.
+
+- [ ] Khoá ký của kernel (`AUTOXIDE_SECRET_KEY`, dẫn khoá theo mục đích; không cấu hình thì sinh
+      một lần và lưu trong database)
+- [ ] `ClientInfo` dùng chung (IP đã giải, user agent, `Origin`, `Referer`);
+      `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`
+- [ ] Băm IP (gộp tiền tố rồi HMAC; dạng `bucket` theo ngày và `fingerprint`)
+- [ ] `Throttle` lưu trong database, dùng chung; `auth` chuyển sang dùng
+- [ ] Token dùng một lần trong kernel; `auth` chuyển sang dùng, hành vi không đổi
+- [ ] Chống spam hai pha: nhận / cách ly / từ chối; trường bẫy, token form ký, giới hạn theo IP
+      và email băm, phát hiện trùng; nonce của token form làm idempotency cho người lạ
+- [ ] ALTCHA v2 tự viết (mặc định tắt)
+- [ ] `Mail` / `Mailer`: `reply_to`, header theo danh sách cho phép, lỗi vĩnh viễn / tạm thời,
+      khoá chống trùng; event thất bại vĩnh viễn
+- [ ] `Actor` cho người lạ trên outbox
+- [ ] `ResourceDirectory` trung lập; `content` đăng ký resolver
+- [ ] `AUTOXIDE_HTTP_PUBLIC_URL`
+- [ ] Hợp đồng chung cho ba module: `docs/prompts/reader-input-contract.md`
+
+## 19. Module `forms` — biểu mẫu (chủ dự án giao ngày 12/11/2026, D-106)
+
+- [ ] Định nghĩa form có phiên bản, trường theo danh sách đóng, nhãn theo ngôn ngữ
+- [ ] Nhận bài gửi công khai qua chống spam; máy chủ kiểm mọi trường, báo mọi lỗi một lần
+- [ ] Hộp thư quản trị, email báo quản trị viên, xuất CSV (chặn CSV injection)
+- [ ] Xoá và xuất theo email; tự xoá theo thời hạn; event không mang câu trả lời; tool MCP
+- [ ] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
+
+## 20. Module `newsletter` — bản tin email (chủ dự án giao ngày 12/11/2026, D-106)
+
+- [ ] Danh sách, người đăng ký, xác nhận hai bước (`POST`, không `GET`)
+- [ ] Huỷ đăng ký một chạm (RFC 8058) và trang chọn danh sách bằng token
+- [ ] Chiến dịch: nháp, hẹn giờ, gửi theo lô có giới hạn tốc độ, tạm dừng, tiếp tục, huỷ; không
+      gửi trùng khi chạy lại
+- [ ] Danh sách chặn, endpoint bounce chung; thư quảng cáo theo cấu hình
+- [ ] Tự tạo bản tin khi `content` đăng bài (tuỳ chọn); tool MCP
+- [ ] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
+
+## 21. Module `comments` — bình luận (chủ dự án giao ngày 12/11/2026, D-106)
+
+- [ ] Bình luận theo đích bất kỳ, hai cấp; người dùng đăng nhập hoặc khách
+- [ ] Kiểm duyệt theo pipeline cố định; báo cáo vi phạm; cấm theo người dùng / email / IP băm
+- [ ] Sửa trong thời hạn (token sửa cho khách), xoá mềm giữ luồng, đếm, mở / đóng đích
+- [ ] Báo email khi có trả lời (chọn nhận, email đã xác minh); giữ dữ liệu theo thời hạn
+- [ ] Dữ liệu cá nhân; tool MCP
+- [ ] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
 
 ## Sau core (chưa mở)
 

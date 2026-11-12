@@ -2377,3 +2377,29 @@ làm cho mỗi việc".
 Đã cân nhắc: foreign key `ON DELETE CASCADE` trong module — hành vi phụ thuộc cấu hình kết nối
 SQLite; lưu preview token vào bảng để thu hồi từng cái — thêm bảng và dọn dẹp cho một tính năng
 token sống 10 phút; retry lịch thất bại — lỗi nghiệp vụ không tự hết, retry chỉ làm ồn log.
+
+## D-106 · Ba module `forms`, `newsletter`, `comments`, sau phần nền chung trong core — 2026-11-12 — chủ dự án quyết
+
+Bối cảnh: đề bài `docs/prompts/forms-newsletter-comments.md` và khảo sát
+`docs/research/forms-newsletter-comments.md`. Cả ba module nhận dữ liệu từ người lạ không đăng
+nhập, nên cần chung một nền (chống spam, token dùng một lần, IP người gọi, băm IP, giới hạn số
+lần) mà core chưa có.
+
+Quyết định (chủ dự án, ngày 12/11/2026):
+
+1. Ba module nghiệp vụ mới, mỗi module một crate: `forms` (biểu mẫu), `newsletter` (bản tin
+   email), `comments` (bình luận). Không gộp. Thứ tự ưu tiên khi phải chọn: `forms` →
+   `newsletter` → `comments`.
+2. Thứ dùng chung cho cả ba làm trong core, ở dạng trung lập, trước khi làm ba module — không
+   module nào tự chế cách riêng.
+3. Làm theo ba giai đoạn: nền chung tuần tự (bước 18); ba module song song, mỗi module một
+   subagent; agent chính gộp (bước 19–21).
+4. Yêu cầu pháp lý chưa chắc chắn (Nghị định 91/2020 về thư rác, Nghị định 147/2024 về bình
+   luận, Luật Bảo vệ dữ liệu cá nhân 2025) làm thành cấu hình, không cài cứng; tài liệu nói rõ
+   người cài phải tự kiểm văn bản gốc.
+5. Người lạ cài là chạy được, không cần tài khoản dịch vụ bên thứ ba (CAPTCHA, Akismet chỉ là
+   tuỳ chọn cắm thêm).
+
+Không làm ở đợt này: tải file kèm bài gửi form, email tự trả lời người gửi form, form nhiều
+bước, thanh toán, đo lượt mở / bấm link, trình soạn email kéo thả, reaction / vote, đăng nhập
+mạng xã hội, phát hiện nội dung độc hại bằng AI, kết nối riêng từng nhà cung cấp email.
