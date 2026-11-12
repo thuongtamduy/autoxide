@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
-use autoxide_kernel::error::Error;
+use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::{ClientInfo, ValidJson};
 use autoxide_kernel::response::{Created, Problem};
 use autoxide_kernel::version::Tagged;
@@ -125,7 +125,7 @@ impl PublicFormResponse {
 pub(crate) struct LocaleQuery {
     /// `en` (default) or `vi`. A text missing in that language falls back to the other.
     #[param(value_type = Option<Locale>, inline)]
-    locale: Option<Locale>,
+    locale: Option<String>,
 }
 
 /// Get a form to show (public).
@@ -142,7 +142,7 @@ pub(crate) struct LocaleQuery {
     responses(
         (status = 200, description = "The form.", body = autoxide_kernel::response::Data<PublicFormResponse>, headers(("ETag" = String, description = "Version; send it in `If-None-Match` to get 304."))),
         (status = 404, description = "No form has this key; code `forms.not_found`.", body = Problem),
-        (status = 422, description = "`locale` is not `en` or `vi`; code `invalid_query`.", body = Problem),
+        (status = 422, description = "`locale` is not `en` or `vi`; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn get_public_form(
@@ -151,8 +151,13 @@ pub(crate) async fn get_public_form(
     Path(key): Path<String>,
     Query(query): Query<LocaleQuery>,
 ) -> Result<Tagged<PublicFormResponse>, Error> {
+    let locale = match query.locale.as_deref().map(str::trim).filter(|raw| !raw.is_empty()) {
+        None => Locale::default(),
+        Some(raw) => Locale::parse(raw).ok_or_else(|| {
+            Error::validation(vec![FieldError::new("locale", "invalid", "must be `en` or `vi`")])
+        })?,
+    };
     let form = service.public_form(&key).await?;
-    let locale = query.locale.unwrap_or_default();
     Ok(Tagged { version: form.row.updated_at, data: PublicFormResponse::new(&form, locale) })
 }
 

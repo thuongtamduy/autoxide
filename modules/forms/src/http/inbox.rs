@@ -324,7 +324,15 @@ pub(crate) async fn delete_submission(
 pub(crate) struct EmailQuery {
     /// The email address of the person (any case).
     #[param(example = "ada@example.com")]
-    email: String,
+    email: Option<String>,
+}
+
+impl EmailQuery {
+    fn email(&self) -> Result<&str, Error> {
+        self.email.as_deref().ok_or_else(|| {
+            Error::validation(vec![FieldError::new("email", "required", "is required")])
+        })
+    }
 }
 
 /// Everything the forms hold about one email address.
@@ -357,7 +365,7 @@ pub(crate) struct ErasedResponse {
         (status = 200, description = "The data.", body = Data<EmailDataResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `forms.export`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "`email` is not an email address; see `errors`.", body = Problem),
+        (status = 422, description = "`email` is missing or not an email address; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn get_email_data(
@@ -365,8 +373,8 @@ pub(crate) async fn get_email_data(
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<EmailDataResponse>, Error> {
-    let found = service.submissions_of_email(&principal, &query.email).await?;
-    let email = crate::fields::normalize_email(&query.email);
+    let found = service.submissions_of_email(&principal, query.email()?).await?;
+    let email = crate::fields::normalize_email(query.email()?);
     let submissions = found.into_iter().map(SubmissionResponse::from).collect();
     Ok(Data { data: EmailDataResponse { email, submissions } })
 }
@@ -386,7 +394,7 @@ pub(crate) async fn get_email_data(
         (status = 200, description = "How many submissions were deleted.", body = Data<ErasedResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `forms.export`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "`email` is not an email address; see `errors`.", body = Problem),
+        (status = 422, description = "`email` is missing or not an email address; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn delete_email_data(
@@ -394,6 +402,6 @@ pub(crate) async fn delete_email_data(
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<ErasedResponse>, Error> {
-    let deleted = service.erase_email(&principal, &query.email).await?;
+    let deleted = service.erase_email(&principal, query.email()?).await?;
     Ok(Data { data: ErasedResponse { deleted } })
 }

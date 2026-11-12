@@ -11511,7 +11511,7 @@
             "name": "email",
             "in": "query",
             "description": "The email address of the person (any case).",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             },
@@ -11562,7 +11562,7 @@
             }
           },
           "422": {
-            "description": "`email` is not an email address; see `errors`.",
+            "description": "`email` is missing or not an email address; see `errors`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11600,7 +11600,7 @@
             "name": "email",
             "in": "query",
             "description": "The email address of the person (any case).",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             },
@@ -11664,7 +11664,7 @@
             }
           },
           "422": {
-            "description": "`email` is not an email address; see `errors`.",
+            "description": "`email` is missing or not an email address; see `errors`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11766,7 +11766,7 @@
             }
           },
           "422": {
-            "description": "`locale` is not `en` or `vi`; code `invalid_query`.",
+            "description": "`locale` is not `en` or `vi`; see `errors`.",
             "content": {
               "application/json": {
                 "schema": {

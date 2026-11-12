@@ -212,6 +212,8 @@ async fn vong_doi_qua_http() {
         let cached = send(&router, "GET", "/forms/public/contact?locale=vi", None, &[("if-none-match", &etag)], None).await;
         assert_eq!(cached.status, StatusCode::NOT_MODIFIED);
         assert_eq!(send(&router, "GET", "/forms/public/nope", None, &[], None).await.status, StatusCode::NOT_FOUND);
+        let french = send(&router, "GET", "/forms/public/contact?locale=fr", None, &[], None).await;
+        assert_eq!((french.status, french.json()["errors"][0]["field"].as_str()), (StatusCode::UNPROCESSABLE_ENTITY, Some("locale")));
 
         // Bài thật.
         let origin = [("origin", "https://example.com")];
@@ -290,6 +292,7 @@ async fn vong_doi_qua_http() {
         assert_eq!(data.status, StatusCode::OK, "{}", data.json());
         assert_eq!(data.json()["data"]["submissions"].as_array().unwrap().len(), 1);
         assert_eq!(send(&router, "GET", "/forms/data?email=ada@example.com", Some("reader"), &[], None).await.status, StatusCode::FORBIDDEN);
+        assert_eq!(send(&router, "GET", "/forms/data", Some("admin"), &[], None).await.status, StatusCode::UNPROCESSABLE_ENTITY);
         let erased = send(&router, "DELETE", "/forms/data?email=ada@example.com", Some("admin"), &[], None).await;
         assert_eq!(erased.json()["data"]["deleted"], 1);
         assert_eq!(send(&router, "GET", &format!("/forms/submissions/{submission}"), Some("admin"), &[], None).await.status, StatusCode::NOT_FOUND);
