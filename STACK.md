@@ -17,7 +17,7 @@ nghiệp vụ cắm vào sau. Core xong khi mọi bước trong lộ trình xanh
 trên cả hai database.
 
 Autoxide là nền cho một **sản phẩm mới**, **mã nguồn mở**, ai cũng dùng được, không
-gắn với một công ty hay một ngành. Module đầu tiên chưa quyết, nên core giữ trung lập với nghiệp vụ.
+gắn với một công ty hay một ngành. Module đầu tiên là `cms` (nội dung, D-078); core vẫn trung lập với nghiệp vụ.
 
 ## Tóm tắt
 

@@ -44,7 +44,7 @@ Thấy đang lạc thì dừng việc đó, quay lại lộ trình và nói rõ 
 **Autoxide dùng để làm gì:** làm nền cho một **sản phẩm mới** (không phải bản viết
 lại của hệ thống nào có sẵn). **Ai dùng:** mọi người đều dùng được — không gắn với
 một công ty hay một ngành. **Mã nguồn mở, công khai toàn bộ.** **Module đầu
-tiên:** chưa quyết.
+tiên:** `cms` — chỉ nội dung (D-078). Giao diện là repo riêng, công khai.
 
 Hệ quả cho agent:
 
@@ -52,8 +52,8 @@ Hệ quả cho agent:
   (đơn hàng, kho, bệnh nhân…) vào core. Thứ đó thuộc về module.
 - Người lạ phải tự cài và dùng được: cấu hình có giá trị mặc định hợp lý, thông báo
   lỗi rõ, tài liệu cài đặt đủ để làm theo mà không cần hỏi ai.
-- Không tự chọn module đầu tiên, không dựng module nghiệp vụ nào ngoài module mẫu
-  của lộ trình khi chủ dự án chưa quyết.
+- Không dựng module nghiệp vụ nào ngoài `cms` và module mẫu của lộ trình khi chủ dự
+  án chưa quyết. Khái niệm của `cms` (bài viết, trang, slug…) không vào core.
 - Repo là công khai: mọi file, commit message, comment và tài liệu đều viết với
   giả định người lạ sẽ đọc. Không ghi tên máy chủ, IP, đường dẫn riêng hay thông
   tin cá nhân của chủ dự án. **Công khai không áp cho secret** — secret không bao

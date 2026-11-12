@@ -1684,3 +1684,50 @@ khoá riêng ở đâu khác. Tự hết hạn: gate chạy `-D advisory-not-det
 tiêu chí "theo chuẩn ngành thay vì tự chế"; lưu nghi thức trong bộ nhớ — hỏng khi chạy
 nhiều máy chủ; quản trị viên xoá passkey của người khác — để sau, khi có nhu cầu (tài
 khoản bị khoá thì passkey cũng không đăng nhập được).
+
+## D-078 · Module đầu tiên là `cms` (nội dung); giao diện là dự án riêng, công khai; chưa làm app — 2026-11-12 — chủ dự án quyết
+
+Quyết định:
+
+- Module nghiệp vụ đầu tiên là `cms`: **chỉ nội dung và những gì liên quan đến nội dung**
+  (bài viết, trang, danh mục, thẻ, menu, phiên bản, đa ngôn ngữ, SEO). Không có thương mại
+  điện tử (sản phẩm, giỏ hàng, đơn hàng, thanh toán).
+- Giao diện — trang quản trị nội dung và website công khai hiển thị nội dung — là một dự án
+  riêng, **công khai toàn bộ** như core, chỉ dùng API của core (D-026).
+- Chưa làm app di động.
+
+Lý do: chủ dự án chọn.
+
+Hệ quả: các khái niệm của `cms` (bài viết, trang, slug…) chỉ nằm trong `modules/cms`; thứ
+`cms` cần mà module khác cũng dùng được (lọc và sắp xếp danh sách, tìm kiếm văn bản, đọc
+công khai có cache) thì thêm vào core ở dạng trung lập với nghiệp vụ. Việc cụ thể ở bước 13
+của `docs/ROADMAP.md`.
+
+Thay: phần "Module đầu tiên chưa quyết" của D-016.
+
+## D-079 · Stack của dự án giao diện — 2026-11-12 — agent quyết
+
+Quyết định: dự án giao diện (repo riêng, gợi ý tên `autoxide-web`) dùng:
+
+- TypeScript strict; một monorepo pnpm workspaces + Turborepo; Biome để lint và format.
+- SDK sinh từ `docs/openapi.json` của core bằng `openapi-typescript` + `openapi-fetch`, có
+  lớp chặn tự gắn `Idempotency-Key` cho lệnh ghi và `Accept-Language`.
+- Next.js 16 (App Router, React 19) cho **cả** trang quản trị và website công khai. Máy chủ
+  Next.js đứng giữa (BFF) và giữ refresh token trong cookie `httpOnly`; trình duyệt không
+  bao giờ cầm refresh token.
+- Tailwind CSS 4 + shadcn/ui; TanStack Query và TanStack Table; React Hook Form + Zod;
+  Tiptap làm trình soạn thảo (nội dung lưu dạng JSON); next-intl cho giao diện vi và en;
+  thông báo lỗi tra theo `code` của core.
+- Vitest, Playwright, MSW để test; build `output: standalone` chạy trong Docker cạnh core.
+
+Lý do: một ngôn ngữ và một framework cho cả hai ứng dụng (mỗi việc một cách làm); website
+công khai cần render phía máy chủ cho SEO; core trả refresh token trong thân JSON nên cần
+BFF để không lộ token khi có lỗi XSS; kiểu dữ liệu sinh từ OpenAPI nên API đổi thì trình
+biên dịch báo ngay; các thư viện trên phổ biến nhất trong hệ React, AI agent viết tốt.
+
+Đã cân nhắc: Vite SPA cho trang quản trị — phải tự giải quyết chỗ cất refresh token và có
+hai cách làm web; Nuxt, SvelteKit — hệ sinh thái nhỏ hơn; Astro cho website — tốt cho nội
+dung tĩnh nhưng thêm một framework thứ hai; `@hey-api/openapi-ts` — sinh SDK đầy đủ hơn
+nhưng chưa tới 1.0; Flutter / Expo cho app — chưa làm app (D-078).
+
+Ghi chú: phiên bản cụ thể ghim trong repo giao diện khi tạo; mục này chỉ chốt lựa chọn.

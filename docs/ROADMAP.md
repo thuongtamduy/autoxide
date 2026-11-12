@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–12 xong** (core + passkey), mọi bước xanh trên cả SQLite và Postgres. Việc tiếp theo do chủ dự án chọn: module nghiệp vụ đầu tiên, hoặc mở một mục ở "Sau core".
+Trạng thái: **bước 0–12 xong** (core + passkey), mọi bước xanh trên cả SQLite và Postgres. Việc tiếp theo: bước 13 — module `cms` (D-078).
 
 ## 0. Khung dự án
 
@@ -123,6 +123,35 @@ Cho AI agent gọi chức năng của hệ thống như công cụ (Model Contex
 - [x] Trạng thái nghi thức lưu trong database (nhiều máy chủ chạy song song được), dùng một lần, có hạn
 - [x] Cấu hình RP ID và origin; không cấu hình thì tính năng tắt, báo lỗi rõ
 - [x] Test bằng authenticator phần mềm trên cả hai database, kể cả dùng đồng thời một nghi thức
+
+## 13. Module `cms` — nội dung (chủ dự án chọn ngày 12/11/2026, D-078)
+
+Chỉ nội dung và những gì liên quan đến nội dung; không thương mại điện tử. Giao diện (trang
+quản trị, website) là repo riêng (D-079) — bước này chỉ làm API.
+
+Core thêm trước — trung lập với nghiệp vụ, module nào cũng dùng được:
+
+- [ ] Danh sách lọc theo trường và sắp xếp theo trường khác thời gian tạo (vd `published_at`,
+      `title`), vẫn dùng cursor, không `OFFSET`
+- [ ] Tìm kiếm văn bản sau một trait, cài đặt và test cho cả SQLite và Postgres
+- [ ] Endpoint đọc công khai (không cần đăng nhập) có `ETag` / `If-None-Match` và `Cache-Control`
+- [ ] Chống ghi đè khi hai người cùng sửa: `ETag` + `If-Match`, sai thì `412`
+
+Module `cms`:
+
+- [ ] Bài viết và trang: tiêu đề, slug duy nhất, tóm tắt, nội dung JSON có cấu trúc (core không
+      phụ thuộc trình soạn thảo), ảnh đại diện (ID file của module `files`), tác giả (ID người dùng)
+- [ ] Trạng thái nháp / đã đăng / lưu trữ; lên lịch đăng qua job queue
+- [ ] Lịch sử phiên bản: xem và khôi phục
+- [ ] Danh mục và thẻ
+- [ ] Menu điều hướng
+- [ ] Đa ngôn ngữ (vi, en): mỗi bản dịch có slug riêng, liên kết với nhau
+- [ ] SEO: meta title, meta description, ảnh chia sẻ, canonical; API đủ để website sinh
+      sitemap và RSS
+- [ ] Permission: đọc nháp, viết, đăng; người đọc công khai chỉ thấy bản đã đăng
+- [ ] Event và audit cho mọi thay đổi; tool MCP (liệt kê, đọc, tạo nháp, sửa, đăng) gọi cùng service
+- [ ] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn dùng
+      (tiếng Anh + tiếng Việt)
 
 ## Sau core (chưa mở)
 
