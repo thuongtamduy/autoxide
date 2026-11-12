@@ -3660,3 +3660,50 @@ sau khi xoá.
 Đã cân nhắc: chờ thêm cho đủ một thời gian cố định — vẫn lộ khi máy chủ bận, và giữ kết nối
 lâu hơn; luôn phát token / luôn xếp mail giả — ghi rác vào database và vẫn khác nhau ở phần
 đổi đăng ký.
+
+## D-155 · Bước 24 — `auth`: mật khẩu đổi thì mọi thứ mở bằng mật khẩu cũ đóng cùng lúc; cấp quyền kiểm lại trong transaction — 2026-11-12 — agent quyết
+
+Rà soát độc lập module `auth` (bước 24). Các phát hiện được kiểm lại với code; sửa kèm test
+chạy trên cả hai database.
+
+Quyết định:
+
+- **`UserService::write_password`** (đổi, đặt lại, quản trị viên đặt mật khẩu đầu) trong CÙNG
+  transaction với việc ghi mật khẩu: thu hồi phiên (như cũ), xoá lượt chờ mã MFA, xoá nghi thức
+  thêm passkey đang dở, thu hồi token đổi email đang chờ. Trước đây kẻ gian giữ mật khẩu cũ mở
+  sẵn mail đổi email về địa chỉ của nó (sống 24 giờ) và chiếm lại tài khoản sau khi chủ thật đặt
+  lại mật khẩu.
+- **Đặt lại mật khẩu là một transaction** (`PasswordWrite::Recovery`): mật khẩu mới, thu hồi
+  phiên, xoá passkey, API key, token đặt lại khác. Trước đây là bốn transaction; hỏng giữa chừng
+  thì token đã dùng mà key cũ còn.
+- **Cấp quyền mới kiểm lại điều đã chứng minh, trong transaction cấp** (`session::lock_grant`):
+  câu `UPDATE auth_user … WHERE id = ? AND disabled_at IS NULL [AND password_hash = <hash vừa
+  kiểm>]`; 0 dòng thì không cấp. Đăng nhập bằng mật khẩu, tạo API key so hash; hoàn tất MFA dùng
+  hết lượt chờ trong cùng transaction; đăng nhập passkey kiểm passkey còn đó trong cùng
+  transaction; thêm passkey dùng nghi thức và lưu passkey trong cùng transaction. Đổi / đặt lại
+  mật khẩu ghi cùng những dòng đó, nên hai bên nối đuôi nhau (SQLite một bên ghi; Postgres khoá
+  dòng): mật khẩu đổi xen giữa thì không cấp, cấp trước thì bị thu hồi cùng phần còn lại.
+  `check_password` / `verify_credentials` trả kèm hash vừa kiểm (hash mới nếu vừa hash lại).
+- **Bật TOTP đòi mật khẩu hiện tại** (`POST /me/mfa/totp` nhận `current_password`), như thêm
+  passkey, tạo API key (D-079). Thay đổi phá vỡ của API `/api/v1` — ngoại lệ cho D-059 vì là lỗ
+  hổng: access token bị lộ đủ để gắn ứng dụng authenticator của kẻ gian rồi khoá chủ thật ở
+  ngoài (đặt lại mật khẩu không gỡ MFA). Cùng tiền lệ với D-150. Ghi trong CHANGELOG.
+- **Xác nhận email mới thu hồi token đặt lại mật khẩu** đã gửi tới địa chỉ cũ.
+- **Thứ tự khoá:** sửa / xoá người dùng khoá dòng người dùng trước rồi mới khoá role toàn quyền
+  (`count_active_admins`), như `set_user_roles` — trước đây ngược nhau, Postgres có thể
+  deadlock. Sửa người dùng chỉ đếm admin khi khoá tài khoản.
+- **Dọn refresh token:** index `expires_at`, `revoked_at` (m0021); hai lệnh xoá thay cho một
+  lệnh `OR`; xoá theo lô 1000 dòng (`DELETE … WHERE id IN (SELECT id … LIMIT n)`, chạy như nhau
+  trên hai database). `revoke_user` chỉ thu hồi token chưa dùng — token đã dùng không đổi được
+  nữa, và gửi lại nó vẫn bị phát hiện (dòng còn với `used_at`). Giữ token đã dùng tới hết hạn để
+  phát hiện dùng lại (D-045), không rút ngắn.
+
+Để lại, ghi rõ:
+
+- **Đoán email qua thời gian trả lời** của `POST /password-reset` (địa chỉ có thật thì ghi token
+  và xếp mail) và `auth.email_taken` ở `POST /me/email` (cần đăng nhập và mật khẩu, có throttling).
+  `POST /register` vốn đã lộ email đã dùng khi bật tự đăng ký. Làm như D-154 (xếp job) nếu cần.
+- **Lệnh CLI gỡ MFA** cho admin duy nhất mất thiết bị: chưa có; gỡ bằng một admin khác
+  (`DELETE /users/{id}/mfa`) hoặc sửa database.
+- Truy vấn tuần tự khi xác thực mỗi request (2 với phiên, 4 với API key): cần đo bằng
+  `scripts/loadtest.sh` trước khi gộp.

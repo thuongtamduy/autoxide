@@ -9,6 +9,27 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `POST /api/v1/auth/me/mfa/totp` (start two-step sign-in) needs
+  `{"current_password": "…"}`, like adding a passkey or an API key: a stolen access token alone
+  can no longer tie someone else's authenticator app to the account.
+
+### Security
+
+- Resetting or changing a password also ends, in the same transaction, everything opened with
+  the old password: a pending email change (its confirmation link stops working), a passkey
+  registration not finished yet, and a sign-in waiting for its two-step code. A reset also removes
+  passkeys and API keys in that same transaction.
+- A session or API key is granted only if the password just checked is still the current one
+  and the account is still active: a password reset that lands between the check and the grant
+  wins.
+- Confirming a new email address voids password-reset mails sent to the old one.
+- Disabling or deleting a user while someone changes their roles no longer risks a deadlock on
+  Postgres.
+- The hourly sign-in cleanup uses indexes and deletes in batches of 1,000 rows (a new migration
+  adds the indexes).
+
 ## [0.4.0] - 2026-11-12
 
 ### Added

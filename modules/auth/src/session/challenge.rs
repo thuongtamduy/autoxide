@@ -91,6 +91,15 @@ pub(crate) async fn consume<C: ConnectionTrait>(connection: &C, id: Uuid) -> Res
     Ok(deleted.rows_affected == 1)
 }
 
+/// Xoá mọi lượt chờ của `user_id`.
+pub(crate) async fn drop_for_user<C: ConnectionTrait>(
+    connection: &C,
+    user_id: Uuid,
+) -> Result<(), Error> {
+    Entity::delete_many().filter(Column::UserId.eq(user_id)).exec(connection).await?;
+    Ok(())
+}
+
 pub(crate) fn invalid_mfa_token() -> Error {
     Error::unauthenticated(
         "auth.invalid_mfa_token",

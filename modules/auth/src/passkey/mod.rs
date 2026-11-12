@@ -6,7 +6,9 @@ mod service;
 mod webauthn;
 
 pub(crate) use entity::passkey::Model as Passkey;
-pub(crate) use service::{Ceremony, PasskeyService};
+pub(crate) use service::{
+    Ceremony, PasskeyService, drop_ceremonies_in, remove_all_in, still_registered_in,
+};
 
 #[cfg(test)]
 pub(crate) mod testing;

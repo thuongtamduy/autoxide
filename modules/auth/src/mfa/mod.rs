@@ -6,4 +6,4 @@ mod entity;
 mod recovery;
 pub(crate) mod service;
 
-pub(crate) use service::{MfaService, MfaStatus};
+pub(crate) use service::{MfaService, MfaStatus, TotpSetup};

@@ -71,6 +71,14 @@ pub(crate) struct TotpSetupResponse {
     otpauth_url: String,
 }
 
+/// Confirms starting two-step sign-in.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub(crate) struct StartTotpRequest {
+    /// Your current password.
+    #[validate(length(min = 1, max = 1024))]
+    current_password: String,
+}
+
 /// A code from the authenticator app, or (where stated) a recovery code.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct CodeRequest {
@@ -103,14 +111,18 @@ async fn mfa_status(
 ///
 /// Returns a new secret to add to the app. Nothing changes until you confirm with
 /// a code (`POST /api/v1/auth/me/mfa/totp/confirm`). Calling again replaces an
-/// unconfirmed secret. Needs a password session, not an API key.
+/// unconfirmed secret. Needs a password session, not an API key, and your current password:
+/// a stolen access token alone cannot tie someone else's authenticator app to your account.
+/// A wrong password counts as a failed sign-in.
 #[utoipa::path(
     post,
     path = "/me/mfa/totp",
     operation_id = "start_totp",
     security(("bearer" = [])),
+    request_body = StartTotpRequest,
     responses(
         (status = 200, description = "Add this secret to the authenticator app, then confirm.", body = Data<TotpSetupResponse>),
+        (status = 400, description = "The current password is wrong; code `auth.wrong_password`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "The request used an API key; code `auth.session_required`.", body = Problem),
         (status = 409, description = "Two-step sign-in is already on; code `auth.mfa_already_enabled`.", body = Problem),
@@ -119,11 +131,10 @@ async fn mfa_status(
 async fn start_totp(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
+    ValidJson(input): ValidJson<StartTotpRequest>,
 ) -> Result<Data<TotpSetupResponse>, Error> {
     require_session(&principal)?;
-    let user =
-        state.users.get(principal.user_id()).await?.ok_or_else(crate::token::invalid_token)?;
-    let setup = state.mfa.start_totp(user.id, &user.email).await?;
+    let setup = state.sessions.start_totp(principal.user_id(), &input.current_password).await?;
     Ok(Data { data: TotpSetupResponse { secret: setup.secret, otpauth_url: setup.otpauth_url } })
 }
 
@@ -256,7 +267,24 @@ mod tests {
             let (app, _) = app(test).await;
             let ada = bearer(&app, "ada@example.com", PASSWORD).await;
 
-            let (status, _, setup) = call(&app, "POST", "/me/mfa/totp", Some(&ada), None).await;
+            // Thiếu hay sai mật khẩu hiện tại: không bắt đầu được (D-155).
+            let (status, _, _) = call(&app, "POST", "/me/mfa/totp", Some(&ada), None).await;
+            assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
+            let wrong = json!({"current_password": "not it"});
+            let (status, _, refused) =
+                call(&app, "POST", "/me/mfa/totp", Some(&ada), Some(wrong)).await;
+            assert_eq!(
+                (status, refused["code"].as_str()),
+                (StatusCode::BAD_REQUEST, Some("auth.wrong_password"))
+            );
+            let (status, _, setup) = call(
+                &app,
+                "POST",
+                "/me/mfa/totp",
+                Some(&ada),
+                Some(json!({"current_password": PASSWORD})),
+            )
+            .await;
             assert_eq!(status, StatusCode::OK, "{setup}");
             let secret = setup["data"]["secret"].as_str().unwrap().to_owned();
             let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();

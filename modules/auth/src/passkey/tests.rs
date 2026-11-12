@@ -288,3 +288,77 @@ async fn dung_dong_thoi_mot_nghi_thuc_chi_mot_ben_duoc() {
     .await
     .unwrap();
 }
+
+/// Kẻ gian giữ mật khẩu cũ mở sẵn ba thứ rồi chờ: nghi thức thêm passkey, mail đổi email về địa
+/// chỉ của nó, lượt chờ mã MFA. Chủ tài khoản đặt lại mật khẩu: cả ba hết dùng được (D-155). Đổi
+/// email thì mail đặt lại gửi tới địa chỉ cũ hết dùng được.
+#[tokio::test]
+async fn dat_lai_mat_khau_dong_moi_cua_mo_bang_mat_khau_cu() {
+    TestDatabase::run(async |test| {
+        use autoxide_kernel::i18n::Language;
+        let services = crate::testing::services(test).await;
+        let ada = user(&services, "ada@example.com").await;
+        let mut attacker = SoftAuthenticator::new(7);
+
+        // 1. Nghi thức thêm passkey mở bằng mật khẩu cũ.
+        let ceremony = services.passkeys.start_registration(ada, PASSWORD).await.unwrap();
+        let credential = attacker.register(&ceremony.options);
+        // 2. Mail đổi email về địa chỉ của kẻ gian.
+        services
+            .verifications
+            .change_email(ada, PASSWORD, "evil@example.com", Language::En)
+            .await
+            .unwrap();
+        let change_token = crate::testing::last_token(&services);
+        // 3. Lượt chờ mã MFA (TOTP đã bật, kẻ gian có một recovery code).
+        let setup = services.mfa.start_totp(ada, "ada@example.com").await.unwrap();
+        let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
+        let code = crate::mfa::service::tests::code_at(&setup.secret, now);
+        let recovery = services.mfa.confirm_totp(ada, &code).await.unwrap();
+        let crate::session::LoginOutcome::MfaRequired { mfa_token, .. } =
+            services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap()
+        else {
+            panic!("MFA is on");
+        };
+
+        // Chủ tài khoản lấy lại tài khoản.
+        services.resets.request("ada@example.com", Language::En).await.unwrap();
+        let reset = crate::testing::last_token(&services);
+        services.resets.confirm(&reset, "a brand new passphrase".to_owned()).await.unwrap();
+
+        let added = services.passkeys.finish_registration(ada, ceremony.id, "Evil", &credential);
+        assert_eq!(added.await.unwrap_err().code(), "auth.invalid_passkey_ceremony");
+        assert!(list(&services, ada).await.is_empty());
+        let changed = services.verifications.confirm(&change_token).await.unwrap_err();
+        assert_eq!(changed.code(), "auth.invalid_verification_token");
+        let finished = services.sessions.complete_mfa(&mfa_token, &recovery[0], None).await;
+        assert_eq!(finished.unwrap_err().code(), "auth.invalid_mfa_token");
+        let still = services.users.get(ada).await.unwrap().unwrap();
+        assert_eq!(still.email, "ada@example.com");
+
+        // Đổi email (đúng chủ): mail đặt lại đã gửi tới địa chỉ cũ hết dùng được. (Bỏ lượt chặn
+        // gửi dồn 60 giây của mail đặt lại vừa rồi.)
+        use sea_orm::ConnectionTrait as _;
+        let older = sea_orm::sea_query::Query::update()
+            .table(sea_orm::sea_query::Alias::new("auth_tokens"))
+            .value(
+                sea_orm::sea_query::Alias::new("created_at"),
+                chrono::Utc::now() - chrono::Duration::minutes(5),
+            )
+            .to_owned();
+        services.database.write().execute(&older).await.unwrap();
+        services.resets.request("ada@example.com", Language::En).await.unwrap();
+        let old_reset = crate::testing::last_token(&services);
+        services
+            .verifications
+            .change_email(ada, "a brand new passphrase", "ada@new.example.com", Language::En)
+            .await
+            .unwrap();
+        let confirm = crate::testing::last_token(&services);
+        services.verifications.confirm(&confirm).await.unwrap();
+        let stale = services.resets.confirm(&old_reset, "another new passphrase".to_owned()).await;
+        assert_eq!(stale.unwrap_err().code(), "auth.invalid_reset_token");
+    })
+    .await
+    .unwrap();
+}

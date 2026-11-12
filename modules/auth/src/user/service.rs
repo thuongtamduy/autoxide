@@ -4,6 +4,7 @@
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
@@ -23,6 +24,17 @@ use serde_json::json;
 /// Độ dài tối đa của email (RFC 5321) và của tên hiển thị, theo ký tự.
 const EMAIL_MAX_LENGTH: usize = 254;
 const NAME_MAX_LENGTH: usize = 200;
+
+/// Vì sao mật khẩu được ghi (xem [`UserService::write_password`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PasswordWrite {
+    /// Người dùng tự đổi, hay hệ thống đặt.
+    Change,
+    /// Quản trị viên đặt mật khẩu đầu cho tài khoản chưa có.
+    Initial,
+    /// Lấy lại tài khoản bằng mail: xoá thêm passkey, API key, token đặt lại khác.
+    Recovery,
+}
 
 /// Dữ liệu để tạo một người dùng.
 #[derive(Debug, Clone)]
@@ -63,11 +75,23 @@ impl UserService {
     /// Email không tồn tại và mật khẩu sai trả CÙNG một lỗi, sau CÙNG một khoảng
     /// thời gian: không ai dò được email nào đã đăng ký. Hash lưu theo tham số cũ
     /// được hash lại theo tham số hiện hành.
+    #[cfg(test)]
     pub(crate) async fn check_credentials(
         &self,
         email: &str,
         password: &str,
     ) -> Result<User, Error> {
+        self.verify_credentials(email, password).await.map(|(user, _)| user)
+    }
+
+    /// Như [`check_credentials`](Self::check_credentials), kèm hash mật khẩu đang lưu lúc
+    /// kiểm (hash mới nếu vừa hash lại). Bên cấp phiên / API key đưa hash này vào
+    /// [`SessionService::lock_grant`]: mật khẩu đổi giữa lúc kiểm và lúc cấp thì không cấp.
+    pub(crate) async fn verify_credentials(
+        &self,
+        email: &str,
+        password: &str,
+    ) -> Result<(User, String), Error> {
         if password.chars().count() > password::MAX_LENGTH {
             return Err(invalid_credentials());
         }
@@ -85,30 +109,36 @@ impl UserService {
         if row.disabled_at.is_some() {
             return Err(user_disabled());
         }
-        if rehash && let Some(stored) = stored {
-            self.upgrade_hash(row.id, &stored, password).await;
+        let Some(mut current) = stored else { return Err(invalid_credentials()) };
+        if rehash && let Some(upgraded) = self.upgrade_hash(row.id, &current, password).await {
+            current = upgraded;
         }
-        Ok(row.into())
+        Ok((row.into(), current))
     }
 
     /// Hash lại mật khẩu theo tham số hiện hành. Hỏng thì chỉ ghi log: người dùng
     /// đã đăng nhập đúng, lần sau thử lại.
-    async fn upgrade_hash(&self, id: Uuid, stored: &str, password: &str) {
+    /// Trả hash mới khi đã thay; `None` khi giữ hash cũ.
+    async fn upgrade_hash(&self, id: Uuid, stored: &str, password: &str) -> Option<String> {
         let result = async {
             let hash = self.passwords.hash(password.to_owned()).await?;
             // Chỉ thay nếu hash vẫn là hash vừa kiểm: không đè mật khẩu vừa được
             // đổi bởi một request khác.
-            Entity::update_many()
-                .col_expr(Column::PasswordHash, Expr::value(Some(hash)))
+            let updated = Entity::update_many()
+                .col_expr(Column::PasswordHash, Expr::value(Some(hash.clone())))
                 .filter(Column::Id.eq(id))
                 .filter(Column::PasswordHash.eq(stored))
                 .exec(self.database.write())
                 .await?;
-            Ok::<(), Error>(())
+            Ok::<_, Error>((updated.rows_affected == 1).then_some(hash))
         }
         .await;
-        if let Err(error) = result {
-            tracing::warn!(user_id = %id, error = %error, "cannot upgrade the password hash");
+        match result {
+            Ok(upgraded) => upgraded,
+            Err(error) => {
+                tracing::warn!(user_id = %id, error = %error, "cannot upgrade the password hash");
+                None
+            }
         }
     }
 
@@ -195,7 +225,16 @@ impl UserService {
             transaction.rollback().await?;
             return Err(autoxide_kernel::version::changed());
         }
-        let admins_before = crate::role::count_active_admins(&transaction).await?;
+        // Chỉ việc khoá mới có thể làm mất admin cuối. Khoá dòng người dùng TRƯỚC rồi mới khoá
+        // các role toàn quyền (trong `count_active_admins`) — cùng thứ tự với
+        // `RoleService::set_user_roles`, nên hai việc chạy cùng lúc trên Postgres chờ nhau thay
+        // vì deadlock (D-155).
+        let admins_before = if changes.disabled == Some(true) {
+            lock_row(&transaction, id).await?;
+            crate::role::count_active_admins(&transaction).await?
+        } else {
+            0
+        };
         let now = now();
         let mut update = Entity::update_many().col_expr(Column::UpdatedAt, Expr::value(now));
         if let Some(name) = name {
@@ -255,6 +294,8 @@ impl UserService {
     /// [`USER_DELETED`]: autoxide_kernel::privacy::USER_DELETED
     pub(crate) async fn delete(&self, actor: Actor, id: Uuid) -> Result<(), Error> {
         let transaction = self.database.begin_write().await?;
+        // Dòng người dùng trước, role toàn quyền sau (xem `update`).
+        lock_row(&transaction, id).await?;
         let admins_before = crate::role::count_active_admins(&transaction).await?;
         let deleted = Entity::delete_by_id(id).exec(&transaction).await?;
         if deleted.rows_affected == 0 {
@@ -330,13 +371,26 @@ impl UserService {
     }
 
     /// Đặt mật khẩu mới cho người dùng `id`.
+    #[cfg(test)]
     pub(crate) async fn set_password(
         &self,
         actor: Actor,
         id: Uuid,
         password: String,
     ) -> Result<(), Error> {
-        self.write_password(actor, id, "password", password, false).await
+        self.write_password(actor, id, "password", password, PasswordWrite::Change).await
+    }
+
+    /// Chủ tài khoản lấy lại tài khoản bằng mail đặt lại mật khẩu: đặt mật khẩu mới, và trong
+    /// CÙNG transaction xoá mọi passkey, API key, token đặt lại khác — kẻ chiếm phiên không
+    /// giữ lại được cửa nào (D-079, D-155).
+    pub(crate) async fn recover_password(
+        &self,
+        actor: Actor,
+        id: Uuid,
+        password: String,
+    ) -> Result<(), Error> {
+        self.write_password(actor, id, "password", password, PasswordWrite::Recovery).await
     }
 
     /// Quản trị viên đặt mật khẩu cho tài khoản tạo không kèm mật khẩu. Tài khoản đã
@@ -348,20 +402,25 @@ impl UserService {
         id: Uuid,
         password: String,
     ) -> Result<(), Error> {
-        self.write_password(actor, id, "password", password, true).await
+        self.write_password(actor, id, "password", password, PasswordWrite::Initial).await
     }
 
     /// Hash và lưu mật khẩu. `field`: tên trường báo trong lỗi luật mật khẩu.
-    /// `only_if_unset`: chỉ ghi khi tài khoản chưa có mật khẩu — kiểm ngay trong câu
+    /// [`PasswordWrite::Initial`]: chỉ ghi khi tài khoản chưa có mật khẩu — kiểm ngay trong câu
     /// `UPDATE` nên hai request đồng thời không cùng ghi được.
+    ///
+    /// Cùng transaction với việc đổi mật khẩu, mọi thứ đã mở bằng mật khẩu cũ hết dùng được
+    /// (D-155): phiên đăng nhập, lượt chờ mã MFA, nghi thức thêm passkey đang dở, token đổi
+    /// email đang chờ.
     pub(crate) async fn write_password(
         &self,
         actor: Actor,
         id: Uuid,
         field: &str,
         password: String,
-        only_if_unset: bool,
+        mode: PasswordWrite,
     ) -> Result<(), Error> {
+        let only_if_unset = mode == PasswordWrite::Initial;
         if let Some(problem) = password::check_rules(field, &password) {
             return Err(Error::validation(vec![problem]));
         }
@@ -385,6 +444,15 @@ impl UserService {
             return Err(user_not_found(id));
         }
         SessionService::revoke_user(&transaction, id).await?;
+        SessionService::drop_mfa_challenges(&transaction, id).await?;
+        crate::passkey::drop_ceremonies_in(&transaction, id).await?;
+        let subject = id.to_string();
+        OneTimeTokens::new("auth").revoke(&transaction, "email_verification", &subject).await?;
+        if mode == PasswordWrite::Recovery {
+            crate::passkey::remove_all_in(&transaction, &self.outbox, actor, id).await?;
+            crate::api_key::revoke_all_in(&transaction, &self.outbox, actor, id).await?;
+            OneTimeTokens::new("auth").revoke(&transaction, "password_reset", &subject).await?;
+        }
         let event = events::PasswordChanged::default();
         self.outbox.record(&transaction, actor, events::user_subject(id), &event).await?;
         transaction.commit().await?;
@@ -471,7 +539,17 @@ pub(crate) fn user_disabled() -> Error {
     )
 }
 
-fn invalid_credentials() -> Error {
+/// Khoá dòng người dùng `id` tới hết transaction (câu `UPDATE` không đổi gì).
+async fn lock_row(transaction: &DatabaseTransaction, id: Uuid) -> Result<(), Error> {
+    Entity::update_many()
+        .col_expr(Column::UpdatedAt, Expr::col(Column::UpdatedAt))
+        .filter(Column::Id.eq(id))
+        .exec(transaction)
+        .await?;
+    Ok(())
+}
+
+pub(crate) fn invalid_credentials() -> Error {
     Error::unauthenticated("auth.invalid_credentials", "The email or password is incorrect.")
 }
 

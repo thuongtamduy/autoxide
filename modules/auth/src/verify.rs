@@ -103,7 +103,7 @@ impl EmailVerifications {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let user = self.sessions.check_password(user_id, current_password).await?;
+        let (user, _) = self.sessions.check_password(user_id, current_password).await?;
         if email == user.email && user.email_verified_at.is_some() {
             return Err(already_verified());
         }
@@ -128,6 +128,10 @@ impl EmailVerifications {
         // Token khác của người này (mail cũ hơn, hay cho địa chỉ khác) hết dùng được.
         // Mọi token xác minh khác của người này hết hiệu lực.
         tokens().revoke(&transaction, PURPOSE, &user_id.to_string()).await?;
+        // Email đổi: mail đặt lại mật khẩu đã gửi tới địa chỉ cũ hết dùng được (D-155).
+        if old != email {
+            tokens().revoke(&transaction, "password_reset", &user_id.to_string()).await?;
+        }
         let before = (old != email).then(|| json!({"email": old}));
         let event = events::EmailVerified { before, after: Some(json!({"email": email})) };
         let subject = events::user_subject(user_id);

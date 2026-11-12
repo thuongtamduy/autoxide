@@ -149,7 +149,7 @@ impl SessionService {
     ) -> Result<LoginOutcome, Error> {
         // Lượt thử được đếm TRƯỚC khi kiểm mật khẩu; đúng thì xoá bộ đếm bên dưới.
         self.throttle.reserve(email).await?;
-        let user = self.users.check_credentials(email, password).await?;
+        let (user, hash) = self.users.verify_credentials(email, password).await?;
         if self.mfa.status(user.id).await?.totp_enabled {
             // Mật khẩu đúng: trả lại lượt vừa xin, nhưng chưa xoá các lần sai trước — đúng
             // mật khẩu mới là nửa đường.
@@ -161,7 +161,8 @@ impl SessionService {
             });
         }
         self.throttle.clear(email).await?;
-        Ok(LoginOutcome::Tokens(self.start_session(user.id, "password", user_agent).await?))
+        let proof = Proof::Password(hash);
+        Ok(LoginOutcome::Tokens(self.start_session(user.id, "password", user_agent, proof).await?))
     }
 
     /// Người dùng `user_id` (đang đăng nhập) tự đổi mật khẩu, kèm mật khẩu hiện tại.
@@ -185,12 +186,18 @@ impl SessionService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let user = self.check_password(user_id, current).await?;
+        let (user, _) = self.check_password(user_id, current).await?;
         self.users
-            .write_password(Actor::user(user_id), user_id, "new_password", new, false)
+            .write_password(
+                Actor::user(user_id),
+                user_id,
+                "new_password",
+                new,
+                crate::user::PasswordWrite::Change,
+            )
             .await?;
         self.throttle.clear(&user.email).await?;
-        self.start_session(user_id, "password_change", user_agent).await
+        self.start_session(user_id, "password_change", user_agent, Proof::Active).await
     }
 
     /// Mở phiên cho người dùng `user_id` vừa chứng minh bằng passkey (đã kiểm ở
@@ -198,6 +205,7 @@ impl SessionService {
     pub(crate) async fn login_with_passkey(
         &self,
         user_id: Uuid,
+        passkey_id: Uuid,
         user_agent: Option<&str>,
     ) -> Result<Tokens, Error> {
         let user =
@@ -205,19 +213,26 @@ impl SessionService {
         if !user.is_active() {
             return Err(crate::user::user_disabled());
         }
-        self.start_session(user_id, "passkey", user_agent).await
+        self.start_session(user_id, "passkey", user_agent, Proof::Passkey(passkey_id)).await
     }
 
     /// Kiểm mật khẩu hiện tại của người dùng `user_id` trước một việc nhạy cảm (đổi mật
     /// khẩu, đổi email). Sai thì `auth.wrong_password` và tính vào login throttling.
-    pub(crate) async fn check_password(&self, user_id: Uuid, current: &str) -> Result<User, Error> {
+    ///
+    /// Trả kèm hash mật khẩu vừa kiểm: bên cấp quyền mới (API key) đưa nó vào
+    /// [`lock_grant`] trong transaction ghi của mình.
+    pub(crate) async fn check_password(
+        &self,
+        user_id: Uuid,
+        current: &str,
+    ) -> Result<(User, String), Error> {
         let user =
             self.users.get(user_id).await?.ok_or_else(|| crate::user::user_not_found(user_id))?;
         self.throttle.reserve(&user.email).await?;
-        match self.users.check_credentials(&user.email, current).await {
-            Ok(user) => {
-                self.throttle.clear(&user.email).await?;
-                Ok(user)
+        match self.users.verify_credentials(&user.email, current).await {
+            Ok(verified) => {
+                self.throttle.clear(&verified.0.email).await?;
+                Ok(verified)
             }
             Err(error) if error.code() == INVALID_CREDENTIALS => Err(Error::bad_request(
                 "auth.wrong_password",
@@ -226,6 +241,18 @@ impl SessionService {
             )),
             Err(error) => Err(error),
         }
+    }
+
+    /// Bắt đầu bật TOTP cho người dùng `user_id`, kèm mật khẩu hiện tại (sai thì tính vào login
+    /// throttling như [`check_password`](Self::check_password)): access token bị lộ không đủ để
+    /// gắn ứng dụng authenticator của kẻ gian vào tài khoản rồi khoá chủ thật ở ngoài (D-155).
+    pub(crate) async fn start_totp(
+        &self,
+        user_id: Uuid,
+        current_password: &str,
+    ) -> Result<crate::mfa::TotpSetup, Error> {
+        let (user, _) = self.check_password(user_id, current_password).await?;
+        self.mfa.start_totp(user.id, &user.email).await
     }
 
     /// Người dùng `user_id` tự xoá tài khoản của mình, kèm mật khẩu hiện tại (sai thì
@@ -258,23 +285,28 @@ impl SessionService {
                  authenticator app, or an unused recovery code.",
             ));
         }
-        if !challenge::consume(self.database.write(), challenge_id).await? {
-            return Err(challenge::invalid_mfa_token());
-        }
+
         if !user.is_active() {
             return Err(crate::user::user_disabled());
         }
         self.throttle.clear(&user.email).await?;
-        self.start_session(user.id, "password_and_mfa", user_agent).await
+        self.start_session(user.id, "password_and_mfa", user_agent, Proof::Challenge(challenge_id))
+            .await
     }
 
     /// Mở một họ refresh token mới và cấp cặp token đầu tiên.
     /// `method`: cách đã xác thực (`password`, `password_and_mfa`), ghi vào audit.
+    ///
+    /// `proof`: điều đã chứng minh người dùng, kiểm lại TRONG transaction cấp phiên (D-155).
+    /// Đổi / đặt lại mật khẩu ghi dòng người dùng, xoá lượt chờ MFA và passkey trong
+    /// transaction của nó, nên một trong hai bên chờ bên kia: mật khẩu đổi giữa lúc kiểm và
+    /// lúc cấp thì không cấp; cấp trước thì phiên bị thu hồi cùng các phiên khác.
     async fn start_session(
         &self,
         user_id: Uuid,
         method: &str,
         user_agent: Option<&str>,
+        proof: Proof,
     ) -> Result<Tokens, Error> {
         let now = now();
         let expires_at = now + self.refresh_token_ttl;
@@ -286,6 +318,26 @@ impl SessionService {
         let session = SessionDetails { started_at: now, user_agent };
         let (refresh_token, row) = new_refresh_token(user_id, family_id, now, expires_at, session)?;
         let transaction = self.database.begin_write().await?;
+        let still_valid = match &proof {
+            Proof::Password(hash) => lock_grant(&transaction, user_id, Some(hash)).await?,
+            Proof::Active => lock_grant(&transaction, user_id, None).await?,
+            Proof::Challenge(id) => {
+                challenge::consume(&transaction, *id).await?
+                    && lock_grant(&transaction, user_id, None).await?
+            }
+            Proof::Passkey(id) => {
+                crate::passkey::still_registered_in(&transaction, *id, user_id).await?
+                    && lock_grant(&transaction, user_id, None).await?
+            }
+        };
+        if !still_valid {
+            transaction.rollback().await?;
+            return Err(match proof {
+                Proof::Challenge(_) => challenge::invalid_mfa_token(),
+                Proof::Password(_) => crate::user::invalid_credentials(),
+                Proof::Active | Proof::Passkey(_) => crate::user::user_disabled(),
+            });
+        }
         row.insert(&transaction).await?;
         let event = events::SignedIn { before: None, after: Some(json!({"method": method})) };
         let subject = events::user_subject(user_id);
@@ -387,13 +439,26 @@ impl SessionService {
 
     /// Thu hồi mọi refresh token của người dùng (vd sau khi đổi mật khẩu). Chạy
     /// trong `connection` để đi cùng transaction của bên gọi.
+    /// Bỏ mọi lượt chờ mã MFA của `user_id` trong `connection`: đổi mật khẩu thì lượt mở bằng
+    /// mật khẩu cũ hết dùng được.
+    pub(crate) async fn drop_mfa_challenges<C: ConnectionTrait>(
+        connection: &C,
+        user_id: Uuid,
+    ) -> Result<(), Error> {
+        challenge::drop_for_user(connection, user_id).await
+    }
+
     pub(crate) async fn revoke_user<C: ConnectionTrait>(
         connection: &C,
         user_id: Uuid,
     ) -> Result<(), Error> {
+        // Chỉ token chưa dùng: token đã đổi lấy token mới thì không dùng lại được nữa, và bảng
+        // giữ hàng nghìn dòng như vậy mỗi phiên (một dòng mỗi lần refresh). Gửi lại token đã dùng
+        // vẫn bị phát hiện (dòng còn đó với `used_at`) và thu hồi cả họ.
         Entity::update_many()
             .col_expr(Column::RevokedAt, Expr::value(Some(now())))
             .filter(Column::UserId.eq(user_id))
+            .filter(Column::UsedAt.is_null())
             .filter(Column::RevokedAt.is_null())
             .exec(connection)
             .await?;
@@ -544,6 +609,38 @@ async fn touch_user<C: ConnectionTrait>(
         update = update.filter(User::DisabledAt.is_null());
     }
     Ok(update.exec(connection).await?.rows_affected)
+}
+
+/// Điều chứng minh người dùng khi mở phiên (xem `SessionService::start_session`).
+enum Proof {
+    /// Mật khẩu vừa kiểm khớp hash này.
+    Password(String),
+    /// Mật khẩu đúng và mã MFA đúng: lượt chờ `id` (dùng hết ngay trong transaction).
+    Challenge(Uuid),
+    /// Passkey `id` vừa xác minh.
+    Passkey(Uuid),
+    /// Người dùng vừa chứng minh xong ở bước trước trong cùng request (vd vừa đổi mật khẩu).
+    Active,
+}
+
+/// Khoá dòng người dùng `user_id` trong `connection` trước khi cấp quyền mới (phiên, API key):
+/// `true` nếu tài khoản còn hoạt động và — khi có `password_hash` — mật khẩu vẫn là mật khẩu
+/// vừa kiểm. Một câu `UPDATE` có điều kiện: chạy như nhau trên SQLite và Postgres, và chờ
+/// transaction đang đổi mật khẩu / khoá tài khoản xong rồi mới xét (D-155).
+pub(crate) async fn lock_grant<C: ConnectionTrait>(
+    connection: &C,
+    user_id: Uuid,
+    password_hash: Option<&str>,
+) -> Result<bool, Error> {
+    use crate::user::entity::{Column as User, Entity as Users};
+    let mut update = Users::update_many()
+        .col_expr(User::UpdatedAt, Expr::col(User::UpdatedAt))
+        .filter(User::Id.eq(user_id))
+        .filter(User::DisabledAt.is_null());
+    if let Some(hash) = password_hash {
+        update = update.filter(User::PasswordHash.eq(hash));
+    }
+    Ok(update.exec(connection).await?.rows_affected > 0)
 }
 
 /// Khoá dòng người dùng `user_id` (xem [`touch_user`]).
@@ -892,6 +989,31 @@ mod tests {
             let error = sessions.refresh(&tokens.refresh_token).await.unwrap_err();
 
             assert_eq!(error.code(), "auth.invalid_refresh_token");
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Kiểm mật khẩu rồi mới cấp: mật khẩu đổi xen giữa (đặt lại, khoá tài khoản) thì không cấp
+    /// được — `lock_grant` so hash vừa kiểm trong transaction cấp (D-155).
+    #[tokio::test]
+    async fn mat_khau_doi_giua_luc_kiem_va_luc_cap_thi_khong_cap() {
+        TestDatabase::run(async |test| {
+            let (sessions, users, user) = setup(test).await;
+            let (_, verified) = sessions.check_password(user.id, PASSWORD).await.unwrap();
+            let write = sessions.database.write();
+            assert!(lock_grant(write, user.id, Some(&verified)).await.unwrap());
+
+            users
+                .set_password(Actor::system(), user.id, "a brand new passphrase".to_owned())
+                .await
+                .unwrap();
+            assert!(!lock_grant(write, user.id, Some(&verified)).await.unwrap());
+            assert!(lock_grant(write, user.id, None).await.unwrap());
+
+            let disable = crate::user::UserChanges { name: None, disabled: Some(true) };
+            users.update(Actor::system(), user.id, disable, None).await.unwrap();
+            assert!(!lock_grant(write, user.id, None).await.unwrap());
         })
         .await
         .unwrap();

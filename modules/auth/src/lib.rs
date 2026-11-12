@@ -153,8 +153,6 @@ impl Module for AuthModule {
             mailer: mailer.clone(),
             translations: context.translations().clone(),
             outbox: outbox.clone(),
-            passkeys: passkeys.clone(),
-            api_keys: api_keys.clone(),
             url: config.password_reset_url.clone(),
         });
         let authenticator = RequestAuthenticator {
@@ -371,8 +369,6 @@ pub(crate) mod testing {
             mailer: mails.clone(),
             translations: translations.clone(),
             outbox: autoxide_kernel::event::Outbox::standalone("auth"),
-            passkeys: passkeys.clone(),
-            api_keys: api_keys.clone(),
             url: None,
         });
         let personal_data = autoxide_kernel::privacy::PersonalDataExport::default();

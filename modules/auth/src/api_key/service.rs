@@ -121,7 +121,8 @@ impl ApiKeyService {
             }
             (Err(error), _) => return Err(error),
         };
-        self.sessions.check_password(creator.user_id(), &input.current_password).await?;
+        let (_, verified_hash) =
+            self.sessions.check_password(creator.user_id(), &input.current_password).await?;
         let user_id = creator.user_id();
         let existing = api_key::Entity::find()
             .filter(api_key::Column::UserId.eq(user_id))
@@ -139,6 +140,12 @@ impl ApiKeyService {
         let prefix: String = secret.chars().take(PREFIX_LENGTH).collect();
         let id = Uuid::now_v7();
         let transaction = self.database.begin_write().await?;
+        // Mật khẩu vừa kiểm phải còn là mật khẩu hiện tại: đặt lại mật khẩu xen giữa thì không
+        // tạo key (D-155).
+        if !crate::session::lock_grant(&transaction, user_id, Some(&verified_hash)).await? {
+            transaction.rollback().await?;
+            return Err(crate::user::invalid_credentials());
+        }
         api_key::ActiveModel {
             id: Set(id),
             user_id: Set(user_id),
@@ -223,24 +230,6 @@ impl ApiKeyService {
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, api_key_id = %id, "API key revoked");
         Ok(())
-    }
-
-    /// Thu hồi mọi API key của người dùng `user_id` (vd khi chủ tài khoản lấy lại tài khoản
-    /// bằng cách đặt lại mật khẩu). Trả số key đã thu hồi.
-    pub(crate) async fn revoke_all(&self, actor: Actor, user_id: Uuid) -> Result<u64, Error> {
-        let transaction = self.database.begin_write().await?;
-        let rows = api_key::Entity::find()
-            .filter(api_key::Column::UserId.eq(user_id))
-            .all(&transaction)
-            .await?;
-        for row in &rows {
-            api_key::Entity::delete_by_id(row.id).exec(&transaction).await?;
-            let before = json!({"user_id": user_id, "name": row.name, "prefix": row.prefix});
-            let event = events::ApiKeyRevoked { before: Some(before), after: None };
-            self.outbox.record(&transaction, actor, key_subject(row.id), &event).await?;
-        }
-        transaction.commit().await?;
-        Ok(rows.len() as u64)
     }
 
     /// Bên gọi của một request mang API key `secret`.
@@ -393,6 +382,25 @@ fn invalid_api_key() -> Error {
 
 fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
+}
+
+/// Thu hồi mọi API key của người dùng `user_id` trong `connection` (transaction của bên gọi, vd
+/// đặt lại mật khẩu). Mỗi key một event. Trả số key đã thu hồi.
+pub(crate) async fn revoke_all_in<C: ConnectionTrait>(
+    connection: &C,
+    outbox: &Outbox,
+    actor: Actor,
+    user_id: Uuid,
+) -> Result<u64, Error> {
+    let rows =
+        api_key::Entity::find().filter(api_key::Column::UserId.eq(user_id)).all(connection).await?;
+    for row in &rows {
+        api_key::Entity::delete_by_id(row.id).exec(connection).await?;
+        let before = json!({"user_id": user_id, "name": row.name, "prefix": row.prefix});
+        let event = events::ApiKeyRevoked { before: Some(before), after: None };
+        outbox.record(connection, actor, key_subject(row.id), &event).await?;
+    }
+    Ok(rows.len() as u64)
 }
 
 #[cfg(test)]

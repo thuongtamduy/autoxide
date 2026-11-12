@@ -728,7 +728,7 @@ mod event_tests {
             call(&app, "PATCH", &path, Some(&admin), Some(body)).await;
             let body = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": PASSWORD});
             let (_, _, key) = call(&app, "POST", "/api-keys", Some(&admin), Some(body)).await;
-            let (_, _, setup) = call(&app, "POST", "/me/mfa/totp", Some(&admin), None).await;
+            let (_, _, setup) = call(&app, "POST", "/me/mfa/totp", Some(&admin), Some(json!({"current_password": PASSWORD}))).await;
             let secret = setup["data"]["secret"].as_str().unwrap().to_owned();
             let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
             let body = json!({"code": code_at(&secret, now)});

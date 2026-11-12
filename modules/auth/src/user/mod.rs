@@ -5,8 +5,8 @@ mod service;
 
 pub(crate) use service::NewUser;
 pub(crate) use service::{
-    UserChanges, UserService, check_email_field, email_taken, normalize_email, user_disabled,
-    user_not_found,
+    PasswordWrite, UserChanges, UserService, check_email_field, email_taken, invalid_credentials,
+    normalize_email, user_disabled, user_not_found,
 };
 
 #[cfg(test)]

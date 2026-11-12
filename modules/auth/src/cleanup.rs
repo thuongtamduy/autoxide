@@ -46,14 +46,11 @@ impl JobHandler for Cleanup {
         removed += throttle.purge(day_ago).await?;
         // Refresh token đã hết hạn, hay đã thu hồi hơn một ngày (gửi lại token đã xoá
         // vẫn bị từ chối như token lạ).
-        removed += delete(
-            connection,
-            "auth_refresh_token",
-            Condition::any()
-                .add(Expr::col(Alias::new("expires_at")).lt(now))
-                .add(Expr::col(Alias::new("revoked_at")).lt(day_ago)),
-        )
-        .await?;
+        // Hai lệnh, mỗi lệnh dùng một index (`OR` của hai cột không dùng được index nào).
+        let expired = Condition::all().add(Expr::col(Alias::new("expires_at")).lt(now));
+        removed += delete(connection, "auth_refresh_token", expired).await?;
+        let revoked = Condition::all().add(Expr::col(Alias::new("revoked_at")).lt(day_ago));
+        removed += delete(connection, "auth_refresh_token", revoked).await?;
         removed += delete(
             connection,
             "auth_mfa_challenge",
@@ -72,14 +69,35 @@ impl JobHandler for Cleanup {
     }
 }
 
+/// Số dòng xoá mỗi lệnh: mỗi lệnh là một transaction ngắn, nên trên SQLite kết nối ghi duy nhất
+/// không bị giữ suốt lúc dọn một bảng lớn.
+const BATCH: u64 = 1000;
+
+/// Xoá mọi dòng của `table` thoả `condition`, theo lô [`BATCH`] dòng
+/// (`DELETE … WHERE id IN (SELECT id … LIMIT n)` — chạy như nhau trên SQLite và Postgres).
 async fn delete<C: ConnectionTrait>(
     connection: &C,
     table: &str,
     condition: Condition,
 ) -> Result<u64, Error> {
-    let mut statement = Query::delete();
-    statement.from_table(Alias::new(table)).cond_where(condition);
-    Ok(connection.execute(&statement).await?.rows_affected())
+    let mut removed = 0;
+    loop {
+        let ids = Query::select()
+            .column(Alias::new("id"))
+            .from(Alias::new(table))
+            .cond_where(condition.clone())
+            .limit(BATCH)
+            .to_owned();
+        let mut statement = Query::delete();
+        statement
+            .from_table(Alias::new(table))
+            .and_where(Expr::col(Alias::new("id")).in_subquery(ids));
+        let deleted = connection.execute(&statement).await?.rows_affected();
+        removed += deleted;
+        if deleted < BATCH {
+            return Ok(removed);
+        }
+    }
 }
 
 #[cfg(test)]
