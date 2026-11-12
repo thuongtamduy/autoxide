@@ -3866,3 +3866,17 @@ Quyết định: job chạy với `attempt == 1` (lượt đầu, hay lượt đ
 thử) gặp lần gửi `failed` thì mở lại nó (`UPDATE … SET status = 'pending' WHERE status =
 'failed'`, có điều kiện) rồi gửi như thường. Lượt đầu bình thường luôn gặp lần gửi `pending`,
 nên điều kiện này chỉ khớp với lần chạy lại của người vận hành. Không thêm trạng thái hay cột mới.
+
+## D-162 · Đặt lại mật khẩu: request chỉ xếp job, như đăng ký bản tin — 2026-11-12 — agent quyết
+
+Đóng một việc để lại của D-156: `POST /password-reset` với email có thật thì tra tài khoản, ghi
+token, ghi event, xếp mail; email lạ thì trả về sau một câu `SELECT` — đo thời gian là đoán được
+email nào đã đăng ký.
+
+Quyết định: như D-154. Request xếp job `auth.send_password_reset` (email, ngôn ngữ) — cùng một
+lệnh ghi cho mọi email — rồi trả 202. Job (`PasswordResets::send`) làm phần cũ: tra tài khoản
+đang hoạt động, giới hạn một mail mỗi phút, token, event, mail. Job xong thì job queue xoá payload
+(có email) như mọi job (D-079). Mail đi sau câu trả lời vài giây; cần worker (mặc định có).
+
+Không làm: `POST /me/email` báo `auth.email_taken` — cần đăng nhập và đúng mật khẩu (có
+throttling), và `POST /register` vốn đã lộ email đã dùng khi bật tự đăng ký.

@@ -64,6 +64,7 @@ struct AuthModule {
     /// Có sau `start`.
     state: Option<http::HttpState>,
     cleanup: Option<Arc<cleanup::Cleanup>>,
+    resets: Option<Arc<reset::PasswordResets>>,
 }
 
 impl Module for AuthModule {
@@ -150,6 +151,7 @@ impl Module for AuthModule {
         ));
         let resets = Arc::new(reset::PasswordResets {
             database: database.clone(),
+            jobs: context.jobs(),
             users: users.clone(),
             mailer: mailer.clone(),
             translations: context.translations().clone(),
@@ -184,11 +186,12 @@ impl Module for AuthModule {
             roles,
             api_keys,
             mfa,
-            resets,
+            resets: resets.clone(),
             verifications,
             passkeys,
             self_registration: config.self_registration,
         });
+        self.resets = Some(resets);
         Ok(())
     }
 
@@ -205,10 +208,15 @@ impl Module for AuthModule {
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {
-        match &self.cleanup {
-            Some(cleanup) => vec![JobRegistration::new(cleanup::KIND, cleanup.clone())],
-            None => Vec::new(),
+        let mut jobs = Vec::new();
+        if let Some(cleanup) = &self.cleanup {
+            jobs.push(JobRegistration::new(cleanup::KIND, cleanup.clone()));
         }
+        if let Some(resets) = &self.resets {
+            let mailer = Arc::new(reset::ResetMailer(resets.clone()));
+            jobs.push(JobRegistration::new(reset::SEND_RESET, mailer));
+        }
+        jobs
     }
 
     fn schedules(&self) -> Vec<Schedule> {
@@ -370,6 +378,7 @@ pub(crate) mod testing {
         );
         let resets = Arc::new(crate::reset::PasswordResets {
             database: database.clone(),
+            jobs: autoxide_kernel::job::JobQueue::new("auth"),
             users: users.clone(),
             mailer: mails.clone(),
             translations: translations.clone(),
@@ -407,6 +416,41 @@ pub(crate) mod testing {
     }
 
     /// Token (chuỗi base64url 43 ký tự) trong mail cuối cùng đã gửi.
+    /// Xin đặt lại mật khẩu cho `email` rồi chạy job gửi mail ngay, như worker (D-162).
+    pub async fn request_reset(
+        services: &Services,
+        email: &str,
+        language: autoxide_kernel::i18n::Language,
+    ) {
+        services.resets.request(email, language).await.unwrap();
+        send_resets(services).await;
+    }
+
+    /// Chạy mọi job gửi mail đặt lại mật khẩu đang chờ, theo thứ tự xếp hàng.
+    pub async fn send_resets(services: &Services) {
+        use sea_orm::ConnectionTrait as _;
+        use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query};
+        let select = Query::select()
+            .columns([Alias::new("id"), Alias::new("payload")])
+            .from(Alias::new("auth_jobs"))
+            .and_where(Expr::col(Alias::new("kind")).eq(crate::reset::SEND_RESET))
+            .and_where(Expr::col(Alias::new("completed_at")).is_null())
+            .order_by(Alias::new("id"), Order::Asc)
+            .to_owned();
+        for row in services.database.write().query_all(&select).await.unwrap() {
+            let id: uuid::Uuid = row.try_get("", "id").unwrap();
+            let payload: String = row.try_get("", "payload").unwrap();
+            let job: crate::reset::ResetJob = serde_json::from_str(&payload).unwrap();
+            services.resets.send(&job).await.unwrap();
+            let done = Query::update()
+                .table(Alias::new("auth_jobs"))
+                .value(Alias::new("completed_at"), chrono::Utc::now())
+                .and_where(Expr::col(Alias::new("id")).eq(id))
+                .to_owned();
+            services.database.write().execute(&done).await.unwrap();
+        }
+    }
+
     pub fn last_token(services: &Services) -> String {
         let sent = services.mails.sent.lock().unwrap();
         let text = &sent.last().unwrap().text;

@@ -22,6 +22,11 @@ endpoints are marked deprecated with a sunset date first.
 - Webhooks: `autoxide jobs retry` on a failed `webhooks.send` job sends the delivery again
   instead of doing nothing.
 
+### Security
+
+- `POST /api/v1/auth/password-reset` answers in the same time whether or not the email has an
+  account: a background job looks the account up and sends the mail a moment later.
+
 ## [0.6.0] - 2026-11-12
 
 ### Changed

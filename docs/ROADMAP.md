@@ -323,7 +323,7 @@ Giao diện quản trị ở repo riêng (D-096, D-097); bước này chỉ làm
 - [x] Lệnh CLI gỡ xác thực hai bước của một tài khoản (admin duy nhất mất thiết bị)
 - [x] `files`: job dọn nội dung mồ côi trong nơi lưu (như `media`)
 - [x] `autoxide jobs retry` một job `webhooks.send` đã hỏng thì gửi lại thật
-- [ ] Đặt lại mật khẩu: trả lời trong cùng khoảng thời gian dù email có hay không (việc chạy trong job)
+- [x] Đặt lại mật khẩu: trả lời trong cùng khoảng thời gian dù email có hay không (việc chạy trong job)
 - [ ] Đo tải (`scripts/loadtest.sh`) rồi tối ưu xác thực mỗi request nếu đo được lợi
 
 ## Sau core (chưa mở)

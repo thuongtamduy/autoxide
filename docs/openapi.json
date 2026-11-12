@@ -3103,7 +3103,7 @@
           "auth"
         ],
         "summary": "Ask for a password-reset mail.",
-        "description": "Always answers 202, whether or not an account has this email, so the answer does\nnot reveal who has an account. When one does, a mail with a reset token (valid 30\nminutes) is sent in the language of `Accept-Language`. At most one mail per minute\nper account.",
+        "description": "Always answers 202, whether or not an account has this email, and in the same time:\nthe account is looked up and the mail sent by a background job a moment later, so\nneither the answer nor its timing reveals who has an account. When one does, a mail\nwith a reset token (valid 30 minutes) is sent in the language of `Accept-Language`. At\nmost one mail per minute per account.",
         "operationId": "auth_request_password_reset",
         "parameters": [
           {

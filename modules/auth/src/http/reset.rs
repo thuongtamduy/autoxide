@@ -39,10 +39,11 @@ pub(crate) struct ResetConfirmation {
 
 /// Ask for a password-reset mail.
 ///
-/// Always answers 202, whether or not an account has this email, so the answer does
-/// not reveal who has an account. When one does, a mail with a reset token (valid 30
-/// minutes) is sent in the language of `Accept-Language`. At most one mail per minute
-/// per account.
+/// Always answers 202, whether or not an account has this email, and in the same time:
+/// the account is looked up and the mail sent by a background job a moment later, so
+/// neither the answer nor its timing reveals who has an account. When one does, a mail
+/// with a reset token (valid 30 minutes) is sent in the language of `Accept-Language`. At
+/// most one mail per minute per account.
 #[utoipa::path(
     post,
     path = "/password-reset",
@@ -105,9 +106,12 @@ mod tests {
             let (status_unknown, _, _) =
                 call(&app, "POST", "/password-reset", None, Some(unknown)).await;
 
-            // Cùng một câu trả lời: không ai biết email nào có tài khoản.
+            // Cùng một câu trả lời: không ai biết email nào có tài khoản. Request chỉ xếp job
+            // (D-162): mail đi khi worker chạy.
             assert_eq!(status_known, StatusCode::ACCEPTED);
             assert_eq!(status_unknown, StatusCode::ACCEPTED);
+            assert!(services.mails.sent.lock().unwrap().is_empty());
+            crate::testing::send_resets(&services).await;
             assert_eq!(services.mails.sent.lock().unwrap().len(), 1);
 
             let body = json!({"token": "nope", "password": "a brand new passphrase"});

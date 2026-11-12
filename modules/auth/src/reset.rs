@@ -1,8 +1,9 @@
 //! Đặt lại mật khẩu qua mail (D-063).
 //!
-//! 1. `request(email)`: có tài khoản đang hoạt động với email đó thì tạo token ngẫu
-//!    nhiên (database giữ bản băm) và gửi mail. Không có thì không làm gì — nhưng bên gọi
-//!    nhận cùng một kết quả, nên không dò được email nào đã đăng ký.
+//! 1. `request(email)`: xếp một job [`SEND_RESET`] — cùng một việc cho mọi email, nên cả câu trả
+//!    lời lẫn thời gian trả lời không cho dò được email nào đã đăng ký (D-162). Job: có tài
+//!    khoản đang hoạt động với email đó thì tạo token ngẫu nhiên (database giữ bản băm) và gửi
+//!    mail; không có thì không làm gì.
 //! 2. `confirm(token, mật khẩu mới)`: token đúng, chưa dùng, chưa hết hạn thì đặt mật
 //!    khẩu mới; mọi phiên đăng nhập và mọi token đặt lại khác của người đó hết hiệu lực.
 
@@ -12,9 +13,11 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
+use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
 use autoxide_kernel::mail::{MailTemplate, Mailer};
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::events;
@@ -49,8 +52,35 @@ const RESET_CODE: MailTemplate = MailTemplate::new(
      your password stays the same.",
 );
 
+/// Loại job gửi mail đặt lại mật khẩu.
+pub(crate) const SEND_RESET: &str = "auth.send_password_reset";
+
+/// Job [`SEND_RESET`]. Mang email người hỏi — job xong thì job queue xoá payload (D-079).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct ResetJob {
+    pub email: String,
+    /// Mã ngôn ngữ của mail (`en`, `vi`).
+    pub language: String,
+}
+
+impl Job for ResetJob {
+    const KIND: &'static str = SEND_RESET;
+}
+
+/// Bên chạy job [`SEND_RESET`].
+pub(crate) struct ResetMailer(pub Arc<PasswordResets>);
+
+#[async_trait::async_trait]
+impl JobHandler for ResetMailer {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let job: ResetJob = serde_json::from_value(job.payload.clone()).map_err(Error::internal)?;
+        self.0.send(&job).await
+    }
+}
+
 pub(crate) struct PasswordResets {
     pub database: Database,
+    pub jobs: JobQueue,
     pub users: Arc<UserService>,
     pub mailer: Arc<dyn Mailer>,
     pub translations: Translations,
@@ -60,10 +90,18 @@ pub(crate) struct PasswordResets {
 }
 
 impl PasswordResets {
-    /// Gửi mail đặt lại mật khẩu nếu `email` là của một tài khoản đang hoạt động. Kết
-    /// quả như nhau dù email có tồn tại hay không.
+    /// Xếp việc gửi mail đặt lại mật khẩu cho `email`. Như nhau dù email có tồn tại hay không
+    /// — kể cả thời gian: việc tra tài khoản, tạo token, gửi mail chạy trong job (D-162).
     pub(crate) async fn request(&self, email: &str, language: Language) -> Result<(), Error> {
-        let Some(user) = self.users.find_by_email(email).await? else {
+        let job = ResetJob { email: email.trim().to_owned(), language: language.tag().to_owned() };
+        self.jobs.enqueue(self.database.write(), &job, EnqueueOptions::default()).await?;
+        Ok(())
+    }
+
+    /// Job: gửi mail đặt lại mật khẩu nếu email là của một tài khoản đang hoạt động.
+    pub(crate) async fn send(&self, job: &ResetJob) -> Result<(), Error> {
+        let language = if job.language == Language::Vi.tag() { Language::Vi } else { Language::En };
+        let Some(user) = self.users.find_by_email(&job.email).await? else {
             return Ok(());
         };
         if !user.is_active() {
@@ -193,7 +231,7 @@ mod tests {
     async fn xoa_tai_khoan_xoa_luon_token() {
         TestDatabase::run(async |test| {
             let services = setup(test).await;
-            services.resets.request("ada@example.com", Language::En).await.unwrap();
+            crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let token = last_token(&services);
             let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
             services.users.delete(Actor::system(), ada.id).await.unwrap();
@@ -209,9 +247,9 @@ mod tests {
         TestDatabase::run(async |test| {
             let services = setup(test).await;
 
-            services.resets.request("ghost@example.com", Language::En).await.unwrap();
+            crate::testing::request_reset(&services, "ghost@example.com", Language::En).await;
             assert_eq!(sent(&services), 0);
-            services.resets.request(" ADA@example.com", Language::Vi).await.unwrap();
+            crate::testing::request_reset(&services, " ADA@example.com", Language::Vi).await;
             assert_eq!(sent(&services), 1);
             {
                 let mails = services.mails.sent.lock().unwrap();
@@ -220,10 +258,10 @@ mod tests {
                 assert!(mails[0].text.contains("trong 30 phút"), "{}", mails[0].text);
             }
             // Gửi dồn trong 60 giây: không thêm mail.
-            services.resets.request("ada@example.com", Language::En).await.unwrap();
+            crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             assert_eq!(sent(&services), 1);
             time_passes(&services, 2).await;
-            services.resets.request("ada@example.com", Language::En).await.unwrap();
+            crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             assert_eq!(sent(&services), 2);
             assert_eq!(services.mails.sent.lock().unwrap()[1].subject, "Reset your password");
 
@@ -232,7 +270,7 @@ mod tests {
             let disable = UserChanges { name: None, disabled: Some(true) };
             services.users.update(Actor::system(), ada.id, disable, None).await.unwrap();
             time_passes(&services, 2).await;
-            services.resets.request("ada@example.com", Language::En).await.unwrap();
+            crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             assert_eq!(sent(&services), 2);
         })
         .await
@@ -245,7 +283,7 @@ mod tests {
             let services = setup(test).await;
             let session =
                 services.sessions.login("ada@example.com", OLD, None).await.unwrap().tokens();
-            services.resets.request("ada@example.com", Language::En).await.unwrap();
+            crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let token = last_token(&services);
 
             // Mật khẩu sai luật: báo lỗi, token vẫn còn dùng được.
@@ -272,10 +310,10 @@ mod tests {
     async fn token_het_han_va_token_cu_khong_dung_duoc() {
         TestDatabase::run(async |test| {
             let services = setup(test).await;
-            services.resets.request("ada@example.com", Language::En).await.unwrap();
+            crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let older = last_token(&services);
             time_passes(&services, 2).await;
-            services.resets.request("ada@example.com", Language::En).await.unwrap();
+            crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let newer = last_token(&services);
 
             services.resets.confirm(&newer, NEW.to_owned()).await.unwrap();
@@ -284,7 +322,7 @@ mod tests {
             assert_eq!(stale.code(), "auth.invalid_reset_token");
 
             time_passes(&services, 2).await;
-            services.resets.request("ada@example.com", Language::En).await.unwrap();
+            crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let expiring = last_token(&services);
             time_passes(&services, 31).await;
             let expired = services.resets.confirm(&expiring, NEW.to_owned()).await.unwrap_err();
@@ -300,7 +338,7 @@ mod tests {
     async fn dung_cung_token_dong_thoi_chi_mot_ben_duoc() {
         TestDatabase::run(async |test| {
             let services = setup(test).await;
-            services.resets.request("ada@example.com", Language::En).await.unwrap();
+            crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let token = last_token(&services);
 
             let attempts: Vec<_> = (0..5)

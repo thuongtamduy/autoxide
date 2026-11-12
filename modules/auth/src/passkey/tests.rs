@@ -216,11 +216,12 @@ async fn can_mat_khau_va_dat_lai_mat_khau_thu_hoi_passkey() {
         let admin = autoxide_kernel::access::Principal::with_all_permissions(ada);
         services.api_keys.create(&admin, key).await.unwrap();
 
-        services
-            .resets
-            .request("ada@example.com", autoxide_kernel::i18n::Language::En)
-            .await
-            .unwrap();
+        crate::testing::request_reset(
+            &services,
+            "ada@example.com",
+            autoxide_kernel::i18n::Language::En,
+        )
+        .await;
         let token = crate::testing::last_token(&services);
         services.resets.confirm(&token, "a brand new passphrase".to_owned()).await.unwrap();
 
@@ -322,7 +323,7 @@ async fn dat_lai_mat_khau_dong_moi_cua_mo_bang_mat_khau_cu() {
         };
 
         // Chủ tài khoản lấy lại tài khoản.
-        services.resets.request("ada@example.com", Language::En).await.unwrap();
+        crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
         let reset = crate::testing::last_token(&services);
         services.resets.confirm(&reset, "a brand new passphrase".to_owned()).await.unwrap();
 
@@ -347,7 +348,7 @@ async fn dat_lai_mat_khau_dong_moi_cua_mo_bang_mat_khau_cu() {
             )
             .to_owned();
         services.database.write().execute(&older).await.unwrap();
-        services.resets.request("ada@example.com", Language::En).await.unwrap();
+        crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
         let old_reset = crate::testing::last_token(&services);
         services
             .verifications
