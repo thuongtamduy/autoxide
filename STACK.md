@@ -17,7 +17,7 @@ nghiệp vụ cắm vào sau. Core xong khi mọi bước trong lộ trình xanh
 trên cả hai database.
 
 Autoxide là nền cho một **sản phẩm mới**, **mã nguồn mở**, ai cũng dùng được, không
-gắn với một công ty hay một ngành. Module đầu tiên là thư viện media (`media`, D-091); core vẫn giữ trung lập với nghiệp vụ.
+gắn với một công ty hay một ngành. Module nghiệp vụ chủ dự án đã chọn: `media` (thư viện media, D-091) và `content` (nội dung, D-096, D-098); core vẫn trung lập với nghiệp vụ.
 
 ## Tóm tắt
 

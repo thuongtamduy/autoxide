@@ -3,7 +3,8 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–12 xong**; đang ở bước 13 (củng cố core), mục "CI chạy xanh trên GitHub".
+Trạng thái: **bước 0–12, 14, 16 xong**; bước 13 còn CI trên GitHub và phát hành; bước 15
+còn tìm tiếng Việt không dấu; tiếp theo là bước 17 (`content`) — D-096, D-098, D-101, D-102.
 
 ## 0. Khung dự án
 
@@ -160,18 +161,24 @@ hợp lệ (`$ref` tới `Order` không tồn tại), mô tả tool MCP lọt ti
 - [x] Tạo mới (201) trả header `Location`; OpenAPI có mục `servers` (D-083)
 - [x] Chống ghi đè khi hai người cùng sửa: `ETag` / `If-Match` cho các endpoint sửa (D-084)
 
-## 15. Thư viện media (chủ dự án giao ngày 12/11/2026)
+## 15. Nền chung cho media và nội dung (core)
 
-Module `media`: ảnh, video, âm thanh, tài liệu trong thư mục lồng nhau, cho website (sắp tới là
-module `content`) dùng lại. Điều kiện trước là phần nền chung ở kernel (D-085).
+Thứ `media` và `content` cùng cần, viết trung lập với nghiệp vụ để module nào cũng dùng được
+(D-085, D-099). Bước này và bước 16 làm trên `main` dưới tên "bước 15: thư viện media"; tách
+lại thành 15 và 16 khi gộp nhánh đề bài của `content` (D-103).
 
-Nền chung (kernel):
-
-- [x] Danh sách sắp theo cột khác (tên, kích thước) bằng keyset pagination; tìm theo chữ dùng chung (D-085)
-- [x] Endpoint công khai (`Option<Principal>`); `If-None-Match` → 304; `If-Match` bắt buộc → 428 (D-085)
+- [x] Danh sách lọc theo trường và sắp xếp theo trường khác thời gian tạo (tên, kích thước…)
+      bằng keyset pagination, không `OFFSET`; tìm theo chữ dùng chung (D-085)
+- [ ] Tìm được tiếng Việt không dấu ("da lat" ra "Đà Lạt"), như nhau trên SQLite và Postgres
+- [x] Endpoint đọc công khai (`Option<Principal>`); rate limiting vẫn áp (D-085)
+- [x] Cache: `ETag` + `If-None-Match` → `304`, `Cache-Control` do endpoint đặt (D-085)
+- [x] Chống ghi đè: `ETag` + `If-Match` → `412` (bước 14, D-084); `If-Match` bắt buộc → `428` (D-085)
 - [x] `Storage` đọc theo khoảng byte và liệt kê theo tiền tố, có cài đặt mặc định (D-085)
 
-Module `media`:
+## 16. Module `media` — thư viện media (chủ dự án giao ngày 12/11/2026)
+
+Module `media`: ảnh, video, âm thanh, tài liệu trong thư mục lồng nhau, cho website và module
+`content` dùng lại (D-086, D-100). `files` giữ nguyên.
 
 - [x] Tải lên: kiểm kích thước, loại được phép, loại thật theo chữ ký đầu file; kích thước ảnh; SHA-256; báo item trùng (D-086, D-089)
 - [x] Danh sách lọc theo thư mục, loại, `visibility`, thùng rác, tên; sắp theo thời gian, tên, kích thước
@@ -187,6 +194,36 @@ Bổ sung (chủ dự án giao thêm ngày 12/11/2026):
 - [x] Ảnh thu nhỏ làm bằng job nền, lấy bằng `?w=` (D-093)
 - [x] Nhãn song song với thư mục; quản lý nhãn (D-094)
 - [x] Tải lên qua MCP (base64, tối đa 1 MiB) (D-095)
+
+
+## 17. Module `content` — nội dung (chủ dự án chọn ngày 12/11/2026, D-096, D-098, D-101)
+
+Chỉ nội dung và những gì liên quan đến nội dung; không thương mại điện tử. Làm sau `media`
+(D-099, D-100). Giao diện (trang quản trị, website) là repo riêng (D-097) — bước này chỉ làm API.
+Thiết kế: D-102; đề bài đầy đủ: [`docs/prompts/step-17-content.md`](prompts/step-17-content.md);
+khảo sát: [`docs/research/content.md`](research/content.md).
+
+- [ ] Bài viết và trang chung một mô hình: tiêu đề, slug, tóm tắt, thân bài JSON (máy chủ kiểm
+      theo danh sách node được phép, chặn link độc), ảnh đại diện và ảnh trong bài (ID của
+      `media`, kiểm qua `api` của `media`); số chữ, thời gian đọc, văn bản thuần để tìm kiếm
+- [ ] Nháp tách khỏi bản công khai; đăng, gỡ, lưu trữ; hẹn giờ đăng và gỡ qua job queue (ghim
+      một revision)
+- [ ] Lịch sử phiên bản: xem và khôi phục
+- [ ] Trang có cấp cha con, đường dẫn lồng nhau, chuyển trang sang nhánh khác (D-101)
+- [ ] Đường dẫn do backend tính; endpoint `resolve`; tự tạo chuyển hướng khi đường dẫn công khai
+      đổi (cả cây con), chuyển hướng làm tay, 410 cho nội dung đã gỡ
+- [ ] Danh mục (cha con) và thẻ; tác giả là hồ sơ của `content`, một bài nhiều tác giả
+- [ ] Menu điều hướng nhiều tầng, theo ngôn ngữ, trỏ tới ID nội dung hoặc URL
+- [ ] Đa ngôn ngữ (vi, en): mỗi bản dịch một bản ghi, slug riêng, liên kết với nhau
+- [ ] SEO: meta title, meta description, ảnh chia sẻ, canonical, `noindex`; dữ liệu cho sitemap
+      (kèm bản dịch cho hreflang) và feed
+- [ ] Xem trước bản nháp bằng token ký, có hạn
+- [ ] Permission: đọc nháp, viết, đăng, quản lý; người đọc công khai chỉ thấy bản đã đăng
+      (endpoint công khai, tìm kiếm và cache của bước 15); `If-Match` bắt buộc (D-102)
+- [ ] Event và audit cho mọi thay đổi, đủ dữ liệu để website làm mới cache qua webhook; tool MCP
+      gọi cùng service; dọn và xuất dữ liệu cá nhân
+- [ ] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database (kể cả test đồng
+      thời); hướng dẫn dùng (tiếng Anh + tiếng Việt)
 
 ## Sau core (chưa mở)
 

@@ -2116,3 +2116,199 @@ hạn thân request chung (`AUTOXIDE_HTTP_BODY_LIMIT_BYTES`, mặc định 1 MiB
 
 Không làm "tải từ URL" (máy chủ tự tải file về): phải chặn địa chỉ mạng nội bộ (SSRF) cẩn thận
 mới an toàn — để khi có nhu cầu thật.
+
+<!-- Các mục D-096 … D-102 được ghi trên nhánh `ccr-ef1f8f71-civ2ra` dưới số D-085 … D-091 (cùng
+ngày, song song với các mục D-085 … D-095 trên `main`). Khi gộp nhánh vào `main` (D-103), chúng
+được đánh số lại theo thứ tự, nội dung giữ nguyên trừ số tham chiếu chéo. -->
+
+## D-096 · Module đầu tiên là `cms` (nội dung); giao diện là dự án riêng, công khai; chưa làm app — 2026-11-12 — chủ dự án quyết
+
+Quyết định:
+
+- Module nghiệp vụ đầu tiên là `cms`: **chỉ nội dung và những gì liên quan đến nội dung**
+  (bài viết, trang, danh mục, thẻ, menu, phiên bản, đa ngôn ngữ, SEO). Không có thương mại
+  điện tử (sản phẩm, giỏ hàng, đơn hàng, thanh toán).
+- Giao diện — trang quản trị nội dung và website công khai hiển thị nội dung — là một dự án
+  riêng, **công khai toàn bộ** như core, chỉ dùng API của core (D-026).
+- Chưa làm app di động.
+
+Lý do: chủ dự án chọn.
+
+Hệ quả: các khái niệm của `cms` (bài viết, trang, slug…) chỉ nằm trong `modules/cms`; thứ
+`cms` cần mà module khác cũng dùng được (lọc và sắp xếp danh sách, tìm kiếm văn bản, đọc
+công khai có cache) thì thêm vào core ở dạng trung lập với nghiệp vụ. Việc cụ thể ở bước 15
+của `docs/ROADMAP.md`.
+
+Thay: phần "Module đầu tiên chưa quyết" của D-016.
+
+## D-097 · Stack của dự án giao diện — 2026-11-12 — agent quyết
+
+Quyết định: dự án giao diện (repo riêng, gợi ý tên `autoxide-web`) dùng:
+
+- TypeScript strict; một monorepo pnpm workspaces + Turborepo; Biome để lint và format.
+- SDK sinh từ `docs/openapi.json` của core bằng `openapi-typescript` + `openapi-fetch`, có
+  lớp chặn tự gắn `Idempotency-Key` cho lệnh ghi và `Accept-Language`.
+- Next.js 16 (App Router, React 19) cho **cả** trang quản trị và website công khai. Máy chủ
+  Next.js đứng giữa (BFF) và giữ refresh token trong cookie `httpOnly`; trình duyệt không
+  bao giờ cầm refresh token.
+- Tailwind CSS 4 + shadcn/ui; TanStack Query và TanStack Table; React Hook Form + Zod;
+  Tiptap làm trình soạn thảo (nội dung lưu dạng JSON); next-intl cho giao diện vi và en;
+  thông báo lỗi tra theo `code` của core.
+- Vitest, Playwright, MSW để test; build `output: standalone` chạy trong Docker cạnh core.
+
+Lý do: một ngôn ngữ và một framework cho cả hai ứng dụng (mỗi việc một cách làm); website
+công khai cần render phía máy chủ cho SEO; core trả refresh token trong thân JSON nên cần
+BFF để không lộ token khi có lỗi XSS; kiểu dữ liệu sinh từ OpenAPI nên API đổi thì trình
+biên dịch báo ngay; các thư viện trên phổ biến nhất trong hệ React, AI agent viết tốt.
+
+Đã cân nhắc: Vite SPA cho trang quản trị — phải tự giải quyết chỗ cất refresh token và có
+hai cách làm web; Nuxt, SvelteKit — hệ sinh thái nhỏ hơn; Astro cho website — tốt cho nội
+dung tĩnh nhưng thêm một framework thứ hai; `@hey-api/openapi-ts` — sinh SDK đầy đủ hơn
+nhưng chưa tới 1.0; Flutter / Expo cho app — chưa làm app (D-096).
+
+Ghi chú: phiên bản cụ thể ghim trong repo giao diện khi tạo; mục này chỉ chốt lựa chọn.
+
+## D-098 · Module nội dung tên là `content`, không phải `cms` — 2026-11-12 — chủ dự án quyết
+
+Quyết định: module nội dung của D-096 tên là `content` (thư mục `modules/content`, crate
+`autoxide-content`; bảng `content_…`; route `/api/v1/content/…`; permission, mã lỗi và event
+mang tiền tố `content.`; cấu hình `AUTOXIDE_CONTENT_…`). Phạm vi giữ nguyên như D-096.
+
+Lý do: chủ dự án thấy `cms` quá chung chung. "CMS" là tên một ứng dụng (màn hình quản trị +
+nội dung), còn module được đặt theo dữ liệu nó sở hữu. Nội dung còn được nơi khác dùng —
+website, storefront nếu sau này có (trang giới thiệu, blog, banner), AI agent qua MCP — nên
+tên phải nói về dữ liệu, không về một màn hình. Sản phẩm, đơn hàng nếu có sau này là module
+riêng; `content` không biết về chúng.
+
+Đã cân nhắc: `posts` — hẹp, nội dung còn có trang và menu; `publishing` — dài, mơ hồ.
+
+Thay: tên `cms` trong D-096.
+
+## D-099 · Nâng `files` thành thư viện media trước khi làm `content` — 2026-11-12 — chủ dự án quyết
+
+Quyết định: thứ tự là bước 15 (nền chung trong core: lọc và sắp xếp, tìm kiếm, đọc công khai,
+cache, `If-Match`) → bước 16 (module `files` thành thư viện media dùng chung: file công khai,
+hiển thị ảnh inline an toàn, metadata ảnh, thư mục hoặc nhãn, thùng rác, `api` cho module
+khác, tool MCP) → bước 17 (module `content`). Tên module vẫn là `files`.
+
+Lý do: chủ dự án chọn. `content` dựa vào ảnh (ảnh đại diện, ảnh trong bài, ảnh chia sẻ), và
+website phải hiển thị được ảnh cho người đọc không đăng nhập — hiện `files` chỉ là kho file
+riêng, luôn tải về dạng attachment (D-067). Làm `files` trước thì `content` chỉ việc giữ ID
+file và gọi `api` của `files`.
+
+Đã cân nhắc: đổi tên `files` thành `media` — tên module là hợp đồng (bảng, route, permission,
+mã lỗi), đổi làm vỡ client đang dùng mà không thêm giá trị; dữ liệu vẫn là file.
+
+Thay: thứ tự "module `content` ngay sau bước 12" của D-096.
+
+## D-100 · `files` giữ nguyên; thư viện media là module riêng `media` — 2026-11-12 — chủ dự án quyết
+
+Quyết định: không nâng `files` thành thư viện media như D-099 viết. `files` giữ nguyên vai kho
+file thô, riêng tư theo người sở hữu, dùng cho mọi module. Thư viện media cho xuất bản là
+module mới `media` (bước 16 của lộ trình): lưu nội dung qua trait `Storage` của kernel (do
+`files` cung cấp) dưới khoá `media/<id>`, metadata ở bảng `media_…`, không tham chiếu bảng của
+`files`. `content` giữ ID của `media`. Thứ tự giữ như D-099: nền chung → `media` → `content`.
+
+Lý do: chủ dự án đề xuất. Hai việc khác nhau: cất file (đính kèm, xuất báo cáo…) cần đơn giản
+và riêng tư; xuất bản cần công khai, hiển thị inline, alt text, thư mục, thùng rác. Tách ra thì
+`files` không phải mang khái niệm của xuất bản, và file riêng tư không thể lỡ bị công khai vì
+không cùng bảng với item công khai. Trait `Storage` ở kernel có sẵn cho đúng việc này (D-066).
+
+Đã cân nhắc: `media` chỉ trỏ tới dòng của `files` rồi thêm metadata — tải lên hai bước, xoá
+phải phối hợp hai module, dữ liệu một tấm ảnh nằm ở hai nơi; nâng `files` (D-099) — trộn hai
+vai vào một module.
+
+Thay: phần "nâng `files` thành thư viện media" của D-099.
+
+## D-101 · Trang có cấp cha con ngay trong bước 17 — 2026-11-12 — chủ dự án quyết
+
+Quyết định: trang (`kind = page`) của `content` có trang cha (để trống được), đường dẫn lồng
+nhau (`/gioi-thieu/doi-ngu`), làm ngay trong bước 17 — không tách thành bước sau. Bài viết
+(`kind = post`) vẫn phẳng, gom nhóm bằng danh mục và thẻ. Trang không có cha thì là trang phẳng
+như thường.
+
+Lý do: chủ dự án chọn. Website công ty, trường học, tổ chức có vài chục trang thường cần đường
+dẫn lồng nhau; làm luôn thì không phải mở thêm một bước và website không phải sửa lần hai.
+
+Đã cân nhắc: làm phẳng trước, thêm cây sau (gọn hơn khoảng 15–20% khối lượng bước 17, cây
+thêm sau được mà không phá API); cho slug chứa `/` gõ tay (không phải cây thật, đổi "cha"
+không tự cập nhật trang con).
+
+## D-102 · Thiết kế module `content` — 2026-11-12 — agent quyết
+
+Dựa trên khảo sát Ghost, WordPress, Contentful, Sanity, Wagtail, Strapi 5, Payload và các
+chuẩn ngành ở `docs/research/content.md`. Chi tiết đủ để làm ở `docs/prompts/step-17-content.md`.
+
+Quyết định:
+
+- **Nháp tách khỏi bản công khai.** `content_entries` giữ bản nháp làm việc (luôn có);
+  `content_published` giữ bản đang công khai (chỉ có khi đang công khai). Publish chép nháp
+  sang trong một transaction. Endpoint công khai chỉ đọc `content_published`, nên không thể lộ
+  nháp. Trạng thái: `draft` / `published` / `archived` + cờ `has_unpublished_changes`; hẹn giờ
+  là tài nguyên riêng (`content_schedules`), không phải một trạng thái.
+- **Mỗi bản dịch là một bản ghi** với slug và trạng thái publish riêng, nối bằng
+  `translation_group_id`. Bài và trang **không fallback** sang ngôn ngữ khác (thiếu thì 404),
+  vì fallback làm hỏng canonical và hreflang; tên danh mục, thẻ, menu thì fallback về ngôn ngữ
+  mặc định và response ghi ngôn ngữ thật đã trả.
+- **Backend tính đường dẫn** (`path`) của mỗi mục: trang = slug của các trang tổ tiên + slug;
+  bài = tiền tố cấu hình (mặc định `blog`) + slug. Website chỉ ghép tên miền và tiền tố ngôn
+  ngữ. Website tra nội dung bằng một endpoint `resolve` theo (ngôn ngữ, đường dẫn), trả về nội
+  dung, chuyển hướng, hoặc "đã gỡ" (410).
+- **Đường dẫn công khai đổi thì tự tạo chuyển hướng** (301) cho mục đó và mọi trang con, trỏ
+  tới ID (không thành chuỗi chuyển hướng). Gỡ hẳn (xoá, lưu trữ) bản đang công khai thì ghi
+  "đã gỡ" (410). Chuyển hướng làm tay được 301/302/307/308/410.
+- **Đổi trang cha là một thao tác riêng** (`move`), có hiệu lực ngay cho cả nháp và bản công
+  khai; mọi thay đổi cây trong một ngôn ngữ đi qua một dòng khoá chung để hai lệnh `move` đồng
+  thời không tạo vòng lặp trên Postgres.
+- **Revision là ảnh chụp đầy đủ**, tạo ở service layer (REST và MCP như nhau); khôi phục tạo
+  nháp mới, không tự đăng. Hẹn giờ ghim một revision; lúc chạy, nếu bản công khai đã mới hơn
+  lúc đặt lịch thì lịch thất bại với mã riêng, không ghi đè.
+- **Bắt buộc `If-Match`** cho lệnh sửa, xoá và mọi thao tác đổi trạng thái của `content`;
+  thiếu thì 428 `precondition_required`. Tool MCP tương ứng nhận tham số `version`. Đây là
+  ngoại lệ có chủ đích so với D-084 (ở đó không bắt buộc để không phá client cũ): `content` là
+  module mới, chưa có client cũ, và AI agent hay sửa song song.
+- **Máy chủ kiểm JSON thân bài** theo danh sách node, mark, thuộc tính được phép (từ chối mặc
+  định), chặn scheme link ngoài `http`/`https`/`mailto` và đường dẫn tương đối, ảnh chỉ giữ ID
+  của `media`, giới hạn kích thước và độ sâu, báo mọi lỗi một lần kèm vị trí. Không lưu HTML.
+- **Tác giả là hồ sơ của `content`** (`content_authors`: tên hiển thị, slug, giới thiệu, ảnh),
+  giữ `user_id` không foreign key; một bài có nhiều tác giả có thứ tự. `content` không phụ
+  thuộc module `auth` (D-046).
+- **Preview token** ký HMAC, chứa ID mục và hạn dùng, không lưu bảng; chưa cấu hình secret thì
+  tính năng tắt và báo lỗi rõ.
+- **Slug** sinh bằng crate `slug` (chạy thử: "Đường đến Đà Lạt" → `duong-den-da-lat`; tự bỏ
+  dấu và đổi `đ` → `d`); thêm vào `STACK.md` khi làm.
+
+Lý do: đặt đúng ranh giới (nháp / công khai, giữa các bản dịch, backend / website) ngay từ
+migration đầu thì redirect, sitemap có hreflang, feed, preview, webhook làm mới cache chỉ còn là
+truy vấn trên bảng thường, chạy như nhau trên SQLite và Postgres. Các CMS đặt sai ranh giới phải
+vá về sau (khảo sát ở `docs/research/content.md`).
+
+Đã cân nhắc: mẫu Wagtail và Payload (bảng chính là bản công khai, nháp nằm trong revision) —
+trang quản trị phải đọc nháp từ JSON, khó lọc và sắp xếp; dịch theo trường bằng cột JSON — khó
+đánh index trên SQLite và phải vá publish theo ngôn ngữ như Contentful; khoá bài khi đang sửa
+(Payload, WordPress) — `If-Match` theo chuẩn HTTP và không giữ trạng thái; mã chuyển hướng 308
+— Google coi như 301, còn 301 được mọi công cụ hiểu.
+
+## D-103 · Gộp nhánh đề bài `content` vào `main`: đánh số lại, bước 15–16 đã xong — 2026-11-12 — agent quyết
+
+Bối cảnh: đề bài bước 17 (`content`) được soạn trên nhánh `ccr-ef1f8f71-civ2ra`, tách ra từ
+`main` trước khi `media` được làm. Nhánh đó ghi quyết định D-085 … D-091, trùng số với D-085 …
+D-095 trên `main`, và lộ trình của nó tách "nền chung" (bước 15) khỏi "`media`" (bước 16).
+
+Quyết định:
+
+- Quyết định của nhánh được đánh số lại D-096 … D-102 (thứ tự giữ nguyên, nội dung giữ nguyên
+  trừ số tham chiếu chéo); đề bài và bản khảo sát được sửa số theo.
+- Module đầu tiên: chủ dự án chọn cả `media` (D-091) lẫn `content` (D-096, D-098) trong cùng
+  ngày, ở hai phiên khác nhau. Không đảo cái nào: `media` đã làm trước, `content` là bước kế.
+  `CLAUDE.md`, `STACK.md` ghi cả hai.
+- Lộ trình: bước "15. Thư viện media" của `main` tách lại thành bước 15 (nền chung) và 16
+  (`media`) cho khớp đề bài; bước 17 lấy từ nhánh.
+- So với yêu cầu bước 15–16 của nhánh, phần đã làm trên `main` khác ở vài chỗ, giữ nguyên:
+  - endpoint công khai khai bằng `Option<Principal>` trong handler + `security((), …)` trong
+    OpenAPI, không qua một hàm mới của hợp đồng module — một cách làm, đã có test;
+  - tìm theo chữ là một hàm của kernel trên cột "khoá tìm" (`search::normalize` +
+    `search::contains`), không sau một trait: một câu `LIKE` chạy như nhau trên hai database,
+    không có nhánh rẽ nào để giấu (CLAUDE.md chỉ yêu cầu trait khi phải rẽ nhánh);
+  - `media` có cả thư mục lẫn nhãn (chủ dự án yêu cầu, D-094), có ảnh thu nhỏ (D-093).
+- Mục còn thiếu của bước 15 — tìm được tiếng Việt không dấu — làm trước khi vào bước 17.
