@@ -9,6 +9,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-12
+
 ### Added
 
 - Installed-module catalog for admin screens and AI agents: `GET /api/v1/kernel/modules` and
@@ -320,7 +322,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/thuongtamduy/autoxide/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/thuongtamduy/autoxide/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/thuongtamduy/autoxide/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/thuongtamduy/autoxide/compare/v0.1.0...v0.2.0
