@@ -220,13 +220,16 @@ async fn module_nhan_database_va_khai_route() {
         // Mỗi module một router; module không khai route thì router rỗng.
         let routes = modules.routes();
         let names: Vec<&str> = routes.iter().map(|(name, _)| *name).collect();
-        // Module nội bộ `kernel` luôn đứng đầu (không có route).
-        assert_eq!(names, ["kernel", "users", "notes", "pinger"]);
+        // Hai module nội bộ luôn đứng đầu; `antispam` có endpoint lấy token form.
+        assert_eq!(names, ["kernel", "antispam", "users", "notes", "pinger"]);
         let paths: Vec<Vec<String>> = routes
             .into_iter()
             .map(|(_, router)| router.into_openapi().paths.paths.keys().cloned().collect())
             .collect();
-        assert_eq!(paths, [vec![], vec![], vec!["/".to_owned()], vec![]]);
+        assert_eq!(
+            paths,
+            [vec![], vec!["/token".to_owned()], vec![], vec!["/".to_owned()], vec![]]
+        );
     })
     .await
     .unwrap();

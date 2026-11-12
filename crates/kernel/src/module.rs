@@ -337,17 +337,20 @@ impl Modules {
     /// Kiểm tên rồi nhận các module. Tên sai là lỗi của người viết module, báo
     /// ngay lúc khởi động.
     ///
-    /// Module nội bộ `kernel` (bảng dùng chung của chương trình, vd khoá ký) luôn được thêm
-    /// vào đầu danh sách: module nào cũng `require` được thứ nó công bố.
+    /// Hai module nội bộ luôn được thêm vào đầu danh sách: `kernel` (bảng dùng chung của
+    /// chương trình, vd khoá ký) và `antispam` (chống spam, D-113). Module nào cũng `require`
+    /// được thứ chúng công bố.
     pub fn new(modules: Vec<Box<dyn Module>>) -> Result<Self, ModuleError> {
         let mut problems = Vec::new();
-        if modules.iter().any(|module| module.name() == crate::builtin::NAME) {
-            problems.push(format!(
-                "module name `{}` is reserved for the kernel's own tables",
-                crate::builtin::NAME
-            ));
+        for reserved in [crate::builtin::NAME, crate::antispam::module::NAME] {
+            if modules.iter().any(|module| module.name() == reserved) {
+                problems.push(format!("module name `{reserved}` is reserved for the kernel"));
+            }
         }
-        let mut all: Vec<Box<dyn Module>> = vec![Box::new(crate::builtin::KernelModule::default())];
+        let mut all: Vec<Box<dyn Module>> = vec![
+            Box::new(crate::builtin::KernelModule::default()),
+            Box::new(crate::antispam::module::AntispamModule::default()),
+        ];
         all.extend(modules);
         let modules = all;
         let names: Vec<&str> = modules.iter().map(|module| module.name()).collect();
@@ -394,8 +397,8 @@ impl Modules {
     }
 
     pub fn is_empty(&self) -> bool {
-        // Module nội bộ `kernel` luôn có, không tính.
-        self.modules.len() <= 1
+        // Hai module nội bộ `kernel` và `antispam` luôn có, không tính.
+        self.modules.len() <= 2
     }
 
     /// Cho từng module đọc cấu hình của nó. Module nào sai cũng không chặn module
@@ -733,9 +736,12 @@ mod tests {
     #[test]
     fn giu_thu_tu_dang_ky() {
         let modules = Modules::new(bare(&["notes", "auth", "tags"])).unwrap();
-        assert_eq!(modules.names(), ["kernel", "notes", "auth", "tags"]);
+        assert_eq!(modules.names(), ["kernel", "antispam", "notes", "auth", "tags"]);
         assert!(!modules.is_empty());
-        assert_eq!(format!("{modules:?}"), r#"Modules(["kernel", "notes", "auth", "tags"])"#);
+        assert_eq!(
+            format!("{modules:?}"),
+            r#"Modules(["kernel", "antispam", "notes", "auth", "tags"])"#
+        );
         assert!(Modules::new(Vec::new()).unwrap().is_empty());
     }
 
@@ -808,9 +814,14 @@ mod tests {
         let mut modules = Modules::new(bare(&["auth"])).unwrap();
 
         assert_eq!(modules.configure(&mut reader), Ok(()));
-        // Chỉ biến của module nội bộ `kernel`.
+        // Chỉ biến của hai module nội bộ `kernel` và `antispam`.
         let names: Vec<&str> = reader.values().iter().map(|value| value.setting.name).collect();
-        assert_eq!(names, ["AUTOXIDE_SECRET_KEY"]);
+        assert!(
+            names.iter().all(
+                |name| *name == "AUTOXIDE_SECRET_KEY" || name.starts_with("AUTOXIDE_ANTISPAM_")
+            ),
+            "{names:?}"
+        );
         assert!(modules.migrator().is_ok());
     }
 }

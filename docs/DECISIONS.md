@@ -2511,3 +2511,41 @@ dùng được) rồi bỏ hai bảng đó. Hai bảng cũ có foreign key `ON D
 `OneTimeTokens::forget` trong cùng transaction — xoá tài khoản vẫn xoá token như trước.
 `random_token` / `sha256` của `auth` là bản của kernel (`autoxide_kernel::secret`), không còn bản
 riêng. Thời gian chờ gửi lại, thời hạn token, mã lỗi giữ nguyên.
+
+## D-113 · Chống spam hai pha trong core: module nội bộ `antispam`, `SpamGuard`, nonce là idempotency cho người lạ — 2026-11-12 — agent quyết
+
+Bối cảnh: `forms`, `newsletter`, `comments` nhận dữ liệu từ người lạ; core bỏ qua
+`Idempotency-Key` khi request không xác thực. Đề bài: ba kết luận nhận / cách ly / từ chối, hai
+pha, không cần tài khoản bên thứ ba.
+
+Quyết định:
+
+- Module nội bộ thứ hai **`antispam`** (luôn đăng ký, sau `kernel`; tên dành riêng): đọc
+  `AUTOXIDE_ANTISPAM_*`, công bố `SpamGuard`, phục vụ `GET /api/v1/antispam/token?scope=` (công
+  khai, `Cache-Control: no-store`). Không có bảng: bảng nằm ở module dùng nó.
+- **Token form** ký HMAC bằng khoá dẫn từ khoá kernel (D-107): phạm vi, lúc phát, nonce 16 byte.
+  Tuổi tối đa `AUTOXIDE_ANTISPAM_TOKEN_MAX_AGE_MINUTES` (120), tối thiểu
+  `AUTOXIDE_ANTISPAM_MIN_FILL_SECONDS` (3).
+- **Pha một** `SpamGuard::check` (trước transaction, mọi việc gọi mạng ở đây): trường bẫy, token,
+  đề (`ChallengeVerifier`, mặc định `NoChallenge`), giới hạn theo khối IP băm theo ngày (D-109),
+  theo email, theo người dùng (`Limits`, bảng `<module>_throttle`, D-110), trùng (module tự dò
+  bằng `content_hash` trên bảng của mình rồi báo cờ `duplicate`), bộ phân loại
+  (`ContentClassifier`, mặc định `NoClassifier`).
+- **Kết luận** (`Verdict`) có thêm `Discard` bên cạnh `Accept` / `Quarantine`, và "từ chối" là
+  `Err(Error)`. Với người lạ, kết luận không bao giờ lộ cho bot (đề bài `forms`: bẫy, quá nhanh,
+  quá nhiều lần trả cùng một câu trả lời): bẫy và vượt giới hạn → `Discard` (trả lời như đã
+  nhận, không lưu); quá nhanh, trùng, bị phân loại spam, nhà cung cấp lỗi khi
+  `AUTOXIDE_ANTISPAM_FAIL_MODE=quarantine` → `Quarantine` (lưu, giữ chờ duyệt). Chỉ token thiếu /
+  sai / hết hạn, đề sai, nhà cung cấp lỗi khi `FAIL_MODE=reject` (503) là lỗi. Vì vậy core
+  không có mã `antispam.too_fast`; `antispam.rate_limited` (429) chỉ dành cho người gọi đã đăng
+  nhập (API key của website, MCP), là người cần biết lý do.
+- **Pha hai** `Checked::claim` trong transaction của module: chèn băm nonce kèm kết quả (vd ID
+  bản ghi) vào `<module>_antispam_nonces` (sinh bằng `antispam_migration`). Đụng unique →
+  `Claim::Replay { result }`: module rollback và trả lại kết quả lần đầu — idempotency cho người
+  lạ, chạy như nhau trên hai database.
+- Người gọi đã đăng nhập bỏ qua bẫy, token, đề; vẫn bị giới hạn theo người dùng; idempotency của
+  họ là `Idempotency-Key`.
+
+Đã cân nhắc: đặt endpoint token ở module `kernel` (đường dẫn `/api/v1/kernel/…` khó hiểu) hay
+ghép thẳng vào `http::build` (endpoint không thuộc module nào, cấu hình đọc ở chỗ khác); trả
+429 / mã lỗi cho người lạ (bot đọc được và né); lưu bài trúng bẫy (bảng phình vì rác).

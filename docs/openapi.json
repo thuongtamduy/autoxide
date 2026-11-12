@@ -12,6 +12,78 @@
     }
   ],
   "paths": {
+    "/api/v1/antispam/token": {
+      "get": {
+        "tags": [
+          "antispam"
+        ],
+        "summary": "Get a form token (public).",
+        "description": "No sign-in needed. Fetch one each time a public form is shown (never put it in cached HTML)\nand send it with the form: the server refuses public submissions without a valid token.\nAnswers with `Cache-Control: no-store`.",
+        "operationId": "antispam_get_antispam_token",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "description": "The form, as the module that receives it names it, e.g. `forms:contact`: 1 to 64\nlower-case letters, digits, `_`, `-`, `.` or `:`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "forms:contact"
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A fresh token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FormTokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`scope` is malformed; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/audit": {
       "get": {
         "tags": [
@@ -16013,6 +16085,46 @@
           }
         }
       },
+      "Data_FormTokenResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A form token.",
+            "required": [
+              "token",
+              "expires_at",
+              "submit_after"
+            ],
+            "properties": {
+              "challenge": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "description": "Parameters of the challenge the browser must solve, when the server uses one; `null`\notherwise."
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "submit_after": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Submissions sent before this moment are held for review: people take longer than bots."
+              },
+              "token": {
+                "type": "string",
+                "description": "Send it with the form (the receiving endpoint says in which field). Valid once."
+              }
+            }
+          }
+        }
+      },
       "Data_Health": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -18190,6 +18302,37 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "FormTokenResponse": {
+        "type": "object",
+        "description": "A form token.",
+        "required": [
+          "token",
+          "expires_at",
+          "submit_after"
+        ],
+        "properties": {
+          "challenge": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Parameters of the challenge the browser must solve, when the server uses one; `null`\notherwise."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "submit_after": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Submissions sent before this moment are held for review: people take longer than bots."
+          },
+          "token": {
+            "type": "string",
+            "description": "Send it with the form (the receiving endpoint says in which field). Valid once."
           }
         }
       },
