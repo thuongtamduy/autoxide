@@ -9,6 +9,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-12
+
 ### Added
 
 - `autoxide user reset-mfa --email …`: the server operator turns off two-step sign-in of an
@@ -406,7 +408,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/thuongtamduy/autoxide/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/thuongtamduy/autoxide/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/thuongtamduy/autoxide/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/thuongtamduy/autoxide/compare/v0.3.0...v0.4.0
