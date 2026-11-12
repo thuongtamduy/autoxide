@@ -3880,3 +3880,27 @@ lệnh ghi cho mọi email — rồi trả 202. Job (`PasswordResets::send`) là
 
 Không làm: `POST /me/email` báo `auth.email_taken` — cần đăng nhập và đúng mật khẩu (có
 throttling), và `POST /register` vốn đã lộ email đã dùng khi bật tự đăng ký.
+
+## D-163 · Đo xác thực mỗi request: chạy song song các câu đọc không có lợi, không làm — 2026-11-12 — agent quyết
+
+Đóng việc "đo trước rồi mới tối ưu" để lại ở D-156 / D-158: xác thực mỗi request chạy tuần tự hai
+câu đọc (access token: tài khoản, quyền theo role) hay bốn (API key).
+
+Đã đo (`scripts/loadtest.sh`, Postgres 16 cùng máy, 4 CPU, 64 kết nối, 6 giây mỗi bài, hai lượt
+xen kẽ trước / sau): bản thử chạy các câu đọc song song (`tokio::try_join!`) và ghi
+`last_used_at` của API key ngoài request.
+
+| Bài đo | Trước (request/giây) | Sau (request/giây) |
+| --- | ---: | ---: |
+| `GET /auth/me` (access token) | 4808 / 5606 | 4558 / 4716 |
+| `GET /auth/me` (API key) | 3816 / 3752 | 3260 / 3226 |
+
+Kết luận: không nhanh hơn, API key chậm hơn ~14%. Database cùng máy thì một vòng truy vấn rất
+ngắn; lấy thêm kết nối từ pool và chạy hai future tốn hơn phần chờ tiết kiệm được. Theo luật "đo
+trước rồi mới tối ưu", giữ cách tuần tự. Đáng đo lại khi database ở máy khác (vòng mạng dài) —
+dùng `LOADTEST_BINARY` để so hai binary trên cùng máy.
+
+Sửa kèm script đo: tắt giới hạn theo API key (`AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE=0`,
+D-109) — trước đó bài đo API key chỉ đo câu trả lời 429; thêm `LOADTEST_BINARY` để đo binary có
+sẵn. Các tối ưu khác để lại ở D-158 (throttle, ghi event, hỏi khi rảnh, mutex rate limiter, log)
+chưa có số đo cho thấy chúng là điểm nghẽn: không làm.

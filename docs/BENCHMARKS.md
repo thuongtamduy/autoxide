@@ -65,7 +65,12 @@ bộ phát event chạy nền, database thật — bằng `oha` (D-076):
 cargo install oha --locked
 scripts/loadtest.sh                                                    # SQLite
 LOADTEST_DATABASE_URL=postgres://user:pass@host:5432/empty_db scripts/loadtest.sh
+LOADTEST_BINARY=/path/to/autoxide-before scripts/loadtest.sh            # đo một binary có sẵn
 ```
+
+So trước / sau một thay đổi: build bản trước, chép binary ra ngoài, build bản sau, rồi chạy
+xen kẽ hai binary (mỗi bản ít nhất hai lượt, database trống mới mỗi lượt) — máy tạo tải và máy
+chủ chung một máy nên một lượt riêng lẻ lệch tới ~15%. Ví dụ: D-163.
 
 Kịch bản tạo admin, đăng nhập, tạo API key, gieo 120 người dùng (audit log có dữ liệu)
 và một file 16 KiB, rồi bắn tải 10 giây mỗi bài: đọc (`/auth/me` bằng token và bằng API

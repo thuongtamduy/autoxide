@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–25 xong; đang làm bước 26**; bản phát hành mới nhất `v0.6.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–26 xong**; bản phát hành mới nhất `v0.6.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -324,7 +324,7 @@ Giao diện quản trị ở repo riêng (D-096, D-097); bước này chỉ làm
 - [x] `files`: job dọn nội dung mồ côi trong nơi lưu (như `media`)
 - [x] `autoxide jobs retry` một job `webhooks.send` đã hỏng thì gửi lại thật
 - [x] Đặt lại mật khẩu: trả lời trong cùng khoảng thời gian dù email có hay không (việc chạy trong job)
-- [ ] Đo tải (`scripts/loadtest.sh`) rồi tối ưu xác thực mỗi request nếu đo được lợi
+- [x] Đo tải (`scripts/loadtest.sh`) rồi tối ưu xác thực mỗi request nếu đo được lợi — đo: không lợi, không làm (D-163)
 
 ## Sau core (chưa mở)
 

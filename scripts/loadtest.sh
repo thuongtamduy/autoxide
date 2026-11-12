@@ -7,7 +7,8 @@
 #
 # Cần: cargo, curl, python3, oha (`cargo install oha --locked`).
 # Biến (không bắt buộc): LOADTEST_DURATION (mặc định 10s), LOADTEST_CONNECTIONS (64),
-# LOADTEST_RAMP ("1 16 64 256 1024"), LOADTEST_PORT (18080).
+# LOADTEST_RAMP ("1 16 64 256 1024"), LOADTEST_PORT (18080), LOADTEST_BINARY (binary có sẵn,
+# không build).
 #
 # Chế độ chạy dài (soak): LOADTEST_SOAK=15m chạy hỗn hợp đọc / ghi / file / MCP liên tục
 # trong thời gian đó, đo bộ nhớ (RSS), số file đang mở của máy chủ và số kết nối
@@ -30,8 +31,14 @@ for tool in cargo curl python3 oha; do
   command -v "$tool" >/dev/null || { echo "loadtest: '$tool' not found" >&2; exit 1; }
 done
 
-cargo build --release --locked -q -p autoxide
-BINARY="$PWD/target/release/autoxide"
+# LOADTEST_BINARY: đo một binary có sẵn (vd bản trước một thay đổi, để so trước / sau trên
+# cùng máy) thay vì build mới.
+if [ -n "${LOADTEST_BINARY:-}" ]; then
+  BINARY="$LOADTEST_BINARY"
+else
+  cargo build --release --locked -q -p autoxide
+  BINARY="$PWD/target/release/autoxide"
+fi
 WORK="$(mktemp -d)"
 SERVER=""
 cleanup() {
@@ -46,6 +53,8 @@ export AUTOXIDE_HTTP_ADDRESS="127.0.0.1:${PORT}"
 # Đo máy chủ, không đo bộ giới hạn request: tắt rate limiting (mặc định 600 request mỗi
 # phút mỗi địa chỉ — một máy tạo tải sẽ bị chặn ngay).
 export AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE=0
+# Cả giới hạn theo API key (D-109): không thì bài đo API key chỉ đo câu trả lời 429.
+export AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE=0
 export AUTOXIDE_LOG_LEVEL=warn
 export AUTOXIDE_AUTH_TOKEN_SECRET="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
 export AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS=86400
