@@ -17088,6 +17088,167 @@
         ]
       }
     },
+    "/api/v1/kernel/modules": {
+      "get": {
+        "tags": [
+          "kernel"
+        ],
+        "summary": "List the installed modules.",
+        "description": "Requires `kernel.modules.read`. Every module the server runs, in start order, with what\neach declares. Modules are compiled into the server: installing or removing one means\nrebuilding it, so this list does not change while the server runs. Migration `applied`\nis `null` here; get one module to read it.",
+        "operationId": "kernel_list_modules",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every installed module, in start order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_ModuleInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `kernel.modules.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/kernel/modules/{name}": {
+      "get": {
+        "tags": [
+          "kernel"
+        ],
+        "summary": "Get one installed module.",
+        "description": "Requires `kernel.modules.read`. The same as an item of the module list, plus whether\neach migration is applied to the database.",
+        "operationId": "kernel_get_module",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Module name, e.g. `notes`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The module, with migration status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ModuleInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `kernel.modules.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such module; code `kernel.module_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/media": {
       "get": {
         "tags": [
@@ -28899,6 +29060,113 @@
           }
         }
       },
+      "Data_ModuleInfo": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A module installed in this server, and everything it declares.",
+            "required": [
+              "name",
+              "internal",
+              "position",
+              "permissions",
+              "events",
+              "subscriptions",
+              "jobs",
+              "schedules",
+              "tools",
+              "deprecations",
+              "languages",
+              "migrations"
+            ],
+            "properties": {
+              "deprecations": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ModuleDeprecation"
+                },
+                "description": "Endpoints of the module that are deprecated."
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ModuleEvent"
+                },
+                "description": "Events the module emits."
+              },
+              "internal": {
+                "type": "boolean",
+                "description": "`true` for the modules the server always installs (`kernel`, `antispam`)."
+              },
+              "jobs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Kinds of background job the module runs."
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Languages, besides English, the module's error messages are translated to."
+              },
+              "migrations": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ModuleMigration"
+                },
+                "description": "Database migrations of the module, in the order they apply."
+              },
+              "name": {
+                "type": "string",
+                "description": "The module name. Its REST endpoints live under `/api/v1/<name>`; its tables,\npermissions, events, error codes and job kinds start with `<name>`.",
+                "example": "notes"
+              },
+              "permissions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ModulePermission"
+                },
+                "description": "Permissions the module declares; roles grant them."
+              },
+              "position": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Place in the start order, from 0. A module starts after the modules it depends on.",
+                "minimum": 0
+              },
+              "schedules": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ModuleSchedule"
+                },
+                "description": "Recurring jobs the module schedules."
+              },
+              "subscriptions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Events the module listens to; `*` means every event."
+              },
+              "tools": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ModuleTool"
+                },
+                "description": "MCP tools the module offers at `/mcp`."
+              }
+            }
+          }
+        }
+      },
       "Data_NewsletterEmailData": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -30838,6 +31106,116 @@
                 "updated_at": {
                   "type": "string",
                   "format": "date-time"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Data_Vec_ModuleInfo": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A module installed in this server, and everything it declares.",
+              "required": [
+                "name",
+                "internal",
+                "position",
+                "permissions",
+                "events",
+                "subscriptions",
+                "jobs",
+                "schedules",
+                "tools",
+                "deprecations",
+                "languages",
+                "migrations"
+              ],
+              "properties": {
+                "deprecations": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleDeprecation"
+                  },
+                  "description": "Endpoints of the module that are deprecated."
+                },
+                "events": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleEvent"
+                  },
+                  "description": "Events the module emits."
+                },
+                "internal": {
+                  "type": "boolean",
+                  "description": "`true` for the modules the server always installs (`kernel`, `antispam`)."
+                },
+                "jobs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Kinds of background job the module runs."
+                },
+                "languages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Languages, besides English, the module's error messages are translated to."
+                },
+                "migrations": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleMigration"
+                  },
+                  "description": "Database migrations of the module, in the order they apply."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The module name. Its REST endpoints live under `/api/v1/<name>`; its tables,\npermissions, events, error codes and job kinds start with `<name>`.",
+                  "example": "notes"
+                },
+                "permissions": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModulePermission"
+                  },
+                  "description": "Permissions the module declares; roles grant them."
+                },
+                "position": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "Place in the start order, from 0. A module starts after the modules it depends on.",
+                  "minimum": 0
+                },
+                "schedules": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleSchedule"
+                  },
+                  "description": "Recurring jobs the module schedules."
+                },
+                "subscriptions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Events the module listens to; `*` means every event."
+                },
+                "tools": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleTool"
+                  },
+                  "description": "MCP tools the module offers at `/mcp`."
                 }
               }
             }
@@ -32910,6 +33288,255 @@
           "totp_enabled": {
             "type": "boolean",
             "description": "Sign-in asks for a code from an authenticator app."
+          }
+        }
+      },
+      "ModuleDeprecation": {
+        "type": "object",
+        "description": "A deprecated endpoint.",
+        "required": [
+          "method",
+          "path",
+          "since"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "example": "GET"
+          },
+          "path": {
+            "type": "string",
+            "description": "Full path, e.g. `/api/v1/notes/{id}`."
+          },
+          "since": {
+            "type": "string",
+            "description": "Deprecated since this date (`YYYY-MM-DD`, UTC)."
+          },
+          "successor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Endpoint to use instead, if any."
+          },
+          "sunset": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The endpoint goes away on this date, if one is set."
+          }
+        }
+      },
+      "ModuleEvent": {
+        "type": "object",
+        "description": "An event a module emits.",
+        "required": [
+          "name",
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "notes.note_created"
+          }
+        }
+      },
+      "ModuleInfo": {
+        "type": "object",
+        "description": "A module installed in this server, and everything it declares.",
+        "required": [
+          "name",
+          "internal",
+          "position",
+          "permissions",
+          "events",
+          "subscriptions",
+          "jobs",
+          "schedules",
+          "tools",
+          "deprecations",
+          "languages",
+          "migrations"
+        ],
+        "properties": {
+          "deprecations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleDeprecation"
+            },
+            "description": "Endpoints of the module that are deprecated."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleEvent"
+            },
+            "description": "Events the module emits."
+          },
+          "internal": {
+            "type": "boolean",
+            "description": "`true` for the modules the server always installs (`kernel`, `antispam`)."
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Kinds of background job the module runs."
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Languages, besides English, the module's error messages are translated to."
+          },
+          "migrations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleMigration"
+            },
+            "description": "Database migrations of the module, in the order they apply."
+          },
+          "name": {
+            "type": "string",
+            "description": "The module name. Its REST endpoints live under `/api/v1/<name>`; its tables,\npermissions, events, error codes and job kinds start with `<name>`.",
+            "example": "notes"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModulePermission"
+            },
+            "description": "Permissions the module declares; roles grant them."
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Place in the start order, from 0. A module starts after the modules it depends on.",
+            "minimum": 0
+          },
+          "schedules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleSchedule"
+            },
+            "description": "Recurring jobs the module schedules."
+          },
+          "subscriptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Events the module listens to; `*` means every event."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleTool"
+            },
+            "description": "MCP tools the module offers at `/mcp`."
+          }
+        }
+      },
+      "ModuleMigration": {
+        "type": "object",
+        "description": "A database migration of a module.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "applied": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the database has it applied. `null` in the module list, which does not read\nthe database; `GET /api/v1/kernel/modules/{name}` fills it."
+          },
+          "name": {
+            "type": "string",
+            "example": "m0001_create_notes"
+          }
+        }
+      },
+      "ModulePermission": {
+        "type": "object",
+        "description": "A permission a module declares.",
+        "required": [
+          "name",
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "notes.write"
+          }
+        }
+      },
+      "ModuleSchedule": {
+        "type": "object",
+        "description": "A recurring job.",
+        "required": [
+          "name",
+          "kind",
+          "every_seconds"
+        ],
+        "properties": {
+          "every_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds between two runs.",
+            "minimum": 0
+          },
+          "kind": {
+            "type": "string",
+            "description": "The job kind it enqueues."
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ModuleTool": {
+        "type": "object",
+        "description": "An MCP tool.",
+        "required": [
+          "name",
+          "description",
+          "permissions",
+          "read_only",
+          "destructive"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "destructive": {
+            "type": "boolean",
+            "description": "The tool deletes or overwrites data that cannot be recovered."
+          },
+          "name": {
+            "type": "string",
+            "description": "Full tool name, `<module>.<tool>`.",
+            "example": "notes.create_note"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The caller needs one of these permissions to see and call the tool; empty means any\nsigned-in caller."
+          },
+          "read_only": {
+            "type": "boolean",
+            "description": "The tool changes nothing."
           }
         }
       },

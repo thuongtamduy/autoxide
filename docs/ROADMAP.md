@@ -305,6 +305,13 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 - [x] `newsletter`: đăng ký công khai trả lời trong cùng một khoảng thời gian dù địa chỉ ở trạng
       thái nào (việc ghi và gửi mail chạy trong job)
 
+## 24. Sổ module cho màn hình quản lý module (chủ dự án giao ngày 12/11/2026, D-155)
+
+Giao diện quản trị ở repo riêng (D-096, D-097); bước này chỉ làm API trong core.
+
+- [x] `GET /api/v1/kernel/modules` và `GET /api/v1/kernel/modules/{name}` (kèm trạng thái
+      migration); permission `kernel.modules.read`; tool MCP; test trên cả hai database
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.

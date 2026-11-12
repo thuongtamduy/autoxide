@@ -220,7 +220,8 @@ async fn module_nhan_database_va_khai_route() {
         // Mỗi module một router; module không khai route thì router rỗng.
         let routes = modules.routes();
         let names: Vec<&str> = routes.iter().map(|(name, _)| *name).collect();
-        // Hai module nội bộ luôn đứng đầu; `antispam` có endpoint lấy token form.
+        // Hai module nội bộ luôn đứng đầu; `kernel` có sổ module, `antispam` có endpoint lấy
+        // token form.
         assert_eq!(names, ["kernel", "antispam", "users", "notes", "pinger"]);
         let paths: Vec<Vec<String>> = routes
             .into_iter()
@@ -228,7 +229,13 @@ async fn module_nhan_database_va_khai_route() {
             .collect();
         assert_eq!(
             paths,
-            [vec![], vec!["/token".to_owned()], vec![], vec!["/".to_owned()], vec![]]
+            [
+                vec!["/modules".to_owned(), "/modules/{name}".to_owned()],
+                vec!["/token".to_owned()],
+                vec![],
+                vec!["/".to_owned()],
+                vec![]
+            ]
         );
     })
     .await
@@ -272,7 +279,8 @@ async fn module_thay_danh_muc_permission_cua_moi_module() {
         modules.start(&db).unwrap();
 
         // Module đăng ký trước vẫn thấy permission của module đăng ký sau.
-        assert_eq!(*seen.lock().unwrap(), ["notes.write"]);
+        // (`kernel.modules.read` là của module nội bộ `kernel`.)
+        assert_eq!(*seen.lock().unwrap(), ["kernel.modules.read", "notes.write"]);
         assert!(modules.permissions().contains("notes.write"));
     })
     .await

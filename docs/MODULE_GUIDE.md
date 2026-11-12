@@ -135,6 +135,10 @@ Tool::new("create_note", "Create a note.", move |principal: Principal, input: Cr
 Mark tools that only read with `.read_only()` and tools that destroy data with
 `.destructive()`. Use `PageInput` for list tools.
 
+Everything a module declares — permissions, events, subscriptions, jobs, schedules, tools,
+deprecated endpoints, migrations — shows up in the installed-module catalog at
+`GET /api/v1/kernel/modules` (permission `kernel.modules.read`). Nothing extra to write.
+
 ### 8. Working with other modules
 
 Publish a trait in `src/api.rs` and provide it in `Module::start` with

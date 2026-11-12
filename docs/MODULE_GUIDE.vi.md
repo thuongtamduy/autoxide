@@ -134,6 +134,10 @@ Tool::new("create_note", "Create a note.", move |principal: Principal, input: Cr
 Tool chỉ đọc thì đánh dấu `.read_only()`, tool xoá dữ liệu thì `.destructive()`. Tool
 liệt kê dùng `PageInput`.
 
+Mọi thứ module khai — permission, event, event nhận, job, lịch, tool, endpoint deprecated,
+migration — tự hiện trong sổ module đã cài ở `GET /api/v1/kernel/modules` (permission
+`kernel.modules.read`). Không phải viết thêm gì.
+
 ### 8. Làm việc với module khác
 
 Công bố một trait trong `src/api.rs` và cung cấp nó trong `Module::start` bằng

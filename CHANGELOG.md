@@ -9,6 +9,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- Installed-module catalog for admin screens and AI agents: `GET /api/v1/kernel/modules` and
+  `GET /api/v1/kernel/modules/{name}` (with migration status), MCP tools `kernel.list_modules` and
+  `kernel.get_module`, permission `kernel.modules.read`.
+
 ## [0.4.0] - 2026-11-12
 
 ### Added
