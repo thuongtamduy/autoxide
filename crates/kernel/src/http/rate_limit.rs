@@ -12,19 +12,19 @@
 //! (đếm trong database, dùng chung mọi máy chủ).
 
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv6Addr, SocketAddr};
+use std::net::{IpAddr, Ipv6Addr};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
-use axum::extract::{ConnectInfo, Request};
-use axum::http::HeaderName;
+use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 
 use uuid::Uuid;
 
+use super::client::ClientIp;
 use crate::access::{Authenticator, Principal};
 use crate::config::RateLimit;
 use crate::error::Error;
@@ -34,7 +34,6 @@ const PRUNE_EVERY: u64 = 1024;
 
 pub(super) struct RateLimiter {
     cells: Gcra<IpAddr>,
-    client_ip_header: Option<HeaderName>,
 }
 
 /// Bộ đếm GCRA cho mọi loại khoá (`K`: địa chỉ client, ID của API key…).
@@ -94,46 +93,14 @@ pub(super) enum Decision {
 
 impl RateLimiter {
     /// `None` khi rate limiting bị tắt (`per_minute = 0`).
-    pub(super) fn new(limit: RateLimit, client_ip_header: Option<HeaderName>) -> Option<Self> {
-        Gcra::new(limit).map(|cells| RateLimiter { cells, client_ip_header })
+    pub(super) fn new(limit: RateLimit) -> Option<Self> {
+        Gcra::new(limit).map(|cells| RateLimiter { cells })
     }
 
     /// Xét một request của `client` tại thời điểm `now`.
     pub(super) fn check(&self, client: IpAddr, now: Instant) -> Decision {
         self.cells.check(client, now)
     }
-
-    /// Địa chỉ client của request: từ header của reverse proxy nếu được cấu hình
-    /// (phần tử cuối — do proxy của mình thêm vào), không thì từ kết nối.
-    fn client(&self, request: &Request) -> Option<IpAddr> {
-        let from_header = self.client_ip_header.as_ref().and_then(|name| {
-            // DÒNG CUỐI của header (proxy có thể thêm dòng mới thay vì nối vào dòng client
-            // gửi), phần tử cuối của dòng đó — phần do proxy của mình ghi (D-079).
-            let line = request.headers().get_all(name).iter().next_back()?.to_str().ok()?;
-            let last = line.rsplit(',').next()?.trim();
-            let parsed = parse_address(last);
-            if parsed.is_none() {
-                tracing::warn!(
-                    header = %name,
-                    value = last,
-                    "cannot read the client address from the configured header; using the \
-                     connection address"
-                );
-            }
-            parsed
-        });
-        let from_connection =
-            || request.extensions().get::<ConnectInfo<SocketAddr>>().map(|info| info.0.ip());
-        from_header.or_else(from_connection).map(group)
-    }
-}
-
-/// Địa chỉ IP trong header của proxy: `203.0.113.9`, `203.0.113.9:4711`, `2001:db8::1`
-/// hoặc `[2001:db8::1]:4711` (vài load balancer ghi kèm port).
-fn parse_address(text: &str) -> Option<IpAddr> {
-    text.parse::<IpAddr>()
-        .ok()
-        .or_else(|| text.parse::<SocketAddr>().ok().map(|address| address.ip()))
 }
 
 /// Gom địa chỉ IPv6 theo khối /64: một máy thường có cả khối, đổi địa chỉ trong khối
@@ -209,8 +176,9 @@ pub(super) async fn limit(
     if request.uri().path().starts_with("/health/") {
         return next.run(request).await;
     }
-    // Không biết địa chỉ client (vd request không đi qua socket) thì không giới hạn.
-    let Some(client) = limiter.client(&request) else {
+    // Địa chỉ do lớp `client::attach` giải (theo số proxy tin cậy). Không biết địa chỉ
+    // client (vd request không đi qua socket) thì không giới hạn.
+    let Some(client) = request.extensions().get::<ClientIp>().and_then(|ip| ip.0).map(group) else {
         return next.run(request).await;
     };
     match limiter.check(client, Instant::now()) {
@@ -236,7 +204,7 @@ mod tests {
     use super::*;
 
     fn limiter(per_minute: u32, burst: u32) -> RateLimiter {
-        RateLimiter::new(RateLimit { per_minute, burst }, None).unwrap()
+        RateLimiter::new(RateLimit { per_minute, burst }).unwrap()
     }
 
     fn ip(text: &str) -> IpAddr {
@@ -280,7 +248,7 @@ mod tests {
 
     #[test]
     fn tat_thi_khong_co_bo_gioi_han() {
-        assert!(RateLimiter::new(RateLimit { per_minute: 0, burst: 10 }, None).is_none());
+        assert!(RateLimiter::new(RateLimit { per_minute: 0, burst: 10 }).is_none());
     }
 
     #[test]
@@ -322,38 +290,5 @@ mod tests {
         let clients = limiter.cells.clients.lock().unwrap();
         assert!(!clients.contains_key(&ip("192.0.2.1")));
         assert!(clients.contains_key(&ip("192.0.2.2")));
-    }
-
-    #[test]
-    fn dia_chi_lay_tu_header_cua_proxy_neu_duoc_cau_hinh() {
-        let header = HeaderName::from_static("x-forwarded-for");
-        let behind_proxy =
-            RateLimiter::new(RateLimit { per_minute: 60, burst: 1 }, Some(header)).unwrap();
-        let direct = limiter(60, 1);
-        let mut request = Request::builder()
-            .header("x-forwarded-for", "198.51.100.1, 203.0.113.9")
-            .body(axum::body::Body::empty())
-            .unwrap();
-        request.extensions_mut().insert(ConnectInfo(SocketAddr::from(([10, 0, 0, 1], 4000))));
-
-        assert_eq!(behind_proxy.client(&request), Some(ip("203.0.113.9")));
-        assert_eq!(direct.client(&request), Some(ip("10.0.0.1")));
-
-        // Client tự gửi một dòng giả, proxy thêm dòng mới: lấy dòng của proxy (dòng cuối).
-        let mut forged = Request::builder()
-            .header("x-forwarded-for", "1.2.3.4")
-            .header("x-forwarded-for", "203.0.113.10")
-            .body(axum::body::Body::empty())
-            .unwrap();
-        forged.extensions_mut().insert(ConnectInfo(SocketAddr::from(([10, 0, 0, 1], 4000))));
-        assert_eq!(behind_proxy.client(&forged), Some(ip("203.0.113.10")));
-    }
-
-    #[test]
-    fn dia_chi_kem_port_van_doc_duoc() {
-        assert_eq!(parse_address("203.0.113.9:4711"), Some(ip("203.0.113.9")));
-        assert_eq!(parse_address("[2001:db8::1]:4711"), Some(ip("2001:db8::1")));
-        assert_eq!(parse_address("2001:db8::1"), Some(ip("2001:db8::1")));
-        assert_eq!(parse_address("unknown"), None);
     }
 }

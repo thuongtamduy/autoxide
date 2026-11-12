@@ -48,6 +48,10 @@ pub(crate) struct AuditEntryResponse {
     actor_user_id: Option<Uuid>,
     /// API key used, when the change was made with one.
     actor_api_key_id: Option<Uuid>,
+    /// Who made the change: `user` (a signed-in user or API key), `system` (command line,
+    /// background jobs) or `public` (someone not signed in, such as a visitor sending a form).
+    #[schema(example = "user")]
+    actor_kind: String,
     /// Record that changed, as `<kind>:<id>`, e.g. `auth.user:0190…`.
     #[schema(example = "auth.user:01936f0e-6c9f-7cc2-8a52-2b2f4d1c1e5a")]
     subject: Option<String>,
@@ -72,6 +76,10 @@ impl From<entity::Model> for AuditEntryResponse {
             action: row.action,
             actor_user_id: row.actor_user_id,
             actor_api_key_id: row.actor_api_key_id,
+            // Dòng ghi trước khi có cột: hiểu theo `actor_user_id`.
+            actor_kind: row.actor_kind.unwrap_or_else(|| {
+                if row.actor_user_id.is_some() { "user" } else { "system" }.to_owned()
+            }),
             subject: row.subject,
             before: json(row.before),
             after: json(row.after),
@@ -260,6 +268,7 @@ mod tests {
             assert_eq!(filtered["data"][0]["subject"], "auth.user:1");
             let (_, by_subject) = get(&app, "/api/v1/audit?subject=auth.user:2", "auditor").await;
             assert_eq!(by_subject["data"][0]["actor_user_id"], json!(bob));
+            assert_eq!(by_subject["data"][0]["actor_kind"], "user");
             let (_, paged) = get(&app, "/api/v1/audit?limit=2", "auditor").await;
             assert!(paged["pagination"]["next_cursor"].is_string());
 

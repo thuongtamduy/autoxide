@@ -124,7 +124,7 @@ async fn noi_dung_sai_bi_tu_choi_khong_de_lai_gi() {
         let mut long_html = samples::HTML.to_vec();
         long_html.extend(vec![b' '; 1500]);
         assert_eq!(refuse("x.png", Some("image/png"), &long_html).await, mismatch);
-        // SVG có nội dung chạy được ở bất cứ đâu, kể cả sau phần đầu (D-112).
+        // SVG có nội dung chạy được ở bất cứ đâu, kể cả sau phần đầu (D-149).
         let active = (ErrorKind::UnsupportedMediaType, "media.svg_active_content".to_owned());
         let mut late_script = b"<svg xmlns=\"http://www.w3.org/2000/svg\">".to_vec();
         late_script.extend(vec![b' '; 1200]);
@@ -1082,7 +1082,7 @@ mod alt {
             assert_eq!(ai.calls(), 0);
 
             // Cho gửi ảnh riêng tư. Ảnh gốc đã nhỏ vẫn được làm lại (bỏ metadata), không
-            // gửi chính file gốc (D-112).
+            // gửi chính file gốc (D-149).
             let (allowed, _, _) = service_with_ai(test, limits(), ai.clone(), true).await;
             let item = allowed
                 .upload(&ada, upload("cat.png", "image/png"), body(&small))

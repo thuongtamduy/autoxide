@@ -247,7 +247,8 @@ impl UserService {
     }
 
     /// Xoá hẳn tài khoản `id` cùng mọi dữ liệu của nó trong module `auth` (phiên, key,
-    /// passkey, MFA… xoá theo foreign key). Phát event [`USER_DELETED`] trong cùng
+    /// passkey, MFA… xoá theo foreign key; token đặt lại mật khẩu và xác minh email trong
+    /// bảng `auth_tokens` của kernel thì xoá ở đây, cùng transaction). Phát event [`USER_DELETED`] trong cùng
     /// transaction để các module khác xoá phần dữ liệu của người đó. Không xoá được
     /// admin cuối cùng còn hoạt động.
     ///
@@ -264,6 +265,9 @@ impl UserService {
             transaction.rollback().await?;
             return Err(crate::role::last_admin());
         }
+        autoxide_kernel::tokens::OneTimeTokens::new("auth")
+            .forget(&transaction, &id.to_string())
+            .await?;
         // Chỉ ghi id: audit log không giữ lại email hay tên của người đã xin xoá.
         let event =
             events::UserDeleted { before: Some(serde_json::json!({"id": id})), after: None };
@@ -987,7 +991,7 @@ mod update_tests {
     }
 
     /// Hai admin cuối cùng xoá (hay khoá) nhau cùng lúc: đúng một bên thành công, luôn còn
-    /// một admin hoạt động — trên cả hai database (D-112).
+    /// một admin hoạt động — trên cả hai database (D-149).
     #[tokio::test]
     async fn hai_admin_cuoi_xoa_nhau_cung_luc_van_con_mot() {
         TestDatabase::run(async |test| {

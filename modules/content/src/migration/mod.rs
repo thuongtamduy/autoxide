@@ -21,5 +21,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0005_translation_requests::Migration),
         // Tìm theo ý nghĩa: vector của đoạn, số phiên bản để nạp lại (D-109).
         Box::new(m0006_embeddings::Migration),
+        // Cột `actor_kind` của bảng `content_events` (người lạ khác hệ thống, D-122).
+        autoxide_kernel::event::outbox_actor_migration("m0007_add_event_actor", "content"),
     ]
 }

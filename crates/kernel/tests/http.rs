@@ -89,6 +89,10 @@ async fn tagged() -> autoxide_kernel::version::Tagged<u32> {
     autoxide_kernel::version::Tagged { version, data: 7 }
 }
 
+async fn whoami(client: http::ClientInfo) -> String {
+    format!("{:?} {:?}", client.ip, client.user_agent)
+}
+
 fn notes_routes() -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(list_notes, create_note))
@@ -98,6 +102,7 @@ fn notes_routes() -> OpenApiRouter {
         .route("/panic", axum::routing::get(panics))
         .route("/echo", axum::routing::post(echo))
         .route("/tagged", axum::routing::get(tagged))
+        .route("/whoami", axum::routing::get(whoami))
 }
 
 fn default_config() -> HttpConfig {
@@ -551,6 +556,82 @@ async fn bo_kiem_tai_lieu_bat_endpoint_thieu_mo_ta() {
     );
 }
 
+/// Hai module cùng đặt tên một kiểu `Locale` nhưng khác nội dung.
+mod clash {
+    use serde::Serialize;
+    use utoipa::ToSchema;
+
+    pub mod first {
+        /// A language.
+        #[derive(serde::Serialize, utoipa::ToSchema)]
+        pub enum Locale {
+            En,
+            Vi,
+        }
+
+        /// First.
+        #[utoipa::path(get, path = "/first", operation_id = "first", responses((status = 200, description = "ok", body = Locale)))]
+        pub async fn first() -> axum::Json<[Locale; 2]> {
+            axum::Json([Locale::En, Locale::Vi])
+        }
+    }
+
+    pub mod second {
+        /// A language with its region.
+        #[derive(serde::Serialize, utoipa::ToSchema)]
+        pub struct Locale {
+            pub tag: String,
+        }
+
+        /// Second.
+        #[utoipa::path(get, path = "/second", operation_id = "second", responses((status = 200, description = "ok", body = Locale)))]
+        pub async fn second() {}
+    }
+
+    /// Same as the kernel's own schema: no conflict.
+    #[derive(Serialize, ToSchema)]
+    pub struct Shared {
+        pub id: String,
+    }
+
+    /// Third.
+    #[utoipa::path(get, path = "/third", operation_id = "third", responses((status = 200, description = "ok", body = Shared)))]
+    pub async fn third() {}
+}
+
+/// Hai module khai cùng tên schema mà khác nội dung: ghép tài liệu sẽ lặng lẽ bỏ một bản, nên
+/// phải được báo; cùng tên cùng nội dung thì không sao.
+#[test]
+fn trung_ten_schema_khac_noi_dung_bi_bao() {
+    let build = |second: OpenApiRouter| {
+        http::build(
+            &default_config(),
+            OpenApiRouter::new(),
+            vec![
+                (
+                    "alpha",
+                    OpenApiRouter::new()
+                        .routes(routes!(clash::first::first))
+                        .routes(routes!(clash::third)),
+                ),
+                ("beta", second),
+            ],
+            http::Extras::default(),
+        )
+    };
+    let api = build(OpenApiRouter::new().routes(routes!(clash::second::second)));
+    assert_eq!(api.schema_conflicts.len(), 1, "{:?}", api.schema_conflicts);
+    let problem = &api.schema_conflicts[0];
+    assert!(
+        problem.contains("`Locale`") && problem.contains("`alpha`") && problem.contains("`beta`"),
+        "{problem}"
+    );
+
+    let api = build(OpenApiRouter::new().routes(routes!(clash::third)));
+    assert_eq!(api.schema_conflicts, Vec::<String>::new());
+    assert!(api_with(&default_config()).schema_conflicts.is_empty());
+}
+
 /// Nơi ghi log vào bộ nhớ, để test đọc lại.
 #[derive(Clone, Default)]
 struct LogBuffer(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
@@ -671,6 +752,35 @@ async fn qua_gioi_han_thi_429_kem_retry_after() {
     assert_eq!(other.unwrap().status(), StatusCode::OK);
     let health = app.clone().oneshot(from_client("/health/live", [192, 0, 2, 1])).await;
     assert_ne!(health.unwrap().status(), StatusCode::TOO_MANY_REQUESTS);
+}
+
+/// Sau hai proxy (CDN → website → API): handler và rate limiter cùng thấy địa chỉ thật của
+/// trình duyệt (thứ hai từ cuối `X-Forwarded-For`), không phải của website.
+#[tokio::test]
+async fn sau_hai_proxy_dung_dia_chi_thu_hai_tu_cuoi() {
+    let mut config = default_config();
+    config.client_ip_header = Some(header::HeaderName::from_static("x-forwarded-for"));
+    config.trusted_proxy_count = 2;
+    config.rate_limit.per_minute = 60;
+    config.rate_limit.burst = 1;
+    let app = api_with(&config).router;
+    let visitor = |browser: &str| {
+        let mut request = from_client("/api/v1/notes/whoami", [10, 0, 0, 5]);
+        let list = format!("6.6.6.6, {browser}, 192.0.2.200");
+        request.headers_mut().insert("x-forwarded-for", list.parse().unwrap());
+        request.headers_mut().insert(header::USER_AGENT, "test-agent".parse().unwrap());
+        request
+    };
+
+    let response = app.clone().oneshot(visitor("203.0.113.9")).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    assert_eq!(body, "Some(203.0.113.9) Some(\"test-agent\")");
+    // Cùng máy website, khách khác: không bị đếm chung.
+    let other = app.clone().oneshot(visitor("203.0.113.10")).await.unwrap();
+    assert_eq!(other.status(), StatusCode::OK);
+    let again = app.clone().oneshot(visitor("203.0.113.9")).await.unwrap();
+    assert_eq!(again.status(), StatusCode::TOO_MANY_REQUESTS);
 }
 
 #[tokio::test]

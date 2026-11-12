@@ -36,17 +36,14 @@ impl JobHandler for Cleanup {
         let day_ago = now - chrono::Duration::days(1);
         let connection = self.database.write();
         let mut removed = 0;
-        // Số đếm của cửa sổ đã qua lâu và không còn khoá.
-        removed += delete(
-            connection,
-            "auth_login_throttle",
-            Condition::all().add(Expr::col(Alias::new("window_started_at")).lt(day_ago)).add(
-                Condition::any()
-                    .add(Expr::col(Alias::new("locked_until")).is_null())
-                    .add(Expr::col(Alias::new("locked_until")).lt(now)),
-            ),
-        )
-        .await?;
+        // Số đếm của cửa sổ đã qua lâu và không còn khoá (bảng `auth_throttle` của kernel).
+        let throttle = autoxide_kernel::throttle::Throttle::new(
+            self.database.clone(),
+            "auth",
+            1,
+            std::time::Duration::from_secs(60),
+        )?;
+        removed += throttle.purge(day_ago).await?;
         // Refresh token đã hết hạn, hay đã thu hồi hơn một ngày (gửi lại token đã xoá
         // vẫn bị từ chối như token lạ).
         removed += delete(
@@ -63,12 +60,13 @@ impl JobHandler for Cleanup {
             Condition::all().add(Expr::col(Alias::new("expires_at")).lt(now)),
         )
         .await?;
-        // Token đặt lại mật khẩu và xác minh email đã hết hạn (dùng rồi hay chưa).
-        // Cùng với nghi thức passkey bỏ dở.
-        for table in ["auth_password_reset", "auth_email_verification", "auth_passkey_ceremony"] {
-            let expired = Condition::all().add(Expr::col(Alias::new("expires_at")).lt(now));
-            removed += delete(connection, table, expired).await?;
-        }
+        // Token đặt lại mật khẩu và xác minh email đã hết hạn hay đã dùng (bảng `auth_tokens`
+        // của kernel).
+        removed +=
+            autoxide_kernel::tokens::OneTimeTokens::new("auth").purge(connection, now).await?;
+        // Nghi thức passkey bỏ dở.
+        let expired = Condition::all().add(Expr::col(Alias::new("expires_at")).lt(now));
+        removed += delete(connection, "auth_passkey_ceremony", expired).await?;
         tracing::info!(removed, "expired sign-in data removed");
         Ok(())
     }
@@ -148,7 +146,7 @@ mod tests {
                 .unwrap();
             age(
                 &database,
-                "UPDATE auth_login_throttle SET window_started_at = '2000-01-01 00:00:00+00:00'",
+                "UPDATE auth_throttle SET window_started_at = '2000-01-01 00:00:00+00:00'",
             )
             .await;
             services.sessions.login("bob@example.com", "wrong", None).await.unwrap_err();
@@ -164,7 +162,7 @@ mod tests {
 
             // Còn token mới nhất (chưa hết hạn) và số đếm vừa ghi của bob.
             assert_eq!(count(&database, "auth_refresh_token").await, 1);
-            assert_eq!(count(&database, "auth_login_throttle").await, 1);
+            assert_eq!(count(&database, "auth_throttle").await, 1);
             assert!(services.sessions.refresh(&old.refresh_token).await.is_err());
         })
         .await

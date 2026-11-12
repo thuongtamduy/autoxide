@@ -22,6 +22,7 @@ mod privacy;
 mod publishing;
 mod reading;
 mod redirects;
+mod resource;
 mod review;
 mod revisions;
 mod schedules;
@@ -110,6 +111,8 @@ impl Module for ContentModule {
             config,
         ));
         context.personal_data(service.clone())?;
+        context
+            .resource_type(resource::ENTRY, Arc::new(resource::EntryResolver(service.clone())))?;
         self.service = Some(service);
         Ok(())
     }

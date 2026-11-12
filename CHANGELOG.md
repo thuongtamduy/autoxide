@@ -11,6 +11,47 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Comments (`/api/v1/comments`, guide in `docs/COMMENTS.md`): two-level comments on any
+  allowed target type (checked through the resource directory, e.g. `content.entry`), from
+  signed-in users with a display name of their own or from guests (optional) with an edit
+  token. A fixed moderation pipeline (closed target, length, duplicates, bans, banned and
+  suspect words, too many links, anti-spam) with `pre`, `first_time` or `post` moderation per
+  target type, for guests and users separately; approval history counts by account only.
+  Plain-text bodies returned as escaped HTML with `http(s)` links marked
+  `nofollow ugc noopener`. Author edits within a time window, soft delete that keeps the
+  thread, reports that hold a comment at a threshold, bans by user, email or hashed IP with
+  an optional end, open / closed targets, counts for up to 100 targets at once, opt-in reply
+  mails to verified addresses, export and erasure by email, automatic deletion of old pending
+  and spam comments. Permissions `comments.post`, `comments.read`, `comments.moderate`,
+  `comments.manage`, `comments.export`; four MCP tools. New settings `AUTOXIDE_COMMENTS_*`.
+- Newsletters (`/api/v1/newsletter`, guide in `docs/NEWSLETTER.md`): lists with titles in
+  English and Vietnamese, public sign-up through the same anti-spam checks as forms (the
+  answer never tells whether an address was already known), double opt-in confirmed by a
+  `POST` from the website, one-click unsubscribe (RFC 8058 `List-Unsubscribe` headers on every
+  campaign mail) and a preferences page by token. Campaigns: drafts, scheduling, sending in
+  batches at a configured rate, pause, resume and cancel, a test mail; re-runs never send
+  twice. A suppression list fed by permanent delivery failures, `POST /bounces` (hard, soft
+  with a threshold, complaint) and manual entries. Optional campaigns for new posts of the
+  content module. Advertising mails get a configurable subject label and a daily limit per
+  address. Export and erasure by email, import with a consent source. Permissions
+  `newsletter.read`, `newsletter.manage`, `newsletter.send`, `newsletter.export`; six MCP
+  tools. New settings `AUTOXIDE_NEWSLETTER_*`.
+- `autoxide openapi` (and the test that keeps `docs/openapi.json` in sync) now fails when two
+  modules declare a schema with the same name but different content, instead of silently
+  keeping one.
+- Forms (`/api/v1/forms`, guide in `docs/FORMS.md`): forms defined through the API with a
+  closed list of field types (text, email, phone, textarea, number, select, radio, checkbox,
+  date, hidden, consent), labels in English and Vietnamese, and versions so old submissions
+  keep their labels. Public endpoints show a form and take submissions: every answer is
+  checked on the server and every problem reported at once; a trap field, a signed form
+  token, an optional ALTCHA challenge and rate limits by hashed IP and email hold spam back,
+  and the answer is the same whether a submission is accepted, held or dropped. Sending the
+  same form token again returns the first answer. An inbox with statuses, accent-insensitive
+  search and CSV export (guarded against formula injection), notification mail to
+  administrators with `Reply-To` set to the sender, export and erasure by email, automatic
+  deletion after a retention period, consent proof. Permissions `forms.read`,
+  `forms.manage`, `forms.review`, `forms.export`; seven MCP tools, including creating and
+  changing forms. New settings `AUTOXIDE_FORMS_*`.
 - AI helpers (guide in `docs/AI.md`): an SEO check without AI
   (`GET /api/v1/content/entries/{id}/seo-check`); SEO suggestions
   (`POST …/seo-suggestions`) and alt text suggestions (`POST /api/v1/media/{id}/alt-suggestions`,
@@ -43,7 +84,6 @@ endpoints are marked deprecated with a sunset date first.
   can confirm a review), `created_via` in the admin API. MCP tools may accept an alternative
   permission. Requests made with an API key are rate limited per key
   (`AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE`, `…_BURST`).
-
 - Content (`/api/v1/content`, guide in `docs/CONTENT.md`): posts and pages with a draft kept
   apart from the published version, a JSON body (ProseMirror / Tiptap) checked against an
   allowlist, slugs made from titles (`Đường đến Đà Lạt` → `duong-den-da-lat`), revisions with

@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::event::EventInfo;
 use autoxide_kernel::job::JobRegistration;
 use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::migration::prelude::MigrationTrait;
@@ -45,7 +46,20 @@ impl Module for MailModule {
     }
 
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        vec![autoxide_kernel::job::jobs_migration("m0001_create_jobs", "mail")]
+        vec![
+            autoxide_kernel::job::jobs_migration("m0001_create_jobs", "mail"),
+            // Bảng `mail_events` (outbox) cho event mail bị từ chối hẳn.
+            autoxide_kernel::event::outbox_migration("m0002_create_events", "mail"),
+            autoxide_kernel::event::outbox_actor_migration("m0003_add_event_actor", "mail"),
+        ]
+    }
+
+    fn events(&self) -> Vec<EventInfo> {
+        vec![EventInfo::new(
+            autoxide_kernel::mail::DELIVERY_FAILED,
+            "A mail was refused for good by the receiving server (the address does not exist, \
+             for example); `to` is the address, `dedupe_key` the sender's key.",
+        )]
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -70,7 +84,9 @@ impl Module for MailModule {
             );
         }
         let transport = Arc::new(Transport::new(config.smtp_url.as_deref(), config.file_dir)?);
-        self.sender = Some(Arc::new(Sender::new(transport, config.from)));
+        let database = context.database().clone();
+        self.sender =
+            Some(Arc::new(Sender::new(transport, config.from, database, context.outbox()?)));
         let service = MailService::new(context.database().clone(), context.jobs());
         context.provide::<dyn Mailer>(Arc::new(service))
     }

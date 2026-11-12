@@ -172,6 +172,7 @@ pub struct StartContext<'a> {
     wake: &'a Arc<tokio::sync::Notify>,
     apis: &'a mut Apis,
     personal_data: &'a PersonalDataExport,
+    resources: &'a crate::resource::ResourceDirectory,
 }
 
 impl StartContext<'_> {
@@ -224,6 +225,22 @@ impl StartContext<'_> {
     /// có cả phần các module khởi động sau đăng ký.
     pub fn personal_data_export(&self) -> PersonalDataExport {
         self.personal_data.clone()
+    }
+
+    /// Đăng ký loại đối tượng `kind` (`<module>.<loại>`) của module này, kèm bộ tra (xem
+    /// [`crate::resource`]).
+    pub fn resource_type(
+        &mut self,
+        kind: &'static str,
+        resolver: Arc<dyn crate::resource::ResourceResolver>,
+    ) -> Result<(), Error> {
+        self.resources.register(self.module, kind, resolver)
+    }
+
+    /// Sổ đối tượng của mọi module, để tra đối tượng của module khác. Sổ có cả các loại do
+    /// module khởi động sau đăng ký.
+    pub fn resources(&self) -> crate::resource::ResourceDirectory {
+        self.resources.clone()
     }
 
     /// Công bố một trait cho module khác dùng. `T` là kiểu `dyn Trait` khai trong
@@ -331,14 +348,32 @@ pub struct Modules {
     apis: Apis,
     /// Phần dữ liệu cá nhân các module đăng ký lúc khởi động.
     personal_data: PersonalDataExport,
+    /// Loại đối tượng các module đăng ký lúc khởi động.
+    resources: crate::resource::ResourceDirectory,
 }
 
 impl Modules {
     /// Kiểm tên rồi nhận các module. Tên sai là lỗi của người viết module, báo
     /// ngay lúc khởi động.
+    ///
+    /// Hai module nội bộ luôn được thêm vào đầu danh sách: `kernel` (bảng dùng chung của
+    /// chương trình, vd khoá ký) và `antispam` (chống spam, D-119). Module nào cũng `require`
+    /// được thứ chúng công bố.
     pub fn new(modules: Vec<Box<dyn Module>>) -> Result<Self, ModuleError> {
+        let mut problems = Vec::new();
+        for reserved in [crate::builtin::NAME, crate::antispam::module::NAME] {
+            if modules.iter().any(|module| module.name() == reserved) {
+                problems.push(format!("module name `{reserved}` is reserved for the kernel"));
+            }
+        }
+        let mut all: Vec<Box<dyn Module>> = vec![
+            Box::new(crate::builtin::KernelModule::default()),
+            Box::new(crate::antispam::module::AntispamModule::default()),
+        ];
+        all.extend(modules);
+        let modules = all;
         let names: Vec<&str> = modules.iter().map(|module| module.name()).collect();
-        let mut problems = module_name_problems(&names);
+        problems.extend(module_name_problems(&names));
         let declared = modules.iter().map(|module| (module.name(), module.permissions())).collect();
         let permissions = PermissionCatalog::new(declared).unwrap_or_else(|errors| {
             problems.extend(errors);
@@ -368,6 +403,7 @@ impl Modules {
                 translations,
                 wake: Arc::new(tokio::sync::Notify::new()),
                 personal_data: PersonalDataExport::default(),
+                resources: crate::resource::ResourceDirectory::default(),
                 apis: Apis::default(),
             })
         } else {
@@ -381,7 +417,8 @@ impl Modules {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.modules.is_empty()
+        // Hai module nội bộ `kernel` và `antispam` luôn có, không tính.
+        self.modules.len() <= 2
     }
 
     /// Cho từng module đọc cấu hình của nó. Module nào sai cũng không chặn module
@@ -411,6 +448,7 @@ impl Modules {
                 wake: &self.wake,
                 apis: &mut apis,
                 personal_data: &self.personal_data,
+                resources: &self.resources,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
@@ -432,6 +470,11 @@ impl Modules {
     /// Sổ dữ liệu cá nhân các module đã đăng ký lúc [`start`](Self::start).
     pub fn personal_data(&self) -> PersonalDataExport {
         self.personal_data.clone()
+    }
+
+    /// Sổ đối tượng các module đã đăng ký (gọi sau [`start`](Self::start)).
+    pub fn resources(&self) -> crate::resource::ResourceDirectory {
+        self.resources.clone()
     }
 
     /// Mọi permission của các module đã đăng ký.
@@ -719,9 +762,12 @@ mod tests {
     #[test]
     fn giu_thu_tu_dang_ky() {
         let modules = Modules::new(bare(&["notes", "auth", "tags"])).unwrap();
-        assert_eq!(modules.names(), ["notes", "auth", "tags"]);
+        assert_eq!(modules.names(), ["kernel", "antispam", "notes", "auth", "tags"]);
         assert!(!modules.is_empty());
-        assert_eq!(format!("{modules:?}"), r#"Modules(["notes", "auth", "tags"])"#);
+        assert_eq!(
+            format!("{modules:?}"),
+            r#"Modules(["kernel", "antispam", "notes", "auth", "tags"])"#
+        );
         assert!(Modules::new(Vec::new()).unwrap().is_empty());
     }
 
@@ -794,7 +840,13 @@ mod tests {
         let mut modules = Modules::new(bare(&["auth"])).unwrap();
 
         assert_eq!(modules.configure(&mut reader), Ok(()));
-        assert!(reader.values().is_empty());
+        // Chỉ biến của hai module nội bộ `kernel` và `antispam`.
+        let names: Vec<&str> = reader.values().iter().map(|value| value.setting.name).collect();
+        let internal = |name: &&str| {
+            ["AUTOXIDE_SECRET_KEY", "AUTOXIDE_HTTP_PUBLIC_URL"].contains(name)
+                || name.starts_with("AUTOXIDE_ANTISPAM_")
+        };
+        assert!(names.iter().all(internal), "{names:?}");
         assert!(modules.migrator().is_ok());
     }
 }

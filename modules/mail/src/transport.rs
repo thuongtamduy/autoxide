@@ -12,6 +12,16 @@ pub(crate) enum Transport {
     File(PathBuf),
 }
 
+/// Kết quả gửi một mail. Lỗi tạm thời (mạng, 4xx) là `Err`: job queue thử lại sau.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Delivery {
+    Sent,
+    /// Máy chủ nhận từ chối hẳn (SMTP 5xx): gửi lại cũng vô ích.
+    Rejected {
+        code: String,
+    },
+}
+
 impl Transport {
     pub(crate) fn new(smtp_url: Option<&str>, file_dir: PathBuf) -> Result<Self, Error> {
         match smtp_url {
@@ -24,13 +34,17 @@ impl Transport {
         }
     }
 
-    pub(crate) async fn deliver(&self, message: Message) -> Result<(), Error> {
+    pub(crate) async fn deliver(&self, message: Message) -> Result<Delivery, Error> {
         match self {
-            Transport::Smtp(smtp) => {
-                smtp.send(message)
-                    .await
-                    .map_err(|error| Error::internal(format!("smtp: {error}")))?;
-            }
+            Transport::Smtp(smtp) => match smtp.send(message).await {
+                Ok(_) => {}
+                Err(error) if error.is_permanent() => {
+                    let code =
+                        error.status().map_or_else(|| "5xx".to_owned(), |code| code.to_string());
+                    return Ok(Delivery::Rejected { code });
+                }
+                Err(error) => return Err(Error::internal(format!("smtp: {error}"))),
+            },
             Transport::File(directory) => {
                 let directory = directory.clone();
                 let bytes = message.formatted();
@@ -45,6 +59,6 @@ impl Transport {
                 .map_err(|error| Error::internal(format!("cannot write mail file: {error}")))?;
             }
         }
-        Ok(())
+        Ok(Delivery::Sent)
     }
 }

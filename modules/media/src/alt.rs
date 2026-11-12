@@ -123,7 +123,7 @@ impl MediaService {
     /// Ảnh gửi cho mô hình: ảnh thu nhỏ lớn nhất vừa [`AI_MAX_SIDE`]; không có thì thu nhỏ
     /// tạm ảnh gốc trong bộ nhớ (không lưu), trên thread riêng. Không bao giờ gửi chính file
     /// gốc, kể cả khi nó đã nhỏ: làm lại ảnh bỏ hết metadata (EXIF: vị trí GPS, số máy) và
-    /// phần dữ liệu nhét thêm (D-112).
+    /// phần dữ liệu nhét thêm (D-149).
     async fn image_for_ai(&self, item: &Item) -> Result<(Vec<u8>, &'static str), Error> {
         let copies =
             variants::variants_of(self.database.read(), std::slice::from_ref(item)).await?;

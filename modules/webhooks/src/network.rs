@@ -1,4 +1,4 @@
-//! Chặn webhook gọi vào mạng nội bộ (SSRF, D-112): người tạo webhook chọn địa chỉ, nên
+//! Chặn webhook gọi vào mạng nội bộ (SSRF, D-149): người tạo webhook chọn địa chỉ, nên
 //! không có lọc thì máy chủ thành công cụ dò và gọi dịch vụ chỉ mở trong mạng riêng (vd
 //! `169.254.169.254` của nhà cung cấp cloud, database, trang quản trị nội bộ).
 //!

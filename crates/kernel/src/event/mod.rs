@@ -28,7 +28,7 @@ use crate::error::Error;
 use crate::module::is_identifier;
 
 pub use dispatcher::{Dispatcher, MAX_ATTEMPTS};
-pub use migration::outbox_migration;
+pub use migration::{outbox_actor_migration, outbox_migration};
 pub use outbox::Outbox;
 
 /// Một loại event, khai bởi module phát nó.
@@ -85,6 +85,9 @@ pub struct Actor {
     pub user_id: Option<Uuid>,
     /// API key, khi người dùng hành động qua key.
     pub api_key_id: Option<Uuid>,
+    /// Người lạ chưa đăng nhập (gửi form, đăng ký bản tin, bình luận của khách) — khác hệ
+    /// thống, dù cả hai đều không có `user_id`.
+    pub public: bool,
 }
 
 impl Actor {
@@ -95,13 +98,33 @@ impl Actor {
 
     /// Người dùng `user_id` (không qua API key).
     pub fn user(user_id: Uuid) -> Self {
-        Actor { user_id: Some(user_id), api_key_id: None }
+        Actor { user_id: Some(user_id), ..Actor::default() }
+    }
+
+    /// Người lạ chưa đăng nhập.
+    pub fn public() -> Self {
+        Actor { public: true, ..Actor::default() }
+    }
+
+    /// `system`, `user` hay `public` — giá trị cột `actor_kind`.
+    pub fn kind(&self) -> &'static str {
+        if self.public {
+            "public"
+        } else if self.user_id.is_some() {
+            "user"
+        } else {
+            "system"
+        }
     }
 }
 
 impl From<&crate::access::Principal> for Actor {
     fn from(principal: &crate::access::Principal) -> Self {
-        Actor { user_id: Some(principal.user_id()), api_key_id: principal.api_key_id() }
+        Actor {
+            user_id: Some(principal.user_id()),
+            api_key_id: principal.api_key_id(),
+            public: false,
+        }
     }
 }
 
@@ -256,7 +279,10 @@ mod tests {
         let key = Uuid::now_v7();
         let principal = crate::access::Principal::new(user, []).via_api_key(key);
 
-        assert_eq!(Actor::from(&principal), Actor { user_id: Some(user), api_key_id: Some(key) });
+        assert_eq!(
+            Actor::from(&principal),
+            Actor { user_id: Some(user), api_key_id: Some(key), public: false }
+        );
         assert_eq!(Actor::system().user_id, None);
     }
 }

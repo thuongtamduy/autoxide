@@ -2,13 +2,25 @@
 //!
 //! Một module (`mail`) công bố `dyn Mailer`; module cần gửi mail lấy nó bằng
 //! `context.require::<dyn Mailer>()` (đăng ký SAU module `mail`). `send` chỉ đưa mail vào
-//! hàng đợi rồi trả về ngay: việc gửi chạy nền, lỗi thì thử lại (D-061).
+//! hàng đợi rồi trả về ngay: việc gửi chạy nền, lỗi tạm thời thì thử lại (D-061). Máy chủ nhận
+//! từ chối hẳn (SMTP 5xx: địa chỉ không có…) thì không thử lại mà phát event
+//! [`DELIVERY_FAILED`] (D-121).
 
-use crate::error::Error;
+use crate::error::{Error, FieldError};
 use crate::i18n::{Language, Translations};
 
-/// Một mail cần gửi.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Event phát khi một mail bị máy chủ nhận từ chối hẳn. Payload:
+/// `{"to": "<địa chỉ>", "dedupe_key": "<khoá của bên gửi>" | null, "code": "<mã SMTP>"}`. Module
+/// quản lý danh sách gửi (vd bản tin) nghe nó để ngừng gửi tới địa chỉ đó.
+pub const DELIVERY_FAILED: &str = "mail.delivery_failed";
+
+/// Header riêng được phép đặt (so sánh không phân biệt hoa thường). Header khác do bên gửi
+/// mail tự đặt (`From`, `To`, `Subject`, `Message-ID`…).
+pub const ALLOWED_HEADERS: [&str; 4] =
+    ["List-Unsubscribe", "List-Unsubscribe-Post", "List-Id", "Auto-Submitted"];
+
+/// Một mail cần gửi. Dựng bằng `Mail { to, subject, text, ..Mail::default() }`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Mail {
     /// Địa chỉ người nhận (`ada@example.com` hoặc `Ada <ada@example.com>`).
     pub to: String,
@@ -17,6 +29,38 @@ pub struct Mail {
     pub text: String,
     /// Nội dung HTML, nếu có.
     pub html: Option<String>,
+    /// Trả lời thì tới địa chỉ này (vd người gửi form), thay vì địa chỉ gửi.
+    pub reply_to: Option<String>,
+    /// Header riêng, chỉ trong [`ALLOWED_HEADERS`] (vd `List-Unsubscribe` của bản tin).
+    pub headers: Vec<(String, String)>,
+    /// Khoá chống gửi trùng: mail cùng khoá đã vào hàng đợi thì mail sau bị bỏ qua (vd ID của
+    /// lượt gửi bản tin, để chạy lại không gửi hai lần). Có trong event [`DELIVERY_FAILED`].
+    pub dedupe_key: Option<String>,
+}
+
+impl Mail {
+    /// Lỗi của các header riêng: tên ngoài [`ALLOWED_HEADERS`], giá trị có ký tự xuống dòng
+    /// (chèn header giả) hay dài quá 998 ký tự (giới hạn một dòng của RFC 5322).
+    pub fn header_problems(&self) -> Vec<FieldError> {
+        let mut problems = Vec::new();
+        for (index, (name, value)) in self.headers.iter().enumerate() {
+            if !ALLOWED_HEADERS.iter().any(|allowed| allowed.eq_ignore_ascii_case(name)) {
+                problems.push(FieldError::new(
+                    format!("headers[{index}].name"),
+                    "not_allowed",
+                    format!("must be one of {}", ALLOWED_HEADERS.join(", ")),
+                ));
+            }
+            if value.chars().any(|c| c == '\r' || c == '\n' || c == '\0') || value.len() > 998 {
+                problems.push(FieldError::new(
+                    format!("headers[{index}].value"),
+                    "invalid",
+                    "must be one line of at most 998 characters",
+                ));
+            }
+        }
+        problems
+    }
 }
 
 /// Bên gửi mail của chương trình.
@@ -92,13 +136,30 @@ impl MailTemplate {
         params: &[(&str, &str)],
     ) -> Mail {
         let rendered = self.render(translations, language, params);
-        Mail { to: to.to_owned(), subject: rendered.subject, text: rendered.text, html: None }
+        Mail {
+            to: to.to_owned(),
+            subject: rendered.subject,
+            text: rendered.text,
+            ..Mail::default()
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn header_rieng_chi_trong_danh_sach_va_mot_dong() {
+        let mut mail = Mail { to: "a@example.com".to_owned(), ..Mail::default() };
+        mail.headers = vec![
+            ("list-unsubscribe".to_owned(), "<https://x/u>".to_owned()),
+            ("Bcc".to_owned(), "eve@example.com".to_owned()),
+            ("List-Id".to_owned(), "News\r\nBcc: eve@example.com".to_owned()),
+        ];
+        let problems: Vec<String> = mail.header_problems().into_iter().map(|p| p.field).collect();
+        assert_eq!(problems, ["headers[1].name", "headers[2].value"]);
+    }
 
     const RESET: MailTemplate = MailTemplate::new(
         "auth.mail.reset",

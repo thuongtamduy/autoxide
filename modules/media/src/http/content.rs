@@ -290,7 +290,7 @@ fn requested_range(headers: &HeaderMap, etag: &str, size: u64) -> Requested {
     let parse = |text: &str| text.trim().parse::<u64>().ok();
     match (first.trim().is_empty(), parse(first), parse(last)) {
         // `bytes=-N`: N byte cuối. File rỗng thì không có byte nào để trả (RFC 9110 §14.1.2);
-        // khoảng rỗng còn làm nơi lưu báo lỗi (D-112).
+        // khoảng rỗng còn làm nơi lưu báo lỗi (D-149).
         (true, _, Some(suffix)) if suffix > 0 && size > 0 => {
             Requested::Part(size.saturating_sub(suffix)..size)
         }

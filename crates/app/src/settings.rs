@@ -115,7 +115,7 @@ mod tests {
 
         let settings = read_with(&source, hello(false)).unwrap();
 
-        assert_eq!(settings.modules.names(), ["hello"]);
+        assert_eq!(settings.modules.names(), ["kernel", "antispam", "hello"]);
         let names: Vec<&str> = settings.values.iter().map(|value| value.setting.name).collect();
         assert_eq!(names.first(), Some(&"DATABASE_URL"));
         assert_eq!(names.last(), Some(&"AUTOXIDE_HELLO_GREETING"));

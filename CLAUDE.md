@@ -45,7 +45,8 @@ Thấy đang lạc thì dừng việc đó, quay lại lộ trình và nói rõ 
 lại của hệ thống nào có sẵn). **Ai dùng:** mọi người đều dùng được — không gắn với
 một công ty hay một ngành. **Mã nguồn mở, công khai toàn bộ.** **Module đầu
 tiên:** `media` (thư viện media, D-091) rồi `content` (nội dung, D-096, D-098) — chủ dự án
-chọn cả hai. Giao diện là repo riêng, công khai (D-096, D-097).
+chọn cả hai. Tiếp theo: `forms`, `newsletter`, `comments` (D-112), sau phần nền chung cho dữ
+liệu người đọc gửi lên. Giao diện là repo riêng, công khai (D-096, D-097).
 
 Hệ quả cho agent:
 
@@ -54,7 +55,8 @@ Hệ quả cho agent:
 - Người lạ phải tự cài và dùng được: cấu hình có giá trị mặc định hợp lý, thông báo
   lỗi rõ, tài liệu cài đặt đủ để làm theo mà không cần hỏi ai.
 - Không dựng module nghiệp vụ nào ngoài những module chủ dự án đã giao (`media`,
-  `content`, và module mẫu `notes`) khi chủ dự án chưa quyết. Khái niệm của `content` (bài
+  `content`, `forms`, `newsletter`, `comments`, và module mẫu `notes`) khi chủ dự án chưa
+  quyết. Khái niệm của `content` (bài
   viết, trang, slug…) không vào core.
 - Repo là công khai: mọi file, commit message, comment và tài liệu đều viết với
   giả định người lạ sẽ đọc. Không ghi tên máy chủ, IP, đường dẫn riêng hay thông

@@ -72,6 +72,12 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
 17. AI features, off by default, with the provider you choose (Claude, OpenAI, Gemini,
     Ollama…): SEO and alt text suggestions, translation into drafts, search by meaning,
     and permissions that keep AI agents to their own work ([`docs/AI.md`](docs/AI.md))
+18. Forms: contact and sign-up forms defined through the API, answers checked on the
+    server, spam held back, an inbox with CSV export ([`docs/FORMS.md`](docs/FORMS.md))
+19. Newsletters: lists, double opt-in, one-click unsubscribe, campaigns sent in batches
+    with pause and resume, bounces, mail for new posts ([`docs/NEWSLETTER.md`](docs/NEWSLETTER.md))
+20. Comments: two-level comments on any target for signed-in users or guests, a fixed
+    moderation pipeline, reports, bans, reply mails ([`docs/COMMENTS.md`](docs/COMMENTS.md))
 
 ## Requirements
 
@@ -326,6 +332,12 @@ never share foreign keys. These rules are checked automatically by the gate.
   pages and addresses, languages, public endpoints for the website, preview
 - [`docs/AI.md`](docs/AI.md) — the AI features: turning them on with each provider,
   embeddings, costs and limits, what is sent, limits for AI agents
+- [`docs/FORMS.md`](docs/FORMS.md) — using the forms module: defining a form, showing it
+  on a website, anti-spam, the inbox, data requests by email
+- [`docs/NEWSLETTER.md`](docs/NEWSLETTER.md) — using the newsletter module: lists, the
+  website's sign-up, confirmation and preferences pages, campaigns, bounces, legal notes
+- [`docs/COMMENTS.md`](docs/COMMENTS.md) — using the comments module: targets, the
+  website's thread and comment box, moderation, reports and bans, reply mails, legal notes
 - [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) — how to write a module, starting
   from the sample module [`modules/notes`](modules/notes) (not registered by default)
 

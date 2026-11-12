@@ -154,7 +154,7 @@ impl Tool {
     }
 
     /// Kết quả chứa secret chỉ trả một lần (vd API key mới): response mang
-    /// `Cache-Control: no-store`, nên không bị lưu lại — kể cả bởi lớp idempotency (D-112).
+    /// `Cache-Control: no-store`, nên không bị lưu lại — kể cả bởi lớp idempotency (D-149).
     pub fn returns_secret(mut self) -> Self {
         self.secret = true;
         self

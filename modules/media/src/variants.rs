@@ -63,7 +63,7 @@ struct Rendered {
 
 /// File có cỡ hợp lý so với số pixel của nó không: ảnh nén không bao giờ lớn hơn pixel
 /// thô (tối đa 8 byte mỗi pixel, ảnh 16-bit RGBA) cộng phần đầu. File lớn hơn thế là ảnh
-/// nhét thêm dữ liệu — không đọc cả file vào bộ nhớ để giải mã (D-112).
+/// nhét thêm dữ liệu — không đọc cả file vào bộ nhớ để giải mã (D-149).
 pub(crate) fn plausible_size(item: &Item) -> bool {
     let (Some(width), Some(height)) = (item.width, item.height) else {
         return false;

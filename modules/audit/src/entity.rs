@@ -12,6 +12,7 @@ pub struct Model {
     pub action: String,
     pub actor_user_id: Option<Uuid>,
     pub actor_api_key_id: Option<Uuid>,
+    pub actor_kind: Option<String>,
     pub subject: Option<String>,
     pub before: Option<String>,
     pub after: Option<String>,

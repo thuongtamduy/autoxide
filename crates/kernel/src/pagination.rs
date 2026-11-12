@@ -358,7 +358,7 @@ where
 
 /// Giá trị trong con trỏ có đúng kiểu của cột không. Con trỏ do client gửi lại nên có thể
 /// bị sửa: so chữ với cột số làm Postgres báo lỗi (500) còn SQLite thì không — kiểm trước
-/// để cả hai cùng trả `invalid_cursor` (D-112).
+/// để cả hai cùng trả `invalid_cursor` (D-149).
 fn fits<C: ColumnTrait>(column: &C, value: &SortValue) -> bool {
     use sea_orm::ColumnType;
     match column.def().get_column_type() {

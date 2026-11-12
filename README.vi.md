@@ -68,6 +68,12 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
 17. Tính năng AI, mặc định tắt, với nhà cung cấp bạn chọn (Claude, OpenAI, Gemini,
     Ollama…): gợi ý SEO và alt text, dịch bài vào bản nháp, tìm theo ý nghĩa, và permission
     giữ AI agent trong phần việc của nó ([`docs/AI.vi.md`](docs/AI.vi.md))
+18. Biểu mẫu: form liên hệ, form đăng ký định nghĩa qua API, máy chủ kiểm câu trả lời,
+    giữ lại spam, hộp thư có xuất CSV ([`docs/FORMS.vi.md`](docs/FORMS.vi.md))
+19. Bản tin email: danh sách, xác nhận hai bước, huỷ một chạm, chiến dịch gửi theo lô có
+    tạm dừng và tiếp tục, bounce, mail cho bài mới ([`docs/NEWSLETTER.vi.md`](docs/NEWSLETTER.vi.md))
+20. Bình luận: bình luận hai cấp gắn vào đích bất kỳ, cho người dùng đăng nhập hoặc khách,
+    kiểm duyệt theo pipeline cố định, báo cáo, cấm, mail báo trả lời ([`docs/COMMENTS.vi.md`](docs/COMMENTS.vi.md))
 
 ## Yêu cầu
 
@@ -322,6 +328,12 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   và địa chỉ, ngôn ngữ, endpoint công khai cho website, xem trước
 - [`docs/AI.vi.md`](docs/AI.vi.md) — tính năng AI: bật với từng nhà cung cấp, embedding, chi
   phí và giới hạn, gửi gì đi, giới hạn cho AI agent
+- [`docs/FORMS.vi.md`](docs/FORMS.vi.md) — dùng module biểu mẫu: định nghĩa form, hiện
+  trên website, chống spam, hộp thư, yêu cầu dữ liệu theo email
+- [`docs/NEWSLETTER.vi.md`](docs/NEWSLETTER.vi.md) — dùng module bản tin: danh sách, ô đăng ký,
+  trang xác nhận và trang lựa chọn của website, chiến dịch, bounce, lưu ý pháp lý
+- [`docs/COMMENTS.vi.md`](docs/COMMENTS.vi.md) — dùng module bình luận: đích, luồng và ô bình
+  luận của website, kiểm duyệt, báo cáo và cấm, mail báo trả lời, lưu ý pháp lý
 - [`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md) — cách viết một module, bắt đầu
   từ module mẫu [`modules/notes`](modules/notes) (mặc định không đăng ký)
 

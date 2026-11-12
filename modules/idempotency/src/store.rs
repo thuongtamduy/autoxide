@@ -438,7 +438,7 @@ mod tests {
     }
 
     /// Response có `Cache-Control: no-store` (chứa secret) không vào database; gửi lại nhận
-    /// 409 giải thích, không chạy lại việc (D-112).
+    /// 409 giải thích, không chạy lại việc (D-149).
     #[tokio::test]
     async fn response_chua_secret_khong_duoc_luu() {
         TestDatabase::run(async |test| {

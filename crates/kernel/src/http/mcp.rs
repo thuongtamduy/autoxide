@@ -99,7 +99,7 @@ async fn authenticate(
             request.extensions_mut().insert(secret.clone());
             let mut response = next.run(request).await;
             if secret.0.load(Ordering::Relaxed) {
-                // Kết quả có secret chỉ trả một lần: không cho ai lưu lại response (D-112).
+                // Kết quả có secret chỉ trả một lần: không cho ai lưu lại response (D-149).
                 response
                     .headers_mut()
                     .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));

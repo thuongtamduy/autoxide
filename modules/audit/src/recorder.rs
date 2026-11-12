@@ -35,6 +35,7 @@ impl EventHandler for Recorder {
             action: Set(event.name.clone()),
             actor_user_id: Set(event.actor.user_id),
             actor_api_key_id: Set(event.actor.api_key_id),
+            actor_kind: Set(Some(event.actor.kind().to_owned())),
             subject: Set(event.subject.clone()),
             before: Set(before),
             after: Set(after),
@@ -61,7 +62,7 @@ impl EventHandler for Recorder {
 impl Recorder {
     /// Tài khoản bị xoá: bỏ phần dữ liệu (`before`, `after`, `details` — có email, tên) của
     /// mọi dòng cùng `subject` với event xoá (các event về chính tài khoản đó), chỉ giữ ai
-    /// làm gì lúc nào (D-080, D-112). Chạy lại vô hại.
+    /// làm gì lúc nào (D-080, D-149). Chạy lại vô hại.
     async fn forget(&self, event: &Delivered) -> Result<(), Error> {
         let Some(subject) = &event.subject else {
             return Ok(());
@@ -159,6 +160,7 @@ mod database_tests {
             assert_eq!(row.id, event.id);
             assert_eq!((row.module.as_str(), row.action.as_str()), ("notes", "notes.note_renamed"));
             assert_eq!(row.actor_user_id, Some(user));
+            assert_eq!(row.actor_kind.as_deref(), Some("user"));
             assert_eq!(row.subject.as_deref(), Some("notes.note:1"));
             assert_eq!(row.before.as_deref(), Some(r#"{"title":"a"}"#));
             assert_eq!(row.after.as_deref(), Some(r#"{"title":"b"}"#));

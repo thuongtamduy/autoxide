@@ -128,6 +128,7 @@ impl Dispatcher {
                 "name",
                 "actor_user_id",
                 "actor_api_key_id",
+                "actor_kind",
                 "subject",
                 "payload",
                 "occurred_at",
@@ -207,7 +208,7 @@ impl Dispatcher {
             .value(Alias::new("last_error"), message.clone())
             .and_where(Expr::col(Alias::new("id")).eq(event.id));
         // Xoá dữ liệu của tài khoản đã xoá là nghĩa vụ, không phải việc phụ: không bỏ cuộc,
-        // cứ thử lại (tối đa mỗi giờ một lần) tới khi mọi module xong (D-112). Tài khoản đã
+        // cứ thử lại (tối đa mỗi giờ một lần) tới khi mọi module xong (D-149). Tài khoản đã
         // mất nên người dùng không tự xin xoá lại được.
         let never_give_up = event.name == crate::privacy::USER_DELETED;
         if attempts >= MAX_ATTEMPTS && !never_give_up {
@@ -270,6 +271,7 @@ fn read_event(module: &'static str, row: &QueryResult) -> Result<Delivered, Erro
         actor: Actor {
             user_id: row.try_get("", "actor_user_id")?,
             api_key_id: row.try_get("", "actor_api_key_id")?,
+            public: row.try_get::<Option<String>>("", "actor_kind")?.as_deref() == Some("public"),
         },
         subject: row.try_get("", "subject")?,
         payload: serde_json::from_str(&payload).map_err(Error::internal)?,

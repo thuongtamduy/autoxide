@@ -125,7 +125,7 @@ async fn media_tren_o_dia_va_s3() {
             assert_eq!(replay["idempotent-replayed"], "true");
             assert_eq!(first["data"]["id"], second["data"]["id"]);
             // Thân lớn hơn giới hạn mặc định (1 MiB): lớp idempotency không đọc trước vào bộ
-            // nhớ mà vẫn nhận ra lần gửi lại (D-112).
+            // nhớ mà vẫn nhận ra lần gửi lại (D-149).
             let mut large = png(30, 20);
             large.resize(1536 * 1024, 0);
             let large_key = format!("upload-large-{backend}");

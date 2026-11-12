@@ -217,7 +217,7 @@ mod tests {
             let (status, headers, created) =
                 call(&app, "POST", "/api-keys", Some(&session), Some(body.clone())).await;
             assert_eq!(status, StatusCode::CREATED, "{created}");
-            // Secret chỉ trả một lần: không ai được lưu response (D-112).
+            // Secret chỉ trả một lần: không ai được lưu response (D-149).
             assert_eq!(headers["cache-control"], "no-store");
             let key = created["data"]["key"].as_str().unwrap().to_owned();
             assert!(key.starts_with("axk_"));

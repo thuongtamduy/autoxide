@@ -128,6 +128,7 @@ fn body(event: &Delivered) -> serde_json::Value {
             "actor": {
                 "user_id": event.actor.user_id,
                 "api_key_id": event.actor.api_key_id,
+                "kind": event.actor.kind(),
             },
             "payload": event.payload,
         },
@@ -149,7 +150,7 @@ pub(crate) struct Sender {
 impl Sender {
     /// HTTP client dùng chung: không theo chuyển hướng (địa chỉ đã kiểm là địa chỉ được
     /// gọi), giới hạn thời gian chờ, và — trừ khi cấu hình cho phép — chỉ kết nối tới IP
-    /// public (D-112).
+    /// public (D-149).
     pub(crate) fn client(
         timeout: Duration,
         allow_private_networks: bool,
@@ -230,7 +231,7 @@ impl JobHandler for Sender {
             }
             Err(error) => {
                 // Lý do chi tiết (chuỗi lỗi của reqwest) chỉ vào log của máy chủ, không vào
-                // lịch sử gửi mà API trả ra: nó giúp dò cổng và máy trong mạng (D-112). Không
+                // lịch sử gửi mà API trả ra: nó giúp dò cổng và máy trong mạng (D-149). Không
                 // ghi URL (có thể chứa token trong query).
                 let detail = std::error::Error::source(&error).map(ToString::to_string);
                 tracing::warn!(delivery_id = %row.id, detail, "webhook request failed");

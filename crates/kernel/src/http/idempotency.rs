@@ -104,7 +104,7 @@ async fn run(
         .and_then(|value| value.parse::<usize>().ok());
     // Chỉ giữ trong bộ nhớ thân không lớn hơn giới hạn mặc định. Route nhận thân lớn (tải
     // file lên, tới hàng GB) mà thân thật sự lớn thì KHÔNG đọc trước: thân chảy thẳng vào
-    // handler như khi không có key, và dấu của request dùng độ dài thay cho nội dung (D-112).
+    // handler như khi không có key, và dấu của request dùng độ dài thay cho nội dung (D-149).
     // Đọc trước cả trăm MB chỉ để băm sẽ cho người chỉ cần đăng nhập giữ RAM máy chủ.
     let buffer_limit = limit.min(settings.body_limits.default_limit());
     let streamed = streams(limit, buffer_limit, declared);
@@ -167,7 +167,7 @@ async fn run(
     }
     if response.status().is_success() && no_store(response.headers()) {
         // Response chứa secret chỉ trả một lần (API key mới, token, mã khôi phục): không lưu
-        // nó vào database. Lần gửi lại nhận lời giải thích thay vì chạy lại việc (D-112).
+        // nó vào database. Lần gửi lại nhận lời giải thích thay vì chạy lại việc (D-149).
         let refusal = Error::conflict(
             "idempotency_result_not_kept",
             "The first request with this `Idempotency-Key` succeeded, but its response held \

@@ -13,21 +13,24 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::mail::{MailTemplate, Mailer};
+use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
-use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use uuid::Uuid;
 
-use self::entity::{Column, Entity};
 use crate::events;
 use crate::password;
-use crate::token;
 use crate::user::UserService;
 
 /// Token sống chừng này.
 const TOKEN_MINUTES: i64 = 30;
 /// Mỗi email nhận nhiều nhất một mail mỗi chừng này giây (chống dùng API để spam).
 const COOLDOWN_SECONDS: i64 = 60;
+/// Mục đích của token trong bảng `auth_tokens` (kernel, D-117); `subject` là ID người dùng.
+const PURPOSE: &str = "password_reset";
+
+fn tokens() -> OneTimeTokens {
+    OneTimeTokens::new("auth")
+}
 
 const RESET_LINK: MailTemplate = MailTemplate::new(
     "auth.mail.password_reset_link",
@@ -45,27 +48,6 @@ const RESET_CODE: MailTemplate = MailTemplate::new(
      /api/v1/auth/password-reset/confirm`):\n\n{token}\n\nIf it was not you, ignore this mail: \
      your password stays the same.",
 );
-
-/// Entity của bảng `auth_password_reset` (SeaORM).
-mod entity {
-    use sea_orm::entity::prelude::*;
-
-    #[sea_orm::model]
-    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-    #[sea_orm(table_name = "auth_password_reset")]
-    pub struct Model {
-        #[sea_orm(primary_key, auto_increment = false)]
-        pub id: Uuid,
-        pub user_id: Uuid,
-        #[sea_orm(unique)]
-        pub token_hash: String,
-        pub expires_at: DateTimeUtc,
-        pub used_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
-    }
-
-    impl ActiveModelBehavior for ActiveModel {}
-}
 
 pub(crate) struct PasswordResets {
     pub database: Database,
@@ -92,28 +74,15 @@ impl PasswordResets {
             return Ok(());
         }
         let now = now();
-        let recent = Entity::find()
-            .filter(Column::UserId.eq(user.id))
-            .filter(Column::CreatedAt.gt(now - chrono::Duration::seconds(COOLDOWN_SECONDS)))
-            .order_by_desc(Column::Id)
-            .one(self.database.write())
-            .await?;
-        if recent.is_some() {
+        let subject = user.id.to_string();
+        let since = now - chrono::Duration::seconds(COOLDOWN_SECONDS);
+        if !tokens().recent(self.database.write(), PURPOSE, &subject, since).await?.is_empty() {
             return Ok(());
         }
 
-        let token = token::random_token(32)?;
         let transaction = self.database.begin_write().await?;
-        entity::ActiveModel {
-            id: Set(Uuid::now_v7()),
-            user_id: Set(user.id),
-            token_hash: Set(token::sha256(&token)),
-            expires_at: Set(now + chrono::Duration::minutes(TOKEN_MINUTES)),
-            used_at: Set(None),
-            created_at: Set(now),
-        }
-        .insert(&transaction)
-        .await?;
+        let ttl = chrono::Duration::minutes(TOKEN_MINUTES);
+        let token = tokens().issue(&transaction, PURPOSE, &subject, None, ttl).await?.token;
         let event = events::PasswordResetRequested::default();
         let subject = events::user_subject(user.id);
         self.outbox.record(&transaction, Actor::system(), subject, &event).await?;
@@ -146,34 +115,16 @@ impl PasswordResets {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let now = now();
-        let row = Entity::find()
-            .filter(Column::TokenHash.eq(token::sha256(token)))
-            .one(self.database.write())
-            .await?
-            .filter(|row| row.used_at.is_none() && row.expires_at > now)
+        let consumed = tokens().consume(self.database.write(), PURPOSE, token).await?;
+        let user_id = consumed
+            .and_then(|consumed| consumed.subject.parse::<Uuid>().ok())
             .ok_or_else(invalid_token)?;
-        // Có điều kiện: hai request cùng dùng một token thì chỉ một bên được.
-        let claimed = Entity::update_many()
-            .col_expr(Column::UsedAt, Expr::value(Some(now)))
-            .filter(Column::Id.eq(row.id))
-            .filter(Column::UsedAt.is_null())
-            .exec(self.database.write())
-            .await?;
-        if claimed.rows_affected == 0 {
-            return Err(invalid_token());
-        }
-        let actor = Actor::user(row.user_id);
-        self.users.set_password(actor, row.user_id, new_password).await?;
-        self.passkeys.remove_all(actor, row.user_id).await?;
-        self.api_keys.revoke_all(actor, row.user_id).await?;
-        // Các token đặt lại khác của người này (mail cũ hơn) cũng hết dùng được.
-        Entity::update_many()
-            .col_expr(Column::UsedAt, Expr::value(Some(now)))
-            .filter(Column::UserId.eq(row.user_id))
-            .filter(Column::UsedAt.is_null())
-            .exec(self.database.write())
-            .await?;
+        let actor = Actor::user(user_id);
+        self.users.set_password(actor, user_id, new_password).await?;
+        self.passkeys.remove_all(actor, user_id).await?;
+        self.api_keys.revoke_all(actor, user_id).await?;
+        // Mọi token đặt lại khác của người này hết hiệu lực.
+        tokens().revoke(self.database.write(), PURPOSE, &user_id.to_string()).await?;
         Ok(())
     }
 }
@@ -233,15 +184,31 @@ mod tests {
 
     /// Cho thời gian trôi qua: token và lượt chặn gửi dồn coi như đã cũ.
     async fn time_passes(services: &Services, minutes: i64) {
-        Entity::update_many()
-            .col_expr(Column::CreatedAt, Expr::value(now() - chrono::Duration::minutes(minutes)))
-            .col_expr(
-                Column::ExpiresAt,
-                Expr::value(now() + chrono::Duration::minutes(30 - minutes)),
-            )
-            .exec(services.database.write())
-            .await
-            .unwrap();
+        use sea_orm::ConnectionTrait as _;
+        use sea_orm::sea_query::{Alias, Query};
+        let update = Query::update()
+            .table(Alias::new("auth_tokens"))
+            .value(Alias::new("created_at"), now() - chrono::Duration::minutes(minutes))
+            .value(Alias::new("expires_at"), now() + chrono::Duration::minutes(30 - minutes))
+            .to_owned();
+        services.database.write().execute(&update).await.unwrap();
+    }
+
+    /// Xoá tài khoản thì token đặt lại của người đó cũng bị xoá (bảng `auth_tokens` không có
+    /// foreign key tới người dùng).
+    #[tokio::test]
+    async fn xoa_tai_khoan_xoa_luon_token() {
+        TestDatabase::run(async |test| {
+            let services = setup(test).await;
+            services.resets.request("ada@example.com", Language::En).await.unwrap();
+            let token = last_token(&services);
+            let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
+            services.users.delete(Actor::system(), ada.id).await.unwrap();
+            let error = services.resets.confirm(&token, NEW.to_owned()).await.unwrap_err();
+            assert_eq!(error.code(), "auth.invalid_reset_token");
+        })
+        .await
+        .unwrap();
     }
 
     #[tokio::test]

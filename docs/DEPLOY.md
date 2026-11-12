@@ -87,6 +87,24 @@ echo 'AUTOXIDE_HTTP_CLIENT_IP_HEADER=X-Forwarded-For' >> .env
 docker compose up -d
 ```
 
+**More than one proxy.** Each proxy adds the address that connected to it at the end of
+`X-Forwarded-For`; whatever comes before was sent by the client and can be forged. Set
+`AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` to the number of your own proxies a request passes
+through (default `1`). A common case is a website server (such as Next.js) that calls the API
+for its visitors, behind a CDN:
+
+```text
+browser ──▶ CDN ──▶ website server ──▶ Caddy ──▶ Autoxide
+            adds     adds the CDN       adds the website
+            browser  address            server address
+X-Forwarded-For:  browser, CDN, website-server
+                  ▲ 3rd from the end → AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT=3
+```
+
+The website server must forward the `X-Forwarded-For` it received (and add the CDN address,
+as proxies do); otherwise every visitor looks like one client. None of your proxies may be
+reachable directly from the internet, or clients can choose their address.
+
 Add other settings the same way: every setting is listed, with its default, in
 [`.env.example`](../.env.example). Settings `compose.yml` does not pass on yet go under
 `environment:` of the `x-autoxide` block.
@@ -227,7 +245,10 @@ into a new database.
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (default) or `postgres://user:password@host:5432/db` |
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Signs access tokens; required in production, the same on every server |
+| `AUTOXIDE_SECRET_KEY` | Signs short-lived tokens of every module; optional: when unset, one is generated once and kept in the database |
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Behind a reverse proxy: the header with the client address |
+| `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | How many of your proxies a request passes (default `1`) |
+| `AUTOXIDE_HTTP_PUBLIC_URL` | The address the internet reaches the API at, e.g. `https://api.example.com`; needed for links back to the API in mail (newsletter unsubscribe) |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Web pages on other origins allowed to call the API |
 | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` | Send mail (password reset, email verification) |
 | `AUTOXIDE_FILES_S3_BUCKET` and `AWS_…` | Store files in S3 or an S3-compatible service |

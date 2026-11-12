@@ -1,0 +1,22 @@
+{
+  "comments.not_found": "Không có bình luận nào có id `{id}`.",
+  "comments.target_not_found": "Không nhận bình luận ở đích này: loại đích không nằm trong `AUTOXIDE_COMMENTS_TARGET_TYPES`, hoặc đích không có hay chưa công khai.",
+  "comments.target_closed": "Đích này không nhận bình luận mới.",
+  "comments.disabled": "Máy chủ này đang tắt bình luận.",
+  "comments.guests_not_allowed": "Hãy đăng nhập để bình luận ở đây: đích này không nhận bình luận của khách.",
+  "comments.parent_not_found": "Bình luận định trả lời không có, chưa hiện, hoặc thuộc đích khác.",
+  "comments.banned": "Bạn không được phép bình luận.",
+  "comments.banned_word": "Bình luận có từ không được phép dùng ở đây. Hãy sửa rồi gửi lại.",
+  "comments.profile_required": "Hãy chọn tên hiển thị trước bằng `PUT /api/v1/comments/profile`.",
+  "comments.not_author": "Chỉ tác giả được sửa hay xoá bình luận này: đăng nhập bằng tài khoản tác giả, hoặc gửi `edit_token` nhận được lúc đăng.",
+  "comments.edit_window_passed": "Đã hết thời gian sửa bình luận này. Bạn vẫn xoá được.",
+  "comments.not_editable": "Bình luận này đã bị từ chối hoặc đã xoá, không sửa được.",
+  "comments.name_taken": "Người khác đã dùng tên này. Hãy chọn tên khác.",
+  "comments.link_invalid": "Link này không hợp lệ, đã hết hạn hoặc đã được dùng.",
+  "comments.deleted": "Bình luận này đã bị xoá; không đổi được trạng thái. Xoá hẳn nếu cần.",
+  "comments.ban_not_found": "Không có lệnh cấm nào có id `{id}`.",
+  "comments.mail.verify.subject": "Xác nhận địa chỉ để nhận mail báo trả lời",
+  "comments.mail.verify.text": "Có người dùng địa chỉ này để xin nhận mail khi một bình luận trên {target} có trả lời.\n\nXác nhận tại đây: {link}\n\nLink dùng được trong {hours} giờ. Nếu không phải bạn, hãy bỏ qua mail này: sẽ không có mail nào nữa.\n",
+  "comments.mail.reply.subject": "Có trả lời mới trên {target}",
+  "comments.mail.reply.text": "Một bình luận bạn theo dõi trên {target} có trả lời mới.\n{page}\nThôi nhận các mail này: {unsubscribe}\n"
+}

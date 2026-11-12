@@ -55,7 +55,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .with_state(Arc::new(state))
         // Response của `auth` hay chứa secret chỉ trả một lần (token, API key mới, secret TOTP,
         // mã khôi phục): không ai được lưu lại — proxy, trình duyệt, lớp idempotency (RFC 6749
-        // §5.1, D-112).
+        // §5.1, D-149).
         .layer(axum::middleware::map_response(no_store))
 }
 

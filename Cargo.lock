@@ -368,12 +368,15 @@ dependencies = [
  "autoxide-ai",
  "autoxide-audit",
  "autoxide-auth",
+ "autoxide-comments",
  "autoxide-content",
  "autoxide-files",
+ "autoxide-forms",
  "autoxide-idempotency",
  "autoxide-kernel",
  "autoxide-mail",
  "autoxide-media",
+ "autoxide-newsletter",
  "autoxide-testkit",
  "autoxide-webhooks",
  "axum",
@@ -466,6 +469,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "autoxide-comments"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "rmcp",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
 name = "autoxide-content"
 version = "0.1.0"
 dependencies = [
@@ -521,6 +546,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "autoxide-forms"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "rmcp",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
 name = "autoxide-idempotency"
 version = "0.1.0"
 dependencies = [
@@ -551,6 +598,8 @@ dependencies = [
  "chrono",
  "dotenvy",
  "futures-util",
+ "getrandom 0.4.3",
+ "hmac 0.13.0",
  "http-body-util",
  "metrics",
  "metrics-exporter-prometheus",
@@ -587,6 +636,8 @@ dependencies = [
  "autoxide-testkit",
  "chrono",
  "lettre",
+ "metrics",
+ "sea-orm",
  "serde",
  "serde_json",
  "tokio",
@@ -614,6 +665,28 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.1",
+ "tokio",
+ "tower",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "autoxide-newsletter"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "rmcp",
+ "sea-orm",
+ "serde",
+ "serde_json",
  "tokio",
  "tower",
  "tracing",

@@ -125,7 +125,7 @@ fn markup(head: &[u8]) -> Option<&'static str> {
 }
 
 /// Tìm nội dung chạy được trong SVG — `<script>`, thuộc tính `on…=`, liên kết `javascript:`,
-/// phần nhúng HTML — trên TOÀN BỘ file, từng mảnh khi đang nhận (D-112). Máy chủ đã trả SVG
+/// phần nhúng HTML — trên TOÀN BỘ file, từng mảnh khi đang nhận (D-149). Máy chủ đã trả SVG
 /// dạng tải về kèm CSP chặn script, nhưng file có thể được phục vụ chỗ khác (CDN, website
 /// đọc thẳng nơi lưu): không nhận thì không lo.
 #[derive(Debug, Default)]

@@ -15,8 +15,10 @@ use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use chrono::{DateTime, Utc};
 use hmac::{Hmac, KeyInit, Mac};
+// Một cách làm cho cả chương trình: token ngẫu nhiên và băm SHA-256 của kernel.
+pub(crate) use autoxide_kernel::secret::{random_token, sha256};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -131,24 +133,11 @@ pub(crate) fn invalid_token() -> Error {
     )
 }
 
-/// `n` byte ngẫu nhiên từ bộ sinh số ngẫu nhiên của hệ điều hành, mã hoá base64url.
-pub(crate) fn random_token(bytes: usize) -> Result<String, Error> {
-    let mut buffer = vec![0u8; bytes];
-    getrandom::fill(&mut buffer)
-        .map_err(|error| Error::internal(format!("random number generator: {error}")))?;
-    Ok(URL_SAFE_NO_PAD.encode(buffer))
-}
-
 /// Băm SHA-256 của refresh token, để lưu. Database chỉ giữ bản băm: lộ bảng cũng
 /// không dùng được token. Không cần Argon2 ở đây — token đã ngẫu nhiên 256 bit,
 /// không đoán thử được như mật khẩu.
 pub(crate) fn hash_refresh_token(token: &str) -> String {
     sha256(token)
-}
-
-/// SHA-256 của `text`, mã hoá base64url (43 ký tự).
-pub(crate) fn sha256(text: &str) -> String {
-    URL_SAFE_NO_PAD.encode(Sha256::digest(text.as_bytes()))
 }
 
 #[cfg(test)]

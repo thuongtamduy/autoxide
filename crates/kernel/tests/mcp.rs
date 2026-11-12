@@ -197,7 +197,7 @@ async fn thieu_hay_sai_token_thi_401() {
 }
 
 /// Tool trả secret: response mang `Cache-Control: no-store` (không ai lưu lại, kể cả lớp
-/// idempotency); tool khác thì không (D-112).
+/// idempotency); tool khác thì không (D-149).
 #[tokio::test]
 async fn tool_tra_secret_thi_response_no_store() {
     for (tool, expected) in [("notes.issue_key", Some("no-store")), ("notes.whoami", None)] {

@@ -282,7 +282,7 @@ async fn het_lan_thu_hoac_endpoint_tat_thi_that_bai() {
 }
 
 /// Địa chỉ trong mạng riêng (vd đã lưu trước khi tắt `ALLOW_PRIVATE_NETWORKS`): không gửi,
-/// thất bại hẳn, lịch sử chỉ ghi lý do cố định (D-112).
+/// thất bại hẳn, lịch sử chỉ ghi lý do cố định (D-149).
 #[tokio::test]
 async fn khong_gui_vao_mang_rieng() {
     TestDatabase::run(async |test| {
@@ -344,7 +344,7 @@ async fn kiem_dia_chi_va_ten_event() {
         let error = setup.service.create(Actor::system(), all_wrong).await.unwrap_err();
         let fields: Vec<&str> = error.fields().iter().map(|field| field.field.as_str()).collect();
         assert_eq!(fields, ["url", "description", "events[0]"]);
-        // Mạng riêng hay máy này: từ chối ngay (SSRF, D-112) — kể cả IP viết kiểu khác.
+        // Mạng riêng hay máy này: từ chối ngay (SSRF, D-149) — kể cả IP viết kiểu khác.
         for private in [
             "https://127.0.0.1/h",
             "https://localhost:8443/h",
