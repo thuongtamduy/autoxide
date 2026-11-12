@@ -3581,3 +3581,34 @@ sách single opt-in; bộ đếm mail xác nhận đếm mọi yêu cầu đã l
 - **Tên viết trọn bằng chữ Kirin** giống tên Latin vẫn lọt.
 - Đếm proxy (D-114): trình duyệt gọi thẳng qua proxy cuối khi `N > 1` thì tự chọn được địa chỉ; đã
   có cảnh báo trong DEPLOY, cách tin theo dải địa chỉ để sau.
+
+## D-151 · Sổ module đã cài: API chỉ đọc trong module nội bộ `kernel` — 2026-11-12 — chủ dự án quyết hướng, agent quyết cách làm
+
+Bối cảnh: chủ dự án muốn "một CMS quản lý module". Theo D-096 / D-097 và luật kiến trúc 9,
+giao diện quản trị là repo riêng; chủ dự án chọn làm trước phần API trong core mà màn hình đó
+cần.
+
+Quyết định:
+
+- Module nội bộ `kernel` phục vụ sổ module: `GET /api/v1/kernel/modules` (mọi module theo thứ tự
+  đăng ký, không chạm database) và `GET /api/v1/kernel/modules/{name}` (một module, kèm trạng thái
+  từng migration đọc từ bảng `<tên>_migrations` của riêng module đó). Mỗi module nêu: tên, nội bộ
+  hay không, vị trí khởi động, permission, event, event nhận, loại job, lịch, tool MCP, endpoint
+  deprecated, ngôn ngữ có bản dịch, migration.
+- Permission mới `kernel.modules.read`; tool MCP `kernel.list_modules`, `kernel.get_module` gọi cùng
+  hàm với REST. Mã lỗi `kernel.module_not_found` (404).
+- Danh sách trả `Data<Vec<…>>`, không phân trang — như `GET /api/v1/auth/permissions`: số module
+  nhỏ, cố định lúc biên dịch.
+- Sổ được điền ở cuối `Modules::start` (tool, job, lịch chỉ có sau `start`), cất trong
+  `OnceLock` dùng chung giữa `Modules` và module `kernel`. Không thêm hàm nào vào trait `Module`:
+  module cũ không phải sửa.
+- **Chỉ đọc.** Không bật / tắt module lúc chạy: module đăng ký lúc biên dịch ở
+  `crates/app/src/modules.rs`; muốn bật / tắt lúc chạy là thay đổi thiết kế lớn, cần chủ dự án mở.
+
+Lý do: màn hình quản lý module (và AI agent) cần biết máy chủ có gì mà không phải đọc mã nguồn;
+gom vào `kernel` vì đây là thông tin của cả chương trình, không của module nghiệp vụ nào, và
+`kernel` đã là module nội bộ có sẵn (không phải dành thêm tên).
+
+Đã cân nhắc: module nội bộ thứ ba tên `system` — thêm một tên cấm dùng mà không được gì; đặt trong
+module `auth` — module nghiệp vụ không được biết các module khác; trả trạng thái migration ngay
+trong danh sách — mỗi lần gọi đọc bảng lịch sử của mọi module (N query thừa trên đường hay gọi).

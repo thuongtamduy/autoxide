@@ -294,6 +294,13 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 - [x] Dữ liệu cá nhân; tool MCP
 - [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
 
+## 23. Sổ module cho màn hình quản lý module (chủ dự án giao ngày 12/11/2026, D-151)
+
+Giao diện quản trị ở repo riêng (D-096, D-097); bước này chỉ làm API trong core.
+
+- [x] `GET /api/v1/kernel/modules` và `GET /api/v1/kernel/modules/{name}` (kèm trạng thái
+      migration); permission `kernel.modules.read`; tool MCP; test trên cả hai database
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.

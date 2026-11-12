@@ -23,6 +23,7 @@ pub mod mcp;
 pub mod metrics;
 pub mod migration;
 pub mod module;
+mod module_catalog;
 pub mod pagination;
 pub mod privacy;
 pub mod public_url;
