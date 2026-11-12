@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–23 xong**; bản phát hành mới nhất `v0.4.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–23 xong; đang làm bước 24**; bản phát hành mới nhất `v0.4.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -304,6 +304,12 @@ Mỗi mục một commit, gate xanh trên cả hai database.
       động khi khoá ký nằm trong database
 - [x] `newsletter`: đăng ký công khai trả lời trong cùng một khoảng thời gian dù địa chỉ ở trạng
       thái nào (việc ghi và gửi mail chạy trong job)
+
+## 24. Rà soát bảo mật và hiệu năng toàn core (chủ dự án giao ngày 12/11/2026)
+
+- [ ] Rà soát độc lập (bốn vùng: HTTP / MCP / quyền; `auth`; lưu trữ, job, event, webhook, mail;
+      hiệu năng đường nóng và index)
+- [ ] Kiểm lại từng phát hiện với code; sửa kèm test chạy trên cả hai database; ghi quyết định
 
 ## Sau core (chưa mở)
 
