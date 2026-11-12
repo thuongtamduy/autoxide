@@ -25,10 +25,14 @@ mod redirects;
 mod review;
 mod revisions;
 mod schedules;
+mod segments;
+mod semantic;
+mod seo;
 mod service;
 mod slug;
 mod terms;
 mod tools;
+mod translate;
 
 #[cfg(test)]
 mod tests;
@@ -93,12 +97,16 @@ impl Module for ContentModule {
             .config
             .clone()
             .ok_or_else(|| Error::internal("module `content` started before it was configured"))?;
-        let media = context.require::<dyn Media>()?;
+        let dependencies = crate::service::Dependencies {
+            media: context.require::<dyn Media>()?,
+            ai: context.require::<dyn autoxide_kernel::ai::TextModel>()?,
+            embedder: context.require::<dyn autoxide_kernel::ai::Embedder>()?,
+        };
         let service = Arc::new(ContentService::new(
             context.database().clone(),
             context.outbox()?,
             context.jobs(),
-            media,
+            dependencies,
             config,
         ));
         context.personal_data(service.clone())?;
@@ -117,14 +125,28 @@ impl Module for ContentModule {
         self.service.clone().map_or_else(Vec::new, |service| {
             vec![
                 JobRegistration::new(schedules::RUN, Arc::new(schedules::Runner(service.clone()))),
-                JobRegistration::new(revisions::PRUNE, Arc::new(revisions::Prune(service))),
+                JobRegistration::new(revisions::PRUNE, Arc::new(revisions::Prune(service.clone()))),
+                JobRegistration::new(
+                    translate::TRANSLATE,
+                    Arc::new(translate::Translator(service.clone())),
+                ),
+                JobRegistration::new(semantic::INDEX, Arc::new(semantic::Indexer(service.clone()))),
+                JobRegistration::new(semantic::CATCH_UP, Arc::new(semantic::CatchUp(service))),
             ]
         })
     }
 
     fn schedules(&self) -> Vec<Schedule> {
         let day = std::time::Duration::from_secs(24 * 3600);
-        vec![Schedule::new(revisions::PRUNE, revisions::PRUNE, day)]
+        vec![
+            Schedule::new(revisions::PRUNE, revisions::PRUNE, day),
+            // Lập index tìm kiếm cho mục còn thiếu (vừa bật embedding, đổi mô hình): mỗi giờ.
+            Schedule::new(
+                semantic::CATCH_UP,
+                semantic::CATCH_UP,
+                std::time::Duration::from_secs(3600),
+            ),
+        ]
     }
 
     fn routes(&self) -> OpenApiRouter {
@@ -199,10 +221,22 @@ pub(crate) mod testing {
         reader.finish(config).unwrap().0
     }
 
-    /// Service trên database (đã migrate) của test.
+    /// Service trên database (đã migrate) của test; AI và embedding tắt.
     pub async fn service(
         test: &TestDatabase,
         config: ContentConfig,
+    ) -> (Arc<ContentService>, Arc<FakeMedia>, Database) {
+        let ai = Arc::new(autoxide_testkit::ai::FakeTextModel::disabled());
+        let embedder = Arc::new(autoxide_testkit::ai::FakeEmbedder::disabled());
+        service_with(test, config, ai, embedder).await
+    }
+
+    /// Như [`service`], với mô hình AI và embedding cho trước.
+    pub async fn service_with(
+        test: &TestDatabase,
+        config: ContentConfig,
+        ai: Arc<dyn autoxide_kernel::ai::TextModel>,
+        embedder: Arc<dyn autoxide_kernel::ai::Embedder>,
     ) -> (Arc<ContentService>, Arc<FakeMedia>, Database) {
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
@@ -215,11 +249,12 @@ pub(crate) mod testing {
             .await
             .unwrap();
         let media = Arc::new(FakeMedia::default());
+        let dependencies = crate::service::Dependencies { media: media.clone(), ai, embedder };
         let service = ContentService::new(
             database.clone(),
             Outbox::standalone("content"),
             autoxide_kernel::job::JobQueue::new("content"),
-            media.clone(),
+            dependencies,
             config,
         );
         (Arc::new(service), media, database)

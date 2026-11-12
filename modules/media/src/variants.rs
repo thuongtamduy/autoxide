@@ -35,7 +35,7 @@ pub(crate) const MAKE_VARIANTS: &str = "media.make_variants";
 /// Ảnh lớn hơn chừng này pixel không có ảnh thu nhỏ (giải mã cần khoảng 4 byte mỗi pixel).
 pub(crate) const MAX_PIXELS: u64 = 40_000_000;
 /// Loại ảnh làm được ảnh thu nhỏ.
-const SOURCES: [&str; 4] = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+pub(crate) const SOURCES: [&str; 4] = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const JPEG_QUALITY: u8 = 82;
 
 /// Một ảnh thu nhỏ.
@@ -240,8 +240,8 @@ pub(crate) async fn variants_of<C: ConnectionTrait>(
     Ok(found)
 }
 
-/// Giải mã `original`, xoay theo EXIF, làm một bản cho mỗi chiều rộng nhỏ hơn ảnh.
-fn render(original: &[u8], widths: &[u32]) -> Result<Vec<Rendered>, String> {
+/// Giải mã `original` (có giới hạn chống "bom giải nén"), xoay theo EXIF.
+fn decode(original: &[u8]) -> Result<DynamicImage, String> {
     let mut reader =
         ImageReader::new(Cursor::new(original)).with_guessed_format().map_err(|e| e.to_string())?;
     let mut limits = Limits::default();
@@ -258,24 +258,35 @@ fn render(original: &[u8], widths: &[u32]) -> Result<Vec<Rendered>, String> {
     let orientation = decoder.orientation().map_err(|e| e.to_string())?;
     let mut image = DynamicImage::from_decoder(decoder).map_err(|e| e.to_string())?;
     image.apply_orientation(orientation);
+    Ok(image)
+}
+
+/// Mã hoá: ảnh có kênh trong suốt → PNG, còn lại → JPEG.
+fn encode(image: &DynamicImage, transparent: bool) -> Result<(Vec<u8>, &'static str), String> {
+    let mut bytes = Vec::new();
+    if transparent {
+        image
+            .write_to(&mut Cursor::new(&mut bytes), ImageFormat::Png)
+            .map_err(|e| e.to_string())?;
+        Ok((bytes, "image/png"))
+    } else {
+        let encoder = JpegEncoder::new_with_quality(&mut bytes, JPEG_QUALITY);
+        DynamicImage::ImageRgb8(image.to_rgb8())
+            .write_with_encoder(encoder)
+            .map_err(|e| e.to_string())?;
+        Ok((bytes, "image/jpeg"))
+    }
+}
+
+/// Giải mã `original`, xoay theo EXIF, làm một bản cho mỗi chiều rộng nhỏ hơn ảnh.
+fn render(original: &[u8], widths: &[u32]) -> Result<Vec<Rendered>, String> {
+    let image = decode(original)?;
     let transparent = image.color().has_alpha();
     let mut rendered = Vec::new();
     for &wanted in widths.iter().filter(|wanted| **wanted < image.width()) {
         // `resize` giữ tỉ lệ, vừa trong khung `wanted` × (rất cao).
         let smaller = image.resize(wanted, u32::MAX, FilterType::CatmullRom);
-        let mut bytes = Vec::new();
-        let content_type = if transparent {
-            smaller
-                .write_to(&mut Cursor::new(&mut bytes), ImageFormat::Png)
-                .map_err(|e| e.to_string())?;
-            "image/png"
-        } else {
-            let encoder = JpegEncoder::new_with_quality(&mut bytes, JPEG_QUALITY);
-            DynamicImage::ImageRgb8(smaller.to_rgb8())
-                .write_with_encoder(encoder)
-                .map_err(|e| e.to_string())?;
-            "image/jpeg"
-        };
+        let (bytes, content_type) = encode(&smaller, transparent)?;
         rendered.push(Rendered {
             width: smaller.width(),
             height: smaller.height(),
@@ -284,6 +295,19 @@ fn render(original: &[u8], widths: &[u32]) -> Result<Vec<Rendered>, String> {
         });
     }
     Ok(rendered)
+}
+
+/// Một bản tạm (không lưu) vừa trong khung `side` × `side`, giữ tỉ lệ — cho gợi ý alt text
+/// khi chưa có ảnh thu nhỏ phù hợp. Trả nội dung và loại.
+pub(crate) fn shrink(original: &[u8], side: u32) -> Result<(Vec<u8>, &'static str), String> {
+    let image = decode(original)?;
+    let transparent = image.color().has_alpha();
+    let smaller = if image.width() > side || image.height() > side {
+        image.resize(side, side, FilterType::CatmullRom)
+    } else {
+        image
+    };
+    encode(&smaller, transparent)
 }
 
 #[cfg(test)]

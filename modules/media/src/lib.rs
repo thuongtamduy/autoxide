@@ -8,6 +8,7 @@
 //! REST ở `/api/v1/media` (hướng dẫn: `docs/MEDIA.md`), tool MCP, trait [`api::Media`]
 //! cho module khác, hai job định kỳ (dọn thùng rác, dọn nội dung mồ côi).
 
+mod alt;
 pub mod api;
 mod config;
 mod entity;
@@ -104,11 +105,13 @@ impl Module for MediaModule {
             .clone()
             .ok_or_else(|| Error::internal("module `media` started before it was configured"))?;
         let storage = context.require::<dyn Storage>()?;
+        let ai = context.require::<dyn autoxide_kernel::ai::TextModel>()?;
         let service = Arc::new(MediaService::new(
             context.database().clone(),
             storage,
             context.outbox()?,
             context.jobs(),
+            ai,
             config,
         ));
         self.service = Some(service.clone());
@@ -220,10 +223,21 @@ pub(crate) mod testing {
         reader.finish(config).unwrap().0.limits
     }
 
-    /// Service trên database (đã migrate) của test, nội dung trong bộ nhớ.
+    /// Service trên database (đã migrate) của test, nội dung trong bộ nhớ; AI tắt.
     pub async fn service(
         test: &TestDatabase,
         limits: Limits,
+    ) -> (Arc<MediaService>, Arc<MemoryStorage>, Database) {
+        let ai = Arc::new(autoxide_testkit::ai::FakeTextModel::disabled());
+        service_with_ai(test, limits, ai, false).await
+    }
+
+    /// Như [`service`], với mô hình AI cho trước; `send_private`: cho gửi ảnh riêng tư.
+    pub async fn service_with_ai(
+        test: &TestDatabase,
+        limits: Limits,
+        ai: Arc<dyn autoxide_kernel::ai::TextModel>,
+        send_private: bool,
     ) -> (Arc<MediaService>, Arc<MemoryStorage>, Database) {
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
@@ -236,12 +250,18 @@ pub(crate) mod testing {
             .await
             .unwrap();
         let storage = Arc::new(MemoryStorage::default());
-        let config = MediaConfig { limits, trash_days: 30, image_widths: vec![100, 200] };
+        let config = MediaConfig {
+            limits,
+            trash_days: 30,
+            image_widths: vec![100, 200],
+            ai_send_private: send_private,
+        };
         let service = MediaService::new(
             database.clone(),
             storage.clone(),
             Outbox::standalone("media"),
             autoxide_kernel::job::JobQueue::new("media"),
+            ai,
             config,
         );
         (Arc::new(service), storage, database)

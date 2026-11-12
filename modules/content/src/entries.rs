@@ -113,6 +113,8 @@ pub(crate) struct EntryFields {
     pub noindex: Option<bool>,
     /// Nội dung do AI tạo (D-109). Agent nên luôn đặt `true`.
     pub ai_generated: Option<bool>,
+    /// Chỉ máy chủ đặt (khi tự dịch): revision của bản gốc đã dịch. Không có trong API.
+    pub translated_from: Option<Uuid>,
 }
 
 /// Một mục mới.
@@ -267,6 +269,7 @@ impl ContentService {
             if let (Some(source), Some(object)) = (source, after.as_object_mut()) {
                 object.insert("translation_of".to_owned(), json!(source));
             }
+            self.enqueue_index(&transaction, entry.id).await?;
             let event =
                 events::EntryCreated(Change { before: None, after: Some(after), published: None });
             self.outbox
@@ -419,6 +422,7 @@ impl ContentService {
         }
         let change =
             Change { before: Some(summary(&before)), after: Some(after_summary), published: None };
+        self.enqueue_index(&transaction, id).await?;
         let actor = Actor::from(principal);
         let subject = events::entry_subject(id);
         if restored_from.is_some() {
@@ -502,6 +506,9 @@ impl ContentService {
         }
         if let Some(ai_generated) = fields.ai_generated {
             candidate.ai_generated = ai_generated;
+        }
+        if let Some(revision) = fields.translated_from {
+            candidate.translated_from_revision_id = Some(revision);
         }
         if let Some(featured) = fields.featured_media_id {
             candidate.featured_media_id = featured;
@@ -695,10 +702,13 @@ impl ContentService {
         candidate.ai_generated = false;
         candidate.review_requested_at = None;
         candidate.review_requested_by = None;
+        candidate.translated_from_revision_id = None;
         candidate.created_at = now;
         candidate.updated_at = now;
         candidate.revised_at = now;
-        let auto_slug = fields.slug.is_none();
+        // Không gửi slug: lấy slug của bản gốc; gửi `""`: sinh từ tiêu đề (đã dịch). Cả hai tự
+        // thêm `-2`, `-3`… khi trùng.
+        let auto_slug = fields.slug.as_deref().is_none_or(|slug| slug.trim().is_empty());
         self.apply(&mut candidate, fields, &mut problems).await?;
         if !problems.is_empty() {
             return Err(invalid(problems));
@@ -755,6 +765,7 @@ pub(crate) fn blank(
         ai_generated: false,
         review_requested_at: None,
         review_requested_by: None,
+        translated_from_revision_id: None,
         created_at: now,
         updated_at: now,
         revised_at: now,
@@ -795,6 +806,7 @@ pub(crate) fn changed_columns(before: &Entry, after: &Entry) -> entry::ActiveMod
         ai_generated,
         review_requested_at,
         review_requested_by,
+        translated_from_revision_id,
         updated_at,
         revised_at,
         translation_group_id

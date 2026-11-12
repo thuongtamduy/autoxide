@@ -73,7 +73,14 @@ impl Module for TestMedia {
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         let media: Arc<dyn Media> = self.0.clone();
-        context.provide::<dyn Media>(media)
+        context.provide::<dyn Media>(media)?;
+        // Module `ai` giả (đã tắt): `content` cần `dyn TextModel` và `dyn Embedder`.
+        let ai: Arc<dyn autoxide_kernel::ai::TextModel> =
+            Arc::new(autoxide_testkit::ai::FakeTextModel::disabled());
+        context.provide::<dyn autoxide_kernel::ai::TextModel>(ai)?;
+        let embedder: Arc<dyn autoxide_kernel::ai::Embedder> =
+            Arc::new(autoxide_testkit::ai::FakeEmbedder::disabled());
+        context.provide::<dyn autoxide_kernel::ai::Embedder>(embedder)
     }
 }
 
@@ -249,19 +256,19 @@ async fn tool_mcp_voi_version() {
         let reader = client("reader").await;
         let mut names: Vec<String> = reader.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name.to_string()).collect();
         names.sort();
-        assert_eq!(names, ["content.get", "content.list", "content.list_revisions", "content.resolve"]);
+        assert_eq!(names, ["content.get", "content.get_translation_request", "content.list", "content.list_revisions", "content.resolve", "content.search", "content.seo_check"]);
         reader.cancel().await.unwrap();
 
         // Agent chỉ có `content.write_own`: thấy tool viết, không thấy tool đăng.
         let agent = client("agent").await;
         let mut names: Vec<String> = agent.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name.to_string()).collect();
         names.sort();
-        assert_eq!(names, ["content.create_draft", "content.get", "content.list", "content.list_revisions", "content.request_review", "content.resolve", "content.restore_revision", "content.update"]);
+        assert_eq!(names, ["content.create_draft", "content.get", "content.get_translation_request", "content.list", "content.list_revisions", "content.request_review", "content.resolve", "content.restore_revision", "content.search", "content.seo_check", "content.suggest_seo", "content.translate", "content.update"]);
         agent.cancel().await.unwrap();
 
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 10);
+        assert_eq!(tools.len(), 15);
         let publish = tools.iter().find(|tool| tool.name == "content.publish").unwrap();
         assert!(publish.description.as_deref().unwrap_or_default().contains("Requires permission `content.publish` or `content.publish_own`."));
         for tool in &tools {

@@ -44,6 +44,8 @@ pub struct Model {
     /// Lúc bên viết xin duyệt (`NULL`: không xin, hay đã đăng / rút lại).
     pub review_requested_at: Option<DateTimeUtc>,
     pub review_requested_by: Option<Uuid>,
+    /// Bản dịch do máy chủ dịch từ revision này của bản gốc (D-109); `NULL`: không phải.
+    pub translated_from_revision_id: Option<Uuid>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
     pub revised_at: DateTimeUtc,

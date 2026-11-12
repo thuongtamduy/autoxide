@@ -67,6 +67,12 @@ pub(crate) struct EntryResponse {
     review_requested_at: Option<DateTime<Utc>>,
     /// Who asked for the review.
     review_requested_by: Option<Uuid>,
+    /// For a translation made by the server's AI: the revision of the source it was translated
+    /// from; `null` otherwise.
+    translated_from_revision_id: Option<Uuid>,
+    /// `true` when the source changed after this AI translation was made: translate it again
+    /// (`POST /entries/{source}/translate`) or update it by hand.
+    translation_outdated: bool,
     created_by: Option<Uuid>,
     /// How the entry was created: `session` (a person signed in) or `api_key` (a machine or an
     /// AI agent).
@@ -82,7 +88,8 @@ pub(crate) struct EntryResponse {
     author_ids: Vec<Uuid>,
 }
 
-/// Mục như API trả, kèm term và tác giả (đọc chung một lần cho mọi mục).
+/// Mục như API trả, kèm term và tác giả (đọc chung một lần cho mọi mục), và bản dịch AI nào đã
+/// cũ (bản gốc sửa sau revision đã dịch).
 pub(crate) async fn describe(
     service: &ContentService,
     entries: Vec<Entry>,
@@ -91,6 +98,7 @@ pub(crate) async fn describe(
     let read = service.database.read();
     let mut terms = crate::terms::term_ids_of(read, &ids).await?;
     let mut authors = crate::authors::author_ids_of(read, &ids).await?;
+    let outdated = crate::translate::outdated(read, &entries).await?;
     Ok(entries
         .into_iter()
         .map(|entry| {
@@ -98,14 +106,22 @@ pub(crate) async fn describe(
                 terms.remove(&entry.id).unwrap_or_default(),
                 authors.remove(&entry.id).unwrap_or_default(),
             );
-            entry_response(entry, term_ids, author_ids)
+            let stale = outdated.contains(&entry.id);
+            entry_response(entry, term_ids, author_ids, stale)
         })
         .collect())
 }
 
 /// API trả mục như thế nào.
-fn entry_response(entry: Entry, term_ids: Vec<Uuid>, author_ids: Vec<Uuid>) -> EntryResponse {
+fn entry_response(
+    entry: Entry,
+    term_ids: Vec<Uuid>,
+    author_ids: Vec<Uuid>,
+    translation_outdated: bool,
+) -> EntryResponse {
     EntryResponse {
+        translation_outdated,
+        translated_from_revision_id: entry.translated_from_revision_id,
         term_ids,
         author_ids,
         kind: Kind::parse(&entry.kind).unwrap_or(Kind::Post),
@@ -263,6 +279,7 @@ impl From<EntryFieldsInput> for EntryFields {
             canonical_url: input.canonical_url,
             noindex: input.noindex,
             ai_generated: input.ai_generated,
+            translated_from: None,
         }
     }
 }

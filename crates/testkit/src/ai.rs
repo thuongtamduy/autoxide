@@ -18,13 +18,28 @@ type Answer = Box<dyn Fn(&Prompt) -> Result<Value, Error> + Send + Sync>;
 pub struct FakeTextModel {
     answer: Answer,
     images: bool,
+    enabled: bool,
     /// Mọi prompt đã nhận, theo thứ tự.
     pub prompts: Mutex<Vec<Prompt>>,
 }
 
 impl FakeTextModel {
     pub fn new(answer: impl Fn(&Prompt) -> Result<Value, Error> + Send + Sync + 'static) -> Self {
-        FakeTextModel { answer: Box::new(answer), images: true, prompts: Mutex::new(Vec::new()) }
+        FakeTextModel {
+            answer: Box::new(answer),
+            images: true,
+            enabled: true,
+            prompts: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Như khi AI chưa bật: mọi lời gọi trả `ai.disabled`.
+    pub fn disabled() -> Self {
+        let mut model = FakeTextModel::new(|_| {
+            Err(Error::unavailable("ai.disabled", "AI features are off on this server."))
+        });
+        model.enabled = false;
+        model
     }
 
     /// Như mô hình không đọc được ảnh.
@@ -43,10 +58,18 @@ impl FakeTextModel {
 impl TextModel for FakeTextModel {
     fn capabilities(&self) -> Capabilities {
         Capabilities {
-            enabled: true,
+            enabled: self.enabled,
             provider: "fake".to_owned(),
             model: "fake-model".to_owned(),
             images: self.images,
+        }
+    }
+
+    fn ready(&self) -> Result<(), Error> {
+        if self.enabled {
+            Ok(())
+        } else {
+            Err(Error::unavailable("ai.disabled", "AI features are off on this server."))
         }
     }
 
@@ -74,6 +97,7 @@ impl TextModel for FakeTextModel {
 /// mô hình thật.
 pub struct FakeEmbedder {
     dimensions: usize,
+    enabled: bool,
     model: String,
     /// Số lần gọi `embed` (để test không tính lại đoạn không đổi).
     pub calls: Mutex<usize>,
@@ -81,7 +105,19 @@ pub struct FakeEmbedder {
 
 impl FakeEmbedder {
     pub fn new(dimensions: usize) -> Self {
-        FakeEmbedder { dimensions, model: "fake-embedding".to_owned(), calls: Mutex::new(0) }
+        FakeEmbedder {
+            dimensions,
+            enabled: true,
+            model: "fake-embedding".to_owned(),
+            calls: Mutex::new(0),
+        }
+    }
+
+    /// Như khi embedding chưa bật: `enabled()` là `false`, `embed` trả `ai.embedding_disabled`.
+    pub fn disabled() -> Self {
+        let mut embedder = FakeEmbedder::new(0);
+        embedder.enabled = false;
+        embedder
     }
 
     /// Như đổi sang một mô hình khác (để test lập lại index).
@@ -115,7 +151,15 @@ impl FakeEmbedder {
 #[async_trait::async_trait]
 impl Embedder for FakeEmbedder {
     fn enabled(&self) -> bool {
-        true
+        self.enabled
+    }
+
+    fn ready(&self) -> Result<(), Error> {
+        if self.enabled {
+            Ok(())
+        } else {
+            Err(Error::unavailable("ai.embedding_disabled", "Embeddings are off."))
+        }
     }
 
     fn model_id(&self) -> &str {
@@ -132,6 +176,9 @@ impl Embedder for FakeEmbedder {
         texts: &[String],
         _kind: EmbedKind,
     ) -> Result<Vec<Vec<f32>>, Error> {
+        if !self.enabled {
+            return Err(Error::unavailable("ai.embedding_disabled", "Embeddings are off."));
+        }
         if let Ok(mut calls) = self.calls.lock() {
             *calls += 1;
         }

@@ -97,6 +97,10 @@ pub struct Capabilities {
 pub trait TextModel: Send + Sync {
     fn capabilities(&self) -> Capabilities;
 
+    /// `Ok` khi đã bật; không thì đúng lỗi mà [`generate`](Self::generate) sẽ trả
+    /// (`ai.disabled`). Gọi trước khi làm việc tốn kém (đọc ảnh, xếp job) để báo lỗi sớm.
+    fn ready(&self) -> Result<(), Error>;
+
     /// Sinh một kết quả khớp `prompt.output_schema`. Lỗi có `code` ổn định (`ai.disabled`,
     /// `ai.quota_exceeded`, `ai.provider_unavailable`, `ai.refused`, `ai.output_truncated`,
     /// `ai.output_invalid`, `ai.unsupported_input`, `ai.misconfigured`).
@@ -117,6 +121,8 @@ pub enum EmbedKind {
 pub trait Embedder: Send + Sync {
     /// Đã bật và cấu hình.
     fn enabled(&self) -> bool;
+    /// `Ok` khi đã bật; không thì lỗi `ai.embedding_disabled`.
+    fn ready(&self) -> Result<(), Error>;
     /// Tên mô hình — lưu cùng vector để biết khi nào phải lập lại index.
     fn model_id(&self) -> &str;
     /// Số chiều của mỗi vector.

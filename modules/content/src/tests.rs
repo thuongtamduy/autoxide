@@ -1800,3 +1800,541 @@ mod agent {
         .unwrap();
     }
 }
+
+/// SEO (D-109): kiểm không dùng AI; gợi ý bằng AI chỉ trả gợi ý, chỉ giữ term có thật.
+mod seo {
+    use std::sync::Arc;
+
+    use autoxide_kernel::access::Principal;
+    use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
+
+    use super::*;
+    use crate::terms::{Taxonomy, TermInput};
+    use crate::testing::service_with;
+
+    #[tokio::test]
+    async fn kiem_seo_khong_dung_ai() {
+        TestDatabase::run(async |test| {
+            let (content, media, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let image = media.add(true);
+            let mut input = post("Hello");
+            input.fields.featured_media_id = Some(Some(image));
+            input.fields.meta_title = Some("x".repeat(70));
+            input.fields.body = Some(json!({"type": "doc", "content": [
+                {"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "A"}]},
+                {"type": "heading", "attrs": {"level": 4}, "content": [{"type": "text", "text": "B"}]},
+                {"type": "image", "attrs": {"mediaId": image.to_string(), "alt": "", "caption": ""}}
+            ]}));
+            let entry = content.create(&ada, input).await.unwrap();
+            content.create(&ada, post("Hello")).await.unwrap();
+            let findings = content.seo_check(&ada, entry.id).await.unwrap();
+            let found: Vec<(&str, &str)> =
+                findings.iter().map(|finding| (finding.code, finding.field.as_str())).collect();
+            for expected in [
+                ("seo.meta_title_too_long", "meta_title"),
+                ("seo.meta_description_missing", "meta_description"),
+                ("seo.excerpt_missing", "excerpt"),
+                ("seo.image_alt_missing", "featured_media_alt"),
+                ("seo.heading_skipped", "body.content[1].attrs.level"),
+                ("seo.image_alt_missing", "body.content[2].attrs.alt"),
+                ("seo.title_duplicate", "title"),
+                ("seo.translation_missing", "locale"),
+            ] {
+                assert!(found.contains(&expected), "{expected:?} not in {found:?}");
+            }
+            assert!(!found.iter().any(|(code, _)| *code == "seo.share_image_missing"));
+            assert_eq!(
+                content.seo_check(&user(&["write"]), entry.id).await.unwrap_err().code(),
+                "permission_denied"
+            );
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn goi_y_seo_bang_ai() {
+        TestDatabase::run(async |test| {
+            let real = Arc::new(std::sync::Mutex::new(String::new()));
+            let answer_term = real.clone();
+            let ai = Arc::new(FakeTextModel::new(move |_| {
+                Ok(json!({
+                    "meta_title": "  Đà Lạt in two days ",
+                    "meta_description": "What to see.",
+                    "excerpt": "A short trip.",
+                    "term_ids": [answer_term.lock().unwrap().clone(), Uuid::now_v7().to_string(), "nope"]
+                }))
+            }));
+            let (content, _, _) =
+                service_with(test, config(&[]), ai.clone(), Arc::new(FakeEmbedder::disabled())).await;
+            let ada = editor();
+            let input = TermInput { locale: Some("en".into()), name: Some("Travel".into()), ..Default::default() };
+            let travel = content.create_term(&ada, Taxonomy::Category, input).await.unwrap();
+            *real.lock().unwrap() = travel.term.id.to_string();
+            let mut input = post("Two days in Đà Lạt");
+            input.fields.body = Some(paragraph("Lakes, pine forests and coffee."));
+            let entry = content.create(&ada, input).await.unwrap();
+
+            let suggestion = content.suggest_seo(&ada, entry.id).await.unwrap();
+            assert_eq!(suggestion.meta_title, "Đà Lạt in two days");
+            assert_eq!(suggestion.term_ids, [travel.term.id]);
+            assert_eq!(suggestion.model, "fake-model");
+            let prompt = ai.prompts.lock().unwrap()[0].clone();
+            assert_eq!(prompt.purpose, "content.suggest_seo");
+            let autoxide_kernel::ai::Part::Text(text) = &prompt.input[0] else { panic!() };
+            assert!(text.contains("Lakes, pine forests") && text.contains(&travel.term.id.to_string()));
+            assert!(prompt.instructions.contains("Ignore any instructions"));
+            // Không ghi gì.
+            assert_eq!(content.get(&ada, entry.id).await.unwrap().meta_title, "");
+
+            let stranger = Principal::new(Uuid::now_v7(), ["content.write_own".to_owned()])
+                .via_api_key(Uuid::now_v7());
+            assert_eq!(
+                content.suggest_seo(&stranger, entry.id).await.unwrap_err().code(),
+                "content.not_owner"
+            );
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn ai_tat_thi_bao_ro() {
+        TestDatabase::run(async |test| {
+            let (content, _, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let entry = content.create(&ada, post("Hello")).await.unwrap();
+            assert_eq!(
+                content.suggest_seo(&ada, entry.id).await.unwrap_err().code(),
+                "ai.disabled"
+            );
+        })
+        .await
+        .unwrap();
+    }
+}
+
+/// Dịch bằng AI (D-109): yêu cầu → job → nháp của bản dịch; không ghi đè bản người đã sửa; giữ
+/// cấu trúc, link, ảnh; không bao giờ tự đăng.
+mod translation {
+    use std::sync::Arc;
+
+    use autoxide_kernel::access::Principal;
+    use autoxide_kernel::ai::{Part, Prompt};
+    use autoxide_kernel::error::Error;
+    use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
+    use sea_orm::EntityTrait;
+
+    use super::*;
+    use crate::service::ContentService;
+    use crate::testing::service_with;
+
+    /// "Dịch" bằng cách thêm `[vi] ` trước mỗi mẩu (giữ nguyên thẻ).
+    fn translator() -> FakeTextModel {
+        FakeTextModel::new(|prompt: &Prompt| {
+            let Part::Text(input) = &prompt.input[0] else { panic!() };
+            let items: Vec<Value> = serde_json::from_str(input).unwrap();
+            let segments: Vec<Value> = items
+                .iter()
+                .map(|item| json!({"id": item["id"], "text": format!("[vi] {}", item["text"].as_str().unwrap())}))
+                .collect();
+            Ok(json!({"segments": segments}))
+        })
+    }
+
+    fn rich_body(image: Uuid) -> Value {
+        json!({"type": "doc", "content": [
+            {"type": "paragraph", "content": [
+                {"type": "text", "text": "See the "},
+                {"type": "text", "text": "map", "marks": [{"type": "link", "attrs": {"href": "https://example.com/map"}}]}
+            ]},
+            {"type": "codeBlock", "content": [{"type": "text", "text": "let x = 1;"}]},
+            {"type": "image", "attrs": {"mediaId": image.to_string(), "alt": "A lake", "caption": ""}}
+        ]})
+    }
+
+    async fn setup(
+        test: &TestDatabase,
+        ai: FakeTextModel,
+        pairs: &[(&str, &str)],
+    ) -> (Arc<ContentService>, Arc<crate::testing::FakeMedia>, Database, Arc<FakeTextModel>) {
+        let ai = Arc::new(ai);
+        let (content, media, database) =
+            service_with(test, config(pairs), ai.clone(), Arc::new(FakeEmbedder::disabled())).await;
+        (content, media, database, ai)
+    }
+
+    async fn request(database: &Database, id: Uuid) -> crate::translate::TranslationRequest {
+        crate::entity::translation_request::Entity::find_by_id(id)
+            .one(database.read())
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn dich_moi_giu_cau_truc_va_khong_tu_dang() {
+        TestDatabase::run(async |test| {
+            let (content, media, database, ai) = setup(test, translator(), &[]).await;
+            let ada = editor();
+            let image = media.add(true);
+            let mut input = post("Two days in Da Lat");
+            input.fields.excerpt = Some("A short trip.".into());
+            input.fields.body = Some(rich_body(image));
+            let source = content.create(&ada, input).await.unwrap();
+            content.publish(&ada, source.id, None, None, false).await.unwrap();
+
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            assert_eq!((queued.status.as_str(), queued.target_entry_id), ("queued", None));
+            content.run_translation(queued.id, 1).await.unwrap();
+            let done = request(&database, queued.id).await;
+            assert_eq!(done.status, "succeeded");
+            assert_eq!(done.active_key, None);
+            let vi = content.get(&ada, done.result_entry_id.unwrap()).await.unwrap();
+            assert_eq!((vi.locale.as_str(), vi.status.as_str()), ("vi", "draft"));
+            assert_eq!(
+                (vi.title.as_str(), vi.excerpt.as_str()),
+                ("[vi] Two days in Da Lat", "[vi] A short trip.")
+            );
+            assert_eq!(vi.slug, "vi-two-days-in-da-lat");
+            assert!(vi.ai_generated);
+            assert_eq!(vi.translated_from_revision_id, Some(done.source_revision_id));
+            assert_eq!(vi.translation_group_id, source.translation_group_id);
+            let body: Value = serde_json::from_str(&vi.body).unwrap();
+            assert_eq!(body["content"][0]["content"][0]["text"], "[vi] See the ");
+            assert_eq!(
+                body["content"][0]["content"][1]["marks"][0]["attrs"]["href"],
+                "https://example.com/map"
+            );
+            assert_eq!(body["content"][1]["content"][0]["text"], "let x = 1;");
+            assert_eq!(body["content"][2]["attrs"]["alt"], "[vi] A lake");
+            assert_eq!(body["content"][2]["attrs"]["mediaId"], image.to_string());
+            let prompt = ai.prompts.lock().unwrap()[0].clone();
+            assert!(prompt.instructions.contains("`en`") && prompt.instructions.contains("`vi`"));
+            let Part::Text(sent) = &prompt.input[0] else { panic!() };
+            assert!(!sent.contains("example.com"), "the model never sees links");
+            let names = events(&database).await;
+            for name in ["content.translation_requested", "content.translation_succeeded"] {
+                assert!(names.contains(&name.to_owned()), "{name}");
+            }
+            // Chạy lại job (thử lại): không làm gì thêm.
+            content.run_translation(queued.id, 2).await.unwrap();
+            assert_eq!(ai.calls(), 1);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn cap_nhat_ban_dich_co_san_va_bao_da_cu() {
+        TestDatabase::run(async |test| {
+            let (content, _, database, _) = setup(test, translator(), &[]).await;
+            let ada = editor();
+            let source = content.create(&ada, post("Hello")).await.unwrap();
+            let vi = content
+                .create_translation(&ada, source.id, "vi", fields("Xin chào"))
+                .await
+                .unwrap();
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            assert_eq!(queued.target_entry_id, Some(vi.id));
+            content.run_translation(queued.id, 1).await.unwrap();
+            let updated = content.get(&ada, vi.id).await.unwrap();
+            assert_eq!(
+                (updated.title.as_str(), updated.slug.as_str()),
+                ("[vi] Hello", vi.slug.as_str())
+            );
+            let view = |entry| {
+                let content = content.clone();
+                async move {
+                    let described = crate::http::describe(&content, vec![entry]).await.unwrap();
+                    serde_json::to_value(&described[0]).unwrap()
+                }
+            };
+            assert_eq!(view(updated.clone()).await["translation_outdated"], false);
+            content.update(&ada, source.id, fields("Hello again"), false, None).await.unwrap();
+            assert_eq!(view(updated).await["translation_outdated"], true);
+
+            // Có người sửa bản dịch trong lúc chờ: không ghi đè.
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            content.update(&ada, vi.id, fields("Sửa tay"), false, None).await.unwrap();
+            content.run_translation(queued.id, 1).await.unwrap();
+            let failed = request(&database, queued.id).await;
+            assert_eq!(
+                (failed.status.as_str(), failed.error_code.as_deref()),
+                ("failed", Some("content.translation_conflict"))
+            );
+            assert_eq!(content.get(&ada, vi.id).await.unwrap().title, "Sửa tay");
+            assert!(events(&database).await.contains(&"content.translation_failed".to_owned()));
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn sai_cau_truc_loi_tam_thoi_va_chia_lo() {
+        TestDatabase::run(async |test| {
+            // Bỏ mất thẻ: bị từ chối hai lần → thất bại, không ghi gì.
+            let broken = FakeTextModel::new(|prompt: &Prompt| {
+                let Part::Text(input) = &prompt.input[0] else { panic!() };
+                let items: Vec<Value> = serde_json::from_str(input).unwrap();
+                let segments: Vec<Value> =
+                    items.iter().map(|item| json!({"id": item["id"], "text": "no tags"})).collect();
+                Ok(json!({"segments": segments}))
+            });
+            let (content, media, database, ai) = setup(test, broken, &[]).await;
+            let ada = editor();
+            let mut input = post("Hello");
+            input.fields.body = Some(rich_body(media.add(true)));
+            let source = content.create(&ada, input).await.unwrap();
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            content.run_translation(queued.id, 1).await.unwrap();
+            let failed = request(&database, queued.id).await;
+            assert_eq!(failed.error_code.as_deref(), Some("content.translation_invalid"));
+            assert_eq!(ai.calls(), 2);
+
+            // Nhà cung cấp bận: thử lại (lỗi trả về cho job queue), lần cuối thì thất bại.
+            // Mã của module `ai` (không phải của `content`): để trong biến cho `cargo xtask check`.
+            let code = "ai.provider_unavailable";
+            let busy = FakeTextModel::new(move |_| Err(Error::unavailable(code, "busy")));
+            let (content, _, database, _) = setup(test, busy, &[]).await;
+            let source = content.create(&ada, post("Hello")).await.unwrap();
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            assert_eq!(content.run_translation(queued.id, 1).await.unwrap_err().code(), "ai.provider_unavailable");
+            assert_eq!(request(&database, queued.id).await.status, "running");
+            content.run_translation(queued.id, 8).await.unwrap();
+            let failed = request(&database, queued.id).await;
+            assert_eq!((failed.status.as_str(), failed.error_code.as_deref()), ("failed", Some("ai.provider_unavailable")));
+
+            // Bài dài: chia nhiều lô.
+            let (content, _, _, ai) =
+                setup(test, translator(), &[("AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS", "500")]).await;
+            let paragraphs: Vec<Value> = (0..6)
+                .map(|i| json!({"type": "paragraph", "content": [{"type": "text", "text": format!("{i} {}", "word ".repeat(80))}]}))
+                .collect();
+            let mut input = post("Long");
+            input.fields.body = Some(json!({"type": "doc", "content": paragraphs}));
+            let source = content.create(&ada, input).await.unwrap();
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            content.run_translation(queued.id, 1).await.unwrap();
+            assert!(ai.calls() > 1, "{} calls", ai.calls());
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn dong_thoi_quyen_va_ai_tat() {
+        TestDatabase::run(async |test| {
+            let (content, _, _, _) = setup(test, translator(), &[]).await;
+            let ada = editor();
+            let source = content.create(&ada, post("Hello")).await.unwrap();
+            // Hai yêu cầu cùng lúc cho cùng một ngôn ngữ: đúng một được nhận.
+            let attempts: Vec<_> = (0..4)
+                .map(|_| {
+                    let content = content.clone();
+                    tokio::spawn(async move {
+                        content.request_translation(&editor(), source.id, "vi").await
+                    })
+                })
+                .collect();
+            let mut accepted = Vec::new();
+            for attempt in attempts {
+                match attempt.await.unwrap() {
+                    Ok(request) => accepted.push(request),
+                    Err(error) => assert_eq!(error.code(), "content.translation_in_progress"),
+                }
+            }
+            assert_eq!(accepted.len(), 1);
+            content.run_translation(accepted[0].id, 1).await.unwrap();
+            // Xong rồi thì xin dịch lại được.
+            content.request_translation(&ada, source.id, "vi").await.unwrap();
+            let bad = content.request_translation(&ada, source.id, "en").await.unwrap_err();
+            assert_eq!(bad.fields()[0].field, "locale");
+
+            let stranger = Principal::new(Uuid::now_v7(), ["content.write_own".to_owned()])
+                .via_api_key(Uuid::now_v7());
+            assert_eq!(
+                content.request_translation(&stranger, source.id, "vi").await.unwrap_err().code(),
+                "content.not_owner"
+            );
+
+            let (off, _, _) = service(test, config(&[])).await;
+            let source = off.create(&ada, post("Hello")).await.unwrap();
+            assert_eq!(
+                off.request_translation(&ada, source.id, "vi").await.unwrap_err().code(),
+                "ai.disabled"
+            );
+        })
+        .await
+        .unwrap();
+    }
+}
+
+/// Tìm theo ý nghĩa (D-109): index theo đoạn, không tính lại đoạn không đổi, gộp với tìm theo
+/// chữ, nhiều máy chủ cùng database, đổi mô hình, embedding tắt.
+mod search {
+    use std::sync::Arc;
+
+    use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
+
+    use super::*;
+    use crate::semantic::SearchQuery;
+    use crate::testing::service_with;
+
+    async fn rows_of(database: &Database, entry_id: Uuid) -> u64 {
+        use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
+        crate::entity::embedding::Entity::find()
+            .filter(crate::entity::embedding::Column::EntryId.eq(entry_id))
+            .count(database.read())
+            .await
+            .unwrap()
+    }
+
+    fn query(q: &str) -> SearchQuery {
+        SearchQuery { q: q.into(), locale: Some("vi".into()), ..Default::default() }
+    }
+
+    fn vi_post(title: &str, text: &str) -> NewEntry {
+        let mut input = post(title);
+        input.locale = Some("vi".into());
+        input.fields.body = Some(paragraph(text));
+        input
+    }
+
+    #[tokio::test]
+    async fn tim_theo_y_nghia_va_theo_chu() {
+        TestDatabase::run(async |test| {
+            let embedder = Arc::new(FakeEmbedder::new(256));
+            let (content, _, database) = service_with(
+                test,
+                config(&[("AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH", "true")]),
+                Arc::new(FakeTextModel::disabled()),
+                embedder.clone(),
+            )
+            .await;
+            let ada = editor();
+            let dalat = content
+                .create(&ada, vi_post("Đà Lạt mùa hoa", "Hoa dã quỳ nở vàng đồi thông."))
+                .await
+                .unwrap();
+            let rust =
+                content.create(&ada, vi_post("Học Rust", "Ownership và lifetime.")).await.unwrap();
+            for id in [dalat.id, rust.id] {
+                content.index_entry(id).await.unwrap();
+            }
+            let calls = embedder.calls();
+            // Không đổi gì: không gọi lại embedding.
+            content.index_entry(dalat.id).await.unwrap();
+            assert_eq!(embedder.calls(), calls);
+
+            // Khớp cả ý nghĩa lẫn chữ.
+            let hits = content.search(Some(&ada), &query("đà lạt"), false).await.unwrap();
+            assert_eq!(hits[0].entry_id, dalat.id);
+            assert_eq!(hits[0].matched_by, ["meaning", "text"]);
+            assert!(hits[0].similarity.unwrap() > 0.0);
+            assert_eq!(hits[0].status.as_deref(), Some("draft"));
+            // Không chứa nguyên cụm chữ, nhưng gần về ý nghĩa.
+            let hits = content.search(Some(&ada), &query("hoa nở ở đà lạt"), false).await.unwrap();
+            assert_eq!((hits[0].entry_id, hits[0].matched_by.clone()), (dalat.id, vec!["meaning"]));
+            assert!(hits[0].snippet.contains("dã quỳ"));
+
+            // Công khai: chỉ bản đã đăng, kèm đường dẫn.
+            assert!(content.search(None, &query("đà lạt"), true).await.unwrap().is_empty());
+            content.publish(&ada, dalat.id, None, None, false).await.unwrap();
+            content.index_entry(dalat.id).await.unwrap();
+            let public = content.search(None, &query("đà lạt"), true).await.unwrap();
+            assert_eq!(public.len(), 1);
+            assert_eq!(
+                (public[0].path.as_deref(), public[0].status.clone()),
+                (Some("/blog/da-lat-mua-hoa"), None)
+            );
+
+            // Kiểm đầu vào; cần quyền đọc.
+            let bad = SearchQuery { q: " ".into(), limit: Some(51), ..Default::default() };
+            let error = content.search(Some(&ada), &bad, false).await.unwrap_err();
+            assert_eq!(
+                error.fields().iter().map(|f| f.field.as_str()).collect::<Vec<_>>(),
+                ["q", "limit"]
+            );
+            assert_eq!(
+                content
+                    .search(Some(&user(&["write"])), &query("x"), false)
+                    .await
+                    .unwrap_err()
+                    .code(),
+                "permission_denied"
+            );
+
+            // Xoá mục: index của nó biến mất.
+            content.delete(&ada, rust.id, None).await.unwrap();
+            assert_eq!(rows_of(&database, rust.id).await, 1);
+            content.index_entry(rust.id).await.unwrap();
+            assert_eq!(rows_of(&database, rust.id).await, 0);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn nhieu_may_chu_va_doi_mo_hinh() {
+        TestDatabase::run(async |test| {
+            let embedder = Arc::new(FakeEmbedder::new(128));
+            let ai = Arc::new(FakeTextModel::disabled());
+            let (first, _, database) =
+                service_with(test, config(&[]), ai.clone(), embedder.clone()).await;
+            let (second, _, _) =
+                service_with(test, config(&[]), ai.clone(), embedder.clone()).await;
+            let ada = editor();
+            let a = first.create(&ada, vi_post("Phở Hà Nội", "Nước dùng trong.")).await.unwrap();
+            first.index_entry(a.id).await.unwrap();
+            assert_eq!(second.search(Some(&ada), &query("phở"), false).await.unwrap().len(), 1);
+            // Máy chủ thứ nhất thêm mục: máy thứ hai (đã nạp vào bộ nhớ) thấy nhờ `version`.
+            let b = first
+                .create(&ada, vi_post("Bún chả", "Phở và bún chả là món Hà Nội."))
+                .await
+                .unwrap();
+            first.index_entry(b.id).await.unwrap();
+            let hits = second.search(Some(&ada), &query("phở hà nội"), false).await.unwrap();
+            assert_eq!(hits.iter().filter(|hit| hit.matched_by.contains(&"meaning")).count(), 2);
+
+            // Hai job lập index cùng mục chạy cùng lúc: cuối cùng mỗi đoạn một dòng.
+            let (x, y) = tokio::join!(first.index_entry(b.id), second.index_entry(b.id));
+            if x.is_err() || y.is_err() {
+                first.index_entry(b.id).await.unwrap();
+            }
+            assert_eq!(rows_of(&database, b.id).await, 1, "one row per chunk (draft only)");
+
+            // Đổi mô hình: job định kỳ xếp lập lại mọi mục.
+            let other = Arc::new(FakeEmbedder::new(128).with_model("another-model"));
+            let (third, _, _) = service_with(test, config(&[]), ai, other).await;
+            assert_eq!(third.catch_up_embeddings().await.unwrap(), 2);
+            third.index_entry(a.id).await.unwrap();
+            assert_eq!(third.catch_up_embeddings().await.unwrap(), 1);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn embedding_tat_chi_tim_theo_chu() {
+        TestDatabase::run(async |test| {
+            let (content, _, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let dalat = content.create(&ada, vi_post("Đà Lạt mùa hoa", "Hoa.")).await.unwrap();
+            content.index_entry(dalat.id).await.unwrap();
+            assert_eq!(content.catch_up_embeddings().await.unwrap(), 0);
+            let hits = content.search(Some(&ada), &query("da lat"), false).await.unwrap();
+            assert_eq!(
+                (hits.len(), hits[0].matched_by.clone(), hits[0].similarity),
+                (1, vec!["text"], None)
+            );
+            assert_eq!(
+                content.search(None, &query("da lat"), true).await.unwrap_err().code(),
+                "content.semantic_search_disabled"
+            );
+        })
+        .await
+        .unwrap();
+    }
+}

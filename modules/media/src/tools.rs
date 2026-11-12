@@ -19,7 +19,9 @@ use validator::Validate;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 
-use crate::http::{DuplicateItem, ItemsQuery, TagResponse, UploadedResponse, present};
+use crate::http::{
+    AltSuggestionResponse, DuplicateItem, ItemsQuery, TagResponse, UploadedResponse, present,
+};
 use crate::permissions::{MEDIA_READ, MEDIA_WRITE};
 use crate::service::{ItemChanges, MediaService, Visibility, content_url, too_large};
 use crate::tags::TagSort;
@@ -127,7 +129,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
     // Mỗi tool giữ một bản `Arc` của service (clone `Arc` chỉ tăng bộ đếm tham chiếu).
     let (list, get, update, trash) =
         (service.clone(), service.clone(), service.clone(), service.clone());
-    let (upload, list_tags) = (service.clone(), service.clone());
+    let (upload, list_tags, alt) = (service.clone(), service.clone(), service.clone());
     vec![
         Tool::new(
             "list",
@@ -289,5 +291,33 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
         )
         .requires(MEDIA_READ)
         .read_only(),
+        Tool::new(
+            "suggest_alt",
+            "Ask the server's AI model to suggest alt text for an image (JPEG, PNG, GIF, WebP) in a \
+             language, optionally with context such as the post title. Saves nothing: store what \
+             you accept with `update`. Uses AI tokens.",
+            move |principal: Principal, input: SuggestAltInput| {
+                let service = alt.clone();
+                async move {
+                    let suggestion = service
+                        .suggest_alt(&principal, input.id, &input.locale, input.context.as_deref())
+                        .await?;
+                    Ok::<AltSuggestionResponse, Error>(suggestion.into())
+                }
+            },
+        )
+        .requires(MEDIA_WRITE),
     ]
+}
+
+/// An image to describe.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SuggestAltInput {
+    /// Id of the media item.
+    id: Uuid,
+    /// Language of the alt text, a BCP 47 code like `vi` or `en`.
+    locale: String,
+    /// Where the image is used (for example the post title), up to 500 characters.
+    context: Option<String>,
 }

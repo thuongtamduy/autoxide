@@ -63,6 +63,27 @@ pub(crate) const PREVIEW_TTL_SECONDS: Setting = Setting::new(
 )
 .with_default("600");
 
+pub(crate) const TRANSLATE_BATCH_TOKENS: Setting = Setting::new(
+    "AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS",
+    "AI translation sends a long entry in parts of about this many tokens each (500 to \
+     100000); smaller parts suit smaller models.",
+)
+.with_default("8000");
+
+pub(crate) const PUBLIC_SEMANTIC_SEARCH: Setting = Setting::new(
+    "AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH",
+    "Serve search by meaning to anonymous readers at `/api/v1/content/public/search` (`true` \
+     or `false`). Every search costs one embeddings request, so it is off by default.",
+)
+.with_default("false");
+
+pub(crate) const PUBLIC_SEARCH_PER_MINUTE: Setting = Setting::new(
+    "AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE",
+    "Public searches one client address may make per minute (1 to 10000), on top of the \
+     general rate limit. Counted per server process.",
+)
+.with_default("30");
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ContentConfig {
     pub locales: Vec<String>,
@@ -74,6 +95,9 @@ pub(crate) struct ContentConfig {
     pub embed_hosts: Vec<String>,
     pub preview_secret: Option<String>,
     pub preview_ttl_seconds: u32,
+    pub translate_batch_tokens: u32,
+    pub public_semantic_search: bool,
+    pub public_search_per_minute: u32,
 }
 
 impl ContentConfig {
@@ -126,6 +150,16 @@ impl ContentConfig {
         });
         let preview_ttl_seconds =
             reader.get_with(&PREVIEW_TTL_SECONDS, |raw| parse_in_range(raw, 60u32, 604_800));
+        let translate_batch_tokens =
+            reader.get_with(&TRANSLATE_BATCH_TOKENS, |raw| parse_in_range(raw, 500u32, 100_000));
+        let public_semantic_search =
+            reader.get_with(&PUBLIC_SEMANTIC_SEARCH, |raw| match raw.trim() {
+                "true" => Ok(true),
+                "false" => Ok(false),
+                _ => Err("must be `true` or `false`".to_owned()),
+            });
+        let public_search_per_minute =
+            reader.get_with(&PUBLIC_SEARCH_PER_MINUTE, |raw| parse_in_range(raw, 1u32, 10_000));
         let (locales, default_locale) = (locales?, default_locale?);
         if !locales.contains(&default_locale) {
             return reader.reject(
@@ -143,6 +177,9 @@ impl ContentConfig {
             embed_hosts: embed_hosts?,
             preview_secret: preview_secret?,
             preview_ttl_seconds: preview_ttl_seconds?,
+            translate_batch_tokens: translate_batch_tokens?,
+            public_semantic_search: public_semantic_search?,
+            public_search_per_minute: public_search_per_minute?,
         })
     }
 }

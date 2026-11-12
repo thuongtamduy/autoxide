@@ -27,6 +27,10 @@ impl TextModel for Text {
         self.capabilities.clone()
     }
 
+    fn ready(&self) -> Result<(), Error> {
+        if self.provider.is_some() { Ok(()) } else { Err(errors::disabled()) }
+    }
+
     async fn generate(&self, prompt: Prompt) -> Result<Generation, Error> {
         let Some(provider) = &self.provider else {
             return Err(errors::disabled());
@@ -84,6 +88,10 @@ pub(crate) struct Embeddings {
 impl Embedder for Embeddings {
     fn enabled(&self) -> bool {
         self.client.is_some()
+    }
+
+    fn ready(&self) -> Result<(), Error> {
+        if self.client.is_some() { Ok(()) } else { Err(errors::embedding_disabled()) }
     }
 
     fn model_id(&self) -> &str {

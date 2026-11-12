@@ -90,6 +90,7 @@ impl ContentService {
             after: Some(summary(&after)),
             published: Some(published_payload(&after, Some(&path), &moved)),
         };
+        self.enqueue_index(&transaction, id).await?;
         self.outbox
             .record(
                 &transaction,
@@ -167,6 +168,7 @@ impl ContentService {
             after: Some(summary(&after)),
             published: removed.as_ref().map(|_| published_payload(&after, None, &stale)),
         };
+        self.enqueue_index(&transaction, id).await?;
         let actor = Actor::from(principal);
         let subject = events::entry_subject(id);
         if to == Status::Archived {
@@ -243,6 +245,7 @@ impl ContentService {
             after: None,
             published: removed.as_ref().map(|_| published_payload(&current, None, &stale)),
         };
+        self.enqueue_index(&transaction, id).await?;
         self.outbox
             .record(
                 &transaction,

@@ -37,12 +37,22 @@ pub(crate) const IMAGE_WIDTHS: Setting = Setting::new(
 )
 .with_default("320,640,1280,1920");
 
+pub(crate) const AI_SEND_PRIVATE: Setting = Setting::new(
+    "AUTOXIDE_MEDIA_AI_SEND_PRIVATE",
+    "Allow sending private images to the AI provider for alt text suggestions (`true` or \
+     `false`). Public images are already visible to anyone; private ones leave the server only \
+     when this is `true`.",
+)
+.with_default("false");
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MediaConfig {
     pub limits: Limits,
     pub trash_days: u32,
     /// Chiều rộng các ảnh thu nhỏ, tăng dần; rỗng: không tạo (D-093).
     pub image_widths: Vec<u32>,
+    /// Được gửi ảnh riêng tư cho nhà cung cấp AI để gợi ý alt text (D-109).
+    pub ai_send_private: bool,
 }
 
 /// Giới hạn của nội dung tải lên.
@@ -121,10 +131,16 @@ impl MediaConfig {
                 Ok(widths)
             }
         });
+        let ai_send_private = reader.get_with(&AI_SEND_PRIVATE, |raw| match raw.trim() {
+            "true" => Ok(true),
+            "false" => Ok(false),
+            _ => Err("must be `true` or `false`".to_owned()),
+        });
         Ok(MediaConfig {
             limits: Limits { max_bytes: max_bytes?, allowed_types: allowed_types? },
             trash_days: trash_days?,
             image_widths: image_widths?,
+            ai_send_private: ai_send_private?,
         })
     }
 }

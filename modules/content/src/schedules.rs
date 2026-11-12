@@ -332,6 +332,7 @@ impl ContentService {
                         &moved,
                     )),
                 };
+                self.enqueue_index(&transaction, after.id).await?;
                 self.outbox
                     .record(
                         &transaction,
@@ -366,6 +367,7 @@ impl ContentService {
                     after: Some(crate::entries::summary(&after)),
                     published: Some(crate::publishing::published_payload(&after, None, &stale)),
                 };
+                self.enqueue_index(&transaction, after.id).await?;
                 self.outbox
                     .record(
                         &transaction,

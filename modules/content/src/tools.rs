@@ -24,8 +24,8 @@ use validator::Validate;
 
 use crate::entries::{Entry, EntryFields, Kind, NewEntry};
 use crate::http::{
-    EntriesQuery, EntryResponse, Resolution, RevisionResponse, choice, describe, page_request,
-    resolution, revision,
+    EntriesQuery, EntryResponse, Resolution, RevisionResponse, SearchHit, SeoReport, SeoSuggestion,
+    TranslationRequestResponse, choice, describe, page_request, resolution, revision,
 };
 use crate::permissions::{
     CONTENT_PUBLISH, CONTENT_PUBLISH_OWN, CONTENT_READ, CONTENT_WRITE, CONTENT_WRITE_OWN,
@@ -206,6 +206,28 @@ pub(crate) struct RestoreInput {
     version: String,
 }
 
+/// What to search for.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SearchInput {
+    /// Words or a question, 1 to 200 characters.
+    q: String,
+    /// Language to search in, e.g. `vi`; omitted: the default language.
+    locale: Option<String>,
+    /// Results to return, 1 to 50. Defaults to 10.
+    limit: Option<u32>,
+}
+
+/// An entry to translate.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TranslateInput {
+    /// Id of the entry to translate.
+    id: Uuid,
+    /// The language to translate into, e.g. `vi`.
+    locale: String,
+}
+
 /// An address to look up.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -222,6 +244,8 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
         (service.clone(), service.clone(), service.clone(), service.clone(), service.clone());
     let (unpublish, revisions, restore, resolve, review) =
         (service.clone(), service.clone(), service.clone(), service.clone(), service.clone());
+    let (seo_check, seo_suggest) = (service.clone(), service.clone());
+    let (translate, translation, search) = (service.clone(), service.clone(), service.clone());
     vec![
         Tool::new(
             "list",
@@ -396,6 +420,89 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
         )
         .requires(CONTENT_WRITE)
         .or_requires(CONTENT_WRITE_OWN),
+        Tool::new(
+            "seo_check",
+            "Check the SEO of the draft of a post or page without AI: missing or too long title \
+             and description for search engines, images without alt text, skipped heading \
+             levels, duplicate titles, missing translations. Changes nothing.",
+            move |principal: Principal, input: EntryId| {
+                let service = seo_check.clone();
+                async move {
+                    let findings = service.seo_check(&principal, input.id).await?;
+                    Ok::<SeoReport, Error>(SeoReport::from(findings))
+                }
+            },
+        )
+        .requires(CONTENT_READ)
+        .read_only(),
+        Tool::new(
+            "suggest_seo",
+            "Ask the server's AI model to suggest a title and description for search engines, a \
+             summary and up to 5 existing categories or tags for a draft. Saves nothing: apply \
+             what you accept with `update`. Uses AI tokens.",
+            move |principal: Principal, input: EntryId| {
+                let service = seo_suggest.clone();
+                async move {
+                    let suggestion = service.suggest_seo(&principal, input.id).await?;
+                    Ok::<SeoSuggestion, Error>(suggestion.into())
+                }
+            },
+        )
+        .requires(CONTENT_WRITE)
+        .or_requires(CONTENT_WRITE_OWN),
+        Tool::new(
+            "translate",
+            "Ask the server's AI to translate a post or page into another configured language. \
+             Returns a request at once; a background job writes the translation's draft (never \
+             published, marked ai_generated) without overwriting changes made meanwhile. Check \
+             it with `get_translation_request`. Uses AI tokens.",
+            move |principal: Principal, input: TranslateInput| {
+                let service = translate.clone();
+                async move {
+                    let request =
+                        service.request_translation(&principal, input.id, &input.locale).await?;
+                    Ok::<TranslationRequestResponse, Error>(request.into())
+                }
+            },
+        )
+        .requires(CONTENT_WRITE)
+        .or_requires(CONTENT_WRITE_OWN),
+        Tool::new(
+            "get_translation_request",
+            "Get an AI translation request: `status` (queued, running, succeeded, failed), the \
+             translation's draft (`result_entry_id`) or why it failed (`error_code`).",
+            move |principal: Principal, input: EntryId| {
+                let service = translation.clone();
+                async move {
+                    let request = service.translation_request(&principal, input.id).await?;
+                    Ok::<TranslationRequestResponse, Error>(request.into())
+                }
+            },
+        )
+        .requires(CONTENT_READ)
+        .or_requires(CONTENT_WRITE_OWN)
+        .read_only(),
+        Tool::new(
+            "search",
+            "Search the posts and pages of one language (drafts included) by meaning and by \
+             words, best first, each with how it matched and the best passage. Good for finding \
+             related or duplicate content before writing.",
+            move |principal: Principal, input: SearchInput| {
+                let service = search.clone();
+                async move {
+                    let query = crate::semantic::SearchQuery {
+                        q: input.q,
+                        locale: input.locale,
+                        kind: None,
+                        limit: input.limit,
+                    };
+                    let hits = service.search(Some(&principal), &query, false).await?;
+                    Ok::<Vec<SearchHit>, Error>(hits.into_iter().map(SearchHit::from).collect())
+                }
+            },
+        )
+        .requires(CONTENT_READ)
+        .read_only(),
         Tool::new(
             "resolve",
             "Look up a public address in a language, as the website does: the published entry \

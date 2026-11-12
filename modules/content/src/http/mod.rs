@@ -3,6 +3,7 @@
 //! đăng ký qua `routes!` để có tài liệu OpenAPI (luật kiến trúc 6).
 
 mod actions;
+mod assist;
 mod entries;
 mod history;
 mod library;
@@ -27,6 +28,7 @@ use uuid::Uuid;
 
 use crate::service::ContentService;
 
+pub(crate) use assist::{SearchHit, SeoReport, SeoSuggestion, TranslationRequestResponse};
 pub(crate) use entries::{EntriesQuery, EntryResponse, describe};
 pub(crate) use history::{RevisionResponse, revision};
 pub(crate) use public::{Resolution, resolution};
@@ -40,6 +42,13 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(actions::archive_entry))
         .routes(routes!(actions::move_entry))
         .routes(routes!(actions::request_review, actions::withdraw_review))
+        .routes(routes!(assist::seo_check))
+        .routes(routes!(assist::seo_suggestions))
+        .routes(routes!(assist::translate))
+        .routes(routes!(assist::list_translation_requests))
+        .routes(routes!(assist::get_translation_request))
+        .routes(routes!(assist::search))
+        .routes(routes!(assist::public_search))
         .routes(routes!(links::create_translation))
         .routes(routes!(links::set_terms))
         .routes(routes!(links::set_authors))

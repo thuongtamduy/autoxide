@@ -27,5 +27,11 @@
   "content.preview_disabled": "Tính năng xem trước bản nháp đang tắt: máy chủ chưa cấu hình AUTOXIDE_CONTENT_PREVIEW_SECRET.",
   "content.preview_token_invalid": "Link xem trước không hợp lệ hoặc đã hết hạn. Hãy xin link mới.",
   "content.not_owner": "Mục này do người khác (hoặc một API key khác) tạo; quyền của bạn chỉ áp cho mục do chính bạn tạo.",
-  "content.ai_review_requires_human": "Chỉ một người đăng nhập (không phải API key) mới xác nhận được rằng nội dung do AI tạo đã được duyệt."
+  "content.ai_review_requires_human": "Chỉ một người đăng nhập (không phải API key) mới xác nhận được rằng nội dung do AI tạo đã được duyệt.",
+  "content.translation_in_progress": "Đã có một yêu cầu dịch mục này sang `{locale}` đang chờ hoặc đang chạy. Hãy đợi nó xong (`GET /api/v1/content/entries/{id}/translation-requests`).",
+  "content.translation_conflict": "Có người đã tạo hoặc sửa bản dịch trong lúc máy đang dịch; bản đó không bị ghi đè. Hãy yêu cầu dịch lại để thay.",
+  "content.translation_invalid": "Bản dịch của AI không giữ được cấu trúc bài, hai lần liền. Thử lại sau, hoặc dùng mô hình mạnh hơn.",
+  "content.translation_request_not_found": "Không có yêu cầu dịch `{id}`.",
+  "content.semantic_search_disabled": "Máy chủ này không mở tìm theo ý nghĩa cho người đọc (AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH). Hãy dùng `GET /api/v1/content/public/posts?q=`.",
+  "content.sign_in_required": "Cần đăng nhập để tìm trong bản nháp."
 }

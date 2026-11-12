@@ -278,6 +278,7 @@ pub(crate) fn fields_of(snapshot: Snapshot) -> EntryFields {
         canonical_url: Some(snapshot.canonical_url),
         noindex: Some(snapshot.noindex),
         ai_generated: Some(snapshot.ai_generated),
+        translated_from: None,
     }
 }
 
