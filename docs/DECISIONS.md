@@ -3856,3 +3856,13 @@ Quyết định: như `media` (`media.clean_orphans`): job `files.clean_orphans`
 — ID của file cũng là tên nội dung), kiểm theo lô 200 ID trên kết nối ghi, xoá khoá không có
 dòng. Khoá dưới `files/` không phải UUID thì để nguyên, ghi cảnh báo. DEPLOY khuyên đặt
 lifecycle rule của S3 cho multipart upload dở (lớp thứ hai cho D-158).
+
+## D-161 · `webhooks`: chạy lại job gửi đã hỏng thì gửi lại thật — 2026-11-12 — agent quyết
+
+Đóng một việc để lại của D-158: `autoxide jobs retry` một job `webhooks.send` đã vào
+dead-letter queue không gửi gì — lần gửi đã `failed`, bên gửi chỉ gửi lần đang `pending`.
+
+Quyết định: job chạy với `attempt == 1` (lượt đầu, hay lượt đầu sau `jobs retry` đặt lại số lần
+thử) gặp lần gửi `failed` thì mở lại nó (`UPDATE … SET status = 'pending' WHERE status =
+'failed'`, có điều kiện) rồi gửi như thường. Lượt đầu bình thường luôn gặp lần gửi `pending`,
+nên điều kiện này chỉ khớp với lần chạy lại của người vận hành. Không thêm trạng thái hay cột mới.

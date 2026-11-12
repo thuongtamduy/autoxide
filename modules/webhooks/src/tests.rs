@@ -265,6 +265,12 @@ async fn het_lan_thu_hoac_endpoint_tat_thi_that_bai() {
         let failed = failed.unwrap().unwrap();
         assert_eq!(failed.status, "failed");
         assert!(failed.last_error.unwrap().contains("502"));
+        // Job chạy lại sau khi hỏng (`autoxide jobs retry` đặt lại số lần thử): lần gửi được mở
+        // lại và gửi thật (D-161). Bên nhận giờ trả 2xx.
+        setup.sender.run(&job(rows[0].id, 1)).await.unwrap();
+        let resent = delivery::Entity::find_by_id(rows[0].id).one(setup.database.read()).await;
+        assert_eq!(resent.unwrap().unwrap().status, "succeeded");
+        assert_eq!(receiver.requests.lock().unwrap().len(), 2);
 
         // Endpoint bị tắt: lần gửi còn chờ thất bại, không gửi đi.
         let off = EndpointChanges { disabled: Some(true), ..Default::default() };
@@ -272,7 +278,7 @@ async fn het_lan_thu_hoac_endpoint_tat_thi_that_bai() {
         setup.sender.run(&job(rows[1].id, 1)).await.unwrap();
         let skipped = delivery::Entity::find_by_id(rows[1].id).one(setup.database.read()).await;
         assert_eq!(skipped.unwrap().unwrap().status, "failed");
-        assert_eq!(receiver.requests.lock().unwrap().len(), 1);
+        assert_eq!(receiver.requests.lock().unwrap().len(), 2);
         // Endpoint tắt không nhận event mới.
         setup.fanout.handle(&event(DEMO_EVENT)).await.unwrap();
         assert_eq!(deliveries(&setup.database).await.len(), 2);

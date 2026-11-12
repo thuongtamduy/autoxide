@@ -17,6 +17,11 @@ endpoints are marked deprecated with a sunset date first.
   a day), such as an upload cut off between storing the content and saving its record (new
   migration).
 
+### Fixed
+
+- Webhooks: `autoxide jobs retry` on a failed `webhooks.send` job sends the delivery again
+  instead of doing nothing.
+
 ## [0.6.0] - 2026-11-12
 
 ### Changed

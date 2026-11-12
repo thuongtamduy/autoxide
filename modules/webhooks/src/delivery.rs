@@ -174,12 +174,18 @@ impl JobHandler for Sender {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         let input: Send = serde_json::from_value(job.payload.clone())
             .map_err(|error| Error::internal(format!("webhook job payload: {error}")))?;
-        let Some(row) =
+        let Some(mut row) =
             delivery::Entity::find_by_id(input.delivery_id).one(self.database.write()).await?
         else {
             // Endpoint đã bị xoá (cùng lịch sử gửi): không còn gì để gửi.
             return Ok(());
         };
+        // Lần gửi đã hỏng hẳn mà job chạy lại từ lần đầu: người vận hành vừa đưa job từ
+        // dead-letter queue về (`autoxide jobs retry`) — mở lại lần gửi rồi gửi thật (D-161).
+        // Lần đầu bình thường thì lần gửi luôn đang `pending`.
+        if row.status == STATUS_FAILED && job.attempt == 1 && self.reopen(&row).await? {
+            row.status = STATUS_PENDING.to_owned();
+        }
         if row.status != STATUS_PENDING {
             return Ok(());
         }
@@ -245,6 +251,20 @@ impl JobHandler for Sender {
 }
 
 impl Sender {
+    /// Lần gửi hỏng hẳn `row` thành `pending` lại; `false` nếu nó không còn `failed`.
+    async fn reopen(&self, row: &delivery::Model) -> Result<bool, Error> {
+        let reopened = delivery::Entity::update_many()
+            .col_expr(delivery::Column::Status, Expr::value(STATUS_PENDING))
+            .filter(delivery::Column::Id.eq(row.id))
+            .filter(delivery::Column::Status.eq(STATUS_FAILED))
+            .exec(self.database.write())
+            .await?;
+        if reopened.rows_affected == 1 {
+            tracing::info!(delivery_id = %row.id, "failed webhook delivery reopened by a job retry");
+        }
+        Ok(reopened.rows_affected == 1)
+    }
+
     /// Ghi kết quả của một lần thử.
     async fn finish(
         &self,
