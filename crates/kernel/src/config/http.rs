@@ -70,12 +70,22 @@ pub const RATE_LIMIT_BURST: Setting = Setting::new(
 
 pub const CLIENT_IP_HEADER: Setting = Setting::new(
     "AUTOXIDE_HTTP_CLIENT_IP_HEADER",
-    "Behind a reverse proxy, the header in which the proxy passes the client's address \
-     (for `X-Forwarded-For`, the last address is used). Set it only when every request goes \
-     through that proxy: clients can forge the header otherwise. When unset, the address of \
-     the connection is used.",
+    "Behind a reverse proxy, the header in which the proxy passes the client's address, \
+     usually `X-Forwarded-For`. Set it only when every request goes through your proxies: \
+     clients can forge the header otherwise. When unset, the address of the connection is \
+     used.",
 )
 .with_example("X-Forwarded-For");
+
+pub const TRUSTED_PROXY_COUNT: Setting = Setting::new(
+    "AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT",
+    "With AUTOXIDE_HTTP_CLIENT_IP_HEADER: how many of your own proxies a request passes \
+     before the API (1 to 10). Each adds an address at the end of the header; the client's is \
+     this many from the end. `1` for one reverse proxy; `2` for a CDN in front of a website \
+     server (such as Next.js) that calls the API and forwards the header. A wrong count makes \
+     every visitor look like one client, or lets clients choose their address.",
+)
+.with_default("1");
 
 /// Những origin (nguồn trang web) được trình duyệt cho gọi API.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -132,6 +142,8 @@ pub struct HttpConfig {
     pub api_docs: bool,
     pub metrics: bool,
     pub rate_limit: RateLimit,
+    /// Số proxy tin cậy đứng trước API (đọc địa chỉ thứ chừng này từ cuối header).
+    pub trusted_proxy_count: usize,
     /// Header chứa địa chỉ client do reverse proxy đặt; `None`: dùng địa chỉ kết nối.
     pub client_ip_header: Option<HeaderName>,
 }
@@ -163,6 +175,8 @@ impl HttpConfig {
         let per_minute =
             reader.get_with(&RATE_LIMIT_PER_MINUTE, |raw| parse_in_range(raw, 0u32, 1_000_000));
         let burst = reader.get_with(&RATE_LIMIT_BURST, |raw| parse_in_range(raw, 1u32, 1_000_000));
+        let trusted_proxy_count =
+            reader.get_with(&TRUSTED_PROXY_COUNT, |raw| parse_in_range(raw, 1usize, 10));
         let client_ip_header = reader.optional_with(&CLIENT_IP_HEADER, |raw| {
             HeaderName::try_from(raw.trim())
                 .map_err(|_| "must be an HTTP header name, like `X-Forwarded-For`".to_owned())
@@ -177,6 +191,7 @@ impl HttpConfig {
             api_docs: api_docs?,
             metrics: metrics?,
             rate_limit: RateLimit { per_minute: per_minute?, burst: burst? },
+            trusted_proxy_count: trusted_proxy_count?,
             client_ip_header: client_ip_header?,
         })
     }

@@ -2432,3 +2432,24 @@ Lý do: người lạ cài là chạy được, nhiều máy chủ đúng ngay; 
 khoá riêng cho từng module (endpoint chống spam trung lập của core và module kiểm token phải dùng
 chung một khoá); thêm tham số khoá vào `Modules::start` (đổi chữ ký mọi chỗ gọi, trong khi
 `provide` đã có sẵn).
+
+## D-108 · Địa chỉ client: đếm proxy tin cậy (`AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`), `ClientInfo` dùng chung — 2026-11-12 — agent quyết
+
+Bổ sung D-079. Bối cảnh: hàm lấy địa chỉ client nằm riêng trong rate limiter; chỉ đúng khi có
+đúng một proxy. Website server-side (Next.js) đứng sau CDN gọi API thì có hai, ba proxy, và
+mọi khách sẽ trông như một client.
+
+Quyết định:
+
+- Lớp HTTP `client::attach` giải địa chỉ **một lần** cho mỗi request; rate limiter và extractor
+  `autoxide_kernel::http::ClientInfo` (IP, user agent, `Origin`, `Referer`, cắt ở 1024 ký tự)
+  dùng chung kết quả đó.
+- Mọi dòng của header cấu hình gộp thành một danh sách theo thứ tự (RFC 9110); địa chỉ là phần
+  tử thứ `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` (1–10, mặc định 1) tính từ cuối. Mặc định 1 giữ
+  đúng hành vi của D-079 (phần tử cuối của dòng cuối). Danh sách ngắn hơn số proxy thì lấy
+  phần tử đầu; giá trị không phải IP thì dùng địa chỉ kết nối kèm cảnh báo trong log.
+- `docs/DEPLOY.md` có sơ đồ trình duyệt → CDN → máy chủ website → proxy → Autoxide.
+
+Đã cân nhắc: liệt kê dải địa chỉ proxy tin cậy (CIDR) — chắc hơn khi địa chỉ proxy cố định, nhưng
+CDN đổi dải địa chỉ thường xuyên; để sau. Tin header do website gửi kèm khi gọi bằng API key —
+hai cách cho cùng một việc (khảo sát 0.15), không làm.

@@ -87,6 +87,25 @@ echo 'AUTOXIDE_HTTP_CLIENT_IP_HEADER=X-Forwarded-For' >> .env
 docker compose up -d
 ```
 
+**Nhiều hơn một proxy.** Mỗi proxy thêm địa chỉ của bên kết nối tới nó vào cuối
+`X-Forwarded-For`; phần đứng trước là do client gửi và giả được. Đặt
+`AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` bằng số proxy của bạn mà một request đi qua (mặc định
+`1`). Trường hợp hay gặp là máy chủ website (như Next.js) gọi API thay cho khách, đứng sau
+CDN:
+
+```text
+trình duyệt ──▶ CDN ──▶ máy chủ website ──▶ Caddy ──▶ Autoxide
+                thêm     thêm địa chỉ        thêm địa chỉ
+                trình    CDN                 máy chủ website
+                duyệt
+X-Forwarded-For:  trình-duyệt, CDN, máy-chủ-website
+                  ▲ thứ 3 từ cuối → AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT=3
+```
+
+Máy chủ website phải chuyển tiếp `X-Forwarded-For` nó nhận được (và thêm địa chỉ CDN, như
+proxy vẫn làm); không thì mọi khách trông như một client. Không proxy nào của bạn được để
+internet gọi thẳng, không thì client tự chọn được địa chỉ của mình.
+
 Các biến cấu hình khác thêm cùng cách: mọi biến được liệt kê kèm giá trị mặc định trong
 [`.env.example`](../.env.example). Biến nào `compose.yml` chưa chuyển vào thì thêm dưới
 `environment:` của khối `x-autoxide`.
@@ -229,6 +248,7 @@ database mới.
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Ký access token; bắt buộc ở production, giống nhau trên mọi máy chủ |
 | `AUTOXIDE_SECRET_KEY` | Ký các token sống ngắn của mọi module; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database |
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Sau reverse proxy: header chứa địa chỉ client |
+| `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | Số proxy của bạn mà một request đi qua (mặc định `1`) |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Trang web ở origin khác được gọi API |
 | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` | Gửi mail (đặt lại mật khẩu, xác minh email) |
 | `AUTOXIDE_FILES_S3_BUCKET` và `AWS_…` | Lưu file trên S3 hay dịch vụ tương thích S3 |

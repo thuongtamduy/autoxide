@@ -234,7 +234,7 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 
 - [x] Khoá ký của kernel (`AUTOXIDE_SECRET_KEY`, dẫn khoá theo mục đích; không cấu hình thì sinh
       một lần và lưu trong database)
-- [ ] `ClientInfo` dùng chung (IP đã giải, user agent, `Origin`, `Referer`);
+- [x] `ClientInfo` dùng chung (IP đã giải, user agent, `Origin`, `Referer`);
       `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`
 - [ ] Băm IP (gộp tiền tố rồi HMAC; dạng `bucket` theo ngày và `fingerprint`)
 - [ ] `Throttle` lưu trong database, dùng chung; `auth` chuyển sang dùng
