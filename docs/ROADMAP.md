@@ -247,7 +247,7 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 - [x] `Actor` cho người lạ trên outbox
 - [x] `ResourceDirectory` trung lập; `content` đăng ký resolver
 - [x] `AUTOXIDE_HTTP_PUBLIC_URL`
-- [ ] Hợp đồng chung cho ba module: `docs/prompts/reader-input-contract.md`
+- [x] Hợp đồng chung cho ba module: `docs/prompts/reader-input-contract.md`
 
 ## 19. Module `forms` — biểu mẫu (chủ dự án giao ngày 12/11/2026, D-106)
 
