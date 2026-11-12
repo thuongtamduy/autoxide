@@ -9,8 +9,9 @@ Khảo sát, nguồn và chi tiết khuyến nghị (cấu hình, mã lỗi, tes
 `docs/research/forms-newsletter-comments.md` — đọc mục "Khuyến nghị cho Autoxide" trước khi làm. Đề bài mô tả **cái cần có và các
 ràng buộc**; tên hàm, cách chia file, chi tiết migration do agent quyết. Chỗ nào đề bài mâu thuẫn
 với code thật hoặc với `CLAUDE.md` thì `CLAUDE.md` thắng — dừng lại, ghi quyết định mới, không
-lặng lẽ làm khác. Đề bài viết khi `main` ở commit `1e78589` (quyết định mới nhất D-095) và đang
-có người gộp module `content` vào; tên và số cụ thể có thể đã đổi — đọc code thật trước.
+lặng lẽ làm khác. Đề bài viết khi `main` ở commit `1e78589` (quyết định mới nhất lúc đó là D-095). Từ đó
+`main` đã có thêm module `content` (bước 17, quyết định D-096 … D-105; số D-0xx trong đề bài này
+đã khớp với `main`), nên tên và số cụ thể có thể đã đổi tiếp — đọc code thật trước.
 
 ---
 

@@ -11,10 +11,11 @@ Ngày viết: 12/11/2026. Trạng thái thật luôn lấy từ `main` của rep
 | Cần biết | Xem ở |
 |---|---|
 | Hợp đồng API (endpoint, kiểu dữ liệu, lỗi, permission) | `docs/openapi.json` (sinh từ code, gate kiểm luôn khớp); máy chủ phục vụ ở `/api/v1/openapi.json` |
-| Stack giao diện đã chốt | Quyết định "Stack của dự án giao diện" trong `docs/DECISIONS.md` (lúc viết là D-086 trên nhánh đề bài; số có thể đổi sau khi gộp vào `main`) |
+| Stack giao diện đã chốt | Quyết định "Stack của dự án giao diện" trong `docs/DECISIONS.md` (D-097) |
 | Thiết kế `content` | `docs/prompts/step-17-content.md` + `docs/research/content.md` |
 | Thiết kế `forms`, `newsletter`, `comments` | `docs/prompts/forms-newsletter-comments.md` + `docs/research/forms-newsletter-comments.md` |
 | Thư viện media | `docs/MEDIA.md` |
+| Nội dung (`content`) | `docs/CONTENT.md` |
 | Cài đặt, chạy core cục bộ | `docs/DEPLOY.md` |
 
 **Stack đã chốt** (tóm tắt): TypeScript strict; pnpm workspaces + Turborepo; Biome; SDK sinh từ
@@ -33,12 +34,11 @@ core.
 | Audit log, webhook | **Dùng được** | |
 | `files` (kho file riêng tư) | **Dùng được** | |
 | `media` (thư viện ảnh / video / tài liệu: thư mục, nhãn, ảnh thu nhỏ, thùng rác, công khai / riêng tư) | **Dùng được** | `/api/v1/media/…` |
-| `content` (bài viết, trang có cấp cha con, danh mục, thẻ, menu, phiên bản, đa ngôn ngữ, SEO, xem trước, chuyển hướng) | **Đang làm** | Thiết kế đã chốt; tên endpoint có thể đổi khi làm |
+| `content` (bài viết, trang có cấp cha con, danh mục, thẻ, menu, phiên bản, đa ngôn ngữ, SEO, xem trước, chuyển hướng) | **Dùng được** | `/api/v1/content/…`; endpoint công khai cho website dưới `/api/v1/content/public/…` |
 | `forms`, `newsletter`, `comments` | **Thiết kế xong, chưa làm** | Làm sau `content` |
 
 Làm được **ngay**: khung repo, SDK, BFF + đăng nhập, quản trị tài khoản / role / API key, thư viện
-media. Phần `content` có thể dựng giao diện trước bằng dữ liệu giả (MSW) theo thiết kế, nhưng phải
-sinh lại SDK và sửa khi API thật ra.
+media, nội dung (`content`: trang quản trị lẫn website).
 
 ## 3. Quy ước chung phía giao diện phải theo
 
@@ -74,12 +74,13 @@ kích thước / ngày; tải lên (thân request là **nội dung thô**, khôn
 xoá hẳn); công khai / riêng tư; ảnh thu nhỏ lấy bằng `?w=`; video / PDF tải theo `Range`. Hộp chọn
 ảnh dùng lại cho `content`.
 
-### `content` (khi API ra)
+### `content` (làm được ngay — hướng dẫn `docs/CONTENT.md`)
 
 **Trang quản trị**
 
-- Trình soạn Tiptap **chỉ bật đúng các node / mark máy chủ cho phép** (danh sách trong đề bài
-  `content`, mục "Thân bài" — chốt cùng phía core; máy chủ từ chối node lạ). Ảnh trong bài là node
+- Trình soạn Tiptap **chỉ bật đúng các node / mark máy chủ cho phép** (danh sách ở
+  `docs/CONTENT.md` mục "The model", kiểu `BodyNode` trong `docs/openapi.json`; máy chủ từ chối
+  node lạ). Ảnh trong bài là node
   `image` mang `mediaId`, **không có `src`**; nhúng video chỉ host được phép.
 - Nháp / đăng / gỡ / lưu trữ; hẹn giờ đăng và gỡ; lịch sử phiên bản + khôi phục (tạo nháp mới).
 - Cây trang: chọn trang cha, kéo thả để **chuyển nhánh** (thao tác `move` riêng); hiện đường dẫn do
@@ -94,8 +95,10 @@ xoá hẳn); công khai / riêng tư; ảnh thu nhỏ lấy bằng `?w=`; video 
   (301) / trả 410 / 404. **Không tự ghép đường dẫn**: máy chủ tính `path`, website chỉ thêm tên miền
   và tiền tố ngôn ngữ.
 - Không fallback ngôn ngữ: thiếu bản dịch là 404 (máy chủ trả danh sách bản dịch đang có để gợi ý).
-- Xem trước: route handler nhận preview token, bật Draft Mode, đọc bản nháp; chuyển hướng tới
-  đường dẫn **lấy từ máy chủ**, không lấy từ query string (tránh open redirect).
+- Xem trước: route handler nhận preview token, bật Draft Mode, đọc bản nháp qua
+  `GET /api/v1/content/public/preview?token=…`. Bản nháp chưa đăng lần nào thì chưa có `path`:
+  hiển thị ở một route xem trước cố định; đường dẫn chuyển tới (nếu có) **lấy từ máy chủ**, không
+  lấy từ query string (tránh open redirect).
 - Làm mới cache: route nhận webhook của core, **kiểm chữ ký Standard Webhooks**, gọi
   `revalidateTag` / `revalidatePath` theo `path` mới **và mọi `path` cũ** trong payload (đổi slug
   trang cha thì trang con cũng đổi).
@@ -125,7 +128,7 @@ xoá hẳn); công khai / riêng tư; ảnh thu nhỏ lấy bằng `?w=`; video 
 
 | Việc | Vì sao |
 |---|---|
-| Danh sách node / mark Tiptap được phép | Máy chủ kiểm và từ chối node lạ; hai bên phải giống nhau |
+| Danh sách node / mark Tiptap được phép | Phía core đã chốt (`docs/CONTENT.md`, `BodyNode` trong `docs/openapi.json`); trình soạn phải bật đúng danh sách đó |
 | Quy ước cache tag cho `revalidateTag` | Payload webhook mang đủ dữ liệu; tên tag do website đặt, nên ghi lại một chỗ |
 | Tiền tố ngôn ngữ và tiền tố bài viết trên URL (`/vi/…`, `/blog/…`) | Máy chủ tính `path` theo cấu hình `AUTOXIDE_CONTENT_POST_PATH_PREFIX` |
 | `AUTOXIDE_HTTP_CORS_ORIGINS`, số proxy tin cậy (CDN → Next.js → API) | Sai số proxy thì rate limiting và chống spam đếm sai IP |
