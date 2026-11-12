@@ -5,6 +5,7 @@
 //! Nội dung được dựng dần ở bước 1 của `docs/ROADMAP.md`.
 
 pub mod access;
+mod builtin;
 pub mod config;
 pub mod database;
 pub mod error;
@@ -23,6 +24,7 @@ pub mod pagination;
 pub mod privacy;
 pub mod response;
 pub mod search;
+pub mod secret;
 pub mod storage;
 pub mod telemetry;
 pub mod tls;

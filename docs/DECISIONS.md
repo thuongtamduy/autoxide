@@ -2403,3 +2403,32 @@ Quyết định (chủ dự án, ngày 12/11/2026):
 Không làm ở đợt này: tải file kèm bài gửi form, email tự trả lời người gửi form, form nhiều
 bước, thanh toán, đo lượt mở / bấm link, trình soạn email kéo thả, reaction / vote, đăng nhập
 mạng xã hội, phát hiện nội dung độc hại bằng AI, kết nối riêng từng nhà cung cấp email.
+
+## D-107 · Khoá ký của kernel: `AUTOXIDE_SECRET_KEY`, không đặt thì sinh một lần và lưu database; module nội bộ `kernel` — 2026-11-12 — agent quyết
+
+Bối cảnh: token form, đề chống spam, băm IP cần một khoá HMAC mà module nghiệp vụ lấy được
+không qua `auth` (D-046). Khảo sát đề xuất "không đặt thì sinh ngẫu nhiên lúc khởi động" như
+`AUTOXIDE_AUTH_TOKEN_SECRET`; đề bài chọn lưu database để khởi động lại và nhiều máy chủ vẫn
+dùng chung khoá mà người cài không phải cấu hình gì.
+
+Quyết định:
+
+- `autoxide_kernel::secret::SecretKey`: khoá gốc là `AUTOXIDE_SECRET_KEY` (ít nhất 32 ký tự)
+  nếu có; không thì đọc dòng `signing_key` của bảng `kernel_secrets`, chưa có thì sinh 48 byte
+  ngẫu nhiên và chèn bằng `ON CONFLICT DO NOTHING` rồi đọc lại (hai máy chủ khởi động cùng lúc
+  vẫn ra một khoá). Đọc database nhiều nhất một lần mỗi process.
+- Module không dùng khoá gốc: `derive(purpose)` = HMAC-SHA256(khoá gốc, nhãn mục đích), 32 byte.
+- Bảng `kernel_secrets` thuộc **module nội bộ `kernel`**, mà `Modules::new` luôn thêm vào đầu
+  danh sách; tên `kernel` dành riêng. Module này công bố `SecretKey` qua `provide`; module khác
+  lấy bằng `context.require::<SecretKey>()`. Nhờ là một module bình thường, luật sở hữu bảng,
+  `migrate`, `backup` / `restore` / `copy` áp cho nó không cần code riêng (khoá đi theo backup).
+- `random_token` và `sha256` có bản trong kernel (`secret`); `auth` chuyển sang dùng ở bước token
+  dùng một lần.
+- Không thứ gì sống lâu được phụ thuộc khoá này.
+
+Lý do: người lạ cài là chạy được, nhiều máy chủ đúng ngay; không thêm cấu hình bắt buộc.
+
+Đã cân nhắc: sinh lúc khởi động (token form hỏng khi khởi động lại và giữa các máy chủ); bảng
+khoá riêng cho từng module (endpoint chống spam trung lập của core và module kiểm token phải dùng
+chung một khoá); thêm tham số khoá vào `Modules::start` (đổi chữ ký mọi chỗ gọi, trong khi
+`provide` đã có sẵn).

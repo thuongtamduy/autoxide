@@ -336,9 +336,22 @@ pub struct Modules {
 impl Modules {
     /// Kiểm tên rồi nhận các module. Tên sai là lỗi của người viết module, báo
     /// ngay lúc khởi động.
+    ///
+    /// Module nội bộ `kernel` (bảng dùng chung của chương trình, vd khoá ký) luôn được thêm
+    /// vào đầu danh sách: module nào cũng `require` được thứ nó công bố.
     pub fn new(modules: Vec<Box<dyn Module>>) -> Result<Self, ModuleError> {
+        let mut problems = Vec::new();
+        if modules.iter().any(|module| module.name() == crate::builtin::NAME) {
+            problems.push(format!(
+                "module name `{}` is reserved for the kernel's own tables",
+                crate::builtin::NAME
+            ));
+        }
+        let mut all: Vec<Box<dyn Module>> = vec![Box::new(crate::builtin::KernelModule::default())];
+        all.extend(modules);
+        let modules = all;
         let names: Vec<&str> = modules.iter().map(|module| module.name()).collect();
-        let mut problems = module_name_problems(&names);
+        problems.extend(module_name_problems(&names));
         let declared = modules.iter().map(|module| (module.name(), module.permissions())).collect();
         let permissions = PermissionCatalog::new(declared).unwrap_or_else(|errors| {
             problems.extend(errors);
@@ -381,7 +394,8 @@ impl Modules {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.modules.is_empty()
+        // Module nội bộ `kernel` luôn có, không tính.
+        self.modules.len() <= 1
     }
 
     /// Cho từng module đọc cấu hình của nó. Module nào sai cũng không chặn module
@@ -719,9 +733,9 @@ mod tests {
     #[test]
     fn giu_thu_tu_dang_ky() {
         let modules = Modules::new(bare(&["notes", "auth", "tags"])).unwrap();
-        assert_eq!(modules.names(), ["notes", "auth", "tags"]);
+        assert_eq!(modules.names(), ["kernel", "notes", "auth", "tags"]);
         assert!(!modules.is_empty());
-        assert_eq!(format!("{modules:?}"), r#"Modules(["notes", "auth", "tags"])"#);
+        assert_eq!(format!("{modules:?}"), r#"Modules(["kernel", "notes", "auth", "tags"])"#);
         assert!(Modules::new(Vec::new()).unwrap().is_empty());
     }
 
@@ -794,7 +808,9 @@ mod tests {
         let mut modules = Modules::new(bare(&["auth"])).unwrap();
 
         assert_eq!(modules.configure(&mut reader), Ok(()));
-        assert!(reader.values().is_empty());
+        // Chỉ biến của module nội bộ `kernel`.
+        let names: Vec<&str> = reader.values().iter().map(|value| value.setting.name).collect();
+        assert_eq!(names, ["AUTOXIDE_SECRET_KEY"]);
         assert!(modules.migrator().is_ok());
     }
 }

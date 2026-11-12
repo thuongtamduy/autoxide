@@ -232,7 +232,7 @@ khảo sát: [`docs/research/content.md`](research/content.md).
 giai đoạn 0; khảo sát: [`docs/research/forms-newsletter-comments.md`](research/forms-newsletter-comments.md).
 Mỗi mục một commit, gate xanh trên cả hai database.
 
-- [ ] Khoá ký của kernel (`AUTOXIDE_SECRET_KEY`, dẫn khoá theo mục đích; không cấu hình thì sinh
+- [x] Khoá ký của kernel (`AUTOXIDE_SECRET_KEY`, dẫn khoá theo mục đích; không cấu hình thì sinh
       một lần và lưu trong database)
 - [ ] `ClientInfo` dùng chung (IP đã giải, user agent, `Origin`, `Referer`);
       `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`

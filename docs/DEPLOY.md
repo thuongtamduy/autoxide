@@ -227,6 +227,7 @@ into a new database.
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (default) or `postgres://user:password@host:5432/db` |
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Signs access tokens; required in production, the same on every server |
+| `AUTOXIDE_SECRET_KEY` | Signs short-lived tokens of every module; optional: when unset, one is generated once and kept in the database |
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Behind a reverse proxy: the header with the client address |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Web pages on other origins allowed to call the API |
 | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` | Send mail (password reset, email verification) |

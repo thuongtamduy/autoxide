@@ -176,8 +176,8 @@ mod tests {
 
             assert_eq!(
                 error,
-                "1 migration has not been applied to the database: notes/m0001_create_note; run \
-                 `autoxide migrate up` first"
+                "2 migrations have not been applied to the database: kernel/m0001_create_secrets, \
+                 notes/m0001_create_note; run `autoxide migrate up` first"
             );
         })
         .await
@@ -254,8 +254,13 @@ mod tests {
                 ("DATABASE_URL", database.url()),
                 ("AUTOXIDE_HTTP_ADDRESS", address.as_str()),
             ]);
-            // Không module nào: không có migration chờ, lỗi duy nhất là port.
+            // Không module nghiệp vụ nào, migration của module nội bộ `kernel` đã chạy: không có
+            // migration chờ, lỗi duy nhất là port.
             let settings = settings::read_with(&source, Vec::new()).unwrap();
+            let db = autoxide_kernel::database::Database::connect(&settings.config.database)
+                .await
+                .unwrap();
+            settings.modules.migrator().unwrap().up(&db).await.unwrap();
 
             let error = serve(settings, std::future::ready(())).await.unwrap_err();
 
