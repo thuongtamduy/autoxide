@@ -9,8 +9,23 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-12
+
 ### Added
 
+- Shared building blocks for anything the public sends (used by forms, newsletters and
+  comments): a signing key for the whole server (`AUTOXIDE_SECRET_KEY`, optional — generated
+  once and kept in the database when unset); form tokens from
+  `GET /api/v1/antispam/token?scope=…` with a trap field, a minimum fill time, rate limits by
+  hashed IP and email, and an optional ALTCHA proof-of-work challenge
+  (`AUTOXIDE_ANTISPAM_*`, off by default); `AUTOXIDE_HTTP_PUBLIC_URL` for absolute links in
+  mail; `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` for a CDN in front of a website server in front
+  of the API. Raw IP addresses are never stored, only keyed hashes.
+- Mail: `Reply-To`, `List-Unsubscribe` and `List-Unsubscribe-Post` headers, a key that stops
+  the same mail from being queued twice, and an event `mail.delivery_failed` when the
+  receiving server refuses a mail for good.
+- The audit log (`actor_kind`) and webhooks (`data.actor.kind`) tell apart changes made by
+  the system, by a user, and by an anonymous visitor (`public`).
 - Comments (`/api/v1/comments`, guide in `docs/COMMENTS.md`): two-level comments on any
   allowed target type (checked through the resource directory, e.g. `content.entry`), from
   signed-in users with a display name of their own or from guests (optional) with an edit
@@ -138,6 +153,14 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Changed
 
+- Two built-in modules, `kernel` and `antispam`, are always registered: `autoxide migrate`
+  lists them and creates their tables. The login throttle and the password reset and email
+  verification tokens of `auth` move to shared tables during `autoxide migrate`; links in
+  mails already sent keep working.
+- With `AUTOXIDE_HTTP_CLIENT_IP_HEADER`, the client address is read
+  `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` entries from the end of the header, across all its
+  lines (the default `1` keeps the previous behaviour).
+- A mail refused for good by the receiving server (SMTP `5xx`) is no longer retried.
 - Deleting a post or page needs the new permission `content.delete`; `content.publish` no
   longer includes it. The `admin` role has every permission, as before; give
   `content.delete` to other roles that should delete.
@@ -201,5 +224,6 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/thuongtamduy/autoxide/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/thuongtamduy/autoxide/releases/tag/v0.1.0
