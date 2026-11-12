@@ -42,7 +42,10 @@ impl Module for Notes {
     }
 
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        vec![outbox_migration("m0001_create_events", "notes")]
+        vec![
+            outbox_migration("m0001_create_events", "notes"),
+            autoxide_kernel::event::outbox_actor_migration("m0002_add_event_actor", "notes"),
+        ]
     }
 
     fn events(&self) -> Vec<EventInfo> {
@@ -146,6 +149,31 @@ async fn event_chi_ton_tai_khi_transaction_commit_roi_duoc_giao_mot_lan() {
         assert_eq!(seen[0].actor, Actor::user(Uuid::nil()));
         assert_eq!(seen[0].subject.as_deref(), Some("notes.note:first"));
         assert_eq!(seen[0].payload, serde_json::json!({"title": "first"}));
+    })
+    .await
+    .unwrap();
+}
+
+/// Event do người lạ gây ra giữ loại người thực hiện qua outbox: khác hệ thống.
+#[tokio::test]
+async fn nguoi_la_khac_he_thong() {
+    TestDatabase::run(async |test| {
+        let recorder = Arc::new(Recorder::default());
+        let listener = Listener { event: "notes.note_created", recorder: recorder.clone() };
+        let setup = setup(test, listener).await;
+        for actor in [Actor::public(), Actor::system()] {
+            let transaction = setup.database.begin_write().await.unwrap();
+            let event = NoteCreated { title: actor.kind().to_owned() };
+            setup.outbox.record(&transaction, actor, None, &event).await.unwrap();
+            transaction.commit().await.unwrap();
+        }
+        let dispatcher = setup.modules.dispatcher(&setup.database).unwrap();
+        assert_eq!(dispatcher.run_once().await.unwrap(), 2);
+        let seen = recorder.seen.lock().unwrap();
+        let kinds: Vec<(&str, bool)> =
+            seen.iter().map(|event| (event.actor.kind(), event.actor.public)).collect();
+        assert_eq!(kinds, [("public", true), ("system", false)]);
+        assert_eq!(Actor::user(Uuid::nil()).kind(), "user");
     })
     .await
     .unwrap();

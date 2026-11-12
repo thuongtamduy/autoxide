@@ -44,5 +44,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0017_fold_user_search::Migration),
         Box::new(m0018_move_login_throttle::Migration),
         Box::new(m0019_move_tokens::Migration),
+        // Cột `actor_kind` của bảng `auth_events` (người lạ khác hệ thống, D-116).
+        autoxide_kernel::event::outbox_actor_migration("m0020_add_event_actor", "auth"),
     ]
 }

@@ -2593,3 +2593,23 @@ Quyết định:
   webhook như mọi event.
 - Không làm `send_batch` (khảo sát gợi ý): chưa module nào cần gửi một lần nhiều mail; bản tin
   xếp từng mail vào hàng đợi theo lô của nó.
+
+## D-116 · Người thực hiện "người lạ" (`Actor::public`), cột `actor_kind` trong outbox và audit — 2026-11-12 — agent quyết
+
+Bối cảnh: event do người lạ gây ra (gửi form, đăng ký bản tin, bình luận của khách) trước đây
+chỉ ghi được như hệ thống (`actor_user_id` trống) — audit không phân biệt được.
+
+Quyết định:
+
+- `Actor` thêm `public: bool` (mặc định `false`), `Actor::public()`, `Actor::kind()` →
+  `system` / `user` / `public`.
+- Kernel thêm `event::outbox_actor_migration(name, module)`: cột `actor_kind` (chữ, có thể
+  trống) trong `<module>_events`; outbox ghi nó, bộ phát đọc lại. Mọi module có outbox thêm
+  migration này (auth m0020, notes m0003, mail m0003, media m0006, content m0004, files m0003,
+  webhooks m0004); module mới thêm ngay sau `outbox_migration`. Không sửa `outbox_migration` vì
+  migration đã chạy thì không đổi được.
+- `audit_entry` thêm cột `actor_kind` (m0002); `GET /api/v1/audit` trả `actor_kind` (dòng cũ hiểu
+  theo `actor_user_id`). Webhook gửi `data.actor.kind`.
+
+Đã cân nhắc: một UUID đặc biệt trong `actor_user_id` thay cho cột mới — rẻ hơn nhưng là giá trị
+"thần kỳ", người đọc audit dễ hiểu nhầm là một người dùng.

@@ -14918,6 +14918,7 @@
           "id",
           "module",
           "action",
+          "actor_kind",
           "occurred_at",
           "recorded_at"
         ],
@@ -14934,6 +14935,11 @@
             ],
             "format": "uuid",
             "description": "API key used, when the change was made with one."
+          },
+          "actor_kind": {
+            "type": "string",
+            "description": "Who made the change: `user` (a signed-in user or API key), `system` (command line,\nbackground jobs) or `public` (someone not signed in, such as a visitor sending a form).",
+            "example": "user"
           },
           "actor_user_id": {
             "type": [
@@ -15458,6 +15464,7 @@
               "id",
               "module",
               "action",
+              "actor_kind",
               "occurred_at",
               "recorded_at"
             ],
@@ -15474,6 +15481,11 @@
                 ],
                 "format": "uuid",
                 "description": "API key used, when the change was made with one."
+              },
+              "actor_kind": {
+                "type": "string",
+                "description": "Who made the change: `user` (a signed-in user or API key), `system` (command line,\nbackground jobs) or `public` (someone not signed in, such as a visitor sending a form).",
+                "example": "user"
               },
               "actor_user_id": {
                 "type": [
@@ -18903,6 +18915,7 @@
                 "id",
                 "module",
                 "action",
+                "actor_kind",
                 "occurred_at",
                 "recorded_at"
               ],
@@ -18919,6 +18932,11 @@
                   ],
                   "format": "uuid",
                   "description": "API key used, when the change was made with one."
+                },
+                "actor_kind": {
+                  "type": "string",
+                  "description": "Who made the change: `user` (a signed-in user or API key), `system` (command line,\nbackground jobs) or `public` (someone not signed in, such as a visitor sending a form).",
+                  "example": "user"
                 },
                 "actor_user_id": {
                   "type": [

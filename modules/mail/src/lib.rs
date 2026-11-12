@@ -50,6 +50,7 @@ impl Module for MailModule {
             autoxide_kernel::job::jobs_migration("m0001_create_jobs", "mail"),
             // Bảng `mail_events` (outbox) cho event mail bị từ chối hẳn.
             autoxide_kernel::event::outbox_migration("m0002_create_events", "mail"),
+            autoxide_kernel::event::outbox_actor_migration("m0003_add_event_actor", "mail"),
         ]
     }
 

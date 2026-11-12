@@ -74,3 +74,47 @@ impl MigrationTrait for OutboxMigration {
         manager.drop_table(Table::drop().table(Alias::new(&table)).to_owned()).await
     }
 }
+
+/// Migration thêm cột `actor_kind` (`system` / `user` / `public`) vào bảng `<module>_events`, để
+/// event do người lạ gây ra (gửi form, đăng ký bản tin…) phân biệt được với event của hệ thống
+/// (D-116). Module phát event thêm nó NGAY SAU [`outbox_migration`] (module mới) hoặc như
+/// migration kế tiếp (module có sẵn). Dòng cũ không có giá trị: đọc ra là `system` / `user`
+/// theo `actor_user_id`.
+pub fn outbox_actor_migration(name: &'static str, module: &'static str) -> Box<dyn MigrationTrait> {
+    Box::new(ActorKindMigration { name, module })
+}
+
+struct ActorKindMigration {
+    name: &'static str,
+    module: &'static str,
+}
+
+impl MigrationName for ActorKindMigration {
+    fn name(&self) -> &str {
+        self.name
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for ActorKindMigration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let table = super::table_name(self.module);
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new(&table))
+                    .add_column(schema::string_len_null("actor_kind", 16))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        let table = super::table_name(self.module);
+        manager
+            .alter_table(
+                Table::alter().table(Alias::new(&table)).drop_column("actor_kind").to_owned(),
+            )
+            .await
+    }
+}

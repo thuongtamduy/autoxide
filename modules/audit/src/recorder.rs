@@ -33,6 +33,7 @@ impl EventHandler for Recorder {
             action: Set(event.name.clone()),
             actor_user_id: Set(event.actor.user_id),
             actor_api_key_id: Set(event.actor.api_key_id),
+            actor_kind: Set(Some(event.actor.kind().to_owned())),
             subject: Set(event.subject.clone()),
             before: Set(before),
             after: Set(after),
@@ -133,6 +134,7 @@ mod database_tests {
             assert_eq!(row.id, event.id);
             assert_eq!((row.module.as_str(), row.action.as_str()), ("notes", "notes.note_renamed"));
             assert_eq!(row.actor_user_id, Some(user));
+            assert_eq!(row.actor_kind.as_deref(), Some("user"));
             assert_eq!(row.subject.as_deref(), Some("notes.note:1"));
             assert_eq!(row.before.as_deref(), Some(r#"{"title":"a"}"#));
             assert_eq!(row.after.as_deref(), Some(r#"{"title":"b"}"#));

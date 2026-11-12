@@ -128,6 +128,7 @@ fn body(event: &Delivered) -> serde_json::Value {
             "actor": {
                 "user_id": event.actor.user_id,
                 "api_key_id": event.actor.api_key_id,
+                "kind": event.actor.kind(),
             },
             "payload": event.payload,
         },

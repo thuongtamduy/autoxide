@@ -127,6 +127,7 @@ impl Dispatcher {
                 "name",
                 "actor_user_id",
                 "actor_api_key_id",
+                "actor_kind",
                 "subject",
                 "payload",
                 "occurred_at",
@@ -257,6 +258,7 @@ fn read_event(module: &'static str, row: &QueryResult) -> Result<Delivered, Erro
         actor: Actor {
             user_id: row.try_get("", "actor_user_id")?,
             api_key_id: row.try_get("", "actor_api_key_id")?,
+            public: row.try_get::<Option<String>>("", "actor_kind")?.as_deref() == Some("public"),
         },
         subject: row.try_get("", "subject")?,
         payload: serde_json::from_str(&payload).map_err(Error::internal)?,

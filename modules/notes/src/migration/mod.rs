@@ -10,5 +10,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0001_create_note::Migration),
         // Bảng `notes_events` (transactional outbox), định nghĩa ở kernel.
         autoxide_kernel::event::outbox_migration("m0002_create_events", "notes"),
+        // Cột `actor_kind` của bảng `notes_events` (người lạ khác hệ thống, D-116).
+        autoxide_kernel::event::outbox_actor_migration("m0003_add_event_actor", "notes"),
     ]
 }
