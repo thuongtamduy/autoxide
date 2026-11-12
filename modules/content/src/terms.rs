@@ -410,12 +410,13 @@ impl ContentService {
         entry_id: Uuid,
         term_ids: Vec<Uuid>,
     ) -> Result<Vec<Uuid>, Error> {
-        principal.require(&crate::permissions::CONTENT_WRITE)?;
+        crate::permissions::require_create(principal)?;
         let entry = self.get(principal, entry_id).await?;
+        crate::permissions::require_write(principal, &entry)?;
         // Gắn có hiệu lực ngay cả trên bản công khai: như mọi thay đổi người đọc thấy, mục
         // đang công khai thì cần quyền đăng.
         if crate::entries::Status::of(&entry) == crate::entries::Status::Published {
-            principal.require(&crate::permissions::CONTENT_PUBLISH)?;
+            crate::permissions::require_publish(principal, &entry)?;
         }
         let mut ids: Vec<Uuid> = Vec::new();
         for id in term_ids {

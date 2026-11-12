@@ -11,6 +11,15 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- AI agents may be limited to their own work: permissions `content.write_own` and
+  `content.publish_own` (only entries created by the same user with the same API key), review
+  requests (`POST/DELETE /api/v1/content/entries/{id}/request-review`, events
+  `content.review_requested` / `content.review_withdrawn`, MCP tool `content.request_review`),
+  `ai_generated` on entries and `ai_reviewed` on the published version (only a signed-in person
+  can confirm a review), `created_via` in the admin API. MCP tools may accept an alternative
+  permission. Requests made with an API key are rate limited per key
+  (`AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE`, `…_BURST`).
+
 - Content (`/api/v1/content`, guide in `docs/CONTENT.md`): posts and pages with a draft kept
   apart from the published version, a JSON body (ProseMirror / Tiptap) checked against an
   allowlist, slugs made from titles (`Đường đến Đà Lạt` → `duong-den-da-lat`), revisions with
@@ -65,6 +74,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Changed
 
+- Deleting a post or page needs the new permission `content.delete`; `content.publish` no
+  longer includes it. The `admin` role has every permission, as before; give
+  `content.delete` to other roles that should delete.
 - Validation reports every problem of a request at once (for example a bad email and an
   empty name together). Webhook endpoints report a non-`https` address or an unknown event
   as field errors (`url`, `events[i]`) like roles and API keys do.

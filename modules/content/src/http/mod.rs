@@ -39,6 +39,7 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(actions::unpublish_entry))
         .routes(routes!(actions::archive_entry))
         .routes(routes!(actions::move_entry))
+        .routes(routes!(actions::request_review, actions::withdraw_review))
         .routes(routes!(links::create_translation))
         .routes(routes!(links::set_terms))
         .routes(routes!(links::set_authors))

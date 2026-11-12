@@ -5893,7 +5893,7 @@
           "content"
         ],
         "summary": "Create a post or page as a draft.",
-        "description": "Requires `content.write`. An empty or missing `slug` is made from the title (`-2`, `-3`…\nare added when taken). Retry safely with an `Idempotency-Key` header.",
+        "description": "Requires `content.write` or `content.write_own`. An empty or missing `slug` is made from the\ntitle (`-2`, `-3`… are added when taken). Retry safely with an `Idempotency-Key` header.",
         "operationId": "content_create_content_entry",
         "parameters": [
           {
@@ -5962,7 +5962,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -6112,7 +6112,7 @@
           "content"
         ],
         "summary": "Delete a post or page.",
-        "description": "Requires `content.publish`. Its revisions and schedules go too. A page with subpages\ncannot be deleted. If it was published, its address answers 410. `If-Match` is required.",
+        "description": "Requires `content.delete`. Its revisions and schedules go too. A page with subpages\ncannot be deleted. If it was published, its address answers 410. `If-Match` is required.",
         "operationId": "content_delete_content_entry",
         "parameters": [
           {
@@ -6175,7 +6175,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.publish`; code `permission_denied`.",
+            "description": "Missing permission `content.delete`; code `permission_denied`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6246,7 +6246,7 @@
           "content"
         ],
         "summary": "Change the draft of a post or page.",
-        "description": "Requires `content.write`. A published entry keeps showing its published version until it\nis published again (`has_unpublished_changes` turns `true`). `If-Match` is required.",
+        "description": "Requires `content.write`, or `content.write_own` for an entry you created. A published entry\nkeeps showing its published version until it\nis published again (`has_unpublished_changes` turns `true`). `If-Match` is required.",
         "operationId": "content_update_content_entry",
         "parameters": [
           {
@@ -6334,7 +6334,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -6560,7 +6560,7 @@
           "content"
         ],
         "summary": "Set the authors of an entry.",
-        "description": "Requires `content.write`, and `content.publish` when the entry is published. Takes effect at\nonce, also for the published version.",
+        "description": "Requires `content.read` and `content.write` (or `content.write_own` for an entry you created),\nand `content.publish` (or `content.publish_own`) when the entry is published. Takes effect at\nonce, also for the published version.",
         "operationId": "content_set_content_entry_authors",
         "parameters": [
           {
@@ -6631,7 +6631,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write` (or `content.publish` for a published entry); code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -6684,7 +6684,7 @@
           "content"
         ],
         "summary": "Move a page under another parent.",
-        "description": "Requires `content.write`, and `content.publish` when the page is published. Takes effect\nat once for the draft and the published version: the page's address and those of its\nsubpages change, and the old ones redirect with 301. `If-Match` is required.",
+        "description": "Requires `content.write` (or `content.write_own` for a page you created), and `content.publish`\nwhen the page is published. Takes effect at once for the draft and the published version: the\npage's address and those of its subpages change, and the old ones redirect with 301. `If-Match`\nis required.",
         "operationId": "content_move_content_page",
         "parameters": [
           {
@@ -6764,7 +6764,7 @@
             }
           },
           "403": {
-            "description": "Missing permission; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`); or the page is published and you lack `content.publish`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6847,7 +6847,7 @@
           "content"
         ],
         "summary": "Make a preview link for the draft of an entry.",
-        "description": "Requires `content.write`. Anyone with the token can read the draft until it expires (10\nminutes by default).",
+        "description": "Requires `content.read` and `content.write` (or `content.write_own` for an entry you\ncreated). Anyone with the token can read the draft until it expires (10\nminutes by default).",
         "operationId": "content_create_content_preview_token",
         "parameters": [
           {
@@ -6908,7 +6908,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -6961,7 +6961,7 @@
           "content"
         ],
         "summary": "Publish a post or page.",
-        "description": "Requires `content.publish`. Copies the current draft to the published version, at an\naddress computed by the server (`/<post prefix>/<slug>` for posts, the parent's address\nplus the slug for pages). If the address changed, the old one (and those of published\nsubpages) redirect with 301. Every media item it uses must be public. `If-Match` is\nrequired. Retry safely with an `Idempotency-Key` header.",
+        "description": "Requires `content.publish`, or `content.publish_own` for an entry you created. Copies the\ncurrent draft to the published version, at an\naddress computed by the server (`/<post prefix>/<slug>` for posts, the parent's address\nplus the slug for pages). If the address changed, the old one (and those of published\nsubpages) redirect with 301. Every media item it uses must be public. `If-Match` is\nrequired. Retry safely with an `Idempotency-Key` header.",
         "operationId": "content_publish_content_entry",
         "parameters": [
           {
@@ -7050,7 +7050,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.publish`; code `permission_denied`.",
+            "description": "Missing permission `content.publish` (or `content.publish_own`; code `permission_denied`), the entry is not yours and you only have `content.publish_own` (code `content.not_owner`), or an API key sent `ai_reviewed` (code `content.ai_review_requires_human`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -7091,6 +7091,286 @@
           },
           "422": {
             "description": "A media item is missing (code `content.media_not_found`) or not public (code `content.media_not_public`); see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/content/entries/{id}/request-review": {
+      "post": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Ask for a review of the draft.",
+        "description": "Requires `content.write`, or `content.write_own` for an entry you created. Marks the draft as\nready for a person to review and publish (`review_requested_at`) and emits the event\n`content.review_requested`, which webhooks can forward to editors. The mark is cleared when\nthe entry is published or the request is withdrawn. Meant for AI agents that may write but\nnot publish. `If-Match` is required.",
+        "operationId": "content_request_content_review",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the entry.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` of the entry (or `*`). Done only if nobody changed the entry since; otherwise `412`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Review requested.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "New version of the entry."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EntryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No entry has this id; code `content.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The entry changed since you read it; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Withdraw a review request.",
+        "description": "Requires `content.write`, or `content.write_own` for an entry you created. Clears\n`review_requested_at` and emits `content.review_withdrawn`. `If-Match` is required.",
+        "operationId": "content_withdraw_content_review",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the entry.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` of the entry (or `*`). Done only if nobody changed the entry since; otherwise `412`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Review request withdrawn.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "New version of the entry."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EntryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No entry has this id; code `content.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The entry changed since you read it; code `precondition_failed`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7361,7 +7641,7 @@
           "content"
         ],
         "summary": "Copy a revision back into the draft.",
-        "description": "Requires `content.write`. Does not publish. Categories, tags, authors and the parent page\nare not part of revisions and stay as they are. `If-Match` is required.",
+        "description": "Requires `content.read`, and `content.write` (or `content.write_own` for an entry you\ncreated). Does not publish. Categories, tags, authors and the parent page\nare not part of revisions and stay as they are. `If-Match` is required.",
         "operationId": "content_restore_content_revision",
         "parameters": [
           {
@@ -7441,7 +7721,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write`; code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -7774,7 +8054,7 @@
           "content"
         ],
         "summary": "Set the categories and tags of an entry.",
-        "description": "Requires `content.write`, and `content.publish` when the entry is published. Takes effect at\nonce, also for the published version.",
+        "description": "Requires `content.read` and `content.write` (or `content.write_own` for an entry you created),\nand `content.publish` (or `content.publish_own`) when the entry is published. Takes effect at\nonce, also for the published version.",
         "operationId": "content_set_content_entry_terms",
         "parameters": [
           {
@@ -7845,7 +8125,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write` (or `content.publish` for a published entry); code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -7898,7 +8178,7 @@
           "content"
         ],
         "summary": "Translate a post or page.",
-        "description": "Requires `content.write`. Creates a new draft entry in `locale`, linked to this one\n(same `translation_group_id`), with its own slug and publishing. Fields not given are\ncopied from this entry. A page's translation goes under the translation of its parent.",
+        "description": "Requires `content.write`, or `content.write_own` when you created the original. Creates a new\ndraft entry in `locale`, linked to this one (same `translation_group_id`), with its own slug and\npublishing. Fields not given are copied from this entry. A page's translation goes under the\ntranslation of its parent.",
         "operationId": "content_create_content_translation",
         "parameters": [
           {
@@ -7977,7 +8257,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write` (or `content.publish` for a published entry); code `permission_denied`.",
+            "description": "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -8040,7 +8320,7 @@
           "content"
         ],
         "summary": "Take a post or page down.",
-        "description": "Requires `content.publish`. Readers no longer see it (its address answers 404); it is a\ndraft again and may be published later. A page with published subpages cannot be taken\ndown. `If-Match` is required.",
+        "description": "Requires `content.publish`, or `content.publish_own` for an entry you created. Readers no longer\nsee it (its address answers 404); it is a draft again and may be published later. A page with\npublished subpages cannot be taken down. `If-Match` is required.",
         "operationId": "content_unpublish_content_entry",
         "parameters": [
           {
@@ -8110,7 +8390,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.publish`; code `permission_denied`.",
+            "description": "Missing permission `content.publish` or `content.publish_own` (code `permission_denied`), or the entry is not yours and you only have `content.publish_own` (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -15748,12 +16028,18 @@
               "meta_description",
               "canonical_url",
               "noindex",
+              "ai_generated",
+              "created_via",
               "created_at",
               "updated_at",
               "term_ids",
               "author_ids"
             ],
             "properties": {
+              "ai_generated": {
+                "type": "boolean",
+                "description": "The content was generated by AI (set by the writer, or by the server when it translated\nthe entry). Shown to readers by the public endpoints."
+              },
               "author_ids": {
                 "type": "array",
                 "items": {
@@ -15784,6 +16070,11 @@
                   "null"
                 ],
                 "format": "uuid"
+              },
+              "created_via": {
+                "type": "string",
+                "description": "How the entry was created: `session` (a person signed in) or `api_key` (a machine or an\nAI agent).",
+                "example": "api_key"
               },
               "excerpt": {
                 "type": "string",
@@ -15844,6 +16135,22 @@
               "reading_time_minutes": {
                 "type": "integer",
                 "format": "int32"
+              },
+              "review_requested_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no\nreview pending. Cleared when the entry is published."
+              },
+              "review_requested_by": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "Who asked for the review."
               },
               "slug": {
                 "type": "string",
@@ -17386,9 +17693,19 @@
                 "content_modified_at",
                 "translations",
                 "terms",
-                "authors"
+                "authors",
+                "ai_generated",
+                "ai_reviewed"
               ],
               "properties": {
+                "ai_generated": {
+                  "type": "boolean",
+                  "description": "The content was generated by AI. Show readers a notice when your rules (for example\nArticle 50 of the EU AI Act) ask for one."
+                },
+                "ai_reviewed": {
+                  "type": "boolean",
+                  "description": "A person reviewed the AI-generated content and took editorial responsibility when it\nwas published. Always `false` when `ai_generated` is `false`."
+                },
                 "authors": {
                   "type": "array",
                   "items": {
@@ -17832,6 +18149,13 @@
         "type": "object",
         "description": "The editable fields of an entry. Omitted fields stay as they are.",
         "properties": {
+          "ai_generated": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "The content was generated by AI. AI agents should always send `true`; readers may be\ntold (public endpoints return it)."
+          },
           "body": {
             "oneOf": [
               {
@@ -17940,12 +18264,18 @@
           "meta_description",
           "canonical_url",
           "noindex",
+          "ai_generated",
+          "created_via",
           "created_at",
           "updated_at",
           "term_ids",
           "author_ids"
         ],
         "properties": {
+          "ai_generated": {
+            "type": "boolean",
+            "description": "The content was generated by AI (set by the writer, or by the server when it translated\nthe entry). Shown to readers by the public endpoints."
+          },
           "author_ids": {
             "type": "array",
             "items": {
@@ -17976,6 +18306,11 @@
               "null"
             ],
             "format": "uuid"
+          },
+          "created_via": {
+            "type": "string",
+            "description": "How the entry was created: `session` (a person signed in) or `api_key` (a machine or an\nAI agent).",
+            "example": "api_key"
           },
           "excerpt": {
             "type": "string",
@@ -18036,6 +18371,22 @@
           "reading_time_minutes": {
             "type": "integer",
             "format": "int32"
+          },
+          "review_requested_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no\nreview pending. Cleared when the entry is published."
+          },
+          "review_requested_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Who asked for the review."
           },
           "slug": {
             "type": "string",
@@ -19095,12 +19446,18 @@
                 "meta_description",
                 "canonical_url",
                 "noindex",
+                "ai_generated",
+                "created_via",
                 "created_at",
                 "updated_at",
                 "term_ids",
                 "author_ids"
               ],
               "properties": {
+                "ai_generated": {
+                  "type": "boolean",
+                  "description": "The content was generated by AI (set by the writer, or by the server when it translated\nthe entry). Shown to readers by the public endpoints."
+                },
                 "author_ids": {
                   "type": "array",
                   "items": {
@@ -19131,6 +19488,11 @@
                     "null"
                   ],
                   "format": "uuid"
+                },
+                "created_via": {
+                  "type": "string",
+                  "description": "How the entry was created: `session` (a person signed in) or `api_key` (a machine or an\nAI agent).",
+                  "example": "api_key"
                 },
                 "excerpt": {
                   "type": "string",
@@ -19191,6 +19553,22 @@
                 "reading_time_minutes": {
                   "type": "integer",
                   "format": "int32"
+                },
+                "review_requested_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no\nreview pending. Cleared when the entry is published."
+                },
+                "review_requested_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "Who asked for the review."
                 },
                 "slug": {
                   "type": "string",
@@ -19593,9 +19971,19 @@
                 "content_modified_at",
                 "translations",
                 "terms",
-                "authors"
+                "authors",
+                "ai_generated",
+                "ai_reviewed"
               ],
               "properties": {
+                "ai_generated": {
+                  "type": "boolean",
+                  "description": "The content was generated by AI. Show readers a notice when your rules (for example\nArticle 50 of the EU AI Act) ask for one."
+                },
+                "ai_reviewed": {
+                  "type": "boolean",
+                  "description": "A person reviewed the AI-generated content and took editorial responsibility when it\nwas published. Always `false` when `ai_generated` is `false`."
+                },
                 "authors": {
                   "type": "array",
                   "items": {
@@ -20511,9 +20899,19 @@
           "content_modified_at",
           "translations",
           "terms",
-          "authors"
+          "authors",
+          "ai_generated",
+          "ai_reviewed"
         ],
         "properties": {
+          "ai_generated": {
+            "type": "boolean",
+            "description": "The content was generated by AI. Show readers a notice when your rules (for example\nArticle 50 of the EU AI Act) ask for one."
+          },
+          "ai_reviewed": {
+            "type": "boolean",
+            "description": "A person reviewed the AI-generated content and took editorial responsibility when it\nwas published. Always `false` when `ai_generated` is `false`."
+          },
           "authors": {
             "type": "array",
             "items": {
@@ -20880,6 +21278,10 @@
         "type": "object",
         "description": "Options of a publish.",
         "properties": {
+          "ai_reviewed": {
+            "type": "boolean",
+            "description": "For an entry marked `ai_generated`: you, a person, reviewed the content and take\neditorial responsibility for it. Recorded on the published version (readers see\n`ai_reviewed`). Only a signed-in person may send `true`; an API key gets 403\n`content.ai_review_requires_human`."
+          },
           "published_at": {
             "type": [
               "string",

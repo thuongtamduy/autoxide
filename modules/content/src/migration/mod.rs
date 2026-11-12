@@ -2,6 +2,7 @@
 //! file mới và một dòng vào cuối [`all`].
 
 mod m0001_create_content;
+mod m0004_agent_fields;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -12,5 +13,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::event::outbox_migration("m0002_create_events", "content"),
         // Bảng `content_jobs` (job queue): hẹn giờ, dọn revision.
         autoxide_kernel::job::jobs_migration("m0003_create_jobs", "content"),
+        // Cột cho AI agent: ai tạo bằng API key nào, xin duyệt, nội dung do AI tạo (D-109).
+        Box::new(m0004_agent_fields::Migration),
     ]
 }

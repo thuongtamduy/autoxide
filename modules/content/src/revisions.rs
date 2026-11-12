@@ -51,6 +51,9 @@ pub(crate) struct Snapshot {
     pub og_media_id: Option<Uuid>,
     pub canonical_url: String,
     pub noindex: bool,
+    /// Revision cũ (trước D-109) không có trường này: coi là `false`.
+    #[serde(default)]
+    pub ai_generated: bool,
 }
 
 impl Snapshot {
@@ -67,6 +70,7 @@ impl Snapshot {
             og_media_id: entry.og_media_id,
             canonical_url: entry.canonical_url.clone(),
             noindex: entry.noindex,
+            ai_generated: entry.ai_generated,
         }
     }
 }
@@ -99,7 +103,7 @@ use sea_orm::sea_query::ExprTrait as _;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
 use crate::entries::{Entry, EntryFields};
-use crate::permissions::{CONTENT_READ, CONTENT_WRITE};
+use crate::permissions::{self, CONTENT_READ};
 use crate::service::ContentService;
 
 /// Một revision.
@@ -144,8 +148,9 @@ impl ContentService {
         id: Uuid,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Entry, Error> {
-        principal.require(&CONTENT_WRITE)?;
+        permissions::require_create(principal)?;
         let revision = self.get_revision(principal, entry_id, id).await?;
+        // Quyền sửa mục (kể cả `content.write_own` trên mục của mình) kiểm ở `update_inner`.
         let snapshot: Snapshot =
             serde_json::from_str(&revision.snapshot).map_err(Error::internal)?;
         self.update_inner(
@@ -272,6 +277,7 @@ pub(crate) fn fields_of(snapshot: Snapshot) -> EntryFields {
         og_media_id: Some(snapshot.og_media_id),
         canonical_url: Some(snapshot.canonical_url),
         noindex: Some(snapshot.noindex),
+        ai_generated: Some(snapshot.ai_generated),
     }
 }
 

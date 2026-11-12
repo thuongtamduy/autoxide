@@ -206,6 +206,9 @@ fn khai_tool_sai_bi_tu_choi() {
                 Tool::new("twice", "x", noop),
                 Tool::new("twice", "x", noop),
                 Tool::new("locked", "x", noop).requires(NOTES_WRITE),
+                Tool::new("either", "x", noop)
+                    .requires(NOTES_WRITE)
+                    .or_requires(Permission::new("notes.write_own", "x")),
             ]
         }
     }
@@ -218,4 +221,21 @@ fn khai_tool_sai_bi_tu_choi() {
         error.contains("requires permission `notes.write`, which no module declares"),
         "{error}"
     );
+    assert!(
+        error.contains("requires permission `notes.write_own`, which no module declares"),
+        "{error}"
+    );
+}
+
+/// Tool có permission thay thế: có một trong hai là thấy và gọi được.
+#[test]
+fn permission_thay_the() {
+    let own = Permission::new("notes.write_own", "Write own notes.");
+    let noop = |_: Principal, _: NoInput| async move { Ok(()) };
+    let tool = Tool::new("edit", "x", noop).requires(NOTES_WRITE).or_requires(own);
+    let with = |permission: &str| Principal::new(Uuid::nil(), [permission.to_owned()]);
+    assert!(tool.allows(&with("notes.write")));
+    assert!(tool.allows(&with("notes.write_own")));
+    assert!(!tool.allows(&with("notes.read")));
+    assert_eq!(tool.alternative().map(|permission| permission.name()), Some("notes.write_own"));
 }

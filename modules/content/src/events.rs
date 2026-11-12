@@ -47,6 +47,8 @@ events! {
     (EntryDeleted, "content.entry_deleted", "A post or page was deleted."),
     (EntryMoved, "content.entry_moved", "A page moved under another parent; its address and those of its subpages may have changed."),
     (EntryRestored, "content.entry_restored", "A revision was copied back into the draft of a post or page."),
+    (ReviewRequested, "content.review_requested", "The writer of a draft (often an AI agent) asked a person to review and publish it."),
+    (ReviewWithdrawn, "content.review_withdrawn", "A review request was withdrawn."),
     (ScheduleCreated, "content.schedule_created", "Publishing or unpublishing was scheduled."),
     (ScheduleCanceled, "content.schedule_canceled", "A schedule was canceled."),
     (ScheduleFailed, "content.schedule_failed", "A schedule could not run."),

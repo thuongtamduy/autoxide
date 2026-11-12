@@ -306,7 +306,17 @@ impl ContentService {
                     ));
                 }
                 let (path, moved) = self
-                    .put_published(&transaction, &version, revision_id, None, now, row.created_by)
+                    .put_published(
+                        &transaction,
+                        &version,
+                        revision_id,
+                        crate::publishing::PublishStamp {
+                            published_at: None,
+                            now,
+                            by: row.created_by,
+                            ai_reviewed_by: None,
+                        },
+                    )
                     .await?;
                 let mut after = current.clone();
                 after.status = Status::Published.as_str().to_owned();

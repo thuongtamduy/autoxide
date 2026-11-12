@@ -261,7 +261,7 @@ mod publishing {
                 "content.not_found"
             );
             let published =
-                content.publish(&ada, entry.id, Some(entry.updated_at), None).await.unwrap();
+                content.publish(&ada, entry.id, Some(entry.updated_at), None, false).await.unwrap();
             assert_eq!(
                 (published.status.as_str(), published.has_unpublished_changes),
                 ("published", false)
@@ -281,8 +281,10 @@ mod publishing {
                 other => panic!("{other:?}"),
             }
             // Phiên bản cũ: 412.
-            let stale =
-                content.publish(&ada, entry.id, Some(entry.updated_at), None).await.unwrap_err();
+            let stale = content
+                .publish(&ada, entry.id, Some(entry.updated_at), None, false)
+                .await
+                .unwrap_err();
             assert_eq!(stale.kind(), ErrorKind::PreconditionFailed);
 
             let down = content.unpublish(&ada, entry.id, None).await.unwrap();
@@ -295,14 +297,14 @@ mod publishing {
                 content.unpublish(&ada, entry.id, None).await.unwrap_err().code(),
                 "content.not_published"
             );
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             content.archive(&ada, entry.id, None).await.unwrap();
             assert!(matches!(
                 resolve(&content, "/blog/hello-world").await.unwrap(),
                 Resolved::Gone
             ));
             // Đăng lại sau khi lưu trữ: đường dẫn sống lại.
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             assert_eq!(
                 entry_path(resolve(&content, "/blog/hello-world").await.unwrap()),
                 "/blog/hello-world"
@@ -315,7 +317,7 @@ mod publishing {
             }
             let writer = user(&["read", "write"]);
             assert_eq!(
-                content.publish(&writer, entry.id, None, None).await.unwrap_err().code(),
+                content.publish(&writer, entry.id, None, None, false).await.unwrap_err().code(),
                 "permission_denied"
             );
         })
@@ -335,11 +337,11 @@ mod publishing {
             let team = content.create(&ada, page("Team", Some(about.id))).await.unwrap();
             let lead = content.create(&ada, page("Lead", Some(team.id))).await.unwrap();
             assert_eq!(
-                content.publish(&ada, team.id, None, None).await.unwrap_err().code(),
+                content.publish(&ada, team.id, None, None, false).await.unwrap_err().code(),
                 "content.parent_not_published"
             );
             for id in [about.id, team.id, lead.id] {
-                content.publish(&ada, id, None, None).await.unwrap();
+                content.publish(&ada, id, None, None, false).await.unwrap();
             }
             assert_eq!(
                 entry_path(resolve(&content, "/about/team/lead").await.unwrap()),
@@ -351,7 +353,7 @@ mod publishing {
 
             let rename = EntryFields { slug: Some("company".into()), ..Default::default() };
             content.update(&ada, about.id, rename, false, None).await.unwrap();
-            content.publish(&ada, about.id, None, None).await.unwrap();
+            content.publish(&ada, about.id, None, None, false).await.unwrap();
             assert_eq!(
                 entry_path(resolve(&content, "/company/team/lead").await.unwrap()),
                 "/company/team/lead"
@@ -371,7 +373,7 @@ mod publishing {
             // Đổi lại tên cũ: chuyển hướng tự động ở đường dẫn đó bị bỏ, trang sống lại ở đó.
             let back = EntryFields { slug: Some("about".into()), ..Default::default() };
             content.update(&ada, about.id, back, false, None).await.unwrap();
-            content.publish(&ada, about.id, None, None).await.unwrap();
+            content.publish(&ada, about.id, None, None, false).await.unwrap();
             assert_eq!(entry_path(resolve(&content, "/about/team").await.unwrap()), "/about/team");
             assert!(matches!(
                 resolve(&content, "/company/team").await.unwrap(),
@@ -406,7 +408,7 @@ mod publishing {
             let b = content.create(&ada, page("B", None)).await.unwrap();
             let child = content.create(&ada, page("Child", Some(a.id))).await.unwrap();
             for id in [a.id, b.id, child.id] {
-                content.publish(&ada, id, None, None).await.unwrap();
+                content.publish(&ada, id, None, None, false).await.unwrap();
             }
             let moved = content.move_page(&ada, a.id, Some(b.id), None).await.unwrap();
             assert_eq!(moved.parent_id, Some(b.id));
@@ -459,7 +461,9 @@ mod publishing {
                 .map(|_| {
                     let content = content.clone();
                     tokio::spawn(async move {
-                        content.publish(&editor(), entry.id, Some(entry.updated_at), None).await
+                        content
+                            .publish(&editor(), entry.id, Some(entry.updated_at), None, false)
+                            .await
                     })
                 })
                 .collect();
@@ -485,12 +489,12 @@ mod publishing {
             let (content, media, _) = service(test, config(&[])).await;
             let ada = editor();
             let a_post = content.create(&ada, post("News")).await.unwrap();
-            content.publish(&ada, a_post.id, None, None).await.unwrap();
+            content.publish(&ada, a_post.id, None, None, false).await.unwrap();
             let blog = content.create(&ada, page("Blog", None)).await.unwrap();
-            content.publish(&ada, blog.id, None, None).await.unwrap();
+            content.publish(&ada, blog.id, None, None, false).await.unwrap();
             let clash = content.create(&ada, page("News", Some(blog.id))).await.unwrap();
             assert_eq!(
-                content.publish(&ada, clash.id, None, None).await.unwrap_err().code(),
+                content.publish(&ada, clash.id, None, None, false).await.unwrap_err().code(),
                 "content.path_taken"
             );
 
@@ -498,13 +502,13 @@ mod publishing {
             let mut with_image = post("Photo");
             with_image.fields.featured_media_id = Some(Some(private));
             let photo = content.create(&ada, with_image).await.unwrap();
-            let error = content.publish(&ada, photo.id, None, None).await.unwrap_err();
+            let error = content.publish(&ada, photo.id, None, None, false).await.unwrap_err();
             assert_eq!(
                 (error.code(), error.fields()[0].field.as_str()),
                 ("content.media_not_public", "featured_media_id")
             );
             media.0.lock().unwrap().insert(private, autoxide_media::api::MediaVisibility::Public);
-            content.publish(&ada, photo.id, None, None).await.unwrap();
+            content.publish(&ada, photo.id, None, None, false).await.unwrap();
         })
         .await
         .unwrap();
@@ -517,7 +521,7 @@ mod publishing {
             let (content, _, _) = service(test, config(&[])).await;
             let ada = editor();
             let target = content.create(&ada, page("Contact", None)).await.unwrap();
-            content.publish(&ada, target.id, None, None).await.unwrap();
+            content.publish(&ada, target.id, None, None, false).await.unwrap();
             let input = |from: &str, to_entry: Option<Uuid>, to_url: Option<&str>, status: i32| {
                 RedirectInput {
                     locale: None,
@@ -602,7 +606,7 @@ mod history {
                 service(test, config(&[("AUTOXIDE_CONTENT_MAX_REVISIONS", "10")])).await;
             let ada = editor();
             let entry = content.create(&ada, post("Version 0")).await.unwrap();
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             for n in 1..=14 {
                 let changes =
                     EntryFields { title: Some(format!("Version {n}")), ..Default::default() };
@@ -721,7 +725,7 @@ mod history {
                 content.create_schedule(&ada, entry.id, Action::Publish, at, None).await.unwrap();
             let manual = EntryFields { title: Some("Manual".into()), ..Default::default() };
             content.update(&ada, entry.id, manual, false, None).await.unwrap();
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             content.run_schedule(schedule.id, Utc::now()).await.unwrap();
             let rows = content.list_schedules(&ada, entry.id).await.unwrap();
             assert_eq!(
@@ -743,7 +747,8 @@ mod history {
                     (
                         tokio::spawn(async move { a.run_schedule(schedule.id, Utc::now()).await }),
                         tokio::spawn(async move {
-                            b.publish(&editor(), entry.id, Some(entry.updated_at), None).await
+                            b.publish(&editor(), entry.id, Some(entry.updated_at), None, false)
+                                .await
                         }),
                     )
                 };
@@ -818,7 +823,7 @@ mod library {
                 .unwrap_err();
             assert_eq!(same.fields()[0].field, "locale");
 
-            content.publish(&ada, about.id, None, None).await.unwrap();
+            content.publish(&ada, about.id, None, None, false).await.unwrap();
             assert_eq!(
                 content.resolve("vi", "/gioi-thieu").await.unwrap_err().code(),
                 "content.not_found"
@@ -828,7 +833,7 @@ mod library {
                 "content.not_found",
                 "no fallback"
             );
-            content.publish(&ada, gioi_thieu.id, None, None).await.unwrap();
+            content.publish(&ada, gioi_thieu.id, None, None, false).await.unwrap();
             let Resolved::Entry(row) = content.resolve("en", "/about").await.unwrap() else {
                 panic!()
             };
@@ -903,7 +908,7 @@ mod library {
                     .len(),
                 1
             );
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             let Resolved::Entry(row) = content.resolve("vi", "/blog/pho-ha-noi").await.unwrap()
             else {
                 panic!()
@@ -993,7 +998,7 @@ mod library {
             let ada = editor();
             let about = content.create(&ada, page("About", None)).await.unwrap();
             let hidden = content.create(&ada, page("Hidden", None)).await.unwrap();
-            content.publish(&ada, about.id, None, None).await.unwrap();
+            content.publish(&ada, about.id, None, None, false).await.unwrap();
             let item = |label: &str,
                         entry: Option<Uuid>,
                         url: Option<&str>,
@@ -1079,17 +1084,17 @@ mod public {
             {
                 let entry = content.create(&ada, post(title)).await.unwrap();
                 let at = chrono::Utc::now() - chrono::Duration::days(10 - index as i64);
-                content.publish(&ada, entry.id, None, Some(at)).await.unwrap();
+                content.publish(&ada, entry.id, None, Some(at), false).await.unwrap();
                 published.push(entry);
             }
             let draft = content.create(&ada, post("Bản nháp bí mật")).await.unwrap();
             let about = content.create(&ada, page("About", None)).await.unwrap();
-            content.publish(&ada, about.id, None, None).await.unwrap();
+            content.publish(&ada, about.id, None, None, false).await.unwrap();
             let vi = content
                 .create_translation(&ada, published[0].id, "vi", fields("Phở"))
                 .await
                 .unwrap();
-            content.publish(&ada, vi.id, None, None).await.unwrap();
+            content.publish(&ada, vi.id, None, None, false).await.unwrap();
             let travel = content
                 .create_term(
                     &ada,
@@ -1367,8 +1372,8 @@ mod ra_soat {
             let ada = editor();
             let parent = content.create(&ada, page("Parent", None)).await.unwrap();
             let about = content.create(&ada, page("About", None)).await.unwrap();
-            content.publish(&ada, parent.id, None, None).await.unwrap();
-            content.publish(&ada, about.id, None, None).await.unwrap();
+            content.publish(&ada, parent.id, None, None, false).await.unwrap();
+            content.publish(&ada, about.id, None, None, false).await.unwrap();
             let draft = EntryFields { slug: Some("secret-draft".into()), ..Default::default() };
             content.update(&ada, about.id, draft, false, None).await.unwrap();
             content.move_page(&ada, about.id, Some(parent.id), None).await.unwrap();
@@ -1394,14 +1399,14 @@ mod ra_soat {
             let (content, _, _) = service(test, config(&[])).await;
             let ada = editor();
             let hello = content.create(&ada, post("Hello")).await.unwrap();
-            content.publish(&ada, hello.id, None, None).await.unwrap();
+            content.publish(&ada, hello.id, None, None, false).await.unwrap();
             let news = content.create(&ada, page("News", None)).await.unwrap();
             let child = content.create(&ada, page("Hello", Some(news.id))).await.unwrap();
-            content.publish(&ada, news.id, None, None).await.unwrap();
-            content.publish(&ada, child.id, None, None).await.unwrap();
+            content.publish(&ada, news.id, None, None, false).await.unwrap();
+            content.publish(&ada, child.id, None, None, false).await.unwrap();
             let rename = EntryFields { slug: Some("blog".into()), ..Default::default() };
             content.update(&ada, news.id, rename, false, None).await.unwrap();
-            let error = content.publish(&ada, news.id, None, None).await.unwrap_err();
+            let error = content.publish(&ada, news.id, None, None, false).await.unwrap_err();
             assert_eq!(error.code(), "content.path_taken", "{error:?}");
             assert!(matches!(
                 content.resolve("en", "/news/hello").await.unwrap(),
@@ -1414,7 +1419,7 @@ mod ra_soat {
             content.update(&ada, news.id, back, false, None).await.unwrap();
             let blog = content.create(&ada, page("Blog", None)).await.unwrap();
             assert_eq!(blog.slug, "blog");
-            content.publish(&ada, blog.id, None, None).await.unwrap();
+            content.publish(&ada, blog.id, None, None, false).await.unwrap();
             let error = content.move_page(&ada, child.id, Some(blog.id), None).await.unwrap_err();
             assert_eq!(error.code(), "content.path_taken", "{error:?}");
         })
@@ -1485,7 +1490,7 @@ mod ra_soat {
             let (content, _, _) = service(test, config(&[])).await;
             let ada = editor();
             let english = content.create(&ada, post("English")).await.unwrap();
-            content.publish(&ada, english.id, None, None).await.unwrap();
+            content.publish(&ada, english.id, None, None, false).await.unwrap();
             let error =
                 content.create_redirect(&ada, redirect("vi", "/cu", english.id)).await.unwrap_err();
             assert_eq!(error.fields()[0].code, "other_locale");
@@ -1493,7 +1498,7 @@ mod ra_soat {
             content.create_redirect(&ada, redirect("en", "/old", english.id)).await.unwrap();
             let rename = EntryFields { slug: Some("renamed".into()), ..Default::default() };
             content.update(&ada, english.id, rename, false, None).await.unwrap();
-            content.publish(&ada, english.id, None, None).await.unwrap();
+            content.publish(&ada, english.id, None, None, false).await.unwrap();
             content.archive(&ada, english.id, None).await.unwrap();
             for old in ["/old", "/blog/english", "/blog/renamed"] {
                 assert!(
@@ -1523,7 +1528,7 @@ mod ra_soat {
             let author = content.create_author(&ada, author).await.unwrap();
             let entry = content.create(&ada, post("Live")).await.unwrap();
             content.set_entry_terms(&writer, entry.id, vec![tag.term.id]).await.unwrap();
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             let denied = content.set_entry_terms(&writer, entry.id, vec![]).await.unwrap_err();
             assert_eq!(denied.kind(), ErrorKind::Forbidden);
             let denied =
@@ -1571,7 +1576,7 @@ mod ra_soat {
             let (content, _, database) = service(test, config(&[])).await;
             let ada = editor();
             let entry = content.create(&ada, post("Planned")).await.unwrap();
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             let at = Utc::now() + Duration::hours(1);
             let down =
                 content.create_schedule(&ada, entry.id, Action::Unpublish, at, None).await.unwrap();
@@ -1579,7 +1584,7 @@ mod ra_soat {
             content.run_schedule(down.id, Utc::now()).await.unwrap();
             assert_eq!(content.revision_count(entry.id).await, before + 1);
 
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             content.create_schedule(&ada, entry.id, Action::Unpublish, at, None).await.unwrap();
             assert_eq!(content.cancel_schedules_of(ada.user_id()).await.unwrap(), 1);
             assert_eq!(content.cancel_schedules_of(ada.user_id()).await.unwrap(), 0);
@@ -1609,12 +1614,187 @@ mod ra_soat {
             let author = content.create_author(&ada, input).await.unwrap();
             let entry = content.create(&ada, post("By Ada")).await.unwrap();
             content.set_entry_authors(&ada, entry.id, vec![author.id]).await.unwrap();
-            content.publish(&ada, entry.id, None, None).await.unwrap();
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
             let filter = PostFilter { locale: "en".into(), ..Default::default() };
             let page = content.public_posts(&filter, &PageRequest::first(10, Order::Desc)).await;
             let mut views = content.public_views(page.unwrap().data).await.unwrap();
             let view = views.remove(0);
             assert_eq!(view.authors[0].avatar_media_id, None);
+        })
+        .await
+        .unwrap();
+    }
+}
+
+/// Quyền cho AI agent (D-109): `write_own` / `publish_own`, quyền xoá riêng, xin duyệt,
+/// `ai_generated` / `ai_reviewed`.
+mod agent {
+    use autoxide_kernel::access::Principal;
+    use sea_orm::EntityTrait;
+
+    use super::*;
+    use crate::revisions::Snapshot;
+
+    /// Agent dùng API key `key` của người dùng `user_id`.
+    fn agent(user_id: Uuid, key: Uuid) -> Principal {
+        Principal::new(
+            user_id,
+            ["read", "write_own", "publish_own"].iter().map(|p| format!("content.{p}")),
+        )
+        .via_api_key(key)
+    }
+
+    /// Chỉ sửa, đăng, gỡ mục do chính mình (cùng người, cùng key) tạo; không lưu trữ, không
+    /// xoá; xoá cần `content.delete` (kể cả người có `content.publish`).
+    #[tokio::test]
+    async fn chi_lam_tren_muc_cua_minh() {
+        TestDatabase::run(async |test| {
+            let (content, _, _) = service(test, config(&[])).await;
+            let owner = Uuid::now_v7();
+            let bot = agent(owner, Uuid::now_v7());
+            let other_key = agent(owner, Uuid::now_v7());
+            let ada = editor();
+
+            let mine = content.create(&bot, post("Mine")).await.unwrap();
+            assert_eq!(mine.created_by_api_key_id, bot.api_key_id());
+            let theirs = content.create(&ada, post("Theirs")).await.unwrap();
+
+            let mine = content
+                .update(&bot, mine.id, fields("Mine, edited"), false, Some(mine.updated_at))
+                .await
+                .unwrap();
+            for (who, id) in [(&other_key, mine.id), (&bot, theirs.id)] {
+                let error = content.update(who, id, fields("x"), false, None).await.unwrap_err();
+                assert_eq!(
+                    (error.kind(), error.code()),
+                    (ErrorKind::Forbidden, "content.not_owner")
+                );
+                assert_eq!(
+                    content.publish(who, id, None, None, false).await.unwrap_err().code(),
+                    "content.not_owner"
+                );
+            }
+            // Bản dịch: chỉ từ bản gốc của mình; bản dịch cũng là của mình.
+            let vi = content.create_translation(&bot, mine.id, "vi", fields("Của tôi")).await;
+            let vi = vi.unwrap();
+            assert_eq!(vi.created_by_api_key_id, bot.api_key_id());
+            assert_eq!(
+                content
+                    .create_translation(&bot, theirs.id, "vi", fields("x"))
+                    .await
+                    .unwrap_err()
+                    .code(),
+                "content.not_owner"
+            );
+
+            let mine = content.publish(&bot, mine.id, None, None, false).await.unwrap();
+            assert_eq!(mine.status, "published");
+            let mine = content.unpublish(&bot, mine.id, None).await.unwrap();
+            for error in [
+                content.archive(&bot, mine.id, None).await.unwrap_err(),
+                content.delete(&bot, mine.id, None).await.unwrap_err(),
+            ] {
+                assert_eq!(error.code(), "permission_denied");
+            }
+            // Người có `content.publish` mà không có `content.delete` không xoá được.
+            let publisher = user(&["read", "write", "publish"]);
+            assert_eq!(
+                content.delete(&publisher, theirs.id, None).await.unwrap_err().code(),
+                "permission_denied"
+            );
+            content.delete(&ada, theirs.id, None).await.unwrap();
+            // Không có quyền viết nào: 403 trước khi biết mục có tồn tại không.
+            let reader = user(&["read"]);
+            assert_eq!(
+                content
+                    .update(&reader, Uuid::now_v7(), fields("x"), false, None)
+                    .await
+                    .unwrap_err()
+                    .code(),
+                "permission_denied"
+            );
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Xin duyệt rồi rút lại; người đăng xác nhận đã duyệt nội dung do AI tạo; API key không
+    /// xác nhận được; `ai_generated` đi qua revision và khôi phục.
+    #[tokio::test]
+    async fn xin_duyet_va_xac_nhan_da_duyet() {
+        TestDatabase::run(async |test| {
+            let (content, _, database) = service(test, config(&[])).await;
+            let bot = agent(Uuid::now_v7(), Uuid::now_v7());
+            let ada = editor();
+            let mut input = post("Written by a bot");
+            input.fields.ai_generated = Some(true);
+            let entry = content.create(&bot, input).await.unwrap();
+            assert!(entry.ai_generated);
+
+            let entry =
+                content.set_review_request(&bot, entry.id, Some(entry.updated_at), false).await;
+            let entry = entry.unwrap();
+            assert!(entry.review_requested_at.is_some());
+            assert_eq!(entry.review_requested_by, Some(bot.user_id()));
+            let entry = content.set_review_request(&bot, entry.id, None, true).await.unwrap();
+            assert_eq!(entry.review_requested_at, None);
+            let entry = content.set_review_request(&bot, entry.id, None, false).await.unwrap();
+            let names = events(&database).await;
+            assert!(names.contains(&"content.review_requested".to_owned()));
+            assert!(names.contains(&"content.review_withdrawn".to_owned()));
+
+            assert_eq!(
+                content.publish(&bot, entry.id, None, None, true).await.unwrap_err().code(),
+                "content.ai_review_requires_human"
+            );
+            let entry = content.publish(&ada, entry.id, None, None, true).await.unwrap();
+            assert_eq!(entry.review_requested_at, None);
+            let published = crate::entity::published::Entity::find_by_id(entry.id)
+                .one(database.read())
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(published.ai_generated);
+            assert_eq!(published.ai_reviewed_by, Some(ada.user_id()));
+            assert!(published.ai_reviewed_at.is_some());
+            // Đăng lại mà không xác nhận: không còn ghi là đã duyệt.
+            content.publish(&ada, entry.id, None, None, false).await.unwrap();
+            let published = crate::entity::published::Entity::find_by_id(entry.id)
+                .one(database.read())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(published.ai_reviewed_by, None);
+
+            // Revision giữ cờ; khôi phục đưa cờ về nháp.
+            let revisions = content
+                .list_revisions(&ada, entry.id, &PageRequest::first(50, Order::Asc))
+                .await
+                .unwrap();
+            let first = &revisions.data[0];
+            let snapshot: Snapshot = serde_json::from_str(&first.snapshot).unwrap();
+            assert!(snapshot.ai_generated);
+            let entry = content
+                .update(
+                    &ada,
+                    entry.id,
+                    EntryFields { ai_generated: Some(false), ..Default::default() },
+                    false,
+                    None,
+                )
+                .await
+                .unwrap();
+            assert!(!entry.ai_generated);
+            let entry = content.restore(&ada, entry.id, first.id, None).await.unwrap();
+            assert!(entry.ai_generated);
+            // Revision cũ (trước D-109) không có trường: đọc được, coi là `false`.
+            let old: Snapshot = serde_json::from_value(json!({
+                "title": "t", "slug": "t", "excerpt": "", "body": paragraph("x"),
+                "featured_media_id": null, "featured_media_alt": "", "meta_title": "",
+                "meta_description": "", "og_media_id": null, "canonical_url": "", "noindex": false
+            }))
+            .unwrap();
+            assert!(!old.ai_generated);
         })
         .await
         .unwrap();

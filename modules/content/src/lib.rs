@@ -22,6 +22,7 @@ mod privacy;
 mod publishing;
 mod reading;
 mod redirects;
+mod review;
 mod revisions;
 mod schedules;
 mod service;
@@ -230,6 +231,6 @@ pub(crate) mod testing {
     }
 
     pub fn editor() -> Principal {
-        user(&["read", "write", "publish", "manage"])
+        user(&["read", "write", "publish", "delete", "manage"])
     }
 }

@@ -13,12 +13,15 @@ ids, and they must be public before the entry can be published.
 
 ## Permissions
 
-| Permission        | Allows                                                                           |
-| ----------------- | -------------------------------------------------------------------------------- |
-| `content.read`    | Reading drafts, revisions and schedules                                          |
-| `content.write`   | Creating and changing drafts, translations, restoring revisions, preview links    |
-| `content.publish` | Publishing, taking down, archiving, deleting, moving pages, scheduling; the terms and authors of a published entry |
-| `content.manage`  | Categories, tags, authors, menus, redirects                                      |
+| Permission            | Allows                                                                       |
+| --------------------- | ---------------------------------------------------------------------------- |
+| `content.read`        | Reading drafts, revisions and schedules                                      |
+| `content.write`       | Creating and changing drafts, translations, restoring revisions, preview links, asking for a review |
+| `content.write_own`   | The same as `content.write`, but only on entries the caller created (same user **and** same API key) |
+| `content.publish`     | Publishing, taking down, archiving, moving pages, scheduling; the terms and authors of a published entry |
+| `content.publish_own` | Publishing and taking down only entries the caller created; no archive, move or schedule |
+| `content.delete`      | Deleting entries for good                                                    |
+| `content.manage`      | Categories, tags, authors, menus, redirects                                  |
 
 Give them to a role with `PUT /api/v1/auth/roles/{id}`. The `admin` role has them all.
 Readers of the website need none: everything under `/api/v1/content/public/` is open.
@@ -217,13 +220,42 @@ Editors can show a draft to someone without an account:
    invalid or expired token is `404` (`content.preview_token_invalid`). Changing the secret
    revokes every token.
 
-## AI agents (MCP)
+## AI agents
 
-Tools `content.list`, `content.get`, `content.create_draft`, `content.update`,
-`content.publish`, `content.unpublish`, `content.list_revisions`, `content.restore_revision`
-and `content.resolve`, with the same permissions as the REST endpoints. Results that contain
-an entry include its `version`; the tools that change an entry require it back in their
-`version` argument, exactly like `If-Match`.
+**MCP tools.** `content.list`, `content.get`, `content.create_draft`, `content.update`,
+`content.publish`, `content.unpublish`, `content.list_revisions`, `content.restore_revision`,
+`content.request_review` and `content.resolve`, with the same permissions as the REST
+endpoints. Results that contain an entry include its `version`; the tools that change an entry
+require it back in their `version` argument, exactly like `If-Match`.
+
+**Give an agent its own API key** (`POST /api/v1/auth/api-keys`) with a short `expires_at` and
+only the permissions it needs:
+
+| The agent may…                         | Permissions                                            |
+| -------------------------------------- | ------------------------------------------------------ |
+| write drafts, a person publishes       | `content.read`, `content.write_own`                    |
+| write and publish its own posts        | `content.read`, `content.write_own`, `content.publish_own` |
+
+With the `_own` permissions an agent only touches the entries it created with that same key:
+another key — even of the same user — gets `403 content.not_owner`. It can never archive,
+move, schedule or delete (deleting needs `content.delete`). Every change is in the audit log
+with the API key that made it, and requests with an API key are rate limited per key
+(`AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE`, default 120).
+
+**Review.** When the agent is done, it calls `POST /entries/{id}/request-review` (tool
+`content.request_review`): the draft gets `review_requested_at` and the event
+`content.review_requested` goes out — subscribe a webhook to tell your editors.
+`DELETE /entries/{id}/request-review` withdraws it; publishing clears it.
+
+**AI-generated content.** Send `"ai_generated": true` when creating or editing content written
+by AI (agents should always do so). When a person — signed in, not with an API key — publishes
+such an entry after reviewing it, they send `{"ai_reviewed": true}` to
+`POST /entries/{id}/publish`; the published version records who and when. Public endpoints
+return `ai_generated` and `ai_reviewed`, so the website can show readers a notice where the
+rules ask for one (for example Article 50 of the EU AI Act, which applies from 2 August 2026;
+its exception for human-reviewed text is read narrowly). Autoxide records the facts; it does
+not give legal advice. The admin API also tells how an entry was created: `created_via` is
+`session` or `api_key`.
 
 ## When an account is deleted
 

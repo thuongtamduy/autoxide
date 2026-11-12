@@ -36,10 +36,19 @@ mod fake {
     impl Authenticator for FakeAuthenticator {
         async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
             let permissions: &[&str] = match authorization {
-                Some("Bearer admin") => {
-                    &["content.read", "content.write", "content.publish", "content.manage"]
-                }
+                Some("Bearer admin") => &[
+                    "content.read",
+                    "content.write",
+                    "content.publish",
+                    "content.delete",
+                    "content.manage",
+                ],
                 Some("Bearer reader") => &["content.read"],
+                Some("Bearer agent") => {
+                    let permissions = ["content.read", "content.write_own"];
+                    return Ok(Principal::new(Uuid::from_u128(2), permissions.map(str::to_owned))
+                        .via_api_key(Uuid::from_u128(3)));
+                }
                 _ => {
                     return Err(Error::unauthenticated(
                         "auth.invalid_token",
@@ -243,9 +252,18 @@ async fn tool_mcp_voi_version() {
         assert_eq!(names, ["content.get", "content.list", "content.list_revisions", "content.resolve"]);
         reader.cancel().await.unwrap();
 
+        // Agent chỉ có `content.write_own`: thấy tool viết, không thấy tool đăng.
+        let agent = client("agent").await;
+        let mut names: Vec<String> = agent.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name.to_string()).collect();
+        names.sort();
+        assert_eq!(names, ["content.create_draft", "content.get", "content.list", "content.list_revisions", "content.request_review", "content.resolve", "content.restore_revision", "content.update"]);
+        agent.cancel().await.unwrap();
+
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 9);
+        assert_eq!(tools.len(), 10);
+        let publish = tools.iter().find(|tool| tool.name == "content.publish").unwrap();
+        assert!(publish.description.as_deref().unwrap_or_default().contains("Requires permission `content.publish` or `content.publish_own`."));
         for tool in &tools {
             assert!(!serde_json::to_string(&tool.input_schema).unwrap().contains("$ref"), "{} has a $ref", tool.name);
         }

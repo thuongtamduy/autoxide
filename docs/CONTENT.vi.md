@@ -13,12 +13,15 @@ chính website là các dự án riêng gọi vào nó. Module nằm dưới `/a
 
 ## Permission
 
-| Permission        | Cho phép                                                                          |
-| ----------------- | --------------------------------------------------------------------------------- |
-| `content.read`    | Đọc bản nháp, revision và lịch                                                    |
-| `content.write`   | Tạo và sửa bản nháp, bản dịch, khôi phục revision, tạo link xem trước             |
-| `content.publish` | Đăng, gỡ, lưu trữ, xoá, chuyển trang, hẹn giờ; danh mục và tác giả của mục đang công khai |
-| `content.manage`  | Danh mục, thẻ, tác giả, menu, chuyển hướng                                        |
+| Permission            | Cho phép                                                                     |
+| --------------------- | ---------------------------------------------------------------------------- |
+| `content.read`        | Đọc bản nháp, revision và lịch                                               |
+| `content.write`       | Tạo và sửa bản nháp, bản dịch, khôi phục revision, tạo link xem trước, xin duyệt |
+| `content.write_own`   | Như `content.write`, nhưng chỉ trên mục do chính bên gọi tạo (cùng người dùng **và** cùng API key) |
+| `content.publish`     | Đăng, gỡ, lưu trữ, chuyển trang, hẹn giờ; danh mục và tác giả của mục đang công khai |
+| `content.publish_own` | Chỉ đăng và gỡ mục do chính bên gọi tạo; không lưu trữ, chuyển trang hay hẹn giờ |
+| `content.delete`      | Xoá hẳn mục                                                                  |
+| `content.manage`      | Danh mục, thẻ, tác giả, menu, chuyển hướng                                   |
 
 Gán cho một role bằng `PUT /api/v1/auth/roles/{id}`. Role `admin` có đủ. Người đọc website
 không cần permission nào: mọi thứ dưới `/api/v1/content/public/` đều mở.
@@ -209,12 +212,40 @@ Người biên tập có thể cho một người không có tài khoản xem b�
    nháp. Câu trả lời có `Cache-Control: no-store`, luôn là bản nháp mới nhất. Token sai hay hết
    hạn trả `404` (`content.preview_token_invalid`). Đổi secret là thu hồi mọi token.
 
-## AI agent (MCP)
+## AI agent
 
-Tool `content.list`, `content.get`, `content.create_draft`, `content.update`,
-`content.publish`, `content.unpublish`, `content.list_revisions`, `content.restore_revision` và
-`content.resolve`, cùng permission với endpoint REST. Kết quả có mục thì kèm `version` của mục;
-tool thay đổi mục bắt buộc gửi lại giá trị đó trong tham số `version`, y như `If-Match`.
+**Tool MCP.** `content.list`, `content.get`, `content.create_draft`, `content.update`,
+`content.publish`, `content.unpublish`, `content.list_revisions`, `content.restore_revision`,
+`content.request_review` và `content.resolve`, cùng permission với endpoint REST. Kết quả có
+mục thì kèm `version` của mục; tool thay đổi mục bắt buộc gửi lại giá trị đó trong tham số
+`version`, y như `If-Match`.
+
+**Cấp cho agent một API key riêng** (`POST /api/v1/auth/api-keys`), `expires_at` ngắn và chỉ
+những permission nó cần:
+
+| Agent được…                            | Permission                                             |
+| -------------------------------------- | ------------------------------------------------------ |
+| viết nháp, người đăng                  | `content.read`, `content.write_own`                    |
+| viết và tự đăng bài của mình           | `content.read`, `content.write_own`, `content.publish_own` |
+
+Với các permission `_own`, agent chỉ đụng tới mục nó tạo bằng chính key đó: key khác — kể cả
+của cùng người dùng — nhận `403 content.not_owner`. Agent không bao giờ lưu trữ, chuyển trang,
+hẹn giờ hay xoá được (xoá cần `content.delete`). Mọi thay đổi nằm trong audit log kèm API key
+đã làm, và request bằng API key bị rate limiting theo từng key
+(`AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE`, mặc định 120).
+
+**Xin duyệt.** Viết xong, agent gọi `POST /entries/{id}/request-review` (tool
+`content.request_review`): bản nháp có `review_requested_at` và event
+`content.review_requested` được phát — đăng ký webhook để báo người biên tập.
+`DELETE /entries/{id}/request-review` rút lại; đăng mục thì cờ tự xoá.
+
+**Nội dung do AI tạo.** Gửi `"ai_generated": true` khi tạo hay sửa nội dung do AI viết (agent
+nên luôn gửi). Khi **một người** — đăng nhập, không phải API key — đăng mục đó sau khi đã duyệt,
+họ gửi `{"ai_reviewed": true}` tới `POST /entries/{id}/publish`; bản công khai ghi ai duyệt và
+lúc nào. Endpoint công khai trả `ai_generated` và `ai_reviewed`, để website hiện thông báo cho
+người đọc khi luật yêu cầu (ví dụ Điều 50 của EU AI Act, áp dụng từ 2/8/2026; ngoại lệ "đã qua
+người duyệt" được hiểu hẹp). Autoxide chỉ ghi lại sự thật, không đưa ra lời khuyên pháp lý. API
+quản trị cũng cho biết mục được tạo thế nào: `created_via` là `session` hoặc `api_key`.
 
 ## Khi một tài khoản bị xoá
 

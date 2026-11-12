@@ -23,6 +23,9 @@ use axum::http::HeaderName;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 
+use uuid::Uuid;
+
+use crate::access::{Authenticator, Principal};
 use crate::config::RateLimit;
 use crate::error::Error;
 
@@ -30,41 +33,38 @@ use crate::error::Error;
 const PRUNE_EVERY: u64 = 1024;
 
 pub(super) struct RateLimiter {
+    cells: Gcra<IpAddr>,
+    client_ip_header: Option<HeaderName>,
+}
+
+/// Bộ đếm GCRA cho mọi loại khoá (`K`: địa chỉ client, ID của API key…).
+//
+// `K: Eq + Hash + Copy`: khoá làm chìa của `HashMap` và chép được rẻ (như `IpAddr`, `Uuid`).
+struct Gcra<K> {
     interval: Duration,
     tolerance: Duration,
-    client_ip_header: Option<HeaderName>,
     // `Mutex` của thư viện chuẩn (không phải của tokio): đoạn giữ khoá rất ngắn và
     // không có `await` bên trong, nên khoá chặn kiểu thường là đúng và nhanh hơn.
-    clients: Mutex<HashMap<IpAddr, Instant>>,
+    clients: Mutex<HashMap<K, Instant>>,
     requests: AtomicU64,
 }
 
-/// Kết quả xét một request.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Decision {
-    Allow,
-    /// Từ chối; client nên chờ chừng này.
-    Deny(Duration),
-}
-
-impl RateLimiter {
-    /// `None` khi rate limiting bị tắt (`per_minute = 0`).
-    pub(super) fn new(limit: RateLimit, client_ip_header: Option<HeaderName>) -> Option<Self> {
+impl<K: Eq + std::hash::Hash + Copy> Gcra<K> {
+    /// `None` khi tắt (`per_minute = 0`).
+    fn new(limit: RateLimit) -> Option<Self> {
         if limit.per_minute == 0 {
             return None;
         }
         let interval = Duration::from_secs(60) / limit.per_minute;
-        Some(RateLimiter {
+        Some(Gcra {
             interval,
             tolerance: interval * (limit.burst - 1),
-            client_ip_header,
             clients: Mutex::new(HashMap::new()),
             requests: AtomicU64::new(0),
         })
     }
 
-    /// Xét một request của `client` tại thời điểm `now`.
-    pub(super) fn check(&self, client: IpAddr, now: Instant) -> Decision {
+    fn check(&self, client: K, now: Instant) -> Decision {
         let Ok(mut clients) = self.clients.lock() else {
             // Khoá chỉ "hỏng" khi một thread panic lúc đang giữ nó; không chặn ai cả
             // còn hơn chặn tất cả.
@@ -81,6 +81,26 @@ impl RateLimiter {
         }
         clients.insert(client, tat + self.interval);
         Decision::Allow
+    }
+}
+
+/// Kết quả xét một request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Decision {
+    Allow,
+    /// Từ chối; client nên chờ chừng này.
+    Deny(Duration),
+}
+
+impl RateLimiter {
+    /// `None` khi rate limiting bị tắt (`per_minute = 0`).
+    pub(super) fn new(limit: RateLimit, client_ip_header: Option<HeaderName>) -> Option<Self> {
+        Gcra::new(limit).map(|cells| RateLimiter { cells, client_ip_header })
+    }
+
+    /// Xét một request của `client` tại thời điểm `now`.
+    pub(super) fn check(&self, client: IpAddr, now: Instant) -> Decision {
+        self.cells.check(client, now)
     }
 
     /// Địa chỉ client của request: từ header của reverse proxy nếu được cấu hình
@@ -137,6 +157,45 @@ fn group(address: IpAddr) -> IpAddr {
     }
 }
 
+/// Giới hạn theo API key (D-109): bọc bộ xác thực, đếm mỗi lần một request bằng API key
+/// được xác thực (extractor `Principal` của REST, lớp xác thực của MCP — mỗi request một lần).
+/// Request bằng phiên đăng nhập không bị đếm ở đây (đã có giới hạn theo địa chỉ).
+pub(super) struct ApiKeyLimited {
+    inner: Arc<dyn Authenticator>,
+    cells: Gcra<Uuid>,
+}
+
+impl ApiKeyLimited {
+    /// `inner` bọc thêm giới hạn `limit`; tắt (`per_minute = 0`) thì trả nguyên `inner`.
+    pub(super) fn wrap(inner: Arc<dyn Authenticator>, limit: RateLimit) -> Arc<dyn Authenticator> {
+        match Gcra::new(limit) {
+            Some(cells) => Arc::new(ApiKeyLimited { inner, cells }),
+            None => inner,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl Authenticator for ApiKeyLimited {
+    async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
+        let principal = self.inner.authenticate(authorization).await?;
+        if let Some(key) = principal.api_key_id()
+            && let Decision::Deny(wait) = self.cells.check(key, Instant::now())
+        {
+            metrics::counter!("http_api_key_rate_limited_total").increment(1);
+            let seconds = wait.as_secs() + u64::from(wait.subsec_nanos() > 0);
+            return Err(Error::too_many_requests(
+                "rate_limited",
+                "Too many requests with this API key. Wait {seconds} seconds, then retry; send \
+                 requests more slowly to avoid this.",
+            )
+            .with_param("seconds", seconds)
+            .with_retry_after(seconds));
+        }
+        Ok(principal)
+    }
+}
+
 /// Lớp HTTP: từ chối bằng 429 `rate_limited` kèm `Retry-After`.
 pub(super) async fn limit(
     limiter: Option<Arc<RateLimiter>>,
@@ -184,6 +243,41 @@ mod tests {
         text.parse().unwrap()
     }
 
+    /// Bộ xác thực giả: token là ID của API key (hay `session` cho phiên đăng nhập).
+    struct Keys;
+
+    #[async_trait::async_trait]
+    impl Authenticator for Keys {
+        async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
+            let principal = Principal::new(Uuid::from_u128(1), Vec::<String>::new());
+            Ok(match authorization {
+                Some("session") | None => principal,
+                Some(key) => principal.via_api_key(key.parse().map_err(Error::internal)?),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn api_key_dem_rieng_tung_key_phien_dang_nhap_khong_dem() {
+        let limited = ApiKeyLimited::wrap(Arc::new(Keys), RateLimit { per_minute: 60, burst: 2 });
+        let (a, b) = (Uuid::from_u128(10).to_string(), Uuid::from_u128(11).to_string());
+        for _ in 0..2 {
+            limited.authenticate(Some(&a)).await.unwrap();
+        }
+        let error = limited.authenticate(Some(&a)).await.unwrap_err();
+        assert_eq!((error.code(), error.retry_after()), ("rate_limited", Some(1)));
+        // Key khác vẫn chạy; phiên đăng nhập không bị đếm.
+        limited.authenticate(Some(&b)).await.unwrap();
+        for _ in 0..5 {
+            limited.authenticate(Some("session")).await.unwrap();
+        }
+        // Tắt: trả nguyên bộ xác thực.
+        let off = ApiKeyLimited::wrap(Arc::new(Keys), RateLimit { per_minute: 0, burst: 1 });
+        for _ in 0..5 {
+            off.authenticate(Some(&a)).await.unwrap();
+        }
+    }
+
     #[test]
     fn tat_thi_khong_co_bo_gioi_han() {
         assert!(RateLimiter::new(RateLimit { per_minute: 0, burst: 10 }, None).is_none());
@@ -221,11 +315,11 @@ mod tests {
         let start = Instant::now();
         limiter.check(ip("192.0.2.1"), start);
         // Lần dọn chạy ở request thứ PRUNE_EVERY + 1, lúc client cũ đã nguội.
-        limiter.requests.store(PRUNE_EVERY, Ordering::Relaxed);
+        limiter.cells.requests.store(PRUNE_EVERY, Ordering::Relaxed);
 
         limiter.check(ip("192.0.2.2"), start + Duration::from_secs(5));
 
-        let clients = limiter.clients.lock().unwrap();
+        let clients = limiter.cells.clients.lock().unwrap();
         assert!(!clients.contains_key(&ip("192.0.2.1")));
         assert!(clients.contains_key(&ip("192.0.2.2")));
     }

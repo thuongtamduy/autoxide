@@ -86,6 +86,9 @@ pub struct Tool {
     name: String,
     description: &'static str,
     permission: Option<Permission>,
+    /// Permission thay thế: có một trong hai là được (vd `content.write` hay
+    /// `content.write_own` — service kiểm phạm vi chi tiết).
+    alternative: Option<Permission>,
     read_only: bool,
     destructive: bool,
     input_schema: Value,
@@ -112,6 +115,7 @@ impl Tool {
             name: name.to_owned(),
             description,
             permission: None,
+            alternative: None,
             read_only: false,
             destructive: false,
             input_schema: serde_json::to_value(<I as PartialSchema>::schema())
@@ -123,6 +127,14 @@ impl Tool {
     /// Chỉ người có `permission` mới thấy và gọi được tool.
     pub fn requires(mut self, permission: Permission) -> Self {
         self.permission = Some(permission);
+        self
+    }
+
+    /// Người có `permission` này (thay cho permission của [`requires`](Self::requires)) cũng
+    /// thấy và gọi được tool. Dùng khi một permission hẹp hơn (vd "chỉ mục của mình") đủ để gọi;
+    /// service vẫn kiểm phạm vi.
+    pub fn or_requires(mut self, permission: Permission) -> Self {
+        self.alternative = Some(permission);
         self
     }
 
@@ -151,6 +163,11 @@ impl Tool {
         self.permission
     }
 
+    /// Permission thay thế (xem [`or_requires`](Self::or_requires)).
+    pub fn alternative(&self) -> Option<Permission> {
+        self.alternative
+    }
+
     pub fn is_read_only(&self) -> bool {
         self.read_only
     }
@@ -167,6 +184,7 @@ impl Tool {
     /// Người gọi có được thấy và gọi tool không.
     pub fn allows(&self, principal: &Principal) -> bool {
         self.permission.is_none_or(|permission| principal.has(&permission))
+            || self.alternative.is_some_and(|permission| principal.has(&permission))
     }
 
     /// Gọi tool (không kiểm permission — bên gọi kiểm bằng [`allows`](Self::allows)).
