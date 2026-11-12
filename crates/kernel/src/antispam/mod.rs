@@ -19,6 +19,7 @@
 //! Request có `Principal` (website gọi bằng API key, MCP) bỏ qua bẫy, token và đề, nhưng vẫn
 //! bị giới hạn theo người dùng (vượt thì 429 `antispam.rate_limited`).
 
+mod altcha;
 mod nonce;
 mod token;
 
@@ -35,6 +36,7 @@ use crate::http::ClientInfo;
 use crate::secret::SecretKey;
 use crate::throttle::{Outcome, Throttle};
 
+pub use altcha::Altcha;
 pub use nonce::{Claim, antispam_migration};
 
 pub(crate) mod module;
@@ -42,9 +44,18 @@ pub(crate) mod module;
 pub(crate) const CHALLENGE: Setting = Setting::new(
     "AUTOXIDE_ANTISPAM_CHALLENGE",
     "Proof that a person sends a public form: `none` (default; the other layers — trap field, \
-     signed form token, rate limits — still apply).",
+     signed form token, rate limits — still apply) or `altcha` (a proof-of-work the browser \
+     solves with the ALTCHA widget, self-hosted, no third-party account).",
 )
 .with_default("none");
+
+pub(crate) const ALTCHA_COST: Setting = Setting::new(
+    "AUTOXIDE_ANTISPAM_ALTCHA_COST",
+    "With AUTOXIDE_ANTISPAM_CHALLENGE=altcha: rounds of SHA-256 per guess (10 to 100000); the \
+     browser makes 32 to 64 guesses. Higher costs bots more and slow phones too: aim for under \
+     a second on a mid-range phone (not measured yet; adjust after trying).",
+)
+.with_default("500");
 
 pub(crate) const MIN_FILL_SECONDS: Setting = Setting::new(
     "AUTOXIDE_ANTISPAM_MIN_FILL_SECONDS",
@@ -74,9 +85,20 @@ pub enum FailMode {
     Reject,
 }
 
+/// Loại đề chống bot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChallengeKind {
+    None,
+    /// ALTCHA v2, `cost` vòng SHA-256 mỗi lần thử.
+    Altcha {
+        cost: u32,
+    },
+}
+
 /// Cấu hình chống spam.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AntispamConfig {
+    pub challenge: ChallengeKind,
     pub min_fill: StdDuration,
     pub token_max_age: StdDuration,
     pub fail_mode: FailMode,
@@ -85,6 +107,7 @@ pub struct AntispamConfig {
 impl Default for AntispamConfig {
     fn default() -> Self {
         AntispamConfig {
+            challenge: ChallengeKind::None,
             min_fill: StdDuration::from_secs(3),
             token_max_age: StdDuration::from_secs(120 * 60),
             fail_mode: FailMode::Quarantine,
@@ -94,10 +117,11 @@ impl Default for AntispamConfig {
 
 impl AntispamConfig {
     pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<Self, Invalid> {
-        let challenge = reader.get_with(&CHALLENGE, |raw| match raw {
-            "none" => Ok(()),
-            _ => Err("must be `none`".to_owned()),
+        let kind = reader.get_with(&CHALLENGE, |raw| match raw {
+            "none" | "altcha" => Ok(raw.to_owned()),
+            _ => Err("must be `none` or `altcha`".to_owned()),
         });
+        let cost = reader.get_with(&ALTCHA_COST, |raw| parse_in_range(raw, 10u32, 100_000));
         let min_fill = reader.get_with(&MIN_FILL_SECONDS, |raw| parse_in_range(raw, 0u64, 600));
         let max_age =
             reader.get_with(&TOKEN_MAX_AGE_MINUTES, |raw| parse_in_range(raw, 1u64, 1440));
@@ -106,8 +130,13 @@ impl AntispamConfig {
             "reject" => Ok(FailMode::Reject),
             _ => Err("must be `quarantine` or `reject`".to_owned()),
         });
-        challenge?;
+        let (kind, cost) = (kind?, cost?);
         Ok(AntispamConfig {
+            challenge: if kind == "altcha" {
+                ChallengeKind::Altcha { cost }
+            } else {
+                ChallengeKind::None
+            },
             min_fill: StdDuration::from_secs(min_fill?),
             token_max_age: StdDuration::from_secs(max_age? * 60),
             fail_mode: fail_mode?,
@@ -132,9 +161,20 @@ pub enum ChallengeOutcome {
 #[async_trait::async_trait]
 pub trait ChallengeVerifier: Send + Sync {
     /// Tham số đề gửi cho trình duyệt cùng token form; `None` khi không có đề.
-    async fn challenge(&self, scope: &str) -> Result<Option<serde_json::Value>, Error>;
-    /// Kiểm lời giải `solution` của đề cho `scope`.
-    async fn verify(&self, scope: &str, solution: Option<&str>) -> Result<ChallengeOutcome, Error>;
+    /// `binding` (nonce của token form) gắn đề với đúng token đó, để một lời giải không dùng lại
+    /// được.
+    async fn challenge(
+        &self,
+        scope: &str,
+        binding: &str,
+    ) -> Result<Option<serde_json::Value>, Error>;
+    /// Kiểm lời giải `solution` của đề cho `scope` và token form có nonce `binding`.
+    async fn verify(
+        &self,
+        scope: &str,
+        binding: &str,
+        solution: Option<&str>,
+    ) -> Result<ChallengeOutcome, Error>;
 }
 
 /// Không có đề: mọi bài đều qua bước này.
@@ -142,13 +182,14 @@ pub struct NoChallenge;
 
 #[async_trait::async_trait]
 impl ChallengeVerifier for NoChallenge {
-    async fn challenge(&self, _scope: &str) -> Result<Option<serde_json::Value>, Error> {
+    async fn challenge(&self, _: &str, _: &str) -> Result<Option<serde_json::Value>, Error> {
         Ok(None)
     }
 
     async fn verify(
         &self,
         _scope: &str,
+        _binding: &str,
         _solution: Option<&str>,
     ) -> Result<ChallengeOutcome, Error> {
         Ok(ChallengeOutcome::Passed)
@@ -290,12 +331,12 @@ pub struct IssuedToken {
 
 impl SpamGuard {
     pub fn new(secret: SecretKey, config: AntispamConfig) -> Self {
-        SpamGuard {
-            secret,
-            config,
-            challenge: Arc::new(NoChallenge),
-            classifier: Arc::new(NoClassifier),
-        }
+        // Đề theo cấu hình.
+        let challenge: Arc<dyn ChallengeVerifier> = match config.challenge {
+            ChallengeKind::None => Arc::new(NoChallenge),
+            ChallengeKind::Altcha { cost } => Arc::new(Altcha::new(secret.clone(), cost)),
+        };
+        SpamGuard { secret, config, challenge, classifier: Arc::new(NoClassifier) }
     }
 
     /// Thay bộ đề.
@@ -318,11 +359,12 @@ impl SpamGuard {
         getrandom::fill(&mut nonce)
             .map_err(|error| Error::internal(format!("random number generator: {error}")))?;
         let key = self.secret.derive(token::PURPOSE).await?;
+        let binding = token::encode_nonce(&nonce);
         Ok(IssuedToken {
             token: token::sign(&key, scope, now, &nonce)?,
             expires_at: now + self.max_age(),
             submit_after: now + self.min_fill(),
-            challenge: self.challenge.challenge(scope).await?,
+            challenge: self.challenge.challenge(scope, &binding).await?,
         })
     }
 
@@ -364,8 +406,12 @@ impl SpamGuard {
                     reasons.push("too_fast");
                 }
                 expires_at = form.issued_at + self.max_age() + Duration::hours(1);
+                let outcome = self
+                    .challenge
+                    .verify(submission.scope, &form.nonce, submission.challenge)
+                    .await?;
                 nonce = Some(form.nonce);
-                match self.challenge.verify(submission.scope, submission.challenge).await? {
+                match outcome {
                     ChallengeOutcome::Passed => {}
                     ChallengeOutcome::Missing => return Err(challenge_required()),
                     ChallengeOutcome::Failed => return Err(challenge_failed()),

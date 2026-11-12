@@ -241,7 +241,7 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 - [x] Token dùng một lần trong kernel; `auth` chuyển sang dùng, hành vi không đổi
 - [x] Chống spam hai pha: nhận / cách ly / từ chối; trường bẫy, token form ký, giới hạn theo IP
       và email băm, phát hiện trùng; nonce của token form làm idempotency cho người lạ
-- [ ] ALTCHA v2 tự viết (mặc định tắt)
+- [x] ALTCHA v2 tự viết (mặc định tắt)
 - [ ] `Mail` / `Mailer`: `reply_to`, header theo danh sách cho phép, lỗi vĩnh viễn / tạm thời,
       khoá chống trùng; event thất bại vĩnh viễn
 - [ ] `Actor` cho người lạ trên outbox

@@ -2549,3 +2549,27 @@ Quyết định:
 Đã cân nhắc: đặt endpoint token ở module `kernel` (đường dẫn `/api/v1/kernel/…` khó hiểu) hay
 ghép thẳng vào `http::build` (endpoint không thuộc module nào, cấu hình đọc ở chỗ khác); trả
 429 / mã lỗi cho người lạ (bot đọc được và né); lưu bài trúng bẫy (bảng phình vì rác).
+
+## D-114 · ALTCHA v2 tự viết, phiên bản giao thức và widget được ghim — 2026-11-12 — agent quyết
+
+Quyết định: `autoxide_kernel::antispam::Altcha` (bật bằng `AUTOXIDE_ANTISPAM_CHALLENGE=altcha`,
+mặc định tắt) cài phần kiểm của giao thức ALTCHA Proof-of-Work v2 bằng `hmac` / `sha2` đang có
+(~150 dòng). Không thêm crate `altcha` vì nó ghim `hmac 0.12` / `sha2 0.10`, kéo vào bộ thư viện
+mã hoá thứ hai. Ghim:
+
+- thuật toán `SHA-256` lặp `AUTOXIDE_ANTISPAM_ALTCHA_COST` vòng (mặc định 500, chưa đo trên
+  điện thoại — ghi rõ trong mô tả biến), bộ đếm `uint32` big-endian, `keyLength` 32;
+- chế độ deterministic: máy chủ chọn bộ đếm ngẫu nhiên trong [32, 64], `keyPrefix` là 16 byte
+  đầu khoá của bộ đếm đó; không dùng chữ ký khoá (đường kiểm nhanh) — máy chủ dựng lại khoá từ
+  bộ đếm (chi phí bằng một lần thử);
+- chữ ký HMAC-SHA256 (hex) trên JSON của `parameters` sắp khoá ở mọi tầng; khoá ký dẫn từ khoá
+  kernel (D-107); đề sống 10 phút;
+- `data` mang phạm vi form và `binding` = nonce của token form: lời giải chỉ dùng được với đúng
+  token đó, mà token chỉ được nhận một lần (D-113) — đây là cách chống dùng lại đề mà thư viện
+  chính thức không có;
+- widget: `altcha@3.5.0` (npm); website đưa `challenge` từ `GET /api/v1/antispam/token` cho
+  widget (`widget.configure({ challenge })`) và gửi giá trị ô ẩn `altcha` (base64) kèm form.
+
+Kiểm: vector sinh một lần bằng thư viện chính thức `altcha` 1.1.0 (`create_challenge` +
+`solve_challenge`, commit ở `crates/kernel/src/antispam/fixtures/altcha_v2.json`): chữ ký và lời
+giải khớp; cộng test từ chối khi hết hạn, sai khoá, sai bộ đếm, đổi tham số, sai form, sai token.

@@ -1,0 +1,23 @@
+{
+  "challenge": {
+    "parameters": {
+      "algorithm": "SHA-256",
+      "cost": 500,
+      "data": {
+        "binding": "bm9uY2UtZm9yLWZpeHR1cmU",
+        "scope": "forms:contact"
+      },
+      "expiresAt": 4102444800,
+      "keyLength": 32,
+      "keyPrefix": "a784f63359f89b879d931834fd3f78fc",
+      "nonce": "b553c44e7e942efc219d4011e3fce53b",
+      "salt": "82534c91c199acf18a96b94a879ea4b7"
+    },
+    "signature": "4bb9f0274a84607070f39188ced5875b34ca0a09090e0f98036d244418bfa5cd"
+  },
+  "solution": {
+    "counter": 73,
+    "derivedKey": "a784f63359f89b879d931834fd3f78fca825affaa5d6f24523b201be92604b3d",
+    "time": 106.3
+  }
+}

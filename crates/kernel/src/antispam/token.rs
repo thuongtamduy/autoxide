@@ -60,6 +60,11 @@ pub(crate) fn open(key: &[u8; 32], token: &str) -> Option<FormToken> {
     })
 }
 
+/// Nonce dạng chữ (base64url), như trong [`FormToken::nonce`].
+pub(crate) fn encode_nonce(nonce: &[u8; 16]) -> String {
+    URL_SAFE_NO_PAD.encode(nonce)
+}
+
 fn mac(key: &[u8; 32], payload: &[u8]) -> Result<Hmac<Sha256>, Error> {
     let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(key)
         .map_err(|error| Error::internal(format!("hmac key: {error}")))?;

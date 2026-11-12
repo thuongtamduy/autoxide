@@ -280,3 +280,72 @@ async fn endpoint_lay_token() {
     .await
     .unwrap();
 }
+
+/// Giải đề ALTCHA v2 như widget: dò bộ đếm từ 0 tới khi khoá khớp `keyPrefix`.
+fn solve(challenge: &serde_json::Value) -> String {
+    use base64::Engine as _;
+    use sha2::{Digest, Sha256};
+    let parameters = &challenge["parameters"];
+    let unhex = |text: &str| {
+        (0..text.len())
+            .step_by(2)
+            .map(|at| u8::from_str_radix(&text[at..at + 2], 16).unwrap())
+            .collect::<Vec<u8>>()
+    };
+    let hex = |bytes: &[u8]| bytes.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+    let (salt, nonce, prefix) = (
+        unhex(parameters["salt"].as_str().unwrap()),
+        unhex(parameters["nonce"].as_str().unwrap()),
+        unhex(parameters["keyPrefix"].as_str().unwrap()),
+    );
+    let cost = parameters["cost"].as_u64().unwrap();
+    for counter in 0u32.. {
+        let mut data: Vec<u8> =
+            salt.iter().chain(&nonce).copied().chain(counter.to_be_bytes()).collect();
+        for _ in 0..cost {
+            data = Sha256::digest(&data).to_vec();
+        }
+        if data.starts_with(&prefix) {
+            let payload = serde_json::json!({"challenge": challenge, "solution": {"counter": counter, "derivedKey": hex(&data)}});
+            return base64::engine::general_purpose::STANDARD
+                .encode(serde_json::to_vec(&payload).unwrap());
+        }
+    }
+    unreachable!()
+}
+
+/// Bật ALTCHA: token kèm đề; lời giải đúng thì nhận; thiếu thì `challenge_required`; dùng lời
+/// giải của token này cho token khác thì `challenge_failed`.
+#[tokio::test]
+async fn de_altcha() {
+    use autoxide_kernel::antispam::ChallengeKind;
+    TestDatabase::run(async |test| {
+        let (database, _) = setup(test).await;
+        let guard = make_guard(
+            &database,
+            AntispamConfig { challenge: ChallengeKind::Altcha { cost: 20 }, ..quick() },
+        );
+        let visitor = client("203.0.113.9");
+        let first = guard.issue("demo:contact").await.unwrap();
+        let challenge = first.challenge.clone().unwrap();
+        assert_eq!(challenge["parameters"]["algorithm"], "SHA-256");
+        let solution = solve(&challenge);
+        let mut sent = submission(&visitor, Some(&first.token));
+        assert_eq!(
+            guard.check(&sent, &Limits::default()).await.unwrap_err().code(),
+            "antispam.challenge_required"
+        );
+        sent.challenge = Some(&solution);
+        assert_eq!(guard.check(&sent, &Limits::default()).await.unwrap().verdict, Verdict::Accept);
+
+        let second = guard.issue("demo:contact").await.unwrap();
+        let mut reused = submission(&visitor, Some(&second.token));
+        reused.challenge = Some(&solution);
+        assert_eq!(
+            guard.check(&reused, &Limits::default()).await.unwrap_err().code(),
+            "antispam.challenge_failed"
+        );
+    })
+    .await
+    .unwrap();
+}
