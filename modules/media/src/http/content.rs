@@ -289,8 +289,11 @@ fn requested_range(headers: &HeaderMap, etag: &str, size: u64) -> Requested {
     };
     let parse = |text: &str| text.trim().parse::<u64>().ok();
     match (first.trim().is_empty(), parse(first), parse(last)) {
-        // `bytes=-N`: N byte cuối.
-        (true, _, Some(suffix)) if suffix > 0 => Requested::Part(size.saturating_sub(suffix)..size),
+        // `bytes=-N`: N byte cuối. File rỗng thì không có byte nào để trả (RFC 9110 §14.1.2);
+        // khoảng rỗng còn làm nơi lưu báo lỗi (D-112).
+        (true, _, Some(suffix)) if suffix > 0 && size > 0 => {
+            Requested::Part(size.saturating_sub(suffix)..size)
+        }
         (true, _, _) => Requested::Unsatisfiable,
         (false, Some(start), _) if start >= size => Requested::Unsatisfiable,
         (false, Some(start), None) if last.trim().is_empty() => Requested::Part(start..size),
@@ -320,6 +323,9 @@ mod tests {
         assert_eq!(range("bytes=5-100", 10), Requested::Part(5..10));
         assert_eq!(range("bytes=10-", 10), Requested::Unsatisfiable);
         assert_eq!(range("bytes=-0", 10), Requested::Unsatisfiable);
+        // File rỗng: không khoảng nào thoả.
+        assert_eq!(range("bytes=-5", 0), Requested::Unsatisfiable);
+        assert_eq!(range("bytes=0-", 0), Requested::Unsatisfiable);
         assert_eq!(range("bytes=0-1,4-5", 10), Requested::Whole);
         assert_eq!(range("items=0-1", 10), Requested::Whole);
         assert_eq!(range("bytes=5-2", 10), Requested::Whole);

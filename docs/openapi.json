@@ -5964,7 +5964,7 @@
           "content"
         ],
         "summary": "Create a post or page as a draft.",
-        "description": "Requires `content.write` or `content.write_own`. An empty or missing `slug` is made from the\ntitle (`-2`, `-3`… are added when taken). Retry safely with an `Idempotency-Key` header.",
+        "description": "Requires `content.write` or `content.write_own`. With only `content.write_own`, the parent\npage must be one you created and the entry is always marked `ai_generated`. An empty or\nmissing `slug` is made from the title (`-2`, `-3`… are added when taken). Retry safely with an\n`Idempotency-Key` header.",
         "operationId": "content_create_content_entry",
         "parameters": [
           {
@@ -6033,7 +6033,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`).",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the parent page is not yours and you only have `content.write_own` (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -6488,7 +6488,7 @@
           "content"
         ],
         "summary": "Archive a post or page.",
-        "description": "Requires `content.publish`. Takes it down for good: its address answers 410 (gone) so\nsearch engines drop it. It can still be published again. `If-Match` is required.",
+        "description": "Requires `content.publish`. Takes it down for good: its address answers 410 (gone) so\nsearch engines drop it. Pending schedules of the entry are canceled. It can still be\npublished again (with `content.publish`). `If-Match` is required.",
         "operationId": "content_archive_content_entry",
         "parameters": [
           {
@@ -6631,7 +6631,7 @@
           "content"
         ],
         "summary": "Set the authors of an entry.",
-        "description": "Requires `content.read` and `content.write` (or `content.write_own` for an entry you created),\nand `content.publish` (or `content.publish_own`) when the entry is published. Takes effect at\nonce, also for the published version.",
+        "description": "Requires `content.write` (or `content.write_own` for an entry you created), and\n`content.publish` (or `content.publish_own`) when the entry is published. Takes effect at\nonce, also for the published version. With only `content.write_own` you may add only author\nprofiles linked to your own account (`user_id`); profiles already on the entry may stay.",
         "operationId": "content_set_content_entry_authors",
         "parameters": [
           {
@@ -6722,7 +6722,7 @@
             }
           },
           "422": {
-            "description": "An id is not an author, or too many; see `errors`.",
+            "description": "An id is not an author, too many, or (with only `content.write_own`) a profile of someone else (`not_allowed`); see `errors`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6755,7 +6755,7 @@
           "content"
         ],
         "summary": "Move a page under another parent.",
-        "description": "Requires `content.write` (or `content.write_own` for a page you created), and `content.publish`\nwhen the page is published. Takes effect at once for the draft and the published version: the\npage's address and those of its subpages change, and the old ones redirect with 301. `If-Match`\nis required.",
+        "description": "Requires `content.write` (or `content.write_own` for a page you created, under a parent you\ncreated), and `content.publish` when the page is published. Takes effect at once for the draft and the published version: the\npage's address and those of its subpages change, and the old ones redirect with 301. `If-Match`\nis required.",
         "operationId": "content_move_content_page",
         "parameters": [
           {
@@ -6835,7 +6835,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`); or the page is published and you lack `content.publish`.",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the page or the new parent is not yours and you only have `content.write_own` (code `content.not_owner`); or the page is published and you lack `content.publish`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6918,7 +6918,7 @@
           "content"
         ],
         "summary": "Make a preview link for the draft of an entry.",
-        "description": "Requires `content.read` and `content.write` (or `content.write_own` for an entry you\ncreated). Anyone with the token can read the draft until it expires (10\nminutes by default).",
+        "description": "Requires `content.write`, or `content.write_own` for an entry you created. Anyone with the\ntoken can read the draft until it expires (10 minutes by default).",
         "operationId": "content_create_content_preview_token",
         "parameters": [
           {
@@ -7032,7 +7032,7 @@
           "content"
         ],
         "summary": "Publish a post or page.",
-        "description": "Requires `content.publish`, or `content.publish_own` for an entry you created. Copies the\ncurrent draft to the published version, at an\naddress computed by the server (`/<post prefix>/<slug>` for posts, the parent's address\nplus the slug for pages). If the address changed, the old one (and those of published\nsubpages) redirect with 301. Every media item it uses must be public. `If-Match` is\nrequired. Retry safely with an `Idempotency-Key` header.",
+        "description": "Requires `content.publish`, or `content.publish_own` for an entry you created. With only\n`content.publish_own` you cannot republish an archived entry, set `published_at`, or publish\nat an address where an editor made a redirect. Copies the current draft to the published\nversion, at an\naddress computed by the server (`/<post prefix>/<slug>` for posts, the parent's address\nplus the slug for pages). If the address changed, the old one (and those of published\nsubpages) redirect with 301. Every media item it uses must be public. `If-Match` is\nrequired. Retry safely with an `Idempotency-Key` header.",
         "operationId": "content_publish_content_entry",
         "parameters": [
           {
@@ -7121,7 +7121,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.publish` (or `content.publish_own`; code `permission_denied`), the entry is not yours and you only have `content.publish_own` (code `content.not_owner`), or an API key sent `ai_reviewed` (code `content.ai_review_requires_human`).",
+            "description": "Missing permission `content.publish` (or `content.publish_own`; code `permission_denied`), the entry is not yours and you only have `content.publish_own` (code `content.not_owner`), an editor archived it and you only have `content.publish_own` (code `content.archived`), or an API key sent `ai_reviewed` (code `content.ai_review_requires_human`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -7141,7 +7141,7 @@
             }
           },
           "409": {
-            "description": "The address is used by another published entry (code `content.path_taken`), or the parent page is not published (code `content.parent_not_published`).",
+            "description": "The address is used by another published entry (code `content.path_taken`), the parent page is not published (code `content.parent_not_published`), or an editor's redirect is at the address and you only have `content.publish_own` (code `content.path_has_redirect`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -7161,7 +7161,7 @@
             }
           },
           "422": {
-            "description": "A media item is missing (code `content.media_not_found`) or not public (code `content.media_not_public`); see `errors`.",
+            "description": "A media item is missing (code `content.media_not_found`) or not public (code `content.media_not_public`), or `published_at` was sent with only `content.publish_own`; see `errors`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8350,7 +8350,7 @@
           "content"
         ],
         "summary": "Set the categories and tags of an entry.",
-        "description": "Requires `content.read` and `content.write` (or `content.write_own` for an entry you created),\nand `content.publish` (or `content.publish_own`) when the entry is published. Takes effect at\nonce, also for the published version.",
+        "description": "Requires `content.write` (or `content.write_own` for an entry you created), and\n`content.publish` (or `content.publish_own`) when the entry is published. Takes effect at\nonce, also for the published version.",
         "operationId": "content_set_content_entry_terms",
         "parameters": [
           {
@@ -8832,7 +8832,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`).",
+            "description": "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry — or the translation of its parent page — is not yours and you only have `content.write_own` (code `content.not_owner`).",
             "content": {
               "application/json": {
                 "schema": {
@@ -8895,7 +8895,7 @@
           "content"
         ],
         "summary": "Take a post or page down.",
-        "description": "Requires `content.publish`, or `content.publish_own` for an entry you created. Readers no longer\nsee it (its address answers 404); it is a draft again and may be published later. A page with\npublished subpages cannot be taken down. `If-Match` is required.",
+        "description": "Requires `content.publish`, or `content.publish_own` for an entry you created. Readers no longer\nsee it (its address answers 404); it is a draft again and may be published later. A pending\nscheduled publish of the entry is canceled. A page with published subpages cannot be taken\ndown. `If-Match` is required.",
         "operationId": "content_unpublish_content_entry",
         "parameters": [
           {
@@ -9653,7 +9653,7 @@
           {
             "name": "q",
             "in": "query",
-            "description": "Only posts whose title, summary or body contains this text, ignoring case and accents.",
+            "description": "Only posts whose title, summary or body contains this text, ignoring case and accents.\nAt most 200 characters.",
             "required": false,
             "schema": {
               "type": "string"
@@ -9754,7 +9754,7 @@
           "content"
         ],
         "summary": "Read a draft through a preview link (public).",
-        "description": "No sign-in needed: the signed token is the permission. Answers with\n`Cache-Control: no-store`.",
+        "description": "No sign-in needed: the signed token is the permission. Returns the content of the latest\ndraft, without the internal fields of the admin view. Answers with `Cache-Control: no-store`.",
         "operationId": "content_get_public_content_preview",
         "parameters": [
           {
@@ -9785,7 +9785,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Data_EntryResponse"
+                  "$ref": "#/components/schemas/Data_PreviewEntryResponse"
                 }
               }
             }
@@ -17310,7 +17310,7 @@
             "properties": {
               "ai_generated": {
                 "type": "boolean",
-                "description": "The content was generated by AI (set by the writer, or by the server when it translated\nthe entry). Shown to readers by the public endpoints."
+                "description": "The content was generated by AI (set by the writer; set by the server when it translated\nthe entry, and always when the writer has only `content.write_own`). Shown to readers by\nthe public endpoints."
               },
               "author_ids": {
                 "type": "array",
@@ -18034,6 +18034,150 @@
                 }
               },
               "files": []
+            }
+          }
+        }
+      },
+      "Data_PreviewEntryResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The draft of a post or page, as a preview link shows it: the content the website renders,\nwithout the internal fields of the admin view (who created it, who asked for a review, how it\nwas created).",
+            "required": [
+              "id",
+              "kind",
+              "locale",
+              "translation_group_id",
+              "status",
+              "title",
+              "slug",
+              "excerpt",
+              "body",
+              "body_schema_version",
+              "word_count",
+              "reading_time_minutes",
+              "featured_media_alt",
+              "meta_title",
+              "meta_description",
+              "canonical_url",
+              "noindex",
+              "ai_generated",
+              "updated_at",
+              "term_ids",
+              "author_ids"
+            ],
+            "properties": {
+              "ai_generated": {
+                "type": "boolean",
+                "description": "The content was generated by AI."
+              },
+              "author_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Authors, in order (the first is the main one)."
+              },
+              "body": {
+                "$ref": "#/components/schemas/BodyNode"
+              },
+              "body_schema_version": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "canonical_url": {
+                "type": "string"
+              },
+              "excerpt": {
+                "type": "string"
+              },
+              "featured_media_alt": {
+                "type": "string"
+              },
+              "featured_media_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "Main image (a media item id)."
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "kind": {
+                "$ref": "#/components/schemas/Kind"
+              },
+              "locale": {
+                "type": "string",
+                "example": "vi"
+              },
+              "meta_description": {
+                "type": "string"
+              },
+              "meta_title": {
+                "type": "string"
+              },
+              "noindex": {
+                "type": "boolean"
+              },
+              "og_media_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "Image for social sharing (a media item id)."
+              },
+              "parent_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The parent page (pages only); `null` at the root."
+              },
+              "reading_time_minutes": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "status": {
+                "$ref": "#/components/schemas/Status"
+              },
+              "term_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Categories and tags, in order (the first category is the main one)."
+              },
+              "title": {
+                "type": "string"
+              },
+              "translation_group_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Last change of the draft."
+              },
+              "word_count": {
+                "type": "integer",
+                "format": "int32"
+              }
             }
           }
         }
@@ -19592,7 +19736,7 @@
               "boolean",
               "null"
             ],
-            "description": "The content was generated by AI. AI agents should always send `true`; readers may be\ntold (public endpoints return it)."
+            "description": "The content was generated by AI. AI agents should always send `true`; readers may be\ntold (public endpoints return it). With only `content.write_own` the server always sets\n`true`, whatever is sent."
           },
           "body": {
             "oneOf": [
@@ -19713,7 +19857,7 @@
         "properties": {
           "ai_generated": {
             "type": "boolean",
-            "description": "The content was generated by AI (set by the writer, or by the server when it translated\nthe entry). Shown to readers by the public endpoints."
+            "description": "The content was generated by AI (set by the writer; set by the server when it translated\nthe entry, and always when the writer has only `content.write_own`). Shown to readers by\nthe public endpoints."
           },
           "author_ids": {
             "type": "array",
@@ -20924,7 +21068,7 @@
               "properties": {
                 "ai_generated": {
                   "type": "boolean",
-                  "description": "The content was generated by AI (set by the writer, or by the server when it translated\nthe entry). Shown to readers by the public endpoints."
+                  "description": "The content was generated by AI (set by the writer; set by the server when it translated\nthe entry, and always when the writer has only `content.write_own`). Shown to readers by\nthe public endpoints."
                 },
                 "author_ids": {
                   "type": "array",
@@ -22378,6 +22522,141 @@
           "files": []
         }
       },
+      "PreviewEntryResponse": {
+        "type": "object",
+        "description": "The draft of a post or page, as a preview link shows it: the content the website renders,\nwithout the internal fields of the admin view (who created it, who asked for a review, how it\nwas created).",
+        "required": [
+          "id",
+          "kind",
+          "locale",
+          "translation_group_id",
+          "status",
+          "title",
+          "slug",
+          "excerpt",
+          "body",
+          "body_schema_version",
+          "word_count",
+          "reading_time_minutes",
+          "featured_media_alt",
+          "meta_title",
+          "meta_description",
+          "canonical_url",
+          "noindex",
+          "ai_generated",
+          "updated_at",
+          "term_ids",
+          "author_ids"
+        ],
+        "properties": {
+          "ai_generated": {
+            "type": "boolean",
+            "description": "The content was generated by AI."
+          },
+          "author_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Authors, in order (the first is the main one)."
+          },
+          "body": {
+            "$ref": "#/components/schemas/BodyNode"
+          },
+          "body_schema_version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "canonical_url": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "featured_media_alt": {
+            "type": "string"
+          },
+          "featured_media_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Main image (a media item id)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/Kind"
+          },
+          "locale": {
+            "type": "string",
+            "example": "vi"
+          },
+          "meta_description": {
+            "type": "string"
+          },
+          "meta_title": {
+            "type": "string"
+          },
+          "noindex": {
+            "type": "boolean"
+          },
+          "og_media_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Image for social sharing (a media item id)."
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The parent page (pages only); `null` at the root."
+          },
+          "reading_time_minutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "term_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Categories and tags, in order (the first category is the main one)."
+          },
+          "title": {
+            "type": "string"
+          },
+          "translation_group_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last change of the draft."
+          },
+          "word_count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PreviewToken": {
         "type": "object",
         "description": "A preview link for a draft.",
@@ -22946,7 +23225,7 @@
               "null"
             ],
             "format": "date-time",
-            "description": "The date shown as the publication date. Default: unchanged, or now on first publish."
+            "description": "The date shown as the publication date. Default: unchanged, or now on first publish.\nNeeds `content.publish`: with only `content.publish_own` it must be left out (422,\n`errors[].code` `not_allowed`)."
           }
         },
         "additionalProperties": false

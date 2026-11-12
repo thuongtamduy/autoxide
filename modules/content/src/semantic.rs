@@ -41,7 +41,8 @@ const OVERLAP_WORDS: usize = 50;
 /// Mỗi cách tìm đưa tối đa chừng này ứng viên vào bước gộp.
 const CANDIDATES: usize = 50;
 const RRF_K: f32 = 60.0;
-const QUERY_MAX: usize = 200;
+/// Độ dài tối đa của câu tìm (ký tự); dùng chung cho tìm theo chữ công khai (`/public/posts?q=`).
+pub(crate) const QUERY_MAX: usize = 200;
 const LIMIT_MAX: u32 = 50;
 const LIMIT_DEFAULT: u32 = 10;
 const SNIPPET_MAX: usize = 300;

@@ -403,7 +403,9 @@ impl ContentService {
     }
 
     /// Thay bộ term của mục `entry_id` (theo thứ tự; term đầu là chính). Có hiệu lực ngay, cả
-    /// với bản công khai. Cần `content.write`.
+    /// với bản công khai. Cần `content.write` (hay `content.write_own` trên mục của mình; không
+    /// cần `content.read`, như mọi thao tác sửa mục — D-111), và quyền đăng khi mục đang công
+    /// khai.
     pub(crate) async fn set_entry_terms(
         &self,
         principal: &Principal,
@@ -411,13 +413,8 @@ impl ContentService {
         term_ids: Vec<Uuid>,
     ) -> Result<Vec<Uuid>, Error> {
         crate::permissions::require_create(principal)?;
-        let entry = self.get(principal, entry_id).await?;
+        let entry = self.load_checked(entry_id, None).await?;
         crate::permissions::require_write(principal, &entry)?;
-        // Gắn có hiệu lực ngay cả trên bản công khai: như mọi thay đổi người đọc thấy, mục
-        // đang công khai thì cần quyền đăng.
-        if crate::entries::Status::of(&entry) == crate::entries::Status::Published {
-            crate::permissions::require_publish(principal, &entry)?;
-        }
         let mut ids: Vec<Uuid> = Vec::new();
         for id in term_ids {
             if !ids.contains(&id) {
@@ -431,9 +428,19 @@ impl ContentService {
                 format!("at most {MAX_PER_ENTRY} terms"),
             )]));
         }
+        let transaction = self.database.begin_write().await?;
+        // Khoá dòng mục trước khi xoá rồi chèn lại liên kết: hai lệnh gắn cùng lúc chạy lần lượt
+        // (không vấp unique thành lỗi 500 trên Postgres), và lệnh xoá mục chạy cùng lúc không để
+        // lại liên kết mồ côi. Trạng thái (cần quyền đăng không) đọc lại sau khi khoá.
+        let entry = crate::entries::lock_entry(&transaction, entry.id).await?;
+        if crate::entries::Status::of(&entry) == crate::entries::Status::Published {
+            // Gắn có hiệu lực ngay cả trên bản công khai: như mọi thay đổi người đọc thấy, mục
+            // đang công khai thì cần quyền đăng.
+            crate::permissions::require_publish(principal, &entry)?;
+        }
         let known = term::Entity::find()
             .filter(term::Column::Id.is_in(ids.clone()))
-            .count(self.database.read())
+            .count(&transaction)
             .await?;
         if known != ids.len() as u64 {
             return Err(invalid(vec![FieldError::new(
@@ -442,7 +449,6 @@ impl ContentService {
                 "every id must be an existing category or tag",
             )]));
         }
-        let transaction = self.database.begin_write().await?;
         let before =
             term_ids_of(&transaction, &[entry_id]).await?.remove(&entry_id).unwrap_or_default();
         entry_term::Entity::delete_many()

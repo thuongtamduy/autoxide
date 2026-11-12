@@ -214,9 +214,11 @@ mod tests {
             assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 
             let body = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": PASSWORD});
-            let (status, _, created) =
+            let (status, headers, created) =
                 call(&app, "POST", "/api-keys", Some(&session), Some(body.clone())).await;
             assert_eq!(status, StatusCode::CREATED, "{created}");
+            // Secret chỉ trả một lần: không ai được lưu response (D-112).
+            assert_eq!(headers["cache-control"], "no-store");
             let key = created["data"]["key"].as_str().unwrap().to_owned();
             assert!(key.starts_with("axk_"));
             assert_eq!(created["data"]["permissions"], json!(["auth.users.read"]));

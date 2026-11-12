@@ -404,6 +404,47 @@ impl ContentService {
         Ok(schedule::Entity::find_by_id(id).one(connection).await?)
     }
 
+    /// Huỷ các lịch `actions` đang chờ của mục `entry_id`, trong `transaction` của thao tác gây
+    /// ra (gỡ, lưu trữ), mỗi lịch kèm event `content.schedule_canceled`. Không huỷ thì một lịch
+    /// đăng đặt từ trước sẽ đăng lại mục vừa bị gỡ hay lưu trữ. Trả số lịch đã huỷ.
+    pub(crate) async fn cancel_pending_schedules<C: sea_orm::ConnectionTrait>(
+        &self,
+        transaction: &C,
+        actor: Actor,
+        entry_id: Uuid,
+        actions: &[Action],
+    ) -> Result<u64, Error> {
+        let pending = schedule::Entity::find()
+            .filter(schedule::Column::EntryId.eq(entry_id))
+            .filter(schedule::Column::Status.eq("scheduled"))
+            .filter(schedule::Column::Action.is_in(actions.iter().map(|action| action.as_str())))
+            .all(transaction)
+            .await?;
+        let mut canceled = 0;
+        for before in pending {
+            let Some(after) =
+                self.set_schedule_status(transaction, before.id, "canceled", None).await?
+            else {
+                continue;
+            };
+            let change = Change {
+                before: Some(schedule_summary(&before)),
+                after: Some(schedule_summary(&after)),
+                published: None,
+            };
+            self.outbox
+                .record(
+                    transaction,
+                    actor,
+                    events::entry_subject(entry_id),
+                    &events::ScheduleCanceled(change),
+                )
+                .await?;
+            canceled += 1;
+        }
+        Ok(canceled)
+    }
+
     /// Huỷ mọi lịch đang chờ do người `user_id` đặt (tài khoản bị xoá). Trả số lịch đã huỷ.
     pub(crate) async fn cancel_schedules_of(&self, user_id: Uuid) -> Result<u64, Error> {
         let pending = schedule::Entity::find()

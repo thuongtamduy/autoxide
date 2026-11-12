@@ -97,23 +97,44 @@ async fn run(
     let api_key = principal.api_key_id().map(|id| id.as_bytes().to_vec()).unwrap_or_default();
     let scope = hash(&[principal.user_id().as_bytes(), &api_key]);
     let limit = settings.body_limits.for_request(&request);
+    let declared = request
+        .headers()
+        .get(header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<usize>().ok());
+    // Chỉ giữ trong bộ nhớ thân không lớn hơn giới hạn mặc định. Route nhận thân lớn (tải
+    // file lên, tới hàng GB) mà thân thật sự lớn thì KHÔNG đọc trước: thân chảy thẳng vào
+    // handler như khi không có key, và dấu của request dùng độ dài thay cho nội dung (D-112).
+    // Đọc trước cả trăm MB chỉ để băm sẽ cho người chỉ cần đăng nhập giữ RAM máy chủ.
+    let buffer_limit = limit.min(settings.body_limits.default_limit());
+    let streamed = streams(limit, buffer_limit, declared);
     let (parts, body) = request.into_parts();
-    // Đọc thân trong giới hạn thời gian của request: client gửi nhỏ giọt không giữ được
-    // kết nối và bộ nhớ mãi.
-    let bytes =
-        match tokio::time::timeout(settings.request_timeout, axum::body::to_bytes(body, limit))
-            .await
-        {
-            Ok(Ok(bytes)) => bytes,
-            Ok(Err(_)) => return Err(super::body_limit::too_large(limit)),
-            Err(_) => return Err(super::timed_out(settings.request_timeout)),
-        };
     let content_type =
         parts.headers.get(header::CONTENT_TYPE).map(HeaderValue::as_bytes).unwrap_or_default();
     let target = parts.uri.path_and_query().map(|target| target.as_str()).unwrap_or_default();
+    let (body, content) = if streamed {
+        let length = declared.map(|length| length.to_string()).unwrap_or_default();
+        (body, format!("streamed:{length}").into_bytes())
+    } else {
+        // Đọc thân trong giới hạn thời gian của request: client gửi nhỏ giọt không giữ được
+        // kết nối và bộ nhớ mãi.
+        let bytes = match tokio::time::timeout(
+            settings.request_timeout,
+            axum::body::to_bytes(body, buffer_limit),
+        )
+        .await
+        {
+            Ok(Ok(bytes)) => bytes,
+            Ok(Err(_)) => return Err(super::body_limit::too_large(buffer_limit)),
+            Err(_) => return Err(super::timed_out(settings.request_timeout)),
+        };
+        let mut content = b"buffered:".to_vec();
+        content.extend_from_slice(&bytes);
+        (Body::from(bytes), content)
+    };
     // Cùng key mà khác đường dẫn, query, loại nội dung hay thân: là request khác.
     let fingerprint =
-        hash(&[parts.method.as_str().as_bytes(), target.as_bytes(), content_type, bytes.as_ref()]);
+        hash(&[parts.method.as_str().as_bytes(), target.as_bytes(), content_type, &content]);
     let lock = chrono::Duration::from_std(settings.request_timeout + Duration::from_secs(30))
         .map_err(Error::internal)?;
     let begin = settings.store.begin(&scope, &key, &fingerprint, chrono::Utc::now() + lock).await?;
@@ -138,25 +159,60 @@ async fn run(
         }
     };
 
-    let response = next.run(Request::from_parts(parts, Body::from(bytes))).await;
+    let response = next.run(Request::from_parts(parts, body)).await;
     if response.status().is_server_error() {
         // Lỗi phía máy chủ: không lưu, để client gửi lại được với cùng key.
         settings.store.abandon(id).await?;
         return Ok(response);
     }
+    if response.status().is_success() && no_store(response.headers()) {
+        // Response chứa secret chỉ trả một lần (API key mới, token, mã khôi phục): không lưu
+        // nó vào database. Lần gửi lại nhận lời giải thích thay vì chạy lại việc (D-112).
+        let refusal = Error::conflict(
+            "idempotency_result_not_kept",
+            "The first request with this `Idempotency-Key` succeeded, but its response held \
+             a secret that the server does not keep. Do not repeat it: look the result up \
+             instead (for example list your API keys), or use a new key to do it again.",
+        )
+        .into_response();
+        let (refusal_parts, refusal_body) = refusal.into_parts();
+        let refusal_body =
+            axum::body::to_bytes(refusal_body, usize::MAX).await.map_err(Error::internal)?;
+        settings.store.complete(id, stored(&refusal_parts, &refusal_body)).await?;
+        return Ok(response);
+    }
     let (response_parts, body) = response.into_parts();
     let body = axum::body::to_bytes(body, usize::MAX).await.map_err(Error::internal)?;
+    let stored = stored(&response_parts, &body);
+    settings.store.complete(id, stored).await?;
+    Ok(Response::from_parts(response_parts, Body::from(body)))
+}
+
+/// Bản lưu của một response: status, các header cần giữ, thân.
+fn stored(parts: &axum::http::response::Parts, body: &[u8]) -> StoredResponse {
     let headers = KEPT_HEADERS
         .iter()
         .filter_map(|name| {
-            let value = response_parts.headers.get(name)?.to_str().ok()?;
+            let value = parts.headers.get(name)?.to_str().ok()?;
             Some((name.as_str().to_owned(), value.to_owned()))
         })
         .collect();
-    let stored =
-        StoredResponse { status: response_parts.status.as_u16(), headers, body: body.to_vec() };
-    settings.store.complete(id, stored).await?;
-    Ok(Response::from_parts(response_parts, Body::from(body)))
+    StoredResponse { status: parts.status.as_u16(), headers, body: body.to_vec() }
+}
+
+/// Response có `Cache-Control: no-store` không.
+fn no_store(headers: &axum::http::HeaderMap) -> bool {
+    headers.get_all(header::CACHE_CONTROL).iter().any(|value| {
+        value.to_str().is_ok_and(|value| {
+            value.split(',').any(|directive| directive.trim().eq_ignore_ascii_case("no-store"))
+        })
+    })
+}
+
+/// Thân request có chảy thẳng vào handler (không đọc trước để băm) không: chỉ khi route nhận
+/// thân lớn hơn mức được giữ trong bộ nhớ và thân không tự khai là nhỏ.
+fn streams(limit: usize, buffer_limit: usize, declared: Option<usize>) -> bool {
+    limit > buffer_limit && declared.is_none_or(|length| length > buffer_limit)
 }
 
 /// Response đã lưu, dựng lại.
@@ -180,4 +236,21 @@ fn hash(parts: &[&[u8]]) -> String {
         digest.update(part);
     }
     URL_SAFE_NO_PAD.encode(digest.finalize())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::streams;
+
+    #[test]
+    fn chi_than_lon_cua_route_than_lon_moi_khong_doc_truoc() {
+        const MIB: usize = 1024 * 1024;
+        // Route thường: luôn đọc trước (giới hạn = mức giữ trong bộ nhớ).
+        assert!(!streams(MIB, MIB, None));
+        assert!(!streams(MIB, MIB, Some(10 * MIB)));
+        // Route tải lên: thân nhỏ thì đọc trước, lớn hoặc không khai độ dài thì không.
+        assert!(!streams(100 * MIB, MIB, Some(1000)));
+        assert!(streams(100 * MIB, MIB, Some(2 * MIB)));
+        assert!(streams(100 * MIB, MIB, None));
+    }
 }

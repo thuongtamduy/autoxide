@@ -20,7 +20,8 @@ use super::{Actor, Delivered, Subscription, table_name};
 use crate::database::Database;
 use crate::error::Error;
 
-/// Số lần giao tối đa của một event; quá thì đánh dấu hỏng (`failed_at`).
+/// Số lần giao tối đa của một event; quá thì đánh dấu hỏng (`failed_at`) — trừ event xoá
+/// tài khoản ([`USER_DELETED`](crate::privacy::USER_DELETED)), thử lại mãi.
 pub const MAX_ATTEMPTS: i32 = 10;
 /// Số event mỗi bảng xử lý trong một lượt.
 const BATCH: u64 = 100;
@@ -205,7 +206,11 @@ impl Dispatcher {
             .value(Alias::new("claimed_until"), Option::<DateTime<Utc>>::None)
             .value(Alias::new("last_error"), message.clone())
             .and_where(Expr::col(Alias::new("id")).eq(event.id));
-        if attempts >= MAX_ATTEMPTS {
+        // Xoá dữ liệu của tài khoản đã xoá là nghĩa vụ, không phải việc phụ: không bỏ cuộc,
+        // cứ thử lại (tối đa mỗi giờ một lần) tới khi mọi module xong (D-112). Tài khoản đã
+        // mất nên người dùng không tự xin xoá lại được.
+        let never_give_up = event.name == crate::privacy::USER_DELETED;
+        if attempts >= MAX_ATTEMPTS && !never_give_up {
             update.value(Alias::new("failed_at"), now);
             tracing::error!(
                 event_id = %event.id,
@@ -215,6 +220,14 @@ impl Dispatcher {
                 "event delivery failed for good; it will not be retried"
             );
             metrics::counter!("events_failed_total").increment(1);
+        } else if attempts >= MAX_ATTEMPTS {
+            tracing::error!(
+                event_id = %event.id,
+                event = %event.name,
+                attempts,
+                error = %message,
+                "erasing a deleted user's data keeps failing; it is retried every hour"
+            );
         } else {
             tracing::warn!(
                 event_id = %event.id,

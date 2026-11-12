@@ -205,14 +205,21 @@ mod tests {
 
     /// Create a note.
     #[utoipa::path(post, path = "/", responses((status = 201, description = "Created.")))]
-    async fn create(State(counter): State<Arc<Counter>>, body: String) -> (StatusCode, String) {
+    async fn create(State(counter): State<Arc<Counter>>, body: String) -> axum::response::Response {
+        use axum::response::IntoResponse as _;
         let run = counter.runs.fetch_add(1, Ordering::SeqCst) + 1;
         // Đủ lâu để các request đồng thời chắc chắn chồng lên nhau.
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         if body.contains("explode") {
-            return (StatusCode::INTERNAL_SERVER_ERROR, "boom".to_owned());
+            return (StatusCode::INTERNAL_SERVER_ERROR, "boom".to_owned()).into_response();
         }
-        (StatusCode::CREATED, format!("run {run}: {body}"))
+        let text = format!("run {run}: {body}");
+        if body.contains("secret") {
+            // Như response tạo API key: secret chỉ trả một lần.
+            let no_store = [(axum::http::header::CACHE_CONTROL, "no-store")];
+            return (StatusCode::CREATED, no_store, text).into_response();
+        }
+        (StatusCode::CREATED, text).into_response()
     }
 
     /// `Bearer ada` và `Bearer ada-renewed` là cùng một người (token vừa làm mới);
@@ -425,6 +432,35 @@ mod tests {
             assert_eq!(second.0, StatusCode::INTERNAL_SERVER_ERROR);
             assert_eq!(second.1, None);
             assert_eq!(counter.runs.load(Ordering::SeqCst), 2);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Response có `Cache-Control: no-store` (chứa secret) không vào database; gửi lại nhận
+    /// 409 giải thích, không chạy lại việc (D-112).
+    #[tokio::test]
+    async fn response_chua_secret_khong_duoc_luu() {
+        TestDatabase::run(async |test| {
+            let (app, counter, database) = setup(test).await;
+
+            let first = post(&app, Some("key-once"), "secret axk_123").await;
+            let second = post(&app, Some("key-once"), "secret axk_123").await;
+
+            assert_eq!(first.0, StatusCode::CREATED);
+            assert!(first.2.contains("axk_123"));
+            assert_eq!(second.0, StatusCode::CONFLICT);
+            assert_eq!(second.1.as_deref(), Some("true"));
+            assert!(second.2.contains("idempotency_result_not_kept"), "{}", second.2);
+            assert!(!second.2.contains("axk_123"));
+            assert_eq!(counter.runs.load(Ordering::SeqCst), 1);
+            let rows = entity::Entity::find().all(database.read()).await.unwrap();
+            assert_eq!(rows.len(), 1);
+            assert!(rows.iter().all(|row| {
+                row.body
+                    .as_deref()
+                    .is_none_or(|body| !String::from_utf8_lossy(body).contains("axk_123"))
+            }));
         })
         .await
         .unwrap();

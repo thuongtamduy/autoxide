@@ -11,8 +11,8 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Query;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
-    QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
+    QueryOrder, Set,
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -268,7 +268,10 @@ impl ContentService {
     }
 
     /// Thay danh sách tác giả của mục `entry_id` (theo thứ tự). Có hiệu lực ngay. Cần
-    /// `content.write`.
+    /// `content.write` (hay `content.write_own` trên mục của mình; không cần `content.read`, như
+    /// mọi thao tác sửa mục — D-111), và quyền đăng khi mục đang công khai. Người chỉ có
+    /// `content.write_own` chỉ thêm được hồ sơ tác giả gắn với chính tài khoản của mình (hồ sơ
+    /// đã có trên mục thì giữ hay bỏ được): không đứng tên người khác.
     pub(crate) async fn set_entry_authors(
         &self,
         principal: &Principal,
@@ -276,13 +279,8 @@ impl ContentService {
         author_ids: Vec<Uuid>,
     ) -> Result<Vec<Uuid>, Error> {
         crate::permissions::require_create(principal)?;
-        let entry = self.get(principal, entry_id).await?;
+        let entry = self.load_checked(entry_id, None).await?;
         crate::permissions::require_write(principal, &entry)?;
-        // Gắn có hiệu lực ngay cả trên bản công khai: như mọi thay đổi người đọc thấy, mục
-        // đang công khai thì cần quyền đăng.
-        if crate::entries::Status::of(&entry) == crate::entries::Status::Published {
-            crate::permissions::require_publish(principal, &entry)?;
-        }
         let mut ids: Vec<Uuid> = Vec::new();
         for id in author_ids {
             if !ids.contains(&id) {
@@ -296,20 +294,38 @@ impl ContentService {
                 format!("at most {MAX_PER_ENTRY} authors"),
             )]));
         }
-        let known = author::Entity::find()
+        let transaction = self.database.begin_write().await?;
+        // Khoá dòng mục trước khi xoá rồi chèn lại liên kết (xem `set_entry_terms`).
+        let entry = crate::entries::lock_entry(&transaction, entry.id).await?;
+        if crate::entries::Status::of(&entry) == crate::entries::Status::Published {
+            // Gắn có hiệu lực ngay cả trên bản công khai: như mọi thay đổi người đọc thấy, mục
+            // đang công khai thì cần quyền đăng.
+            crate::permissions::require_publish(principal, &entry)?;
+        }
+        let profiles = author::Entity::find()
             .filter(author::Column::Id.is_in(ids.clone()))
-            .count(self.database.read())
+            .all(&transaction)
             .await?;
-        if known != ids.len() as u64 {
+        if profiles.len() != ids.len() {
             return Err(invalid(vec![FieldError::new(
                 "author_ids",
                 "not_found",
                 "every id must be an existing author",
             )]));
         }
-        let transaction = self.database.begin_write().await?;
         let before =
             author_ids_of(&transaction, &[entry_id]).await?.remove(&entry_id).unwrap_or_default();
+        if crate::permissions::write_own_only(principal)
+            && profiles.iter().any(|profile| {
+                profile.user_id != Some(principal.user_id()) && !before.contains(&profile.id)
+            })
+        {
+            return Err(invalid(vec![FieldError::new(
+                "author_ids",
+                "not_allowed",
+                "with `content.write_own` you may only add author profiles linked to your own account",
+            )]));
+        }
         entry_author::Entity::delete_many()
             .filter(entry_author::Column::EntryId.eq(entry_id))
             .exec(&transaction)

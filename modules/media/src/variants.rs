@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
+use autoxide_kernel::storage::StoredFile;
 use bytes::Bytes;
 use futures_util::TryStreamExt as _;
 use image::codecs::jpeg::JpegEncoder;
@@ -60,13 +61,39 @@ struct Rendered {
     bytes: Vec<u8>,
 }
 
+/// File có cỡ hợp lý so với số pixel của nó không: ảnh nén không bao giờ lớn hơn pixel
+/// thô (tối đa 8 byte mỗi pixel, ảnh 16-bit RGBA) cộng phần đầu. File lớn hơn thế là ảnh
+/// nhét thêm dữ liệu — không đọc cả file vào bộ nhớ để giải mã (D-112).
+pub(crate) fn plausible_size(item: &Item) -> bool {
+    let (Some(width), Some(height)) = (item.width, item.height) else {
+        return false;
+    };
+    let pixels = u64::try_from(width).unwrap_or(0) * u64::try_from(height).unwrap_or(0);
+    let size = u64::try_from(item.size).unwrap_or(u64::MAX);
+    size <= pixels.saturating_mul(8).saturating_add(1024 * 1024)
+}
+
+/// Đọc hết `stored` vào MỘT vùng nhớ cấp sẵn đúng cỡ (gom từng mảnh rồi nối sẽ giữ file
+/// hai lần trong bộ nhớ).
+pub(crate) async fn read_all(stored: StoredFile) -> Result<Vec<u8>, Error> {
+    let mut bytes = Vec::with_capacity(usize::try_from(stored.size).unwrap_or(0));
+    let mut content = stored.content;
+    while let Some(chunk) = content.try_next().await? {
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(bytes)
+}
+
 /// Các chiều rộng cần làm cho `item` (rỗng: không làm).
 pub(crate) fn wanted_widths(widths: &[u32], item: &Item) -> Vec<u32> {
     let (Some(width), Some(height)) = (item.width, item.height) else {
         return Vec::new();
     };
     let pixels = u64::try_from(width).unwrap_or(0) * u64::try_from(height).unwrap_or(0);
-    if !SOURCES.contains(&item.content_type.as_str()) || pixels > MAX_PIXELS {
+    if !SOURCES.contains(&item.content_type.as_str())
+        || pixels > MAX_PIXELS
+        || !plausible_size(item)
+    {
         return Vec::new();
     }
     // Ảnh xoay 90° theo EXIF thì chiều rộng thật là `height`; lấy cạnh lớn hơn cho chắc,
@@ -116,9 +143,7 @@ impl MediaService {
         if item.version_id != version_id || widths.is_empty() {
             return Ok(0);
         }
-        let stored = self.read(&item, None).await?;
-        let chunks: Vec<Bytes> = stored.content.try_collect().await?;
-        let original = chunks.concat();
+        let original = read_all(self.read(&item, None).await?).await?;
         // Giải mã và đổi cỡ tốn CPU: chạy trên thread riêng của tokio cho việc chặn.
         let rendered = tokio::task::spawn_blocking(move || render(&original, &widths))
             .await
@@ -384,5 +409,12 @@ mod tests {
         item.width = Some(10_000);
         item.height = Some(10_000);
         assert!(wanted_widths(&[320], &item).is_empty(), "too many pixels");
+        // File lớn hơn mọi cách nén của số pixel đó (dữ liệu nhét thêm): không giải mã.
+        item.width = Some(1000);
+        item.height = Some(800);
+        item.size = 1000 * 800 * 8 + 1024 * 1024;
+        assert_eq!(wanted_widths(&[320], &item), [320]);
+        item.size += 1;
+        assert!(wanted_widths(&[320], &item).is_empty(), "padded file");
     }
 }

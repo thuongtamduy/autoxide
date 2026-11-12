@@ -24,6 +24,8 @@ use crate::service::ContentService;
 #[serde(deny_unknown_fields)]
 pub(crate) struct PublishRequest {
     /// The date shown as the publication date. Default: unchanged, or now on first publish.
+    /// Needs `content.publish`: with only `content.publish_own` it must be left out (422,
+    /// `errors[].code` `not_allowed`).
     pub published_at: Option<DateTime<Utc>>,
     /// For an entry marked `ai_generated`: you, a person, reviewed the content and take
     /// editorial responsibility for it. Recorded on the published version (readers see
@@ -45,8 +47,10 @@ const IF_MATCH: &str = "Required: the `ETag` of the entry (or `*`). Done only if
 
 /// Publish a post or page.
 ///
-/// Requires `content.publish`, or `content.publish_own` for an entry you created. Copies the
-/// current draft to the published version, at an
+/// Requires `content.publish`, or `content.publish_own` for an entry you created. With only
+/// `content.publish_own` you cannot republish an archived entry, set `published_at`, or publish
+/// at an address where an editor made a redirect. Copies the current draft to the published
+/// version, at an
 /// address computed by the server (`/<post prefix>/<slug>` for posts, the parent's address
 /// plus the slug for pages). If the address changed, the old one (and those of published
 /// subpages) redirect with 301. Every media item it uses must be public. `If-Match` is
@@ -61,11 +65,11 @@ const IF_MATCH: &str = "Required: the `ETag` of the entry (or `*`). Done only if
     responses(
         (status = 200, description = "Published.", body = Data<EntryResponse>, headers(("ETag" = String, description = "New version of the entry."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.publish` (or `content.publish_own`; code `permission_denied`), the entry is not yours and you only have `content.publish_own` (code `content.not_owner`), or an API key sent `ai_reviewed` (code `content.ai_review_requires_human`).", body = Problem),
+        (status = 403, description = "Missing permission `content.publish` (or `content.publish_own`; code `permission_denied`), the entry is not yours and you only have `content.publish_own` (code `content.not_owner`), an editor archived it and you only have `content.publish_own` (code `content.archived`), or an API key sent `ai_reviewed` (code `content.ai_review_requires_human`).", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
-        (status = 409, description = "The address is used by another published entry (code `content.path_taken`), or the parent page is not published (code `content.parent_not_published`).", body = Problem),
+        (status = 409, description = "The address is used by another published entry (code `content.path_taken`), the parent page is not published (code `content.parent_not_published`), or an editor's redirect is at the address and you only have `content.publish_own` (code `content.path_has_redirect`).", body = Problem),
         (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
-        (status = 422, description = "A media item is missing (code `content.media_not_found`) or not public (code `content.media_not_public`); see `errors`.", body = Problem),
+        (status = 422, description = "A media item is missing (code `content.media_not_found`) or not public (code `content.media_not_public`), or `published_at` was sent with only `content.publish_own`; see `errors`.", body = Problem),
         (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
     )
 )]
@@ -97,8 +101,9 @@ pub(crate) async fn publish_entry(
 /// Take a post or page down.
 ///
 /// Requires `content.publish`, or `content.publish_own` for an entry you created. Readers no longer
-/// see it (its address answers 404); it is a draft again and may be published later. A page with
-/// published subpages cannot be taken down. `If-Match` is required.
+/// see it (its address answers 404); it is a draft again and may be published later. A pending
+/// scheduled publish of the entry is canceled. A page with published subpages cannot be taken
+/// down. `If-Match` is required.
 #[utoipa::path(
     post,
     path = "/entries/{id}/unpublish",
@@ -128,7 +133,8 @@ pub(crate) async fn unpublish_entry(
 /// Archive a post or page.
 ///
 /// Requires `content.publish`. Takes it down for good: its address answers 410 (gone) so
-/// search engines drop it. It can still be published again. `If-Match` is required.
+/// search engines drop it. Pending schedules of the entry are canceled. It can still be
+/// published again (with `content.publish`). `If-Match` is required.
 #[utoipa::path(
     post,
     path = "/entries/{id}/archive",
@@ -157,8 +163,8 @@ pub(crate) async fn archive_entry(
 
 /// Move a page under another parent.
 ///
-/// Requires `content.write` (or `content.write_own` for a page you created), and `content.publish`
-/// when the page is published. Takes effect at once for the draft and the published version: the
+/// Requires `content.write` (or `content.write_own` for a page you created, under a parent you
+/// created), and `content.publish` when the page is published. Takes effect at once for the draft and the published version: the
 /// page's address and those of its subpages change, and the old ones redirect with 301. `If-Match`
 /// is required.
 #[utoipa::path(
@@ -171,7 +177,7 @@ pub(crate) async fn archive_entry(
     responses(
         (status = 200, description = "Moved.", body = Data<EntryResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry is not yours and you only have `content.write_own` (code `content.not_owner`); or the page is published and you lack `content.publish`.", body = Problem),
+        (status = 403, description = "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the page or the new parent is not yours and you only have `content.write_own` (code `content.not_owner`); or the page is published and you lack `content.publish`.", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
         (status = 409, description = "Under itself or a subpage (code `content.tree_cycle`), slug taken at the new place (code `content.slug_taken`), address taken (code `content.path_taken`), or the new parent is not published (code `content.parent_not_published`).", body = Problem),
         (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),

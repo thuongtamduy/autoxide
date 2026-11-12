@@ -225,7 +225,8 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
                     Ok::<_, Error>(CreatedApiKeyResponse::from(created))
                 }
             },
-        ),
+        )
+        .returns_secret(),
         Tool::new(
             "revoke_api_key",
             "Revoke one of your API keys; it stops working at once.",
@@ -442,6 +443,8 @@ mod tests {
             let input = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": password});
             let created = call(&tools, "create_api_key", admin.clone(), input.clone()).await.unwrap();
             assert!(created["key"].as_str().unwrap().starts_with("axk_"));
+            // Kết quả có secret: response MCP mang `Cache-Control: no-store` (D-112).
+            assert!(tools.iter().any(|tool| tool.name() == "create_api_key" && tool.is_secret()));
             let key_id: Uuid = created["id"].as_str().unwrap().parse().unwrap();
             let via_key = admin.clone().via_api_key(key_id);
             let refused = call(&tools, "create_api_key", via_key, input).await.unwrap_err();

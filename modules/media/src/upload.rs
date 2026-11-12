@@ -65,6 +65,8 @@ struct Intake {
     head: Vec<u8>,
     /// Loại đã kiểm xong (khi đã đủ byte).
     verdict: Option<String>,
+    /// Quét nội dung chạy được, khi file có thể là SVG.
+    markup: sniff::ActiveMarkup,
 }
 
 impl MediaService {
@@ -282,6 +284,13 @@ impl MediaService {
                     let verdict = verify(expected_type.as_deref(), &state.head, &limits)?;
                     state.verdict = Some(verdict);
                 }
+                // Chưa biết loại hay là SVG: quét cả file (loại khác thì thôi, khỏi tốn CPU).
+                if state.verdict.as_deref().is_none_or(|verdict| verdict == SVG) {
+                    state.markup.feed(&chunk);
+                    if state.verdict.is_some() && state.markup.found {
+                        return Err(active_svg());
+                    }
+                }
                 Ok(chunk)
             })
             .boxed();
@@ -320,6 +329,9 @@ fn finish(state: Intake, declared: Option<&str>, limits: &Limits) -> Result<Rece
         Some(verdict) => verdict,
         None => verify(declared, &state.head, limits)?,
     };
+    if content_type == SVG && state.markup.found {
+        return Err(active_svg());
+    }
     let (width, height) = if sniff::is_raster_image(&content_type) {
         let (width, height) = sniff::dimensions(&state.head).ok_or_else(|| {
             Error::new(
@@ -391,6 +403,17 @@ fn verify(declared: Option<&str>, head: &[u8], limits: &Limits) -> Result<String
         .with_param("declared", declared)
         .with_param("detected", detected.unwrap_or("unknown"))),
     }
+}
+
+const SVG: &str = "image/svg+xml";
+
+fn active_svg() -> Error {
+    Error::new(
+        ErrorKind::UnsupportedMediaType,
+        "media.svg_active_content",
+        "The SVG contains content that can run in a browser (`<script>`, `on…=` event \
+         attributes, `javascript:` links or embedded HTML). Remove it and upload again.",
+    )
 }
 
 fn check_allowed(content_type: &str, limits: &Limits) -> Result<(), Error> {

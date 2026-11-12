@@ -2631,3 +2631,86 @@ mỗi cái kèm test khi kiểm được:
   báo `content.translation_conflict` dù bản dịch đã được ghi. Hiếm, và không mất dữ liệu.
 - **Tool MCP `get_translation_request`** hiện với `content.read` hay `content.write_own`. Người
   chỉ có `content.write` dùng REST.
+
+## D-112 · Rà soát bảo mật phần thêm sau D-079: sửa và các quy ước mới — 2026-11-12 — agent quyết
+
+Bốn agent đọc độc lập phần thêm sau lượt rà soát D-079: `media` (chưa từng rà), kernel cùng
+`files` / `webhooks` / `auth`, `content`, và luồng dữ liệu giữa các module. Không có lỗi nặng.
+Mọi phát hiện được kiểm lại với code; những cái dưới đây đã sửa, mỗi cái kèm test chạy trên cả
+hai database.
+
+**Kernel và hạ tầng:**
+
+- **Idempotency không giữ thân request lớn trong RAM.** Trước đây lớp idempotency đọc hết thân
+  (tới `AUTOXIDE_MEDIA_MAX_BYTES`, mặc định 100 MiB) để băm, trước khi handler kiểm permission:
+  người chỉ cần đăng nhập giữ được hàng GB RAM. Nay chỉ thân không lớn hơn
+  `AUTOXIDE_HTTP_BODY_LIMIT_BYTES` được đọc trước; thân lớn hơn (hay không khai độ dài) ở route
+  nhận thân lớn chảy thẳng vào handler, và dấu của request dùng độ dài thay cho nội dung. Cái
+  giá: gửi lại cùng key, cùng độ dài mà khác nội dung thì nhận lại kết quả lần đầu thay vì
+  `idempotency_key_reused` — chấp nhận, vì dùng lại key cho request khác là lỗi của client.
+- **Response chứa secret không bị lưu.** Lớp idempotency từng lưu 24 giờ response của mọi lệnh
+  ghi có key, kể cả API key mới, token, mã khôi phục — những thứ `auth` chỉ lưu dạng băm. Quy
+  ước mới: response mang `Cache-Control: no-store` thì không lưu; lần gửi lại nhận
+  `409 idempotency_result_not_kept` (không chạy lại việc). Module `auth` gắn `no-store` cho mọi
+  response của nó (RFC 6749 §5.1). Tool MCP trả secret khai `Tool::returns_secret()`; response
+  MCP khi đó mang `no-store` (cờ dùng chung giữa lớp xác thực và `call_tool` qua extensions).
+- **Webhook chỉ gửi tới địa chỉ public (SSRF).** Từ chối khi tạo / sửa địa chỉ là IP không
+  public hay `localhost`; lúc gửi, tên miền được phân giải bằng bộ lọc riêng (`PublicOnly`) bỏ
+  mọi IP không public — lọc lúc kết nối nên chặn cả DNS rebinding; không dùng proxy hệ thống.
+  Cấu hình mới `AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS` (mặc định `false`) cho máy nhận trong
+  mạng riêng. Lịch sử gửi chỉ ghi lý do cố định (không chép chuỗi lỗi, vốn giúp dò cổng); chi
+  tiết vào log máy chủ.
+- **Cursor sai kiểu** (chữ cho cột số) trả `invalid_cursor` trên cả hai database, không còn 500
+  trên Postgres.
+- **Admin cuối cùng:** `count_active_admins` khoá các role toàn quyền trước khi đếm, nên mọi
+  thay đổi có thể làm mất admin nối đuôi nhau; trên Postgres hai admin cuối xoá nhau cùng lúc
+  không còn để lại 0 admin.
+- **Xoá tài khoản:** audit bỏ `before` / `after` / `details` của mọi dòng cùng `subject` với event
+  xoá (email, tên); event `auth.user_deleted` không bao giờ bị đánh dấu hỏng — thử lại tối đa mỗi
+  giờ một lần tới khi mọi module xong, vì tài khoản đã mất thì không ai xin xoá lại được.
+- **Mô tả permission** `audit.read` và `media.write` nói rõ chúng thấy được những gì.
+
+**`media`:**
+
+- SVG có nội dung chạy được (`<script>`, `on…=`, `javascript:`, HTML nhúng) ở **bất cứ đâu**
+  trong file bị từ chối (`media.svg_active_content`), quét từng mảnh khi đang nhận.
+- Gợi ý alt text luôn gửi bản làm lại (bỏ EXIF), không bao giờ gửi chính file gốc, khớp tài liệu.
+- Ảnh có file lớn hơn mọi cách nén của số pixel (8 byte mỗi pixel + 1 MiB) không được giải mã
+  (không làm bản thu nhỏ, không gợi ý alt); file được đọc vào một vùng nhớ cấp sẵn, không giữ
+  hai lần.
+- `Range: bytes=-N` trên file rỗng trả `416`.
+- Tài liệu: file gốc giữ metadata như lúc tải lên; `media.upload` qua MCP thực tế khoảng 750 KiB
+  với giới hạn thân mặc định.
+
+**`content`** (thêm vào D-102, D-105, D-111):
+
+- Gỡ hay lưu trữ huỷ lịch đăng đang chờ (lưu trữ huỷ cả lịch gỡ), kèm event
+  `content.schedule_canceled`: trước đây lịch đăng chạy sau đó đăng lại mục vừa bị gỡ.
+- Người chỉ có `content.publish_own`: không đăng lại mục đã lưu trữ (`content.archived`), không
+  tự đặt `published_at`, không đăng vào địa chỉ có chuyển hướng làm tay
+  (`content.path_has_redirect`).
+- Người chỉ có `content.write_own`: `ai_generated` luôn `true`; chỉ gắn hồ sơ tác giả của chính
+  mình (hồ sơ đã có trên mục được giữ); trang cha phải là trang của mình.
+- Chuyển hướng và link menu từ chối `//host`.
+- `q` của tìm kiếm công khai tối đa 200 ký tự; bản xem trước công khai không lộ id người dùng
+  (`PreviewEntryResponse`).
+- Gắn chủ đề / tác giả khoá dòng của mục trong transaction (Postgres hết 500 khi gọi đồng thời);
+  việc đó và tạo token xem trước chỉ cần quyền sửa mục, không cần `content.read`.
+- Xoá tài khoản bỏ cả `review_requested_by` và `ai_reviewed_by`; `ai_reviewed` công khai tính từ
+  `ai_reviewed_at` nên vẫn đúng.
+
+Để lại, ghi rõ:
+
+- **Xoá dữ liệu khi xoá tài khoản không phát event cho từng file / item** (`files`, `media`): một
+  tài khoản lớn sẽ đẩy hàng nghìn event vào audit và webhook; event `auth.user_deleted` trong
+  audit đã ghi việc xoá. Ngoại lệ có chủ ý cho luật 3.
+- **Thân event đã gửi qua webhook** (có email, tên) nằm trong lịch sử gửi tới 30 ngày sau khi
+  tài khoản bị xoá; API không trả thân đó.
+- **Lịch đăng chạy với quyền của người đặt lịch lúc đặt.** Đặt lịch cần `content.publish`; người
+  bị khoá hay mất quyền sau đó thì lịch vẫn chạy — muốn dừng thì huỷ lịch. Xoá tài khoản huỷ lịch.
+- **Xoá chủ đề đúng lúc đang gắn chủ đề** vẫn có thể để lại một liên kết mồ côi trên Postgres
+  (khoá dòng mục, không khoá dòng chủ đề); cửa sổ đã hẹp lại vì kiểm chủ đề tồn tại trong
+  transaction.
+- **Job làm ảnh thu nhỏ chậm:** hết giờ thì job bị huỷ nhưng thread giải mã vẫn chạy tới xong;
+  chưa đo được ảnh nào gây ra, nên chưa đổi.
+- `GET /api/v1/content/entries?q=` (cần `content.read`) chưa giới hạn độ dài.

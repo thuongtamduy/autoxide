@@ -11,6 +11,7 @@
 //!   `message` dịch theo `Accept-Language` — agent đọc được và tự sửa.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use axum::Router;
 use axum::extract::Request;
@@ -94,7 +95,16 @@ async fn authenticate(
     match authenticator.authenticate(authorization).await {
         Ok(principal) => {
             request.extensions_mut().insert(principal);
-            next.run(request).await
+            let secret = SecretResult::default();
+            request.extensions_mut().insert(secret.clone());
+            let mut response = next.run(request).await;
+            if secret.0.load(Ordering::Relaxed) {
+                // Kết quả có secret chỉ trả một lần: không cho ai lưu lại response (D-112).
+                response
+                    .headers_mut()
+                    .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            }
+            response
         }
         Err(error) => {
             let mut response = error.into_response();
@@ -107,6 +117,12 @@ async fn authenticate(
         }
     }
 }
+
+/// Cờ chung giữa lớp xác thực và `call_tool`: request đã gọi một tool trả secret. `Arc` vì
+/// rmcp chép phần đầu request (kèm extensions) sang ngữ cảnh của tool — bản chép vẫn trỏ
+/// cùng một cờ.
+#[derive(Clone, Default)]
+struct SecretResult(Arc<AtomicBool>);
 
 /// Người gọi và ngôn ngữ của request đang xử lý.
 fn caller(context: &RequestContext<RoleServer>) -> Result<(Principal, Language), ErrorData> {
@@ -215,6 +231,14 @@ impl ServerHandler for McpServer {
                     None,
                 )
             })?;
+        if tool.is_secret()
+            && let Some(secret) = context
+                .extensions
+                .get::<axum::http::request::Parts>()
+                .and_then(|parts| parts.extensions.get::<SecretResult>())
+        {
+            secret.0.store(true, Ordering::Relaxed);
+        }
         let arguments = request.arguments.map_or(Value::Null, Value::Object);
         metrics::counter!("mcp_tool_calls_total").increment(1);
         let result = match tool.call(principal, arguments).await {

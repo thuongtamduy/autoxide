@@ -233,14 +233,14 @@ impl ContentService {
             let lower = url.to_ascii_lowercase();
             let valid = (lower.starts_with("https://")
                 || lower.starts_with("http://")
-                || paths::normalize(url).is_some())
+                || paths::is_site_link(url))
                 && url.len() <= 2048
                 && !url.chars().any(|c| c.is_whitespace() || c.is_control());
             if !valid {
                 problems.push(FieldError::new(
                     "to_url",
                     "invalid",
-                    "must be an `https://` address or a path starting with `/`",
+                    "must be an `https://` address or a path starting with a single `/`",
                 ));
             }
         }

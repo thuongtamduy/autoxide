@@ -17,5 +17,6 @@
   "media.tag_name_taken": "Đã có nhãn tên `{name}` (tên không phân biệt hoa thường). Hãy chọn tên khác.",
   "media.tag_not_found": "Không có nhãn media `{id}`.",
   "media.ai_private_not_allowed": "Ảnh này đang riêng tư, và máy chủ không gửi ảnh riêng tư cho nhà cung cấp AI (AUTOXIDE_MEDIA_AI_SEND_PRIVATE). Hãy chuyển ảnh sang công khai trước, hoặc hỏi người vận hành.",
-  "media.ai_unsupported_image": "Chỉ gợi ý được alt text cho ảnh JPEG, PNG, GIF và WebP đọc được."
+  "media.ai_unsupported_image": "Chỉ gợi ý được alt text cho ảnh JPEG, PNG, GIF và WebP đọc được.",
+  "media.svg_active_content": "File SVG chứa nội dung chạy được trong trình duyệt (`<script>`, thuộc tính sự kiện `on…=`, liên kết `javascript:` hay HTML nhúng). Hãy bỏ phần đó rồi tải lên lại."
 }

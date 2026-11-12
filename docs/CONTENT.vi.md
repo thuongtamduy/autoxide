@@ -19,7 +19,7 @@ chính website là các dự án riêng gọi vào nó. Module nằm dưới `/a
 | `content.write`       | Tạo và sửa bản nháp, bản dịch, khôi phục revision, tạo link xem trước, xin duyệt |
 | `content.write_own`   | Như `content.write`, nhưng chỉ trên mục do chính bên gọi tạo (cùng người dùng **và** cùng API key) |
 | `content.publish`     | Đăng, gỡ, lưu trữ, chuyển trang, hẹn giờ; danh mục và tác giả của mục đang công khai |
-| `content.publish_own` | Chỉ đăng và gỡ mục do chính bên gọi tạo; không lưu trữ, chuyển trang hay hẹn giờ |
+| `content.publish_own` | Chỉ đăng và gỡ mục do chính bên gọi tạo; không lưu trữ, hẹn giờ hay chuyển trang đang công khai |
 | `content.delete`      | Xoá hẳn mục                                                                  |
 | `content.manage`      | Danh mục, thẻ, tác giả, menu, chuyển hướng                                   |
 
@@ -94,7 +94,9 @@ curl -X POST http://localhost:8080/api/v1/content/entries/$ID/publish \
 - **Hẹn giờ**: `POST …/schedules` với `{"action": "publish" | "unpublish", "run_at": …}`. Lịch
   đăng ghim bản nháp lúc đặt thành một revision: sửa sau đó không bị lịch này đăng. Nếu mục đã
   được đăng tay sau khi đặt lịch, lịch thất bại (`content.schedule_outdated`) thay vì ghi đè.
-  Lịch thất bại giữ mã lỗi (`status: failed`) và phát event `content.schedule_failed`.
+  Lịch thất bại giữ mã lỗi (`status: failed`) và phát event `content.schedule_failed`. Gỡ mục
+  thì huỷ lịch đăng đang chờ của nó, lưu trữ thì huỷ mọi lịch đang chờ của mục (mỗi lịch phát
+  `content.schedule_canceled`): lịch đặt từ trước không bao giờ đăng lại mục đã bị gỡ.
 
 ## Trang và địa chỉ
 
@@ -113,7 +115,8 @@ Website chỉ ghép tên miền và, nếu dùng, tiền tố ngôn ngữ (`/vi/
   `410 Gone`.
 - Chuyển hướng cũng làm tay được (`/api/v1/content/redirects`, permission `content.manage`):
   `301`, `302`, `307`, `308` tới một mục hay một địa chỉ, hoặc `410`. Vòng lặp bị từ chối
-  (`content.redirect_loop`).
+  (`content.redirect_loop`). Địa chỉ trong site bắt đầu bằng đúng một `/`: `//host` (trình duyệt
+  hiểu là site khác) bị từ chối, ở đây và trong menu.
 
 ## Ngôn ngữ
 
@@ -140,7 +143,8 @@ Permission `content.manage`.
   tác giả cũng vậy).
 - **Tác giả** (`/api/v1/content/authors`): hồ sơ của module content — tên hiển thị, slug, giới
   thiệu, ảnh đại diện (ID media), website — có thể gắn với một tài khoản (`user_id`). Một mục có
-  thể có nhiều tác giả, theo thứ tự: `PUT /api/v1/content/entries/{id}/authors`.
+  thể có nhiều tác giả, theo thứ tự: `PUT /api/v1/content/entries/{id}/authors`. Gắn term hay
+  tác giả cho mục cần quyền sửa mục đó, không cần `content.read`.
 - **Menu** (`/api/v1/content/menus/{key}?locale=`): một cây mục (tối đa 4 cấp, 200 mục), mỗi
   mục trỏ tới một bài / trang, một term, hoặc một địa chỉ. `PUT` thay cả cây (`If-Match: *` để
   tạo mới).
@@ -152,7 +156,7 @@ Không cần đăng nhập. Chỉ trả bản đã đăng — không bao giờ t
 | Endpoint                                              | Trả                                                          |
 | ----------------------------------------------------- | ------------------------------------------------------------ |
 | `GET /public/resolve?locale=&path=`                   | Thứ ở một địa chỉ: `entry`, `redirect` hoặc `gone`           |
-| `GET /public/posts?locale=&term_id=&author_id=&q=`    | Bài đã đăng, mới nhất trước, có pagination                    |
+| `GET /public/posts?locale=&term_id=&author_id=&q=`    | Bài đã đăng, mới nhất trước, có pagination (`q`: tối đa 200 ký tự) |
 | `GET /public/menus/{key}?locale=`                     | Menu kèm `href` đã tính; mục trỏ tới bài chưa đăng bị ẩn     |
 | `GET /public/terms/{taxonomy}/{slug}?locale=`         | Trang của một danh mục hay thẻ                               |
 | `GET /public/authors/{slug}`                          | Trang của một tác giả                                        |
@@ -209,8 +213,9 @@ Người biên tập có thể cho một người không có tài khoản xem b�
 2. `POST /api/v1/content/entries/{id}/preview-token` (permission `content.write`) trả một
    `token` đã ký và `expires_at` (`AUTOXIDE_CONTENT_PREVIEW_TTL_SECONDS`, mặc định 10 phút).
 3. Trang xem trước của website gọi `GET /api/v1/content/public/preview?token=…` rồi hiển thị bản
-   nháp. Câu trả lời có `Cache-Control: no-store`, luôn là bản nháp mới nhất. Token sai hay hết
-   hạn trả `404` (`content.preview_token_invalid`). Đổi secret là thu hồi mọi token.
+   nháp. Câu trả lời có `Cache-Control: no-store`, luôn là bản nháp mới nhất, và chỉ có nội dung
+   — không có ai tạo hay ai xin duyệt. Token sai hay hết hạn trả `404`
+   (`content.preview_token_invalid`). Đổi secret là thu hồi mọi token.
 
 ## AI agent
 
@@ -237,10 +242,23 @@ những permission nó cần:
 | viết và tự đăng bài của mình           | `content.read`, `content.write_own`, `content.publish_own` |
 
 Với các permission `_own`, agent chỉ đụng tới mục nó tạo bằng chính key đó: key khác — kể cả
-của cùng người dùng — nhận `403 content.not_owner`. Agent không bao giờ lưu trữ, chuyển trang,
-hẹn giờ hay xoá được (xoá cần `content.delete`). Mọi thay đổi nằm trong audit log kèm API key
-đã làm, và request bằng API key bị rate limiting theo từng key
-(`AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE`, mặc định 120).
+của cùng người dùng — nhận `403 content.not_owner`. Agent không bao giờ lưu trữ, hẹn giờ hay xoá
+được (xoá cần `content.delete`), cũng không chuyển được trang đang công khai; nó chuyển được trang
+chưa đăng của mình, vào dưới trang do nó tạo. Thêm vài giới hạn để agent không đi vòng qua người
+biên tập:
+
+- `content.write_own` mà không có `content.write`: trang mới, trang được chuyển hay bản dịch của
+  trang con chỉ nằm dưới trang cha do chính agent tạo (`403 content.not_owner`), để nó không
+  chặn được việc gỡ hay xoá trang của người khác; mục luôn mang `ai_generated: true`, dù gửi gì;
+  ở `PUT …/authors` chỉ thêm được hồ sơ tác giả gắn với chính tài khoản của nó (`user_id`) — hồ
+  sơ đã có trên mục thì giữ được.
+- `content.publish_own` mà không có `content.publish`: không đăng lại được mục người biên tập đã
+  lưu trữ (`403 content.archived`); không tự đặt `published_at` (422, `not_allowed`; máy chủ
+  dùng giờ hiện tại, hoặc giữ ngày của lần đăng trước); không đăng vào địa chỉ đang có chuyển
+  hướng do người biên tập đặt (`409 content.path_has_redirect`), vì bản công khai sẽ che mất nó.
+
+Mọi thay đổi nằm trong audit log kèm API key đã làm, và request bằng API key bị rate limiting
+theo từng key (`AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE`, mặc định 120).
 
 **Xin duyệt.** Viết xong, agent gọi `POST /entries/{id}/request-review` (tool
 `content.request_review`): bản nháp có `review_requested_at` và event
@@ -248,7 +266,7 @@ hẹn giờ hay xoá được (xoá cần `content.delete`). Mọi thay đổi n
 `DELETE /entries/{id}/request-review` rút lại; đăng mục thì cờ tự xoá.
 
 **Nội dung do AI tạo.** Gửi `"ai_generated": true` khi tạo hay sửa nội dung do AI viết (agent
-nên luôn gửi). Khi **một người** — đăng nhập, không phải API key — đăng mục đó sau khi đã duyệt,
+nên luôn gửi; chỉ có `content.write_own` thì máy chủ tự đặt). Khi **một người** — đăng nhập, không phải API key — đăng mục đó sau khi đã duyệt,
 họ gửi `{"ai_reviewed": true}` tới `POST /entries/{id}/publish`; bản công khai ghi ai duyệt và
 lúc nào. Endpoint công khai trả `ai_generated` và `ai_reviewed`, để website hiện thông báo cho
 người đọc khi luật yêu cầu (ví dụ Điều 50 của EU AI Act, áp dụng từ 2/8/2026; ngoại lệ "đã qua
@@ -258,8 +276,10 @@ quản trị cũng cho biết mục được tạo thế nào: `created_via` là
 ## Khi một tài khoản bị xoá
 
 Bài và trang thuộc về site, không thuộc người viết: chúng được giữ. Hồ sơ tác giả gắn với tài
-khoản bị xoá (và gỡ khỏi các mục), lịch người đó đặt bị huỷ, `created_by` thành `null`. Bản xuất
-dữ liệu cá nhân liệt kê hồ sơ tác giả của người đó và các mục họ tạo.
+khoản bị xoá (và gỡ khỏi các mục), lịch người đó đặt bị huỷ, `created_by` thành `null`, cùng
+`review_requested_by` (ai xin duyệt) và ghi nhận ai đã xác nhận duyệt nội dung AI — thời điểm xác
+nhận vẫn giữ, nên người đọc vẫn thấy `ai_reviewed`. Bản xuất dữ liệu cá nhân liệt kê hồ sơ tác giả
+của người đó và các mục họ tạo.
 
 ## Cấu hình
 

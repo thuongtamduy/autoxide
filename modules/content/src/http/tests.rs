@@ -206,6 +206,11 @@ async fn vong_doi_va_endpoint_cong_khai() {
 
         let posts = send(&router, "GET", "/public/posts?locale=en&q=da%20lat", None, &[], None).await.json();
         assert_eq!(posts["data"][0]["path"], "/blog/duong-den-da-lat");
+        // Câu tìm công khai có giới hạn độ dài (như tìm theo ý nghĩa).
+        let longest = send(&router, "GET", &format!("/public/posts?locale=en&q={}", "a".repeat(200)), None, &[], None).await;
+        assert_eq!(longest.status, StatusCode::OK);
+        let too_long = send(&router, "GET", &format!("/public/posts?locale=en&q={}", "a".repeat(201)), None, &[], None).await;
+        assert_eq!((too_long.status, too_long.json()["errors"][0]["field"].as_str()), (StatusCode::UNPROCESSABLE_ENTITY, Some("q")));
         let sitemap = send(&router, "GET", "/public/sitemap?locale=en", None, &[], None).await.json();
         assert_eq!((sitemap["data"][0]["path"].as_str(), sitemap["data"][0]["kind"].as_str()), (Some("/blog/duong-den-da-lat"), Some("post")));
         assert_eq!(send(&router, "GET", "/public/feed?locale=en&limit=5", None, &[], None).await.json()["data"].as_array().unwrap().len(), 1);
@@ -231,6 +236,11 @@ async fn vong_doi_va_endpoint_cong_khai() {
         let preview = send(&router, "GET", &format!("/public/preview?token={token}"), None, &[], None).await;
         assert_eq!((preview.status, preview.json()["data"]["title"].as_str()), (StatusCode::OK, Some("Bản nháp mới")));
         assert_eq!(preview.header(header::CACHE_CONTROL), "no-store");
+        // Token có thể tới tay người ngoài: không lộ ID người dùng hay trường nội bộ.
+        let shown = preview.json()["data"].clone();
+        for internal in ["created_by", "created_via", "review_requested_by", "review_requested_at", "translated_from_revision_id"] {
+            assert!(shown.get(internal).is_none(), "preview shows {internal}");
+        }
         assert_eq!(send(&router, "GET", path, None, &[], None).await.json()["data"]["entry"]["title"], "Đường đến Đà Lạt", "readers still see the published version");
         let bad = send(&router, "GET", "/public/preview?token=abc.def", None, &[], None).await;
         assert_eq!((bad.status, bad.json()["code"].as_str()), (StatusCode::NOT_FOUND, Some("content.preview_token_invalid")));
@@ -388,6 +398,43 @@ async fn etag_resolve_theo_ca_cau_tra_loi() {
         )
         .await;
         assert_eq!(same.status, StatusCode::NOT_MODIFIED);
+    })
+    .await
+    .unwrap();
+}
+
+/// Xoá tài khoản người đã xác nhận duyệt nội dung AI: `ai_reviewed_by` bỏ trống nhưng người đọc
+/// vẫn thấy `ai_reviewed` (tính từ thời điểm xác nhận).
+#[tokio::test]
+async fn da_duyet_ai_van_hien_sau_xoa_tai_khoan() {
+    use autoxide_kernel::event::{Actor, Delivered, EventHandler};
+
+    TestDatabase::run(async |test| {
+        let (content, _, _) = crate::testing::service(test, crate::testing::config(&[])).await;
+        let ada = crate::testing::editor();
+        let mut input = crate::tests::post("Reviewed");
+        input.fields.ai_generated = Some(true);
+        let entry = content.create(&ada, input).await.unwrap();
+        content.publish(&ada, entry.id, None, None, true).await.unwrap();
+        let deleted = Delivered {
+            id: uuid::Uuid::now_v7(),
+            module: "auth",
+            name: autoxide_kernel::privacy::USER_DELETED.to_owned(),
+            actor: Actor::system(),
+            subject: None,
+            payload: json!({"before": {"id": ada.user_id()}}),
+            occurred_at: chrono::Utc::now(),
+        };
+        content.handle(&deleted).await.unwrap();
+        content.handle(&deleted).await.unwrap();
+        let (resolution, _) =
+            super::public::resolution(&content, "en", "/blog/reviewed").await.unwrap();
+        let shown = serde_json::to_value(resolution).unwrap();
+        assert_eq!(
+            (shown["entry"]["ai_generated"].as_bool(), shown["entry"]["ai_reviewed"].as_bool()),
+            (Some(true), Some(true)),
+            "{shown}"
+        );
     })
     .await
     .unwrap();

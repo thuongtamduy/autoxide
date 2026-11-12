@@ -18,8 +18,12 @@ use uuid::Uuid;
 use crate::entity;
 use crate::service::{AuditService, Filter};
 
-pub(crate) const AUDIT_READ: Permission =
-    Permission::new("audit.read", "Read the audit log: who changed what, when, before and after.");
+pub(crate) const AUDIT_READ: Permission = Permission::new(
+    "audit.read",
+    "Read the audit log: who changed what, when, before and after. The before and after \
+         values hold the data of every module (draft content, private media details, user \
+         names and emails), so this amounts to reading everything.",
+);
 
 pub(crate) fn routes(service: Arc<AuditService>) -> OpenApiRouter {
     OpenApiRouter::new()

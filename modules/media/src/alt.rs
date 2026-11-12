@@ -7,8 +7,6 @@
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::ai::{Effort, Part, Prompt};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
-use bytes::Bytes;
-use futures_util::TryStreamExt as _;
 use sea_orm::EntityTrait;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -122,8 +120,10 @@ impl MediaService {
         Ok(AltSuggestion { alt, decorative, model: answer.model })
     }
 
-    /// Ảnh gửi cho mô hình: ảnh thu nhỏ lớn nhất vừa [`AI_MAX_SIDE`]; ảnh gốc đã nhỏ thì ảnh
-    /// gốc; còn lại thu nhỏ tạm trong bộ nhớ (không lưu), trên thread riêng.
+    /// Ảnh gửi cho mô hình: ảnh thu nhỏ lớn nhất vừa [`AI_MAX_SIDE`]; không có thì thu nhỏ
+    /// tạm ảnh gốc trong bộ nhớ (không lưu), trên thread riêng. Không bao giờ gửi chính file
+    /// gốc, kể cả khi nó đã nhỏ: làm lại ảnh bỏ hết metadata (EXIF: vị trí GPS, số máy) và
+    /// phần dữ liệu nhét thêm (D-112).
     async fn image_for_ai(&self, item: &Item) -> Result<(Vec<u8>, &'static str), Error> {
         let copies =
             variants::variants_of(self.database.read(), std::slice::from_ref(item)).await?;
@@ -136,24 +136,18 @@ impl MediaService {
             })
             .max_by_key(|copy| copy.width);
         if let Some(copy) = fitting {
+            // Ảnh thu nhỏ do máy chủ làm (đã sạch metadata).
             let stored = self.read_key(&copy.storage_key(), None).await?;
-            let chunks: Vec<Bytes> = stored.content.try_collect().await?;
             let media_type =
                 if copy.content_type == "image/png" { "image/png" } else { "image/jpeg" };
-            return Ok((chunks.concat(), media_type));
+            return Ok((variants::read_all(stored).await?, media_type));
         }
-        let stored = self.read(item, None).await?;
-        let chunks: Vec<Bytes> = stored.content.try_collect().await?;
-        let original = chunks.concat();
-        let side = i32::try_from(AI_MAX_SIDE).unwrap_or(i32::MAX);
-        let small =
-            item.width.zip(item.height).is_some_and(|(width, height)| width.max(height) <= side);
-        if small
-            && let Some(media_type) =
-                variants::SOURCES.iter().find(|kind| **kind == item.content_type)
+        if !variants::SOURCES.contains(&item.content_type.as_str())
+            || !variants::plausible_size(item)
         {
-            return Ok((original, media_type));
+            return Err(unsupported_image());
         }
+        let original = variants::read_all(self.read(item, None).await?).await?;
         // Giải mã và đổi cỡ tốn CPU: chạy trên thread riêng của tokio cho việc chặn.
         let shrunk = tokio::task::spawn_blocking(move || variants::shrink(&original, AI_MAX_SIDE))
             .await

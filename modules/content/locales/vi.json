@@ -35,5 +35,7 @@
   "content.semantic_search_disabled": "Máy chủ này không mở tìm theo ý nghĩa cho người đọc (AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH). Hãy dùng `GET /api/v1/content/public/posts?q=`.",
   "content.sign_in_required": "Cần đăng nhập để tìm trong bản nháp.",
   "content.translation_timed_out": "Dịch bằng AI mất quá lâu. Việc dịch sẽ được thử lại; giảm AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS hoặc dùng mô hình nhanh hơn sẽ giúp.",
-  "content.translation_canceled": "Tài khoản đã yêu cầu bản dịch này đã bị xoá."
+  "content.translation_canceled": "Tài khoản đã yêu cầu bản dịch này đã bị xoá.",
+  "content.archived": "Một biên tập viên đã lưu trữ mục này; với `content.publish_own` bạn không đăng lại được. Hãy nhờ người có `content.publish`.",
+  "content.path_has_redirect": "Ở `{path}` có một chuyển hướng do biên tập viên đặt; đăng vào đây sẽ che mất nó. Hãy đổi slug, hoặc nhờ người có `content.publish`."
 }

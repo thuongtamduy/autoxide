@@ -142,19 +142,29 @@ pub(crate) const STATUS_FAILED: &str = "failed";
 pub(crate) struct Sender {
     pub database: Database,
     pub client: reqwest::Client,
+    /// `AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS`.
+    pub allow_private_networks: bool,
 }
 
 impl Sender {
     /// HTTP client dùng chung: không theo chuyển hướng (địa chỉ đã kiểm là địa chỉ được
-    /// gọi), giới hạn thời gian chờ.
-    pub(crate) fn client(timeout: Duration) -> Result<reqwest::Client, Error> {
+    /// gọi), giới hạn thời gian chờ, và — trừ khi cấu hình cho phép — chỉ kết nối tới IP
+    /// public (D-112).
+    pub(crate) fn client(
+        timeout: Duration,
+        allow_private_networks: bool,
+    ) -> Result<reqwest::Client, Error> {
         autoxide_kernel::tls::install_crypto_provider();
-        reqwest::Client::builder()
+        let mut builder = reqwest::Client::builder()
             .timeout(timeout)
             .redirect(reqwest::redirect::Policy::none())
-            .user_agent(concat!("Autoxide-Webhooks/", env!("CARGO_PKG_VERSION")))
-            .build()
-            .map_err(|error| Error::internal(format!("webhook HTTP client: {error}")))
+            // Proxy của hệ thống sẽ tự phân giải tên, vượt qua bộ lọc: không dùng.
+            .no_proxy()
+            .user_agent(concat!("Autoxide-Webhooks/", env!("CARGO_PKG_VERSION")));
+        if !allow_private_networks {
+            builder = builder.dns_resolver(crate::network::PublicOnly);
+        }
+        builder.build().map_err(|error| Error::internal(format!("webhook HTTP client: {error}")))
     }
 }
 
@@ -178,6 +188,16 @@ impl JobHandler for Sender {
             self.finish(&row, STATUS_FAILED, None, Some("the endpoint was disabled")).await?;
             return Ok(());
         };
+
+        // Địa chỉ là IP thì không qua bộ phân giải: kiểm ở đây (cấu hình có thể đã đổi từ
+        // lúc tạo webhook). Không lành lại khi thử lại nên thôi luôn.
+        let public =
+            reqwest::Url::parse(&target.url).is_ok_and(|url| crate::network::is_public_host(&url));
+        if !self.allow_private_networks && !public {
+            let problem = format!("the address {}", crate::network::PRIVATE_ADDRESS);
+            self.finish(&row, STATUS_FAILED, None, Some(&problem)).await?;
+            return Ok(());
+        }
 
         let timestamp = now().timestamp();
         let message_id = row.id.to_string();
@@ -209,7 +229,11 @@ impl JobHandler for Sender {
                 Err(failed(&problem, last))
             }
             Err(error) => {
-                // Không ghi URL (có thể chứa token trong query) vào lỗi.
+                // Lý do chi tiết (chuỗi lỗi của reqwest) chỉ vào log của máy chủ, không vào
+                // lịch sử gửi mà API trả ra: nó giúp dò cổng và máy trong mạng (D-112). Không
+                // ghi URL (có thể chứa token trong query).
+                let detail = std::error::Error::source(&error).map(ToString::to_string);
+                tracing::warn!(delivery_id = %row.id, detail, "webhook request failed");
                 let problem = describe(&error);
                 let outcome = if last { STATUS_FAILED } else { STATUS_PENDING };
                 self.finish(&row, outcome, None, Some(&problem)).await?;
@@ -257,19 +281,21 @@ fn failed(problem: &str, last: bool) -> Error {
     Error::internal(format!("webhook delivery: {problem}; {next}"))
 }
 
-/// Lỗi gửi, không kèm URL.
+/// Lỗi gửi, chỉ là một trong vài loại cố định: không kèm URL, không kèm chi tiết của lỗi.
 fn describe(error: &reqwest::Error) -> String {
-    let kind = if error.is_timeout() {
-        "the endpoint did not answer in time"
+    let mut source: Option<&(dyn std::error::Error + 'static)> = Some(error);
+    while let Some(current) = source {
+        if current.is::<crate::network::PrivateAddress>() {
+            return format!("the address {}", crate::network::PRIVATE_ADDRESS);
+        }
+        source = current.source();
+    }
+    if error.is_timeout() {
+        "the endpoint did not answer in time".to_owned()
     } else if error.is_connect() {
-        "could not connect to the endpoint"
+        "could not connect to the endpoint (DNS, network or TLS)".to_owned()
     } else {
-        "the request failed"
-    };
-    let source = std::error::Error::source(error).map(ToString::to_string);
-    match source {
-        Some(source) => format!("{kind}: {source}"),
-        None => kind.to_owned(),
+        "the request failed".to_owned()
     }
 }
 

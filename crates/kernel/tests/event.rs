@@ -193,6 +193,43 @@ async fn ben_nhan_loi_thi_giao_lai_roi_danh_dau_hong() {
     .unwrap();
 }
 
+/// Event xoá tài khoản không bao giờ bị bỏ: quá số lần thử vẫn được giao lại (D-112).
+#[tokio::test]
+async fn event_xoa_tai_khoan_thu_lai_mai() {
+    TestDatabase::run(async |test| {
+        let recorder = Arc::new(Recorder { fail: true, ..Recorder::default() });
+        let listener = Listener { event: Subscription::ALL, recorder: recorder.clone() };
+        let setup = setup(test, listener).await;
+        record(&setup, "erase me").await;
+        let backend = setup.database.write().get_database_backend();
+        let rename =
+            format!("UPDATE notes_events SET name = '{}'", autoxide_kernel::privacy::USER_DELETED);
+        setup.database.write().execute_raw(Statement::from_string(backend, rename)).await.unwrap();
+        let dispatcher = setup.modules.dispatcher(&setup.database).unwrap();
+
+        for attempt in 1..=MAX_ATTEMPTS + 2 {
+            assert_eq!(dispatcher.run_once().await.unwrap(), 1, "attempt {attempt}");
+            let sql = "UPDATE notes_events SET next_attempt_at = occurred_at";
+            setup.database.write().execute_raw(Statement::from_string(backend, sql)).await.unwrap();
+        }
+        let row = setup
+            .database
+            .read()
+            .query_one_raw(Statement::from_string(
+                backend,
+                "SELECT attempts, failed_at FROM notes_events",
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.try_get::<i32>("", "attempts").unwrap(), MAX_ATTEMPTS + 2);
+        let failed: Option<chrono::DateTime<chrono::Utc>> = row.try_get("", "failed_at").unwrap();
+        assert!(failed.is_none());
+    })
+    .await
+    .unwrap();
+}
+
 /// Hai bộ phát (như hai máy chủ) chạy cùng lúc: mỗi event được giao đúng một lần.
 #[tokio::test]
 async fn nhieu_bo_phat_dong_thoi_khong_giao_trung() {

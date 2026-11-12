@@ -257,6 +257,27 @@ async fn sap_theo_cot_khac_lat_trang_khong_trung_khong_sot() {
         .await
         .unwrap_err();
         assert_eq!(mixed.fields()[0].field, "cursor");
+
+        // Con trỏ bị sửa cho sai kiểu (số cho cột chữ): cả hai database trả lỗi con trỏ,
+        // không phải lỗi máy chủ trên Postgres (D-112).
+        use base64::Engine as _;
+        let forged = serde_json::json!({"c": "kind", "v": {"i": 5}, "id": ids[0]});
+        let forged = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(serde_json::to_vec(&forged).unwrap());
+        let query = PageQuery { limit: None, cursor: Some(forged), order: None };
+        let request = PageRequest::try_from(query).unwrap();
+        let wrong_type = fetch_page_by(
+            item::Entity::find(),
+            item::Column::Kind,
+            |row| SortValue::Text(row.kind.clone()),
+            item::Column::Id,
+            |row| row.id,
+            &request,
+            db.read(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(wrong_type.fields()[0].field, "cursor");
         db.close().await.unwrap();
     })
     .await

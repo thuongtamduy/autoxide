@@ -481,6 +481,15 @@ async fn roles_of_user<C: ConnectionTrait>(
 
 /// Số người dùng CÒN HOẠT ĐỘNG (chưa bị khoá) đang có một role mang mọi permission.
 pub(crate) async fn count_active_admins<C: ConnectionTrait>(connection: &C) -> Result<u64, Error> {
+    // Khoá các role toàn quyền (câu `UPDATE` không đổi gì vẫn giữ khoá dòng tới hết
+    // transaction): mọi thay đổi có thể làm mất admin nối đuôi nhau. Thiếu khoá này, trên
+    // Postgres hai admin cuối cùng xoá nhau cùng lúc thì mỗi bên vẫn đếm thấy người kia còn
+    // và cả hai cùng thành công (D-112). SQLite chỉ có một bên ghi nên vốn đã nối đuôi.
+    role::Entity::update_many()
+        .col_expr(role::Column::AllPermissions, Expr::col(role::Column::AllPermissions))
+        .filter(role::Column::AllPermissions.eq(true))
+        .exec(connection)
+        .await?;
     let count = user_role::Entity::find()
         .filter(
             user_role::Column::RoleId.in_subquery(

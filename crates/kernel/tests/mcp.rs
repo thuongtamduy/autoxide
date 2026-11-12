@@ -65,6 +65,10 @@ impl Module for Notes {
                 Ok(input.a + input.b)
             })
             .requires(NOTES_WRITE),
+            Tool::new("issue_key", "Issue a secret.", |_: Principal, _: NoInput| async move {
+                Ok(json!({ "key": "secret-once" }))
+            })
+            .returns_secret(),
         ]
     }
 }
@@ -132,8 +136,8 @@ async fn chi_liet_ke_va_goi_duoc_tool_co_permission() {
     let add = tools.iter().find(|tool| tool.name == "notes.add").unwrap();
     assert!(add.description.as_deref().unwrap().ends_with("Requires permission `notes.write`."));
     assert_eq!(add.input_schema["properties"]["a"]["type"], "integer");
-    assert_eq!(names(tools), ["notes.whoami", "notes.add"]);
-    assert_eq!(names(reader.list_all_tools().await.unwrap()), ["notes.whoami"]);
+    assert_eq!(names(tools), ["notes.whoami", "notes.add", "notes.issue_key"]);
+    assert_eq!(names(reader.list_all_tools().await.unwrap()), ["notes.whoami", "notes.issue_key"]);
 
     let call =
         CallToolRequestParams::new("notes.add").with_arguments(arguments(json!({"a": 2, "b": 3})));
@@ -189,6 +193,35 @@ async fn thieu_hay_sai_token_thi_401() {
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(response.headers()[header::WWW_AUTHENTICATE], "Bearer");
+    }
+}
+
+/// Tool trả secret: response mang `Cache-Control: no-store` (không ai lưu lại, kể cả lớp
+/// idempotency); tool khác thì không (D-112).
+#[tokio::test]
+async fn tool_tra_secret_thi_response_no_store() {
+    for (tool, expected) in [("notes.issue_key", Some("no-store")), ("notes.whoami", None)] {
+        let body = json!({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": tool, "arguments": {}}
+        });
+        let request = Request::builder()
+            .method("POST")
+            .uri(MCP_PATH)
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::ACCEPT, "application/json, text/event-stream")
+            .header(header::AUTHORIZATION, "Bearer writer")
+            .header(header::HOST, "localhost")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        let response = router().oneshot(request).await.unwrap();
+
+        let status = response.status();
+        let headers = response.headers().clone();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(status, StatusCode::OK, "{tool}: {}", String::from_utf8_lossy(&bytes));
+        let cache = headers.get(header::CACHE_CONTROL);
+        assert_eq!(cache.map(|value| value.to_str().unwrap()), expected, "{tool}");
     }
 }
 

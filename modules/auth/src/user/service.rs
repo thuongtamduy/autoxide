@@ -985,4 +985,30 @@ mod update_tests {
         .await
         .unwrap();
     }
+
+    /// Hai admin cuối cùng xoá (hay khoá) nhau cùng lúc: đúng một bên thành công, luôn còn
+    /// một admin hoạt động — trên cả hai database (D-112).
+    #[tokio::test]
+    async fn hai_admin_cuoi_xoa_nhau_cung_luc_van_con_mot() {
+        TestDatabase::run(async |test| {
+            let services = crate::testing::services(test).await;
+            let users = services.users.clone();
+            let a = Accounts::create(users.as_ref(), account("a@example.com", true)).await.unwrap();
+            let b = Accounts::create(users.as_ref(), account("b@example.com", true)).await.unwrap();
+            let (first, second) = (users.clone(), users.clone());
+            let delete_a = tokio::spawn(async move { first.delete(Actor::system(), a.id).await });
+            let disable_b = tokio::spawn(async move {
+                second.update(Actor::system(), b.id, disable(true), None).await.map(|_| ())
+            });
+            let outcomes = [delete_a.await.unwrap(), disable_b.await.unwrap()];
+            let refused: Vec<_> =
+                outcomes.iter().filter_map(|outcome| outcome.as_ref().err()).collect();
+            assert_eq!(refused.len(), 1, "{outcomes:?}");
+            assert_eq!(refused[0].code(), "auth.last_admin");
+            let left = crate::role::count_active_admins(services.database.write()).await.unwrap();
+            assert_eq!(left, 1);
+        })
+        .await
+        .unwrap();
+    }
 }

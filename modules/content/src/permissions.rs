@@ -90,6 +90,26 @@ fn scoped(
     principal.require(any)
 }
 
+/// Quyền viết của `principal` chỉ là `content.write_own` (không có `content.write`). Gọi sau
+/// `require_create`/`require_write`. Người như vậy (thường là AI agent) bị giới hạn thêm: mục
+/// luôn mang `ai_generated`, trang cha phải là của mình, chỉ gắn hồ sơ tác giả của chính mình.
+pub(crate) fn write_own_only(principal: &Principal) -> bool {
+    !principal.has(&CONTENT_WRITE)
+}
+
+/// Quyền đăng của `principal` chỉ là `content.publish_own` (không có `content.publish`). Người
+/// như vậy không đăng lại mục đã lưu trữ, không tự đặt `published_at`, không đăng đè lên chuyển
+/// hướng làm tay.
+pub(crate) fn publish_own_only(principal: &Principal) -> bool {
+    !principal.has(&CONTENT_PUBLISH)
+}
+
+/// Được đặt mục dưới trang cha `parent` không: có `content.write`, hoặc trang cha là của mình.
+/// Không thì trang con của người chỉ có `content.write_own` sẽ chặn chủ trang cha gỡ hay xoá nó.
+pub(crate) fn require_parent(principal: &Principal, parent: &Entry) -> Result<(), Error> {
+    if !write_own_only(principal) || owns(principal, parent) { Ok(()) } else { Err(not_owner()) }
+}
+
 pub(crate) fn not_owner() -> Error {
     Error::forbidden(
         "content.not_owner",

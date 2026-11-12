@@ -135,6 +135,38 @@ endpoints are marked deprecated with a sunset date first.
 - The rate limiter reads only the last value of the client IP header, as added by your
   proxy; `autoxide restore` refuses backups that contain symbolic links; idempotency waits
   for a request body no longer than the request timeout.
+- Webhooks are sent only to public addresses: private, local and link-local addresses
+  (including names that resolve to them, checked when connecting) are refused unless
+  `AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true`; the delivery log keeps only a short reason.
+- Responses holding a one-time secret (new API keys, tokens, recovery codes, the TOTP secret)
+  carry `Cache-Control: no-store` and are never stored for `Idempotency-Key`; a repeat gets
+  `409 idempotency_result_not_kept`. The MCP tool `auth.create_api_key` is marked the same way.
+- Uploads larger than `AUTOXIDE_HTTP_BODY_LIMIT_BYTES` sent with `Idempotency-Key` are no longer
+  held in memory before the handler checks permissions.
+- Deleting an account also clears the email and name from the audit entries about it, and the
+  erasure event is retried until every module is done instead of giving up after ten tries.
+- Two last administrators removing each other at the same time can no longer leave none
+  (Postgres).
+- A tampered list cursor of the wrong type answers `invalid_cursor` on both databases instead
+  of a server error on Postgres.
+- Media: an SVG with anything that can run (`<script>`, `on…=` attributes, `javascript:` links,
+  embedded HTML) anywhere in the file is refused (`media.svg_active_content`); alt text
+  suggestions always send a re-encoded copy without metadata; images whose file is far larger
+  than their pixels get no smaller copies; a suffix `Range` on an empty file answers `416`.
+- Content:
+  - unpublishing or archiving cancels pending scheduled publishes, which could publish the
+    entry again;
+  - callers with only `content.publish_own` cannot republish an archived entry
+    (`content.archived`), set `published_at`, or publish over an editor's redirect
+    (`content.path_has_redirect`);
+  - callers with only `content.write_own` always get `ai_generated: true`, may attach only
+    their own author profiles and may place pages only under their own pages;
+  - redirects and menu links refuse `//host`;
+  - public search `q` is capped at 200 characters;
+  - the public preview no longer shows internal user ids;
+  - setting terms or authors is safe under concurrent requests on Postgres;
+  - deleting an account also clears who asked for review and who reviewed AI content, while
+    `ai_reviewed` stays shown.
 
 ## [0.1.0] - 2026-11-11
 

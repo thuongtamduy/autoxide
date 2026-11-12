@@ -40,7 +40,9 @@ with backoff, kept when they fail for good (`autoxide jobs failed`, `autoxide jo
 retry`), and run on a schedule when a module asks. `AUTOXIDE_PROCESS_ROLE` splits a
 deployment into API processes and worker processes. Error messages come in English or
 Vietnamese, chosen with the `Accept-Language` header. Write requests sent with an
-`Idempotency-Key` header are safe to retry: a repeat returns the first result. Mail
+`Idempotency-Key` header are safe to retry: a repeat returns the first result (except a
+result holding a one-time secret, such as a new API key, which is never stored: the repeat
+gets `409 idempotency_result_not_kept`). Mail
 goes out through SMTP from the job queue (password reset, email verification). Files
 are stored on local disk or in S3. AI agents call the system as tools over MCP at
 `/mcp`.
@@ -252,7 +254,10 @@ list of events is at `GET /api/v1/webhooks/events`). Each event is sent as a sig
 `POST` following [Standard Webhooks](https://www.standardwebhooks.com), so the receiver
 can check it with an existing library and the secret returned at creation. Failed
 deliveries are retried for about two hours; `GET /api/v1/webhooks/{id}/deliveries` shows
-what was sent and what failed.
+what was sent and what failed. Webhooks go only to public addresses: an address in a
+private or local network (`localhost`, `10.x`, `192.168.x`, `169.254.x`…) is refused,
+unless `AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true` because the receivers run in your
+own network.
 
 New accounts receive a mail asking to confirm their address; the token in it (valid
 24 hours) is confirmed with `POST /api/v1/auth/email-verification/confirm`, and

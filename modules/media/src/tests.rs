@@ -124,6 +124,15 @@ async fn noi_dung_sai_bi_tu_choi_khong_de_lai_gi() {
         let mut long_html = samples::HTML.to_vec();
         long_html.extend(vec![b' '; 1500]);
         assert_eq!(refuse("x.png", Some("image/png"), &long_html).await, mismatch);
+        // SVG có nội dung chạy được ở bất cứ đâu, kể cả sau phần đầu (D-112).
+        let active = (ErrorKind::UnsupportedMediaType, "media.svg_active_content".to_owned());
+        let mut late_script = b"<svg xmlns=\"http://www.w3.org/2000/svg\">".to_vec();
+        late_script.extend(vec![b' '; 1200]);
+        late_script.extend(b"<script>alert(1)</script></svg>");
+        assert_eq!(refuse("x.svg", Some("image/svg+xml"), &late_script).await, active);
+        assert_eq!(refuse("x.svg", None, &late_script).await, active);
+        let short = b"<svg xmlns=\"http://www.w3.org/2000/svg\" onload=\"x()\"/>";
+        assert_eq!(refuse("x.svg", Some("image/svg+xml"), short).await, active);
         assert_eq!(
             refuse("x.html", Some("text/html"), samples::HTML).await,
             (ErrorKind::UnsupportedMediaType, "media.type_not_allowed".to_owned())
@@ -1072,7 +1081,8 @@ mod alt {
             );
             assert_eq!(ai.calls(), 0);
 
-            // Cho gửi ảnh riêng tư: ảnh gốc đã nhỏ thì gửi nguyên.
+            // Cho gửi ảnh riêng tư. Ảnh gốc đã nhỏ vẫn được làm lại (bỏ metadata), không
+            // gửi chính file gốc (D-112).
             let (allowed, _, _) = service_with_ai(test, limits(), ai.clone(), true).await;
             let item = allowed
                 .upload(&ada, upload("cat.png", "image/png"), body(&small))
@@ -1081,7 +1091,7 @@ mod alt {
                 .item;
             assert_eq!(allowed.suggest_alt(&ada, item.id, "en", None).await.unwrap().alt, "A cat");
             let (media_type, sent) = image_of(&ai, 0);
-            assert_eq!((media_type.as_str(), sent.width()), ("image/png", 40));
+            assert_eq!((media_type.as_str(), sent.width()), ("image/jpeg", 40));
         })
         .await
         .unwrap();

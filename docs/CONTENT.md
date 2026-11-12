@@ -19,7 +19,7 @@ ids, and they must be public before the entry can be published.
 | `content.write`       | Creating and changing drafts, translations, restoring revisions, preview links, asking for a review |
 | `content.write_own`   | The same as `content.write`, but only on entries the caller created (same user **and** same API key) |
 | `content.publish`     | Publishing, taking down, archiving, moving pages, scheduling; the terms and authors of a published entry |
-| `content.publish_own` | Publishing and taking down only entries the caller created; no archive, move or schedule |
+| `content.publish_own` | Publishing and taking down only entries the caller created; no archive, schedule or moving published pages |
 | `content.delete`      | Deleting entries for good                                                    |
 | `content.manage`      | Categories, tags, authors, menus, redirects                                  |
 
@@ -98,7 +98,10 @@ curl -X POST http://localhost:8080/api/v1/content/entries/$ID/publish \
   A scheduled publish pins the current draft as a revision: later edits are not published by
   it. If the entry was published by hand after the schedule was made, the schedule fails
   (`content.schedule_outdated`) instead of overwriting it. A failed schedule keeps its error
-  code (`status: failed`) and sends the event `content.schedule_failed`.
+  code (`status: failed`) and sends the event `content.schedule_failed`. Taking an entry down
+  cancels its pending scheduled publish, and archiving cancels every pending schedule of the
+  entry (each sends `content.schedule_canceled`): a schedule made earlier never brings back an
+  entry that was taken down.
 
 ## Pages and addresses
 
@@ -117,7 +120,8 @@ The website only adds its domain and, if it uses one, a language prefix (`/vi/�
   working. Archiving or deleting records a `410 Gone`.
 - Redirects can also be made by hand (`/api/v1/content/redirects`, permission
   `content.manage`): `301`, `302`, `307`, `308` to an entry or an address, or `410`. Loops
-  are refused (`content.redirect_loop`).
+  are refused (`content.redirect_loop`). An address in the site starts with a single `/`:
+  `//host` (which browsers read as another site) is refused, here and in menus.
 
 ## Languages
 
@@ -144,7 +148,8 @@ Permission `content.manage`.
   entry it needs `content.publish` as well as `content.write` (the same for its authors).
 - **Authors** (`/api/v1/content/authors`): profiles of the content module — display name, slug,
   bio, avatar (a media id), website — optionally linked to a user account (`user_id`). An
-  entry can have several, in order: `PUT /api/v1/content/entries/{id}/authors`.
+  entry can have several, in order: `PUT /api/v1/content/entries/{id}/authors`. Setting the
+  terms or authors of an entry needs the right to edit it, not `content.read`.
 - **Menus** (`/api/v1/content/menus/{key}?locale=`): a tree of items (at most 4 levels, 200
   items), each pointing to an entry, a term, or an address. `PUT` replaces the whole tree
   (`If-Match: *` to create one).
@@ -156,7 +161,7 @@ No sign-in needed. Only published versions are ever returned — drafts never.
 | Endpoint                                              | Gives                                                      |
 | ----------------------------------------------------- | ---------------------------------------------------------- |
 | `GET /public/resolve?locale=&path=`                   | What lives at an address: `entry`, `redirect` or `gone`    |
-| `GET /public/posts?locale=&term_id=&author_id=&q=`    | Published posts, newest first, paged                       |
+| `GET /public/posts?locale=&term_id=&author_id=&q=`    | Published posts, newest first, paged (`q`: at most 200 characters) |
 | `GET /public/menus/{key}?locale=`                     | A menu with computed `href`s; unpublished targets hidden   |
 | `GET /public/terms/{taxonomy}/{slug}?locale=`         | A category or tag page                                     |
 | `GET /public/authors/{slug}`                          | An author page                                             |
@@ -216,9 +221,9 @@ Editors can show a draft to someone without an account:
    signed `token` and its `expires_at` (`AUTOXIDE_CONTENT_PREVIEW_TTL_SECONDS`, default 10
    minutes).
 3. The website's preview page calls `GET /api/v1/content/public/preview?token=…` and renders
-   the draft. The answer is `Cache-Control: no-store`; it always shows the latest draft. An
-   invalid or expired token is `404` (`content.preview_token_invalid`). Changing the secret
-   revokes every token.
+   the draft. The answer is `Cache-Control: no-store`; it always shows the latest draft, and
+   holds only its content — not who created it or asked for a review. An invalid or expired
+   token is `404` (`content.preview_token_invalid`). Changing the secret revokes every token.
 
 ## AI agents
 
@@ -245,9 +250,23 @@ only the permissions it needs:
 
 With the `_own` permissions an agent only touches the entries it created with that same key:
 another key — even of the same user — gets `403 content.not_owner`. It can never archive,
-move, schedule or delete (deleting needs `content.delete`). Every change is in the audit log
-with the API key that made it, and requests with an API key are rate limited per key
-(`AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE`, default 120).
+schedule or delete (deleting needs `content.delete`), nor move a published page; it can move
+its own unpublished pages, under pages it created. More limits keep it from going around an
+editor:
+
+- `content.write_own` without `content.write`: a new page, a moved page or a translated subpage
+  goes only under a parent page the agent created (`403 content.not_owner`), so it cannot block
+  someone else's page from being taken down or deleted; the entry is always marked
+  `ai_generated: true`, whatever is sent; on `PUT …/authors` it may add only author profiles
+  linked to its own account (`user_id`) — profiles already on the entry may stay.
+- `content.publish_own` without `content.publish`: it cannot publish an entry an editor
+  archived (`403 content.archived`); it cannot set `published_at` (422, `not_allowed`; the
+  server uses the current time, or keeps the date of an earlier publish); it cannot publish at
+  an address where an editor made a redirect (`409 content.path_has_redirect`), since the
+  published entry would hide it.
+
+Every change is in the audit log with the API key that made it, and requests with an API key
+are rate limited per key (`AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_PER_MINUTE`, default 120).
 
 **Review.** When the agent is done, it calls `POST /entries/{id}/request-review` (tool
 `content.request_review`): the draft gets `review_requested_at` and the event
@@ -255,7 +274,8 @@ with the API key that made it, and requests with an API key are rate limited per
 `DELETE /entries/{id}/request-review` withdraws it; publishing clears it.
 
 **AI-generated content.** Send `"ai_generated": true` when creating or editing content written
-by AI (agents should always do so). When a person — signed in, not with an API key — publishes
+by AI (agents should always do so; with only `content.write_own` the server sets it anyway).
+When a person — signed in, not with an API key — publishes
 such an entry after reviewing it, they send `{"ai_reviewed": true}` to
 `POST /entries/{id}/publish`; the published version records who and when. Public endpoints
 return `ai_generated` and `ai_reviewed`, so the website can show readers a notice where the
@@ -268,8 +288,10 @@ not give legal advice. The admin API also tells how an entry was created: `creat
 
 Posts and pages belong to the site, not to the person who wrote them: they stay. Author
 profiles linked to the account are deleted (and removed from entries), schedules the person
-made are canceled, and `created_by` becomes `null`. The personal data export lists the
-person's author profiles and the entries they created.
+made are canceled, and `created_by` becomes `null`, as do `review_requested_by` (who asked
+for a review) and the record of who confirmed an AI review — the time of that confirmation
+stays, so readers still see `ai_reviewed`. The personal data export lists the person's author
+profiles and the entries they created.
 
 ## Settings
 

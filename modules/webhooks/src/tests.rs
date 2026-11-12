@@ -110,10 +110,12 @@ async fn setup(test: &TestDatabase, allow_http: bool) -> Setup {
         Outbox::standalone("webhooks"),
         catalog,
         allow_http,
+        // Máy nhận trong test chạy trên 127.0.0.1.
+        allow_http,
     ));
     let fanout = Fanout { database: database.clone(), jobs: JobQueue::new("webhooks") };
-    let client = Sender::client(std::time::Duration::from_secs(5)).unwrap();
-    let sender = Sender { database: database.clone(), client };
+    let client = Sender::client(std::time::Duration::from_secs(5), allow_http).unwrap();
+    let sender = Sender { database: database.clone(), client, allow_private_networks: allow_http };
     Setup { database, service, fanout, sender }
 }
 
@@ -279,6 +281,46 @@ async fn het_lan_thu_hoac_endpoint_tat_thi_that_bai() {
     .unwrap();
 }
 
+/// Địa chỉ trong mạng riêng (vd đã lưu trước khi tắt `ALLOW_PRIVATE_NETWORKS`): không gửi,
+/// thất bại hẳn, lịch sử chỉ ghi lý do cố định (D-112).
+#[tokio::test]
+async fn khong_gui_vao_mang_rieng() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, false).await;
+        let input = NewEndpoint {
+            url: "https://example.com/hook".to_owned(),
+            description: String::new(),
+            events: vec!["*".to_owned()],
+        };
+        let endpoint = setup.service.create(Actor::system(), input).await.unwrap().endpoint;
+        let backend = setup.database.write().get_database_backend();
+        let sql = format!(
+            "UPDATE webhooks_endpoint SET url = 'https://127.0.0.1:9/hook' WHERE id = '{}'",
+            endpoint.id
+        );
+        let sql = if backend == sea_orm::DatabaseBackend::Sqlite {
+            // SQLite lưu UUID dạng blob.
+            format!(
+                "UPDATE webhooks_endpoint SET url = 'https://127.0.0.1:9/hook' WHERE id = x'{}'",
+                endpoint.id.simple()
+            )
+        } else {
+            sql
+        };
+        setup.database.write().execute_unprepared(&sql).await.unwrap();
+
+        setup.fanout.handle(&event(DEMO_EVENT)).await.unwrap();
+        let rows = deliveries(&setup.database).await;
+        setup.sender.run(&job(rows[0].id, 1)).await.unwrap();
+        let row = delivery::Entity::find_by_id(rows[0].id).one(setup.database.read()).await;
+        let row = row.unwrap().unwrap();
+        assert_eq!(row.status, "failed");
+        assert!(row.last_error.unwrap().contains("private"));
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn kiem_dia_chi_va_ten_event() {
     TestDatabase::run(async |test| {
@@ -302,6 +344,21 @@ async fn kiem_dia_chi_va_ten_event() {
         let error = setup.service.create(Actor::system(), all_wrong).await.unwrap_err();
         let fields: Vec<&str> = error.fields().iter().map(|field| field.field.as_str()).collect();
         assert_eq!(fields, ["url", "description", "events[0]"]);
+        // Mạng riêng hay máy này: từ chối ngay (SSRF, D-112) — kể cả IP viết kiểu khác.
+        for private in [
+            "https://127.0.0.1/h",
+            "https://localhost:8443/h",
+            "https://[::1]/h",
+            "https://169.254.169.254/latest/meta-data",
+            "https://10.0.0.5/h",
+            "https://2130706433/h",
+            "https://[::ffff:192.168.1.1]/h",
+        ] {
+            let refused = setup.service.create(Actor::system(), new(private, DEMO_EVENT)).await;
+            let error = refused.unwrap_err();
+            assert_eq!(error.fields()[0].field, "url", "{private}");
+            assert!(error.fields()[0].message.contains("private"), "{private}");
+        }
         for bad in ["not a url", "https://user:pass@example.com/h", "ftp://example.com"] {
             assert!(
                 setup.service.create(Actor::system(), new(bad, DEMO_EVENT)).await.is_err(),

@@ -84,7 +84,12 @@ Every item has a `url`: `/api/v1/media/{id}/content?v=<version_id>`.
 - **Safety**: only raster images open in the browser (`Content-Disposition: inline`);
   everything else, SVG and PDF included, is downloaded (`attachment`). Every answer carries
   `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none';
-  sandbox`, so content cannot run scripts on your domain.
+  sandbox`, so content cannot run scripts on your domain. On top of that, an SVG containing
+  anything that can run (`<script>`, `on…=` attributes, `javascript:` links, embedded HTML),
+  anywhere in the file, is refused at upload (`415 media.svg_active_content`).
+- **Metadata**: the original is served exactly as uploaded, metadata included — a photo's
+  EXIF may hold where it was taken and the camera's serial number. Remove it before
+  uploading when that matters; the smaller copies below carry none.
 - **Video and large files**: one `Range: bytes=…` is answered with `206` (seeking in a
   video works); a range outside the content with `416`. `HEAD` gives the headers only.
   `If-None-Match` with the `ETag` gives `304`.
@@ -136,7 +141,8 @@ empty folders can be deleted — items in the trash count (`409`, `media.folder_
 
 `POST /api/v1/media/{id}/alt-suggestions` with `{"locale": "vi", "context": "…"}` (permission
 `media.write`) asks the server's AI model for the alt text of a JPEG, PNG, GIF or WebP image in
-that language. It sends a small copy (at most 1280 px), never the original; private images only
+that language. It sends a small copy (at most 1280 px), re-encoded without metadata even when
+the original is small, never the original file; private images only
 when `AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true`. Nothing is saved: store what a person accepts with
 `PATCH`. `decorative: true` means the image adds no information — leave its alt text empty.
 `media.alt` has one language; the alt text per language lives in the image nodes of a post
@@ -147,8 +153,12 @@ body. Turning AI on: [`AI.md`](AI.md).
 Tools `media.list`, `media.get`, `media.update`, `media.trash`, `media.list_tags`,
 `media.upload` and `media.suggest_alt`, with the same permissions as the REST endpoints. `media.update` takes the
 `updated_at` you read instead of `If-Match`. `media.upload` takes the content as base64, up
-to 1 MiB (the whole tool call must also fit `AUTOXIDE_HTTP_BODY_LIMIT_BYTES`, 1 MiB by
-default); upload larger files through REST.
+to 1 MiB once decoded — but the whole tool call must also fit
+`AUTOXIDE_HTTP_BODY_LIMIT_BYTES` (1 MiB by default), and base64 is a third larger, so with
+the default limit files of up to about 750 KiB fit; upload larger files through REST.
+
+`media.write` lets its holder see every item it changes — for example by making a private
+item public — so give it only to people who may also read the library.
 
 ## For module authors
 

@@ -1,7 +1,9 @@
 //! Dữ liệu cá nhân trong module `content`.
 //!
 //! Tài khoản bị xoá (`privacy::USER_DELETED`): xoá hồ sơ tác giả gắn với người đó (cùng liên
-//! kết của hồ sơ với các mục), bỏ trống `created_by` ở mọi bảng, huỷ lịch người đó đặt. Bài và
+//! kết của hồ sơ với các mục), bỏ trống `created_by` ở mọi bảng, cùng `review_requested_by` (ai
+//! xin duyệt) và `ai_reviewed_by` (ai xác nhận đã duyệt nội dung AI — thời điểm
+//! `ai_reviewed_at` vẫn giữ, nên người đọc vẫn thấy `ai_reviewed`), huỷ lịch người đó đặt. Bài và
 //! trang vẫn giữ: nội dung là của site, không của người viết. Nhận lại cùng event thì kết quả
 //! không đổi (D-054).
 
@@ -13,7 +15,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::entity::{author, entry, redirect, revision, schedule};
+use crate::entity::{author, entry, published, redirect, revision, schedule};
 use crate::service::ContentService;
 
 #[async_trait::async_trait]
@@ -74,6 +76,16 @@ impl EventHandler for ContentService {
         entry::Entity::update_many()
             .col_expr(entry::Column::CreatedBy, none())
             .filter(entry::Column::CreatedBy.eq(user_id))
+            .exec(write)
+            .await?;
+        entry::Entity::update_many()
+            .col_expr(entry::Column::ReviewRequestedBy, none())
+            .filter(entry::Column::ReviewRequestedBy.eq(user_id))
+            .exec(write)
+            .await?;
+        published::Entity::update_many()
+            .col_expr(published::Column::AiReviewedBy, none())
+            .filter(published::Column::AiReviewedBy.eq(user_id))
             .exec(write)
             .await?;
         revision::Entity::update_many()

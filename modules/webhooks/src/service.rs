@@ -97,6 +97,7 @@ pub(crate) struct WebhookService {
     outbox: Outbox,
     catalog: EventCatalog,
     allow_http: bool,
+    allow_private_networks: bool,
 }
 
 impl WebhookService {
@@ -105,8 +106,9 @@ impl WebhookService {
         outbox: Outbox,
         catalog: EventCatalog,
         allow_http: bool,
+        allow_private_networks: bool,
     ) -> Self {
-        WebhookService { database, outbox, catalog, allow_http }
+        WebhookService { database, outbox, catalog, allow_http, allow_private_networks }
     }
 
     /// Mọi loại event có thể đăng ký, theo tên.
@@ -320,6 +322,9 @@ impl WebhookService {
         }
         if !url.username().is_empty() || url.password().is_some() {
             return Err("must not contain a user name or password".to_owned());
+        }
+        if !self.allow_private_networks && !crate::network::is_public_host(&url) {
+            return Err(crate::network::PRIVATE_ADDRESS.to_owned());
         }
         match url.scheme() {
             "https" => Ok(url.to_string()),

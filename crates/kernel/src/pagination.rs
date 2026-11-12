@@ -327,7 +327,9 @@ where
     let column_name = sort_column.as_str();
     let select = match &request.position {
         None => select,
-        Some(Position::Key(cursor)) if cursor.column == column_name => {
+        Some(Position::Key(cursor))
+            if cursor.column == column_name && fits(&sort_column, &cursor.value) =>
+        {
             let value = sea_orm::Value::from(cursor.value.clone());
             let (after, tie) = match request.order {
                 Order::Asc => (sort_column.gt(value.clone()), id_column.gt(cursor.id)),
@@ -352,6 +354,31 @@ where
     });
 
     Ok(Page { data: rows, pagination: Pagination { limit: request.limit, next_cursor } })
+}
+
+/// Giá trị trong con trỏ có đúng kiểu của cột không. Con trỏ do client gửi lại nên có thể
+/// bị sửa: so chữ với cột số làm Postgres báo lỗi (500) còn SQLite thì không — kiểm trước
+/// để cả hai cùng trả `invalid_cursor` (D-112).
+fn fits<C: ColumnTrait>(column: &C, value: &SortValue) -> bool {
+    use sea_orm::ColumnType;
+    match column.def().get_column_type() {
+        ColumnType::TinyInteger
+        | ColumnType::SmallInteger
+        | ColumnType::Integer
+        | ColumnType::BigInteger
+        | ColumnType::TinyUnsigned
+        | ColumnType::SmallUnsigned
+        | ColumnType::Unsigned
+        | ColumnType::BigUnsigned => matches!(value, SortValue::Integer(_)),
+        ColumnType::Char(_) | ColumnType::String(_) | ColumnType::Text => {
+            matches!(value, SortValue::Text(_))
+        }
+        ColumnType::DateTime | ColumnType::Timestamp | ColumnType::TimestampWithTimeZone => {
+            matches!(value, SortValue::Time(_))
+        }
+        // Kiểu khác không dùng để sắp; nếu có thì để database phán.
+        _ => true,
+    }
 }
 
 /// Đọc tối đa `limit` dòng; kèm biết còn dòng sau hay không.

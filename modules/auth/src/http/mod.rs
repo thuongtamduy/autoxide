@@ -53,6 +53,18 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(passkeys::routes())
         .merge(sessions::routes())
         .with_state(Arc::new(state))
+        // Response của `auth` hay chứa secret chỉ trả một lần (token, API key mới, secret TOTP,
+        // mã khôi phục): không ai được lưu lại — proxy, trình duyệt, lớp idempotency (RFC 6749
+        // §5.1, D-112).
+        .layer(axum::middleware::map_response(no_store))
+}
+
+async fn no_store(mut response: axum::response::Response) -> axum::response::Response {
+    response.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("no-store"),
+    );
+    response
 }
 
 /// Việc chỉ làm được trong phiên đăng nhập bằng mật khẩu, không bằng API key (vd đổi

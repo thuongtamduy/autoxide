@@ -165,14 +165,21 @@ pub(crate) struct EntryFilter {
 }
 
 impl ContentService {
-    /// Tạo một mục nháp. Cần `content.write` hoặc `content.write_own`. Slug để trống thì sinh
-    /// từ tiêu đề (trùng thì thêm `-2`, `-3`…).
+    /// Tạo một mục nháp. Cần `content.write` hoặc `content.write_own` (khi đó trang cha phải là
+    /// của mình, và mục luôn mang `ai_generated`). Slug để trống thì sinh từ tiêu đề (trùng thì
+    /// thêm `-2`, `-3`…).
     pub(crate) async fn create(
         &self,
         principal: &Principal,
         input: NewEntry,
     ) -> Result<Entry, Error> {
         permissions::require_create(principal)?;
+        if let Some(parent) = input.parent_id {
+            // Trang cha không có thì `check_parent` báo bên dưới, cùng các lỗi khác.
+            if let Some(row) = Entity::find_by_id(parent).one(self.database.read()).await? {
+                permissions::require_parent(principal, &row)?;
+            }
+        }
         let mut problems = Vec::new();
         let locale = self.check_locale(input.locale.as_deref(), "locale", &mut problems);
         if input.fields.title.as_deref().is_none_or(|title| title.trim().is_empty()) {
@@ -192,6 +199,7 @@ impl ContentService {
         candidate.created_by_api_key_id = principal.api_key_id();
         let auto_slug = input.fields.slug.is_none();
         self.apply(&mut candidate, input.fields, &mut problems).await?;
+        mark_agent_written(principal, &mut candidate);
         if let Some(parent) = input.parent_id {
             self.check_parent(self.database.read(), &candidate, parent, &mut problems).await?;
         }
@@ -377,6 +385,7 @@ impl ContentService {
         let mut candidate = before.clone();
         let slug_changed = fields.slug.as_ref().is_some_and(|slug| slug.trim() != before.slug);
         self.apply(&mut candidate, fields, &mut problems).await?;
+        mark_agent_written(principal, &mut candidate);
         if !problems.is_empty() {
             return Err(invalid(problems));
         }
@@ -676,7 +685,12 @@ impl ContentService {
                     .one(self.database.read())
                     .await?;
                 match translated {
-                    Some(translated) => Some(translated.id),
+                    Some(translated) => {
+                        // Bản dịch nằm dưới bản dịch của trang cha: cùng luật "trang cha phải là
+                        // của mình" như khi tạo trang con.
+                        permissions::require_parent(principal, &translated)?;
+                        Some(translated.id)
+                    }
                     None => {
                         return Err(Error::conflict(
                             "content.parent_not_translated",
@@ -710,6 +724,7 @@ impl ContentService {
         // thêm `-2`, `-3`… khi trùng.
         let auto_slug = fields.slug.as_deref().is_none_or(|slug| slug.trim().is_empty());
         self.apply(&mut candidate, fields, &mut problems).await?;
+        mark_agent_written(principal, &mut candidate);
         if !problems.is_empty() {
             return Err(invalid(problems));
         }
@@ -723,6 +738,14 @@ impl ContentService {
             .one(self.database.write())
             .await?
             .is_some())
+    }
+}
+
+/// Người chỉ có `content.write_own` (thường là AI agent) không tự khai được `ai_generated`: máy
+/// chủ luôn đặt `true`, để người đọc không bị giấu nội dung do máy viết (D-109).
+fn mark_agent_written(principal: &Principal, candidate: &mut Entry) {
+    if permissions::write_own_only(principal) {
+        candidate.ai_generated = true;
     }
 }
 
@@ -842,6 +865,18 @@ pub(crate) async fn touch<C: ConnectionTrait>(connection: &C, id: Uuid) -> Resul
         .exec(connection)
         .await?;
     Ok(touched.rows_affected == 1)
+}
+
+/// Khoá dòng mục `id` tới hết `transaction` (như [`touch`]) rồi đọc nó trong transaction đó;
+/// mục không còn: `content.not_found`.
+pub(crate) async fn lock_entry<C: ConnectionTrait>(
+    transaction: &C,
+    id: Uuid,
+) -> Result<Entry, Error> {
+    if !touch(transaction, id).await? {
+        return Err(entry_not_found(id));
+    }
+    Entity::find_by_id(id).one(transaction).await?.ok_or_else(|| entry_not_found(id))
 }
 
 /// Cấp của trang `id` trong cây (trang gốc: 1).

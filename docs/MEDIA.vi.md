@@ -83,7 +83,12 @@ Mỗi item có `url`: `/api/v1/media/{id}/content?v=<version_id>`.
 - **An toàn**: chỉ ảnh raster được mở ngay trong trình duyệt (`Content-Disposition:
   inline`); mọi loại khác, kể cả SVG và PDF, là tải về (`attachment`). Mọi response có
   `X-Content-Type-Options: nosniff` và `Content-Security-Policy: default-src 'none';
-  sandbox`, nên nội dung không chạy được script trên tên miền của bạn.
+  sandbox`, nên nội dung không chạy được script trên tên miền của bạn. Thêm nữa, SVG chứa
+  bất cứ thứ gì chạy được (`<script>`, thuộc tính `on…=`, liên kết `javascript:`, HTML nhúng),
+  ở bất cứ đâu trong file, bị từ chối khi tải lên (`415 media.svg_active_content`).
+- **Metadata**: file gốc được trả đúng như lúc tải lên, kể cả metadata — EXIF của ảnh chụp
+  có thể chứa nơi chụp và số máy. Cần thì xoá trước khi tải lên; các bản thu nhỏ bên dưới
+  không mang metadata nào.
 - **Video và file lớn**: một `Range: bytes=…` được trả `206` (tua video được); khoảng nằm
   ngoài nội dung thì `416`. `HEAD` chỉ trả header. `If-None-Match` với `ETag` thì `304`.
 
@@ -135,7 +140,8 @@ cũng tính (`409`, `media.folder_not_empty`).
 
 `POST /api/v1/media/{id}/alt-suggestions` với `{"locale": "vi", "context": "…"}` (permission
 `media.write`) nhờ mô hình AI của máy chủ gợi ý alt text cho một ảnh JPEG, PNG, GIF hay WebP
-bằng ngôn ngữ đó. Gửi một bản nhỏ (tối đa 1280 px), không bao giờ gửi file gốc; ảnh riêng tư chỉ
+bằng ngôn ngữ đó. Gửi một bản nhỏ (tối đa 1280 px), làm lại không kèm metadata kể cả khi ảnh
+gốc đã nhỏ, không bao giờ gửi file gốc; ảnh riêng tư chỉ
 gửi khi `AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true`. Không lưu gì: người xem rồi lưu bằng `PATCH`.
 `decorative: true` nghĩa là ảnh không thêm thông tin — để alt trống. `media.alt` chỉ có một
 ngôn ngữ; alt theo từng ngôn ngữ nằm ở node ảnh trong thân bài. Bật AI: [`AI.vi.md`](AI.vi.md).
@@ -144,9 +150,13 @@ ngôn ngữ; alt theo từng ngôn ngữ nằm ở node ảnh trong thân bài. 
 
 Tool `media.list`, `media.get`, `media.update`, `media.trash`, `media.list_tags`,
 `media.upload` và `media.suggest_alt`, cùng permission với endpoint REST. `media.update` nhận `updated_at` đã đọc
-thay cho `If-Match`. `media.upload` nhận nội dung dạng base64, tối đa 1 MiB (cả lời gọi tool
-còn phải lọt `AUTOXIDE_HTTP_BODY_LIMIT_BYTES`, mặc định 1 MiB); file lớn hơn thì tải lên
-qua REST.
+thay cho `If-Match`. `media.upload` nhận nội dung dạng base64, tối đa 1 MiB sau khi giải mã —
+nhưng cả lời gọi tool còn phải lọt `AUTOXIDE_HTTP_BODY_LIMIT_BYTES` (mặc định 1 MiB), mà
+base64 dài hơn một phần ba, nên với giới hạn mặc định chỉ file tới khoảng 750 KiB là vừa; file
+lớn hơn thì tải lên qua REST.
+
+`media.write` cho người giữ nó thấy mọi item nó thay đổi — ví dụ bằng cách đổi item riêng tư
+thành công khai — nên chỉ cấp cho người cũng được xem thư viện.
 
 ## Cho người viết module
 

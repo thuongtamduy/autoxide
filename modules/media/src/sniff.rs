@@ -124,6 +124,62 @@ fn markup(head: &[u8]) -> Option<&'static str> {
     text.starts_with("<?xml").then_some("application/xml")
 }
 
+/// Tìm nội dung chạy được trong SVG — `<script>`, thuộc tính `on…=`, liên kết `javascript:`,
+/// phần nhúng HTML — trên TOÀN BỘ file, từng mảnh khi đang nhận (D-112). Máy chủ đã trả SVG
+/// dạng tải về kèm CSP chặn script, nhưng file có thể được phục vụ chỗ khác (CDN, website
+/// đọc thẳng nơi lưu): không nhận thì không lo.
+#[derive(Debug, Default)]
+pub(crate) struct ActiveMarkup {
+    /// Đuôi của mảnh trước, để mẫu nằm vắt qua hai mảnh vẫn thấy.
+    tail: Vec<u8>,
+    pub(crate) found: bool,
+}
+
+/// Độ dài phần đuôi giữ lại: dài hơn mẫu dài nhất.
+const ACTIVE_TAIL: usize = 32;
+
+impl ActiveMarkup {
+    pub(crate) fn feed(&mut self, chunk: &[u8]) {
+        if self.found {
+            return;
+        }
+        let mut window = std::mem::take(&mut self.tail);
+        window.extend(chunk.iter().map(u8::to_ascii_lowercase));
+        self.found = has_active_markup(&window);
+        let keep = window.len().saturating_sub(ACTIVE_TAIL);
+        self.tail = window.split_off(keep);
+    }
+}
+
+fn has_active_markup(text: &[u8]) -> bool {
+    const TAGS: [&[u8]; 7] = [
+        b"<script",
+        b"javascript:",
+        b"vbscript:",
+        b"<foreignobject",
+        b"<iframe",
+        b"<embed",
+        b"<object",
+    ];
+    if TAGS.iter().any(|tag| text.windows(tag.len()).any(|window| window == *tag)) {
+        return true;
+    }
+    // Thuộc tính sự kiện: khoảng trắng hay `/`, rồi `on` + chữ cái, rồi `=` (có thể cách).
+    text.windows(3).enumerate().any(|(index, window)| {
+        let starts = window[0].is_ascii_whitespace() || window[0] == b'/';
+        if !(starts && &window[1..] == b"on") {
+            return false;
+        }
+        let rest = &text[index + 3..];
+        let name = rest.iter().take_while(|byte| byte.is_ascii_alphabetic()).count();
+        name > 0
+            && rest[name..]
+                .iter()
+                .find(|byte| !byte.is_ascii_whitespace())
+                .is_some_and(|b| *b == b'=')
+    })
+}
+
 /// Các tên khác của cùng một loại; tên đầu nhóm là tên chuẩn, được lưu.
 const SYNONYMS: [&[&str]; 9] = [
     &["image/jpeg", "image/jpg", "image/pjpeg"],
@@ -272,6 +328,24 @@ pub(crate) mod samples {
 mod tests {
     use super::samples::*;
     use super::*;
+
+    #[test]
+    fn tim_noi_dung_chay_duoc_trong_svg_ca_khi_vat_qua_hai_manh() {
+        let scan = |parts: &[&str]| {
+            let mut scanner = ActiveMarkup::default();
+            for part in parts {
+                scanner.feed(part.as_bytes());
+            }
+            scanner.found
+        };
+        assert!(!scan(&["<svg viewBox=\"0 0 1 1\"><path d=\"M0 0\" stroke=\"red\"/></svg>"]));
+        assert!(!scan(&["<svg><text>Don't wait, online now</text></svg>"]));
+        assert!(scan(&["<svg>", "<SCRIPT>alert(1)</script>"]));
+        assert!(scan(&["<svg><scr", "ipt>"]));
+        assert!(scan(&["<svg onload", " = \"x()\">"]));
+        assert!(scan(&["<svg><a href=\"JavaScript:x()\">"]));
+        assert!(scan(&["<svg><foreignObject><div/></foreignObject>"]));
+    }
 
     #[test]
     fn nhan_dien_loai_that() {

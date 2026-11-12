@@ -37,7 +37,9 @@ thì thử lại với backoff, hỏng hẳn thì được giữ lại (`autoxid
 jobs retry`), và chạy theo lịch khi module yêu cầu. `AUTOXIDE_PROCESS_ROLE` tách một
 bản triển khai thành tiến trình API và tiến trình worker. Thông báo lỗi có tiếng Anh và
 tiếng Việt, chọn bằng header `Accept-Language`. Lệnh ghi gửi kèm header
-`Idempotency-Key` gửi lại an toàn: lần gửi lại nhận đúng kết quả lần đầu. Mail gửi qua
+`Idempotency-Key` gửi lại an toàn: lần gửi lại nhận đúng kết quả lần đầu (trừ kết quả chứa
+secret chỉ trả một lần, như API key mới, vốn không bao giờ được lưu: lần gửi lại nhận
+`409 idempotency_result_not_kept`). Mail gửi qua
 SMTP từ job queue (đặt lại mật khẩu, xác minh email). File lưu trên ổ đĩa hoặc S3. AI
 agent gọi hệ thống như công cụ qua MCP ở `/mcp`.
 
@@ -248,7 +250,10 @@ chỉ `https://` cùng các event muốn nhận ở `POST /api/v1/webhooks` (dan
 `GET /api/v1/webhooks/events`). Mỗi event được gửi bằng một request `POST` có chữ ký theo
 [Standard Webhooks](https://www.standardwebhooks.com), nên bên nhận kiểm được bằng thư
 viện có sẵn và secret nhận lúc tạo. Lần gửi lỗi được thử lại trong khoảng hai giờ;
-`GET /api/v1/webhooks/{id}/deliveries` cho biết đã gửi gì và cái gì lỗi.
+`GET /api/v1/webhooks/{id}/deliveries` cho biết đã gửi gì và cái gì lỗi. Webhook chỉ gửi
+tới địa chỉ public: địa chỉ trong mạng riêng hay máy này (`localhost`, `10.x`, `192.168.x`,
+`169.254.x`…) bị từ chối, trừ khi đặt `AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true` vì máy
+nhận chạy trong mạng của bạn.
 
 Tài khoản mới nhận một mail đề nghị xác nhận địa chỉ; token trong đó (hạn 24 giờ)
 được xác nhận bằng `POST /api/v1/auth/email-verification/confirm`, sau đó

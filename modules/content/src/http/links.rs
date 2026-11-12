@@ -58,7 +58,7 @@ pub(crate) struct EntryAuthors {
     responses(
         (status = 201, description = "The new translation (a draft).", body = Data<EntryResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`).", body = Problem),
+        (status = 403, description = "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry — or the translation of its parent page — is not yours and you only have `content.write_own` (code `content.not_owner`).", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
         (status = 409, description = "A translation in this language exists (code `content.translation_exists`), the parent page is not translated (code `content.parent_not_translated`), or the slug is taken (code `content.slug_taken`).", body = Problem),
         (status = 422, description = "The language is not supported or a value is invalid; see `errors`.", body = Problem),
@@ -78,8 +78,8 @@ pub(crate) async fn create_translation(
 
 /// Set the categories and tags of an entry.
 ///
-/// Requires `content.read` and `content.write` (or `content.write_own` for an entry you created),
-/// and `content.publish` (or `content.publish_own`) when the entry is published. Takes effect at
+/// Requires `content.write` (or `content.write_own` for an entry you created), and
+/// `content.publish` (or `content.publish_own`) when the entry is published. Takes effect at
 /// once, also for the published version.
 #[utoipa::path(
     put,
@@ -108,9 +108,10 @@ pub(crate) async fn set_terms(
 
 /// Set the authors of an entry.
 ///
-/// Requires `content.read` and `content.write` (or `content.write_own` for an entry you created),
-/// and `content.publish` (or `content.publish_own`) when the entry is published. Takes effect at
-/// once, also for the published version.
+/// Requires `content.write` (or `content.write_own` for an entry you created), and
+/// `content.publish` (or `content.publish_own`) when the entry is published. Takes effect at
+/// once, also for the published version. With only `content.write_own` you may add only author
+/// profiles linked to your own account (`user_id`); profiles already on the entry may stay.
 #[utoipa::path(
     put,
     path = "/entries/{id}/authors",
@@ -123,7 +124,7 @@ pub(crate) async fn set_terms(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `content.write` or `content.write_own` (or `content.publish` / `content.publish_own` for a published entry; code `permission_denied`), or the entry is not yours and you only have the `_own` permission (code `content.not_owner`).", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
-        (status = 422, description = "An id is not an author, or too many; see `errors`.", body = Problem),
+        (status = 422, description = "An id is not an author, too many, or (with only `content.write_own`) a profile of someone else (`not_allowed`); see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn set_authors(

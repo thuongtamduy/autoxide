@@ -127,6 +127,21 @@ pub(crate) async fn path_used<C: ConnectionTrait>(
         .is_some())
 }
 
+/// Ở `path` (ngôn ngữ `locale`) có chuyển hướng làm tay (`manual`) không.
+pub(crate) async fn manual_redirect_at<C: ConnectionTrait>(
+    connection: &C,
+    locale: &str,
+    path: &str,
+) -> Result<bool, Error> {
+    Ok(redirect::Entity::find()
+        .filter(redirect::Column::Locale.eq(locale))
+        .filter(redirect::Column::FromPath.eq(path))
+        .filter(redirect::Column::Source.eq("manual"))
+        .one(connection)
+        .await?
+        .is_some())
+}
+
 /// Ghi chuyển hướng 301 tự động từ đường dẫn cũ tới mục (theo ID) cho mỗi thay đổi trong
 /// `moved`; bỏ chuyển hướng tự động / "đã gỡ" đang chiếm đường dẫn mới.
 pub(crate) async fn redirect_moved<C: ConnectionTrait>(
@@ -224,6 +239,14 @@ pub(crate) fn normalize(raw: &str) -> Option<String> {
     Some(format!("/{}", parts.join("/")))
 }
 
+/// `raw` là một đường dẫn trong site dùng được làm đích link (chuyển hướng, menu): hợp lệ theo
+/// [`normalize`] và không bắt đầu bằng `//` — trình duyệt hiểu `//evil.com` là địa chỉ của site
+/// khác (URL không có scheme), dù `normalize` gộp nó thành `/evil.com`. Cùng luật với link trong
+/// thân bài (`body::safe_link`). (`/\` đã bị `normalize` từ chối.)
+pub(crate) fn is_site_link(raw: &str) -> bool {
+    !raw.trim().starts_with("//") && normalize(raw).is_some()
+}
+
 /// Đường dẫn công khai của các mục trong `ids` (mục không công khai thì không có mặt).
 pub(crate) async fn paths<C: ConnectionTrait>(
     connection: &C,
@@ -252,6 +275,15 @@ mod tests {
         assert_eq!(normalize("//a//b").as_deref(), Some("/a/b"));
         for bad in ["a/b", "/a/../b", "/a?x=1", "", "/\\evil.com", "/a\\b"] {
             assert_eq!(normalize(bad), None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn link_trong_site_khong_nhan_dia_chi_khong_scheme() {
+        assert!(is_site_link("/about/team"));
+        assert!(is_site_link("/"));
+        for bad in ["//evil.com", " //evil.com/x", "/\\evil.com", "\\\\evil.com", "evil.com"] {
+            assert!(!is_site_link(bad), "{bad}");
         }
     }
 }

@@ -23,6 +23,7 @@ use crate::events::{self, Change};
 use crate::paths::{self, Generated, Moved};
 use crate::permissions::{self, CONTENT_DELETE, CONTENT_PUBLISH};
 use crate::revisions::{self, Reason};
+use crate::schedules::Action;
 use crate::service::{ContentService, entry_not_found, invalid, now};
 
 /// Bản công khai của một mục.
@@ -42,6 +43,11 @@ impl ContentService {
     /// trên mục của mình. `published_at`: ngày hiển thị (mặc định: giữ ngày cũ, hay bây giờ nếu
     /// đăng lần đầu). `ai_reviewed`: người đăng xác nhận đã duyệt nội dung do AI tạo — chỉ một
     /// người (phiên đăng nhập) xác nhận được, API key thì bị từ chối.
+    ///
+    /// Người chỉ có `content.publish_own` bị giới hạn thêm: không đăng lại mục một biên tập viên
+    /// đã lưu trữ (`content.archived`), không tự đặt `published_at` (đặt ngày tương lai hay quá
+    /// khứ là việc của biên tập viên), không đăng vào địa chỉ đang có chuyển hướng làm tay
+    /// (`content.path_has_redirect`: bản công khai sẽ che chuyển hướng đó).
     pub(crate) async fn publish(
         &self,
         principal: &Principal,
@@ -60,6 +66,22 @@ impl ContentService {
         // Quyền trước, phiên bản sau: người không có quyền không biết được mục có đổi hay không.
         let entry = self.load_checked(id, None).await?;
         permissions::require_publish(principal, &entry)?;
+        let own_only = permissions::publish_own_only(principal);
+        if own_only {
+            if Status::of(&entry) == Status::Archived {
+                return Err(Error::forbidden(
+                    "content.archived",
+                    "An editor archived this entry; with `content.publish_own` you cannot publish it again. Ask someone with `content.publish`.",
+                ));
+            }
+            if published_at.is_some() {
+                return Err(invalid(vec![FieldError::new(
+                    "published_at",
+                    "not_allowed",
+                    "setting the publication date needs `content.publish`; leave it out and the server uses the current time",
+                )]));
+            }
+        }
         check_version(&entry, expected)?;
         // Ảnh phải tồn tại và công khai; hỏi `media` TRƯỚC transaction.
         self.check_publishable(&entry).await?;
@@ -68,6 +90,19 @@ impl ContentService {
         let transaction = self.database.begin_write().await?;
         paths::lock_tree(&transaction, &entry.locale).await?;
         let current = self.reload(&transaction, id, expected.unwrap_or(entry.updated_at)).await?;
+        if own_only
+            && let Ok(path) =
+                paths::path_of(&transaction, &current, &self.config.post_path_prefix).await?
+            && paths::manual_redirect_at(&transaction, &current.locale, &path).await?
+        {
+            // `resolve` xem bản công khai trước chuyển hướng: đăng ở đây sẽ lặng lẽ vô hiệu một
+            // chuyển hướng biên tập viên đặt. Chỉ người có `content.publish` được quyết điều đó.
+            return Err(Error::conflict(
+                "content.path_has_redirect",
+                "A redirect made by an editor is at `{path}`; publishing here would hide it. Change the slug, or ask someone with `content.publish`.",
+            )
+            .with_param("path", &path));
+        }
         let revision =
             revisions::record(&transaction, &current, Reason::Published, by, now).await?;
         let reviewed_by = (ai_reviewed && current.ai_generated).then(|| principal.user_id());
@@ -159,6 +194,13 @@ impl ContentService {
         if to == Status::Draft {
             revisions::record(&transaction, &current, Reason::Unpublished, by, now).await?;
         }
+        // Lịch đăng đang chờ sẽ đăng lại mục vừa gỡ: huỷ. Lưu trữ thì lịch gỡ cũng vô nghĩa.
+        let actions: &[Action] = if to == Status::Archived {
+            &[Action::Publish, Action::Unpublish]
+        } else {
+            &[Action::Publish]
+        };
+        self.cancel_pending_schedules(&transaction, Actor::from(principal), id, actions).await?;
         let mut after = current.clone();
         after.status = to.as_str().to_owned();
         after.has_unpublished_changes = false;
@@ -293,6 +335,9 @@ impl ContentService {
         paths::lock_tree(&transaction, &entry.locale).await?;
         let current = self.reload(&transaction, id, expected.unwrap_or(entry.updated_at)).await?;
         if let Some(parent) = parent {
+            if let Some(row) = entry::Entity::find_by_id(parent).one(&transaction).await? {
+                permissions::require_parent(principal, &row)?;
+            }
             if crate::entries::depth(&transaction, parent).await.is_ok()
                 && self.is_ancestor(&transaction, id, parent).await?
             {

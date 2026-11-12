@@ -91,6 +91,7 @@ pub struct Tool {
     alternative: Option<Permission>,
     read_only: bool,
     destructive: bool,
+    secret: bool,
     input_schema: Value,
     handler: Arc<dyn ToolHandler>,
 }
@@ -118,6 +119,7 @@ impl Tool {
             alternative: None,
             read_only: false,
             destructive: false,
+            secret: false,
             input_schema: serde_json::to_value(<I as PartialSchema>::schema())
                 .unwrap_or(Value::Null),
             handler: Arc::new(Typed { handler, input: PhantomData }),
@@ -151,6 +153,13 @@ impl Tool {
         self
     }
 
+    /// Kết quả chứa secret chỉ trả một lần (vd API key mới): response mang
+    /// `Cache-Control: no-store`, nên không bị lưu lại — kể cả bởi lớp idempotency (D-112).
+    pub fn returns_secret(mut self) -> Self {
+        self.secret = true;
+        self
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -174,6 +183,11 @@ impl Tool {
 
     pub fn is_destructive(&self) -> bool {
         self.destructive
+    }
+
+    /// Xem [`returns_secret`](Self::returns_secret).
+    pub fn is_secret(&self) -> bool {
+        self.secret
     }
 
     /// JSON Schema của đầu vào.

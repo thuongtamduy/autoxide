@@ -61,6 +61,11 @@ impl BodyLimits {
         BodyLimits { default, routes }
     }
 
+    /// Giới hạn mặc định (`AUTOXIDE_HTTP_BODY_LIMIT_BYTES`).
+    pub(super) fn default_limit(&self) -> usize {
+        self.default
+    }
+
     /// Giới hạn cho `request`.
     pub(super) fn for_request(&self, request: &Request) -> usize {
         request

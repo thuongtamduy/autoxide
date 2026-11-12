@@ -124,8 +124,31 @@ async fn media_tren_o_dia_va_s3() {
             assert_eq!(status, StatusCode::CREATED);
             assert_eq!(replay["idempotent-replayed"], "true");
             assert_eq!(first["data"]["id"], second["data"]["id"]);
+            // Thân lớn hơn giới hạn mặc định (1 MiB): lớp idempotency không đọc trước vào bộ
+            // nhớ mà vẫn nhận ra lần gửi lại (D-112).
+            let mut large = png(30, 20);
+            large.resize(1536 * 1024, 0);
+            let large_key = format!("upload-large-{backend}");
+            let large_headers = [
+                ("authorization", auth.as_str()),
+                ("content-type", "image/png"),
+                ("idempotency-key", large_key.as_str()),
+            ];
+            let (status, _, big) =
+                call(&runtime, "POST", "/api/v1/media?name=big.png", &large_headers, large.clone()).await;
+            assert_eq!(status, StatusCode::CREATED, "{backend}: {big}");
+            let (status, replay, again) =
+                call(&runtime, "POST", "/api/v1/media?name=big.png", &large_headers, large).await;
+            assert_eq!(status, StatusCode::CREATED, "{backend}: {again}");
+            assert_eq!(replay["idempotent-replayed"], "true");
+            assert_eq!(big["data"]["id"], again["data"]["id"]);
+            let big_id = big["data"]["id"].as_str().unwrap().to_owned();
             let (_, _, list) = call(&runtime, "GET", "/api/v1/media", &[("authorization", auth.as_str())], Vec::new()).await;
-            assert_eq!(list["data"].as_array().unwrap().len(), 1, "{backend}");
+            assert_eq!(list["data"].as_array().unwrap().len(), 2, "{backend}");
+            let big_path = format!("/api/v1/media/{big_id}");
+            call(&runtime, "DELETE", &big_path, &[("authorization", auth.as_str())], Vec::new()).await;
+            let (status, _, _) = call(&runtime, "POST", &format!("{big_path}/purge"), &[("authorization", auth.as_str())], Vec::new()).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
 
             let item = &first["data"];
             let id = item["id"].as_str().unwrap();

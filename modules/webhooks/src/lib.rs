@@ -12,6 +12,7 @@ mod entity;
 mod events;
 mod http;
 mod migration;
+mod network;
 mod permissions;
 mod service;
 mod signature;
@@ -91,10 +92,12 @@ impl Module for WebhooksModule {
             context.outbox()?,
             context.events().clone(),
             config.allow_http,
+            config.allow_private_networks,
         ));
         let sender = Arc::new(Sender {
             database: database.clone(),
-            client: Sender::client(config.timeout)?,
+            client: Sender::client(config.timeout, config.allow_private_networks)?,
+            allow_private_networks: config.allow_private_networks,
         });
         self.running = Some(Running {
             service,

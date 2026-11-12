@@ -7,8 +7,10 @@
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
+use autoxide_kernel::privacy::deleted_user;
 use chrono::{SubsecRound, Utc};
-use sea_orm::{ActiveModelTrait, Set, SqlErr};
+use sea_orm::sea_query::Expr;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use serde_json::Value;
 
 use crate::entity;
@@ -43,13 +45,37 @@ impl EventHandler for Recorder {
         .insert(self.database.write())
         .await;
         match inserted {
-            Ok(_) => Ok(()),
+            Ok(_) => {}
             // Đã ghi ở lần giao trước: đúng như mong muốn.
             Err(error) if matches!(error.sql_err(), Some(SqlErr::UniqueConstraintViolation(_))) => {
-                Ok(())
             }
-            Err(error) => Err(error.into()),
+            Err(error) => return Err(error.into()),
         }
+        if deleted_user(event).is_some() {
+            self.forget(event).await?;
+        }
+        Ok(())
+    }
+}
+
+impl Recorder {
+    /// Tài khoản bị xoá: bỏ phần dữ liệu (`before`, `after`, `details` — có email, tên) của
+    /// mọi dòng cùng `subject` với event xoá (các event về chính tài khoản đó), chỉ giữ ai
+    /// làm gì lúc nào (D-080, D-112). Chạy lại vô hại.
+    async fn forget(&self, event: &Delivered) -> Result<(), Error> {
+        let Some(subject) = &event.subject else {
+            return Ok(());
+        };
+        let cleared = entity::Entity::update_many()
+            .col_expr(entity::Column::Before, Expr::value(None::<String>))
+            .col_expr(entity::Column::After, Expr::value(None::<String>))
+            .col_expr(entity::Column::Details, Expr::value(None::<String>))
+            .filter(entity::Column::Subject.eq(subject.as_str()))
+            .filter(entity::Column::Id.ne(event.id))
+            .exec(self.database.write())
+            .await?;
+        tracing::info!(rows = cleared.rows_affected, "audit entries of a deleted user cleared");
+        Ok(())
     }
 }
 
@@ -137,6 +163,54 @@ mod database_tests {
             assert_eq!(row.before.as_deref(), Some(r#"{"title":"a"}"#));
             assert_eq!(row.after.as_deref(), Some(r#"{"title":"b"}"#));
             assert_eq!(row.occurred_at, event.occurred_at);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Tài khoản bị xoá: các dòng về tài khoản đó mất email, tên; dòng khác giữ nguyên.
+    #[tokio::test]
+    async fn xoa_tai_khoan_thi_bo_du_lieu_cua_cac_dong_ve_no() {
+        TestDatabase::run(async |test| {
+            let database = database(test).await;
+            let recorder = Recorder::new(database.clone());
+            let user = Uuid::now_v7();
+            let subject = Some(format!("auth.user:{user}"));
+            let happened = |name: &str, subject: Option<String>, payload| Delivered {
+                id: Uuid::now_v7(),
+                module: "auth",
+                name: name.to_owned(),
+                actor: Actor::user(user),
+                subject,
+                payload,
+                occurred_at: Utc::now().trunc_subsecs(6),
+            };
+            let created = happened(
+                "auth.user_created",
+                subject.clone(),
+                json!({"after": {"email": "ada@example.com", "name": "Ada"}}),
+            );
+            let other = happened(
+                "auth.user_updated",
+                Some("auth.user:other".to_owned()),
+                json!({"after": {"name": "Bob"}}),
+            );
+            let deleted = happened(
+                autoxide_kernel::privacy::USER_DELETED,
+                subject.clone(),
+                json!({"before": {"id": user}}),
+            );
+            for event in [&created, &other, &deleted, &deleted] {
+                recorder.handle(event).await.unwrap();
+            }
+
+            let row = |id| entity::Entity::find_by_id(id).one(database.read());
+            let kept = row(created.id).await.unwrap().unwrap();
+            assert_eq!((kept.before, kept.after, kept.details), (None, None, None));
+            assert_eq!(kept.action, "auth.user_created");
+            assert_eq!(kept.actor_user_id, Some(user));
+            assert!(row(other.id).await.unwrap().unwrap().after.unwrap().contains("Bob"));
+            assert!(row(deleted.id).await.unwrap().unwrap().before.is_some());
         })
         .await
         .unwrap();

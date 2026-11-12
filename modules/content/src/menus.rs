@@ -378,13 +378,13 @@ fn flatten(
             let valid = (lower.starts_with("https://")
                 || lower.starts_with("http://")
                 || lower.starts_with("mailto:")
-                || crate::paths::normalize(url).is_some())
+                || crate::paths::is_site_link(url))
                 && !url.chars().any(|c| c.is_whitespace() || c.is_control());
             if !valid {
                 problems.push(FieldError::new(
                     format!("{here}.url"),
                     "invalid",
-                    "must be `https://`, `mailto:` or a path starting with `/`",
+                    "must be `https://`, `mailto:` or a path starting with a single `/`",
                 ));
             }
         }
