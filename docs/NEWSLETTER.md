@@ -87,6 +87,10 @@ curl -X POST http://localhost:8080/api/v1/newsletter/lists \
 - The answer is always `202 {"data": {"accepted": true}}` — new address, waiting for
   confirmation, already subscribed, blocked, trap filled, too many requests: nobody can learn
   which addresses are on a list. Tell the visitor to check their inbox.
+- The request only checks the data and the anti-spam token, then queues the sign-up; a
+  background job stores it and sends the confirmation mail a moment later. So the time the
+  answer takes does not depend on the address either. The job worker must be running (it is,
+  in the default `all` process role).
 - Wrong data: `422` with every problem in `errors` (a key that is not a public list is
   `lists[0]`). A missing or expired token: `400 antispam.token_*` — reload the form.
 - The consent text, its version, the time, the source and a hash of the network block are kept

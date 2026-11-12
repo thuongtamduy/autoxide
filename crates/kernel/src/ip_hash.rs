@@ -12,6 +12,15 @@
 //!   nay"). Bản băm của hai ngày không nối được với nhau.
 //! - [`fingerprint`]: khoá cố định — lưu cùng bản ghi (bình luận, bài gửi form) để cấm hay gom
 //!   theo người gửi; module tự xoá sau thời hạn của mình.
+//!
+//! Cả hai nhận `scope` (tên module, hay phạm vi form): mỗi phạm vi một khoá riêng (D-153), nên
+//! dấu của cùng một người ở `forms` và ở `comments` khác nhau — đọc được database của module
+//! này không nối được người đó sang module kia. Hai bản ghi chỉ so được với nhau khi cùng
+//! phạm vi.
+//!
+//! Giới hạn: khoá gốc nằm trong database (không đặt `AUTOXIDE_SECRET_KEY`) thì ai có bản sao
+//! database cũng tính lại được khoá và thử hết các khối IPv4 (2^24). Máy chủ cảnh báo lúc khởi
+//! động; khi chạy thật hãy đặt khoá ngoài database.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -44,16 +53,24 @@ fn v4_block(v4: Ipv4Addr) -> Ipv4Addr {
     Ipv4Addr::new(a, b, c, 0)
 }
 
-/// Bản băm của khối chứa `ip`, khoá đổi theo ngày UTC của `now`. Dùng cho bộ đếm.
-pub async fn bucket(secret: &SecretKey, ip: IpAddr, now: DateTime<Utc>) -> Result<String, Error> {
-    let key =
-        secret.derive(&format!("autoxide/ip-hash/bucket/v1/{}", now.format("%Y-%m-%d"))).await?;
+/// Bản băm của khối chứa `ip` trong phạm vi `scope`, khoá đổi theo ngày UTC của `now`. Dùng
+/// cho bộ đếm.
+pub async fn bucket(
+    secret: &SecretKey,
+    scope: &str,
+    ip: IpAddr,
+    now: DateTime<Utc>,
+) -> Result<String, Error> {
+    let key = secret
+        .derive(&format!("autoxide/ip-hash/bucket/v2/{scope}/{}", now.format("%Y-%m-%d")))
+        .await?;
     digest(&key, ip)
 }
 
-/// Bản băm cố định của khối chứa `ip`. Lưu cùng bản ghi; module xoá sau thời hạn của mình.
-pub async fn fingerprint(secret: &SecretKey, ip: IpAddr) -> Result<String, Error> {
-    let key = secret.derive("autoxide/ip-hash/fingerprint/v1").await?;
+/// Bản băm cố định của khối chứa `ip` trong phạm vi `scope` (tên module). Lưu cùng bản ghi;
+/// module xoá sau thời hạn của mình.
+pub async fn fingerprint(secret: &SecretKey, scope: &str, ip: IpAddr) -> Result<String, Error> {
+    let key = secret.derive(&format!("autoxide/ip-hash/fingerprint/v2/{scope}")).await?;
     digest(&key, ip)
 }
 

@@ -3582,7 +3582,86 @@ sách single opt-in; bộ đếm mail xác nhận đếm mọi yêu cầu đã l
 - Đếm proxy (D-114): trình duyệt gọi thẳng qua proxy cuối khi `N > 1` thì tự chọn được địa chỉ; đã
   có cảnh báo trong DEPLOY, cách tin theo dải địa chỉ để sau.
 
-## D-151 · Sổ module đã cài: API chỉ đọc trong module nội bộ `kernel` — 2026-11-12 — chủ dự án quyết hướng, agent quyết cách làm
+## D-151 · `comments`: so tên theo dạng "khung" — chữ Kirin / Hy Lạp giống chữ Latin thành chữ Latin — 2026-11-12 — agent quyết
+
+Đóng giới hạn "tên viết trọn bằng chữ Kirin giống tên Latin vẫn lọt" của D-150.
+
+Quyết định: `text::name_key` = `words_key` rồi đổi chữ Kirin / Hy Lạp trông như chữ Latin
+thành chữ Latin (bảng tự liệt kê ~60 chữ, xét theo hoa / thường, đổi cả trước khi viết thường
+lẫn sau khi bỏ dấu). Dùng cho: khoá unique `comments_profiles.name_key` và việc so với danh sách
+tên dành riêng (`contains_name`, cho cả khách lẫn người dùng). Migration m0008 tính lại khoá
+của hồ sơ có sẵn; hai hồ sơ có sẵn ra cùng khoá thì hồ sơ sau giữ khoá cũ (không đổi tên của
+ai, không chạm index unique giữa chừng). Luật "không trộn bảng chữ trong một từ" giữ nguyên.
+
+Không dùng `name_key` cho nội dung bình luận và từ cấm: từ cấm tiếng Nga sẽ khớp nhầm chữ
+Latin.
+
+Đã cân nhắc: thư viện bảng confusables đầy đủ (Unicode TS #39) — vài nghìn dòng dữ liệu cho
+một việc chỉ cần ba bảng chữ hay bị dùng giả; cấm hẳn tên Kirin / Hy Lạp — loại người dùng
+thật.
+
+## D-152 · Địa chỉ client: tin proxy theo dải địa chỉ (`AUTOXIDE_HTTP_TRUSTED_PROXIES`) — 2026-11-12 — agent quyết
+
+Bổ sung D-114, đóng giới hạn "đếm proxy" của D-150: khi `N > 1`, trình duyệt gọi thẳng proxy
+cuối (bỏ qua CDN) thì tự chọn được địa chỉ.
+
+Quyết định: biến không bắt buộc `AUTOXIDE_HTTP_TRUSTED_PROXIES` — danh sách địa chỉ / dải CIDR
+(IPv4, IPv6; `::ffff:a.b.c.d` tính như IPv4). Có giá trị thì thay cho
+`AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`: kết nối không đến từ dải thì bỏ qua header; có thì đi từ
+phải sang trái, bỏ qua địa chỉ thuộc dải, lấy địa chỉ đầu tiên không thuộc dải (toàn dải: phần
+tử đầu; giá trị không đọc được: địa chỉ kết nối, như D-114). Đặt dải mà không đặt
+`AUTOXIDE_HTTP_CLIENT_IP_HEADER` là lỗi cấu hình. Kiểu `config::IpRange` tự viết (~40 dòng),
+không thêm thư viện CIDR.
+
+Giữ cách đếm làm mặc định: không cần biết địa chỉ proxy, đúng cho trường hợp phổ biến (một
+reverse proxy).
+
+## D-153 · Dấu IP riêng theo phạm vi; cảnh báo khi khoá ký nằm trong database — 2026-11-12 — agent quyết
+
+Sửa D-115, đóng giới hạn "dấu IP giống nhau giữa các module" của D-150.
+
+Quyết định:
+
+- `ip_hash::fingerprint(secret, scope, ip)` và `ip_hash::bucket(secret, scope, ip, now)` nhận
+  phạm vi; khoá dẫn theo nhãn `autoxide/ip-hash/{fingerprint,bucket}/v2/<scope>…`. Module truyền
+  tên mình cho `fingerprint`; chống spam truyền phạm vi form (`forms:contact`…) cho `bucket`.
+  Đọc database của một module không nối được người gửi sang module khác.
+- Thay đổi phá vỡ: dấu đã lưu không khớp dấu mới. Dấu của bài gửi / bình luận tự xoá theo thời
+  hạn của module; lệnh cấm bình luận theo dấu mạng làm trước bản này hết tác dụng — ghi trong
+  CHANGELOG. Không giữ cách tính cũ song song (hai cách cho cùng một việc).
+- Khoá gốc nằm trong database thì vẫn tính ngược được (2^24 khối IPv4 là ít): không sửa được
+  mà vẫn giữ "người lạ tự cài được không cần cấu hình". `SecretKey::is_configured`; tiến trình
+  phục vụ API ghi cảnh báo lúc khởi động khi chưa đặt `AUTOXIDE_SECRET_KEY`. DEPLOY nhắc đặt
+  khoá khi chạy thật.
+
+Đã cân nhắc: hàm băm chậm (Argon2) cho dấu IP — bộ đếm chạy trên mọi lần gửi, quá chậm, và
+2^24 lần Argon2 vẫn làm được; cắt dấu còn vài bit (k-ẩn danh) — lệnh cấm theo mạng chặn nhầm
+người khác; bắt buộc `AUTOXIDE_SECRET_KEY` — người lạ không cài được nếu không đọc tài liệu.
+
+## D-154 · `newsletter`: đăng ký công khai chỉ xếp job; việc theo trạng thái địa chỉ chạy nền — 2026-11-12 — agent quyết
+
+Đóng giới hạn "đo thời gian trả lời đăng ký bản tin" của D-150: đường cần mail chèn thêm token
+và một mail vào hàng đợi, đường "đã xác nhận" / "bị chặn" không ghi gì — đo thời gian là đoán
+được địa chỉ nào đã có trong danh sách.
+
+Quyết định: request `POST /public/subscribe` làm cùng một việc cho mọi địa chỉ — kiểm dữ liệu,
+`SpamGuard::check`, rồi một transaction ngắn: xếp job `newsletter.subscribe` (email, tên, ngôn
+ngữ, ID danh sách, bằng chứng đồng ý, lý do bị giữ, người gọi) và chèn nonce của token form.
+Job (`apply_subscription`) làm phần còn lại như trước: người, đăng ký, event, token xác nhận,
+bộ đếm mail và mail. Gửi lại cùng token không xếp job thứ hai. Job chạy lại thì như người đó
+gửi lại yêu cầu (không thêm người; có thể thêm một mail xác nhận, vẫn trong giới hạn ngày).
+Danh sách bị xoá giữa lúc nhận và lúc chạy job thì bỏ qua.
+
+Hệ quả: mail xác nhận đi sau câu trả lời vài giây (chu kỳ của worker); cần worker chạy (mặc
+định có). Job mang email và tên tới khi job queue dọn job đã xong — như job gửi mail. Yêu cầu
+xoá theo email đến khi job còn chờ thì job vẫn tạo lại người đó, như một lần đăng ký mới ngay
+sau khi xoá.
+
+Đã cân nhắc: chờ thêm cho đủ một thời gian cố định — vẫn lộ khi máy chủ bận, và giữ kết nối
+lâu hơn; luôn phát token / luôn xếp mail giả — ghi rác vào database và vẫn khác nhau ở phần
+đổi đăng ký.
+
+## D-155 · Sổ module đã cài: API chỉ đọc trong module nội bộ `kernel` — 2026-11-12 — chủ dự án quyết hướng, agent quyết cách làm
 
 Bối cảnh: chủ dự án muốn "một CMS quản lý module". Theo D-096 / D-097 và luật kiến trúc 9,
 giao diện quản trị là repo riêng; chủ dự án chọn làm trước phần API trong core mà màn hình đó

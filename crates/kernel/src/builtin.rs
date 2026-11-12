@@ -1,7 +1,7 @@
 //! Module nội bộ `kernel`: luôn được đăng ký đầu tiên (trong [`crate::module::Modules::new`]),
 //! giữ những bảng mà cả chương trình dùng chung, không thuộc module nghiệp vụ nào — hiện là
 //! `kernel_secrets` (khoá ký, [`crate::secret`]). Nó cũng đọc và công bố URL công khai của API
-//! ([`crate::public_url`]), và phục vụ sổ module đã cài ([`crate::module_catalog`], D-151). Là
+//! ([`crate::public_url`]), và phục vụ sổ module đã cài ([`crate::module_catalog`], D-155). Là
 //! một module như mọi module khác nên luật sở hữu bảng, `autoxide backup` / `copy` và `migrate` áp cho nó y như vậy.
 
 use std::sync::Arc;

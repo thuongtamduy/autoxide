@@ -87,6 +87,12 @@ impl SecretKey {
         }
     }
 
+    /// `true` khi khoá gốc đến từ `AUTOXIDE_SECRET_KEY`; `false` khi kernel tự sinh và giữ nó
+    /// trong database (ai có bản sao database cũng có khoá).
+    pub fn is_configured(&self) -> bool {
+        self.configured.is_some()
+    }
+
     /// Khoá 32 byte riêng cho mục đích `purpose`: HMAC-SHA256 của nhãn trên khoá gốc. Cùng
     /// khoá gốc và cùng nhãn thì luôn ra cùng khoá.
     pub async fn derive(&self, purpose: &str) -> Result<[u8; 32], Error> {

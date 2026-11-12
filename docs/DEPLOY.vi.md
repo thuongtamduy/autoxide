@@ -103,8 +103,23 @@ X-Forwarded-For:  trình-duyệt, CDN, máy-chủ-website
 ```
 
 Máy chủ website phải chuyển tiếp `X-Forwarded-For` nó nhận được (và thêm địa chỉ CDN, như
-proxy vẫn làm); không thì mọi khách trông như một client. Không proxy nào của bạn được để
-internet gọi thẳng, không thì client tự chọn được địa chỉ của mình.
+proxy vẫn làm); không thì mọi khách trông như một client. Khi đếm proxy, không proxy nào của
+bạn được để internet gọi thẳng, không thì client tự chọn được địa chỉ của mình.
+
+**Proxy mà internet gọi thẳng được.** Khi khách có thể bỏ qua CDN mà gọi thẳng máy chủ
+website, hoặc request đi theo nhiều đường khác nhau, đếm proxy sẽ sai với một số request. Khi
+đó hãy liệt kê địa chỉ các proxy của bạn, từng địa chỉ hoặc theo dải:
+
+```bash
+echo 'AUTOXIDE_HTTP_TRUSTED_PROXIES=10.0.0.0/8, 198.51.100.0/24' >> .env
+```
+
+Biến này thay cho `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`. Autoxide chỉ đọc header khi kết nối đến
+từ một trong các địa chỉ đó, và lấy địa chỉ cuối cùng trong header không thuộc danh sách. CDN
+công bố dải địa chỉ của họ; nhớ cập nhật danh sách khi dải đổi.
+
+Log lúc khởi động cũng cảnh báo khi chưa đặt `AUTOXIDE_SECRET_KEY` (xem bảng dưới): hãy đặt nó
+trước khi chạy thật.
 
 Các biến cấu hình khác thêm cùng cách: mọi biến được liệt kê kèm giá trị mặc định trong
 [`.env.example`](../.env.example). Biến nào `compose.yml` chưa chuyển vào thì thêm dưới
@@ -249,6 +264,7 @@ database mới.
 | `AUTOXIDE_SECRET_KEY` | Ký các token sống ngắn của mọi module và làm khoá băm địa chỉ IP của người lạ; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database. Khi chạy thật nên đặt (ngoài database, giống nhau trên mọi máy chủ): khoá nằm trong database thì ai có bản backup database cũng tính ngược được khối IP từ các bản băm đã lưu |
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Sau reverse proxy: header chứa địa chỉ client |
 | `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | Số proxy của bạn mà một request đi qua (mặc định `1`) |
+| `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Thay cho số proxy: địa chỉ và dải địa chỉ của proxy, vd `10.0.0.0/8, 192.0.2.7` |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | Địa chỉ internet dùng để gọi API, vd `https://api.example.com`; cần cho link trỏ về API trong mail (huỷ đăng ký bản tin) |
 | `AUTOXIDE_HTTP_CORS_ORIGINS` | Trang web ở origin khác được gọi API |
 | `AUTOXIDE_MAIL_SMTP_URL`, `AUTOXIDE_MAIL_FROM` | Gửi mail (đặt lại mật khẩu, xác minh email) |

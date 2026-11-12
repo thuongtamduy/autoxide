@@ -1,7 +1,7 @@
 //! Sổ module đã cài: cho người quản trị (và AI agent) xem chương trình đang chạy gồm những
 //! module nào và mỗi module khai gì — permission, event, job, lịch, tool MCP, endpoint
 //! deprecated, migration. Đây là phần API mà một màn hình "quản lý module" ở dự án giao diện
-//! dùng (D-151).
+//! dùng (D-155).
 //!
 //! Sổ chỉ ĐỌC. Module đăng ký lúc biên dịch (`crates/app/src/modules.rs`), nên không có bật /
 //! tắt module lúc chạy.

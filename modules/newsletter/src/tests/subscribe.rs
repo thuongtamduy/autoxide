@@ -7,8 +7,8 @@ use autoxide_kernel::event::Actor;
 use autoxide_testkit::TestDatabase;
 
 use super::{
-    count_events, events, form_token, list, subscribe, subscribers, subscriptions, token_in,
-    visitor,
+    count_events, events, form_token, list, store_subscriptions, subscribe, subscribers,
+    subscriptions, token_in, visitor,
 };
 use crate::config::NewsletterConfig;
 use crate::public::SubscribeRequest;
@@ -36,6 +36,10 @@ async fn dang_ky_moi_truong_hop_cung_ket_qua_chi_mail_khi_can() {
             ..SubscribeRequest::default()
         };
         h.service.subscribe(None, &visitor("203.0.113.9"), request).await.unwrap();
+        // Request chỉ xếp job: chưa có gì được lưu, chưa có mail.
+        assert_eq!(subscribers(&h.database).await, 0);
+        assert!(h.mailer.to("ada@example.com").is_empty());
+        assert_eq!(store_subscriptions(&h.service).await, 1);
         assert_eq!(subscribers(&h.database).await, 1);
         let rows = subscriptions(&h.database).await;
         assert_eq!(rows[0].status, "unconfirmed");
@@ -110,6 +114,7 @@ async fn dang_ky_moi_truong_hop_cung_ket_qua_chi_mail_khi_can() {
             ..SubscribeRequest::default()
         };
         h.service.subscribe(None, &visitor("198.51.100.1"), trapped).await.unwrap();
+        assert_eq!(store_subscriptions(&h.service).await, 0, "a trapped bot queues nothing");
         assert_eq!(subscribers(&h.database).await, 2);
 
         // Quá nhiều lần với một email (mặc định 5 / giờ): bị bỏ lặng lẽ.
@@ -217,6 +222,7 @@ async fn dang_ky_dong_thoi_cung_email() {
         for task in tasks {
             task.await.unwrap().unwrap();
         }
+        assert_eq!(store_subscriptions(&h.service).await, 1, "the same token queues once");
         assert_eq!(subscribers(&h.database).await, 2);
         assert_eq!(h.mailer.to("bob@example.com").len(), 1, "the same token stores once");
     })
@@ -286,6 +292,7 @@ async fn dang_nhap_khong_co_quyen_dang_ky_nhu_nguoi_la() {
             .subscribe(Some(&website), &visitor("203.0.113.9"), request("b@example.com"))
             .await
             .unwrap();
+        store_subscriptions(&h.service).await;
         assert_eq!(subscriptions(&h.database).await[0].status, "confirmed");
     })
     .await
@@ -350,6 +357,69 @@ async fn dang_ky_lai_sau_khi_huy_phai_xac_nhan() {
         subscribe(&bare.service, "bob@example.com", &["promo"], "203.0.113.13").await.unwrap();
         assert_eq!(of_promo().await.status, "unconfirmed");
         assert!(bare.mailer.sent().is_empty());
+    })
+    .await
+    .unwrap();
+}
+
+/// Request đăng ký làm CÙNG một việc cho mọi địa chỉ (D-154): xếp đúng một job, không ghi người,
+/// đăng ký hay event nào — địa chỉ mới, đã xác nhận hay bị chặn đều thế. Thời gian trả lời vì
+/// vậy không lộ trạng thái của địa chỉ.
+#[tokio::test]
+async fn request_chi_xep_job_nhu_nhau_moi_dia_chi() {
+    TestDatabase::run(async |test| {
+        let config = NewsletterConfig { per_ip_per_hour: 100, ..config() };
+        let h = service(test, config).await;
+        let deals = list(&h.service, "deals", false).await;
+        crate::tests::import(&h.service, deals.row.id, &["known@example.com".to_owned()]).await;
+        subscribe(&h.service, "blocked@example.com", &["deals"], "203.0.113.1").await.unwrap();
+        let blocked = h
+            .service
+            .list_subscribers(
+                &admin(),
+                &crate::subscribers::SubscriberFilter {
+                    email: Some("blocked@".to_owned()),
+                    ..Default::default()
+                },
+                &autoxide_kernel::pagination::PageRequest::first(
+                    10,
+                    autoxide_kernel::pagination::Order::Desc,
+                ),
+            )
+            .await
+            .unwrap()
+            .data
+            .remove(0);
+        let change = SubscriberChange {
+            status: Some(SubscriberStatus::Blocked),
+            ..SubscriberChange::default()
+        };
+        h.service.update_subscriber(&admin(), blocked.row.id, change, None).await.unwrap();
+
+        let jobs = async || super::next_jobs(&h.database, crate::public::SUBSCRIBE).await;
+        let before = (subscribers(&h.database).await, events(&h.database).await.len());
+        for (index, email) in
+            ["new@example.com", "known@example.com", "blocked@example.com"].into_iter().enumerate()
+        {
+            let request = SubscribeRequest {
+                email: Some(email.to_owned()),
+                lists: vec!["deals".to_owned()],
+                form_token: Some(form_token(&h.service).await),
+                ..SubscribeRequest::default()
+            };
+            h.service
+                .subscribe(None, &visitor(&format!("198.51.100.{index}")), request)
+                .await
+                .unwrap();
+            assert_eq!(jobs().await, index + 1, "{email}");
+            assert_eq!(
+                (subscribers(&h.database).await, events(&h.database).await.len()),
+                before,
+                "{email}: nothing stored by the request itself"
+            );
+        }
+        assert_eq!(store_subscriptions(&h.service).await, 3);
+        assert_eq!(subscribers(&h.database).await, before.0 + 1);
     })
     .await
     .unwrap();

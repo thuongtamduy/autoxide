@@ -105,7 +105,8 @@ impl CommentsService {
             (Some(principal), _) => format!("user:{}", principal.user_id()),
             (None, Some(ip)) => format!(
                 "{GUEST_REPORTER}{}",
-                autoxide_kernel::ip_hash::fingerprint(&self.secret, reporter_block(ip)).await?
+                autoxide_kernel::ip_hash::fingerprint(&self.secret, MODULE, reporter_block(ip))
+                    .await?
             ),
             (None, None) => format!("{GUEST_REPORTER}unknown"),
         };

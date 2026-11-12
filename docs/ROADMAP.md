@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–22 xong**; bản phát hành mới nhất `v0.2.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–23 xong**; bản phát hành mới nhất `v0.4.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -294,7 +294,18 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 - [x] Dữ liệu cá nhân; tool MCP
 - [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
 
-## 23. Sổ module cho màn hình quản lý module (chủ dự án giao ngày 12/11/2026, D-151)
+## 23. Đóng các giới hạn còn để lại của D-150 (chủ dự án giao ngày 12/11/2026)
+
+- [x] `comments`: tên viết trọn chữ Kirin / Hy Lạp trông như tên Latin không qua được danh sách
+      tên dành riêng và luật không trùng tên (so theo dạng "khung" của chữ)
+- [x] Địa chỉ client: tin proxy theo dải địa chỉ (`AUTOXIDE_HTTP_TRUSTED_PROXIES`), header chỉ
+      được đọc khi kết nối đến từ proxy tin cậy
+- [x] Dấu IP riêng cho từng module (không nối được người gửi giữa các module); cảnh báo lúc khởi
+      động khi khoá ký nằm trong database
+- [x] `newsletter`: đăng ký công khai trả lời trong cùng một khoảng thời gian dù địa chỉ ở trạng
+      thái nào (việc ghi và gửi mail chạy trong job)
+
+## 24. Sổ module cho màn hình quản lý module (chủ dự án giao ngày 12/11/2026, D-155)
 
 Giao diện quản trị ở repo riêng (D-096, D-097); bước này chỉ làm API trong core.
 

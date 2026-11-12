@@ -1,4 +1,4 @@
-//! Sổ module đã cài (D-151): `GET /api/v1/kernel/modules`, `GET /api/v1/kernel/modules/{name}`
+//! Sổ module đã cài (D-155): `GET /api/v1/kernel/modules`, `GET /api/v1/kernel/modules/{name}`
 //! và hai tool MCP `kernel.list_modules`, `kernel.get_module`. Gate chạy file này trên cả hai
 //! database.
 

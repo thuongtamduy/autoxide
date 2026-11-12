@@ -15,6 +15,33 @@ endpoints are marked deprecated with a sunset date first.
   `GET /api/v1/kernel/modules/{name}` (with migration status), MCP tools `kernel.list_modules` and
   `kernel.get_module`, permission `kernel.modules.read`.
 
+## [0.4.0] - 2026-11-12
+
+### Added
+
+- `AUTOXIDE_HTTP_TRUSTED_PROXIES`: list the addresses and ranges of your proxies instead of
+  counting them. The client-address header is then read only from a trusted proxy, and the
+  client is the last address in it that is not a trusted proxy — safe even when visitors can
+  reach one of your proxies directly.
+- The server warns at startup when `AUTOXIDE_SECRET_KEY` is not set.
+
+### Changed
+
+- **Breaking:** hashed IP addresses differ per module (forms, newsletter, comments): one
+  visitor's records can no longer be linked across modules. Hashes stored before this version
+  stop matching new ones, so comment bans by network fingerprint made before it no longer
+  apply — ban again from a newer comment.
+
+### Security
+
+- Newsletter: a public sign-up only checks the data and the anti-spam token, then queues a job
+  that stores it and sends the confirmation mail. The answer now takes the same time whether
+  the address is new, already subscribed or blocked. The confirmation mail leaves a moment
+  later, once the job worker picks the job up.
+- Comments: a display name written entirely in Cyrillic or Greek letters that look like Latin
+  ones (`аdmіn`) counts as the Latin name — it can no longer pass the reserved-name list or take
+  another person's name. Existing profiles are re-keyed by a migration.
+
 ## [0.3.0] - 2026-11-12
 
 ### Changed
@@ -293,7 +320,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/thuongtamduy/autoxide/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/thuongtamduy/autoxide/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/thuongtamduy/autoxide/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/thuongtamduy/autoxide/releases/tag/v0.1.0

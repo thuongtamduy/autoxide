@@ -184,6 +184,7 @@ pub fn build(
     let client_address = Arc::new(client::ClientAddress::new(
         config.client_ip_header.clone(),
         config.trusted_proxy_count,
+        config.trusted_proxies.clone(),
     ));
     let request_timeout = config.request_timeout;
     // `.layer` bọc thêm một lớp RA NGOÀI các lớp trước đó: lớp khai sau cùng là lớp

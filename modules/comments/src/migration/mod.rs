@@ -2,6 +2,7 @@
 //! và một dòng vào cuối [`all`].
 
 mod m0001_create_comments;
+mod m0008_name_key_lookalikes;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -21,5 +22,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::antispam::antispam_migration("m0006_create_antispam_nonces", "comments"),
         // Bảng `comments_tokens`: xác minh email của khách, huỷ theo dõi trả lời (D-117).
         autoxide_kernel::tokens::tokens_migration("m0007_create_tokens", "comments"),
+        // Khoá tên so theo dạng "khung": tên giả chữ Latin bằng chữ Kirin / Hy Lạp (D-151).
+        Box::new(m0008_name_key_lookalikes::Migration),
     ]
 }

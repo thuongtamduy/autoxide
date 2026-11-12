@@ -10,7 +10,8 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub user_id: Uuid,
     pub display_name: String,
-    /// `words_key` của tên, unique: hai người không trùng tên (chống mạo danh).
+    /// `text::name_key` của tên, unique: hai người không trùng tên, kể cả tên viết bằng chữ Kirin /
+    /// Hy Lạp trông như tên Latin (chống mạo danh).
     pub name_key: String,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,

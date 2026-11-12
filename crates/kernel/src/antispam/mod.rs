@@ -437,7 +437,8 @@ impl SpamGuard {
                     },
                 }
                 if let (Some(throttle), Some(ip)) = (&limits.ip, submission.client.ip) {
-                    let bucket = crate::ip_hash::bucket(&self.secret, ip, now).await?;
+                    let bucket =
+                        crate::ip_hash::bucket(&self.secret, submission.scope, ip, now).await?;
                     if !throttle
                         .hit(&format!("ip:{}:{bucket}", submission.scope))
                         .await?
