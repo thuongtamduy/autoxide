@@ -130,7 +130,7 @@ Kiểm lại phần đã có:
 
 - [ ] CI chạy xanh trên GitHub
 - [x] Rà soát bảo mật toàn repo bằng một lượt đọc độc lập; sửa mọi lỗi tìm thấy (D-079)
-- [ ] Thử tải dài hạn: không rò bộ nhớ, không rò kết nối database
+- [x] Thử tải dài hạn: không rò bộ nhớ, không rò kết nối database (docs/BENCHMARKS.md)
 
 Hệ thống tài khoản:
 
@@ -147,6 +147,18 @@ Phát hành và nâng cấp:
 Tích hợp:
 
 - [x] Webhook: gửi event ra hệ thống bên ngoài, có chữ ký, thử lại, theo dõi được (D-081)
+
+## 14. Hoàn thiện hợp đồng API (chủ dự án giao ngày 12/11/2026)
+
+Sau lượt kiểm hợp đồng API của chủ dự án. Đã sửa ngay (D-082): `docs/openapi.json` không
+hợp lệ (`$ref` tới `Order` không tồn tại), mô tả tool MCP lọt tiếng Việt; gate kiểm cả hai.
+
+- [ ] Kết quả tool MCP dạng danh sách không lồng `data` hai lần — cùng hình dạng với REST
+- [ ] Tool MCP cho phần còn thiếu: file, audit log, role, API key (cùng service, cùng permission với REST)
+- [ ] Khai header `Idempotency-Key` và `Accept-Language` trên từng endpoint trong OpenAPI, để SDK sinh tự động có sẵn tham số
+- [ ] Kiểm dữ liệu báo mọi lỗi trong một lần (email sai và tên rỗng cùng báo), đúng như tài liệu hứa
+- [ ] Tạo mới (201) trả header `Location`; OpenAPI có mục `servers`
+- [ ] Chống ghi đè khi hai người cùng sửa: `ETag` / `If-Match` cho các endpoint sửa
 
 ## Sau core (chưa mở)
 

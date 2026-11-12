@@ -1803,3 +1803,27 @@ dùng lại job queue (retry, dead-letter queue) đã có trên cả hai databas
 Đã cân nhắc: webhook theo từng người dùng — cần lọc event theo quyền xem dữ liệu của từng
 người, để sau khi có nhu cầu; chặn địa chỉ mạng nội bộ (SSRF) — chỉ quản trị viên tạo được
 endpoint và không theo chuyển hướng; thêm khi mở cho người dùng thường.
+
+## D-082 · Gate kiểm tài liệu OpenAPI hợp lệ và mô tả gửi ra ngoài là tiếng Anh — 2026-11-12 — agent quyết
+
+Bối cảnh: chủ dự án kiểm `docs/openapi.json` bằng trình kiểm chuẩn và thấy file không hợp
+lệ — tham số `order` của mọi endpoint danh sách trỏ tới `#/components/schemas/Order` không
+có trong file (trình kiểm chuẩn và công cụ sinh SDK từ chối cả file). Tool MCP mang mô tả
+tiếng Việt (`///` trên `NoInput`, `PageInput`). Gate cũ chỉ kiểm "có mô tả hay không".
+
+Quyết định:
+
+- `Order` khai `inline` trong `PageQuery`.
+- `http::lint` (chạy khi sinh `docs/openapi.json` và trong test của gate) kiểm thêm: mọi
+  `$ref` trỏ tới một mục có thật; không `summary` / `description` / `title` nào có chữ tiếng
+  Việt. Kiểm tiếng Việt cũng chạy cho mô tả và schema đầu vào của mọi tool MCP lúc khởi
+  động.
+- Đã xác nhận bằng `openapi-spec-validator`: file cũ bị từ chối, file mới hợp lệ.
+
+Lý do: OpenAPI là hợp đồng để dùng Autoxide từ ngôn ngữ khác; một `$ref` treo làm hỏng cả
+hợp đồng. Kiểm trong Rust, không thêm công cụ ngoài vào gate (người lạ không cần Python
+hay Node để chạy gate).
+
+Đã cân nhắc: chạy trình kiểm chuẩn đầy đủ (Python / Node) trong gate — thêm phụ thuộc
+ngoài cho mọi người phát triển; kiểm theo JSON Schema chính thức của OpenAPI 3.1 bằng thư
+viện Rust — thêm thư viện lớn trong khi lỗi thực tế gặp là `$ref` treo, đã kiểm trực tiếp.

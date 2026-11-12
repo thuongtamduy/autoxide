@@ -34,6 +34,13 @@ endpoints are marked deprecated with a sunset date first.
 - Idempotency keys are scoped to the caller: a request that is not signed in is never
   stored, and two users using the same key do not see each other's answers.
 
+### Fixed
+
+- `docs/openapi.json` (and `/api/v1/openapi.json`) is valid again: the `order` parameter of
+  list endpoints referred to a schema missing from the document, so validators and SDK
+  generators rejected it. The quality gate now checks every `$ref`.
+- MCP tool descriptions are in English only.
+
 ### Security
 
 - Concurrent wrong passwords or codes can no longer go past the login throttle; wrong

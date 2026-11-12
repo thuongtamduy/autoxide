@@ -66,6 +66,7 @@ pub use extract::ValidJson;
 pub use health::{Health, health_routes};
 pub use mcp::MCP_PATH;
 pub use metrics::metrics_routes;
+pub(crate) use openapi::untranslated_text;
 pub use openapi::{BEARER_AUTH, DOCS_PATH, OPENAPI_PATH, lint};
 pub use request_id::REQUEST_ID_HEADER;
 pub use server::{Shutdown, serve, shutdown_signal};

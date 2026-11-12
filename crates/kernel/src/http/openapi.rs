@@ -173,7 +173,95 @@ pub fn lint(openapi: &OpenApi) -> Vec<String> {
             }
         }
     }
+    match serde_json::to_value(openapi) {
+        Ok(document) => {
+            problems.extend(dangling_refs(&document));
+            problems.extend(untranslated_text(&document, "OpenAPI"));
+        }
+        Err(error) => problems.push(format!("the document cannot be serialized: {error}")),
+    }
     problems
+}
+
+/// Mọi `$ref` phải trỏ tới một mục có thật trong chính tài liệu: thiếu một mục là tài
+/// liệu không hợp lệ — trình kiểm chuẩn và công cụ sinh SDK từ chối cả file.
+fn dangling_refs(document: &serde_json::Value) -> Vec<String> {
+    let mut refs = BTreeSet::new();
+    collect_refs(document, &mut refs);
+    refs.into_iter()
+        .filter(|reference| {
+            let target = reference
+                .strip_prefix("#/")
+                .map(|path| path.split('/').try_fold(document, |node, key| node.get(key)));
+            !matches!(target, Some(Some(_)))
+        })
+        .map(|reference| {
+            format!(
+                "`$ref` `{reference}` points to nothing in the document — the type is used but \
+                 not registered (derive `ToSchema` and list it, or mark the field `inline`)"
+            )
+        })
+        .collect()
+}
+
+fn collect_refs(node: &serde_json::Value, refs: &mut BTreeSet<String>) {
+    match node {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                match value {
+                    serde_json::Value::String(reference) if key == "$ref" => {
+                        refs.insert(reference.clone());
+                    }
+                    _ => collect_refs(value, refs),
+                }
+            }
+        }
+        serde_json::Value::Array(items) => items.iter().for_each(|item| collect_refs(item, refs)),
+        _ => {}
+    }
+}
+
+/// Mô tả gửi ra ngoài (OpenAPI, tool MCP) phải là tiếng Anh: `///` trên kiểu có
+/// `ToSchema` / `IntoParams` được chép thẳng vào đó. Báo mọi `summary` / `description`
+/// có chữ tiếng Việt; `what` là tên tài liệu trong thông báo.
+pub(crate) fn untranslated_text(document: &serde_json::Value, what: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    collect_untranslated(document, what, &mut problems);
+    problems
+}
+
+fn collect_untranslated(node: &serde_json::Value, what: &str, problems: &mut Vec<String>) {
+    match node {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                match value {
+                    serde_json::Value::String(text)
+                        if matches!(key.as_str(), "summary" | "description" | "title")
+                            && looks_vietnamese(text) =>
+                    {
+                        problems.push(format!(
+                            "{what}: `{text}` is not English — `///` comments on handlers and on \
+                             types with `ToSchema`/`IntoParams` are published; write them in \
+                             English and keep notes for readers of the code in `//` comments"
+                        ));
+                    }
+                    _ => collect_untranslated(value, what, problems),
+                }
+            }
+        }
+        serde_json::Value::Array(items) => {
+            items.iter().for_each(|item| collect_untranslated(item, what, problems));
+        }
+        _ => {}
+    }
+}
+
+/// Có chữ cái riêng của tiếng Việt (ă â đ ê ô ơ ư, hoặc nguyên âm mang dấu thanh).
+pub(crate) fn looks_vietnamese(text: &str) -> bool {
+    text.chars().any(|c| {
+        matches!(c, 'ă' | 'Ă' | 'đ' | 'Đ' | 'ơ' | 'Ơ' | 'ư' | 'Ư')
+            || ('\u{1EA0}'..='\u{1EF9}').contains(&c)
+    })
 }
 
 /// Các operation của một đường dẫn, kèm tên method.
@@ -205,4 +293,37 @@ fn operations_mut(item: &mut PathItem) -> impl Iterator<Item = (&'static str, &m
     ]
     .into_iter()
     .filter_map(|(method, operation)| operation.as_mut().map(|operation| (method, operation)))
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn bat_ref_tro_vao_khoang_khong() {
+        let document = json!({
+            "paths": {"/x": {"get": {"parameters": [
+                {"schema": {"$ref": "#/components/schemas/Order"}},
+                {"schema": {"$ref": "#/components/schemas/Page"}},
+            ]}}},
+            "components": {"schemas": {"Page": {"type": "object"}}},
+        });
+        let problems = dangling_refs(&document);
+        assert_eq!(problems.len(), 1);
+        assert!(problems[0].contains("#/components/schemas/Order"), "{problems:?}");
+    }
+
+    #[test]
+    fn bat_mo_ta_tieng_viet() {
+        let document = json!({"description": "Đầu vào của tool", "properties": {
+            "a": {"description": "Maximum number of items, café"},
+            "b": {"title": "Tên người dùng"},
+            "description": {"type": "string"},
+        }});
+        let problems = untranslated_text(&document, "tool `x`");
+        assert_eq!(problems.len(), 2, "{problems:?}");
+        assert!(!looks_vietnamese("Resume naïve café über"));
+    }
 }
