@@ -143,7 +143,7 @@ webauthn_rp = { version = "0.3", default-features = false, features = [
   "serializable_server_state",
 ] }
 # Chỉ cho test: authenticator phần mềm ký câu trả lời passkey bằng P-256.
-p256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
+p256 = { version = "0.14", default-features = false, features = ["ecdsa", "std"] }
 totp-rs = { version = "6.0", default-features = false, features = ["std", "otpauth"] }
 
 # --- Observability (STACK.md, bảng "Observability") ---
