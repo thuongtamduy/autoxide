@@ -2535,3 +2535,56 @@ Act Điều 50.
   có nhiều lỗi mở về thẻ bị mất hoặc sửa.
 - **Để AI tự ghi thẳng vào bản công khai:** mọi CMS đã khảo sát đều đưa kết quả về nháp hoặc gợi
   ý.
+
+## D-110 · Bước 18 (AI): những chỗ đề bài chưa nói hoặc làm khác — 2026-11-12 — agent quyết
+
+Bối cảnh: làm bước 18 theo `docs/prompts/ai.md` và D-109. Ghi lại để phiên sau không đảo nhầm.
+
+Quyết định:
+
+- **Tên biến cấu hình theo module đọc nó.** `AUTOXIDE_AI_SEND_PRIVATE_MEDIA` của đề bài thành
+  `AUTOXIDE_MEDIA_AI_SEND_PRIVATE`, `AUTOXIDE_AI_TRANSLATE_BATCH_TOKENS` thành
+  `AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS`. Lý do: mỗi biến khai một lần, ở module dùng nó;
+  module `ai` không biết ảnh hay bài viết. Thêm `AUTOXIDE_AI_IMAGES` (mô hình có đọc ảnh không),
+  vì Chat Completions không cho biết điều đó.
+- **`TextModel::ready()` / `Embedder::ready()`** trong trait của kernel. Module dùng AI kiểm "đã
+  bật chưa" trước việc tốn kém (đọc và thu nhỏ ảnh, xếp job dịch). Lỗi là chính lỗi `ai.*` của
+  module `ai`, nên không module nào phải tự chế mã riêng.
+- **Mã lỗi của `content` cho phần dịch.** Bản dịch sai cấu trúc là `content.translation_invalid`,
+  không phải `ai.output_invalid`: mã lỗi mang tiền tố module tạo ra nó (`cargo xtask check`).
+  Ngôn ngữ đích trùng ngôn ngữ nguồn là lỗi trường `locale` (`validation_failed`), như khi tạo
+  bản dịch bằng tay, không có mã riêng `translation_same_locale`. Tài khoản đã yêu cầu bị xoá thì
+  yêu cầu dừng với `error_code` `content.translation_canceled`; đây là giá trị lưu trong bảng,
+  không phải lỗi API.
+- **Chặn hai yêu cầu dịch cùng lúc bằng cột `active_key`** (`<nhóm bản dịch>:<ngôn ngữ>` khi đang
+  chờ hay đang chạy, `NULL` khi xong) có unique index. Cả SQLite và Postgres coi hai `NULL` là
+  khác nhau, nên không cần partial index. Khoá theo nhóm bản dịch, không theo bản gốc: hai bản gốc
+  của cùng nhóm không cùng ghi một bản dịch.
+- **Bản dịch mới lấy slug từ tiêu đề đã dịch.** Gửi `slug: ""` khi tạo bản dịch nghĩa là "sinh từ
+  tiêu đề, trùng thì thêm hậu tố", như khi không gửi slug. Bản dịch có sẵn giữ slug, để địa chỉ
+  không đổi.
+- **Tìm công khai: ngân sách chung mỗi phút, hết thì chỉ tìm theo chữ.** Đề bài viết "rate
+  limiting theo địa chỉ client". Đổi lại vì điều cần chặn là chi phí embedding, không phải số
+  request (rate limiting theo địa chỉ của kernel đã có). Hết ngân sách thì vẫn trả kết quả theo
+  chữ, không trả 429. Đếm trong tiến trình. `AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE` mặc
+  định 30.
+- **Lập index còn thiếu bằng lịch chạy mỗi giờ** (`content.catch_up_embeddings`, mỗi lần tối đa
+  500 mục), không bằng lệnh CLI. Bật embedding hay đổi mô hình là tự lập lại, không ai phải nhớ
+  chạy lệnh.
+- **Job lập index không dùng `unique_key`.** Khoá chống trùng của job queue giữ cả job đã xong
+  cho tới khi bị dọn, nên sẽ chặn lần lập index sau. Job lập index tự nhận ra khi không có gì
+  đổi: đoạn có cùng SHA-256 và cùng mô hình thì không gọi embedding.
+- **Ngưỡng thời gian tìm chấp nhận được: dưới 50 ms cho phần tính toán.** Đo được 8,3 ms với
+  10.000 đoạn và 107 ms với 100.000 đoạn × 1.024 chiều, một nhân 2,1 GHz (`docs/BENCHMARKS.md`).
+  Tức khoảng 40.000 đoạn mỗi ngôn ngữ, cỡ 7.000–8.000 bài. Vượt ngưỡng đó mới là lý do cho bước
+  sau (vector `f16` / `int8`, nhiều nhân, ANN hay `pgvector` sau trait).
+- **Máy chủ HTTP giả trong test của module `ai` là một handler không có router.** Luật
+  `module-routes` cấm `.route(…)` và `.fallback(…)` trong module, kể cả trong test.
+
+Đã cân nhắc:
+
+- **Đặt biến AI của `media` và `content` dưới `AUTOXIDE_AI_`:** module `ai` phải biết nghiệp
+  vụ.
+- **Partial unique index cho yêu cầu dịch đang chạy:** cú pháp tạo khác nhau qua SeaORM, trong
+  khi cột `active_key` đơn giản và đã kiểm trên cả hai database.
+- **Trả 429 khi hết ngân sách tìm công khai:** người đọc không có kết quả nào.

@@ -222,10 +222,17 @@ Editors can show a draft to someone without an account:
 
 ## AI agents
 
+**AI helpers** (guide: [`AI.md`](AI.md)): `GET /entries/{id}/seo-check` (no AI),
+`POST /entries/{id}/seo-suggestions`, `POST /entries/{id}/translate` (into the draft of the
+translation, never published; follow `GET /translation-requests/{id}`), and `GET /search` /
+`GET /public/search` (by meaning and words). Entries made by the server's translation carry
+`translated_from_revision_id`, and `translation_outdated` once the source changes.
+
 **MCP tools.** `content.list`, `content.get`, `content.create_draft`, `content.update`,
 `content.publish`, `content.unpublish`, `content.list_revisions`, `content.restore_revision`,
-`content.request_review` and `content.resolve`, with the same permissions as the REST
-endpoints. Results that contain an entry include its `version`; the tools that change an entry
+`content.request_review`, `content.seo_check`, `content.suggest_seo`, `content.translate`,
+`content.get_translation_request`, `content.search` and `content.resolve`, with the same
+permissions as the REST endpoints. Results that contain an entry include its `version`; the tools that change an entry
 require it back in their `version` argument, exactly like `If-Match`.
 
 **Give an agent its own API key** (`POST /api/v1/auth/api-keys`) with a short `expires_at` and

@@ -287,8 +287,11 @@ impl ContentService {
             .filter(entry::Column::Locale.eq(request.target_locale.as_str()))
             .one(read)
             .await?;
-        // Job chạy lại sau khi đã ghi xong (tiến trình chết trước khi đánh dấu xong): đã có kết quả.
-        if let Some(done) = &existing
+        // Job chạy lại sau khi đã TẠO bản dịch (tiến trình chết trước khi đánh dấu xong): đã có
+        // kết quả. Chỉ với bản dịch mới — bản dịch có sẵn thì một lần sửa tay sau yêu cầu cũng
+        // khớp điều kiện này, nên để bước ghi (kiểm `updated_at`) báo xung đột.
+        if request.target_entry_id.is_none()
+            && let Some(done) = &existing
             && done.translated_from_revision_id == Some(pinned.id)
             && done.updated_at >= request.created_at
         {

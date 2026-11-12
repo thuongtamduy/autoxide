@@ -214,9 +214,17 @@ Người biên tập có thể cho một người không có tài khoản xem b�
 
 ## AI agent
 
+**Công cụ AI** (hướng dẫn: [`AI.vi.md`](AI.vi.md)): `GET /entries/{id}/seo-check` (không AI),
+`POST /entries/{id}/seo-suggestions`, `POST /entries/{id}/translate` (vào bản nháp của bản dịch,
+không bao giờ tự đăng; theo dõi bằng `GET /translation-requests/{id}`), và `GET /search` /
+`GET /public/search` (theo ý nghĩa và theo chữ). Mục do máy chủ dịch mang
+`translated_from_revision_id`, và `translation_outdated` khi bản gốc đổi.
+
 **Tool MCP.** `content.list`, `content.get`, `content.create_draft`, `content.update`,
 `content.publish`, `content.unpublish`, `content.list_revisions`, `content.restore_revision`,
-`content.request_review` và `content.resolve`, cùng permission với endpoint REST. Kết quả có
+`content.request_review`, `content.seo_check`, `content.suggest_seo`, `content.translate`,
+`content.get_translation_request`, `content.search` và `content.resolve`, cùng permission với
+endpoint REST. Kết quả có
 mục thì kèm `version` của mục; tool thay đổi mục bắt buộc gửi lại giá trị đó trong tham số
 `version`, y như `If-Match`.
 

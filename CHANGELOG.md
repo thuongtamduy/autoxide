@@ -11,6 +11,21 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- AI helpers (guide in `docs/AI.md`): an SEO check without AI
+  (`GET /api/v1/content/entries/{id}/seo-check`); SEO suggestions
+  (`POST …/seo-suggestions`) and alt text suggestions (`POST /api/v1/media/{id}/alt-suggestions`,
+  from a small copy; private images only with `AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true`) that save
+  nothing; translation into the draft of a translation (`POST …/translate` → `202`, a
+  background job that keeps structure, links and images, never overwrites a translation
+  changed meanwhile and never publishes; `GET /api/v1/content/translation-requests/{id}`,
+  events `content.translation_*`, `translation_outdated`); search by meaning combined with
+  word search (`GET /api/v1/content/search`, `GET /api/v1/content/public/search` off by
+  default), same results on SQLite and PostgreSQL. MCP tools `content.seo_check`,
+  `content.suggest_seo`, `content.translate`, `content.get_translation_request`,
+  `content.search`, `media.suggest_alt`. New settings `AUTOXIDE_MEDIA_AI_SEND_PRIVATE`,
+  `AUTOXIDE_CONTENT_TRANSLATE_BATCH_TOKENS`, `AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH`,
+  `AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE`.
+
 - AI connection (module `ai`, off by default): one interface for every module to generate
   structured answers and embeddings, with two adapters — `anthropic` (Claude, Messages API)
   and `openai` (the Chat Completions format: OpenAI, Google Gemini, Ollama, vLLM, LM Studio,

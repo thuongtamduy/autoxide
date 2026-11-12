@@ -132,10 +132,20 @@ empty folders can be deleted — items in the trash count (`409`, `media.folder_
   deletes them. Another daily job deletes stored content no item points to any more
   (left by an interrupted upload, say), only when it is older than a day.
 
+## Alt text suggestions
+
+`POST /api/v1/media/{id}/alt-suggestions` with `{"locale": "vi", "context": "…"}` (permission
+`media.write`) asks the server's AI model for the alt text of a JPEG, PNG, GIF or WebP image in
+that language. It sends a small copy (at most 1280 px), never the original; private images only
+when `AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true`. Nothing is saved: store what a person accepts with
+`PATCH`. `decorative: true` means the image adds no information — leave its alt text empty.
+`media.alt` has one language; the alt text per language lives in the image nodes of a post
+body. Turning AI on: [`AI.md`](AI.md).
+
 ## AI agents (MCP)
 
-Tools `media.list`, `media.get`, `media.update`, `media.trash`, `media.list_tags` and
-`media.upload`, with the same permissions as the REST endpoints. `media.update` takes the
+Tools `media.list`, `media.get`, `media.update`, `media.trash`, `media.list_tags`,
+`media.upload` and `media.suggest_alt`, with the same permissions as the REST endpoints. `media.update` takes the
 `updated_at` you read instead of `If-Match`. `media.upload` takes the content as base64, up
 to 1 MiB (the whole tool call must also fit `AUTOXIDE_HTTP_BODY_LIMIT_BYTES`, 1 MiB by
 default); upload larger files through REST.

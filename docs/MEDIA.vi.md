@@ -131,10 +131,19 @@ cũng tính (`409`, `media.folder_not_empty`).
   hằng ngày xoá hẳn. Một job hằng ngày khác xoá nội dung không còn item nào trỏ tới (vd do
   tải lên bị ngắt), chỉ khi nó cũ hơn một ngày.
 
+## Gợi ý alt text
+
+`POST /api/v1/media/{id}/alt-suggestions` với `{"locale": "vi", "context": "…"}` (permission
+`media.write`) nhờ mô hình AI của máy chủ gợi ý alt text cho một ảnh JPEG, PNG, GIF hay WebP
+bằng ngôn ngữ đó. Gửi một bản nhỏ (tối đa 1280 px), không bao giờ gửi file gốc; ảnh riêng tư chỉ
+gửi khi `AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true`. Không lưu gì: người xem rồi lưu bằng `PATCH`.
+`decorative: true` nghĩa là ảnh không thêm thông tin — để alt trống. `media.alt` chỉ có một
+ngôn ngữ; alt theo từng ngôn ngữ nằm ở node ảnh trong thân bài. Bật AI: [`AI.vi.md`](AI.vi.md).
+
 ## AI agent (MCP)
 
-Tool `media.list`, `media.get`, `media.update`, `media.trash`, `media.list_tags` và
-`media.upload`, cùng permission với endpoint REST. `media.update` nhận `updated_at` đã đọc
+Tool `media.list`, `media.get`, `media.update`, `media.trash`, `media.list_tags`,
+`media.upload` và `media.suggest_alt`, cùng permission với endpoint REST. `media.update` nhận `updated_at` đã đọc
 thay cho `If-Match`. `media.upload` nhận nội dung dạng base64, tối đa 1 MiB (cả lời gọi tool
 còn phải lọt `AUTOXIDE_HTTP_BODY_LIMIT_BYTES`, mặc định 1 MiB); file lớn hơn thì tải lên
 qua REST.

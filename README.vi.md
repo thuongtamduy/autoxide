@@ -63,6 +63,9 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
 16. Nội dung: bài viết và trang nhiều ngôn ngữ, bản nháp và lịch sử, hẹn giờ, danh mục,
     thẻ, tác giả, menu, chuyển hướng, và endpoint công khai cho website
     ([`docs/CONTENT.vi.md`](docs/CONTENT.vi.md))
+17. Tính năng AI, mặc định tắt, với nhà cung cấp bạn chọn (Claude, OpenAI, Gemini,
+    Ollama…): gợi ý SEO và alt text, dịch bài vào bản nháp, tìm theo ý nghĩa, và permission
+    giữ AI agent trong phần việc của nó ([`docs/AI.vi.md`](docs/AI.vi.md))
 
 ## Yêu cầu
 
@@ -312,6 +315,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   công khai, cache, thùng rác
 - [`docs/CONTENT.vi.md`](docs/CONTENT.vi.md) — dùng module nội dung: bản nháp, đăng, trang
   và địa chỉ, ngôn ngữ, endpoint công khai cho website, xem trước
+- [`docs/AI.vi.md`](docs/AI.vi.md) — tính năng AI: bật với từng nhà cung cấp, embedding, chi
+  phí và giới hạn, gửi gì đi, giới hạn cho AI agent
 - [`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md) — cách viết một module, bắt đầu
   từ module mẫu [`modules/notes`](modules/notes) (mặc định không đăng ký)
 

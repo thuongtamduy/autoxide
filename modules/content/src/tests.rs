@@ -2066,6 +2066,21 @@ mod translation {
             );
             assert_eq!(content.get(&ada, vi.id).await.unwrap().title, "Sửa tay");
             assert!(events(&database).await.contains(&"content.translation_failed".to_owned()));
+
+            // Bản gốc không đổi (cùng revision với lần dịch trước), người sửa bản dịch sau khi
+            // yêu cầu: vẫn là xung đột, không báo nhầm "thành công".
+            let queued = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            content.run_translation(queued.id, 1).await.unwrap();
+            assert_eq!(request(&database, queued.id).await.status, "succeeded");
+            let again = content.request_translation(&ada, source.id, "vi").await.unwrap();
+            assert_eq!(again.source_revision_id, queued.source_revision_id);
+            content.update(&ada, vi.id, fields("Sửa tay lần hai"), false, None).await.unwrap();
+            content.run_translation(again.id, 1).await.unwrap();
+            assert_eq!(
+                request(&database, again.id).await.error_code.as_deref(),
+                Some("content.translation_conflict")
+            );
+            assert_eq!(content.get(&ada, vi.id).await.unwrap().title, "Sửa tay lần hai");
         })
         .await
         .unwrap();

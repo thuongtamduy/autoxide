@@ -284,6 +284,10 @@ sẵn lệnh.
   chuẩn ngành nếu có (`DATABASE_URL`), còn lại tiền tố `AUTOXIDE_`. Thêm biến thì
   sinh lại `.env.example` (`cargo run -p autoxide -- config --env-example`).
 - Không thêm thư viện khi vài chục dòng tự viết là đủ; thêm thì ghi vào `STACK.md`.
+- AI (D-109): gọi chỉ qua trait `TextModel` / `Embedder` của `autoxide_kernel::ai` (module `ai`
+  công bố), không gọi nhà cung cấp trực tiếp, không gọi trong transaction ghi. Luật cho mô hình
+  ở `instructions`, dữ liệu người dùng ở `input`; kết quả theo JSON Schema, chỉ thành gợi ý hay
+  bản nháp — không bao giờ tự đăng. Test dùng `FakeTextModel` / `FakeEmbedder` của testkit.
 
 ## Luật ngôn ngữ của tài liệu
 
