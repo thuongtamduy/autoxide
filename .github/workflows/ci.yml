@@ -45,7 +45,7 @@ jobs:
       GATE_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
       GATE_S3_ENDPOINT: http://127.0.0.1:5000
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # Toolchain theo rust-toolchain.toml: không đối số thì rustup cài đúng bản ghim.
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # Toàn bộ lịch sử: secret đã commit rồi xoá vẫn nằm trong git.
           fetch-depth: 0
