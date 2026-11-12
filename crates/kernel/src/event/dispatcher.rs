@@ -7,10 +7,12 @@
 //! trình nhận việc rồi chết giữa chừng thì hết hạn nhận việc, tiến trình khác giao lại.
 
 use std::future::Future;
+use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, SubsecRound, Utc};
+use futures_util::FutureExt as _;
 use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, Order, Query};
 use sea_orm::{ConnectionTrait, QueryResult};
 use tokio::sync::Notify;
@@ -27,6 +29,10 @@ pub const MAX_ATTEMPTS: i32 = 10;
 const BATCH: u64 = 100;
 /// Một tiến trình giữ việc giao một event tối đa chừng này.
 const CLAIM_SECONDS: i64 = 60;
+/// Một lần giao (mọi bên nhận của một event) tối đa chừng này — ngắn hơn thời gian giữ, nên
+/// không tiến trình nào khác nhận lại event đang giao (D-157). Bên nhận cần lâu hơn thì làm
+/// từng phần (lần sau làm tiếp) hoặc chuyển việc vào job.
+const DELIVERY_TIMEOUT: Duration = Duration::from_secs(50);
 /// Không có event mới thì hỏi lại sau chừng này.
 const IDLE_POLL: Duration = Duration::from_secs(1);
 /// Độ dài tối đa của lỗi lưu lại.
@@ -120,7 +126,6 @@ impl Dispatcher {
 
     async fn run_table(&self, module: &'static str) -> Result<usize, Error> {
         let table = Alias::new(table_name(module));
-        let now = now();
         let mut select = Query::select();
         select
             .columns([
@@ -135,15 +140,25 @@ impl Dispatcher {
                 "attempts",
             ])
             .from(table.clone())
-            .cond_where(pending(now))
+            .cond_where(pending(now()))
             .order_by(Alias::new("id"), Order::Asc)
             .limit(BATCH);
         let rows = self.database.write().query_all(&select).await?;
         let mut handled = 0;
         for row in rows {
-            let event = read_event(module, &row)?;
+            let id: Uuid = row.try_get("", "id")?;
             let attempts: i32 = row.try_get("", "attempts")?;
-            if !self.claim(&table, event.id, now).await? {
+            let event = match read_event(module, &row) {
+                Ok(event) => event,
+                Err(error) => {
+                    // Dòng hỏng (sửa tay, dữ liệu lỗi): đánh dấu hỏng hẳn rồi đi tiếp — không để
+                    // nó chặn mọi event sau nó mỗi giây (D-157).
+                    self.mark_unreadable(&table, id, &error).await?;
+                    continue;
+                }
+            };
+            // Giờ mới cho mỗi lần nhận: giao các event trước có thể đã mất thời gian.
+            if !self.claim(&table, event.id, now()).await? {
                 continue; // tiến trình khác vừa nhận việc giao event này
             }
             handled += 1;
@@ -165,15 +180,54 @@ impl Dispatcher {
         Ok(self.database.write().execute(&update).await?.rows_affected() == 1)
     }
 
-    /// Giao cho mọi bên nhận khớp tên event, lần lượt; bên đầu tiên lỗi thì dừng.
+    /// Giao cho mọi bên nhận khớp tên event, lần lượt; bên đầu tiên lỗi thì dừng. Bên nhận
+    /// panic hay chạy quá [`DELIVERY_TIMEOUT`] tính là một lần giao lỗi (thử lại theo backoff),
+    /// không làm chết dispatcher của cả tiến trình (D-157).
     async fn deliver(&self, event: &Delivered) -> Result<(), Error> {
-        for (subscriber, subscription) in &self.subscriptions {
-            if subscription.matches(&event.name) {
-                subscription.handler.handle(event).await.map_err(|error| {
-                    Error::internal(format!("module `{subscriber}`: {}", describe(&error)))
-                })?;
+        let all = async {
+            for (subscriber, subscription) in &self.subscriptions {
+                if !subscription.matches(&event.name) {
+                    continue;
+                }
+                let handled = AssertUnwindSafe(subscription.handler.handle(event)).catch_unwind();
+                match handled.await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(error)) => {
+                        return Err(Error::internal(format!(
+                            "module `{subscriber}`: {}",
+                            describe(&error)
+                        )));
+                    }
+                    Err(_) => {
+                        return Err(Error::internal(format!(
+                            "module `{subscriber}`: the event handler panicked"
+                        )));
+                    }
+                }
             }
+            Ok(())
+        };
+        match tokio::time::timeout(DELIVERY_TIMEOUT, all).await {
+            Ok(outcome) => outcome,
+            Err(_) => Err(Error::internal(format!(
+                "delivery took longer than {} seconds",
+                DELIVERY_TIMEOUT.as_secs()
+            ))),
         }
+    }
+
+    /// Dòng event `id` không đọc được: hỏng hẳn, kèm lý do.
+    async fn mark_unreadable(&self, table: &Alias, id: Uuid, error: &Error) -> Result<(), Error> {
+        let message: String = describe(error).chars().take(MAX_ERROR_LENGTH).collect();
+        tracing::error!(event_id = %id, error = %message, "an event row cannot be read; it will not be delivered");
+        let mut update = Query::update();
+        update
+            .table(table.clone())
+            .value(Alias::new("failed_at"), now())
+            .value(Alias::new("last_error"), message)
+            .and_where(Expr::col(Alias::new("id")).eq(id));
+        self.database.write().execute(&update).await?;
+        metrics::counter!("events_failed_total").increment(1);
         Ok(())
     }
 

@@ -13,7 +13,7 @@
 
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
-use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, Order, Query};
+use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query};
 use sea_orm_migration::prelude::{
     DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
 };
@@ -186,8 +186,9 @@ impl OneTimeTokens {
         Ok(connection.execute(&delete).await?.rows_affected())
     }
 
-    /// Xoá token đã hết hạn hay đã dùng trước `before` (job dọn dẹp của module). Trả số dòng
-    /// đã xoá.
+    /// Xoá token đã hết hạn trước `before` (job dọn dẹp của module) — token đã dùng cũng đi
+    /// theo khi tới hạn của nó (vài phút tới một ngày). Một điều kiện trên cột có index thay vì
+    /// `OR` với `used_at` (không index, buộc duyệt cả bảng — D-157). Trả số dòng đã xoá.
     pub async fn purge<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -195,11 +196,7 @@ impl OneTimeTokens {
     ) -> Result<u64, Error> {
         let delete = Query::delete()
             .from_table(Alias::new(&self.table))
-            .cond_where(
-                Condition::any()
-                    .add(Expr::col(Alias::new("expires_at")).lt(before))
-                    .add(Expr::col(Alias::new("used_at")).lt(before)),
-            )
+            .and_where(Expr::col(Alias::new("expires_at")).lt(before))
             .to_owned();
         Ok(connection.execute(&delete).await?.rows_affected())
     }

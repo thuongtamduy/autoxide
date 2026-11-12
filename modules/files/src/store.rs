@@ -91,32 +91,18 @@ impl Storage for ObjectStorage {
     async fn put(&self, key: &str, mut content: ByteStream) -> Result<u64, Error> {
         let path = self.path(key)?;
         // `BufWriter`: file nhỏ ghi một lần; file lớn tự chuyển sang ghi từng phần, không
-        // giữ cả file trong bộ nhớ.
-        let mut writer = BufWriter::with_capacity(self.store.clone(), path, PART_SIZE);
+        // giữ cả file trong bộ nhớ. Bọc trong `Upload`: request bị huỷ giữa chừng (hết giờ,
+        // client ngắt) thì phần đã gửi lên S3 cũng được huỷ (D-157).
+        let mut upload =
+            Upload(Some(BufWriter::with_capacity(self.store.clone(), path, PART_SIZE)));
         let mut written: u64 = 0;
         while let Some(chunk) = content.next().await {
-            let chunk = match chunk {
-                Ok(chunk) => chunk,
-                Err(error) => {
-                    // Huỷ phần đã ghi dở; lỗi của luồng (vd quá lớn) trả lại nguyên vẹn.
-                    if let Err(abort) = writer.abort().await {
-                        tracing::warn!(error = %abort, "cannot abort a partial upload");
-                    }
-                    return Err(error);
-                }
-            };
+            // Lỗi của luồng (vd quá lớn) trả lại nguyên vẹn; `upload` bị bỏ thì tự huỷ.
+            let chunk = chunk?;
             written += chunk.len() as u64;
-            if let Err(error) = writer.put(chunk).await {
-                if let Err(abort) = writer.abort().await {
-                    tracing::warn!(error = %abort, "cannot abort a partial upload");
-                }
-                return Err(storage_error(error));
-            }
+            upload.writer()?.put(chunk).await.map_err(storage_error)?;
         }
-        writer
-            .shutdown()
-            .await
-            .map_err(|error| Error::internal(format!("file storage: {error}")))?;
+        upload.finish().await?;
         Ok(written)
     }
 
@@ -195,5 +181,45 @@ impl ObjectStorage {
             .collect();
         keys.sort();
         Ok(keys)
+    }
+}
+
+/// Một lần ghi đang dở. Bị bỏ trước [`finish`](Self::finish) — lỗi, hay future của request bị
+/// huỷ (hết giờ, client ngắt) — thì huỷ phần đã ghi: `object_store` không tự huỷ multipart
+/// upload của S3 khi bị bỏ, các phần đã gửi nằm lại (vô hình, vẫn tính tiền) (D-157).
+struct Upload(Option<BufWriter>);
+
+impl Upload {
+    fn writer(&mut self) -> Result<&mut BufWriter, Error> {
+        self.0.as_mut().ok_or_else(|| Error::internal("file storage: upload already finished"))
+    }
+
+    async fn finish(mut self) -> Result<(), Error> {
+        let mut writer = self
+            .0
+            .take()
+            .ok_or_else(|| Error::internal("file storage: upload already finished"))?;
+        if let Err(error) = writer.shutdown().await {
+            abort(writer).await;
+            return Err(Error::internal(format!("file storage: {error}")));
+        }
+        Ok(())
+    }
+}
+
+impl Drop for Upload {
+    fn drop(&mut self) {
+        // `Drop` không chờ được: giao việc huỷ cho runtime (nếu còn).
+        if let Some(writer) = self.0.take()
+            && let Ok(runtime) = tokio::runtime::Handle::try_current()
+        {
+            runtime.spawn(abort(writer));
+        }
+    }
+}
+
+async fn abort(mut writer: BufWriter) {
+    if let Err(error) = writer.abort().await {
+        tracing::warn!(error = %error, "cannot abort a partial upload");
     }
 }

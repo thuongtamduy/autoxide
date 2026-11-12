@@ -3,9 +3,14 @@
 
 mod m0001_create_entry;
 mod m0002_add_actor_kind;
+mod m0003_add_module_index;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
-    vec![Box::new(m0001_create_entry::Migration), Box::new(m0002_add_actor_kind::Migration)]
+    vec![
+        Box::new(m0001_create_entry::Migration),
+        Box::new(m0002_add_actor_kind::Migration),
+        Box::new(m0003_add_module_index::Migration),
+    ]
 }

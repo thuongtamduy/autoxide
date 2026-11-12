@@ -3753,3 +3753,51 @@ Quyết định:
 - Bản ghi idempotency (có thể chứa dữ liệu cá nhân trong response) không xoá theo tài khoản; sống
   tối đa 24 giờ.
 - `/metrics` chạy trên cùng cổng với API: DEPLOY phải chặn đường dẫn này ở proxy khi bật.
+
+## D-157 · Bước 24 — job queue, event, mail, lưu trữ, backup: các phát hiện của lượt rà soát — 2026-11-12 — agent quyết
+
+Rà soát độc lập phần chạy nền và lưu trữ của core, và hiệu năng đường nóng (bước 24). Sửa kèm
+test chạy trên cả hai database.
+
+Quyết định:
+
+- **Worker chạy liên tục, không theo lượt** (`Worker::run`): mỗi module một `Semaphore` có
+  `concurrency` chỗ; vòng lặp claim đúng số chỗ trống của từng module, mỗi job một task giữ chỗ
+  tới khi xong, rồi chờ (một job xong, 1 giây, hay lệnh dừng). Trước đây worker claim một lô
+  của một module và chờ cả lô xong mới sang module khác: một job AI 270 giây giữ mail đặt lại mật
+  khẩu chừng đó. `run_once` (test, công cụ) vẫn chạy một lượt và chờ. Claim SQL không đổi.
+- **Job panic** là một lần lỗi (`catch_unwind`), thử lại rồi vào dead-letter queue. **Job đã
+  chạy đủ `max_attempts` lần** không được claim lại (`attempts < max_attempts` trong điều kiện
+  chờ); lượt dọn hằng giờ đưa job hết lượt mà lần cuối không ghi được kết quả (tiến trình chết)
+  và đã hết hạn giữ vào dead-letter queue. Trước đây một job làm tiến trình hết bộ nhớ được chạy
+  lại mỗi 5 phút, mãi mãi.
+- **Thêm job trùng `unique_key`** dùng `INSERT … ON CONFLICT (unique_key) DO NOTHING` thay vì
+  để lệnh lỗi rồi bắt lỗi: trong transaction, Postgres hỏng cả transaction sau một lệnh lỗi
+  (`COMMIT` thành `ROLLBACK` mà không báo), SQLite thì không — hai database khác nhau.
+- **Dispatcher event:** mỗi lần nhận việc giao dùng giờ hiện tại (trước đây dùng giờ đầu lô —
+  lô chậm làm hạn giữ đã qua ngay khi ghi, tiến trình khác giao trùng). Một lần giao tối đa 50
+  giây (ngắn hơn hạn giữ 60 giây); bên nhận panic hay quá giờ là giao lỗi, thử lại theo backoff,
+  không làm chết dispatcher của cả tiến trình. Dòng event không đọc được bị đánh dấu hỏng hẳn
+  rồi đi tiếp, không chặn mọi event sau nó.
+- **Mail:** chỉ lỗi SMTP vĩnh viễn có mã mở rộng `5.1.x` / `5.2.x` (địa chỉ, hộp thư) mới là
+  lỗi của người nhận và phát `mail.delivery_failed`. Lỗi 5xx khác (535 sai mật khẩu, địa chỉ gửi
+  bị chặn, hết hạn mức 5.4.5, nội dung bị chặn) là lỗi bên gửi: thử lại rồi vào dead-letter
+  queue. Không có mã mở rộng thì không đoán. Trước đây SMTP cấu hình sai giữa một chiến dịch làm
+  bản tin chặn mọi người đăng ký.
+- **Backup** tạo thư mục `0700` (Unix), cả thư mục tạm khi restore: backup chứa hash mật khẩu,
+  secret webhook, MFA, và khoá ký khi nó nằm trong database.
+- **Files:** lần ghi dở bị bỏ (request hết giờ, client ngắt) tự huỷ multipart upload trên S3
+  (`object_store` không tự làm).
+- **Hiệu năng:** index `audit_entry(module, id)` (m0003 của `audit`); `OneTimeTokens::purge`
+  chỉ xoá theo `expires_at` (có index) — token đã dùng đi theo khi tới hạn, vài phút tới một
+  ngày; tài liệu OpenAPI trả bằng `Bytes` (không chép hơn 1 MB mỗi request).
+
+Để lại, ghi rõ (cần đo trước, theo luật "đo trước rồi mới tối ưu"):
+
+- Xác thực hai lần cho request ghi có `Idempotency-Key` (lớp idempotency và handler); truy vấn
+  tuần tự khi xác thực (D-155); `Throttle::hit` nhiều lệnh; mỗi event ba lệnh ghi; worker và
+  dispatcher hỏi mỗi module mỗi giây khi rảnh; rate limiter một mutex; log ghi thẳng stderr.
+  Đo bằng `scripts/loadtest.sh` trên Postgres trước khi đổi.
+- `files` chưa có lượt quét nội dung mồ côi trong nơi lưu (như `media`); DEPLOY nên khuyên đặt
+  lifecycle rule của S3 cho multipart upload dở.
+- `autoxide jobs retry` một job `webhooks.send` đã hỏng không gửi lại (lượt gửi đã `failed`).

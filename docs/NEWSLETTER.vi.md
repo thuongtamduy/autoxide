@@ -167,8 +167,11 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
 ## Danh sách chặn và bounce
 
 - Địa chỉ bị chặn không nhận mail chiến dịch nào, dù đăng ký thế nào.
-- Mail do máy chủ này gửi bị từ chối hẳn (`mail.delivery_failed`) thì địa chỉ bị chặn
-  (`hard_bounce`) và mail đó thành `failed`.
+- Mail do máy chủ này gửi bị từ chối hẳn vì chính địa chỉ người nhận (`mail.delivery_failed`: mã
+  mở rộng `5.1.x` hay `5.2.x`, như "không có hộp thư này") thì địa chỉ bị chặn (`hard_bounce`) và
+  mail đó thành `failed`. Lỗi vĩnh viễn khác (sai mật khẩu SMTP, địa chỉ gửi không được phép, hết
+  hạn mức gửi) là lỗi của bên gửi: mail được thử lại rồi vào dead-letter queue
+  (`autoxide jobs failed`), không chặn người đăng ký nào.
 - Dịch vụ gửi mail có báo bounce gọi `POST /api/v1/newsletter/bounces`
   `{"email": …, "type": "hard" | "soft" | "complaint", "reason": …}` bằng API key có
   `newsletter.manage`. `hard` và `complaint` chặn ngay; `soft` chặn sau

@@ -43,6 +43,11 @@ struct Recorder {
 #[async_trait::async_trait]
 impl JobHandler for Recorder {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        match job.payload["to"].as_str() {
+            Some("slow") => tokio::time::sleep(std::time::Duration::from_millis(1500)).await,
+            Some("panic") => panic!("the handler has a bug"),
+            _ => {}
+        }
         self.runs.lock().unwrap().push(job.clone());
         if self.fail.load(Ordering::SeqCst) {
             return Err(Error::internal("the mail server is down"));
@@ -151,6 +156,40 @@ async fn hen_gio_va_chong_trung() {
         let worker = modules.worker(&database, 4).unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 1);
         assert_eq!(recorder.runs.lock().unwrap()[0].payload["to"], "once");
+    })
+    .await
+    .unwrap();
+}
+
+/// Job trùng `unique_key` GIỮA một transaction: các lệnh sau vẫn chạy và commit giữ mọi thứ.
+/// Trước đây Postgres hỏng cả transaction sau lệnh chèn lỗi (D-157).
+#[tokio::test]
+async fn trung_khoa_giua_transaction_khong_hong_transaction() {
+    TestDatabase::run(async |test| {
+        let (database, modules, recorder) = setup(test, Vec::new()).await;
+        let queue = JobQueue::new("reports");
+        let unique =
+            |key: &str| EnqueueOptions { unique_key: Some(key.to_owned()), ..Default::default() };
+        enqueue(&database, "first", unique("a")).await;
+
+        let transaction = database.begin_write().await.unwrap();
+        let again = SendReport { to: "again".to_owned() };
+        assert!(queue.enqueue(&transaction, &again, unique("a")).await.unwrap().is_none());
+        let next = SendReport { to: "next".to_owned() };
+        assert!(queue.enqueue(&transaction, &next, unique("b")).await.unwrap().is_some());
+        transaction.commit().await.unwrap();
+
+        let worker = modules.worker(&database, 4).unwrap();
+        assert_eq!(worker.run_once().await.unwrap(), 2);
+        let mut sent: Vec<String> = recorder
+            .runs
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|run| run.payload["to"].as_str().unwrap().to_owned())
+            .collect();
+        sent.sort();
+        assert_eq!(sent, ["first", "next"]);
     })
     .await
     .unwrap();
@@ -288,6 +327,76 @@ async fn khai_bao_sai_bi_tu_choi_luc_khoi_dong() {
         let error = modules.worker(&database, 4).err().unwrap().to_string();
 
         assert!(error.contains("runs job kind `reports.missing`, which has no handler"), "{error}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Worker chạy liên tục: job chậm chỉ giữ chỗ của chính nó, job khác được nhận ngay khi có chỗ
+/// — không chờ cả lượt xong (D-157).
+#[tokio::test]
+async fn job_cham_khong_giu_cac_job_khac() {
+    TestDatabase::run(async |test| {
+        let (database, modules, recorder) = setup(test, Vec::new()).await;
+        enqueue(&database, "slow", EnqueueOptions::default()).await;
+        for name in ["a", "b", "c"] {
+            enqueue(&database, name, EnqueueOptions::default()).await;
+        }
+        let worker = modules.worker(&database, 2).unwrap();
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let task = tokio::spawn(worker.run(async move {
+            let _ = stopped.await;
+        }));
+        // Ba job nhanh xong trong khi job chậm (1,5 giây) còn chạy.
+        let started = std::time::Instant::now();
+        while recorder.runs.lock().unwrap().len() < 3 {
+            assert!(started.elapsed() < std::time::Duration::from_secs(5), "quick jobs are stuck");
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        assert!(
+            started.elapsed() < std::time::Duration::from_millis(1400),
+            "waited for the slow job"
+        );
+        assert!(recorder.runs.lock().unwrap().iter().all(|run| run.payload["to"] != "slow"));
+        // Dừng: chờ job đang chạy xong.
+        stop.send(()).unwrap();
+        task.await.unwrap();
+        assert_eq!(recorder.runs.lock().unwrap().len(), 4);
+    })
+    .await
+    .unwrap();
+}
+
+/// Handler panic: ghi như một lần lỗi rồi vào dead-letter queue. Job đã chạy đủ số lần mà lần
+/// cuối không ghi được kết quả (tiến trình chết): không lấy lại nữa, lượt dọn đưa vào
+/// dead-letter queue (D-157).
+#[tokio::test]
+async fn panic_va_tien_trinh_chet_vao_dead_letter_queue() {
+    TestDatabase::run(async |test| {
+        let (database, modules, _) = setup(test, Vec::new()).await;
+        let once = || EnqueueOptions { max_attempts: Some(1), ..Default::default() };
+        enqueue(&database, "panic", once()).await;
+        let worker = modules.worker(&database, 4).unwrap();
+        assert_eq!(worker.run_once().await.unwrap(), 1);
+        let failed = worker.list("reports", JobStatus::Failed, 10).await.unwrap();
+        assert_eq!(failed.len(), 1);
+        assert_eq!(failed[0].last_error.as_deref(), Some("the job handler panicked"));
+
+        // Chạy hết lượt mà tiến trình chết: còn giữ, hết hạn giữ, chưa ghi kết quả.
+        let stuck = enqueue(&database, "ada", once()).await.unwrap();
+        use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
+        let crashed = Query::update()
+            .table(Alias::new("reports_jobs"))
+            .value(Alias::new("attempts"), 1)
+            .value(Alias::new("claimed_by"), "dead")
+            .value(Alias::new("claimed_until"), Utc::now() - chrono::Duration::minutes(1))
+            .and_where(Expr::col(Alias::new("id")).eq(stuck))
+            .to_owned();
+        assert_eq!(database.write().execute(&crashed).await.unwrap().rows_affected(), 1);
+        let fresh = modules.worker(&database, 4).unwrap();
+        assert_eq!(fresh.run_once().await.unwrap(), 0, "not claimed again");
+        let failed = fresh.list("reports", JobStatus::Failed, 10).await.unwrap();
+        assert!(failed.iter().any(|job| job.id == stuck), "{failed:?}");
     })
     .await
     .unwrap();

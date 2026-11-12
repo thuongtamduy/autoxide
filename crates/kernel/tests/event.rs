@@ -68,6 +68,9 @@ struct Recorder {
 #[async_trait::async_trait]
 impl EventHandler for Recorder {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        if event.payload["title"] == "bug" {
+            panic!("the event handler has a bug");
+        }
         self.seen.lock().unwrap().push(event.clone());
         if self.fail {
             return Err(Error::internal("the downstream system is down"));
@@ -303,6 +306,62 @@ async fn khai_sai_thi_bao_ro() {
         let error =
             setup.outbox.record(setup.database.write(), Actor::system(), None, &Foreign).await;
         assert_eq!(error.unwrap_err().code(), "internal_error");
+    })
+    .await
+    .unwrap();
+}
+
+/// Bên nhận panic, hay dòng event không đọc được: tính là giao lỗi / hỏng hẳn, các event sau
+/// vẫn được giao — dispatcher không chết, không bị chặn (D-157).
+#[tokio::test]
+async fn ben_nhan_panic_hay_dong_hong_khong_chan_event_sau() {
+    TestDatabase::run(async |test| {
+        let recorder = Arc::new(Recorder::default());
+        let listener = Listener { event: Subscription::ALL, recorder: recorder.clone() };
+        let setup = setup(test, listener).await;
+        record(&setup, "bug").await;
+        record(&setup, "broken").await;
+        record(&setup, "fine").await;
+        // Dòng thứ hai hỏng: payload không phải JSON.
+        use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
+        let damage = Query::update()
+            .table(Alias::new("notes_events"))
+            .value(Alias::new("payload"), "{not json")
+            .and_where(Expr::col(Alias::new("subject")).eq("notes.note:broken"))
+            .to_owned();
+        setup.database.write().execute(&damage).await.unwrap();
+
+        let dispatcher = setup.modules.dispatcher(&setup.database).unwrap();
+        dispatcher.run_once().await.unwrap();
+        let seen: Vec<String> = recorder
+            .seen
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|event| event.payload["title"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(seen, ["fine"]);
+        let backend = setup.database.read().get_database_backend();
+        let rows = setup
+            .database
+            .read()
+            .query_all_raw(Statement::from_string(
+                backend,
+                "SELECT subject, attempts, failed_at, last_error FROM notes_events ORDER BY id",
+            ))
+            .await
+            .unwrap();
+        let bug = &rows[0];
+        assert_eq!(bug.try_get::<i32>("", "attempts").unwrap(), 1);
+        let error: String = bug.try_get("", "last_error").unwrap();
+        assert!(error.contains("panicked"), "{error}");
+        let broken = &rows[1];
+        assert!(
+            broken
+                .try_get::<Option<chrono::DateTime<chrono::Utc>>>("", "failed_at")
+                .unwrap()
+                .is_some()
+        );
     })
     .await
     .unwrap();

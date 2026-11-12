@@ -57,8 +57,9 @@ impl Module for MailModule {
     fn events(&self) -> Vec<EventInfo> {
         vec![EventInfo::new(
             autoxide_kernel::mail::DELIVERY_FAILED,
-            "A mail was refused for good by the receiving server (the address does not exist, \
-             for example); `to` is the address, `dedupe_key` the sender's key.",
+            "A mail was refused for good because of its recipient address (SMTP enhanced status \
+             5.1.x or 5.2.x: no such mailbox, for example); `to` is the address, `dedupe_key` \
+             the sender's key.",
         )]
     }
 

@@ -15,6 +15,21 @@ endpoints are marked deprecated with a sunset date first.
   `{"current_password": "…"}`, like adding a passkey or an API key: a stolen access token alone
   can no longer tie someone else's authenticator app to the account.
 
+### Fixed
+
+- Jobs: the worker no longer waits for a whole batch before taking new jobs: each module runs up
+  to `AUTOXIDE_JOBS_CONCURRENCY` jobs at once and a slow job (AI call, slow webhook) only holds
+  its own slot. A job whose handler panics counts as a failed attempt; a job whose process died
+  on its last attempt goes to the dead-letter queue instead of being retried forever.
+- Jobs queued with a `unique_key` that already exists inside a transaction no longer break that
+  transaction on Postgres.
+- Events: a subscriber that panics or takes longer than 50 seconds counts as a failed delivery
+  (retried later) instead of stopping event delivery; an unreadable event row is marked failed
+  instead of blocking every later event; a claim is taken with the current time, so a slow
+  batch can no longer let a second server deliver the same event.
+- Files: an upload cut off midway (timeout, client gone) aborts the partial S3 multipart upload.
+- Audit: filtering by `module` uses an index (new migration).
+
 ### Security
 
 - Resetting or changing a password also ends, in the same transaction, everything opened with
@@ -46,6 +61,12 @@ endpoints are marked deprecated with a sunset date first.
 - Files: names with invisible formatting characters (such as right-to-left override) are
   refused; a download the client already has (`If-None-Match`) answers 304 without reading the
   stored content.
+- Mail: only a permanent SMTP refusal that blames the recipient address (enhanced status
+  `5.1.x` / `5.2.x`) emits `mail.delivery_failed`; other permanent errors (wrong SMTP password,
+  sender not allowed, sending quota) are retried and then land in the dead-letter queue, so a
+  misconfigured SMTP server no longer gets every newsletter subscriber blocked.
+- Backups and the scratch copy made during a restore are created readable by their owner only
+  (`0700` directories, on Unix).
 - The hourly sign-in cleanup uses indexes and deletes in batches of 1,000 rows (a new migration
   adds the indexes).
 

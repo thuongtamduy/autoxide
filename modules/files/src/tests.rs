@@ -135,3 +135,22 @@ async fn doc_theo_khoang_va_liet_ke_theo_tien_to() {
         }
     }
 }
+
+/// Request bị huỷ giữa lúc ghi (hết giờ, client ngắt): không để lại file dở. Trên S3, phần đã
+/// gửi của multipart upload được huỷ (D-157).
+#[tokio::test]
+async fn ghi_bi_huy_giua_chung_khong_de_lai_gi() {
+    for (name, storage) in backends() {
+        let part: Vec<u8> = vec![7u8; 9 * 1024 * 1024];
+        // Một phần lớn (đủ để S3 bắt đầu multipart), rồi luồng đứng im mãi.
+        let content = futures_util::stream::iter(vec![Ok(Bytes::from(part))])
+            .chain(futures_util::stream::pending())
+            .boxed();
+        let put = storage.put("cut.bin", content);
+        let cut = tokio::time::timeout(std::time::Duration::from_millis(500), put).await;
+        assert!(cut.is_err(), "{name}");
+        // Cho việc huỷ chạy nền xong.
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        assert!(storage.get("cut.bin").await.unwrap().is_none(), "{name}");
+    }
+}

@@ -139,8 +139,9 @@ pub fn build(
     openapi::finish(&mut openapi, extras.idempotency.is_some());
     let deprecated = Arc::new(deprecation::apply(&mut openapi, &extras.deprecations));
 
-    // Tài liệu không đổi trong lúc chạy: đổi thành JSON một lần rồi trả lại mãi.
-    let document = openapi.to_json().unwrap_or_default();
+    // Tài liệu không đổi trong lúc chạy: đổi thành JSON một lần rồi trả lại mãi. `Bytes` clone
+    // chỉ tăng bộ đếm tham chiếu, không chép cả tài liệu (hơn 1 MB) mỗi request (D-157).
+    let document = axum::body::Bytes::from(openapi.to_json().unwrap_or_default());
     let mut router = router.route(
         OPENAPI_PATH,
         axum::routing::get(move || {

@@ -3,12 +3,15 @@
 
 use std::collections::HashMap;
 use std::future::Future;
+use std::panic::AssertUnwindSafe;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use chrono::{DateTime, Utc};
+use futures_util::FutureExt as _;
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::task::JoinSet;
 use uuid::Uuid;
 
@@ -74,59 +77,117 @@ impl Worker {
     }
 
     /// Một lượt: đưa job của lịch tới hạn vào hàng đợi, rồi chạy tối đa `concurrency`
-    /// job của mỗi module. Trả về số job đã chạy.
+    /// job của mỗi module và chờ chúng xong. Trả về số job đã chạy. Cho test và công cụ;
+    /// chương trình dùng [`run`](Self::run), không chờ theo lượt.
     pub async fn run_once(&self) -> Result<usize, Error> {
         self.enqueue_schedules().await?;
         self.cleanup().await?;
+        let mut running = JoinSet::new();
         let mut ran = 0;
         for module in &self.modules {
-            let now = now();
-            let until = now + chrono::Duration::from_std(LEASE).map_err(Error::internal)?;
-            let table = table_name(module);
-            let claimed = self
-                .claim
-                .claim(self.database.write(), &table, &self.id, now, until, self.concurrency)
-                .await?;
-            ran += claimed.len();
-            // Chạy song song; mỗi job một task. `JoinSet` đợi tất cả xong.
-            let mut running = JoinSet::new();
-            for job in claimed {
-                let database = self.database.clone();
-                let handlers = Arc::clone(&self.handlers);
-                let (table, worker) = (table.clone(), self.id.clone());
-                running.spawn(
-                    async move { run_job(&database, &handlers, &table, &worker, job).await },
-                );
+            for job in self.claim(module, self.concurrency).await? {
+                ran += 1;
+                running.spawn(self.job_task(module, job, None));
             }
-            while let Some(result) = running.join_next().await {
-                match result {
-                    Ok(Ok(())) => {}
-                    Ok(Err(error)) => tracing::error!(error = %error, "cannot record a job result"),
-                    Err(error) => tracing::error!(error = %error, "a job task panicked"),
-                }
-            }
+        }
+        while let Some(result) = running.join_next().await {
+            log_task(result);
         }
         Ok(ran)
     }
 
-    /// Chạy tới khi `shutdown` hoàn thành. Lỗi database thì ghi log rồi thử lại.
+    /// Chạy tới khi `shutdown` hoàn thành, rồi chờ các job đang chạy xong. Lỗi database thì
+    /// ghi log rồi thử lại.
+    ///
+    /// Mỗi module tối đa `concurrency` job cùng lúc, độc lập với nhau: một job chậm (gọi AI,
+    /// webhook tới máy chủ chậm) chỉ giữ chỗ của chính nó — job khác, của module khác (mail đặt
+    /// lại mật khẩu) vẫn được nhận ngay khi có chỗ (D-157).
     pub async fn run(self, shutdown: impl Future<Output = ()>) {
         tokio::pin!(shutdown);
+        let slots: HashMap<&'static str, Arc<Semaphore>> = self
+            .modules
+            .iter()
+            .map(|module| {
+                let permits = usize::try_from(self.concurrency).unwrap_or(usize::MAX);
+                (*module, Arc::new(Semaphore::new(permits)))
+            })
+            .collect();
+        let mut running = JoinSet::new();
         loop {
-            let ran = match self.run_once().await {
-                Ok(ran) => ran,
+            let claimed = match self.claim_free(&slots, &mut running).await {
+                Ok(claimed) => claimed,
                 Err(error) => {
                     tracing::error!(error = %error, "job worker failed; retrying");
                     0
                 }
             };
-            if ran > 0 {
+            if claimed > 0 {
                 continue;
             }
+            // Không có gì mới: chờ một job xong (có chỗ), hết giờ chờ, hay lệnh dừng.
             tokio::select! {
-                () = &mut shutdown => return,
+                () = &mut shutdown => break,
+                Some(result) = running.join_next() => log_task(result),
                 () = tokio::time::sleep(IDLE_POLL) => {}
             }
+        }
+        while let Some(result) = running.join_next().await {
+            log_task(result);
+        }
+    }
+
+    /// Một vòng của [`run`](Self::run): lịch, dọn dẹp, rồi claim cho mỗi module đúng số chỗ
+    /// còn trống. Trả số job vừa nhận.
+    async fn claim_free(
+        &self,
+        slots: &HashMap<&'static str, Arc<Semaphore>>,
+        running: &mut JoinSet<()>,
+    ) -> Result<usize, Error> {
+        while let Some(result) = running.try_join_next() {
+            log_task(result);
+        }
+        self.enqueue_schedules().await?;
+        self.cleanup().await?;
+        let mut claimed = 0;
+        for module in &self.modules {
+            let Some(slots) = slots.get(module) else { continue };
+            let free = u64::try_from(slots.available_permits()).unwrap_or(0);
+            if free == 0 {
+                continue;
+            }
+            for job in self.claim(module, free).await? {
+                // Còn chỗ (vừa đếm, và chỉ vòng này lấy chỗ): `try_acquire` không hụt.
+                let Ok(permit) = Arc::clone(slots).try_acquire_owned() else { break };
+                claimed += 1;
+                running.spawn(self.job_task(module, job, Some(permit)));
+            }
+        }
+        Ok(claimed)
+    }
+
+    /// Claim tối đa `limit` job tới hạn của `module`.
+    async fn claim(&self, module: &str, limit: u64) -> Result<Vec<ClaimedJob>, Error> {
+        let now = now();
+        let until = now + chrono::Duration::from_std(LEASE).map_err(Error::internal)?;
+        let table = table_name(module);
+        self.claim.claim(self.database.write(), &table, &self.id, now, until, limit).await
+    }
+
+    /// Task chạy `job` của `module`; giữ `permit` (chỗ của module) tới khi xong.
+    fn job_task(
+        &self,
+        module: &str,
+        job: ClaimedJob,
+        permit: Option<OwnedSemaphorePermit>,
+    ) -> impl Future<Output = ()> + Send + 'static {
+        let database = self.database.clone();
+        let handlers = Arc::clone(&self.handlers);
+        let (table, worker) = (table_name(module), self.id.clone());
+        async move {
+            if let Err(error) = run_job(&database, &handlers, &table, &worker, job).await {
+                tracing::error!(error = %error, "cannot record a job result");
+            }
+            drop(permit);
         }
     }
 
@@ -225,15 +286,49 @@ impl Worker {
             }
             *last = Some(Instant::now());
         }
-        let before = now() - KEEP_COMPLETED;
+        let now = now();
+        let before = now - KEEP_COMPLETED;
         for module in &self.modules {
             let mut delete = Query::delete();
             delete
                 .from_table(Alias::new(table_name(module)))
                 .and_where(Expr::col(Alias::new("completed_at")).lt(before));
             self.database.write().execute(&delete).await?;
+            // Job đã chạy đủ số lần mà lần cuối không ghi được kết quả (tiến trình chết giữa
+            // chừng) và đã hết hạn giữ: vào dead-letter queue (D-157).
+            let mut exhausted = Query::update();
+            exhausted
+                .table(Alias::new(table_name(module)))
+                .value(Alias::new("failed_at"), now)
+                .value(
+                    Alias::new("last_error"),
+                    "the worker stopped during the last attempt (crash or restart)",
+                )
+                .value(Alias::new("claimed_by"), Option::<String>::None)
+                .value(Alias::new("claimed_until"), Option::<DateTime<Utc>>::None)
+                .and_where(Expr::col(Alias::new("completed_at")).is_null())
+                .and_where(Expr::col(Alias::new("failed_at")).is_null())
+                .and_where(
+                    Expr::col(Alias::new("attempts")).gte(Expr::col(Alias::new("max_attempts"))),
+                )
+                .and_where(Expr::col(Alias::new("claimed_until")).lt(now));
+            let moved = self.database.write().execute(&exhausted).await?.rows_affected();
+            if moved > 0 {
+                tracing::error!(
+                    module,
+                    jobs = moved,
+                    "jobs moved to the dead-letter queue after the worker stopped mid-run"
+                );
+            }
         }
         Ok(())
+    }
+}
+
+/// Ghi log task job kết thúc bất thường (đáng lẽ không xảy ra: `run_job` tự bắt panic).
+fn log_task(result: Result<(), tokio::task::JoinError>) {
+    if let Err(error) = result {
+        tracing::error!(error = %error, "a job task ended abnormally");
     }
 }
 
@@ -258,9 +353,13 @@ async fn run_job(
                 };
                 // Dừng trước khi hết hạn giữ, để không worker nào khác chạy chồng.
                 let limit = LEASE - Duration::from_secs(30);
-                match tokio::time::timeout(limit, handler.run(&context)).await {
-                    Ok(Ok(())) => Ok(()),
-                    Ok(Err(error)) => Err(describe(&error)),
+                // Handler panic: ghi như một lần lỗi (thử lại, rồi vào dead-letter queue) thay
+                // vì để job nằm đó tới hết hạn giữ rồi chạy lại mãi (D-157).
+                let run = AssertUnwindSafe(handler.run(&context)).catch_unwind();
+                match tokio::time::timeout(limit, run).await {
+                    Ok(Ok(Ok(()))) => Ok(()),
+                    Ok(Ok(Err(error))) => Err(describe(&error)),
+                    Ok(Err(_)) => Err("the job handler panicked".to_owned()),
                     Err(_) => Err(format!("timed out after {} seconds", limit.as_secs())),
                 }
             }

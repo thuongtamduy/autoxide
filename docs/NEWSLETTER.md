@@ -171,8 +171,12 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
 ## Suppressions and bounces
 
 - A suppressed address gets no campaign mail, whatever its subscriptions.
-- A permanent SMTP failure of a mail sent by this server (`mail.delivery_failed`) suppresses the
-  address (`hard_bounce`) and marks that mail `failed`.
+- A permanent SMTP failure of a mail sent by this server that blames the address itself
+  (`mail.delivery_failed`: enhanced status `5.1.x` or `5.2.x`, such as "no such mailbox")
+  suppresses the address (`hard_bounce`) and marks that mail `failed`. Other permanent errors
+  (wrong SMTP password, sender not allowed, sending quota) are the sender's problem: the mail is
+  retried, then lands in the dead-letter queue (`autoxide jobs failed`), and no subscriber is
+  blocked.
 - Mail services that report bounces call `POST /api/v1/newsletter/bounces`
   `{"email": …, "type": "hard" | "soft" | "complaint", "reason": …}` with an API key that has
   `newsletter.manage`. `hard` and `complaint` suppress at once; `soft` after

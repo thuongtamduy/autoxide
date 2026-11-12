@@ -135,7 +135,7 @@ pub(crate) async fn run_restore(settings: Settings, directory: PathBuf) -> Resul
     // RUSTSEC-2026-0459 của SQLite đóng gói chỉ khai thác được qua một file `-wal` do kẻ
     // tấn công chuẩn bị (D-032, D-075).
     let scratch = std::env::temp_dir().join(format!("autoxide-restore-{}", uuid::Uuid::now_v7()));
-    std::fs::create_dir_all(&scratch).map_err(|error| error.to_string())?;
+    private_dir(&scratch).map_err(|error| error.to_string())?;
     let result = async {
         let copy = scratch.join(DATABASE_FILE);
         std::fs::copy(directory.join(DATABASE_FILE), &copy)
@@ -197,7 +197,21 @@ fn prepare_directory(directory: &Path) -> Result<(), String> {
             ));
         }
     }
-    std::fs::create_dir_all(directory).map_err(|error| format!("{}: {error}", directory.display()))
+    private_dir(directory).map_err(|error| format!("{}: {error}", directory.display()))
+}
+
+/// Tạo thư mục `path` (và các thư mục cha) rồi, trên Unix, chỉ để chủ của nó đọc / ghi / mở
+/// (`0700`). Backup chứa hash mật khẩu, secret webhook, MFA, và khoá ký khi nó nằm trong
+/// database: người dùng khác trên cùng máy không được đọc (D-157). Khoá thư mục là đủ — file bên
+/// trong không mở được qua thư mục đã khoá.
+fn private_dir(path: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
+    }
+    Ok(())
 }
 
 async fn read_manifest(directory: &Path) -> Result<Value, String> {
@@ -401,6 +415,18 @@ mod tests {
     }
 
     /// Nguồn là database gate đang chọn; khôi phục vào một file SQLite mới.
+    /// Thư mục backup chỉ chủ của nó mở được (D-157).
+    #[cfg(unix)]
+    #[test]
+    fn thu_muc_backup_chi_chu_mo_duoc() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let path = std::env::temp_dir().join(format!("autoxide-private-{}", uuid::Uuid::now_v7()));
+        private_dir(&path.join("inner")).unwrap();
+        let mode = std::fs::metadata(path.join("inner")).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o700);
+        std::fs::remove_dir_all(&path).unwrap();
+    }
+
     #[tokio::test]
     async fn backup_roi_restore_vao_sqlite() {
         TestDatabase::run(async |test| {

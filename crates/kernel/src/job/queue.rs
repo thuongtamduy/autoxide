@@ -1,8 +1,8 @@
 //! Đưa job vào hàng đợi, và các thao tác cho người vận hành (xem, chạy lại job hỏng).
 
 use chrono::{DateTime, SubsecRound, Utc};
-use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query};
-use sea_orm::{ConnectionTrait, SqlErr};
+use sea_orm::ConnectionTrait;
+use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, OnConflict, Order, Query};
 use uuid::Uuid;
 
 use super::{Job, foreign_kind, module_of, table_name};
@@ -89,14 +89,13 @@ impl JobQueue {
                 options.unique_key.into(),
                 now.into(),
             ])
-            .map_err(|error| Error::internal(format!("job insert: {error}")))?;
-        match connection.execute(&insert).await {
-            Ok(_) => Ok(Some(id)),
-            Err(error) if matches!(error.sql_err(), Some(SqlErr::UniqueConstraintViolation(_))) => {
-                Ok(None)
-            }
-            Err(error) => Err(error.into()),
-        }
+            .map_err(|error| Error::internal(format!("job insert: {error}")))?
+            // Trùng `unique_key` thì không chèn — bằng `ON CONFLICT DO NOTHING`, KHÔNG để lệnh
+            // lỗi rồi bắt lỗi: trong transaction, Postgres đánh dấu cả transaction là hỏng sau
+            // một lệnh lỗi (lệnh sau lỗi, `COMMIT` thành `ROLLBACK`), SQLite thì không (D-157).
+            .on_conflict(OnConflict::column(Alias::new("unique_key")).do_nothing().to_owned());
+        let inserted = connection.execute(&insert).await?.rows_affected();
+        Ok((inserted == 1).then_some(id))
     }
 }
 

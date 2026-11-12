@@ -99,6 +99,9 @@ pub(crate) fn pending(now: DateTime<Utc>) -> Condition {
         .add(Expr::col(Alias::new("completed_at")).is_null())
         .add(Expr::col(Alias::new("failed_at")).is_null())
         .add(Expr::col(Alias::new("run_at")).lte(now))
+        // Đã chạy đủ số lần mà chưa ghi được kết quả (tiến trình chết giữa chừng — hết bộ nhớ,
+        // bị kill): không lấy lại nữa; lượt dọn đưa nó vào dead-letter queue (D-157).
+        .add(Expr::col(Alias::new("attempts")).lt(Expr::col(Alias::new("max_attempts"))))
         .add(
             Condition::any()
                 .add(Expr::col(Alias::new("claimed_until")).is_null())
