@@ -2030,3 +2030,13 @@ Lý do: tool MCP đi qua JSON-RPC, nội dung nhị phân phải mã hoá base64
 nằm trọn trong bộ nhớ), trong khi media thường là ảnh / video lớn — giới hạn 1 MiB như tool
 của `files` (D-083) gần như vô dụng ở đây. AI agent có REST đầy đủ, cùng permission, kèm
 `Idempotency-Key`. Thêm tool tải lên từ URL hay base64 nhỏ sau được mà không phá gì.
+
+## D-091 · Module đầu tiên là `media` — 2026-11-12 — chủ dự án quyết
+
+Quyết định: module nghiệp vụ đầu tiên của Autoxide là thư viện media (`media`, D-086). Bổ
+sung D-016 (lúc đó "module đầu tiên chưa quyết"); phần còn lại của D-016 giữ nguyên: core
+trung lập với nghiệp vụ, ai cũng dùng được.
+
+Hệ quả: `CLAUDE.md` và `STACK.md` ghi `media` là module đầu tiên. Agent vẫn không tự chọn
+module nghiệp vụ tiếp theo — module nội dung (`content`) dùng `media` chỉ dựng khi chủ dự án
+giao.

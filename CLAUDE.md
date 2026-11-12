@@ -44,7 +44,8 @@ Thấy đang lạc thì dừng việc đó, quay lại lộ trình và nói rõ 
 **Autoxide dùng để làm gì:** làm nền cho một **sản phẩm mới** (không phải bản viết
 lại của hệ thống nào có sẵn). **Ai dùng:** mọi người đều dùng được — không gắn với
 một công ty hay một ngành. **Mã nguồn mở, công khai toàn bộ.** **Module đầu
-tiên:** chưa quyết.
+tiên:** `media` — thư viện media (chủ dự án chốt 12/11/2026, D-091); module nội dung
+(`content`) dùng nó là bước sau, chưa giao.
 
 Hệ quả cho agent:
 
@@ -52,8 +53,8 @@ Hệ quả cho agent:
   (đơn hàng, kho, bệnh nhân…) vào core. Thứ đó thuộc về module.
 - Người lạ phải tự cài và dùng được: cấu hình có giá trị mặc định hợp lý, thông báo
   lỗi rõ, tài liệu cài đặt đủ để làm theo mà không cần hỏi ai.
-- Không tự chọn module đầu tiên, không dựng module nghiệp vụ nào ngoài module mẫu
-  của lộ trình khi chủ dự án chưa quyết.
+- Không tự chọn module nghiệp vụ tiếp theo, không dựng module nghiệp vụ nào ngoài
+  những module chủ dự án đã giao (`notes` mẫu, `media`) khi chủ dự án chưa quyết.
 - Repo là công khai: mọi file, commit message, comment và tài liệu đều viết với
   giả định người lạ sẽ đọc. Không ghi tên máy chủ, IP, đường dẫn riêng hay thông
   tin cá nhân của chủ dự án. **Công khai không áp cho secret** — secret không bao
