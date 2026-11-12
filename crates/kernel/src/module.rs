@@ -842,12 +842,11 @@ mod tests {
         assert_eq!(modules.configure(&mut reader), Ok(()));
         // Chỉ biến của hai module nội bộ `kernel` và `antispam`.
         let names: Vec<&str> = reader.values().iter().map(|value| value.setting.name).collect();
-        assert!(
-            names.iter().all(
-                |name| *name == "AUTOXIDE_SECRET_KEY" || name.starts_with("AUTOXIDE_ANTISPAM_")
-            ),
-            "{names:?}"
-        );
+        let internal = |name: &&str| {
+            ["AUTOXIDE_SECRET_KEY", "AUTOXIDE_HTTP_PUBLIC_URL"].contains(name)
+                || name.starts_with("AUTOXIDE_ANTISPAM_")
+        };
+        assert!(names.iter().all(internal), "{names:?}");
         assert!(modules.migrator().is_ok());
     }
 }

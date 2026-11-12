@@ -2629,3 +2629,15 @@ hay đọc bảng của nó.
 
 Đã cân nhắc: để `comments` / `newsletter` phụ thuộc `autoxide_content::api` — gắn chặt hai module
 vào `content`, trong khi bình luận gắn được vào đích bất kỳ.
+
+## D-118 · `AUTOXIDE_HTTP_PUBLIC_URL`, công bố bởi module nội bộ `kernel` — 2026-11-12 — agent quyết
+
+Quyết định: URL công khai của API (không bắt buộc) do module nội bộ `kernel` đọc và công bố
+`autoxide_kernel::public_url::PublicUrl` (`context.require::<PublicUrl>()`). `link(path)` ghép
+link tuyệt đối; chưa đặt thì lỗi 503 `public_url_missing` nói rõ phải đặt biến nào — chỉ chức
+năng cần link tuyệt đối (vd header `List-Unsubscribe` của bản tin) bị ảnh hưởng, chương trình vẫn
+khởi động. Giá trị phải là địa chỉ `https://` (hoặc `http://`) tuyệt đối, không query, không
+fragment; dấu `/` cuối bị bỏ.
+
+Lý do: module không đọc cấu hình HTTP của binary; công bố qua `provide` như `SecretKey` là một
+cách làm sẵn có.
