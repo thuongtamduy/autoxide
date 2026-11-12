@@ -28,7 +28,7 @@ impl Recorder {
 #[async_trait::async_trait]
 impl EventHandler for Recorder {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
-        let (before, after, details) = split(&event.payload);
+        let (before, after, details) = split(&redacted(event));
         let inserted = entity::ActiveModel {
             id: Set(event.id),
             module: Set(event.module.to_owned()),
@@ -80,6 +80,27 @@ impl Recorder {
     }
 }
 
+/// Event mang địa chỉ email của người nhận mà không gắn với tài khoản nào (nên không xoá được
+/// theo `subject` khi tài khoản bị xoá): audit chỉ giữ bản băm của địa chỉ (D-150). Bên nhận
+/// khác (bản tin, webhook) vẫn nhận địa chỉ đầy đủ.
+const EMAIL_FIELDS: [(&str, &str); 1] = [("mail.delivery_failed", "to")];
+
+/// Payload sẽ lưu: các trường email ở [`EMAIL_FIELDS`] thay bằng `sha256:<hex>` của địa chỉ đã
+/// chuẩn hoá (chữ thường, bỏ khoảng trắng hai đầu).
+fn redacted(event: &Delivered) -> Value {
+    let mut payload = event.payload.clone();
+    for (name, field) in EMAIL_FIELDS {
+        if event.name == name
+            && let Some(value) = payload.get_mut(field)
+            && let Some(email) = value.as_str()
+        {
+            let hash = autoxide_kernel::secret::sha256(&email.trim().to_lowercase());
+            *value = Value::String(format!("sha256:{hash}"));
+        }
+    }
+    payload
+}
+
 /// Tách payload thành (trước, sau, phần còn lại), mỗi phần dạng JSON chữ.
 fn split(payload: &Value) -> (Option<String>, Option<String>, Option<String>) {
     let Value::Object(fields) = payload else {
@@ -96,6 +117,26 @@ fn split(payload: &Value) -> (Option<String>, Option<String>, Option<String>) {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn audit_khong_giu_email_cua_mail_bi_tu_choi() {
+        let event = Delivered {
+            id: uuid::Uuid::now_v7(),
+            module: "mail",
+            name: "mail.delivery_failed".to_owned(),
+            actor: autoxide_kernel::event::Actor::system(),
+            subject: None,
+            payload: json!({"to": " Ada@Example.com", "dedupe_key": null, "code": "550"}),
+            occurred_at: Utc::now(),
+        };
+        let stored = redacted(&event);
+        let expected = autoxide_kernel::secret::sha256("ada@example.com");
+        assert_eq!(stored["to"], format!("sha256:{expected}"));
+        assert_eq!(stored["code"], "550");
+        let mut other = event.clone();
+        other.name = "mail.something_else".to_owned();
+        assert_eq!(redacted(&other)["to"], " Ada@Example.com");
+    }
 
     #[test]
     fn tach_truoc_sau_va_phan_con_lai() {

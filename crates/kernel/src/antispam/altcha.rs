@@ -63,8 +63,15 @@ impl ChallengeVerifier for Altcha {
         let span = COUNTER_MAX - COUNTER_MIN + 1;
         let counter = COUNTER_MIN
             + u32::from_be_bytes([random[32], random[33], random[34], random[35]]) % span;
-        let (nonce, salt) = (&random[..16], &random[16..32]);
-        let derived = derive(salt, nonce, counter, self.cost);
+        let (nonce, salt) = (random[..16].to_vec(), random[16..32].to_vec());
+        // `cost` vòng SHA-256 trên một endpoint công khai: chạy trên thread cho việc chặn, không
+        // giữ thread async (D-150).
+        let (seed_salt, seed_nonce, cost) = (salt.clone(), nonce.clone(), self.cost);
+        let derived =
+            tokio::task::spawn_blocking(move || derive(&seed_salt, &seed_nonce, counter, cost))
+                .await
+                .map_err(Error::internal)?;
+        let (nonce, salt) = (nonce.as_slice(), salt.as_slice());
         let parameters = json!({
             "algorithm": ALGORITHM,
             "cost": self.cost,
@@ -88,12 +95,17 @@ impl ChallengeVerifier for Altcha {
         let Some(solution) = solution.filter(|solution| !solution.trim().is_empty()) else {
             return Ok(ChallengeOutcome::Missing);
         };
-        let expected = Expected { scope, binding, cost: self.cost, now: Utc::now().timestamp() };
-        Ok(if check(solution, &self.key().await?, &expected) {
-            ChallengeOutcome::Passed
-        } else {
-            ChallengeOutcome::Failed
+        let (key, cost, now) = (self.key().await?, self.cost, Utc::now().timestamp());
+        let (solution, scope, binding) =
+            (solution.to_owned(), scope.to_owned(), binding.to_owned());
+        // Kiểm lời giải cũng tính `cost` vòng SHA-256: thread cho việc chặn.
+        let passed = tokio::task::spawn_blocking(move || {
+            let expected = Expected { scope: &scope, binding: &binding, cost, now };
+            check(&solution, &key, &expected)
         })
+        .await
+        .map_err(Error::internal)?;
+        Ok(if passed { ChallengeOutcome::Passed } else { ChallengeOutcome::Failed })
     }
 }
 

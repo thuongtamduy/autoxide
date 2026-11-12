@@ -245,7 +245,7 @@ into a new database.
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (default) or `postgres://user:password@host:5432/db` |
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Signs access tokens; required in production, the same on every server |
-| `AUTOXIDE_SECRET_KEY` | Signs short-lived tokens of every module; optional: when unset, one is generated once and kept in the database |
+| `AUTOXIDE_SECRET_KEY` | Signs short-lived tokens of every module and keys the hashes of visitors' IP addresses; optional: when unset, one is generated once and kept in the database. Set it (outside the database, the same on every server) in production: with the key in the database, anyone holding a database backup can work the IP blocks back out of the stored hashes |
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Behind a reverse proxy: the header with the client address |
 | `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | How many of your proxies a request passes (default `1`) |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | The address the internet reaches the API at, e.g. `https://api.example.com`; needed for links back to the API in mail (newsletter unsubscribe) |

@@ -28,8 +28,9 @@ impl ResourceResolver for EntryResolver {
             return Ok(None);
         };
         let owners = draft.created_by.into_iter().collect();
-        // Đang công khai: thông tin của bản công khai (thứ người đọc thấy). Không thì của bản nháp,
-        // và `public` là `false`.
+        // Đang công khai: thông tin của bản công khai (thứ người đọc thấy). Không thì `public` là
+        // `false` và không đưa tiêu đề, tóm tắt của bản nháp ra ngoài — module khác có thể chép
+        // chúng vào mail gửi người lạ (D-150).
         Ok(Some(match published::Entity::find_by_id(id).one(read).await? {
             Some(live) => Resource {
                 public: true,
@@ -41,8 +42,8 @@ impl ResourceResolver for EntryResolver {
             },
             None => Resource {
                 public: false,
-                title: draft.title,
-                summary: draft.excerpt,
+                title: String::new(),
+                summary: String::new(),
                 url: None,
                 locale: Some(draft.locale),
                 owner_user_ids: owners,

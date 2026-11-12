@@ -76,6 +76,12 @@ impl Throttle {
     }
 
     /// Vượt giới hạn thì chặn trong `lock` (thay vì `window`).
+    /// Module sở hữu bảng (`<module>_throttle`) và kết nối của nó — để chống spam đọc bảng nonce
+    /// của cùng module.
+    pub(crate) fn owner(&self) -> Option<(&Database, &str)> {
+        self.table.strip_suffix("_throttle").map(|module| (&self.database, module))
+    }
+
     pub fn with_lock(mut self, lock: Duration) -> Result<Self, Error> {
         self.lock = chrono::Duration::from_std(lock).map_err(Error::internal)?;
         Ok(self)

@@ -402,6 +402,22 @@ impl SpamGuard {
                 if form.issued_at + self.max_age() < now {
                     return Err(token_expired());
                 }
+                // Token đã dùng cho một bài đã nhận (gửi lại): pha hai sẽ trả lại kết quả cũ. Dừng
+                // ở đây, không đếm giới hạn theo IP / email, không gọi bộ phân loại — nếu không,
+                // một token gửi lại nhiều lần khoá được email của người khác (D-150).
+                let owner = [&limits.email, &limits.ip, &limits.user]
+                    .into_iter()
+                    .flatten()
+                    .find_map(Throttle::owner);
+                if let Some((database, module)) = owner
+                    && nonce::exists(database.read(), module, &form.nonce).await?
+                {
+                    return Ok(Checked {
+                        verdict: Verdict::Accept,
+                        nonce: Some(form.nonce),
+                        expires_at: form.issued_at + self.max_age() + Duration::hours(1),
+                    });
+                }
                 if form.issued_at + self.min_fill() > now {
                     reasons.push("too_fast");
                 }

@@ -18,6 +18,8 @@ use crate::error::Error;
 pub struct Resource {
     /// Người lạ có xem được không (vd bài đã đăng).
     pub public: bool,
+    /// Tiêu đề và tóm tắt người lạ thấy; rỗng khi `public` là `false` (bộ tra không đưa nội dung
+    /// chưa công khai ra ngoài module của nó).
     pub title: String,
     pub summary: String,
     /// Đường dẫn công khai (không có tên miền), khi có.

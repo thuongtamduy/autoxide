@@ -236,6 +236,40 @@ async fn nonce_la_idempotency_cho_nguoi_la() {
     .unwrap();
 }
 
+/// Gửi lại một token đã dùng: không đếm vào giới hạn theo email, nên kẻ xấu không khoá được
+/// email của người khác bằng cách gửi lại một token nhiều lần (D-150).
+#[tokio::test]
+async fn gui_lai_token_da_dung_khong_dem_gioi_han() {
+    TestDatabase::run(async |test| {
+        let (database, _) = setup(test).await;
+        let guard = make_guard(&database, quick());
+        let email = Throttle::new(database.clone(), "demo", 2, Duration::from_secs(3600)).unwrap();
+        let limits = Limits { ip: None, email: Some(email), user: None };
+        let visitor = client("203.0.113.9");
+        let token = guard.issue("demo:contact").await.unwrap().token;
+        let mut sent = submission(&visitor, Some(&token));
+        sent.email = Some("victim@example.com");
+        let first = guard.check(&sent, &limits).await.unwrap();
+        assert_eq!(first.verdict, Verdict::Accept);
+        let transaction = database.begin_write().await.unwrap();
+        assert_eq!(first.claim(&transaction, "demo", Some("r1")).await.unwrap(), Claim::New);
+        transaction.commit().await.unwrap();
+        for _ in 0..5 {
+            let again = guard.check(&sent, &limits).await.unwrap();
+            assert_eq!(again.verdict, Verdict::Accept);
+            let replay = again.claim(database.write(), "demo", None).await.unwrap();
+            assert_eq!(replay, Claim::Replay { result: Some("r1".to_owned()) });
+        }
+        // Chỉ lần đầu được đếm: người thật vẫn gửi được một lần nữa.
+        let fresh = guard.issue("demo:contact").await.unwrap().token;
+        let mut real = submission(&visitor, Some(&fresh));
+        real.email = Some("victim@example.com");
+        assert_eq!(guard.check(&real, &limits).await.unwrap().verdict, Verdict::Accept);
+    })
+    .await
+    .unwrap();
+}
+
 /// Endpoint công khai lấy token: không cần đăng nhập, không cache, phạm vi sai thì 422.
 #[tokio::test]
 async fn endpoint_lay_token() {

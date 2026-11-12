@@ -141,11 +141,8 @@ impl Translations {
         let Some(template) = template else {
             return error.message();
         };
-        let mut text = template.clone();
-        for (name, value) in error.params() {
-            text = text.replace(&format!("{{{name}}}"), value);
-        }
-        if has_placeholder(&text) { error.message() } else { text }
+        let params: Vec<(&str, &str)> = error.params().collect();
+        fill_all(template, &params).unwrap_or_else(|| error.message())
     }
 
     /// Câu đã dịch của khoá `key` bằng `language`, nếu có (tiếng Anh: luôn `None`, câu
@@ -164,26 +161,51 @@ impl Translations {
 }
 
 /// Điền mọi `{tên}` của `template` bằng `params`; `None` nếu còn chỗ điền không có giá trị.
+///
+/// Một lượt, từ trái sang phải: giá trị đã điền không bị đọc lại, nên chữ người dùng gõ (vd câu
+/// trả lời của form chứa `{x}` hay `{id}`) không làm hỏng mẫu hay bị thay tiếp (D-150).
 pub(crate) fn fill_all(template: &str, params: &[(&str, &str)]) -> Option<String> {
-    let mut text = template.to_owned();
-    for (name, value) in params {
-        text = text.replace(&format!("{{{name}}}"), value);
-    }
-    (!has_placeholder(&text)).then_some(text)
-}
-
-/// Còn chỗ điền `{tên}` chưa có giá trị.
-fn has_placeholder(text: &str) -> bool {
-    text.split('{').skip(1).any(|rest| {
-        rest.split_once('}').is_some_and(|(name, _)| {
+    let mut text = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(start) = rest.find('{') {
+        text.push_str(&rest[..start]);
+        let after = &rest[start + 1..];
+        let name = after.split_once('}').map(|(name, _)| name).filter(|name| {
             !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
-        })
-    })
+        });
+        match name {
+            Some(name) => {
+                let (_, value) = params.iter().find(|(key, _)| *key == name)?;
+                text.push_str(value);
+                rest = &after[name.len() + 1..];
+            }
+            None => {
+                text.push('{');
+                rest = after;
+            }
+        }
+    }
+    text.push_str(rest);
+    Some(text)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dien_mot_luot_khong_doc_lai_gia_tri() {
+        let filled = fill_all(
+            "Hi {name}: {answers} ({id})",
+            &[("name", "Ada"), ("answers", "message: {x} {id} {"), ("id", "42")],
+        );
+        assert_eq!(filled.as_deref(), Some("Hi Ada: message: {x} {id} { (42)"));
+        assert_eq!(fill_all("{missing}", &[]), None);
+        assert_eq!(
+            fill_all("JSON {\"a\": 1} and { spaced }", &[]).as_deref(),
+            Some("JSON {\"a\": 1} and { spaced }")
+        );
+    }
 
     #[test]
     fn chon_ngon_ngu_theo_accept_language() {

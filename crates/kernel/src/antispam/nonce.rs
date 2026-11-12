@@ -27,6 +27,20 @@ pub(crate) fn table_name(module: &str) -> String {
     format!("{module}_antispam_nonces")
 }
 
+/// `nonce` đã được nhận (bài đã gửi rồi) chưa — đọc, không ghi.
+pub(crate) async fn exists<C: ConnectionTrait>(
+    connection: &C,
+    module: &str,
+    nonce: &str,
+) -> Result<bool, Error> {
+    let select = Query::select()
+        .expr(Expr::val(1))
+        .from(Alias::new(table_name(module)))
+        .and_where(Expr::col(Alias::new("nonce_hash")).eq(sha256(nonce)))
+        .to_owned();
+    Ok(connection.query_one(&select).await?.is_some())
+}
+
 /// Chèn `nonce` (đã băm) kèm `result` của lần gửi này; giữ tới `expires_at`.
 pub(crate) async fn claim<C: ConnectionTrait>(
     connection: &C,

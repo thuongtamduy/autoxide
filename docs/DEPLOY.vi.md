@@ -246,7 +246,7 @@ database mới.
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (mặc định) hoặc `postgres://user:password@host:5432/db` |
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Ký access token; bắt buộc ở production, giống nhau trên mọi máy chủ |
-| `AUTOXIDE_SECRET_KEY` | Ký các token sống ngắn của mọi module; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database |
+| `AUTOXIDE_SECRET_KEY` | Ký các token sống ngắn của mọi module và làm khoá băm địa chỉ IP của người lạ; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database. Khi chạy thật nên đặt (ngoài database, giống nhau trên mọi máy chủ): khoá nằm trong database thì ai có bản backup database cũng tính ngược được khối IP từ các bản băm đã lưu |
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Sau reverse proxy: header chứa địa chỉ client |
 | `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | Số proxy của bạn mà một request đi qua (mặc định `1`) |
 | `AUTOXIDE_HTTP_PUBLIC_URL` | Địa chỉ internet dùng để gọi API, vd `https://api.example.com`; cần cho link trỏ về API trong mail (huỷ đăng ký bản tin) |

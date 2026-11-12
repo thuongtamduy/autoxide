@@ -1342,8 +1342,8 @@ mod privacy {
     }
 }
 
-/// Sổ đối tượng: bài nháp có nhưng không công khai; bài đã đăng có tiêu đề, tóm tắt, đường dẫn,
-/// ngôn ngữ của bản công khai; ID lạ thì không có.
+/// Sổ đối tượng: bài nháp có nhưng không công khai và không lộ tiêu đề (D-150); bài đã đăng có
+/// tiêu đề, tóm tắt, đường dẫn, ngôn ngữ của bản công khai; ID lạ thì không có.
 #[tokio::test]
 async fn so_doi_tuong_content_entry() {
     use autoxide_kernel::resource::ResourceResolver;
@@ -1356,8 +1356,8 @@ async fn so_doi_tuong_content_entry() {
         let entry = content.create(&ada, new).await.unwrap();
         let draft = resolver.resolve(&entry.id.to_string()).await.unwrap().unwrap();
         assert_eq!(
-            (draft.public, draft.title.as_str(), draft.url.as_deref()),
-            (false, "Hello", None)
+            (draft.public, draft.title.as_str(), draft.summary.as_str(), draft.url.as_deref()),
+            (false, "", "", None)
         );
         assert_eq!(draft.owner_user_ids, [ada.user_id()]);
         content.publish(&ada, entry.id, None, None, false).await.unwrap();
