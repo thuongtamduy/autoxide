@@ -3,8 +3,8 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–12, 14–22 xong**; bước 13 còn phát hành (làm tay, D-107). CI trên GitHub
-đã tắt (D-107): `./gate.sh` cục bộ là gate duy nhất.
+Trạng thái: **bước 0–22 xong**; bản phát hành mới nhất `v0.2.0`. CI trên GitHub đã tắt (D-107):
+`./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
 
@@ -142,7 +142,7 @@ Hệ thống tài khoản:
 
 Phát hành và nâng cấp:
 
-- [ ] Số phiên bản, `CHANGELOG`, bản phát hành trên GitHub (làm tay theo `docs/RELEASING.md`, D-107)
+- [x] Số phiên bản, `CHANGELOG`, bản phát hành trên GitHub (làm tay theo `docs/RELEASING.md`, D-107; `v0.2.0`)
 - [x] ~~CI build và đăng image Docker lên GitHub Container Registry~~ — thay bằng build image cục bộ khi phát hành (D-107)
 - [x] Dependabot đề xuất nâng cấp; kiểm lỗ hổng thư viện bằng `cargo deny check` trong gate (lịch hằng ngày trên GitHub đã tắt, D-107)
 
