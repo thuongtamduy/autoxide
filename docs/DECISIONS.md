@@ -2453,3 +2453,17 @@ Quyết định:
 Đã cân nhắc: liệt kê dải địa chỉ proxy tin cậy (CIDR) — chắc hơn khi địa chỉ proxy cố định, nhưng
 CDN đổi dải địa chỉ thường xuyên; để sau. Tin header do website gửi kèm khi gọi bằng API key —
 hai cách cho cùng một việc (khảo sát 0.15), không làm.
+
+## D-109 · Băm IP: gộp /24 – /64 rồi HMAC; `bucket` theo ngày, `fingerprint` cố định — 2026-11-12 — agent quyết
+
+Quyết định: `autoxide_kernel::ip_hash`. Gộp địa chỉ theo khối (IPv4 /24, IPv6 /64; IPv4 viết
+dạng `::ffff:` tính như IPv4) rồi HMAC-SHA256 bằng khoá dẫn từ `SecretKey` (D-107), giữ 16 byte,
+base64url 22 ký tự. `bucket(secret, ip, now)` dùng khoá đổi theo ngày UTC, cho bộ đếm;
+`fingerprint(secret, ip)` dùng khoá cố định, lưu cùng bản ghi, module tự xoá sau thời hạn của
+mình. Không module nào lưu IP thô.
+
+Lý do: không gian IPv4 nhỏ, băm không khoá thì thử hết được; khoá theo ngày làm bộ đếm các ngày
+không nối được với nhau. Gộp khối vì một nhà mạng cấp cả khối cho một khách.
+
+Đã cân nhắc: cắt bớt octet cuối mà không băm (Isso) — vẫn lộ khối địa chỉ; băm từng địa chỉ
+không gộp — đổi địa chỉ trong khối IPv6 là thoát bộ đếm.

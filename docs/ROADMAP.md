@@ -236,7 +236,7 @@ Mỗi mục một commit, gate xanh trên cả hai database.
       một lần và lưu trong database)
 - [x] `ClientInfo` dùng chung (IP đã giải, user agent, `Origin`, `Referer`);
       `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`
-- [ ] Băm IP (gộp tiền tố rồi HMAC; dạng `bucket` theo ngày và `fingerprint`)
+- [x] Băm IP (gộp tiền tố rồi HMAC; dạng `bucket` theo ngày và `fingerprint`)
 - [ ] `Throttle` lưu trong database, dùng chung; `auth` chuyển sang dùng
 - [ ] Token dùng một lần trong kernel; `auth` chuyển sang dùng, hành vi không đổi
 - [ ] Chống spam hai pha: nhận / cách ly / từ chối; trường bẫy, token form ký, giới hạn theo IP

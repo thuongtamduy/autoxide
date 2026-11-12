@@ -13,6 +13,7 @@ pub mod event;
 pub mod http;
 pub mod i18n;
 pub mod idempotency;
+pub mod ip_hash;
 pub mod job;
 pub mod logging;
 pub mod mail;

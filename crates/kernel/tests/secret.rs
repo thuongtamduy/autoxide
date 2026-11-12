@@ -105,3 +105,24 @@ fn ten_kernel_danh_rieng() {
     let error = Modules::new(vec![Box::new(Fake)]).unwrap_err();
     assert!(error.message().contains("reserved"), "{}", error.message());
 }
+
+/// Băm IP: `bucket` đổi theo ngày, `fingerprint` cố định; cả hai khác nhau và không chứa IP.
+#[tokio::test]
+async fn bam_ip_theo_ngay_va_co_dinh() {
+    use autoxide_kernel::ip_hash::{bucket, fingerprint};
+    use chrono::{Duration, Utc};
+    TestDatabase::run(async |test| {
+        let (_, key) = start(test, &[]).await;
+        let address: std::net::IpAddr = "203.0.113.9".parse().unwrap();
+        let today = Utc::now();
+        let a = bucket(&key, address, today).await.unwrap();
+        assert_eq!(a, bucket(&key, "203.0.113.200".parse().unwrap(), today).await.unwrap());
+        assert_ne!(a, bucket(&key, address, today + Duration::days(1)).await.unwrap());
+        let fixed = fingerprint(&key, address).await.unwrap();
+        assert_ne!(fixed, a);
+        assert_eq!(fixed, fingerprint(&key, address).await.unwrap());
+        assert!(!fixed.contains("203"));
+    })
+    .await
+    .unwrap();
+}
