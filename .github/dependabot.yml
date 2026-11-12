@@ -10,6 +10,11 @@ updates:
     groups:
       rust-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Chỉ test passkey dùng `p256`, và phải cùng bản với `webauthn_rp` (0.3 dùng 0.13).
+      # Bỏ dòng này khi nâng `webauthn_rp` lên bản dùng `p256` 0.14 (D-092).
+      - dependency-name: p256
+        versions: [">= 0.14"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

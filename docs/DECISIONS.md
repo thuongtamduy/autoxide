@@ -2040,3 +2040,15 @@ trung lập với nghiệp vụ, ai cũng dùng được.
 Hệ quả: `CLAUDE.md` và `STACK.md` ghi `media` là module đầu tiên. Agent vẫn không tự chọn
 module nghiệp vụ tiếp theo — module nội dung (`content`) dùng `media` chỉ dựng khi chủ dự án
 giao.
+
+## D-092 · Dependabot bỏ qua `p256` ≥ 0.14 cho tới khi `webauthn_rp` nâng theo — 2026-11-12 — chủ dự án quyết
+
+Quyết định: đóng PR nâng `p256` 0.13 → 0.14 (thuongtamduy/autoxide#2) và thêm luật `ignore`
+trong `.github/dependabot.yml` cho `p256` từ 0.14 trở lên. Merge PR nâng 5 action của GitHub
+Actions (thuongtamduy/autoxide#1).
+
+Lý do: `p256` chỉ là phụ thuộc test (authenticator phần mềm cho test passkey). Bản 0.14 đổi
+API (`to_encoded_point` không còn) nên PR không biên dịch; `webauthn_rp` 0.3 vẫn dùng 0.13 —
+nâng riêng phần test thì cây thư viện có hai bản `p256`. Nâng cùng lúc khi `webauthn_rp` lên
+bản mới, rồi bỏ luật `ignore`. PR action: thay đổi phá vỡ của các bản mới chỉ chạm
+`pull_request_target` / `workflow_run` và vài input cũ của action Docker — repo không dùng.
