@@ -21,10 +21,13 @@
 //!    cả lỗi do thư viện sinh ra (404, 405, 413…);
 //! 8. **bắt panic** — handler panic thành lỗi 500 thay vì đứt kết nối;
 //! 9. **timeout** — request chạy quá lâu bị cắt, trả 503;
-//! 10. **giới hạn body** — body quá lớn bị từ chối, trả 413.
+//! 10. **giới hạn body** — body quá lớn bị từ chối, trả 413;
+//! 11. **304** — `GET` có `ETag` khớp `If-None-Match` của client thành `304 Not Modified`.
 
 mod body_limit;
+mod conditional;
 mod deprecation;
+mod disposition;
 mod extract;
 mod health;
 mod idempotency;
@@ -62,6 +65,7 @@ use crate::idempotency::IdempotencyStore;
 
 pub use body_limit::{BodyLimit, is_too_large};
 pub use deprecation::Deprecation;
+pub use disposition::{Disposition, content_disposition};
 pub use extract::ValidJson;
 pub use health::{Health, health_routes};
 pub use mcp::MCP_PATH;
@@ -169,6 +173,7 @@ pub fn build(
     // `.layer` bọc thêm một lớp RA NGOÀI các lớp trước đó: lớp khai sau cùng là lớp
     // request gặp đầu tiên. Đọc từ dưới lên sẽ ra thứ tự ở đầu file.
     let router = router
+        .layer(middleware::from_fn(conditional::not_modified))
         // Giới hạn mặc định của axum (2 MiB cho extractor) tắt đi: lớp `body_limit`
         // đã giới hạn theo từng route.
         .layer(DefaultBodyLimit::disable())
@@ -237,6 +242,9 @@ fn cors(origins: &CorsOrigins) -> CorsLayer {
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
             header::IF_MATCH,
+            header::IF_NONE_MATCH,
+            header::IF_RANGE,
+            header::RANGE,
             idempotency::IDEMPOTENCY_KEY,
             REQUEST_ID_HEADER,
             // Header của giao thức MCP (endpoint `/mcp`).
@@ -248,6 +256,9 @@ fn cors(origins: &CorsOrigins) -> CorsLayer {
         .expose_headers([
             header::ETAG,
             header::LOCATION,
+            header::CONTENT_DISPOSITION,
+            header::CONTENT_RANGE,
+            header::ACCEPT_RANGES,
             header::RETRY_AFTER,
             header::LINK,
             HeaderName::from_static("deprecation"),

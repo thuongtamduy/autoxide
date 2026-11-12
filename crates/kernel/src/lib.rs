@@ -22,6 +22,7 @@ pub mod module;
 pub mod pagination;
 pub mod privacy;
 pub mod response;
+pub mod search;
 pub mod storage;
 pub mod telemetry;
 pub mod tls;

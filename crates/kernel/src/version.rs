@@ -9,7 +9,11 @@
 //!   bằng một câu `UPDATE … WHERE updated_at = <phiên bản mong đợi>`: 0 dòng nghĩa là bản
 //!   ghi vừa bị người khác sửa → [`changed`] (412). Kiểm trong chính câu `UPDATE` nên hai
 //!   request đồng thời không đè nhau được, trên cả hai database.
-//! - Không gửi `If-Match` thì sửa như cũ (ghi đè), để client cũ vẫn chạy.
+//! - Không gửi `If-Match` thì sửa như cũ (ghi đè), để client cũ vẫn chạy — trừ endpoint
+//!   gọi [`IfMatch::required`]: không gửi là 428 `precondition_required` (RFC 6585).
+//! - Đọc: client gửi lại `ETag` trong `If-None-Match`; còn khớp thì lớp HTTP của kernel
+//!   trả `304 Not Modified` không kèm thân (xem [`if_none_match`]) — mọi `GET` có `ETag`
+//!   đều được, không phải viết gì thêm.
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
@@ -46,7 +50,9 @@ impl<T: Serialize> IntoResponse for Tagged<T> {
 /// Header `If-Match` của request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IfMatch {
-    /// Không gửi, hoặc gửi `*`: sửa không cần kiểm phiên bản.
+    /// Không gửi header.
+    Missing,
+    /// Gửi `*`: sửa không cần kiểm phiên bản.
     Any,
     /// Chỉ sửa khi bản ghi còn đúng phiên bản này.
     Version(DateTime<Utc>),
@@ -59,15 +65,29 @@ impl IfMatch {
     /// Phiên bản service phải khớp (`None`: không kiểm); lỗi 412 nếu không thể khớp.
     pub fn expected(self) -> Result<Option<DateTime<Utc>>, Error> {
         match self {
-            IfMatch::Any => Ok(None),
+            IfMatch::Missing | IfMatch::Any => Ok(None),
             IfMatch::Version(version) => Ok(Some(version)),
             IfMatch::Never => Err(changed()),
         }
     }
 
+    /// Như [`expected`](Self::expected), nhưng bắt buộc gửi header: thiếu thì 428.
+    /// `*` vẫn được nhận — người gọi nói rõ là muốn ghi đè.
+    pub fn required(self) -> Result<Option<DateTime<Utc>>, Error> {
+        match self {
+            IfMatch::Missing => Err(Error::new(
+                ErrorKind::PreconditionRequired,
+                "precondition_required",
+                "Send the `ETag` you read in an `If-Match` header, so that the change is not \
+                 made over someone else's (`If-Match: *` to change it whatever its version).",
+            )),
+            other => other.expected(),
+        }
+    }
+
     fn parse(value: Option<&str>) -> IfMatch {
         let Some(value) = value.map(str::trim) else {
-            return IfMatch::Any;
+            return IfMatch::Missing;
         };
         if value == "*" {
             return IfMatch::Any;
@@ -92,10 +112,25 @@ impl<S: Send + Sync> FromRequestParts<S> for IfMatch {
             return Ok(IfMatch::Never);
         }
         match first {
-            None => Ok(IfMatch::Any),
+            None => Ok(IfMatch::Missing),
             Some(value) => Ok(IfMatch::parse(Some(value.to_str().unwrap_or_default()))),
         }
     }
+}
+
+/// Header `If-None-Match` của request có khớp `etag` (một giá trị `ETag` đầy đủ, kể cả
+/// ngoặc kép) không: so sánh "yếu" của RFC 9110 (bỏ qua tiền tố `W/`), nhận danh sách
+/// nhiều giá trị và `*`. Khớp nghĩa là client đã có đúng bản này: trả 304.
+pub fn if_none_match(headers: &axum::http::HeaderMap, etag: &str) -> bool {
+    let wanted = etag.trim_start_matches("W/");
+    headers.get_all(header::IF_NONE_MATCH).iter().filter_map(|value| value.to_str().ok()).any(
+        |value| {
+            value
+                .split(',')
+                .map(str::trim)
+                .any(|candidate| candidate == "*" || candidate.trim_start_matches("W/") == wanted)
+        },
+    )
 }
 
 /// Lỗi 412: bản ghi đã bị sửa từ lúc người gọi đọc nó.
@@ -118,12 +153,30 @@ mod tests {
     fn etag_doc_lai_dung_phien_ban() {
         let version = Utc::now().trunc_subsecs(6);
         assert_eq!(IfMatch::parse(Some(&etag(version))), IfMatch::Version(version));
-        assert_eq!(IfMatch::parse(None), IfMatch::Any);
+        assert_eq!(IfMatch::parse(None), IfMatch::Missing);
+        assert_eq!(IfMatch::Missing.expected().unwrap(), None);
+        let required = IfMatch::Missing.required().unwrap_err();
+        assert_eq!(
+            (required.kind(), required.code()),
+            (ErrorKind::PreconditionRequired, "precondition_required")
+        );
+        assert_eq!(IfMatch::Any.required().unwrap(), None);
         assert_eq!(IfMatch::parse(Some("*")), IfMatch::Any);
         for wrong in ["W/\"1\"", "\"abc\"", "1", "\"1\", \"2\"", ""] {
             assert_eq!(IfMatch::parse(Some(wrong)), IfMatch::Never, "{wrong}");
         }
         assert_eq!(IfMatch::Never.expected().unwrap_err().kind(), ErrorKind::PreconditionFailed);
+    }
+
+    #[test]
+    fn if_none_match_so_yeu_va_danh_sach() {
+        let mut headers = axum::http::HeaderMap::new();
+        assert!(!if_none_match(&headers, "\"a\""));
+        headers.insert(header::IF_NONE_MATCH, HeaderValue::from_static("\"x\", W/\"a\""));
+        assert!(if_none_match(&headers, "\"a\""));
+        assert!(!if_none_match(&headers, "\"b\""));
+        headers.insert(header::IF_NONE_MATCH, HeaderValue::from_static("*"));
+        assert!(if_none_match(&headers, "\"b\""));
     }
 
     #[tokio::test]

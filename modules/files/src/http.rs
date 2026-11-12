@@ -245,24 +245,9 @@ async fn delete_file(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// `attachment` kèm tên file theo RFC 6266: `filename` chỉ chữ ASCII an toàn (cho client
-/// cũ), `filename*` là tên đầy đủ mã hoá UTF-8 (RFC 8187).
+/// `attachment` kèm tên file (RFC 6266): không bao giờ mở ngay trong trình duyệt.
 fn content_disposition(name: &str) -> String {
-    let fallback: String = name
-        .chars()
-        .map(|c| if c.is_ascii_graphic() && c != '"' && c != '\\' || c == ' ' { c } else { '_' })
-        .collect();
-    let encoded: String = name
-        .bytes()
-        .map(|byte| {
-            if byte.is_ascii_alphanumeric() || b"!#$&+-.^_`|~".contains(&byte) {
-                (byte as char).to_string()
-            } else {
-                format!("%{byte:02X}")
-            }
-        })
-        .collect();
-    format!("attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}")
+    autoxide_kernel::http::content_disposition(autoxide_kernel::http::Disposition::Attachment, name)
 }
 
 #[cfg(test)]

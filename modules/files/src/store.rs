@@ -10,7 +10,7 @@ use object_store::aws::AmazonS3Builder;
 use object_store::buffered::BufWriter;
 use object_store::local::LocalFileSystem;
 use object_store::path::Path;
-use object_store::{ObjectStore, ObjectStoreExt as _};
+use object_store::{GetOptions, GetRange, ObjectStore, ObjectStoreExt as _};
 use tokio::io::AsyncWriteExt as _;
 
 use crate::config::{Backend, S3Config};
@@ -133,8 +133,54 @@ impl Storage for ObjectStorage {
         }
     }
 
+    async fn get_range(
+        &self,
+        key: &str,
+        range: std::ops::Range<u64>,
+    ) -> Result<Option<StoredFile>, Error> {
+        let path = self.path(key)?;
+        let options = GetOptions { range: Some(GetRange::Bounded(range)), ..Default::default() };
+        match self.store.get_opts(&path, options).await {
+            Ok(result) => {
+                let size = result.range.end - result.range.start;
+                let content = result.into_stream().map_err(storage_error).boxed();
+                Ok(Some(StoredFile { size, content }))
+            }
+            Err(object_store::Error::NotFound { .. }) => Ok(None),
+            Err(error) => Err(storage_error(error)),
+        }
+    }
+
     async fn keys(&self) -> Result<Vec<String>, Error> {
-        let prefix = self.prefix.as_deref().map(Path::from);
+        self.list_under("").await
+    }
+
+    async fn keys_with_prefix(&self, prefix: &str) -> Result<Vec<String>, Error> {
+        // `object_store` liệt kê theo thư mục: liệt kê thư mục chứa `prefix` rồi lọc tiếp.
+        let directory = prefix.rsplit_once('/').map_or("", |(directory, _)| directory);
+        let mut keys = self.list_under(directory).await?;
+        keys.retain(|key| key.starts_with(prefix));
+        Ok(keys)
+    }
+
+    async fn delete(&self, key: &str) -> Result<(), Error> {
+        let path = self.path(key)?;
+        match self.store.delete(&path).await {
+            Ok(()) | Err(object_store::Error::NotFound { .. }) => Ok(()),
+            Err(error) => Err(storage_error(error)),
+        }
+    }
+}
+
+impl ObjectStorage {
+    /// Khoá của mọi file trong thư mục `directory` (rỗng: mọi file), theo thứ tự tên.
+    async fn list_under(&self, directory: &str) -> Result<Vec<String>, Error> {
+        let full = [self.prefix.as_deref().unwrap_or_default(), directory]
+            .into_iter()
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>()
+            .join("/");
+        let prefix = (!full.is_empty()).then(|| Path::from(full.as_str()));
         let listed: Vec<_> = match self.store.list(prefix.as_ref()).try_collect().await {
             Ok(listed) => listed,
             // Thư mục cục bộ chưa có (chưa ghi file nào): không có file.
@@ -149,13 +195,5 @@ impl Storage for ObjectStorage {
             .collect();
         keys.sort();
         Ok(keys)
-    }
-
-    async fn delete(&self, key: &str) -> Result<(), Error> {
-        let path = self.path(key)?;
-        match self.store.delete(&path).await {
-            Ok(()) | Err(object_store::Error::NotFound { .. }) => Ok(()),
-            Err(error) => Err(storage_error(error)),
-        }
     }
 }

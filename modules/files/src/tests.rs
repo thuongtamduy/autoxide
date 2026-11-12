@@ -107,3 +107,31 @@ async fn khoa_sai_dang_bi_tu_choi() {
         }
     }
 }
+
+/// Đọc theo khoảng byte và liệt kê theo tiền tố — trên ổ đĩa và S3.
+#[tokio::test]
+async fn doc_theo_khoang_va_liet_ke_theo_tien_to() {
+    for (name, storage) in backends() {
+        let chunks = vec![Ok(Bytes::from_static(b"0123456789"))];
+        storage.put("media/a/1", stream(chunks)).await.unwrap();
+        storage.put("media/b/2", stream(vec![Ok(Bytes::from_static(b"x"))])).await.unwrap();
+        storage.put("files/c", stream(vec![Ok(Bytes::from_static(b"y"))])).await.unwrap();
+        storage.put("mediax", stream(vec![Ok(Bytes::from_static(b"z"))])).await.unwrap();
+
+        let part = storage.get_range("media/a/1", 2..6).await.unwrap().unwrap();
+        assert_eq!(part.size, 4, "{name}");
+        let chunks: Vec<Bytes> = part.content.try_collect().await.unwrap();
+        assert_eq!(chunks.concat(), b"2345", "{name}");
+        assert!(storage.get_range("media/none", 0..1).await.unwrap().is_none(), "{name}");
+
+        assert_eq!(
+            storage.keys_with_prefix("media/").await.unwrap(),
+            ["media/a/1", "media/b/2"],
+            "{name}"
+        );
+        assert_eq!(storage.keys_with_prefix("media/a/").await.unwrap(), ["media/a/1"], "{name}");
+        for key in ["media/a/1", "media/b/2", "files/c", "mediax"] {
+            storage.delete(key).await.unwrap();
+        }
+    }
+}

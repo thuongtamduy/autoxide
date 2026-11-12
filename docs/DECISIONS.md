@@ -1876,3 +1876,44 @@ Lý do: mục cuối của bước 14; theo chuẩn HTTP (RFC 9110) thay vì t�
 Đã cân nhắc: cột `version` số nguyên tăng dần — chắc hơn khi hai lần sửa rơi vào cùng một micro
 giây, nhưng phải thêm migration cho mọi bảng; khả năng đó gần như không xảy ra với một bản ghi.
 Bắt buộc `If-Match` (428) — phá client đang có.
+
+## D-085 · Nền chung cho danh sách sắp theo cột, endpoint công khai và nội dung tải về — 2026-11-12 — agent quyết
+
+Bối cảnh: chủ dự án giao module thư viện media (`media`). Lời giao nêu "bước 13: nền chung"
+(lọc / sắp xếp danh sách, tìm theo chữ, endpoint công khai, `ETag` / `If-None-Match`, `If-Match`
+→ 412) làm điều kiện trước, và gọi việc là "bước 14" — nhưng trong lộ trình của repo bước 13 và
+14 đã là việc khác, đã xong. Ghi việc mới thành bước 15 của lộ trình. `If-Match` → 412 đã có
+(D-084); phần còn thiếu thêm vào kernel, trung lập với nghiệp vụ, có mặc định (D-038):
+
+- **Sắp theo cột khác ID** (`pagination::fetch_page_by`): keyset pagination trên `(cột, id)`.
+  Con trỏ là base64url của JSON `{c: tên cột, v: giá trị, id}` — client vẫn coi là chuỗi mờ;
+  `PageRequest` nhận cả con trỏ cũ (UUID) lẫn con trỏ mới. Con trỏ của cách sắp này dùng cho
+  cách sắp khác (hay cho `fetch_page`) thì 422 trên `cursor`, không đoán. Endpoint tự khai tham
+  số `sort` và bộ lọc của mình. Sắp theo thời gian tạo vẫn là sắp theo ID (UUIDv7).
+- **Tìm theo chữ** (`search::normalize`, `search::contains`): cột "khoá tìm" viết thường bằng
+  Rust (không dùng `LOWER()` — SQLite chỉ biết ASCII), lọc `LIKE '%…%' ESCAPE '\'`. `auth` chuyển
+  sang dùng chung hàm này (cùng kết quả). Cột chữ dùng để sắp thì so sánh theo byte trên cả hai
+  database (Postgres: `COLLATE "C"` khai trong migration của module) để thứ tự như nhau.
+- **Endpoint công khai**: handler nhận `Option<Principal>`. Không gửi `Authorization` → `None`;
+  gửi mà sai → vẫn 401 (không lặng lẽ coi như khách). OpenAPI khai `security((), ("bearer" = []))`.
+- **`If-None-Match` → 304** cho mọi `GET` / `HEAD` trả 200 có `ETag`: một lớp của kernel, handler
+  không phải viết gì; so sánh yếu, nhận danh sách và `*` (RFC 9110). Hàm `version::if_none_match`
+  cho handler đọc dữ liệu đắt tự kiểm trước.
+- **`If-Match` bắt buộc ở endpoint chọn** (`IfMatch::required`): thiếu header → 428
+  `precondition_required` (RFC 6585). `IfMatch` có thêm `Missing` để phân biệt với `*`. Endpoint
+  cũ vẫn không bắt buộc (D-084).
+- **`ErrorKind`** thêm `RangeNotSatisfiable` (416) và `PreconditionRequired` (428).
+- **`Storage`** thêm `get_range(key, start..end)` và `keys_with_prefix(prefix)`, đều có cài đặt
+  mặc định (đọc từ đầu rồi cắt; lọc từ `keys`). `files` cài lại bằng khả năng đọc theo khoảng và
+  liệt kê theo thư mục của `object_store` — có test trên ổ đĩa và S3.
+- **`http::content_disposition(Disposition, name)`** (RFC 6266 + 8187) chuyển từ `files` lên
+  kernel để module khác dùng chung; `files` gọi nó, kết quả không đổi.
+- CORS cho trình duyệt gửi `If-None-Match`, `If-Range`, `Range` và đọc `Content-Disposition`,
+  `Content-Range`, `Accept-Ranges`.
+
+Lý do: đây là thứ mọi module có danh sách lớn hay nội dung tải về sẽ cần; làm một lần ở kernel
+thì mỗi module chỉ khai, không tự chế lại.
+
+Đã cân nhắc: con trỏ chỉ chứa ID rồi đọc lại giá trị cột của dòng đó — gọn hơn nhưng dòng đó bị
+xoá giữa hai trang thì mất chỗ. Bộ lọc chung kiểu `filter[field]=…` ở kernel — mỗi module lọc
+khác nhau, khai riêng rõ hơn và OpenAPI mô tả được từng tham số.

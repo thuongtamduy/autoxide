@@ -160,6 +160,28 @@ hợp lệ (`$ref` tới `Order` không tồn tại), mô tả tool MCP lọt ti
 - [x] Tạo mới (201) trả header `Location`; OpenAPI có mục `servers` (D-083)
 - [x] Chống ghi đè khi hai người cùng sửa: `ETag` / `If-Match` cho các endpoint sửa (D-084)
 
+## 15. Thư viện media (chủ dự án giao ngày 12/11/2026)
+
+Module `media`: ảnh, video, âm thanh, tài liệu trong thư mục lồng nhau, cho website (sắp tới là
+module `content`) dùng lại. Điều kiện trước là phần nền chung ở kernel (D-085).
+
+Nền chung (kernel):
+
+- [x] Danh sách sắp theo cột khác (tên, kích thước) bằng keyset pagination; tìm theo chữ dùng chung (D-085)
+- [x] Endpoint công khai (`Option<Principal>`); `If-None-Match` → 304; `If-Match` bắt buộc → 428 (D-085)
+- [x] `Storage` đọc theo khoảng byte và liệt kê theo tiền tố, có cài đặt mặc định (D-085)
+
+Module `media`:
+
+- [ ] Tải lên: kiểm kích thước, loại được phép, loại thật theo chữ ký đầu file; kích thước ảnh; SHA-256; báo item trùng
+- [ ] Danh sách lọc theo thư mục, loại, `visibility`, thùng rác, tên; sắp theo thời gian, tên, kích thước
+- [ ] Sửa thông tin và thay nội dung giữ ID, bắt buộc `If-Match`
+- [ ] Tải nội dung: công khai hay cần quyền; `inline` chỉ cho ảnh raster; `Range`, `HEAD`, 304; cache theo phiên bản
+- [ ] Thư mục lồng nhau: tạo, đổi tên, chuyển, xoá khi trống
+- [ ] Thùng rác: vào, khôi phục, xoá hẳn (permission riêng); job xoá quá hạn và dọn nội dung mồ côi
+- [ ] Event cho mọi thay đổi (vào audit log); tool MCP; trait `Media` cho module khác
+- [ ] Backup / restore mang theo `media`; hướng dẫn dùng (tiếng Anh + tiếng Việt)
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.

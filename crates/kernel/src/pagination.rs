@@ -16,9 +16,18 @@
 //!
 //! Mọi danh sách dùng chung ba tham số query `limit`, `cursor`, `order` và cùng
 //! hình dạng response — học một endpoint là biết mọi endpoint.
+//!
+//! Danh sách sắp theo một cột khác (tên, kích thước…) dùng [`fetch_page_by`]: con trỏ
+//! khi đó mang cả giá trị của cột đó lẫn ID ("keyset pagination"), vẫn đi thẳng tới chỗ
+//! cần đọc bằng index `(cột, id)` — cùng hai ưu điểm trên. Endpoint tự khai tham số
+//! `sort` của mình (vd `sort=name`), kernel lo con trỏ.
 
+use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use sea_orm::IdenStatic;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Select,
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    Select,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
@@ -34,7 +43,8 @@ pub const DEFAULT_LIMIT: u32 = 50;
 /// Số dòng tối đa một trang.
 pub const MAX_LIMIT: u32 = 200;
 
-/// Sort direction of a list. Items are always ordered by creation time.
+/// Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers
+/// a `sort` parameter to order by something else.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Order {
@@ -60,28 +70,83 @@ pub struct PageQuery {
     #[param(value_type = Option<String>)]
     pub cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc` (oldest first). Keep the same
-    /// order while following `next_cursor`.
+    /// order (and `sort`, where offered) while following `next_cursor`.
     #[param(value_type = Option<Order>, inline)]
     pub order: Option<String>,
 }
 
 /// Yêu cầu một trang, đã kiểm.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PageRequest {
     limit: u32,
-    cursor: Option<Uuid>,
+    position: Option<Position>,
     order: Order,
+}
+
+/// Chỗ trang kế bắt đầu: sau dòng có ID này, hoặc (danh sách sắp theo cột khác) sau dòng
+/// có giá trị cột này và ID này.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Position {
+    Id(Uuid),
+    Key(KeyCursor),
+}
+
+/// Giá trị của cột sắp xếp (ngoài ID) mà con trỏ mang theo.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum SortValue {
+    Integer(i64),
+    Text(String),
+}
+
+impl From<SortValue> for sea_orm::Value {
+    fn from(value: SortValue) -> Self {
+        match value {
+            SortValue::Integer(number) => number.into(),
+            SortValue::Text(text) => text.into(),
+        }
+    }
+}
+
+/// Con trỏ của danh sách sắp theo cột `column`: giá trị cột và ID của dòng cuối trang
+/// trước. Gửi cho client dạng base64url của JSON — client coi là chuỗi mờ.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct KeyCursor {
+    #[serde(rename = "c")]
+    column: String,
+    #[serde(rename = "v")]
+    value: SortValue,
+    id: Uuid,
+}
+
+impl KeyCursor {
+    fn encode(&self) -> String {
+        URL_SAFE_NO_PAD.encode(serde_json::to_vec(self).unwrap_or_default())
+    }
+
+    fn decode(raw: &str) -> Option<Self> {
+        let bytes = URL_SAFE_NO_PAD.decode(raw).ok()?;
+        serde_json::from_slice(&bytes).ok()
+    }
+}
+
+fn wrong_cursor() -> Error {
+    Error::validation(vec![FieldError::new(
+        "cursor",
+        "invalid",
+        "must be the `next_cursor` value of a previous page of the same list and sort, unchanged",
+    )])
 }
 
 impl PageRequest {
     /// Trang đầu tiên. `limit` bị kẹp vào khoảng `1..=MAX_LIMIT`.
     pub fn first(limit: u32, order: Order) -> Self {
-        PageRequest { limit: limit.clamp(1, MAX_LIMIT), cursor: None, order }
+        PageRequest { limit: limit.clamp(1, MAX_LIMIT), position: None, order }
     }
 
     /// Trang đứng sau dòng có ID `cursor`.
     pub fn after(mut self, cursor: Uuid) -> Self {
-        self.cursor = Some(cursor);
+        self.position = Some(Position::Id(cursor));
         self
     }
 
@@ -89,8 +154,13 @@ impl PageRequest {
         self.limit
     }
 
+    /// ID của con trỏ (danh sách sắp theo ID). `None` ở trang đầu, hoặc khi con trỏ là của
+    /// danh sách sắp theo cột khác.
     pub fn cursor(&self) -> Option<Uuid> {
-        self.cursor
+        match &self.position {
+            Some(Position::Id(id)) => Some(*id),
+            _ => None,
+        }
     }
 
     pub fn order(&self) -> Order {
@@ -126,11 +196,15 @@ impl TryFrom<PageQuery> for PageRequest {
                 }
             },
         };
-        let cursor = match query.cursor.as_deref().map(str::trim) {
+        let position = match query.cursor.as_deref().map(str::trim) {
             None | Some("") => None,
-            Some(raw) => match Uuid::parse_str(raw) {
-                Ok(cursor) => Some(cursor),
-                Err(_) => {
+            Some(raw) => match Uuid::parse_str(raw)
+                .ok()
+                .map(Position::Id)
+                .or_else(|| KeyCursor::decode(raw).map(Position::Key))
+            {
+                Some(position) => Some(position),
+                None => {
                     problems.push(FieldError::new(
                         "cursor",
                         "invalid",
@@ -151,7 +225,7 @@ impl TryFrom<PageQuery> for PageRequest {
         };
 
         if problems.is_empty() {
-            Ok(PageRequest { limit, cursor, order })
+            Ok(PageRequest { limit, position, order })
         } else {
             Err(Error::validation(problems))
         }
@@ -208,24 +282,89 @@ where
     E: EntityTrait,
     C: ConnectionTrait,
 {
-    let select = match (request.cursor, request.order) {
+    let select = match (&request.position, request.order) {
         (None, _) => select,
-        (Some(cursor), Order::Asc) => select.filter(id_column.gt(cursor)),
-        (Some(cursor), Order::Desc) => select.filter(id_column.lt(cursor)),
+        (Some(Position::Id(cursor)), Order::Asc) => select.filter(id_column.gt(*cursor)),
+        (Some(Position::Id(cursor)), Order::Desc) => select.filter(id_column.lt(*cursor)),
+        (Some(Position::Key(_)), _) => return Err(wrong_cursor()),
     };
     let select = match request.order {
         Order::Asc => select.order_by_asc(id_column),
         Order::Desc => select.order_by_desc(id_column),
     };
-    // Lấy dư MỘT dòng để biết còn trang sau hay không mà không cần câu lệnh đếm.
-    let mut rows = select.limit(u64::from(request.limit) + 1).all(connection).await?;
-
-    let limit = request.limit as usize;
-    let has_more = rows.len() > limit;
-    rows.truncate(limit);
+    let (rows, has_more) = fetch_rows(select, request, connection).await?;
     let next_cursor = if has_more { rows.last().map(|row| id_of(row).to_string()) } else { None };
 
     Ok(Page { data: rows, pagination: Pagination { limit: request.limit, next_cursor } })
+}
+
+/// Như [`fetch_page`], nhưng sắp theo cột `sort_column` trước, rồi theo ID (để hai dòng
+/// cùng giá trị vẫn có thứ tự cố định).
+///
+/// - `sort_value`: giá trị cột đó của một dòng, để tính con trỏ của trang kế. Cột có thể
+///   `NULL` thì không dùng được ở đây.
+/// - Cần index `(sort_column, id)` để nhanh.
+/// - Hai database phải so sánh giá trị cột như nhau: cột chữ nên lưu sẵn dạng so sánh
+///   được theo byte (vd chữ thường, collation `C` trên Postgres) để thứ tự giống nhau.
+pub async fn fetch_page_by<E, C>(
+    select: Select<E>,
+    sort_column: E::Column,
+    sort_value: impl Fn(&E::Model) -> SortValue,
+    id_column: E::Column,
+    id_of: impl Fn(&E::Model) -> Uuid,
+    request: &PageRequest,
+    connection: &C,
+) -> Result<Page<E::Model>, Error>
+where
+    E: EntityTrait,
+    C: ConnectionTrait,
+{
+    let column_name = sort_column.as_str();
+    let select = match &request.position {
+        None => select,
+        Some(Position::Key(cursor)) if cursor.column == column_name => {
+            let value = sea_orm::Value::from(cursor.value.clone());
+            let (after, tie) = match request.order {
+                Order::Asc => (sort_column.gt(value.clone()), id_column.gt(cursor.id)),
+                Order::Desc => (sort_column.lt(value.clone()), id_column.lt(cursor.id)),
+            };
+            select.filter(
+                Condition::any()
+                    .add(after)
+                    .add(Condition::all().add(sort_column.eq(value)).add(tie)),
+            )
+        }
+        Some(_) => return Err(wrong_cursor()),
+    };
+    let select = match request.order {
+        Order::Asc => select.order_by_asc(sort_column).order_by_asc(id_column),
+        Order::Desc => select.order_by_desc(sort_column).order_by_desc(id_column),
+    };
+    let (rows, has_more) = fetch_rows(select, request, connection).await?;
+    let next_cursor = has_more.then(|| rows.last()).flatten().map(|row| {
+        KeyCursor { column: column_name.to_owned(), value: sort_value(row), id: id_of(row) }
+            .encode()
+    });
+
+    Ok(Page { data: rows, pagination: Pagination { limit: request.limit, next_cursor } })
+}
+
+/// Đọc tối đa `limit` dòng; kèm biết còn dòng sau hay không.
+async fn fetch_rows<E, C>(
+    select: Select<E>,
+    request: &PageRequest,
+    connection: &C,
+) -> Result<(Vec<E::Model>, bool), Error>
+where
+    E: EntityTrait,
+    C: ConnectionTrait,
+{
+    // Lấy dư MỘT dòng để biết còn trang sau hay không mà không cần câu lệnh đếm.
+    let mut rows = select.limit(u64::from(request.limit) + 1).all(connection).await?;
+    let limit = request.limit as usize;
+    let has_more = rows.len() > limit;
+    rows.truncate(limit);
+    Ok((rows, has_more))
 }
 
 #[cfg(test)]
@@ -246,8 +385,24 @@ mod tests {
         let request = PageRequest::try_from(PageQuery::default()).unwrap();
         assert_eq!((request.limit(), request.cursor(), request.order()), (50, None, Order::Desc));
         assert_eq!(request, PageRequest::default());
-        // Tham số rỗng (`?limit=&cursor=`) coi như không nêu.
         assert_eq!(PageRequest::try_from(query(Some(""), Some(" "), Some(""))).unwrap(), request);
+    }
+
+    #[test]
+    fn con_tro_theo_cot_doc_lai_duoc() {
+        let cursor = KeyCursor {
+            column: "name".to_owned(),
+            value: SortValue::Text("ảnh 1".to_owned()),
+            id: Uuid::now_v7(),
+        };
+        let raw = cursor.encode();
+        let request = PageRequest::try_from(query(None, Some(&raw), None)).unwrap();
+        assert_eq!(request.position, Some(Position::Key(cursor)));
+        assert_eq!(request.cursor(), None);
+        let number =
+            KeyCursor { column: "size".to_owned(), value: SortValue::Integer(-5), id: Uuid::nil() };
+        assert_eq!(KeyCursor::decode(&number.encode()), Some(number));
+        assert!(PageRequest::try_from(query(None, Some("e30"), None)).is_err());
     }
 
     #[test]

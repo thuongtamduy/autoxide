@@ -193,3 +193,72 @@ async fn du_lieu_them_giua_chung_khong_lam_trung_hay_sot() {
     .await
     .unwrap();
 }
+
+/// Sắp theo cột khác ID (nhiều dòng cùng giá trị): lật hết các trang theo `next_cursor`
+/// thì được mọi dòng đúng một lần, theo (cột, ID) — trên cả hai database.
+#[tokio::test]
+async fn sap_theo_cot_khac_lat_trang_khong_trung_khong_sot() {
+    use autoxide_kernel::pagination::{PageQuery, SortValue, fetch_page_by};
+
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let ids = insert_items(&db, 7).await;
+
+        for order in [Order::Asc, Order::Desc] {
+            let mut cursor: Option<String> = None;
+            let mut seen = Vec::new();
+            loop {
+                let query = PageQuery {
+                    limit: Some("2".to_owned()),
+                    cursor: cursor.clone(),
+                    order: Some(if order == Order::Asc { "asc" } else { "desc" }.to_owned()),
+                };
+                let request = PageRequest::try_from(query).unwrap();
+                let page = fetch_page_by(
+                    item::Entity::find(),
+                    item::Column::Kind,
+                    |row| SortValue::Text(row.kind.clone()),
+                    item::Column::Id,
+                    |row| row.id,
+                    &request,
+                    db.read(),
+                )
+                .await
+                .unwrap();
+                seen.extend(page.data.iter().map(|row| (row.kind.clone(), row.id)));
+                match page.pagination.next_cursor {
+                    Some(next) => cursor = Some(next),
+                    None => break,
+                }
+            }
+            let mut expected: Vec<(String, Uuid)> = ids
+                .iter()
+                .enumerate()
+                .map(|(index, id)| ((if index % 2 == 0 { "a" } else { "b" }).to_owned(), *id))
+                .collect();
+            expected.sort();
+            if order == Order::Desc {
+                expected.reverse();
+            }
+            assert_eq!(seen, expected, "{order:?}");
+        }
+
+        // Con trỏ của danh sách sắp theo ID không dùng được cho danh sách sắp theo cột.
+        let request = PageRequest::first(2, Order::Asc).after(ids[0]);
+        let mixed = fetch_page_by(
+            item::Entity::find(),
+            item::Column::Kind,
+            |row| SortValue::Text(row.kind.clone()),
+            item::Column::Id,
+            |row| row.id,
+            &request,
+            db.read(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(mixed.fields()[0].field, "cursor");
+        db.close().await.unwrap();
+    })
+    .await
+    .unwrap();
+}

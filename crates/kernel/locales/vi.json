@@ -30,5 +30,6 @@
   "unavailable": "Máy chủ tạm thời không xử lý được request. Hãy thử lại sau.",
   "unsupported_media_type": "Kiểu nội dung không được hỗ trợ. Gửi JSON với `content-type: application/json`.",
   "uri_too_long": "Đường dẫn của request quá dài.",
-  "validation_failed": "Request có giá trị không hợp lệ. Xem `errors` để biết từng trường sai gì."
+  "validation_failed": "Request có giá trị không hợp lệ. Xem `errors` để biết từng trường sai gì.",
+  "precondition_required": "Hãy gửi `ETag` bạn đã đọc trong header `If-Match`, để thay đổi không đè lên thay đổi của người khác (`If-Match: *` nếu muốn sửa bất kể phiên bản)."
 }

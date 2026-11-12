@@ -84,6 +84,11 @@ async fn echo(body: Bytes) -> Bytes {
     body
 }
 
+async fn tagged() -> autoxide_kernel::version::Tagged<u32> {
+    let version = chrono::DateTime::from_timestamp_micros(1_700_000_000_000_001).unwrap();
+    autoxide_kernel::version::Tagged { version, data: 7 }
+}
+
 fn notes_routes() -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(list_notes, create_note))
@@ -92,6 +97,7 @@ fn notes_routes() -> OpenApiRouter {
         .route("/slow", axum::routing::get(slow))
         .route("/panic", axum::routing::get(panics))
         .route("/echo", axum::routing::post(echo))
+        .route("/tagged", axum::routing::get(tagged))
 }
 
 fn default_config() -> HttpConfig {
@@ -765,4 +771,26 @@ async fn tai_lieu_khai_header_chung_tren_tung_endpoint() {
         .map(|parameter| parameter["name"].as_str().unwrap())
         .collect();
     assert_eq!(headers, ["Accept-Language"]);
+}
+
+/// `GET` có `ETag`: client gửi lại đúng `ETag` trong `If-None-Match` thì nhận 304 không thân;
+/// `ETag` khác thì nhận đủ.
+#[tokio::test]
+async fn if_none_match_khop_thi_304() {
+    let request = |etag: &str| {
+        Request::builder()
+            .uri("/api/v1/notes/tagged")
+            .header(header::IF_NONE_MATCH, etag)
+            .body(Body::empty())
+            .unwrap()
+    };
+    let response = send(app(), request("\"1700000000000001\"")).await;
+    assert_eq!(response.status(), StatusCode::NOT_MODIFIED);
+    assert_eq!(response.headers()[header::ETAG], "\"1700000000000001\"");
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    assert!(body.is_empty());
+
+    let response = send(app(), request("\"1\"")).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(json(response).await["data"], 7);
 }

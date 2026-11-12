@@ -7,6 +7,10 @@
 //!   `Authorization` và trả về [`Principal`]. Kernel gắn nó vào mọi request.
 //! - Handler cần đăng nhập nhận `principal: Principal` làm tham số, rồi gọi
 //!   `principal.require(&NOTES_WRITE)?`. Thiếu quyền thì trả 403 `permission_denied`.
+//! - Endpoint công khai (ai cũng gọi được, người đăng nhập thấy nhiều hơn) nhận
+//!   `principal: Option<Principal>`: không gửi `Authorization` thì `None`; gửi mà sai
+//!   thì vẫn 401 như endpoint thường — không lặng lẽ coi như khách. Tài liệu OpenAPI của
+//!   handler đó khai `security((), ("bearer" = []))`.
 //!
 //! Nhờ vậy module nghiệp vụ kiểm quyền mà không phụ thuộc module `auth`, và module
 //! `auth` có thể thay bằng cách xác thực khác mà không module nào phải sửa.
@@ -14,7 +18,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use axum::extract::FromRequestParts;
+use axum::extract::{FromRequestParts, OptionalFromRequestParts};
 use axum::http::header;
 use axum::http::request::Parts;
 use uuid::Uuid;
@@ -227,6 +231,23 @@ impl<S: Send + Sync> FromRequestParts<S> for Principal {
         let authorization =
             parts.headers.get(header::AUTHORIZATION).and_then(|value| value.to_str().ok());
         authenticator.authenticate(authorization).await
+    }
+}
+
+// Handler viết `principal: Option<Principal>`: endpoint công khai. Không có header
+// `Authorization` thì `None` (kể cả khi chưa module nào xác thực); có thì xác thực như
+// trên, sai là lỗi.
+impl<S: Send + Sync> OptionalFromRequestParts<S> for Principal {
+    type Rejection = Error;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &S,
+    ) -> Result<Option<Self>, Self::Rejection> {
+        if !parts.headers.contains_key(header::AUTHORIZATION) {
+            return Ok(None);
+        }
+        <Principal as FromRequestParts<S>>::from_request_parts(parts, state).await.map(Some)
     }
 }
 

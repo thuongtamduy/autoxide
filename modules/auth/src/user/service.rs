@@ -5,7 +5,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
-use sea_orm::sea_query::{Expr, ExprTrait as _, LikeExpr};
+use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set, SqlErr,
 };
@@ -318,10 +318,8 @@ impl UserService {
     ) -> Result<Page<User>, Error> {
         let mut select = Entity::find();
         if let Some(search) = search.map(str::trim).filter(|search| !search.is_empty()) {
-            // `LIKE` có `ESCAPE`: `%` hay `_` người dùng gõ là chữ thường, không phải ký
-            // tự đại diện. Không có index nào giúp được tìm "chứa": quét bảng người dùng.
-            let pattern = format!("%{}%", escape_like(&search.to_lowercase()));
-            select = select.filter(Column::SearchText.like(LikeExpr::new(pattern).escape('\\')));
+            // Không có index nào giúp được tìm "chứa": quét bảng người dùng.
+            select = select.filter(autoxide_kernel::search::contains(Column::SearchText, search));
         }
         let page = fetch_page(select, Column::Id, |row| row.id, page, self.database.read()).await?;
         Ok(page.map(User::from))
@@ -419,18 +417,6 @@ fn snapshot(row: &entity::Model) -> serde_json::Value {
 /// Rust cho cùng một kết quả trên hai database (m0016).
 fn search_text(email: &str, name: &str) -> String {
     format!("{email} {name}").to_lowercase()
-}
-
-/// Thoát `\`, `%` và `_` để dùng trong mẫu `LIKE … ESCAPE '\'`.
-fn escape_like(text: &str) -> String {
-    let mut escaped = String::with_capacity(text.len());
-    for character in text.chars() {
-        if matches!(character, '\\' | '%' | '_') {
-            escaped.push('\\');
-        }
-        escaped.push(character);
-    }
-    escaped
 }
 
 fn now() -> DateTime<Utc> {

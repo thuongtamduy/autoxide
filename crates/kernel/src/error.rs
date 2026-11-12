@@ -49,8 +49,12 @@ pub enum ErrorKind {
     PayloadTooLarge,
     /// Kiểu nội dung của request không được hỗ trợ. HTTP 415.
     UnsupportedMediaType,
+    /// Khoảng byte (`Range`) xin đọc nằm ngoài nội dung. HTTP 416.
+    RangeNotSatisfiable,
     /// Request đọc được nhưng giá trị không qua kiểm tra. HTTP 422.
     Validation,
+    /// Endpoint bắt buộc gửi điều kiện (`If-Match`) mà request không gửi. HTTP 428.
+    PreconditionRequired,
     /// Gọi quá nhiều. HTTP 429.
     TooManyRequests,
     /// Lỗi phía máy chủ; chi tiết chỉ nằm trong log. HTTP 500.
@@ -71,7 +75,9 @@ impl ErrorKind {
             ErrorKind::PreconditionFailed => 412,
             ErrorKind::PayloadTooLarge => 413,
             ErrorKind::UnsupportedMediaType => 415,
+            ErrorKind::RangeNotSatisfiable => 416,
             ErrorKind::Validation => 422,
+            ErrorKind::PreconditionRequired => 428,
             ErrorKind::TooManyRequests => 429,
             ErrorKind::Internal => 500,
             ErrorKind::Unavailable => 503,
