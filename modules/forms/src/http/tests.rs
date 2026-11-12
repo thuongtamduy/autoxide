@@ -165,7 +165,7 @@ fn definition() -> Value {
         "allowed_origins": ["https://example.com"],
         "notify_emails": ["owner@example.com"],
         "success_message": {"en": "Thanks!", "vi": "Cảm ơn!"},
-        "email_limit_per_hour": 2
+        "email_limit_per_hour": 1
     })
 }
 
@@ -238,7 +238,8 @@ async fn vong_doi_qua_http() {
         let trapped = send(&router, "POST", "/forms/public/contact/submissions", None, &origin, Some(trapped)).await;
         assert_eq!((trapped.status, shape(&trapped), &trapped.json()["data"]["message"]), (accepted.status, shape(&accepted), &accepted.json()["data"]["message"]));
         assert_eq!(trapped.header(header::LOCATION).len(), accepted.header(header::LOCATION).len());
-        // Quá nhiều lần với một email (giới hạn 2/giờ, đã đếm 2): câu trả lời y hệt, không lưu.
+        // Quá nhiều lần với một email (giới hạn 1/giờ; lần gửi lại cùng token ở trên KHÔNG bị
+        // đếm, để không ai khoá được email của người khác — D-150): câu trả lời y hệt, không lưu.
         let limited = send(&router, "POST", "/forms/public/contact/submissions", None, &origin, Some(body(&form_token(&router).await, "ada@example.com"))).await;
         assert_eq!((limited.status, shape(&limited)), (accepted.status, shape(&accepted)));
         assert_ne!(limited.json()["data"]["id"], accepted.json()["data"]["id"]);
