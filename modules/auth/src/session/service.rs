@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use autoxide_kernel::database::Database;
-use autoxide_kernel::error::Error;
+use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
@@ -177,8 +177,13 @@ impl SessionService {
         new: String,
         user_agent: Option<&str>,
     ) -> Result<Tokens, Error> {
-        if let Some(problem) = crate::password::check_rules("new_password", &new) {
-            return Err(Error::validation(vec![problem]));
+        // Mọi lỗi của đầu vào báo một lần.
+        let problems: Vec<FieldError> = FieldError::blank("current_password", current)
+            .into_iter()
+            .chain(crate::password::check_rules("new_password", &new))
+            .collect();
+        if !problems.is_empty() {
+            return Err(Error::validation(problems));
         }
         let user = self.check_password(user_id, current).await?;
         self.users

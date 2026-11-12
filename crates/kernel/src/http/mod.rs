@@ -121,7 +121,7 @@ pub fn build(
         .merge(root)
         .nest(API_PREFIX, api)
         .split_for_parts();
-    openapi::finish(&mut openapi);
+    openapi::finish(&mut openapi, extras.idempotency.is_some());
     let deprecated = Arc::new(deprecation::apply(&mut openapi, &extras.deprecations));
 
     // Tài liệu không đổi trong lúc chạy: đổi thành JSON một lần rồi trả lại mãi.

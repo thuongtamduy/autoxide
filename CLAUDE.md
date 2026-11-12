@@ -212,7 +212,9 @@ sẵn lệnh.
    bảng người dùng.
 5. **Logic ở service layer.** Handler chỉ: lấy dữ liệu vào → gọi service → trả
    envelope. Không truy vấn database trong handler. Thân JSON nhận bằng
-   `ValidJson<T>` (đã kiểm bằng `validator`), không dùng `Json<T>` trần.
+   `ValidJson<T>` (đã kiểm bằng `validator`), không dùng `Json<T>` trần. Trường nào
+   service kiểm thì chỉ service kiểm (không thêm `#[validate]`), và service gom mọi lỗi
+   của đầu vào để báo **một lần** (D-083). Tạo mới trả `Created` (201 + `Location`).
 6. **Mọi route có tài liệu OpenAPI**, đăng ký qua `utoipa-axum` cùng lúc với route
    (`OpenApiRouter::routes(routes!(…))`, không dùng `.route(…)` trần). Route của
    module `x` nằm dưới `/api/v1/x`; module chỉ khai phần đuôi (`/`, `/{id}`). Thay

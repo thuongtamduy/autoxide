@@ -38,6 +38,40 @@ impl<T: Serialize> IntoResponse for Data<T> {
     }
 }
 
+/// Kết quả của một lệnh tạo mới: 201, header `Location` trỏ tới bản ghi vừa tạo, thân
+/// `{"data": …}`. `path` tính từ gốc API, vd `/auth/users/<id>` thành
+/// `Location: /api/v1/auth/users/<id>`. Tài liệu OpenAPI khai header này cho mọi
+/// response 201 (`http::build`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Created<T> {
+    pub path: String,
+    pub data: T,
+}
+
+impl<T> Created<T> {
+    pub fn new(path: impl Into<String>, data: T) -> Self {
+        Created { path: path.into(), data }
+    }
+}
+
+impl<T: Serialize> IntoResponse for Created<T> {
+    fn into_response(self) -> Response {
+        let location = format!("{}{}", crate::http::API_PREFIX, self.path);
+        match axum::http::HeaderValue::from_str(&location) {
+            Ok(location) => (
+                axum::http::StatusCode::CREATED,
+                [(axum::http::header::LOCATION, location)],
+                Json(Data { data: self.data }),
+            )
+                .into_response(),
+            // Đường dẫn do code ghép từ id: không bao giờ sai; phòng hờ thì vẫn trả 201.
+            Err(_) => {
+                (axum::http::StatusCode::CREATED, Json(Data { data: self.data })).into_response()
+            }
+        }
+    }
+}
+
 /// An error, as RFC 9457 Problem Details. Branch on `code`; show `detail` to people.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Problem {
@@ -148,6 +182,15 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.headers()[header::CONTENT_TYPE], "application/json");
         assert_eq!(body_json(response).await, serde_json::json!({"data": {"id": 1}}));
+    }
+
+    #[tokio::test]
+    async fn tao_moi_tra_201_location_va_envelope() {
+        let response = Created::new("/notes/42", serde_json::json!({"id": 42})).into_response();
+
+        assert_eq!(response.status(), StatusCode::CREATED);
+        assert_eq!(response.headers()[header::LOCATION], "/api/v1/notes/42");
+        assert_eq!(body_json(response).await, serde_json::json!({"data": {"id": 42}}));
     }
 
     #[tokio::test]

@@ -20,6 +20,10 @@ pub(crate) const ALL_EVENTS: &str = "*";
 /// Số event tối đa một endpoint đăng ký (danh sách tên rõ ràng).
 const MAX_EVENTS: usize = 100;
 
+/// Độ dài tối đa của địa chỉ và mô tả, theo ký tự.
+const URL_MAX_LENGTH: usize = 2048;
+const DESCRIPTION_MAX_LENGTH: usize = 200;
+
 /// Một nơi nhận, không kèm secret.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Endpoint {
@@ -115,8 +119,9 @@ impl WebhookService {
         actor: Actor,
         input: NewEndpoint,
     ) -> Result<CreatedEndpoint, Error> {
-        let url = self.check_url(&input.url)?;
-        let events = self.check_events(input.events)?;
+        let (url, events) =
+            self.check(Some(&input.url), Some(&input.description), Some(input.events))?;
+        let (url, events) = (url.unwrap_or_default(), events.unwrap_or_default());
         let secret = signature::new_secret()?;
         let now = now();
         let transaction = self.database.begin_write().await?;
@@ -172,8 +177,8 @@ impl WebhookService {
         id: Uuid,
         changes: EndpointChanges,
     ) -> Result<Endpoint, Error> {
-        let url = changes.url.as_deref().map(|url| self.check_url(url)).transpose()?;
-        let events = changes.events.map(|events| self.check_events(events)).transpose()?;
+        let (url, events) =
+            self.check(changes.url.as_deref(), changes.description.as_deref(), changes.events)?;
         let transaction = self.database.begin_write().await?;
         let row = endpoint::Entity::find_by_id(id)
             .one(&transaction)
@@ -262,58 +267,84 @@ impl WebhookService {
         fetch_page(select, delivery::Column::Id, |row| row.id, page, self.database.read()).await
     }
 
-    /// Địa chỉ đã kiểm: URL tuyệt đối, `https` (hoặc `http` khi cấu hình cho phép), không
-    /// chứa tên đăng nhập / mật khẩu.
-    fn check_url(&self, raw: &str) -> Result<String, Error> {
+    /// Kiểm đầu vào của một endpoint (trường `None` bỏ qua) và báo mọi lỗi một lần. Trả
+    /// địa chỉ đã chuẩn hoá và danh sách event đã sắp, bỏ trùng.
+    fn check(
+        &self,
+        url: Option<&str>,
+        description: Option<&str>,
+        events: Option<Vec<String>>,
+    ) -> Result<(Option<String>, Option<Vec<String>>), Error> {
+        let mut problems = Vec::new();
+        let url = url.and_then(|url| match self.check_url(url) {
+            Ok(url) => Some(url),
+            Err(problem) => {
+                problems.push(FieldError::new("url", "invalid", problem));
+                None
+            }
+        });
+        if description.is_some_and(|text| text.trim().chars().count() > DESCRIPTION_MAX_LENGTH) {
+            problems.push(FieldError::new(
+                "description",
+                "length",
+                format!("must be at most {DESCRIPTION_MAX_LENGTH} characters long"),
+            ));
+        }
+        let events = events.map(|events| self.check_events(events, &mut problems));
+        if !problems.is_empty() {
+            return Err(Error::validation(problems));
+        }
+        Ok((url, events))
+    }
+
+    /// Địa chỉ đã kiểm: URL tuyệt đối tới 2048 ký tự, `https` (hoặc `http` khi cấu hình
+    /// cho phép), không chứa tên đăng nhập / mật khẩu. Sai thì câu nói rõ phải sửa gì.
+    fn check_url(&self, raw: &str) -> Result<String, String> {
         let raw = raw.trim();
-        let invalid = |problem: &str| {
-            Error::validation(vec![FieldError::new("url", "invalid", problem.to_owned())])
-        };
-        let url = reqwest::Url::parse(raw).map_err(|_| invalid("must be an absolute URL"))?;
+        if raw.chars().count() > URL_MAX_LENGTH {
+            return Err(format!("must be at most {URL_MAX_LENGTH} characters long"));
+        }
+        let url = reqwest::Url::parse(raw).map_err(|_| "must be an absolute URL".to_owned())?;
         if url.host_str().is_none_or(str::is_empty) {
-            return Err(invalid("must name a host"));
+            return Err("must name a host".to_owned());
         }
         if !url.username().is_empty() || url.password().is_some() {
-            return Err(invalid("must not contain a user name or password"));
+            return Err("must not contain a user name or password".to_owned());
         }
         match url.scheme() {
-            "https" => {}
-            "http" if self.allow_http => {}
-            _ => {
-                return Err(Error::bad_request(
-                    "webhooks.insecure_url",
-                    "A webhook address must start with `https://`. Only for development on one \
-                     machine, set `AUTOXIDE_WEBHOOKS_ALLOW_HTTP=true` to allow `http://`.",
+            "https" => Ok(url.to_string()),
+            "http" if self.allow_http => Ok(url.to_string()),
+            _ => Err("must start with `https://` (`http://` only when the server sets \
+                      `AUTOXIDE_WEBHOOKS_ALLOW_HTTP=true`, for development)"
+                .to_owned()),
+        }
+    }
+
+    /// Danh sách event đã sắp, bỏ trùng; lỗi (rỗng, quá dài, tên không có) ghi vào
+    /// `problems`.
+    fn check_events(&self, events: Vec<String>, problems: &mut Vec<FieldError>) -> Vec<String> {
+        if events.is_empty() || events.len() > MAX_EVENTS {
+            problems.push(FieldError::new(
+                "events",
+                "length",
+                format!("must list 1 to {MAX_EVENTS} event names, or `*` for every event"),
+            ));
+        }
+        for (index, event) in events.iter().enumerate() {
+            let event = event.trim();
+            if event != ALL_EVENTS && !self.catalog.contains(event) {
+                problems.push(FieldError::new(
+                    format!("events[{index}]"),
+                    "unknown",
+                    "is not an event of this system; see `GET /api/v1/webhooks/events`",
                 ));
             }
         }
-        Ok(url.to_string())
-    }
-
-    /// Danh sách event đã kiểm: không rỗng, mỗi tên là một event có thật (hoặc `*`), bỏ
-    /// trùng, theo thứ tự tên.
-    fn check_events(&self, events: Vec<String>) -> Result<Vec<String>, Error> {
         let mut events: Vec<String> =
             events.into_iter().map(|event| event.trim().to_owned()).collect();
         events.sort();
         events.dedup();
-        if events.is_empty() || events.len() > MAX_EVENTS {
-            return Err(Error::validation(vec![FieldError::new(
-                "events",
-                "length",
-                format!("must list 1 to {MAX_EVENTS} event names, or `*` for every event"),
-            )]));
-        }
-        if let Some(unknown) =
-            events.iter().find(|event| *event != ALL_EVENTS && !self.catalog.contains(event))
-        {
-            return Err(Error::bad_request(
-                "webhooks.unknown_event",
-                "No event is named `{event}`. See the list at `GET /api/v1/webhooks/events`.",
-            )
-            .with_param("event", unknown));
-        }
-        Ok(events)
+        events
     }
 }
 

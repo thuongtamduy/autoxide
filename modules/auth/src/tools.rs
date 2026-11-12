@@ -15,10 +15,12 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::http::HttpState;
-use crate::http::roles::PermissionResponse;
+use crate::http::api_keys::{ApiKeyResponse, CreateApiKeyRequest, CreatedApiKeyResponse};
+use crate::http::roles::{PermissionResponse, RoleRequest, RoleResponse};
 use crate::http::session::MeResponse;
 use crate::http::users::UserResponse;
-use crate::permissions::{ROLES_READ, USERS_MANAGE, USERS_READ};
+use crate::permissions::{ROLES_MANAGE, ROLES_READ, USERS_MANAGE, USERS_READ};
+use crate::role::RoleInput;
 use crate::user::UserChanges;
 
 /// Changes to a user account; omitted fields stay as they are.
@@ -28,7 +30,6 @@ pub(crate) struct UpdateUserInput {
     /// Id of the user.
     id: Uuid,
     /// New display name, 1 to 200 characters.
-    #[validate(length(min = 1, max = 200))]
     name: Option<String>,
     /// `true` disables the account and signs it out everywhere; `false` enables it.
     disabled: Option<bool>,
@@ -50,7 +51,202 @@ pub(crate) struct ListUsersInput {
     order: Option<String>,
 }
 
+/// A role or user to act on.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct IdInput {
+    /// The id.
+    id: Uuid,
+}
+
+/// The full new content of a role.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ReplaceRoleInput {
+    /// Id of the role.
+    id: Uuid,
+    /// Unique. Lowercase letters, digits, `_` and `-`, starting with a letter.
+    name: String,
+    /// What the role is for.
+    #[serde(default)]
+    description: String,
+    /// Every permission the role grants (replaces the old list); see `list_permissions`.
+    #[serde(default)]
+    permissions: Vec<String>,
+}
+
+/// The complete list of roles a user should have.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SetUserRolesInput {
+    /// Id of the user.
+    user_id: Uuid,
+    /// Ids of the roles. Replaces every role the user had; `[]` removes all.
+    #[validate(length(max = 100))]
+    role_ids: Vec<Uuid>,
+}
+
 pub(crate) fn all(state: &Arc<HttpState>) -> Vec<Tool> {
+    let mut tools = users(state);
+    tools.extend(roles(state));
+    tools.extend(api_keys(state));
+    tools
+}
+
+/// Tool về role: cùng service và permission với `/api/v1/auth/roles` và
+/// `/api/v1/auth/users/{id}/roles`.
+fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
+    let (list, get, create, replace, delete, of_user, set) = (
+        state.clone(),
+        state.clone(),
+        state.clone(),
+        state.clone(),
+        state.clone(),
+        state.clone(),
+        state.clone(),
+    );
+    vec![
+        Tool::new(
+            "list_roles",
+            "List roles with the permissions they grant; follow `pagination.next_cursor` for more.",
+            move |_: Principal, input: PageInput| {
+                let state = list.clone();
+                async move {
+                    let page = state.roles.list(&input.page()?).await?;
+                    Ok::<Page<RoleResponse>, Error>(page.map(RoleResponse::from))
+                }
+            },
+        )
+        .requires(ROLES_READ)
+        .read_only(),
+        Tool::new("get_role", "Get one role.", move |_: Principal, input: IdInput| {
+            let state = get.clone();
+            async move { Ok::<_, Error>(RoleResponse::from(state.roles.get(input.id).await?)) }
+        })
+        .requires(ROLES_READ)
+        .read_only(),
+        Tool::new(
+            "create_role",
+            "Create a role that grants the listed permissions (see `list_permissions`).",
+            move |principal: Principal, input: RoleRequest| {
+                let state = create.clone();
+                async move {
+                    let role = state.roles.create(Actor::from(&principal), input.into()).await?;
+                    Ok::<_, Error>(RoleResponse::from(role))
+                }
+            },
+        )
+        .requires(ROLES_MANAGE),
+        Tool::new(
+            "replace_role",
+            "Replace the name, description and permissions of a role. The built-in `admin` \
+             role cannot be changed.",
+            move |principal: Principal, input: ReplaceRoleInput| {
+                let state = replace.clone();
+                async move {
+                    let role = RoleInput {
+                        name: input.name,
+                        description: input.description,
+                        permissions: input.permissions,
+                    };
+                    let role = state.roles.update(Actor::from(&principal), input.id, role).await?;
+                    Ok::<_, Error>(RoleResponse::from(role))
+                }
+            },
+        )
+        .requires(ROLES_MANAGE),
+        Tool::new(
+            "delete_role",
+            "Delete a role; users who had it lose its permissions. The built-in `admin` role \
+             cannot be deleted.",
+            move |principal: Principal, input: IdInput| {
+                let state = delete.clone();
+                async move {
+                    state.roles.delete(Actor::from(&principal), input.id).await?;
+                    Ok::<_, Error>(serde_json::json!({ "deleted": input.id }))
+                }
+            },
+        )
+        .requires(ROLES_MANAGE)
+        .destructive(),
+        Tool::new(
+            "get_user_roles",
+            "List the roles of a user (`id` is the user's id).",
+            move |_: Principal, input: IdInput| {
+                let state = of_user.clone();
+                async move { Ok::<_, Error>(roles_response(state.roles.user_roles(input.id).await?)) }
+            },
+        )
+        .requires(USERS_READ)
+        .read_only(),
+        Tool::new(
+            "set_user_roles",
+            "Replace every role of a user with `role_ids`. The last administrator cannot lose \
+             the `admin` role.",
+            move |principal: Principal, input: SetUserRolesInput| {
+                let state = set.clone();
+                async move {
+                    let actor = Actor::from(&principal);
+                    let roles = state.roles.set_user_roles(actor, input.user_id, input.role_ids);
+                    Ok::<_, Error>(roles_response(roles.await?))
+                }
+            },
+        )
+        .requires(ROLES_MANAGE),
+    ]
+}
+
+/// Tool về API key của chính người gọi: cùng service với `/api/v1/auth/api-keys`.
+fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
+    let (list, create, revoke) = (state.clone(), state.clone(), state.clone());
+    vec![
+        Tool::new(
+            "list_api_keys",
+            "List your API keys (never their secrets); follow `pagination.next_cursor` for more.",
+            move |principal: Principal, input: PageInput| {
+                let state = list.clone();
+                async move {
+                    let page = state.api_keys.list(principal.user_id(), &input.page()?).await?;
+                    Ok::<Page<ApiKeyResponse>, Error>(page.map(ApiKeyResponse::from))
+                }
+            },
+        )
+        .read_only(),
+        Tool::new(
+            "create_api_key",
+            "Create an API key that acts as you, limited to the listed permissions. Needs your \
+             current password and a password session: an API key cannot create keys. The \
+             result carries the key, shown only once.",
+            move |principal: Principal, input: CreateApiKeyRequest| {
+                let state = create.clone();
+                async move {
+                    let created = state.api_keys.create(&principal, input.into()).await?;
+                    Ok::<_, Error>(CreatedApiKeyResponse::from(created))
+                }
+            },
+        ),
+        Tool::new(
+            "revoke_api_key",
+            "Revoke one of your API keys; it stops working at once.",
+            move |principal: Principal, input: IdInput| {
+                let state = revoke.clone();
+                async move {
+                    state.api_keys.revoke(&principal, input.id).await?;
+                    Ok::<_, Error>(serde_json::json!({ "revoked": input.id }))
+                }
+            },
+        )
+        .destructive(),
+    ]
+}
+
+fn roles_response(roles: Vec<crate::role::Role>) -> Vec<RoleResponse> {
+    roles.into_iter().map(RoleResponse::from).collect()
+}
+
+/// Tool về người dùng: cùng service và permission với `/api/v1/auth/me` và
+/// `/api/v1/auth/users`.
+fn users(state: &Arc<HttpState>) -> Vec<Tool> {
     let (me, catalog, list, update) = (state.clone(), state.clone(), state.clone(), state.clone());
     vec![
         Tool::new(
@@ -196,6 +392,64 @@ mod tests {
             let input = json!({"id": Uuid::now_v7(), "name": "Ghost"});
             let missing = call(&tools, "update_user", admin, input).await.unwrap_err();
             assert_eq!(missing.code(), "auth.user_not_found");
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn tool_role_va_api_key_dung_service_cua_rest() {
+        TestDatabase::run(async |test| {
+            let services = crate::testing::services(test).await;
+            let password = "correct horse battery staple".to_owned();
+            let ada = NewUser {
+                email: "ada@example.com".into(),
+                name: "Ada".into(),
+                password: Some(password.clone()),
+            };
+            let ada = services.users.create(Actor::system(), ada).await.unwrap();
+            let tools = all(&state(&services));
+            let admin = Principal::with_all_permissions(ada.id);
+            let reader = Principal::new(ada.id, ["auth.roles.read".to_owned()]);
+
+            for name in ["create_role", "replace_role", "delete_role", "set_user_roles"] {
+                let tool = tools.iter().find(|tool| tool.name() == name).unwrap();
+                assert!(!tool.allows(&reader), "{name}");
+            }
+            let input = json!({"name": "editor", "permissions": ["auth.users.read"]});
+            let role = call(&tools, "create_role", admin.clone(), input).await.unwrap();
+            assert_eq!(role["permissions"], json!(["auth.users.read"]));
+            let id = role["id"].clone();
+            let input = json!({"id": id, "name": "editor", "permissions": []});
+            let replaced = call(&tools, "replace_role", admin.clone(), input).await.unwrap();
+            assert_eq!(replaced["permissions"], json!([]));
+            let page = call(&tools, "list_roles", reader.clone(), json!({})).await.unwrap();
+            assert!(page["data"].as_array().unwrap().iter().any(|role| role["name"] == "editor"));
+            let input = json!({"user_id": ada.id, "role_ids": [id]});
+            let set = call(&tools, "set_user_roles", admin.clone(), input).await.unwrap();
+            assert_eq!(set[0]["name"], "editor");
+            let of_user = json!({"id": ada.id});
+            let roles = call(&tools, "get_user_roles", admin.clone(), of_user).await.unwrap();
+            assert_eq!(roles.as_array().unwrap().len(), 1);
+
+            // API key: cần mật khẩu như REST; key không tạo được key.
+            let input = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": "nope"});
+            let wrong = call(&tools, "create_api_key", admin.clone(), input).await.unwrap_err();
+            assert_eq!(wrong.code(), "auth.wrong_password");
+            let input = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": password});
+            let created = call(&tools, "create_api_key", admin.clone(), input.clone()).await.unwrap();
+            assert!(created["key"].as_str().unwrap().starts_with("axk_"));
+            let key_id: Uuid = created["id"].as_str().unwrap().parse().unwrap();
+            let via_key = admin.clone().via_api_key(key_id);
+            let refused = call(&tools, "create_api_key", via_key, input).await.unwrap_err();
+            assert_eq!(refused.code(), "auth.api_key_cannot_create_keys");
+            let keys = call(&tools, "list_api_keys", admin.clone(), json!({})).await.unwrap();
+            assert!(keys["data"][0].get("key").is_none());
+            let revoked = call(&tools, "revoke_api_key", admin.clone(), json!({"id": key_id})).await;
+            assert_eq!(revoked.unwrap()["revoked"], key_id.to_string());
+
+            let deleted = call(&tools, "delete_role", admin, json!({"id": id})).await.unwrap();
+            assert_eq!(deleted["deleted"], id);
         })
         .await
         .unwrap();

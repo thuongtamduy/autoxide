@@ -9,7 +9,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
-use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::response::{Created, Data, Problem};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -37,7 +37,6 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct SetPasswordRequest {
     /// 12 to 128 characters.
-    #[validate(length(min = 1, max = 128))]
     password: String,
 }
 
@@ -79,16 +78,13 @@ impl From<User> for UserResponse {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct CreateUserRequest {
     /// Email; also the sign-in name. Case and surrounding spaces do not matter.
-    #[validate(length(min = 1, max = 254))]
     #[schema(example = "ada@example.com")]
     email: String,
     /// Display name, 1 to 200 characters.
-    #[validate(length(min = 1, max = 200))]
     #[schema(example = "Ada Lovelace")]
     name: String,
     /// 12 to 128 characters. When omitted, the account cannot sign in with a password
     /// until one is set.
-    #[validate(length(max = 128))]
     password: Option<String>,
 }
 
@@ -96,15 +92,12 @@ pub(crate) struct CreateUserRequest {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct RegisterRequest {
     /// Email; also the sign-in name.
-    #[validate(length(min = 1, max = 254))]
     #[schema(example = "ada@example.com")]
     email: String,
     /// Display name, 1 to 200 characters.
-    #[validate(length(min = 1, max = 200))]
     #[schema(example = "Ada Lovelace")]
     name: String,
     /// 12 to 128 characters.
-    #[validate(length(min = 1, max = 128))]
     password: String,
 }
 
@@ -112,7 +105,6 @@ pub(crate) struct RegisterRequest {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct UpdateUserRequest {
     /// New display name, 1 to 200 characters.
-    #[validate(length(min = 1, max = 200))]
     name: Option<String>,
     /// `true` disables the account and signs it out everywhere; `false` enables it.
     disabled: Option<bool>,
@@ -181,13 +173,13 @@ async fn create_user(
     principal: Principal,
     language: Language,
     ValidJson(input): ValidJson<CreateUserRequest>,
-) -> Result<(StatusCode, Data<UserResponse>), Error> {
+) -> Result<Created<UserResponse>, Error> {
     principal.require(&USERS_MANAGE)?;
     let input = NewUser { email: input.email, name: input.name, password: input.password };
     let actor = Actor::from(&principal);
     let user = state.users.create(actor, input).await?;
     state.verifications.after_signup(actor, &user, language).await;
-    Ok((StatusCode::CREATED, Data { data: user.into() }))
+    Ok(Created::new(format!("/auth/users/{}", user.id), user.into()))
 }
 
 /// Get a user account.
@@ -300,7 +292,7 @@ async fn register(
     State(state): State<Arc<HttpState>>,
     language: Language,
     ValidJson(input): ValidJson<RegisterRequest>,
-) -> Result<(StatusCode, Data<UserResponse>), Error> {
+) -> Result<Created<UserResponse>, Error> {
     if !state.self_registration {
         return Err(Error::forbidden(
             "auth.registration_disabled",
@@ -312,7 +304,7 @@ async fn register(
     // Chưa đăng nhập, chưa có tài khoản: "hệ thống" tạo thay người đăng ký.
     let user = state.users.create(Actor::system(), input).await?;
     state.verifications.after_signup(Actor::system(), &user, language).await;
-    Ok((StatusCode::CREATED, Data { data: user.into() }))
+    Ok(Created::new(format!("/auth/users/{}", user.id), user.into()))
 }
 
 /// Set the password of an account created without one.
@@ -358,6 +350,57 @@ mod tests {
 
     use crate::api::{Accounts, NewAccount};
     use crate::http::test_support::{PASSWORD, app, app_with, bearer, call};
+
+    /// Mọi lỗi của đầu vào báo trong MỘT lần (tài liệu API hứa vậy): email sai và tên
+    /// rỗng cùng có trong `errors`, không phải sửa một lỗi mới thấy lỗi kia.
+    #[tokio::test]
+    async fn bao_moi_loi_dau_vao_mot_lan() {
+        TestDatabase::run(async |test| {
+            let (app, services) = app(test).await;
+            let root = NewAccount {
+                email: "root@example.com".to_owned(),
+                name: "Root".to_owned(),
+                password: Some(PASSWORD.to_owned()),
+                admin: true,
+            };
+            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            let admin = bearer(&app, "root@example.com", PASSWORD).await;
+            let fields = |problem: &serde_json::Value| {
+                let mut fields: Vec<String> = problem["errors"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|error| error["field"].as_str().unwrap().to_owned())
+                    .collect();
+                fields.sort();
+                fields
+            };
+
+            let body = json!({"email": "not-an-email", "name": "", "password": "short"});
+            let (status, _, problem) = call(&app, "POST", "/users", Some(&admin), Some(body)).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+            assert_eq!(fields(&problem), ["email", "name", "password"]);
+
+            let body = json!({"name": "", "permissions": [], "current_password": ""});
+            let (status, _, problem) =
+                call(&app, "POST", "/api-keys", Some(&admin), Some(body)).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+            assert_eq!(fields(&problem), ["current_password", "name", "permissions"]);
+
+            let body = json!({"current_password": "", "new_password": "short"});
+            let (status, _, problem) =
+                call(&app, "POST", "/me/password", Some(&admin), Some(body)).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+            assert_eq!(fields(&problem), ["current_password", "new_password"]);
+
+            let body = json!({"name": "Bad Name!", "description": "x".repeat(501)});
+            let (status, _, problem) = call(&app, "POST", "/roles", Some(&admin), Some(body)).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+            assert_eq!(fields(&problem), ["description", "name"]);
+        })
+        .await
+        .unwrap();
+    }
 
     /// Tìm theo email hoặc tên, không phân biệt hoa thường — kể cả chữ có dấu, và cho
     /// cùng kết quả trên hai database; `%` và `_` là chữ thường, không phải ký tự đại diện.
@@ -502,8 +545,12 @@ mod tests {
             let (status, _, _) = call(&app, "POST", "/users", Some(&ada), Some(body.clone())).await;
             assert_eq!(status, StatusCode::FORBIDDEN);
 
-            let (status, _, created) = call(&app, "POST", "/users", Some(&admin), Some(body)).await;
+            let (status, headers, created) =
+                call(&app, "POST", "/users", Some(&admin), Some(body)).await;
             assert_eq!(status, StatusCode::CREATED, "{created}");
+            let location =
+                format!("/api/v1/auth/users/{}", created["data"]["id"].as_str().unwrap());
+            assert_eq!(headers[axum::http::header::LOCATION], location.as_str());
             assert_eq!(created["data"]["email"], "bob@example.com");
             assert!(created["data"]["disabled_at"].is_null());
             assert!(created["data"].get("password").is_none());

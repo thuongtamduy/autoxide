@@ -9,7 +9,7 @@
 use std::sync::Arc;
 
 use autoxide_kernel::database::Database;
-use autoxide_kernel::error::Error;
+use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::mail::{MailTemplate, Mailer};
@@ -139,8 +139,12 @@ impl PasswordResets {
     /// Đặt mật khẩu mới bằng `token` lấy từ mail.
     pub(crate) async fn confirm(&self, token: &str, new_password: String) -> Result<(), Error> {
         // Kiểm luật mật khẩu TRƯỚC khi dùng token: mật khẩu sai thì token còn dùng lại được.
-        if let Some(problem) = password::check_rules("password", &new_password) {
-            return Err(Error::validation(vec![problem]));
+        let problems: Vec<FieldError> = FieldError::blank("token", token)
+            .into_iter()
+            .chain(password::check_rules("password", &new_password))
+            .collect();
+        if !problems.is_empty() {
+            return Err(Error::validation(problems));
         }
         let now = now();
         let row = Entity::find()

@@ -9,7 +9,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
-use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::response::{Created, Data, Problem};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -90,7 +90,6 @@ pub(crate) struct AddPasskeyRequest {
     /// The `ceremony_id` from `POST /api/v1/auth/me/passkeys/registration`.
     ceremony_id: Uuid,
     /// A name to recognize the passkey by, 1 to 100 characters.
-    #[validate(length(min = 1, max = 100))]
     #[schema(example = "Ada's phone")]
     name: String,
     /// The created credential as JSON (`credential.toJSON()` in the browser).
@@ -160,13 +159,13 @@ async fn add_passkey(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
     ValidJson(input): ValidJson<AddPasskeyRequest>,
-) -> Result<(StatusCode, Data<PasskeyResponse>), Error> {
+) -> Result<Created<PasskeyResponse>, Error> {
     require_session(&principal)?;
     let passkey = state
         .passkeys
         .finish_registration(principal.user_id(), input.ceremony_id, &input.name, &input.credential)
         .await?;
-    Ok((StatusCode::CREATED, Data { data: passkey.into() }))
+    Ok(Created::new(format!("/auth/me/passkeys/{}", passkey.id), passkey.into()))
 }
 
 /// List your passkeys.

@@ -52,7 +52,7 @@ impl NoteService {
     /// `notes.title_taken`.
     pub(crate) async fn create(&self, actor: Actor, input: NewNote) -> Result<Note, Error> {
         let owner = owner(actor)?;
-        let title = check_title(&input.title)?;
+        let title = check(Some(&input.title), Some(&input.body))?.unwrap_or_default();
         let now = now();
         let transaction = self.database.begin_write().await?;
         let note = entity::ActiveModel {
@@ -92,7 +92,7 @@ impl NoteService {
         id: Uuid,
         changes: NoteChanges,
     ) -> Result<Note, Error> {
-        let title = changes.title.as_deref().map(check_title).transpose()?;
+        let title = check(changes.title.as_deref(), changes.body.as_deref())?;
         let transaction = self.database.begin_write().await?;
         let before = Entity::find_by_id(id)
             .one(&transaction)
@@ -194,17 +194,33 @@ fn owner(actor: Actor) -> Result<Uuid, Error> {
     actor.user_id.ok_or_else(|| Error::internal("notes need a signed-in user"))
 }
 
-/// Tên: bỏ khoảng trắng hai đầu, không rỗng.
-fn check_title(title: &str) -> Result<String, Error> {
-    let title = title.trim();
-    if title.is_empty() {
-        return Err(Error::validation(vec![FieldError::new(
+/// Độ dài tối đa của tên và nội dung, theo ký tự.
+const TITLE_MAX_LENGTH: usize = 200;
+const BODY_MAX_LENGTH: usize = 10_000;
+
+/// Kiểm tên (bỏ khoảng trắng hai đầu, 1 tới 200 ký tự) và nội dung (tối đa 10000 ký
+/// tự) — trường `None` bỏ qua. Mọi lỗi báo một lần. Trả tên đã chuẩn hoá.
+fn check(title: Option<&str>, body: Option<&str>) -> Result<Option<String>, Error> {
+    let title = title.map(str::trim);
+    let mut problems = Vec::new();
+    if title.is_some_and(|title| !(1..=TITLE_MAX_LENGTH).contains(&title.chars().count())) {
+        problems.push(FieldError::new(
             "title",
             "length",
-            "must not be empty or only spaces",
-        )]));
+            format!("must be 1 to {TITLE_MAX_LENGTH} characters, not only spaces"),
+        ));
     }
-    Ok(title.to_owned())
+    if body.is_some_and(|body| body.chars().count() > BODY_MAX_LENGTH) {
+        problems.push(FieldError::new(
+            "body",
+            "length",
+            format!("must be at most {BODY_MAX_LENGTH} characters long"),
+        ));
+    }
+    if !problems.is_empty() {
+        return Err(Error::validation(problems));
+    }
+    Ok(title.map(str::to_owned))
 }
 
 /// Vi phạm index unique (chủ, tên) thành lỗi 409 dễ hiểu; lỗi khác giữ nguyên.

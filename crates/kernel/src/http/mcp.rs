@@ -39,7 +39,8 @@ pub const MCP_PATH: &str = "/mcp";
 /// Hướng dẫn gửi cho client lúc bắt tay.
 const INSTRUCTIONS: &str = "Tools of this Autoxide server. Each tool calls the same service as \
 the REST API (`/api/v1/openapi.json`) with the caller's permissions; only the tools the caller \
-may use are listed. Results are JSON objects with the value under `data`. Failed calls return \
+may use are listed. Results have the same shape as REST: the value under `data`, and lists also \
+carry `pagination` (follow `next_cursor` with the `cursor` argument). Failed calls return \
 `isError` with a stable `code` and a `message` that says what to fix.";
 
 #[derive(Clone)]
@@ -160,6 +161,15 @@ impl McpServer {
     }
 }
 
+/// Kết quả tool theo đúng envelope của REST: một trang (`Page`: `data` + `pagination`)
+/// giữ nguyên; giá trị khác bọc thành `{"data": …}` (như `Data`).
+fn envelope(value: Value) -> Value {
+    let is_page = value.as_object().is_some_and(|object| {
+        object.len() == 2 && object.contains_key("data") && object.contains_key("pagination")
+    });
+    if is_page { value } else { json!({ "data": value }) }
+}
+
 impl ServerHandler for McpServer {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
@@ -200,9 +210,25 @@ impl ServerHandler for McpServer {
         let arguments = request.arguments.map_or(Value::Null, Value::Object);
         metrics::counter!("mcp_tool_calls_total").increment(1);
         let result = match tool.call(principal, arguments).await {
-            Ok(value) => CallToolResult::structured(json!({ "data": value })),
+            Ok(value) => CallToolResult::structured(envelope(value)),
             Err(error) => self.failure(tool.name(), &error, language),
         };
         Ok(result.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ket_qua_cung_envelope_voi_rest() {
+        let page = json!({"data": [1, 2], "pagination": {"limit": 2, "next_cursor": null}});
+        assert_eq!(envelope(page.clone()), page);
+        assert_eq!(envelope(json!({"id": 1})), json!({"data": {"id": 1}}));
+        assert_eq!(envelope(json!([1])), json!({"data": [1]}));
+        // Trùng tên trường mà không phải trang: vẫn bọc.
+        let lookalike = json!({"data": 1, "pagination": 2, "extra": 3});
+        assert_eq!(envelope(lookalike.clone()), json!({"data": lookalike}));
     }
 }

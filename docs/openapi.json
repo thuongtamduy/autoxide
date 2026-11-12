@@ -2,9 +2,15 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Autoxide API",
-    "description": "REST API of Autoxide.\n\n## Conventions\n\nEvery endpoint follows the same rules, so learning one endpoint teaches all of them.\n\n- **Success**: a single result is `{\"data\": …}`; a list is `{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`.\n- **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the stable `code` field, never on `detail`. Validation problems list every invalid field in `errors`.\n- **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.\n- **Authentication**: endpoints that need it list the `bearer` security scheme. Send `Authorization: Bearer <access token>`. A `401` response carries `WWW-Authenticate: Bearer`; its `code` says whether the token is missing, invalid or expired.\n- **Retries**: send `Idempotency-Key: <a random UUID>` with `POST`, `PUT`, `PATCH` and `DELETE`. Repeating the same request with the same key within 24 hours returns the first result (marked `Idempotent-Replayed: true`) instead of doing it twice; a different request with a used key gets `422`, and a repeat while the first is still running gets `409`.\n- **Deprecation**: an endpoint being retired is marked `deprecated` here and answers with `Deprecation` (RFC 9745), `Sunset` (RFC 8594, the removal date) and `Link: <…>; rel=\"successor-version\"` headers. Move to the successor before the sunset date.\n- **Language**: send `Accept-Language` (e.g. `vi`) to get the `detail` of errors in that language; English (`en`) by default and for unsupported languages. Responses carry `Content-Language`. Codes never change with the language.\n- **Rate limits**: too many requests from one address are answered with `429` (code `rate_limited`) and a `Retry-After` header giving the seconds to wait.\n- **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote it when reporting a problem.\n- **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount in the smallest currency unit plus a currency code.",
+    "description": "REST API of Autoxide.\n\n## Conventions\n\nEvery endpoint follows the same rules, so learning one endpoint teaches all of them.\n\n- **Success**: a single result is `{\"data\": …}`; a list is `{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`. Creating a record answers `201` with a `Location` header pointing to it.\n- **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the stable `code` field, never on `detail`. Validation problems list every invalid field of the request in `errors`, all at once.\n- **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.\n- **Authentication**: endpoints that need it list the `bearer` security scheme. Send `Authorization: Bearer <access token>`. A `401` response carries `WWW-Authenticate: Bearer`; its `code` says whether the token is missing, invalid or expired.\n- **Retries**: send `Idempotency-Key: <a random UUID>` with `POST`, `PUT`, `PATCH` and `DELETE`. Repeating the same request with the same key within 24 hours returns the first result (marked `Idempotent-Replayed: true`) instead of doing it twice; a different request with a used key gets `422`, and a repeat while the first is still running gets `409`.\n- **Deprecation**: an endpoint being retired is marked `deprecated` here and answers with `Deprecation` (RFC 9745), `Sunset` (RFC 8594, the removal date) and `Link: <…>; rel=\"successor-version\"` headers. Move to the successor before the sunset date.\n- **Language**: send `Accept-Language` (e.g. `vi`) to get the `detail` of errors in that language; English (`en`) by default and for unsupported languages. Responses carry `Content-Language`. Codes never change with the language.\n- **Rate limits**: too many requests from one address are answered with `429` (code `rate_limited`) and a `Retry-After` header giving the seconds to wait.\n- **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote it when reporting a problem.\n- **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount in the smallest currency unit plus a currency code.",
     "version": "0.1.0"
   },
+  "servers": [
+    {
+      "url": "/",
+      "description": "The server that serves this document. When generating a client from a saved copy, use your deployment's address instead, e.g. `https://api.example.com`."
+    }
+  ],
   "paths": {
     "/api/v1/audit": {
       "get": {
@@ -85,6 +91,18 @@
               "enum": [
                 "asc",
                 "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
               ]
             }
           }
@@ -175,6 +193,18 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
             }
           }
         ],
@@ -281,6 +311,18 @@
                 "desc"
               ]
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -338,6 +380,33 @@
         "summary": "Create an API key for a program or an AI agent.",
         "description": "Signed in with a password session only: an API key cannot create keys. The key\nacts as you, limited to the permissions listed. The response carries the key\nitself, shown only once.",
         "operationId": "auth_create_api_key",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -351,6 +420,14 @@
         "responses": {
           "201": {
             "description": "The key was created; `key` holds the secret.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -435,6 +512,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "responses": {
@@ -487,6 +589,20 @@
         "summary": "Confirm an email address with the token from a verification mail.",
         "description": "Needs no sign-in: the token proves the mail was received. When the token was sent\nfor a new address (`POST /api/v1/auth/me/email`), the account's email becomes that\naddress; sign in with it from now on. Every other verification token of the\naccount stops working.",
         "operationId": "auth_confirm_email_verification",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -559,6 +675,20 @@
         "summary": "Sign in with email and password.",
         "description": "Returns a short-lived access token and a refresh token. When the account has\ntwo-step sign-in on, answers 202 instead: send the `mfa_token` and a code to\n`POST /api/v1/auth/login/mfa`. The same error answers an unknown email and a\nwrong password. After several failed attempts the email is locked for a while,\neven for the right password.",
         "operationId": "auth_login",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -651,6 +781,20 @@
         "summary": "Finish signing in with a code from the authenticator app or a recovery code.",
         "description": "Send the `mfa_token` from `POST /api/v1/auth/login` within its `expires_in`\nseconds. Each `mfa_token` allows five wrong codes; wrong codes also count\ntowards the sign-in lock of the email.",
         "operationId": "auth_login_mfa",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -733,6 +877,20 @@
         "summary": "Sign in with a passkey: finish the ceremony from `POST /api/v1/auth/login/passkey/options`.",
         "description": "Returns the same tokens as `POST /api/v1/auth/login`. A passkey verifies the user\nitself, so no two-step code is asked for.",
         "operationId": "auth_passkey_login",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -815,6 +973,20 @@
         "summary": "Start signing in with a passkey.",
         "description": "Needs no email: the browser lets the user pick one of their passkeys for this site.",
         "operationId": "auth_start_passkey_login",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Options for the browser, and the ceremony to finish with `POST /api/v1/auth/login/passkey`.",
@@ -857,6 +1029,20 @@
         "summary": "Sign out: end the session of a refresh token.",
         "description": "Every refresh token of the session stops working; access tokens already issued\nkeep working until they expire. Safe to repeat.",
         "operationId": "auth_logout",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -901,6 +1087,20 @@
         ],
         "summary": "Get the signed-in user and their permissions.",
         "operationId": "auth_me",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "The user the access token belongs to, with the permissions of their roles.",
@@ -956,6 +1156,33 @@
         "summary": "Delete your own account and everything it owns.",
         "description": "Signed in with a password session only, and needs your current password (an account\nwithout a password must set one first). The account, its sessions, keys and passkeys\ngo at once; data kept by other modules (notes, files…) is deleted shortly after.\nThis cannot be undone: download your data first with `GET /api/v1/auth/me/export`.",
         "operationId": "auth_delete_own_account",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1056,6 +1283,33 @@
         "summary": "Change your email address.",
         "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). A verification mail goes to the NEW address; the email changes\nonly when its token is confirmed with `POST /api/v1/auth/email-verification/confirm`,\nwithin 24 hours. Until then the old address stays in use. Wrong passwords count\ntowards the sign-in lock of the email.",
         "operationId": "auth_change_email",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1156,6 +1410,33 @@
         "summary": "Send the verification mail for your email address again.",
         "description": "The mail (in the language of `Accept-Language`) carries a token valid 24 hours;\nconfirm it with `POST /api/v1/auth/email-verification/confirm`. At most one mail\nper minute per address.",
         "operationId": "auth_resend_email_verification",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "responses": {
           "202": {
             "description": "A verification mail is on its way."
@@ -1206,6 +1487,20 @@
         "summary": "Download everything the server keeps about you.",
         "description": "Signed in with a password session only (an API key cannot do this). The answer has\none entry per module that keeps personal data, named after the module (`auth` holds\nyour profile, roles, sessions, API keys, passkeys and two-step sign-in status).\nSecrets — password, tokens, keys — are never included.",
         "operationId": "auth_export_personal_data",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Your data, by module.",
@@ -1262,6 +1557,20 @@
         ],
         "summary": "Get your two-step sign-in settings.",
         "operationId": "auth_get_mfa",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Your settings.",
@@ -1309,6 +1618,33 @@
         "summary": "Replace your recovery codes with ten new ones.",
         "description": "The old codes stop working. Needs a current authenticator code (not a recovery\ncode) and a password session.",
         "operationId": "auth_regenerate_recovery_codes",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1396,6 +1732,33 @@
         "summary": "Start turning on two-step sign-in with an authenticator app.",
         "description": "Returns a new secret to add to the app. Nothing changes until you confirm with\na code (`POST /api/v1/auth/me/mfa/totp/confirm`). Calling again replaces an\nunconfirmed secret. Needs a password session, not an API key.",
         "operationId": "auth_start_totp",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Add this secret to the authenticator app, then confirm.",
@@ -1463,6 +1826,33 @@
         "summary": "Confirm two-step sign-in with the first code from the app.",
         "description": "From now on, signing in asks for a code. The response holds ten one-time\nrecovery codes, shown only this once. Needs a password session.",
         "operationId": "auth_confirm_totp",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1550,6 +1940,33 @@
         "summary": "Turn off two-step sign-in.",
         "description": "Needs a current authenticator code or an unused recovery code, and a password\nsession. Remaining recovery codes are deleted.",
         "operationId": "auth_disable_totp",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1673,6 +2090,18 @@
                 "desc"
               ]
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -1730,6 +2159,33 @@
         "summary": "Add a passkey: finish the ceremony started with `POST /api/v1/auth/me/passkeys/registration`.",
         "description": "Needs a session signed in with a password. Afterwards the passkey signs in with\n`POST /api/v1/auth/login/passkey`.",
         "operationId": "auth_add_passkey",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1743,6 +2199,14 @@
         "responses": {
           "201": {
             "description": "The passkey was added.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -1827,6 +2291,33 @@
         "summary": "Start adding a passkey to your account.",
         "description": "Needs your current password and a session signed in with a password (an API key cannot do this). Answers 403\nwith code `auth.passkeys_disabled` when the server has passkeys off.",
         "operationId": "auth_start_passkey_registration",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1924,6 +2415,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "responses": {
@@ -1986,6 +2502,33 @@
         "summary": "Change your own password.",
         "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). Every session of the account ends, including this one; the\nresponse carries the tokens of a new session, so this client stays signed in.\nWrong current passwords count towards the sign-in lock of the email.",
         "operationId": "auth_change_password",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2119,6 +2662,18 @@
                 "desc"
               ]
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -2195,6 +2750,31 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
             }
           }
         ],
@@ -2275,6 +2855,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "responses": {
@@ -2337,6 +2942,20 @@
         "summary": "Ask for a password-reset mail.",
         "description": "Always answers 202, whether or not an account has this email, so the answer does\nnot reveal who has an account. When one does, a mail with a reset token (valid 30\nminutes) is sent in the language of `Accept-Language`. At most one mail per minute\nper account.",
         "operationId": "auth_request_password_reset",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2382,6 +3001,20 @@
         "summary": "Choose a new password with the token from the reset mail.",
         "description": "Signs the account out everywhere; every other reset token of the account stops\nworking. Then sign in with the new password.",
         "operationId": "auth_confirm_password_reset",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2437,6 +3070,20 @@
         "summary": "List every permission that roles can grant.",
         "description": "Requires `auth.roles.read`. Each module declares its own permissions; the list\ngrows when modules are added.",
         "operationId": "auth_list_permissions",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Every permission, sorted by name.",
@@ -2494,6 +3141,20 @@
         "summary": "Exchange a refresh token for a new pair of tokens.",
         "description": "The refresh token sent is used up. Sending a used refresh token again ends the\nwhole session (it may have been stolen): sign in again.",
         "operationId": "auth_refresh",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2566,6 +3227,20 @@
         "summary": "Create your own account.",
         "description": "Open only when the server enables self-registration; otherwise answers 403. The\nnew account has no role. A mail asking to confirm the address goes to the email,\nin the language of `Accept-Language`. Then sign in with `POST /api/v1/auth/login`.",
         "operationId": "auth_register",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2579,6 +3254,14 @@
         "responses": {
           "201": {
             "description": "The account was created.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -2674,6 +3357,18 @@
                 "desc"
               ]
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -2741,6 +3436,33 @@
         "summary": "Create a role.",
         "description": "Requires `auth.roles.manage`.",
         "operationId": "auth_create_role",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2754,6 +3476,14 @@
         "responses": {
           "201": {
             "description": "The role was created.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -2838,6 +3568,18 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -2914,6 +3656,31 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
             }
           }
         ],
@@ -3021,6 +3788,31 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
             }
           }
         ],
@@ -3139,6 +3931,18 @@
                 "desc"
               ]
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -3206,6 +4010,33 @@
         "summary": "Create a user account.",
         "description": "Requires `auth.users.manage`. The account has no role; give it roles with\n`PUT /api/v1/auth/users/{id}/roles`. A mail asking to confirm the address goes to\nthe new email, in the language of `Accept-Language`.",
         "operationId": "auth_create_user",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -3219,6 +4050,14 @@
         "responses": {
           "201": {
             "description": "The account was created.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -3303,6 +4142,18 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -3379,6 +4230,31 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
             }
           }
         ],
@@ -3459,6 +4335,31 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
             }
           }
         ],
@@ -3569,6 +4470,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "responses": {
@@ -3640,6 +4566,31 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
             }
           }
         ],
@@ -3743,6 +4694,18 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -3819,6 +4782,31 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
             }
           }
         ],
@@ -3929,6 +4917,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "responses": {
@@ -4034,6 +5047,18 @@
                 "desc"
               ]
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -4111,6 +5136,31 @@
               "type": "string"
             },
             "example": "report.pdf"
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "requestBody": {
@@ -4132,6 +5182,14 @@
         "responses": {
           "201": {
             "description": "Uploaded.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -4236,6 +5294,18 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -4313,6 +5383,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "responses": {
@@ -4384,6 +5479,18 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
             }
           }
         ],
@@ -4495,6 +5602,18 @@
                 "desc"
               ]
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
           }
         ],
         "responses": {
@@ -4562,6 +5681,33 @@
         "summary": "Create a webhook endpoint.",
         "description": "Requires `webhooks.manage`. From now on, every event it subscribes to is sent to\n`url` as a signed `POST` (Standard Webhooks headers `webhook-id`,\n`webhook-timestamp`, `webhook-signature`); answer with any 2xx within 10 seconds\n(`AUTOXIDE_WEBHOOKS_TIMEOUT_SECONDS`).\nOther answers are retried with growing delays for about two hours. The response\ncarries the signing secret, shown only once.",
         "operationId": "webhooks_create_webhook_endpoint",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -4575,20 +5721,18 @@
         "responses": {
           "201": {
             "description": "Created; store `secret` now.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Data_CreatedEndpointResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The address is not `https://` (code `webhooks.insecure_url`) or an event name is unknown (code `webhooks.unknown_event`).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -4614,7 +5758,7 @@
             }
           },
           "422": {
-            "description": "A value is invalid; see `errors`.",
+            "description": "A value is invalid — e.g. the address is not `https://` or an event name is unknown; `errors` lists every problem.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4649,6 +5793,20 @@
         "summary": "List the kinds of events endpoints can receive.",
         "description": "Requires `webhooks.manage`. Sorted by name.",
         "operationId": "webhooks_list_webhook_event_types",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Every event kind.",
@@ -4715,6 +5873,18 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
             }
           }
         ],
@@ -4793,6 +5963,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "responses": {
@@ -4863,6 +6058,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "requestBody": {
@@ -4882,16 +6102,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Data_EndpointResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The address is not `https://` (code `webhooks.insecure_url`) or an event name is unknown (code `webhooks.unknown_event`).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -4927,7 +6137,7 @@
             }
           },
           "422": {
-            "description": "A value is invalid; see `errors`.",
+            "description": "A value is invalid — e.g. the address is not `https://` or an event name is unknown; `errors` lists every problem.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5006,6 +6216,18 @@
               "enum": [
                 "asc",
                 "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
               ]
             }
           }
@@ -5097,6 +6319,31 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
           }
         ],
         "responses": {
@@ -5166,6 +6413,20 @@
         "summary": "Liveness probe: is the process running?",
         "description": "Never touches the database. Restart the process when this fails.",
         "operationId": "health_live",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "The process is running.",
@@ -5198,6 +6459,20 @@
         "summary": "Readiness probe: can the service handle requests?",
         "description": "Checks that the database answers. Stop sending traffic when this fails.",
         "operationId": "health_ready",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Ready to handle requests.",

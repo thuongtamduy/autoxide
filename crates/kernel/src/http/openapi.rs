@@ -11,11 +11,15 @@
 
 use std::collections::BTreeSet;
 
+use serde_json::json;
 use utoipa::ToSchema;
-use utoipa::openapi::path::{Operation, PathItem};
+use utoipa::openapi::header::HeaderBuilder;
+use utoipa::openapi::path::{Operation, Parameter, ParameterBuilder, ParameterIn, PathItem};
+use utoipa::openapi::schema::{ObjectBuilder, Type};
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::openapi::server::ServerBuilder;
 use utoipa::openapi::{
-    ContentBuilder, InfoBuilder, OpenApi, OpenApiBuilder, Ref, RefOr, ResponseBuilder,
+    ContentBuilder, InfoBuilder, OpenApi, OpenApiBuilder, Ref, RefOr, Required, ResponseBuilder,
 };
 
 use crate::response::{PROBLEM_CONTENT_TYPE, Problem};
@@ -37,9 +41,11 @@ REST API of Autoxide.
 Every endpoint follows the same rules, so learning one endpoint teaches all of them.
 
 - **Success**: a single result is `{\"data\": …}`; a list is \
-`{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`.
+`{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`. Creating a record answers \
+`201` with a `Location` header pointing to it.
 - **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the \
-stable `code` field, never on `detail`. Validation problems list every invalid field in `errors`.
+stable `code` field, never on `detail`. Validation problems list every invalid field of the \
+request in `errors`, all at once.
 - **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and \
 `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.
 - **Authentication**: endpoints that need it list the `bearer` security scheme. Send \
@@ -72,6 +78,15 @@ pub(super) fn base_document() -> OpenApi {
                 .description(Some(DESCRIPTION))
                 .build(),
         )
+        // Địa chỉ tương đối: tài liệu được phục vụ từ chính máy chủ (`/api/v1/openapi.json`)
+        // nên `/` là máy chủ đó; bản trong repo không biết tên miền của người triển khai.
+        .servers(Some([ServerBuilder::new()
+            .url("/")
+            .description(Some(
+                "The server that serves this document. When generating a client from a saved \
+                 copy, use your deployment's address instead, e.g. `https://api.example.com`.",
+            ))
+            .build()]))
         .build()
 }
 
@@ -91,7 +106,10 @@ pub(super) fn label_module(module: &str, openapi: &mut OpenApi) {
 }
 
 /// Hoàn thiện tài liệu chung sau khi đã ghép mọi module.
-pub(super) fn finish(openapi: &mut OpenApi) {
+/// Hoàn tất tài liệu: schema `Problem`, cách xác thực, response lỗi mặc định, và các
+/// header chung khai trên từng operation (để SDK sinh tự động có sẵn tham số).
+/// `idempotency`: có nơi lưu idempotency key (header `Idempotency-Key` có tác dụng).
+pub(super) fn finish(openapi: &mut OpenApi, idempotency: bool) {
     // Schema `Problem` (và các schema nó dùng) phải có mặt để `$ref` bên dưới trỏ tới.
     let mut schemas =
         vec![(Problem::name().into_owned(), <Problem as utoipa::PartialSchema>::schema())];
@@ -130,6 +148,32 @@ pub(super) fn finish(openapi: &mut OpenApi) {
                 .responses
                 .entry("default".to_owned())
                 .or_insert_with(|| RefOr::T(problem.clone()));
+        }
+    }
+    for item in openapi.paths.paths.values_mut() {
+        for (method, operation) in operations_mut(item) {
+            // Mọi response 201 đến từ `response::Created`, luôn có `Location`.
+            if let Some(RefOr::T(created)) = operation.responses.responses.get_mut("201") {
+                created.headers.entry("Location".to_owned()).or_insert_with(|| {
+                    RefOr::T(
+                        HeaderBuilder::new()
+                            .schema(Some(ObjectBuilder::new().schema_type(Type::String)))
+                            .description(Some(
+                                "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                            ))
+                            .build(),
+                    )
+                });
+            }
+            let parameters = operation.parameters.get_or_insert_default();
+            parameters.push(RefOr::T(accept_language()));
+            // Lớp idempotency chỉ lưu lệnh ghi của người đã đăng nhập.
+            let writes = matches!(method, "post" | "put" | "patch" | "delete");
+            let signed_in =
+                operation.security.as_ref().is_some_and(|security| !security.is_empty());
+            if idempotency && writes && signed_in {
+                parameters.push(RefOr::T(idempotency_key()));
+            }
         }
     }
 }
@@ -262,6 +306,40 @@ pub(crate) fn looks_vietnamese(text: &str) -> bool {
         matches!(c, 'ă' | 'Ă' | 'đ' | 'Đ' | 'ơ' | 'Ơ' | 'ư' | 'Ư')
             || ('\u{1EA0}'..='\u{1EF9}').contains(&c)
     })
+}
+
+/// Header `Accept-Language`, có ở mọi operation.
+fn accept_language() -> Parameter {
+    ParameterBuilder::new()
+        .name("Accept-Language")
+        .parameter_in(ParameterIn::Header)
+        .required(Required::False)
+        .description(Some(
+            "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change \
+             with the language.",
+        ))
+        .schema(Some(ObjectBuilder::new().schema_type(Type::String).examples([json!("vi")])))
+        .build()
+}
+
+/// Header `Idempotency-Key`, có ở mọi lệnh ghi cần đăng nhập.
+fn idempotency_key() -> Parameter {
+    ParameterBuilder::new()
+        .name("Idempotency-Key")
+        .parameter_in(ParameterIn::Header)
+        .required(Required::False)
+        .description(Some(
+            "A random UUID that makes this request safe to retry: a repeat with the same key \
+             within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead \
+             of doing it twice.",
+        ))
+        .schema(Some(
+            ObjectBuilder::new()
+                .schema_type(Type::String)
+                .max_length(Some(255))
+                .examples([json!("0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11")]),
+        ))
+        .build()
 }
 
 /// Các operation của một đường dẫn, kèm tên method.

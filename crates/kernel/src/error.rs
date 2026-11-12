@@ -95,6 +95,12 @@ impl FieldError {
     ) -> Self {
         FieldError { field: field.into(), code: code.into(), message: message.into() }
     }
+
+    /// Lỗi `required` nếu `value` rỗng (hoặc chỉ có khoảng trắng). Dùng trong service khi
+    /// gom mọi lỗi của một đầu vào để báo một lần.
+    pub fn blank(field: impl Into<String>, value: &str) -> Option<Self> {
+        value.trim().is_empty().then(|| FieldError::new(field, "required", "must not be empty"))
+    }
 }
 
 /// Nguyên nhân gốc của một lỗi, giữ cho log.

@@ -735,3 +735,20 @@ async fn endpoint_deprecated_co_header_va_danh_dau_trong_tai_lieu() {
     assert!(description.contains("removed on 2027-05-01"), "{description}");
     assert!(document["paths"]["/api/v1/notes"]["get"].get("deprecated").is_none());
 }
+
+/// Header chung được khai trên từng operation để SDK sinh tự động có sẵn tham số:
+/// `Accept-Language` ở mọi nơi; `Idempotency-Key` chỉ khi có nơi lưu key (và chỉ ở lệnh
+/// ghi cần đăng nhập — route mẫu ở đây không cần đăng nhập).
+#[tokio::test]
+async fn tai_lieu_khai_header_chung_tren_tung_endpoint() {
+    let document = serde_json::to_value(api_with(&default_config()).openapi).unwrap();
+    let operation = &document["paths"]["/api/v1/notes"]["post"];
+    let headers: Vec<&str> = operation["parameters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|parameter| parameter["in"] == "header")
+        .map(|parameter| parameter["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(headers, ["Accept-Language"]);
+}

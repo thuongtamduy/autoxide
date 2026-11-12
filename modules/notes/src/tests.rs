@@ -131,7 +131,9 @@ async fn rest_va_mcp_dung_chung_service() {
         assert_eq!(status, StatusCode::CREATED, "{created}");
         let listed = ada.call_tool(tool("notes.list_notes", json!({}))).await.unwrap();
         let listed = listed.structured_content.unwrap();
-        assert_eq!(listed["data"]["data"][0]["id"], created["data"]["id"]);
+        // Cùng hình dạng với REST: `data` + `pagination`, không lồng thêm.
+        assert_eq!(listed["data"][0]["id"], created["data"]["id"]);
+        assert!(listed["pagination"].is_object(), "{listed}");
 
         let made = ada.call_tool(tool("notes.create_note", json!({"title": "Ideas"}))).await;
         let made = made.unwrap().structured_content.unwrap();

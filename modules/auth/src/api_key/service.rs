@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::database::Database;
-use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
@@ -107,10 +107,21 @@ impl ApiKeyService {
                  more. Sign in with a password to create keys.",
             ));
         }
-        self.sessions.check_password(creator.user_id(), &input.current_password).await?;
         let now = now();
-        let (name, permissions) =
-            self.check(creator, input.name, input.permissions, input.expires_at, now)?;
+        // Kiểm đầu vào (gom mọi lỗi, kể cả thiếu mật khẩu) TRƯỚC khi kiểm mật khẩu.
+        let blank = FieldError::blank("current_password", &input.current_password);
+        let checked = self.check(creator, input.name, input.permissions, input.expires_at, now);
+        let (name, permissions) = match (checked, blank) {
+            (Ok(checked), None) => checked,
+            (Ok(_), Some(problem)) => return Err(Error::validation(vec![problem])),
+            (Err(error), Some(problem)) if error.kind() == ErrorKind::Validation => {
+                let mut problems = error.fields().to_vec();
+                problems.push(problem);
+                return Err(Error::validation(problems));
+            }
+            (Err(error), _) => return Err(error),
+        };
+        self.sessions.check_password(creator.user_id(), &input.current_password).await?;
         let user_id = creator.user_id();
         let existing = api_key::Entity::find()
             .filter(api_key::Column::UserId.eq(user_id))

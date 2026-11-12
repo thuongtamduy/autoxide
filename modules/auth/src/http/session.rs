@@ -34,10 +34,8 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 /// The current password and the new one.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct ChangePasswordRequest {
-    #[validate(length(min = 1, max = 1024))]
     current_password: String,
     /// 12 to 128 characters.
-    #[validate(length(min = 1, max = 128))]
     new_password: String,
 }
 

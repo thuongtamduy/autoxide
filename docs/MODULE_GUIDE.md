@@ -78,8 +78,12 @@ event in the same transaction with `Outbox::record(&transaction, actor, subject,
 Routes live in `src/http.rs`, are registered with `OpenApiRouter::routes(routes!(…))`,
 and are mounted under `/api/v1/<name>`; a module declares only the tail (`/`, `/{id}`).
 
-- Read JSON bodies with `ValidJson<T>` (`T: Deserialize + Validate + ToSchema`).
-- Answer with `Data<T>`, `Page<T>` (lists, via `fetch_page` with
+- Read JSON bodies with `ValidJson<T>` (`T: Deserialize + Validate + ToSchema`). A field
+  the service checks is checked only there (no `#[validate]` on it), and the service
+  collects every problem of the input into one `Error::validation(…)`: callers see all
+  their mistakes at once.
+- Answer with `Data<T>`, `Created::new("/<name>/<id>", …)` (201 with a `Location` header)
+  for a new record, `Page<T>` (lists, via `fetch_page` with
   `limit`/`cursor`/`order`) or an `Error` (sent as RFC 9457 Problem Details).
 - A handler that needs a signed-in caller takes `principal: Principal` and calls
   `principal.require(&PERMISSION)?`.

@@ -1827,3 +1827,30 @@ hay Node để chạy gate).
 Đã cân nhắc: chạy trình kiểm chuẩn đầy đủ (Python / Node) trong gate — thêm phụ thuộc
 ngoài cho mọi người phát triển; kiểm theo JSON Schema chính thức của OpenAPI 3.1 bằng thư
 viện Rust — thêm thư viện lớn trong khi lỗi thực tế gặp là `$ref` treo, đã kiểm trực tiếp.
+
+## D-083 · Bước 14: kiểm đầu vào ở service và báo mọi lỗi một lần; `Created`; header chung trong OpenAPI; MCP cùng envelope với REST — 2026-11-12 — agent quyết
+
+Quyết định:
+
+- **Mỗi trường được kiểm ở đúng một chỗ.** Trường service kiểm thì không gắn `#[validate]`
+  trên kiểu nhận JSON; service gom mọi lỗi của đầu vào (kể cả "thiếu mật khẩu hiện tại" —
+  `FieldError::blank`) thành một `Error::validation`. Trước đây `ValidJson` dừng ở lỗi độ
+  dài nên lỗi định dạng email chỉ hiện ở lần gửi sau. `#[validate]` chỉ còn ở trường không
+  service nào kiểm (token, mã đăng nhập…). Lợi thêm: REST và MCP kiểm như nhau. Webhook báo
+  địa chỉ sai và tên event lạ bằng lỗi theo trường (`url`, `events[i]`) như role và API key,
+  thay cho mã riêng `webhooks.insecure_url` / `webhooks.unknown_event` (chưa phát hành).
+- **`response::Created`**: mọi endpoint tạo mới trả 201 + `Location` (đường dẫn tới bản ghi);
+  idempotency đã giữ header này khi trả lại. OpenAPI tự khai `Location` cho mọi response 201.
+- **OpenAPI khai header chung trên từng operation**: `Accept-Language` ở mọi nơi;
+  `Idempotency-Key` ở lệnh ghi cần đăng nhập khi có nơi lưu key. Có mục `servers` (`/`, địa
+  chỉ tương đối — bản trong repo không biết tên miền người triển khai).
+- **MCP**: kết quả dạng trang giữ nguyên `{"data", "pagination"}` như REST, giá trị khác bọc
+  `{"data": …}`. Thêm tool cho role, API key (auth), audit log và file (nội dung base64, tới
+  1 MiB; file lớn dùng REST — mã `files.too_large_for_tool`).
+
+Lý do: các điểm chủ dự án tìm thấy khi kiểm hợp đồng API (bước 14); giữ "học một endpoint là
+biết mọi endpoint" cho cả người lẫn agent.
+
+Đã cân nhắc: để `ValidJson` gom lỗi rồi cho handler chạy tiếp — handler phải xử lý dữ liệu
+chưa hợp lệ, dễ sai; gắn `#[validate(custom)]` gọi lại luật của service — luật cần ngữ cảnh
+(danh mục permission, cấu hình) không chạy được ở đó, vẫn thành hai đợt.

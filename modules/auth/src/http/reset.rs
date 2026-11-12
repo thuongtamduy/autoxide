@@ -32,10 +32,8 @@ pub(crate) struct ResetRequest {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct ResetConfirmation {
     /// The token from the reset mail.
-    #[validate(length(min = 1, max = 256))]
     token: String,
     /// 12 to 128 characters.
-    #[validate(length(min = 1, max = 128))]
     password: String,
 }
 

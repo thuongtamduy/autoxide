@@ -2,7 +2,7 @@
 //! vào, gọi service và trả envelope; mọi logic nằm ở service.
 
 mod account;
-mod api_keys;
+pub(crate) mod api_keys;
 mod email;
 mod mfa;
 mod passkeys;

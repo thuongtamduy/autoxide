@@ -7,7 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
-use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::response::{Created, Data, Problem};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -89,12 +89,10 @@ impl From<Role> for RoleResponse {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct RoleRequest {
     /// Unique. Lowercase letters, digits, `_` and `-`, starting with a letter.
-    #[validate(length(min = 1, max = 64))]
     #[schema(example = "editor")]
     name: String,
     /// What the role is for. Optional.
     #[serde(default)]
-    #[validate(length(max = 500))]
     description: String,
     /// Permissions to grant; each must be listed by `GET /api/v1/auth/permissions`.
     /// Duplicates are ignored.
@@ -195,10 +193,10 @@ async fn create_role(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
     ValidJson(input): ValidJson<RoleRequest>,
-) -> Result<(StatusCode, Data<RoleResponse>), Error> {
+) -> Result<Created<RoleResponse>, Error> {
     principal.require(&ROLES_MANAGE)?;
     let role = state.roles.create(Actor::from(&principal), input.into()).await?;
-    Ok((StatusCode::CREATED, Data { data: role.into() }))
+    Ok(Created::new(format!("/auth/roles/{}", role.id), role.into()))
 }
 
 /// Get a role.

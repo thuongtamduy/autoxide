@@ -9,7 +9,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
-use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::response::{Created, Data, Problem};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -60,11 +60,9 @@ impl From<Note> for NoteResponse {
 #[serde(deny_unknown_fields)]
 pub(crate) struct CreateNoteRequest {
     /// Title, 1 to 200 characters; unique among your notes.
-    #[validate(length(min = 1, max = 200))]
     #[schema(example = "Shopping list")]
     title: String,
     /// Text of the note, up to 10000 characters.
-    #[validate(length(max = 10000))]
     #[serde(default)]
     body: String,
 }
@@ -80,10 +78,8 @@ impl From<CreateNoteRequest> for NewNote {
 #[serde(deny_unknown_fields)]
 pub(crate) struct UpdateNoteRequest {
     /// New title, 1 to 200 characters.
-    #[validate(length(min = 1, max = 200))]
     title: Option<String>,
     /// New text, up to 10000 characters.
-    #[validate(length(max = 10000))]
     body: Option<String>,
 }
 
@@ -134,10 +130,10 @@ async fn create_note(
     State(service): State<Arc<NoteService>>,
     principal: Principal,
     ValidJson(input): ValidJson<CreateNoteRequest>,
-) -> Result<(StatusCode, Data<NoteResponse>), Error> {
+) -> Result<Created<NoteResponse>, Error> {
     principal.require(&NOTES_WRITE)?;
     let note = service.create(Actor::from(&principal), input.into()).await?;
-    Ok((StatusCode::CREATED, Data { data: note.into() }))
+    Ok(Created::new(format!("/notes/{}", note.id), note.into()))
 }
 
 /// Get one of your notes.

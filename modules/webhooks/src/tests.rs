@@ -290,9 +290,18 @@ async fn kiem_dia_chi_va_ten_event() {
         };
         let insecure =
             setup.service.create(Actor::system(), new("http://example.com/h", DEMO_EVENT));
-        assert_eq!(insecure.await.unwrap_err().code(), "webhooks.insecure_url");
+        assert_eq!(insecure.await.unwrap_err().fields()[0].field, "url");
         let unknown = setup.service.create(Actor::system(), new("https://example.com/h", "x.y"));
-        assert_eq!(unknown.await.unwrap_err().code(), "webhooks.unknown_event");
+        assert_eq!(unknown.await.unwrap_err().fields()[0].field, "events[0]");
+        // Mọi lỗi cùng một lần.
+        let all_wrong = NewEndpoint {
+            url: "http://example.com/h".to_owned(),
+            description: "x".repeat(201),
+            events: vec!["x.y".to_owned()],
+        };
+        let error = setup.service.create(Actor::system(), all_wrong).await.unwrap_err();
+        let fields: Vec<&str> = error.fields().iter().map(|field| field.field.as_str()).collect();
+        assert_eq!(fields, ["url", "description", "events[0]"]);
         for bad in ["not a url", "https://user:pass@example.com/h", "ftp://example.com"] {
             assert!(
                 setup.service.create(Actor::system(), new(bad, DEMO_EVENT)).await.is_err(),

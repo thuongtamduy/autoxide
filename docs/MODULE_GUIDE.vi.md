@@ -78,8 +78,11 @@ thay đổi và dòng audit log cùng có, hoặc cùng không.
 Route nằm trong `src/http.rs`, đăng ký bằng `OpenApiRouter::routes(routes!(…))`, và
 được gắn dưới `/api/v1/<tên>`; module chỉ khai phần đuôi (`/`, `/{id}`).
 
-- Đọc thân JSON bằng `ValidJson<T>` (`T: Deserialize + Validate + ToSchema`).
-- Trả `Data<T>`, `Page<T>` (danh sách, qua `fetch_page` với `limit`/`cursor`/`order`)
+- Đọc thân JSON bằng `ValidJson<T>` (`T: Deserialize + Validate + ToSchema`). Trường
+  nào service kiểm thì chỉ kiểm ở service (không gắn `#[validate]`), và service gom mọi
+  lỗi của đầu vào vào một `Error::validation(…)`: người gọi thấy hết lỗi trong một lần.
+- Trả `Data<T>`, `Created::new("/<tên>/<id>", …)` (201 kèm header `Location`) cho bản ghi
+  mới, `Page<T>` (danh sách, qua `fetch_page` với `limit`/`cursor`/`order`)
   hoặc một `Error` (gửi đi dạng RFC 9457 Problem Details).
 - Handler cần người gọi đã đăng nhập nhận `principal: Principal` và gọi
   `principal.require(&PERMISSION)?`.

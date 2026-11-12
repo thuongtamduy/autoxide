@@ -29,10 +29,8 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct ChangeEmailRequest {
     /// The new address. Case and surrounding spaces do not matter.
-    #[validate(length(min = 1, max = 254))]
     #[schema(example = "ada@example.org")]
     new_email: String,
-    #[validate(length(min = 1, max = 1024))]
     current_password: String,
 }
 

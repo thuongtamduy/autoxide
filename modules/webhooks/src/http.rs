@@ -8,7 +8,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
-use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::response::{Created, Data, Problem};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -94,11 +94,9 @@ pub(crate) struct SecretResponse {
 #[serde(deny_unknown_fields)]
 pub(crate) struct CreateEndpointRequest {
     /// Where to send events: an `https://` address, up to 2048 characters.
-    #[validate(length(min = 1, max = 2048))]
     #[schema(example = "https://example.com/hooks/autoxide")]
     url: String,
     /// What the endpoint is for, up to 200 characters.
-    #[validate(length(max = 200))]
     #[serde(default)]
     description: String,
     /// Event names to receive (see `GET /api/v1/webhooks/events`), or `["*"]` for every
@@ -111,9 +109,7 @@ pub(crate) struct CreateEndpointRequest {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct UpdateEndpointRequest {
-    #[validate(length(min = 1, max = 2048))]
     url: Option<String>,
-    #[validate(length(max = 200))]
     description: Option<String>,
     events: Option<Vec<String>>,
     /// `true` stops sending to it (pending retries are dropped); `false` starts again.
@@ -231,24 +227,24 @@ async fn list_endpoints(
     request_body = CreateEndpointRequest,
     responses(
         (status = 201, description = "Created; store `secret` now.", body = Data<CreatedEndpointResponse>),
-        (status = 400, description = "The address is not `https://` (code `webhooks.insecure_url`) or an event name is unknown (code `webhooks.unknown_event`).", body = Problem),
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `webhooks.manage`; code `permission_denied`.", body = Problem),
-        (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
+        (status = 422, description = "A value is invalid — e.g. the address is not `https://` or an event name is unknown; `errors` lists every problem.", body = Problem),
     )
 )]
 async fn create_endpoint(
     State(service): State<Arc<WebhookService>>,
     principal: Principal,
     ValidJson(input): ValidJson<CreateEndpointRequest>,
-) -> Result<(StatusCode, Data<CreatedEndpointResponse>), Error> {
+) -> Result<Created<CreatedEndpointResponse>, Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
     let input =
         NewEndpoint { url: input.url, description: input.description, events: input.events };
     let created = service.create(Actor::from(&principal), input).await?;
+    let path = format!("/webhooks/{}", created.endpoint.id);
     let data =
         CreatedEndpointResponse { secret: created.secret, endpoint: created.endpoint.into() };
-    Ok((StatusCode::CREATED, Data { data }))
+    Ok(Created::new(path, data))
 }
 
 /// Get a webhook endpoint.
@@ -288,11 +284,10 @@ async fn get_endpoint(
     request_body = UpdateEndpointRequest,
     responses(
         (status = 200, description = "The changed endpoint.", body = Data<EndpointResponse>),
-        (status = 400, description = "The address is not `https://` (code `webhooks.insecure_url`) or an event name is unknown (code `webhooks.unknown_event`).", body = Problem),
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `webhooks.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No endpoint has this id; code `webhooks.endpoint_not_found`.", body = Problem),
-        (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
+        (status = 422, description = "A value is invalid — e.g. the address is not `https://` or an event name is unknown; `errors` lists every problem.", body = Problem),
     )
 )]
 async fn update_endpoint(

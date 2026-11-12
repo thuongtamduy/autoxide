@@ -20,12 +20,21 @@ endpoints are marked deprecated with a sunset date first.
   `autoxide_kernel::privacy` (`PersonalData`, the `auth.user_deleted` event).
 - User search: `GET /api/v1/auth/users?search=…` (and `search` in the `list_users` MCP
   tool) finds users by email or name, in any case.
+- MCP tools for roles, API keys, the audit log and files (content as base64, up to 1 MiB).
 - Webhooks (`/api/v1/webhooks`, permission `webhooks.manage`): events are sent to your
   `https://` endpoints, signed following Standard Webhooks, retried for about two hours,
   with a delivery log. New settings `AUTOXIDE_WEBHOOKS_ALLOW_HTTP` and
   `AUTOXIDE_WEBHOOKS_TIMEOUT_SECONDS`.
 
 ### Changed
+
+- Validation reports every problem of a request at once (for example a bad email and an
+  empty name together). Webhook endpoints report a non-`https` address or an unknown event
+  as field errors (`url`, `events[i]`) like roles and API keys do.
+- Creating a record answers `201` with a `Location` header. The OpenAPI document declares
+  `Accept-Language` and `Idempotency-Key` on each endpoint and has a `servers` entry.
+- MCP tool results have the same shape as REST: lists are `{"data": […], "pagination": …}`
+  instead of being wrapped in a second `data`.
 
 - Creating an API key (`POST /api/v1/auth/api-keys`) and starting a passkey registration
   (`POST /api/v1/auth/me/passkeys/registration`) now need `current_password` in the body.

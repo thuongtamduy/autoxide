@@ -153,11 +153,11 @@ Tích hợp:
 Sau lượt kiểm hợp đồng API của chủ dự án. Đã sửa ngay (D-082): `docs/openapi.json` không
 hợp lệ (`$ref` tới `Order` không tồn tại), mô tả tool MCP lọt tiếng Việt; gate kiểm cả hai.
 
-- [ ] Kết quả tool MCP dạng danh sách không lồng `data` hai lần — cùng hình dạng với REST
-- [ ] Tool MCP cho phần còn thiếu: file, audit log, role, API key (cùng service, cùng permission với REST)
-- [ ] Khai header `Idempotency-Key` và `Accept-Language` trên từng endpoint trong OpenAPI, để SDK sinh tự động có sẵn tham số
-- [ ] Kiểm dữ liệu báo mọi lỗi trong một lần (email sai và tên rỗng cùng báo), đúng như tài liệu hứa
-- [ ] Tạo mới (201) trả header `Location`; OpenAPI có mục `servers`
+- [x] Kết quả tool MCP dạng danh sách không lồng `data` hai lần — cùng hình dạng với REST (D-083)
+- [x] Tool MCP cho phần còn thiếu: file, audit log, role, API key (cùng service, cùng permission với REST) (D-083)
+- [x] Khai header `Idempotency-Key` và `Accept-Language` trên từng endpoint trong OpenAPI, để SDK sinh tự động có sẵn tham số (D-083)
+- [x] Kiểm dữ liệu báo mọi lỗi trong một lần (email sai và tên rỗng cùng báo), đúng như tài liệu hứa (D-083)
+- [x] Tạo mới (201) trả header `Location`; OpenAPI có mục `servers` (D-083)
 - [ ] Chống ghi đè khi hai người cùng sửa: `ETag` / `If-Match` cho các endpoint sửa
 
 ## Sau core (chưa mở)
