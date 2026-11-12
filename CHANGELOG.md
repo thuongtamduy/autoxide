@@ -13,6 +13,9 @@ endpoints are marked deprecated with a sunset date first.
 
 - `autoxide user reset-mfa --email …`: the server operator turns off two-step sign-in of an
   account, for an only administrator who lost their device.
+- Files: a daily job removes stored content that no file record points to any more (older than
+  a day), such as an upload cut off between storing the content and saving its record (new
+  migration).
 
 ## [0.6.0] - 2026-11-12
 

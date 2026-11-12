@@ -65,6 +65,14 @@ impl FileService {
         &self.limits
     }
 
+    pub(crate) fn storage(&self) -> &Arc<dyn Storage> {
+        &self.storage
+    }
+
+    pub(crate) fn database(&self) -> &Database {
+        &self.database
+    }
+
     /// Tải lên `content` với tên `name` và loại `content_type`; người tải là chủ file.
     /// Tên và loại được kiểm TRƯỚC khi đọc nội dung.
     pub(crate) async fn upload(

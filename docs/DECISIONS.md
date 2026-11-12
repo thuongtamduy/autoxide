@@ -3844,3 +3844,15 @@ hành máy chủ (ai chạy được lệnh trên máy đã đọc được data
 `MfaService::reset` với `Actor::system()`; event `auth.mfa_disabled` ghi `by_administrator`. Tài
 khoản không có thì `auth.account_not_found`. Không đổi mật khẩu, không đăng xuất phiên: người dùng
 đăng nhập bằng mật khẩu rồi bật lại.
+
+## D-160 · `files`: job dọn nội dung mồ côi hằng ngày — 2026-11-12 — agent quyết
+
+Đóng một việc để lại của D-158. Nội dung dưới `files/` có thể không còn dòng nào trỏ tới:
+request bị huỷ giữa lúc ghi nội dung và lúc lưu dòng, xoá nội dung hỏng sau khi dòng đã xoá
+(event xoá tài khoản giao lại không làm lại được), upload xong sau khi tài khoản đã bị xoá.
+
+Quyết định: như `media` (`media.clean_orphans`): job `files.clean_orphans` chạy mỗi ngày (bảng
+`files_jobs`, m0004), liệt kê khoá dưới `files/`, bỏ qua khoá mới hơn 24 giờ (tuổi đọc từ UUIDv7
+— ID của file cũng là tên nội dung), kiểm theo lô 200 ID trên kết nối ghi, xoá khoá không có
+dòng. Khoá dưới `files/` không phải UUID thì để nguyên, ghi cảnh báo. DEPLOY khuyên đặt
+lifecycle rule của S3 cho multipart upload dở (lớp thứ hai cho D-158).

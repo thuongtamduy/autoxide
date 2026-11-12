@@ -8,6 +8,7 @@
 //! tin file nằm trong bảng `files_file`, có giới hạn kích thước và loại.
 
 pub mod api;
+mod cleanup;
 mod config;
 mod entity;
 mod events;
@@ -25,6 +26,7 @@ use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{EventInfo, Subscription};
 use autoxide_kernel::http::BodyLimit;
+use autoxide_kernel::job::{JobRegistration, Schedule};
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
 use autoxide_kernel::storage::Storage;
@@ -115,6 +117,20 @@ impl Module for FilesModule {
 
     fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {
         self.service.as_ref().map_or_else(Vec::new, tools::all)
+    }
+
+    fn jobs(&self) -> Vec<JobRegistration> {
+        self.service.clone().map_or_else(Vec::new, |service| {
+            vec![JobRegistration::new(
+                cleanup::CLEAN_ORPHANS,
+                Arc::new(cleanup::CleanOrphans(service)),
+            )]
+        })
+    }
+
+    fn schedules(&self) -> Vec<Schedule> {
+        let day = std::time::Duration::from_secs(24 * 3600);
+        vec![Schedule::new(cleanup::CLEAN_ORPHANS, cleanup::CLEAN_ORPHANS, day)]
     }
 }
 

@@ -321,7 +321,7 @@ Giao diện quản trị ở repo riêng (D-096, D-097); bước này chỉ làm
 ## 26. Đóng các việc để lại của bước 25 (agent quyết, theo D-156…D-158)
 
 - [x] Lệnh CLI gỡ xác thực hai bước của một tài khoản (admin duy nhất mất thiết bị)
-- [ ] `files`: job dọn nội dung mồ côi trong nơi lưu (như `media`)
+- [x] `files`: job dọn nội dung mồ côi trong nơi lưu (như `media`)
 - [ ] `autoxide jobs retry` một job `webhooks.send` đã hỏng thì gửi lại thật
 - [ ] Đặt lại mật khẩu: trả lời trong cùng khoảng thời gian dù email có hay không (việc chạy trong job)
 - [ ] Đo tải (`scripts/loadtest.sh`) rồi tối ưu xác thực mỗi request nếu đo được lợi
