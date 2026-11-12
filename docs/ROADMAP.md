@@ -3,8 +3,8 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–12, 14–16 xong**; bước 13 còn CI trên GitHub và phát hành; đang làm
-bước 17 (`content`) — D-096, D-098, D-101, D-102.
+Trạng thái: **bước 0–12, 14–17 xong**; bước 13 còn phát hành (làm tay, D-107). CI trên GitHub
+đã tắt (D-107): `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
 
@@ -129,7 +129,7 @@ Cho AI agent gọi chức năng của hệ thống như công cụ (Model Contex
 
 Kiểm lại phần đã có:
 
-- [ ] CI chạy xanh trên GitHub
+- [x] ~~CI chạy xanh trên GitHub~~ — chủ dự án tắt CI trên GitHub; `./gate.sh` cục bộ là gate duy nhất (D-107)
 - [x] Rà soát bảo mật toàn repo bằng một lượt đọc độc lập; sửa mọi lỗi tìm thấy (D-079)
 - [x] Thử tải dài hạn: không rò bộ nhớ, không rò kết nối database (docs/BENCHMARKS.md)
 
@@ -141,9 +141,9 @@ Hệ thống tài khoản:
 
 Phát hành và nâng cấp:
 
-- [ ] Số phiên bản, `CHANGELOG`, bản phát hành trên GitHub
-- [ ] CI build và đăng image Docker lên GitHub Container Registry
-- [x] Dependabot đề xuất nâng cấp; kiểm lỗ hổng thư viện hằng ngày
+- [ ] Số phiên bản, `CHANGELOG`, bản phát hành trên GitHub (làm tay theo `docs/RELEASING.md`, D-107)
+- [x] ~~CI build và đăng image Docker lên GitHub Container Registry~~ — thay bằng build image cục bộ khi phát hành (D-107)
+- [x] Dependabot đề xuất nâng cấp; kiểm lỗ hổng thư viện bằng `cargo deny check` trong gate (lịch hằng ngày trên GitHub đã tắt, D-107)
 
 Tích hợp:
 

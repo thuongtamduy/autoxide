@@ -56,7 +56,7 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
 9. MCP endpoint để AI agent gọi hệ thống như công cụ
 10. Một module mẫu và hướng dẫn viết module
 11. Công cụ và deploy: chép dữ liệu giữa SQLite và PostgreSQL, đo hiệu năng, Docker,
-    backup và restore, CI
+    backup và restore, một lệnh kiểm tra (`./gate.sh`)
 12. Passkey; 13–14. quản lý tài khoản, webhook, hợp đồng API chặt hơn
 15. Thư viện media: ảnh, video, âm thanh, tài liệu trong thư mục lồng nhau, phục vụ
     công khai hay riêng tư ([`docs/MEDIA.vi.md`](docs/MEDIA.vi.md))

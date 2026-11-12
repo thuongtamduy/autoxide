@@ -1,11 +1,14 @@
+# TẮT tự chạy (D-107): tài khoản GitHub không dùng runner có tính phí; gate cục bộ
+# (`./gate.sh`) là gate duy nhất. Muốn bật lại: trả các trigger cũ (xem git log) và ghi
+# quyết định mới.
 # Phát hành khi đẩy tag `vX.Y.Z` (D-078): kiểm tag khớp phiên bản trong Cargo.toml, chạy
 # lại gate, build và đăng image Docker lên GitHub Container Registry, tạo bản phát hành
 # GitHub với ghi chú lấy từ CHANGELOG.md. Quy trình: docs/RELEASING.md.
 name: Release
 
 on:
-  push:
-    tags: ["v*.*.*"]
+  # Chỉ chạy khi bấm tay trên một tag `vX.Y.Z` (Actions → Run workflow → chọn tag).
+  workflow_dispatch:
 
 permissions:
   contents: read

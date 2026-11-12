@@ -117,7 +117,7 @@ ghi quyết định vào `docs/DECISIONS.md` nếu đổi.
   replica.
 - Có lệnh CLI chép toàn bộ dữ liệu giữa hai database, để bắt đầu bằng SQLite
   không thành ngõ cụt.
-- CI chạy test trên **cả hai** database, gồm test ghi đồng thời.
+- Gate (`./gate.sh`) chạy test trên **cả hai** database, gồm test ghi đồng thời.
 
 ## Quy ước dữ liệu
 
@@ -138,7 +138,7 @@ Bố cục thư mục và crate: [`CLAUDE.md`](CLAUDE.md), mục "Bố cục wor
 2. Module gọi nhau qua trait do module kia công bố.
 3. Việc phụ (audit, thông báo) đi qua event, không gọi thẳng.
 4. Không foreign key xuyên module — chỉ giữ ID.
-5. Phụ thuộc một chiều; `cargo xtask check` (chạy trong gate và CI) kiểm chiều phụ
+5. Phụ thuộc một chiều; `cargo xtask check` (chạy trong gate) kiểm chiều phụ
    thuộc và việc import vào phần bên trong của module khác.
 
 Logic nằm ở service layer. Handler REST chỉ là wrapper mỏng — nhờ vậy thêm GraphQL
@@ -169,7 +169,7 @@ repo này; giao diện là dự án riêng dùng API.
 | Test                | `cargo test` trên SQLite và Postgres                            |
 | Database cho test   | `autoxide-testkit` — mỗi test một database trống (D-033)        |
 | Kiểm ranh giới      | `cargo xtask check` — bố cục, license, lint, chiều phụ thuộc, bề mặt module (D-031) |
-| Kiểm phụ thuộc      | `cargo-deny` (license, lỗ hổng đã công bố, nguồn) — cấu hình `deny.toml`, chạy trong gate và CI |
+| Kiểm phụ thuộc      | `cargo-deny` (license, lỗ hổng đã công bố, nguồn) — cấu hình `deny.toml`, chạy trong gate |
 | Postgres cho test   | Docker — `gate.sh` tự dựng một container dùng xong bỏ           |
 | Gate                | `./gate.sh` — chạy tất cả các mục trên theo thứ tự              |
 
@@ -177,5 +177,5 @@ repo này; giao diện là dự án riêng dùng API.
 
 Docker trên VPS: image multi-stage (stage build có toolchain, stage chạy chỉ có một
 file binary), `compose.yml` gồm ứng dụng và Postgres, kèm backup và restore.
-So với Deno: chạy đơn giản hơn (không cần runtime, image nhỏ), build lâu hơn (CI
-cần cache).
+So với Deno: chạy đơn giản hơn (không cần runtime, image nhỏ), build lâu hơn (cần
+cache).

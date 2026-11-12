@@ -2425,3 +2425,31 @@ luật hai database.
 event một lần, nặng hơn quy ước tag cache; `ETag` từ thời điểm lớn nhất của mọi thứ gộp vào — phải
 thêm cột thời gian cho bảng liên kết và vẫn sót ảnh (thuộc module `media`); khoá danh mục bằng
 bảng riêng — thêm migration chỉ để có một dòng khoá.
+
+## D-107 · Tắt CI trên GitHub; gate cục bộ là gate duy nhất — 2026-11-12 — chủ dự án quyết
+
+Quyết định:
+
+- Ba workflow trong `.github/workflows` (`CI`, `Security audit`, `Release`) **không tự chạy
+  nữa** (không theo push, pull request, lịch hay tag); chỉ còn `workflow_dispatch` (bấm tay). File
+  giữ nguyên để bật lại dễ.
+- `./gate.sh` trên máy là gate duy nhất, như CLAUDE.md đã quy định: fmt, clippy, kiểm ranh giới,
+  `cargo deny` (gồm lỗ hổng thư viện), test trên SQLite và Postgres.
+- Phát hành làm tay theo `docs/RELEASING.md`: tag, bản phát hành GitHub tạo trên trang web,
+  image Docker build trên máy và chỉ đăng khi chủ dự án cấp token.
+- Dependabot vẫn mở PR nâng thư viện Rust và Docker (chạy trên hạ tầng riêng của GitHub, không
+  cần runner trả phí); người duyệt chạy `./gate.sh` trên nhánh PR trước khi merge. Bỏ phần nâng
+  phiên bản GitHub Actions vì workflow không còn tự chạy.
+
+Lý do: chủ dự án không gắn thẻ thanh toán cho tài khoản GitHub; mọi lần chạy CI đều dừng sau vài
+giây mà không khởi động job, chỉ sinh báo đỏ vô nghĩa trên mỗi commit.
+
+Đã cân nhắc: xoá hẳn các workflow — mất công dựng lại khi có runner (ví dụ runner tự host); runner
+tự host — cần một máy chạy liên tục, chủ dự án chưa có.
+
+Hệ quả: mất quét secret bằng gitleaks trong CI (D-074). Thay thế: bật "Secret scanning" và "Push
+protection" của GitHub (miễn phí cho repo công khai, Settings → Code security) — việc của chủ dự
+án; agent vẫn giữ luật "secret không vào git".
+
+Thay: phần "chạy trên GitHub Actions" của D-074 và phần workflow tự động của D-078; mục "CI chạy
+xanh trên GitHub" và "CI build và đăng image" của bước 13.

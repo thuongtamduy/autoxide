@@ -1,10 +1,12 @@
+# TẮT tự chạy (D-107): tài khoản GitHub không dùng runner có tính phí; gate cục bộ
+# (`./gate.sh`) là gate duy nhất. Muốn bật lại: trả các trigger cũ (xem git log) và ghi
+# quyết định mới.
 # Kiểm lỗ hổng thư viện mỗi ngày, kể cả khi không ai commit: lỗ hổng mới được công bố
 # cho thư viện đang dùng thì job đỏ (D-078).
 name: Security audit
 
 on:
-  schedule:
-    - cron: "17 3 * * *"
+  # Chỉ chạy khi bấm tay; kiểm lỗ hổng cục bộ bằng `cargo deny check` (có trong gate).
   workflow_dispatch:
 
 permissions:

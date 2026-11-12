@@ -60,7 +60,7 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
 9. An MCP endpoint so AI agents can call the system as tools
 10. A sample module and a guide for writing modules
 11. Tooling and deployment: data copy between SQLite and PostgreSQL, benchmarks,
-    Docker, backup and restore, CI
+    Docker, backup and restore, a one-command check (`./gate.sh`)
 12. Passkeys; 13–14. account management, webhooks, a hardened API contract
 15. A media library: images, video, audio and documents in nested folders, served
     publicly or privately ([`docs/MEDIA.md`](docs/MEDIA.md))
