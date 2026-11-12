@@ -9,6 +9,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-12
+
 ### Changed
 
 - **Breaking:** `POST /api/v1/auth/me/mfa/totp` (start two-step sign-in) needs
@@ -29,6 +31,8 @@ endpoints are marked deprecated with a sunset date first.
   batch can no longer let a second server deliver the same event.
 - Files: an upload cut off midway (timeout, client gone) aborts the partial S3 multipart upload.
 - Audit: filtering by `module` uses an index (new migration).
+- Content: several entries created at the same moment with the same title (automatic slug) no
+  longer fail with `content.slug_taken` on Postgres.
 
 ### Security
 
@@ -383,7 +387,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/thuongtamduy/autoxide/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/thuongtamduy/autoxide/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/thuongtamduy/autoxide/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/thuongtamduy/autoxide/compare/v0.2.0...v0.3.0

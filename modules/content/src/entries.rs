@@ -26,6 +26,11 @@ use crate::permissions::{self, CONTENT_READ};
 use crate::revisions::{self, Reason};
 use crate::service::{ContentService, check_length, check_url, entry_not_found, invalid, now};
 
+/// Số lần thử tạo mục với slug tự sinh. Mỗi lượt chỉ một trong các request tạo CÙNG slug lúc đó
+/// thắng (Postgres chạy chúng song song; SQLite chỉ một bên ghi nên nối đuôi): đủ cho chừng ấy
+/// request trùng tiêu đề cùng lúc mà không request nào nhận `content.slug_taken` oan.
+const SLUG_ATTEMPTS: usize = 12;
+
 /// Một mục (bản nháp làm việc).
 pub(crate) type Entry = entry::Model;
 
@@ -219,7 +224,7 @@ impl ContentService {
         source: Option<Uuid>,
     ) -> Result<Entry, Error> {
         let base = candidate.slug.clone();
-        for _ in 0..5 {
+        for _ in 0..SLUG_ATTEMPTS {
             let transaction = self.database.begin_write().await?;
             if let Some(parent) = candidate.parent_id {
                 // Khoá cây của ngôn ngữ (cùng khoá với xoá, chuyển, đăng) rồi kiểm lại trang cha
