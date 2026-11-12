@@ -571,7 +571,9 @@ mod clash {
 
         /// First.
         #[utoipa::path(get, path = "/first", operation_id = "first", responses((status = 200, description = "ok", body = Locale)))]
-        pub async fn first() {}
+        pub async fn first() -> axum::Json<[Locale; 2]> {
+            axum::Json([Locale::En, Locale::Vi])
+        }
     }
 
     pub mod second {
