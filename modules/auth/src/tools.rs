@@ -149,7 +149,8 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
                         description: input.description,
                         permissions: input.permissions,
                     };
-                    let role = state.roles.update(Actor::from(&principal), input.id, role).await?;
+                    let role =
+                        state.roles.update(Actor::from(&principal), input.id, role, None).await?;
                     Ok::<_, Error>(RoleResponse::from(role))
                 }
             },
@@ -299,8 +300,10 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
                     // Như REST: không tác động lên người có permission mà mình không có.
                     state.roles.require_covers(&principal, input.id).await?;
                     let changes = UserChanges { name: input.name, disabled: input.disabled };
-                    let user =
-                        state.users.update(Actor::from(&principal), input.id, changes).await?;
+                    let user = state
+                        .users
+                        .update(Actor::from(&principal), input.id, changes, None)
+                        .await?;
                     Ok::<_, Error>(UserResponse::from(user))
                 }
             },

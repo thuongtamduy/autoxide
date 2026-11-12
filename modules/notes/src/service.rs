@@ -91,6 +91,7 @@ impl NoteService {
         actor: Actor,
         id: Uuid,
         changes: NoteChanges,
+        expected: Option<DateTime<Utc>>,
     ) -> Result<Note, Error> {
         let title = check(changes.title.as_deref(), changes.body.as_deref())?;
         let transaction = self.database.begin_write().await?;
@@ -107,10 +108,15 @@ impl NoteService {
             row.body = Set(body);
         }
         row.updated_at = Set(now());
-        let after = row
-            .update(&transaction)
-            .await
-            .map_err(|error| title_conflict(error, title.as_deref().unwrap_or_default()))?;
+        let mut update = Entity::update(row).validate()?;
+        if let Some(expected) = expected {
+            // Kiểm phiên bản ngay trong câu `UPDATE`: người khác vừa sửa thì 0 dòng (D-084).
+            update = update.filter(Column::UpdatedAt.eq(expected));
+        }
+        let after = update.exec(&transaction).await.map_err(|error| match error {
+            sea_orm::DbErr::RecordNotUpdated => autoxide_kernel::version::changed(),
+            error => title_conflict(error, title.as_deref().unwrap_or_default()),
+        })?;
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::NoteUpdated(change);
         self.outbox.record(&transaction, actor, events::note_subject(id), &event).await?;

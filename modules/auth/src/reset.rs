@@ -270,7 +270,7 @@ mod tests {
             // Tài khoản bị khoá: không gửi.
             let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
             let disable = UserChanges { name: None, disabled: Some(true) };
-            services.users.update(Actor::system(), ada.id, disable).await.unwrap();
+            services.users.update(Actor::system(), ada.id, disable, None).await.unwrap();
             time_passes(&services, 2).await;
             services.resets.request("ada@example.com", Language::En).await.unwrap();
             assert_eq!(sent(&services), 2);

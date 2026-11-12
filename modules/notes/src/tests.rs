@@ -269,7 +269,7 @@ async fn tao_trung_ten_dong_thoi_chi_mot_thanh_cong() {
         let second = NewNote { title: "Second".to_owned(), body: String::new() };
         let second = service.create(Actor::user(ADA), second).await.unwrap();
         let rename = NoteChanges { title: Some("Same".to_owned()), body: None };
-        let taken = service.update(Actor::user(ADA), second.id, rename).await.unwrap_err();
+        let taken = service.update(Actor::user(ADA), second.id, rename, None).await.unwrap_err();
         assert_eq!(taken.code(), "notes.title_taken");
     })
     .await
@@ -357,6 +357,44 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
         assert_eq!(exported["notes"], json!([]));
         let exported = app.modules.personal_data().export(BOB).await.unwrap();
         assert_eq!(exported["notes"].as_array().unwrap().len(), 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// Nhiều người cùng sửa một ghi chú với cùng một phiên bản (`If-Match`): đúng một người
+/// thành công, những người khác nhận 412 — trên cả hai database (D-084).
+#[tokio::test]
+async fn sua_dong_thoi_cung_phien_ban_chi_mot_nguoi_thang() {
+    use autoxide_kernel::event::Outbox;
+
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let service = Arc::new(crate::service::NoteService::new(
+            app.database.clone(),
+            Outbox::standalone("notes"),
+        ));
+        let note = NewNote { title: "Shared".to_owned(), body: String::new() };
+        let note = service.create(Actor::user(ADA), note).await.unwrap();
+
+        let attempts: Vec<_> = (0..8)
+            .map(|index| {
+                let service = service.clone();
+                let changes = NoteChanges { title: None, body: Some(format!("edit {index}")) };
+                let version = Some(note.updated_at);
+                tokio::spawn(async move {
+                    service.update(Actor::user(ADA), note.id, changes, version).await
+                })
+            })
+            .collect();
+        let mut won = 0;
+        for attempt in attempts {
+            match attempt.await.unwrap() {
+                Ok(_) => won += 1,
+                Err(error) => assert_eq!(error.code(), "precondition_failed"),
+            }
+        }
+        assert_eq!(won, 1);
     })
     .await
     .unwrap();

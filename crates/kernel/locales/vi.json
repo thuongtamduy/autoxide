@@ -22,6 +22,7 @@
   "not_ready": "Máy chủ chưa xử lý được request: database không trả lời.",
   "payload_too_large": "Thân request lớn hơn mức endpoint này nhận ({limit} byte).",
   "permission_denied": "Việc này cần permission `{permission}`. Hãy nhờ quản trị viên cấp cho bạn một role có permission đó.",
+  "precondition_failed": "Bản ghi đã bị sửa từ lúc bạn đọc nó (`ETag` đã khác). Hãy đọc lại, áp lại thay đổi của bạn, rồi gửi `ETag` mới trong `If-Match`.",
   "rate_limited": "Quá nhiều request từ địa chỉ của bạn. Hãy chờ {seconds} giây rồi thử lại, và gửi chậm hơn để tránh lỗi này.",
   "request_timeout": "Máy chủ không xử lý xong request trong {seconds} giây. Hãy thử lại sau.",
   "too_many_requests": "Quá nhiều request. Hãy chờ rồi thử lại.",

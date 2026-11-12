@@ -85,6 +85,11 @@ and are mounted under `/api/v1/<name>`; a module declares only the tail (`/`, `/
 - Answer with `Data<T>`, `Created::new("/<name>/<id>", …)` (201 with a `Location` header)
   for a new record, `Page<T>` (lists, via `fetch_page` with
   `limit`/`cursor`/`order`) or an `Error` (sent as RFC 9457 Problem Details).
+- A record that can be changed carries `updated_at`. Return it with
+  `Tagged { version: row.updated_at, data }` (adds `ETag`) from its `GET` and its update;
+  the update handler takes `if_match: IfMatch` and passes `if_match.expected()?` to the
+  service, which adds `updated_at = <expected>` to its `UPDATE` and answers
+  `version::changed()` (412) when no row matched (see `autoxide_kernel::version`).
 - A handler that needs a signed-in caller takes `principal: Principal` and calls
   `principal.require(&PERMISSION)?`.
 - Document every handler: a `///` line (the summary), the required permission, and a

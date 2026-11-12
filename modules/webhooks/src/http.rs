@@ -9,6 +9,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -257,7 +258,7 @@ async fn create_endpoint(
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the endpoint.")),
     responses(
-        (status = 200, description = "The endpoint.", body = Data<EndpointResponse>),
+        (status = 200, description = "The endpoint.", body = Data<EndpointResponse>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `webhooks.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No endpoint has this id; code `webhooks.endpoint_not_found`.", body = Problem),
@@ -267,9 +268,10 @@ async fn get_endpoint(
     State(service): State<Arc<WebhookService>>,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<EndpointResponse>, Error> {
+) -> Result<Tagged<EndpointResponse>, Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
-    Ok(Data { data: service.get(id).await?.into() })
+    let endpoint = service.get(id).await?;
+    Ok(Tagged { version: endpoint.updated_at, data: endpoint.into() })
 }
 
 /// Change a webhook endpoint, or turn it off and on.
@@ -280,22 +282,24 @@ async fn get_endpoint(
     path = "/{id}",
     operation_id = "update_webhook_endpoint",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the endpoint.")),
+    params(("id" = Uuid, Path, description = "Id of the endpoint."), ("If-Match" = Option<String>, Header, description = "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.")),
     request_body = UpdateEndpointRequest,
     responses(
-        (status = 200, description = "The changed endpoint.", body = Data<EndpointResponse>),
+        (status = 200, description = "The changed endpoint.", body = Data<EndpointResponse>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
         (status = 401, description = "Not signed in.", body = Problem),
         (status = 403, description = "Missing permission `webhooks.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No endpoint has this id; code `webhooks.endpoint_not_found`.", body = Problem),
         (status = 422, description = "A value is invalid — e.g. the address is not `https://` or an event name is unknown; `errors` lists every problem.", body = Problem),
+        (status = 412, description = "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`.", body = Problem),
     )
 )]
 async fn update_endpoint(
     State(service): State<Arc<WebhookService>>,
     principal: Principal,
     Path(id): Path<Uuid>,
+    if_match: IfMatch,
     ValidJson(input): ValidJson<UpdateEndpointRequest>,
-) -> Result<Data<EndpointResponse>, Error> {
+) -> Result<Tagged<EndpointResponse>, Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
     let changes = EndpointChanges {
         url: input.url,
@@ -303,7 +307,9 @@ async fn update_endpoint(
         events: input.events,
         disabled: input.disabled,
     };
-    Ok(Data { data: service.update(Actor::from(&principal), id, changes).await?.into() })
+    let expected = if_match.expected()?;
+    let endpoint = service.update(Actor::from(&principal), id, changes, expected).await?;
+    Ok(Tagged { version: endpoint.updated_at, data: endpoint.into() })
 }
 
 /// Delete a webhook endpoint and its delivery history.

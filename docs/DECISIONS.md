@@ -1854,3 +1854,25 @@ biết mọi endpoint" cho cả người lẫn agent.
 Đã cân nhắc: để `ValidJson` gom lỗi rồi cho handler chạy tiếp — handler phải xử lý dữ liệu
 chưa hợp lệ, dễ sai; gắn `#[validate(custom)]` gọi lại luật của service — luật cần ngữ cảnh
 (danh mục permission, cấu hình) không chạy được ở đó, vẫn thành hai đợt.
+
+## D-084 · Chống ghi đè: `ETag` từ `updated_at`, `If-Match` kiểm trong câu `UPDATE` — 2026-11-12 — agent quyết
+
+Quyết định:
+
+- Phiên bản của bản ghi là cột `updated_at` sẵn có (cắt tới micro giây, hai database lưu như
+  nhau); `ETag` = `"<số micro giây>"`. Không thêm cột `version`, không migration.
+- `GET` một bản ghi sửa được và lệnh sửa của nó trả `ETag` (`version::Tagged`). Lệnh sửa nhận
+  `If-Match` (`version::IfMatch`): service thêm `updated_at = <phiên bản>` vào chính câu
+  `UPDATE`, không dòng nào khớp thì 412 `precondition_failed` (`ErrorKind::PreconditionFailed`).
+  Trên Postgres, câu `UPDATE` chờ khoá dòng rồi kiểm lại điều kiện, nên hai người cùng sửa thì
+  chỉ một người thắng — có test đồng thời trên cả hai database.
+- Không gửi `If-Match` thì sửa như cũ (client đã có không hỏng). `*` coi như không kiểm; `ETag`
+  yếu (`W/…`), sai dạng hay nhiều giá trị thì không bao giờ khớp.
+- Áp cho người dùng (`PATCH /auth/users/{id}`), role (`PUT /auth/roles/{id}`), ghi chú và
+  endpoint webhook. Tool MCP sửa không kiểm phiên bản (như REST không gửi `If-Match`).
+
+Lý do: mục cuối của bước 14; theo chuẩn HTTP (RFC 9110) thay vì tự chế cơ chế khoá.
+
+Đã cân nhắc: cột `version` số nguyên tăng dần — chắc hơn khi hai lần sửa rơi vào cùng một micro
+giây, nhưng phải thêm migration cho mọi bảng; khả năng đó gần như không xảy ra với một bản ghi.
+Bắt buộc `If-Match` (428) — phá client đang có.

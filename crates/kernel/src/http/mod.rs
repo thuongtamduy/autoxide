@@ -236,6 +236,7 @@ fn cors(origins: &CorsOrigins) -> CorsLayer {
             header::ACCEPT_LANGUAGE,
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
+            header::IF_MATCH,
             idempotency::IDEMPOTENCY_KEY,
             REQUEST_ID_HEADER,
             // Header của giao thức MCP (endpoint `/mcp`).
@@ -243,7 +244,14 @@ fn cors(origins: &CorsOrigins) -> CorsLayer {
             HeaderName::from_static("mcp-session-id"),
             HeaderName::from_static("last-event-id"),
         ])
+        // Header trình duyệt mặc định giấu khỏi JavaScript mà client cần đọc.
         .expose_headers([
+            header::ETAG,
+            header::LOCATION,
+            header::RETRY_AFTER,
+            header::LINK,
+            HeaderName::from_static("deprecation"),
+            HeaderName::from_static("sunset"),
             REQUEST_ID_HEADER,
             idempotency::IDEMPOTENT_REPLAYED,
             HeaderName::from_static("mcp-session-id"),

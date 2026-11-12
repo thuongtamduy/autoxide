@@ -20,6 +20,9 @@ endpoints are marked deprecated with a sunset date first.
   `autoxide_kernel::privacy` (`PersonalData`, the `auth.user_deleted` event).
 - User search: `GET /api/v1/auth/users?search=…` (and `search` in the `list_users` MCP
   tool) finds users by email or name, in any case.
+- Protection against overwriting someone else's change: `GET` of a user, role, note or
+  webhook endpoint returns an `ETag`; send it in `If-Match` with `PATCH`/`PUT` to get `412`
+  (code `precondition_failed`) instead of overwriting a newer version.
 - MCP tools for roles, API keys, the audit log and files (content as base64, up to 1 MiB).
 - Webhooks (`/api/v1/webhooks`, permission `webhooks.manage`): events are sent to your
   `https://` endpoints, signed following Standard Webhooks, retried for about two hours,

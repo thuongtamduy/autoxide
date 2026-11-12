@@ -524,7 +524,7 @@ mod tests {
             assert!(!after_role.allows("auth.users.read"));
 
             let disable = UserChanges { name: None, disabled: Some(true) };
-            services.users.update(Actor::system(), ada.user_id(), disable).await.unwrap();
+            services.users.update(Actor::system(), ada.user_id(), disable, None).await.unwrap();
             let error = services.api_keys.authenticate(&created.secret).await.unwrap_err();
             assert_eq!(error.code(), "auth.user_disabled");
         })

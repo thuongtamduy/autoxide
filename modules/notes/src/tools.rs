@@ -88,7 +88,8 @@ pub(crate) fn all(service: &Arc<NoteService>) -> Vec<Tool> {
                 let service = update.clone();
                 async move {
                     let changes = NoteChanges { title: input.title, body: input.body };
-                    let note = service.update(Actor::from(&principal), input.id, changes).await?;
+                    let note =
+                        service.update(Actor::from(&principal), input.id, changes, None).await?;
                     Ok::<_, Error>(NoteResponse::from(note))
                 }
             },

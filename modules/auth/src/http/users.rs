@@ -10,6 +10,7 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -192,7 +193,7 @@ async fn create_user(
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user.")),
     responses(
-        (status = 200, description = "The account.", body = Data<UserResponse>),
+        (status = 200, description = "The account.", body = Data<UserResponse>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.users.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
@@ -202,10 +203,10 @@ async fn get_user(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<UserResponse>, Error> {
+) -> Result<Tagged<UserResponse>, Error> {
     principal.require(&USERS_READ)?;
     let user = state.users.get(id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
-    Ok(Data { data: user.into() })
+    Ok(Tagged { version: user.updated_at, data: user.into() })
 }
 
 /// Rename, disable or enable a user account.
@@ -218,27 +219,31 @@ async fn get_user(
     path = "/users/{id}",
     operation_id = "update_user",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the user.")),
+    params(("id" = Uuid, Path, description = "Id of the user."), ("If-Match" = Option<String>, Header, description = "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.")),
     request_body = UpdateUserRequest,
     responses(
-        (status = 200, description = "The account after the change.", body = Data<UserResponse>),
+        (status = 200, description = "The account after the change.", body = Data<UserResponse>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
         (status = 409, description = "No active user would keep the `admin` role; code `auth.last_admin`.", body = Problem),
         (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
+        (status = 412, description = "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`.", body = Problem),
     )
 )]
 async fn update_user(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
     Path(id): Path<Uuid>,
+    if_match: IfMatch,
     ValidJson(input): ValidJson<UpdateUserRequest>,
-) -> Result<Data<UserResponse>, Error> {
+) -> Result<Tagged<UserResponse>, Error> {
     principal.require(&USERS_MANAGE)?;
     state.roles.require_covers(&principal, id).await?;
     let changes = UserChanges { name: input.name, disabled: input.disabled };
-    Ok(Data { data: state.users.update(Actor::from(&principal), id, changes).await?.into() })
+    let user = state.users.update(Actor::from(&principal), id, changes, if_match.expected()?);
+    let user = user.await?;
+    Ok(Tagged { version: user.updated_at, data: user.into() })
 }
 
 /// Delete a user account and everything it owns.
@@ -350,6 +355,61 @@ mod tests {
 
     use crate::api::{Accounts, NewAccount};
     use crate::http::test_support::{PASSWORD, app, app_with, bearer, call};
+
+    /// Đọc thì có `ETag`; sửa kèm `If-Match` cũ thì 412, không ghi đè thay đổi của người
+    /// khác; không gửi `If-Match` thì sửa như thường (D-084).
+    #[tokio::test]
+    async fn etag_va_if_match_chong_ghi_de() {
+        use crate::http::test_support::call_with;
+
+        TestDatabase::run(async |test| {
+            let (app, services) = app(test).await;
+            let root = NewAccount {
+                email: "root@example.com".to_owned(),
+                name: "Root".to_owned(),
+                password: Some(PASSWORD.to_owned()),
+                admin: true,
+            };
+            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            let admin = bearer(&app, "root@example.com", PASSWORD).await;
+            let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
+            let path = format!("/users/{}", ada.id);
+
+            let (status, headers, _) = call(&app, "GET", &path, Some(&admin), None).await;
+            assert_eq!(status, StatusCode::OK);
+            let etag = headers[axum::http::header::ETAG].to_str().unwrap().to_owned();
+
+            let patch = |if_match: String, name: &str| {
+                let (admin, path, name) = (admin.clone(), path.clone(), name.to_owned());
+                let app = app.clone();
+                async move {
+                    let headers =
+                        [("authorization", admin.as_str()), ("if-match", if_match.as_str())];
+                    call_with(&app, "PATCH", &path, &headers, Some(json!({"name": name}))).await
+                }
+            };
+            let (status, headers, body) = patch(etag.clone(), "Ada L").await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            let newer = headers[axum::http::header::ETAG].to_str().unwrap().to_owned();
+            assert_ne!(newer, etag);
+
+            // Người thứ hai còn giữ ETag cũ: bị từ chối, tên không bị đè.
+            let (status, _, problem) = patch(etag, "Stale").await;
+            assert_eq!(status, StatusCode::PRECONDITION_FAILED, "{problem}");
+            assert_eq!(problem["code"], "precondition_failed");
+            let (status, _, _) = patch("W/\"garbage\"".to_owned(), "Stale").await;
+            assert_eq!(status, StatusCode::PRECONDITION_FAILED);
+            let (_, _, current) = call(&app, "GET", &path, Some(&admin), None).await;
+            assert_eq!(current["data"]["name"], "Ada L");
+
+            // Không `If-Match`: sửa như cũ.
+            let body = json!({"name": "Ada"});
+            let (status, _, _) = call(&app, "PATCH", &path, Some(&admin), Some(body)).await;
+            assert_eq!(status, StatusCode::OK);
+        })
+        .await
+        .unwrap();
+    }
 
     /// Mọi lỗi của đầu vào báo trong MỘT lần (tài liệu API hứa vậy): email sai và tên
     /// rỗng cùng có trong `errors`, không phải sửa một lỗi mới thấy lỗi kia.

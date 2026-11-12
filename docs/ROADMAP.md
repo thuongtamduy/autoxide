@@ -158,7 +158,7 @@ hợp lệ (`$ref` tới `Order` không tồn tại), mô tả tool MCP lọt ti
 - [x] Khai header `Idempotency-Key` và `Accept-Language` trên từng endpoint trong OpenAPI, để SDK sinh tự động có sẵn tham số (D-083)
 - [x] Kiểm dữ liệu báo mọi lỗi trong một lần (email sai và tên rỗng cùng báo), đúng như tài liệu hứa (D-083)
 - [x] Tạo mới (201) trả header `Location`; OpenAPI có mục `servers` (D-083)
-- [ ] Chống ghi đè khi hai người cùng sửa: `ETag` / `If-Match` cho các endpoint sửa
+- [x] Chống ghi đè khi hai người cùng sửa: `ETag` / `If-Match` cho các endpoint sửa (D-084)
 
 ## Sau core (chưa mở)
 

@@ -381,6 +381,20 @@ async fn cors_chi_cho_origin_da_cau_hinh() {
     config.cors_origins = CorsOrigins::Any;
     let response = send(api_with(&config).router, preflight("https://anything.example.com")).await;
     assert_eq!(allow_origin(&response).as_deref(), Some("*"));
+
+    // Trình duyệt gửi được `If-Match` và đọc được `ETag`, `Location`.
+    let allowed = response.headers()[header::ACCESS_CONTROL_ALLOW_HEADERS].to_str().unwrap();
+    assert!(allowed.contains("if-match"), "{allowed}");
+    let request = Request::builder()
+        .uri("/api/v1/notes")
+        .header(header::ORIGIN, "https://anything.example.com")
+        .body(Body::empty())
+        .unwrap();
+    let response = send(api_with(&config).router, request).await;
+    let exposed = response.headers()[header::ACCESS_CONTROL_EXPOSE_HEADERS].to_str().unwrap();
+    for name in ["etag", "location", "retry-after", "x-request-id"] {
+        assert!(exposed.contains(name), "{name} not in {exposed}");
+    }
 }
 
 /// Gửi một request GET qua kết nối TCP thật; trả về toàn bộ response dạng chữ.

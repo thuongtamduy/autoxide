@@ -43,6 +43,8 @@ pub enum ErrorKind {
     NotFound,
     /// Trái với trạng thái hiện tại (trùng giá trị unique, sửa bản đã cũ). HTTP 409.
     Conflict,
+    /// Điều kiện của request không còn đúng (`If-Match` cũ: bản ghi đã bị sửa). HTTP 412.
+    PreconditionFailed,
     /// Thân request lớn hơn giới hạn. HTTP 413.
     PayloadTooLarge,
     /// Kiểu nội dung của request không được hỗ trợ. HTTP 415.
@@ -66,6 +68,7 @@ impl ErrorKind {
             ErrorKind::Forbidden => 403,
             ErrorKind::NotFound => 404,
             ErrorKind::Conflict => 409,
+            ErrorKind::PreconditionFailed => 412,
             ErrorKind::PayloadTooLarge => 413,
             ErrorKind::UnsupportedMediaType => 415,
             ErrorKind::Validation => 422,

@@ -84,6 +84,11 @@ Route nằm trong `src/http.rs`, đăng ký bằng `OpenApiRouter::routes(routes
 - Trả `Data<T>`, `Created::new("/<tên>/<id>", …)` (201 kèm header `Location`) cho bản ghi
   mới, `Page<T>` (danh sách, qua `fetch_page` với `limit`/`cursor`/`order`)
   hoặc một `Error` (gửi đi dạng RFC 9457 Problem Details).
+- Bản ghi sửa được thì có `updated_at`. `GET` và lệnh sửa của nó trả
+  `Tagged { version: row.updated_at, data }` (thêm `ETag`); handler sửa nhận
+  `if_match: IfMatch` và đưa `if_match.expected()?` cho service, service thêm
+  `updated_at = <phiên bản mong đợi>` vào câu `UPDATE` và trả `version::changed()` (412)
+  khi không dòng nào khớp (xem `autoxide_kernel::version`).
 - Handler cần người gọi đã đăng nhập nhận `principal: Principal` và gọi
   `principal.require(&PERMISSION)?`.
 - Viết tài liệu cho mọi handler: một dòng `///` (thành summary), permission cần có, và

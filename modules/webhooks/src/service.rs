@@ -176,6 +176,7 @@ impl WebhookService {
         actor: Actor,
         id: Uuid,
         changes: EndpointChanges,
+        expected: Option<DateTime<Utc>>,
     ) -> Result<Endpoint, Error> {
         let (url, events) =
             self.check(changes.url.as_deref(), changes.description.as_deref(), changes.events)?;
@@ -202,7 +203,16 @@ impl WebhookService {
             _ => {}
         }
         active.updated_at = Set(now);
-        let after = Endpoint::from_row(active.update(&transaction).await?)?;
+        let mut update = endpoint::Entity::update(active).validate()?;
+        if let Some(expected) = expected {
+            // Kiểm phiên bản ngay trong câu `UPDATE` (D-084).
+            update = update.filter(endpoint::Column::UpdatedAt.eq(expected));
+        }
+        let updated = update.exec(&transaction).await.map_err(|error| match error {
+            sea_orm::DbErr::RecordNotUpdated => autoxide_kernel::version::changed(),
+            error => Error::from(error),
+        })?;
+        let after = Endpoint::from_row(updated)?;
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::EndpointUpdated(change);
         self.outbox.record(&transaction, actor, events::endpoint_subject(id), &event).await?;

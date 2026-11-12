@@ -176,11 +176,13 @@ impl UserService {
 
     /// Đổi tên và/hoặc khoá, mở khoá người dùng `id`. Khoá thì đăng xuất người đó ở
     /// mọi nơi; không khoá được admin cuối cùng còn hoạt động.
+    /// `expected`: phiên bản (`updated_at`) người gọi đã đọc; khác thì lỗi 412 (D-084).
     pub(crate) async fn update(
         &self,
         actor: Actor,
         id: Uuid,
         changes: UserChanges,
+        expected: Option<DateTime<Utc>>,
     ) -> Result<User, Error> {
         let name = changes.name.map(|name| name.trim().to_owned());
         if let Some(problem) = name.as_deref().and_then(check_name) {
@@ -189,6 +191,10 @@ impl UserService {
         let transaction = self.database.begin_write().await?;
         let before =
             Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| user_not_found(id))?;
+        if expected.is_some_and(|expected| expected != before.updated_at) {
+            transaction.rollback().await?;
+            return Err(autoxide_kernel::version::changed());
+        }
         let admins_before = crate::role::count_active_admins(&transaction).await?;
         let now = now();
         let mut update = Entity::update_many().col_expr(Column::UpdatedAt, Expr::value(now));
@@ -210,11 +216,18 @@ impl UserService {
             }
             None => {}
         }
+        if let Some(expected) = expected {
+            // Kiểm phiên bản ngay trong câu `UPDATE`: người khác vừa sửa thì 0 dòng.
+            update = update.filter(Column::UpdatedAt.eq(expected));
+        }
         // Câu `UPDATE` này cũng khoá dòng người dùng tới hết transaction.
         let updated = update.filter(Column::Id.eq(id)).exec(&transaction).await?;
         if updated.rows_affected == 0 {
             transaction.rollback().await?;
-            return Err(user_not_found(id));
+            return Err(match expected {
+                Some(_) => autoxide_kernel::version::changed(),
+                None => user_not_found(id),
+            });
         }
         if changes.disabled == Some(true) {
             SessionService::revoke_user(&transaction, id).await?;
@@ -925,16 +938,18 @@ mod update_tests {
                     Actor::system(),
                     ada.id,
                     UserChanges { name: Some("  Ada L. ".to_owned()), disabled: None },
+                    None,
                 )
                 .await
                 .unwrap();
             assert_eq!(renamed.name, "Ada L.");
             assert!(renamed.is_active());
 
-            let disabled = users.update(Actor::system(), ada.id, disable(true)).await.unwrap();
+            let disabled =
+                users.update(Actor::system(), ada.id, disable(true), None).await.unwrap();
             assert!(!disabled.is_active());
             // Khoá lần nữa giữ thời điểm khoá cũ.
-            let again = users.update(Actor::system(), ada.id, disable(true)).await.unwrap();
+            let again = users.update(Actor::system(), ada.id, disable(true), None).await.unwrap();
             assert_eq!(again.disabled_at, disabled.disabled_at);
             // Đăng xuất ở mọi nơi: refresh token cũ hết dùng được.
             let refresh = services.sessions.refresh(&tokens.refresh_token).await.unwrap_err();
@@ -943,16 +958,19 @@ mod update_tests {
                 services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap_err();
             assert_eq!(login.code(), "auth.user_disabled");
 
-            let enabled = users.update(Actor::system(), ada.id, disable(false)).await.unwrap();
+            let enabled =
+                users.update(Actor::system(), ada.id, disable(false), None).await.unwrap();
             assert!(enabled.is_active());
             services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
-            let missing =
-                users.update(Actor::system(), Uuid::now_v7(), disable(true)).await.unwrap_err();
+            let missing = users
+                .update(Actor::system(), Uuid::now_v7(), disable(true), None)
+                .await
+                .unwrap_err();
             assert_eq!(missing.code(), "auth.user_not_found");
             let empty = UserChanges { name: Some(" ".to_owned()), disabled: None };
             assert_eq!(
-                users.update(Actor::system(), ada.id, empty).await.unwrap_err().code(),
+                users.update(Actor::system(), ada.id, empty, None).await.unwrap_err().code(),
                 "validation_failed"
             );
         })
@@ -968,14 +986,15 @@ mod update_tests {
             let root =
                 Accounts::create(users.as_ref(), account("root@example.com", true)).await.unwrap();
 
-            let error = users.update(Actor::system(), root.id, disable(true)).await.unwrap_err();
+            let error =
+                users.update(Actor::system(), root.id, disable(true), None).await.unwrap_err();
 
             assert_eq!(error.kind(), ErrorKind::Conflict);
             assert_eq!(error.code(), "auth.last_admin");
             assert!(users.get(root.id).await.unwrap().unwrap().is_active());
             // Có admin khác còn hoạt động thì khoá được.
             Accounts::create(users.as_ref(), account("second@example.com", true)).await.unwrap();
-            users.update(Actor::system(), root.id, disable(true)).await.unwrap();
+            users.update(Actor::system(), root.id, disable(true), None).await.unwrap();
         })
         .await
         .unwrap();

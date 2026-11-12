@@ -266,7 +266,7 @@ async fn het_lan_thu_hoac_endpoint_tat_thi_that_bai() {
 
         // Endpoint bị tắt: lần gửi còn chờ thất bại, không gửi đi.
         let off = EndpointChanges { disabled: Some(true), ..Default::default() };
-        setup.service.update(Actor::system(), endpoint.id, off).await.unwrap();
+        setup.service.update(Actor::system(), endpoint.id, off, None).await.unwrap();
         setup.sender.run(&job(rows[1].id, 1)).await.unwrap();
         let skipped = delivery::Entity::find_by_id(rows[1].id).one(setup.database.read()).await;
         assert_eq!(skipped.unwrap().unwrap().status, "failed");

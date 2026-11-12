@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Autoxide API",
-    "description": "REST API of Autoxide.\n\n## Conventions\n\nEvery endpoint follows the same rules, so learning one endpoint teaches all of them.\n\n- **Success**: a single result is `{\"data\": …}`; a list is `{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`. Creating a record answers `201` with a `Location` header pointing to it.\n- **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the stable `code` field, never on `detail`. Validation problems list every invalid field of the request in `errors`, all at once.\n- **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.\n- **Authentication**: endpoints that need it list the `bearer` security scheme. Send `Authorization: Bearer <access token>`. A `401` response carries `WWW-Authenticate: Bearer`; its `code` says whether the token is missing, invalid or expired.\n- **Retries**: send `Idempotency-Key: <a random UUID>` with `POST`, `PUT`, `PATCH` and `DELETE`. Repeating the same request with the same key within 24 hours returns the first result (marked `Idempotent-Replayed: true`) instead of doing it twice; a different request with a used key gets `422`, and a repeat while the first is still running gets `409`.\n- **Deprecation**: an endpoint being retired is marked `deprecated` here and answers with `Deprecation` (RFC 9745), `Sunset` (RFC 8594, the removal date) and `Link: <…>; rel=\"successor-version\"` headers. Move to the successor before the sunset date.\n- **Language**: send `Accept-Language` (e.g. `vi`) to get the `detail` of errors in that language; English (`en`) by default and for unsupported languages. Responses carry `Content-Language`. Codes never change with the language.\n- **Rate limits**: too many requests from one address are answered with `429` (code `rate_limited`) and a `Retry-After` header giving the seconds to wait.\n- **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote it when reporting a problem.\n- **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount in the smallest currency unit plus a currency code.",
+    "description": "REST API of Autoxide.\n\n## Conventions\n\nEvery endpoint follows the same rules, so learning one endpoint teaches all of them.\n\n- **Success**: a single result is `{\"data\": …}`; a list is `{\"data\": […], \"pagination\": {\"limit\", \"next_cursor\"}}`. Creating a record answers `201` with a `Location` header pointing to it.\n- **Errors**: always RFC 9457 Problem Details (`application/problem+json`). Branch on the stable `code` field, never on `detail`. Validation problems list every invalid field of the request in `errors`, all at once.\n- **Lists**: accept `limit` (1–200, default 50), `order` (`desc` or `asc`, by creation time) and `cursor`. To get the next page, pass `pagination.next_cursor` as `cursor`; `null` means last page.\n- **Authentication**: endpoints that need it list the `bearer` security scheme. Send `Authorization: Bearer <access token>`. A `401` response carries `WWW-Authenticate: Bearer`; its `code` says whether the token is missing, invalid or expired.\n- **Retries**: send `Idempotency-Key: <a random UUID>` with `POST`, `PUT`, `PATCH` and `DELETE`. Repeating the same request with the same key within 24 hours returns the first result (marked `Idempotent-Replayed: true`) instead of doing it twice; a different request with a used key gets `422`, and a repeat while the first is still running gets `409`.\n- **Concurrent edits**: reading a single record returns its version in `ETag`. Send it back in `If-Match` when changing the record: if someone changed it in between, the answer is `412` (code `precondition_failed`) instead of silently overwriting their change. Without `If-Match` the change is made anyway.\n- **Deprecation**: an endpoint being retired is marked `deprecated` here and answers with `Deprecation` (RFC 9745), `Sunset` (RFC 8594, the removal date) and `Link: <…>; rel=\"successor-version\"` headers. Move to the successor before the sunset date.\n- **Language**: send `Accept-Language` (e.g. `vi`) to get the `detail` of errors in that language; English (`en`) by default and for unsupported languages. Responses carry `Content-Language`. Codes never change with the language.\n- **Rate limits**: too many requests from one address are answered with `429` (code `rate_limited`) and a `Retry-After` header giving the seconds to wait.\n- **Request id**: every response carries `x-request-id`. Send your own to correlate calls; quote it when reporting a problem.\n- **IDs** are UUIDv7 strings; **timestamps** are UTC in RFC 3339; **money** is an integer amount in the smallest currency unit plus a currency code.",
     "version": "0.1.0"
   },
   "servers": [
@@ -3585,6 +3585,14 @@
         "responses": {
           "200": {
             "description": "The role.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -3659,6 +3667,18 @@
             }
           },
           {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "name": "Accept-Language",
             "in": "header",
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
@@ -3697,6 +3717,14 @@
         "responses": {
           "200": {
             "description": "The role after the change.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -3737,6 +3765,16 @@
           },
           "409": {
             "description": "Another role has this name (`auth.role_name_taken`), or the role is the built-in `admin` (`auth.role_builtin`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4159,6 +4197,14 @@
         "responses": {
           "200": {
             "description": "The account.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -4338,6 +4384,18 @@
             }
           },
           {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "name": "Accept-Language",
             "in": "header",
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
@@ -4376,6 +4434,14 @@
         "responses": {
           "200": {
             "description": "The account after the change.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -4416,6 +4482,16 @@
           },
           "409": {
             "description": "No active user would keep the `admin` role; code `auth.last_admin`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5891,6 +5967,14 @@
         "responses": {
           "200": {
             "description": "The endpoint.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -6060,6 +6144,18 @@
             }
           },
           {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "name": "Accept-Language",
             "in": "header",
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
@@ -6098,6 +6194,14 @@
         "responses": {
           "200": {
             "description": "The changed endpoint.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -6128,6 +6232,16 @@
           },
           "404": {
             "description": "No endpoint has this id; code `webhooks.endpoint_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`.",
             "content": {
               "application/json": {
                 "schema": {

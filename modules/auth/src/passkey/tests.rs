@@ -178,7 +178,7 @@ async fn nhieu_passkey_xoa_va_tai_khoan_bi_khoa() {
 
         // Tài khoản bị khoá: passkey còn đó nhưng không đăng nhập được.
         let disable = UserChanges { name: None, disabled: Some(true) };
-        services.users.update(Actor::system(), ada, disable).await.unwrap();
+        services.users.update(Actor::system(), ada, disable, None).await.unwrap();
         let (ceremony, response) = sign_in(&services.passkeys, &mut key).await;
         let disabled = services.passkeys.finish_login(ceremony, &response, None).await.unwrap_err();
         assert_eq!(disabled.code(), "auth.user_disabled");

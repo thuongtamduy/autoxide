@@ -26,3 +26,4 @@ pub mod storage;
 pub mod telemetry;
 pub mod tls;
 pub mod transfer;
+pub mod version;

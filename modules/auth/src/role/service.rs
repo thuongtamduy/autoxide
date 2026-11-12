@@ -121,6 +121,7 @@ impl RoleService {
         actor: Actor,
         id: Uuid,
         input: RoleInput,
+        expected: Option<DateTime<Utc>>,
     ) -> Result<Role, Error> {
         let (name, description, permissions) = self.check(input)?;
         let transaction = self.database.begin_write().await?;
@@ -132,14 +133,21 @@ impl RoleService {
             return Err(builtin_role());
         }
         let before = role_snapshot(&transaction, &current).await?;
-        role::Entity::update_many()
+        let mut update = role::Entity::update_many()
             .col_expr(role::Column::Name, Expr::value(name.clone()))
             .col_expr(role::Column::Description, Expr::value(description.clone()))
             .col_expr(role::Column::UpdatedAt, Expr::value(now()))
-            .filter(role::Column::Id.eq(id))
-            .exec(&transaction)
-            .await
-            .map_err(|error| name_taken_or(error, &name))?;
+            .filter(role::Column::Id.eq(id));
+        if let Some(expected) = expected {
+            // Kiểm phiên bản ngay trong câu `UPDATE` (D-084).
+            update = update.filter(role::Column::UpdatedAt.eq(expected));
+        }
+        let updated =
+            update.exec(&transaction).await.map_err(|error| name_taken_or(error, &name))?;
+        if updated.rows_affected == 0 {
+            transaction.rollback().await?;
+            return Err(autoxide_kernel::version::changed());
+        }
         role_permission::Entity::delete_many()
             .filter(role_permission::Column::RoleId.eq(id))
             .exec(&transaction)
@@ -586,8 +594,10 @@ mod tests {
 
             assert_eq!(admin.name, "admin");
             assert!(admin.permissions.is_empty());
-            let changed =
-                roles.update(Actor::system(), admin.id, input("boss", &[])).await.unwrap_err();
+            let changed = roles
+                .update(Actor::system(), admin.id, input("boss", &[]), None)
+                .await
+                .unwrap_err();
             let deleted = roles.delete(Actor::system(), admin.id).await.unwrap_err();
             assert_eq!(changed.code(), "auth.role_builtin");
             assert_eq!(deleted.code(), "auth.role_builtin");
@@ -613,7 +623,7 @@ mod tests {
             assert!(!created.all_permissions);
 
             let changed = roles
-                .update(Actor::system(), created.id, input("writer", &["notes.write"]))
+                .update(Actor::system(), created.id, input("writer", &["notes.write"]), None)
                 .await
                 .unwrap();
             assert_eq!(changed.name, "writer");
@@ -680,7 +690,7 @@ mod tests {
             assert_eq!(roles.user_roles(ada).await.unwrap(), assigned);
 
             // Sửa role: người có role nhận permission mới ngay.
-            roles.update(Actor::system(), writer.id, input("writer", &[])).await.unwrap();
+            roles.update(Actor::system(), writer.id, input("writer", &[]), None).await.unwrap();
             assert!(!roles.principal(ada).await.unwrap().has(&NOTES_WRITE));
 
             let admin = admin_role(roles).await;

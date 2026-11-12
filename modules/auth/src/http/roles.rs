@@ -8,6 +8,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -209,7 +210,7 @@ async fn create_role(
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the role.")),
     responses(
-        (status = 200, description = "The role.", body = Data<RoleResponse>),
+        (status = 200, description = "The role.", body = Data<RoleResponse>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.roles.read`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No role has this id; code `auth.role_not_found`.", body = Problem),
@@ -219,9 +220,10 @@ async fn get_role(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<RoleResponse>, Error> {
+) -> Result<Tagged<RoleResponse>, Error> {
     principal.require(&ROLES_READ)?;
-    Ok(Data { data: state.roles.get(id).await?.into() })
+    let role = state.roles.get(id).await?;
+    Ok(Tagged { version: role.updated_at, data: role.into() })
 }
 
 /// Replace a role: its name, description and permissions.
@@ -233,25 +235,29 @@ async fn get_role(
     path = "/roles/{id}",
     operation_id = "replace_role",
     security(("bearer" = [])),
-    params(("id" = Uuid, Path, description = "Id of the role.")),
+    params(("id" = Uuid, Path, description = "Id of the role."), ("If-Match" = Option<String>, Header, description = "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.")),
     request_body = RoleRequest,
     responses(
-        (status = 200, description = "The role after the change.", body = Data<RoleResponse>),
+        (status = 200, description = "The role after the change.", body = Data<RoleResponse>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.roles.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No role has this id; code `auth.role_not_found`.", body = Problem),
         (status = 409, description = "Another role has this name (`auth.role_name_taken`), or the role is the built-in `admin` (`auth.role_builtin`).", body = Problem),
         (status = 422, description = "A value is invalid, e.g. an unknown permission; see `errors`.", body = Problem),
+        (status = 412, description = "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`.", body = Problem),
     )
 )]
 async fn replace_role(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
     Path(id): Path<Uuid>,
+    if_match: IfMatch,
     ValidJson(input): ValidJson<RoleRequest>,
-) -> Result<Data<RoleResponse>, Error> {
+) -> Result<Tagged<RoleResponse>, Error> {
     principal.require(&ROLES_MANAGE)?;
-    Ok(Data { data: state.roles.update(Actor::from(&principal), id, input.into()).await?.into() })
+    let expected = if_match.expected()?;
+    let role = state.roles.update(Actor::from(&principal), id, input.into(), expected).await?;
+    Ok(Tagged { version: role.updated_at, data: role.into() })
 }
 
 /// Delete a role.
