@@ -46,6 +46,7 @@ autoxide-notes = { path = "modules/notes" }
 autoxide-webhooks = { path = "modules/webhooks" }
 autoxide-media = { path = "modules/media" }
 autoxide-content = { path = "modules/content" }
+autoxide-forms = { path = "modules/forms" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
