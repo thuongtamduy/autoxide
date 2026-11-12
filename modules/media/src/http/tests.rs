@@ -74,12 +74,15 @@ impl Module for TestStorage {
 struct App {
     router: Router,
     storage: Arc<MemoryStorage>,
+    modules: Modules,
+    database: Database,
 }
 
 async fn app(test: &TestDatabase) -> App {
     let source = ConfigSource::from_pairs([
         ("DATABASE_URL", test.url()),
-        ("AUTOXIDE_MEDIA_MAX_BYTES", "4096"),
+        ("AUTOXIDE_MEDIA_MAX_BYTES", "200000"),
+        ("AUTOXIDE_MEDIA_IMAGE_WIDTHS", "100"),
     ]);
     let mut reader = ConfigReader::new(&source);
     let config = Config::read(&mut reader);
@@ -105,7 +108,7 @@ async fn app(test: &TestDatabase) -> App {
         modules.routes(),
         extras,
     );
-    App { router: api.router, storage }
+    App { router: api.router, storage, modules, database }
 }
 
 struct Answer {
@@ -230,7 +233,7 @@ async fn tai_len_tai_ve_va_header_an_toan() {
         let zip = [("authorization", auth.as_str()), ("content-type", "application/zip")];
         let refused = send(&app, "POST", "?name=x.zip", &zip, b"PK\x03\x04".to_vec()).await;
         assert_eq!(refused.json()["code"], "media.type_not_allowed");
-        let big = [samples::png(1, 1), vec![0; 5000]].concat();
+        let big = [samples::png(1, 1), vec![0; 200_000]].concat();
         let refused = send(&app, "POST", "?name=x.png", &html, big).await;
         assert_eq!(refused.status, StatusCode::PAYLOAD_TOO_LARGE);
     })
@@ -536,9 +539,16 @@ async fn tool_mcp_theo_permission() {
         };
         assert_eq!(
             names("writer").await,
-            ["media.get", "media.list", "media.trash", "media.update"]
+            [
+                "media.get",
+                "media.list",
+                "media.list_tags",
+                "media.trash",
+                "media.update",
+                "media.upload"
+            ]
         );
-        assert_eq!(names("reader").await, ["media.get", "media.list"]);
+        assert_eq!(names("reader").await, ["media.get", "media.list", "media.list_tags"]);
         assert!(names("nobody").await.is_empty());
 
         let writer = client("writer").await;
@@ -563,6 +573,195 @@ async fn tool_mcp_theo_permission() {
             writer.call_tool(call("media.trash", json!({"id": item["id"]}))).await.unwrap();
         assert!(trashed.structured_content.unwrap()["data"]["trashed_at"].is_string());
         writer.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// Ảnh thu nhỏ qua đường thật: tải lên → worker chạy job → item có `variants` → `?w=` trả
+/// bản nhỏ (JPEG, mở trong trang); cỡ chưa có thì trả bản gốc với cache ngắn.
+#[tokio::test]
+async fn anh_thu_nho_qua_worker_va_tham_so_w() {
+    use image::ImageFormat;
+
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let png = crate::variants::samples::encoded(240, 120, ImageFormat::Png, false);
+        let item = upload(&app, "wide.png", "image/png", &png).await;
+        assert_eq!(item["variants"], json!([]), "made in the background");
+
+        // Worker chạy mọi job đang chờ (cả hai lịch định kỳ của module lẫn job làm ảnh).
+        let worker = app.modules.worker(&app.database, 4).unwrap();
+        while worker.run_once().await.unwrap() > 0 {}
+        let id = item["id"].as_str().unwrap();
+        let auth = as_user("reader");
+        let got =
+            send(&app, "GET", &format!("/{id}"), &[("authorization", auth.as_str())], Vec::new())
+                .await;
+        let variants = got.json()["data"]["variants"].clone();
+        assert_eq!(variants.as_array().unwrap().len(), 1, "{variants}");
+        assert_eq!(
+            (variants[0]["width"].as_i64(), variants[0]["height"].as_i64()),
+            (Some(100), Some(50))
+        );
+        let url =
+            variants[0]["url"].as_str().unwrap().trim_start_matches("/api/v1/media").to_owned();
+        assert!(url.ends_with("&w=100"), "{url}");
+
+        let small = send(&app, "GET", &url, &[("authorization", auth.as_str())], Vec::new()).await;
+        assert_eq!(small.status, StatusCode::OK);
+        assert_eq!(small.header(header::CONTENT_TYPE), "image/jpeg");
+        assert_eq!(small.header(header::CACHE_CONTROL), "private, max-age=31536000, immutable");
+        assert!(small.header(header::CONTENT_DISPOSITION).starts_with("inline; "));
+        let decoded = image::load_from_memory(&small.body).unwrap();
+        assert_eq!(decoded.width(), 100);
+        let etag = small.header(header::ETAG).to_owned();
+        let again = send(
+            &app,
+            "GET",
+            &url,
+            &[("authorization", auth.as_str()), ("if-none-match", etag.as_str())],
+            Vec::new(),
+        )
+        .await;
+        assert_eq!(again.status, StatusCode::NOT_MODIFIED);
+
+        // Cỡ không có: bản gốc.
+        let other = url.replace("w=100", "w=640");
+        let original =
+            send(&app, "GET", &other, &[("authorization", auth.as_str())], Vec::new()).await;
+        assert_eq!((original.status, original.body.len()), (StatusCode::OK, png.len()));
+        assert_eq!(original.header(header::CONTENT_TYPE), "image/png");
+    })
+    .await
+    .unwrap();
+}
+
+/// Nhãn qua REST: gắn khi tải lên (`tags=a,b`), sửa bằng `PATCH`, lọc `tag=`, liệt kê, đổi
+/// tên (cần `If-Match`), xoá; permission của từng endpoint nhãn.
+#[tokio::test]
+async fn nhan_qua_rest() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let auth = as_user("admin");
+        let headers = [("authorization", auth.as_str()), ("content-type", "image/png")];
+        let answer =
+            send(&app, "POST", "?name=a.png&tags=Brand,%20logo", &headers, samples::png(1, 1))
+                .await;
+        assert_eq!(answer.status, StatusCode::CREATED, "{}", answer.json());
+        let item = answer.json()["data"].clone();
+        assert_eq!(item["tags"], json!(["Brand", "logo"]));
+        let id = item["id"].as_str().unwrap();
+
+        let changed = patch(&app, id, Some("*"), json!({"tags": ["logo", "Summer"]})).await;
+        assert_eq!(changed.json()["data"]["tags"], json!(["logo", "Summer"]));
+        let listed =
+            send(&app, "GET", "?tag=summer", &[("authorization", auth.as_str())], Vec::new()).await;
+        assert_eq!(listed.json()["data"].as_array().unwrap().len(), 1);
+
+        let tags =
+            send(&app, "GET", "/tags?order=asc", &[("authorization", auth.as_str())], Vec::new())
+                .await;
+        let names: Vec<(String, u64)> = tags.json()["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|tag| {
+                (tag["name"].as_str().unwrap().to_owned(), tag["item_count"].as_u64().unwrap())
+            })
+            .collect();
+        assert_eq!(
+            names,
+            [("Brand".to_owned(), 0), ("logo".to_owned(), 1), ("Summer".to_owned(), 1)]
+        );
+        let summer = tags.json()["data"][2]["id"].as_str().unwrap().to_owned();
+
+        let rename = |if_match: Option<&'static str>| {
+            let mut headers =
+                vec![("authorization", auth.as_str()), ("content-type", "application/json")];
+            if let Some(value) = if_match {
+                headers.push(("if-match", value));
+            }
+            headers
+        };
+        let path = format!("/tags/{summer}");
+        let missing =
+            send(&app, "PATCH", &path, &rename(None), r#"{"name":"Hè"}"#.as_bytes().to_vec()).await;
+        assert_eq!(missing.status, StatusCode::PRECONDITION_REQUIRED);
+        let renamed =
+            send(&app, "PATCH", &path, &rename(Some("*")), r#"{"name":"Hè"}"#.as_bytes().to_vec())
+                .await;
+        assert_eq!(
+            (renamed.status, renamed.json()["data"]["name"].clone()),
+            (StatusCode::OK, json!("Hè"))
+        );
+        let deleted =
+            send(&app, "DELETE", &path, &[("authorization", auth.as_str())], Vec::new()).await;
+        assert_eq!(deleted.status, StatusCode::NO_CONTENT);
+        let gone = send(&app, "GET", &path, &[("authorization", auth.as_str())], Vec::new()).await;
+        assert_eq!(gone.json()["code"], "media.tag_not_found");
+
+        let tag_id = tags.json()["data"][1]["id"].as_str().unwrap().to_owned();
+        for (method, path, who) in [
+            ("GET", "/tags".to_owned(), "nobody"),
+            ("GET", format!("/tags/{tag_id}"), "nobody"),
+            ("PATCH", format!("/tags/{tag_id}"), "reader"),
+            ("DELETE", format!("/tags/{tag_id}"), "reader"),
+        ] {
+            let auth = as_user(who);
+            let headers = [
+                ("authorization", auth.as_str()),
+                ("content-type", "application/json"),
+                ("if-match", "*"),
+            ];
+            let answer = send(&app, method, &path, &headers, br#"{"name":"x"}"#.to_vec()).await;
+            assert_eq!(answer.status, StatusCode::FORBIDDEN, "{method} {path}");
+        }
+    })
+    .await
+    .unwrap();
+}
+
+/// Tải lên qua MCP: nội dung base64, kiểm loại thật như REST, giới hạn 1 MiB; người chỉ có
+/// quyền đọc không thấy tool.
+#[tokio::test]
+async fn tai_len_qua_mcp() {
+    use base64::Engine as _;
+    use base64::engine::general_purpose::STANDARD;
+
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/mcp", listener.local_addr().unwrap());
+        let router = app.router.clone();
+        tokio::spawn(async move { axum::serve(listener, router).await });
+        autoxide_kernel::tls::install_crypto_provider();
+        let config = StreamableHttpClientTransportConfig::with_uri(url).auth_header("writer".to_owned());
+        let client = ().serve(StreamableHttpClientTransport::from_config(config)).await.unwrap();
+        let call = |arguments: Value| {
+            CallToolRequestParams::new("media.upload").with_arguments(arguments.as_object().cloned().unwrap())
+        };
+
+        let png = samples::png(7, 5);
+        let arguments = json!({"name": "dot.png", "content_base64": STANDARD.encode(&png), "tags": ["tiny"]});
+        let uploaded = client.call_tool(call(arguments)).await.unwrap();
+        assert_eq!(uploaded.is_error, Some(false), "{uploaded:?}");
+        let data = uploaded.structured_content.unwrap()["data"].clone();
+        assert_eq!((data["content_type"].as_str(), data["width"].as_i64()), (Some("image/png"), Some(7)));
+        assert_eq!(data["tags"], json!(["tiny"]));
+        assert_eq!(data["duplicates"], json!([]));
+        let auth = as_user("reader");
+        let path = format!("/{}/content", data["id"].as_str().unwrap());
+        let got = send(&app, "GET", &path, &[("authorization", auth.as_str())], Vec::new()).await;
+        assert_eq!(got.body, png);
+
+        // Nội dung giả, base64 hỏng: lỗi rõ.
+        let fake = json!({"name": "x.png", "content_type": "image/png", "content_base64": STANDARD.encode(samples::HTML)});
+        let refused = client.call_tool(call(fake)).await.unwrap();
+        assert_eq!(refused.is_error, Some(true));
+        let broken = client.call_tool(call(json!({"name": "x.png", "content_base64": "%%%"}))).await.unwrap();
+        assert_eq!(broken.is_error, Some(true));
+        client.cancel().await.unwrap();
     })
     .await
     .unwrap();

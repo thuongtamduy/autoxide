@@ -2052,3 +2052,67 @@ API (`to_encoded_point` không còn) nên PR không biên dịch; `webauthn_rp` 
 nâng riêng phần test thì cây thư viện có hai bản `p256`. Nâng cùng lúc khi `webauthn_rp` lên
 bản mới, rồi bỏ luật `ignore`. PR action: thay đổi phá vỡ của các bản mới chỉ chạm
 `pull_request_target` / `workflow_run` và vài input cũ của action Docker — repo không dùng.
+
+## D-093 · `media` làm ảnh thu nhỏ bằng job nền, thư viện `image` — 2026-11-12 — chủ dự án quyết, agent quyết cách làm
+
+Thay D-087 (không làm ảnh thu nhỏ trong core): chủ dự án yêu cầu làm.
+
+Quyết định:
+
+- Sau khi tải lên / thay nội dung, cùng transaction đưa job `media.make_variants` vào hàng
+  đợi của module. Job làm bản nhỏ hơn của ảnh JPEG, PNG, GIF, WebP theo các chiều rộng
+  `AUTOXIDE_MEDIA_IMAGE_WIDTHS` (mặc định `320,640,1280,1920`; chỉ cỡ nhỏ hơn ảnh; `off` để
+  tắt), xoay theo EXIF, giữ tỉ lệ, lọc `CatmullRom`; ảnh không trong suốt → JPEG chất lượng
+  82, có kênh trong suốt → PNG. Không làm WebP / AVIF đầu ra: bộ mã hoá WebP thuần Rust chỉ
+  có dạng không nén mất dữ liệu (to hơn JPEG), AVIF cần `rav1e` rất nặng.
+- Thư viện `image` 0.25 (MIT / Apache-2.0, thuần Rust), chỉ bật `jpeg`, `png`, `gif`, `webp`,
+  không `rayon`. Không giải mã AVIF (bộ giải mã cần `dav1d` viết bằng C) — AVIF không có bản
+  thu nhỏ; SVG cũng không (vốn co giãn được).
+- An toàn: ảnh quá 40 triệu pixel không được giải mã (kiểm từ kích thước đã lưu, rồi kiểm lại
+  bằng `Limits` của `image`); giải mã chạy trong `spawn_blocking`; ảnh không giải mã được thì
+  ghi log và thôi (không thử lại mãi).
+- Bảng `media_variant (item_id, version_id, width)` duy nhất; khoá nơi lưu
+  `media/<id>/<version_id>_w<width>`. Lưu dòng chỉ khi item còn đúng phiên bản (chạm dòng item
+  trong transaction); thay nội dung xoá dòng + nội dung bản cũ; xoá hẳn xoá hết; job dọn mồ
+  côi hiểu khoá có `_w<width>`.
+- API: item có `variants` (rộng, cao, loại, kích thước, `url` = `url` của item + `&w=`).
+  `GET …/content?w=<rộng>` trả bản thu nhỏ (`ETag` theo phiên bản + rộng, cùng luật cache /
+  công khai / header an toàn); cỡ chưa làm xong thì trả bản gốc với cache ngắn, cỡ không tồn
+  tại thì bản gốc. `api::MediaRef` có `variants`.
+
+Lý do: website dùng ngay `srcset` mà không cần dịch vụ đổi cỡ riêng. Làm trong job nền nên
+request tải lên không chậm thêm, và làm một lần thay vì mỗi lần xem.
+
+Đã cân nhắc: đổi cỡ theo yêu cầu khi xem (`?w=` bất kỳ) — linh hoạt hơn nhưng mỗi cỡ lạ tốn CPU
+ngay trong request và mở đường cho người lạ ép máy chủ làm việc nặng; dịch vụ ảnh riêng
+(imgproxy…) — thêm một thứ phải vận hành.
+
+## D-094 · `media` có nhãn, song song với thư mục — 2026-11-12 — chủ dự án quyết, agent quyết cách làm
+
+Bổ sung D-088 (thư mục, chưa có nhãn): chủ dự án yêu cầu làm nhãn. Thư mục giữ nguyên.
+
+Quyết định: bảng `media_tag` (tên duy nhất không phân biệt hoa thường, `name_key` `COLLATE "C"`
+trên Postgres) và `media_item_tag`. Item mang tối đa 20 nhãn, mỗi nhãn 1–50 ký tự, không có
+`,`. Nhãn tạo ngầm khi lần đầu gắn (`tags=a,b` khi tải lên, `tags: [...]` khi `PATCH` — thay cả
+bộ); lọc `GET /media?tag=`; `/media/tags` liệt kê (kèm số item ngoài thùng rác), đổi tên
+(`If-Match` bắt buộc), xoá (gỡ khỏi mọi item). Event `media.tag_updated`, `media.tag_deleted`;
+thay đổi nhãn của item nằm trong `before` / `after` của `media.item_updated`.
+
+Đồng thời đúng trên cả hai database: tạo nhãn bằng `INSERT … ON CONFLICT DO NOTHING` rồi đọc
+lại (Postgres không hỏng transaction vì trùng), chạm dòng nhãn trước khi gắn; xoá nhãn xoá dòng
+trước rồi gỡ liên kết — có test nhiều lần tải lên cùng lúc cùng tạo một nhãn mới.
+
+Đổi tên nhãn không đổi `ETag` của item mang nó (bản ghi item không đổi).
+
+## D-095 · Tải lên media qua MCP bằng base64, tối đa 1 MiB — 2026-11-12 — chủ dự án quyết, agent quyết cách làm
+
+Thay D-090 (không tải lên qua MCP): chủ dự án yêu cầu làm.
+
+Quyết định: tool `media.upload` (permission `media.write`) nhận `content_base64`, tên, loại (tuỳ
+chọn), thư mục, nhãn; gọi đúng service tải lên của REST (kiểm loại thật, kích thước ảnh, báo
+trùng, event). Tối đa 1 MiB sau giải mã, như tool của `files`; cả lời gọi còn phải lọt giới
+hạn thân request chung (`AUTOXIDE_HTTP_BODY_LIMIT_BYTES`, mặc định 1 MiB). Thêm tool
+`media.list_tags`.
+
+Không làm "tải từ URL" (máy chủ tự tải file về): phải chặn địa chỉ mạng nội bộ (SSRF) cẩn thận
+mới an toàn — để khi có nhu cầu thật.

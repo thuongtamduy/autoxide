@@ -119,9 +119,19 @@ impl MediaService {
     }
 }
 
-/// `media/<item_id>/<version_id>` → hai ID.
+/// `media/<item_id>/<version_id>` (bản gốc) hay `media/<item_id>/<version_id>_w<rộng>`
+/// (ảnh thu nhỏ) → ID item và phiên bản.
 fn parse_key(key: &str) -> Option<(Uuid, Uuid)> {
-    let (item, version) = key.strip_prefix(KEY_PREFIX)?.split_once('/')?;
+    let (item, rest) = key.strip_prefix(KEY_PREFIX)?.split_once('/')?;
+    let version = match rest.split_once("_w") {
+        Some((version, width))
+            if !width.is_empty() && width.bytes().all(|b| b.is_ascii_digit()) =>
+        {
+            version
+        }
+        Some(_) => return None,
+        None => rest,
+    };
     Some((Uuid::parse_str(item).ok()?, Uuid::parse_str(version).ok()?))
 }
 
@@ -139,6 +149,8 @@ mod tests {
     fn doc_khoa_va_tuoi() {
         let (item, version) = (Uuid::now_v7(), Uuid::now_v7());
         assert_eq!(parse_key(&format!("media/{item}/{version}")), Some((item, version)));
+        assert_eq!(parse_key(&format!("media/{item}/{version}_w640")), Some((item, version)));
+        assert_eq!(parse_key(&format!("media/{item}/{version}_wx")), None);
         assert_eq!(parse_key("files/x"), None);
         assert_eq!(parse_key("media/x/y"), None);
         let age = Utc::now() - created_at(version).unwrap();

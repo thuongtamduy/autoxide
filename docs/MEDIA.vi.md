@@ -41,12 +41,12 @@ curl -X POST "http://localhost:8080/api/v1/media?name=team.jpg" \
 - Loại được nhận đặt bằng `AUTOXIDE_MEDIA_ALLOWED_TYPES` (mặc định: JPEG, PNG, GIF, WebP,
   AVIF, SVG, MP4, WebM, mọi loại âm thanh, PDF); kích thước tối đa bằng
   `AUTOXIDE_MEDIA_MAX_BYTES` (mặc định 100 MiB).
-- Ảnh raster (JPEG, PNG, GIF, WebP, AVIF) có `width` và `height`. Máy chủ chỉ giữ bản
-  gốc, không tự tạo ảnh thu nhỏ hay cỡ khác. Đổi cỡ ở website (vd component ảnh của
-  framework) hoặc ở lớp đứng trước máy chủ.
+- Ảnh raster (JPEG, PNG, GIF, WebP, AVIF) có `width` và `height`. Ảnh JPEG, PNG, GIF và
+  WebP còn có ảnh thu nhỏ (xem bên dưới).
 - Kết quả (`201`, kèm `Location`) có `duplicates`: các item đã có trong thư viện với nội
   dung y hệt (cùng SHA-256). Bản vừa tải lên vẫn được giữ.
-- `folder_id=<id>` đặt item vào một thư mục. Item mới là `private`.
+- `folder_id=<id>` đặt item vào một thư mục, `tags=brand,logo` gắn nhãn. Item mới là
+  `private`.
 
 ## Đọc, liệt kê, tìm
 
@@ -54,7 +54,8 @@ curl -X POST "http://localhost:8080/api/v1/media?name=team.jpg" \
 - `GET /api/v1/media` — một trang item. Bộ lọc: `folder_id` (`root` hay một ID; chỉ thư
   mục đó, không gồm thư mục con), `type` (`image/png` hay `image/*`), `visibility`
   (`public` / `private`), `trashed=true` (thùng rác), `q` (tên chứa chuỗi, không phân biệt
-  hoa thường). Thứ tự: `sort=created_at|name|size` với `order=asc|desc`. Lật trang theo
+  hoa thường), `tag` (mang nhãn này, không phân biệt hoa thường). Thứ tự:
+  `sort=created_at|name|size` với `order=asc|desc`. Lật trang theo
   `pagination.next_cursor`, giữ nguyên bộ lọc.
 
 ## Sửa
@@ -64,7 +65,7 @@ thì nhận `428` (mã `precondition_required`); ai đó vừa sửa trước th
 `precondition_failed`) — đọc lại rồi thử lại.
 
 - `PATCH /api/v1/media/{id}` — `name`, `alt`, `title`, `caption`, `folder_id` (`null` là
-  thư mục gốc), `visibility`.
+  thư mục gốc), `visibility`, `tags` (thay cả bộ nhãn; `[]` gỡ hết).
 - `PUT /api/v1/media/{id}/content` — thay nội dung, GIỮ ID (mọi chỗ đang dùng item vẫn
   đúng). Kiểm như khi tải lên. `url`, `version_id` và `ETag` đổi; nội dung cũ bị xoá.
 
@@ -85,6 +86,31 @@ Mỗi item có `url`: `/api/v1/media/{id}/content?v=<version_id>`.
   sandbox`, nên nội dung không chạy được script trên tên miền của bạn.
 - **Video và file lớn**: một `Range: bytes=…` được trả `206` (tua video được); khoảng nằm
   ngoài nội dung thì `416`. `HEAD` chỉ trả header. `If-None-Match` với `ETag` thì `304`.
+
+## Ảnh thu nhỏ
+
+Vài giây sau khi tải lên (hay thay nội dung), một job nền làm các bản nhỏ hơn của mọi ảnh
+JPEG, PNG, GIF và WebP, theo các chiều rộng trong `AUTOXIDE_MEDIA_IMAGE_WIDTHS` (mặc định
+`320,640,1280,1920`; chỉ những cỡ nhỏ hơn ảnh; `off` để tắt). Ảnh được xoay đúng chiều (theo
+EXIF), giữ tỉ lệ, lưu dạng JPEG — hoặc PNG khi ảnh có phần trong suốt. Item liệt kê chúng
+trong `variants`, mỗi bản có `url` riêng (`url` của item thêm `&w=<rộng>`), dùng ngay cho
+`srcset`:
+
+```html
+<img src="/api/v1/media/…/content?v=…&w=640"
+     srcset="…&w=320 320w, …&w=640 640w, …&w=1280 1280w" sizes="100vw" alt="…">
+```
+
+Khi bản thu nhỏ chưa làm xong, xin nó thì nhận bản gốc, cache ngắn. Ảnh hơn 40 triệu pixel,
+ảnh AVIF và SVG không có bản thu nhỏ. Thay nội dung thì làm bản mới và xoá bản cũ. Bản thu
+nhỏ theo chế độ công khai và thùng rác của item.
+
+## Nhãn
+
+Ngoài một thư mục, item mang được tối đa 20 nhãn (mỗi nhãn 1 tới 50 ký tự, không có `,`).
+Nhãn được tạo khi lần đầu gắn cho một item. `/api/v1/media/tags` liệt kê nhãn, kèm số item
+(ngoài thùng rác) mang mỗi nhãn, đổi tên (`PATCH`, kèm `If-Match`) hay xoá nhãn (`DELETE`,
+gỡ khỏi mọi item). Tên nhãn không trùng, không phân biệt hoa thường.
 
 ## Thư mục
 
@@ -107,15 +133,17 @@ cũng tính (`409`, `media.folder_not_empty`).
 
 ## AI agent (MCP)
 
-Tool `media.list`, `media.get`, `media.update` và `media.trash`, cùng permission với
-endpoint REST. `media.update` nhận `updated_at` đã đọc thay cho `If-Match`. Tải lên đi
-qua REST: nội dung nhị phân không hợp với lời gọi tool.
+Tool `media.list`, `media.get`, `media.update`, `media.trash`, `media.list_tags` và
+`media.upload`, cùng permission với endpoint REST. `media.update` nhận `updated_at` đã đọc
+thay cho `If-Match`. `media.upload` nhận nội dung dạng base64, tối đa 1 MiB (cả lời gọi tool
+còn phải lọt `AUTOXIDE_HTTP_BODY_LIMIT_BYTES`, mặc định 1 MiB); file lớn hơn thì tải lên
+qua REST.
 
 ## Cho người viết module
 
 Module khác đọc media qua trait `autoxide_media::api::Media` (đăng ký sau `media`):
-`find_many(&ids)` trả về, trong một câu query, ID, visibility, loại, kích thước ảnh, `alt`
-và `url` của mỗi item không ở thùng rác. Bảng của module mình chỉ giữ ID của item.
+`find_many(&ids)` trả về, trong hai câu query cho bao nhiêu ID cũng được, ID, visibility,
+loại, kích thước ảnh, `alt`, `url` và ảnh thu nhỏ của mỗi item không ở thùng rác. Bảng của module mình chỉ giữ ID của item.
 
 ## Khi một tài khoản bị xoá
 

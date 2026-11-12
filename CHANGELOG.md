@@ -21,6 +21,10 @@ endpoints are marked deprecated with a sunset date first.
   `media.write`, `media.purge`; MCP tools `media.list`, `media.get`, `media.update`,
   `media.trash`. New settings `AUTOXIDE_MEDIA_MAX_BYTES`, `AUTOXIDE_MEDIA_ALLOWED_TYPES`,
   `AUTOXIDE_MEDIA_TRASH_DAYS`.
+- Media: smaller copies of JPEG, PNG, GIF and WebP images made in the background
+  (`variants`, `?w=` on the content URL; widths set by `AUTOXIDE_MEDIA_IMAGE_WIDTHS`), tags
+  next to folders (`tags` on upload and edit, `?tag=` filter, `/api/v1/media/tags`), and the
+  MCP tools `media.upload` (base64, up to 1 MiB) and `media.list_tags`.
 - Every `GET` that returns an `ETag` answers `304 Not Modified` to a matching
   `If-None-Match`.
 - For module authors: lists sorted by another column (`pagination::fetch_page_by`), shared

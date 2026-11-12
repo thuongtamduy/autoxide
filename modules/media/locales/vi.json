@@ -13,5 +13,7 @@
   "media.folder_not_found": "Không có thư mục media `{id}`.",
   "media.folder_name_taken": "Thư mục này đã có thư mục con tên `{name}` (tên không phân biệt hoa thường). Hãy chọn tên khác.",
   "media.folder_cycle": "Không thể chuyển một thư mục vào chính nó hay vào thư mục con của nó.",
-  "media.folder_not_empty": "Thư mục vẫn còn {folders} thư mục và {items} item (kể cả item trong thùng rác). Hãy chuyển hay xoá chúng trước."
+  "media.folder_not_empty": "Thư mục vẫn còn {folders} thư mục và {items} item (kể cả item trong thùng rác). Hãy chuyển hay xoá chúng trước.",
+  "media.tag_name_taken": "Đã có nhãn tên `{name}` (tên không phân biệt hoa thường). Hãy chọn tên khác.",
+  "media.tag_not_found": "Không có nhãn media `{id}`."
 }

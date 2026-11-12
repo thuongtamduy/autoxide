@@ -17,7 +17,7 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
 
-use super::{MediaItemResponse, folder_filter, page_request, present, sort};
+use super::{MediaItemResponse, folder_filter, page_of, page_request, present, sort, tagged};
 use crate::config::normalize_type;
 use crate::entity::api_folder;
 use crate::service::{
@@ -46,6 +46,9 @@ pub(crate) struct ItemsQuery {
     /// Only items whose name contains this text, ignoring case.
     #[param(example = "logo")]
     pub q: Option<String>,
+    /// Only items with this tag, ignoring case.
+    #[param(example = "brand")]
+    pub tag: Option<String>,
     /// `created_at` (the default), `name` or `size`; the direction is `order`.
     #[param(value_type = Option<ItemSort>, inline)]
     pub sort: Option<String>,
@@ -97,6 +100,7 @@ impl ItemsQuery {
             visibility,
             trashed,
             search: self.q.clone(),
+            tag: self.tag.clone(),
             sort: sort(self.sort.as_deref(), "`created_at`, `name`, `size`", problems),
         }
     }
@@ -111,27 +115,30 @@ pub(crate) struct UploadQuery {
     name: String,
     /// Folder to put the item in. Omit for the root.
     folder_id: Option<Uuid>,
+    /// Tags for the item, comma-separated (each 1 to 50 characters, at most 20).
+    #[param(example = "brand,logo")]
+    tags: Option<String>,
 }
 
 /// An item with the same content, found at upload.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct DuplicateItem {
-    id: Uuid,
-    name: String,
+    pub(crate) id: Uuid,
+    pub(crate) name: String,
     /// `null` for the root.
-    folder_id: Option<Uuid>,
-    url: String,
+    pub(crate) folder_id: Option<Uuid>,
+    pub(crate) url: String,
 }
 
 /// The uploaded item, plus the items already in the library with exactly the same content.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct UploadedResponse {
     #[serde(flatten)]
-    item: MediaItemResponse,
+    pub(crate) item: MediaItemResponse,
     /// Items (not in the trash) whose content has the same SHA-256, oldest first, at most
     /// 20. Empty when the content is new. The upload is kept either way: delete it if you
     /// would rather reuse one of these.
-    duplicates: Vec<DuplicateItem>,
+    pub(crate) duplicates: Vec<DuplicateItem>,
 }
 
 /// Changes to a media item. Omitted fields stay as they are.
@@ -152,6 +159,10 @@ pub(crate) struct UpdateItemRequest {
     pub folder_id: Option<Option<Uuid>>,
     /// `public` lets anyone load the content without signing in.
     pub visibility: Option<Visibility>,
+    /// Replace the tags of the item (each 1 to 50 characters, without `,`; at most 20);
+    /// `[]` removes them all. New tag names are created.
+    #[schema(example = json!(["brand", "logo"]))]
+    pub tags: Option<Vec<String>>,
 }
 
 impl From<UpdateItemRequest> for ItemChanges {
@@ -163,6 +174,7 @@ impl From<UpdateItemRequest> for ItemChanges {
             caption: input.caption,
             folder_id: input.folder_id,
             visibility: input.visibility,
+            tags: input.tags,
         }
     }
 }
@@ -220,7 +232,7 @@ pub(crate) async fn list_items(
     let mut problems = Vec::new();
     let filter = query.filter(&mut problems);
     let page = page_request(paging, problems)?;
-    Ok(service.list(&principal, &filter, &page).await?.map(MediaItemResponse::from))
+    page_of(&service, service.list(&principal, &filter, &page).await?).await
 }
 
 /// Upload a media item.
@@ -263,6 +275,13 @@ pub(crate) async fn upload_item(
         name: query.name,
         folder_id: query.folder_id,
         content_type: content_type(&headers)?.map(str::to_owned),
+        tags: query
+            .tags
+            .as_deref()
+            .map(|tags| {
+                tags.split(',').filter(|tag| !tag.trim().is_empty()).map(str::to_owned).collect()
+            })
+            .unwrap_or_default(),
     };
     let content = body_stream(body, service.config.limits.max_bytes);
     let uploaded = service.upload(&principal, input, content).await?;
@@ -276,7 +295,7 @@ pub(crate) async fn upload_item(
             folder_id: api_folder(item.folder_id),
         })
         .collect();
-    let item = MediaItemResponse::from(uploaded.item);
+    let item = super::describe(&service, uploaded.item).await?;
     let location = format!("/media/{}", item.id_ref());
     Ok(Created::new(location, UploadedResponse { item, duplicates }))
 }
@@ -303,7 +322,7 @@ pub(crate) async fn get_item(
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<MediaItemResponse>, Error> {
     let item = service.get(&principal, id).await?;
-    Ok(Tagged { version: item.updated_at, data: item.into() })
+    tagged(&service, item).await
 }
 
 /// Change the details of a media item.
@@ -338,7 +357,7 @@ pub(crate) async fn update_item(
 ) -> Result<Tagged<MediaItemResponse>, Error> {
     let expected = if_match.required()?;
     let item = service.update(&principal, id, input.into(), expected).await?;
-    Ok(Tagged { version: item.updated_at, data: item.into() })
+    tagged(&service, item).await
 }
 
 /// Move a media item to the trash.
@@ -366,7 +385,7 @@ pub(crate) async fn trash_item(
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<MediaItemResponse>, Error> {
     let item = service.trash(&principal, id).await?;
-    Ok(Tagged { version: item.updated_at, data: item.into() })
+    tagged(&service, item).await
 }
 
 /// Restore a media item from the trash.
@@ -392,7 +411,7 @@ pub(crate) async fn restore_item(
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<MediaItemResponse>, Error> {
     let item = service.restore(&principal, id).await?;
-    Ok(Tagged { version: item.updated_at, data: item.into() })
+    tagged(&service, item).await
 }
 
 /// Delete a media item in the trash for good.

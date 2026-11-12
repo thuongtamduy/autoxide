@@ -5,6 +5,7 @@
 mod content;
 mod folders;
 mod items;
+mod tags;
 
 use std::sync::Arc;
 
@@ -19,16 +20,20 @@ use uuid::Uuid;
 
 use crate::entity::api_folder;
 use crate::folders::Folder;
-use crate::service::{FolderFilter, Item, MediaService, Visibility, content_url};
+use crate::service::{FolderFilter, Item, ItemDetails, MediaService, Visibility, content_url};
+use crate::variants::Variant;
 
 pub(crate) use folders::FolderResponse;
-pub(crate) use items::ItemsQuery;
+pub(crate) use items::{DuplicateItem, ItemsQuery, UploadedResponse};
+pub(crate) use tags::TagResponse;
 
 pub(crate) fn routes(service: Arc<MediaService>) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(items::list_items, items::upload_item))
         .routes(routes!(folders::list_folders, folders::create_folder))
         .routes(routes!(folders::get_folder, folders::update_folder, folders::delete_folder))
+        .routes(routes!(tags::list_tags))
+        .routes(routes!(tags::get_tag, tags::rename_tag, tags::delete_tag))
         .routes(routes!(items::get_item, items::update_item, items::trash_item))
         .routes(routes!(items::restore_item))
         .routes(routes!(items::purge_item))
@@ -80,12 +85,54 @@ pub(crate) struct MediaItemResponse {
     updated_at: DateTime<Utc>,
     /// When the item was moved to the trash; `null` when it is not in the trash.
     trashed_at: Option<DateTime<Utc>>,
+    /// Tags of the item, sorted by name.
+    #[schema(example = json!(["logo", "brand"]))]
+    tags: Vec<String>,
+    /// Smaller copies of a JPEG, PNG, GIF or WebP image, narrowest first, for `srcset`.
+    /// Made in the background shortly after an upload or a content change: empty until then,
+    /// and for other types.
+    variants: Vec<VariantResponse>,
 }
 
-impl From<Item> for MediaItemResponse {
-    fn from(item: Item) -> Self {
+/// A smaller copy of an image.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct VariantResponse {
+    #[schema(example = 640)]
+    width: i32,
+    #[schema(example = 360)]
+    height: i32,
+    /// `image/jpeg`, or `image/png` for images with transparency.
+    #[schema(example = "image/jpeg")]
+    content_type: String,
+    /// Size in bytes.
+    size: u64,
+    /// Where to load it: the item's `url` with `&w=<width>`.
+    url: String,
+}
+
+impl VariantResponse {
+    fn new(item_url: &str, variant: Variant) -> Self {
+        VariantResponse {
+            url: format!("{item_url}&w={}", variant.width),
+            width: variant.width,
+            height: variant.height,
+            content_type: variant.content_type,
+            size: u64::try_from(variant.size).unwrap_or_default(),
+        }
+    }
+}
+
+impl From<ItemDetails> for MediaItemResponse {
+    fn from(details: ItemDetails) -> Self {
+        let ItemDetails { item, tags, variants } = details;
+        let url = content_url(&item);
         MediaItemResponse {
-            url: content_url(&item),
+            tags,
+            variants: variants
+                .into_iter()
+                .map(|variant| VariantResponse::new(&url, variant))
+                .collect(),
+            url,
             visibility: Visibility::of(&item),
             id: item.id,
             folder_id: api_folder(item.folder_id),
@@ -117,6 +164,33 @@ impl From<Folder> for FolderResponse {
             updated_at: folder.updated_at,
         }
     }
+}
+
+/// Item như API trả về (kèm nhãn và ảnh thu nhỏ).
+pub(crate) async fn describe(
+    service: &MediaService,
+    item: Item,
+) -> Result<MediaItemResponse, Error> {
+    Ok(service.describe_one(item).await?.into())
+}
+
+/// Item kèm `ETag` (phiên bản của bản ghi).
+pub(crate) async fn tagged(
+    service: &MediaService,
+    item: Item,
+) -> Result<autoxide_kernel::version::Tagged<MediaItemResponse>, Error> {
+    let version = item.updated_at;
+    Ok(autoxide_kernel::version::Tagged { version, data: describe(service, item).await? })
+}
+
+/// Một trang item như API trả về; nhãn và ảnh thu nhỏ của cả trang đọc chung một lần.
+pub(crate) async fn page_of(
+    service: &MediaService,
+    page: autoxide_kernel::pagination::Page<Item>,
+) -> Result<autoxide_kernel::pagination::Page<MediaItemResponse>, Error> {
+    let autoxide_kernel::pagination::Page { data, pagination } = page;
+    let data = service.describe(data).await?.into_iter().map(MediaItemResponse::from).collect();
+    Ok(autoxide_kernel::pagination::Page { data, pagination })
 }
 
 /// Tham số `folder_id` / `parent_id` của danh sách: `root` hay một UUID.

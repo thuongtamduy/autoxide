@@ -40,19 +40,20 @@ curl -X POST "http://localhost:8080/api/v1/media?name=team.jpg" \
 - Accepted types are set by `AUTOXIDE_MEDIA_ALLOWED_TYPES` (default: JPEG, PNG, GIF, WebP,
   AVIF, SVG, MP4, WebM, every audio type, PDF); the largest size by
   `AUTOXIDE_MEDIA_MAX_BYTES` (default 100 MiB).
-- Raster images (JPEG, PNG, GIF, WebP, AVIF) get `width` and `height`. The server keeps
-  the original only: it makes no thumbnails or other sizes. Resize on the website (for
-  example with an image component of your framework) or in front of the server.
+- Raster images (JPEG, PNG, GIF, WebP, AVIF) get `width` and `height`. JPEG, PNG, GIF and
+  WebP images also get smaller copies (see below).
 - The answer (`201`, with `Location`) lists `duplicates`: items already in the library
   with exactly the same content (same SHA-256). The upload is kept either way.
-- `folder_id=<id>` puts the item in a folder. New items are `private`.
+- `folder_id=<id>` puts the item in a folder, `tags=brand,logo` gives it tags. New items
+  are `private`.
 
 ## Read, list, search
 
 - `GET /api/v1/media/{id}` — one item, with an `ETag`.
 - `GET /api/v1/media` — a page of items. Filters: `folder_id` (`root` or an id; only that
   folder, not its subfolders), `type` (`image/png` or `image/*`), `visibility` (`public` /
-  `private`), `trashed=true` (the trash), `q` (name contains, ignoring case). Order:
+  `private`), `trashed=true` (the trash), `q` (name contains, ignoring case), `tag` (has
+  this tag, ignoring case). Order:
   `sort=created_at|name|size` with `order=asc|desc`. Follow `pagination.next_cursor` with
   the same filters.
 
@@ -63,7 +64,7 @@ Without it the answer is `428` (code `precondition_required`); if someone change
 in between, `412` (code `precondition_failed`) — read it again and retry.
 
 - `PATCH /api/v1/media/{id}` — `name`, `alt`, `title`, `caption`, `folder_id` (`null`
-  for the root), `visibility`.
+  for the root), `visibility`, `tags` (replaces them all; `[]` removes them).
 - `PUT /api/v1/media/{id}/content` — replace the content, keeping the id (and every place
   that uses the item). Same checks as an upload. The `url`, `version_id` and `ETag` change;
   the old content is deleted.
@@ -88,6 +89,31 @@ Every item has a `url`: `/api/v1/media/{id}/content?v=<version_id>`.
   video works); a range outside the content with `416`. `HEAD` gives the headers only.
   `If-None-Match` with the `ETag` gives `304`.
 
+## Smaller copies of images
+
+A few seconds after an upload (or a content change), a background job makes smaller copies
+of every JPEG, PNG, GIF and WebP image, at the widths in `AUTOXIDE_MEDIA_IMAGE_WIDTHS`
+(default `320,640,1280,1920`; only widths smaller than the image; `off` to turn this off).
+They are turned the right way up (EXIF orientation), keep the proportions, and are JPEG — or
+PNG when the image has transparency. The item lists them in `variants`, each with its `url`
+(the item's `url` plus `&w=<width>`), ready for `srcset`:
+
+```html
+<img src="/api/v1/media/…/content?v=…&w=640"
+     srcset="…&w=320 320w, …&w=640 640w, …&w=1280 1280w" sizes="100vw" alt="…">
+```
+
+Until a copy is made, asking for it returns the original, briefly cached. Images over 40
+million pixels, AVIF and SVG get no copies. Replacing the content makes new copies and
+deletes the old ones. Copies follow the item's visibility and trash.
+
+## Tags
+
+Besides its one folder, an item may carry up to 20 tags (each 1 to 50 characters, without
+`,`). Tags are created when first given to an item. `/api/v1/media/tags` lists them, with
+the number of items (not in the trash) carrying each, renames one (`PATCH`, with `If-Match`)
+or deletes one (`DELETE`, removing it from every item). Names are unique, ignoring case.
+
 ## Folders
 
 `/api/v1/media/folders`: create (`POST`, `name` and `parent_id`), list (`GET`, filter
@@ -108,16 +134,17 @@ empty folders can be deleted — items in the trash count (`409`, `media.folder_
 
 ## AI agents (MCP)
 
-Tools `media.list`, `media.get`, `media.update` and `media.trash`, with the same
-permissions as the REST endpoints. `media.update` takes the `updated_at` you read instead
-of `If-Match`. Uploading goes through REST: binary content does not fit well in a tool
-call.
+Tools `media.list`, `media.get`, `media.update`, `media.trash`, `media.list_tags` and
+`media.upload`, with the same permissions as the REST endpoints. `media.update` takes the
+`updated_at` you read instead of `If-Match`. `media.upload` takes the content as base64, up
+to 1 MiB (the whole tool call must also fit `AUTOXIDE_HTTP_BODY_LIMIT_BYTES`, 1 MiB by
+default); upload larger files through REST.
 
 ## For module authors
 
 Other modules read media through the `autoxide_media::api::Media` trait (register after
-`media`): `find_many(&ids)` returns, in one query, the id, visibility, type, image size,
-`alt` and `url` of each item not in the trash. Keep only the item id in your own tables.
+`media`): `find_many(&ids)` returns, in two queries for any number of ids, the id, visibility, type,
+image size, `alt`, `url` and smaller copies of each item not in the trash. Keep only the item id in your own tables.
 
 ## When an account is deleted
 

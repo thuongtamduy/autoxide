@@ -25,6 +25,7 @@ fn upload(name: &str, content_type: &str) -> NewUpload {
         name: name.to_owned(),
         folder_id: None,
         content_type: Some(content_type.to_owned()),
+        tags: Vec::new(),
     }
 }
 
@@ -76,7 +77,12 @@ async fn tai_len_moi_dinh_dang_anh() {
         );
 
         // Không khai loại: tự nhận.
-        let auto = NewUpload { name: "doc.pdf".into(), folder_id: None, content_type: None };
+        let auto = NewUpload {
+            name: "doc.pdf".into(),
+            folder_id: None,
+            content_type: None,
+            tags: Vec::new(),
+        };
         let pdf = media.upload(&ada, auto, body(samples::PDF)).await.unwrap().item;
         assert_eq!((pdf.content_type.as_str(), pdf.width), ("application/pdf", None));
         let octet = upload("clip.mp4", "application/octet-stream");
@@ -104,6 +110,7 @@ async fn noi_dung_sai_bi_tu_choi_khong_de_lai_gi() {
                 name: name.into(),
                 folder_id: None,
                 content_type: declared.map(str::to_owned),
+                tags: Vec::new(),
             };
             let error = media.upload(&ada, input, body(bytes)).await.unwrap_err();
             (error.kind(), error.code().to_owned())
@@ -144,6 +151,7 @@ async fn noi_dung_sai_bi_tu_choi_khong_de_lai_gi() {
             name: " ".into(),
             folder_id: Some(Uuid::now_v7()),
             content_type: Some("image/png".into()),
+            tags: Vec::new(),
         };
         let error = media.upload(&ada, input, body(&samples::png(1, 1))).await.unwrap_err();
         let fields: Vec<&str> = error.fields().iter().map(|field| field.field.as_str()).collect();
@@ -344,8 +352,12 @@ async fn danh_sach_loc_sap_lat_trang() {
             ("Report 100%.pdf", "application/pdf", samples::PDF.to_vec(), Some(folder.id)),
             ("cat.gif", "image/gif", samples::gif(1, 1), Some(folder.id)),
         ] {
-            let input =
-                NewUpload { name: name.into(), folder_id, content_type: Some(declared.into()) };
+            let input = NewUpload {
+                name: name.into(),
+                folder_id,
+                content_type: Some(declared.into()),
+                tags: Vec::new(),
+            };
             ids.push(media.upload(&ada, input, body(&bytes)).await.unwrap().item.id);
         }
         let public = ItemChanges { visibility: Some(Visibility::Public), ..Default::default() };
@@ -526,6 +538,7 @@ async fn thu_muc_long_nhau() {
             name: "a.png".into(),
             folder_id: Some(summer.id),
             content_type: Some("image/png".into()),
+            tags: Vec::new(),
         };
         let item = media.upload(&ada, input, body(&samples::png(1, 1))).await.unwrap().item;
         media.trash(&ada, item.id).await.unwrap();
@@ -707,6 +720,215 @@ async fn du_lieu_ca_nhan() {
         media.handle(&deleted).await.unwrap();
         assert_eq!(media.get(&ada, item.id).await.unwrap().uploaded_by, None);
         assert_eq!(media.export(ada.user_id()).await.unwrap(), json!([]));
+    })
+    .await
+    .unwrap();
+}
+
+/// Nhãn: gắn khi tải lên và khi sửa (thay cả bộ, bỏ trùng không phân biệt hoa thường), lọc
+/// theo nhãn, đếm item (không tính thùng rác), đổi tên, xoá — trên cả hai database.
+#[tokio::test]
+async fn nhan_gan_loc_doi_ten_xoa() {
+    use crate::tags::TagSort;
+
+    TestDatabase::run(async |test| {
+        let (media, _, database) = service(test, limits()).await;
+        let ada = editor();
+        let tagged = |name: &str, tags: &[&str]| NewUpload {
+            name: name.into(),
+            folder_id: None,
+            content_type: Some("image/png".into()),
+            tags: tags.iter().map(|tag| (*tag).to_owned()).collect(),
+        };
+        let a = media
+            .upload(&ada, tagged("a.png", &["Brand", " logo ", "brand"]), body(&samples::png(1, 1)))
+            .await;
+        let a = a.unwrap().item;
+        let b = media
+            .upload(&ada, tagged("b.png", &["logo"]), body(&samples::png(2, 2)))
+            .await
+            .unwrap()
+            .item;
+        let described = media.describe(vec![a.clone(), b.clone()]).await.unwrap();
+        assert_eq!(described[0].tags, ["Brand", "logo"]);
+        assert_eq!(described[1].tags, ["logo"]);
+
+        let only = |tag: &str| ItemFilter { tag: Some(tag.into()), ..Default::default() };
+        let names = async |filter: ItemFilter| -> Vec<String> {
+            media
+                .list(&ada, &filter, &page(10))
+                .await
+                .unwrap()
+                .data
+                .into_iter()
+                .map(|item| item.name)
+                .collect()
+        };
+        assert_eq!(names(only("LOGO")).await, ["a.png", "b.png"]);
+        assert_eq!(names(only("brand")).await, ["a.png"]);
+        assert!(names(only("missing")).await.is_empty());
+
+        // Thay cả bộ nhãn; lỗi của mọi trường báo một lần.
+        let changes = ItemChanges { tags: Some(vec!["Summer".into()]), ..Default::default() };
+        media.update(&ada, a.id, changes, None).await.unwrap();
+        assert_eq!(names(only("brand")).await, Vec::<String>::new());
+        let bad = ItemChanges {
+            tags: Some(vec!["a,b".into(), "x".repeat(51)]),
+            alt: Some("x".repeat(1001)),
+            ..Default::default()
+        };
+        let error = media.update(&ada, a.id, bad, None).await.unwrap_err();
+        let fields: Vec<&str> = error.fields().iter().map(|field| field.field.as_str()).collect();
+        assert_eq!(fields, ["alt", "tags"]);
+        let many = ItemChanges {
+            tags: Some((0..21).map(|n| format!("t{n}")).collect()),
+            ..Default::default()
+        };
+        assert_eq!(
+            media.update(&ada, a.id, many, None).await.unwrap_err().fields()[0].code,
+            "length"
+        );
+
+        media.trash(&ada, b.id).await.unwrap();
+        let tags = media.list_tags(&ada, None, TagSort::Name, &page(10)).await.unwrap();
+        let counted: Vec<(String, u64)> =
+            tags.data.iter().map(|t| (t.tag.name.clone(), t.items)).collect();
+        assert_eq!(counted, [("Brand".into(), 0), ("logo".into(), 0), ("Summer".into(), 1)]);
+        let summer = tags.data[2].tag.clone();
+        let searched = media.list_tags(&ada, Some("SUM"), TagSort::Name, &page(10)).await.unwrap();
+        assert_eq!(searched.data.len(), 1);
+
+        let renamed = media
+            .rename_tag(&ada, summer.id, "Summer 2026", Some(summer.updated_at))
+            .await
+            .unwrap();
+        assert_eq!(renamed.tag.name, "Summer 2026");
+        let stale =
+            media.rename_tag(&ada, summer.id, "x", Some(summer.updated_at)).await.unwrap_err();
+        assert_eq!(stale.kind(), ErrorKind::PreconditionFailed);
+        let taken = media.rename_tag(&ada, summer.id, "LOGO", None).await.unwrap_err();
+        assert_eq!(taken.code(), "media.tag_name_taken");
+        assert_eq!(media.describe(vec![a.clone()]).await.unwrap()[0].tags, ["Summer 2026"]);
+
+        media.delete_tag(&ada, summer.id).await.unwrap();
+        assert!(media.describe(vec![a.clone()]).await.unwrap()[0].tags.is_empty());
+        assert_eq!(
+            media.delete_tag(&ada, summer.id).await.unwrap_err().code(),
+            "media.tag_not_found"
+        );
+        let reader = user(&["read"]);
+        assert_eq!(
+            media.delete_tag(&reader, tags.data[0].tag.id).await.unwrap_err().code(),
+            "permission_denied"
+        );
+        let names = events(&database).await;
+        assert!(names.contains(&"media.tag_updated".to_owned()));
+        assert!(names.contains(&"media.tag_deleted".to_owned()));
+    })
+    .await
+    .unwrap();
+}
+
+/// Nhiều lần tải lên cùng lúc, cùng gắn một nhãn mới: mọi lần thành công, chỉ có một nhãn —
+/// trên cả hai database.
+#[tokio::test]
+async fn gan_nhan_moi_dong_thoi() {
+    TestDatabase::run(async |test| {
+        let (media, _, _) = service(test, limits()).await;
+        let attempts: Vec<_> = (1..=5u32)
+            .map(|size| {
+                let media = media.clone();
+                tokio::spawn(async move {
+                    let input = NewUpload {
+                        name: format!("{size}.png"),
+                        folder_id: None,
+                        content_type: Some("image/png".into()),
+                        tags: vec!["Fresh".into()],
+                    };
+                    media.upload(&editor(), input, body(&samples::png(size, size))).await
+                })
+            })
+            .collect();
+        for attempt in attempts {
+            attempt.await.unwrap().unwrap();
+        }
+        let tags =
+            media.list_tags(&editor(), None, crate::tags::TagSort::Name, &page(10)).await.unwrap();
+        assert_eq!(tags.data.len(), 1);
+        assert_eq!(tags.data[0].items, 5);
+    })
+    .await
+    .unwrap();
+}
+
+/// Ảnh thu nhỏ: tải lên đưa job vào hàng đợi; job làm đúng các cỡ nhỏ hơn ảnh; thay nội dung
+/// thì bản cũ bị xoá và job cũ không làm gì; xoá hẳn thì hết; job dọn mồ côi giữ bản hiện tại.
+#[tokio::test]
+async fn anh_thu_nho_theo_phien_ban() {
+    use image::ImageFormat;
+
+    use crate::variants::samples::encoded;
+
+    TestDatabase::run(async |test| {
+        let (media, storage, database) = service(test, limits()).await;
+        let ada = editor();
+        let original = encoded(150, 90, ImageFormat::Png, false);
+        let item = media.upload(&ada, upload("wide.png", "image/png"), body(&original)).await;
+        let item = item.unwrap().item;
+        let backend = database.read().get_database_backend();
+        let jobs = database
+            .read()
+            .query_all_raw(Statement::from_string(backend, "SELECT kind FROM media_jobs"))
+            .await
+            .unwrap();
+        assert_eq!(jobs.len(), 1, "one job queued with the upload");
+
+        // Cấu hình test: rộng 100 và 200; ảnh rộng 150 nên chỉ có bản 100.
+        assert_eq!(media.make_variants(item.id, item.version_id).await.unwrap(), 1);
+        let copies = media.describe_one(item.clone()).await.unwrap().variants;
+        assert_eq!(copies.iter().map(|c| (c.width, c.height)).collect::<Vec<_>>(), [(100, 60)]);
+        assert_eq!(copies[0].content_type, "image/jpeg");
+        let copy_key = copies[0].storage_key();
+        let stored = media.read_key(&copy_key, None).await.unwrap();
+        let bytes: Vec<bytes::Bytes> = stored.content.try_collect().await.unwrap();
+        let decoded = image::load_from_memory(&bytes.concat()).unwrap();
+        assert_eq!((decoded.width(), decoded.height()), (100, 60));
+        // Chạy lại job (vd thử lại): không nhân đôi.
+        media.make_variants(item.id, item.version_id).await.unwrap();
+        assert_eq!(media.describe_one(item.clone()).await.unwrap().variants.len(), 1);
+
+        // Ảnh SVG, PDF, ảnh nhỏ hơn mọi cỡ: không có job.
+        media
+            .upload(&ada, upload("tiny.png", "image/png"), body(&samples::png(50, 50)))
+            .await
+            .unwrap();
+        let jobs = database
+            .read()
+            .query_all_raw(Statement::from_string(backend, "SELECT kind FROM media_jobs"))
+            .await;
+        assert_eq!(jobs.unwrap().len(), 1);
+
+        // Thay nội dung: bản thu nhỏ cũ bị xoá, job của phiên bản cũ không làm gì.
+        let bigger = encoded(400, 200, ImageFormat::Png, true);
+        let new =
+            media.replace(&ada, item.id, Some("image/png"), body(&bigger), None).await.unwrap();
+        assert!(media.describe_one(new.clone()).await.unwrap().variants.is_empty());
+        assert!(storage.get(&copy_key).await.unwrap().is_none());
+        assert_eq!(media.make_variants(item.id, item.version_id).await.unwrap(), 0);
+        assert_eq!(media.make_variants(new.id, new.version_id).await.unwrap(), 2);
+        let copies = media.describe_one(new.clone()).await.unwrap().variants;
+        assert_eq!(
+            copies.iter().map(|c| c.content_type.as_str()).collect::<Vec<_>>(),
+            ["image/png", "image/png"]
+        );
+
+        // Dọn mồ côi giữ bản thu nhỏ của phiên bản hiện tại.
+        assert_eq!(media.clean_orphans(Utc::now() + chrono::Duration::days(2)).await.unwrap(), 0);
+        assert_eq!(storage.keys_with_prefix(&format!("media/{}/", new.id)).await.unwrap().len(), 3);
+
+        media.trash(&ada, new.id).await.unwrap();
+        media.purge(&ada, new.id).await.unwrap();
+        assert!(storage.keys_with_prefix(&format!("media/{}/", new.id)).await.unwrap().is_empty());
     })
     .await
     .unwrap();

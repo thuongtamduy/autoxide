@@ -1,7 +1,8 @@
 //! Tool MCP của module `media`. Mỗi tool: một kiểu đầu vào (kiểm như REST), permission như
 //! endpoint REST tương ứng (service tự kiểm), thân là MỘT lời gọi service (luật kiến trúc 8).
-//! Không có tool tải lên ở bước này: nội dung nhị phân qua JSON-RPC phải mã hoá base64,
-//! nặng và dễ vượt giới hạn — AI agent tải lên qua REST (D-090).
+//! Tải lên qua MCP (`media.upload`, D-095): nội dung base64 trong lời gọi tool, chỉ cho file
+//! nhỏ ([`MAX_TOOL_BYTES`]) — lời gọi MCP còn chịu giới hạn thân request chung của máy chủ.
+//! File lớn tải lên qua REST.
 
 use std::sync::Arc;
 
@@ -15,9 +16,18 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::http::{ItemsQuery, MediaItemResponse, present};
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
+
+use crate::http::{DuplicateItem, ItemsQuery, TagResponse, UploadedResponse, present};
 use crate::permissions::{MEDIA_READ, MEDIA_WRITE};
-use crate::service::{ItemChanges, MediaService, Visibility};
+use crate::service::{ItemChanges, MediaService, Visibility, content_url, too_large};
+use crate::tags::TagSort;
+use crate::upload::NewUpload;
+
+/// Lớn nhất `media.upload` nhận (base64 to hơn khoảng một phần ba; lời gọi còn phải lọt giới
+/// hạn thân request chung `AUTOXIDE_HTTP_BODY_LIMIT_BYTES`).
+pub(crate) const MAX_TOOL_BYTES: u64 = 1024 * 1024;
 
 /// Filters, order and paging of the media list; omitted fields do not filter.
 #[derive(Debug, Default, Deserialize, Validate, ToSchema)]
@@ -35,6 +45,8 @@ pub(crate) struct ListMediaInput {
     trashed: Option<bool>,
     /// Only items whose name contains this text, ignoring case.
     q: Option<String>,
+    /// Only items with this tag, ignoring case.
+    tag: Option<String>,
     /// `created_at` (default), `name` or `size`.
     sort: Option<String>,
     /// Maximum number of items to return, 1 to 200. Defaults to 50.
@@ -77,12 +89,45 @@ pub(crate) struct UpdateMediaInput {
     folder_id: Option<Option<Uuid>>,
     /// `public` (anyone with the link may load the content) or `private`.
     visibility: Option<String>,
+    /// Replace the tags of the item; `[]` removes them all.
+    tags: Option<Vec<String>>,
+}
+
+/// A small file to add to the media library.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UploadMediaInput {
+    /// File name, 1 to 255 characters, without `/` or `\`.
+    name: String,
+    /// The content, base64-encoded (standard alphabet, with padding); at most 1 MiB once
+    /// decoded. Upload larger files with `POST /api/v1/media`.
+    content_base64: String,
+    /// Media type, e.g. `image/png`. Omit to let the server detect it.
+    content_type: Option<String>,
+    /// Folder to put the item in. Omit for the root.
+    folder_id: Option<Uuid>,
+    /// Tags for the item.
+    tags: Option<Vec<String>>,
+}
+
+/// Which tags to list.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListTagsInput {
+    /// Only tags whose name contains this text, ignoring case.
+    q: Option<String>,
+    /// Maximum number of tags to return, 1 to 200. Defaults to 50.
+    #[schema(minimum = 1, maximum = 200)]
+    limit: Option<u32>,
+    /// Where to continue: the `next_cursor` of the previous page.
+    cursor: Option<String>,
 }
 
 pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
     // Mỗi tool giữ một bản `Arc` của service (clone `Arc` chỉ tăng bộ đếm tham chiếu).
     let (list, get, update, trash) =
         (service.clone(), service.clone(), service.clone(), service.clone());
+    let (upload, list_tags) = (service.clone(), service.clone());
     vec![
         Tool::new(
             "list",
@@ -98,6 +143,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                         visibility: input.visibility,
                         trashed: input.trashed.map(|trashed| trashed.to_string()),
                         q: input.q,
+                        tag: input.tag,
                         sort: input.sort,
                     };
                     let paging = PageQuery {
@@ -109,7 +155,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                     let filter = query.filter(&mut problems);
                     let page = crate::http::page_request(paging, problems)?;
                     let page = service.list(&principal, &filter, &page).await?;
-                    Ok::<Page<MediaItemResponse>, Error>(page.map(MediaItemResponse::from))
+                    crate::http::page_of(&service, page).await
                 }
             },
         )
@@ -122,9 +168,8 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             move |principal: Principal, input: MediaId| {
                 let service = get.clone();
                 async move {
-                    Ok::<_, Error>(MediaItemResponse::from(
-                        service.get(&principal, input.id).await?,
-                    ))
+                    let item = service.get(&principal, input.id).await?;
+                    crate::http::describe(&service, item).await
                 }
             },
         )
@@ -157,11 +202,12 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                         caption: input.caption,
                         folder_id: input.folder_id,
                         visibility,
+                        tags: input.tags,
                     };
                     let item = service
                         .update(&principal, input.id, changes, Some(input.updated_at))
                         .await?;
-                    Ok(MediaItemResponse::from(item))
+                    crate::http::describe(&service, item).await
                 }
             },
         )
@@ -173,12 +219,75 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             move |principal: Principal, input: MediaId| {
                 let service = trash.clone();
                 async move {
-                    Ok::<_, Error>(MediaItemResponse::from(
-                        service.trash(&principal, input.id).await?,
-                    ))
+                    let item = service.trash(&principal, input.id).await?;
+                    crate::http::describe(&service, item).await
                 }
             },
         )
         .requires(MEDIA_WRITE),
+        Tool::new(
+            "upload",
+            "Add a small file (at most 1 MiB) to the media library, sent as base64. The server \
+             checks the content really is of its type and reads image sizes. Upload larger \
+             files with `POST /api/v1/media`. The answer lists items that already had the same \
+             content in `duplicates`.",
+            move |principal: Principal, input: UploadMediaInput| {
+                let service = upload.clone();
+                async move {
+                    let bytes = STANDARD.decode(input.content_base64.trim()).map_err(|_| {
+                        Error::validation(vec![FieldError::new(
+                            "content_base64",
+                            "invalid",
+                            "must be base64 (standard alphabet, with padding)",
+                        )])
+                    })?;
+                    if bytes.len() as u64 > MAX_TOOL_BYTES {
+                        return Err(too_large(MAX_TOOL_BYTES));
+                    }
+                    let upload = NewUpload {
+                        name: input.name,
+                        folder_id: input.folder_id,
+                        content_type: input.content_type,
+                        tags: input.tags.unwrap_or_default(),
+                    };
+                    let body = futures_util::stream::iter([Ok(bytes::Bytes::from(bytes))]);
+                    let uploaded = service.upload(&principal, upload, Box::pin(body)).await?;
+                    let duplicates = uploaded
+                        .duplicates
+                        .into_iter()
+                        .map(|item| DuplicateItem {
+                            url: content_url(&item),
+                            id: item.id,
+                            name: item.name,
+                            folder_id: crate::entity::api_folder(item.folder_id),
+                        })
+                        .collect();
+                    let item = crate::http::describe(&service, uploaded.item).await?;
+                    Ok(UploadedResponse { item, duplicates })
+                }
+            },
+        )
+        .requires(MEDIA_WRITE),
+        Tool::new(
+            "list_tags",
+            "List media tags by name, each with the number of items carrying it.",
+            move |principal: Principal, input: ListTagsInput| {
+                let service = list_tags.clone();
+                async move {
+                    let paging = PageQuery {
+                        limit: input.limit.map(|limit| limit.to_string()),
+                        cursor: input.cursor,
+                        order: Some("asc".to_owned()),
+                    };
+                    let page = crate::http::page_request(paging, Vec::new())?;
+                    let tags = service
+                        .list_tags(&principal, input.q.as_deref(), TagSort::Name, &page)
+                        .await?;
+                    Ok::<Page<TagResponse>, Error>(tags.map(TagResponse::from))
+                }
+            },
+        )
+        .requires(MEDIA_READ)
+        .read_only(),
     ]
 }

@@ -5697,6 +5697,16 @@
             "example": "logo"
           },
           {
+            "name": "tag",
+            "in": "query",
+            "description": "Only items with this tag, ignoring case.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "brand"
+          },
+          {
             "name": "sort",
             "in": "query",
             "description": "`created_at` (the default), `name` or `size`; the direction is `order`.",
@@ -5845,6 +5855,16 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "description": "Tags for the item, comma-separated (each 1 to 50 characters, at most 20).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "brand,logo"
           },
           {
             "name": "Accept-Language",
@@ -6619,6 +6639,509 @@
         ]
       }
     },
+    "/api/v1/media/tags": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "List media tags.",
+        "description": "Requires `media.read`. Each tag comes with the number of items carrying it. Sorted by\nname (A to Z with `order=asc`) unless `sort=created_at`.",
+        "operationId": "media_list_media_tags",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only tags whose name contains this text, ignoring case.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "`name` (the default) or `created_at`; the direction is `order`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Field to sort the tag list by.",
+              "enum": [
+                "name",
+                "created_at"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of tags.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TagResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/media/tags/{id}": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Get a media tag.",
+        "description": "Requires `media.read`.",
+        "operationId": "media_get_media_tag",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the tag.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The tag.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TagResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No tag has this id; code `media.tag_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Delete a media tag.",
+        "description": "Requires `media.write`. The tag is removed from every item; the items stay.",
+        "operationId": "media_delete_media_tag",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the tag.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No tag has this id; code `media.tag_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Rename a media tag.",
+        "description": "Requires `media.write`. Every item carrying the tag shows the new name. `If-Match` is\nrequired.",
+        "operationId": "media_rename_media_tag",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the tag.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the tag since; otherwise `412`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameTagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The tag after the change.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TagResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No tag has this id; code `media.tag_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another tag has this name; code `media.tag_name_taken`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "`If-Match` does not match: the tag changed since you read it; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The name is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/media/{id}": {
       "get": {
         "tags": [
@@ -7028,6 +7551,17 @@
             }
           },
           {
+            "name": "w",
+            "in": "query",
+            "description": "Width of a smaller copy (one of the item's `variants`). Until that copy is made, or\nwhen the image is narrower, the original is sent.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
             "name": "Range",
             "in": "header",
             "description": "One byte range, e.g. `bytes=0-1023`, `bytes=1024-` or `bytes=-500`. Several ranges are answered with the whole content.",
@@ -7408,6 +7942,17 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "w",
+            "in": "query",
+            "description": "Width of a smaller copy (one of the item's `variants`). Until that copy is made, or\nwhen the image is narrower, the original is sent.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
             }
           },
           {
@@ -9510,7 +10055,9 @@
               "version_id",
               "url",
               "created_at",
-              "updated_at"
+              "updated_at",
+              "tags",
+              "variants"
             ],
             "properties": {
               "alt": {
@@ -9567,6 +10114,17 @@
                 "example": 482133,
                 "minimum": 0
               },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Tags of the item, sorted by name.",
+                "example": [
+                  "logo",
+                  "brand"
+                ]
+              },
               "title": {
                 "type": "string",
                 "description": "Title; empty when unset."
@@ -9595,6 +10153,13 @@
                 "type": "string",
                 "description": "Where to load the content, with its version: the address changes when the content\ndoes, so it may be cached for a long time. Public items load without signing in.",
                 "example": "/api/v1/media/0193a0c4-7d1e-7c2a-9b1e-3f2d5c6b7a81/content?v=0193a0c4-7d1e-7c2a-9b1e-3f2d5c6b7a82"
+              },
+              "variants": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VariantResponse"
+                },
+                "description": "Smaller copies of a JPEG, PNG, GIF or WebP image, narrowest first, for `srcset`.\nMade in the background shortly after an upload or a content change: empty until then,\nand for other types."
               },
               "version_id": {
                 "type": "string",
@@ -9870,6 +10435,52 @@
               "secret": {
                 "type": "string",
                 "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+              }
+            }
+          }
+        }
+      },
+      "Data_TagResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A tag. Items carry tags as names; tags are created when first given to an item.",
+            "required": [
+              "id",
+              "name",
+              "item_count",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "item_count": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Number of items (not in the trash) with this tag.",
+                "example": 12,
+                "minimum": 0
+              },
+              "name": {
+                "type": "string",
+                "description": "Unique, ignoring case.",
+                "example": "brand"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
               }
             }
           }
@@ -10574,7 +11185,9 @@
           "version_id",
           "url",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "tags",
+          "variants"
         ],
         "properties": {
           "alt": {
@@ -10631,6 +11244,17 @@
             "example": 482133,
             "minimum": 0
           },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags of the item, sorted by name.",
+            "example": [
+              "logo",
+              "brand"
+            ]
+          },
           "title": {
             "type": "string",
             "description": "Title; empty when unset."
@@ -10659,6 +11283,13 @@
             "type": "string",
             "description": "Where to load the content, with its version: the address changes when the content\ndoes, so it may be cached for a long time. Public items load without signing in.",
             "example": "/api/v1/media/0193a0c4-7d1e-7c2a-9b1e-3f2d5c6b7a81/content?v=0193a0c4-7d1e-7c2a-9b1e-3f2d5c6b7a82"
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VariantResponse"
+            },
+            "description": "Smaller copies of a JPEG, PNG, GIF or WebP image, narrowest first, for `srcset`.\nMade in the background shortly after an upload or a content change: empty until then,\nand for other types."
           },
           "version_id": {
             "type": "string",
@@ -11197,7 +11828,9 @@
                 "version_id",
                 "url",
                 "created_at",
-                "updated_at"
+                "updated_at",
+                "tags",
+                "variants"
               ],
               "properties": {
                 "alt": {
@@ -11254,6 +11887,17 @@
                   "example": 482133,
                   "minimum": 0
                 },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Tags of the item, sorted by name.",
+                  "example": [
+                    "logo",
+                    "brand"
+                  ]
+                },
                 "title": {
                   "type": "string",
                   "description": "Title; empty when unset."
@@ -11282,6 +11926,13 @@
                   "type": "string",
                   "description": "Where to load the content, with its version: the address changes when the content\ndoes, so it may be cached for a long time. Public items load without signing in.",
                   "example": "/api/v1/media/0193a0c4-7d1e-7c2a-9b1e-3f2d5c6b7a81/content?v=0193a0c4-7d1e-7c2a-9b1e-3f2d5c6b7a82"
+                },
+                "variants": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VariantResponse"
+                  },
+                  "description": "Smaller copies of a JPEG, PNG, GIF or WebP image, narrowest first, for `srcset`.\nMade in the background shortly after an upload or a content change: empty until then,\nand for other types."
                 },
                 "version_id": {
                   "type": "string",
@@ -11470,6 +12121,60 @@
                   ],
                   "description": "The `User-Agent` header sent when signing in (up to 255 characters); `null` when\nnone was sent.",
                   "example": "Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Page_TagResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A tag. Items carry tags as names; tags are created when first given to an item.",
+              "required": [
+                "id",
+                "name",
+                "item_count",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "item_count": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "Number of items (not in the trash) with this tag.",
+                  "example": 12,
+                  "minimum": 0
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Unique, ignoring case.",
+                  "example": "brand"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
                 }
               }
             },
@@ -11799,6 +12504,21 @@
           }
         }
       },
+      "RenameTagRequest": {
+        "type": "object",
+        "description": "A new name for a tag.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "1 to 50 characters, without `,`; unique, ignoring case.",
+            "example": "brand"
+          }
+        },
+        "additionalProperties": false
+      },
       "ResetConfirmation": {
         "type": "object",
         "description": "A new password, with the token from the reset mail.",
@@ -11985,6 +12705,43 @@
           }
         }
       },
+      "TagResponse": {
+        "type": "object",
+        "description": "A tag. Items carry tags as names; tags are created when first given to an item.",
+        "required": [
+          "id",
+          "name",
+          "item_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "item_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of items (not in the trash) with this tag.",
+            "example": 12,
+            "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique, ignoring case.",
+            "example": "brand"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "TokenResponse": {
         "type": "object",
         "description": "A new pair of tokens.",
@@ -12139,6 +12896,20 @@
             ],
             "description": "New file name, 1 to 255 characters, without `/` or `\\`."
           },
+          "tags": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Replace the tags of the item (each 1 to 50 characters, without `,`; at most 20);\n`[]` removes them all. New tag names are created.",
+            "example": [
+              "brand",
+              "logo"
+            ]
+          },
           "title": {
             "type": [
               "string",
@@ -12268,6 +13039,44 @@
               "format": "uuid"
             },
             "description": "Ids of the roles. Replaces every role the user had; `[]` removes all."
+          }
+        }
+      },
+      "VariantResponse": {
+        "type": "object",
+        "description": "A smaller copy of an image.",
+        "required": [
+          "width",
+          "height",
+          "content_type",
+          "size",
+          "url"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string",
+            "description": "`image/jpeg`, or `image/png` for images with transparency.",
+            "example": "image/jpeg"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32",
+            "example": 360
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Size in bytes.",
+            "minimum": 0
+          },
+          "url": {
+            "type": "string",
+            "description": "Where to load it: the item's `url` with `&w=<width>`."
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32",
+            "example": 640
           }
         }
       },

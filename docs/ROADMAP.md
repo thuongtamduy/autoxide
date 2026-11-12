@@ -182,6 +182,12 @@ Module `media`:
 - [x] Event cho mọi thay đổi (vào audit log); tool MCP; trait `Media` cho module khác (D-090)
 - [x] Backup / restore mang theo `media`; hướng dẫn dùng (tiếng Anh + tiếng Việt)
 
+Bổ sung (chủ dự án giao thêm ngày 12/11/2026):
+
+- [x] Ảnh thu nhỏ làm bằng job nền, lấy bằng `?w=` (D-093)
+- [x] Nhãn song song với thư mục; quản lý nhãn (D-094)
+- [x] Tải lên qua MCP (base64, tối đa 1 MiB) (D-095)
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.

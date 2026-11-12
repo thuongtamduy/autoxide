@@ -29,10 +29,20 @@ pub(crate) const TRASH_DAYS: Setting = Setting::new(
 )
 .with_default("30");
 
+pub(crate) const IMAGE_WIDTHS: Setting = Setting::new(
+    "AUTOXIDE_MEDIA_IMAGE_WIDTHS",
+    "Widths in pixels of the smaller copies made of every JPEG, PNG, GIF and WebP image \
+     (comma-separated, each 16 to 8192, at most 10); only widths smaller than the image are \
+     made. `off`: no smaller copies.",
+)
+.with_default("320,640,1280,1920");
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MediaConfig {
     pub limits: Limits,
     pub trash_days: u32,
+    /// Chiều rộng các ảnh thu nhỏ, tăng dần; rỗng: không tạo (D-093).
+    pub image_widths: Vec<u32>,
 }
 
 /// Giới hạn của nội dung tải lên.
@@ -93,9 +103,28 @@ impl MediaConfig {
             }
         });
         let trash_days = reader.get_with(&TRASH_DAYS, |raw| parse_in_range(raw, 1u32, 3650));
+        let image_widths = reader.get_with(&IMAGE_WIDTHS, |raw| {
+            if raw.trim().eq_ignore_ascii_case("off") {
+                return Ok(Vec::new());
+            }
+            let mut widths = raw
+                .split(',')
+                .map(str::trim)
+                .filter(|item| !item.is_empty())
+                .map(|item| parse_in_range(item, 16u32, 8192))
+                .collect::<Result<Vec<_>, _>>()?;
+            widths.sort_unstable();
+            widths.dedup();
+            if widths.len() > 10 {
+                Err("must list at most 10 widths".to_owned())
+            } else {
+                Ok(widths)
+            }
+        });
         Ok(MediaConfig {
             limits: Limits { max_bytes: max_bytes?, allowed_types: allowed_types? },
             trash_days: trash_days?,
+            image_widths: image_widths?,
         })
     }
 }
@@ -117,6 +146,12 @@ mod tests {
         let config = read(&[]).unwrap();
         assert_eq!(config.limits.max_bytes, 104_857_600);
         assert_eq!(config.trash_days, 30);
+        assert_eq!(config.image_widths, [320, 640, 1280, 1920]);
+        let none = read(&[("AUTOXIDE_MEDIA_IMAGE_WIDTHS", "off")]).unwrap();
+        assert!(none.image_widths.is_empty());
+        let custom = read(&[("AUTOXIDE_MEDIA_IMAGE_WIDTHS", "800, 200,800")]).unwrap();
+        assert_eq!(custom.image_widths, [200, 800]);
+        assert!(read(&[("AUTOXIDE_MEDIA_IMAGE_WIDTHS", "8")]).is_err());
         for allowed in ["image/png", "image/avif", "image/svg+xml", "audio/ogg", "application/pdf"]
         {
             assert!(config.limits.allows(allowed), "{allowed}");

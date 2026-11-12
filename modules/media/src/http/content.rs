@@ -44,6 +44,9 @@ pub(crate) struct VersionQuery {
     /// The `version_id` of the item, as in its `url`. With the current version the answer
     /// may be cached for a year; without it (or with an old one) only briefly.
     v: Option<String>,
+    /// Width of a smaller copy (one of the item's `variants`). Until that copy is made, or
+    /// when the image is narrower, the original is sent.
+    w: Option<u32>,
 }
 
 /// Download the content of a media item.
@@ -153,7 +156,7 @@ pub(crate) async fn replace_content(
     let expected = if_match.required()?;
     let content = body_stream(body, service.config.limits.max_bytes);
     let item = service.replace(&principal, id, content_type(&headers)?, content, expected).await?;
-    Ok(Tagged { version: item.updated_at, data: item.into() })
+    super::tagged(&service, item).await
 }
 
 /// Trả nội dung (hay chỉ header, khi `with_body` là `false`).
@@ -166,30 +169,48 @@ async fn serve(
     with_body: bool,
 ) -> Result<Response, Error> {
     let item = service.viewable(principal.as_ref(), id).await?;
-    let etag = format!("\"{}\"", item.sha256);
+    // Ảnh thu nhỏ xin bằng `w`, nếu đã làm xong; không thì bản gốc.
+    let copy = match query.w {
+        Some(width) => service.variant(&item, width).await?,
+        None => None,
+    };
+    let pending = query.w.is_some_and(|width| {
+        copy.is_none()
+            && crate::variants::wanted_widths(&service.config.image_widths, &item).contains(&width)
+    });
+    let (etag, content_type, size) = match &copy {
+        Some(copy) => (
+            format!("\"{}-w{}\"", item.version_id, copy.width),
+            copy.content_type.clone(),
+            u64::try_from(copy.size).unwrap_or_default(),
+        ),
+        None => (
+            format!("\"{}\"", item.sha256),
+            item.content_type.clone(),
+            u64::try_from(item.size).unwrap_or_default(),
+        ),
+    };
     let mut headers = HeaderMap::new();
     let mut set = |name: HeaderName, value: String| -> Result<(), Error> {
         headers.insert(name, HeaderValue::from_str(&value).map_err(Error::internal)?);
         Ok(())
     };
     set(header::ETAG, etag.clone())?;
-    set(header::CACHE_CONTROL, cache_control(&item, query.v.as_deref()))?;
+    // Ảnh thu nhỏ chưa làm xong: bản gốc tạm thời, không được cache lâu dưới địa chỉ này.
+    let version = if pending { None } else { query.v.as_deref() };
+    set(header::CACHE_CONTROL, cache_control(&item, version))?;
     if if_none_match(request, &etag) {
         // Đã có đúng bản này: khỏi đọc nơi lưu.
         return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
     }
-    let disposition = if is_raster_image(&item.content_type) {
-        Disposition::Inline
-    } else {
-        Disposition::Attachment
-    };
-    set(header::CONTENT_TYPE, item.content_type.clone())?;
+    let disposition =
+        if is_raster_image(&content_type) { Disposition::Inline } else { Disposition::Attachment };
+    set(header::CONTENT_TYPE, content_type)?;
     set(header::CONTENT_DISPOSITION, content_disposition(disposition, &item.name))?;
     set(header::ACCEPT_RANGES, "bytes".to_owned())?;
     set(header::X_CONTENT_TYPE_OPTIONS, "nosniff".to_owned())?;
     set(header::CONTENT_SECURITY_POLICY, "default-src 'none'; sandbox".to_owned())?;
 
-    let size = u64::try_from(item.size).unwrap_or_default();
     let range = match requested_range(request, &etag, size) {
         Requested::Whole => None,
         Requested::Part(range) => Some(range),
@@ -218,7 +239,10 @@ async fn serve(
     if !with_body {
         return Ok((status, headers).into_response());
     }
-    let stored = service.read(&item, range).await?;
+    let stored = match &copy {
+        Some(copy) => service.read_key(&copy.storage_key(), range).await?,
+        None => service.read(&item, range).await?,
+    };
     Ok((status, headers, Body::from_stream(stored.content)).into_response())
 }
 

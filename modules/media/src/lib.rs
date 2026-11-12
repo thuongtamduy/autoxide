@@ -19,8 +19,10 @@ mod migration;
 mod permissions;
 mod service;
 mod sniff;
+mod tags;
 mod tools;
 mod upload;
+mod variants;
 
 #[cfg(test)]
 mod tests;
@@ -44,6 +46,7 @@ use utoipa_axum::router::OpenApiRouter;
 use crate::config::MediaConfig;
 use crate::jobs::{CLEAN_ORPHANS, CleanOrphans, PURGE_TRASH, PurgeTrash};
 use crate::service::MediaService;
+use crate::variants::{Generator, MAKE_VARIANTS};
 
 /// Module `media`, để binary đăng ký trong `crates/app/src/modules.rs` — SAU module `files`
 /// (cần `dyn Storage` của nó).
@@ -105,6 +108,7 @@ impl Module for MediaModule {
             context.database().clone(),
             storage,
             context.outbox()?,
+            context.jobs(),
             config,
         ));
         self.service = Some(service.clone());
@@ -123,7 +127,8 @@ impl Module for MediaModule {
         self.service.clone().map_or_else(Vec::new, |service| {
             vec![
                 JobRegistration::new(PURGE_TRASH, Arc::new(PurgeTrash(service.clone()))),
-                JobRegistration::new(CLEAN_ORPHANS, Arc::new(CleanOrphans(service))),
+                JobRegistration::new(CLEAN_ORPHANS, Arc::new(CleanOrphans(service.clone()))),
+                JobRegistration::new(MAKE_VARIANTS, Arc::new(Generator(service))),
             ]
         })
     }
@@ -231,11 +236,12 @@ pub(crate) mod testing {
             .await
             .unwrap();
         let storage = Arc::new(MemoryStorage::default());
-        let config = MediaConfig { limits, trash_days: 30 };
+        let config = MediaConfig { limits, trash_days: 30, image_widths: vec![100, 200] };
         let service = MediaService::new(
             database.clone(),
             storage.clone(),
             Outbox::standalone("media"),
+            autoxide_kernel::job::JobQueue::new("media"),
             config,
         );
         (Arc::new(service), storage, database)

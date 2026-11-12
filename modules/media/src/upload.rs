@@ -37,6 +37,8 @@ pub(crate) struct NewUpload {
     /// Header `Content-Type` như client gửi; `None` hay `application/octet-stream`: máy
     /// chủ tự nhận loại.
     pub content_type: Option<String>,
+    /// Nhãn gắn ngay khi tải lên.
+    pub tags: Vec<String>,
 }
 
 /// Kết quả tải lên: item mới, và các item đã có cùng nội dung.
@@ -80,6 +82,7 @@ impl MediaService {
         if let Some(folder) = input.folder_id {
             self.check_folder_exists(folder, "folder_id", &mut problems).await?;
         }
+        let tags = crate::tags::check_tags(&input.tags, "tags", &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -88,7 +91,9 @@ impl MediaService {
         let (id, version_id) = (Uuid::now_v7(), Uuid::now_v7());
         let key = storage_key(id, version_id);
         let received = self.receive(&key, declared, content).await?;
-        let saved = self.save_new(principal, id, version_id, name, input.folder_id, received).await;
+        let saved = self
+            .save_new(principal, (id, version_id), name, input.folder_id, &tags, received)
+            .await;
         if saved.is_err() {
             self.discard(&key).await;
         }
@@ -130,15 +135,19 @@ impl MediaService {
         let received = self.receive(&key, declared, content).await?;
 
         let replaced = self.save_replacement(principal, id, version_id, received, expected).await;
-        let (before, after) = match replaced {
+        let (before, after, old_copies) = match replaced {
             Ok(changed) => changed,
             Err(error) => {
                 self.discard(&key).await;
                 return Err(error);
             }
         };
-        // Nội dung cũ không còn ai trỏ tới; xoá hỏng thì job dọn mồ côi xoá sau.
+        // Nội dung cũ (và ảnh thu nhỏ của nó) không còn ai trỏ tới; xoá hỏng thì job dọn mồ
+        // côi xoá sau.
         self.discard(&before.storage_key()).await;
+        for copy in &old_copies {
+            self.discard(&copy.storage_key()).await;
+        }
         tracing::info!(media_item_id = %id, size = after.size, "media item content replaced");
         Ok(after)
     }
@@ -146,10 +155,10 @@ impl MediaService {
     async fn save_new(
         &self,
         principal: &Principal,
-        id: Uuid,
-        version_id: Uuid,
+        (id, version_id): (Uuid, Uuid),
         name: String,
         folder: Option<Uuid>,
+        tags: &[String],
         received: Received,
     ) -> Result<Item, Error> {
         let now = now();
@@ -181,7 +190,14 @@ impl MediaService {
         }
         .insert(&transaction)
         .await?;
-        let event = events::ItemUploaded(Change { before: None, after: Some(snapshot(&item)) });
+        let tags = if tags.is_empty() {
+            Vec::new()
+        } else {
+            crate::tags::set_item_tags(&transaction, id, tags).await?
+        };
+        self.enqueue_variants(&transaction, &item).await?;
+        let after = crate::service::with_tags(snapshot(&item), &tags);
+        let event = events::ItemUploaded(Change { before: None, after: Some(after) });
         let actor = Actor::from(principal);
         self.outbox.record(&transaction, actor, events::item_subject(id), &event).await?;
         transaction.commit().await?;
@@ -195,7 +211,7 @@ impl MediaService {
         version_id: Uuid,
         received: Received,
         expected: Option<DateTime<Utc>>,
-    ) -> Result<(Item, Item), Error> {
+    ) -> Result<(Item, Item, Vec<crate::variants::Variant>), Error> {
         let transaction = self.database.begin_write().await?;
         let before =
             Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| item_not_found(id))?;
@@ -221,12 +237,22 @@ impl MediaService {
             }
             Err(error) => return Err(error.into()),
         };
+        use crate::entity::variant;
+        let old_copies = variant::Entity::find()
+            .filter(variant::Column::ItemId.eq(id))
+            .all(&transaction)
+            .await?;
+        variant::Entity::delete_many()
+            .filter(variant::Column::ItemId.eq(id))
+            .exec(&transaction)
+            .await?;
+        self.enqueue_variants(&transaction, &after).await?;
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::ItemContentReplaced(change);
         let actor = Actor::from(principal);
         self.outbox.record(&transaction, actor, events::item_subject(id), &event).await?;
         transaction.commit().await?;
-        Ok((before, after))
+        Ok((before, after, old_copies))
     }
 
     /// Ghi `content` vào `key`, kiểm trên đường đi; lỗi thì không để lại gì ở nơi lưu.

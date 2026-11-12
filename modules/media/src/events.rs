@@ -43,6 +43,8 @@ events! {
     (FolderCreated, "media.folder_created", "A media folder was created."),
     (FolderUpdated, "media.folder_updated", "A media folder was renamed or moved."),
     (FolderDeleted, "media.folder_deleted", "An empty media folder was deleted."),
+    (TagUpdated, "media.tag_updated", "A media tag was renamed."),
+    (TagDeleted, "media.tag_deleted", "A media tag was deleted and removed from every item."),
 }
 
 /// Chủ thể (subject) của event về item `id`.
@@ -53,4 +55,9 @@ pub(crate) fn item_subject(id: uuid::Uuid) -> Option<String> {
 /// Chủ thể của event về thư mục `id`.
 pub(crate) fn folder_subject(id: uuid::Uuid) -> Option<String> {
     Some(format!("media.folder:{id}"))
+}
+
+/// Chủ thể của event về nhãn `id`.
+pub(crate) fn tag_subject(id: uuid::Uuid) -> Option<String> {
+    Some(format!("media.tag:{id}"))
 }

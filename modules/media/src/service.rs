@@ -14,7 +14,10 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
-use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
+use autoxide_kernel::job::JobQueue;
+use autoxide_kernel::pagination::{
+    Page, PageRequest, Pagination, SortValue, fetch_page, fetch_page_by,
+};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::storage::{Storage, StoredFile};
 use chrono::{DateTime, SubsecRound, Utc};
@@ -105,6 +108,8 @@ pub(crate) struct ItemFilter {
     pub trashed: bool,
     /// Tên chứa chuỗi này (không phân biệt hoa thường).
     pub search: Option<String>,
+    /// Chỉ item mang nhãn này (không phân biệt hoa thường).
+    pub tag: Option<String>,
     pub sort: ItemSort,
 }
 
@@ -118,12 +123,23 @@ pub(crate) struct ItemChanges {
     /// `Some(None)`: chuyển về thư mục gốc.
     pub folder_id: Option<Option<Uuid>>,
     pub visibility: Option<Visibility>,
+    /// Thay cả bộ nhãn.
+    pub tags: Option<Vec<String>>,
+}
+
+/// Một item kèm nhãn và ảnh thu nhỏ của nó — những gì API trả về.
+#[derive(Debug, Clone)]
+pub(crate) struct ItemDetails {
+    pub item: Item,
+    pub tags: Vec<String>,
+    pub variants: Vec<crate::variants::Variant>,
 }
 
 pub(crate) struct MediaService {
     pub(crate) database: Database,
     pub(crate) storage: Arc<dyn Storage>,
     pub(crate) outbox: Outbox,
+    pub(crate) jobs: JobQueue,
     pub(crate) config: MediaConfig,
 }
 
@@ -132,9 +148,10 @@ impl MediaService {
         database: Database,
         storage: Arc<dyn Storage>,
         outbox: Outbox,
+        jobs: JobQueue,
         config: MediaConfig,
     ) -> Self {
-        MediaService { database, storage, outbox, config }
+        MediaService { database, storage, outbox, jobs, config }
     }
 
     /// Một trang item theo bộ lọc. Cần `media.read`.
@@ -168,6 +185,14 @@ impl MediaService {
         if let Some(search) = filter.search.as_deref().filter(|search| !search.trim().is_empty()) {
             select = select.filter(autoxide_kernel::search::contains(Column::NameKey, search));
         }
+        if let Some(tag) = filter.tag.as_deref().filter(|tag| !tag.trim().is_empty()) {
+            let Some(tag_id) = crate::tags::find_tag(self.database.read(), tag).await? else {
+                // Không có nhãn đó: không item nào mang nó.
+                let pagination = Pagination { limit: page.limit(), next_cursor: None };
+                return Ok(Page { data: Vec::new(), pagination });
+            };
+            select = select.filter(crate::tags::has_tag(tag_id));
+        }
         let read = self.database.read();
         match filter.sort {
             ItemSort::CreatedAt => fetch_page(select, Column::Id, |row| row.id, page, read).await,
@@ -181,6 +206,28 @@ impl MediaService {
                 fetch_page_by(select, Column::Size, key, Column::Id, |row| row.id, page, read).await
             }
         }
+    }
+
+    /// Kèm nhãn và ảnh thu nhỏ cho từng item (thêm hai, ba câu query cho cả danh sách).
+    pub(crate) async fn describe(&self, items: Vec<Item>) -> Result<Vec<ItemDetails>, Error> {
+        let read = self.database.read();
+        let ids: Vec<Uuid> = items.iter().map(|item| item.id).collect();
+        let mut tags = crate::tags::tags_of(read, &ids).await?;
+        let mut variants = crate::variants::variants_of(read, &items).await?;
+        Ok(items
+            .into_iter()
+            .map(|item| ItemDetails {
+                tags: tags.remove(&item.id).unwrap_or_default(),
+                variants: variants.remove(&item.id).unwrap_or_default(),
+                item,
+            })
+            .collect())
+    }
+
+    /// Như [`describe`](Self::describe), cho một item.
+    pub(crate) async fn describe_one(&self, item: Item) -> Result<ItemDetails, Error> {
+        let details = self.describe(vec![item]).await?.into_iter().next();
+        details.ok_or_else(|| Error::internal("describing a media item returned nothing"))
     }
 
     /// Item `id` (kể cả trong thùng rác). Cần `media.read`.
@@ -211,17 +258,22 @@ impl MediaService {
         item: &Item,
         range: Option<std::ops::Range<u64>>,
     ) -> Result<StoredFile, Error> {
-        let key = item.storage_key();
+        self.read_key(&item.storage_key(), range).await
+    }
+
+    /// Nội dung ở khoá `key` (của module), cả file hoặc đoạn `range`.
+    pub(crate) async fn read_key(
+        &self,
+        key: &str,
+        range: Option<std::ops::Range<u64>>,
+    ) -> Result<StoredFile, Error> {
         let stored = match range {
-            None => self.storage.get(&key).await?,
-            Some(range) => self.storage.get_range(&key, range).await?,
+            None => self.storage.get(key).await?,
+            Some(range) => self.storage.get_range(key, range).await?,
         };
         // Có dòng mà không có nội dung: nơi lưu bị đổi từ bên ngoài.
         stored.ok_or_else(|| {
-            Error::internal(format!(
-                "the content of media item {} is missing from storage",
-                item.id
-            ))
+            Error::internal(format!("media content `{key}` is missing from storage"))
         })
     }
 
@@ -247,6 +299,10 @@ impl MediaService {
         if let Some(Some(folder)) = changes.folder_id {
             self.check_folder_exists(folder, "folder_id", &mut problems).await?;
         }
+        let tags = changes
+            .tags
+            .as_deref()
+            .map(|tags| crate::tags::check_tags(tags, "tags", &mut problems));
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -294,9 +350,15 @@ impl MediaService {
             }
             Err(error) => return Err(error.into()),
         };
+        let tags_before =
+            crate::tags::tags_of(&transaction, &[id]).await?.remove(&id).unwrap_or_default();
+        let tags_after = match &tags {
+            Some(tags) => crate::tags::set_item_tags(&transaction, id, tags).await?,
+            None => tags_before.clone(),
+        };
         let event = events::ItemUpdated(Change {
-            before: Some(snapshot(&before)),
-            after: Some(snapshot(&after)),
+            before: Some(with_tags(snapshot(&before), &tags_before)),
+            after: Some(with_tags(snapshot(&after), &tags_after)),
         });
         let actor = Actor::from(principal);
         self.outbox.record(&transaction, actor, events::item_subject(id), &event).await?;
@@ -383,12 +445,28 @@ impl MediaService {
             transaction.rollback().await?;
             return Ok(false);
         }
+        crate::entity::item_tag::Entity::delete_many()
+            .filter(crate::entity::item_tag::Column::ItemId.eq(item.id))
+            .exec(&transaction)
+            .await?;
+        let copies = crate::entity::variant::Entity::find()
+            .filter(crate::entity::variant::Column::ItemId.eq(item.id))
+            .all(&transaction)
+            .await?;
+        crate::entity::variant::Entity::delete_many()
+            .filter(crate::entity::variant::Column::ItemId.eq(item.id))
+            .exec(&transaction)
+            .await?;
         let event = events::ItemPurged(Change { before: Some(snapshot(item)), after: None });
         self.outbox.record(&transaction, actor, events::item_subject(item.id), &event).await?;
         transaction.commit().await?;
-        if let Err(error) = self.storage.delete(&item.storage_key()).await {
-            // Job dọn mồ côi sẽ xoá sau.
-            tracing::warn!(media_item_id = %item.id, error = %error, "media item purged but its content remains");
+        let keys =
+            std::iter::once(item.storage_key()).chain(copies.iter().map(|copy| copy.storage_key()));
+        for key in keys {
+            if let Err(error) = self.storage.delete(&key).await {
+                // Job dọn mồ côi sẽ xoá sau.
+                tracing::warn!(media_item_id = %item.id, error = %error, "media item purged but its content remains");
+            }
         }
         tracing::info!(media_item_id = %item.id, "media item purged");
         metrics::counter!("media_items_purged_total").increment(1);
@@ -533,6 +611,14 @@ pub(crate) fn content_url(item: &Item) -> String {
     format!("/api/v1/media/{}/content?v={}", item.id, item.version_id)
 }
 
+/// `snapshot` kèm danh sách nhãn.
+pub(crate) fn with_tags(mut snapshot: Value, tags: &[String]) -> Value {
+    if let Some(object) = snapshot.as_object_mut() {
+        object.insert("tags".to_owned(), json!(tags));
+    }
+    snapshot
+}
+
 /// Những gì audit cần biết về một item.
 pub(crate) fn snapshot(item: &Item) -> Value {
     json!({
@@ -612,22 +698,37 @@ impl crate::api::Media for MediaService {
             .filter(Column::TrashedAt.is_null())
             .all(self.database.read())
             .await?;
+        let mut copies = crate::variants::variants_of(self.database.read(), &rows).await?;
         let mut found: std::collections::HashMap<Uuid, Item> =
             rows.into_iter().map(|item| (item.id, item)).collect();
         Ok(ids
             .iter()
             .filter_map(|id| found.remove(id))
-            .map(|item| MediaRef {
-                id: item.id,
-                visibility: match Visibility::of(&item) {
-                    Visibility::Public => MediaVisibility::Public,
-                    Visibility::Private => MediaVisibility::Private,
-                },
-                url: content_url(&item),
-                content_type: item.content_type,
-                width: item.width,
-                height: item.height,
-                alt: item.alt,
+            .map(|item| {
+                let url = content_url(&item);
+                let variants = copies
+                    .remove(&item.id)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|copy| crate::api::MediaVariant {
+                        url: format!("{url}&w={}", copy.width),
+                        width: copy.width,
+                        height: copy.height,
+                    })
+                    .collect();
+                MediaRef {
+                    id: item.id,
+                    visibility: match Visibility::of(&item) {
+                        Visibility::Public => MediaVisibility::Public,
+                        Visibility::Private => MediaVisibility::Private,
+                    },
+                    url,
+                    variants,
+                    content_type: item.content_type,
+                    width: item.width,
+                    height: item.height,
+                    alt: item.alt,
+                }
             })
             .collect())
     }

@@ -2,7 +2,10 @@
 
 pub(crate) mod folder;
 pub(crate) mod item;
+pub(crate) mod item_tag;
 pub(crate) mod lock;
+pub(crate) mod tag;
+pub(crate) mod variant;
 
 use uuid::Uuid;
 
