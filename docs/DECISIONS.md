@@ -1747,3 +1747,20 @@ riêng; `content` không biết về chúng.
 Đã cân nhắc: `posts` — hẹp, nội dung còn có trang và menu; `publishing` — dài, mơ hồ.
 
 Thay: tên `cms` trong D-078.
+
+## D-081 · Nâng `files` thành thư viện media trước khi làm `content` — 2026-11-12 — chủ dự án quyết
+
+Quyết định: thứ tự là bước 13 (nền chung trong core: lọc và sắp xếp, tìm kiếm, đọc công khai,
+cache, `If-Match`) → bước 14 (module `files` thành thư viện media dùng chung: file công khai,
+hiển thị ảnh inline an toàn, metadata ảnh, thư mục hoặc nhãn, thùng rác, `api` cho module
+khác, tool MCP) → bước 15 (module `content`). Tên module vẫn là `files`.
+
+Lý do: chủ dự án chọn. `content` dựa vào ảnh (ảnh đại diện, ảnh trong bài, ảnh chia sẻ), và
+website phải hiển thị được ảnh cho người đọc không đăng nhập — hiện `files` chỉ là kho file
+riêng, luôn tải về dạng attachment (D-067). Làm `files` trước thì `content` chỉ việc giữ ID
+file và gọi `api` của `files`.
+
+Đã cân nhắc: đổi tên `files` thành `media` — tên module là hợp đồng (bảng, route, permission,
+mã lỗi), đổi làm vỡ client đang dùng mà không thêm giá trị; dữ liệu vẫn là file.
+
+Thay: thứ tự "module `content` ngay sau bước 12" của D-078.
