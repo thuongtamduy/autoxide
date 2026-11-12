@@ -68,6 +68,7 @@ async fn khoa_cau_hinh_thang_khoa_luu() {
     TestDatabase::run(async |test| {
         let configured = "a-configured-secret-that-is-long-enough-0123";
         let (database, key) = start(test, &[("AUTOXIDE_SECRET_KEY", configured)]).await;
+        assert!(key.is_configured());
         let stored = SecretKey::new(database.clone(), None).derive("test/a").await.unwrap();
         let from_config = key.derive("test/a").await.unwrap();
         assert_ne!(from_config, stored);
@@ -115,13 +116,42 @@ async fn bam_ip_theo_ngay_va_co_dinh() {
         let (_, key) = start(test, &[]).await;
         let address: std::net::IpAddr = "203.0.113.9".parse().unwrap();
         let today = Utc::now();
-        let a = bucket(&key, address, today).await.unwrap();
-        assert_eq!(a, bucket(&key, "203.0.113.200".parse().unwrap(), today).await.unwrap());
-        assert_ne!(a, bucket(&key, address, today + Duration::days(1)).await.unwrap());
-        let fixed = fingerprint(&key, address).await.unwrap();
+        let a = bucket(&key, "forms:contact", address, today).await.unwrap();
+        assert_eq!(
+            a,
+            bucket(&key, "forms:contact", "203.0.113.200".parse().unwrap(), today).await.unwrap()
+        );
+        assert_ne!(
+            a,
+            bucket(&key, "forms:contact", address, today + Duration::days(1)).await.unwrap()
+        );
+        let fixed = fingerprint(&key, "forms", address).await.unwrap();
         assert_ne!(fixed, a);
-        assert_eq!(fixed, fingerprint(&key, address).await.unwrap());
+        assert_eq!(fixed, fingerprint(&key, "forms", address).await.unwrap());
         assert!(!fixed.contains("203"));
+    })
+    .await
+    .unwrap();
+}
+
+/// Dấu IP (D-153): mỗi phạm vi một khoá — cùng người, hai module, hai dấu không nối được.
+#[tokio::test]
+async fn dau_ip_rieng_theo_pham_vi() {
+    use autoxide_kernel::ip_hash::{bucket, fingerprint};
+    TestDatabase::run(async |test| {
+        let (_, key) = start(test, &[]).await;
+        assert!(!key.is_configured());
+        let visitor: std::net::IpAddr = "203.0.113.9".parse().unwrap();
+        let forms = fingerprint(&key, "forms", visitor).await.unwrap();
+        assert_ne!(forms, fingerprint(&key, "comments", visitor).await.unwrap());
+        // Cùng phạm vi, cùng khối /24: cùng dấu.
+        let neighbour = "203.0.113.200".parse().unwrap();
+        assert_eq!(forms, fingerprint(&key, "forms", neighbour).await.unwrap());
+        let now = chrono::Utc::now();
+        let today = bucket(&key, "forms:contact", visitor, now).await.unwrap();
+        assert_ne!(today, bucket(&key, "comments:post", visitor, now).await.unwrap());
+        let tomorrow = now + chrono::Duration::days(1);
+        assert_ne!(today, bucket(&key, "forms:contact", visitor, tomorrow).await.unwrap());
     })
     .await
     .unwrap();

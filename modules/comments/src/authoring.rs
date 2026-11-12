@@ -215,7 +215,7 @@ impl CommentsService {
         let name = text::clean_name(display_name, "display_name", &mut problems);
         if problems.is_empty()
             && !principal.has(&COMMENTS_MODERATE)
-            && text::contains_word(&name, &self.config.reserved_names)
+            && text::contains_name(&name, &self.config.reserved_names)
         {
             problems.push(FieldError::new(
                 "display_name",
@@ -227,7 +227,7 @@ impl CommentsService {
             return Err(Error::validation(problems));
         }
         let now = now();
-        let key = text::words_key(&name);
+        let key = text::name_key(&name);
         let existing =
             profile::Entity::find_by_id(principal.user_id()).one(self.database.read()).await?;
         let saved = match existing {

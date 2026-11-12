@@ -323,6 +323,32 @@ async fn pipeline_kiem_duyet() {
             h.service.set_profile(&fresh, "Moderator").await.unwrap_err().fields()[0].code,
             "reserved"
         );
+        // Tên viết trọn chữ Kirin trông như tên Latin: vẫn là tên dành riêng, vẫn trùng tên
+        // người khác (D-151).
+        assert_eq!(
+            h.service
+                .set_profile(&fresh, "\u{0430}\u{0501}\u{043C}\u{0456}\u{043F}")
+                .await
+                .unwrap_err()
+                .fields()[0]
+                .code,
+            "reserved"
+        );
+        member(&h.service, "Coco", &[]).await;
+        assert_eq!(
+            h.service
+                .set_profile(&fresh, "\u{0421}\u{041E}\u{0421}\u{041E}")
+                .await
+                .unwrap_err()
+                .code(),
+            "comments.name_taken"
+        );
+        let mut fake = guest("\u{0430}\u{0501}\u{043C}\u{0456}\u{043F}", "Xin chào");
+        fake.email = Some("fake@example.com".to_owned());
+        assert_eq!(
+            as_guest(&h.service, &client, fake).await.unwrap_err().fields()[0].code,
+            "reserved"
+        );
 
         // Đích đóng: từ chối. Tắt bình luận: từ chối.
         h.service
@@ -512,10 +538,13 @@ async fn lenh_cam_het_han_thi_gui_lai_duoc() {
             as_guest(&h.service, &visitor("192.0.2.9"), by_email).await.unwrap_err().code(),
             "comments.banned"
         );
-        let fingerprint =
-            autoxide_kernel::ip_hash::fingerprint(&h.service.secret, "192.0.2.77".parse().unwrap())
-                .await
-                .unwrap();
+        let fingerprint = autoxide_kernel::ip_hash::fingerprint(
+            &h.service.secret,
+            crate::service::MODULE,
+            "192.0.2.77".parse().unwrap(),
+        )
+        .await
+        .unwrap();
         h.service
             .ban(
                 &moderator,

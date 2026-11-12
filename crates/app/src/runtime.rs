@@ -11,6 +11,7 @@ use autoxide_kernel::idempotency::IdempotencyStore;
 use autoxide_kernel::job::Worker;
 use autoxide_kernel::metrics::Metrics;
 use autoxide_kernel::module::Modules;
+use autoxide_kernel::secret::SecretKey;
 
 use crate::settings::Settings;
 
@@ -51,6 +52,17 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         // Đóng kết nối trước khi báo lỗi; lỗi khởi động quan trọng hơn lỗi lúc đóng.
         let _ = database.close().await;
         return Err(error.to_string());
+    }
+    // Khoá ký nằm trong database: ai có bản sao database cũng tính ngược được dấu IP của khách
+    // (D-153). Chỉ cảnh báo ở tiến trình phục vụ API — lệnh CLI không cần nghe điều này.
+    if config.process.role.serves_api()
+        && modules.api::<SecretKey>().is_some_and(|key| !key.is_configured())
+    {
+        tracing::warn!(
+            "AUTOXIDE_SECRET_KEY is not set: the signing key is kept in the database, so anyone \
+             with a copy of the database can work visitors' IP blocks back out of the stored \
+             hashes. Set it (outside the database, the same on every server) in production."
+        );
     }
     let background = modules.dispatcher(&database).and_then(|dispatcher| {
         let worker = modules.worker(&database, config.process.job_concurrency)?;

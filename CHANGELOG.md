@@ -9,6 +9,27 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- `AUTOXIDE_HTTP_TRUSTED_PROXIES`: list the addresses and ranges of your proxies instead of
+  counting them. The client-address header is then read only from a trusted proxy, and the
+  client is the last address in it that is not a trusted proxy — safe even when visitors can
+  reach one of your proxies directly.
+- The server warns at startup when `AUTOXIDE_SECRET_KEY` is not set.
+
+### Changed
+
+- **Breaking:** hashed IP addresses differ per module (forms, newsletter, comments): one
+  visitor's records can no longer be linked across modules. Hashes stored before this version
+  stop matching new ones, so comment bans by network fingerprint made before it no longer
+  apply — ban again from a newer comment.
+
+### Security
+
+- Comments: a display name written entirely in Cyrillic or Greek letters that look like Latin
+  ones (`аdmіn`) counts as the Latin name — it can no longer pass the reserved-name list or take
+  another person's name. Existing profiles are re-keyed by a migration.
+
 ## [0.3.0] - 2026-11-12
 
 ### Changed

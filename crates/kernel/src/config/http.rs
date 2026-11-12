@@ -1,6 +1,6 @@
 //! Cấu hình máy chủ HTTP.
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
 
 use axum::http::HeaderName;
@@ -102,6 +102,94 @@ pub const TRUSTED_PROXY_COUNT: Setting = Setting::new(
 )
 .with_default("1");
 
+pub const TRUSTED_PROXIES: Setting = Setting::new(
+    "AUTOXIDE_HTTP_TRUSTED_PROXIES",
+    "With AUTOXIDE_HTTP_CLIENT_IP_HEADER: the addresses of your own proxies, as a \
+     comma-separated list of IP addresses and ranges (`10.0.0.0/8, 2001:db8::/32, \
+     192.0.2.7`). When set, it replaces AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT: the header is read \
+     only when the connection comes from one of these addresses, and the client is the last \
+     address in the header that is not one of them. Safer than a count when clients could \
+     reach one of your proxies directly, or take different paths to the API.",
+)
+.with_example("10.0.0.0/8, 192.0.2.7");
+
+/// Một địa chỉ hoặc dải địa chỉ (CIDR) của proxy tin cậy: `10.0.0.0/8`, `2001:db8::/32`,
+/// `192.0.2.7` (= `/32`). Tự viết vài chục dòng thay vì thêm thư viện CIDR.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IpRange {
+    network: IpAddr,
+    prefix: u8,
+}
+
+impl IpRange {
+    /// `address` có nằm trong dải không. Địa chỉ IPv4 viết dạng IPv6 (`::ffff:a.b.c.d`) tính
+    /// như IPv4 (proxy nghe trên socket hai giao thức thấy địa chỉ dạng này).
+    pub fn contains(&self, address: IpAddr) -> bool {
+        let address = match address {
+            IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(address, IpAddr::V4),
+            v4 => v4,
+        };
+        match (self.network, address) {
+            (IpAddr::V4(network), IpAddr::V4(address)) => same_prefix(
+                u128::from(network.to_bits()),
+                u128::from(address.to_bits()),
+                32,
+                self.prefix,
+            ),
+            (IpAddr::V6(network), IpAddr::V6(address)) => {
+                same_prefix(network.to_bits(), address.to_bits(), 128, self.prefix)
+            }
+            _ => false,
+        }
+    }
+
+    fn parse(text: &str) -> Result<Self, String> {
+        let (address, prefix) = match text.split_once('/') {
+            Some((address, prefix)) => (address, Some(prefix)),
+            None => (text, None),
+        };
+        let network: IpAddr = address
+            .parse()
+            .map_err(|_| format!("`{text}` is not an IP address or a range like `10.0.0.0/8`"))?;
+        let network = match network {
+            IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(network, IpAddr::V4),
+            v4 => v4,
+        };
+        let bits = if network.is_ipv4() { 32 } else { 128 };
+        let prefix = match prefix {
+            None => bits,
+            Some(prefix) => prefix
+                .parse::<u8>()
+                .ok()
+                .filter(|prefix| *prefix <= bits)
+                .ok_or_else(|| format!("`{text}`: the prefix length must be 0 to {bits}"))?,
+        };
+        Ok(IpRange { network, prefix })
+    }
+}
+
+/// Hai số `width` bit có cùng `prefix` bit đầu không.
+fn same_prefix(network: u128, address: u128, width: u8, prefix: u8) -> bool {
+    if prefix == 0 {
+        return true;
+    }
+    let shift = u32::from(width - prefix);
+    (network >> shift) == (address >> shift)
+}
+
+fn parse_ranges(raw: &str) -> Result<Vec<IpRange>, String> {
+    let ranges = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .map(IpRange::parse)
+        .collect::<Result<Vec<_>, _>>()?;
+    if ranges.is_empty() {
+        return Err("must list at least one IP address or range, like `10.0.0.0/8`".to_owned());
+    }
+    Ok(ranges)
+}
+
 /// Những origin (nguồn trang web) được trình duyệt cho gọi API.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum CorsOrigins {
@@ -157,8 +245,11 @@ pub struct HttpConfig {
     pub api_docs: bool,
     pub metrics: bool,
     pub rate_limit: RateLimit,
-    /// Số proxy tin cậy đứng trước API (đọc địa chỉ thứ chừng này từ cuối header).
+    /// Số proxy tin cậy đứng trước API (đọc địa chỉ thứ chừng này từ cuối header). Bỏ qua khi
+    /// có `trusted_proxies`.
     pub trusted_proxy_count: usize,
+    /// Địa chỉ / dải địa chỉ của proxy tin cậy (D-152); rỗng: đếm theo `trusted_proxy_count`.
+    pub trusted_proxies: Vec<IpRange>,
     /// Giới hạn số request của một API key (D-109).
     pub api_key_rate_limit: RateLimit,
     /// Header chứa địa chỉ client do reverse proxy đặt; `None`: dùng địa chỉ kết nối.
@@ -202,6 +293,14 @@ impl HttpConfig {
             HeaderName::try_from(raw.trim())
                 .map_err(|_| "must be an HTTP header name, like `X-Forwarded-For`".to_owned())
         });
+        let mut trusted_proxies = reader.optional_with(&TRUSTED_PROXIES, parse_ranges);
+        // Dải proxy mà không có header thì không có tác dụng gì: báo sai thay vì lặng lẽ bỏ qua.
+        if matches!(&trusted_proxies, Ok(Some(_))) && matches!(&client_ip_header, Ok(None)) {
+            trusted_proxies = reader.reject(
+                &TRUSTED_PROXIES,
+                "needs AUTOXIDE_HTTP_CLIENT_IP_HEADER (usually `X-Forwarded-For`): set both, or neither",
+            );
+        }
 
         Ok(HttpConfig {
             address: address?,
@@ -213,6 +312,7 @@ impl HttpConfig {
             metrics: metrics?,
             rate_limit: RateLimit { per_minute: per_minute?, burst: burst? },
             trusted_proxy_count: trusted_proxy_count?,
+            trusted_proxies: trusted_proxies?.unwrap_or_default(),
             api_key_rate_limit: RateLimit { per_minute: key_per_minute?, burst: key_burst? },
             client_ip_header: client_ip_header?,
         })
@@ -307,5 +407,47 @@ mod tests {
         ] {
             assert!(CorsOrigins::parse(raw).is_err(), "{raw}");
         }
+    }
+
+    #[test]
+    fn dai_proxy_tin_cay() {
+        let config = read(&[
+            ("AUTOXIDE_HTTP_CLIENT_IP_HEADER", "X-Forwarded-For"),
+            ("AUTOXIDE_HTTP_TRUSTED_PROXIES", " 10.0.0.0/8, 192.0.2.7 ,2001:db8::/32,"),
+        ])
+        .unwrap();
+        let [private, single, v6] = config.trusted_proxies.as_slice() else {
+            panic!("{:?}", config.trusted_proxies)
+        };
+        let ip = |text: &str| text.parse::<IpAddr>().unwrap();
+        assert!(private.contains(ip("10.255.1.2")));
+        assert!(private.contains(ip("::ffff:10.0.0.1")));
+        assert!(!private.contains(ip("11.0.0.1")));
+        assert!(single.contains(ip("192.0.2.7")));
+        assert!(!single.contains(ip("192.0.2.8")));
+        assert!(v6.contains(ip("2001:db8:ffff::1")));
+        assert!(!v6.contains(ip("2001:db9::1")));
+        assert!(!v6.contains(ip("10.0.0.1")));
+        assert!(IpRange::parse("0.0.0.0/0").unwrap().contains(ip("203.0.113.1")));
+        assert!(IpRange::parse("::/0").unwrap().contains(ip("2001:db8::1")));
+        // Mặc định: không có dải, đếm proxy như cũ.
+        assert!(read(&[]).unwrap().trusted_proxies.is_empty());
+
+        for (raw, problem) in [
+            ("10.0.0.0/33", "the prefix length must be 0 to 32"),
+            ("2001:db8::/129", "the prefix length must be 0 to 128"),
+            ("proxy.example.com", "is not an IP address"),
+            (" , ", "must list at least one"),
+        ] {
+            let message = read(&[
+                ("AUTOXIDE_HTTP_CLIENT_IP_HEADER", "X-Forwarded-For"),
+                ("AUTOXIDE_HTTP_TRUSTED_PROXIES", raw),
+            ])
+            .unwrap_err();
+            assert!(message.contains(problem), "{raw}: {message}");
+        }
+        // Dải proxy mà không có header: báo sai.
+        let message = read(&[("AUTOXIDE_HTTP_TRUSTED_PROXIES", "10.0.0.0/8")]).unwrap_err();
+        assert!(message.contains("needs AUTOXIDE_HTTP_CLIENT_IP_HEADER"), "{message}");
     }
 }

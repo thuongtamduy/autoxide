@@ -167,7 +167,9 @@ impl FormsService {
             Verdict::Quarantine { reasons } => (SubmissionStatus::Spam, Some(reasons.join(","))),
         };
         let ip_fingerprint = match client.ip {
-            Some(ip) => Some(autoxide_kernel::ip_hash::fingerprint(&self.secret, ip).await?),
+            Some(ip) => {
+                Some(autoxide_kernel::ip_hash::fingerprint(&self.secret, "forms", ip).await?)
+            }
             None => None,
         };
         let now = now();

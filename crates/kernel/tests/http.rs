@@ -783,6 +783,42 @@ async fn sau_hai_proxy_dung_dia_chi_thu_hai_tu_cuoi() {
     assert_eq!(again.status(), StatusCode::TOO_MANY_REQUESTS);
 }
 
+/// Dải proxy tin cậy (D-152): header chỉ được đọc khi kết nối đến từ proxy; khách gọi thẳng
+/// từ ngoài dải thì header giả bị bỏ qua.
+#[tokio::test]
+async fn dai_proxy_tin_cay_chi_doc_header_tu_proxy() {
+    let mut config = default_config();
+    config.client_ip_header = Some(header::HeaderName::from_static("x-forwarded-for"));
+    let source = autoxide_kernel::config::ConfigSource::from_pairs([
+        ("AUTOXIDE_HTTP_CLIENT_IP_HEADER", "X-Forwarded-For"),
+        ("AUTOXIDE_HTTP_TRUSTED_PROXIES", "10.0.0.0/24, 192.0.2.200"),
+    ]);
+    let mut reader = autoxide_kernel::config::ConfigReader::new(&source);
+    let read = autoxide_kernel::config::HttpConfig::read(&mut reader);
+    config.trusted_proxies = reader.finish(read).unwrap().0.trusted_proxies;
+    let app = api_with(&config).router;
+    let call = |connection: [u8; 4], list: &str| {
+        let mut request = from_client("/api/v1/notes/whoami", connection);
+        request.headers_mut().insert("x-forwarded-for", list.parse().unwrap());
+        request.headers_mut().insert(header::USER_AGENT, "test-agent".parse().unwrap());
+        request
+    };
+    let seen = |response: axum::response::Response| async move {
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        String::from_utf8(body.to_vec()).unwrap()
+    };
+
+    // Qua CDN rồi website: địa chỉ trình duyệt.
+    let via_cdn = app.clone().oneshot(call([10, 0, 0, 5], "6.6.6.6, 203.0.113.9, 192.0.2.200"));
+    assert_eq!(seen(via_cdn.await.unwrap()).await, "Some(203.0.113.9) Some(\"test-agent\")");
+    // Gọi thẳng website, bỏ qua CDN: vẫn địa chỉ trình duyệt.
+    let direct = app.clone().oneshot(call([10, 0, 0, 5], "6.6.6.6, 203.0.113.9"));
+    assert_eq!(seen(direct.await.unwrap()).await, "Some(203.0.113.9) Some(\"test-agent\")");
+    // Gọi thẳng API từ ngoài dải: header giả bị bỏ qua.
+    let forged = app.clone().oneshot(call([198, 51, 100, 7], "203.0.113.9"));
+    assert_eq!(seen(forged.await.unwrap()).await, "Some(198.51.100.7) Some(\"test-agent\")");
+}
+
 #[tokio::test]
 async fn tat_rate_limiting_thi_khong_gioi_han() {
     let mut config = default_config();

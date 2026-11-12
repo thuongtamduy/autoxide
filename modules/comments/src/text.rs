@@ -243,6 +243,101 @@ pub(crate) fn words_key(text: &str) -> String {
         .join(" ")
 }
 
+/// Chữ Kirin / Hy Lạp trông giống một chữ Latin thì đổi thành chữ Latin đó; chữ khác giữ nguyên.
+/// Xét theo hoa / thường (`Н` Kirin hoa giống `H`, `н` thường thì không). Bảng tự liệt kê, chỉ gồm
+/// những chữ dễ nhầm trong phông chữ thường gặp (theo tinh thần "skeleton" của Unicode TS #39),
+/// thay vì thêm thư viện bảng confusables đầy đủ.
+fn latin_lookalike(c: char) -> char {
+    match c {
+        // Kirin hoa.
+        'А' => 'A',
+        'В' => 'B',
+        'Е' => 'E',
+        'Ѕ' => 'S',
+        'І' | 'Ӏ' => 'I',
+        'Ј' => 'J',
+        'К' => 'K',
+        'М' => 'M',
+        'Н' => 'H',
+        'О' => 'O',
+        'Р' => 'P',
+        'С' => 'C',
+        'Т' => 'T',
+        'У' | 'Ү' => 'Y',
+        'Х' => 'X',
+        'Ԛ' => 'Q',
+        'Ԝ' => 'W',
+        // Kirin thường.
+        'а' => 'a',
+        'ԁ' => 'd',
+        'е' => 'e',
+        'һ' => 'h',
+        'і' => 'i',
+        'ј' => 'j',
+        'к' => 'k',
+        'ӏ' => 'l',
+        'м' => 'm',
+        'п' => 'n',
+        'о' => 'o',
+        'р' => 'p',
+        'ԛ' => 'q',
+        'ѕ' => 's',
+        'с' => 'c',
+        'у' | 'ү' => 'y',
+        'ԝ' => 'w',
+        'х' => 'x',
+        'ь' => 'b',
+        // Hy Lạp hoa.
+        'Α' => 'A',
+        'Β' => 'B',
+        'Ε' => 'E',
+        'Ζ' => 'Z',
+        'Η' => 'H',
+        'Ι' => 'I',
+        'Κ' => 'K',
+        'Μ' => 'M',
+        'Ν' => 'N',
+        'Ο' => 'O',
+        'Ρ' => 'P',
+        'Τ' => 'T',
+        'Υ' => 'Y',
+        'Χ' => 'X',
+        // Hy Lạp thường.
+        'α' => 'a',
+        'ϲ' => 'c',
+        'ι' => 'i',
+        'κ' => 'k',
+        'ν' => 'v',
+        'ο' => 'o',
+        'ρ' => 'p',
+        'υ' => 'u',
+        'χ' => 'x',
+        other => other,
+    }
+}
+
+/// Dạng đem so của TÊN: như [`words_key`], rồi chữ Kirin / Hy Lạp trông như chữ Latin thành chữ
+/// Latin. "Аdmin" viết trọn chữ Kirin (`Аԁміп`) ra cùng khoá với "admin": không qua được danh
+/// sách tên dành riêng, không chiếm được tên người khác. Chỉ dùng cho tên — đem dùng cho nội
+/// dung thì từ cấm tiếng Nga sẽ khớp nhầm chữ Latin.
+pub(crate) fn name_key(name: &str) -> String {
+    // Đổi hai lần: trước khi viết thường (để phân biệt `Н` hoa với `н` thường) và sau khi bỏ dấu
+    // (chữ có dấu như `ё` tách thành `е` + dấu).
+    let before: String = name.chars().map(latin_lookalike).collect();
+    let folded: String = words_key(&before).chars().map(latin_lookalike).collect();
+    folded
+}
+
+/// Tên `name` có chứa trọn một tên / cụm tên nào trong `list` (đã qua [`words_key`]) không, so
+/// theo [`name_key`] ở cả hai phía.
+pub(crate) fn contains_name(name: &str, list: &[String]) -> bool {
+    if list.is_empty() {
+        return false;
+    }
+    let haystack = format!(" {} ", name_key(name));
+    list.iter().any(|word| haystack.contains(&format!(" {} ", name_key(word))))
+}
+
 /// `body` có chứa trọn một từ / cụm từ nào trong `list` (đã qua [`words_key`]) không.
 pub(crate) fn contains_word(body: &str, list: &[String]) -> bool {
     if list.is_empty() {
@@ -446,5 +541,32 @@ mod tests {
             assert!(check(name).is_empty(), "{name}");
         }
         assert!(!is_target_id("a/b"));
+    }
+
+    #[test]
+    fn ten_gia_chu_latin_ra_cung_khoa() {
+        // Viết trọn chữ Kirin (không trộn bảng chữ nên lọt `clean_name`) mà trông như "admin".
+        let fake_admin = "\u{0430}\u{0501}\u{043C}\u{0456}\u{043F}";
+        let mut problems = Vec::new();
+        clean_name(fake_admin, "name", &mut problems);
+        assert!(problems.is_empty());
+        assert_eq!(name_key(fake_admin), "admin");
+        // Hoa: `С`, `О` Kirin; `Μ`, `Ο` Hy Lạp.
+        assert_eq!(name_key("\u{0421}\u{041E}\u{0421}\u{041E}"), name_key("COCO"));
+        assert_eq!(name_key("\u{039C}\u{039F}"), "mo");
+        // `Н` hoa giống `H`, `н` thường thì không.
+        assert_eq!(name_key("\u{041D}"), "h");
+        assert_eq!(name_key("\u{043D}"), "\u{043D}");
+        // Có dấu: `ё` tách thành `е` + dấu, rồi thành `e`.
+        assert_eq!(name_key("\u{0451}"), "e");
+        // Chữ Latin giữ nguyên như `words_key`.
+        assert_eq!(name_key("  Ada   Lovelace "), "ada lovelace");
+
+        let reserved = ["admin".to_owned(), "moderator".to_owned()];
+        assert!(contains_name(fake_admin, &reserved));
+        assert!(contains_name(&format!("{fake_admin} team"), &reserved));
+        // Tên tiếng Nga, Hy Lạp thật không bị coi là tên dành riêng.
+        assert!(!contains_name("Анна Каренина", &reserved));
+        assert!(!contains_name("Σωκράτης", &reserved));
     }
 }

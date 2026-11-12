@@ -154,7 +154,7 @@ impl CommentsService {
                 }
                 Some(raw) => {
                     let name = text::clean_name(raw, "author_name", &mut problems);
-                    if text::contains_word(&name, &self.config.reserved_names) {
+                    if text::contains_name(&name, &self.config.reserved_names) {
                         problems.push(FieldError::new(
                             "author_name",
                             "reserved",
@@ -238,7 +238,9 @@ impl CommentsService {
 
         // Bị cấm (theo người dùng, email, dấu vết IP).
         let ip_fingerprint = match client.ip {
-            Some(ip) => Some(autoxide_kernel::ip_hash::fingerprint(&self.secret, ip).await?),
+            Some(ip) => {
+                Some(autoxide_kernel::ip_hash::fingerprint(&self.secret, MODULE, ip).await?)
+            }
             None => None,
         };
         let user_id = principal.map(Principal::user_id);
