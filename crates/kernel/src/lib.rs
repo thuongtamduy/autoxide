@@ -28,6 +28,7 @@ pub mod search;
 pub mod secret;
 pub mod storage;
 pub mod telemetry;
+pub mod throttle;
 pub mod tls;
 pub mod transfer;
 pub mod version;

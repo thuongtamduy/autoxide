@@ -2467,3 +2467,20 @@ không nối được với nhau. Gộp khối vì một nhà mạng cấp cả 
 
 Đã cân nhắc: cắt bớt octet cuối mà không băm (Isso) — vẫn lộ khối địa chỉ; băm từng địa chỉ
 không gộp — đổi địa chỉ trong khối IPv6 là thoát bộ đếm.
+
+## D-110 · `Throttle` dùng chung trong kernel, đếm trong database; `auth` chuyển sang — 2026-11-12 — agent quyết
+
+Quyết định: `autoxide_kernel::throttle::Throttle` tổng quát từ `LoginThrottle` của `auth`:
+`check` (không đếm), `hit` (đếm trước rồi xét — D-079), `record`, `refund`, `clear`, `purge`.
+Cửa sổ cố định `window`; vượt `limit` thì chặn trong `lock` (mặc định bằng `window`) rồi đếm
+lại. Bảng `<module>_throttle(key, count, window_started_at, locked_until)` sinh bằng
+`throttle_migration`, module tự thêm như `jobs_migration`. Khoá đếm băm SHA-256 trước khi
+lưu. Mọi bước là `UPDATE` có điều kiện hoặc `INSERT … ON CONFLICT DO NOTHING`: chạy như nhau
+trên hai database và đúng khi nhiều máy chủ.
+
+`auth` chuyển sang bằng migration m0018 (tạo `auth_throttle`, bỏ `auth_login_throttle`; số đếm
+cũ không chép vì chỉ sống một cửa sổ). Mã lỗi `auth.login_throttled` và thời gian chờ không đổi.
+
+Đã cân nhắc: rate limiter trong bộ nhớ (GCRA) cho việc này — mất khi khởi động lại, mỗi máy chủ
+đếm riêng; cửa sổ trượt — cần lưu từng lần, tốn bảng hơn mà lợi ích nhỏ ở các giới hạn thô
+(số lần gửi form mỗi giờ).
