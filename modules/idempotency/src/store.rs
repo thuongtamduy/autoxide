@@ -213,6 +213,16 @@ mod tests {
         if body.contains("explode") {
             return (StatusCode::INTERNAL_SERVER_ERROR, "boom".to_owned()).into_response();
         }
+        if body.contains("throttled") {
+            return (StatusCode::TOO_MANY_REQUESTS, "slow down".to_owned()).into_response();
+        }
+        if body.contains("panic") {
+            // Như handler đã commit rồi mới chết.
+            panic!("after commit");
+        }
+        if body.contains("huge") {
+            return (StatusCode::CREATED, "x".repeat(300 * 1024)).into_response();
+        }
         let text = format!("run {run}: {body}");
         if body.contains("secret") {
             // Như response tạo API key: secret chỉ trả một lần.
@@ -432,6 +442,41 @@ mod tests {
             assert_eq!(second.0, StatusCode::INTERNAL_SERVER_ERROR);
             assert_eq!(second.1, None);
             assert_eq!(counter.runs.load(Ordering::SeqCst), 2);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Lỗi tạm (429) không được lưu: gửi lại cùng key khi hết giới hạn thì việc chạy thật.
+    /// Handler chết giữa chừng (có thể đã commit): gửi lại không chạy lại việc mà nhận 409
+    /// giải thích. Response quá lớn không được lưu (D-156).
+    #[tokio::test]
+    async fn loi_tam_khong_luu_ket_qua_khong_ro_khong_chay_lai() {
+        TestDatabase::run(async |test| {
+            let (app, counter, _) = setup(test).await;
+
+            let first = post(&app, Some("busy"), "throttled").await;
+            let second = post(&app, Some("busy"), "throttled").await;
+            assert_eq!(
+                (first.0, second.0),
+                (StatusCode::TOO_MANY_REQUESTS, StatusCode::TOO_MANY_REQUESTS)
+            );
+            assert_eq!(second.1, None, "not a replay");
+            assert_eq!(counter.runs.load(Ordering::SeqCst), 2);
+
+            let died = post(&app, Some("died"), "panic").await;
+            assert_eq!(died.0, StatusCode::INTERNAL_SERVER_ERROR);
+            let again = post(&app, Some("died"), "panic").await;
+            assert_eq!(again.0, StatusCode::CONFLICT);
+            assert!(again.2.contains("idempotency_result_unknown"), "{}", again.2);
+            assert_eq!(counter.runs.load(Ordering::SeqCst), 3);
+
+            let big = post(&app, Some("big"), "huge").await;
+            assert_eq!((big.0, big.2.len()), (StatusCode::CREATED, 300 * 1024));
+            let big_again = post(&app, Some("big"), "huge").await;
+            assert_eq!(big_again.0, StatusCode::CONFLICT);
+            assert!(big_again.2.contains("idempotency_result_too_large"), "{}", big_again.2);
+            assert_eq!(counter.runs.load(Ordering::SeqCst), 4);
         })
         .await
         .unwrap();

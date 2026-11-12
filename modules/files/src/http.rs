@@ -203,8 +203,13 @@ async fn download_file(
     State(service): State<Arc<FileService>>,
     principal: Principal,
     Path(id): Path<Uuid>,
+    request_headers: HeaderMap,
 ) -> Result<Response, Error> {
-    let download = service.download(&principal, id).await?;
+    let unchanged = |etag: &str| autoxide_kernel::version::if_none_match(&request_headers, etag);
+    let Some(download) = service.download(&principal, id, unchanged).await? else {
+        // Client đã có đúng bản này: lớp `not_modified` của kernel cũng trả 304 như vầy.
+        return Ok(StatusCode::NOT_MODIFIED.into_response());
+    };
     let file = download.file;
     let header_value = |text: &str| HeaderValue::from_str(text).map_err(Error::internal);
     let headers = [
@@ -214,7 +219,7 @@ async fn download_file(
         // Trình duyệt không được đoán loại khác với loại đã khai (chặn file HTML giả
         // dạng ảnh chạy script).
         (header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff")),
-        (header::ETAG, header_value(&format!("\"{}\"", file.sha256))?),
+        (header::ETAG, header_value(&file.etag())?),
         (header::CACHE_CONTROL, HeaderValue::from_static("private, no-cache")),
     ];
     Ok((headers, Body::from_stream(download.content)).into_response())

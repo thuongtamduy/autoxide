@@ -9,7 +9,8 @@
 //! Hai endpoint nằm ngoài `/api/v1` vì chúng không thuộc hợp đồng nghiệp vụ và
 //! không đổi theo phiên bản API.
 
-use std::time::Duration;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,22 @@ use crate::response::{Data, Problem};
 
 /// Bộ kiểm tra gọi liên tục, vài giây một lần: không để một lần hỏi treo lâu hơn mức này.
 const READY_TIMEOUT: Duration = Duration::from_secs(2);
+/// Kết quả hỏi database dùng lại trong chừng này: endpoint công khai, không bị rate limit, mà
+/// mỗi lần hỏi chiếm kết nối ghi duy nhất của SQLite — một người gọi dồn dập không được làm
+/// chậm các lệnh ghi thật (D-156).
+const READY_CACHE: Duration = Duration::from_secs(1);
+
+/// Database, kèm lần hỏi gần nhất (lúc hỏi, có trả lời không).
+#[derive(Clone)]
+struct Readiness {
+    database: Database,
+    // Mutex của tokio: giữ qua `.await` của lần hỏi, nên nhiều request cùng lúc chỉ hỏi database
+    // một lần, các request kia chờ rồi dùng lại kết quả.
+    last: Arc<tokio::sync::Mutex<Option<Checked>>>,
+}
+
+/// Một lần hỏi database: lúc hỏi, và lỗi (nếu có).
+type Checked = (Instant, Result<(), String>);
 
 /// Health of the service.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -40,7 +57,8 @@ impl Health {
 
 /// Hai route health check, gắn ở gốc (ngoài `/api/v1`).
 pub fn health_routes(database: Database) -> OpenApiRouter {
-    OpenApiRouter::new().routes(routes!(live)).routes(routes!(ready)).with_state(database)
+    let readiness = Readiness { database, last: Arc::default() };
+    OpenApiRouter::new().routes(routes!(live)).routes(routes!(ready)).with_state(readiness)
 }
 
 /// Liveness probe: is the process running?
@@ -70,17 +88,30 @@ async fn live() -> Data<Health> {
         (status = 503, description = "A dependency is unavailable; code `not_ready`.", body = Problem),
     )
 )]
-async fn ready(State(database): State<Database>) -> Result<Data<Health>, Error> {
-    let not_ready = || {
-        Error::unavailable(
+async fn ready(State(readiness): State<Readiness>) -> Result<Data<Health>, Error> {
+    let mut last = readiness.last.lock().await;
+    let fresh = last.as_ref().filter(|(at, _)| at.elapsed() < READY_CACHE).map(|(_, ok)| ok);
+    let outcome = match fresh {
+        Some(outcome) => outcome.clone(),
+        None => {
+            let outcome = match tokio::time::timeout(READY_TIMEOUT, readiness.database.ping()).await
+            {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(error)) => Err(error.to_string()),
+                Err(_) => Err("database ping timed out".to_owned()),
+            };
+            *last = Some((Instant::now(), outcome.clone()));
+            outcome
+        }
+    };
+    drop(last);
+    match outcome {
+        Ok(()) => Ok(Health::ok()),
+        // Nguyên nhân gốc gắn vào lỗi để vào log; client chỉ thấy câu chung.
+        Err(cause) => Err(Error::unavailable(
             "not_ready",
             "The service cannot handle requests right now: the database is not answering.",
         )
-    };
-    match tokio::time::timeout(READY_TIMEOUT, database.ping()).await {
-        Ok(Ok(())) => Ok(Health::ok()),
-        // Nguyên nhân gốc gắn vào lỗi để vào log; client chỉ thấy câu chung ở trên.
-        Ok(Err(error)) => Err(not_ready().with_source(error)),
-        Err(_) => Err(not_ready().with_source("database ping timed out")),
+        .with_source(cause)),
     }
 }

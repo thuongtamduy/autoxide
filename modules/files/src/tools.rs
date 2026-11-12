@@ -93,7 +93,10 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
                     if u64::try_from(file.size).unwrap_or(u64::MAX) > MAX_TOOL_BYTES {
                         return Err(too_large_for_tool(input.id));
                     }
-                    let download = service.download(&principal, input.id).await?;
+                    let download = service
+                        .download(&principal, input.id, |_| false)
+                        .await?
+                        .ok_or_else(|| Error::internal("a download without a known version"))?;
                     let chunks: Vec<Bytes> = download.content.try_collect().await?;
                     let content_base64 = STANDARD.encode(chunks.concat());
                     Ok(FileContent { file: download.file.into(), content_base64 })

@@ -12,6 +12,8 @@
 //!                                              N = 2 ─────────────────────▲
 //! ```
 //!
+//! Địa chỉ trả ra luôn ở dạng chuẩn: IPv4 viết dạng IPv6 (`::ffff:a.b.c.d`) thành IPv4 (D-156).
+//!
 //! Nhiều dòng header được gộp thành một danh sách theo thứ tự (RFC 9110). Danh sách ngắn hơn
 //! `N` (request không đi qua đủ proxy) thì lấy phần tử đầu. Giá trị không phải địa chỉ IP thì
 //! dùng địa chỉ kết nối.
@@ -74,6 +76,7 @@ impl ClientAddress {
         headers: &HeaderMap,
         connection: Option<IpAddr>,
     ) -> Option<IpAddr> {
+        let connection = connection.map(|ip| ip.to_canonical());
         let Some(name) = &self.header else {
             return connection;
         };
@@ -106,11 +109,13 @@ impl ClientAddress {
                 .unwrap_or(entries[0])
         };
         match parse_address(chosen) {
-            Some(address) => Some(address),
+            Some(address) => Some(address.to_canonical()),
             None => {
+                // Giá trị do client gửi được: chỉ ghi phần đầu, không để log phình theo header.
+                let shown: String = chosen.chars().take(64).collect();
                 tracing::warn!(
                     header = %name,
-                    value = chosen,
+                    value = %shown,
                     "cannot read the client address from the configured header; using the connection address"
                 );
                 connection
@@ -171,7 +176,10 @@ impl<S: Send + Sync> FromRequestParts<S> for ClientInfo {
         let ip = match parts.extensions.get::<ClientIp>() {
             Some(resolved) => resolved.0,
             // Router không đi qua lớp `attach` (vd test dựng router riêng): địa chỉ kết nối.
-            None => parts.extensions.get::<ConnectInfo<SocketAddr>>().map(|info| info.0.ip()),
+            None => parts
+                .extensions
+                .get::<ConnectInfo<SocketAddr>>()
+                .map(|info| info.0.ip().to_canonical()),
         };
         Ok(ClientInfo {
             ip,
@@ -308,5 +316,16 @@ mod tests {
             resolver.resolve(&via_cdn, Some(ip("::ffff:10.0.0.5"))),
             Some(ip("203.0.113.9"))
         );
+    }
+
+    #[test]
+    fn ipv4_viet_dang_ipv6_thanh_ipv4() {
+        let direct = ClientAddress::new(None, 1, Vec::new());
+        assert_eq!(
+            direct.resolve(&HeaderMap::new(), Some(ip("::ffff:203.0.113.9"))),
+            Some(ip("203.0.113.9"))
+        );
+        let list = headers(&["::ffff:198.51.100.7"]);
+        assert_eq!(proxies(1).resolve(&list, None), Some(ip("198.51.100.7")));
     }
 }

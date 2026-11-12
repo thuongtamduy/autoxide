@@ -266,6 +266,9 @@ where
             Value::Null => Value::Object(Map::new()),
             other => other,
         };
+        if crate::http::value_contains_nul(&arguments) {
+            return Err(crate::http::nul_refused());
+        }
         let input: I = serde_json::from_value(arguments).map_err(|error| {
             Error::validation(vec![FieldError::new("arguments", "invalid", error.to_string())])
         })?;

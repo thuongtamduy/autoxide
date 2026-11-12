@@ -35,6 +35,12 @@ async fn scrape(State(metrics): State<Metrics>) -> impl IntoResponse {
 /// `/api/v1/notes/{id}`), không phải đường dẫn thô — để số chuỗi số đo không tăng
 /// theo số ID.
 pub(super) fn record_request(method: &str, route: &str, status: u16, elapsed_seconds: f64) {
+    // HTTP nhận method bất kỳ (`FOO`, `M123`…): nhãn chỉ lấy trong tập cố định, không thì mỗi
+    // method lạ thêm một chuỗi số đo sống mãi trong bộ nhớ (D-156).
+    let method = match method {
+        "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" => method,
+        _ => "other",
+    };
     let labels = [
         ("method", method.to_owned()),
         ("route", route.to_owned()),

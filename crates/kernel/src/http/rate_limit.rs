@@ -104,9 +104,11 @@ impl RateLimiter {
 }
 
 /// Gom địa chỉ IPv6 theo khối /64: một máy thường có cả khối, đổi địa chỉ trong khối
-/// không được tính là client mới.
+/// không được tính là client mới. Địa chỉ IPv4 viết dạng IPv6 (`::ffff:a.b.c.d`, khi máy chủ
+/// nghe trên `[::]`) tính như IPv4 — không thì mọi client IPv4 rơi vào cùng khối `::/64` và một
+/// client làm cả nhóm bị chặn (D-156).
 fn group(address: IpAddr) -> IpAddr {
-    match address {
+    match address.to_canonical() {
         IpAddr::V6(v6) => {
             let segments = v6.segments();
             IpAddr::V6(Ipv6Addr::new(
@@ -275,6 +277,9 @@ mod tests {
         assert_eq!(group(ip("2001:db8:1:2:aaaa::1")), group(ip("2001:db8:1:2:bbbb::9")));
         assert_ne!(group(ip("2001:db8:1:2::1")), group(ip("2001:db8:1:3::1")));
         assert_eq!(group(ip("192.0.2.1")), ip("192.0.2.1"));
+        // IPv4 viết dạng IPv6: mỗi địa chỉ IPv4 vẫn là một client (D-156).
+        assert_eq!(group(ip("::ffff:192.0.2.1")), ip("192.0.2.1"));
+        assert_ne!(group(ip("::ffff:192.0.2.1")), group(ip("::ffff:192.0.2.2")));
     }
 
     #[test]

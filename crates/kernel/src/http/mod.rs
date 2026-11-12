@@ -69,6 +69,7 @@ pub use client::ClientInfo;
 pub use deprecation::Deprecation;
 pub use disposition::{Disposition, content_disposition};
 pub use extract::ValidJson;
+pub(crate) use extract::{contains_nul_escape, nul_refused, value_contains_nul};
 pub use health::{Health, health_routes};
 pub use mcp::MCP_PATH;
 pub use metrics::metrics_routes;
@@ -197,6 +198,7 @@ pub fn build(
         .layer(middleware::from_fn(move |request: Request, next: Next| {
             body_limit::limit(body_limits.clone(), request, next)
         }))
+        .layer(middleware::from_fn(refuse_nul_in_url))
         .layer(middleware::from_fn(move |request: Request, next: Next| {
             enforce_timeout(request_timeout, request, next)
         }))
@@ -231,10 +233,24 @@ pub fn build(
     Api { router, openapi, schema_conflicts }
 }
 
+/// Từ chối request có ký tự NUL (`%00`) trong đường dẫn hay query: giá trị đó tới database thì
+/// Postgres lỗi 500, SQLite thì không (D-156). Một lớp cho mọi route, thay vì từng extractor.
+async fn refuse_nul_in_url(request: Request, next: Next) -> Response {
+    let target = request.uri().path_and_query().map(|target| target.as_str()).unwrap_or_default();
+    if target.contains("%00") {
+        return nul_refused().into_response();
+    }
+    next.run(request).await
+}
+
 async fn enforce_timeout(limit: Duration, request: Request, next: Next) -> Response {
     match tokio::time::timeout(limit, next.run(request)).await {
         Ok(response) => response,
-        Err(_) => timed_out(limit).into_response(),
+        Err(_) => {
+            let mut response = timed_out(limit).into_response();
+            response.extensions_mut().insert(idempotency::OutcomeUnknown);
+            response
+        }
     }
 }
 

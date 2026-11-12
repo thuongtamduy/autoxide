@@ -272,7 +272,7 @@ into a new database.
 | `AUTOXIDE_AUTH_PASSWORD_RESET_URL`, `AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` | Link mails to your own pages |
 | `AUTOXIDE_AUTH_PASSKEY_RP_ID`, `AUTOXIDE_AUTH_PASSKEY_ORIGINS` | Turn on passkey sign-in for your domain |
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` to run the API and background work in separate processes |
-| `AUTOXIDE_HTTP_METRICS` | Prometheus metrics at `/metrics` |
+| `AUTOXIDE_HTTP_METRICS` | Prometheus metrics at `/metrics`, on the API port: when you turn it on, block `/metrics` in your reverse proxy (Caddy: `respond /metrics 404`) and scrape it from the machine itself |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Send traces to an OpenTelemetry collector |
 
 Check the configuration without starting anything: `autoxide config`. It lists every

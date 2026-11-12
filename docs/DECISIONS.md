@@ -3707,3 +3707,49 @@ Quyết định:
   (`DELETE /users/{id}/mfa`) hoặc sửa database.
 - Truy vấn tuần tự khi xác thực mỗi request (2 với phiên, 4 với API key): cần đo bằng
   `scripts/loadtest.sh` trước khi gộp.
+
+## D-156 · Bước 24 — lớp HTTP, idempotency, webhooks, files: các phát hiện của lượt rà soát — 2026-11-12 — agent quyết
+
+Rà soát độc lập lớp HTTP / MCP / quyền và phần dữ liệu, I/O của core (bước 24). Không có lỗi
+vượt quyền hay lộ dữ liệu giữa người gọi; sửa các lỗi sau, kèm test chạy trên cả hai database.
+
+Quyết định:
+
+- **Địa chỉ client ở dạng chuẩn** (`IpAddr::to_canonical`) ngay khi giải: máy chủ nghe trên
+  `[::]` thấy client IPv4 dưới dạng `::ffff:a.b.c.d`, và rate limiter gom IPv6 theo /64 đã gom
+  MỌI client IPv4 vào một khối — một client làm cả nhóm bị 429. Rate limiter cũng tự chuẩn hoá.
+  Giá trị header không đọc được chỉ ghi 64 ký tự đầu vào log.
+- **Idempotency:** lỗi tạm (429, 408, 425) không lưu, như 5xx. Response mang dấu
+  `OutcomeUnknown` (hết giờ ở `enforce_timeout`, panic ở `PanicToProblem`) — việc có thể đã xong
+  — thì không bỏ cũng không lưu lỗi: lần gửi lại nhận `409 idempotency_result_unknown`. Lưu kết
+  quả hỏng thì vẫn trả response thật (ghi log). Response lớn hơn 256 KiB không lưu
+  (`409 idempotency_result_too_large` khi gửi lại). `If-Match` vào dấu vân tay của request;
+  `ETag` được giữ khi trả lại.
+- **Ký tự NUL** bị từ chối ở mọi cửa vào bằng một lỗi `400 invalid_character`: thân JSON
+  (`ValidJson` đọc thân một lần, tìm `\u0000` không bị thoát), tham số tool MCP, đường dẫn và
+  query (`%00`, một lớp cho mọi route), con trỏ trang (coi là con trỏ hỏng). Postgres không lưu
+  được NUL trong cột chữ (500), SQLite lưu — hai database phải như nhau (luật số một).
+- **`/health/ready`** dùng lại kết quả hỏi database trong 1 giây, nhiều request cùng lúc chỉ hỏi
+  một lần: endpoint công khai, ngoài rate limit, mà mỗi lần hỏi chiếm kết nối ghi duy nhất của
+  SQLite.
+- **Nhãn `method` của metrics** chỉ nhận method chuẩn, còn lại là `other`: HTTP nhận method bất
+  kỳ, mỗi method lạ thêm một chuỗi số đo sống mãi.
+- **Webhooks:** tạo endpoint và đổi secret trả `Cache-Control: no-store` (quy ước D-149 — lớp
+  idempotency không lưu secret). Event về endpoint chỉ mang origin của URL: đường dẫn / query của
+  URL webhook (Slack, Discord…) thường là secret, mà event đi tới audit log và webhook khác nhận
+  `*`. Bộ lọc địa chỉ chặn thêm: IPv4-compatible `::/96`, 6to4 `2002::/16` (xét IPv4 bên trong),
+  NAT64 nội bộ `64:ff9b:1::/48`, site-local `fec0::/10`, Teredo `2001::/32`, `192.88.99.0/24`.
+- **Files:** tên file không nhận ký tự định dạng vô hình (đảo chiều chữ…); tải về với
+  `If-None-Match` khớp thì trả 304 mà không mở nội dung (với S3 là một lần GET bỏ dở).
+
+Để lại, ghi rõ:
+
+- **Audit giữ `before` / `after` của các dòng mà người bị xoá là người làm** (vd tên file họ
+  tải lên): xoá đi thì mất dấu vết "ai đã làm gì với dữ liệu của người khác" — trách nhiệm quan
+  trọng hơn ở audit. Chỉ dòng về chính tài khoản bị xoá mới bị bỏ dữ liệu (D-080, D-149).
+- **Không có timeout đọc header HTTP** (`axum::serve` không gắn timer cho hyper): bố cục DEPLOY
+  đặt Autoxide sau reverse proxy trên `127.0.0.1`, proxy lo việc này.
+- Trang tài liệu `/api/docs` (tắt mặc định) tải script Scalar từ CDN không ghim phiên bản.
+- Bản ghi idempotency (có thể chứa dữ liệu cá nhân trong response) không xoá theo tài khoản; sống
+  tối đa 24 giờ.
+- `/metrics` chạy trên cùng cổng với API: DEPLOY phải chặn đường dẫn này ở proxy khi bật.

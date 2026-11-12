@@ -131,6 +131,11 @@ impl KeyCursor {
 
     fn decode(raw: &str) -> Option<Self> {
         let bytes = URL_SAFE_NO_PAD.decode(raw).ok()?;
+        // Giá trị chữ chứa NUL: Postgres lỗi 500, SQLite thì không — coi như con trỏ hỏng
+        // (D-156).
+        if crate::http::contains_nul_escape(&bytes) {
+            return None;
+        }
         serde_json::from_slice(&bytes).ok()
     }
 }

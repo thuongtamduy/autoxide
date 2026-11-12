@@ -122,6 +122,9 @@ impl ResponseForPanic for PanicToProblem {
             .map(|text| (*text).to_owned())
             .or_else(|| panic.downcast_ref::<String>().cloned())
             .unwrap_or_else(|| "unknown panic".to_owned());
-        Error::internal(format!("handler panicked: {message}")).into_response()
+        let mut response = Error::internal(format!("handler panicked: {message}")).into_response();
+        // Handler chết giữa chừng: việc có thể đã xong (D-156).
+        response.extensions_mut().insert(super::idempotency::OutcomeUnknown);
+        response
     }
 }

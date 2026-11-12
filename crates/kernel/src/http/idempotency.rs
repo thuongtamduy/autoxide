@@ -22,13 +22,24 @@ pub const IDEMPOTENT_REPLAYED: HeaderName = HeaderName::from_static("idempotent-
 /// Độ dài tối đa của key.
 const MAX_KEY_LENGTH: usize = 255;
 /// Header của response được lưu và trả lại khi gửi lại.
-const KEPT_HEADERS: [HeaderName; 5] = [
+const KEPT_HEADERS: [HeaderName; 6] = [
     header::CONTENT_TYPE,
+    header::ETAG,
     header::LOCATION,
     header::RETRY_AFTER,
     header::WWW_AUTHENTICATE,
     header::CONTENT_LANGUAGE,
 ];
+
+/// Đánh dấu trên response: request có thể đã làm xong việc dù trả lỗi (hết giờ, panic giữa
+/// chừng — transaction có thể đã commit). Lớp idempotency không cho chạy lại bằng cùng key
+/// (D-156).
+#[derive(Debug, Clone, Copy)]
+pub(super) struct OutcomeUnknown;
+
+/// Response lớn hơn chừng này không được lưu (thay bằng lời giải thích): kho idempotency không
+/// phình theo response lớn (đọc file qua MCP…).
+const MAX_STORED_BODY: usize = 256 * 1024;
 
 pub(super) struct Settings {
     pub store: Arc<dyn IdempotencyStore>,
@@ -132,9 +143,17 @@ async fn run(
         content.extend_from_slice(&bytes);
         (Body::from(bytes), content)
     };
-    // Cùng key mà khác đường dẫn, query, loại nội dung hay thân: là request khác.
-    let fingerprint =
-        hash(&[parts.method.as_str().as_bytes(), target.as_bytes(), content_type, &content]);
+    // Cùng key mà khác đường dẫn, query, loại nội dung, `If-Match` hay thân: là request khác
+    // (client đọc lại rồi gửi `If-Match` mới thì không nhận lại lỗi 412 cũ).
+    let if_match =
+        parts.headers.get(header::IF_MATCH).map(HeaderValue::as_bytes).unwrap_or_default();
+    let fingerprint = hash(&[
+        parts.method.as_str().as_bytes(),
+        target.as_bytes(),
+        content_type,
+        if_match,
+        &content,
+    ]);
     let lock = chrono::Duration::from_std(settings.request_timeout + Duration::from_secs(30))
         .map_err(Error::internal)?;
     let begin = settings.store.begin(&scope, &key, &fingerprint, chrono::Utc::now() + lock).await?;
@@ -160,32 +179,92 @@ async fn run(
     };
 
     let response = next.run(Request::from_parts(parts, body)).await;
-    if response.status().is_server_error() {
-        // Lỗi phía máy chủ: không lưu, để client gửi lại được với cùng key.
-        settings.store.abandon(id).await?;
-        return Ok(response);
+    // Lưu kết quả mà hỏng (database bận, mất kết nối): việc đã xong, client vẫn nhận đúng
+    // response; dòng còn khoá tới `locked_until` rồi lần gửi lại chạy lại (đã ghi log).
+    let (response, outcome) = settle(settings, id, response).await;
+    if let Err(error) = outcome {
+        tracing::error!(code = error.code(), "cannot save the idempotent result");
     }
-    if response.status().is_success() && no_store(response.headers()) {
+    Ok(response)
+}
+
+/// Quyết định lưu gì cho lần chạy `id` vừa trả `response`, rồi trả response cho client.
+async fn settle(
+    settings: &Settings,
+    id: uuid::Uuid,
+    response: Response,
+) -> (Response, Result<(), Error>) {
+    let status = response.status();
+    if response.extensions().get::<OutcomeUnknown>().is_some() {
+        // Hết giờ hay panic: việc có thể đã xong. Không bỏ (chạy lại có thể làm hai lần),
+        // không lưu lỗi 5xx như kết quả: lần gửi lại nhận lời giải thích (D-156).
+        let refusal = not_kept(
+            "idempotency_result_unknown",
+            "The first request with this `Idempotency-Key` did not finish in time, so the \
+             server cannot tell whether it took effect. Look the result up before repeating \
+             it, then use a new key.",
+        );
+        let outcome = keep(settings, id, refusal).await;
+        return (response, outcome);
+    }
+    if status.is_server_error() || is_temporary(status) {
+        // Lỗi phía máy chủ, hay lỗi tạm (429 vượt giới hạn, 408): không lưu, để client gửi lại
+        // được với cùng key khi hết giới hạn (D-156).
+        return (response, settings.store.abandon(id).await);
+    }
+    if status.is_success() && no_store(response.headers()) {
         // Response chứa secret chỉ trả một lần (API key mới, token, mã khôi phục): không lưu
         // nó vào database. Lần gửi lại nhận lời giải thích thay vì chạy lại việc (D-149).
-        let refusal = Error::conflict(
+        let refusal = not_kept(
             "idempotency_result_not_kept",
             "The first request with this `Idempotency-Key` succeeded, but its response held \
              a secret that the server does not keep. Do not repeat it: look the result up \
              instead (for example list your API keys), or use a new key to do it again.",
-        )
-        .into_response();
-        let (refusal_parts, refusal_body) = refusal.into_parts();
-        let refusal_body =
-            axum::body::to_bytes(refusal_body, usize::MAX).await.map_err(Error::internal)?;
-        settings.store.complete(id, stored(&refusal_parts, &refusal_body)).await?;
-        return Ok(response);
+        );
+        let outcome = keep(settings, id, refusal).await;
+        return (response, outcome);
     }
     let (response_parts, body) = response.into_parts();
+    let body = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(body) => body,
+        Err(error) => {
+            let error = Error::internal(error);
+            let abandoned = settings.store.abandon(id).await;
+            return (error.into_response(), abandoned);
+        }
+    };
+    let outcome = if body.len() > MAX_STORED_BODY {
+        let refusal = not_kept(
+            "idempotency_result_too_large",
+            "The first request with this `Idempotency-Key` succeeded, but its response was \
+             too large to keep. Do not repeat it: look the result up instead, or use a new \
+             key to do it again.",
+        );
+        keep(settings, id, refusal).await
+    } else {
+        settings.store.complete(id, stored(&response_parts, &body)).await
+    };
+    (Response::from_parts(response_parts, Body::from(body)), outcome)
+}
+
+/// Lỗi tạm thời: gửi lại sau sẽ khác.
+fn is_temporary(status: StatusCode) -> bool {
+    matches!(
+        status,
+        StatusCode::TOO_MANY_REQUESTS | StatusCode::REQUEST_TIMEOUT | StatusCode::TOO_EARLY
+    )
+}
+
+/// Response 409 thay cho kết quả không lưu được.
+fn not_kept(code: &'static str, message: &'static str) -> Response {
+    Error::conflict(code, message).into_response()
+}
+
+/// Lưu `refusal` làm kết quả của lần chạy `id`.
+async fn keep(settings: &Settings, id: uuid::Uuid, refusal: Response) -> Result<(), Error> {
+    let (parts, body) = refusal.into_parts();
     let body = axum::body::to_bytes(body, usize::MAX).await.map_err(Error::internal)?;
-    let stored = stored(&response_parts, &body);
-    settings.store.complete(id, stored).await?;
-    Ok(Response::from_parts(response_parts, Body::from(body)))
+    settings.store.complete(id, stored(&parts, &body)).await
 }
 
 /// Bản lưu của một response: status, các header cần giữ, thân.

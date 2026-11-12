@@ -363,14 +363,23 @@ impl WebhookService {
     }
 }
 
-/// Những gì audit cần biết về một endpoint (không có secret).
+/// Những gì audit cần biết về một endpoint (không có secret). URL chỉ giữ scheme, host,
+/// port: đường dẫn và query của URL webhook thường chính là secret (Slack, Discord…), mà event
+/// đi tới audit log (người có `audit.read`) và tới webhook khác nhận `*` (D-156).
 fn snapshot(endpoint: &Endpoint) -> Value {
     json!({
-        "url": endpoint.url,
+        "url": origin(&endpoint.url),
         "description": endpoint.description,
         "events": endpoint.events,
         "disabled": endpoint.disabled_at.is_some(),
     })
+}
+
+/// `scheme://host[:port]` của `url`, bỏ đường dẫn, query, thông tin đăng nhập.
+fn origin(url: &str) -> String {
+    reqwest::Url::parse(url)
+        .map(|url| url.origin().ascii_serialization())
+        .unwrap_or_else(|_| "invalid".to_owned())
 }
 
 fn endpoint_not_found(id: Uuid) -> Error {
@@ -381,4 +390,20 @@ fn endpoint_not_found(id: Uuid) -> Error {
 /// Bây giờ, cắt tới micro giây để hai database lưu cùng một giá trị.
 pub(crate) fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::origin;
+
+    /// Event về endpoint chỉ mang scheme, host, port của URL (D-156).
+    #[test]
+    fn url_trong_event_bo_duong_dan_va_query() {
+        assert_eq!(
+            origin("https://hooks.example.com/services/T0/B0/secret?token=abc"),
+            "https://hooks.example.com"
+        );
+        assert_eq!(origin("https://user:pw@example.com:8443/h"), "https://example.com:8443");
+        assert_eq!(origin("not a url"), "invalid");
+    }
 }

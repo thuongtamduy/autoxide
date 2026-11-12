@@ -33,6 +33,11 @@ pub(crate) fn routes(service: Arc<WebhookService>) -> OpenApiRouter {
         .with_state(service)
 }
 
+/// `Cache-Control: no-store` cho response chứa secret chỉ trả một lần: proxy không giữ, lớp
+/// idempotency không lưu vào database (D-149, D-156).
+type NoStore = [(axum::http::HeaderName, &'static str); 1];
+const NO_STORE: NoStore = [(axum::http::header::CACHE_CONTROL, "no-store")];
+
 /// A kind of event that endpoints can subscribe to.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(crate) struct EventTypeResponse {
@@ -237,7 +242,7 @@ async fn create_endpoint(
     State(service): State<Arc<WebhookService>>,
     principal: Principal,
     ValidJson(input): ValidJson<CreateEndpointRequest>,
-) -> Result<Created<CreatedEndpointResponse>, Error> {
+) -> Result<(NoStore, Created<CreatedEndpointResponse>), Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
     let input =
         NewEndpoint { url: input.url, description: input.description, events: input.events };
@@ -245,7 +250,7 @@ async fn create_endpoint(
     let path = format!("/webhooks/{}", created.endpoint.id);
     let data =
         CreatedEndpointResponse { secret: created.secret, endpoint: created.endpoint.into() };
-    Ok(Created::new(path, data))
+    Ok((NO_STORE, Created::new(path, data)))
 }
 
 /// Get a webhook endpoint.
@@ -359,10 +364,10 @@ async fn rotate_secret(
     State(service): State<Arc<WebhookService>>,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<SecretResponse>, Error> {
+) -> Result<(NoStore, Data<SecretResponse>), Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
     let secret = service.rotate_secret(Actor::from(&principal), id).await?;
-    Ok(Data { data: SecretResponse { secret } })
+    Ok((NO_STORE, Data { data: SecretResponse { secret } }))
 }
 
 /// List the deliveries of an endpoint, to see what was sent and what failed.

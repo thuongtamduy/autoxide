@@ -23,6 +23,11 @@ impl Model {
     pub(crate) fn storage_key(&self) -> String {
         storage_key(self.id)
     }
+
+    /// `ETag` của nội dung: SHA-256 trong ngoặc kép.
+    pub(crate) fn etag(&self) -> String {
+        format!("\"{}\"", self.sha256)
+    }
 }
 
 pub(crate) fn storage_key(id: Uuid) -> String {

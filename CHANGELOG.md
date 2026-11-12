@@ -27,6 +27,25 @@ endpoints are marked deprecated with a sunset date first.
 - Confirming a new email address voids password-reset mails sent to the old one.
 - Disabling or deleting a user while someone changes their roles no longer risks a deadlock on
   Postgres.
+- Requests whose client address is an IPv4 address written as IPv6 (`::ffff:a.b.c.d`, when the
+  server listens on `[::]`) are rate-limited per address again, instead of all sharing one
+  limit.
+- `Idempotency-Key`: a temporary refusal (429, 408) is no longer stored and replayed; a request
+  that timed out or crashed after it may have taken effect answers a retry with
+  `409 idempotency_result_unknown` instead of running again; responses over 256 KiB are not
+  stored (`409 idempotency_result_too_large` on a retry); `If-Match` is part of the request's
+  fingerprint and `ETag` is replayed.
+- The NUL character (`\u0000` in JSON, `%00` in a URL) is refused everywhere with
+  `400 invalid_character`; before, Postgres answered 500 while SQLite stored it.
+- `/health/ready` asks the database at most once a second, however often it is called.
+- The `method` label of HTTP metrics only takes standard methods (others count as `other`).
+- Webhooks: creating an endpoint and rotating its secret answer with `Cache-Control: no-store`;
+  events about endpoints carry only the origin of the URL (paths and queries often hold
+  tokens); more IPv6 forms that embed private IPv4 addresses (6to4, IPv4-compatible) and the
+  remaining special ranges are refused as targets.
+- Files: names with invisible formatting characters (such as right-to-left override) are
+  refused; a download the client already has (`If-None-Match`) answers 304 without reading the
+  stored content.
 - The hourly sign-in cleanup uses indexes and deletes in batches of 1,000 rows (a new migration
   adds the indexes).
 

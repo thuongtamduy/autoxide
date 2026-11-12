@@ -118,18 +118,24 @@ impl FileService {
         fetch_page(select, Column::Id, |row| row.id, page, self.database.read()).await
     }
 
-    /// Thông tin và nội dung của file `id`.
+    /// Thông tin và nội dung của file `id`. `unchanged(etag)` trả `true` (client đã có đúng bản
+    /// này, `If-None-Match`) thì trả `None` mà KHÔNG mở nội dung — với S3, mở là một lần GET tính
+    /// tiền rồi bỏ dở (D-156).
     pub(crate) async fn download(
         &self,
         principal: &Principal,
         id: Uuid,
-    ) -> Result<Download, Error> {
+        unchanged: impl FnOnce(&str) -> bool,
+    ) -> Result<Option<Download>, Error> {
         let file = self.get(principal, id).await?;
+        if unchanged(&file.etag()) {
+            return Ok(None);
+        }
         let stored = self.storage.get(&file.storage_key()).await?.ok_or_else(|| {
             // Có dòng mà không có nội dung: nơi lưu bị đổi từ bên ngoài.
             Error::internal(format!("the content of file {id} is missing from storage"))
         })?;
-        Ok(Download { file, content: stored.content })
+        Ok(Some(Download { file, content: stored.content }))
     }
 
     /// Xoá file `id`.
@@ -235,13 +241,14 @@ fn visible(principal: &Principal, file: Option<FileRecord>, id: Uuid) -> Result<
     .ok_or_else(|| file_not_found(id))
 }
 
-/// Tên file: bỏ khoảng trắng hai đầu; 1 tới 255 ký tự; không có `/`, `\` hay ký tự điều
-/// khiển (tên chỉ để hiển thị và đặt khi tải về, không bao giờ thành đường dẫn).
+/// Tên file: bỏ khoảng trắng hai đầu; 1 tới 255 ký tự; không có `/`, `\`, ký tự điều khiển
+/// hay ký tự định dạng vô hình (tên chỉ để hiển thị và đặt khi tải về, không bao giờ thành
+/// đường dẫn).
 fn check_name(name: &str) -> Result<String, Error> {
     let name = name.trim();
     let length = name.chars().count();
     let valid = (1..=NAME_MAX_LENGTH).contains(&length)
-        && !name.chars().any(|c| c == '/' || c == '\\' || c.is_control());
+        && !name.chars().any(|c| c == '/' || c == '\\' || c.is_control() || is_invisible(c));
     if valid {
         return Ok(name.to_owned());
     }
@@ -249,9 +256,26 @@ fn check_name(name: &str) -> Result<String, Error> {
         "name",
         "invalid",
         format!(
-            "must be 1 to {NAME_MAX_LENGTH} characters, without `/`, `\\` or control characters"
+            "must be 1 to {NAME_MAX_LENGTH} characters, without `/`, `\\`, control or invisible \
+             formatting characters"
         ),
     )]))
+}
+
+/// Ký tự định dạng vô hình đổi cách tên hiện ra: đảo chiều chữ (`invoice\u{202E}fdp.exe` hiện
+/// thành `invoiceexe.pdf`), chữ rộng 0, gạch nối mềm (D-156).
+fn is_invisible(c: char) -> bool {
+    matches!(
+        c,
+        '\u{00AD}'
+            | '\u{061C}'
+            | '\u{180E}'
+            | '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{206F}'
+            | '\u{FEFF}'
+            | '\u{FFF9}'..='\u{FFFB}'
+    )
 }
 
 /// Số file xoá mỗi lượt khi dọn file của một tài khoản đã xoá.
@@ -401,7 +425,12 @@ mod tests {
             assert_eq!(files.get(&ada, file.id).await.unwrap(), file);
             let page = files.list(&ada, &PageRequest::first(10, Default::default())).await.unwrap();
             assert_eq!(page.data, vec![file.clone()]);
-            assert_eq!(content(files.download(&ada, file.id).await.unwrap()).await, b"hello");
+            let download = files.download(&ada, file.id, |_| false).await.unwrap().unwrap();
+            assert_eq!(content(download).await, b"hello");
+            // Client đã có đúng bản này: không mở nội dung (D-156).
+            let etag = file.etag();
+            let known = files.download(&ada, file.id, |current| current == etag).await.unwrap();
+            assert!(known.is_none());
 
             files.delete(&ada, file.id).await.unwrap();
             let gone = files.get(&ada, file.id).await.unwrap_err();
@@ -543,5 +572,18 @@ mod tests {
         })
         .await
         .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod name_tests {
+    use super::check_name;
+
+    #[test]
+    fn ten_file_khong_co_ky_tu_vo_hinh() {
+        assert_eq!(check_name("  bao cao.pdf ").unwrap(), "bao cao.pdf");
+        for bad in ["invoice\u{202E}fdp.exe", "a\u{200B}b.txt", "a/b", "a\u{0007}b", ""] {
+            assert!(check_name(bad).is_err(), "{bad:?}");
+        }
     }
 }
