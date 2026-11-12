@@ -92,8 +92,29 @@ impl FormsService {
             // Khoá ngắn (cột `unique_key` của job giới hạn độ dài): địa chỉ băm.
             mail.dedupe_key =
                 Some(format!("forms.notify:{id}:{}", autoxide_kernel::secret::sha256(to)));
-            self.mailer.send(mail).await?;
+            match self.mailer.send(mail.clone()).await {
+                Ok(()) => {}
+                // Bên gửi mail không nhận địa chỉ người gửi làm `Reply-To` (địa chỉ cũ lưu từ
+                // trước khi kiểm chặt hơn…): vẫn báo quản trị viên, chỉ bỏ `Reply-To` — không để
+                // event bị thử lại tới khi hỏng hẳn. Không ghi địa chỉ vào log.
+                Err(error) if refuses_reply_to(&error) => {
+                    tracing::warn!(
+                        submission_id = %id,
+                        "the mailer refused the sender's address as Reply-To; notifying without it"
+                    );
+                    mail.reply_to = None;
+                    self.mailer.send(mail).await?;
+                }
+                Err(error) => return Err(error),
+            }
         }
         Ok(form.notify_emails.len())
     }
+}
+
+/// Lỗi của bên gửi mail chỉ vì `reply_to` sai dạng.
+fn refuses_reply_to(error: &Error) -> bool {
+    error.kind() == ErrorKind::Validation
+        && !error.fields().is_empty()
+        && error.fields().iter().all(|field| field.field == "reply_to")
 }

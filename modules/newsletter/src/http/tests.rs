@@ -32,7 +32,8 @@ mod fake {
     use uuid::Uuid;
 
     /// Token → permission: `admin` mọi quyền; `reader` chỉ đọc; `writer` đọc và soạn; `website`
-    /// không quyền nào (máy chủ của website gọi đăng ký bằng API key).
+    /// chỉ `newsletter.subscribe` (máy chủ của website gọi đăng ký bằng API key); `member` không
+    /// quyền nào (tài khoản tự đăng ký).
     pub(super) struct FakeAuthenticator;
 
     #[async_trait::async_trait]
@@ -50,7 +51,8 @@ mod fake {
                 ),
                 Some("Bearer reader") => (2, &["newsletter.read"]),
                 Some("Bearer writer") => (3, &["newsletter.read", "newsletter.manage"]),
-                Some("Bearer website") => (4, &[]),
+                Some("Bearer website") => (4, &["newsletter.subscribe"]),
+                Some("Bearer member") => (5, &[]),
                 _ => {
                     return Err(Error::unauthenticated(
                         "auth.invalid_token",
@@ -257,6 +259,9 @@ async fn vong_doi_qua_http() {
         // Website gọi bằng API key: không cần token.
         let by_website = send(router, "POST", "/newsletter/public/subscribe", Some("website"), &[], Some(json!({"email": "web@example.com", "lists": ["weekly"]}))).await;
         assert_eq!(by_website.status, StatusCode::ACCEPTED);
+        // Đăng nhập mà không có `newsletter.subscribe`: như người lạ, thiếu token thì bị từ chối.
+        let by_member = send(router, "POST", "/newsletter/public/subscribe", Some("member"), &[], Some(json!({"email": "member@example.com", "lists": ["weekly"]}))).await;
+        assert_eq!((by_member.status, by_member.code().as_deref()), (StatusCode::BAD_REQUEST, Some("antispam.token_missing")));
 
         // Xác nhận: trang của website gọi `POST`.
         let mails = app.mailer.to("ada@example.com");

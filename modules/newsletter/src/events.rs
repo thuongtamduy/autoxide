@@ -50,7 +50,7 @@ events! {
     (SuppressionAdded, "newsletter.suppression_added", "An address was put on the suppression list (hard bounce, complaint, soft bounces or by hand); it gets no campaign mail. No address in the payload."),
     (SuppressionRemoved, "newsletter.suppression_removed", "An address was taken off the suppression list."),
     (CampaignCreated, "newsletter.campaign_created", "A draft campaign was created (by hand or for a new post)."),
-    (CampaignUpdated, "newsletter.campaign_updated", "A draft or scheduled campaign changed."),
+    (CampaignUpdated, "newsletter.campaign_updated", "A draft or scheduled campaign changed. A scheduled one goes back to `draft` (see `status` and `scheduled_at` in `after`) and must be scheduled or sent again."),
     (CampaignDeleted, "newsletter.campaign_deleted", "A campaign that never sent was deleted."),
     (CampaignScheduled, "newsletter.campaign_scheduled", "A campaign was scheduled to start sending at `scheduled_at`."),
     (CampaignStarted, "newsletter.campaign_started", "A campaign started sending."),

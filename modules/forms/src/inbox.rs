@@ -9,7 +9,9 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Order, Page, PageRequest, fetch_page};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
-use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use sea_orm::{
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use utoipa::ToSchema;
@@ -220,7 +222,8 @@ impl FormsService {
         Ok(())
     }
 
-    /// Mọi bài gửi có email `email` (yêu cầu xuất dữ liệu của chủ dữ liệu). Cần `forms.export`.
+    /// Mọi bài gửi của email `email` (yêu cầu xuất dữ liệu của chủ dữ liệu; xem
+    /// [`rows_of_email`]). Cần `forms.export`.
     pub(crate) async fn submissions_of_email(
         &self,
         principal: &Principal,
@@ -228,17 +231,13 @@ impl FormsService {
     ) -> Result<Vec<Submission>, Error> {
         principal.require(&FORMS_EXPORT)?;
         let email = checked_email(email)?;
-        let rows = submission::Entity::find()
-            .filter(submission::Column::Email.eq(email))
-            .all(self.database.read())
-            .await?;
-        let mut rows = rows;
+        let mut rows = rows_of_email(self.database.read(), &email).await?;
         rows.sort_by_key(|row| row.id);
         self.describe(rows).await
     }
 
-    /// Xoá hẳn mọi bài gửi có email `email` (yêu cầu xoá của chủ dữ liệu). Cần `forms.export`.
-    /// Event không mang email. Trả số bài đã xoá.
+    /// Xoá hẳn mọi bài gửi của email `email` (yêu cầu xoá của chủ dữ liệu; xem
+    /// [`rows_of_email`]). Cần `forms.export`. Event không mang email. Trả số bài đã xoá.
     pub(crate) async fn erase_email(
         &self,
         principal: &Principal,
@@ -247,10 +246,7 @@ impl FormsService {
         principal.require(&FORMS_EXPORT)?;
         let email = checked_email(email)?;
         let transaction = self.database.begin_write().await?;
-        let rows = submission::Entity::find()
-            .filter(submission::Column::Email.eq(email.as_str()))
-            .all(&transaction)
-            .await?;
+        let rows = rows_of_email(&transaction, &email).await?;
         if rows.is_empty() {
             return Ok(0);
         }
@@ -419,6 +415,45 @@ impl FormsService {
             .map(Form::parse)
             .collect()
     }
+}
+
+/// Bài gửi của email `email` (đã chuẩn hoá): email người gửi (cột `email`) là nó, HOẶC một câu
+/// trả lời nào đó đúng bằng địa chỉ đó (vd trường email thứ hai "email người được giới thiệu").
+///
+/// Lọc thô trong database (cột `email`, hoặc `search_key` — chữ của mọi câu trả lời đã qua
+/// `search::fold` — có chứa địa chỉ; `LIKE` chạy giống nhau trên SQLite và Postgres), rồi giữ
+/// đúng những bài có câu trả lời BẰNG địa chỉ sau khi chuẩn hoá. Quét `search_key` không dùng được
+/// index — chấp nhận được cho yêu cầu hiếm của chủ dữ liệu.
+async fn rows_of_email<C: ConnectionTrait>(
+    connection: &C,
+    email: &str,
+) -> Result<Vec<submission::Model>, Error> {
+    let rows = submission::Entity::find()
+        .filter(
+            Condition::any()
+                .add(submission::Column::Email.eq(email))
+                .add(autoxide_kernel::search::contains(submission::Column::SearchKey, email)),
+        )
+        .all(connection)
+        .await?;
+    let mut matched = Vec::with_capacity(rows.len());
+    for row in rows {
+        if row.email.as_deref() == Some(email) || answers_contain(&row.data, email)? {
+            matched.push(row);
+        }
+    }
+    Ok(matched)
+}
+
+/// Có câu trả lời nào (chuỗi, hay một phần tử của mảng) đúng bằng `email` sau khi chuẩn hoá.
+fn answers_contain(data: &str, email: &str) -> Result<bool, Error> {
+    let data: Map<String, Value> = from_json(data)?;
+    let equal =
+        |value: &Value| value.as_str().is_some_and(|text| fields::normalize_email(text) == email);
+    Ok(data.values().any(|value| match value {
+        Value::Array(items) => items.iter().any(equal),
+        other => equal(other),
+    }))
 }
 
 /// Email của yêu cầu xuất / xoá, đã chuẩn hoá; sai dạng thì 422.

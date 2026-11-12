@@ -23,6 +23,8 @@ mail goes through the `mail` module (your SMTP relay).
 2. **`AUTOXIDE_HTTP_PUBLIC_URL`** — the address of this API, e.g. `https://api.example.com`.
    Every campaign mail carries `List-Unsubscribe: <https://api.example.com/api/v1/newsletter/public/unsubscribe?token=…>`.
 3. **`AUTOXIDE_NEWSLETTER_CONFIRM_URL`** — your website's confirmation page, with `{token}`.
+   Set it even if no list uses double opt-in: suspicious sign-ups and people re-joining a list
+   they left are confirmed by mail on every list.
 4. **`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`** — your website's preferences page, with `{token}`;
    the footer of every campaign mail links there.
 5. **`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`** — the sender's name and postal address, printed in
@@ -38,12 +40,16 @@ Nothing here is needed to start the server: a feature that needs a missing setti
 | ------------------- | --------------------------------------------------------------------------------------- |
 | `newsletter.read`   | Reading lists, subscribers (personal data), campaigns with progress, suppressions       |
 | `newsletter.manage` | Lists, importing and changing subscribers, writing draft campaigns, suppressions, bounces |
-| `newsletter.send`   | Sending, scheduling, pausing, resuming and cancelling campaigns; test mails             |
+| `newsletter.send`   | Sending, scheduling, pausing, resuming and cancelling campaigns; test mails; `new_posts: send` on a list |
 | `newsletter.export` | Exporting or erasing everything about an email address                                  |
+| `newsletter.subscribe` | Adding sign-ups without the anti-spam checks for anonymous visitors (a website server's own API key) |
 
 An agent with `newsletter.manage` but not `newsletter.send` can write campaigns that a person
-then reviews and sends. Visitors need nothing: everything under `/api/v1/newsletter/public/` is
-open.
+then reviews and sends: changing a scheduled campaign moves it back to draft, and setting a list
+to send new posts automatically needs `newsletter.send`, so nothing goes out that nobody with
+`newsletter.send` approved. Visitors need nothing: everything under
+`/api/v1/newsletter/public/` is open. Give `newsletter.subscribe` only to the API key of a
+website server; being signed in is not enough to skip the anti-spam checks.
 
 ## Lists
 
@@ -58,7 +64,8 @@ curl -X POST http://localhost:8080/api/v1/newsletter/lists \
 - `double_opt_in` (default `true`): public sign-ups get a confirmation mail and receive nothing
   until they open its link.
 - `public` (default `false`): shown by `GET /public/lists` and open to public sign-up.
-- `new_posts`: `off` (default), `draft` or `send` — see "New posts".
+- `new_posts`: `off` (default), `draft` or `send` — see "New posts". Setting `send` needs
+  `newsletter.send`.
 - `PATCH` and `DELETE` need `If-Match`. A list with an unfinished campaign cannot be deleted
   (`409 newsletter.list_in_use`); deleting a list deletes its subscriptions.
 
@@ -87,10 +94,18 @@ curl -X POST http://localhost:8080/api/v1/newsletter/lists \
 - The confirmation mail contains the list names and the link — never anything the visitor
   typed, so the form cannot be used to send spam to someone else. At most
   `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` such mails go to one address a day.
-- A sign-up the anti-spam checks find suspicious (sent too fast…) always needs the
-  confirmation mail, even on a list without double opt-in.
-- A website server may call with its own API key instead: no token needed, limited to
-  `AUTOXIDE_NEWSLETTER_SUBSCRIBE_PER_USER_PER_HOUR`.
+- The confirmation mail is always needed, even on a list without double opt-in, for a sign-up
+  the anti-spam checks find suspicious (sent too fast…) and for an address that unsubscribed
+  from that list or is still waiting for confirmation: nobody can sign someone else back up.
+- Every stored sign-up request counts towards `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` for
+  its address, whether it needs a mail or not, so answers take about as long either way. If the
+  mail cannot be queued (for example `AUTOXIDE_NEWSLETTER_CONFIRM_URL` is not set and the list
+  has no double opt-in), the answer is still `202` and the reason goes to the server log.
+- A website server may call with its own API key instead, if that key has the permission
+  `newsletter.subscribe`: no token needed, limited to
+  `AUTOXIDE_NEWSLETTER_SUBSCRIBE_PER_USER_PER_HOUR`. Any other signed-in caller (for example a
+  self-registered account) goes through the same checks as an anonymous visitor: without a form
+  token it gets `400 antispam.token_missing`.
 
 ## The website: confirmation and preferences pages
 
@@ -135,6 +150,12 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
   even when jobs are retried or run on several servers. Cancelling skips the mails not sent yet.
 - `send` and `schedule` need `If-Match`, so that the version you reviewed is the one sent. Only
   a draft or scheduled campaign can be changed; only one that never sent can be deleted.
+- Changing a scheduled campaign (`PATCH`, with any real change) moves it back to `draft` and
+  drops its schedule; the jobs already waiting for the old schedule do nothing. Someone with
+  `newsletter.send` must schedule or send it again.
+- `body_html` is stored and sent as is — it is **not sanitised**. An admin interface must never
+  insert it into its own page: preview it only inside a sandboxed `<iframe sandbox>` (no
+  scripts, no same origin).
 - `GET /campaigns/{id}` shows `progress`: `total`, `pending`, `sent` (handed to the mail
   queue), `failed`, `skipped`.
 - Every mail gets a footer (in the campaign's `locale`) with the preferences link and the
@@ -166,7 +187,7 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
 
 A list with `new_posts` set to `draft` gets a draft campaign (title, summary and link of the
 post) each time the `content` module publishes a **post** (pages are left out); `send` sends it
-at once. `new_post_locale` keeps only posts in one language. The link is
+at once (setting `send` needs `newsletter.send`). `new_post_locale` keeps only posts in one language. The link is
 `AUTOXIDE_NEWSLETTER_SITE_URL` followed by the post's path; without it (or without the settings
 needed to send) campaigns stay drafts. A post makes at most one campaign per list, ever —
 republishing it makes nothing new. Importing many old posts publishes them all: keep `new_posts`
@@ -219,7 +240,7 @@ permissions as REST.
 
 | Setting                                            | Default                  |
 | -------------------------------------------------- | ------------------------ |
-| `AUTOXIDE_NEWSLETTER_CONFIRM_URL`                  | — (needed for double opt-in) |
+| `AUTOXIDE_NEWSLETTER_CONFIRM_URL`                  | — (needed for confirmation mails) |
 | `AUTOXIDE_NEWSLETTER_PREFERENCES_URL`              | — (needed to send)       |
 | `AUTOXIDE_NEWSLETTER_SITE_URL`                     | — (new-post links)       |
 | `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`               | — (needed for advertising) |

@@ -31,8 +31,9 @@ pub(crate) const PER_EMAIL_PER_HOUR: Setting = Setting::new(
 
 pub(crate) const PER_USER_PER_HOUR: Setting = Setting::new(
     "AUTOXIDE_FORMS_SUBMISSIONS_PER_USER_PER_HOUR",
-    "Submissions per hour from one signed-in caller, e.g. a website server sending forms with \
-     its API key for all its visitors (1 to 1000000); more are refused with 429.",
+    "Submissions per hour from one caller with the permission `forms.submit`, e.g. a website \
+     server sending forms with its API key for all its visitors (1 to 1000000); more are \
+     refused with 429.",
 )
 .with_default("1000");
 

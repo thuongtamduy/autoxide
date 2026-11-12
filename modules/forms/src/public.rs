@@ -18,18 +18,21 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::throttle::Throttle;
+use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
+    QueryFilter,
 };
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
-use crate::entity::submission;
+use crate::entity::{form as form_row, submission};
 use crate::events::{self, Change};
 use crate::fields::{self, FieldType, Locale};
 use crate::forms::{Form, FormStatus, normalize_origin};
 use crate::inbox::{SubmissionStatus, summary};
-use crate::service::{FormsService, now, to_json};
+use crate::permissions::FORMS_SUBMIT;
+use crate::service::{FormsService, form_not_found, now, to_json};
 
 const HOUR: Duration = Duration::from_secs(3600);
 /// Cùng nội dung gửi tới cùng form trong chừng này giờ thì bị coi là trùng (giữ lại).
@@ -61,8 +64,10 @@ impl FormsService {
         self.find_by_key(key).await
     }
 
-    /// Nhận bài gửi cho form `key`. `principal`: website gọi bằng API key (bỏ qua bẫy, token,
-    /// đề; vẫn bị giới hạn theo người dùng).
+    /// Nhận bài gửi cho form `key`. `principal` có `forms.submit` (máy chủ website gọi bằng API
+    /// key): bỏ qua bẫy, token, đề, vẫn bị giới hạn theo người dùng. Đăng nhập mà KHÔNG có
+    /// `forms.submit` (vd tài khoản tự đăng ký) thì đi đúng đường của người lạ — đăng nhập không
+    /// phải là bằng chứng "không phải bot". `principal` vẫn là người làm (actor) của event.
     pub(crate) async fn submit(
         &self,
         key: &str,
@@ -134,12 +139,13 @@ impl FormsService {
         // Pha một: chống spam, ngoài transaction.
         let scope = form.scope();
         let limits = self.limits(&form)?;
+        let trusted = principal.filter(|principal| principal.has(&FORMS_SUBMIT));
         let checked = self
             .guard
             .check(
                 &Check {
                     scope: &scope,
-                    principal,
+                    principal: trusted,
                     client,
                     honeypot: input.trap.as_deref(),
                     form_token: input.form_token.as_deref(),
@@ -202,8 +208,14 @@ impl FormsService {
             updated_at: now,
         };
 
-        // Pha hai: một transaction ngắn.
+        // Pha hai: một transaction ngắn. Chạm dòng form trước (khoá dòng tới hết transaction
+        // trên Postgres; SQLite chỉ có một bên ghi): form bị xoá giữa hai pha thì dừng ở đây,
+        // không để lại bài mồ côi chứa dữ liệu cá nhân; xoá form chạy sau thì thấy và xoá cả bài này.
         let transaction = self.database.begin_write().await?;
+        if !touch_form(&transaction, form.row.id).await? {
+            transaction.rollback().await?;
+            return Err(form_not_found());
+        }
         let row = row.into_active_model().insert(&transaction).await?;
         if status == SubmissionStatus::New {
             let actor = principal.map_or_else(Actor::public, Actor::from);
@@ -244,6 +256,17 @@ impl FormsService {
             user: Some(throttle(self.config.per_user_per_hour)?),
         })
     }
+}
+
+/// "Chạm" form `id` (cập nhật mà không đổi gì, kể cả `updated_at` nên ETag giữ nguyên) để khoá
+/// dòng tới hết transaction. `false`: form không còn.
+async fn touch_form<C: ConnectionTrait>(connection: &C, id: Uuid) -> Result<bool, Error> {
+    let touched = form_row::Entity::update_many()
+        .col_expr(form_row::Column::UpdatedAt, Expr::col(form_row::Column::UpdatedAt))
+        .filter(form_row::Column::Id.eq(id))
+        .exec(connection)
+        .await?;
+    Ok(touched.rows_affected == 1)
 }
 
 /// Địa chỉ `http(s)` tuỳ chọn; sai thì thêm lỗi `field`.

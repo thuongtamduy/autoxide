@@ -30,8 +30,9 @@ mod fake {
     use autoxide_kernel::error::Error;
     use uuid::Uuid;
 
-    /// Token → permission: `admin` mọi quyền của module; `reader` chỉ đọc; `website` không
-    /// quyền nào (máy chủ của website gửi form bằng API key).
+    /// Token → permission: `admin` mọi quyền của module; `reader` chỉ đọc; `website` chỉ
+    /// `forms.submit` (máy chủ của website gửi form bằng API key); `member` không quyền nào (tài
+    /// khoản tự đăng ký).
     pub(super) struct FakeAuthenticator;
 
     #[async_trait::async_trait]
@@ -42,7 +43,8 @@ mod fake {
                     (1, &["forms.read", "forms.manage", "forms.review", "forms.export"])
                 }
                 Some("Bearer reader") => (2, &["forms.read"]),
-                Some("Bearer website") => (3, &[]),
+                Some("Bearer website") => (3, &["forms.submit"]),
+                Some("Bearer member") => (4, &[]),
                 _ => {
                     return Err(Error::unauthenticated(
                         "auth.invalid_token",
@@ -260,6 +262,10 @@ async fn vong_doi_qua_http() {
         let signed = json!({"data": {"name": "Web", "email": "web@example.com"}});
         let by_website = send(&router, "POST", "/forms/public/contact/submissions", Some("website"), &[], Some(signed)).await;
         assert_eq!(by_website.status, StatusCode::CREATED, "{}", by_website.json());
+        // Đăng nhập mà không có `forms.submit`: như người lạ, thiếu token thì bị từ chối.
+        let signed = json!({"data": {"name": "Member", "email": "member@example.com"}});
+        let by_member = send(&router, "POST", "/forms/public/contact/submissions", Some("member"), &[], Some(signed)).await;
+        assert_eq!((by_member.status, by_member.json()["code"].as_str()), (StatusCode::BAD_REQUEST, Some("antispam.token_missing")));
 
         // Hộp thư: hai bài (Ada, Web); đổi trạng thái cần `If-Match`.
         let inbox = send(&router, "GET", &format!("/forms/{id}/submissions"), Some("reader"), &[], None).await;

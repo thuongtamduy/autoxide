@@ -100,7 +100,8 @@ pub(crate) struct CreateFormRequest {
     allowed_origins: Option<Vec<String>>,
     /// Up to 1000 characters per language.
     success_message: Option<Localized>,
-    /// Up to 20 addresses.
+    /// Up to 20 addresses mailed for each new submission (the mails carry the answers).
+    /// Setting them also needs the permission `forms.read`.
     notify_emails: Option<Vec<String>>,
     /// Key of an `email` field.
     reply_to_field: Option<String>,
@@ -142,6 +143,8 @@ pub(crate) struct UpdateFormRequest {
     fields: Option<Vec<Field>>,
     allowed_origins: Option<Vec<String>>,
     success_message: Option<Localized>,
+    /// The whole new list of addresses mailed for each new submission (the mails carry the
+    /// answers). Changing it also needs the permission `forms.read`.
     notify_emails: Option<Vec<String>>,
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<String>, nullable)]
@@ -214,9 +217,10 @@ pub(crate) async fn list_forms(
 
 /// Create a form.
 ///
-/// Requires `forms.manage`. Every problem of the definition is reported at once in `errors`
-/// (paths like `fields[2].options`). The form takes submissions at once unless `status` is
-/// `closed`. Retry safely with an `Idempotency-Key` header.
+/// Requires `forms.manage`, and also `forms.read` when `notify_emails` is not empty (the
+/// notification mails carry the answers). Every problem of the definition is reported at once
+/// in `errors` (paths like `fields[2].options`). The form takes submissions at once unless
+/// `status` is `closed`. Retry safely with an `Idempotency-Key` header.
 #[utoipa::path(
     post,
     path = "/",
@@ -226,7 +230,7 @@ pub(crate) async fn list_forms(
     responses(
         (status = 201, description = "Created.", body = Data<FormResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `forms.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `forms.manage` (or `forms.read`, needed to set `notify_emails`); code `permission_denied`.", body = Problem),
         (status = 409, description = "The key is taken; code `forms.key_taken`.", body = Problem),
         (status = 422, description = "The definition is invalid; see `errors`.", body = Problem),
     )
@@ -267,7 +271,8 @@ pub(crate) async fn get_form(
 
 /// Change a form.
 ///
-/// Requires `forms.manage`. `If-Match` is required. Sending `fields` replaces the whole list;
+/// Requires `forms.manage`, and also `forms.read` to change `notify_emails` (the notification
+/// mails carry the answers). `If-Match` is required. Sending `fields` replaces the whole list;
 /// a change makes a new `version` (old submissions keep their own labels). Close a form with
 /// `{"status": "closed"}`.
 #[utoipa::path(
@@ -280,7 +285,7 @@ pub(crate) async fn get_form(
     responses(
         (status = 200, description = "The form after the change.", body = Data<FormResponse>, headers(("ETag" = String, description = "New version of the form."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `forms.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `forms.manage` (or `forms.read`, needed to change `notify_emails`); code `permission_denied`.", body = Problem),
         (status = 404, description = "No form has this id; code `forms.not_found`.", body = Problem),
         (status = 409, description = "The key is taken; code `forms.key_taken`.", body = Problem),
         (status = 412, description = "The form changed since you read it; code `precondition_failed`.", body = Problem),

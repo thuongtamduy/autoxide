@@ -3519,3 +3519,65 @@ hai database.
 - **Ngoại lệ gitleaks:** commit `e7ecf3d` lỡ chứa một chuỗi giả (`0123456789abcdef…`) làm secret
   xem trước trong test của `content`; commit sau thay bằng hằng số test có sẵn. Vì không viết
   lại lịch sử nhánh đã đẩy, `.gitleaks.toml` bỏ qua đúng commit đó, đúng file đó.
+
+## D-150 · Rà soát bảo mật forms, newsletter, comments và nền chung cho dữ liệu người lạ — 2026-11-12 — agent quyết
+
+Bốn agent đọc độc lập ba module mới và các khối dùng chung trong core (D-113…D-124). Một lỗi
+nặng (comments), còn lại trung bình và nhẹ. Mọi phát hiện được kiểm lại với code và sửa, kèm test
+chạy trên cả hai database.
+
+**Quy ước mới:**
+
+- **Đăng nhập không phải bằng chứng "không phải bot".** Bỏ qua lớp chống spam cho người lạ (bẫy,
+  token form, đề, giới hạn theo IP / email) cần permission riêng của module: `forms.submit`,
+  `newsletter.subscribe` — cấp cho API key của máy chủ website. Tài khoản khác (vd tự đăng ký) đi
+  đúng đường của người lạ. `comments` vốn đã đòi `comments.post`. Đây là thay đổi phá vỡ cho website
+  đang gọi bằng API key không có hai permission đó.
+- **Việc dẫn tới dữ liệu cá nhân hay thư gửi đi đòi đúng quyền đó:** đổi `notify_emails` của form
+  cần thêm `forms.read`; bật `new_posts: send` cần `newsletter.send`; sửa chiến dịch đang hẹn giờ
+  thì nó về nháp và tăng `run` (người có `newsletter.send` phải hẹn lại).
+- **Form token đã dùng** (bài đã nhận) dừng ở pha một: không đếm giới hạn theo IP / email, không
+  gọi bộ phân loại — trước đây gửi lại một token nhiều lần khoá được email của người khác. Pha một
+  đọc bảng nonce của module qua `Throttle` của nó.
+- **Điền tham số i18n một lượt** (`fill_all`): chữ người dùng chứa `{x}` không còn làm mail rơi về
+  mẫu thô, `{id}` trong câu trả lời không bị thay.
+- **Bộ tra của `ResourceDirectory` không đưa nội dung chưa công khai ra ngoài:** `title`,
+  `summary` rỗng khi `public` là `false`.
+- **Audit chỉ giữ bản băm email** (`sha256:…`) của event `mail.delivery_failed` — event không gắn
+  tài khoản nên không xoá được theo `subject`.
+- Tính SHA-256 của ALTCHA chạy trên thread cho việc chặn.
+
+**comments:**
+
+- **(nặng)** Job dọn chỉ xoá bình luận **chưa từng hiện** (`published_at IS NULL`); mỗi dòng xoá có
+  điều kiện trạng thái và `updated_at`. Trước đây ba báo cáo vô danh đưa một bình luận cũ về chờ
+  duyệt, rồi job dọn xoá vĩnh viễn nó. Khách báo cáo gom theo IPv6 /48.
+- Sửa bình luận đang hiện thì xét lại chế độ duyệt như bình luận mới; `PATCH` trả thêm `status`.
+- "Đã từng được duyệt" chỉ tính bình luận đang `published`.
+- `reporter_key` của khách bỏ dấu vết IP sau `IP_RETENTION_DAYS`.
+- Trả lời khoá dòng gốc bằng `UPDATE` có điều kiện trong transaction; `hard_delete` khoá trả lời,
+  rồi gốc; thứ tự khoá trong module là bình luận → gốc → đích.
+- Xoá với id lạ trả như xoá thật (`PATCH` với id giả vẫn 404 — giới hạn đã ghi).
+- Tên từ chối ký tự định dạng Unicode (Cf), ký tự trông như khoảng trống, và từ trộn chữ Latin /
+  Hy Lạp / Kirin.
+
+**forms:** email kiểm theo byte như lettre và cả dạng đã chuẩn hoá (hết 500 trên Postgres); mail
+báo bỏ `Reply-To` thay vì hỏng; xoá / xuất theo email khớp mọi câu trả lời bằng đúng địa chỉ; pha
+hai chạm dòng form (form bị xoá giữa chừng thì `forms.not_found`), job dọn xoá bài mồ côi; tối đa
+50 lỗi cho key lạ.
+
+**newsletter:** người đã `unsubscribed` hay đang `unconfirmed` phải xác nhận qua mail kể cả ở danh
+sách single opt-in; bộ đếm mail xác nhận đếm mọi yêu cầu đã lưu, sau commit
+(`AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` đổi nghĩa); lỗi xếp hàng mail sau commit chỉ ghi log;
+`body_html` không được làm sạch — giao diện quản trị phải hiện trong `<iframe sandbox>`.
+
+Để lại, ghi rõ:
+
+- **Dấu IP giống nhau giữa các module, và tính ngược được khi khoá nằm trong database.** Đổi khoá
+  theo module đụng tới việc kiểm token chống spam giữa module; ghi trong DEPLOY: khi chạy thật nên
+  đặt `AUTOXIDE_SECRET_KEY` ngoài database.
+- **Đo thời gian trả lời đăng ký bản tin** vẫn phân biệt được phần nào (đường cần mail chèn thêm
+  token và một mail vào hàng đợi).
+- **Tên viết trọn bằng chữ Kirin** giống tên Latin vẫn lọt.
+- Đếm proxy (D-114): trình duyệt gọi thẳng qua proxy cuối khi `N > 1` thì tự chọn được địa chỉ; đã
+  có cảnh báo trong DEPLOY, cách tin theo dải địa chỉ để sau.

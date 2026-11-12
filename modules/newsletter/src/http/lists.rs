@@ -78,7 +78,7 @@ pub(crate) struct CreateListRequest {
     double_opt_in: Option<bool>,
     /// Omitted: `false` (not open to public sign-up).
     public: Option<bool>,
-    /// Omitted: `off`.
+    /// Omitted: `off`. `send` also needs the permission `newsletter.send`.
     new_posts: Option<NewPosts>,
     /// Omitted: posts in any language.
     new_post_locale: Option<Locale>,
@@ -93,6 +93,7 @@ pub(crate) struct UpdateListRequest {
     description: Option<Localized>,
     double_opt_in: Option<bool>,
     public: Option<bool>,
+    /// Setting `send` also needs the permission `newsletter.send`.
     new_posts: Option<NewPosts>,
     /// `null`: posts in any language.
     #[serde(default, deserialize_with = "present")]
@@ -134,7 +135,8 @@ pub(crate) async fn list_lists(
 
 /// Create a list.
 ///
-/// Requires `newsletter.manage`. Every problem is reported at once in `errors`. Retry safely
+/// Requires `newsletter.manage`, and also `newsletter.send` for `new_posts: send` (new posts
+/// are then sent without review). Every problem is reported at once in `errors`. Retry safely
 /// with an `Idempotency-Key` header.
 #[utoipa::path(
     post,
@@ -145,7 +147,7 @@ pub(crate) async fn list_lists(
     responses(
         (status = 201, description = "Created.", body = Data<ListResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `newsletter.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `newsletter.manage` (or `newsletter.send`, needed for `new_posts: send`); code `permission_denied`.", body = Problem),
         (status = 409, description = "The key is taken; code `newsletter.list_key_taken`.", body = Problem),
         (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
     )
@@ -199,7 +201,8 @@ pub(crate) async fn get_list(
 
 /// Change a list.
 ///
-/// Requires `newsletter.manage`. `If-Match` is required.
+/// Requires `newsletter.manage`, and also `newsletter.send` to set `new_posts: send` (new
+/// posts are then sent without review). `If-Match` is required.
 #[utoipa::path(
     patch,
     path = "/lists/{id}",
@@ -210,7 +213,7 @@ pub(crate) async fn get_list(
     responses(
         (status = 200, description = "The list after the change.", body = Data<ListResponse>, headers(("ETag" = String, description = "New version of the list."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `newsletter.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `newsletter.manage` (or `newsletter.send`, needed for `new_posts: send`); code `permission_denied`.", body = Problem),
         (status = 404, description = "No list has this id; code `newsletter.list_not_found`.", body = Problem),
         (status = 409, description = "The key is taken; code `newsletter.list_key_taken`.", body = Problem),
         (status = 412, description = "The list changed since you read it; code `precondition_failed`.", body = Problem),

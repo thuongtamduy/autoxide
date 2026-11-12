@@ -7,12 +7,22 @@
 //!    đăng ký (email unique, chèn `ON CONFLICT DO NOTHING` nên hai request cùng email ra một
 //!    dòng), đặt đăng ký, phát token xác nhận, event bằng `Actor::public()`, rồi chèn nonce của
 //!    token form (`Checked::claim`). Nonce đã có → rollback (gửi lại cùng token = cùng kết quả).
-//! 3. Mail xác nhận xếp hàng SAU commit.
+//! 3. SAU commit: đếm bộ đếm mail xác nhận của địa chỉ, rồi xếp hàng mail nếu cần và còn lượt
+//!    (bộ đếm và bên gửi mail ghi bằng kết nối ghi riêng; gọi trong transaction thì SQLite — một
+//!    bên ghi — chờ chính mình). Lỗi ở bước này chỉ ghi log: câu trả lời không được khác đi theo
+//!    việc có mail hay không.
 //!
 //! Câu trả lời luôn GIỐNG HỆT (202, cùng thân) dù email mới, đang chờ, đã xác nhận, bị chặn hay
-//! bị bỏ vì spam: không ai dò được địa chỉ nào đã có trong danh sách. `Quarantine` (gửi quá
-//! nhanh…) không bị bỏ mà bị buộc xác nhận qua mail, kể cả ở danh sách không bật double opt-in —
-//! người thật bấm link là xong, bot thì không.
+//! bị bỏ vì spam: không ai dò được địa chỉ nào đã có trong danh sách. Mọi yêu cầu đã lưu đều đếm
+//! bộ đếm mail xác nhận (sau commit), để thời gian trả lời ít lộ trường hợp hơn.
+//!
+//! Buộc xác nhận qua mail, kể cả ở danh sách không bật double opt-in, khi: bị `Quarantine` (gửi
+//! quá nhanh… — người thật bấm link là xong, bot thì không); hoặc đăng ký hiện có đang
+//! `unsubscribed` (người đã rời đi thì chỉ chính họ mới vào lại được, người lạ không đăng ký hộ
+//! được) hay `unconfirmed` (đang chờ xác nhận thì không được gửi lại để bỏ qua bước đó).
+//!
+//! Gọi bằng tài khoản có `newsletter.subscribe` (máy chủ website): bỏ qua bẫy / token / đề, vẫn
+//! bị giới hạn theo tài khoản. Đăng nhập mà không có quyền đó thì đi đường của người lạ.
 
 use std::collections::{BTreeMap, HashMap};
 use std::time::Duration;
@@ -30,6 +40,7 @@ use uuid::Uuid;
 use crate::entity::{campaign, delivery, subscriber, subscription, suppression};
 use crate::events::{self, Change};
 use crate::lists::List;
+use crate::permissions::NEWSLETTER_SUBSCRIBE;
 use crate::service::{MODULE, NewsletterService, now, to_json};
 use crate::subscribers::{
     ImportPerson, SubscriberStatus, SubscriptionStatus, Wanted, set_subscription,
@@ -80,9 +91,22 @@ pub(crate) struct PreferencesChange {
     pub consent_version: Option<String>,
 }
 
+/// Đăng ký vào `list` (trạng thái hiện có `current`) có phải xác nhận qua mail không: danh sách
+/// bật double opt-in, bị lớp chống spam giữ lại (`held`), hoặc người này đã rời danh sách hay
+/// đang chờ xác nhận — một yêu cầu đăng ký công khai không chứng minh được nó đến từ chính họ.
+fn must_confirm(list: &List, current: Option<SubscriptionStatus>, held: bool) -> bool {
+    list.row.double_opt_in
+        || held
+        || matches!(
+            current,
+            Some(SubscriptionStatus::Unsubscribed | SubscriptionStatus::Unconfirmed)
+        )
+}
+
 impl NewsletterService {
     /// Nhận một yêu cầu đăng ký. Trả `Ok(())` như nhau cho mọi trường hợp không phải lỗi dữ
-    /// liệu / token / cấu hình.
+    /// liệu / token / cấu hình. `principal` có `newsletter.subscribe`: bỏ qua lớp chống spam cho
+    /// người lạ (vẫn bị giới hạn theo tài khoản).
     pub(crate) async fn subscribe(
         &self,
         principal: Option<&Principal>,
@@ -138,13 +162,15 @@ impl NewsletterService {
             self.confirm_url()?;
         }
 
-        // Pha một: chống spam, ngoài transaction.
+        // Pha một: chống spam, ngoài transaction. Chỉ tài khoản có `newsletter.subscribe` mới
+        // được bỏ qua lớp chống spam cho người lạ; `principal` vẫn là người làm của event.
+        let trusted = principal.filter(|principal| principal.has(&NEWSLETTER_SUBSCRIBE));
         let checked = self
             .guard
             .check(
                 &Check {
                     scope: SCOPE,
-                    principal,
+                    principal: trusted,
                     client,
                     honeypot: input.trap.as_deref(),
                     form_token: input.form_token.as_deref(),
@@ -164,20 +190,6 @@ impl NewsletterService {
             Verdict::Accept => None,
             Verdict::Quarantine { reasons } => Some(reasons.join(",")),
         };
-        // Cần xác nhận khi danh sách bật double opt-in hoặc bị giữ lại. Đếm số mail xác nhận
-        // gửi tới địa chỉ này TRƯỚC transaction (bộ đếm ghi bằng kết nối riêng).
-        let needs_mail = (hold.is_some() || lists.iter().any(|list| list.row.double_opt_in))
-            && !self.all_confirmed(&email, &lists).await?;
-        let mail_allowed = needs_mail
-            && Throttle::new(
-                self.database.clone(),
-                MODULE,
-                self.config.confirm_mails_per_day,
-                DAY,
-            )?
-            .hit(&format!("confirm:{email}"))
-            .await?
-            .is_allowed();
         let ip_fingerprint = match client.ip {
             Some(ip) => Some(autoxide_kernel::ip_hash::fingerprint(&self.secret, ip).await?),
             None => None,
@@ -211,7 +223,7 @@ impl NewsletterService {
                 if current == Some(SubscriptionStatus::Confirmed) {
                     continue;
                 }
-                let double = list.row.double_opt_in || hold.is_some();
+                let double = must_confirm(list, current, hold.is_some());
                 let status = if double {
                     SubscriptionStatus::Unconfirmed
                 } else {
@@ -241,7 +253,11 @@ impl NewsletterService {
                 }
             }
         }
-        let issued = if !to_confirm.is_empty() && mail_allowed {
+        // Token xác nhận phát trong transaction; có gửi mail hay không thì xét SAU commit (bộ
+        // đếm mail xác nhận ghi bằng kết nối riêng). Token không được gửi đi thì tự hết hạn.
+        let issued = if to_confirm.is_empty() {
+            None
+        } else {
             let ids: Vec<String> = to_confirm.iter().map(|list| list.row.id.to_string()).collect();
             let ttl = chrono::Duration::hours(i64::from(self.config.confirm_hours));
             let subject = row.id.to_string();
@@ -250,8 +266,6 @@ impl NewsletterService {
                     .issue(&transaction, CONFIRM, &subject, Some(&ids.join(",")), ttl)
                     .await?,
             )
-        } else {
-            None
         };
         if let Claim::Replay { .. } =
             checked.claim(&transaction, MODULE, Some(&row.id.to_string())).await?
@@ -261,31 +275,42 @@ impl NewsletterService {
         }
         transaction.commit().await?;
         tracing::info!(subscriber_id = %row.id, lists = lists.len(), confirming = to_confirm.len(), "newsletter subscription request stored");
-        if let Some(issued) = issued {
-            let locale = locale.unwrap_or_else(|| Locale::stored(&row.locale));
-            let mail =
-                self.confirmation_mail(&email, locale, &to_confirm, &issued.token, issued.id)?;
-            self.mailer.send(mail).await?;
+        // Sau commit, MỌI yêu cầu đã lưu đều đếm một lần vào bộ đếm mail xác nhận của địa chỉ
+        // (cần mail hay không — thời gian trả lời gần nhau hơn); yêu cầu gửi lại cùng token đã
+        // dừng ở trên nên không ăn mất lượt. Lỗi ở đây chỉ ghi log: câu trả lời giống hệt dù
+        // mail có xếp hàng được hay không (không lộ "địa chỉ này cần mail"); người đăng ký gửi
+        // lại là có link mới.
+        let queued = match self.confirm_mail_allowed(&email).await {
+            Ok(allowed) => match issued.filter(|_| allowed) {
+                Some(issued) => {
+                    let locale = locale.unwrap_or_else(|| Locale::stored(&row.locale));
+                    match self.confirmation_mail(
+                        &email,
+                        locale,
+                        &to_confirm,
+                        &issued.token,
+                        issued.id,
+                    ) {
+                        Ok(mail) => self.mailer.send(mail).await,
+                        Err(error) => Err(error),
+                    }
+                }
+                None => Ok(()),
+            },
+            Err(error) => Err(error),
+        };
+        if let Err(error) = queued {
+            tracing::warn!(subscriber_id = %row.id, code = error.code(), "newsletter confirmation mail not queued");
         }
         Ok(())
     }
 
-    /// Người có địa chỉ `email` đã `confirmed` ở mọi danh sách `lists` chưa (đọc trước pha hai).
-    async fn all_confirmed(&self, email: &str, lists: &[&List]) -> Result<bool, Error> {
-        let read = self.database.read();
-        let Some(row) = subscriber::Entity::find()
-            .filter(subscriber::Column::Email.eq(email))
-            .one(read)
-            .await?
-        else {
-            return Ok(false);
-        };
-        let confirmed = subscription::Entity::find()
-            .filter(subscription::Column::SubscriberId.eq(row.id))
-            .filter(subscription::Column::Status.eq(SubscriptionStatus::Confirmed.as_str()))
-            .all(read)
-            .await?;
-        Ok(lists.iter().all(|list| confirmed.iter().any(|row| row.list_id == list.row.id)))
+    /// Đếm một lần cho `email` vào bộ đếm mail xác nhận (tối đa
+    /// `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` một ngày); `true` nếu còn được gửi.
+    async fn confirm_mail_allowed(&self, email: &str) -> Result<bool, Error> {
+        let throttle =
+            Throttle::new(self.database.clone(), MODULE, self.config.confirm_mails_per_day, DAY)?;
+        Ok(throttle.hit(&format!("confirm:{email}")).await?.is_allowed())
     }
 
     /// Giới hạn số lần đăng ký (theo IP băm, email, người dùng), trên bảng `newsletter_throttle`.

@@ -20,8 +20,15 @@ self-hosted proof-of-work challenge).
 | `forms.manage` | Creating, changing, opening, closing and deleting forms                       |
 | `forms.review` | Marking submissions read, archived, spam or not spam; deleting one           |
 | `forms.export` | CSV export; exporting and erasing every submission of an email address       |
+| `forms.submit` | Sending submissions without the anti-spam checks for anonymous visitors (a website server's own API key) |
 
 People who fill in a form need none: everything under `/api/v1/forms/public/` is open.
+
+- Setting or changing `notify_emails` needs `forms.read` as well as `forms.manage`: the
+  notification mails carry the answers, so someone who may not read submissions cannot send
+  them to their own inbox.
+- Give `forms.submit` only to the API key of a website server; being signed in is not enough
+  to skip the anti-spam checks (see [The website](#the-website)).
 
 ## Define a form
 
@@ -54,8 +61,11 @@ curl -X POST http://localhost:8080/api/v1/forms \
 - `PATCH` and `DELETE` of a form need `If-Match` (the `ETag` you read). Closing a form
   (`{"status": "closed"}`) keeps its submissions; deleting it deletes them too.
 - `notify_emails` are mailed for each new submission, with `Reply-To` set to the sender's
-  address. They are never shown by the public endpoints, and recipients never come from what a
-  visitor sends.
+  address (left out if the mail service cannot use that address). They are never shown by the
+  public endpoints, and recipients never come from what a visitor sends. Setting them needs
+  `forms.read` too.
+- Email answers are checked the way the mail service counts them: at most 64 bytes before the
+  `@` and 254 bytes in all, measured in UTF-8 after lower-casing (`é` takes two bytes).
 
 ## The website
 
@@ -76,13 +86,16 @@ curl -X POST http://localhost:8080/api/v1/forms \
   submission was accepted, held as spam (sent too fast, duplicate) or dropped (trap filled,
   too many from one network or address): bots learn nothing.
 - Wrong answers: `422` with every problem in `errors` (`data.email` → `email`, unknown keys →
-  `unknown`). A missing or expired token: `400 antispam.token_*` — reload the form. A closed
+  `unknown`; past 50 unknown keys, the rest are counted in one `data` entry). A missing or expired token: `400 antispam.token_*` — reload the form. A closed
   form: `409 forms.closed`. A page whose `Origin` is not in `allowed_origins`: `403
   forms.origin_not_allowed` (an empty list allows any site).
 - Sending the same `form_token` again (double click, flaky network) returns the first `id`
   and stores nothing new.
-- A website server may send the form with its own API key instead: no token needed, limited
-  to `AUTOXIDE_FORMS_SUBMISSIONS_PER_USER_PER_HOUR`; use an `Idempotency-Key` header.
+- A website server may send the form with its own API key instead, if that key has the
+  permission `forms.submit`: no token needed, limited to
+  `AUTOXIDE_FORMS_SUBMISSIONS_PER_USER_PER_HOUR`; use an `Idempotency-Key` header. Any other
+  signed-in caller (for example a self-registered account) goes through the same checks as an
+  anonymous visitor: without a form token it gets `400 antispam.token_missing`.
 
 ## The inbox
 
@@ -98,14 +111,19 @@ curl -X POST http://localhost:8080/api/v1/forms \
 ## Personal data
 
 - `GET /api/v1/forms/data?email=…` lists, and `DELETE /api/v1/forms/data?email=…` deletes for
-  good, every submission sent with an address, in every form (permission `forms.export`) —
-  for requests of the person the data is about.
+  good, every submission of an address, in every form (permission `forms.export`) — for
+  requests of the person the data is about. A submission counts when the address is its
+  sender's email, or when any answer is exactly that address (ignoring case), such as a
+  second email field ("your friend's email"). An address only mentioned inside a longer answer
+  (a message) is not found: search the inbox with `q` for those.
 - Network addresses are never stored: only a keyed hash of the network block, cleared after
   `AUTOXIDE_FORMS_IP_RETENTION_DAYS`.
 - A ticked consent box stores the exact text shown, the form version, the time and the source.
 - Events (and so webhooks) carry ids and the form key only, never answers or addresses; other
   systems read details through the API with a permission.
 - When an account is deleted, forms it created stay; `created_by` becomes `null`.
+- Deleting a form deletes its submissions. A submission whose form no longer exists is
+  deleted by the daily cleanup job.
 
 ## Legal
 
@@ -119,7 +137,8 @@ Decree 356/2025): **check the original texts for your case** and set
 
 Tools, with the same permissions and checks as REST:
 
-- `forms.list`, `forms.get` (`forms.read`); `forms.create` and `forms.update` (`forms.manage`).
+- `forms.list`, `forms.get` (`forms.read`); `forms.create` and `forms.update` (`forms.manage`;
+  setting `notify_emails` also needs `forms.read`).
   `forms.get` returns the form with an `etag`; pass it back as `etag` to `forms.update`, like
   `If-Match` (it is not the form's `version`, which counts changes to the fields). Close a
   form with `forms.update` and `status: closed`.

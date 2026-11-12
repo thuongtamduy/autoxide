@@ -9,6 +9,18 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** a signed-in caller skips the anti-spam checks for anonymous visitors only with
+  `forms.submit` (forms) or `newsletter.subscribe` (newsletter sign-ups) — give these to your
+  website server's API key. Other accounts must send a form token like anyone else.
+- Changing a form's `notify_emails` also needs `forms.read`; turning on `new_posts: send` for a
+  newsletter list needs `newsletter.send`; editing a scheduled campaign puts it back to draft.
+- `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` counts sign-up requests that may send a mail, not
+  mails sent.
+- Comments: `PATCH /api/v1/comments/public/comments/{id}` also returns `status` (an edit of a
+  shown comment may wait for approval again); deleting an unknown id answers like a real delete.
+
 ### Security
 
 - Webhooks are sent only to public addresses: private, local and link-local addresses
@@ -43,6 +55,20 @@ endpoints are marked deprecated with a sunset date first.
   - setting terms or authors is safe under concurrent requests on Postgres;
   - deleting an account also clears who asked for review and who reviewed AI content, while
     `ai_reviewed` stays shown.
+- Comments: a few anonymous reports can no longer get an old comment deleted by the daily
+  clean-up (only comments that were never shown expire); editing an approved comment goes
+  through moderation again; trust from earlier approval counts only comments still shown; names
+  refuse invisible and mixed-script characters; races around replies and hard deletes fixed.
+- A form token sent again no longer counts towards the per-address and per-email limits, so
+  nobody can block someone else's email that way.
+- Forms: email addresses are checked in bytes like the mail library, so a long Unicode address
+  no longer breaks admin notifications (or gives a server error on PostgreSQL); erasing by email
+  finds every answer with that address; submissions to a form deleted meanwhile are refused.
+- Newsletter: someone who unsubscribed (or never confirmed) must confirm by mail even on
+  single opt-in lists; the answer to a sign-up no longer depends on whether a mail was queued.
+- Mail templates are filled in one pass, so `{…}` in submitted text no longer breaks them.
+- Shared resource lookups no longer expose titles of unpublished content; the audit log keeps
+  only a hash of the address of a mail refused for good.
 
 ## [0.2.0] - 2026-11-12
 

@@ -114,7 +114,8 @@ pub(crate) struct FormInput {
 }
 
 impl FormsService {
-    /// Tạo form (mở nhận bài ngay, trừ khi `status` là `closed`). Cần `forms.manage`.
+    /// Tạo form (mở nhận bài ngay, trừ khi `status` là `closed`). Cần `forms.manage`; đặt
+    /// `notify_emails` cần thêm `forms.read`.
     pub(crate) async fn create_form(
         &self,
         principal: &Principal,
@@ -151,6 +152,10 @@ impl FormsService {
             updated_at: now,
         };
         let mut candidate = Form::parse(blank)?;
+        let sets_notify = input.notify_emails.as_ref().is_some_and(|emails| !emails.is_empty());
+        if sets_notify {
+            principal.require(&FORMS_READ)?;
+        }
         self.apply(&mut candidate, input, &mut problems)?;
         if !problems.is_empty() {
             return Err(Error::validation(problems));
@@ -226,7 +231,9 @@ impl FormsService {
         Ok(Page { data, pagination })
     }
 
-    /// Sửa form `id`. Cần `forms.manage`. Đổi trường thì tăng `version`.
+    /// Sửa form `id`. Cần `forms.manage`; đổi `notify_emails` cần thêm `forms.read` (mail báo
+    /// chứa câu trả lời: không có quyền đọc bài thì không được tự chuyển bài về hộp thư mình).
+    /// Đổi trường thì tăng `version`.
     pub(crate) async fn update_form(
         &self,
         principal: &Principal,
@@ -241,7 +248,15 @@ impl FormsService {
         }
         let mut problems = Vec::new();
         let mut candidate = before.clone();
+        let notify_given = input.notify_emails.is_some();
         self.apply(&mut candidate, input, &mut problems)?;
+        // So danh sách đã chuẩn hoá; gửi lại đúng danh sách cũ (vd client gửi cả form) thì không
+        // cần thêm quyền.
+        let notify_problem =
+            problems.iter().any(|problem| problem.field.starts_with("notify_emails"));
+        if notify_given && (candidate.notify_emails != before.notify_emails || notify_problem) {
+            principal.require(&FORMS_READ)?;
+        }
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }

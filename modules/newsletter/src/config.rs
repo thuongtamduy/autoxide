@@ -10,7 +10,8 @@ pub(crate) const CONFIRM_URL: Setting = Setting::new(
     "AUTOXIDE_NEWSLETTER_CONFIRM_URL",
     "Page of your website that confirms a newsletter subscription, with `{token}` where the \
      token goes; the page sends it to `POST /api/v1/newsletter/public/confirm`. Needed to \
-     subscribe to a list with double opt-in.",
+     subscribe to a list with double opt-in; without it, sign-ups that must be confirmed on \
+     other lists (held by the anti-spam checks, or from people who unsubscribed) get no mail.",
 )
 .with_example("https://www.example.com/newsletter/confirm?token={token}");
 
@@ -37,8 +38,8 @@ pub(crate) const CONFIRM_HOURS: Setting = Setting::new(
 
 pub(crate) const CONFIRM_MAILS_PER_DAY: Setting = Setting::new(
     "AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY",
-    "Confirmation mails sent to one address per day at most (1 to 100); more requests are \
-     answered as usual but send nothing.",
+    "Sign-up requests per address per day that may send a confirmation mail (1 to 100); every \
+     request for the address counts, and later ones are answered as usual but send nothing.",
 )
 .with_default("3");
 
@@ -64,8 +65,9 @@ pub(crate) const PER_EMAIL_PER_HOUR: Setting = Setting::new(
 
 pub(crate) const PER_USER_PER_HOUR: Setting = Setting::new(
     "AUTOXIDE_NEWSLETTER_SUBSCRIBE_PER_USER_PER_HOUR",
-    "Subscribe requests per hour from one signed-in caller, e.g. a website server with an API \
-     key subscribing its visitors (1 to 1000000); more are refused with 429.",
+    "Subscribe requests per hour from one caller with the permission `newsletter.subscribe`, \
+     e.g. a website server with an API key subscribing its visitors (1 to 1000000); more are \
+     refused with 429.",
 )
 .with_default("1000");
 

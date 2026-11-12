@@ -20,8 +20,14 @@ chạy trên máy chủ).
 | `forms.manage` | Tạo, sửa, mở, đóng, xoá form                                                   |
 | `forms.review` | Đánh dấu bài đã đọc, lưu trữ, spam hay không phải spam; xoá một bài            |
 | `forms.export` | Xuất CSV; xuất và xoá mọi bài gửi của một địa chỉ email                        |
+| `forms.submit` | Gửi bài mà không qua lớp chống spam dành cho người lạ (API key riêng của máy chủ website) |
 
 Người điền form không cần permission nào: mọi thứ dưới `/api/v1/forms/public/` đều mở.
+
+- Đặt hay đổi `notify_emails` cần `forms.read` cùng với `forms.manage`: mail báo chứa câu trả
+  lời, nên người không được đọc bài gửi không thể chuyển chúng về hộp thư của mình.
+- Chỉ cấp `forms.submit` cho API key của máy chủ website; đăng nhập thôi chưa đủ để bỏ qua lớp
+  chống spam (xem [Website](#website)).
 
 ## Định nghĩa form
 
@@ -52,8 +58,12 @@ curl -X POST http://localhost:8080/api/v1/forms \
   hiện với nhãn của đúng phiên bản đó (`answers[]`), nên bài cũ vẫn đọc được sau khi form đổi.
 - `PATCH` và `DELETE` form cần `If-Match` (`ETag` đã đọc). Đóng form (`{"status": "closed"}`)
   giữ bài gửi; xoá form thì xoá luôn bài gửi.
-- `notify_emails` nhận mail cho mỗi bài mới, `Reply-To` là địa chỉ người gửi. Endpoint công khai
-  không bao giờ trả các địa chỉ này, và người nhận không bao giờ lấy từ dữ liệu khách gửi lên.
+- `notify_emails` nhận mail cho mỗi bài mới, `Reply-To` là địa chỉ người gửi (bỏ đi nếu dịch vụ
+  gửi mail không dùng được địa chỉ đó). Endpoint công khai không bao giờ trả các địa chỉ này, và
+  người nhận không bao giờ lấy từ dữ liệu khách gửi lên. Đặt các địa chỉ này cần thêm
+  `forms.read`.
+- Câu trả lời kiểu email được kiểm theo cách dịch vụ gửi mail đếm: tối đa 64 byte trước `@` và
+  254 byte cả địa chỉ, đếm theo UTF-8 sau khi viết thường (`é` chiếm hai byte).
 
 ## Website
 
@@ -73,13 +83,16 @@ curl -X POST http://localhost:8080/api/v1/forms \
 - Câu trả lời là `201 {"data": {"id": …, "message": "Cảm ơn bạn!"}}` — **giống hệt** dù bài được
   nhận, bị giữ ở spam (gửi quá nhanh, trùng) hay bị bỏ (dính bẫy, quá nhiều lần từ một mạng hay
   một địa chỉ): bot không học được gì.
-- Câu trả lời sai: `422`, mọi lỗi trong `errors` (`data.email` → `email`, khoá lạ → `unknown`).
+- Câu trả lời sai: `422`, mọi lỗi trong `errors` (`data.email` → `email`, khoá lạ → `unknown`;
+  quá 50 khoá lạ thì phần còn lại được đếm gộp trong một dòng `data`).
   Thiếu token hay token hết hạn: `400 antispam.token_*` — tải lại form. Form đã đóng: `409
   forms.closed`. Trang có `Origin` không nằm trong `allowed_origins`: `403
   forms.origin_not_allowed` (danh sách rỗng cho mọi site).
 - Gửi lại cùng `form_token` (bấm hai lần, mạng chập chờn) trả lại `id` lần đầu, không lưu thêm.
-- Máy chủ của website có thể gửi bằng API key của nó: không cần token, giới hạn theo
-  `AUTOXIDE_FORMS_SUBMISSIONS_PER_USER_PER_HOUR`; dùng header `Idempotency-Key`.
+- Máy chủ của website có thể gửi bằng API key của nó, nếu key đó có permission `forms.submit`:
+  không cần token, giới hạn theo `AUTOXIDE_FORMS_SUBMISSIONS_PER_USER_PER_HOUR`; dùng header
+  `Idempotency-Key`. Người gọi đã đăng nhập khác (vd tài khoản tự đăng ký) đi qua đúng các bước
+  kiểm như người lạ: không có token form thì nhận `400 antispam.token_missing`.
 
 ## Hộp thư
 
@@ -93,14 +106,19 @@ curl -X POST http://localhost:8080/api/v1/forms \
 ## Dữ liệu cá nhân
 
 - `GET /api/v1/forms/data?email=…` liệt kê, `DELETE /api/v1/forms/data?email=…` xoá hẳn mọi bài
-  gửi bằng một địa chỉ, ở mọi form (permission `forms.export`) — cho yêu cầu của chính người
-  có dữ liệu.
+  gửi của một địa chỉ, ở mọi form (permission `forms.export`) — cho yêu cầu của chính người có
+  dữ liệu. Một bài được tính khi địa chỉ là email người gửi, hoặc khi có câu trả lời đúng bằng
+  địa chỉ đó (không phân biệt hoa thường), vd trường email thứ hai ("email của bạn bè"). Địa chỉ
+  chỉ được nhắc trong một câu trả lời dài hơn (lời nhắn) thì không tìm thấy: hãy tìm trong hộp
+  thư bằng `q` cho những bài đó.
 - Không lưu địa chỉ IP: chỉ lưu bản băm có khoá của khối mạng, xoá sau
   `AUTOXIDE_FORMS_IP_RETENTION_DAYS`.
 - Ô đồng ý được tích thì lưu đúng chữ đã hiện, phiên bản form, thời điểm và nguồn.
 - Event (và vì vậy webhook) chỉ mang ID và key của form, không mang câu trả lời hay địa chỉ;
   hệ thống khác đọc chi tiết qua API có permission.
 - Tài khoản bị xoá: form người đó tạo vẫn giữ; `created_by` thành `null`.
+- Xoá form thì xoá luôn bài gửi của nó. Bài gửi mà form không còn thì bị job dọn dẹp hằng ngày
+  xoá.
 
 ## Pháp lý
 
@@ -114,7 +132,8 @@ từng form) cho phù hợp.
 
 Các tool, cùng permission và cùng cách kiểm với REST:
 
-- `forms.list`, `forms.get` (`forms.read`); `forms.create` và `forms.update` (`forms.manage`).
+- `forms.list`, `forms.get` (`forms.read`); `forms.create` và `forms.update` (`forms.manage`;
+  đặt `notify_emails` cần thêm `forms.read`).
   `forms.get` trả form kèm `etag`; truyền lại vào `etag` của `forms.update`, như `If-Match` (không
   phải `version` của form — số đó đếm số lần đổi danh sách trường). Đóng form bằng `forms.update`
   với `status: closed`.

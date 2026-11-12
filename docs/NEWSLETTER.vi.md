@@ -22,7 +22,9 @@ module `mail` (máy chủ SMTP của bạn).
    SPF và DMARC).
 2. **`AUTOXIDE_HTTP_PUBLIC_URL`** — địa chỉ của API này, vd `https://api.example.com`. Mỗi mail
    chiến dịch mang `List-Unsubscribe: <https://api.example.com/api/v1/newsletter/public/unsubscribe?token=…>`.
-3. **`AUTOXIDE_NEWSLETTER_CONFIRM_URL`** — trang xác nhận của website, có `{token}`.
+3. **`AUTOXIDE_NEWSLETTER_CONFIRM_URL`** — trang xác nhận của website, có `{token}`. Hãy đặt
+   kể cả khi không danh sách nào bật double opt-in: đăng ký đáng ngờ và người vào lại danh sách
+   đã rời đều được xác nhận qua mail ở mọi danh sách.
 4. **`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`** — trang lựa chọn của website, có `{token}`; chân mỗi
    mail chiến dịch có link tới đó.
 5. **`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`** — tên và địa chỉ bưu chính của người gửi, in ở chân
@@ -38,11 +40,16 @@ Không biến nào ở trên cần để khởi động máy chủ: chức năng
 | ------------------- | -------------------------------------------------------------------------------------- |
 | `newsletter.read`   | Đọc danh sách, người đăng ký (dữ liệu cá nhân), chiến dịch kèm tiến độ, danh sách chặn |
 | `newsletter.manage` | Danh sách, nhập và sửa người đăng ký, soạn chiến dịch nháp, danh sách chặn, bounce     |
-| `newsletter.send`   | Gửi, hẹn giờ, tạm dừng, tiếp tục, huỷ chiến dịch; gửi thử                              |
+| `newsletter.send`   | Gửi, hẹn giờ, tạm dừng, tiếp tục, huỷ chiến dịch; gửi thử; `new_posts: send` cho danh sách |
 | `newsletter.export` | Xuất hoặc xoá mọi thứ về một địa chỉ email                                             |
+| `newsletter.subscribe` | Thêm đăng ký mà không qua lớp chống spam dành cho người lạ (API key riêng của máy chủ website) |
 
 Agent có `newsletter.manage` mà không có `newsletter.send` soạn được chiến dịch để một người duyệt
-rồi gửi. Người đọc website không cần gì: mọi thứ dưới `/api/v1/newsletter/public/` là công khai.
+rồi gửi: sửa chiến dịch đang hẹn giờ thì nó về nháp, và cho danh sách tự gửi bài mới cần
+`newsletter.send`, nên không thư nào đi mà không có người giữ `newsletter.send` đồng ý. Người đọc
+website không cần gì: mọi thứ dưới `/api/v1/newsletter/public/` là công khai. Chỉ cấp
+`newsletter.subscribe` cho API key của máy chủ website; đăng nhập thôi chưa đủ để bỏ qua lớp
+chống spam.
 
 ## Danh sách
 
@@ -57,7 +64,8 @@ curl -X POST http://localhost:8080/api/v1/newsletter/lists \
 - `double_opt_in` (mặc định `true`): người đăng ký công khai nhận mail xác nhận và không nhận gì
   cho tới khi mở link trong đó.
 - `public` (mặc định `false`): hiện ở `GET /public/lists` và cho người lạ đăng ký.
-- `new_posts`: `off` (mặc định), `draft` hoặc `send` — xem mục "Bài mới".
+- `new_posts`: `off` (mặc định), `draft` hoặc `send` — xem mục "Bài mới". Đặt `send` cần
+  `newsletter.send`.
 - `PATCH` và `DELETE` cần `If-Match`. Danh sách còn chiến dịch chưa xong thì không xoá được
   (`409 newsletter.list_in_use`); xoá danh sách thì xoá luôn các đăng ký của nó.
 
@@ -86,10 +94,18 @@ curl -X POST http://localhost:8080/api/v1/newsletter/lists \
 - Mail xác nhận chỉ có tên danh sách và link — không bao giờ có chữ người đọc gõ, để form không
   bị dùng gửi thư rác cho người khác. Mỗi địa chỉ nhận tối đa
   `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` mail xác nhận mỗi ngày.
-- Đăng ký bị bộ chống spam nghi ngờ (gửi quá nhanh…) luôn cần mail xác nhận, kể cả ở danh sách
-  không bật double opt-in.
-- Máy chủ website có thể gọi bằng API key của nó: không cần token, giới hạn
-  `AUTOXIDE_NEWSLETTER_SUBSCRIBE_PER_USER_PER_HOUR`.
+- Luôn cần mail xác nhận, kể cả ở danh sách không bật double opt-in, khi đăng ký bị bộ chống
+  spam nghi ngờ (gửi quá nhanh…) và khi địa chỉ đã huỷ đăng ký danh sách đó hay vẫn đang chờ xác
+  nhận: không ai đăng ký lại hộ người khác được.
+- Mọi yêu cầu đăng ký đã lưu đều được đếm vào `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` của địa
+  chỉ đó, dù có cần mail hay không, để thời gian trả lời gần như nhau. Không xếp hàng được mail
+  (vd chưa đặt `AUTOXIDE_NEWSLETTER_CONFIRM_URL` và danh sách không bật double opt-in) thì câu
+  trả lời vẫn là `202`, lý do ghi vào log của máy chủ.
+- Máy chủ website có thể gọi bằng API key của nó, nếu key đó có permission
+  `newsletter.subscribe`: không cần token, giới hạn
+  `AUTOXIDE_NEWSLETTER_SUBSCRIBE_PER_USER_PER_HOUR`. Người gọi đã đăng nhập khác (vd tài khoản tự
+  đăng ký) đi qua đúng các bước kiểm như người lạ: không có token form thì nhận `400
+  antispam.token_missing`.
 
 ## Website: trang xác nhận và trang lựa chọn
 
@@ -133,6 +149,11 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
   job chạy lại hay chạy trên nhiều máy chủ. Huỷ thì bỏ qua các mail chưa gửi.
 - `send` và `schedule` cần `If-Match`, để bản bạn đã duyệt là bản được gửi. Chỉ sửa được chiến
   dịch nháp hay đang hẹn giờ; chỉ xoá được chiến dịch chưa từng gửi.
+- Sửa chiến dịch đang hẹn giờ (`PATCH`, có đổi thật) thì nó về `draft` và bỏ giờ hẹn; các job
+  đang chờ theo giờ hẹn cũ không làm gì. Người có `newsletter.send` phải hẹn giờ hay gửi lại.
+- `body_html` được lưu và gửi nguyên vẹn — **không được làm sạch**. Giao diện quản trị không bao
+  giờ được chèn nó vào trang của mình: chỉ xem trước trong `<iframe sandbox>` (không chạy script,
+  không cùng origin).
 - `GET /campaigns/{id}` có `progress`: `total`, `pending`, `sent` (đã giao cho hàng đợi mail),
   `failed`, `skipped`.
 - Mỗi mail có chân thư (theo `locale` của chiến dịch) với link trang lựa chọn và địa chỉ bưu
@@ -162,7 +183,8 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
 ## Bài mới
 
 Danh sách có `new_posts` là `draft` nhận một chiến dịch nháp (tiêu đề, tóm tắt và link của bài)
-mỗi khi module `content` đăng một **bài viết** (trang thì không); `send` thì gửi luôn.
+mỗi khi module `content` đăng một **bài viết** (trang thì không); `send` thì gửi luôn (đặt
+`send` cần `newsletter.send`).
 `new_post_locale` chỉ lấy bài bằng một ngôn ngữ. Link là `AUTOXIDE_NEWSLETTER_SITE_URL` nối với
 đường dẫn của bài; thiếu nó (hay thiếu cấu hình cần để gửi) thì chiến dịch chỉ là nháp. Một bài
 sinh nhiều nhất một chiến dịch cho mỗi danh sách, mãi mãi — đăng lại không sinh gì mới. Nhập nhiều
@@ -214,7 +236,7 @@ Tool `newsletter.list_lists`, `newsletter.find_subscribers`, `newsletter.get_cam
 
 | Biến                                               | Mặc định                  |
 | -------------------------------------------------- | ------------------------- |
-| `AUTOXIDE_NEWSLETTER_CONFIRM_URL`                  | — (cần cho double opt-in) |
+| `AUTOXIDE_NEWSLETTER_CONFIRM_URL`                  | — (cần cho mail xác nhận) |
 | `AUTOXIDE_NEWSLETTER_PREFERENCES_URL`              | — (cần để gửi)            |
 | `AUTOXIDE_NEWSLETTER_SITE_URL`                     | — (link bài mới)          |
 | `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`               | — (cần cho thư quảng cáo) |

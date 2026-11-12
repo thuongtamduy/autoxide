@@ -44,7 +44,8 @@ const SCHEDULE_MAX_DAYS: i64 = 366;
 pub(crate) enum CampaignStatus {
     /// Being written; can be changed, sent, scheduled or deleted.
     Draft,
-    /// Starts sending at `scheduled_at`; can still be changed or sent at once.
+    /// Starts sending at `scheduled_at`; can still be sent at once. Changing it moves it back
+    /// to `draft` (the schedule is dropped): schedule or send it again.
     Scheduled,
     /// Mails are being handed to the mail queue, batch by batch.
     Sending,
@@ -290,6 +291,11 @@ impl NewsletterService {
     }
 
     /// Sửa chiến dịch `id` (chỉ khi còn nháp hay đang hẹn giờ). Cần `newsletter.manage`.
+    ///
+    /// Sửa (thật sự đổi gì đó) một chiến dịch đang hẹn giờ thì nó về `draft`, bỏ giờ hẹn và tăng
+    /// `run`: job chụp người nhận đã xếp hàng của lượt cũ thấy khác số thì dừng, và nội dung mới
+    /// phải được người có `newsletter.send` hẹn giờ / gửi lại — người chỉ có `newsletter.manage`
+    /// không đổi được thư sắp gửi sau lưng người đã duyệt.
     pub(crate) async fn update_campaign(
         &self,
         principal: &Principal,
@@ -312,6 +318,8 @@ impl NewsletterService {
             return Err(Error::validation(problems));
         }
         let now = now();
+        let unscheduled =
+            before.status() == CampaignStatus::Scheduled && content_changed(&before.row, &next);
         let mut row = before.row.clone().into_active_model();
         row.list_id = Set(next.list_id);
         row.subject = Set(next.subject);
@@ -321,6 +329,11 @@ impl NewsletterService {
         row.locale = Set(next.locale);
         row.advertising = Set(next.advertising);
         row.updated_at = Set(now);
+        if unscheduled {
+            row.status = Set(CampaignStatus::Draft.as_str().to_owned());
+            row.scheduled_at = Set(None);
+            row.run = Set(before.row.run + 1);
+        }
         let transaction = self.database.begin_write().await?;
         let update = campaign::Entity::update(row)
             .validate()?
@@ -341,6 +354,9 @@ impl NewsletterService {
             .record(&transaction, Actor::from(principal), events::campaign_subject(id), &event)
             .await?;
         transaction.commit().await?;
+        if unscheduled {
+            tracing::info!(campaign_id = %id, "scheduled newsletter campaign changed: back to draft");
+        }
         Ok(Campaign { row: after, counts: before.counts })
     }
 
@@ -640,6 +656,17 @@ impl NewsletterService {
         }
         Ok(())
     }
+}
+
+/// Nội dung hay người nhận của chiến dịch có khác không (những gì `update_campaign` sửa được).
+fn content_changed(before: &campaign::Model, after: &campaign::Model) -> bool {
+    before.list_id != after.list_id
+        || before.subject != after.subject
+        || before.preheader != after.preheader
+        || before.body_text != after.body_text
+        || before.body_html != after.body_html
+        || before.locale != after.locale
+        || before.advertising != after.advertising
 }
 
 /// Chiến dịch nháp rỗng của danh sách `list_id`.

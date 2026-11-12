@@ -1,8 +1,9 @@
 //! Job dọn dẹp hằng ngày `forms.cleanup`: xoá bài spam quá `AUTOXIDE_FORMS_SPAM_RETENTION_DAYS`,
 //! xoá bài quá thời hạn giữ của form (`retention_days`, mặc định theo
 //! `AUTOXIDE_FORMS_RETENTION_DAYS`; 0 là giữ mãi), xoá dấu vết IP quá
-//! `AUTOXIDE_FORMS_IP_RETENTION_DAYS`, và dọn nonce, bộ đếm đã hết hạn. Chạy lại bao nhiêu lần
-//! cũng ra cùng kết quả.
+//! `AUTOXIDE_FORMS_IP_RETENTION_DAYS`, xoá bài "mồ côi" (form của nó không còn — lưới an toàn,
+//! vì không có foreign key), và dọn nonce, bộ đếm đã hết hạn. Chạy lại bao nhiêu lần cũng ra
+//! cùng kết quả.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -12,7 +13,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::throttle::Throttle;
 use chrono::{DateTime, Utc};
-use sea_orm::sea_query::Expr;
+use sea_orm::sea_query::{Expr, Query};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::json;
 
@@ -29,6 +30,8 @@ pub(crate) struct Cleaned {
     pub spam: u64,
     pub expired: u64,
     pub fingerprints: u64,
+    /// Bài của form đã bị xoá.
+    pub orphans: u64,
 }
 
 pub(crate) struct Cleanup(pub Arc<FormsService>);
@@ -67,6 +70,16 @@ impl FormsService {
             .exec(write)
             .await?
             .rows_affected;
+        // Bài mà form không còn (không có foreign key; nhận bài đã khoá dòng form nên không
+        // còn đường tạo bài mồ côi, đây là lưới an toàn cho dữ liệu cũ): xoá, dữ liệu cá nhân
+        // không ai đọc được thì không giữ.
+        cleaned.orphans = submission::Entity::delete_many()
+            .filter(submission::Column::FormId.not_in_subquery(
+                Query::select().column(form::Column::Id).from(form::Entity).to_owned(),
+            ))
+            .exec(write)
+            .await?
+            .rows_affected;
         self.guard.purge_nonces(write, "forms").await?;
         Throttle::new(self.database.clone(), "forms", 1, Duration::from_secs(3600))?
             .purge(now - chrono::Duration::days(1))
@@ -76,6 +89,7 @@ impl FormsService {
                 spam = cleaned.spam,
                 expired = cleaned.expired,
                 fingerprints = cleaned.fingerprints,
+                orphans = cleaned.orphans,
                 "forms cleanup"
             );
         }

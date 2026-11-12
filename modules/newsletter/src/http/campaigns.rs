@@ -34,7 +34,9 @@ pub(crate) struct CampaignResponse {
     pub preheader: Option<String>,
     /// Plain-text body (every mail has it).
     pub body_text: String,
-    /// HTML body, if any; sent as is.
+    /// HTML body, if any; stored and sent as is, NOT sanitised. An admin interface must
+    /// show it only inside a sandboxed `<iframe sandbox>` (no scripts, no same origin), never
+    /// inserted into its own page.
     pub body_html: Option<String>,
     /// Language of the footer added to every mail.
     pub locale: Locale,
@@ -92,7 +94,8 @@ pub(crate) struct CreateCampaignRequest {
     /// Plain-text body, up to 200000 characters. A footer with the unsubscribe link and the
     /// sender's address is added to every mail.
     body_text: String,
-    /// HTML body, up to 500000 bytes, sent as is (the footer is added).
+    /// HTML body, up to 500000 bytes, sent as is (the footer is added). Not sanitised: admin
+    /// interfaces must preview it only inside a sandboxed `<iframe sandbox>`.
     body_html: Option<String>,
     /// Language of the footer; omitted: `en`.
     locale: Option<Locale>,
@@ -110,6 +113,8 @@ pub(crate) struct UpdateCampaignRequest {
     #[schema(value_type = Option<String>, nullable)]
     preheader: Option<Option<String>>,
     body_text: Option<String>,
+    /// Not sanitised: admin interfaces must preview it only inside a sandboxed
+    /// `<iframe sandbox>`. `null` removes it.
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<String>, nullable)]
     body_html: Option<Option<String>>,
@@ -259,7 +264,10 @@ pub(crate) async fn get_campaign(
 /// Change a campaign.
 ///
 /// Requires `newsletter.manage`. `If-Match` is required. Only a draft or scheduled campaign
-/// can be changed.
+/// can be changed. Changing a scheduled campaign moves it back to `draft` and drops its
+/// schedule: someone with `newsletter.send` must schedule or send it again, so nobody can
+/// change a reviewed campaign behind their back. A request that changes nothing keeps it
+/// scheduled.
 #[utoipa::path(
     patch,
     path = "/campaigns/{id}",

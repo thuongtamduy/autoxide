@@ -113,9 +113,12 @@ pub(crate) fn normalize_email(email: &str) -> String {
 }
 
 /// Email có dạng `phần-trước@tên.miền` hợp lý (không đầy đủ RFC 5322 — đủ để chặn chữ rác).
+/// Độ dài đếm theo BYTE như bên gửi mail (`lettre`): phần trước `@` tối đa 64 byte, tên miền 254
+/// byte, mỗi nhãn 63 byte — địa chỉ nhận ở đây thì gửi mail được. Cả địa chỉ tối đa 320 byte nên
+/// vừa cột `VARCHAR(320)` trên cả hai database.
 pub(crate) fn is_email(text: &str) -> bool {
     let Some((local, domain)) = text.split_once('@') else { return false };
-    let local_ok = (1..=64).contains(&local.chars().count())
+    let local_ok = (1..=64).contains(&local.len())
         && !local.starts_with('.')
         && !local.ends_with('.')
         && !local.contains("..")
@@ -124,9 +127,10 @@ pub(crate) fn is_email(text: &str) -> bool {
             .all(|c| !c.is_whitespace() && !c.is_control() && !"<>()[]\\,;:\"@".contains(c));
     let labels: Vec<&str> = domain.split('.').collect();
     let domain_ok = text.len() <= 320
+        && domain.len() <= 254
         && labels.len() >= 2
         && labels.iter().all(|label| {
-            (1..=63).contains(&label.chars().count())
+            (1..=63).contains(&label.len())
                 && !label.starts_with('-')
                 && !label.ends_with('-')
                 && label.chars().all(|c| c.is_alphanumeric() || c == '-')
@@ -219,6 +223,17 @@ mod tests {
             assert!(!is_email(bad), "{bad}");
         }
         assert_eq!(normalize_email("  Ada@Example.COM "), "ada@example.com");
+        // Đếm byte như bên gửi mail: 33 chữ `é` là 66 byte.
+        assert!(is_email(&format!("{}@example.com", "é".repeat(32))));
+        assert!(!is_email(&format!("{}@example.com", "é".repeat(33))));
+        assert!(!is_email(&format!("a@{}.com", "é".repeat(32))));
+        // Kiểm sau khi chuẩn hoá: `İ` viết thường dài ra (2 → 3 byte).
+        let mut problems = Vec::new();
+        assert_eq!(
+            checked_email(&format!("{}@x.io", "İ".repeat(30)), "email", &mut problems),
+            None
+        );
+        assert_eq!(problems.len(), 1);
         assert!(is_valid_key("weekly-news-2"));
         for bad in ["", "Weekly", "a--b", "-a", "a_b"] {
             assert!(!is_valid_key(bad), "{bad}");

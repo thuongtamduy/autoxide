@@ -77,7 +77,7 @@ pub(crate) struct CreateCampaignInput {
     preheader: Option<String>,
     /// Plain-text body. A footer with the unsubscribe link is added to every mail.
     body_text: String,
-    /// HTML body, sent as is.
+    /// HTML body, sent as is (not sanitised: admin interfaces preview it in a sandboxed iframe).
     body_html: Option<String>,
     /// Language of the footer: `en` (default) or `vi`.
     locale: Option<String>,

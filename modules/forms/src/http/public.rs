@@ -177,7 +177,8 @@ pub(crate) struct SubmitRequest {
     /// Page that led the visitor there (`document.referrer`), if any.
     referrer: Option<String>,
     /// Token from `GET /api/v1/antispam/token?scope=forms:<key>`; needed unless the caller
-    /// is signed in (a website server with an API key).
+    /// has the permission `forms.submit` (a website server with its own API key). Being
+    /// signed in without it is not enough.
     form_token: Option<String>,
     /// The hidden trap field: people leave it empty.
     trap: Option<String>,
@@ -198,7 +199,9 @@ pub(crate) struct SubmitResponse {
 ///
 /// No sign-in needed. Every answer is checked on the server and every problem is reported at
 /// once in `errors` (paths `data.<key>`). Send `form_token` (and `challenge` when the server
-/// uses one); a website server signed in with an API key may omit them. The answer is the
+/// uses one); only a caller with the permission `forms.submit` (a website server with its own
+/// API key) may omit them — other signed-in callers go through the same checks as anonymous
+/// visitors. The answer is the
 /// same 201 whether the submission is accepted, held for review or dropped by the anti-spam
 /// checks. Sending the same `form_token` again returns the first answer and stores nothing
 /// new. The body may be at most `AUTOXIDE_FORMS_MAX_SUBMISSION_BYTES`.
@@ -217,7 +220,7 @@ pub(crate) struct SubmitResponse {
         (status = 409, description = "The form is closed; code `forms.closed`.", body = Problem),
         (status = 413, description = "The body is too large; code `payload_too_large`.", body = Problem),
         (status = 422, description = "An answer is invalid; see `errors`.", body = Problem),
-        (status = 429, description = "A signed-in caller sent too many; code `antispam.rate_limited`.", body = Problem),
+        (status = 429, description = "A caller with `forms.submit` sent too many; code `antispam.rate_limited`.", body = Problem),
         (status = 503, description = "The anti-spam check cannot run; code `antispam.verifier_unavailable`.", body = Problem),
     )
 )]

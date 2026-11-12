@@ -189,7 +189,14 @@ const LABEL_MAX: usize = 500;
 const CONSENT_LABEL_MAX: usize = 5000;
 const OPTIONS_MAX: usize = 100;
 const OPTION_VALUE_MAX: usize = 200;
+/// Độ dài tối đa của địa chỉ email, tính theo BYTE (UTF-8) như bên gửi mail.
 const EMAIL_MAX: usize = 254;
+/// Phần trước `@`, theo byte (RFC 5321; bên gửi mail cũng đếm byte).
+const EMAIL_LOCAL_MAX: usize = 64;
+/// Một nhãn của tên miền, theo byte.
+const EMAIL_LABEL_MAX: usize = 63;
+/// Số key lạ trong `data` được báo từng cái.
+const UNKNOWN_REPORTED: usize = 50;
 const PHONE_MAX: usize = 32;
 
 /// `key` của trường: chữ thường đầu tiên, rồi chữ thường, số, `_`; tối đa 64 ký tự.
@@ -381,14 +388,26 @@ pub(crate) fn check_answers(
 ) -> Answers {
     let mut answers = Answers::default();
     let mut text = Vec::new();
-    for key in input.keys() {
-        if !fields.iter().any(|field| &field.key == key) {
-            problems.push(FieldError::new(
-                format!("data.{key}"),
-                "unknown",
-                "this form has no such field",
-            ));
-        }
+    let unknown: Vec<&String> =
+        input.keys().filter(|key| !fields.iter().any(|field| &field.key == *key)).collect();
+    // Báo tối đa `UNKNOWN_REPORTED` key lạ, phần còn lại gộp một dòng: thân request đầy key rác
+    // không biến thành câu trả lời lỗi khổng lồ.
+    for key in unknown.iter().take(UNKNOWN_REPORTED) {
+        problems.push(FieldError::new(
+            format!("data.{key}"),
+            "unknown",
+            "this form has no such field",
+        ));
+    }
+    if unknown.len() > UNKNOWN_REPORTED {
+        problems.push(FieldError::new(
+            "data",
+            "unknown",
+            format!(
+                "has {} more keys that are not fields of this form",
+                unknown.len() - UNKNOWN_REPORTED
+            ),
+        ));
     }
     for field in fields {
         let path = format!("data.{}", field.key);
@@ -509,7 +528,9 @@ fn check_value(
             let length = text.chars().count();
             match kind {
                 FieldType::Email => {
-                    if length > EMAIL_MAX || !is_email(&text) {
+                    // Kiểm cả dạng sẽ lưu (viết thường): vài chữ dài ra khi viết thường (`İ` →
+                    // `i̇`), dạng đó cũng phải vừa giới hạn.
+                    if !is_email(&text) || !is_email(&normalize_email(&text)) {
                         return fail(
                             "email",
                             "must be an email address like `name@example.com`".to_owned(),
@@ -565,12 +586,16 @@ fn option_list(field: &Field) -> String {
     field.options.iter().map(|option| format!("`{}`", option.value)).collect::<Vec<_>>().join(", ")
 }
 
-/// Địa chỉ email hợp lệ ở mức đủ dùng cho form: một `@`, phần trước 1–64 ký tự không có
-/// khoảng trắng hay ký tự đặc biệt của header, tên miền có ít nhất một dấu chấm, mỗi nhãn
-/// 1–63 ký tự chữ, số hoặc `-` (không ở đầu, cuối).
+/// Địa chỉ email hợp lệ ở mức đủ dùng cho form: tổng cộng tối đa 254 byte, một `@`, phần
+/// trước 1–64 BYTE không có khoảng trắng hay ký tự đặc biệt của header, tên miền có ít nhất
+/// một dấu chấm, mỗi nhãn 1–63 byte chữ, số hoặc `-` (không ở đầu, cuối). Đếm byte chứ không
+/// đếm ký tự, như bên gửi mail (`lettre`): địa chỉ nhận ở đây thì gửi mail được.
 pub(crate) fn is_email(text: &str) -> bool {
+    if text.len() > EMAIL_MAX {
+        return false;
+    }
     let Some((local, domain)) = text.split_once('@') else { return false };
-    let local_ok = (1..=64).contains(&local.chars().count())
+    let local_ok = (1..=EMAIL_LOCAL_MAX).contains(&local.len())
         && !local.starts_with('.')
         && !local.ends_with('.')
         && !local.contains("..")
@@ -580,7 +605,7 @@ pub(crate) fn is_email(text: &str) -> bool {
     let labels: Vec<&str> = domain.split('.').collect();
     let domain_ok = labels.len() >= 2
         && labels.iter().all(|label| {
-            (1..=63).contains(&label.chars().count())
+            (1..=EMAIL_LABEL_MAX).contains(&label.len())
                 && !label.starts_with('-')
                 && !label.ends_with('-')
                 && label.chars().all(|c| c.is_alphanumeric() || c == '-')
@@ -746,6 +771,49 @@ mod tests {
         ] {
             assert!(!is_email(bad), "{bad}");
         }
+    }
+
+    /// Độ dài email tính theo byte như bên gửi mail: 33 chữ `é` (66 byte) ở phần trước `@` bị
+    /// từ chối ngay khi gửi, thay vì nhận rồi mọi mail báo đều hỏng.
+    #[test]
+    fn email_dem_byte_va_kiem_ca_dang_viet_thuong() {
+        assert!(is_email(&format!("{}@example.com", "é".repeat(32))));
+        assert!(!is_email(&format!("{}@example.com", "é".repeat(33))));
+        assert!(!is_email(&format!("a@{}.com", "é".repeat(32))), "label over 63 bytes");
+        assert!(
+            !is_email(&format!("a@{}.com", vec!["x".repeat(60); 5].join("."))),
+            "over 254 bytes"
+        );
+
+        let email = fields(json!([{"key": "e", "type": "email", "label": {"en": "E"}}]));
+        let check = |value: String| {
+            let mut problems = Vec::new();
+            check_answers(&email, json!({ "e": value }).as_object().unwrap(), &mut problems);
+            codes(&problems)
+        };
+        assert_eq!(
+            check(format!("{}@example.com", "é".repeat(33))),
+            [("data.e".to_owned(), "email".to_owned())]
+        );
+        // `İ` (2 byte) viết thường thành `i̇` (3 byte): 30 chữ vừa 64 byte, dạng lưu thì không.
+        let dotted = format!("{}@example.com", "İ".repeat(30));
+        assert!(is_email(&dotted));
+        assert_eq!(check(dotted), [("data.e".to_owned(), "email".to_owned())]);
+    }
+
+    #[test]
+    fn key_la_bao_toi_da_50_dong() {
+        let mut input = serde_json::Map::new();
+        for index in 0..80 {
+            input.insert(format!("junk{index:02}"), json!("x"));
+        }
+        let mut problems = Vec::new();
+        check_answers(&sample(), &input, &mut problems);
+        let unknown: Vec<&FieldError> =
+            problems.iter().filter(|problem| problem.code == "unknown").collect();
+        assert_eq!(unknown.len(), 51);
+        assert_eq!(unknown[50].field, "data");
+        assert!(unknown[50].message.contains("30 more"), "{}", unknown[50].message);
     }
 
     #[test]

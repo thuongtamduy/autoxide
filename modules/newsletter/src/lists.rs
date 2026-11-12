@@ -20,7 +20,7 @@ use uuid::Uuid;
 use crate::campaigns::CampaignStatus;
 use crate::entity::{campaign, list, subscription};
 use crate::events::{self, Change};
-use crate::permissions::{NEWSLETTER_MANAGE, NEWSLETTER_READ};
+use crate::permissions::{NEWSLETTER_MANAGE, NEWSLETTER_READ, NEWSLETTER_SEND};
 use crate::service::{
     NewsletterService, from_json, is_unique_violation, list_not_found, now, to_json,
 };
@@ -38,7 +38,8 @@ pub(crate) enum NewPosts {
     Off,
     /// A draft campaign is created for each new post, to review and send by hand.
     Draft,
-    /// A campaign is created and sent at once.
+    /// A campaign is created and sent at once. Setting it needs the permission
+    /// `newsletter.send`.
     Send,
 }
 
@@ -115,7 +116,7 @@ pub(crate) struct ListInput {
 }
 
 impl NewsletterService {
-    /// Tạo danh sách. Cần `newsletter.manage`.
+    /// Tạo danh sách. Cần `newsletter.manage`; `new_posts = send` cần thêm `newsletter.send`.
     pub(crate) async fn create_list(
         &self,
         principal: &Principal,
@@ -144,6 +145,9 @@ impl NewsletterService {
         };
         let mut candidate = List::parse(blank)?;
         apply(&mut candidate, input, &mut problems)?;
+        if candidate.new_posts() == NewPosts::Send {
+            principal.require(&NEWSLETTER_SEND)?;
+        }
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -264,7 +268,8 @@ impl NewsletterService {
         Ok(counts)
     }
 
-    /// Sửa danh sách `id`. Cần `newsletter.manage`.
+    /// Sửa danh sách `id`. Cần `newsletter.manage`; bật `new_posts = send` (bài mới tự gửi
+    /// đi, không ai duyệt) cần thêm `newsletter.send`.
     pub(crate) async fn update_list(
         &self,
         principal: &Principal,
@@ -280,6 +285,9 @@ impl NewsletterService {
         let mut problems = Vec::new();
         let mut candidate = before.clone();
         apply(&mut candidate, input, &mut problems)?;
+        if candidate.new_posts() == NewPosts::Send && before.new_posts() != NewPosts::Send {
+            principal.require(&NEWSLETTER_SEND)?;
+        }
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }

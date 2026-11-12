@@ -146,6 +146,7 @@ impl Module for FormsModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
@@ -153,7 +154,7 @@ pub(crate) mod testing {
     use autoxide_kernel::antispam::{AntispamConfig, SpamGuard};
     use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
     use autoxide_kernel::database::Database;
-    use autoxide_kernel::error::Error;
+    use autoxide_kernel::error::{Error, FieldError};
     use autoxide_kernel::event::Outbox;
     use autoxide_kernel::i18n::Translations;
     use autoxide_kernel::mail::{Mail, Mailer};
@@ -165,20 +166,31 @@ pub(crate) mod testing {
     use crate::config::FormsConfig;
     use crate::service::{FormsService, Parts};
 
-    /// Bên gửi mail giả: giữ lại mọi mail.
+    /// Bên gửi mail giả: giữ lại mọi mail. Bật `refuse_reply_to` thì từ chối mọi mail có
+    /// `reply_to`, như module `mail` từ chối địa chỉ nó không gửi được.
     #[derive(Default)]
-    pub struct FakeMailer(pub Mutex<Vec<Mail>>);
+    pub struct FakeMailer {
+        pub mails: Mutex<Vec<Mail>>,
+        pub refuse_reply_to: AtomicBool,
+    }
 
     impl FakeMailer {
         pub fn sent(&self) -> Vec<Mail> {
-            self.0.lock().unwrap().clone()
+            self.mails.lock().unwrap().clone()
         }
     }
 
     #[async_trait::async_trait]
     impl Mailer for FakeMailer {
         async fn send(&self, mail: Mail) -> Result<(), Error> {
-            self.0.lock().unwrap().push(mail);
+            if mail.reply_to.is_some() && self.refuse_reply_to.load(Ordering::SeqCst) {
+                return Err(Error::validation(vec![FieldError::new(
+                    "reply_to",
+                    "email",
+                    "must be a mail address, like `ada@example.com`",
+                )]));
+            }
+            self.mails.lock().unwrap().push(mail);
             Ok(())
         }
     }
@@ -231,6 +243,8 @@ pub(crate) mod testing {
         Principal::new(Uuid::now_v7(), permissions.iter().map(|p| format!("forms.{p}")))
     }
 
+    /// Mọi quyền quản trị của module (không có `forms.submit`: quản trị viên gửi form như mọi
+    /// người).
     pub fn admin() -> Principal {
         user(&["read", "manage", "review", "export"])
     }

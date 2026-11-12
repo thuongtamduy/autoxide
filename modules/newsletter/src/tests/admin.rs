@@ -379,3 +379,48 @@ async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
     .await
     .unwrap();
 }
+
+/// `new_posts = send` (bài mới tự gửi đi, không ai duyệt) cần `newsletter.send`, khi tạo và khi
+/// sửa; `newsletter.manage` thôi thì chỉ đặt được `off` / `draft`.
+#[tokio::test]
+async fn bat_tu_gui_bai_moi_can_quyen_gui() {
+    TestDatabase::run(async |test| {
+        let h = service(test, config()).await;
+        let manager = user(&["manage"]);
+        let input = |key: &str, new_posts: NewPosts| ListInput {
+            key: Some(key.to_owned()),
+            name: Some(Localized { en: Some("News".to_owned()), vi: None }),
+            new_posts: Some(new_posts),
+            ..ListInput::default()
+        };
+        assert_eq!(
+            h.service
+                .create_list(&manager, input("auto", NewPosts::Send))
+                .await
+                .unwrap_err()
+                .code(),
+            "permission_denied"
+        );
+        let list = h.service.create_list(&manager, input("auto", NewPosts::Draft)).await.unwrap();
+        let send = || ListInput { new_posts: Some(NewPosts::Send), ..ListInput::default() };
+        assert_eq!(
+            h.service.update_list(&manager, list.row.id, send(), None).await.unwrap_err().code(),
+            "permission_denied"
+        );
+        let sender = user(&["manage", "send"]);
+        let changed = h.service.update_list(&sender, list.row.id, send(), None).await.unwrap();
+        assert_eq!(changed.new_posts(), NewPosts::Send);
+        // Đã là `send`: người quản lý vẫn sửa được phần khác, và tắt được.
+        let rename = ListInput {
+            name: Some(Localized { en: Some("Auto news".to_owned()), vi: None }),
+            new_posts: Some(NewPosts::Send),
+            ..ListInput::default()
+        };
+        h.service.update_list(&manager, list.row.id, rename, None).await.unwrap();
+        let off = ListInput { new_posts: Some(NewPosts::Off), ..ListInput::default() };
+        h.service.update_list(&manager, list.row.id, off, None).await.unwrap();
+        h.service.create_list(&sender, input("auto-2", NewPosts::Send)).await.unwrap();
+    })
+    .await
+    .unwrap();
+}

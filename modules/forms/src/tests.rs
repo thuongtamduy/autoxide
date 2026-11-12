@@ -429,12 +429,22 @@ async fn form_dong_origin_va_nguoi_goi_dang_nhap() {
             .await
             .unwrap();
 
-        // Website gọi bằng API key: không cần token; vượt giới hạn theo người dùng thì 429.
-        let website = Principal::new(Uuid::now_v7(), Vec::<String>::new());
+        // Đăng nhập mà không có `forms.submit` (tài khoản tự đăng ký): đi đường của người lạ —
+        // thiếu token thì bị từ chối như người lạ; có token thì được nhận.
+        let member = Principal::new(Uuid::now_v7(), Vec::<String>::new());
         let signed = || PublicSubmission {
             data: answers("C", "c@example.com"),
             ..PublicSubmission::default()
         };
+        let refused = service.submit("contact", Some(&member), &client, signed()).await;
+        assert_eq!(refused.unwrap_err().code(), "antispam.token_missing");
+        let mut with_token = signed();
+        with_token.form_token = Some(token(&service, "contact").await);
+        service.submit("contact", Some(&member), &client, with_token).await.unwrap();
+
+        // Website gọi bằng API key có `forms.submit`: không cần token; vượt giới hạn theo người
+        // dùng thì 429.
+        let website = user(&["submit"]);
         service.submit("contact", Some(&website), &client, signed()).await.unwrap();
         let limited =
             service.submit("contact", Some(&website), &client, signed()).await.unwrap_err();
@@ -738,6 +748,168 @@ async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
         service.handle(&deleted).await.unwrap();
         assert_eq!(service.get_form(&owner, form.row.id).await.unwrap().row.created_by, None);
         assert_eq!(service.export(owner.user_id()).await.unwrap()["forms"], json!([]));
+    })
+    .await
+    .unwrap();
+}
+
+/// `forms.manage` thôi thì không đặt / đổi được `notify_emails` (mail báo chứa câu trả lời):
+/// cần thêm `forms.read`. Gửi lại đúng danh sách cũ thì không cần.
+#[tokio::test]
+async fn doi_noi_nhan_mail_bao_can_quyen_doc() {
+    TestDatabase::run(async |test| {
+        let (service, _, _) = service(test, FormsConfig::default()).await;
+        let manager = user(&["manage"]);
+        assert_eq!(
+            service.create_form(&manager, contact("contact")).await.unwrap_err().code(),
+            "permission_denied"
+        );
+        let mut quiet = contact("contact");
+        quiet.notify_emails = None;
+        let form = service.create_form(&manager, quiet).await.unwrap();
+        assert!(form.notify_emails.is_empty());
+
+        let redirect = || FormInput {
+            notify_emails: Some(vec!["thief@example.com".to_owned()]),
+            ..FormInput::default()
+        };
+        let refused = service.update_form(&manager, form.row.id, redirect(), None).await;
+        assert_eq!(refused.unwrap_err().code(), "permission_denied");
+        let rename = FormInput {
+            name: Some("Contact".to_owned()),
+            notify_emails: Some(Vec::new()),
+            ..FormInput::default()
+        };
+        service.update_form(&manager, form.row.id, rename, None).await.unwrap();
+
+        let both = user(&["manage", "read"]);
+        let changed = service.update_form(&both, form.row.id, redirect(), None).await.unwrap();
+        assert_eq!(changed.notify_emails, ["thief@example.com"]);
+        let same = FormInput {
+            notify_emails: Some(vec!["Thief@Example.com".to_owned()]),
+            ..FormInput::default()
+        };
+        service.update_form(&manager, form.row.id, same, None).await.unwrap();
+        let removed = FormInput { notify_emails: Some(Vec::new()), ..FormInput::default() };
+        let refused = service.update_form(&manager, form.row.id, removed, None).await;
+        assert_eq!(refused.unwrap_err().code(), "permission_denied");
+    })
+    .await
+    .unwrap();
+}
+
+/// Bên gửi mail không nhận địa chỉ người gửi làm `Reply-To`: mail báo vẫn đi, không có
+/// `Reply-To`, event không lỗi (không bị thử lại tới khi hỏng hẳn).
+#[tokio::test]
+async fn mail_bao_bo_reply_to_khi_ben_gui_tu_choi() {
+    TestDatabase::run(async |test| {
+        let (service, mailer, _) = service(test, FormsConfig::default()).await;
+        service.create_form(&admin(), contact("contact")).await.unwrap();
+        let receipt =
+            send(&service, "contact", &visitor("203.0.113.9"), answers("Ada", "ada@example.com"))
+                .await
+                .unwrap();
+        mailer.refuse_reply_to.store(true, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(service.notify(receipt.id).await.unwrap(), 1);
+        let sent = mailer.sent();
+        assert_eq!(sent.len(), 1);
+        assert_eq!((sent[0].to.as_str(), sent[0].reply_to.as_deref()), ("owner@example.com", None));
+    })
+    .await
+    .unwrap();
+}
+
+/// Email dài ra khi viết thường (`İ` → `i̇`) bị kiểm theo dạng sẽ lưu: báo lỗi 422, không vỡ cột
+/// `email` (`VARCHAR(320)` trên Postgres) thành 500. Dạng vừa giới hạn thì lưu được trên cả hai.
+#[tokio::test]
+async fn email_dai_ra_khi_viet_thuong_bi_kiem_theo_dang_luu() {
+    TestDatabase::run(async |test| {
+        let (service, _, database) = service(test, FormsConfig::default()).await;
+        service.create_form(&admin(), contact("contact")).await.unwrap();
+        let client = visitor("203.0.113.9");
+        let long = format!("{}@{}.example.com", "İ".repeat(30), "x".repeat(60));
+        let error = send(&service, "contact", &client, answers("A", &long)).await.unwrap_err();
+        assert_eq!(error.code(), "validation_failed");
+        assert_eq!(error.fields()[0].field, "data.email");
+
+        let fits = format!("{}@{}.example.com", "İ".repeat(20), "x".repeat(60));
+        let receipt = send(&service, "contact", &client, answers("B", &fits)).await.unwrap();
+        let stored = service.get_submission(&admin(), receipt.id).await.unwrap();
+        assert_eq!(stored.row.email, Some(fits.to_lowercase()));
+        assert_eq!(count(&database).await, 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// Xoá / xuất theo email gặp cả bài mà địa chỉ nằm ở một câu trả lời khác (trường email thứ
+/// hai), không chỉ email người gửi; câu trả lời chỉ CHỨA địa chỉ thì không tính.
+#[tokio::test]
+async fn xoa_theo_email_gap_ca_cau_tra_loi_khac() {
+    TestDatabase::run(async |test| {
+        let (service, _, database) = service(test, FormsConfig::default()).await;
+        let input = FormInput {
+            key: Some("refer".to_owned()),
+            name: Some("Refer a friend".to_owned()),
+            fields: Some(fields(json!([
+                {"key": "email", "type": "email", "label": {"en": "Your email"}, "required": true},
+                {"key": "friend", "type": "email", "label": {"en": "Friend's email"}},
+                {"key": "note", "type": "text", "label": {"en": "Note"}}
+            ]))),
+            reply_to_field: Some(Some("email".to_owned())),
+            ..FormInput::default()
+        };
+        service.create_form(&admin(), input).await.unwrap();
+        let client = visitor("203.0.113.9");
+        let submit = |email: &str, friend: &str, note: &str| {
+            let data = json!({"email": email, "friend": friend, "note": note});
+            let service = service.clone();
+            let client = client.clone();
+            async move {
+                let input = PublicSubmission {
+                    data: data.as_object().unwrap().clone(),
+                    form_token: Some(token(&service, "refer").await),
+                    ..PublicSubmission::default()
+                };
+                service.submit("refer", None, &client, input).await.unwrap()
+            }
+        };
+        submit("bob@example.com", "Ada@Example.com", "hi").await;
+        submit("ada@example.com", "carl@example.com", "me").await;
+        submit("dan@example.com", "erin@example.com", "write to ada@example.com.org").await;
+
+        let exporter = user(&["export"]);
+        assert_eq!(
+            service.submissions_of_email(&exporter, "ada@example.com").await.unwrap().len(),
+            2
+        );
+        assert_eq!(service.erase_email(&exporter, "ADA@example.com").await.unwrap(), 2);
+        assert_eq!(count(&database).await, 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// Bài mà form không còn (không có foreign key) bị job dọn dẹp xoá; chạy lại không còn gì.
+#[tokio::test]
+async fn don_dep_xoa_bai_mo_coi() {
+    TestDatabase::run(async |test| {
+        let (service, _, database) = service(test, FormsConfig::default()).await;
+        let gone = service.create_form(&admin(), contact("gone")).await.unwrap();
+        service.create_form(&admin(), contact("kept")).await.unwrap();
+        let client = visitor("203.0.113.9");
+        send(&service, "gone", &client, answers("A", "a@example.com")).await.unwrap();
+        send(&service, "kept", &client, answers("B", "b@example.com")).await.unwrap();
+        // Xoá dòng form mà không qua service (như form bị xoá giữa hai pha của bài gửi).
+        crate::entity::form::Entity::delete_by_id(gone.row.id)
+            .exec(database.write())
+            .await
+            .unwrap();
+
+        let now = chrono::Utc::now();
+        assert_eq!(service.cleanup(now).await.unwrap().orphans, 1);
+        assert_eq!(service.cleanup(now).await.unwrap(), crate::retention::Cleaned::default());
+        assert_eq!(count(&database).await, 1);
     })
     .await
     .unwrap();

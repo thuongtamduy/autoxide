@@ -133,7 +133,8 @@ pub(crate) struct SubscribeBody {
     /// Where the form is (kept with the consent), e.g. `footer`; up to 100 characters.
     source: Option<String>,
     /// Token from `GET /api/v1/antispam/token?scope=newsletter:subscribe`; needed unless the
-    /// caller is signed in (a website server with an API key).
+    /// caller has the permission `newsletter.subscribe` (a website server with its own API
+    /// key). Being signed in without it is not enough.
     form_token: Option<String>,
     /// The hidden trap field: people leave it empty.
     trap: Option<String>,
@@ -152,10 +153,15 @@ pub(crate) struct SubscribeResponse {
 ///
 /// No sign-in needed. The answer is the same `202` whether the address is new, waiting for
 /// confirmation, already subscribed, blocked, or dropped by the anti-spam checks: nobody can
-/// learn which addresses are on a list. For lists with double opt-in (and for sign-ups held by
-/// the anti-spam checks) a confirmation mail links to `AUTOXIDE_NEWSLETTER_CONFIRM_URL`; at most
-/// `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` such mails go to one address a day. Sending the
-/// same `form_token` again stores nothing new.
+/// learn which addresses are on a list. A confirmation mail links to
+/// `AUTOXIDE_NEWSLETTER_CONFIRM_URL` for lists with double opt-in, for sign-ups held by the
+/// anti-spam checks, and — on any list — for an address that unsubscribed from it or is still
+/// waiting for confirmation (nobody can sign someone else back up); at most
+/// `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` sign-up requests a day for one address may send
+/// one. Send `form_token` (and `challenge` when the server uses one); only a caller with the
+/// permission `newsletter.subscribe` (a website server with its own API key) may omit them —
+/// other signed-in callers go through the same checks as anonymous visitors. Sending the same
+/// `form_token` again stores nothing new.
 #[utoipa::path(
     post,
     path = "/public/subscribe",
@@ -166,7 +172,7 @@ pub(crate) struct SubscribeResponse {
         (status = 202, description = "Received.", body = Data<SubscribeResponse>),
         (status = 400, description = "The form token or challenge is missing, invalid or expired (codes `antispam.token_missing`, `antispam.token_invalid`, `antispam.token_expired`, `antispam.challenge_required`, `antispam.challenge_failed`): reload the form.", body = Problem),
         (status = 422, description = "A value is invalid (e.g. a key that is not a public list); see `errors`.", body = Problem),
-        (status = 429, description = "A signed-in caller sent too many; code `antispam.rate_limited`.", body = Problem),
+        (status = 429, description = "A caller with `newsletter.subscribe` sent too many; code `antispam.rate_limited`.", body = Problem),
         (status = 503, description = "The server cannot confirm sign-ups (code `newsletter.confirm_url_missing`), or the anti-spam check cannot run (`antispam.verifier_unavailable`).", body = Problem),
     )
 )]

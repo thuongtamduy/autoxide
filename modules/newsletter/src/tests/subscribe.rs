@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use autoxide_kernel::antispam::AntispamConfig;
+use autoxide_kernel::event::Actor;
 use autoxide_testkit::TestDatabase;
 
 use super::{
@@ -12,7 +13,7 @@ use super::{
 use crate::config::NewsletterConfig;
 use crate::public::SubscribeRequest;
 use crate::subscribers::{SubscriberChange, SubscriberStatus, SubscriptionStatus};
-use crate::testing::{admin, config, service, service_with};
+use crate::testing::{admin, config, service, service_with, user};
 
 /// Mới, đang chờ, đã xác nhận, bị khoá, dính bẫy, quá nhiều lần: cùng `Ok(())`; chỉ "mới" và
 /// "đang chờ" sinh mail xác nhận; mail không chứa chữ người đăng ký gõ.
@@ -258,6 +259,97 @@ async fn gioi_han_mail_xac_nhan_va_thieu_cau_hinh() {
                 .code(),
             "newsletter.confirm_url_missing"
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// Đăng nhập mà không có `newsletter.subscribe` (tài khoản tự đăng ký): đi đường của người lạ —
+/// thiếu token thì bị từ chối. Có quyền đó (máy chủ website): không cần token.
+#[tokio::test]
+async fn dang_nhap_khong_co_quyen_dang_ky_nhu_nguoi_la() {
+    TestDatabase::run(async |test| {
+        let h = service(test, config()).await;
+        list(&h.service, "deals", false).await;
+        let request = |email: &str| SubscribeRequest {
+            email: Some(email.to_owned()),
+            lists: vec!["deals".to_owned()],
+            ..SubscribeRequest::default()
+        };
+        let member = user(&[]);
+        let client = visitor("203.0.113.9");
+        let refused = h.service.subscribe(Some(&member), &client, request("a@example.com")).await;
+        assert_eq!(refused.unwrap_err().code(), "antispam.token_missing");
+        assert_eq!(subscribers(&h.database).await, 0);
+        let website = user(&["subscribe"]);
+        h.service
+            .subscribe(Some(&website), &visitor("203.0.113.9"), request("b@example.com"))
+            .await
+            .unwrap();
+        assert_eq!(subscriptions(&h.database).await[0].status, "confirmed");
+    })
+    .await
+    .unwrap();
+}
+
+/// Danh sách không bật double opt-in: người đã huỷ (hay đang chờ xác nhận) không bị người lạ
+/// đăng ký lại ngay — phải xác nhận qua mail. Thiếu URL trang xác nhận thì mail không đi, nhưng
+/// câu trả lời vẫn như mọi khi (không lộ trạng thái).
+#[tokio::test]
+async fn dang_ky_lai_sau_khi_huy_phai_xac_nhan() {
+    TestDatabase::run(async |test| {
+        let h = service(test, config()).await;
+        let deals = list(&h.service, "deals", false).await;
+        subscribe(&h.service, "ada@example.com", &["deals"], "203.0.113.9").await.unwrap();
+        let row = subscriptions(&h.database).await.remove(0);
+        assert_eq!(row.status, "confirmed");
+        h.service
+            .unsubscribe_in(
+                h.database.write(),
+                Actor::system(),
+                row.subscriber_id,
+                &deals,
+                chrono::Utc::now(),
+            )
+            .await
+            .unwrap();
+
+        subscribe(&h.service, "ada@example.com", &["deals"], "203.0.113.10").await.unwrap();
+        assert_eq!(subscriptions(&h.database).await[0].status, "unconfirmed");
+        let mails = h.mailer.to("ada@example.com");
+        assert_eq!(mails.len(), 1);
+        // Gửi lại khi đang chờ: vẫn chờ, thêm một mail; không thành `confirmed`.
+        subscribe(&h.service, "ada@example.com", &["deals"], "203.0.113.11").await.unwrap();
+        assert_eq!(subscriptions(&h.database).await[0].status, "unconfirmed");
+        assert_eq!(h.mailer.to("ada@example.com").len(), 2);
+        h.service.confirm(&token_in(&mails[0].text)).await.unwrap();
+        assert_eq!(subscriptions(&h.database).await[0].status, "confirmed");
+
+        // Không có URL trang xác nhận (cùng database, service khác): không mail, vẫn `Ok(())`.
+        let bare = service(test, NewsletterConfig::default()).await;
+        let promo = list(&bare.service, "promo", false).await;
+        let of_promo = async || {
+            subscriptions(&bare.database)
+                .await
+                .into_iter()
+                .find(|row| row.list_id == promo.row.id)
+                .unwrap()
+        };
+        subscribe(&bare.service, "bob@example.com", &["promo"], "203.0.113.12").await.unwrap();
+        let row = of_promo().await;
+        bare.service
+            .unsubscribe_in(
+                bare.database.write(),
+                Actor::system(),
+                row.subscriber_id,
+                &promo,
+                chrono::Utc::now(),
+            )
+            .await
+            .unwrap();
+        subscribe(&bare.service, "bob@example.com", &["promo"], "203.0.113.13").await.unwrap();
+        assert_eq!(of_promo().await.status, "unconfirmed");
+        assert!(bare.mailer.sent().is_empty());
     })
     .await
     .unwrap();

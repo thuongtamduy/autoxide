@@ -462,3 +462,72 @@ async fn hen_gio_va_huy() {
     .await
     .unwrap();
 }
+
+/// Người chỉ có `newsletter.manage` sửa chiến dịch đang hẹn giờ: nó về nháp, bỏ giờ hẹn, tăng
+/// `run` — job đã xếp hàng của lượt cũ thôi, không gửi gì; phải hẹn / gửi lại (cần
+/// `newsletter.send`). Sửa mà không đổi gì thì vẫn hẹn giờ.
+#[tokio::test]
+async fn sua_chien_dich_hen_gio_ve_nhap() {
+    TestDatabase::run(async |test| {
+        let h = service(test, config()).await;
+        let weekly = list(&h.service, "weekly", true).await;
+        import(&h.service, weekly.row.id, &emails("reader", 2)).await;
+        let draft = campaign(&h.service, weekly.row.id, false).await;
+        let later = chrono::Utc::now() + chrono::Duration::hours(1);
+        let scheduled = h
+            .service
+            .change_state(&admin(), draft.row.id, Action::Schedule(later), None)
+            .await
+            .unwrap();
+        let manager = user(&["manage"]);
+        let same = crate::campaigns::CampaignInput {
+            subject: Some("Hello".to_owned()),
+            ..crate::campaigns::CampaignInput::default()
+        };
+        let kept = h.service.update_campaign(&manager, draft.row.id, same, None).await.unwrap();
+        assert_eq!((kept.status(), kept.row.run), (CampaignStatus::Scheduled, scheduled.row.run));
+
+        let rewrite = crate::campaigns::CampaignInput {
+            subject: Some("Something else".to_owned()),
+            advertising: Some(true),
+            ..crate::campaigns::CampaignInput::default()
+        };
+        let changed =
+            h.service.update_campaign(&manager, draft.row.id, rewrite, None).await.unwrap();
+        assert_eq!(changed.status(), CampaignStatus::Draft);
+        assert_eq!(changed.row.scheduled_at, None);
+        assert_eq!(changed.row.run, scheduled.row.run + 1);
+        let (_, payload) = super::events(&h.database)
+            .await
+            .into_iter()
+            .rfind(|(name, _)| name == "newsletter.campaign_updated")
+            .unwrap();
+        let payload: serde_json::Value = serde_json::from_str(&payload).unwrap();
+        assert_eq!(
+            (payload["before"]["status"].as_str(), payload["after"]["status"].as_str()),
+            (Some("scheduled"), Some("draft"))
+        );
+
+        // Job hẹn giờ của lượt cũ tới giờ: không bắt đầu gửi.
+        let old = crate::sending::PrepareJob {
+            campaign_id: draft.row.id,
+            run: scheduled.row.run,
+            after: None,
+        };
+        h.service.prepare(&old).await.unwrap();
+        drain(&h).await;
+        let current = h.service.find_campaign(draft.row.id).await.unwrap();
+        assert_eq!((current.status(), current.counts.total), (CampaignStatus::Draft, 0));
+        assert_eq!(h.mailer.calls(), 0);
+        assert_eq!(
+            h.service
+                .change_state(&manager, draft.row.id, Action::Schedule(later), None)
+                .await
+                .unwrap_err()
+                .code(),
+            "permission_denied"
+        );
+    })
+    .await
+    .unwrap();
+}

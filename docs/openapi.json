@@ -6340,7 +6340,7 @@
           "comments"
         ],
         "summary": "Change one's comment (public).",
-        "description": "The author only — signed in as the same user (with `comments.post`), or a guest sending\n`edit_token` — within `edit_minutes` of posting. The text is checked again; a shown comment\nthat now has suspect words or too many links waits for approval again.",
+        "description": "The author only — signed in as the same user (with `comments.post`), or a guest sending\n`edit_token` — within `edit_minutes` of posting. The text is checked again. A shown comment\nwaits for approval again (`status: pending`) when it now has suspect words or too many links,\nor when a new comment of the same author on the same target would wait (approval mode `pre`,\nor `first_time` without a shown comment).",
         "operationId": "comments_edit_comment",
         "parameters": [
           {
@@ -6391,11 +6391,11 @@
         },
         "responses": {
           "200": {
-            "description": "The comment after the change.",
+            "description": "The comment after the change, and whether it is shown.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Data_PublicComment"
+                  "$ref": "#/components/schemas/Data_EditedComment"
                 }
               }
             }
@@ -6475,7 +6475,7 @@
           "comments"
         ],
         "summary": "Delete one's comment (public).",
-        "description": "The author only (signed in as the same user, or a guest sending `edit_token`), at any time.\nThe text, name and email are removed; the comment keeps its place in the thread so replies\nstay. A body is used (not `DELETE`) because the token must not travel in the address.",
+        "description": "The author only (signed in as the same user, or a guest sending `edit_token`), at any time.\nThe text, name and email are removed; the comment keeps its place in the thread so replies\nstay. A body is used (not `DELETE`) because the token must not travel in the address. An id\nthat does not exist (deleted for good, or a comment dropped by the anti-spam checks) also\nanswers `200`, so the answer tells nothing about what happened to a comment.",
         "operationId": "comments_delete_own_comment",
         "parameters": [
           {
@@ -6526,7 +6526,7 @@
         },
         "responses": {
           "200": {
-            "description": "Deleted (also when it already was).",
+            "description": "Deleted (also when it already was, or no comment has this id).",
             "content": {
               "application/json": {
                 "schema": {
@@ -6537,16 +6537,6 @@
           },
           "403": {
             "description": "Not the author; code `comments.not_author`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No comment has this id; code `comments.not_found`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15472,7 +15462,7 @@
           "forms"
         ],
         "summary": "Create a form.",
-        "description": "Requires `forms.manage`. Every problem of the definition is reported at once in `errors`\n(paths like `fields[2].options`). The form takes submissions at once unless `status` is\n`closed`. Retry safely with an `Idempotency-Key` header.",
+        "description": "Requires `forms.manage`, and also `forms.read` when `notify_emails` is not empty (the\nnotification mails carry the answers). Every problem of the definition is reported at once\nin `errors` (paths like `fields[2].options`). The form takes submissions at once unless\n`status` is `closed`. Retry safely with an `Idempotency-Key` header.",
         "operationId": "forms_create_form",
         "parameters": [
           {
@@ -15541,7 +15531,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `forms.manage`; code `permission_denied`.",
+            "description": "Missing permission `forms.manage` (or `forms.read`, needed to set `notify_emails`); code `permission_denied`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15890,7 +15880,7 @@
           "forms"
         ],
         "summary": "Send a form (public).",
-        "description": "No sign-in needed. Every answer is checked on the server and every problem is reported at\nonce in `errors` (paths `data.<key>`). Send `form_token` (and `challenge` when the server\nuses one); a website server signed in with an API key may omit them. The answer is the\nsame 201 whether the submission is accepted, held for review or dropped by the anti-spam\nchecks. Sending the same `form_token` again returns the first answer and stores nothing\nnew. The body may be at most `AUTOXIDE_FORMS_MAX_SUBMISSION_BYTES`.",
+        "description": "No sign-in needed. Every answer is checked on the server and every problem is reported at\nonce in `errors` (paths `data.<key>`). Send `form_token` (and `challenge` when the server\nuses one); only a caller with the permission `forms.submit` (a website server with its own\nAPI key) may omit them — other signed-in callers go through the same checks as anonymous\nvisitors. The answer is the\nsame 201 whether the submission is accepted, held for review or dropped by the anti-spam\nchecks. Sending the same `form_token` again returns the first answer and stores nothing\nnew. The body may be at most `AUTOXIDE_FORMS_MAX_SUBMISSION_BYTES`.",
         "operationId": "forms_submit_form",
         "parameters": [
           {
@@ -16018,7 +16008,7 @@
             }
           },
           "429": {
-            "description": "A signed-in caller sent too many; code `antispam.rate_limited`.",
+            "description": "A caller with `forms.submit` sent too many; code `antispam.rate_limited`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -16636,7 +16626,7 @@
           "forms"
         ],
         "summary": "Change a form.",
-        "description": "Requires `forms.manage`. `If-Match` is required. Sending `fields` replaces the whole list;\na change makes a new `version` (old submissions keep their own labels). Close a form with\n`{\"status\": \"closed\"}`.",
+        "description": "Requires `forms.manage`, and also `forms.read` to change `notify_emails` (the notification\nmails carry the answers). `If-Match` is required. Sending `fields` replaces the whole list;\na change makes a new `version` (old submissions keep their own labels). Close a form with\n`{\"status\": \"closed\"}`.",
         "operationId": "forms_update_form",
         "parameters": [
           {
@@ -16724,7 +16714,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `forms.manage`; code `permission_denied`.",
+            "description": "Missing permission `forms.manage` (or `forms.read`, needed to change `notify_emails`); code `permission_denied`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -20430,7 +20420,7 @@
           "newsletter"
         ],
         "summary": "Change a campaign.",
-        "description": "Requires `newsletter.manage`. `If-Match` is required. Only a draft or scheduled campaign\ncan be changed.",
+        "description": "Requires `newsletter.manage`. `If-Match` is required. Only a draft or scheduled campaign\ncan be changed. Changing a scheduled campaign moves it back to `draft` and drops its\nschedule: someone with `newsletter.send` must schedule or send it again, so nobody can\nchange a reviewed campaign behind their back. A request that changes nothing keeps it\nscheduled.",
         "operationId": "newsletter_update_newsletter_campaign",
         "parameters": [
           {
@@ -21811,7 +21801,7 @@
           "newsletter"
         ],
         "summary": "Create a list.",
-        "description": "Requires `newsletter.manage`. Every problem is reported at once in `errors`. Retry safely\nwith an `Idempotency-Key` header.",
+        "description": "Requires `newsletter.manage`, and also `newsletter.send` for `new_posts: send` (new posts\nare then sent without review). Every problem is reported at once in `errors`. Retry safely\nwith an `Idempotency-Key` header.",
         "operationId": "newsletter_create_newsletter_list",
         "parameters": [
           {
@@ -21880,7 +21870,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `newsletter.manage`; code `permission_denied`.",
+            "description": "Missing permission `newsletter.manage` (or `newsletter.send`, needed for `new_posts: send`); code `permission_denied`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -22164,7 +22154,7 @@
           "newsletter"
         ],
         "summary": "Change a list.",
-        "description": "Requires `newsletter.manage`. `If-Match` is required.",
+        "description": "Requires `newsletter.manage`, and also `newsletter.send` to set `new_posts: send` (new\nposts are then sent without review). `If-Match` is required.",
         "operationId": "newsletter_update_newsletter_list",
         "parameters": [
           {
@@ -22252,7 +22242,7 @@
             }
           },
           "403": {
-            "description": "Missing permission `newsletter.manage`; code `permission_denied`.",
+            "description": "Missing permission `newsletter.manage` (or `newsletter.send`, needed for `new_posts: send`); code `permission_denied`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -22679,7 +22669,7 @@
           "newsletter"
         ],
         "summary": "Subscribe to lists (public).",
-        "description": "No sign-in needed. The answer is the same `202` whether the address is new, waiting for\nconfirmation, already subscribed, blocked, or dropped by the anti-spam checks: nobody can\nlearn which addresses are on a list. For lists with double opt-in (and for sign-ups held by\nthe anti-spam checks) a confirmation mail links to `AUTOXIDE_NEWSLETTER_CONFIRM_URL`; at most\n`AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` such mails go to one address a day. Sending the\nsame `form_token` again stores nothing new.",
+        "description": "No sign-in needed. The answer is the same `202` whether the address is new, waiting for\nconfirmation, already subscribed, blocked, or dropped by the anti-spam checks: nobody can\nlearn which addresses are on a list. A confirmation mail links to\n`AUTOXIDE_NEWSLETTER_CONFIRM_URL` for lists with double opt-in, for sign-ups held by the\nanti-spam checks, and — on any list — for an address that unsubscribed from it or is still\nwaiting for confirmation (nobody can sign someone else back up); at most\n`AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` sign-up requests a day for one address may send\none. Send `form_token` (and `challenge` when the server uses one); only a caller with the\npermission `newsletter.subscribe` (a website server with its own API key) may omit them —\nother signed-in callers go through the same checks as anonymous visitors. Sending the same\n`form_token` again stores nothing new.",
         "operationId": "newsletter_subscribe_newsletter",
         "parameters": [
           {
@@ -22750,7 +22740,7 @@
             }
           },
           "429": {
-            "description": "A signed-in caller sent too many; code `antispam.rate_limited`.",
+            "description": "A caller with `newsletter.subscribe` sent too many; code `antispam.rate_limited`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -25389,7 +25379,7 @@
               "string",
               "null"
             ],
-            "description": "HTML body, if any; sent as is."
+            "description": "HTML body, if any; stored and sent as is, NOT sanitised. An admin interface must\nshow it only inside a sandboxed `<iframe sandbox>` (no scripts, no same origin), never\ninserted into its own page."
           },
           "body_text": {
             "type": "string",
@@ -26234,7 +26224,7 @@
               "string",
               "null"
             ],
-            "description": "HTML body, up to 500000 bytes, sent as is (the footer is added)."
+            "description": "HTML body, up to 500000 bytes, sent as is (the footer is added). Not sanitised: admin\ninterfaces must preview it only inside a sandboxed `<iframe sandbox>`."
           },
           "body_text": {
             "type": "string",
@@ -26498,7 +26488,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Up to 20 addresses."
+            "description": "Up to 20 addresses mailed for each new submission (the mails carry the answers).\nSetting them also needs the permission `forms.read`."
           },
           "reply_to_field": {
             "type": [
@@ -26591,7 +26581,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/NewPosts",
-                "description": "Omitted: `off`."
+                "description": "Omitted: `off`. `send` also needs the permission `newsletter.send`."
               },
               {
                 "type": "null"
@@ -27025,7 +27015,7 @@
                   "string",
                   "null"
                 ],
-                "description": "HTML body, if any; sent as is."
+                "description": "HTML body, if any; stored and sent as is, NOT sanitised. An admin interface must\nshow it only inside a sandboxed `<iframe sandbox>` (no scripts, no same origin), never\ninserted into its own page."
               },
               "body_text": {
                 "type": "string",
@@ -27740,6 +27730,35 @@
               }
             ],
             "description": "A new endpoint and its signing secret, shown only once."
+          }
+        }
+      },
+      "Data_EditedComment": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicComment"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "$ref": "#/components/schemas/CommentVisibility",
+                    "description": "`pending` when the change waits for approval (show \"your change awaits approval\")."
+                  }
+                }
+              }
+            ],
+            "description": "A comment just changed, for its author."
           }
         }
       },
@@ -31352,6 +31371,26 @@
         },
         "additionalProperties": false
       },
+      "EditedComment": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PublicComment"
+          },
+          {
+            "type": "object",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "$ref": "#/components/schemas/CommentVisibility",
+                "description": "`pending` when the change waits for approval (show \"your change awaits approval\")."
+              }
+            }
+          }
+        ],
+        "description": "A comment just changed, for its author."
+      },
       "EmailDataResponse": {
         "type": "object",
         "description": "Everything the forms hold about one email address.",
@@ -33305,7 +33344,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "HTML body, if any; sent as is."
+                  "description": "HTML body, if any; stored and sent as is, NOT sanitised. An admin interface must\nshow it only inside a sandboxed `<iframe sandbox>` (no scripts, no same origin), never\ninserted into its own page."
                 },
                 "body_text": {
                   "type": "string",
@@ -38031,7 +38070,7 @@
               "string",
               "null"
             ],
-            "description": "Token from `GET /api/v1/antispam/token?scope=forms:<key>`; needed unless the caller\nis signed in (a website server with an API key)."
+            "description": "Token from `GET /api/v1/antispam/token?scope=forms:<key>`; needed unless the caller\nhas the permission `forms.submit` (a website server with its own API key). Being\nsigned in without it is not enough."
           },
           "locale": {
             "type": [
@@ -38120,7 +38159,7 @@
               "string",
               "null"
             ],
-            "description": "Token from `GET /api/v1/antispam/token?scope=newsletter:subscribe`; needed unless the\ncaller is signed in (a website server with an API key)."
+            "description": "Token from `GET /api/v1/antispam/token?scope=newsletter:subscribe`; needed unless the\ncaller has the permission `newsletter.subscribe` (a website server with its own API\nkey). Being signed in without it is not enough."
           },
           "lists": {
             "type": "array",
@@ -38857,7 +38896,8 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Not sanitised: admin interfaces must preview it only inside a sandboxed\n`<iframe sandbox>`. `null` removes it."
           },
           "body_text": {
             "type": [
@@ -39043,7 +39083,8 @@
             ],
             "items": {
               "type": "string"
-            }
+            },
+            "description": "The whole new list of addresses mailed for each new submission (the mails carry the\nanswers). Changing it also needs the permission `forms.read`."
           },
           "reply_to_field": {
             "type": [
@@ -39200,7 +39241,8 @@
           "new_posts": {
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NewPosts"
+                "$ref": "#/components/schemas/NewPosts",
+                "description": "Setting `send` also needs the permission `newsletter.send`."
               },
               {
                 "type": "null"

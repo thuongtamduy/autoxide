@@ -129,7 +129,8 @@ pub(crate) struct CreateFormInput {
     /// Shown after sending: `{"en": …, "vi": …}`.
     #[schema(value_type = Option<Object>)]
     success_message: Option<Value>,
-    /// Addresses mailed for each new submission, up to 20.
+    /// Addresses mailed for each new submission (the mails carry the answers), up to 20.
+    /// Setting them also needs the permission `forms.read`.
     notify_emails: Option<Vec<String>>,
     /// Key of the `email` field used as `Reply-To`; omitted: the first `email` field.
     reply_to_field: Option<String>,
@@ -161,6 +162,8 @@ pub(crate) struct UpdateFormInput {
     allowed_origins: Option<Vec<String>>,
     #[schema(value_type = Option<Object>)]
     success_message: Option<Value>,
+    /// The whole new list of addresses mailed for each new submission (the mails carry the
+    /// answers). Changing it also needs the permission `forms.read`.
     notify_emails: Option<Vec<String>>,
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<String>, nullable)]
@@ -276,7 +279,9 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
             "create",
             concat!(
                 "Create a form (open unless `status` is `closed`); websites show it from \
-                 `GET /api/v1/forms/public/{key}`. Every problem is reported at once. ",
+                 `GET /api/v1/forms/public/{key}`. Every problem is reported at once. Setting \
+                 `notify_emails` also needs the permission `forms.read` (the mails carry the \
+                 answers). ",
                 fields_help!()
             ),
             move |principal: Principal, input: CreateFormInput| {
@@ -316,7 +321,8 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
             concat!(
                 "Change a form: only the given fields change. Close it with `status: closed` \
                  (there is no delete tool: deleting a form also deletes its submissions). Pass \
-                 the `etag` you read. ",
+                 the `etag` you read. Changing `notify_emails` also needs the permission \
+                 `forms.read` (the mails carry the answers). ",
                 fields_help!()
             ),
             move |principal: Principal, input: UpdateFormInput| {
