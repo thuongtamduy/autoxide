@@ -27,7 +27,8 @@ pub fn run() -> ExitCode {
 /// đủ để gọi API mà không đọc mã nguồn (xem `http::lint`) thì là lỗi.
 pub async fn render(settings: Settings) -> Result<String, String> {
     let runtime = runtime::start(settings, runtime::Migrations::Ignore).await?;
-    let problems = http::lint(&runtime.api.openapi);
+    let mut problems = http::lint(&runtime.api.openapi);
+    problems.extend(runtime.api.schema_conflicts.iter().cloned());
     let document = runtime.api.openapi.to_pretty_json();
     runtime.database.close().await.map_err(|error| format!("database: {error}"))?;
 

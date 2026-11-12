@@ -11,6 +11,21 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Newsletters (`/api/v1/newsletter`, guide in `docs/NEWSLETTER.md`): lists with titles in
+  English and Vietnamese, public sign-up through the same anti-spam checks as forms (the
+  answer never tells whether an address was already known), double opt-in confirmed by a
+  `POST` from the website, one-click unsubscribe (RFC 8058 `List-Unsubscribe` headers on every
+  campaign mail) and a preferences page by token. Campaigns: drafts, scheduling, sending in
+  batches at a configured rate, pause, resume and cancel, a test mail; re-runs never send
+  twice. A suppression list fed by permanent delivery failures, `POST /bounces` (hard, soft
+  with a threshold, complaint) and manual entries. Optional campaigns for new posts of the
+  content module. Advertising mails get a configurable subject label and a daily limit per
+  address. Export and erasure by email, import with a consent source. Permissions
+  `newsletter.read`, `newsletter.manage`, `newsletter.send`, `newsletter.export`; six MCP
+  tools. New settings `AUTOXIDE_NEWSLETTER_*`.
+- `autoxide openapi` (and the test that keeps `docs/openapi.json` in sync) now fails when two
+  modules declare a schema with the same name but different content, instead of silently
+  keeping one.
 - Forms (`/api/v1/forms`, guide in `docs/FORMS.md`): forms defined through the API with a
   closed list of field types (text, email, phone, textarea, number, select, radio, checkbox,
   date, hidden, consent), labels in English and Vietnamese, and versions so old submissions

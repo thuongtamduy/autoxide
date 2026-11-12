@@ -259,13 +259,13 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 
 ## 20. Module `newsletter` — bản tin email (chủ dự án giao ngày 12/11/2026, D-106)
 
-- [ ] Danh sách, người đăng ký, xác nhận hai bước (`POST`, không `GET`)
-- [ ] Huỷ đăng ký một chạm (RFC 8058) và trang chọn danh sách bằng token
-- [ ] Chiến dịch: nháp, hẹn giờ, gửi theo lô có giới hạn tốc độ, tạm dừng, tiếp tục, huỷ; không
+- [x] Danh sách, người đăng ký, xác nhận hai bước (`POST`, không `GET`)
+- [x] Huỷ đăng ký một chạm (RFC 8058) và trang chọn danh sách bằng token
+- [x] Chiến dịch: nháp, hẹn giờ, gửi theo lô có giới hạn tốc độ, tạm dừng, tiếp tục, huỷ; không
       gửi trùng khi chạy lại
-- [ ] Danh sách chặn, endpoint bounce chung; thư quảng cáo theo cấu hình
-- [ ] Tự tạo bản tin khi `content` đăng bài (tuỳ chọn); tool MCP
-- [ ] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
+- [x] Danh sách chặn, endpoint bounce chung; thư quảng cáo theo cấu hình
+- [x] Tự tạo bản tin khi `content` đăng bài (tuỳ chọn); tool MCP
+- [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
 
 ## 21. Module `comments` — bình luận (chủ dự án giao ngày 12/11/2026, D-106)
 

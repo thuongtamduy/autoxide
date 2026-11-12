@@ -65,6 +65,8 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
     ([`docs/CONTENT.vi.md`](docs/CONTENT.vi.md))
 17. Biểu mẫu: form liên hệ, form đăng ký định nghĩa qua API, máy chủ kiểm câu trả lời,
     giữ lại spam, hộp thư có xuất CSV ([`docs/FORMS.vi.md`](docs/FORMS.vi.md))
+18. Bản tin email: danh sách, xác nhận hai bước, huỷ một chạm, chiến dịch gửi theo lô có
+    tạm dừng và tiếp tục, bounce, mail cho bài mới ([`docs/NEWSLETTER.vi.md`](docs/NEWSLETTER.vi.md))
 
 ## Yêu cầu
 
@@ -316,6 +318,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   và địa chỉ, ngôn ngữ, endpoint công khai cho website, xem trước
 - [`docs/FORMS.vi.md`](docs/FORMS.vi.md) — dùng module biểu mẫu: định nghĩa form, hiện
   trên website, chống spam, hộp thư, yêu cầu dữ liệu theo email
+- [`docs/NEWSLETTER.vi.md`](docs/NEWSLETTER.vi.md) — dùng module bản tin: danh sách, ô đăng ký,
+  trang xác nhận và trang lựa chọn của website, chiến dịch, bounce, lưu ý pháp lý
 - [`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md) — cách viết một module, bắt đầu
   từ module mẫu [`modules/notes`](modules/notes) (mặc định không đăng ký)
 

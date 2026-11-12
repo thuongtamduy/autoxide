@@ -556,6 +556,80 @@ async fn bo_kiem_tai_lieu_bat_endpoint_thieu_mo_ta() {
     );
 }
 
+/// Hai module cùng đặt tên một kiểu `Locale` nhưng khác nội dung.
+mod clash {
+    use serde::Serialize;
+    use utoipa::ToSchema;
+
+    pub mod first {
+        /// A language.
+        #[derive(serde::Serialize, utoipa::ToSchema)]
+        pub enum Locale {
+            En,
+            Vi,
+        }
+
+        /// First.
+        #[utoipa::path(get, path = "/first", operation_id = "first", responses((status = 200, description = "ok", body = Locale)))]
+        pub async fn first() {}
+    }
+
+    pub mod second {
+        /// A language with its region.
+        #[derive(serde::Serialize, utoipa::ToSchema)]
+        pub struct Locale {
+            pub tag: String,
+        }
+
+        /// Second.
+        #[utoipa::path(get, path = "/second", operation_id = "second", responses((status = 200, description = "ok", body = Locale)))]
+        pub async fn second() {}
+    }
+
+    /// Same as the kernel's own schema: no conflict.
+    #[derive(Serialize, ToSchema)]
+    pub struct Shared {
+        pub id: String,
+    }
+
+    /// Third.
+    #[utoipa::path(get, path = "/third", operation_id = "third", responses((status = 200, description = "ok", body = Shared)))]
+    pub async fn third() {}
+}
+
+/// Hai module khai cùng tên schema mà khác nội dung: ghép tài liệu sẽ lặng lẽ bỏ một bản, nên
+/// phải được báo; cùng tên cùng nội dung thì không sao.
+#[test]
+fn trung_ten_schema_khac_noi_dung_bi_bao() {
+    let build = |second: OpenApiRouter| {
+        http::build(
+            &default_config(),
+            OpenApiRouter::new(),
+            vec![
+                (
+                    "alpha",
+                    OpenApiRouter::new()
+                        .routes(routes!(clash::first::first))
+                        .routes(routes!(clash::third)),
+                ),
+                ("beta", second),
+            ],
+            http::Extras::default(),
+        )
+    };
+    let api = build(OpenApiRouter::new().routes(routes!(clash::second::second)));
+    assert_eq!(api.schema_conflicts.len(), 1, "{:?}", api.schema_conflicts);
+    let problem = &api.schema_conflicts[0];
+    assert!(
+        problem.contains("`Locale`") && problem.contains("`alpha`") && problem.contains("`beta`"),
+        "{problem}"
+    );
+
+    let api = build(OpenApiRouter::new().routes(routes!(clash::third)));
+    assert_eq!(api.schema_conflicts, Vec::<String>::new());
+    assert!(api_with(&default_config()).schema_conflicts.is_empty());
+}
+
 /// Nơi ghi log vào bộ nhớ, để test đọc lại.
 #[derive(Clone, Default)]
 struct LogBuffer(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);

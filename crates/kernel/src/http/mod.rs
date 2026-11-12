@@ -84,6 +84,10 @@ pub const API_PREFIX: &str = "/api/v1";
 pub struct Api {
     pub router: Router,
     pub openapi: OpenApi,
+    /// Tên schema bị hai nơi (module hay kernel) khai với nội dung khác nhau. Khi ghép tài liệu,
+    /// utoipa giữ một bản và lặng lẽ bỏ bản kia — endpoint của một bên sẽ mô tả sai. Rỗng là
+    /// đạt; lệnh `autoxide openapi` (và test giữ `docs/openapi.json` khớp code) coi đây là lỗi.
+    pub schema_conflicts: Vec<String>,
 }
 
 /// Ghép route của các module (tên module, router) dưới [`API_PREFIX`], thêm các
@@ -118,6 +122,10 @@ pub fn build(
     modules: Vec<(&'static str, OpenApiRouter)>,
     extras: Extras,
 ) -> Api {
+    let schema_conflicts = openapi::schema_conflicts(
+        std::iter::once(("kernel", root.get_openapi()))
+            .chain(modules.iter().map(|(name, routes)| (*name, routes.get_openapi()))),
+    );
     let mut api = OpenApiRouter::new();
     for (name, mut routes) in modules {
         openapi::label_module(name, routes.get_openapi_mut());
@@ -216,7 +224,7 @@ pub fn build(
         .layer(SetRequestIdLayer::new(REQUEST_ID_HEADER, request_id::MakeUuidV7))
         .layer(middleware::from_fn(request_id::drop_untrusted));
 
-    Api { router, openapi }
+    Api { router, openapi, schema_conflicts }
 }
 
 async fn enforce_timeout(limit: Duration, request: Request, next: Next) -> Response {

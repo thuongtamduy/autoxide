@@ -9,7 +9,7 @@
 //!   sinh SDK dùng nó làm tên hàm);
 //! - response `default` = Problem Details: mọi endpoint đều có thể trả lỗi dạng đó.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::json;
 use utoipa::ToSchema;
@@ -233,6 +233,32 @@ pub fn lint(openapi: &OpenApi) -> Vec<String> {
             problems.extend(untranslated_text(&document, "OpenAPI"));
         }
         Err(error) => problems.push(format!("the document cannot be serialized: {error}")),
+    }
+    problems
+}
+
+/// Tên schema mà hai nơi trong `documents` (tên nơi, tài liệu của nơi đó) khai với nội dung khác
+/// nhau. Cùng tên cùng nội dung (vd `Problem` của kernel mà module nào cũng dùng) thì không sao.
+pub(super) fn schema_conflicts<'a>(
+    documents: impl IntoIterator<Item = (&'a str, &'a OpenApi)>,
+) -> Vec<String> {
+    let mut seen: BTreeMap<&str, (&str, serde_json::Value)> = BTreeMap::new();
+    let mut problems = Vec::new();
+    for (owner, document) in documents {
+        let Some(components) = &document.components else { continue };
+        for (name, schema) in &components.schemas {
+            let value = serde_json::to_value(schema).unwrap_or_default();
+            match seen.get(name.as_str()) {
+                Some((first, known)) if *known != value => problems.push(format!(
+                    "schema `{name}` is declared differently by `{first}` and `{owner}` — one \
+                     would silently replace the other; rename one with `#[schema(as = …)]`"
+                )),
+                Some(_) => {}
+                None => {
+                    seen.insert(name, (owner, value));
+                }
+            }
+        }
     }
     problems
 }
