@@ -263,6 +263,10 @@ async fn vong_doi_qua_http() {
         let by_member = send(router, "POST", "/newsletter/public/subscribe", Some("member"), &[], Some(json!({"email": "member@example.com", "lists": ["weekly"]}))).await;
         assert_eq!((by_member.status, by_member.code().as_deref()), (StatusCode::BAD_REQUEST, Some("antispam.token_missing")));
 
+        // Worker lưu các yêu cầu và gửi mail xác nhận (D-154).
+        assert!(app.mailer.to("ada@example.com").is_empty());
+        app.work().await;
+
         // Xác nhận: trang của website gọi `POST`.
         let mails = app.mailer.to("ada@example.com");
         assert_eq!(mails.len(), 2);

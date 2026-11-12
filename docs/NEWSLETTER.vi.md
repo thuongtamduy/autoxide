@@ -87,6 +87,9 @@ curl -X POST http://localhost:8080/api/v1/newsletter/lists \
 - Câu trả lời luôn là `202 {"data": {"accepted": true}}` — địa chỉ mới, đang chờ xác nhận, đã
   đăng ký, bị khoá, dính bẫy, gửi quá nhiều: không ai dò được địa chỉ nào đã có trong danh sách.
   Hãy nhắc người đọc xem hộp thư.
+- Request chỉ kiểm dữ liệu và token chống spam rồi xếp yêu cầu vào hàng đợi; một job chạy nền
+  lưu nó và gửi mail xác nhận ngay sau đó. Vì vậy thời gian trả lời cũng không phụ thuộc địa
+  chỉ. Worker chạy job phải đang chạy (mặc định có, ở vai trò tiến trình `all`).
 - Dữ liệu sai: `422` với mọi lỗi trong `errors` (key không phải danh sách công khai là
   `lists[0]`). Token thiếu hay hết hạn: `400 antispam.token_*` — tải lại form.
 - Chữ đồng ý, phiên bản của nó, thời điểm, nguồn và dấu vết băm của khối địa chỉ mạng được lưu

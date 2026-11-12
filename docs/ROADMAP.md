@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–22 xong; đang làm bước 23**; bản phát hành mới nhất `v0.3.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–23 xong**; bản phát hành mới nhất `v0.3.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -302,7 +302,7 @@ Mỗi mục một commit, gate xanh trên cả hai database.
       được đọc khi kết nối đến từ proxy tin cậy
 - [x] Dấu IP riêng cho từng module (không nối được người gửi giữa các module); cảnh báo lúc khởi
       động khi khoá ký nằm trong database
-- [ ] `newsletter`: đăng ký công khai trả lời trong cùng một khoảng thời gian dù địa chỉ ở trạng
+- [x] `newsletter`: đăng ký công khai trả lời trong cùng một khoảng thời gian dù địa chỉ ở trạng
       thái nào (việc ghi và gửi mail chạy trong job)
 
 ## Sau core (chưa mở)

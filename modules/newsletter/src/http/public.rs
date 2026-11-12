@@ -161,7 +161,9 @@ pub(crate) struct SubscribeResponse {
 /// one. Send `form_token` (and `challenge` when the server uses one); only a caller with the
 /// permission `newsletter.subscribe` (a website server with its own API key) may omit them —
 /// other signed-in callers go through the same checks as anonymous visitors. Sending the same
-/// `form_token` again stores nothing new.
+/// `form_token` again stores nothing new. The sign-up is stored, and the confirmation mail
+/// sent, by a background job shortly after the answer, so the answer takes the same time
+/// whatever the address.
 #[utoipa::path(
     post,
     path = "/public/subscribe",

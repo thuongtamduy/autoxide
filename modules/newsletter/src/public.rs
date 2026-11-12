@@ -3,18 +3,18 @@
 //! Đăng ký theo hợp đồng chung (`docs/prompts/reader-input-contract.md`):
 //!
 //! 1. Kiểm dữ liệu (báo mọi lỗi một lần), rồi `SpamGuard::check` — NGOÀI transaction.
-//! 2. `Discard` → không ghi gì. `Accept` / `Quarantine` → một transaction: tạo hoặc giữ người
-//!    đăng ký (email unique, chèn `ON CONFLICT DO NOTHING` nên hai request cùng email ra một
-//!    dòng), đặt đăng ký, phát token xác nhận, event bằng `Actor::public()`, rồi chèn nonce của
-//!    token form (`Checked::claim`). Nonce đã có → rollback (gửi lại cùng token = cùng kết quả).
-//! 3. SAU commit: đếm bộ đếm mail xác nhận của địa chỉ, rồi xếp hàng mail nếu cần và còn lượt
-//!    (bộ đếm và bên gửi mail ghi bằng kết nối ghi riêng; gọi trong transaction thì SQLite — một
-//!    bên ghi — chờ chính mình). Lỗi ở bước này chỉ ghi log: câu trả lời không được khác đi theo
-//!    việc có mail hay không.
+//! 2. `Discard` → không ghi gì. `Accept` / `Quarantine` → một transaction ngắn, giống nhau cho
+//!    mọi địa chỉ: xếp job [`SUBSCRIBE`] và chèn nonce của token form (`Checked::claim`). Nonce
+//!    đã có → rollback (gửi lại cùng token = không thêm job).
+//! 3. Job (`apply_subscription`): một transaction tạo hoặc giữ người đăng ký (email unique, chèn
+//!    `ON CONFLICT DO NOTHING` nên hai job cùng email ra một dòng), đặt đăng ký, phát token xác
+//!    nhận, event; SAU commit đếm bộ đếm mail xác nhận của địa chỉ rồi xếp hàng mail nếu cần và
+//!    còn lượt (bộ đếm và bên gửi mail ghi bằng kết nối ghi riêng; gọi trong transaction thì
+//!    SQLite — một bên ghi — chờ chính mình). Lỗi ở bước mail chỉ ghi log.
 //!
 //! Câu trả lời luôn GIỐNG HỆT (202, cùng thân) dù email mới, đang chờ, đã xác nhận, bị chặn hay
-//! bị bỏ vì spam: không ai dò được địa chỉ nào đã có trong danh sách. Mọi yêu cầu đã lưu đều đếm
-//! bộ đếm mail xác nhận (sau commit), để thời gian trả lời ít lộ trường hợp hơn.
+//! bị bỏ vì spam: không ai dò được địa chỉ nào đã có trong danh sách. Thời gian trả lời cũng
+//! không lộ: phần tuỳ theo trạng thái của địa chỉ chạy trong job (D-154).
 //!
 //! Buộc xác nhận qua mail, kể cả ở danh sách không bật double opt-in, khi: bị `Quarantine` (gửi
 //! quá nhanh… — người thật bấm link là xong, bot thì không); hoặc đăng ký hiện có đang
@@ -25,6 +25,7 @@
 //! bị giới hạn theo tài khoản. Đăng nhập mà không có quyền đó thì đi đường của người lạ.
 
 use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
 use std::time::Duration;
 
 use autoxide_kernel::access::Principal;
@@ -32,8 +33,10 @@ use autoxide_kernel::antispam::{Claim, Limits, Submission as Check, Verdict};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ClientInfo;
+use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::throttle::Throttle;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -55,6 +58,42 @@ const CONFIRM: &str = "confirm";
 const HOUR: Duration = Duration::from_secs(3600);
 const DAY: Duration = Duration::from_secs(24 * 3600);
 const LISTS_MAX: usize = 20;
+
+/// Loại job lưu một yêu cầu đăng ký đã qua lớp chống spam.
+pub(crate) const SUBSCRIBE: &str = "newsletter.subscribe";
+
+/// Job [`SUBSCRIBE`]: yêu cầu đăng ký đã kiểm, chờ lưu. Mang email và tên người đăng ký — job
+/// queue xoá job đã xong sau thời hạn của nó, như job gửi mail.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct SubscribeJob {
+    pub email: String,
+    pub name: Option<String>,
+    pub locale: Option<Locale>,
+    pub list_ids: Vec<Uuid>,
+    /// Bằng chứng đồng ý (JSON), lập lúc nhận yêu cầu.
+    pub consent: String,
+    /// Lý do lớp chống spam giữ lại; có thì phải xác nhận qua mail.
+    pub hold_reason: Option<String>,
+    /// Người gọi đã đăng nhập (máy chủ website); `None`: người lạ.
+    pub actor_user_id: Option<Uuid>,
+    pub actor_api_key_id: Option<Uuid>,
+}
+
+impl Job for SubscribeJob {
+    const KIND: &'static str = SUBSCRIBE;
+}
+
+/// Bên chạy job [`SUBSCRIBE`].
+pub(crate) struct Subscriber(pub Arc<NewsletterService>);
+
+#[async_trait::async_trait]
+impl JobHandler for Subscriber {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let job: SubscribeJob =
+            serde_json::from_value(job.payload.clone()).map_err(Error::internal)?;
+        self.0.apply_subscription(&job).await
+    }
+}
 
 /// Một yêu cầu đăng ký, như client gửi lên.
 #[derive(Debug, Clone, Default)]
@@ -196,25 +235,68 @@ impl NewsletterService {
             }
             None => None,
         };
-        let now = now();
         let consent = to_json(&json!({
             "text": consent_text,
             "version": version,
-            "at": now,
+            "at": now(),
             "source": source.unwrap_or_else(|| SCOPE.to_owned()),
             "ip_fingerprint": ip_fingerprint,
         }))?;
+        let job = SubscribeJob {
+            email,
+            name,
+            locale,
+            list_ids: lists.iter().map(|list| list.row.id).collect(),
+            consent,
+            hold_reason: hold,
+            actor_user_id: principal.map(Principal::user_id),
+            actor_api_key_id: principal.and_then(Principal::api_key_id),
+        };
 
-        // Pha hai: một transaction ngắn.
+        // Pha hai: một transaction ngắn, CÙNG một việc cho mọi địa chỉ — xếp job và chèn nonce
+        // của token form. Việc tuỳ theo trạng thái của địa chỉ (tạo người, đổi đăng ký, token
+        // xác nhận, mail) chạy trong job, nên thời gian trả lời không lộ địa chỉ đã có hay chưa
+        // (D-154). Nonce đã có (gửi lại cùng token) → rollback: không xếp job thứ hai.
         let transaction = self.database.begin_write().await?;
-        let person = ImportPerson { email: email.clone(), name, locale, attributes: None };
+        self.jobs.enqueue(&transaction, &job, EnqueueOptions::default()).await?;
+        if let Claim::Replay { .. } = checked.claim(&transaction, MODULE, None).await? {
+            transaction.rollback().await?;
+            return Ok(());
+        }
+        transaction.commit().await?;
+        tracing::info!(lists = job.list_ids.len(), "newsletter subscription request queued");
+        Ok(())
+    }
+
+    /// Job [`SUBSCRIBE`]: lưu một yêu cầu đăng ký đã qua lớp chống spam, rồi gửi mail xác nhận
+    /// nếu cần. Chạy lại (worker chết giữa chừng) thì như người đó gửi lại yêu cầu: không thêm
+    /// người, không đổi đăng ký đã xác nhận; có thể thêm một mail xác nhận (vẫn trong giới hạn
+    /// mỗi ngày).
+    pub(crate) async fn apply_subscription(&self, job: &SubscribeJob) -> Result<(), Error> {
+        let now = now();
+        let actor = match job.actor_user_id {
+            Some(user_id) => {
+                Actor { user_id: Some(user_id), api_key_id: job.actor_api_key_id, public: false }
+            }
+            None => Actor::public(),
+        };
+        let transaction = self.database.begin_write().await?;
+        // Danh sách bị xoá từ lúc nhận yêu cầu thì bỏ qua.
+        let by_id = self.lists_by_id(&transaction, job.list_ids.iter().copied()).await?;
+        let lists: Vec<&List> = job.list_ids.iter().filter_map(|id| by_id.get(id)).collect();
+        let person = ImportPerson {
+            email: job.email.clone(),
+            name: job.name.clone(),
+            locale: job.locale,
+            attributes: None,
+        };
         let (row, _) = upsert_subscriber(&transaction, &person, now).await?;
         let suppressed = suppression::Entity::find()
-            .filter(suppression::Column::Email.eq(email.as_str()))
+            .filter(suppression::Column::Email.eq(job.email.as_str()))
             .one(&transaction)
             .await?
             .is_some();
-        let actor = principal.map_or_else(Actor::public, Actor::from);
+        let held = job.hold_reason.is_some();
         let mut to_confirm: Vec<&List> = Vec::new();
         if row.status != SubscriberStatus::Blocked.as_str() && !suppressed {
             for list in &lists {
@@ -225,14 +307,17 @@ impl NewsletterService {
                 if current == Some(SubscriptionStatus::Confirmed) {
                     continue;
                 }
-                let double = must_confirm(list, current, hold.is_some());
+                let double = must_confirm(list, current, held);
                 let status = if double {
                     SubscriptionStatus::Unconfirmed
                 } else {
                     SubscriptionStatus::Confirmed
                 };
-                let wanted =
-                    Wanted { status, consent: Some(consent.clone()), hold_reason: hold.clone() };
+                let wanted = Wanted {
+                    status,
+                    consent: Some(job.consent.clone()),
+                    hold_reason: job.hold_reason.clone(),
+                };
                 let saved =
                     set_subscription(&transaction, existing, (row.id, list.row.id), wanted, now)
                         .await?;
@@ -269,25 +354,17 @@ impl NewsletterService {
                     .await?,
             )
         };
-        if let Claim::Replay { .. } =
-            checked.claim(&transaction, MODULE, Some(&row.id.to_string())).await?
-        {
-            transaction.rollback().await?;
-            return Ok(());
-        }
         transaction.commit().await?;
         tracing::info!(subscriber_id = %row.id, lists = lists.len(), confirming = to_confirm.len(), "newsletter subscription request stored");
-        // Sau commit, MỌI yêu cầu đã lưu đều đếm một lần vào bộ đếm mail xác nhận của địa chỉ
-        // (cần mail hay không — thời gian trả lời gần nhau hơn); yêu cầu gửi lại cùng token đã
-        // dừng ở trên nên không ăn mất lượt. Lỗi ở đây chỉ ghi log: câu trả lời giống hệt dù
-        // mail có xếp hàng được hay không (không lộ "địa chỉ này cần mail"); người đăng ký gửi
-        // lại là có link mới.
-        let queued = match self.confirm_mail_allowed(&email).await {
+        // Sau commit, mọi yêu cầu đã lưu đều đếm một lần vào bộ đếm mail xác nhận của địa chỉ
+        // (cần mail hay không). Lỗi ở đây chỉ ghi log, không làm job chạy lại: người đăng ký
+        // gửi lại là có link mới.
+        let queued = match self.confirm_mail_allowed(&job.email).await {
             Ok(allowed) => match issued.filter(|_| allowed) {
                 Some(issued) => {
-                    let locale = locale.unwrap_or_else(|| Locale::stored(&row.locale));
+                    let locale = job.locale.unwrap_or_else(|| Locale::stored(&row.locale));
                     match self.confirmation_mail(
-                        &email,
+                        &job.email,
                         locale,
                         &to_confirm,
                         &issued.token,

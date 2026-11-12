@@ -3637,3 +3637,26 @@ Quyết định:
 Đã cân nhắc: hàm băm chậm (Argon2) cho dấu IP — bộ đếm chạy trên mọi lần gửi, quá chậm, và
 2^24 lần Argon2 vẫn làm được; cắt dấu còn vài bit (k-ẩn danh) — lệnh cấm theo mạng chặn nhầm
 người khác; bắt buộc `AUTOXIDE_SECRET_KEY` — người lạ không cài được nếu không đọc tài liệu.
+
+## D-154 · `newsletter`: đăng ký công khai chỉ xếp job; việc theo trạng thái địa chỉ chạy nền — 2026-11-12 — agent quyết
+
+Đóng giới hạn "đo thời gian trả lời đăng ký bản tin" của D-150: đường cần mail chèn thêm token
+và một mail vào hàng đợi, đường "đã xác nhận" / "bị chặn" không ghi gì — đo thời gian là đoán
+được địa chỉ nào đã có trong danh sách.
+
+Quyết định: request `POST /public/subscribe` làm cùng một việc cho mọi địa chỉ — kiểm dữ liệu,
+`SpamGuard::check`, rồi một transaction ngắn: xếp job `newsletter.subscribe` (email, tên, ngôn
+ngữ, ID danh sách, bằng chứng đồng ý, lý do bị giữ, người gọi) và chèn nonce của token form.
+Job (`apply_subscription`) làm phần còn lại như trước: người, đăng ký, event, token xác nhận,
+bộ đếm mail và mail. Gửi lại cùng token không xếp job thứ hai. Job chạy lại thì như người đó
+gửi lại yêu cầu (không thêm người; có thể thêm một mail xác nhận, vẫn trong giới hạn ngày).
+Danh sách bị xoá giữa lúc nhận và lúc chạy job thì bỏ qua.
+
+Hệ quả: mail xác nhận đi sau câu trả lời vài giây (chu kỳ của worker); cần worker chạy (mặc
+định có). Job mang email và tên tới khi job queue dọn job đã xong — như job gửi mail. Yêu cầu
+xoá theo email đến khi job còn chờ thì job vẫn tạo lại người đó, như một lần đăng ký mới ngay
+sau khi xoá.
+
+Đã cân nhắc: chờ thêm cho đủ một thời gian cố định — vẫn lộ khi máy chủ bận, và giữ kết nối
+lâu hơn; luôn phát token / luôn xếp mail giả — ghi rác vào database và vẫn khác nhau ở phần
+đổi đăng ký.

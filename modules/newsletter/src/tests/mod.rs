@@ -24,7 +24,7 @@ use uuid::Uuid;
 use crate::campaigns::{Action, Campaign, CampaignInput};
 use crate::entity::{subscriber, subscription};
 use crate::lists::{List, ListInput};
-use crate::public::{SCOPE, SubscribeRequest};
+use crate::public::{SCOPE, SUBSCRIBE, SubscribeJob, SubscribeRequest};
 use crate::sending::{PREPARE, PrepareJob, SEND, SendJob};
 use crate::service::NewsletterService;
 use crate::subscribers::{ImportInput, ImportPerson};
@@ -65,7 +65,38 @@ pub(crate) async fn subscribe(
         form_token: Some(form_token(service).await),
         ..SubscribeRequest::default()
     };
-    service.subscribe(None, &visitor(ip), request).await
+    service.subscribe(None, &visitor(ip), request).await?;
+    store_subscriptions(service).await;
+    Ok(())
+}
+
+/// Chạy mọi job đăng ký đang chờ (như worker), theo thứ tự xếp hàng. Trả số job đã chạy.
+pub(crate) async fn store_subscriptions(service: &NewsletterService) -> usize {
+    let mut ran = 0;
+    loop {
+        let select = Query::select()
+            .columns([Alias::new("id"), Alias::new("payload")])
+            .from(Alias::new("newsletter_jobs"))
+            .and_where(Expr::col(Alias::new("kind")).eq(SUBSCRIBE))
+            .and_where(Expr::col(Alias::new("completed_at")).is_null())
+            .order_by(Alias::new("id"), Order::Asc)
+            .limit(1)
+            .to_owned();
+        let Some(row) = service.database.read().query_one(&select).await.unwrap() else {
+            return ran;
+        };
+        let id: Uuid = row.try_get("", "id").unwrap();
+        let payload: String = row.try_get("", "payload").unwrap();
+        let job: SubscribeJob = serde_json::from_str(&payload).unwrap();
+        service.apply_subscription(&job).await.unwrap();
+        let done = Query::update()
+            .table(Alias::new("newsletter_jobs"))
+            .value(Alias::new("completed_at"), chrono::Utc::now())
+            .and_where(Expr::col(Alias::new("id")).eq(id))
+            .to_owned();
+        service.database.write().execute(&done).await.unwrap();
+        ran += 1;
+    }
 }
 
 /// Nhập `emails` vào danh sách `list_id` (đã xác nhận).
@@ -142,6 +173,10 @@ pub(crate) async fn run_job(harness: &Harness, any_time: bool) -> Option<String>
             let job: SendJob = serde_json::from_value(payload).unwrap();
             harness.service.send_batch(&job).await.unwrap();
         }
+        SUBSCRIBE => {
+            let job: SubscribeJob = serde_json::from_value(payload).unwrap();
+            harness.service.apply_subscription(&job).await.unwrap();
+        }
         _ => {}
     }
     let done = Query::update()
@@ -151,6 +186,19 @@ pub(crate) async fn run_job(harness: &Harness, any_time: bool) -> Option<String>
         .to_owned();
     harness.database.write().execute(&done).await.unwrap();
     Some(kind)
+}
+
+/// Số job loại `kind` chưa chạy của module.
+pub(crate) async fn next_jobs(database: &Database, kind: &str) -> usize {
+    let select = Query::select()
+        .expr(Expr::col(Alias::new("id")).count())
+        .from(Alias::new("newsletter_jobs"))
+        .and_where(Expr::col(Alias::new("kind")).eq(kind))
+        .and_where(Expr::col(Alias::new("completed_at")).is_null())
+        .to_owned();
+    let row = database.read().query_one(&select).await.unwrap().unwrap();
+    let count: i64 = row.try_get_by_index(0).unwrap();
+    usize::try_from(count).unwrap()
 }
 
 /// Chạy mọi job (bỏ qua `run_at`) tới khi hết. Trả số job đã chạy.

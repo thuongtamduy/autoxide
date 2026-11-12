@@ -26,6 +26,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Security
 
+- Newsletter: a public sign-up only checks the data and the anti-spam token, then queues a job
+  that stores it and sends the confirmation mail. The answer now takes the same time whether
+  the address is new, already subscribed or blocked. The confirmation mail leaves a moment
+  later, once the job worker picks the job up.
 - Comments: a display name written entirely in Cyrillic or Greek letters that look like Latin
   ones (`аdmіn`) counts as the Latin name — it can no longer pass the reserved-name list or take
   another person's name. Existing profiles are re-keyed by a migration.

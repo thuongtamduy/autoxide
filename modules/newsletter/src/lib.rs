@@ -148,6 +148,10 @@ impl Module for NewsletterModule {
                     Arc::new(sending::Preparer(service.clone())),
                 ),
                 JobRegistration::new(sending::SEND, Arc::new(sending::Sender(service.clone()))),
+                JobRegistration::new(
+                    public::SUBSCRIBE,
+                    Arc::new(public::Subscriber(service.clone())),
+                ),
                 JobRegistration::new(retention::CLEANUP, Arc::new(retention::Cleanup(service))),
             ]
         })
