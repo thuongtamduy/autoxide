@@ -2475,3 +2475,63 @@ làm bước này đỏ.
 GHCR không ổn định ở mọi mạng, Docker Hub phổ biến hơn.
 
 Thay: phần quét secret trong CI của D-074; phần "Hệ quả" của D-107 (bật secret scanning của GitHub).
+
+## D-109 · Tính năng AI: tầng kết nối trung lập, hai adapter, quyền cho agent, mặc định tắt — 2026-11-12 — chủ dự án quyết, agent quyết cách làm
+
+Chủ dự án đề xuất bốn tính năng AI (tìm theo ý nghĩa, AI dịch bài vi ↔ en, gợi ý SEO và alt
+text, giới hạn quyền cho agent tự viết và đăng bài) và đồng ý hướng làm dưới đây. Đề bài đầy đủ:
+`docs/prompts/ai.md`; khảo sát và số đo: `docs/research/ai.md`. Thành bước 18 của lộ trình.
+
+Quyết định (chủ dự án):
+
+- Làm cả bốn tính năng, theo thứ tự: quyền cho agent → tầng kết nối AI → gợi ý SEO / alt →
+  dịch → tìm theo ý nghĩa.
+- **Hỗ trợ nhiều nhà cung cấp ngay từ đầu**, không chỉ Anthropic: adapter `anthropic`
+  (Messages API gốc) và adapter `openai` (Chat Completions — dùng được với OpenAI, Gemini qua
+  endpoint tương thích OpenAI, Ollama, vLLM, LM Studio, OpenRouter… bằng cách đổi base URL).
+  Embedding là client riêng theo dạng `/v1/embeddings`.
+- **Mặc định tắt.** Người cài tự chọn nhà cung cấp và tự đặt key; không gửi dữ liệu cho bên nào
+  khi chưa cấu hình.
+
+Quyết định (agent, cách làm):
+
+- Trait `TextModel` và `Embedder` trong kernel (trung lập với nhà cung cấp và nghiệp vụ); module
+  hạ tầng `ai` công bố cài đặt — cùng khuôn với `Mailer` / module `mail`. Module khác không gọi
+  nhà cung cấp trực tiếp.
+- Mỗi lời gọi sinh chữ trả JSON theo schema, và luôn được kiểm lại trong Rust.
+- Không gọi AI trong transaction ghi. Việc có ghi chạy bằng job; gợi ý chạy ngay trong request.
+  Kết quả AI chỉ thành nháp hoặc gợi ý, không bao giờ tự đăng.
+- Dịch tách thân bài thành mẩu có thẻ giữ chỗ, ráp lại theo cấu trúc gốc. Mô hình không bao giờ
+  thấy hay sửa link, ID ảnh, cấu trúc node.
+- Tìm theo ý nghĩa: vector lưu nhị phân trong bảng thường, cosine duyệt hết trong bộ nhớ, gộp
+  với tìm theo chữ bằng Reciprocal Rank Fusion; endpoint công khai tắt mặc định. Đo trước khi
+  tính tới index ANN.
+- Quyền mới: `content.delete` (tách khỏi `content.publish`), `content.write_own`,
+  `content.publish_own`; xin duyệt; `ai_generated` / `ai_reviewed`; rate limiting theo API key.
+- Không thêm thư viện.
+
+Lý do: OpenAI, Gemini và phần mềm chạy tại máy đều nói được Chat Completions. Vì vậy hai adapter
+phủ gần hết lựa chọn mà người cài có, không phải giữ một adapter cho mỗi hãng. Anthropic giữ
+adapter gốc vì lớp tương thích OpenAI làm mất fallback khi bị từ chối và `stop_reason` đầy đủ.
+
+Về hai database: `pgvector` chỉ Postgres có. `sqlite-vec` là extension C; với sqlx 0.9, nạp
+extension phải gọi API `unsafe`, mà repo cấm `unsafe`. Vector trong bảng thường với cosine tính
+trong Rust chạy như nhau trên hai database. Ước tính dưới 50 ms với 100.000 đoạn — số đo thật
+ghi khi làm.
+
+Về quyền: tách quyền và bắt người duyệt các việc có tác động lớn là cách chống prompt injection
+mà OWASP khuyên (LLM01, LLM06). `ai_reviewed` ghi lại sự thật để người vận hành làm đúng EU AI
+Act Điều 50.
+
+Đã cân nhắc:
+
+- **Chỉ Anthropic:** trái mục tiêu "ai cũng dùng được".
+- **Một adapter riêng cho mỗi hãng**, gồm cả Gemini gốc và Responses API của OpenAI: nhiều code
+  phải giữ hơn. Chỉ thêm khi đo được Chat Completions thiếu thứ cần.
+- **Thư viện nhiều nhà cung cấp** (`genai`, `rig`, `async-openai`): kéo theo phụ thuộc và thay
+  đổi API thường xuyên, trong khi phần cần dùng chỉ vài trăm dòng HTTP.
+- **Chạy mô hình trong binary** (ONNX, candle): binary nặng, trái "không thêm thư viện thừa".
+- **Gửi nguyên HTML / JSON của bài cho mô hình dịch:** module AI Translate của Drupal làm vậy và
+  có nhiều lỗi mở về thẻ bị mất hoặc sửa.
+- **Để AI tự ghi thẳng vào bản công khai:** mọi CMS đã khảo sát đều đưa kết quả về nháp hoặc gợi
+  ý.

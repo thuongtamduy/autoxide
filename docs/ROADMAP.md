@@ -3,7 +3,8 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–12, 14–17 xong**; bước 13 còn phát hành (làm tay, D-107). CI trên GitHub
+Trạng thái: **bước 0–12, 14–17 xong**; bước 13 còn phát hành (làm tay, D-107); bước 18 (AI) đã
+có đề bài, chưa làm. CI trên GitHub
 đã tắt (D-107): `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -224,6 +225,23 @@ khảo sát: [`docs/research/content.md`](research/content.md).
       gọi cùng service; dọn và xuất dữ liệu cá nhân
 - [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database (kể cả test đồng
       thời); hướng dẫn dùng (tiếng Anh + tiếng Việt)
+
+## 18. Tính năng AI (chủ dự án giao ngày 12/11/2026, D-109)
+
+Tầng kết nối AI trung lập (nhiều nhà cung cấp, mặc định tắt), quyền cho AI agent, gợi ý SEO và
+alt text, dịch bài, tìm theo ý nghĩa. Đề bài: [`docs/prompts/ai.md`](prompts/ai.md); khảo sát:
+[`docs/research/ai.md`](research/ai.md).
+
+- [ ] Quyền cho agent: `content.delete` tách riêng, `content.write_own`, `content.publish_own`, xin
+      duyệt, `ai_generated` / `ai_reviewed`, rate limiting theo API key
+- [ ] Tầng kết nối: trait `TextModel` / `Embedder` ở kernel, module `ai` (adapter `anthropic` và
+      `openai`, client embedding, hạn mức token mỗi ngày, metrics, `/ai/status`, `autoxide ai check`)
+- [ ] Kiểm SEO không dùng AI; gợi ý SEO bằng AI (chỉ gợi ý, không ghi)
+- [ ] Gợi ý alt text cho ảnh của `media` (ảnh riêng tư chỉ gửi khi bật)
+- [ ] Dịch bài bằng AI vào nháp: tách mẩu có thẻ giữ chỗ, không ghi đè bản người đã sửa, báo bản dịch đã cũ
+- [ ] Tìm theo ý nghĩa kết hợp tìm theo chữ (RRF), chạy như nhau trên hai database; endpoint công
+      khai tắt mặc định; số đo 10.000 và 100.000 đoạn
+- [ ] Test trên cả hai database (kể cả đồng thời, máy chủ AI giả); hướng dẫn `docs/AI.md` + `docs/AI.vi.md`
 
 ## Sau core (chưa mở)
 
