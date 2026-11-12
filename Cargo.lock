@@ -566,6 +566,8 @@ dependencies = [
  "autoxide-testkit",
  "chrono",
  "lettre",
+ "metrics",
+ "sea-orm",
  "serde",
  "serde_json",
  "tokio",

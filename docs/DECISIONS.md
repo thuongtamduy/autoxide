@@ -2573,3 +2573,23 @@ mã hoá thứ hai. Ghim:
 Kiểm: vector sinh một lần bằng thư viện chính thức `altcha` 1.1.0 (`create_challenge` +
 `solve_challenge`, commit ở `crates/kernel/src/antispam/fixtures/altcha_v2.json`): chữ ký và lời
 giải khớp; cộng test từ chối khi hết hạn, sai khoá, sai bộ đếm, đổi tham số, sai form, sai token.
+
+## D-115 · `Mail` có `reply_to`, header theo danh sách cho phép, khoá chống trùng; lỗi vĩnh viễn thành event — 2026-11-12 — agent quyết
+
+Quyết định:
+
+- `autoxide_kernel::mail::Mail` thêm `reply_to`, `headers` (chỉ `List-Unsubscribe`,
+  `List-Unsubscribe-Post`, `List-Id`, `Auto-Submitted`; giá trị một dòng, ≤ 998 ký tự — chặn
+  chèn header bằng CR/LF), `dedupe_key`; có `Default`, dựng bằng `..Mail::default()` nên thêm
+  trường sau này không làm hỏng chỗ gọi. `Mail::header_problems` kiểm; module `mail` kiểm khi
+  xếp hàng và báo mọi lỗi một lần.
+- `dedupe_key` thành `unique_key` của job `mail.send` (`mail:<khoá>`): xếp hàng lại cùng khoá
+  không gửi lần hai (vd lượt gửi bản tin chạy lại).
+- Lỗi SMTP **vĩnh viễn** (5xx, theo `lettre::transport::smtp::Error::is_permanent`) không thử
+  lại: job xong, module `mail` phát event trung lập `mail.delivery_failed`
+  (`{"to", "dedupe_key", "code"}`, tên ở `autoxide_kernel::mail::DELIVERY_FAILED`) qua outbox
+  của mình (`mail_events`, migration m0002). Lỗi tạm thời (4xx, mạng) vẫn thử lại như cũ.
+  Event mang địa chỉ người nhận vì bên nghe (danh sách chặn của bản tin) cần nó; nó cũng đi qua
+  webhook như mọi event.
+- Không làm `send_batch` (khảo sát gợi ý): chưa module nào cần gửi một lần nhiều mail; bản tin
+  xếp từng mail vào hàng đợi theo lô của nó.

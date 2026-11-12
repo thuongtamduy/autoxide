@@ -35,6 +35,14 @@ async fn setup(
     test: &TestDatabase,
     pairs: &[(&str, &str)],
 ) -> (Arc<dyn Mailer>, autoxide_kernel::job::Worker) {
+    let (mailer, worker, _) = setup_with_database(test, pairs).await;
+    (mailer, worker)
+}
+
+async fn setup_with_database(
+    test: &TestDatabase,
+    pairs: &[(&str, &str)],
+) -> (Arc<dyn Mailer>, autoxide_kernel::job::Worker, Database) {
     let mut all = vec![("DATABASE_URL", test.url())];
     all.extend_from_slice(pairs);
     let source = ConfigSource::from_pairs(all);
@@ -49,7 +57,7 @@ async fn setup(
     modules.start(&database).unwrap();
     let mailer = modules.api::<dyn Mailer>().unwrap();
     let worker = modules.worker(&database, 4).unwrap();
-    (mailer, worker)
+    (mailer, worker, database)
 }
 
 fn welcome(to: &str) -> Mail {
@@ -58,6 +66,7 @@ fn welcome(to: &str) -> Mail {
         subject: "Welcome".to_owned(),
         text: "Hello Ada, your account is ready.".to_owned(),
         html: Some("<p>Hello Ada, your account is ready.</p>".to_owned()),
+        ..Mail::default()
     }
 }
 
@@ -102,6 +111,11 @@ async fn dia_chi_sai_bi_tu_choi_ngay() {
 
 /// Máy chủ SMTP giả: trả lời đủ để gửi một mail, ghi lại mọi dòng nhận được.
 async fn fake_smtp() -> (u16, Arc<Mutex<Vec<String>>>) {
+    fake_smtp_answering(b"250 ok\r\n").await
+}
+
+/// Như [`fake_smtp`], nhưng trả lời `rcpt` cho lệnh `RCPT TO` (vd từ chối người nhận).
+async fn fake_smtp_answering(rcpt: &'static [u8]) -> (u16, Arc<Mutex<Vec<String>>>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let received = Arc::new(Mutex::new(Vec::new()));
@@ -126,6 +140,8 @@ async fn fake_smtp() -> (u16, Arc<Mutex<Vec<String>>>) {
             } else if line == "DATA" {
                 in_data = true;
                 b"354 go ahead\r\n"
+            } else if line.starts_with("RCPT TO") {
+                rcpt
             } else if line == "QUIT" {
                 writer.write_all(b"221 bye\r\n").await.unwrap();
                 break;
@@ -156,6 +172,95 @@ async fn co_smtp_thi_gui_qua_smtp() {
         let done =
             worker.list("mail", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
         assert_eq!(done.len(), 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// `Reply-To` và header riêng đi theo mail; header lạ hay có ký tự xuống dòng bị từ chối khi
+/// xếp hàng; mail cùng `dedupe_key` chỉ gửi một lần.
+#[tokio::test]
+async fn reply_to_header_rieng_va_chong_trung() {
+    TestDatabase::run(async |test| {
+        let directory = TempDir::new("headers");
+        let path = directory.0.to_string_lossy().into_owned();
+        let (mailer, worker) = setup(test, &[("AUTOXIDE_MAIL_FILE_DIR", path.as_str())]).await;
+        let mut mail = welcome("ada@example.com");
+        mail.reply_to = Some("Bob <bob@example.com>".to_owned());
+        mail.headers = vec![
+            ("List-Unsubscribe".to_owned(), "<https://api.example.com/u/abc>".to_owned()),
+            ("List-Unsubscribe-Post".to_owned(), "List-Unsubscribe=One-Click".to_owned()),
+        ];
+        mail.dedupe_key = Some("delivery-1".to_owned());
+        mailer.send(mail.clone()).await.unwrap();
+        mailer.send(mail.clone()).await.unwrap();
+        assert_eq!(worker.run_once().await.unwrap(), 1, "the second one is a duplicate");
+        let files: Vec<_> = std::fs::read_dir(&directory.0).unwrap().collect();
+        assert_eq!(files.len(), 1);
+        let content = std::fs::read_to_string(files[0].as_ref().unwrap().path()).unwrap();
+        assert!(content.contains("Reply-To: Bob <bob@example.com>"), "{content}");
+        assert!(content.contains("List-Unsubscribe: <https://api.example.com/u/abc>"), "{content}");
+        assert!(content.contains("List-Unsubscribe-Post: List-Unsubscribe=One-Click"), "{content}");
+
+        let mut bad = welcome("ada@example.com");
+        bad.reply_to = Some("not an address".to_owned());
+        bad.headers = vec![
+            ("Bcc".to_owned(), "eve@example.com".to_owned()),
+            ("List-Id".to_owned(), "x\r\nBcc: eve@example.com".to_owned()),
+        ];
+        let error = mailer.send(bad).await.unwrap_err();
+        let fields: Vec<&str> = error.fields().iter().map(|field| field.field.as_str()).collect();
+        assert_eq!(fields, ["reply_to", "headers[0].name", "headers[1].value"]);
+    })
+    .await
+    .unwrap();
+}
+
+async fn failures(database: &Database) -> Vec<String> {
+    use sea_orm::{ConnectionTrait, Statement};
+    let backend = database.read().get_database_backend();
+    let sql = "SELECT payload FROM mail_events WHERE name = 'mail.delivery_failed'";
+    let rows = database.read().query_all_raw(Statement::from_string(backend, sql)).await.unwrap();
+    rows.iter().map(|row| row.try_get::<String>("", "payload").unwrap()).collect()
+}
+
+/// Máy chủ nhận từ chối hẳn (550): không thử lại, phát event kèm địa chỉ và khoá; từ chối tạm
+/// (450): job được thử lại.
+#[tokio::test]
+async fn tu_choi_han_thi_phat_event_tu_choi_tam_thi_thu_lai() {
+    TestDatabase::run(async |test| {
+        let (port, _) = fake_smtp_answering(b"550 5.1.1 no such user\r\n").await;
+        let url = format!("smtp://127.0.0.1:{port}");
+        let (mailer, worker, database) =
+            setup_with_database(test, &[("AUTOXIDE_MAIL_SMTP_URL", url.as_str())]).await;
+        let mut mail = welcome("ghost@example.com");
+        mail.dedupe_key = Some("delivery-9".to_owned());
+        mailer.send(mail).await.unwrap();
+        assert_eq!(worker.run_once().await.unwrap(), 1);
+        let done =
+            worker.list("mail", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
+        assert_eq!(done.len(), 1, "not retried");
+        let events = failures(&database).await;
+        assert_eq!(events.len(), 1);
+        let payload: serde_json::Value = serde_json::from_str(&events[0]).unwrap();
+        assert_eq!(
+            (payload["to"].as_str(), payload["dedupe_key"].as_str(), payload["code"].as_str()),
+            (Some("ghost@example.com"), Some("delivery-9"), Some("550"))
+        );
+    })
+    .await
+    .unwrap();
+    TestDatabase::run(async |test| {
+        let (port, _) = fake_smtp_answering(b"450 4.2.0 try later\r\n").await;
+        let url = format!("smtp://127.0.0.1:{port}");
+        let (mailer, worker, database) =
+            setup_with_database(test, &[("AUTOXIDE_MAIL_SMTP_URL", url.as_str())]).await;
+        mailer.send(welcome("ada@example.com")).await.unwrap();
+        assert_eq!(worker.run_once().await.unwrap(), 1);
+        let done =
+            worker.list("mail", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
+        assert!(done.is_empty(), "will be retried");
+        assert!(failures(&database).await.is_empty());
     })
     .await
     .unwrap();

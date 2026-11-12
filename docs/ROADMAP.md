@@ -242,7 +242,7 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 - [x] Chống spam hai pha: nhận / cách ly / từ chối; trường bẫy, token form ký, giới hạn theo IP
       và email băm, phát hiện trùng; nonce của token form làm idempotency cho người lạ
 - [x] ALTCHA v2 tự viết (mặc định tắt)
-- [ ] `Mail` / `Mailer`: `reply_to`, header theo danh sách cho phép, lỗi vĩnh viễn / tạm thời,
+- [x] `Mail` / `Mailer`: `reply_to`, header theo danh sách cho phép, lỗi vĩnh viễn / tạm thời,
       khoá chống trùng; event thất bại vĩnh viễn
 - [ ] `Actor` cho người lạ trên outbox
 - [ ] `ResourceDirectory` trung lập; `content` đăng ký resolver
