@@ -1,0 +1,17 @@
+{
+  "media.item_not_found": "Không có item media `{id}`.",
+  "media.item_in_trash": "Item media `{id}` đang ở thùng rác. Hãy khôi phục trước bằng `POST /api/v1/media/{id}/restore`.",
+  "media.item_not_in_trash": "Item media `{id}` không ở thùng rác. Hãy chuyển vào thùng rác trước bằng `DELETE /api/v1/media/{id}`.",
+  "media.too_large": "Nội dung lớn hơn {max} byte, mức tối đa máy chủ nhận cho một item media.",
+  "media.invalid_content_type": "Header `Content-Type` phải là một loại nội dung, vd `image/png`.",
+  "media.upload_interrupted": "Việc tải lên bị ngắt trước khi nhận đủ nội dung. Hãy gửi lại.",
+  "media.type_not_allowed": "Không được tải lên media loại `{type}`. Các loại được nhận: {allowed}.",
+  "media.content_mismatch": "Nội dung không phải file `{declared}` (trông như `{detected}`). Hãy khai đúng loại trong `Content-Type`.",
+  "media.unknown_type": "Không nhận ra loại của nội dung. Hãy khai loại trong `Content-Type`.",
+  "media.invalid_image": "Không đọc được ảnh: ảnh bị hỏng, hoặc không phải file `{type}`.",
+  "media.range_not_satisfiable": "Khoảng byte xin đọc nằm ngoài nội dung, nội dung dài {size} byte.",
+  "media.folder_not_found": "Không có thư mục media `{id}`.",
+  "media.folder_name_taken": "Thư mục này đã có thư mục con tên `{name}` (tên không phân biệt hoa thường). Hãy chọn tên khác.",
+  "media.folder_cycle": "Không thể chuyển một thư mục vào chính nó hay vào thư mục con của nó.",
+  "media.folder_not_empty": "Thư mục vẫn còn {folders} thư mục và {items} item (kể cả item trong thùng rác). Hãy chuyển hay xoá chúng trước."
+}

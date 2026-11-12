@@ -91,7 +91,18 @@ and are mounted under `/api/v1/<name>`; a module declares only the tail (`/`, `/
   service, which adds `updated_at = <expected>` to its `UPDATE` and answers
   `version::changed()` (412) when no row matched (see `autoxide_kernel::version`).
 - A handler that needs a signed-in caller takes `principal: Principal` and calls
-  `principal.require(&PERMISSION)?`.
+  `principal.require(&PERMISSION)?`. A public endpoint (anyone may call it, signed-in
+  callers may see more) takes `principal: Option<Principal>` and declares
+  `security((), ("bearer" = []))`.
+- To make `If-Match` mandatory on an update, call `if_match.required()?` instead of
+  `expected()?` (missing header: 428).
+- Lists sorted by something other than creation time use `fetch_page_by` (keyset
+  pagination on `(column, id)`, with an index on both); text search uses
+  `autoxide_kernel::search` on a lower-cased column. A `GET` that returns an `ETag`
+  answers `304` to a matching `If-None-Match` without extra code.
+- Stored content is read with `Storage::get_range` for byte ranges, and a module lists
+  only its own keys with `Storage::keys_with_prefix("<name>/")`. The `media` module is
+  the full example of these (`modules/media`).
 - Document every handler: a `///` line (the summary), the required permission, and a
   `description` for every response with the error `code`s. Doc comments on handlers and
   schema types are English, written for API callers.

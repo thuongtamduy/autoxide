@@ -44,6 +44,7 @@ autoxide-mail = { path = "modules/mail" }
 autoxide-files = { path = "modules/files" }
 autoxide-notes = { path = "modules/notes" }
 autoxide-webhooks = { path = "modules/webhooks" }
+autoxide-media = { path = "modules/media" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
@@ -91,6 +92,15 @@ async-trait = "0.1"
 bytes = "1.12"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 http-body-util = "0.1"
+# Chiều rộng / cao của ảnh (JPEG, PNG, GIF, WebP, AVIF) từ header, không giải mã ảnh
+# (module `media`, D-089). Chỉ bật đúng các định dạng cần.
+imagesize = { version = "0.15", default-features = false, features = [
+  "jpeg",
+  "png",
+  "gif",
+  "webp",
+  "heif",
+] }
 # Lưu file: một trait chung cho ổ đĩa cục bộ và S3 / dịch vụ tương thích S3. S3 dùng
 # `aws-base` + `ring` thay vì feature `aws` (kéo aws-lc-rs): một thư viện mật mã duy
 # nhất cho cả chương trình (D-043).

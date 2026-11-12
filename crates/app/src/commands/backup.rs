@@ -470,4 +470,62 @@ mod tests {
         .await
         .unwrap();
     }
+
+    /// Backup rồi restore mang theo cả thông tin (bảng `media_…`) lẫn nội dung (khoá
+    /// `media/…`) của thư viện media.
+    #[tokio::test]
+    async fn backup_mang_theo_media() {
+        use autoxide_media::api::{Media, MediaVisibility};
+
+        TestDatabase::run(async |test| {
+            let scratch = Scratch::new();
+            let files_a = scratch.0.join("files-a");
+            let storage = [("AUTOXIDE_FILES_DIR", files_a.display().to_string())];
+            let runtime = crate::media_e2e::start(test.url(), &storage).await;
+            let token = crate::media_e2e::admin_token(&runtime, "root@example.com").await;
+            let auth = format!("Bearer {token}");
+            let png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR\x00\x00\x00\x07\x00\x00\x00\x05\x08\x06\x00\x00\x00\x00\x00\x00\x00";
+            let headers = [("authorization", auth.as_str()), ("content-type", "image/png")];
+            let (_, _, uploaded) =
+                crate::media_e2e::call(&runtime, "POST", "/api/v1/media?name=a.png", &headers, png.to_vec())
+                    .await;
+            let id: uuid::Uuid = uploaded["data"]["id"].as_str().unwrap().parse().unwrap();
+            let headers = [
+                ("authorization", auth.as_str()),
+                ("content-type", "application/json"),
+                ("if-match", "*"),
+            ];
+            let change = br#"{"alt": "Seven by five", "visibility": "public"}"#.to_vec();
+            let (status, _, _) =
+                crate::media_e2e::call(&runtime, "PATCH", &format!("/api/v1/media/{id}"), &headers, change)
+                    .await;
+            assert_eq!(status, axum::http::StatusCode::OK);
+            runtime.database.close().await.unwrap();
+
+            let backup = scratch.0.join("backup");
+            run_backup(settings(test.url(), &files_a), backup.clone()).await.unwrap();
+            let restored =
+                format!("sqlite://{}?mode=rwc", scratch.0.join("restored.sqlite").display());
+            let files_b = scratch.0.join("files-b");
+            run_restore(settings(&restored, &files_b), backup).await.unwrap();
+
+            let runtime = runtime::start(settings(&restored, &files_b), Migrations::RequireApplied)
+                .await
+                .unwrap();
+            let media = runtime.modules.api::<dyn Media>().unwrap();
+            let item = media.find(id).await.unwrap().unwrap();
+            assert_eq!((item.width, item.height, item.alt.as_str()), (Some(7), Some(5), "Seven by five"));
+            assert_eq!(item.visibility, MediaVisibility::Public);
+            let storage = runtime.modules.api::<dyn Storage>().unwrap();
+            let keys = storage.keys_with_prefix("media/").await.unwrap();
+            assert_eq!(keys.len(), 1);
+            assert!(item.url.ends_with(keys[0].rsplit('/').next().unwrap()));
+            let file = storage.get(&keys[0]).await.unwrap().unwrap();
+            let chunks: Vec<bytes::Bytes> = file.content.try_collect().await.unwrap();
+            assert_eq!(chunks.concat(), png);
+            runtime.database.close().await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
 }

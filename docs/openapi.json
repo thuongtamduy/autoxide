@@ -5634,6 +5634,2045 @@
         ]
       }
     },
+    "/api/v1/media": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "List media items.",
+        "description": "Requires `media.read`. Filter by folder, type, visibility, trash and name; sort by\nupload time, name or size. Keep the same filters, `sort` and `order` while following\n`next_cursor`.",
+        "operationId": "media_list_media_items",
+        "parameters": [
+          {
+            "name": "folder_id",
+            "in": "query",
+            "description": "Only items in this folder (not in its subfolders): a folder id, or `root`. Omit for\nevery folder.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "root"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Only this media type (`image/png`) or family (`image/*`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "image/*"
+          },
+          {
+            "name": "visibility",
+            "in": "query",
+            "description": "Only `public` or only `private` items.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Who may load the content without signing in.",
+              "enum": [
+                "private",
+                "public"
+              ]
+            }
+          },
+          {
+            "name": "trashed",
+            "in": "query",
+            "description": "`true`: only items in the trash. Default `false`: only items not in the trash.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only items whose name contains this text, ignoring case.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "logo"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "`created_at` (the default), `name` or `size`; the direction is `order`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Field to sort the list by.",
+              "enum": [
+                "created_at",
+                "name",
+                "size"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of media items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MediaItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A filter or paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Upload a media item.",
+        "description": "Requires `media.write`. Send the raw content as the body (not a multipart form), its\nmedia type as `Content-Type`, and its name in `name`. The server checks the content\nreally is of that type (from its first bytes); without `Content-Type` (or with\n`application/octet-stream`) it detects the type itself. Images get their width and\nheight. The new item is `private` until you change its `visibility`. Retry safely with\nan `Idempotency-Key` header.",
+        "operationId": "media_upload_media_item",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "description": "File name, 1 to 255 characters, without `/` or `\\`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "team-photo.jpg"
+          },
+          {
+            "name": "folder_id",
+            "in": "query",
+            "description": "Folder to put the item in. Omit for the root.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The content of the file, with its `Content-Type`.",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Uploaded. `duplicates` lists items that already had this content.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UploadedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The `Content-Type` is not a media type (code `media.invalid_content_type`), or the upload was cut off (code `media.upload_interrupted`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The content is too large; code `media.too_large` (or `payload_too_large` when `Content-Length` already says so).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The type is not accepted (code `media.type_not_allowed`, the message lists the accepted types), the content is not of the declared type (code `media.content_mismatch`), the type could not be detected (code `media.unknown_type`), or the image is damaged (code `media.invalid_image`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The name is invalid, the folder does not exist, or the body is empty; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/media/folders": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "List media folders.",
+        "description": "Requires `media.read`.",
+        "operationId": "media_list_media_folders",
+        "parameters": [
+          {
+            "name": "parent_id",
+            "in": "query",
+            "description": "Only the folders directly inside this one: a folder id, or `root`. Omit for every\nfolder.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "root"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "`created_at` (the default) or `name`; the direction is `order`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Field to sort the folder list by.",
+              "enum": [
+                "created_at",
+                "name"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of folders.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_FolderResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A filter or paging parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Create a media folder.",
+        "description": "Requires `media.write`. Retry safely with an `Idempotency-Key` header.",
+        "operationId": "media_create_media_folder",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFolderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FolderResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The parent already holds a folder with this name; code `media.folder_name_taken`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The name is invalid or the parent does not exist; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/media/folders/{id}": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Get a media folder.",
+        "description": "Requires `media.read`.",
+        "operationId": "media_get_media_folder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the folder.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The folder.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FolderResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No folder has this id; code `media.folder_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Delete an empty media folder.",
+        "description": "Requires `media.write`. The folder must hold no folders and no items, not even items\nin the trash.",
+        "operationId": "media_delete_media_folder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the folder.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No folder has this id; code `media.folder_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The folder is not empty; code `media.folder_not_empty`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Rename or move a media folder.",
+        "description": "Requires `media.write`. `If-Match` is required.",
+        "operationId": "media_update_media_folder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the folder.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the folder since; otherwise `412`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFolderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The folder after the change.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FolderResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No folder has this id; code `media.folder_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The new parent already holds a folder with this name (code `media.folder_name_taken`), or is the folder itself or one of its subfolders (code `media.folder_cycle`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "`If-Match` does not match: the folder changed since you read it; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The name is invalid or the parent does not exist; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/media/{id}": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Get a media item.",
+        "description": "Requires `media.read`. Items in the trash can be read too (see `trashed_at`).",
+        "operationId": "media_get_media_item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the media item.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The item.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MediaItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No media item has this id; code `media.item_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Move a media item to the trash.",
+        "description": "Requires `media.write`. Its public link stops working; restore it with\n`POST /api/v1/media/{id}/restore`. Items stay in the trash for a number of days set by\nthe server (30 by default), then are deleted for good.",
+        "operationId": "media_trash_media_item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the media item.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The item, now in the trash.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MediaItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No media item has this id; code `media.item_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item is already in the trash; code `media.item_in_trash`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Change the details of a media item.",
+        "description": "Requires `media.write`. Rename, describe (`alt`, `title`, `caption`), move to another\nfolder, or publish (`visibility`). `If-Match` is required. Restore an item from the\ntrash before changing it.",
+        "operationId": "media_update_media_item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the media item.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the item since; otherwise `412`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The item after the change.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MediaItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No media item has this id; code `media.item_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item is in the trash; code `media.item_in_trash`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "`If-Match` does not match: the item changed since you read it. Get it again and retry; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is invalid or the folder does not exist; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/media/{id}/content": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Download the content of a media item.",
+        "description": "Public items (not in the trash) need no sign-in; others require `media.read`. Raster\nimages (JPEG, PNG, GIF, WebP, AVIF) open in the browser (`inline`); every other type is\na download (`attachment`). Supports one byte range (`Range: bytes=…`, answered with\n`206`), `If-None-Match` (`304`) and `HEAD`.",
+        "operationId": "media_download_media_item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the media item.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "v",
+            "in": "query",
+            "description": "The `version_id` of the item, as in its `url`. With the current version the answer\nmay be cached for a year; without it (or with an old one) only briefly.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "description": "One byte range, e.g. `bytes=0-1023`, `bytes=1024-` or `bytes=-500`. Several ranges are answered with the whole content.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "If-Range",
+            "in": "header",
+            "description": "An `ETag`: apply `Range` only if the content still has it.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "The `ETag` you have: `304` if the content did not change.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The content, with its own `Content-Type`.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "A year and `immutable` when `v` is the current version; short otherwise."
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "`inline` for raster images, `attachment` otherwise, with the file name."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "SHA-256 of the content."
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "The requested byte range; `Content-Range` says which.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the `ETag` in `If-None-Match` is current."
+          },
+          "401": {
+            "description": "A token was sent but is not valid; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No media item has this id that you may load; code `media.item_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "The range is outside the content; code `media.range_not_satisfiable`. `Content-Range: bytes */<size>` gives the size.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Replace the content of a media item, keeping its id.",
+        "description": "Requires `media.write`. Same body and checks as an upload. Everything that points to\nthe item keeps working; its `url`, `version_id` and `ETag` change, so caches pick up\nthe new content. `If-Match` is required. Retry safely with an `Idempotency-Key` header.",
+        "operationId": "media_replace_media_content",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the media item.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` of the item (from `GET /api/v1/media/{id}`), or `*`. The content is replaced only if nobody changed the item since; otherwise `412`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The new content, with its `Content-Type`.",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The item with its new content.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MediaItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The `Content-Type` is not a media type (code `media.invalid_content_type`), or the upload was cut off (code `media.upload_interrupted`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No media item has this id; code `media.item_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item is in the trash; code `media.item_in_trash`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "`If-Match` does not match: the item changed since you read it; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The content is too large; code `media.too_large` (or `payload_too_large`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The type is not accepted or the content is not of that type; codes as for an upload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is empty; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "head": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Check the content of a media item without downloading it.",
+        "description": "Same rules and headers as `GET`, without the body.",
+        "operationId": "media_head_media_item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the media item.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "v",
+            "in": "query",
+            "description": "The `version_id` of the item, as in its `url`. With the current version the answer\nmay be cached for a year; without it (or with an old one) only briefly.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The headers of the content (`Content-Length`, `Content-Type`, `ETag`…)."
+          },
+          "304": {
+            "description": "Not modified: the `ETag` in `If-None-Match` is current."
+          },
+          "404": {
+            "description": "No media item has this id that you may load."
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/media/{id}/purge": {
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Delete a media item in the trash for good.",
+        "description": "Requires `media.purge`. The item must be in the trash first. Its content is deleted\ntoo; this cannot be undone.",
+        "operationId": "media_purge_media_item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the media item.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted for good."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.purge`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No media item has this id (or it was already deleted); code `media.item_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item is not in the trash; code `media.item_not_in_trash`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/media/{id}/restore": {
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Restore a media item from the trash.",
+        "description": "Requires `media.write`.",
+        "operationId": "media_restore_media_item",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the media item.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The item, out of the trash.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MediaItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No media item has this id; code `media.item_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item is not in the trash; code `media.item_not_in_trash`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/webhooks": {
       "get": {
         "tags": [
@@ -6913,6 +8952,29 @@
         },
         "additionalProperties": false
       },
+      "CreateFolderRequest": {
+        "type": "object",
+        "description": "A new folder.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name, 1 to 255 characters, without `/` or `\\`; unique (ignoring case) in the parent.",
+            "example": "Products"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The parent folder. Omit (or `null`) for the root."
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateUserRequest": {
         "type": "object",
         "description": "A new account.",
@@ -7294,6 +9356,51 @@
           }
         }
       },
+      "Data_FolderResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A media folder. Folders nest; names are unique (ignoring case) within a parent.",
+            "required": [
+              "id",
+              "name",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "example": "Products"
+              },
+              "parent_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The parent folder; `null` for a folder at the root."
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      },
       "Data_Health": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -7375,6 +9482,136 @@
                 "example": [
                   "auth.roles.read"
                 ]
+              }
+            }
+          }
+        }
+      },
+      "Data_MediaItemResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A media item. Its content is at `url`.",
+            "required": [
+              "id",
+              "name",
+              "content_type",
+              "size",
+              "sha256",
+              "alt",
+              "title",
+              "caption",
+              "visibility",
+              "version_id",
+              "url",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "alt": {
+                "type": "string",
+                "description": "Text alternative for screen readers (the `alt` of an `<img>`); empty when unset."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Caption; empty when unset."
+              },
+              "content_type": {
+                "type": "string",
+                "description": "Real media type of the content (checked against its first bytes at upload).",
+                "example": "image/jpeg"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "folder_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The folder holding the item; `null` for the root."
+              },
+              "height": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32",
+                "description": "Height in pixels; only for raster images.",
+                "example": 1080
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "File name, given back on download.",
+                "example": "team-photo.jpg"
+              },
+              "sha256": {
+                "type": "string",
+                "description": "SHA-256 of the content, as 64 hex digits."
+              },
+              "size": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Size in bytes.",
+                "example": 482133,
+                "minimum": 0
+              },
+              "title": {
+                "type": "string",
+                "description": "Title; empty when unset."
+              },
+              "trashed_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When the item was moved to the trash; `null` when it is not in the trash."
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "uploaded_by": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The user who uploaded the item; `null` once that account is deleted."
+              },
+              "url": {
+                "type": "string",
+                "description": "Where to load the content, with its version: the address changes when the content\ndoes, so it may be cached for a long time. Public items load without signing in.",
+                "example": "/api/v1/media/0193a0c4-7d1e-7c2a-9b1e-3f2d5c6b7a81/content?v=0193a0c4-7d1e-7c2a-9b1e-3f2d5c6b7a82"
+              },
+              "version_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Version of the content; changes when the content is replaced."
+              },
+              "visibility": {
+                "$ref": "#/components/schemas/Visibility"
+              },
+              "width": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32",
+                "description": "Width in pixels; only for raster images (JPEG, PNG, GIF, WebP, AVIF).",
+                "example": 1920
               }
             }
           }
@@ -7720,6 +9957,38 @@
           }
         }
       },
+      "Data_UploadedResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MediaItemResponse"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "duplicates"
+                ],
+                "properties": {
+                  "duplicates": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/DuplicateItem"
+                    },
+                    "description": "Items (not in the trash) whose content has the same SHA-256, oldest first, at most\n20. Empty when the content is new. The upload is kept either way: delete it if you\nwould rather reuse one of these."
+                  }
+                }
+              }
+            ],
+            "description": "The uploaded item, plus the items already in the library with exactly the same content."
+          }
+        }
+      },
       "Data_UserResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -7984,6 +10253,35 @@
           }
         }
       },
+      "DuplicateItem": {
+        "type": "object",
+        "description": "An item with the same content, found at upload.",
+        "required": [
+          "id",
+          "name",
+          "url"
+        ],
+        "properties": {
+          "folder_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "`null` for the root."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
       "EndedSessionsResponse": {
         "type": "object",
         "description": "How many sessions were ended.",
@@ -8118,6 +10416,42 @@
           }
         }
       },
+      "FolderResponse": {
+        "type": "object",
+        "description": "A media folder. Folders nest; names are unique (ignoring case) within a parent.",
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Products"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The parent folder; `null` for a folder at the root."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "Health": {
         "type": "object",
         "description": "Health of the service.",
@@ -8221,6 +10555,127 @@
             "example": [
               "auth.roles.read"
             ]
+          }
+        }
+      },
+      "MediaItemResponse": {
+        "type": "object",
+        "description": "A media item. Its content is at `url`.",
+        "required": [
+          "id",
+          "name",
+          "content_type",
+          "size",
+          "sha256",
+          "alt",
+          "title",
+          "caption",
+          "visibility",
+          "version_id",
+          "url",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "alt": {
+            "type": "string",
+            "description": "Text alternative for screen readers (the `alt` of an `<img>`); empty when unset."
+          },
+          "caption": {
+            "type": "string",
+            "description": "Caption; empty when unset."
+          },
+          "content_type": {
+            "type": "string",
+            "description": "Real media type of the content (checked against its first bytes at upload).",
+            "example": "image/jpeg"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "folder_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The folder holding the item; `null` for the root."
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Height in pixels; only for raster images.",
+            "example": 1080
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "File name, given back on download.",
+            "example": "team-photo.jpg"
+          },
+          "sha256": {
+            "type": "string",
+            "description": "SHA-256 of the content, as 64 hex digits."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Size in bytes.",
+            "example": 482133,
+            "minimum": 0
+          },
+          "title": {
+            "type": "string",
+            "description": "Title; empty when unset."
+          },
+          "trashed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the item was moved to the trash; `null` when it is not in the trash."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uploaded_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The user who uploaded the item; `null` once that account is deleted."
+          },
+          "url": {
+            "type": "string",
+            "description": "Where to load the content, with its version: the address changes when the content\ndoes, so it may be cached for a long time. Public items load without signing in.",
+            "example": "/api/v1/media/0193a0c4-7d1e-7c2a-9b1e-3f2d5c6b7a81/content?v=0193a0c4-7d1e-7c2a-9b1e-3f2d5c6b7a82"
+          },
+          "version_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Version of the content; changes when the content is replaced."
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Width in pixels; only for raster images (JPEG, PNG, GIF, WebP, AVIF).",
+            "example": 1920
           }
         }
       },
@@ -8653,6 +11108,197 @@
                   "description": "Size in bytes.",
                   "example": 48213,
                   "minimum": 0
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Page_FolderResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A media folder. Folders nest; names are unique (ignoring case) within a parent.",
+              "required": [
+                "id",
+                "name",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "example": "Products"
+                },
+                "parent_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "The parent folder; `null` for a folder at the root."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Page_MediaItemResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A media item. Its content is at `url`.",
+              "required": [
+                "id",
+                "name",
+                "content_type",
+                "size",
+                "sha256",
+                "alt",
+                "title",
+                "caption",
+                "visibility",
+                "version_id",
+                "url",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "alt": {
+                  "type": "string",
+                  "description": "Text alternative for screen readers (the `alt` of an `<img>`); empty when unset."
+                },
+                "caption": {
+                  "type": "string",
+                  "description": "Caption; empty when unset."
+                },
+                "content_type": {
+                  "type": "string",
+                  "description": "Real media type of the content (checked against its first bytes at upload).",
+                  "example": "image/jpeg"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "folder_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "The folder holding the item; `null` for the root."
+                },
+                "height": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int32",
+                  "description": "Height in pixels; only for raster images.",
+                  "example": 1080
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "File name, given back on download.",
+                  "example": "team-photo.jpg"
+                },
+                "sha256": {
+                  "type": "string",
+                  "description": "SHA-256 of the content, as 64 hex digits."
+                },
+                "size": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "Size in bytes.",
+                  "example": 482133,
+                  "minimum": 0
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Title; empty when unset."
+                },
+                "trashed_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "description": "When the item was moved to the trash; `null` when it is not in the trash."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "uploaded_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "The user who uploaded the item; `null` once that account is deleted."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Where to load the content, with its version: the address changes when the content\ndoes, so it may be cached for a long time. Public items load without signing in.",
+                  "example": "/api/v1/media/0193a0c4-7d1e-7c2a-9b1e-3f2d5c6b7a81/content?v=0193a0c4-7d1e-7c2a-9b1e-3f2d5c6b7a82"
+                },
+                "version_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Version of the content; changes when the content is replaced."
+                },
+                "visibility": {
+                  "$ref": "#/components/schemas/Visibility"
+                },
+                "width": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int32",
+                  "description": "Width in pixels; only for raster images (JPEG, PNG, GIF, WebP, AVIF).",
+                  "example": 1920
                 }
               }
             },
@@ -9438,6 +12084,82 @@
         },
         "additionalProperties": false
       },
+      "UpdateFolderRequest": {
+        "type": "object",
+        "description": "Changes to a folder. Omitted fields stay as they are.",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "New name."
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Move into this folder; `null` moves to the root. Not into itself or its subfolders."
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateItemRequest": {
+        "type": "object",
+        "description": "Changes to a media item. Omitted fields stay as they are.",
+        "properties": {
+          "alt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Text alternative, up to 1000 characters; `\"\"` clears it."
+          },
+          "caption": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Caption, up to 2000 characters; `\"\"` clears it."
+          },
+          "folder_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Move to this folder; `null` moves to the root."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "New file name, 1 to 255 characters, without `/` or `\\`."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Title, up to 255 characters; `\"\"` clears it."
+          },
+          "visibility": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Visibility",
+                "description": "`public` lets anyone load the content without signing in."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "UpdateUserRequest": {
         "type": "object",
         "description": "Changes to an account. Omitted fields stay as they are.",
@@ -9457,6 +12179,29 @@
             "description": "New display name, 1 to 200 characters."
           }
         }
+      },
+      "UploadedResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MediaItemResponse"
+          },
+          {
+            "type": "object",
+            "required": [
+              "duplicates"
+            ],
+            "properties": {
+              "duplicates": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DuplicateItem"
+                },
+                "description": "Items (not in the trash) whose content has the same SHA-256, oldest first, at most\n20. Empty when the content is new. The upload is kept either way: delete it if you\nwould rather reuse one of these."
+              }
+            }
+          }
+        ],
+        "description": "The uploaded item, plus the items already in the library with exactly the same content."
       },
       "UserResponse": {
         "type": "object",
@@ -9537,6 +12282,14 @@
             "type": "string"
           }
         }
+      },
+      "Visibility": {
+        "type": "string",
+        "description": "Who may load the content without signing in.",
+        "enum": [
+          "private",
+          "public"
+        ]
       }
     },
     "securitySchemes": {

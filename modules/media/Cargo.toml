@@ -1,0 +1,41 @@
+[package]
+name = "autoxide-media"
+description = "Autoxide media library: images, video, audio and documents in nested folders, with real-type checks, image sizes, public links, byte ranges, versioned URLs and a trash."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+autoxide-kernel.workspace = true
+axum.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+futures-util.workspace = true
+imagesize.workspace = true
+metrics.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
+validator.workspace = true
+
+[dev-dependencies]
+autoxide-testkit.workspace = true
+# MCP client thật cho test tool của module.
+rmcp = { workspace = true, features = [
+  "client",
+  "transport-streamable-http-client-reqwest",
+  "reqwest-tls-no-provider",
+] }
+tokio.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true

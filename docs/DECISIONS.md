@@ -1917,3 +1917,116 @@ thì mỗi module chỉ khai, không tự chế lại.
 Đã cân nhắc: con trỏ chỉ chứa ID rồi đọc lại giá trị cột của dòng đó — gọn hơn nhưng dòng đó bị
 xoá giữa hai trang thì mất chỗ. Bộ lọc chung kiểu `filter[field]=…` ở kernel — mỗi module lọc
 khác nhau, khai riêng rõ hơn và OpenAPI mô tả được từng tham số.
+
+## D-086 · Module `media`: thư viện media tách khỏi `files` — 2026-11-12 — chủ dự án giao, agent quyết cách làm
+
+Quyết định:
+
+- **Module riêng** `media` (crate `autoxide-media`), không mở rộng `files`: `files` là chỗ lưu
+  file của từng người (chủ file, `files.upload`), còn thư viện media là tài sản chung của một
+  website (thư mục, công khai, thùng rác, dùng lại trong nội dung). Hai mô hình quyền khác
+  nhau. `media` không đọc, ghi hay tham chiếu bảng của `files`; nội dung đi qua `dyn Storage`
+  (đăng ký sau `files`), khoá `media/<item_id>/<version_id>`, không bao giờ đụng khoá khác.
+- **Permission**: `media.read` (mọi item kể cả riêng tư, thư mục, thùng rác), `media.write`
+  (tải lên, sửa, thay nội dung, chuyển, công khai, thùng rác, thư mục), `media.purge` (xoá
+  hẳn — việc không lấy lại được nên tách riêng). Quyền theo thư viện, không theo người tải
+  lên.
+- **Dữ liệu**: `media_item`, `media_folder`, `media_lock`. Thư mục gốc lưu là UUID toàn số 0
+  chứ không `NULL` — unique index `(parent_id, name_key)` của SQLite lẫn Postgres coi hai
+  `NULL` là khác nhau, nên hai thư mục gốc cùng tên sẽ lọt; có test tạo đồng thời ở gốc. API
+  vẫn trả `null` cho gốc. `name_key` (tên viết thường) để tìm, sắp và chặn trùng không phân
+  biệt hoa thường; trên Postgres cột này `COLLATE "C"` để thứ tự giống SQLite.
+- **Ghi đồng thời đúng trên cả hai database**: thêm item / thư mục con vào một thư mục thì
+  "chạm" dòng thư mục đó trong transaction; xoá thư mục thì xoá dòng trước rồi đếm con — hai
+  bên chờ nhau, không còn item mồ côi trong thư mục đã xoá. Chuyển thư mục cập nhật dòng
+  `media_lock.folder_tree` trước, nên các lệnh chuyển chạy lần lượt và hai lệnh chéo nhau
+  (A vào B, B vào A) không tạo vòng — có test đồng thời.
+- **Thay nội dung giữ ID**: nội dung mới ghi dưới `version_id` mới, rồi cập nhật dòng + event
+  trong một transaction với điều kiện phiên bản trong câu `UPDATE`, rồi xoá nội dung cũ. Hai
+  lệnh thay cùng `If-Match`: đúng một thắng (test đồng thời).
+- **`If-Match` bắt buộc** (`IfMatch::required`, 428) cho `PATCH` item / thư mục và
+  `PUT …/content`, như lời giao. Tool MCP `media.update` nhận `updated_at` đã đọc thay cho
+  `If-Match`.
+- **Phục vụ nội dung**: item công khai ngoài thùng rác tải được không cần đăng nhập; còn lại
+  cần `media.read`, không có thì 404 (không lộ item có tồn tại). `inline` chỉ cho ảnh raster;
+  SVG, HTML, PDF… là `attachment`; luôn `nosniff` và `Content-Security-Policy: default-src
+  'none'; sandbox`. `ETag` là SHA-256 nội dung. URL kèm `?v=<version_id>` đúng phiên bản hiện
+  tại thì cache một năm `immutable`; không kèm hay phiên bản cũ thì 60 giây (công khai) hoặc
+  `no-cache` (riêng tư). Một khoảng `Range` → 206, ngoài nội dung → 416, nhiều khoảng → trả
+  cả nội dung (RFC 9110 cho phép).
+- **Tài khoản bị xoá**: item KHÔNG bị xoá (của thư viện, không của người tải); `uploaded_by`
+  thành `NULL`. Bản xuất dữ liệu cá nhân liệt kê item người đó tải lên.
+- **Thùng rác**: giữ `AUTOXIDE_MEDIA_TRASH_DAYS` ngày (mặc định 30) rồi job hằng ngày xoá
+  hẳn. Job hằng ngày khác xoá nội dung `media/` không item nào trỏ tới, chỉ khoá cũ hơn 24 giờ
+  — tuổi đọc từ `version_id` (UUIDv7), không cần nơi lưu cho biết thời điểm ghi.
+- **`api::Media`** cho module khác (sắp tới là module nội dung): `find_many(&ids)` một câu
+  query, tối đa 500 ID, bỏ item trong thùng rác, giữ thứ tự hỏi.
+
+Lý do: chủ dự án giao thư viện media làm nền cho website. Mỗi chi tiết chọn cách đúng trên
+cả hai database mà không cần tính năng riêng của bên nào (trừ `COLLATE "C"` khai trong
+migration, chỉ để Postgres so sánh giống SQLite).
+
+Đã cân nhắc: thêm thư mục, công khai, thùng rác vào `files` — đổi hành vi của module đang
+chạy và trộn hai mô hình quyền. Khoá thứ tự bằng `SELECT … FOR UPDATE` — SQLite không có cú
+pháp đó; dòng khoá dùng `UPDATE` thường chạy được cả hai. Đường dẫn vật chất hoá (`path`)
+cho cây thư mục — vẫn cần khoá khi chuyển, mà đổi tên một thư mục phải viết lại cả nhánh.
+
+## D-087 · Không sinh biến thể ảnh (thumbnail, đổi cỡ, WebP/AVIF) trong core — 2026-11-12 — agent quyết
+
+Quyết định: `media` lưu bản gốc kèm chiều rộng / cao; không tạo ảnh thu nhỏ hay chuyển định
+dạng. Website (vd component ảnh của Next.js) hoặc CDN / image proxy đứng trước tự tối ưu,
+dùng `url` có phiên bản (cache được lâu) làm nguồn.
+
+Lý do: giải mã và mã hoá ảnh cần thư viện lớn (và thường có mã C cho AVIF), tốn CPU / RAM
+trong tiến trình API, mở thêm bề mặt tấn công (ảnh độc hại nhắm vào bộ giải mã), và mỗi
+website cần bộ cỡ khác nhau. Các framework web hiện đại đã làm việc này tốt. Khi thật sự cần
+trong core, thêm sau như job nền mà không phá API (thêm trường `variants`).
+
+Đã cân nhắc: crate `image` + job queue tạo vài cỡ cố định — làm sau nếu chủ dự án cần.
+
+## D-088 · Thư viện media dùng thư mục lồng nhau, không dùng nhãn — 2026-11-12 — agent quyết
+
+Quyết định: mỗi item nằm trong đúng một thư mục (hay gốc); thư mục lồng nhau không giới hạn
+độ sâu (chặn vòng lặp). Không có nhãn (tag) ở bước này.
+
+Lý do: người quản trị website quen tổ chức theo thư mục (như máy tính, như các CMS phổ biến);
+một item một chỗ thì quyền xoá thư mục ("chỉ khi trống") và di chuyển rõ ràng. Tìm theo tên,
+lọc theo loại bù phần lớn nhu cầu của nhãn. Nhãn thêm sau được (bảng riêng) mà không đổi API
+hiện có.
+
+Đã cân nhắc: chỉ nhãn (một item nhiều nhãn) — linh hoạt hơn nhưng khó duyệt như cây thư mục;
+cả hai cùng lúc — gấp đôi việc khi chưa ai cần.
+
+## D-089 · Nhận loại thật tự viết; kích thước ảnh bằng `imagesize` — 2026-11-12 — agent quyết
+
+Quyết định:
+
+- **Loại thật** theo chữ ký đầu file (`sniff.rs`, vài chục dòng tự viết): JPEG, PNG, GIF,
+  WebP, AVIF / HEIC (hộp `ftyp`), SVG / HTML / XML (đọc phần đầu dạng chữ), MP4 / MOV, WebM /
+  Matroska, Ogg, FLAC, MP3, AAC, WAV, AVI, PDF, zip. Loại khai phải khớp loại thật (có bảng tên
+  đồng nghĩa và định dạng chứa dùng chung cho hình / tiếng); loại có chữ ký mà nội dung không
+  mang chữ ký đó thì từ chối; loại không có chữ ký (vd `text/plain` nếu quản trị viên cho
+  phép) thì nhận theo lời khai — vẫn luôn được tải về dạng `attachment`. Không khai (hay
+  `application/octet-stream`) thì dùng loại nhận ra. Kiểm ngay khi luồng đủ 1 KiB: khai sai
+  thì dừng tải lên giữa chừng, không chờ hết file.
+- **Kích thước ảnh** bằng thư viện `imagesize` 0.15 (MIT, không phụ thuộc gì, chỉ đọc header,
+  không giải mã ảnh), chỉ bật JPEG, PNG, GIF, WebP và HEIF (AVIF). Đọc từ 1 MiB đầu giữ lại
+  trên đường tải lên; ảnh raster không đọc được kích thước thì từ chối (`media.invalid_image`).
+
+Lý do: nhận loại là so vài byte — tự viết gọn và kiểm soát được (luật "không thêm thư viện
+khi vài chục dòng là đủ"). Đọc kích thước đúng cho JPEG (nhiều đoạn metadata) và nhất là AVIF
+(cây hộp ISO-BMFF, `ispe`, `irot`) thì không còn là vài chục dòng; `imagesize` nhỏ, giấy phép
+hợp `cargo deny`.
+
+Đã cân nhắc: crate `infer` cho nhận loại — nhiều loại hơn cần, vẫn phải tự viết phần so lời
+khai; crate `image` — giải mã cả ảnh, quá nặng cho việc đọc header.
+
+## D-090 · Không tải lên media qua MCP ở bước này — 2026-11-12 — agent quyết
+
+Quyết định: tool MCP của `media` là `media.list`, `media.get`, `media.update` (thông tin) và
+`media.trash`. Tải lên và thay nội dung chỉ qua REST.
+
+Lý do: tool MCP đi qua JSON-RPC, nội dung nhị phân phải mã hoá base64 (to thêm một phần ba,
+nằm trọn trong bộ nhớ), trong khi media thường là ảnh / video lớn — giới hạn 1 MiB như tool
+của `files` (D-083) gần như vô dụng ở đây. AI agent có REST đầy đủ, cùng permission, kèm
+`Idempotency-Key`. Thêm tool tải lên từ URL hay base64 nhỏ sau được mà không phá gì.

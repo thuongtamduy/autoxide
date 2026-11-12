@@ -90,7 +90,18 @@ Route nằm trong `src/http.rs`, đăng ký bằng `OpenApiRouter::routes(routes
   `updated_at = <phiên bản mong đợi>` vào câu `UPDATE` và trả `version::changed()` (412)
   khi không dòng nào khớp (xem `autoxide_kernel::version`).
 - Handler cần người gọi đã đăng nhập nhận `principal: Principal` và gọi
-  `principal.require(&PERMISSION)?`.
+  `principal.require(&PERMISSION)?`. Endpoint công khai (ai cũng gọi được, người đã đăng
+  nhập thấy nhiều hơn) nhận `principal: Option<Principal>` và khai
+  `security((), ("bearer" = []))`.
+- Muốn bắt buộc `If-Match` khi sửa thì gọi `if_match.required()?` thay cho
+  `expected()?` (thiếu header: 428).
+- Danh sách sắp theo thứ khác thời gian tạo dùng `fetch_page_by` (keyset pagination trên
+  `(cột, id)`, có index trên cả hai); tìm theo chữ dùng `autoxide_kernel::search` trên một
+  cột viết thường. `GET` trả `ETag` thì tự trả `304` khi `If-None-Match` khớp, không phải
+  viết thêm gì.
+- Nội dung đã lưu đọc theo khoảng byte bằng `Storage::get_range`, và module chỉ liệt kê
+  khoá của mình bằng `Storage::keys_with_prefix("<tên>/")`. Module `media` là ví dụ đầy
+  đủ cho các phần này (`modules/media`).
 - Viết tài liệu cho mọi handler: một dòng `///` (thành summary), permission cần có, và
   `description` cho mọi response kèm `code` lỗi. Doc comment trên handler và kiểu schema
   viết tiếng Anh, cho người gọi API.

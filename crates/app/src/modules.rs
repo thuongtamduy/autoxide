@@ -22,6 +22,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         Box::new(autoxide_idempotency::module()),
         // Webhook: gửi event của mọi module ra ngoài; không module nào cần trait của nó.
         Box::new(autoxide_webhooks::module()),
+        // Thư viện media: cần nơi lưu của `files` (đứng sau nó); module nội dung sau này
+        // cần trait `Media` của nó.
+        Box::new(autoxide_media::module()),
     ]
 }
 
@@ -119,8 +122,8 @@ mod tests {
 
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
-            // Mỗi lịch (của `auth`, `idempotency` và `webhooks`) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 3);
+            // Mỗi lịch (của `auth`, `idempotency`, `webhooks` và hai của `media`) đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 5);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

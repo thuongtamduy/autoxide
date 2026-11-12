@@ -61,6 +61,9 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
 10. A sample module and a guide for writing modules
 11. Tooling and deployment: data copy between SQLite and PostgreSQL, benchmarks,
     Docker, backup and restore, CI
+12. Passkeys; 13–14. account management, webhooks, a hardened API contract
+15. A media library: images, video, audio and documents in nested folders, served
+    publicly or privately ([`docs/MEDIA.md`](docs/MEDIA.md))
 
 ## Requirements
 
@@ -306,6 +309,8 @@ never share foreign keys. These rules are checked automatically by the gate.
   are at `ghcr.io/<owner>/autoxide`
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — installing and deploying: Docker Compose with
   PostgreSQL or one binary with SQLite, reverse proxy, updates, backups
+- [`docs/MEDIA.md`](docs/MEDIA.md) — using the media library: upload, folders, public
+  links, caching, trash
 - [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) — how to write a module, starting
   from the sample module [`modules/notes`](modules/notes) (not registered by default)
 

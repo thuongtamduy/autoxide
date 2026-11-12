@@ -11,6 +11,22 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Media library (`/api/v1/media`, guide in `docs/MEDIA.md`): images, video, audio and
+  documents in nested folders. Uploads are checked against their real type (first bytes),
+  raster images get their width and height, duplicates are reported. Items can be public
+  (no sign-in needed) or private; content is served with byte ranges, `HEAD`, `304`, safe
+  headers (`inline` only for raster images, `nosniff`, a sandboxing CSP) and long caching
+  for versioned URLs. Edits need `If-Match`; content can be replaced keeping the id. A
+  trash with restore and purge, and daily cleanup jobs. Permissions `media.read`,
+  `media.write`, `media.purge`; MCP tools `media.list`, `media.get`, `media.update`,
+  `media.trash`. New settings `AUTOXIDE_MEDIA_MAX_BYTES`, `AUTOXIDE_MEDIA_ALLOWED_TYPES`,
+  `AUTOXIDE_MEDIA_TRASH_DAYS`.
+- Every `GET` that returns an `ETag` answers `304 Not Modified` to a matching
+  `If-None-Match`.
+- For module authors: lists sorted by another column (`pagination::fetch_page_by`), shared
+  text search (`search`), public endpoints (`Option<Principal>`), mandatory `If-Match`
+  (`IfMatch::required`, `428`), and byte-range reads and prefix listing in `Storage`.
+
 - Session management: `GET /api/v1/auth/me/sessions` lists your signed-in devices,
   `DELETE /api/v1/auth/me/sessions/{id}` signs one out, `DELETE /api/v1/auth/me/sessions`
   signs out all (or all but `keep`); administrators use

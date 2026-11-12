@@ -15,6 +15,7 @@ autoxide-mail.workspace = true
 autoxide-files.workspace = true
 autoxide-kernel.workspace = true
 autoxide-webhooks.workspace = true
+autoxide-media.workspace = true
 base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true

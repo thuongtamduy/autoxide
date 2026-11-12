@@ -173,14 +173,14 @@ Nền chung (kernel):
 
 Module `media`:
 
-- [ ] Tải lên: kiểm kích thước, loại được phép, loại thật theo chữ ký đầu file; kích thước ảnh; SHA-256; báo item trùng
-- [ ] Danh sách lọc theo thư mục, loại, `visibility`, thùng rác, tên; sắp theo thời gian, tên, kích thước
-- [ ] Sửa thông tin và thay nội dung giữ ID, bắt buộc `If-Match`
-- [ ] Tải nội dung: công khai hay cần quyền; `inline` chỉ cho ảnh raster; `Range`, `HEAD`, 304; cache theo phiên bản
-- [ ] Thư mục lồng nhau: tạo, đổi tên, chuyển, xoá khi trống
-- [ ] Thùng rác: vào, khôi phục, xoá hẳn (permission riêng); job xoá quá hạn và dọn nội dung mồ côi
-- [ ] Event cho mọi thay đổi (vào audit log); tool MCP; trait `Media` cho module khác
-- [ ] Backup / restore mang theo `media`; hướng dẫn dùng (tiếng Anh + tiếng Việt)
+- [x] Tải lên: kiểm kích thước, loại được phép, loại thật theo chữ ký đầu file; kích thước ảnh; SHA-256; báo item trùng (D-086, D-089)
+- [x] Danh sách lọc theo thư mục, loại, `visibility`, thùng rác, tên; sắp theo thời gian, tên, kích thước
+- [x] Sửa thông tin và thay nội dung giữ ID, bắt buộc `If-Match`
+- [x] Tải nội dung: công khai hay cần quyền; `inline` chỉ cho ảnh raster; `Range`, `HEAD`, 304; cache theo phiên bản (D-086, D-087)
+- [x] Thư mục lồng nhau: tạo, đổi tên, chuyển, xoá khi trống (D-088)
+- [x] Thùng rác: vào, khôi phục, xoá hẳn (permission riêng); job xoá quá hạn và dọn nội dung mồ côi
+- [x] Event cho mọi thay đổi (vào audit log); tool MCP; trait `Media` cho module khác (D-090)
+- [x] Backup / restore mang theo `media`; hướng dẫn dùng (tiếng Anh + tiếng Việt)
 
 ## Sau core (chưa mở)
 

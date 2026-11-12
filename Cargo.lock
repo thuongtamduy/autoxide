@@ -365,6 +365,7 @@ dependencies = [
  "autoxide-idempotency",
  "autoxide-kernel",
  "autoxide-mail",
+ "autoxide-media",
  "autoxide-testkit",
  "autoxide-webhooks",
  "axum",
@@ -533,6 +534,33 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "autoxide-media"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "bytes",
+ "chrono",
+ "futures-util",
+ "imagesize",
+ "metrics",
+ "rmcp",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tokio",
+ "tower",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
 ]
 
 [[package]]
@@ -1975,6 +2003,12 @@ dependencies = [
  "icu_normalizer",
  "icu_properties",
 ]
+
+[[package]]
+name = "imagesize"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65b27460c2c92b037f3f94c538ed9a3342f3fdf923606781629ccb35f82d042a"
 
 [[package]]
 name = "indexmap"

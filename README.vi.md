@@ -57,6 +57,9 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
 10. Một module mẫu và hướng dẫn viết module
 11. Công cụ và deploy: chép dữ liệu giữa SQLite và PostgreSQL, đo hiệu năng, Docker,
     backup và restore, CI
+12. Passkey; 13–14. quản lý tài khoản, webhook, hợp đồng API chặt hơn
+15. Thư viện media: ảnh, video, âm thanh, tài liệu trong thư mục lồng nhau, phục vụ
+    công khai hay riêng tư ([`docs/MEDIA.vi.md`](docs/MEDIA.vi.md))
 
 ## Yêu cầu
 
@@ -302,6 +305,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   Docker đã phát hành ở `ghcr.io/<owner>/autoxide`
 - [`docs/DEPLOY.vi.md`](docs/DEPLOY.vi.md) — cài đặt và deploy: Docker Compose với
   PostgreSQL hoặc một binary với SQLite, reverse proxy, cập nhật, backup
+- [`docs/MEDIA.vi.md`](docs/MEDIA.vi.md) — dùng thư viện media: tải lên, thư mục, link
+  công khai, cache, thùng rác
 - [`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md) — cách viết một module, bắt đầu
   từ module mẫu [`modules/notes`](modules/notes) (mặc định không đăng ký)
 

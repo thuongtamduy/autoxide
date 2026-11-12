@@ -4,6 +4,8 @@
 //! này chỉ phân tích dòng lệnh và chuyển cho từng lệnh trong `commands/`.
 
 mod commands;
+#[cfg(test)]
+mod media_e2e;
 mod modules;
 mod observability;
 mod runtime;
