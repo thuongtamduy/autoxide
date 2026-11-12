@@ -208,14 +208,13 @@ pub(crate) mod testing {
             .up(&database)
             .await
             .unwrap();
-        let secret = SecretKey::new(database.clone(), Some(b"forms-test-secret-key-0123456789".to_vec()));
+        let secret =
+            SecretKey::new(database.clone(), Some(b"forms-test-secret-key-0123456789".to_vec()));
         let guard = Arc::new(SpamGuard::new(secret.clone(), antispam));
         let mailer = Arc::new(FakeMailer::default());
-        let translations = Translations::new(vec![(
-            "forms",
-            vec![("vi", include_str!("../locales/vi.json"))],
-        )])
-        .unwrap();
+        let translations =
+            Translations::new(vec![("forms", vec![("vi", include_str!("../locales/vi.json"))])])
+                .unwrap();
         let parts = Parts {
             database: database.clone(),
             outbox: Outbox::standalone("forms"),

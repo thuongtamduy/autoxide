@@ -369,6 +369,7 @@ dependencies = [
  "autoxide-auth",
  "autoxide-content",
  "autoxide-files",
+ "autoxide-forms",
  "autoxide-idempotency",
  "autoxide-kernel",
  "autoxide-mail",

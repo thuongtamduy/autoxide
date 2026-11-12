@@ -113,7 +113,12 @@ impl Localized {
     }
 
     /// Bỏ khoảng trắng hai đầu, chuỗi rỗng thành `None`; kiểm độ dài từng bản.
-    pub(crate) fn normalized(&self, field: &str, max: usize, problems: &mut Vec<FieldError>) -> Localized {
+    pub(crate) fn normalized(
+        &self,
+        field: &str,
+        max: usize,
+        problems: &mut Vec<FieldError>,
+    ) -> Localized {
         let mut clean = |locale: &str, value: &Option<String>| {
             let value = value.as_deref().map(str::trim).filter(|value| !value.is_empty())?;
             if value.chars().count() > max {

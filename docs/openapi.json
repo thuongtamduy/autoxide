@@ -11247,6 +11247,1767 @@
         ]
       }
     },
+    "/api/v1/forms": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "List forms.",
+        "description": "Requires `forms.read`. Newest first; follow `pagination.next_cursor` for more.",
+        "operationId": "forms_list_forms",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "`open` or `closed`; omitted: both.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Whether a form takes submissions.",
+              "enum": [
+                "open",
+                "closed"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of forms.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_FormResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `forms.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Create a form.",
+        "description": "Requires `forms.manage`. Every problem of the definition is reported at once in `errors`\n(paths like `fields[2].options`). The form takes submissions at once unless `status` is\n`closed`. Retry safely with an `Idempotency-Key` header.",
+        "operationId": "forms_create_form",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFormRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FormResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `forms.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The key is taken; code `forms.key_taken`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The definition is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/forms/data": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Export the data of an email address.",
+        "description": "Requires `forms.export`. For a request of the person the data is about (someone who sent\nforms, without an account): every submission sent with this address, in every form.",
+        "operationId": "forms_export_forms_email_data",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "description": "The email address of the person (any case).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "ada@example.com"
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EmailDataResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `forms.export`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`email` is not an email address; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Erase the data of an email address.",
+        "description": "Requires `forms.export`. Deletes for good every submission sent with this address, in\nevery form (a request of the person the data is about). The event\n`forms.submissions_erased` does not carry the address.",
+        "operationId": "forms_erase_forms_email_data",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "description": "The email address of the person (any case).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "ada@example.com"
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How many submissions were deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ErasedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `forms.export`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`email` is not an email address; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/forms/public/{key}": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Get a form to show (public).",
+        "description": "No sign-in needed. The fields with their labels, help and choices in one language, the\ntoken scope and the success message. Admin settings (notification addresses, limits,\nretention, allowed origins) are never included.",
+        "operationId": "forms_get_public_form",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Key of the form.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "`en` (default) or `vi`. A text missing in that language falls back to the other.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "A language of form texts.",
+              "enum": [
+                "en",
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The form.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version; send it in `If-None-Match` to get 304."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PublicFormResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No form has this key; code `forms.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`locale` is not `en` or `vi`; code `invalid_query`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/forms/public/{key}/submissions": {
+      "post": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Send a form (public).",
+        "description": "No sign-in needed. Every answer is checked on the server and every problem is reported at\nonce in `errors` (paths `data.<key>`). Send `form_token` (and `challenge` when the server\nuses one); a website server signed in with an API key may omit them. The answer is the\nsame 201 whether the submission is accepted, held for review or dropped by the anti-spam\nchecks. Sending the same `form_token` again returns the first answer and stores nothing\nnew. The body may be at most `AUTOXIDE_FORMS_MAX_SUBMISSION_BYTES`.",
+        "operationId": "forms_submit_form",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Key of the form.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Received.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SubmitResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The form token or challenge is missing, invalid or expired (codes `antispam.token_missing`, `antispam.token_invalid`, `antispam.token_expired`, `antispam.challenge_required`, `antispam.challenge_failed`): reload the form.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The page's `Origin` is not allowed for this form; code `forms.origin_not_allowed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No form has this key; code `forms.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The form is closed; code `forms.closed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The body is too large; code `payload_too_large`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "An answer is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "A signed-in caller sent too many; code `antispam.rate_limited`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The anti-spam check cannot run; code `antispam.verifier_unavailable`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/forms/submissions/{id}": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Get a submission.",
+        "description": "Requires `forms.read`.",
+        "operationId": "forms_get_form_submission",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the submission.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The submission.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the submission; send it in `If-Match` to change its status."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SubmissionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `forms.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No submission has this id; code `forms.submission_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Delete a submission.",
+        "description": "Requires `forms.review`.",
+        "operationId": "forms_delete_form_submission",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the submission.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `forms.review`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No submission has this id; code `forms.submission_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Change the status of a submission.",
+        "description": "Requires `forms.review`. `If-Match` is required. Moving a submission out of `spam` sends\nthe notification mail as for a new one (`forms.submission_received`).",
+        "operationId": "forms_update_form_submission",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the submission.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` you read (or `*`).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSubmissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The submission after the change.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "New version of the submission."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SubmissionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `forms.review`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No submission has this id; code `forms.submission_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The submission changed since you read it; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The status is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/forms/{id}": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Get a form.",
+        "description": "Requires `forms.read`.",
+        "operationId": "forms_get_form",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the form.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The form.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the form; send it in `If-Match` to change it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FormResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `forms.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No form has this id; code `forms.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Delete a form.",
+        "description": "Requires `forms.manage`. `If-Match` is required. Deletes every submission of the form\ntoo; export them first if you need them. To stop taking submissions but keep them, close\nthe form instead.",
+        "operationId": "forms_delete_form",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the form.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` you read (or `*`).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted, with its submissions."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `forms.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No form has this id; code `forms.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The form changed since you read it; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Change a form.",
+        "description": "Requires `forms.manage`. `If-Match` is required. Sending `fields` replaces the whole list;\na change makes a new `version` (old submissions keep their own labels). Close a form with\n`{\"status\": \"closed\"}`.",
+        "operationId": "forms_update_form",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the form.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` you read (or `*`).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFormRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The form after the change.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "New version of the form."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_FormResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `forms.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No form has this id; code `forms.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The key is taken; code `forms.key_taken`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The form changed since you read it; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/forms/{id}/submissions": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "List the submissions of a form.",
+        "description": "Requires `forms.read`. Newest first; follow `pagination.next_cursor` with the same filters\nfor more. Each submission comes with the labels of the form version it was sent with.",
+        "operationId": "forms_list_form_submissions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the form.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "`new`, `read`, `archived` or `spam`; omitted: every status but `spam`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Where a submission is in the inbox.",
+              "enum": [
+                "new",
+                "read",
+                "archived",
+                "spam"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only submissions whose answers contain this text, ignoring case and accents.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of submissions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SubmissionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `forms.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No form has this id; code `forms.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/forms/{id}/submissions/export": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "summary": "Export the submissions of a form as CSV.",
+        "description": "Requires `forms.export`. One row per submission, oldest first; columns `id`,\n`created_at`, `status`, `form_version`, `locale`, `email`, `page_url`, `referrer`, then\none column per field key (current fields first, then fields only older versions had).\nUTF-8 with a byte order mark, CRLF line ends, every cell quoted. Cells starting with `=`,\n`+`, `-`, `@`, tab or carriage return get a leading `'` so spreadsheets do not run them as\nformulas.",
+        "operationId": "forms_export_form_submissions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the form.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "`csv` (the only format, and the default).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "csv"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "`new`, `read`, `archived` or `spam`; omitted: every status but `spam`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Where a submission is in the inbox.",
+              "enum": [
+                "new",
+                "read",
+                "archived",
+                "spam"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The CSV file.",
+            "headers": {
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "`attachment` with the file name `<key>-submissions.csv`."
+              }
+            },
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `forms.export`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No form has this id; code `forms.not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A parameter is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/media": {
       "get": {
         "tags": [
@@ -14854,6 +16615,32 @@
           }
         }
       },
+      "AnswerResponse": {
+        "type": "object",
+        "description": "One answer, with the field as it was when the submission was sent.",
+        "required": [
+          "key",
+          "type",
+          "label",
+          "value"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "$ref": "#/components/schemas/Localized",
+            "description": "The field's label in the form version the submission was sent with."
+          },
+          "type": {
+            "$ref": "#/components/schemas/FieldType"
+          },
+          "value": {
+            "type": "object",
+            "description": "A string; a number for `number`; an array of values for `checkbox`; `true` for\n`consent`."
+          }
+        }
+      },
       "ApiKeyResponse": {
         "type": "object",
         "description": "An API key, without its secret.",
@@ -15362,6 +17149,111 @@
         },
         "additionalProperties": false
       },
+      "CreateFormRequest": {
+        "type": "object",
+        "description": "A new form.",
+        "required": [
+          "key",
+          "name",
+          "fields"
+        ],
+        "properties": {
+          "allowed_origins": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Up to 20 origins like `https://example.com`."
+          },
+          "email_limit_per_hour": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "1 to 100000.",
+            "minimum": 0
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            },
+            "description": "1 to `AUTOXIDE_FORMS_MAX_FIELDS` (default 50) fields, in display order."
+          },
+          "ip_limit_per_hour": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "1 to 100000.",
+            "minimum": 0
+          },
+          "key": {
+            "type": "string",
+            "description": "Lower-case letters and digits in groups joined by `-`, at most 50 characters; unique.",
+            "example": "contact"
+          },
+          "name": {
+            "type": "string",
+            "description": "1 to 200 characters.",
+            "example": "Contact us"
+          },
+          "notify_emails": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Up to 20 addresses."
+          },
+          "reply_to_field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Key of an `email` field."
+          },
+          "retention_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "0 (keep) to 36500.",
+            "minimum": 0
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FormStatus",
+                "description": "Omitted: `open`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success_message": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Localized",
+                "description": "Up to 1000 characters per language."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateTermRequest": {
         "allOf": [
           {
@@ -15690,6 +17582,36 @@
           }
         }
       },
+      "Data_EmailDataResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "Everything the forms hold about one email address.",
+            "required": [
+              "email",
+              "submissions"
+            ],
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "The address, as matched (lower case)."
+              },
+              "submissions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SubmissionResponse"
+                },
+                "description": "Every submission with this address, oldest first, any status."
+              }
+            }
+          }
+        }
+      },
       "Data_EndedSessionsResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -15994,6 +17916,30 @@
           }
         }
       },
+      "Data_ErasedResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "Result of erasing an email address.",
+            "required": [
+              "deleted"
+            ],
+            "properties": {
+              "deleted": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Submissions deleted.",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
       "Data_FileResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -16092,6 +18038,125 @@
               "updated_at": {
                 "type": "string",
                 "format": "date-time"
+              }
+            }
+          }
+        }
+      },
+      "Data_FormResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A form, as admins see it.",
+            "required": [
+              "id",
+              "key",
+              "name",
+              "status",
+              "version",
+              "fields",
+              "allowed_origins",
+              "success_message",
+              "notify_emails",
+              "token_scope",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "allowed_origins": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Websites allowed to send the form from a browser (`https://example.com`); empty: any.\nA request whose `Origin` is not listed is refused with `forms.origin_not_allowed`."
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "email_limit_per_hour": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32",
+                "description": "Public submissions per hour from one email address; `null`: the server default."
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Field"
+                }
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "ip_limit_per_hour": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32",
+                "description": "Public submissions per hour from one network block; `null`: the server default."
+              },
+              "key": {
+                "type": "string",
+                "description": "Unique; part of the public address `/api/v1/forms/public/{key}`.",
+                "example": "contact"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name for admins (also shown by the public endpoint).",
+                "example": "Contact us"
+              },
+              "notify_emails": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Addresses mailed for each new submission. Never shown by the public endpoint."
+              },
+              "reply_to_field": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Key of the `email` field used as `Reply-To` of the notification and to find\nsubmissions by email; `null`: the first `email` field."
+              },
+              "retention_days": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32",
+                "description": "Days submissions are kept (`0`: until deleted); `null`: the server default."
+              },
+              "status": {
+                "$ref": "#/components/schemas/FormStatus"
+              },
+              "success_message": {
+                "$ref": "#/components/schemas/Localized",
+                "description": "Shown to the sender after sending."
+              },
+              "token_scope": {
+                "type": "string",
+                "description": "The `scope` to ask `GET /api/v1/antispam/token` for, e.g. `forms:contact`.",
+                "example": "forms:contact"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "version": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Version of `fields`: grows by one each time the fields change. Each submission keeps\nthe version it was sent with, and is shown with that version's labels."
               }
             }
           }
@@ -16646,6 +18711,66 @@
           }
         }
       },
+      "Data_PublicFormResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A form, as a website shows it.",
+            "required": [
+              "key",
+              "name",
+              "status",
+              "version",
+              "locale",
+              "fields",
+              "token_scope",
+              "success_message"
+            ],
+            "properties": {
+              "fields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PublicField"
+                }
+              },
+              "key": {
+                "type": "string",
+                "example": "contact"
+              },
+              "locale": {
+                "$ref": "#/components/schemas/Locale",
+                "description": "Language of the texts below."
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "$ref": "#/components/schemas/FormStatus",
+                "description": "`closed`: show that the form is closed; sending is refused with `forms.closed`."
+              },
+              "success_message": {
+                "type": "string",
+                "description": "Shown after sending (also returned by the submit endpoint)."
+              },
+              "token_scope": {
+                "type": "string",
+                "description": "Ask `GET /api/v1/antispam/token?scope=<token_scope>` for a form token each time the\nform is shown, and send it as `form_token`.",
+                "example": "forms:contact"
+              },
+              "version": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Version of the fields."
+              }
+            }
+          }
+        }
+      },
       "Data_PublicMenu": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -17105,6 +19230,153 @@
               "secret": {
                 "type": "string",
                 "example": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+              }
+            }
+          }
+        }
+      },
+      "Data_SubmissionResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A submission.",
+            "required": [
+              "id",
+              "form_id",
+              "form_key",
+              "form_version",
+              "status",
+              "data",
+              "answers",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "answers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AnswerResponse"
+                },
+                "description": "The answers in the order of the form version, with their labels."
+              },
+              "consent": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "description": "Proof of consent when the form has a `consent` field: `{text, version, at, source,\nfield, ip_fingerprint}` — the exact text shown, the form version, when."
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "data": {
+                "type": "object",
+                "description": "The answers, by field key."
+              },
+              "email": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The sender's email address (lower case), when the form asks for one."
+              },
+              "form_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "form_key": {
+                "type": "string"
+              },
+              "form_version": {
+                "type": "integer",
+                "format": "int32",
+                "description": "The form version (of its fields) the submission was sent with."
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "ip_fingerprint": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Keyed hash of the sender's network block (never the address itself); cleared after\n`AUTOXIDE_FORMS_IP_RETENTION_DAYS`."
+              },
+              "locale": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Language the sender saw: `en` or `vi`."
+              },
+              "page_url": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Page the form was sent from."
+              },
+              "referrer": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Page that led the sender to the form, when the website sends it."
+              },
+              "spam_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Why the anti-spam checks held it (`too_fast`, `duplicate`, `classifier`…, joined by\ncommas); `null` unless `spam`."
+              },
+              "status": {
+                "$ref": "#/components/schemas/SubmissionStatus"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "user_agent": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Data_SubmitResponse": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The answer to a submission.",
+            "required": [
+              "id",
+              "message"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Id of the submission. Sending the same form token again returns the same id."
+              },
+              "message": {
+                "type": "string",
+                "description": "The form's success message, in the language sent."
               }
             }
           }
@@ -17866,6 +20138,27 @@
           }
         }
       },
+      "EmailDataResponse": {
+        "type": "object",
+        "description": "Everything the forms hold about one email address.",
+        "required": [
+          "email",
+          "submissions"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The address, as matched (lower case)."
+          },
+          "submissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubmissionResponse"
+            },
+            "description": "Every submission with this address, oldest first, any status."
+          }
+        }
+      },
       "EndedSessionsResponse": {
         "type": "object",
         "description": "How many sessions were ended.",
@@ -18215,6 +20508,21 @@
         },
         "additionalProperties": false
       },
+      "ErasedResponse": {
+        "type": "object",
+        "description": "Result of erasing an email address.",
+        "required": [
+          "deleted"
+        ],
+        "properties": {
+          "deleted": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Submissions deleted.",
+            "minimum": 0
+          }
+        }
+      },
       "EventTypeResponse": {
         "type": "object",
         "description": "A kind of event that endpoints can subscribe to.",
@@ -18231,6 +20539,132 @@
             "example": "auth.user_created"
           }
         }
+      },
+      "Field": {
+        "type": "object",
+        "description": "A field of a form.",
+        "required": [
+          "key",
+          "type",
+          "label"
+        ],
+        "properties": {
+          "help": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Localized",
+                "description": "Help text under the field."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable name of the answer: a lower-case letter, then lower-case letters, digits or\n`_`; at most 64 characters; unique in the form. Answers are sent and stored under it.",
+            "example": "email"
+          },
+          "label": {
+            "$ref": "#/components/schemas/Localized",
+            "description": "What people see next to the field (for `consent`: the whole consent text)."
+          },
+          "max": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Largest value (`number` only)."
+          },
+          "max_length": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Most characters (`text`: default 500, up to 10000; `textarea`: default 5000, up to\n20000; `hidden`: default 1000, up to 10000).",
+            "minimum": 0
+          },
+          "min": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Smallest value (`number` only)."
+          },
+          "min_length": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Fewest characters (`text`, `textarea`, `hidden`).",
+            "minimum": 0
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldOption"
+            },
+            "description": "Choices of `select`, `radio` and `checkbox` fields (1 to 100); not allowed for other\ntypes."
+          },
+          "placeholder": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Localized",
+                "description": "Example shown inside an empty field."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "required": {
+            "type": "boolean",
+            "description": "An answer is needed (for `consent`: the box must be ticked)."
+          },
+          "type": {
+            "$ref": "#/components/schemas/FieldType"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldOption": {
+        "type": "object",
+        "description": "One choice of a `select`, `radio` or `checkbox` field.",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/Localized",
+            "description": "What people see; omitted: the value."
+          },
+          "value": {
+            "type": "string",
+            "description": "What is stored and sent: 1 to 200 characters, unique in the field."
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldType": {
+        "type": "string",
+        "description": "The kind of a field. The list is closed: anything else is refused.",
+        "enum": [
+          "text",
+          "email",
+          "phone",
+          "textarea",
+          "number",
+          "select",
+          "radio",
+          "checkbox",
+          "date",
+          "hidden",
+          "consent"
+        ]
       },
       "FileResponse": {
         "type": "object",
@@ -18317,6 +20751,124 @@
           }
         }
       },
+      "FormResponse": {
+        "type": "object",
+        "description": "A form, as admins see it.",
+        "required": [
+          "id",
+          "key",
+          "name",
+          "status",
+          "version",
+          "fields",
+          "allowed_origins",
+          "success_message",
+          "notify_emails",
+          "token_scope",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "allowed_origins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Websites allowed to send the form from a browser (`https://example.com`); empty: any.\nA request whose `Origin` is not listed is refused with `forms.origin_not_allowed`."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email_limit_per_hour": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Public submissions per hour from one email address; `null`: the server default."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            }
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ip_limit_per_hour": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Public submissions per hour from one network block; `null`: the server default."
+          },
+          "key": {
+            "type": "string",
+            "description": "Unique; part of the public address `/api/v1/forms/public/{key}`.",
+            "example": "contact"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name for admins (also shown by the public endpoint).",
+            "example": "Contact us"
+          },
+          "notify_emails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Addresses mailed for each new submission. Never shown by the public endpoint."
+          },
+          "reply_to_field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Key of the `email` field used as `Reply-To` of the notification and to find\nsubmissions by email; `null`: the first `email` field."
+          },
+          "retention_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Days submissions are kept (`0`: until deleted); `null`: the server default."
+          },
+          "status": {
+            "$ref": "#/components/schemas/FormStatus"
+          },
+          "success_message": {
+            "$ref": "#/components/schemas/Localized",
+            "description": "Shown to the sender after sending."
+          },
+          "token_scope": {
+            "type": "string",
+            "description": "The `scope` to ask `GET /api/v1/antispam/token` for, e.g. `forms:contact`.",
+            "example": "forms:contact"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Version of `fields`: grows by one each time the fields change. Each submission keeps\nthe version it was sent with, and is shown with that version's labels."
+          }
+        }
+      },
+      "FormStatus": {
+        "type": "string",
+        "description": "Whether a form takes submissions.",
+        "enum": [
+          "open",
+          "closed"
+        ]
+      },
       "FormTokenResponse": {
         "type": "object",
         "description": "A form token.",
@@ -18369,6 +20921,33 @@
           "post",
           "page"
         ]
+      },
+      "Locale": {
+        "type": "string",
+        "description": "A language of form texts.",
+        "enum": [
+          "en",
+          "vi"
+        ]
+      },
+      "Localized": {
+        "type": "object",
+        "description": "A text in English and Vietnamese; at least one is needed where the text is required. A\nmissing language falls back to the other one.",
+        "properties": {
+          "en": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vi": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "LoginMfaRequest": {
         "type": "object",
@@ -19515,6 +22094,133 @@
           }
         }
       },
+      "Page_FormResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A form, as admins see it.",
+              "required": [
+                "id",
+                "key",
+                "name",
+                "status",
+                "version",
+                "fields",
+                "allowed_origins",
+                "success_message",
+                "notify_emails",
+                "token_scope",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "allowed_origins": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Websites allowed to send the form from a browser (`https://example.com`); empty: any.\nA request whose `Origin` is not listed is refused with `forms.origin_not_allowed`."
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "email_limit_per_hour": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int32",
+                  "description": "Public submissions per hour from one email address; `null`: the server default."
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Field"
+                  }
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "ip_limit_per_hour": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int32",
+                  "description": "Public submissions per hour from one network block; `null`: the server default."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "Unique; part of the public address `/api/v1/forms/public/{key}`.",
+                  "example": "contact"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Name for admins (also shown by the public endpoint).",
+                  "example": "Contact us"
+                },
+                "notify_emails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Addresses mailed for each new submission. Never shown by the public endpoint."
+                },
+                "reply_to_field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Key of the `email` field used as `Reply-To` of the notification and to find\nsubmissions by email; `null`: the first `email` field."
+                },
+                "retention_days": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int32",
+                  "description": "Days submissions are kept (`0`: until deleted); `null`: the server default."
+                },
+                "status": {
+                  "$ref": "#/components/schemas/FormStatus"
+                },
+                "success_message": {
+                  "$ref": "#/components/schemas/Localized",
+                  "description": "Shown to the sender after sending."
+                },
+                "token_scope": {
+                  "type": "string",
+                  "description": "The `scope` to ask `GET /api/v1/antispam/token` for, e.g. `forms:contact`.",
+                  "example": "forms:contact"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "version": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "Version of `fields`: grows by one each time the fields change. Each submission keeps\nthe version it was sent with, and is shown with that version's labels."
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
       "Page_MediaItemResponse": {
         "type": "object",
         "description": "One page of a list.",
@@ -20190,6 +22896,133 @@
           }
         }
       },
+      "Page_SubmissionResponse": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A submission.",
+              "required": [
+                "id",
+                "form_id",
+                "form_key",
+                "form_version",
+                "status",
+                "data",
+                "answers",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "answers": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AnswerResponse"
+                  },
+                  "description": "The answers in the order of the form version, with their labels."
+                },
+                "consent": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "description": "Proof of consent when the form has a `consent` field: `{text, version, at, source,\nfield, ip_fingerprint}` — the exact text shown, the form version, when."
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "data": {
+                  "type": "object",
+                  "description": "The answers, by field key."
+                },
+                "email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The sender's email address (lower case), when the form asks for one."
+                },
+                "form_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "form_key": {
+                  "type": "string"
+                },
+                "form_version": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "The form version (of its fields) the submission was sent with."
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "ip_fingerprint": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Keyed hash of the sender's network block (never the address itself); cleared after\n`AUTOXIDE_FORMS_IP_RETENTION_DAYS`."
+                },
+                "locale": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Language the sender saw: `en` or `vi`."
+                },
+                "page_url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Page the form was sent from."
+                },
+                "referrer": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Page that led the sender to the form, when the website sends it."
+                },
+                "spam_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Why the anti-spam checks held it (`too_fast`, `duplicate`, `classifier`…, joined by\ncommas); `null` unless `spam`."
+                },
+                "status": {
+                  "$ref": "#/components/schemas/SubmissionStatus"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "user_agent": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
       "Page_TagResponse": {
         "type": "object",
         "description": "One page of a list.",
@@ -20776,6 +23609,132 @@
           }
         }
       },
+      "PublicField": {
+        "type": "object",
+        "description": "A field, in the asked language.",
+        "required": [
+          "key",
+          "type",
+          "label",
+          "required"
+        ],
+        "properties": {
+          "help": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "key": {
+            "type": "string",
+            "description": "Send the answer under this key in `data`."
+          },
+          "label": {
+            "type": "string",
+            "description": "For `consent`: the exact text to show next to the box (it is stored with the\nsubmission as proof)."
+          },
+          "max": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "max_length": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "min": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "min_length": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicOption"
+            },
+            "description": "Choices of `select`, `radio` and `checkbox`."
+          },
+          "placeholder": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "type": {
+            "$ref": "#/components/schemas/FieldType"
+          }
+        }
+      },
+      "PublicFormResponse": {
+        "type": "object",
+        "description": "A form, as a website shows it.",
+        "required": [
+          "key",
+          "name",
+          "status",
+          "version",
+          "locale",
+          "fields",
+          "token_scope",
+          "success_message"
+        ],
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicField"
+            }
+          },
+          "key": {
+            "type": "string",
+            "example": "contact"
+          },
+          "locale": {
+            "$ref": "#/components/schemas/Locale",
+            "description": "Language of the texts below."
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FormStatus",
+            "description": "`closed`: show that the form is closed; sending is refused with `forms.closed`."
+          },
+          "success_message": {
+            "type": "string",
+            "description": "Shown after sending (also returned by the submit endpoint)."
+          },
+          "token_scope": {
+            "type": "string",
+            "description": "Ask `GET /api/v1/antispam/token?scope=<token_scope>` for a form token each time the\nform is shown, and send it as `form_token`.",
+            "example": "forms:contact"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Version of the fields."
+          }
+        }
+      },
       "PublicMedia": {
         "type": "object",
         "description": "An image, as readers load it.",
@@ -20884,6 +23843,24 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "PublicOption": {
+        "type": "object",
+        "description": "A choice, in the asked language.",
+        "required": [
+          "value",
+          "label"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "What to show."
+          },
+          "value": {
+            "type": "string",
+            "description": "What to send."
           }
         }
       },
@@ -21675,6 +24652,201 @@
           "archived"
         ]
       },
+      "SubmissionResponse": {
+        "type": "object",
+        "description": "A submission.",
+        "required": [
+          "id",
+          "form_id",
+          "form_key",
+          "form_version",
+          "status",
+          "data",
+          "answers",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "answers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnswerResponse"
+            },
+            "description": "The answers in the order of the form version, with their labels."
+          },
+          "consent": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Proof of consent when the form has a `consent` field: `{text, version, at, source,\nfield, ip_fingerprint}` — the exact text shown, the form version, when."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "description": "The answers, by field key."
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sender's email address (lower case), when the form asks for one."
+          },
+          "form_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "form_key": {
+            "type": "string"
+          },
+          "form_version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The form version (of its fields) the submission was sent with."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ip_fingerprint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Keyed hash of the sender's network block (never the address itself); cleared after\n`AUTOXIDE_FORMS_IP_RETENTION_DAYS`."
+          },
+          "locale": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Language the sender saw: `en` or `vi`."
+          },
+          "page_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Page the form was sent from."
+          },
+          "referrer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Page that led the sender to the form, when the website sends it."
+          },
+          "spam_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the anti-spam checks held it (`too_fast`, `duplicate`, `classifier`…, joined by\ncommas); `null` unless `spam`."
+          },
+          "status": {
+            "$ref": "#/components/schemas/SubmissionStatus"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user_agent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SubmissionStatus": {
+        "type": "string",
+        "description": "Where a submission is in the inbox.",
+        "enum": [
+          "new",
+          "read",
+          "archived",
+          "spam"
+        ]
+      },
+      "SubmitRequest": {
+        "type": "object",
+        "description": "A submission of a public form.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "challenge": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The value of the `altcha` widget, when the server uses a challenge."
+          },
+          "data": {
+            "type": "object",
+            "description": "Answers by field key: a string for most types, a number for `number`, an array of\noption values for `checkbox`, `true` for a ticked `consent`. Omit (or send `\"\"` /\n`null`) unanswered fields. Unknown keys are refused."
+          },
+          "form_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Token from `GET /api/v1/antispam/token?scope=forms:<key>`; needed unless the caller\nis signed in (a website server with an API key)."
+          },
+          "locale": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Language the form was shown in: `en` or `vi`."
+          },
+          "page_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Address of the page the form is on; omitted: the `Referer` header."
+          },
+          "referrer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Page that led the visitor there (`document.referrer`), if any."
+          },
+          "trap": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The hidden trap field: people leave it empty."
+          }
+        },
+        "additionalProperties": false
+      },
+      "SubmitResponse": {
+        "type": "object",
+        "description": "The answer to a submission.",
+        "required": [
+          "id",
+          "message"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id of the submission. Sending the same form token again returns the same id."
+          },
+          "message": {
+            "type": "string",
+            "description": "The form's success message, in the language sent."
+          }
+        }
+      },
       "TagResponse": {
         "type": "object",
         "description": "A tag. Items carry tags as names; tags are created when first given to an item.",
@@ -22010,6 +25182,103 @@
         },
         "additionalProperties": false
       },
+      "UpdateFormRequest": {
+        "type": "object",
+        "description": "Changes to a form. Omitted fields stay as they are; `null` clears the nullable ones.",
+        "properties": {
+          "allowed_origins": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "email_limit_per_hour": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "fields": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            },
+            "description": "The whole new list of fields; a change makes a new `version`. Old submissions keep\nthe labels of their own version."
+          },
+          "ip_limit_per_hour": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notify_emails": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "reply_to_field": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retention_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FormStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success_message": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Localized"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "UpdateItemRequest": {
         "type": "object",
         "description": "Changes to a media item. Omitted fields stay as they are.",
@@ -22074,6 +25343,20 @@
                 "type": "null"
               }
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateSubmissionRequest": {
+        "type": "object",
+        "description": "A new status for a submission.",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/SubmissionStatus",
+            "description": "`read`, `archived`, `spam`, or `new` (e.g. not spam after all)."
           }
         },
         "additionalProperties": false
