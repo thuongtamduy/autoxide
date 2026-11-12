@@ -11,6 +11,8 @@ pub struct Model {
     pub name: String,
     /// `search::normalize(name)`: chặn trùng không phân biệt hoa thường, tìm và sắp.
     pub name_key: String,
+    /// `search::fold(name)` (bỏ dấu): để tìm (D-104).
+    pub search_key: String,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }

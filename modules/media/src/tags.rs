@@ -139,6 +139,7 @@ async fn ensure_tag<C: ConnectionTrait>(transaction: &C, name: &str) -> Result<U
             id: Set(Uuid::now_v7()),
             name: Set(name.to_owned()),
             name_key: Set(key.clone()),
+            search_key: Set(autoxide_kernel::search::fold(name)),
             created_at: Set(now),
             updated_at: Set(now),
         };
@@ -237,7 +238,8 @@ impl MediaService {
         principal.require(&MEDIA_READ)?;
         let mut select = tag::Entity::find();
         if let Some(search) = search.filter(|search| !search.trim().is_empty()) {
-            select = select.filter(autoxide_kernel::search::contains(tag::Column::NameKey, search));
+            select =
+                select.filter(autoxide_kernel::search::contains(tag::Column::SearchKey, search));
         }
         let read = self.database.read();
         let page = match sort {
@@ -299,6 +301,7 @@ impl MediaService {
             .ok_or_else(|| tag_not_found(id))?;
         let mut row = before.clone().into_active_model();
         row.name_key = Set(autoxide_kernel::search::normalize(&name));
+        row.search_key = Set(autoxide_kernel::search::fold(&name));
         row.name = Set(name.clone());
         row.updated_at = Set(now());
         let mut update = tag::Entity::update(row).validate()?;

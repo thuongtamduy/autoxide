@@ -386,6 +386,9 @@ async fn danh_sach_loc_sap_lat_trang() {
         assert_eq!(names(trash).await, ["cat.gif"]);
         let search = ItemFilter { search: Some("REPORT 100%".into()), ..Default::default() };
         assert_eq!(names(search).await, ["Report 100%.pdf"]);
+        // Không phân biệt dấu (tìm "report" ra "Report", và ngược lại).
+        let plain = ItemFilter { search: Some("rëport".into()), ..Default::default() };
+        assert_eq!(names(plain).await, ["Report 100%.pdf"]);
         // `%` gõ vào là chữ, không phải ký tự đại diện.
         let literal = ItemFilter { search: Some("%".into()), ..Default::default() };
         assert_eq!(names(literal).await, ["Report 100%.pdf"]);
@@ -929,6 +932,35 @@ async fn anh_thu_nho_theo_phien_ban() {
         media.trash(&ada, new.id).await.unwrap();
         media.purge(&ada, new.id).await.unwrap();
         assert!(storage.keys_with_prefix(&format!("media/{}/", new.id)).await.unwrap().is_empty());
+    })
+    .await
+    .unwrap();
+}
+
+/// Tìm tiếng Việt không dấu: "da lat" ra "Đà Lạt"; nhãn "Ảnh" và "Anh" là hai nhãn khác nhau
+/// nhưng tìm "anh" ra cả hai — trên cả hai database.
+#[tokio::test]
+async fn tim_khong_dau() {
+    use crate::tags::TagSort;
+
+    TestDatabase::run(async |test| {
+        let (media, _, _) = service(test, limits()).await;
+        let ada = editor();
+        let input = NewUpload {
+            name: "Đường đến Đà Lạt.png".into(),
+            folder_id: None,
+            content_type: Some("image/png".into()),
+            tags: vec!["Ảnh".into(), "Anh".into()],
+        };
+        media.upload(&ada, input, body(&samples::png(1, 1))).await.unwrap();
+        for search in ["da lat", "ĐÀ LẠT", "duong den"] {
+            let filter = ItemFilter { search: Some(search.into()), ..Default::default() };
+            let found = media.list(&ada, &filter, &page(5)).await.unwrap();
+            assert_eq!(found.data.len(), 1, "{search}");
+        }
+        let tags = media.list_tags(&ada, Some("anh"), TagSort::Name, &page(5)).await.unwrap();
+        let names: Vec<String> = tags.data.into_iter().map(|tag| tag.tag.name).collect();
+        assert_eq!(names, ["Anh", "Ảnh"]);
     })
     .await
     .unwrap();

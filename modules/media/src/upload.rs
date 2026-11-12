@@ -171,7 +171,7 @@ impl MediaService {
         let item = item::ActiveModel {
             id: Set(id),
             folder_id: Set(folder),
-            name_key: Set(autoxide_kernel::search::normalize(&name)),
+            name_key: Set(autoxide_kernel::search::fold(&name)),
             name: Set(name),
             content_type: Set(received.content_type),
             size: Set(received.size),

@@ -51,7 +51,7 @@ impl From<TagWithCount> for TagResponse {
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct TagsQuery {
-    /// Only tags whose name contains this text, ignoring case.
+    /// Only tags whose name contains this text, ignoring case and accents.
     pub(crate) q: Option<String>,
     /// `name` (the default) or `created_at`; the direction is `order`.
     #[param(value_type = Option<TagSort>, inline)]

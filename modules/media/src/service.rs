@@ -315,7 +315,7 @@ impl MediaService {
         }
         let mut row = before.clone().into_active_model();
         if let Some(name) = name {
-            row.name_key = Set(autoxide_kernel::search::normalize(&name));
+            row.name_key = Set(autoxide_kernel::search::fold(&name));
             row.name = Set(name);
         }
         for (column, value) in [

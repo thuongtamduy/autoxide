@@ -95,6 +95,9 @@ http-body-util = "0.1"
 # Tạo ảnh thu nhỏ trong module `media` (D-093): giải mã JPEG / PNG / GIF / WebP, đổi cỡ,
 # mã hoá JPEG / PNG. Thuần Rust, chỉ bật đúng các định dạng cần, không `rayon`.
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+# Bỏ dấu khi tìm theo chữ ("da lat" ra "Đà Lạt"): tách chữ và dấu (NFD) rồi bỏ dấu
+# (`search::fold` của kernel). Đã có sẵn trong cây phụ thuộc (qua `webauthn_rp`).
+unicode-normalization = "0.1"
 # Chiều rộng / cao của ảnh (JPEG, PNG, GIF, WebP, AVIF) từ header, không giải mã ảnh
 # (module `media`, D-089). Chỉ bật đúng các định dạng cần.
 imagesize = { version = "0.15", default-features = false, features = [

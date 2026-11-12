@@ -2312,3 +2312,19 @@ Quyết định:
     không có nhánh rẽ nào để giấu (CLAUDE.md chỉ yêu cầu trait khi phải rẽ nhánh);
   - `media` có cả thư mục lẫn nhãn (chủ dự án yêu cầu, D-094), có ảnh thu nhỏ (D-093).
 - Mục còn thiếu của bước 15 — tìm được tiếng Việt không dấu — làm trước khi vào bước 17.
+
+## D-104 · Tìm theo chữ không phân biệt dấu: `search::fold` — 2026-11-12 — agent quyết
+
+Quyết định: kernel thêm `search::fold` = viết thường, tách chữ khỏi dấu (Unicode NFD), bỏ dấu,
+`đ` → `d` ("Đường đến Đà Lạt" → "duong den da lat"). `search::contains` so trên dạng đó, nên mọi
+cột "khoá tìm" lưu dạng `fold`: `auth_user.search_text` (tính lại ở m0017), `media_item.name_key`
+và cột mới `media_tag.search_key` (m0005). `search::normalize` (chỉ viết thường) vẫn là khoá
+chặn trùng và để sắp khi cần phân biệt dấu: "Anh" và "Ảnh" là hai nhãn, hai thư mục khác nhau.
+Thư viện `unicode-normalization` (đã có sẵn trong cây phụ thuộc).
+
+Lý do: mục cuối của bước 15 (đề bài D-099): người Việt hay gõ không dấu. Làm trong Rust thì hai
+database cho cùng kết quả; `unaccent` chỉ Postgres có, `LOWER` của SQLite chỉ biết ASCII.
+
+Đã cân nhắc: full-text search riêng của từng database (FTS5, `tsvector`) — mạnh hơn nhưng phải rẽ
+nhánh theo database, và cấu hình tiếng Việt của Postgres không có sẵn; để khi bảng lớn tới mức
+`LIKE '%…%'` chậm thật (đo trước). Bỏ dấu cả ở khoá chặn trùng — gộp nhầm hai từ khác nghĩa.

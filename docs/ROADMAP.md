@@ -3,8 +3,8 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–12, 14, 16 xong**; bước 13 còn CI trên GitHub và phát hành; bước 15
-còn tìm tiếng Việt không dấu; tiếp theo là bước 17 (`content`) — D-096, D-098, D-101, D-102.
+Trạng thái: **bước 0–12, 14–16 xong**; bước 13 còn CI trên GitHub và phát hành; đang làm
+bước 17 (`content`) — D-096, D-098, D-101, D-102.
 
 ## 0. Khung dự án
 
@@ -169,7 +169,7 @@ lại thành 15 và 16 khi gộp nhánh đề bài của `content` (D-103).
 
 - [x] Danh sách lọc theo trường và sắp xếp theo trường khác thời gian tạo (tên, kích thước…)
       bằng keyset pagination, không `OFFSET`; tìm theo chữ dùng chung (D-085)
-- [ ] Tìm được tiếng Việt không dấu ("da lat" ra "Đà Lạt"), như nhau trên SQLite và Postgres
+- [x] Tìm được tiếng Việt không dấu ("da lat" ra "Đà Lạt"), như nhau trên SQLite và Postgres (D-104)
 - [x] Endpoint đọc công khai (`Option<Principal>`); rate limiting vẫn áp (D-085)
 - [x] Cache: `ETag` + `If-None-Match` → `304`, `Cache-Control` do endpoint đặt (D-085)
 - [x] Chống ghi đè: `ETag` + `If-Match` → `412` (bước 14, D-084); `If-Match` bắt buộc → `428` (D-085)

@@ -43,7 +43,7 @@ pub(crate) struct ListMediaInput {
     visibility: Option<String>,
     /// `true`: only items in the trash. Default: only items not in the trash.
     trashed: Option<bool>,
-    /// Only items whose name contains this text, ignoring case.
+    /// Only items whose name contains this text, ignoring case and accents.
     q: Option<String>,
     /// Only items with this tag, ignoring case.
     tag: Option<String>,
@@ -114,7 +114,7 @@ pub(crate) struct UploadMediaInput {
 #[derive(Debug, Default, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListTagsInput {
-    /// Only tags whose name contains this text, ignoring case.
+    /// Only tags whose name contains this text, ignoring case and accents.
     q: Option<String>,
     /// Maximum number of tags to return, 1 to 200. Defaults to 50.
     #[schema(minimum = 1, maximum = 200)]

@@ -11,7 +11,7 @@ pub struct Model {
     /// `entity::ROOT` khi ở thư mục gốc.
     pub folder_id: Uuid,
     pub name: String,
-    /// `search::normalize(name)`: để tìm và sắp theo tên.
+    /// `search::fold(name)` (viết thường, bỏ dấu): để tìm và sắp theo tên (D-104).
     pub name_key: String,
     pub content_type: String,
     pub size: i64,

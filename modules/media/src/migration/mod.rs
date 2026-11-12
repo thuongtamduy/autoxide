@@ -3,6 +3,7 @@
 
 mod m0001_create_media;
 mod m0004_create_tags_and_variants;
+mod m0005_fold_search_keys;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -14,5 +15,6 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         // Bảng `media_jobs` (job queue): dọn thùng rác và nội dung mồ côi.
         autoxide_kernel::job::jobs_migration("m0003_create_jobs", "media"),
         Box::new(m0004_create_tags_and_variants::Migration),
+        Box::new(m0005_fold_search_keys::Migration),
     ]
 }

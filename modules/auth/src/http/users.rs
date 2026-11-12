@@ -501,6 +501,8 @@ mod tests {
             assert_eq!(emails("EXAMPLE.VN").await, ["dat@example.vn"]);
             // "đạt" viết thường, tìm "ĐẠT" viết hoa (đã mã hoá cho URL).
             assert_eq!(emails("%C4%90%E1%BA%A0T").await, ["dat@example.vn"]);
+            // Không dấu vẫn ra: "tran dat" tìm ra "Trần Đạt".
+            assert_eq!(emails("tran%20dat").await, ["dat@example.vn"]);
             assert_eq!(emails("100%25").await, ["x_y@example.com"]);
             assert_eq!(emails("x_y").await, ["x_y@example.com"]);
             assert!(emails("x%25y").await.is_empty());
@@ -514,7 +516,8 @@ mod tests {
             let (status, _, _) = call(&app, "PATCH", &path, Some(&admin), Some(body)).await;
             assert_eq!(status, StatusCode::OK);
             assert_eq!(emails("grace").await, ["dat@example.vn"]);
-            assert!(emails("%C4%91%E1%BA%A1t").await.is_empty());
+            // Tên cũ "Trần Đạt" không còn.
+            assert!(emails("tr%E1%BA%A7n").await.is_empty());
 
             let long = "a".repeat(201);
             let path = format!("/users?search={long}");

@@ -43,7 +43,7 @@ pub(crate) struct ItemsQuery {
     /// `true`: only items in the trash. Default `false`: only items not in the trash.
     #[param(value_type = Option<bool>)]
     pub trashed: Option<String>,
-    /// Only items whose name contains this text, ignoring case.
+    /// Only items whose name contains this text, ignoring case and accents.
     #[param(example = "logo")]
     pub q: Option<String>,
     /// Only items with this tag, ignoring case.

@@ -11,6 +11,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Text search ignores accents as well as case: `da lat` finds `Đà Lạt` (users, media items,
+  media tags), the same on SQLite and PostgreSQL.
 - Media library (`/api/v1/media`, guide in `docs/MEDIA.md`): images, video, audio and
   documents in nested folders. Uploads are checked against their real type (first bytes),
   raster images get their width and height, duplicates are reported. Items can be public

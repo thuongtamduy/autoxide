@@ -413,10 +413,10 @@ fn snapshot(row: &entity::Model) -> serde_json::Value {
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên.
 /// Cắt trước để hai database trả về cùng một giá trị.
-/// Email và tên viết thường, lưu ở `auth_user.search_text` để tìm. Viết thường trong
-/// Rust cho cùng một kết quả trên hai database (m0016).
+/// Email và tên viết thường, bỏ dấu, lưu ở `auth_user.search_text` để tìm (m0016, m0017):
+/// "dat" tìm ra "Đạt".
 fn search_text(email: &str, name: &str) -> String {
-    format!("{email} {name}").to_lowercase()
+    autoxide_kernel::search::fold(&format!("{email} {name}"))
 }
 
 fn now() -> DateTime<Utc> {

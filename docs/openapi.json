@@ -5689,7 +5689,7 @@
           {
             "name": "q",
             "in": "query",
-            "description": "Only items whose name contains this text, ignoring case.",
+            "description": "Only items whose name contains this text, ignoring case and accents.",
             "required": false,
             "schema": {
               "type": "string"
@@ -6651,7 +6651,7 @@
           {
             "name": "q",
             "in": "query",
-            "description": "Only tags whose name contains this text, ignoring case.",
+            "description": "Only tags whose name contains this text, ignoring case and accents.",
             "required": false,
             "schema": {
               "type": "string"
