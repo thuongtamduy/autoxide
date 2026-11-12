@@ -17,3 +17,8 @@ regexTarget = "match"
 regexes = [
   '''whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw''',
 ]
+
+[[allowlists]]
+description = "Chuỗi giả `0123456789abcdef…` làm secret xem trước trong một test của `content`, lỡ commit ở e7ecf3d (đã thay bằng hằng số test ở commit sau) — không phải secret của ai (D-112)"
+commits = ["e7ecf3d3e2a41f91310a1ffb9f815bca8e60919d"]
+paths = ['''modules/content/src/tests\.rs''']

@@ -1069,7 +1069,7 @@ mod public {
     use super::*;
     use crate::reading::PostFilter;
 
-    const SECRET: &str = "a-test-secret-that-is-long-enough-0123456789";
+    pub(super) const SECRET: &str = "a-test-secret-that-is-long-enough-0123456789";
 
     /// Danh sách bài công khai: chỉ bài đã đăng của đúng ngôn ngữ, mới nhất trước, lọc theo
     /// danh mục và tìm không dấu; bản nháp và trang không bao giờ lộ. Sitemap đủ mọi mục kèm
@@ -2787,11 +2787,8 @@ mod bao_mat {
     #[tokio::test]
     async fn sua_lien_ket_khong_can_quyen_doc() {
         TestDatabase::run(async |test| {
-            let (content, _, _) = service(
-                test,
-                config(&[("AUTOXIDE_CONTENT_PREVIEW_SECRET", "0123456789abcdef0123456789abcdef")]),
-            )
-            .await;
+            let (content, _, _) =
+                service(test, config(&[("AUTOXIDE_CONTENT_PREVIEW_SECRET", public::SECRET)])).await;
             let ada = editor();
             let writer = user(&["write"]);
             let tag = TermInput {

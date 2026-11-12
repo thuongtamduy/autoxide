@@ -2714,3 +2714,6 @@ hai database.
 - **Job làm ảnh thu nhỏ chậm:** hết giờ thì job bị huỷ nhưng thread giải mã vẫn chạy tới xong;
   chưa đo được ảnh nào gây ra, nên chưa đổi.
 - `GET /api/v1/content/entries?q=` (cần `content.read`) chưa giới hạn độ dài.
+- **Ngoại lệ gitleaks:** commit `e7ecf3d` lỡ chứa một chuỗi giả (`0123456789abcdef…`) làm secret
+  xem trước trong test của `content`; commit sau thay bằng hằng số test có sẵn. Vì không viết
+  lại lịch sử nhánh đã đẩy, `.gitleaks.toml` bỏ qua đúng commit đó, đúng file đó.
