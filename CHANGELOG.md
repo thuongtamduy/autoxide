@@ -11,6 +11,19 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Comments (`/api/v1/comments`, guide in `docs/COMMENTS.md`): two-level comments on any
+  allowed target type (checked through the resource directory, e.g. `content.entry`), from
+  signed-in users with a display name of their own or from guests (optional) with an edit
+  token. A fixed moderation pipeline (closed target, length, duplicates, bans, banned and
+  suspect words, too many links, anti-spam) with `pre`, `first_time` or `post` moderation per
+  target type, for guests and users separately; approval history counts by account only.
+  Plain-text bodies returned as escaped HTML with `http(s)` links marked
+  `nofollow ugc noopener`. Author edits within a time window, soft delete that keeps the
+  thread, reports that hold a comment at a threshold, bans by user, email or hashed IP with
+  an optional end, open / closed targets, counts for up to 100 targets at once, opt-in reply
+  mails to verified addresses, export and erasure by email, automatic deletion of old pending
+  and spam comments. Permissions `comments.post`, `comments.read`, `comments.moderate`,
+  `comments.manage`, `comments.export`; four MCP tools. New settings `AUTOXIDE_COMMENTS_*`.
 - Newsletters (`/api/v1/newsletter`, guide in `docs/NEWSLETTER.md`): lists with titles in
   English and Vietnamese, public sign-up through the same anti-spam checks as forms (the
   answer never tells whether an address was already known), double opt-in confirmed by a

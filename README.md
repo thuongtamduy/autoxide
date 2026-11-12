@@ -71,6 +71,8 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
     server, spam held back, an inbox with CSV export ([`docs/FORMS.md`](docs/FORMS.md))
 18. Newsletters: lists, double opt-in, one-click unsubscribe, campaigns sent in batches
     with pause and resume, bounces, mail for new posts ([`docs/NEWSLETTER.md`](docs/NEWSLETTER.md))
+19. Comments: two-level comments on any target for signed-in users or guests, a fixed
+    moderation pipeline, reports, bans, reply mails ([`docs/COMMENTS.md`](docs/COMMENTS.md))
 
 ## Requirements
 
@@ -324,6 +326,8 @@ never share foreign keys. These rules are checked automatically by the gate.
   on a website, anti-spam, the inbox, data requests by email
 - [`docs/NEWSLETTER.md`](docs/NEWSLETTER.md) — using the newsletter module: lists, the
   website's sign-up, confirmation and preferences pages, campaigns, bounces, legal notes
+- [`docs/COMMENTS.md`](docs/COMMENTS.md) — using the comments module: targets, the
+  website's thread and comment box, moderation, reports and bans, reply mails, legal notes
 - [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) — how to write a module, starting
   from the sample module [`modules/notes`](modules/notes) (not registered by default)
 

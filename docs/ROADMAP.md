@@ -269,12 +269,12 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 
 ## 21. Module `comments` — bình luận (chủ dự án giao ngày 12/11/2026, D-106)
 
-- [ ] Bình luận theo đích bất kỳ, hai cấp; người dùng đăng nhập hoặc khách
-- [ ] Kiểm duyệt theo pipeline cố định; báo cáo vi phạm; cấm theo người dùng / email / IP băm
-- [ ] Sửa trong thời hạn (token sửa cho khách), xoá mềm giữ luồng, đếm, mở / đóng đích
-- [ ] Báo email khi có trả lời (chọn nhận, email đã xác minh); giữ dữ liệu theo thời hạn
-- [ ] Dữ liệu cá nhân; tool MCP
-- [ ] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
+- [x] Bình luận theo đích bất kỳ, hai cấp; người dùng đăng nhập hoặc khách
+- [x] Kiểm duyệt theo pipeline cố định; báo cáo vi phạm; cấm theo người dùng / email / IP băm
+- [x] Sửa trong thời hạn (token sửa cho khách), xoá mềm giữ luồng, đếm, mở / đóng đích
+- [x] Báo email khi có trả lời (chọn nhận, email đã xác minh); giữ dữ liệu theo thời hạn
+- [x] Dữ liệu cá nhân; tool MCP
+- [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
 
 ## Sau core (chưa mở)
 
