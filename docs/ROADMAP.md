@@ -5,7 +5,7 @@ Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STA
 
 Trạng thái: **bước 0–12 xong**; đang ở bước 13 (củng cố core), mục "CI chạy xanh trên
 GitHub". Sau đó: bước 15 (nền chung) → 16 (module `media`) → 17 (`content`) — D-085, D-087,
-D-088, D-089.
+D-088, D-089, D-090, D-091.
 
 ## 0. Khung dự án
 
@@ -169,7 +169,8 @@ Thứ `media` và `content` cùng cần, viết trung lập với nghiệp vụ 
 
 - [ ] Danh sách lọc theo trường và sắp xếp theo trường khác thời gian tạo (vd tên, kích thước,
       `published_at`), vẫn dùng cursor, không `OFFSET`
-- [ ] Tìm kiếm văn bản sau một trait, cài đặt và test cho cả SQLite và Postgres
+- [ ] Tìm kiếm văn bản sau một trait, cài đặt và test cho cả SQLite và Postgres; tìm được
+      tiếng Việt không dấu ("da lat" ra "Đà Lạt")
 - [ ] Endpoint đọc công khai (không cần đăng nhập): module khai route nào công khai qua hợp đồng
       module; rate limiting vẫn áp
 - [ ] Cache: `ETag` + `If-None-Match` → `304`, `Cache-Control` do endpoint khai
@@ -213,26 +214,34 @@ cung cấp, D-066) dưới khoá `media/<id>`; metadata ở bảng `media_…`; 
 Chưa làm, đã cân nhắc: tải lên thẳng S3 bằng URL ký sẵn, hạn mức dung lượng, quét virus — thêm
 khi có nhu cầu.
 
-## 17. Module `content` — nội dung (chủ dự án chọn ngày 12/11/2026, D-085, D-087)
+## 17. Module `content` — nội dung (chủ dự án chọn ngày 12/11/2026, D-085, D-087, D-090)
 
 Chỉ nội dung và những gì liên quan đến nội dung; không thương mại điện tử. Làm sau `media`
 (D-088, D-089). Giao diện (trang quản trị, website) là repo riêng (D-086) — bước này chỉ làm API.
+Thiết kế: D-091; đề bài đầy đủ: [`docs/prompts/step-17-content.md`](prompts/step-17-content.md);
+khảo sát: [`docs/research/content.md`](research/content.md).
 
-- [ ] Bài viết và trang: tiêu đề, slug duy nhất, tóm tắt, nội dung JSON có cấu trúc (core không
-      phụ thuộc trình soạn thảo), ảnh đại diện và ảnh trong bài (ID của `media`, kiểm qua `api`
-      của `media`), tác giả (ID người dùng)
-- [ ] Trạng thái nháp / đã đăng / lưu trữ; lên lịch đăng qua job queue
+- [ ] Bài viết và trang chung một mô hình: tiêu đề, slug, tóm tắt, thân bài JSON (máy chủ kiểm
+      theo danh sách node được phép, chặn link độc), ảnh đại diện và ảnh trong bài (ID của
+      `media`, kiểm qua `api` của `media`); số chữ, thời gian đọc, văn bản thuần để tìm kiếm
+- [ ] Nháp tách khỏi bản công khai; đăng, gỡ, lưu trữ; hẹn giờ đăng và gỡ qua job queue (ghim
+      một revision)
 - [ ] Lịch sử phiên bản: xem và khôi phục
-- [ ] Danh mục và thẻ
-- [ ] Menu điều hướng
-- [ ] Đa ngôn ngữ (vi, en): mỗi bản dịch có slug riêng, liên kết với nhau
-- [ ] SEO: meta title, meta description, ảnh chia sẻ, canonical; API đủ để website sinh
-      sitemap và RSS
-- [ ] Permission: đọc nháp, viết, đăng; người đọc công khai chỉ thấy bản đã đăng (endpoint
-      công khai và cache của bước 15)
-- [ ] Event và audit cho mọi thay đổi; tool MCP (liệt kê, đọc, tạo nháp, sửa, đăng) gọi cùng service
-- [ ] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn dùng
-      (tiếng Anh + tiếng Việt)
+- [ ] Trang có cấp cha con, đường dẫn lồng nhau, chuyển trang sang nhánh khác (D-090)
+- [ ] Đường dẫn do backend tính; endpoint `resolve`; tự tạo chuyển hướng khi đường dẫn công khai
+      đổi (cả cây con), chuyển hướng làm tay, 410 cho nội dung đã gỡ
+- [ ] Danh mục (cha con) và thẻ; tác giả là hồ sơ của `content`, một bài nhiều tác giả
+- [ ] Menu điều hướng nhiều tầng, theo ngôn ngữ, trỏ tới ID nội dung hoặc URL
+- [ ] Đa ngôn ngữ (vi, en): mỗi bản dịch một bản ghi, slug riêng, liên kết với nhau
+- [ ] SEO: meta title, meta description, ảnh chia sẻ, canonical, `noindex`; dữ liệu cho sitemap
+      (kèm bản dịch cho hreflang) và feed
+- [ ] Xem trước bản nháp bằng token ký, có hạn
+- [ ] Permission: đọc nháp, viết, đăng, quản lý; người đọc công khai chỉ thấy bản đã đăng
+      (endpoint công khai, tìm kiếm và cache của bước 15); `If-Match` bắt buộc (D-091)
+- [ ] Event và audit cho mọi thay đổi, đủ dữ liệu để website làm mới cache qua webhook; tool MCP
+      gọi cùng service; dọn và xuất dữ liệu cá nhân
+- [ ] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database (kể cả test đồng
+      thời); hướng dẫn dùng (tiếng Anh + tiếng Việt)
 
 ## Sau core (chưa mở)
 

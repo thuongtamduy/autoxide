@@ -1975,3 +1975,72 @@ phải phối hợp hai module, dữ liệu một tấm ảnh nằm ở hai nơi
 vai vào một module.
 
 Thay: phần "nâng `files` thành thư viện media" của D-088.
+
+## D-090 · Trang có cấp cha con ngay trong bước 17 — 2026-11-12 — chủ dự án quyết
+
+Quyết định: trang (`kind = page`) của `content` có trang cha (để trống được), đường dẫn lồng
+nhau (`/gioi-thieu/doi-ngu`), làm ngay trong bước 17 — không tách thành bước sau. Bài viết
+(`kind = post`) vẫn phẳng, gom nhóm bằng danh mục và thẻ. Trang không có cha thì là trang phẳng
+như thường.
+
+Lý do: chủ dự án chọn. Website công ty, trường học, tổ chức có vài chục trang thường cần đường
+dẫn lồng nhau; làm luôn thì không phải mở thêm một bước và website không phải sửa lần hai.
+
+Đã cân nhắc: làm phẳng trước, thêm cây sau (gọn hơn khoảng 15–20% khối lượng bước 17, cây
+thêm sau được mà không phá API); cho slug chứa `/` gõ tay (không phải cây thật, đổi "cha"
+không tự cập nhật trang con).
+
+## D-091 · Thiết kế module `content` — 2026-11-12 — agent quyết
+
+Dựa trên khảo sát Ghost, WordPress, Contentful, Sanity, Wagtail, Strapi 5, Payload và các
+chuẩn ngành ở `docs/research/content.md`. Chi tiết đủ để làm ở `docs/prompts/step-17-content.md`.
+
+Quyết định:
+
+- **Nháp tách khỏi bản công khai.** `content_entries` giữ bản nháp làm việc (luôn có);
+  `content_published` giữ bản đang công khai (chỉ có khi đang công khai). Publish chép nháp
+  sang trong một transaction. Endpoint công khai chỉ đọc `content_published`, nên không thể lộ
+  nháp. Trạng thái: `draft` / `published` / `archived` + cờ `has_unpublished_changes`; hẹn giờ
+  là tài nguyên riêng (`content_schedules`), không phải một trạng thái.
+- **Mỗi bản dịch là một bản ghi** với slug và trạng thái publish riêng, nối bằng
+  `translation_group_id`. Bài và trang **không fallback** sang ngôn ngữ khác (thiếu thì 404),
+  vì fallback làm hỏng canonical và hreflang; tên danh mục, thẻ, menu thì fallback về ngôn ngữ
+  mặc định và response ghi ngôn ngữ thật đã trả.
+- **Backend tính đường dẫn** (`path`) của mỗi mục: trang = slug của các trang tổ tiên + slug;
+  bài = tiền tố cấu hình (mặc định `blog`) + slug. Website chỉ ghép tên miền và tiền tố ngôn
+  ngữ. Website tra nội dung bằng một endpoint `resolve` theo (ngôn ngữ, đường dẫn), trả về nội
+  dung, chuyển hướng, hoặc "đã gỡ" (410).
+- **Đường dẫn công khai đổi thì tự tạo chuyển hướng** (301) cho mục đó và mọi trang con, trỏ
+  tới ID (không thành chuỗi chuyển hướng). Gỡ hẳn (xoá, lưu trữ) bản đang công khai thì ghi
+  "đã gỡ" (410). Chuyển hướng làm tay được 301/302/307/308/410.
+- **Đổi trang cha là một thao tác riêng** (`move`), có hiệu lực ngay cho cả nháp và bản công
+  khai; mọi thay đổi cây trong một ngôn ngữ đi qua một dòng khoá chung để hai lệnh `move` đồng
+  thời không tạo vòng lặp trên Postgres.
+- **Revision là ảnh chụp đầy đủ**, tạo ở service layer (REST và MCP như nhau); khôi phục tạo
+  nháp mới, không tự đăng. Hẹn giờ ghim một revision; lúc chạy, nếu bản công khai đã mới hơn
+  lúc đặt lịch thì lịch thất bại với mã riêng, không ghi đè.
+- **Bắt buộc `If-Match`** cho lệnh sửa, xoá và mọi thao tác đổi trạng thái của `content`;
+  thiếu thì 428 `precondition_required`. Tool MCP tương ứng nhận tham số `version`. Đây là
+  ngoại lệ có chủ đích so với D-084 (ở đó không bắt buộc để không phá client cũ): `content` là
+  module mới, chưa có client cũ, và AI agent hay sửa song song.
+- **Máy chủ kiểm JSON thân bài** theo danh sách node, mark, thuộc tính được phép (từ chối mặc
+  định), chặn scheme link ngoài `http`/`https`/`mailto` và đường dẫn tương đối, ảnh chỉ giữ ID
+  của `media`, giới hạn kích thước và độ sâu, báo mọi lỗi một lần kèm vị trí. Không lưu HTML.
+- **Tác giả là hồ sơ của `content`** (`content_authors`: tên hiển thị, slug, giới thiệu, ảnh),
+  giữ `user_id` không foreign key; một bài có nhiều tác giả có thứ tự. `content` không phụ
+  thuộc module `auth` (D-046).
+- **Preview token** ký HMAC, chứa ID mục và hạn dùng, không lưu bảng; chưa cấu hình secret thì
+  tính năng tắt và báo lỗi rõ.
+- **Slug** sinh bằng crate `slug` (chạy thử: "Đường đến Đà Lạt" → `duong-den-da-lat`; tự bỏ
+  dấu và đổi `đ` → `d`); thêm vào `STACK.md` khi làm.
+
+Lý do: đặt đúng ranh giới (nháp / công khai, giữa các bản dịch, backend / website) ngay từ
+migration đầu thì redirect, sitemap có hreflang, feed, preview, webhook làm mới cache chỉ còn là
+truy vấn trên bảng thường, chạy như nhau trên SQLite và Postgres. Các CMS đặt sai ranh giới phải
+vá về sau (khảo sát ở `docs/research/content.md`).
+
+Đã cân nhắc: mẫu Wagtail và Payload (bảng chính là bản công khai, nháp nằm trong revision) —
+trang quản trị phải đọc nháp từ JSON, khó lọc và sắp xếp; dịch theo trường bằng cột JSON — khó
+đánh index trên SQLite và phải vá publish theo ngôn ngữ như Contentful; khoá bài khi đang sửa
+(Payload, WordPress) — `If-Match` theo chuẩn HTTP và không giữ trạng thái; mã chuyển hướng 308
+— Google coi như 301, còn 301 được mọi công cụ hiểu.
