@@ -1,4 +1,4 @@
-# Cấu hình gitleaks (quét secret trong CI): bộ luật mặc định, cộng một ngoại lệ hẹp.
+# Cấu hình gitleaks (quét secret trong gate — `./gate.sh`, D-108): bộ luật mặc định, cộng vài ngoại lệ hẹp.
 title = "Autoxide"
 
 [extend]
@@ -9,4 +9,11 @@ description = "Chủ thể event dạng `<module>.<loại>:<UUID>` trong ví d�
 regexTarget = "match"
 regexes = [
   '''[a-z_]+\.[a-z_]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}''',
+]
+
+[[allowlists]]
+description = "Khoá ví dụ CÔNG KHAI trong bộ test chính thức của Standard Webhooks (modules/webhooks, test khớp chữ ký) — không phải secret của ai"
+regexTarget = "match"
+regexes = [
+  '''whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw''',
 ]

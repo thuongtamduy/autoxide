@@ -171,6 +171,7 @@ repo này; giao diện là dự án riêng dùng API.
 | Kiểm ranh giới      | `cargo xtask check` — bố cục, license, lint, chiều phụ thuộc, bề mặt module (D-031) |
 | Kiểm phụ thuộc      | `cargo-deny` (license, lỗ hổng đã công bố, nguồn) — cấu hình `deny.toml`, chạy trong gate |
 | Postgres cho test   | Docker — `gate.sh` tự dựng một container dùng xong bỏ           |
+| Quét secret         | `gitleaks` (cài sẵn hoặc image Docker ghim) — cấu hình `.gitleaks.toml`, chạy trong gate (D-108) |
 | Gate                | `./gate.sh` — chạy tất cả các mục trên theo thứ tự              |
 
 ## Deploy

@@ -154,6 +154,7 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo xtask check                                    # ranh giới workspace, license, lint
 cargo deny check                                     # license, lỗ hổng, nguồn thư viện
+gitleaks git .                                       # secret: cả lịch sử và thay đổi chưa commit
 cargo test --workspace                               # SQLite
 TEST_DATABASE_URL=postgres://… cargo test --workspace  # Postgres (gate tự dựng bằng Docker)
 ```

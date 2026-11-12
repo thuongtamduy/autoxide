@@ -2453,3 +2453,25 @@ protection" của GitHub (miễn phí cho repo công khai, Settings → Code sec
 
 Thay: phần "chạy trên GitHub Actions" của D-074 và phần workflow tự động của D-078; mục "CI chạy
 xanh trên GitHub" và "CI build và đăng image" của bước 13.
+
+## D-108 · Quét secret bằng gitleaks trong gate — 2026-11-12 — chủ dự án quyết, agent quyết cách làm
+
+Quyết định: `./gate.sh` có thêm bước 5 "secrets": gitleaks quét toàn bộ lịch sử git, rồi thay
+đổi đã stage và chưa stage, theo `.gitleaks.toml`. Máy có `gitleaks` thì dùng nó; không thì chạy
+image Docker ghim `zricethezav/gitleaks:v8.30.0` (Docker vốn đã cần cho Postgres của gate; đổi
+bằng `GATE_GITLEAKS_IMAGE`). Có secret thì gate đỏ, không commit được.
+
+Lý do: chủ dự án giữ repo riêng tư (chọn hướng B): GitHub không cho secret scanning miễn phí với
+repo riêng tư, và CI đã tắt (D-107) nên bước gitleaks trong CI (D-074) không còn chạy. Đưa vào
+gate thì mỗi lần "xong" đều được quét, không cần dịch vụ ngoài.
+
+Ngoại lệ: lần quét đầu tìm một chỗ trong lịch sử — khoá ví dụ **công khai** của bộ test chính
+thức Standard Webhooks (`modules/webhooks`, test khớp chữ ký), không phải secret. `.gitleaks.toml`
+thêm một ngoại lệ đúng chuỗi đó, không nới luật nào khác. Đã thử ngược: một khoá giả chưa commit
+làm bước này đỏ.
+
+Đã cân nhắc: chuyển repo sang công khai để dùng secret scanning và CI miễn phí của GitHub (hướng A)
+— chủ dự án chưa muốn; image `ghcr.io/gitleaks/gitleaks` như CI cũ — cùng phiên bản nhưng tải từ
+GHCR không ổn định ở mọi mạng, Docker Hub phổ biến hơn.
+
+Thay: phần quét secret trong CI của D-074; phần "Hệ quả" của D-107 (bật secret scanning của GitHub).
