@@ -363,7 +363,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "autoxide"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "autoxide-ai",
  "autoxide-audit",
@@ -398,7 +398,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-ai"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -420,7 +420,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-audit"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -441,7 +441,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-auth"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "argon2",
  "async-trait",
@@ -471,7 +471,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-comments"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -493,7 +493,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-content"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-files"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -548,7 +548,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-forms"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -570,7 +570,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-idempotency"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -589,7 +589,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-kernel"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-testkit",
@@ -630,7 +630,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-mail"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -648,7 +648,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-media"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -677,7 +677,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-newsletter"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -699,7 +699,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-notes"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -721,7 +721,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-testkit"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -738,7 +738,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-webhooks"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -5460,7 +5460,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xtask"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "serde",
  "serde_json",
