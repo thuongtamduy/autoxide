@@ -178,6 +178,10 @@ A module that keeps data about users takes part in data export and account delet
   service that does not answer, missing initial data) gets a check in `Module::checks`:
   a `Check` whose `Probe` returns a `Finding` (ok, warning or failed, with a hint). It runs
   in `autoxide doctor`; it must not change data. See `modules/files/src/doctor.rs`.
+- Work an operator runs by hand now and then (rebuild derived data after a setting
+  changed, a one-off clean-up) is a task in `Module::tasks`: a `Task` with its
+  `TaskArgument`s and a `TaskRun`, run with `autoxide task <module>.<task> name=value`. It
+  calls the service, like REST does. See `modules/media/src/refresh.rs`.
 
 ### 10. Translations
 

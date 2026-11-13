@@ -3,19 +3,16 @@
 
 use std::sync::{Arc, Mutex};
 
-use autoxide_kernel::access::{Authenticator, Principal};
 use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
 use autoxide_kernel::database::Database;
-use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Delivered, EventCatalog, EventHandler, EventInfo, Outbox};
 use autoxide_kernel::job::{JobContext, JobHandler, JobQueue};
 use autoxide_kernel::migration::{Migrator, ModuleMigrations};
-use autoxide_testkit::TestDatabase;
-use axum::body::Body;
-use axum::http::{HeaderMap, Request, StatusCode, header};
+use autoxide_kernel::module::Module;
+use autoxide_testkit::{TestApp, TestDatabase};
+use axum::http::{HeaderMap, Method, StatusCode, header};
 use sea_orm::{ConnectionTrait, EntityTrait, Statement};
 use serde_json::{Value, json};
-use tower::ServiceExt as _;
 use uuid::Uuid;
 
 use crate::delivery::{Fanout, Sender};
@@ -392,55 +389,47 @@ async fn kiem_dia_chi_va_ten_event() {
     .unwrap();
 }
 
-/// `Bearer admin`: có `webhooks.manage`; còn lại: không có permission nào.
-struct FakeAuthenticator;
+/// Module `demo` giả: chỉ khai event `demo.thing_happened`, để endpoint đăng ký nhận được nó.
+struct Demo;
 
-#[async_trait::async_trait]
-impl Authenticator for FakeAuthenticator {
-    async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
-        let id = Uuid::from_u128(1);
-        Ok(match authorization {
-            Some("Bearer admin") => Principal::new(id, ["webhooks.manage".to_owned()]),
-            _ => Principal::new(id, []),
-        })
+impl Module for Demo {
+    fn name(&self) -> &'static str {
+        "demo"
+    }
+
+    fn events(&self) -> Vec<EventInfo> {
+        vec![EventInfo::new(DEMO_EVENT, "Something happened.")]
     }
 }
 
 #[tokio::test]
 async fn quan_ly_qua_api_khong_lo_secret() {
     TestDatabase::run(async |test| {
-        let setup = setup(test, false).await;
-        let source = ConfigSource::default();
-        let mut reader = ConfigReader::new(&source);
-        let config = Config::read(&mut reader);
-        let (config, _) = reader.finish(config).unwrap();
-        let app = autoxide_kernel::http::build(
-            &config.http,
-            utoipa_axum::router::OpenApiRouter::new(),
-            vec![("webhooks", crate::http::routes(setup.service.clone()))],
-            autoxide_kernel::http::Extras {
-                authenticator: Some(Arc::new(FakeAuthenticator)),
-                ..Default::default()
-            },
-        )
-        .router;
+        // `admin`: có `webhooks.manage`; `nobody`: không có permission nào.
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["webhooks.manage"])
+            .user("nobody", 1, &[])
+            .module(Demo)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
         let call = async |method: &str, path: &str, who: &str, body: Option<Value>| {
-            let request = Request::builder()
-                .method(method)
-                .uri(format!("/api/v1/webhooks{path}"))
-                .header(header::AUTHORIZATION, format!("Bearer {who}"))
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(body.map_or_else(Body::empty, |body| Body::from(body.to_string())))
-                .unwrap();
-            let response = app.clone().oneshot(request).await.unwrap();
-            let status = response.status();
-            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
-            let json = if bytes.is_empty() {
+            let method = Method::from_bytes(method.as_bytes()).unwrap();
+            let mut request = app
+                .request(method, &format!("/api/v1/webhooks{path}"))
+                .token(who)
+                .header(header::CONTENT_TYPE.as_str(), "application/json");
+            if let Some(body) = body {
+                request = request.bytes(body.to_string());
+            }
+            let answer = request.send().await.unwrap();
+            let json = if answer.body().is_empty() {
                 Value::Null
             } else {
-                serde_json::from_slice(&bytes).unwrap()
+                serde_json::from_slice(answer.body()).unwrap()
             };
-            (status, json)
+            (answer.status(), json)
         };
 
         let (status, _) = call("GET", "", "nobody", None).await;

@@ -4053,3 +4053,36 @@ Chưa làm (ghi lại để chủ dự án quyết, đo trong cùng lần thử)
 Với ảnh thử, WebP nhẹ hơn JPEG cùng cỡ khoảng 60–70%, AVIF khoảng 70–80%; bản nhỏ PNG của ảnh
 có vùng trong suốt nặng gần bằng ảnh gốc (1,2 MB ở 1920 px, trong khi WebP có alpha khoảng
 55 KB). Thêm định dạng mới cần thêm thư viện mã hoá (xem ghi chú đầu `variants.rs`).
+
+## D-169 · `autoxide task` và `Module::tasks`; mọi module test HTTP qua `TestApp` — 2026-11-13 — agent quyết
+
+Quyết định:
+
+- Kernel có `autoxide_kernel::task`: `Task` (tên ngắn, mô tả, danh sách `TaskArgument` — tên,
+  mô tả, bắt buộc hay không — và một `TaskRun`), `TaskArgs` (đã kiểm: chỉ tên đã khai, đủ tham
+  số bắt buộc, không trùng; `flag()` đọc `true` / `false`). Module khai qua `Module::tasks` (mặc
+  định rỗng, D-038); kernel thêm tiền tố `<module>.` và kiểm tên, mô tả, tham số lúc liệt kê.
+- Lệnh `autoxide task` liệt kê; `autoxide task <module>.<lệnh> [tên=giá_trị …]` chạy, cần đủ
+  migration. Tham số dạng `tên=giá_trị` (không dùng cờ `--tên`): module không phải phụ thuộc
+  `clap`, và AI agent gọi được theo đúng một mẫu. Mã thoát: 0 xong, 64 gọi sai (như `EX_USAGE`),
+  1 lệnh hỏng, 2 cấu hình sai. Lệnh chạy với quyền người vận hành máy chủ (như `user create`) và
+  gọi service — không có logic riêng (luật 8).
+- Lệnh đầu tiên: `media.refresh_variants [dry_run=true]` — đổi `AUTOXIDE_MEDIA_IMAGE_WIDTHS` thì
+  ảnh cũ giữ bộ ảnh thu nhỏ cũ; lệnh duyệt ảnh theo lô 200, xếp job `media.make_variants` sẵn có
+  cho ảnh có bản ở cỡ đã bỏ hoặc thiếu một cỡ chắc chắn làm được (nhỏ hơn cả hai cạnh — cỡ nằm
+  giữa hai cạnh có thể bị bỏ khi xoay theo EXIF, không tính là thiếu, để chạy lại không xếp mãi).
+  Khoá chống trùng `refresh:<item>:<phiên bản>`: chạy hai lần trước khi worker kịp làm không xếp
+  trùng. Bản ở cỡ đã bỏ nằm lại nơi lưu tới khi job dọn mồ côi của `media` xoá.
+- Các lệnh CLI sẵn có (`user`, `jobs`, `ai check`) giữ nguyên: đổi chúng thành `task` là thay
+  đổi phá vỡ CLI mà không thêm lợi ích.
+- Test HTTP / MCP của mọi module đi qua `TestApp` (trừ `notes/benches`, đo đường thô, và test
+  của chính lớp HTTP trong `crates/kernel/tests`). `TestApp` có thêm `principal(token, Principal)`
+  (bên gọi qua API key) và `TestRequest::body(Body)` (gửi theo từng đoạn). Module `auth` vẫn dựng
+  `Services` riêng cạnh module thật (cùng database, khoá ký, cấu hình) cho test mức service.
+
+Lý do: mượn tasks của Loco / management commands của Django (D-164) — thêm việc quản trị không
+phải sửa binary. Bỏ khoảng 600 dòng dựng app lặp lại trong test của 10 module.
+
+Đã cân nhắc: tham số kiểu `--tên giá_trị` qua `clap` cho từng lệnh — module phải phụ thuộc
+`clap` và khai kiểu riêng; tự chạy `refresh_variants` khi khởi động thấy cấu hình đổi — phải lưu
+cấu hình cũ, và việc nặng chạy ngầm lúc khởi động khó đoán.

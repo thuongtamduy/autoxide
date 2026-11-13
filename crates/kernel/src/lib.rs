@@ -33,6 +33,7 @@ pub mod response;
 pub mod search;
 pub mod secret;
 pub mod storage;
+pub mod task;
 pub mod telemetry;
 pub mod throttle;
 pub mod tls;

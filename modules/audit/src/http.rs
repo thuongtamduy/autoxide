@@ -167,58 +167,23 @@ async fn get_entry(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use autoxide_kernel::access::Authenticator;
-    use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
-    use autoxide_kernel::database::Database;
     use autoxide_kernel::event::{Actor, Delivered, EventHandler};
-    use autoxide_kernel::migration::{Migrator, ModuleMigrations};
-    use autoxide_testkit::TestDatabase;
-    use axum::Router;
-    use axum::body::Body;
-    use axum::http::{Request, StatusCode, header};
+    use autoxide_testkit::{TestApp, TestDatabase};
+    use axum::http::StatusCode;
     use chrono::SubsecRound;
     use serde_json::json;
-    use tower::ServiceExt as _;
 
     /// `Bearer auditor` có `audit.read`; `Bearer nobody` không có gì.
-    struct FakeAuthenticator;
-
-    #[async_trait::async_trait]
-    impl Authenticator for FakeAuthenticator {
-        async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
-            match authorization {
-                Some("Bearer auditor") => {
-                    Ok(Principal::new(Uuid::nil(), ["audit.read".to_owned()]))
-                }
-                _ => Ok(Principal::new(Uuid::nil(), [])),
-            }
-        }
-    }
-
-    async fn setup(test: &TestDatabase) -> (Router, crate::recorder::Recorder) {
-        let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
-        let mut reader = ConfigReader::new(&source);
-        let config = Config::read(&mut reader);
-        let (config, _) = reader.finish(config).unwrap();
-        let database = Database::connect(&config.database).await.unwrap();
-        Migrator::new(vec![ModuleMigrations::new("audit", crate::migration::all())])
-            .unwrap()
-            .up(&database)
+    async fn setup(test: &TestDatabase) -> (TestApp, crate::recorder::Recorder) {
+        let app = TestApp::builder(test)
+            .user("auditor", 0, &["audit.read"])
+            .user("nobody", 0, &[])
+            .module(crate::module())
+            .build()
             .await
             .unwrap();
-        let service = Arc::new(AuditService::new(database.clone()));
-        let authenticator: Arc<dyn Authenticator> = Arc::new(FakeAuthenticator);
-        let router = autoxide_kernel::http::build(
-            &config.http,
-            OpenApiRouter::new(),
-            vec![("audit", routes(service))],
-            autoxide_kernel::http::Extras {
-                authenticator: Some(authenticator),
-                ..Default::default()
-            },
-        )
-        .router;
-        (router, crate::recorder::Recorder::new(database))
+        let recorder = crate::recorder::Recorder::new(app.database().clone());
+        (app, recorder)
     }
 
     fn event(name: &str, actor: Uuid, subject: &str) -> Delivered {
@@ -233,16 +198,9 @@ mod tests {
         }
     }
 
-    async fn get(app: &Router, uri: &str, as_who: &str) -> (StatusCode, Value) {
-        let request = Request::builder()
-            .uri(uri)
-            .header(header::AUTHORIZATION, format!("Bearer {as_who}"))
-            .body(Body::empty())
-            .unwrap();
-        let response = app.clone().oneshot(request).await.unwrap();
-        let status = response.status();
-        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        (status, serde_json::from_slice(&bytes).unwrap())
+    async fn get(app: &TestApp, uri: &str, as_who: &str) -> (StatusCode, Value) {
+        let answer = app.get(uri).token(as_who).send().await.unwrap();
+        (answer.status(), serde_json::from_slice(answer.body()).unwrap())
     }
 
     #[tokio::test]

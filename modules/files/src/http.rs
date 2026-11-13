@@ -258,66 +258,35 @@ fn content_disposition(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use autoxide_kernel::access::Authenticator;
-    use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
-    use autoxide_kernel::http::BodyLimit;
-    use autoxide_testkit::TestDatabase;
-    use axum::Router;
-    use axum::http::{Method, Request};
+    use autoxide_testkit::{TestApp, TestDatabase, TestRequest};
     use serde_json::Value;
-    use tower::ServiceExt as _;
 
-    use crate::config::Limits;
-
-    /// `Bearer ada`: người dùng có `files.upload`; còn lại: không có permission nào.
-    struct FakeAuthenticator(Uuid);
-
-    #[async_trait::async_trait]
-    impl Authenticator for FakeAuthenticator {
-        async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
-            Ok(match authorization {
-                Some("Bearer ada") => Principal::new(self.0, ["files.upload".to_owned()]),
-                _ => Principal::new(Uuid::now_v7(), []),
-            })
-        }
-    }
-
-    async fn app(test: &TestDatabase) -> Router {
-        let limits = Limits { max_bytes: 64, allowed_types: Some(vec!["text/*".into()]) };
-        let (service, _) = crate::testing::service(test, limits).await;
-        let source = ConfigSource::default();
-        let mut reader = ConfigReader::new(&source);
-        let config = Config::read(&mut reader);
-        let (config, _) = reader.finish(config).unwrap();
-        let authenticator: Arc<dyn Authenticator> = Arc::new(FakeAuthenticator(Uuid::now_v7()));
-        autoxide_kernel::http::build(
-            &config.http,
-            OpenApiRouter::new(),
-            vec![("files", routes(service))],
-            autoxide_kernel::http::Extras {
-                authenticator: Some(authenticator),
-                body_limits: vec![("files", BodyLimit::new(Method::POST, "/", 64))],
-                ..Default::default()
-            },
-        )
-        .router
-    }
-
-    async fn send(app: &Router, request: Request<Body>) -> (StatusCode, HeaderMap, Vec<u8>) {
-        let response = app.clone().oneshot(request).await.unwrap();
-        let (parts, body) = response.into_parts();
-        let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
-        (parts.status, parts.headers, bytes.to_vec())
-    }
-
-    fn upload(name: &str, content_type: &str, body: Body) -> Request<Body> {
-        Request::builder()
-            .method("POST")
-            .uri(format!("/api/v1/files?name={name}"))
-            .header(header::AUTHORIZATION, "Bearer ada")
-            .header(header::CONTENT_TYPE, content_type)
-            .body(body)
+    /// `ada`: người dùng có `files.upload`; `nobody`: không có permission nào. File lưu trên
+    /// đĩa, trong một thư mục tạm riêng; tối đa 64 byte, chỉ `text/*`.
+    async fn app(test: &TestDatabase) -> TestApp {
+        let dir = std::env::temp_dir().join(format!("autoxide-files-{}", Uuid::now_v7()));
+        TestApp::builder(test)
+            .setting("AUTOXIDE_FILES_DIR", dir.to_str().unwrap())
+            .setting("AUTOXIDE_FILES_MAX_BYTES", "64")
+            .setting("AUTOXIDE_FILES_ALLOWED_TYPES", "text/*")
+            .user("ada", 0xada, &["files.upload"])
+            .user("nobody", 0xb0b, &[])
+            .module(crate::module())
+            .build()
+            .await
             .unwrap()
+    }
+
+    async fn send(request: TestRequest<'_>) -> (StatusCode, HeaderMap, Vec<u8>) {
+        let answer = request.send().await.unwrap();
+        (answer.status(), answer.headers().clone(), answer.body().to_vec())
+    }
+
+    fn upload<'a>(app: &'a TestApp, name: &str, content_type: &str, body: Body) -> TestRequest<'a> {
+        app.post(&format!("/api/v1/files?name={name}"))
+            .token("ada")
+            .header(header::CONTENT_TYPE.as_str(), content_type)
+            .body(body)
     }
 
     fn json(bytes: &[u8]) -> Value {
@@ -330,18 +299,14 @@ mod tests {
             let app = app(test).await;
 
             let (status, _, body) =
-                send(&app, upload("b%C3%A1o.txt", "text/plain", Body::from("hello"))).await;
+                send(upload(&app, "b%C3%A1o.txt", "text/plain", Body::from("hello"))).await;
             assert_eq!(status, StatusCode::CREATED, "{}", String::from_utf8_lossy(&body));
             let file = json(&body)["data"].clone();
             assert_eq!((file["name"].as_str(), file["size"].as_u64()), (Some("báo.txt"), Some(5)));
 
             let id = file["id"].as_str().unwrap();
-            let request = Request::builder()
-                .uri(format!("/api/v1/files/{id}/content"))
-                .header(header::AUTHORIZATION, "Bearer ada")
-                .body(Body::empty())
-                .unwrap();
-            let (status, headers, content) = send(&app, request).await;
+            let request = app.get(&format!("/api/v1/files/{id}/content")).token("ada");
+            let (status, headers, content) = send(request).await;
             assert_eq!(status, StatusCode::OK);
             assert_eq!(content, b"hello");
             assert_eq!(headers[header::CONTENT_TYPE], "text/plain");
@@ -351,9 +316,8 @@ mod tests {
             assert!(disposition.ends_with("filename*=UTF-8''b%C3%A1o.txt"), "{disposition}");
 
             // Người không có permission.
-            let request =
-                Request::builder().uri(format!("/api/v1/files/{id}")).body(Body::empty()).unwrap();
-            assert_eq!(send(&app, request).await.0, StatusCode::FORBIDDEN);
+            let request = app.get(&format!("/api/v1/files/{id}")).token("nobody");
+            assert_eq!(send(request).await.0, StatusCode::FORBIDDEN);
         })
         .await
         .unwrap();
@@ -366,9 +330,9 @@ mod tests {
             let large = "x".repeat(65);
 
             // Có `Content-Length`: kernel chặn trước khi đọc.
-            let mut request = upload("a.txt", "text/plain", Body::from(large.clone()));
-            request.headers_mut().insert(header::CONTENT_LENGTH, HeaderValue::from(65));
-            let (status, _, body) = send(&app, request).await;
+            let request = upload(&app, "a.txt", "text/plain", Body::from(large.clone()))
+                .header(header::CONTENT_LENGTH.as_str(), "65");
+            let (status, _, body) = send(request).await;
             assert_eq!(
                 (status, json(&body)["code"].clone()),
                 (StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large".into())
@@ -376,14 +340,14 @@ mod tests {
             // Gửi theo từng đoạn: dừng khi vượt.
             let stream = futures_util::stream::iter([Ok::<_, std::io::Error>(large)]);
             let (status, _, body) =
-                send(&app, upload("a.txt", "text/plain", Body::from_stream(stream))).await;
+                send(upload(&app, "a.txt", "text/plain", Body::from_stream(stream))).await;
             assert_eq!(
                 (status, json(&body)["code"].clone()),
                 (StatusCode::PAYLOAD_TOO_LARGE, "files.too_large".into())
             );
 
             let (status, _, body) =
-                send(&app, upload("a.pdf", "application/pdf", Body::from("x"))).await;
+                send(upload(&app, "a.pdf", "application/pdf", Body::from("x"))).await;
             assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
             assert_eq!(json(&body)["code"], "files.type_not_allowed");
         })

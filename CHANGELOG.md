@@ -9,6 +9,16 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- `autoxide task`: lists and runs maintenance tasks that modules declare (`Module::tasks`).
+  The first one, `media.refresh_variants [dry_run=true]`, queues new smaller copies for images
+  uploaded before `AUTOXIDE_MEDIA_IMAGE_WIDTHS` changed.
+
+### Changed
+
+- `autoxide-testkit`: every module's HTTP tests use `TestApp`.
+
 ## [0.8.0] - 2026-11-13
 
 ### Added

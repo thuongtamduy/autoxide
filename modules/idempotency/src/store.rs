@@ -186,14 +186,10 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
-    use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
-    use autoxide_kernel::migration::{Migrator, ModuleMigrations};
-    use autoxide_testkit::TestDatabase;
-    use axum::Router;
-    use axum::body::Body;
+    use autoxide_kernel::module::Module;
+    use autoxide_testkit::{TestApp, TestDatabase};
     use axum::extract::State;
-    use axum::http::{Request, StatusCode};
-    use tower::ServiceExt as _;
+    use axum::http::StatusCode;
     use utoipa_axum::router::OpenApiRouter;
     use utoipa_axum::routes;
 
@@ -232,56 +228,38 @@ mod tests {
         (StatusCode::CREATED, text).into_response()
     }
 
-    /// `Bearer ada` và `Bearer ada-renewed` là cùng một người (token vừa làm mới);
-    /// `Bearer bob` là người khác; không token thì không xác thực được.
-    struct FakeAuthenticator;
+    /// Module `notes` giả: một route `POST /api/v1/notes` đếm số lần chạy.
+    struct Notes(Arc<Counter>);
 
-    #[async_trait::async_trait]
-    impl autoxide_kernel::access::Authenticator for FakeAuthenticator {
-        async fn authenticate(
-            &self,
-            authorization: Option<&str>,
-        ) -> Result<autoxide_kernel::access::Principal, autoxide_kernel::error::Error> {
-            let user = match authorization {
-                Some("Bearer ada" | "Bearer ada-renewed") => 1,
-                Some("Bearer bob") => 2,
-                _ => return Err(autoxide_kernel::error::Error::internal("unknown test token")),
-            };
-            Ok(autoxide_kernel::access::Principal::new(uuid::Uuid::from_u128(user), []))
+    impl Module for Notes {
+        fn name(&self) -> &'static str {
+            "notes"
+        }
+
+        fn routes(&self) -> OpenApiRouter {
+            OpenApiRouter::new().routes(routes!(create)).with_state(self.0.clone())
         }
     }
 
-    async fn setup(test: &TestDatabase) -> (Router, Arc<Counter>, Database) {
-        let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
-        let mut reader = ConfigReader::new(&source);
-        let config = Config::read(&mut reader);
-        let (config, _) = reader.finish(config).unwrap();
-        let database = Database::connect(&config.database).await.unwrap();
-        Migrator::new(vec![ModuleMigrations::new("idempotency", crate::migration::all())])
-            .unwrap()
-            .up(&database)
+    /// `Bearer ada` và `Bearer ada-renewed` là cùng một người (token vừa làm mới);
+    /// `Bearer bob` là người khác; không token thì không xác thực được.
+    async fn setup(test: &TestDatabase) -> (TestApp, Arc<Counter>, Database) {
+        let counter = Arc::new(Counter::default());
+        let app = TestApp::builder(test)
+            .user("ada", 1, &[])
+            .user("ada-renewed", 1, &[])
+            .user("bob", 2, &[])
+            .module(crate::module())
+            .module(Notes(counter.clone()))
+            .build()
             .await
             .unwrap();
-        let counter = Arc::new(Counter::default());
-        let routes = OpenApiRouter::new().routes(routes!(create)).with_state(counter.clone());
-        let store: Arc<dyn IdempotencyStore> = Arc::new(Store::new(database.clone()));
-        let extras = autoxide_kernel::http::Extras {
-            idempotency: Some(store),
-            authenticator: Some(Arc::new(FakeAuthenticator)),
-            ..Default::default()
-        };
-        let router = autoxide_kernel::http::build(
-            &config.http,
-            OpenApiRouter::new(),
-            vec![("notes", routes)],
-            extras,
-        )
-        .router;
-        (router, counter, database)
+        let database = app.database().clone();
+        (app, counter, database)
     }
 
     async fn post(
-        app: &Router,
+        app: &TestApp,
         key: Option<&str>,
         body: &str,
     ) -> (StatusCode, Option<String>, String) {
@@ -289,28 +267,25 @@ mod tests {
     }
 
     async fn post_as(
-        app: &Router,
+        app: &TestApp,
         authorization: Option<&str>,
         uri: &str,
         key: Option<&str>,
         body: &str,
     ) -> (StatusCode, Option<String>, String) {
-        let mut request = Request::builder().method("POST").uri(uri);
+        let mut request = app.post(uri);
         if let Some(authorization) = authorization {
             request = request.header("authorization", authorization);
         }
         if let Some(key) = key {
             request = request.header("idempotency-key", key);
         }
-        let request = request.body(Body::from(body.to_owned())).unwrap();
-        let response = app.clone().oneshot(request).await.unwrap();
-        let status = response.status();
-        let replayed = response
+        let answer = request.bytes(body.to_owned()).send().await.unwrap();
+        let replayed = answer
             .headers()
             .get("idempotent-replayed")
             .map(|value| value.to_str().unwrap().to_owned());
-        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        (status, replayed, String::from_utf8(bytes.to_vec()).unwrap())
+        (answer.status(), replayed, String::from_utf8(answer.body().to_vec()).unwrap())
     }
 
     #[tokio::test]
@@ -397,6 +372,8 @@ mod tests {
     async fn gui_trung_dong_thoi_chi_chay_mot_lan() {
         TestDatabase::run(async |test| {
             let (app, counter, _) = setup(test).await;
+            // `Arc`: mỗi task giữ một tham chiếu tới cùng app, sống tới khi task xong.
+            let app = Arc::new(app);
 
             let attempts: Vec<_> = (0..6)
                 .map(|_| {

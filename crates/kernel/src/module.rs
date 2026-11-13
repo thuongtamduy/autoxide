@@ -148,6 +148,13 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Lệnh quản trị của module cho `autoxide task` (D-169): việc người vận hành chạy tay,
+    /// vd làm lại dữ liệu dẫn xuất sau khi đổi cấu hình. Gọi sau `start`. Tên khai ngắn
+    /// (`refresh_variants`); kernel thêm tiền tố `<module>.`.
+    fn tasks(&self) -> Vec<crate::task::Task> {
+        Vec::new()
+    }
+
     /// Route cần thân request lớn hơn giới hạn chung (`AUTOXIDE_HTTP_BODY_LIMIT_BYTES`),
     /// vd tải file lên. Gọi sau `configure` (giới hạn có thể lấy từ cấu hình của module).
     fn body_limits(&self) -> Vec<crate::http::BodyLimit> {
@@ -655,6 +662,44 @@ impl Modules {
             .iter()
             .flat_map(|module| module.checks().into_iter().map(|check| (module.name(), check)))
             .collect()
+    }
+
+    /// Lệnh quản trị của mọi module, tên đầy đủ `<module>.<lệnh>`, theo thứ tự đăng ký. Gọi sau
+    /// [`start`](Self::start). Tên sai dạng, trùng, thiếu mô tả hay tham số trùng tên là lỗi.
+    pub fn tasks(&self) -> Result<Vec<(String, crate::task::Task)>, ModuleError> {
+        let mut found = Vec::new();
+        let mut problems = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+        for module in &self.modules {
+            for task in module.tasks() {
+                let full = format!("{}.{}", module.name(), task.name);
+                if !crate::task::valid_name(task.name) {
+                    problems.push(format!(
+                        "task `{full}`: the name must use lowercase letters, digits and `_`"
+                    ));
+                }
+                if task.description.trim().is_empty() {
+                    problems.push(format!("task `{full}` has no description"));
+                }
+                let mut arguments = std::collections::BTreeSet::new();
+                for argument in &task.arguments {
+                    if !crate::task::valid_name(argument.name) || !arguments.insert(argument.name) {
+                        problems.push(format!(
+                            "task `{full}`: argument `{}` is malformed or declared twice",
+                            argument.name
+                        ));
+                    }
+                }
+                if !seen.insert(full.clone()) {
+                    problems.push(format!("task `{full}` is declared twice"));
+                }
+                found.push((full, task));
+            }
+        }
+        if !problems.is_empty() {
+            return Err(ModuleError(problems.join("; ")));
+        }
+        Ok(found)
     }
 
     /// Route của từng module kèm tên module, theo thứ tự đăng ký. Gọi sau

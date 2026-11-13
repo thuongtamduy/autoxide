@@ -4,159 +4,75 @@
 
 use std::sync::Arc;
 
-use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
-use autoxide_kernel::error::Error;
-use autoxide_kernel::module::{Module, Modules, StartContext};
+use autoxide_kernel::access::Principal;
+use autoxide_kernel::ai::{Embedder, TextModel};
 use autoxide_media::api::Media;
-use autoxide_testkit::TestDatabase;
-use axum::Router;
-use axum::body::Body;
-use axum::http::{HeaderMap, Request, StatusCode, header};
-use rmcp::ServiceExt as _;
-use rmcp::model::CallToolRequestParams;
-use rmcp::transport::StreamableHttpClientTransport;
-use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
+use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
+use autoxide_testkit::{TestApp, TestDatabase, TestResponse, tool};
+use axum::http::{Method, StatusCode, header};
 use serde_json::{Value, json};
-use tower::ServiceExt as _;
+use uuid::Uuid;
 
 use crate::testing::FakeMedia;
 
-#[cfg(test)]
-mod fake {
-    //! Bộ xác thực giả (chỉ có trong test; `cargo xtask check` bỏ qua phần `#[cfg(test)]`).
-
-    use autoxide_kernel::access::{Authenticator, Principal};
-    use autoxide_kernel::error::Error;
-    use uuid::Uuid;
-
-    /// Token → permission: `admin` mọi quyền của module; `reader` chỉ đọc.
-    pub(super) struct FakeAuthenticator;
-
-    #[async_trait::async_trait]
-    impl Authenticator for FakeAuthenticator {
-        async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
-            let permissions: &[&str] = match authorization {
-                Some("Bearer admin") => &[
-                    "content.read",
-                    "content.write",
-                    "content.publish",
-                    "content.delete",
-                    "content.manage",
-                ],
-                Some("Bearer reader") => &["content.read"],
-                Some("Bearer agent") => {
-                    let permissions = ["content.read", "content.write_own"];
-                    return Ok(Principal::new(Uuid::from_u128(2), permissions.map(str::to_owned))
-                        .via_api_key(Uuid::from_u128(3)));
-                }
-                _ => {
-                    return Err(Error::unauthenticated(
-                        "auth.invalid_token",
-                        "The token is not valid.",
-                    ));
-                }
-            };
-            Ok(Principal::new(Uuid::from_u128(1), permissions.iter().map(|p| (*p).to_owned())))
-        }
-    }
-}
-
-use fake::FakeAuthenticator;
-
-/// Module giả công bố thư viện media, thay cho module `media`.
-struct TestMedia(Arc<FakeMedia>);
-
-impl Module for TestMedia {
-    fn name(&self) -> &'static str {
-        "testmedia"
-    }
-
-    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
-        let media: Arc<dyn Media> = self.0.clone();
-        context.provide::<dyn Media>(media)?;
-        // Module `ai` giả (đã tắt): `content` cần `dyn TextModel` và `dyn Embedder`.
-        let ai: Arc<dyn autoxide_kernel::ai::TextModel> =
-            Arc::new(autoxide_testkit::ai::FakeTextModel::disabled());
-        context.provide::<dyn autoxide_kernel::ai::TextModel>(ai)?;
-        let embedder: Arc<dyn autoxide_kernel::ai::Embedder> =
-            Arc::new(autoxide_testkit::ai::FakeEmbedder::disabled());
-        context.provide::<dyn autoxide_kernel::ai::Embedder>(embedder)
-    }
-}
-
 const SECRET: &str = "a-test-secret-that-is-long-enough-0123456789";
 
-async fn app(test: &TestDatabase) -> Router {
-    let source = ConfigSource::from_pairs([
-        ("DATABASE_URL", test.url()),
-        ("AUTOXIDE_CONTENT_PREVIEW_SECRET", SECRET),
-    ]);
-    let mut reader = ConfigReader::new(&source);
-    let config = Config::read(&mut reader);
-    let media = Arc::new(FakeMedia::default());
-    let mut modules =
-        Modules::new(vec![Box::new(TestMedia(media)), Box::new(crate::module())]).unwrap();
-    let configured = modules.configure(&mut reader);
-    let (config, _) = reader.finish(config.and_then(|config| configured.map(|_| config))).unwrap();
-    let database = autoxide_kernel::database::Database::connect(&config.database).await.unwrap();
-    modules.migrator().unwrap().up(&database).await.unwrap();
-    modules.start(&database).unwrap();
-    let extras = autoxide_kernel::http::Extras {
-        authenticator: Some(Arc::new(FakeAuthenticator)),
-        tools: modules.tools().unwrap(),
-        translations: modules.translations().clone(),
-        body_limits: modules.body_limits(),
-        ..Default::default()
-    };
-    autoxide_kernel::http::build(
-        &config.http,
-        utoipa_axum::router::OpenApiRouter::new(),
-        modules.routes(),
-        extras,
-    )
-    .router
-}
-
-struct Answer {
-    status: StatusCode,
-    headers: HeaderMap,
-    body: Vec<u8>,
-}
-
-impl Answer {
-    fn json(&self) -> Value {
-        serde_json::from_slice(&self.body).unwrap_or(Value::Null)
-    }
-
-    fn header(&self, name: header::HeaderName) -> &str {
-        self.headers.get(name).map_or("", |value| value.to_str().unwrap())
-    }
+/// Token → permission: `admin` mọi quyền của module; `reader` chỉ đọc; `agent` gọi bằng API key,
+/// chỉ viết bài của mình. Thư viện media giả thay cho module `media`; module `ai` giả (đã tắt):
+/// `content` cần `dyn TextModel` và `dyn Embedder`.
+async fn app(test: &TestDatabase) -> TestApp {
+    let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+    let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+    let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+    let agent = ["content.read", "content.write_own"].map(str::to_owned);
+    TestApp::builder(test)
+        .setting("AUTOXIDE_CONTENT_PREVIEW_SECRET", SECRET)
+        .user(
+            "admin",
+            1,
+            &[
+                "content.read",
+                "content.write",
+                "content.publish",
+                "content.delete",
+                "content.manage",
+            ],
+        )
+        .user("reader", 1, &["content.read"])
+        .principal(
+            "agent",
+            Principal::new(Uuid::from_u128(2), agent).via_api_key(Uuid::from_u128(3)),
+        )
+        .provide::<dyn Media>(media)
+        .provide::<dyn TextModel>(text)
+        .provide::<dyn Embedder>(embedder)
+        .module(crate::module())
+        .build()
+        .await
+        .unwrap()
 }
 
 /// Gửi request; `who`: token (`None`: không đăng nhập); `headers`: header thêm vào.
 async fn send(
-    router: &Router,
+    app: &TestApp,
     method: &str,
     uri: &str,
     who: Option<&str>,
     headers: &[(&str, &str)],
     body: Option<Value>,
-) -> Answer {
-    let mut request = Request::builder().method(method).uri(format!("/api/v1/content{uri}"));
+) -> TestResponse {
+    let method = Method::from_bytes(method.as_bytes()).unwrap();
+    let mut request = app.request(method, &format!("/api/v1/content{uri}"));
     if let Some(who) = who {
-        request = request.header("authorization", format!("Bearer {who}"));
+        request = request.token(who);
     }
-    if body.is_some() {
-        request = request.header("content-type", "application/json");
+    if let Some(body) = body {
+        request = request.json(body);
     }
     for (name, value) in headers {
-        request = request.header(*name, *value);
+        request = request.header(name, value);
     }
-    let body = body.map_or_else(Body::empty, |body| Body::from(body.to_string()));
-    let response = router.clone().oneshot(request.body(body).unwrap()).await;
-    let (parts, body) = response.unwrap().into_parts();
-    let body = axum::body::to_bytes(body, usize::MAX).await.unwrap().to_vec();
-    Answer { status: parts.status, headers: parts.headers, body }
+    request.send().await.unwrap()
 }
 
 /// Vòng đời qua HTTP và mọi endpoint công khai: nháp không bao giờ lộ; `If-Match` bắt buộc;
@@ -164,86 +80,86 @@ async fn send(
 #[tokio::test]
 async fn vong_doi_va_endpoint_cong_khai() {
     TestDatabase::run(async |test| {
-        let router = app(test).await;
-        let created = send(&router, "POST", "/entries", Some("admin"), &[], Some(json!({"kind": "post", "title": "Đường đến Đà Lạt"}))).await;
-        assert_eq!(created.status, StatusCode::CREATED, "{}", created.json());
+        let app = app(test).await;
+        let created = send(&app, "POST", "/entries", Some("admin"), &[], Some(json!({"kind": "post", "title": "Đường đến Đà Lạt"}))).await;
+        assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
         let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
-        let read = send(&router, "GET", &format!("/entries/{id}"), Some("admin"), &[], None).await;
+        let read = send(&app, "GET", &format!("/entries/{id}"), Some("admin"), &[], None).await;
         let etag = read.header(header::ETAG).to_owned();
 
         let change = json!({"excerpt": "Một chuyến đi"});
-        let missing = send(&router, "PATCH", &format!("/entries/{id}"), Some("admin"), &[], Some(change.clone())).await;
-        assert_eq!((missing.status, missing.json()["code"].as_str()), (StatusCode::PRECONDITION_REQUIRED, Some("precondition_required")));
-        let changed = send(&router, "PATCH", &format!("/entries/{id}"), Some("admin"), &[("if-match", &etag)], Some(change.clone())).await;
-        assert_eq!(changed.status, StatusCode::OK, "{}", changed.json());
-        let stale = send(&router, "PATCH", &format!("/entries/{id}"), Some("admin"), &[("if-match", &etag)], Some(change)).await;
-        assert_eq!(stale.status, StatusCode::PRECONDITION_FAILED);
+        let missing = send(&app, "PATCH", &format!("/entries/{id}"), Some("admin"), &[], Some(change.clone())).await;
+        assert_eq!((missing.status(), missing.json()["code"].as_str()), (StatusCode::PRECONDITION_REQUIRED, Some("precondition_required")));
+        let changed = send(&app, "PATCH", &format!("/entries/{id}"), Some("admin"), &[("if-match", &etag)], Some(change.clone())).await;
+        assert_eq!(changed.status(), StatusCode::OK, "{}", changed.json());
+        let stale = send(&app, "PATCH", &format!("/entries/{id}"), Some("admin"), &[("if-match", &etag)], Some(change)).await;
+        assert_eq!(stale.status(), StatusCode::PRECONDITION_FAILED);
         let etag = changed.header(header::ETAG).to_owned();
 
         // Nháp: không endpoint công khai nào thấy.
         let path = "/public/resolve?locale=en&path=/blog/duong-den-da-lat";
-        assert_eq!(send(&router, "GET", path, None, &[], None).await.status, StatusCode::NOT_FOUND);
-        assert_eq!(send(&router, "GET", "/public/posts?locale=en", None, &[], None).await.json()["data"], json!([]));
-        assert_eq!(send(&router, "GET", "/public/sitemap", None, &[], None).await.json()["data"], json!([]));
-        assert_eq!(send(&router, "GET", "/public/feed?locale=en", None, &[], None).await.json()["data"], json!([]));
+        assert_eq!(send(&app, "GET", path, None, &[], None).await.status(), StatusCode::NOT_FOUND);
+        assert_eq!(send(&app, "GET", "/public/posts?locale=en", None, &[], None).await.json()["data"], json!([]));
+        assert_eq!(send(&app, "GET", "/public/sitemap", None, &[], None).await.json()["data"], json!([]));
+        assert_eq!(send(&app, "GET", "/public/feed?locale=en", None, &[], None).await.json()["data"], json!([]));
 
-        let reader_publish = send(&router, "POST", &format!("/entries/{id}/publish"), Some("reader"), &[("if-match", &etag)], None).await;
-        assert_eq!(reader_publish.status, StatusCode::FORBIDDEN);
-        let published = send(&router, "POST", &format!("/entries/{id}/publish"), Some("admin"), &[("if-match", &etag)], None).await;
-        assert_eq!(published.status, StatusCode::OK, "{}", published.json());
+        let reader_publish = send(&app, "POST", &format!("/entries/{id}/publish"), Some("reader"), &[("if-match", &etag)], None).await;
+        assert_eq!(reader_publish.status(), StatusCode::FORBIDDEN);
+        let published = send(&app, "POST", &format!("/entries/{id}/publish"), Some("admin"), &[("if-match", &etag)], None).await;
+        assert_eq!(published.status(), StatusCode::OK, "{}", published.json());
 
-        let found = send(&router, "GET", path, None, &[], None).await;
-        assert_eq!(found.status, StatusCode::OK, "{}", found.json());
+        let found = send(&app, "GET", path, None, &[], None).await;
+        assert_eq!(found.status(), StatusCode::OK, "{}", found.json());
         assert_eq!((found.json()["data"]["type"].as_str(), found.json()["data"]["entry"]["excerpt"].as_str()), (Some("entry"), Some("Một chuyến đi")));
         assert_eq!(found.header(header::CACHE_CONTROL), "public, no-cache");
         let public_etag = found.header(header::ETAG).to_owned();
-        let again = send(&router, "GET", path, None, &[("if-none-match", &public_etag)], None).await;
-        assert_eq!(again.status, StatusCode::NOT_MODIFIED);
-        let vi = send(&router, "GET", "/public/resolve?locale=vi&path=/blog/duong-den-da-lat", None, &[], None).await;
-        assert_eq!((vi.status, vi.json()["code"].as_str()), (StatusCode::NOT_FOUND, Some("content.not_found")), "no fallback");
-        let unsupported = send(&router, "GET", "/public/resolve?locale=fr&path=/x", None, &[], None).await;
-        assert_eq!(unsupported.status, StatusCode::UNPROCESSABLE_ENTITY);
+        let again = send(&app, "GET", path, None, &[("if-none-match", &public_etag)], None).await;
+        assert_eq!(again.status(), StatusCode::NOT_MODIFIED);
+        let vi = send(&app, "GET", "/public/resolve?locale=vi&path=/blog/duong-den-da-lat", None, &[], None).await;
+        assert_eq!((vi.status(), vi.json()["code"].as_str()), (StatusCode::NOT_FOUND, Some("content.not_found")), "no fallback");
+        let unsupported = send(&app, "GET", "/public/resolve?locale=fr&path=/x", None, &[], None).await;
+        assert_eq!(unsupported.status(), StatusCode::UNPROCESSABLE_ENTITY);
 
-        let posts = send(&router, "GET", "/public/posts?locale=en&q=da%20lat", None, &[], None).await.json();
+        let posts = send(&app, "GET", "/public/posts?locale=en&q=da%20lat", None, &[], None).await.json();
         assert_eq!(posts["data"][0]["path"], "/blog/duong-den-da-lat");
         // Câu tìm công khai có giới hạn độ dài (như tìm theo ý nghĩa).
-        let longest = send(&router, "GET", &format!("/public/posts?locale=en&q={}", "a".repeat(200)), None, &[], None).await;
-        assert_eq!(longest.status, StatusCode::OK);
-        let too_long = send(&router, "GET", &format!("/public/posts?locale=en&q={}", "a".repeat(201)), None, &[], None).await;
-        assert_eq!((too_long.status, too_long.json()["errors"][0]["field"].as_str()), (StatusCode::UNPROCESSABLE_ENTITY, Some("q")));
-        let sitemap = send(&router, "GET", "/public/sitemap?locale=en", None, &[], None).await.json();
+        let longest = send(&app, "GET", &format!("/public/posts?locale=en&q={}", "a".repeat(200)), None, &[], None).await;
+        assert_eq!(longest.status(), StatusCode::OK);
+        let too_long = send(&app, "GET", &format!("/public/posts?locale=en&q={}", "a".repeat(201)), None, &[], None).await;
+        assert_eq!((too_long.status(), too_long.json()["errors"][0]["field"].as_str()), (StatusCode::UNPROCESSABLE_ENTITY, Some("q")));
+        let sitemap = send(&app, "GET", "/public/sitemap?locale=en", None, &[], None).await.json();
         assert_eq!((sitemap["data"][0]["path"].as_str(), sitemap["data"][0]["kind"].as_str()), (Some("/blog/duong-den-da-lat"), Some("post")));
-        assert_eq!(send(&router, "GET", "/public/feed?locale=en&limit=5", None, &[], None).await.json()["data"].as_array().unwrap().len(), 1);
-        assert_eq!(send(&router, "GET", "/public/feed?locale=en&limit=0", None, &[], None).await.status, StatusCode::UNPROCESSABLE_ENTITY);
-        let author = send(&router, "GET", "/public/authors/nobody", None, &[], None).await;
+        assert_eq!(send(&app, "GET", "/public/feed?locale=en&limit=5", None, &[], None).await.json()["data"].as_array().unwrap().len(), 1);
+        assert_eq!(send(&app, "GET", "/public/feed?locale=en&limit=0", None, &[], None).await.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let author = send(&app, "GET", "/public/authors/nobody", None, &[], None).await;
         assert_eq!(author.json()["code"], "content.author_not_found");
 
         let menu = json!({"items": [{"label": "Blog", "entry_id": id}]});
-        let put = send(&router, "PUT", "/menus/main?locale=en", Some("admin"), &[("if-match", "*")], Some(menu)).await;
-        assert_eq!(put.status, StatusCode::OK, "{}", put.json());
-        let public_menu = send(&router, "GET", "/public/menus/main?locale=vi", None, &[], None).await.json();
+        let put = send(&app, "PUT", "/menus/main?locale=en", Some("admin"), &[("if-match", "*")], Some(menu)).await;
+        assert_eq!(put.status(), StatusCode::OK, "{}", put.json());
+        let public_menu = send(&app, "GET", "/public/menus/main?locale=vi", None, &[], None).await.json();
         assert_eq!((public_menu["data"]["locale"].as_str(), public_menu["data"]["items"][0]["href"].as_str()), (Some("en"), Some("/blog/duong-den-da-lat")));
 
         // Link xem trước: thấy bản nháp mới nhất, không được cache.
-        let draft = send(&router, "GET", &format!("/entries/{id}"), Some("admin"), &[], None).await;
+        let draft = send(&app, "GET", &format!("/entries/{id}"), Some("admin"), &[], None).await;
         let draft_etag = draft.header(header::ETAG).to_owned();
         let edit = json!({"title": "Bản nháp mới"});
-        send(&router, "PATCH", &format!("/entries/{id}"), Some("admin"), &[("if-match", &draft_etag)], Some(edit)).await;
-        let denied = send(&router, "POST", &format!("/entries/{id}/preview-token"), Some("reader"), &[], None).await;
-        assert_eq!(denied.status, StatusCode::FORBIDDEN);
-        let token = send(&router, "POST", &format!("/entries/{id}/preview-token"), Some("admin"), &[], None).await.json();
+        send(&app, "PATCH", &format!("/entries/{id}"), Some("admin"), &[("if-match", &draft_etag)], Some(edit)).await;
+        let denied = send(&app, "POST", &format!("/entries/{id}/preview-token"), Some("reader"), &[], None).await;
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+        let token = send(&app, "POST", &format!("/entries/{id}/preview-token"), Some("admin"), &[], None).await.json();
         let token = token["data"]["token"].as_str().unwrap().to_owned();
-        let preview = send(&router, "GET", &format!("/public/preview?token={token}"), None, &[], None).await;
-        assert_eq!((preview.status, preview.json()["data"]["title"].as_str()), (StatusCode::OK, Some("Bản nháp mới")));
+        let preview = send(&app, "GET", &format!("/public/preview?token={token}"), None, &[], None).await;
+        assert_eq!((preview.status(), preview.json()["data"]["title"].as_str()), (StatusCode::OK, Some("Bản nháp mới")));
         assert_eq!(preview.header(header::CACHE_CONTROL), "no-store");
         // Token có thể tới tay người ngoài: không lộ ID người dùng hay trường nội bộ.
         let shown = preview.json()["data"].clone();
         for internal in ["created_by", "created_via", "review_requested_by", "review_requested_at", "translated_from_revision_id"] {
             assert!(shown.get(internal).is_none(), "preview shows {internal}");
         }
-        assert_eq!(send(&router, "GET", path, None, &[], None).await.json()["data"]["entry"]["title"], "Đường đến Đà Lạt", "readers still see the published version");
-        let bad = send(&router, "GET", "/public/preview?token=abc.def", None, &[], None).await;
-        assert_eq!((bad.status, bad.json()["code"].as_str()), (StatusCode::NOT_FOUND, Some("content.preview_token_invalid")));
+        assert_eq!(send(&app, "GET", path, None, &[], None).await.json()["data"]["entry"]["title"], "Đường đến Đà Lạt", "readers still see the published version");
+        let bad = send(&app, "GET", "/public/preview?token=abc.def", None, &[], None).await;
+        assert_eq!((bad.status(), bad.json()["code"].as_str()), (StatusCode::NOT_FOUND, Some("content.preview_token_invalid")));
     })
     .await
     .unwrap();
@@ -254,15 +170,8 @@ async fn vong_doi_va_endpoint_cong_khai() {
 #[tokio::test]
 async fn tool_mcp_voi_version() {
     TestDatabase::run(async |test| {
-        let router = app(test).await;
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let url = format!("http://{}/mcp", listener.local_addr().unwrap());
-        tokio::spawn(async move { axum::serve(listener, router).await });
-        autoxide_kernel::tls::install_crypto_provider();
-        let client = async |who: &str| {
-            let config = StreamableHttpClientTransportConfig::with_uri(url.clone()).auth_header(who.to_owned());
-            ().serve(StreamableHttpClientTransport::from_config(config)).await.unwrap()
-        };
+        let app = app(test).await;
+        let client = async |who: &str| app.mcp(who).await.unwrap();
         let reader = client("reader").await;
         let mut names: Vec<String> = reader.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name.to_string()).collect();
         names.sort();
@@ -285,8 +194,7 @@ async fn tool_mcp_voi_version() {
             assert!(!serde_json::to_string(&tool.input_schema).unwrap().contains("$ref"), "{} has a $ref", tool.name);
         }
         let call = async |name: &str, arguments: Value| {
-            let request = CallToolRequestParams::new(name.to_owned()).with_arguments(arguments.as_object().cloned().unwrap());
-            let result = admin.call_tool(request).await.unwrap();
+            let result = admin.call_tool(tool(name, arguments)).await.unwrap();
             (result.is_error == Some(true), result.structured_content.unwrap_or(Value::Null))
         };
         let body = json!({"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Xin chào"}]}]});
@@ -335,9 +243,9 @@ async fn tool_mcp_voi_version() {
 #[tokio::test]
 async fn etag_resolve_theo_ca_cau_tra_loi() {
     TestDatabase::run(async |test| {
-        let router = app(test).await;
+        let app = app(test).await;
         let created = send(
-            &router,
+            &app,
             "POST",
             "/entries",
             Some("admin"),
@@ -346,10 +254,10 @@ async fn etag_resolve_theo_ca_cau_tra_loi() {
         )
         .await;
         let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
-        let read = send(&router, "GET", &format!("/entries/{id}"), Some("admin"), &[], None).await;
+        let read = send(&app, "GET", &format!("/entries/{id}"), Some("admin"), &[], None).await;
         let etag = read.header(header::ETAG).to_owned();
         let published = send(
-            &router,
+            &app,
             "POST",
             &format!("/entries/{id}/publish"),
             Some("admin"),
@@ -357,14 +265,14 @@ async fn etag_resolve_theo_ca_cau_tra_loi() {
             None,
         )
         .await;
-        assert_eq!(published.status, StatusCode::OK, "{}", published.json());
+        assert_eq!(published.status(), StatusCode::OK, "{}", published.json());
         let path = "/public/resolve?locale=en&path=/blog/tagged";
-        let first = send(&router, "GET", path, None, &[], None).await;
+        let first = send(&app, "GET", path, None, &[], None).await;
         let first_etag = first.header(header::ETAG).to_owned();
         assert!(!first_etag.is_empty());
 
         let tag = send(
-            &router,
+            &app,
             "POST",
             "/terms",
             Some("admin"),
@@ -372,10 +280,10 @@ async fn etag_resolve_theo_ca_cau_tra_loi() {
             Some(json!({"taxonomy": "tag", "locale": "en", "name": "Food"})),
         )
         .await;
-        assert_eq!(tag.status, StatusCode::CREATED, "{}", tag.json());
+        assert_eq!(tag.status(), StatusCode::CREATED, "{}", tag.json());
         let tag_id = tag.json()["data"]["id"].as_str().unwrap().to_owned();
         let linked = send(
-            &router,
+            &app,
             "PUT",
             &format!("/entries/{id}/terms"),
             Some("admin"),
@@ -383,21 +291,15 @@ async fn etag_resolve_theo_ca_cau_tra_loi() {
             Some(json!({"term_ids": [tag_id]})),
         )
         .await;
-        assert_eq!(linked.status, StatusCode::OK, "{}", linked.json());
+        assert_eq!(linked.status(), StatusCode::OK, "{}", linked.json());
 
-        let again = send(&router, "GET", path, None, &[("if-none-match", &first_etag)], None).await;
-        assert_eq!(again.status, StatusCode::OK, "the tag changed the answer");
+        let again = send(&app, "GET", path, None, &[("if-none-match", &first_etag)], None).await;
+        assert_eq!(again.status(), StatusCode::OK, "the tag changed the answer");
         assert_ne!(again.header(header::ETAG), first_etag);
-        let same = send(
-            &router,
-            "GET",
-            path,
-            None,
-            &[("if-none-match", again.header(header::ETAG))],
-            None,
-        )
-        .await;
-        assert_eq!(same.status, StatusCode::NOT_MODIFIED);
+        let same =
+            send(&app, "GET", path, None, &[("if-none-match", again.header(header::ETAG))], None)
+                .await;
+        assert_eq!(same.status(), StatusCode::NOT_MODIFIED);
     })
     .await
     .unwrap();

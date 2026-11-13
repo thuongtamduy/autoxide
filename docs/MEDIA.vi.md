@@ -110,6 +110,14 @@ Khi bản thu nhỏ chưa làm xong, xin nó thì nhận bản gốc, cache ng�
 ảnh AVIF và SVG không có bản thu nhỏ. Thay nội dung thì làm bản mới và xoá bản cũ. Bản thu
 nhỏ theo chế độ công khai và thùng rác của item.
 
+Đổi `AUTOXIDE_MEDIA_IMAGE_WIDTHS` chỉ áp cho ảnh tải lên sau đó. Để ảnh đã tải lên trước cũng
+có đúng các cỡ mới, chạy lệnh này một lần sau khi khởi động lại với cấu hình mới; worker làm
+bản thu nhỏ ở nền (`dry_run=true` thì chỉ đếm):
+
+```bash
+autoxide task media.refresh_variants
+```
+
 ## Nhãn
 
 Ngoài một thư mục, item mang được tối đa 20 nhãn (mỗi nhãn 1 tới 50 ký tự, không có `,`).

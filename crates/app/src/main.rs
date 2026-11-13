@@ -92,6 +92,14 @@ enum Command {
     /// `AUTOXIDE_HTTP_SHUTDOWN_SECONDS` to finish.
     Serve,
 
+    /// List or run the maintenance tasks that modules declare.
+    ///
+    /// `autoxide task` lists every task with its arguments; `autoxide task <module>.<task>
+    /// [name=value …]` runs one, e.g. `autoxide task media.refresh_variants dry_run=true`.
+    /// Runs with the rights of whoever operates the server. Exits with status 64 when the task
+    /// or an argument is wrong, 1 when the task fails. Run `autoxide migrate up` first.
+    Task(commands::task::Arguments),
+
     /// Manage user accounts, e.g. create the first administrator.
     ///
     /// Runs with the rights of whoever operates the server: no sign-in needed.
@@ -112,6 +120,7 @@ fn main() -> ExitCode {
         Command::Openapi => commands::openapi::run(),
         Command::Restore(arguments) => commands::backup::restore(&arguments),
         Command::Serve => commands::serve::run(),
+        Command::Task(arguments) => commands::task::run(&arguments),
         Command::User(arguments) => commands::user::run(&arguments),
     }
 }

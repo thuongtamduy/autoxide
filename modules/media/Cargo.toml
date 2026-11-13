@@ -31,14 +31,7 @@ validator.workspace = true
 
 [dev-dependencies]
 autoxide-testkit.workspace = true
-# MCP client thật cho test tool của module.
-rmcp = { workspace = true, features = [
-  "client",
-  "transport-streamable-http-client-reqwest",
-  "reqwest-tls-no-provider",
-] }
 tokio.workspace = true
-tower.workspace = true
 
 [lints]
 workspace = true

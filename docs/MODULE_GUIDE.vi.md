@@ -177,6 +177,10 @@ Module giữ dữ liệu về người dùng tham gia việc xuất dữ liệu 
   thiếu dữ liệu ban đầu) thì có một bước kiểm trong `Module::checks`: một `Check` có
   `Probe` trả `Finding` (ok, warning hay failed, kèm gợi ý sửa). Nó chạy trong
   `autoxide doctor`; không được thay đổi dữ liệu. Xem `modules/files/src/doctor.rs`.
+- Việc người vận hành chạy tay thỉnh thoảng (làm lại dữ liệu dẫn xuất sau khi đổi cấu
+  hình, dọn một lần) là một lệnh trong `Module::tasks`: một `Task` kèm các `TaskArgument`
+  và một `TaskRun`, chạy bằng `autoxide task <module>.<lệnh> tên=giá_trị`. Nó gọi service,
+  như REST. Xem `modules/media/src/refresh.rs`.
 
 ### 10. Bản dịch
 

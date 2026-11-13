@@ -394,19 +394,15 @@ mod tests {
             assert_eq!(problem["code"], "auth.missing_token");
 
             // Cùng lỗi, bằng tiếng Việt khi client yêu cầu.
-            let request = axum::http::Request::builder()
-                .method("POST")
-                .uri("/api/v1/auth/login")
-                .header(header::CONTENT_TYPE, "application/json")
-                .header(header::ACCEPT_LANGUAGE, "vi")
-                .body(axum::body::Body::from(
-                    json!({"email": "ada@example.com", "password": "wrong password"}).to_string(),
-                ))
+            let response = app
+                .post("/api/v1/auth/login")
+                .header(header::ACCEPT_LANGUAGE.as_str(), "vi")
+                .json(json!({"email": "ada@example.com", "password": "wrong password"}))
+                .send()
+                .await
                 .unwrap();
-            let response = tower::ServiceExt::oneshot(app.clone(), request).await.unwrap();
             assert_eq!(response.headers()[header::CONTENT_LANGUAGE], "vi");
-            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
-            let vi: Value = serde_json::from_slice(&bytes).unwrap();
+            let vi: Value = serde_json::from_slice(response.body()).unwrap();
             assert_eq!(vi["code"], "auth.invalid_credentials");
             assert_eq!(vi["detail"], "Email hoặc mật khẩu không đúng.");
 
