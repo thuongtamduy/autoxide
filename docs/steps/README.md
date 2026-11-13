@@ -1,6 +1,6 @@
-# Đặc tả từng bước (30–52)
+# Đặc tả từng bước (30–53)
 
-Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51, 52, có một file đặc tả ở đây (bước 50 chỉ là việc của chủ dự án). Đặc tả nói **cách làm**:
+Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51, 52, 53, có một file đặc tả ở đây (bước 50 chỉ là việc của chủ dự án). Đặc tả nói **cách làm**:
 
 - bảng dữ liệu, API, permission, event, mã lỗi;
 - thứ tự commit, test bắt buộc, tiêu chí xong;
@@ -40,6 +40,7 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51, 52, có 
 | 40 | [40-core-capabilities.md](40-core-capabilities.md) | Header bảo mật, MCP, OIDC, tải thẳng S3, SSE, rate limit |
 | 51 | [51-ui-contracts.md](51-ui-contracts.md) | Sổ điều hướng, hộp việc, tìm xuyên phân hệ, số liệu tóm tắt, hoạt động, nhúng bản ghi trong nội dung (D-200); view đã lưu, thao tác hàng loạt, giải thích quyền, lệnh cần duyệt cho agent, ghi chú trên bản ghi (D-201) |
 | 52 | [52-admin-experience.md](52-admin-experience.md) | Bàn kỹ thuật, hoàn tác, AI trong quản trị, thông báo, sức khoẻ người bán và tuân thủ (D-201) |
+| 53 | [53-support.md](53-support.md) | `support`: phiếu hỗ trợ khách hàng, SLA theo giờ làm, phân công theo nút, chuyển sang khiếu nại (D-204) |
 | 41–49 | [41](41-catalog.md) · [42](42-inventory.md) · [43](43-promotions.md) · [44](44-shipping.md) · [45](45-orders.md) · [46](46-marketplace.md) · [47](47-customers.md) · [48](48-channels.md) · [49](49-affiliate.md) | Module thương mại |
 
 ## Luật chung đã chốt (D-198)
@@ -81,7 +82,7 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51, 52, có 
 ```
 kernel → address → organizations → auth (và các module sẵn có theo thứ tự hiện tại,
          trừ newsletter, comments)
-       → tax → ledger → invoices → compliance → notifications → newsletter, comments → plans
+       → tax → ledger → invoices → compliance → notifications → newsletter, comments, support → plans
        → catalog → inventory, promotions, shipping → orders → marketplace → affiliate, customers, channels
        → reporting
 ```

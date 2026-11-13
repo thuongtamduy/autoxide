@@ -655,3 +655,33 @@ hữu ích". Phần này nằm trong thư mục `reviews/` của `orders`, bật
   - `dem_huu_ich_dung_khi_bo_phieu_dong_thoi` (nhiều người cùng lúc, cùng người gửi lặp)
   - `sap_theo_huu_ich_lat_trang_khong_trung_khong_sot`
   - `xoa_tai_khoan_xoa_phieu_va_tru_dem`
+
+## Bổ sung theo D-204 (hàng đặt trước, phiếu hỗ trợ)
+
+### Hàng đặt trước
+
+- Dòng đơn chụp `sale_mode` và `preorder_available_on` lúc đặt; một đơn có hàng sẵn lẫn hàng đặt trước
+  thì tách thành hai lần giao (`orders_fulfillments`) — hàng sẵn đi trước, không chờ.
+- **Thanh toán:** theo chính sách của nút `preorder_payment` (`full` trả hết lúc đặt / `on_arrival` trả khi
+  hàng về, chỉ với COD hay thanh toán khi có hàng). Không làm tiền cọc một phần trong bước này (cần sổ cái
+  ghi nghĩa vụ cọc — để sau, ghi trong DECISIONS khi làm).
+- **Thông tin bắt buộc trước khi đặt:** báo giá giỏ trả `preorder: {available_on, message}` cho từng dòng;
+  checkout yêu cầu `accept_preorder_terms = true` khi giỏ có hàng đặt trước (lưu vào chứng cứ chấp nhận của
+  bước 37). Thời gian giao dự kiến phải hiện rõ trước khi đặt (Luật 19/2023, NĐ 55/2024 — cần đối chiếu).
+- **Dời ngày / huỷ hàng:** nghe `catalog.preorder_date_changed` → báo người mua qua `notifications` (tin
+  giao dịch), cho **huỷ không mất phí** và hoàn tiền đủ khi ngày mới trễ hơn ngày đã hứa; người bán ngừng
+  bán đặt trước → huỷ các dòng chưa chia hàng, hoàn tiền tự động. Nghe `inventory.preorder_allocated` →
+  chuyển dòng sang `processing`.
+- **Mã lỗi:** `orders.preorder_terms_required` (422), `orders.preorder_sold_out` (409, từ `inventory`),
+  `orders.preorder_closed` (409, quá `preorder_ends_at`).
+- **Test** (cả hai database): `don_tron_hang_san_va_dat_truoc_tach_hai_lan_giao`,
+  `doi_ngay_dat_truoc_bao_nguoi_mua_va_cho_huy_mien_phi`, `dat_truoc_phai_dong_y_dieu_kien`,
+  `ngung_dat_truoc_huy_va_hoan_tien_tu_dong`.
+
+### Phiếu hỗ trợ (bước 53)
+
+Thay ý "mở hỗ trợ… event `orders.support_requested`, kênh nhận là `notifications`" ở mục D-202: nút "mở hỗ
+trợ" trên trang đơn (có tài khoản và vãng lai) gọi `SupportIntake::open` của `support` (bước 53) với
+`links = ["orders.order:<id>"]`, `reference = "orders.order:<id>:<Idempotency-Key>"`. `support` chưa cài thì
+endpoint trả 404 `orders.support_unavailable` và đơn không hiện nút (đọc qua `Subscription::optional` /
+điểm nối tuỳ chọn). Không còn event `orders.support_requested`.
