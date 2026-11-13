@@ -125,6 +125,13 @@ pub(crate) async fn term_ids_of<C: ConnectionTrait>(
     Ok(found)
 }
 
+impl ContentService {
+    /// ID term của từng mục trong `ids`, theo thứ tự gắn (để API trả mục kèm term).
+    pub(crate) async fn term_ids(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, Vec<Uuid>>, Error> {
+        term_ids_of(self.database.read(), ids).await
+    }
+}
+
 /// Term của từng bản công khai trong `rows` (theo thứ tự gắn), tên theo ngôn ngữ của mục.
 pub(crate) async fn terms_of<C: ConnectionTrait>(
     connection: &C,

@@ -552,6 +552,16 @@ pub(crate) async fn outdated<C: sea_orm::ConnectionTrait>(
     Ok(stale)
 }
 
+impl ContentService {
+    /// Trong `entries`, những bản dịch AI đã cũ (xem [`outdated`]).
+    pub(crate) async fn outdated_translations(
+        &self,
+        entries: &[crate::entries::Entry],
+    ) -> Result<std::collections::BTreeSet<Uuid>, Error> {
+        outdated(self.database.read(), entries).await
+    }
+}
+
 /// Lỗi tạm thời: thử lại sau thay vì đánh dấu thất bại.
 fn transient(error: &Error) -> bool {
     matches!(

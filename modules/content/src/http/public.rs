@@ -738,10 +738,9 @@ async fn preview_entry(
     service: &ContentService,
     entry: crate::entries::Entry,
 ) -> Result<PreviewEntryResponse, Error> {
-    let read = service.database.read();
     let ids = [entry.id];
-    let term_ids = crate::terms::term_ids_of(read, &ids).await?.remove(&entry.id);
-    let author_ids = crate::authors::author_ids_of(read, &ids).await?.remove(&entry.id);
+    let term_ids = service.term_ids(&ids).await?.remove(&entry.id);
+    let author_ids = service.author_ids(&ids).await?.remove(&entry.id);
     Ok(PreviewEntryResponse {
         kind: Kind::parse(&entry.kind).unwrap_or(Kind::Post),
         status: crate::entries::Status::of(&entry),
