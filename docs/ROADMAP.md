@@ -404,9 +404,8 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 ## 30. Ra mắt công khai (chủ dự án giao ngày 13/11/2026, D-175, D-176)
 
 Đưa Autoxide tới tay người lạ: repo công khai, CI và phát hành tự động, image Docker có chứng
-thực, file của một dự án mã nguồn mở, ảnh nhẹ, deploy không gián đoạn, cài được chỉ bằng README,
-và những năng lực một lõi backend hiện đại thường có sẵn (nhóm D). Làm ngay được, song song với
-bước 29 — chỗ đụng chung ghi ở nhóm D.
+thực, file của một dự án mã nguồn mở, ảnh nhẹ, deploy không gián đoạn, cài được chỉ bằng README.
+Không đụng code của bước 29 (trừ `media` và `kernel/src/http/health.rs`), nên làm ngay được.
 Tài liệu cho người ngoài viết tiếng Anh kèm bản tiếng Việt cùng nội dung.
 
 Nhóm A — repo công khai, CI, phát hành (D-175):
@@ -457,35 +456,6 @@ Nhóm C — sản phẩm (D-176):
 - [ ] Thử cài như người lạ: máy hay container sạch, làm đúng README tiếng Anh bằng image Docker đã
       đăng (cả SQLite và Postgres), ghi mọi chỗ vấp rồi sửa README / `docs/DEPLOY.md` (EN + VI cùng
       commit)
-
-Nhóm D — năng lực còn thiếu của core (so với một lõi backend hiện đại). Endpoint mới có OpenAPI
-và tool MCP tương ứng. Đăng nhập OIDC (sửa `auth`) và rate limit dùng chung (sửa `kernel`) đụng
-file bước 29 đang sửa: làm hai mục đó sau cùng, rebase thường xuyên.
-
-- [ ] Đăng nhập qua nhà cung cấp danh tính theo OpenID Connect (Google, Microsoft, GitHub qua
-      OAuth 2.0, và một nhà cung cấp OIDC bất kỳ khai bằng cấu hình): PKCE, kiểm `state` / `nonce`,
-      kiểm chữ ký `id_token` qua JWKS; liên kết với tài khoản sẵn có theo email đã xác minh, không
-      tự gộp khi email chưa xác minh; MFA của Autoxide vẫn áp dụng; tắt mặc định, bật bằng cấu hình
-- [ ] Tải file lớn thẳng lên nơi lưu: khi nơi lưu là S3, cấp link tải lên ký sẵn có hạn và giới hạn
-      cỡ / loại, rồi một lệnh xác nhận kiểm file (cỡ, loại thật, hash) trước khi ghi bản ghi; nơi
-      lưu là ổ đĩa thì đi qua máy chủ như cũ. Một trait trong `Storage`, `files` và `media` dùng
-      chung; file tải lên mà không xác nhận được dọn bằng job
-- [ ] Header bảo mật chung cho mọi response của API (`X-Content-Type-Options: nosniff`,
-      `Referrer-Policy`, `X-Frame-Options` hay `frame-ancestors`, HSTS khi cấu hình chạy sau
-      HTTPS, CSP chặt cho trang tài liệu API): một lớp trong `kernel/src/http/`, cấu hình được,
-      có test; hai endpoint trả file đang tự đặt header thì dùng chung lớp này
-- [ ] Đẩy event theo thời gian thực bằng Server-Sent Events: một endpoint stream các event mà người
-      gọi có permission được xem (lọc theo tên event và theo quyền đọc bản ghi), nối lại bằng
-      `Last-Event-ID` không mất event trong khoảng giữ, giới hạn số kết nối; chạy đúng khi nhiều
-      máy chủ (đọc từ bảng event, không chỉ từ bộ nhớ một tiến trình)
-- [ ] MCP đầy đủ hơn: resources (vd tài liệu của module, schema một loại bản ghi), prompts mẫu cho
-      việc hay làm (viết nháp bài, kiểm duyệt bình luận) do module khai qua `Module`, kèm cài đặt
-      mặc định rỗng (D-038); một trang mô tả cho agent tự khám phá API (vd `/llms.txt` trỏ tới
-      OpenAPI, MCP và hướng dẫn), sinh từ code để không lệch
-- [ ] Rate limit đúng khi chạy nhiều máy chủ: giới hạn theo API key (và tuỳ chọn theo địa chỉ) đếm
-      chung qua database như `throttle` (D-116) hay một cách khác chạy trên cả hai database; đo
-      chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
-      quyết định
 
 ## 31. Hợp đồng API và chống hồi quy (chủ dự án giao ngày 13/11/2026, D-177)
 
@@ -617,6 +587,43 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
       với ngưỡng 50 ms của D-110 (`docs/BENCHMARKS.md`, mục "Tìm theo ý nghĩa"); vượt ngưỡng thì
       chọn cách giảm (vector nhỏ hơn, chia nhiều nhân, hay index sau một trait) chạy được trên cả
       hai database, ghi quyết định; không vượt thì ghi số đo và giữ nguyên
+
+## 34. Năng lực còn thiếu của core (agent đề xuất, chủ dự án tách thành bước riêng ngày 13/11/2026)
+
+So với những gì một lõi backend hiện đại thường có sẵn, core còn thiếu sáu năng lực chung, không
+gắn với ngành nào. Làm ngay được, song song với bước 30 và 31. Endpoint mới có OpenAPI và tool MCP
+tương ứng; thêm thư viện thì kiểm đúng phiên bản và ghi `STACK.md`; mọi mục chạy và có test trên
+cả SQLite và Postgres.
+
+Chỗ đụng với người khác: đăng nhập OIDC (sửa `auth`) và rate limit dùng chung (sửa `kernel`) đụng
+file bước 29 đang sửa — làm hai mục đó sau cùng, rebase thường xuyên; tải file thẳng lên S3 đụng
+`media` mà WebP của bước 30 cũng sửa; header bảo mật sửa chuỗi lớp HTTP của `kernel` mà deploy
+không gián đoạn của bước 30 cũng chạm — ai merge sau thì gộp cẩn thận.
+
+- [ ] Đăng nhập qua nhà cung cấp danh tính theo OpenID Connect (Google, Microsoft, GitHub qua
+      OAuth 2.0, và một nhà cung cấp OIDC bất kỳ khai bằng cấu hình): PKCE, kiểm `state` / `nonce`,
+      kiểm chữ ký `id_token` qua JWKS; liên kết với tài khoản sẵn có theo email đã xác minh, không
+      tự gộp khi email chưa xác minh; MFA của Autoxide vẫn áp dụng; tắt mặc định, bật bằng cấu hình
+- [ ] Tải file lớn thẳng lên nơi lưu: khi nơi lưu là S3, cấp link tải lên ký sẵn có hạn và giới hạn
+      cỡ / loại, rồi một lệnh xác nhận kiểm file (cỡ, loại thật, hash) trước khi ghi bản ghi; nơi
+      lưu là ổ đĩa thì đi qua máy chủ như cũ. Một trait trong `Storage`, `files` và `media` dùng
+      chung; file tải lên mà không xác nhận được dọn bằng job
+- [ ] Header bảo mật chung cho mọi response của API (`X-Content-Type-Options: nosniff`,
+      `Referrer-Policy`, `X-Frame-Options` hay `frame-ancestors`, HSTS khi cấu hình chạy sau
+      HTTPS, CSP chặt cho trang tài liệu API): một lớp trong `kernel/src/http/`, cấu hình được,
+      có test; hai endpoint trả file đang tự đặt header thì dùng chung lớp này
+- [ ] Đẩy event theo thời gian thực bằng Server-Sent Events: một endpoint stream các event mà người
+      gọi có permission được xem (lọc theo tên event và theo quyền đọc bản ghi), nối lại bằng
+      `Last-Event-ID` không mất event trong khoảng giữ, giới hạn số kết nối; chạy đúng khi nhiều
+      máy chủ (đọc từ bảng event, không chỉ từ bộ nhớ một tiến trình)
+- [ ] MCP đầy đủ hơn: resources (vd tài liệu của module, schema một loại bản ghi), prompts mẫu cho
+      việc hay làm (viết nháp bài, kiểm duyệt bình luận) do module khai qua `Module`, kèm cài đặt
+      mặc định rỗng (D-038); một trang mô tả cho agent tự khám phá API (vd `/llms.txt` trỏ tới
+      OpenAPI, MCP và hướng dẫn), sinh từ code để không lệch
+- [ ] Rate limit đúng khi chạy nhiều máy chủ: giới hạn theo API key (và tuỳ chọn theo địa chỉ) đếm
+      chung qua database như `throttle` (D-116) hay một cách khác chạy trên cả hai database; đo
+      chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
+      quyết định
 
 ## Sau core (chưa mở)
 
