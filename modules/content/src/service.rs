@@ -1,5 +1,7 @@
-//! Service của `content`: MỌI logic nằm ở đây và các file cùng cấp (`entries.rs`,
-//! `publishing.rs`…). Handler REST và tool MCP chỉ lấy dữ liệu vào rồi gọi service — cùng
+//! Service của `content`: MỌI logic nằm ở đây và trong bốn nhóm theo tính năng — `entries`
+//! (soạn bài: nháp, revision, thân bài, slug, xin duyệt), `publishing` (đăng, hẹn giờ, xem
+//! trước, đọc công khai, đường dẫn, chuyển hướng), `taxonomy` (danh mục, thẻ, tác giả, menu),
+//! `ai` (dịch, tìm theo ý nghĩa, SEO). Handler REST và tool MCP chỉ lấy dữ liệu vào rồi gọi service — cùng
 //! kết quả, cùng permission (luật kiến trúc 8). Mỗi lệnh ghi đi cùng event trong CÙNG
 //! transaction (luật kiến trúc 3).
 
@@ -26,7 +28,7 @@ pub(crate) struct ContentService {
     pub(crate) embedder: Arc<dyn Embedder>,
     pub(crate) config: ContentConfig,
     /// Vector và câu tìm giữ trong bộ nhớ của tiến trình (tìm theo ý nghĩa).
-    pub(crate) search_cache: crate::semantic::SearchCache,
+    pub(crate) search_cache: crate::ai::semantic::SearchCache,
 }
 
 /// Những gì service dùng từ module khác.
@@ -45,7 +47,7 @@ impl ContentService {
         config: ContentConfig,
     ) -> Self {
         let Dependencies { media, ai, embedder } = dependencies;
-        let search_cache = crate::semantic::SearchCache::default();
+        let search_cache = crate::ai::semantic::SearchCache::default();
         ContentService { database, outbox, jobs, media, ai, embedder, config, search_cache }
     }
 

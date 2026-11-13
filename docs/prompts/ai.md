@@ -26,7 +26,7 @@ chính đề bài này). Nếu đề bài `forms-newsletter-comments.md` đượ
 3. Đọc code thật trước khi thiết kế: `crates/kernel/src/mail.rs` + `modules/mail` (khuôn mẫu
    "trait ở kernel, module công bố cài đặt"); `crates/kernel/src/storage.rs`; `job/` (`enqueue`
    nhận `ConnectionTrait` — xếp job được trong transaction); `http/rate_limit.rs` (GCRA);
-   `access.rs` (`Principal::api_key_id`); `mcp.rs`; `modules/content/src/body.rs` (bộ kiểm thân
+   `access.rs` (`Principal::api_key_id`); `mcp.rs`; `modules/content/src/entries/body.rs` (bộ kiểm thân
    bài), `entries.rs`, `permissions.rs`, `tools.rs`; `modules/media/src/api.rs`, `variants.rs`.
 4. API thư viện: skill `check-library-api` trước khi dùng thứ chưa dùng trong repo (phần
    `reqwest` cho JSON và multipart không cần; phần mới của SeaORM cho cột nhị phân).

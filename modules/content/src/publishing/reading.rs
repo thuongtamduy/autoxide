@@ -9,11 +9,11 @@ use autoxide_media::api::{MediaRef, MediaVisibility};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
 
-use crate::authors::AuthorRef;
 use crate::entity::published;
 use crate::publishing::Published;
 use crate::service::ContentService;
-use crate::terms::TermRef;
+use crate::taxonomy::authors::AuthorRef;
+use crate::taxonomy::terms::TermRef;
 
 /// Một mục công khai kèm những gì website cần để hiển thị.
 #[derive(Debug, Clone)]
@@ -37,13 +37,13 @@ impl ContentService {
         rows: Vec<Published>,
     ) -> Result<Vec<PublicView>, Error> {
         let ids: Vec<Uuid> = rows.iter().map(|row| row.entry_id).collect();
-        let mut authors = crate::authors::authors_of(self.database.read(), &ids).await?;
+        let mut authors = crate::taxonomy::authors::authors_of(self.database.read(), &ids).await?;
         // Ảnh đại diện của tác giả cũng tra qua `media`: ảnh riêng tư thì không lộ cả ID.
         let avatars = authors.values().flatten().filter_map(|author| author.avatar_media_id);
         // Ảnh trong thân bài: website cần kích thước và các bản nhỏ của chúng cho `srcset`
         // (D-168). Tra chung một lượt với ảnh đại diện.
         let body_images: Vec<Vec<Uuid>> =
-            rows.iter().map(|row| crate::body::stored_image_ids(&row.body)).collect();
+            rows.iter().map(|row| crate::entries::body::stored_image_ids(&row.body)).collect();
         let media_ids: Vec<Uuid> = rows
             .iter()
             .flat_map(|row| [row.featured_media_id, row.og_media_id])
@@ -75,9 +75,13 @@ impl ContentService {
                 .all(self.database.read())
                 .await?
         };
-        let mut terms =
-            crate::terms::terms_of(self.database.read(), &ids, &self.config.default_locale, &rows)
-                .await?;
+        let mut terms = crate::taxonomy::terms::terms_of(
+            self.database.read(),
+            &ids,
+            &self.config.default_locale,
+            &rows,
+        )
+        .await?;
         for author in authors.values_mut().flatten() {
             if author.avatar_media_id.is_some_and(|id| !media.contains_key(&id)) {
                 author.avatar_media_id = None;
@@ -131,10 +135,10 @@ impl ContentService {
             .filter(published::Column::Kind.eq("post"))
             .filter(published::Column::Locale.eq(filter.locale.as_str()));
         if let Some(term) = filter.term_id {
-            select = select.filter(crate::terms::published_has_term(term));
+            select = select.filter(crate::taxonomy::terms::published_has_term(term));
         }
         if let Some(author) = filter.author_id {
-            select = select.filter(crate::authors::published_has_author(author));
+            select = select.filter(crate::taxonomy::authors::published_has_author(author));
         }
         if let Some(search) = filter.search.as_deref().filter(|search| !search.trim().is_empty()) {
             select = select

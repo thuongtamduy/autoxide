@@ -2,6 +2,12 @@
 //! bằng khoá cây của ngôn ngữ (`paths::lock_tree`), và kiểm phiên bản (`If-Match`) ngay trong
 //! câu `UPDATE` của mục: hai lệnh cùng phiên bản thì một bên nhận 412.
 
+pub(crate) mod paths;
+pub(crate) mod preview;
+pub(crate) mod reading;
+pub(crate) mod redirects;
+pub(crate) mod schedules;
+
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
@@ -14,16 +20,16 @@ use sea_orm::{
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::body;
 use crate::entity::{
     ROOT, entry, entry_author, entry_term, published, redirect, revision, schedule,
 };
+use crate::entries::body;
+use crate::entries::revisions::{self, Reason};
 use crate::entries::{Entry, Kind, Status, changed_columns, is_unique_violation, summary};
 use crate::events::{self, Change};
-use crate::paths::{self, Generated, Moved};
 use crate::permissions::{self, CONTENT_DELETE, CONTENT_PUBLISH};
-use crate::revisions::{self, Reason};
-use crate::schedules::Action;
+use crate::publishing::paths::{Generated, Moved};
+use crate::publishing::schedules::Action;
 use crate::service::{ContentService, entry_not_found, invalid, now};
 
 /// Bản công khai của một mục.

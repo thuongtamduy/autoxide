@@ -26,11 +26,11 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::entity::{entry, published, schedule};
+use crate::entries::revisions::{self, Reason, Snapshot};
 use crate::entries::{Entry, Status, touch};
 use crate::events::{self, Change};
-use crate::paths;
 use crate::permissions::{CONTENT_PUBLISH, CONTENT_READ};
-use crate::revisions::{self, Reason, Snapshot};
+use crate::publishing::paths;
 use crate::service::{ContentService, entry_not_found, invalid, now};
 
 pub(crate) const RUN: &str = "content.run_schedule";

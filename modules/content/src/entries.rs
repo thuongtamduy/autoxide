@@ -1,6 +1,11 @@
 //! Bản nháp của bài viết và trang: tạo, đọc, liệt kê, sửa. Mỗi bản dịch là một mục riêng
 //! (D-102). Đăng, gỡ, chuyển, xoá ở `publishing.rs`.
 
+pub(crate) mod body;
+pub(crate) mod review;
+pub(crate) mod revisions;
+pub(crate) mod slug;
+
 use std::collections::BTreeSet;
 
 use autoxide_kernel::access::Principal;
@@ -18,12 +23,11 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::body;
 use crate::entity::ROOT;
 use crate::entity::entry::{self, Column, Entity};
+use crate::entries::revisions::Reason;
 use crate::events::{self, Change};
 use crate::permissions::{self, CONTENT_READ};
-use crate::revisions::{self, Reason};
 use crate::service::{ContentService, check_length, check_url, entry_not_found, invalid, now};
 
 /// Số lần thử tạo mục với slug tự sinh. Mỗi lượt chỉ một trong các request tạo CÙNG slug lúc đó
@@ -231,7 +235,7 @@ impl ContentService {
                 // trong transaction: không tạo được trang con dưới một trang đang bị xoá, và độ
                 // sâu tính trên cây hiện tại (một lệnh `move` vừa xong có thể đã đổi nó; bản dịch
                 // lấy cha trong ngôn ngữ khác, có thể đã sâu hơn).
-                crate::paths::lock_tree(&transaction, &candidate.locale).await?;
+                crate::publishing::paths::lock_tree(&transaction, &candidate.locale).await?;
                 let mut problems = Vec::new();
                 self.check_parent(&transaction, &candidate, parent, &mut problems).await?;
                 if !problems.is_empty() {
@@ -336,10 +340,10 @@ impl ContentService {
             select = select.filter(Column::TranslationGroupId.eq(group));
         }
         if let Some(term) = filter.term_id {
-            select = select.filter(crate::terms::has_term(term));
+            select = select.filter(crate::taxonomy::terms::has_term(term));
         }
         if let Some(author) = filter.author_id {
-            select = select.filter(crate::authors::has_author(author));
+            select = select.filter(crate::taxonomy::authors::has_author(author));
         }
         let read = self.database.read();
         match filter.sort {
@@ -473,10 +477,10 @@ impl ContentService {
         }
         match trim(fields.slug) {
             Some(slug) if slug.is_empty() => {
-                candidate.slug = crate::slug::from_title(&candidate.title, candidate.id);
+                candidate.slug = crate::entries::slug::from_title(&candidate.title, candidate.id);
             }
             Some(slug) => {
-                if !crate::slug::is_valid(&slug) {
+                if !crate::entries::slug::is_valid(&slug) {
                     problems.push(FieldError::new(
                         "slug",
                         "invalid",
@@ -486,7 +490,7 @@ impl ContentService {
                 candidate.slug = slug;
             }
             None if candidate.slug.is_empty() => {
-                candidate.slug = crate::slug::from_title(&candidate.title, candidate.id);
+                candidate.slug = crate::entries::slug::from_title(&candidate.title, candidate.id);
             }
             None => {}
         }
@@ -960,7 +964,7 @@ async fn free_slug<C: ConnectionTrait>(
     }
     let mut n = 2;
     loop {
-        let next = crate::slug::with_suffix(base, n);
+        let next = crate::entries::slug::with_suffix(base, n);
         if !taken.contains(&next) {
             return Ok(next);
         }

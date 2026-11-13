@@ -6,34 +6,20 @@
 //! `media` (đăng ký SAU `media`, kiểm qua `autoxide_media::api::Media`). Hướng dẫn dùng:
 //! `docs/CONTENT.md`.
 
-mod authors;
-mod body;
+mod ai;
 mod config;
 mod entity;
 mod entries;
 mod events;
 mod http;
-mod menus;
 mod migration;
-mod paths;
 mod permissions;
-mod preview;
 mod privacy;
 mod publishing;
-mod reading;
-mod redirects;
 mod resource;
-mod review;
-mod revisions;
-mod schedules;
-mod segments;
-mod semantic;
-mod seo;
 mod service;
-mod slug;
-mod terms;
+mod taxonomy;
 mod tools;
-mod translate;
 
 #[cfg(test)]
 mod tests;
@@ -51,7 +37,10 @@ use autoxide_kernel::module::{Module, StartContext};
 use autoxide_media::api::Media;
 use utoipa_axum::router::OpenApiRouter;
 
+use crate::ai::{semantic, translate};
 use crate::config::ContentConfig;
+use crate::entries::revisions;
+use crate::publishing::schedules;
 use crate::service::ContentService;
 
 /// Module `content`, để binary đăng ký trong `crates/app/src/modules.rs` — SAU module `media`.

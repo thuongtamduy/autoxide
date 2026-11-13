@@ -349,7 +349,7 @@ Từ lượt rà soát kiến trúc cùng ngày: bỏ code lặp, giữ luật h
       dùng chung phần chuẩn hoá
 - [x] `content`: handler không đọc database (`describe`, `preview_entry` vào service); `cargo xtask
       check` chặn handler gọi database
-- [ ] `content`: gom file theo nhóm, tách `tests.rs` thành thư mục
+- [x] `content`: gom file theo nhóm, tách `tests.rs` thành thư mục
 - [ ] Quy ước bố cục module (theo lớp hay theo tính năng) trong hướng dẫn viết module (EN + VI)
 - [ ] `kernel`: tách bộ đăng ký `Modules` khỏi `module.rs`
 - [ ] `crates/app`: test đầu-cuối `media_e2e` ra khỏi chỗ code của binary

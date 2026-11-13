@@ -18,8 +18,8 @@ use uuid::Uuid;
 
 use super::BodyNode;
 use crate::entries::Kind;
-use crate::reading::PublicView;
-use crate::redirects::Resolved;
+use crate::publishing::reading::PublicView;
+use crate::publishing::redirects::Resolved;
 use crate::service::ContentService;
 
 /// An image, as readers load it.
@@ -312,8 +312,8 @@ use autoxide_kernel::pagination::{Page, PageQuery};
 use axum::extract::Path;
 
 use super::page_request;
-use crate::reading::PostFilter;
-use crate::terms::Taxonomy;
+use crate::publishing::reading::PostFilter;
+use crate::taxonomy::terms::Taxonomy;
 
 /// Ghép thông tin cho một trang bản công khai.
 async fn views(
@@ -365,7 +365,7 @@ pub(crate) async fn list_posts(
     let mut problems = Vec::new();
     let locale = service.check_locale(Some(&query.locale), "locale", &mut problems);
     // Câu tìm dài vô hạn thành một câu `LIKE` đắt trên mọi bài, cho bất kỳ ai gọi.
-    let max = crate::semantic::QUERY_MAX;
+    let max = crate::ai::semantic::QUERY_MAX;
     if query.q.as_deref().is_some_and(|q| q.trim().chars().count() > max) {
         problems.push(autoxide_kernel::error::FieldError::new(
             "q",
@@ -402,7 +402,7 @@ pub(crate) struct PublicMenuItem {
     children: Vec<PublicMenuItem>,
 }
 
-fn menu_items(nodes: Vec<crate::menus::PublicNode>) -> Vec<PublicMenuItem> {
+fn menu_items(nodes: Vec<crate::taxonomy::menus::PublicNode>) -> Vec<PublicMenuItem> {
     nodes
         .into_iter()
         .map(|node| PublicMenuItem {

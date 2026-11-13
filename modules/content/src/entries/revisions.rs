@@ -62,7 +62,8 @@ impl Snapshot {
             title: entry.title.clone(),
             slug: entry.slug.clone(),
             excerpt: entry.excerpt.clone(),
-            body: serde_json::from_str(&entry.body).unwrap_or_else(|_| crate::body::empty()),
+            body: serde_json::from_str(&entry.body)
+                .unwrap_or_else(|_| crate::entries::body::empty()),
             featured_media_id: entry.featured_media_id,
             featured_media_alt: entry.featured_media_alt.clone(),
             meta_title: entry.meta_title.clone(),

@@ -18,9 +18,9 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{choice, page_request, present};
-use crate::authors::{Author, AuthorInput};
 use crate::service::ContentService;
-use crate::terms::{Taxonomy, TermInput, TermWithTexts};
+use crate::taxonomy::authors::{Author, AuthorInput};
+use crate::taxonomy::terms::{Taxonomy, TermInput, TermWithTexts};
 
 /// The name of a term in one language.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

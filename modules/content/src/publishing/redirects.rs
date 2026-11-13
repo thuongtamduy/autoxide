@@ -16,8 +16,8 @@ use uuid::Uuid;
 use crate::entity::{entry, published, redirect};
 use crate::entries::Status;
 use crate::events::{self, Change};
-use crate::paths;
 use crate::permissions::CONTENT_MANAGE;
+use crate::publishing::paths;
 use crate::service::{ContentService, invalid, now};
 
 pub(crate) type Redirect = redirect::Model;
