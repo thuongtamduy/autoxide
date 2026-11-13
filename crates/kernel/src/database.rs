@@ -14,14 +14,20 @@
 //! ở test, trên database nào cũng vậy — chứ không lặng lẽ chạy được ở một bên.
 
 use std::fmt;
+use std::future::Future;
+use std::time::Duration;
 
 use sea_orm::sqlx::sqlite::{SqliteJournalMode, SqliteSynchronous};
 use sea_orm::{
     AccessMode, ConnectOptions, DatabaseConnection, DatabaseTransaction, DbErr, IsolationLevel,
-    SqliteTransactionMode, TransactionOptions, TransactionTrait,
+    RuntimeErr, SqliteTransactionMode, TransactionOptions, TransactionTrait,
 };
 
 use crate::config::{DatabaseBackend, DatabaseConfig, DatabaseUrl};
+use crate::error::Error;
+
+/// Số lần chạy tối đa của [`Database::write_with_retry`] (lần đầu + 4 lần chạy lại).
+pub const RETRY_ATTEMPTS: u32 = 5;
 
 /// Lỗi khi mở kết nối database.
 #[derive(Debug)]
@@ -103,6 +109,56 @@ impl Database {
         self.write.begin_with_options(options).await
     }
 
+    /// Chạy lại thao tác ghi `work` khi gặp xung đột TẠM THỜI, tối đa [`RETRY_ATTEMPTS`] lần
+    /// (D-182). `work` tự mở transaction bằng [`begin_write`](Self::begin_write), làm việc và
+    /// commit; lỗi ở bất kỳ bước nào làm transaction tự rollback (bị drop chưa commit).
+    ///
+    /// Xung đột tạm thời là lỗi mà chạy lại có thể thành công: Postgres `40001` (serialization
+    /// failure) và `40P01` (deadlock — Postgres huỷ một trong hai transaction chờ nhau); SQLite
+    /// bận (`SQLITE_BUSY`, `SQLITE_LOCKED`: tiến trình khác giữ quyền ghi quá
+    /// `AUTOXIDE_DATABASE_WAIT_SECONDS`). Mọi lỗi khác — kể cả lỗi nghiệp vụ `work` tự trả — trả
+    /// về ngay, không chạy lại.
+    ///
+    /// **`work` phải chịu được chạy lại**: mọi thay đổi database của lần trước đã bị rollback,
+    /// nhưng việc ngoài database thì không — đừng gửi mail, gọi mạng hay đổi biến bên ngoài
+    /// trong `work`; đọc lại mọi thứ trong transaction mới thay vì dùng giá trị đọc trước đó.
+    /// Giữa các lần chờ ngắn, tăng dần, có độ lệch ngẫu nhiên để hai bên không đụng nhau nữa.
+    ///
+    /// ```ignore
+    /// // `move` + tham chiếu: mỗi lần gọi closure tạo một future mới mượn cùng dữ liệu.
+    /// let (database, order) = (&self.database, &order);
+    /// let paid = database
+    ///     .write_with_retry(move || async move {
+    ///         let transaction = database.begin_write().await?;
+    ///         let paid = pay(&transaction, order).await?;
+    ///         transaction.commit().await?;
+    ///         Ok(paid)
+    ///     })
+    ///     .await?;
+    /// ```
+    pub async fn write_with_retry<T, F, Work>(&self, mut work: F) -> Result<T, Error>
+    where
+        // `FnMut() -> Work`: closure gọi được nhiều lần, mỗi lần trả một future mới (một lần
+        // chạy). Không nhận transaction làm tham số: future mượn transaction thì kiểu của nó phải
+        // mang thời gian sống của transaction, và Rust hiện chưa chứng minh được future như vậy
+        // là `Send` (handler HTTP và event handler cần `Send`).
+        F: FnMut() -> Work,
+        Work: Future<Output = Result<T, Error>>,
+    {
+        let mut attempt = 1;
+        loop {
+            match work().await {
+                Err(error) if attempt < RETRY_ATTEMPTS && is_transient(&error) => {
+                    tracing::debug!(attempt, error = %error, "transient write conflict; retrying");
+                    metrics::counter!("database_write_retries_total").increment(1);
+                    tokio::time::sleep(retry_delay(attempt)).await;
+                    attempt += 1;
+                }
+                outcome => return outcome,
+            }
+        }
+    }
+
     /// Mở một transaction CHỈ ĐỌC thấy database như ở một thời điểm: mọi câu đọc bên
     /// trong cho cùng một bức ảnh, dù lệnh ghi khác đang chạy (dùng cho backup, chép dữ
     /// liệu). Postgres: `REPEATABLE READ READ ONLY`; SQLite (WAL): transaction đọc thường
@@ -139,6 +195,56 @@ impl Database {
         self.read.close().await?;
         self.write.close().await
     }
+}
+
+/// Lỗi `error` có phải xung đột tạm thời, chạy lại transaction có thể thành công không (xem
+/// [`Database::write_with_retry`]). Đi dọc chuỗi nguyên nhân tìm lỗi của database.
+pub fn is_transient(error: &(dyn std::error::Error + 'static)) -> bool {
+    let mut current = Some(error);
+    while let Some(error) = current {
+        if let Some(code) = error.downcast_ref::<DbErr>().and_then(database_code) {
+            return is_transient_code(&code);
+        }
+        current = error.source();
+    }
+    false
+}
+
+/// Mã lỗi database (SQLSTATE của Postgres, mã kết quả của SQLite) trong `error`, nếu có.
+fn database_code(error: &DbErr) -> Option<String> {
+    let runtime = match error {
+        DbErr::Conn(runtime) | DbErr::Exec(runtime) | DbErr::Query(runtime) => runtime,
+        _ => return None,
+    };
+    match runtime {
+        RuntimeErr::SqlxError(sqlx) => sqlx
+            .as_database_error()
+            .and_then(|database| database.code())
+            .map(|code| code.into_owned()),
+        _ => None,
+    }
+}
+
+fn is_transient_code(code: &str) -> bool {
+    match code {
+        // Postgres: serialization_failure, deadlock_detected.
+        "40001" | "40P01" => true,
+        // SQLite: mã kết quả mở rộng; byte thấp là mã chính — 5 SQLITE_BUSY (cả BUSY_RECOVERY,
+        // BUSY_SNAPSHOT, BUSY_TIMEOUT), 6 SQLITE_LOCKED.
+        _ => code.parse::<u32>().is_ok_and(|code| matches!(code & 0xff, 5 | 6)),
+    }
+}
+
+/// Thời gian chờ trước lần chạy thứ `attempt + 1`: 10 ms, 20 ms, 40 ms, 80 ms… cộng một độ lệch
+/// ngẫu nhiên tới bằng chính nó, để hai transaction vừa đụng nhau không chạy lại cùng lúc.
+fn retry_delay(attempt: u32) -> Duration {
+    let base = 10u64 << attempt.saturating_sub(1).min(6);
+    let mut byte = [0u8; 1];
+    let jitter = match getrandom::fill(&mut byte) {
+        Ok(()) => base * u64::from(byte[0]) / 255,
+        Err(_) => 0,
+    };
+    Duration::from_millis(base + jitter)
 }
 
 async fn open(
@@ -217,4 +323,30 @@ fn read_options(config: &DatabaseConfig, url: &DatabaseUrl) -> ConnectOptions {
         }
     }
     options
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ma_loi_tam_thoi() {
+        for code in ["40001", "40P01", "5", "6", "261", "517", "773", "262"] {
+            assert!(is_transient_code(code), "{code}");
+        }
+        for code in ["23505", "23503", "42P01", "19", "2067", "1555", "", "abc"] {
+            assert!(!is_transient_code(code), "{code}");
+        }
+        let plain = Error::conflict("notes.title_taken", "taken");
+        assert!(!is_transient(&plain));
+    }
+
+    #[test]
+    fn thoi_gian_cho_tang_dan() {
+        for attempt in 1..RETRY_ATTEMPTS {
+            let base = 10u64 << (attempt - 1);
+            let delay = retry_delay(attempt).as_millis() as u64;
+            assert!((base..=2 * base).contains(&delay), "{attempt}: {delay}");
+        }
+    }
 }

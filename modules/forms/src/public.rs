@@ -17,8 +17,8 @@ use autoxide_kernel::antispam::{self, Claim, Limits, Submission as Check, Verdic
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ClientInfo;
+use autoxide_kernel::rows;
 use autoxide_kernel::throttle::Throttle;
-use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
     QueryFilter,
@@ -207,11 +207,11 @@ impl FormsService {
             updated_at: now,
         };
 
-        // Pha hai: một transaction ngắn. Chạm dòng form trước (khoá dòng tới hết transaction
+        // Pha hai: một transaction ngắn. Khoá dòng form trước (khoá dòng tới hết transaction
         // trên Postgres; SQLite chỉ có một bên ghi): form bị xoá giữa hai pha thì dừng ở đây,
         // không để lại bài mồ côi chứa dữ liệu cá nhân; xoá form chạy sau thì thấy và xoá cả bài này.
         let transaction = self.database.begin_write().await?;
-        if !touch_form(&transaction, form.row.id).await? {
+        if !lock_form(&transaction, form.row.id).await? {
             transaction.rollback().await?;
             return Err(form_not_found());
         }
@@ -256,15 +256,10 @@ impl FormsService {
     }
 }
 
-/// "Chạm" form `id` (cập nhật mà không đổi gì, kể cả `updated_at` nên ETag giữ nguyên) để khoá
-/// dòng tới hết transaction. `false`: form không còn.
-async fn touch_form<C: ConnectionTrait>(connection: &C, id: Uuid) -> Result<bool, Error> {
-    let touched = form_row::Entity::update_many()
-        .col_expr(form_row::Column::UpdatedAt, Expr::col(form_row::Column::UpdatedAt))
-        .filter(form_row::Column::Id.eq(id))
-        .exec(connection)
-        .await?;
-    Ok(touched.rows_affected == 1)
+/// Khoá dòng form `id` tới hết transaction (`rows::lock_one`, D-181; không ghi gì nên ETag giữ
+/// nguyên). `false`: form không còn.
+async fn lock_form<C: ConnectionTrait>(connection: &C, id: Uuid) -> Result<bool, Error> {
+    Ok(rows::lock_one(connection, form_row::Entity::find_by_id(id)).await?.is_some())
 }
 
 /// Địa chỉ `http(s)` tuỳ chọn; sai thì thêm lỗi `field`.

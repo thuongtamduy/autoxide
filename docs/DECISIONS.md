@@ -4285,3 +4285,149 @@ và theo điều phải chờ; không bỏ mục nào. Mục cũ nhắc số bư
 Lý do: bước 30 và 34 cùng sửa GitHub, CI, phát hành; 32 và 36 cùng sửa `xtask`, `testkit` và hợp
 đồng API; 30 nhóm C và 35 cùng sửa module sau khi bước 29 merge; 31 và 33 cùng cần bố cục mới và
 dùng chung số đo. Ít bước hơn thì ít lần phát hành và ít chỗ hai người sửa chung một file.
+
+## D-179 · Bản release kiểm tràn số nguyên (`overflow-checks = true`) — 2026-11-13 — agent quyết
+
+Quyết định: `[profile.release] overflow-checks = true` trong `Cargo.toml` gốc. Bản release
+(binary, Docker image) panic khi số nguyên tràn — thành lỗi 500 có log — thay vì quay vòng.
+
+Lý do: mặc định Rust chỉ kiểm tràn ở bản dev; bản build thật cộng tràn `i64` sẽ âm thầm thành
+số âm (số dư, bộ đếm). Với nghiệp vụ tiền, dữ liệu sai lặng lẽ tệ hơn một request lỗi. Tiền đi
+qua `Money` (D-180) còn trả lỗi trước cả khi tràn; cờ này chặn mọi phép tính khác.
+
+Số đo: `scripts/loadtest.sh` trên SQLite, cùng một máy Linux 4 CPU (máy tạo tải chạy chung), cùng
+code, chỉ khác cờ này, đo liền nhau (request/s, 64 kết nối trừ khi ghi khác):
+
+| Bài đo                              | Không kiểm | Có kiểm |
+| ----------------------------------- | ---------: | ------: |
+| GET /health/ready                   |      16552 |   19746 |
+| GET /auth/me (access token)         |       6179 |    5033 |
+| GET /auth/me (API key)              |       4180 |    3974 |
+| GET /auth/users?limit=50            |       2219 |    2041 |
+| GET /audit?limit=50                 |       1264 |    1272 |
+| GET /files/{id}/content (16 KiB)    |       4823 |    4449 |
+| MCP tools/call auth.whoami          |       4532 |    5206 |
+| PATCH /auth/users/{id} (ghi + event) |      1291 |    1328 |
+| POST /files (4 KiB, ghi)            |       1729 |    1534 |
+| đọc, 1 / 256 / 1024 kết nối         | 1317 / 4765 / 4739 | 1449 / 4644 / 4854 |
+| ghi, 1 / 256 / 1024 kết nối         | 620 / 1209 / 1275 | 555 / 1182 / 1312 |
+
+Chênh lệch đi cả hai chiều, trong khoảng ±20% — bằng độ dao động giữa hai lần đo cùng một
+binary trên máy này; không thấy chi phí đo được. Bài `POST /auth/login` không so được: nó đo
+login throttling, số request lọt qua trước khi bị chặn tuỳ thời điểm.
+
+Đã cân nhắc: chỉ dùng `checked_*` ở chỗ tính tiền — mọi phép cộng khác (bộ đếm, kích thước,
+thời gian) vẫn quay vòng lặng lẽ; `wrapping`/`saturating` — đổi lỗi thành dữ liệu sai.
+
+## D-180 · Tiền là `autoxide_kernel::money::Money`: `i64` đơn vị nhỏ nhất + mã ISO 4217 — 2026-11-13 — agent quyết
+
+Quyết định: kernel có `Money { minor: i64, currency: Currency }`. `Currency` chỉ nhận mã ISO 4217
+đang lưu hành có đơn vị nhỏ (bảng `money::CURRENCIES`, kèm số chữ số thập phân; không có kim loại
+quý, mã thử, mã đã thôi dùng). `checked_add` / `checked_sub` / `checked_mul` / `checked_neg` /
+`sum` trả lỗi `money.overflow` thay vì tràn; phép tính giữa hai loại tiền trả
+`money.currency_mismatch`; không có `Ord` (so bằng `compare`, cũng từ chối hai loại tiền).
+`allocate(&[tỉ lệ])` / `split(n)` dùng phương pháp phần dư lớn nhất (bằng nhau thì phần đứng
+trước), tính bằng `i128`, tổng các phần luôn bằng số ban đầu; số âm chia đối xứng. JSON:
+`{"amount": "<chuỗi số nguyên>", "currency": "USD"}`, `amount` không nhận số JSON, `+`, khoảng
+trắng hay số thập phân. Lưu: hai cột `<tên>_minor` (`BIGINT`) và `<tên>_currency`;
+`Money::from_columns` coi mã lạ trong database là lỗi nội bộ. Mã lỗi `money.*` nằm ở kernel,
+dịch trong `crates/kernel/locales/vi.json`.
+
+Lý do: luật dữ liệu đã cấm `f32`/`f64` và kiểu thập phân nhưng chưa có kiểu chung, nên mỗi module
+sẽ tự viết phép cộng, cách chia và cách đưa ra JSON — và lệch nhau. `amount` là chuỗi vì
+JavaScript đọc số JSON thành `f64`, sai với mọi số lớn hơn 2⁵³. Bảng mã viết tay (165 mã) thay
+vì thêm thư viện: vài chục dòng đủ, đổi khi ISO công bố sửa đổi.
+
+Đã cân nhắc: `rusty-money` / `iso_currency` — thêm thư viện cho một bảng; phân bổ kiểu Fowler
+(dư trao cho phần đầu) — 1 chia [1, 99] trao cho phần 1% thay vì phần 99%; nhận cả số JSON cho
+`amount` — hai cách cho một việc, và số lớn đã hỏng trước khi tới máy chủ.
+
+## D-181 · Khoá dòng và cập nhật có điều kiện: `autoxide_kernel::rows` thay mẹo "chạm dòng" — 2026-11-13 — agent quyết
+
+Quyết định: kernel có `rows::lock_one(conn, select)` / `rows::lock(conn, select, cột_thứ_tự)`
+(đọc và khoá tới hết transaction: Postgres `SELECT … FOR UPDATE`, SQLite câu `SELECT` thường vì
+transaction ghi đã là `BEGIN IMMEDIATE`, D-009) và `rows::adjust(conn, cột, điều_kiện, delta,
+Bounds)` — một câu `UPDATE … SET c = c + Δ WHERE … AND floor − Δ <= c <= ceiling − Δ`, trả số
+dòng đã đổi. Các câu `UPDATE` không đổi gì dùng để khoá dòng ở `auth` (user, session),
+`forms`, `media` (nhãn, thư mục, ảnh thu nhỏ) và `content` (mục, `content_tree_locks`) đổi sang
+`rows::lock_one`; cột `content_tree_locks.version` thôi được tăng (giữ cột, migration đã commit).
+Không đổi: `RoleService::set_user_roles` (cập nhật `updated_at` thật vì role là một phần người
+dùng) và câu tăng `reply_count` của `comments` (đã là cập nhật có điều kiện thật).
+
+Lý do: sáu module tự viết cùng một mẹo, mỗi chỗ một kiểu, và mẹo đó ghi vào dòng (WAL, trigger,
+`updated_at` dễ lỡ đổi theo). Trừ số dư cần một cách chuẩn: đọc rồi ghi để hở khe giữa hai câu.
+Điều kiện chặn tràn đặt ở `WHERE` vì SQLite âm thầm đổi số nguyên tràn thành số thực còn
+Postgres báo lỗi — chặn trước thì hai database như nhau. Test đồng thời: 40 request trừ cùng lúc
+(đúng 33 thành công, số dư không âm), chuyển qua lại giữa hai ví, trên cả hai database.
+
+Đã cân nhắc: giữ "chạm dòng" và chỉ gom thành một hàm — vẫn ghi vào dòng mà không cần; khoá
+mức transaction (`SERIALIZABLE` trên Postgres) — mọi lệnh ghi phải sẵn sàng chạy lại, đắt với
+đường nóng; advisory lock của Postgres — SQLite không có.
+
+## D-182 · Chạy lại thao tác ghi khi xung đột tạm thời: `Database::write_with_retry` — 2026-11-13 — agent quyết
+
+Quyết định: `Database::write_with_retry(move || async move { … })` chạy lại closure khi lỗi (tìm
+dọc chuỗi nguyên nhân tới `DbErr`) là Postgres `40001` / `40P01` hay SQLite có byte thấp của mã
+kết quả là 5 (`BUSY`) / 6 (`LOCKED`); tối đa `RETRY_ATTEMPTS` = 5 lần, chờ 10, 20, 40, 80 ms cộng
+độ lệch ngẫu nhiên tới bằng chính nó; mỗi lần chạy lại tăng số đo
+`database_write_retries_total`. Closure tự `begin_write` và `commit`; lỗi khác (kể cả lỗi nghiệp
+vụ, vi phạm unique) trả ngay. `database::is_transient` công khai để module tự phân loại khi cần.
+Module `audit` dùng nó khi nối chuỗi băm.
+
+Lý do: khoá nhiều dòng sai thứ tự hay `SERIALIZABLE` làm Postgres huỷ một bên; SQLite báo bận
+khi tiến trình khác giữ quyền ghi quá `AUTOXIDE_DATABASE_WAIT_SECONDS`. Cả hai lành khi chạy
+lại. Closure không nhận transaction làm tham số: future mượn transaction phải mang thời gian sống
+của nó (`for<'t>`), và Rust 1.99 không chứng minh được future như vậy là `Send` (lỗi
+"implementation of `Send` is not general enough" trong event handler), còn kiểu
+`BoxFuture<'t>` buộc mọi dữ liệu mượn từ ngoài phải sống mãi. Test: deadlock thật trên Postgres
+(≥ 3 lần chạy, cả hai xong), database bận thật trên SQLite (hai `Database`, thời gian chờ 1 s),
+lỗi khác chạy đúng một lần.
+
+Đã cân nhắc: `async |transaction|` (`AsyncFnMut`) — lỗi `Send` nói trên; hàm nhận closure trả
+`BoxFuture<'t>` như `TransactionTrait::transaction` của SeaORM — không mượn được biến bên ngoài;
+chạy lại cả vi phạm unique — che lỗi thật.
+
+## D-183 · Audit log là chuỗi băm; xoá dữ liệu cá nhân vẫn giữ được chuỗi — 2026-11-13 — agent quyết
+
+Quyết định: `audit_entry` thêm `sequence` (unique, 1, 2, 3…), `payload_hash` (SHA-256 của
+`before` / `after` / `details`) và `chain_hash` (SHA-256 của `chain_hash` dòng trước, mọi cột còn
+lại và `payload_hash`; mỗi phần ghi kèm độ dài, thời gian ở micro giây, tiền tố `audit-v1`).
+Bảng `audit_chain` một dòng giữ đầu chuỗi. Recorder khoá đầu chuỗi (`rows::lock_one`), bỏ qua
+event đã ghi, thêm dòng và dời đầu chuỗi trong một transaction (`write_with_retry`). Xoá tài
+khoản vẫn bỏ dữ liệu của các dòng về tài khoản đó nhưng giữ `payload_hash`; khi kiểm, dòng mất
+dữ liệu chỉ hợp lệ nếu chuỗi có `USER_DELETED` cùng `subject`. `autoxide doctor` có bước
+`audit.chain` (đọc cả bảng trong một snapshot, tối đa 10 phút — kernel thêm
+`Check::with_timeout`) báo dòng đầu tiên bị sửa, bị xoá hay chèn ngoài chuỗi. Migration `m0004`
+điền chuỗi cho dữ liệu cũ theo thứ tự ID. Cách băm `v1` là định dạng lưu trữ: không sửa, cần
+đổi thì thêm `v2`.
+
+Lý do: audit log "chỉ thêm" chỉ là quy ước của code; ai có quyền ghi database vẫn sửa được dòng
+cũ mà không để lại dấu. Băm `payload_hash` thay vì băm thẳng dữ liệu là cách duy nhất để vừa xoá
+được dữ liệu cá nhân (D-080, D-149) vừa giữ chuỗi kiểm được. Nối chuỗi tuần tự làm audit ghi nối
+đuôi nhau; audit chạy qua event (không trên đường request) nên chấp nhận được.
+
+Đã cân nhắc: ký từng dòng bằng khoá bí mật (HMAC) — khoá nằm cùng máy chủ thì kẻ sửa database
+thường cũng lấy được, và mất khoá là mất khả năng kiểm; Merkle tree hay neo ra ngoài — để sau,
+khi có nhu cầu chứng minh với bên thứ ba; mã hoá dữ liệu cá nhân rồi xoá khoá
+(crypto-shredding) — cần quản lý khoá cho từng người dùng.
+
+## D-184 · Chống trùng lệnh bằng mã tham chiếu của client: `autoxide_kernel::reference` — 2026-11-13 — agent quyết
+
+Quyết định: quy ước cho lệnh có hậu quả lâu dài: client gửi `reference` (1–100 ký tự ASCII nhìn
+thấy được, kiểm bằng `Reference::checked`); module lưu nó vĩnh viễn cùng bản ghi trong cột
+`reference` và `reference_fingerprint` (`reference::fingerprint` = SHA-256 của JSON chuẩn hoá,
+khoá sắp tăng dần, tự viết để không phụ thuộc feature `preserve_order`), unique index trên
+(người sở hữu, `reference`). Service chạy lệnh bằng `reference::submit_once` và gọi
+`reference::replayed` trên bản ghi tìm thấy: cùng nội dung → `Submitted::Replayed` (REST trả
+200), khác → lỗi `reference_reused` (422, như `idempotency_key_reused`), chưa có → tạo
+(`Submitted::Created`, 201). Hai request trùng đồng thời trên Postgres: unique index chặn bên
+sau, `submit_once` chạy lại nó một lần để thấy bản ghi của bên kia.
+
+Lý do: idempotency key HTTP (D-079) hết hạn sau 24 giờ và gắn với một request; lệnh thanh toán
+gửi lại sau một ngày (agent retry, hàng đợi phía client) vẫn phải không tạo bản ghi thứ hai.
+Kernel chỉ có helper; khái niệm "lệnh", "giao dịch" thuộc module. Test 16 request đồng thời cùng
+mã chỉ tạo một bản ghi, trên cả hai database.
+
+Đã cân nhắc: kéo dài thời hạn idempotency key — bảng đó lưu cả response, không hợp để giữ mãi;
+trả 409 khi nội dung khác — 422 khớp mã đã có cho cùng tình huống ở idempotency key; một bảng
+`reference` chung của kernel — module sẽ phải ghi hai bảng và join chéo, trái luật sở hữu bảng.

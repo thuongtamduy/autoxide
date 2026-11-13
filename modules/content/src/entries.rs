@@ -12,8 +12,9 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
+use autoxide_kernel::rows;
 use chrono::{DateTime, Utc};
-use sea_orm::sea_query::{Expr, ExprTrait as _};
+use sea_orm::sea_query::ExprTrait as _;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
     QuerySelect, Set, SqlErr,
@@ -242,7 +243,7 @@ impl ContentService {
                     transaction.rollback().await?;
                     return Err(invalid(problems));
                 }
-                if !touch(&transaction, parent).await? {
+                if !lock(&transaction, parent).await? {
                     return Err(invalid(vec![FieldError::new(
                         "parent_id",
                         "not_found",
@@ -865,27 +866,19 @@ pub(crate) fn summary(entry: &Entry) -> Value {
     })
 }
 
-/// "Chạm" mục `id` (cập nhật mà không đổi gì) để khoá dòng tới hết transaction. `false`:
-/// không còn.
-pub(crate) async fn touch<C: ConnectionTrait>(connection: &C, id: Uuid) -> Result<bool, Error> {
-    let touched = Entity::update_many()
-        .col_expr(Column::UpdatedAt, Expr::col(Column::UpdatedAt))
-        .filter(Column::Id.eq(id))
-        .exec(connection)
-        .await?;
-    Ok(touched.rows_affected == 1)
+/// Khoá dòng mục `id` tới hết transaction (`rows::lock_one`, D-181). `false`: không còn.
+pub(crate) async fn lock<C: ConnectionTrait>(connection: &C, id: Uuid) -> Result<bool, Error> {
+    Ok(rows::lock_one(connection, Entity::find_by_id(id)).await?.is_some())
 }
 
-/// Khoá dòng mục `id` tới hết `transaction` (như [`touch`]) rồi đọc nó trong transaction đó;
+/// Khoá dòng mục `id` tới hết `transaction` (như [`lock`]) rồi đọc nó trong transaction đó;
 /// mục không còn: `content.not_found`.
 pub(crate) async fn lock_entry<C: ConnectionTrait>(
     transaction: &C,
     id: Uuid,
 ) -> Result<Entry, Error> {
-    if !touch(transaction, id).await? {
-        return Err(entry_not_found(id));
-    }
-    Entity::find_by_id(id).one(transaction).await?.ok_or_else(|| entry_not_found(id))
+    // Khoá và đọc trong một câu.
+    rows::lock_one(transaction, Entity::find_by_id(id)).await?.ok_or_else(|| entry_not_found(id))
 }
 
 /// Cấp của trang `id` trong cây (trang gốc: 1).

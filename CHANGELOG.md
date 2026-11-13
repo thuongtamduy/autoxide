@@ -9,6 +9,31 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- `autoxide_kernel::money`: a `Money` type for modules that handle money — an `i64` count of
+  the currency's minor unit plus an ISO 4217 currency. Arithmetic returns an error instead of
+  overflowing, mixing currencies is refused (`money.currency_mismatch`), and `allocate` /
+  `split` divide an amount without losing a unit (100 split 3 ways is 34, 33, 33). In JSON
+  the amount is a string: `{"amount": "1999", "currency": "USD"}`.
+- `autoxide_kernel::rows`: `lock_one` / `lock` lock rows until the end of a write transaction
+  on SQLite and PostgreSQL, and `adjust` changes a balance in one conditional update that
+  never goes below a floor or overflows.
+- `Database::write_with_retry` runs a write again when PostgreSQL reports a deadlock or a
+  serialization failure, or SQLite stays busy.
+- `autoxide_kernel::reference`: a client-chosen `reference` that is kept with a record makes
+  a command run only once, however late it is sent again; different content under the same
+  reference fails with `reference_reused` (422).
+- The audit log is a hash chain: `autoxide doctor` reports the first entry that was changed,
+  removed or inserted afterwards (`audit.chain`). Existing entries are chained when the
+  database is migrated; deleting an account still removes its personal data.
+- The module guide has a section on money and balances.
+
+### Changed
+
+- Release builds check integer overflow (`overflow-checks = true`): an overflow stops the
+  request with an error instead of silently wrapping around.
+
 ## [0.10.0] - 2026-11-13
 
 ### Changed

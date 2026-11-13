@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
+use autoxide_kernel::rows;
 use autoxide_kernel::storage::StoredFile;
 use bytes::Bytes;
 use futures_util::TryStreamExt as _;
@@ -187,17 +188,10 @@ impl MediaService {
         rendered: &[Rendered],
     ) -> Result<bool, Error> {
         let transaction = self.database.begin_write().await?;
-        // Khoá dòng item (chạm mà không đổi gì) để lệnh thay nội dung chạy cùng lúc phải chờ.
-        let current = item::Entity::update_many()
-            .col_expr(
-                item::Column::VersionId,
-                sea_orm::sea_query::Expr::col(item::Column::VersionId),
-            )
-            .filter(item::Column::Id.eq(item_id))
-            .filter(item::Column::VersionId.eq(version_id))
-            .exec(&transaction)
-            .await?;
-        if current.rows_affected == 0 {
+        // Khoá dòng item (`rows::lock_one`) để lệnh thay nội dung chạy cùng lúc phải chờ.
+        let current =
+            item::Entity::find_by_id(item_id).filter(item::Column::VersionId.eq(version_id));
+        if rows::lock_one(&transaction, current).await?.is_none() {
             transaction.rollback().await?;
             return Ok(false);
         }

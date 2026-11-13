@@ -6,10 +6,15 @@
 // Trong `src/` thì KHÔNG được khai dòng này (`cargo xtask check` chặn).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
+
 use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseBackend, DatabaseConfig};
-use autoxide_kernel::database::Database;
+use autoxide_kernel::database::{Database, is_transient};
+use autoxide_kernel::error::Error;
 use autoxide_testkit::TestDatabase;
-use sea_orm::sea_query::{ColumnDef, ForeignKey, Query, Table};
+use sea_orm::sea_query::{ColumnDef, Expr, ExprTrait as _, ForeignKey, Query, Table};
 use sea_orm::{ConnectionTrait, DbBackend, Statement};
 
 /// Cấu hình database trỏ vào `url`, cộng các biến `extra`.
@@ -261,4 +266,133 @@ async fn loi_ket_noi_khong_lo_mat_khau() {
         "{message}"
     );
     assert!(!message.contains("s3cr3t"), "{message}");
+}
+
+/// Đổi `body` của note `id` trong `connection`; lỗi trả nguyên cho bên gọi.
+async fn touch_note(connection: &impl ConnectionTrait, id: i32) -> Result<(), Error> {
+    let update = Query::update()
+        .table("note")
+        .value("body", format!("touched {id}"))
+        .and_where(Expr::col("id").eq(id))
+        .to_owned();
+    connection.execute(&update).await?;
+    Ok(())
+}
+
+/// Hai transaction khoá hai dòng theo thứ tự ngược nhau. Postgres phát hiện deadlock và huỷ một
+/// bên (`40P01`) — `write_with_retry` chạy lại bên đó và cả hai cùng xong. SQLite vốn chỉ một bên
+/// ghi nên không deadlock; cả hai cũng phải xong.
+#[tokio::test(flavor = "multi_thread")]
+async fn chay_lai_khi_deadlock() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        create_note_table(db.write()).await;
+        insert_note(db.write(), 1).await.unwrap();
+        insert_note(db.write(), 2).await.unwrap();
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let mut tasks = tokio::task::JoinSet::new();
+        for (first, second) in [(1, 2), (2, 1)] {
+            let (db, attempts) = (db.clone(), attempts.clone());
+            tasks.spawn(async move {
+                let (db, attempts) = (&db, &attempts);
+                db.write_with_retry(move || async move {
+                    attempts.fetch_add(1, Ordering::SeqCst);
+                    let transaction = db.begin_write().await?;
+                    touch_note(&transaction, first).await?;
+                    tokio::time::sleep(Duration::from_millis(300)).await;
+                    touch_note(&transaction, second).await?;
+                    transaction.commit().await?;
+                    Ok(())
+                })
+                .await
+                .unwrap();
+            });
+        }
+        tasks.join_all().await;
+        let attempts = attempts.load(Ordering::SeqCst);
+        match db.backend() {
+            DatabaseBackend::Postgres => assert!(attempts >= 3, "{attempts} attempts"),
+            DatabaseBackend::Sqlite => assert_eq!(attempts, 2),
+        }
+    })
+    .await
+    .unwrap();
+}
+
+/// Một tiến trình khác giữ quyền ghi lâu hơn thời gian chờ: SQLite báo bận, `write_with_retry`
+/// chờ rồi chạy lại và xong. Postgres không khoá cả database nên xong ngay lần đầu.
+#[tokio::test(flavor = "multi_thread")]
+async fn chay_lai_khi_database_ban() {
+    TestDatabase::run(async |database| {
+        let config = config_for(database.url(), &[("AUTOXIDE_DATABASE_WAIT_SECONDS", "1")]);
+        let holder = Database::connect(&config).await.unwrap();
+        let waiter = Database::connect(&config).await.unwrap();
+        create_note_table(holder.write()).await;
+
+        let held = holder.begin_write().await.unwrap();
+        insert_note(&held, 1).await.unwrap();
+        let release = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(1500)).await;
+            held.commit().await.unwrap();
+        });
+        let attempts = AtomicUsize::new(0);
+        let attempts_ref = &attempts;
+        let waiter_ref = &waiter;
+        waiter
+            .write_with_retry(move || async move {
+                attempts_ref.fetch_add(1, Ordering::SeqCst);
+                let transaction = waiter_ref.begin_write().await?;
+                insert_note(&transaction, 2).await?;
+                transaction.commit().await?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+        release.await.unwrap();
+        assert_eq!(count_notes(waiter.read()).await, 2);
+        let attempts = attempts.load(Ordering::SeqCst);
+        match waiter.backend() {
+            DatabaseBackend::Sqlite => assert!(attempts >= 2, "{attempts} attempts"),
+            DatabaseBackend::Postgres => assert_eq!(attempts, 1),
+        }
+    })
+    .await
+    .unwrap();
+}
+
+/// Lỗi không tạm thời trả ngay, không chạy lại: lỗi nghiệp vụ và vi phạm unique.
+#[tokio::test]
+async fn loi_khac_khong_chay_lai() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        create_note_table(db.write()).await;
+        insert_note(db.write(), 1).await.unwrap();
+        let attempts = AtomicUsize::new(0);
+        let (db_ref, attempts_ref) = (&db, &attempts);
+
+        let error = db
+            .write_with_retry(move || async move {
+                attempts_ref.fetch_add(1, Ordering::SeqCst);
+                Err::<(), _>(Error::conflict("notes.title_taken", "taken"))
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), "notes.title_taken");
+
+        let error = db
+            .write_with_retry(move || async move {
+                attempts_ref.fetch_add(1, Ordering::SeqCst);
+                let transaction = db_ref.begin_write().await?;
+                insert_note(&transaction, 1).await?;
+                transaction.commit().await?;
+                Ok(())
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), "internal_error");
+        assert!(!is_transient(&error));
+        assert_eq!(attempts.load(Ordering::SeqCst), 2);
+    })
+    .await
+    .unwrap();
 }

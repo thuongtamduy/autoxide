@@ -361,35 +361,35 @@ key (24 giờ), ETag / `If-Match`, job không chạy trùng, audit log chỉ th�
 nghiệp vụ có tiền (số dư, giao dịch, phân bổ). Mọi mục thuộc core, trung lập với ngành, chạy và
 có test trên cả SQLite và Postgres; test đồng thời cho mọi thứ ghi đồng thời.
 
-- [ ] Kiểm tràn số nguyên ở bản release: `[profile.release] overflow-checks = true` trong
+- [x] Kiểm tràn số nguyên ở bản release: `[profile.release] overflow-checks = true` trong
       `Cargo.toml` gốc (hiện không khai, nên bản build thật cộng tràn `i64` sẽ âm thầm quay
       vòng). Đo lại bằng `scripts/loadtest.sh` trước và sau, ghi số đo vào quyết định
-- [ ] `autoxide_kernel::money`: kiểu `Money` = số nguyên `i64` đơn vị nhỏ nhất + mã tiền tệ
+- [x] `autoxide_kernel::money`: kiểu `Money` = số nguyên `i64` đơn vị nhỏ nhất + mã tiền tệ
       ISO 4217 (kèm số chữ số thập phân của mã). Cộng, trừ, nhân với số nguyên có kiểm tràn và
       trả `Error`; cấm phép tính giữa hai loại tiền; chia / phân bổ theo tỉ lệ không mất đơn vị
       nào (100 chia 3 → 34, 33, 33); JSON và OpenAPI với `amount` là chuỗi số nguyên (client
       JavaScript làm tròn sai số lớn hơn 2⁵³) và `currency`; cách lưu chuẩn là hai cột
       `<tên>_minor` (`BIGINT`) và `<tên>_currency`
-- [ ] Cập nhật có điều kiện và khoá dòng thành công cụ chung của kernel, thay mẹo "chạm dòng"
+- [x] Cập nhật có điều kiện và khoá dòng thành công cụ chung của kernel, thay mẹo "chạm dòng"
       đang viết tay ở `auth` (`user/service.rs`, `role/service.rs`, `session/service.rs`),
       `forms` (`public.rs`), `comments` và `content` (`content_tree_locks`): hàm khoá một dòng tới
       hết transaction, và cách chuẩn để trừ số dư (`UPDATE … SET balance = balance - x WHERE id = ?
       AND balance >= x`, kiểm số dòng bị đổi). Test: nhiều request trừ cùng lúc trên cả hai
       database, số dư không bao giờ âm, tổng không lệch
-- [ ] Thử lại transaction khi xung đột tạm thời: một hàm của `Database` chạy lại transaction ghi
+- [x] Thử lại transaction khi xung đột tạm thời: một hàm của `Database` chạy lại transaction ghi
       có giới hạn số lần khi gặp deadlock hay xung đột (Postgres `40001`, `40P01`; SQLite bận),
       lỗi khác trả ngay. Tài liệu nói rõ phần việc bên trong phải chịu được chạy lại. Test cả
       hai nhánh
-- [ ] Audit log chống sửa: mỗi dòng của `audit_entry` mang mã băm của nội dung và của dòng trước
+- [x] Audit log chống sửa: mỗi dòng của `audit_entry` mang mã băm của nội dung và của dòng trước
       (chuỗi băm); `autoxide doctor` kiểm chuỗi còn nguyên và báo dòng đầu tiên bị sửa. Giải
       quyết cùng việc xoá dữ liệu cá nhân (`modules/audit/src/recorder.rs` xử lý `USER_DELETED`):
       băm phần không chứa dữ liệu cá nhân, hoặc cách khác giữ được chuỗi. Có migration cho dữ
       liệu cũ
-- [ ] Chống trùng lệnh ở tầng nghiệp vụ: quy ước mã tham chiếu do client đặt (`reference`), duy
+- [x] Chống trùng lệnh ở tầng nghiệp vụ: quy ước mã tham chiếu do client đặt (`reference`), duy
       nhất theo người gọi, lưu vĩnh viễn cùng bản ghi; gửi lại cùng mã thì trả kết quả cũ, cùng
       mã mà nội dung khác thì 409/422 — không dựa riêng vào idempotency key HTTP (hết hạn sau 24
       giờ). Helper trong kernel nếu đủ chung
-- [ ] Hướng dẫn "Nghiệp vụ có tiền" trong hướng dẫn viết module (EN + VI): dùng `Money`, thứ tự
+- [x] Hướng dẫn "Nghiệp vụ có tiền" trong hướng dẫn viết module (EN + VI): dùng `Money`, thứ tự
       khoá dòng chống deadlock, cập nhật có điều kiện, thử lại khi xung đột, mã tham chiếu, event
       cùng transaction, không sửa hay xoá giao dịch mà ghi giao dịch đảo; module `notes` hay một
       test mẫu minh hoạ

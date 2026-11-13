@@ -27,7 +27,7 @@ use uuid::Uuid;
 
 use crate::entity::{entry, published, schedule};
 use crate::entries::revisions::{self, Reason, Snapshot};
-use crate::entries::{Entry, Status, touch};
+use crate::entries::{Entry, Status, lock};
 use crate::events::{self, Change};
 use crate::permissions::{CONTENT_PUBLISH, CONTENT_READ};
 use crate::publishing::paths;
@@ -106,7 +106,7 @@ impl ContentService {
         let by = Some(principal.user_id());
         let transaction = self.database.begin_write().await?;
         // Khoá dòng mục: hai request đặt lịch cùng lúc chạy lần lượt.
-        if !touch(&transaction, entry_id).await? {
+        if !lock(&transaction, entry_id).await? {
             return Err(entry_not_found(entry_id));
         }
         let current =

@@ -14,8 +14,9 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
+use autoxide_kernel::rows;
 use chrono::{DateTime, Utc};
-use sea_orm::sea_query::{Expr, OnConflict, Query};
+use sea_orm::sea_query::{OnConflict, Query};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, QuerySelect, Set,
     SqlErr,
@@ -154,12 +155,7 @@ async fn ensure_tag<C: ConnectionTrait>(transaction: &C, name: &str) -> Result<U
         else {
             continue;
         };
-        let touched = tag::Entity::update_many()
-            .col_expr(tag::Column::UpdatedAt, Expr::col(tag::Column::UpdatedAt))
-            .filter(tag::Column::Id.eq(found.id))
-            .exec(transaction)
-            .await?;
-        if touched.rows_affected == 1 {
+        if rows::lock_one(transaction, tag::Entity::find_by_id(found.id)).await?.is_some() {
             return Ok(found.id);
         }
     }

@@ -174,6 +174,50 @@ Module giữ dữ liệu về người dùng tham gia việc xuất dữ liệu 
 - đăng ký nhận `privacy::USER_DELETED` trong `Module::subscriptions` và xoá các dòng của
   người đó khi nhận (`privacy::deleted_user(event)` cho id). Có thể nhận hai lần.
 
+### Tiền và số dư
+
+Module giữ số tiền, số dư hay giao dịch dùng các công cụ của kernel;
+`crates/kernel/tests/money.rs` dùng đủ cả trên một bảng ví mẫu, trên cả hai database.
+
+- **Số tiền là `autoxide_kernel::money::Money`**: số `i64` đơn vị nhỏ nhất của loại tiền
+  (cent của `USD`, đồng của `VND`) cùng một `Currency` theo ISO 4217. Không bao giờ
+  `f32`/`f64` hay kiểu thập phân của database. `checked_add`, `checked_sub`, `checked_mul` và
+  `checked_neg` trả lỗi thay vì tràn số; trộn hai loại tiền là lỗi (`money.currency_mismatch`).
+  Chia một số tiền bằng `allocate(&[tỉ lệ])` hay `split(n)`: tổng các phần luôn bằng số ban
+  đầu (100 chia 3 thành 34, 33, 33).
+- **Lưu** một `Money` thành hai cột `<tên>_minor` (`BIGINT`) và `<tên>_currency` (3 ký tự);
+  đọc lại bằng `Money::from_columns`. **Trong JSON** nó là
+  `{"amount": "1999", "currency": "USD"}` — `amount` là chuỗi, vì JavaScript làm tròn số lớn
+  hơn 2^53. Dùng thẳng `Money` trong kiểu request và response; schema OpenAPI của nó nói rõ
+  điều này.
+- **Đổi số dư bằng một câu cập nhật có điều kiện**, không bao giờ "đọc, kiểm, ghi":
+  `rows::adjust::<Entity, _>(&transaction, Column::BalanceMinor, Column::Id.eq(id), -amount,
+  Bounds::NON_NEGATIVE)` trả `0` khi không đủ số dư (hay dòng không còn) và không bao giờ để
+  cột tràn số. Các request đồng thời xếp hàng ở dòng đó; số dư không bao giờ xuống dưới mức
+  sàn.
+- **Khi buộc phải đọc trước khi ghi** (kiểm trạng thái, chuyển giữa hai dòng), khoá dòng
+  trước bằng `rows::lock_one` / `rows::lock` trong `Database::begin_write()`. Khoá nhiều dòng
+  **theo cùng một thứ tự** — `rows::lock(…, Column::Id)` khoá theo id — để hai transaction
+  không chờ nhau thành vòng (deadlock).
+- **Chạy lại khi xung đột**: bọc cả thao tác ghi trong `Database::write_with_retry(move ||
+  async move { … })`. Nó chạy lại closure khi PostgreSQL báo deadlock hay serialization
+  failure, hoặc SQLite bận lâu; lỗi khác trả ngay. Closure tự mở transaction và phải chịu được
+  chạy lại: không gửi mail, không gọi mạng, không đổi gì ngoài database bên trong nó.
+- **Mã tham chiếu của client chặn trùng lệnh mãi mãi.** Header `Idempotency-Key` chỉ sống 24
+  giờ. Lệnh có hậu quả lâu dài (thanh toán, chuyển tiền) nhận một `reference` từ người gọi,
+  kiểm bằng `reference::Reference::checked`, và lưu cùng bản ghi bên cạnh
+  `reference::fingerprint(&nội_dung)` dưới một unique index trên (người sở hữu,
+  `reference`). Chạy lệnh bằng `reference::submit_once`, gọi `reference::replayed` trên bản ghi
+  đã lưu trước: cùng mã, cùng nội dung thì trả bản ghi cũ (`Submitted::Replayed`, trả `200`),
+  khác nội dung thì lỗi `reference_reused` (422), và các bản gửi trùng đồng thời chỉ tạo một
+  bản ghi.
+- **Ghi event trong cùng transaction** với thay đổi (`Outbox::record`), để audit log và module
+  khác thấy mọi biến động. Audit log là chuỗi băm: `autoxide doctor` báo dòng đầu tiên bị sửa
+  hay bị xoá.
+- **Không bao giờ sửa hay xoá một giao dịch.** Sửa sai bằng một giao dịch đảo mới
+  (`amount.checked_neg()`) trỏ tới giao dịch nó đảo; nhờ vậy số dư luôn giải thích được bằng
+  lịch sử.
+
 ### 9. Cấu hình, job, giới hạn
 
 - Cấu hình: khai mỗi biến bằng `Setting` và đọc trong `Module::configure` qua
@@ -298,5 +342,7 @@ Luật core tự giữ:
 - [ ] Tool MCP cho những gì agent cần làm được
 - [ ] Mã lỗi có tiền tố và có bản dịch
 - [ ] Dữ liệu về người dùng được xuất (`PersonalData`) và xoá khi nhận `USER_DELETED`
+- [ ] Tiền dùng `Money`; số dư đổi bằng `rows::adjust`, khoá dòng theo thứ tự id, lệnh có
+      hậu quả lâu dài chống trùng bằng `reference`
 - [ ] Test trên cả hai database, kể cả ghi đồng thời
 - [ ] Đã sinh lại `docs/openapi.json` và `.env.example`; gate xanh

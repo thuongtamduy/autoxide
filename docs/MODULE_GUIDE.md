@@ -174,6 +174,53 @@ A module that keeps data about users takes part in data export and account delet
 - subscribe to `privacy::USER_DELETED` in `Module::subscriptions` and delete the user's
   rows when it arrives (`privacy::deleted_user(event)` gives the id). It may arrive twice.
 
+### Money and balances
+
+A module that keeps amounts of money, balances or transactions uses the tools in the
+kernel; `crates/kernel/tests/money.rs` shows all of them on a sample wallet table, on both
+databases.
+
+- **Amounts are `autoxide_kernel::money::Money`**: an `i64` count of the currency's minor
+  unit (cents for `USD`, đồng for `VND`) plus an ISO 4217 `Currency`. Never `f32`/`f64` or a
+  database decimal type. `checked_add`, `checked_sub`, `checked_mul` and `checked_neg`
+  return an error instead of overflowing; mixing two currencies is an error
+  (`money.currency_mismatch`). Split an amount with `allocate(&[ratios])` or `split(n)`:
+  the parts always add up to the whole (100 split 3 ways is 34, 33, 33).
+- **Store** a `Money` in two columns, `<name>_minor` (`BIGINT`) and `<name>_currency`
+  (3 characters); read it back with `Money::from_columns`. **In JSON** it is
+  `{"amount": "1999", "currency": "USD"}` — `amount` is a string, because JavaScript
+  rounds numbers above 2^53. Use `Money` directly in request and response types; its
+  OpenAPI schema says this.
+- **Change a balance with one conditional update**, never "read, check, write":
+  `rows::adjust::<Entity, _>(&transaction, Column::BalanceMinor, Column::Id.eq(id), -amount,
+  Bounds::NON_NEGATIVE)` returns `0` when the balance is not enough (or the row is gone)
+  and never lets the column overflow. Concurrent requests queue on the row; the balance
+  never goes below the floor.
+- **When you must read before you write** (check a status, move between two rows), lock
+  the rows first with `rows::lock_one` / `rows::lock` inside `Database::begin_write()`.
+  Lock several rows **in one consistent order** — `rows::lock(…, Column::Id)` locks by id —
+  so two transactions never wait for each other in a circle (deadlock).
+- **Retry on conflict**: wrap the whole write in `Database::write_with_retry(move || async
+  move { … })`. It runs the closure again when PostgreSQL reports a deadlock or a
+  serialization failure, or SQLite stays busy; any other error returns at once. The
+  closure opens its own transaction and must be safe to run again: no mail, no network
+  calls, no changes outside the database inside it.
+- **A client reference stops duplicate commands for good.** The `Idempotency-Key` header
+  only lives 24 hours. For a command with lasting effect (a payment, a transfer) accept a
+  `reference` from the caller, check it with `reference::Reference::checked`, and store it
+  with the record next to `reference::fingerprint(&content)` under a unique index on
+  (owner, `reference`). Run the command with `reference::submit_once`, calling
+  `reference::replayed` on the stored record first: the same reference with the same
+  content returns the earlier record (`Submitted::Replayed`, answer `200`), with different
+  content it fails with `reference_reused` (422), and concurrent duplicates create one
+  record.
+- **Record the event in the same transaction** as the change (`Outbox::record`), so the
+  audit log and other modules see every movement. The audit log is a hash chain:
+  `autoxide doctor` reports the first entry that was changed or removed.
+- **Never update or delete a transaction.** Correct a mistake with a new, reversing
+  transaction (`amount.checked_neg()`) that points to the one it reverses; balances are
+  then always explained by the history.
+
 ### 9. Configuration, jobs, limits
 
 - Settings: declare each with `Setting` and read it in `Module::configure` through
@@ -301,5 +348,7 @@ Rules the core follows:
 - [ ] MCP tools for what agents should be able to do
 - [ ] Error codes prefixed and translated
 - [ ] Data about users exported (`PersonalData`) and deleted on `USER_DELETED`
+- [ ] Money as `Money`; balances changed with `rows::adjust`, rows locked in id order,
+      lasting commands deduplicated by `reference`
 - [ ] Tests on both databases, including concurrent writes
 - [ ] `docs/openapi.json` and `.env.example` regenerated; gate green
