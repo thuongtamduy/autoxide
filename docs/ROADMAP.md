@@ -424,6 +424,8 @@ Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một ngư�
 
 ## 30. Ra mắt công khai (chủ dự án giao ngày 13/11/2026, D-175, D-176)
 
+Đặc tả: [`docs/steps/30-public-launch.md`](steps/30-public-launch.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Đưa Autoxide tới tay người lạ: repo công khai, CI và phát hành tự động, image Docker có chứng
 thực, file của một dự án mã nguồn mở, ảnh nhẹ, deploy không gián đoạn, cài được chỉ bằng README.
 Không đụng code của bước 29 (trừ `media` và `kernel/src/http/health.rs`), nên làm ngay được.
@@ -489,6 +491,8 @@ Nhóm C — sản phẩm (D-176):
 
 ## 31. Hợp đồng API và chống hồi quy (chủ dự án giao ngày 13/11/2026, D-177)
 
+Đặc tả: [`docs/steps/31-api-contract.md`](steps/31-api-contract.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Người viết giao diện (repo riêng, D-097), nhà phát triển ngoài và AI agent dùng API không gọi sai;
 hợp đồng, tài liệu và database của bản cũ không bao giờ âm thầm lệch khỏi code. Bước này sửa
 `xtask`, `testkit`, `gate.sh`, tài liệu và thêm thư mục SDK — làm ngay được; riêng test nâng cấp
@@ -534,6 +538,8 @@ Nhóm B — chống hồi quy:
 
 ## 32. Dọn bố cục và việc để lại (agent đề xuất ngày 13/11/2026)
 
+Đặc tả: [`docs/steps/32-layout-cleanup.md`](steps/32-layout-cleanup.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Bước 29 đã merge — làm được ngay; riêng dời file của `media` làm sau khi WebP (bước 30) merge vì
 cùng sửa module đó. Làm nhóm A trước: nhóm B sửa đúng
 các module nhóm A dời file. Mỗi mục có test trên cả hai database và dòng CHANGELOG.
@@ -564,8 +570,11 @@ Chờ chủ dự án quyết: định dạng AVIF cho ảnh thu nhỏ (cần th�
 
 ## 33. Nền đa khách: khách hàng, vị trí dữ liệu, mặt điều khiển (D-185)
 
+Đặc tả: [`docs/steps/33-tenancy.md`](steps/33-tenancy.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Thiết kế: `docs/research/business-foundation.md`, trụ 1. Bắt đầu SAU bước 31 và nhóm A của bước 32.
-Mọi mục chạy và có test trên cả SQLite và Postgres, ở cả chế độ `single` và nhiều khách. Ở chế độ
+Làm theo ba nhóm A (nền kernel), B (chuyển 13 module, mỗi module một commit), C (vận hành) của đặc tả;
+một người làm tuần tự. Mọi mục chạy và có test trên cả SQLite và Postgres, ở cả chế độ `single` và nhiều khách. Ở chế độ
 `single`, `/api/v1` không đổi (gate chặn thay đổi phá vỡ của bước 31 kiểm) và bản cài cũ nâng cấp
 được: migration gán mọi dữ liệu có sẵn cho khách mặc định, test nâng cấp của bước 31 phải xanh.
 
@@ -581,7 +590,7 @@ Mọi mục chạy và có test trên cả SQLite và Postgres, ở cả chế �
 - [ ] Mọi truy vấn của service lọc theo khách qua một công cụ của kernel; testkit có bài **rò rỉ
       giữa khách** chạy cho mọi module (ghi ở khách A, đọc bằng người của khách B: không thấy gì)
 - [ ] Job, event, outbox, lịch chạy theo từng database; worker và bộ phát event duyệt mọi database
-      được giao; `autoxide migrate --all` cho cả đội database; dời một khách `shared` ↔ `dedicated`
+      được giao; `autoxide migrate up --all` cho cả đội database; dời một khách `shared` ↔ `dedicated`
       bằng chép dữ liệu (mở rộng `autoxide copy`)
 - [ ] Đo đường nóng trước và sau (`scripts/loadtest.sh`); hướng dẫn viết module (EN + VI) có quy
       tắc phân loại bảng và lọc theo khách
@@ -608,6 +617,8 @@ Mọi mục chạy và có test trên cả SQLite và Postgres, ở cả chế �
       các khách trong database chung (một khách không chiếm hết job queue)
 
 ## 34. Tổ chức, quyền theo độ sâu, danh tính (D-185)
+
+Đặc tả: [`docs/steps/34-organizations-identity.md`](steps/34-organizations-identity.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
 Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 
@@ -645,6 +656,8 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 
 ## 35. Gói, quyền dùng tính năng, hạn mức, thuê bao (D-185)
 
+Đặc tả: [`docs/steps/35-plans-subscriptions.md`](steps/35-plans-subscriptions.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Thiết kế: trụ 3. Bắt đầu SAU bước 34; mục tính tiền chờ `PaymentGateway` của bước 36, mục cấp phát
 chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh toán, hạn mức là dữ liệu, không phải code.
 
@@ -663,6 +676,8 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
       liệu theo gói → migrate → dữ liệu mẫu → mời quản trị; lệnh CLI và API tương ứng
 
 ## 36. Tiền, sổ cái, thuế, chứng từ (D-187, D-188)
+
+Đặc tả: [`docs/steps/36-money-ledger-tax.md`](steps/36-money-ledger-tax.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
 Thiết kế: trụ 4. Bắt đầu SAU bước 34 (làm song song với 35 được; mục tính tiền của 35 dùng cổng
 thanh toán của bước này). Core không bao giờ tự giữ tiền.
@@ -703,6 +718,8 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
       của phần mềm kế toán phổ biến, để kế toán của khách không nhập lại tay
 
 ## 37. Tuân thủ pháp luật Việt Nam (D-186)
+
+Đặc tả: [`docs/steps/37-compliance.md`](steps/37-compliance.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
 Thiết kế: trụ 5 và mục 4 (đăng ký Bộ Công Thương). Bắt đầu SAU bước 34. Mỗi mục ghi căn cứ pháp lý
 trong quyết định của nó; quy định hay đổi để dạng dữ liệu có ngày hiệu lực.
@@ -748,6 +765,8 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
 
 ## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
 
+Đặc tả: [`docs/steps/38-cross-database-reporting.md`](steps/38-cross-database-reporting.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 36 (báo cáo gộp cần số liệu tiền).
 
 - [ ] Kho báo cáo gộp: event của các khách con đổ về khách cha (hay một database báo cáo) gần thời
@@ -759,6 +778,8 @@ Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 3
       test trên cả hai database
 
 ## 39. Vận hành và hiệu năng (chủ dự án giao ngày 13/11/2026; số cũ 33, D-189)
+
+Đặc tả: [`docs/steps/39-operations-performance.md`](steps/39-operations-performance.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
 Khi đã có người dùng thật: biết sớm khi hệ thống kẹt, không mất dữ liệu, xử lý sự cố không phải
 đoán, và chịu được dữ liệu cỡ thật. Bắt đầu SAU bước 38 (nền đa khách): backup, số đo, cảnh báo
@@ -819,6 +840,8 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
 
 ## 40. Năng lực còn thiếu của core (agent đề xuất; số cũ 34, D-189)
 
+Đặc tả: [`docs/steps/40-core-capabilities.md`](steps/40-core-capabilities.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 So với những gì một lõi backend hiện đại thường có sẵn, core còn thiếu sáu năng lực chung, không
 gắn với ngành nào. Header bảo mật và MCP đầy đủ hơn không phụ thuộc nền đa khách: làm được ngay.
 Bốn mục còn lại (OIDC, tải thẳng lên S3, SSE, rate limit) bắt đầu SAU bước 34 vì phải theo khách hàng
@@ -856,7 +879,7 @@ cả SQLite và Postgres.
 ## Giai đoạn module thương mại (chủ dự án giao ngày 13/11/2026, D-191)
 
 Module nghiệp vụ, không phải core: khái niệm sản phẩm, đơn hàng, kho không vào `kernel`. Thiết kế:
-`docs/research/business-foundation.md`, mục 8. Luật chung cho bước 41–46:
+`docs/research/business-foundation.md`, mục 8. Luật chung cho bước 41–49:
 
 - Mỗi module một crate, sở hữu bảng của mình; mọi bảng có `tenant_id`, dữ liệu theo cửa hàng / kho /
   người bán có `org_id`; quyền theo độ sâu của bước 34. Tiền là `Money`; thuế qua engine thuế, mọi
@@ -874,9 +897,14 @@ Module nghiệp vụ, không phải core: khái niệm sản phẩm, đơn hàng
 
 ## 41. Sản phẩm (`catalog`)
 
+Đặc tả: [`docs/steps/41-catalog.md`](steps/41-catalog.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Bắt đầu SAU bước 35 và 36. Khai hạn mức (số sản phẩm) và tính năng (nhiều biến thể, bảng giá) theo
 bước 35.
 
+- [ ] Chuẩn bị chung cho bước 42–49 (đặc tả 41, commit đầu tiên): `Subscription::optional` (nhận
+      event của module có thể chưa cài), dời bộ CSV của `forms` thành `autoxide_kernel::csv` và slug
+      của `content` thành `autoxide_kernel::slug` — để ba bước song song 42–44 không cùng sửa kernel
 - [ ] Sản phẩm và biến thể: tuỳ chọn (màu, cỡ…), SKU và mã vạch duy nhất trong khách, trạng thái
       (nháp, đang bán, ngừng bán, lưu trữ), ảnh qua `Media`, nội dung nhiều ngôn ngữ, cân nặng và
       kích thước (cho vận chuyển), nhóm thuế của engine thuế; slug và đường dẫn công khai
@@ -899,6 +927,8 @@ bước 35.
 
 ## 42. Kho (`inventory`)
 
+Đặc tả: [`docs/steps/42-inventory.md`](steps/42-inventory.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều request cùng lúc, trên cả hai database.
 
 - [ ] Kho là nút tổ chức loại `warehouse` hay cửa hàng (bước 34); tồn theo biến thể × kho; **sổ biến
@@ -916,6 +946,8 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
 
 ## 43. Khuyến mại (`promotions`)
 
+Đặc tả: [`docs/steps/43-promotions.md`](steps/43-promotions.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Bắt đầu SAU bước 41. Luật khuyến mại đổi thường xuyên: hạn mức là dữ liệu có ngày hiệu lực, không viết
 cứng (Thông tư 39/2025/TT-BCT trần 50% giá ngay trước khuyến mại, có ngoại lệ chương trình tập trung
 quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản hiện hành).
@@ -930,6 +962,8 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 
 ## 44. Vận chuyển (`shipping`)
 
+Đặc tả: [`docs/steps/44-shipping.md`](steps/44-shipping.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua event, báo trạng thái qua event.
 
 - [ ] Sổ địa chỉ của người mua dùng `Address` của module nền `address` (bước 34, D-193); địa chỉ
@@ -943,6 +977,8 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
       ghi phải thu từ hãng, đối soát với bảng kê COD của hãng; lệch thì báo
 
 ## 45. Giỏ hàng, đặt hàng, đơn hàng (`orders`)
+
+Đặc tả: [`docs/steps/45-orders.md`](steps/45-orders.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
 Bắt đầu SAU bước 42, 43, 44. Gọi `catalog`, `inventory`, `promotions`, `shipping` qua `api` của chúng;
 tiền qua `PaymentGateway` và sổ cái của bước 36.
@@ -973,6 +1009,8 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 
 ## 46. Sàn (`marketplace`)
 
+Đặc tả: [`docs/steps/46-marketplace.md`](steps/46-marketplace.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nút loại `seller` (bước 34).
 
 - [ ] Người bán đăng ký: hồ sơ, KYC qua cổng chặn của bước 37 (chưa xác thực thì không đăng bán),
@@ -991,6 +1029,8 @@ Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nú
 
 ## 47. Khách hàng và giữ chân khách (`customers`)
 
+Đặc tả: [`docs/steps/47-customers.md`](steps/47-customers.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (bước 34); module này giữ hồ sơ bán hàng.
 
 - [ ] Hồ sơ khách: lịch sử mua (từ event của `orders`), tổng chi, nhóm và phân khúc theo quy tắc,
@@ -1005,6 +1045,8 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
 
 ## 48. Bán đa kênh (`channels`)
 
+Đặc tả: [`docs/steps/48-channels.md`](steps/48-channels.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
 Bắt đầu SAU bước 45. Người bán ở Việt Nam bán cùng lúc trên website, Shopee, Lazada, TikTok Shop,
 Facebook / Zalo; một kho, một danh sách sản phẩm, đơn từ mọi nơi về một chỗ.
 
@@ -1016,6 +1058,8 @@ Facebook / Zalo; một kho, một danh sách sản phẩm, đơn từ mọi nơi
       báo cáo theo kênh; đối soát tiền sàn trả với sổ cái
 
 ## 49. Tiếp thị liên kết và bán qua livestream (`affiliate`)
+
+Đặc tả: [`docs/steps/49-affiliate.md`](steps/49-affiliate.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
 Bắt đầu SAU bước 45 và 37. Luật TMĐT 2025 buộc xác thực danh tính người livestream và người tiếp thị
 liên kết (bước 37).
