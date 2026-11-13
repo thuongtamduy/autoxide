@@ -24,9 +24,11 @@ endpoints are marked deprecated with a sunset date first.
   entry of `variants` has `webp_url` (the copy's `url` plus `&format=webp`) and `webp_size`;
   the content module's public `featured_media` and `body_media` carry `webp_url` too. Run
   `autoxide task media.refresh_variants` once to add WebP copies to images uploaded before.
-- Docker images are published by the `Release` workflow for `linux/amd64` and `linux/arm64`
+- The `Release` workflow is ready to publish Docker images for `linux/amd64` and `linux/arm64`
   as `ghcr.io/<owner>/autoxide:X.Y.Z` and `:X.Y`, with a signed build provenance and a signed
-  SBOM; `docs/DEPLOY.md` shows how to verify them with `gh attestation verify`.
+  SBOM; `docs/DEPLOY.md` shows how to verify them with `gh attestation verify`. It runs once
+  the repository is public: this release has no published image yet — build it with
+  `docker compose up -d --build`.
 - `CODE_OF_CONDUCT.md`: the Contributor Covenant 3.0, with a Vietnamese translation.
 - `CONTRIBUTING.md` (and `CONTRIBUTING.vi.md`): setting up a machine, the two gates, the
   rules that matter most, commits and pull requests, and the license of contributions.
