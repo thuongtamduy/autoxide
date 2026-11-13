@@ -14,15 +14,16 @@ use std::path::Path;
 use crate::boundaries::Violation;
 
 /// File phải có, tính từ gốc repo. Cặp `X.md` / `X.vi.md` trong danh sách còn được luật
-/// `docs-translation` so khung. (`CODE_OF_CONDUCT.md` thêm vào đây khi chủ dự án đặt địa chỉ
-/// liên hệ — bước 30 của lộ trình.)
-const REQUIRED: [&str; 14] = [
+/// `docs-translation` so khung.
+const REQUIRED: [&str; 16] = [
     "README.md",
     "README.vi.md",
     "SECURITY.md",
     "SECURITY.vi.md",
     "CONTRIBUTING.md",
     "CONTRIBUTING.vi.md",
+    "CODE_OF_CONDUCT.md",
+    "CODE_OF_CONDUCT.vi.md",
     "CHANGELOG.md",
     "LICENSE-MIT",
     "LICENSE-APACHE",
@@ -44,8 +45,8 @@ pub fn check_docs(root: &Path) -> Result<Vec<Violation>, String> {
                 rule: "docs-required",
                 location: file.to_owned(),
                 message: "missing: this file is part of the open-source project (README, \
-                          license, security policy, contributing guide, issue and pull request \
-                          templates); restore it"
+                          license, security policy, contributing guide, code of conduct, issue \
+                          and pull request templates); restore it"
                     .to_owned(),
             });
         }

@@ -44,8 +44,28 @@ docker compose up -d --build
 Hoặc khỏi build, dùng image đã phát hành (xem các bản phát hành trên GitHub của dự án):
 
 ```bash
-echo 'AUTOXIDE_IMAGE=ghcr.io/<owner>/autoxide:0.1' >> .env
+echo 'AUTOXIDE_IMAGE=ghcr.io/<owner>/autoxide:<version>' >> .env
 docker compose up -d --no-build
+```
+
+Image đã phát hành chạy trên `linux/amd64` và `linux/arm64` (vd AWS Graviton hay Raspberry
+Pi 4 trở lên). `<version>` là một bản phát hành như `0.12.0`, hoặc `0.12` để nhận theo các bản
+sửa lỗi của nó. Mỗi image do workflow `Release` của dự án trên GitHub build, kèm chứng thực
+nguồn gốc build đã ký và danh sách thành phần (SBOM) đã ký. Trước khi chạy một image, kiểm nó
+được build từ đúng repo này bằng [GitHub CLI](https://cli.github.com/):
+
+```bash
+gh attestation verify oci://ghcr.io/<owner>/autoxide:<version> --owner <owner>
+```
+
+Lệnh in ra workflow, commit và tag đã build image, và báo lỗi nếu image không do repo này
+build. SBOM (SPDX) được đính vào mỗi bản phát hành trên GitHub với tên `sbom.spdx.json`; kiểm
+nó thuộc đúng image và đọc nó bằng:
+
+```bash
+gh attestation verify oci://ghcr.io/<owner>/autoxide:<version> --owner <owner> \
+  --predicate-type https://spdx.dev/Document/v2.3 --format json \
+  | jq '.[0].verificationResult.statement.predicate.packages[].name'
 ```
 
 Compose khởi động PostgreSQL, áp dụng mọi migration một lần (service `migrate`), rồi

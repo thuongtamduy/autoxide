@@ -7,7 +7,8 @@ chỉ phát hành khi chủ dự án giao. Không phát hành giữa bước, kh
 
 Cần quyền đẩy lên GitHub: `gh` đã đăng nhập, hoặc biến môi trường `GH_TOKEN` (token
 fine-grained chỉ cho repo này, quyền Contents và Pull requests: Read and write). Thiếu quyền
-thì dừng và báo chủ dự án, không tìm đường vòng.
+thì dừng và báo chủ dự án, không tìm đường vòng. Image Docker không cần token cá nhân nào:
+workflow `Release` đăng bằng `GITHUB_TOKEN` của chính nó.
 
 ## Đánh số phiên bản
 
@@ -28,7 +29,11 @@ dòng tiếng Anh vào mục `## [Unreleased]` của `CHANGELOG.md`, dưới `Ad
 
 ## Các bước phát hành
 
-CI trên GitHub đã tắt (D-107): mọi bước chạy trên máy của người phát hành.
+Agent chỉ chuẩn bị bản phát hành và đẩy tag; workflow `Release` (`.github/workflows/release.yml`,
+D-175, D-193) chạy lại gate, build và đăng image Docker (`linux/amd64` và `linux/arm64`) lên
+`ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` bằng `GITHUB_TOKEN`, đính kèm chứng thực nguồn gốc build
+và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú từ `CHANGELOG.md`. Workflow chỉ chạy khi
+repo công khai; `./gate.sh` trên máy vẫn là gate bắt buộc trước khi đẩy tag.
 
 1. Đưa nhánh lên `main` mới nhất: `git fetch origin`, rồi `git rebase origin/main`. Phiên
    khác có thể đã merge trong lúc mình làm — xem "Khi hai phiên đụng nhau" bên dưới.
@@ -36,7 +41,8 @@ CI trên GitHub đã tắt (D-107): mọi bước chạy trên máy của ngư�
    theo: `"version"` trong `docs/openapi.json`, bản phát hành mới nhất ở dòng "Trạng thái"
    của `docs/ROADMAP.md`.
 3. Trong `CHANGELOG.md`: đổi `## [Unreleased]` thành `## [X.Y.Z] - YYYY-MM-DD`, thêm một
-   mục `## [Unreleased]` trống ở trên, cập nhật hai dòng liên kết ở cuối file.
+   mục `## [Unreleased]` trống ở trên, cập nhật hai dòng liên kết ở cuối file. Workflow kiểm
+   có mục `## [X.Y.Z]` và tag khớp `version`, sai thì không phát hành.
 4. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này.
 5. Đẩy nhánh, mở PR vào `main`, merge kiểu rebase để commit `release: vX.Y.Z` nằm nguyên
    trên `main`:
@@ -59,31 +65,21 @@ CI trên GitHub đã tắt (D-107): mọi bước chạy trên máy của ngư�
    git push origin vX.Y.Z
    ```
 
-7. Tạo bản phát hành trên GitHub, ghi chú là phần `## [X.Y.Z]` của `CHANGELOG.md`:
+7. Theo dõi workflow `Release` của tag (Actions → Release) tới khi xanh, rồi kiểm image đã đăng:
 
    ```bash
-   awk '/^## \[X.Y.Z\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md > notes.md
-   gh release create vX.Y.Z --title vX.Y.Z --notes-file notes.md --verify-tag
+   gh attestation verify oci://ghcr.io/<owner>/autoxide:X.Y.Z --owner <owner>
+   docker run --rm ghcr.io/<owner>/autoxide:X.Y.Z --version
    ```
 
+   Workflow đỏ thì sửa nguyên nhân rồi chạy lại trên cùng tag (Actions → Release → Run workflow,
+   chọn tag); không xoá tag đã đẩy. Lỗi nằm ở code thì phát hành bản vá `X.Y.Z+1`.
 8. `cargo clean`: mỗi lần đổi phiên bản, cargo build lại cả workspace thành một bộ file mới
    mà không xoá bộ cũ, `target/` phình thêm hàng chục GB.
-9. Image Docker (khi chủ dự án muốn đăng): build trên máy rồi đẩy lên GitHub Container
-   Registry. Cần một token GitHub có quyền `write:packages` của chủ dự án — thiếu thì bỏ qua
-   bước này và báo lại, không tự tạo hay lưu token:
 
-   ```bash
-   docker build -t ghcr.io/<owner>/autoxide:X.Y.Z -t ghcr.io/<owner>/autoxide:X.Y .
-   echo "$TOKEN" | docker login ghcr.io -u <owner> --password-stdin
-   docker push ghcr.io/<owner>/autoxide:X.Y.Z
-   docker push ghcr.io/<owner>/autoxide:X.Y
-   ```
-
-   Lần đầu đăng image, gói mặc định là riêng tư: chủ repo vào trang của gói (Packages →
-   autoxide → Package settings) đổi thành Public để người lạ tải được.
-
-Workflow `Release` (`.github/workflows/release.yml`) vẫn còn trong repo nhưng chỉ chạy khi
-bấm tay; bật lại khi có runner dùng được thì các bước 7 và 9 lại tự động.
+Lần đầu workflow đăng image, gói trên GitHub Container Registry mặc định là riêng tư: chủ repo
+vào trang của gói (Packages → autoxide → Package settings → Change visibility) đổi thành Public
+một lần để người lạ tải được (GitHub không cho đổi bằng `GITHUB_TOKEN`).
 
 ## Khi hai phiên đụng nhau
 
@@ -100,8 +96,8 @@ Nhiều phiên agent có thể làm song song trên các nhánh khác nhau. Lúc
 ## Nâng cấp thư viện
 
 Dependabot (`.github/dependabot.yml`) mở pull request mỗi tuần, gom bản minor/patch của
-thư viện Rust thành một PR. CI không chạy trên PR (D-107): người duyệt hoặc agent lấy nhánh
-của PR về, chạy `./gate.sh`, xanh mới merge. Bản lớn (major) đến từng PR riêng: đọc
+thư viện Rust thành một PR. CI chạy gate trên PR (khi repo công khai); người duyệt hoặc agent
+vẫn chạy `./gate.sh` trên máy, xanh mới merge. Bản lớn (major) đến từng PR riêng: đọc
 CHANGELOG của thư viện (skill `check-library-api`) trước khi merge. Lỗ hổng thư viện được
 `cargo deny check` trong gate bắt; đỏ thì nâng thư viện hoặc ghi ngoại lệ có lý do trong
 `deny.toml` và `docs/DECISIONS.md`.

@@ -4,7 +4,8 @@
 
 Cảm ơn bạn đã giúp. Hướng dẫn này dành cho người; nếu bạn làm cùng một AI agent viết code,
 hãy trỏ nó tới [`CLAUDE.md`](CLAUDE.md) (cũng có tên `AGENTS.md`), nơi ghi đầy đủ luật agent
-làm theo. Luật dưới đây là cùng luật đó, chỉ ngắn hơn.
+làm theo. Luật dưới đây là cùng luật đó, chỉ ngắn hơn. Mọi người tham gia đều theo
+[quy tắc ứng xử](CODE_OF_CONDUCT.vi.md).
 
 ## Trước khi bắt đầu
 

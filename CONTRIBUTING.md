@@ -4,7 +4,8 @@
 
 Thank you for helping. This guide is for people; if you work with an AI coding agent, point
 it at [`CLAUDE.md`](CLAUDE.md) (also linked as `AGENTS.md`), which holds the full rules the
-agent follows. The rules below are the same, only shorter.
+agent follows. The rules below are the same, only shorter. Everyone taking part follows the
+[code of conduct](CODE_OF_CONDUCT.md).
 
 ## Before you start
 

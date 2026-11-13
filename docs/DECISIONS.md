@@ -4627,3 +4627,39 @@ rộng.
 `Accept`, ảnh sai loại đến trình duyệt cũ; chỉ làm WebP, bỏ JPEG — email và vài client cũ không
 đọc WebP; WebP không mất dữ liệu cho ảnh trong suốt — nặng gấp nhiều lần bản có mất dữ liệu;
 AVIF — nhẹ hơn nữa (D-168) nhưng mã hoá chậm hơn nhiều và cần thêm thư viện C lớn, để sau.
+
+## D-193 · Workflow GitHub tự chạy chỉ khi repo công khai; image hai kiến trúc, chứng thực và SBOM; quy tắc ứng xử — 2026-11-13 — agent quyết
+
+Quyết định (thực hiện D-175):
+
+- `ci.yml` (push lên `main`, pull request), `audit.yml` (lịch hằng ngày) và `release.yml` (tag
+  `vX.Y.Z`) có lại trigger tự chạy. Mọi job mang `if: ${{ !github.event.repository.private }}`:
+  repo riêng tư thì job bị bỏ qua trước khi xin runner, không tốn phút nào; chủ dự án công khai
+  repo là chúng tự chạy, không cần sửa file. Payload của sự kiện `schedule` có thể không mang
+  `repository`: khi đó `audit.yml` vẫn chạy (khoảng 1–2 phút `cargo deny` mỗi ngày) cho tới lúc
+  công khai — chấp nhận được, đổi lại không có nguy cơ job lặng lẽ không bao giờ chạy.
+- `release.yml`: gate → build image `linux/amd64` trên `ubuntu-24.04` và `linux/arm64` trên
+  `ubuntu-24.04-arm` (máy gốc, không giả lập QEMU; miễn phí cho repo công khai), đẩy theo digest
+  → job `publish` ghép thành một image đa nền tảng với tag `X.Y.Z` và `X.Y`, rồi `actions/attest`
+  ký chứng thực nguồn gốc build (SLSA) và SBOM (SPDX do `anchore/sbom-action` tạo), đẩy cả hai
+  lên registry; SBOM đính vào bản phát hành GitHub. BuildKit cũng gắn SBOM và provenance của nó
+  vào từng image. Mọi việc bằng `GITHUB_TOKEN`, không token cá nhân. `docs/RELEASING.md`: agent
+  chỉ đẩy tag; đổi gói image sang Public lần đầu là việc của chủ repo (GitHub không cho đổi
+  bằng `GITHUB_TOKEN`). `docs/DEPLOY.md` có lệnh `gh attestation verify`.
+- `CODE_OF_CONDUCT.md`: nguyên văn Contributor Covenant 3.0 (bản mới nhất), chỉ điền cách báo
+  cáo (email do chủ dự án chọn) và bỏ ghi chú mẫu ở phần xử lý. Bản 3.0 chưa có bản tiếng Việt
+  chính thức: `CODE_OF_CONDUCT.vi.md` là bản dịch của dự án, ghi rõ bản tiếng Anh có giá trị,
+  cùng license CC BY-SA 4.0 như bản gốc (bản phỏng theo phải giữ license đó).
+- Lịch sử commit mang email cá nhân của chủ dự án: chủ dự án chọn giữ nguyên, không viết lại
+  lịch sử.
+
+Lý do: D-107 tắt CI vì runner của repo riêng tư tính phí; điều kiện theo `private` giữ đúng lý
+do đó mà không bắt ai nhớ bật lại. Máy build ARM gốc nhanh ngang amd64, còn giả lập là lý do
+D-078 để ARM64 lại. Chứng thực ký qua Sigstore cho người cài kiểm image đúng do repo này build;
+attestation của GitHub chỉ có cho repo công khai trên gói Free / Pro / Team, nên cũng chờ công
+khai như phần còn lại.
+
+Đã cân nhắc: bật trigger không điều kiện — tốn phí hoặc chạy đỏ khi repo còn riêng tư; một job
+đầu tiên gọi API để hỏi repo có công khai không — chính job đó cũng tốn phút; build đa nền tảng
+bằng QEMU trên một máy — chậm gấp nhiều lần (D-078); `cosign` tự cài thay cho `actions/attest`
+— thêm một công cụ, còn `gh attestation verify` người dùng đã có cùng GitHub CLI.

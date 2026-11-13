@@ -22,11 +22,17 @@ endpoints are marked deprecated with a sunset date first.
   entry of `variants` has `webp_url` (the copy's `url` plus `&format=webp`) and `webp_size`;
   the content module's public `featured_media` and `body_media` carry `webp_url` too. Run
   `autoxide task media.refresh_variants` once to add WebP copies to images uploaded before.
+- Docker images are published by the `Release` workflow for `linux/amd64` and `linux/arm64`
+  as `ghcr.io/<owner>/autoxide:X.Y.Z` and `:X.Y`, with a signed build provenance and a signed
+  SBOM; `docs/DEPLOY.md` shows how to verify them with `gh attestation verify`.
+- `CODE_OF_CONDUCT.md`: the Contributor Covenant 3.0, with a Vietnamese translation.
 - `CONTRIBUTING.md` (and `CONTRIBUTING.vi.md`): setting up a machine, the two gates, the
   rules that matter most, commits and pull requests, and the license of contributions.
 
 ### Changed
 
+- The GitHub workflows run again on their own (CI on pushes to `main` and pull requests, a
+  daily dependency audit, releases on `vX.Y.Z` tags), but only while the repository is public.
 - `autoxide_media::api::MediaVariant` has a new field, `webp_url`.
 - Building Autoxide compiles `libwebp` (C), like SQLite: a C compiler was already required.
 - `autoxide_kernel::http::health_routes` takes a second argument, the `http::Draining` flag

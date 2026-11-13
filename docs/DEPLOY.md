@@ -44,8 +44,29 @@ docker compose up -d --build
 Or skip building and use a released image (see the project's GitHub releases):
 
 ```bash
-echo 'AUTOXIDE_IMAGE=ghcr.io/<owner>/autoxide:0.1' >> .env
+echo 'AUTOXIDE_IMAGE=ghcr.io/<owner>/autoxide:<version>' >> .env
 docker compose up -d --no-build
+```
+
+Released images run on `linux/amd64` and `linux/arm64` (for example AWS Graviton or a
+Raspberry Pi 4 and newer). `<version>` is a release such as `0.12.0`, or `0.12` to follow its
+bug fixes. Each image is built by the project's `Release` workflow on GitHub and carries a
+signed build provenance and a signed list of its components (SBOM). Before you run an image,
+check that it was built from this repository with the
+[GitHub CLI](https://cli.github.com/):
+
+```bash
+gh attestation verify oci://ghcr.io/<owner>/autoxide:<version> --owner <owner>
+```
+
+It prints the workflow, commit and tag the image was built from, and fails if the image
+was not built by this repository. The SBOM (SPDX) is attached to each GitHub release as
+`sbom.spdx.json`; check that it belongs to the image and read it with:
+
+```bash
+gh attestation verify oci://ghcr.io/<owner>/autoxide:<version> --owner <owner> \
+  --predicate-type https://spdx.dev/Document/v2.3 --format json \
+  | jq '.[0].verificationResult.statement.predicate.packages[].name'
 ```
 
 Compose starts PostgreSQL, applies every migration once (the `migrate` service), then

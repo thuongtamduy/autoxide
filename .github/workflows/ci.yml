@@ -1,12 +1,16 @@
-# TẮT tự chạy (D-107): tài khoản GitHub không dùng runner có tính phí; gate cục bộ
-# (`./gate.sh`) là gate duy nhất. Muốn bật lại: trả các trigger cũ (xem git log) và ghi
-# quyết định mới.
 # CI của Autoxide: gate đầy đủ (giống `./gate.sh` trên máy) trên PostgreSQL thấp nhất
-# được hỗ trợ và mới nhất, cộng quét secret trong toàn bộ lịch sử git (D-074).
+# được hỗ trợ và mới nhất, cộng quét secret trong toàn bộ lịch sử git (D-074). `./gate.sh` trên
+# máy vẫn là định nghĩa "xong" (D-173); CI là lưới thứ hai (D-175).
+#
+# Mọi job chỉ chạy khi repo công khai (D-193): repo riêng tư thì GitHub tính phí runner, nên
+# job bị bỏ qua trước khi xin runner — không tốn phút nào.
 name: CI
 
 on:
-  # Chỉ chạy khi bấm tay (Actions → Run workflow).
+  push:
+    branches: [main]
+  pull_request:
+  # Chạy tay (Actions → Run workflow), vd sau khi đổi cài đặt của repo.
   workflow_dispatch:
 
 permissions:
@@ -19,6 +23,7 @@ concurrency:
 jobs:
   gate:
     name: gate (PostgreSQL ${{ matrix.postgres }})
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
@@ -64,6 +69,7 @@ jobs:
 
   secrets:
     name: secret scan (gitleaks)
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

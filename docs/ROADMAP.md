@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–29 xong**; đang làm 30–32 (bước 30 xong: deploy không gián đoạn, WebP, `SECURITY.md`, `CONTRIBUTING.md`, kiểm tài liệu EN / VI), nền đa khách 33–38 (D-185…D-189); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–29 xong**; đang làm 30–32 (bước 30: phần trong repo xong, chờ chủ dự án công khai repo rồi kiểm lần chạy đầu của workflow), nền đa khách 33–38 (D-185…D-189); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -414,18 +414,23 @@ Nhóm A — repo công khai, CI, phát hành (D-175):
       quét toàn lịch sử xanh và không file nào chứa tên máy chủ, IP, đường dẫn riêng hay thông tin
       cá nhân. Agent không tự đổi chế độ công khai
       — 13/11/2026 agent đã quét: gitleaks toàn lịch sử mọi nhánh xanh, file không chứa IP thật,
-      tên máy hay đường dẫn riêng; còn lại: metadata của một số commit mang email cá nhân của chủ
-      dự án — chủ dự án chọn giữ, hay viết lại lịch sử sang địa chỉ `noreply` của GitHub
+      tên máy hay đường dẫn riêng; email cá nhân trong metadata commit: chủ dự án chọn giữ
+      nguyên (D-193). Còn chờ chủ dự án bấm công khai
 - [ ] Ba workflow tự chạy lại: `ci.yml` (push lên `main`, pull request), `audit.yml` (lịch),
       `release.yml` (tag `vX.Y.Z`) — trigger cũ có trong `git log -p -- .github/workflows`; chạy
-      xanh trên GitHub; bỏ ghi chú "TẮT tự chạy (D-107)" ở đầu các file
+      xanh trên GitHub; bỏ ghi chú "TẮT tự chạy (D-107)" ở đầu các file — trigger đã bật lại, job
+      chỉ chạy khi repo công khai (D-193); còn chờ lần chạy xanh đầu tiên sau khi công khai
 - [ ] `release.yml` đăng image `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` bằng `GITHUB_TOKEN`
       (`packages: write`), gói image để công khai; thử với bản phát hành kế tiếp. `docs/RELEASING.md`
-      sửa theo: agent chỉ còn đẩy tag, bản phát hành và image do workflow làm
+      sửa theo: agent chỉ còn đẩy tag, bản phát hành và image do workflow làm — workflow và
+      `RELEASING.md` đã sửa (D-193); còn chờ bản phát hành đầu tiên sau khi công khai, và chủ
+      repo đổi gói image sang Public một lần
 - [ ] Secret scanning và push protection của GitHub bật; Dependabot alerts bật; gitleaks trong
-      `./gate.sh` giữ nguyên
+      `./gate.sh` giữ nguyên — chủ dự án bật trong Settings → Code security sau khi công khai,
+      cùng "Private vulnerability reporting" mà `SECURITY.md` dựa vào
 - [ ] Image Docker cho máy ARM64 (`linux/arm64`) trong workflow `Release` khi repo đã công khai
       (máy build ARM của GitHub miễn phí cho repo công khai; D-078 để sau vì build giả lập quá lâu)
+      — đã có trong `release.yml` (D-193); còn chờ bản phát hành đầu tiên sau khi công khai
 
 Nhóm B — file của dự án mã nguồn mở:
 
@@ -436,14 +441,13 @@ Nhóm B — file của dự án mã nguồn mở:
       (D-173), luật quan trọng nhất tóm từ `CLAUDE.md` (hai database, ranh giới module, lỗi có
       `code`, test), cách viết commit và PR, license của phần đóng góp (MIT OR Apache-2.0, như
       repo); trỏ `CLAUDE.md` cho người dùng AI agent
-- [ ] Quy tắc ứng xử (`CODE_OF_CONDUCT.md`, theo Contributor Covenant bản mới nhất) với địa chỉ
+- [x] Quy tắc ứng xử (`CODE_OF_CONDUCT.md`, theo Contributor Covenant bản mới nhất) với địa chỉ
       liên hệ do chủ dự án đặt; mẫu issue (báo lỗi: phiên bản, database, cách tái hiện; đề xuất) và
-      mẫu PR (đã chạy `./gate.sh`, đã sửa EN + VI, đã thêm CHANGELOG) trong `.github/` — mẫu
-      issue và PR đã xong; còn `CODE_OF_CONDUCT.md` chờ địa chỉ, có rồi thì thêm vào `REQUIRED`
-      của `xtask/src/docs.rs`
+      mẫu PR (đã chạy `./gate.sh`, đã sửa EN + VI, đã thêm CHANGELOG) trong `.github/`
 - [ ] Bản phát hành đáng tin: workflow `Release` (sau nhóm A) đính kèm chứng thực nguồn gốc build
       (GitHub artifact attestation) và danh sách thành phần (SBOM) cho image Docker; `docs/DEPLOY.md`
-      (EN + VI) có lệnh kiểm chứng thực trước khi chạy image
+      (EN + VI) có lệnh kiểm chứng thực trước khi chạy image — đã có trong `release.yml` và
+      `DEPLOY.md` (D-193); còn chờ bản phát hành đầu tiên để kiểm bằng `gh attestation verify`
 - [x] `cargo xtask check` hay test giữ các file trên không mất và hai bản EN / VI không lệch
       tiêu đề mục (cách làm như kiểm bản dịch i18n), để agent phiên sau không quên sửa một bên
 

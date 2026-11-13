@@ -1,13 +1,14 @@
-# TẮT tự chạy (D-107): tài khoản GitHub không dùng runner có tính phí; gate cục bộ
-# (`./gate.sh`) là gate duy nhất. Muốn bật lại: trả các trigger cũ (xem git log) và ghi
-# quyết định mới.
-# Phát hành khi đẩy tag `vX.Y.Z` (D-078): kiểm tag khớp phiên bản trong Cargo.toml, chạy
-# lại gate, build và đăng image Docker lên GitHub Container Registry, tạo bản phát hành
-# GitHub với ghi chú lấy từ CHANGELOG.md. Quy trình: docs/RELEASING.md.
+# Phát hành khi đẩy tag `vX.Y.Z` (D-078, D-175): kiểm tag khớp phiên bản trong Cargo.toml, chạy
+# lại gate, build image Docker cho `linux/amd64` và `linux/arm64` trên máy build gốc của GitHub
+# (không giả lập), đăng lên GitHub Container Registry bằng `GITHUB_TOKEN`, đính kèm chứng thực
+# nguồn gốc build và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú lấy từ CHANGELOG.md.
+# Quy trình: docs/RELEASING.md. Chỉ chạy khi repo công khai (D-193).
 name: Release
 
 on:
-  # Chỉ chạy khi bấm tay trên một tag `vX.Y.Z` (Actions → Run workflow → chọn tag).
+  push:
+    tags: ["v*.*.*"]
+  # Chạy lại bằng tay trên một tag `vX.Y.Z` (Actions → Run workflow → chọn tag).
   workflow_dispatch:
 
 permissions:
@@ -15,6 +16,7 @@ permissions:
 
 jobs:
   gate:
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     services:
@@ -59,15 +61,84 @@ jobs:
           exit 1
       - run: ./gate.sh
 
-  publish:
+  # Mỗi kiến trúc build trên máy cùng kiến trúc, đẩy image theo digest (chưa có tag); job
+  # `publish` ghép các digest thành một image đa nền tảng.
+  image:
     needs: gate
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          # Máy build ARM của GitHub: miễn phí cho repo công khai (D-078 để sau vì giả lập quá lâu).
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     permissions:
-      contents: write
+      contents: read
       packages: write
     steps:
       - uses: actions/checkout@v7
+      # Tên image trên ghcr.io phải viết thường; tên chủ repo có thể có chữ hoa.
+      - name: Image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          # Chứng thực của BuildKit nằm cùng image: SBOM và nguồn gốc build đầy đủ.
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+      - name: Export the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p digests
+          touch "digests/${DIGEST#sha256:}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ strategy.job-index }}
+          path: digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      packages: write
+      # Ký chứng thực (Sigstore qua OIDC) và lưu nó vào GitHub.
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: digests-*
+          merge-multiple: true
+          path: digests
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
@@ -77,18 +148,46 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ env.IMAGE }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-      - uses: docker/build-push-action@v7
+      - name: Create the multi-platform image with its tags
+        working-directory: digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "$IMAGE@sha256:%s " *)
+      - id: index
+        name: Digest of the multi-platform image
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          digest="$(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      # Chứng thực nguồn gốc build (SLSA), ký và lưu ở GitHub lẫn registry:
+      # `gh attestation verify oci://ghcr.io/<owner>/autoxide:X.Y.Z --owner <owner>`.
+      - uses: actions/attest@v4
         with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.index.outputs.digest }}
+          push-to-registry: true
+      # Danh sách thành phần (SPDX) của image, cũng ký thành chứng thực và đính vào bản phát hành.
+      - uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.index.outputs.digest }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - uses: actions/attest@v4
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.index.outputs.digest }}
+          sbom-path: sbom.spdx.json
+          push-to-registry: true
       - name: Release notes from CHANGELOG.md
         env:
           TAG: ${{ github.ref_name }}
@@ -103,4 +202,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" --title "Autoxide $TAG" --notes-file notes.md --verify-tag
+        run: |
+          gh release create "$TAG" --title "Autoxide $TAG" --notes-file notes.md --verify-tag \
+            "sbom.spdx.json#SBOM (SPDX JSON) of the Docker image"
