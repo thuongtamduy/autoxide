@@ -95,7 +95,7 @@ impl EmailVerifications {
         new_email: &str,
         language: Language,
     ) -> Result<(), Error> {
-        let email = user::normalize_email(new_email);
+        let email = autoxide_kernel::email::normalize(new_email);
         let problems: Vec<FieldError> = user::check_email_field("new_email", &email)
             .into_iter()
             .chain(FieldError::blank("current_password", current_password))

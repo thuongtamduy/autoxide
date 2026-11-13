@@ -154,7 +154,7 @@ impl NewsletterService {
     ) -> Result<(), Error> {
         let mut problems = Vec::new();
         let email = match input.email.as_deref() {
-            Some(email) => text::checked_email(email, "email", &mut problems),
+            Some(email) => autoxide_kernel::email::checked(email, "email", &mut problems),
             None => {
                 problems.push(FieldError::new("email", "required", "is required"));
                 None

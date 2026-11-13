@@ -96,7 +96,7 @@ impl UserService {
             return Err(invalid_credentials());
         }
         let row = Entity::find()
-            .filter(Column::Email.eq(normalize_email(email)))
+            .filter(Column::Email.eq(autoxide_kernel::email::normalize(email)))
             .one(self.database.read())
             .await?;
         let stored = row.as_ref().and_then(|row| row.password_hash.clone());
@@ -156,7 +156,7 @@ impl UserService {
         input: NewUser,
         admin: bool,
     ) -> Result<User, Error> {
-        let email = normalize_email(&input.email);
+        let email = autoxide_kernel::email::normalize(&input.email);
         let name = input.name.trim().to_owned();
         let mut problems = Vec::new();
         problems.extend(check_email_field("email", &email));
@@ -321,7 +321,7 @@ impl UserService {
     /// Người dùng có email `email` (so sánh sau khi chuẩn hoá).
     pub(crate) async fn find_by_email(&self, email: &str) -> Result<Option<User>, Error> {
         let row = Entity::find()
-            .filter(Column::Email.eq(normalize_email(email)))
+            .filter(Column::Email.eq(autoxide_kernel::email::normalize(email)))
             .one(self.database.read())
             .await?;
         Ok(row.map(User::from))
@@ -493,10 +493,6 @@ fn search_text(email: &str, name: &str) -> String {
 
 fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
-}
-
-pub(crate) fn normalize_email(email: &str) -> String {
-    email.trim().to_lowercase()
 }
 
 pub(crate) fn email_taken(email: &str) -> Error {

@@ -189,12 +189,6 @@ const LABEL_MAX: usize = 500;
 const CONSENT_LABEL_MAX: usize = 5000;
 const OPTIONS_MAX: usize = 100;
 const OPTION_VALUE_MAX: usize = 200;
-/// Độ dài tối đa của địa chỉ email, tính theo BYTE (UTF-8) như bên gửi mail.
-const EMAIL_MAX: usize = 254;
-/// Phần trước `@`, theo byte (RFC 5321; bên gửi mail cũng đếm byte).
-const EMAIL_LOCAL_MAX: usize = 64;
-/// Một nhãn của tên miền, theo byte.
-const EMAIL_LABEL_MAX: usize = 63;
 /// Số key lạ trong `data` được báo từng cái.
 const UNKNOWN_REPORTED: usize = 50;
 const PHONE_MAX: usize = 32;
@@ -530,7 +524,11 @@ fn check_value(
                 FieldType::Email => {
                     // Kiểm cả dạng sẽ lưu (viết thường): vài chữ dài ra khi viết thường (`İ` →
                     // `i̇`), dạng đó cũng phải vừa giới hạn.
-                    if !is_email(&text) || !is_email(&normalize_email(&text)) {
+                    if !autoxide_kernel::email::is_valid(&text)
+                        || !autoxide_kernel::email::is_valid(&autoxide_kernel::email::normalize(
+                            &text,
+                        ))
+                    {
                         return fail(
                             "email",
                             "must be an email address like `name@example.com`".to_owned(),
@@ -586,44 +584,12 @@ fn option_list(field: &Field) -> String {
     field.options.iter().map(|option| format!("`{}`", option.value)).collect::<Vec<_>>().join(", ")
 }
 
-/// Địa chỉ email hợp lệ ở mức đủ dùng cho form: tổng cộng tối đa 254 byte, một `@`, phần
-/// trước 1–64 BYTE không có khoảng trắng hay ký tự đặc biệt của header, tên miền có ít nhất
-/// một dấu chấm, mỗi nhãn 1–63 byte chữ, số hoặc `-` (không ở đầu, cuối). Đếm byte chứ không
-/// đếm ký tự, như bên gửi mail (`lettre`): địa chỉ nhận ở đây thì gửi mail được.
-pub(crate) fn is_email(text: &str) -> bool {
-    if text.len() > EMAIL_MAX {
-        return false;
-    }
-    let Some((local, domain)) = text.split_once('@') else { return false };
-    let local_ok = (1..=EMAIL_LOCAL_MAX).contains(&local.len())
-        && !local.starts_with('.')
-        && !local.ends_with('.')
-        && !local.contains("..")
-        && local
-            .chars()
-            .all(|c| !c.is_whitespace() && !c.is_control() && !"<>()[]\\,;:\"@".contains(c));
-    let labels: Vec<&str> = domain.split('.').collect();
-    let domain_ok = labels.len() >= 2
-        && labels.iter().all(|label| {
-            (1..=EMAIL_LABEL_MAX).contains(&label.len())
-                && !label.starts_with('-')
-                && !label.ends_with('-')
-                && label.chars().all(|c| c.is_alphanumeric() || c == '-')
-        });
-    local_ok && domain_ok
-}
-
 /// Số điện thoại: chữ số, khoảng trắng, `-`, `(`, `)`, `.`, và `+` chỉ ở đầu; 6–15 chữ số.
 fn is_phone(text: &str) -> bool {
     let body = text.strip_prefix('+').unwrap_or(text);
     let digits = body.chars().filter(char::is_ascii_digit).count();
     (6..=15).contains(&digits)
         && body.chars().all(|c| c.is_ascii_digit() || matches!(c, ' ' | '-' | '(' | ')' | '.'))
-}
-
-/// Email chuẩn hoá để lưu và tra: bỏ khoảng trắng hai đầu, chữ thường.
-pub(crate) fn normalize_email(email: &str) -> String {
-    email.trim().to_lowercase()
 }
 
 /// Email của người gửi: trường `reply_to_field` nếu có câu trả lời, không thì trường `email`
@@ -702,7 +668,8 @@ mod tests {
         assert_eq!(answers.data["agree"], json!(true));
         assert!(answers.text.contains("Xin chào"));
         assert_eq!(
-            sender_email(&sample(), None, &answers.data).map(|e| normalize_email(&e)),
+            sender_email(&sample(), None, &answers.data)
+                .map(|e| autoxide_kernel::email::normalize(&e)),
             Some("ada@example.com".to_owned())
         );
     }
@@ -759,7 +726,7 @@ mod tests {
             check_answers(&number, json!({"n": raw}).as_object().unwrap(), &mut problems);
             assert_eq!(problems.is_empty(), ok, "{raw}");
         }
-        assert!(is_email("a.b+tag@mail.example.vn"));
+        assert!(autoxide_kernel::email::is_valid("a.b+tag@mail.example.vn"));
         for bad in [
             "a@b",
             "a b@example.com",
@@ -769,7 +736,7 @@ mod tests {
             "a..b@x.com",
             "a@x.com\nBcc: y",
         ] {
-            assert!(!is_email(bad), "{bad}");
+            assert!(!autoxide_kernel::email::is_valid(bad), "{bad}");
         }
     }
 
@@ -777,11 +744,17 @@ mod tests {
     /// từ chối ngay khi gửi, thay vì nhận rồi mọi mail báo đều hỏng.
     #[test]
     fn email_dem_byte_va_kiem_ca_dang_viet_thuong() {
-        assert!(is_email(&format!("{}@example.com", "é".repeat(32))));
-        assert!(!is_email(&format!("{}@example.com", "é".repeat(33))));
-        assert!(!is_email(&format!("a@{}.com", "é".repeat(32))), "label over 63 bytes");
+        assert!(autoxide_kernel::email::is_valid(&format!("{}@example.com", "é".repeat(32))));
+        assert!(!autoxide_kernel::email::is_valid(&format!("{}@example.com", "é".repeat(33))));
         assert!(
-            !is_email(&format!("a@{}.com", vec!["x".repeat(60); 5].join("."))),
+            !autoxide_kernel::email::is_valid(&format!("a@{}.com", "é".repeat(32))),
+            "label over 63 bytes"
+        );
+        assert!(
+            !autoxide_kernel::email::is_valid(&format!(
+                "a@{}.com",
+                vec!["x".repeat(60); 5].join(".")
+            )),
             "over 254 bytes"
         );
 
@@ -797,7 +770,7 @@ mod tests {
         );
         // `İ` (2 byte) viết thường thành `i̇` (3 byte): 30 chữ vừa 64 byte, dạng lưu thì không.
         let dotted = format!("{}@example.com", "İ".repeat(30));
-        assert!(is_email(&dotted));
+        assert!(autoxide_kernel::email::is_valid(&dotted));
         assert_eq!(check(dotted), [("data.e".to_owned(), "email".to_owned())]);
     }
 

@@ -9,6 +9,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Changed
+
+- `forms`, `comments` and `newsletter` check email addresses the same way: at most 254 bytes in
+  all, 64 bytes before the `@`, a domain with at least one dot. Before, `newsletter` accepted
+  addresses up to 320 bytes (which mail servers refuse) and `comments` counted characters
+  instead of bytes.
+
 ## [0.9.0] - 2026-11-13
 
 ### Added

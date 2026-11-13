@@ -125,7 +125,7 @@ impl FormsService {
         }
         let email =
             fields::sender_email(&form.fields, form.row.reply_to_field.as_deref(), &answers.data)
-                .map(|email| fields::normalize_email(&email));
+                .map(|email| autoxide_kernel::email::normalize(&email));
         let content_hash = antispam::content_hash(&data);
         let since = now() - chrono::Duration::hours(DUPLICATE_HOURS);
         let duplicate = submission::Entity::find()

@@ -22,7 +22,6 @@ use crate::permissions::{COMMENTS_EXPORT, COMMENTS_MANAGE, COMMENTS_MODERATE, CO
 use crate::service::{
     Comment, CommentsService, Status, comment_not_found, now, shift_counts, summary,
 };
-use crate::text;
 
 /// Bộ lọc hàng chờ.
 #[derive(Debug, Clone, Default)]
@@ -274,7 +273,7 @@ impl CommentsService {
                     None
                 }
             },
-            "email" => text::checked_email(raw, "value", &mut problems),
+            "email" => autoxide_kernel::email::checked(raw, "value", &mut problems),
             "ip" => {
                 let valid = (1..=64).contains(&raw.len())
                     && raw.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
@@ -430,8 +429,6 @@ fn ban_summary(row: &ban::Model) -> serde_json::Value {
 /// Email của yêu cầu xuất / xoá, đã chuẩn hoá; sai dạng thì 422.
 fn checked_email(email: &str) -> Result<String, Error> {
     let mut problems = Vec::new();
-    match text::checked_email(email, "email", &mut problems) {
-        Some(email) => Ok(email),
-        None => Err(Error::validation(problems)),
-    }
+    autoxide_kernel::email::checked(email, "email", &mut problems)
+        .ok_or_else(|| Error::validation(problems))
 }

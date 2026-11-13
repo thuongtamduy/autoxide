@@ -550,7 +550,7 @@ impl NewsletterService {
     ) -> Result<(), Error> {
         principal.require(&NEWSLETTER_SEND)?;
         let mut problems = Vec::new();
-        let email = text::checked_email(email, "email", &mut problems)
+        let email = autoxide_kernel::email::checked(email, "email", &mut problems)
             .ok_or_else(|| Error::validation(problems))?;
         let campaign = self.find_campaign(id).await?;
         let list = self.find_list(campaign.row.list_id).await?;

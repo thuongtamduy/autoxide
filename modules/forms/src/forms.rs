@@ -434,8 +434,8 @@ impl FormsService {
             }
             let mut clean = Vec::new();
             for (index, email) in emails.iter().enumerate() {
-                let email = fields::normalize_email(email);
-                if !fields::is_email(&email) {
+                let email = autoxide_kernel::email::normalize(email);
+                if !autoxide_kernel::email::is_valid(&email) {
                     problems.push(FieldError::new(
                         format!("notify_emails[{index}]"),
                         "email",
