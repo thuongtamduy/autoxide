@@ -1,4 +1,4 @@
-//! Mỗi cỡ ảnh thu nhỏ có hai bản: JPEG / PNG và WebP (D-186). Unique index của `media_variant`
+//! Mỗi cỡ ảnh thu nhỏ có hai bản: JPEG / PNG và WebP (D-192). Unique index của `media_variant`
 //! thêm cột `content_type`, để hai bản cùng cỡ cùng nằm được trong bảng.
 
 use autoxide_kernel::migration::prelude::*;

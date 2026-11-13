@@ -1,6 +1,6 @@
 //! Lệnh `autoxide task media.refresh_variants` (D-169): sau khi đổi
 //! `AUTOXIDE_MEDIA_IMAGE_WIDTHS`, ảnh đã tải lên trước đó vẫn giữ bộ ảnh thu nhỏ cũ. Lệnh này tìm
-//! các ảnh có bộ ảnh thu nhỏ không còn khớp cấu hình — hay thiếu bản WebP (ảnh làm trước D-186)
+//! các ảnh có bộ ảnh thu nhỏ không còn khớp cấu hình — hay thiếu bản WebP (ảnh làm trước D-192)
 //! — và xếp job làm lại (job sẵn có, D-093).
 
 use std::collections::BTreeSet;
@@ -81,7 +81,7 @@ impl MediaService {
                     let webp: BTreeSet<i32> =
                         rows.iter().filter(|row| row.is_webp()).map(|row| row.width).collect();
                     let wanted = wanted_widths(&self.config.image_widths, item);
-                    // Ảnh làm trước khi có bản WebP (D-186): cỡ nào thiếu WebP thì làm lại cả bộ.
+                    // Ảnh làm trước khi có bản WebP (D-192): cỡ nào thiếu WebP thì làm lại cả bộ.
                     needs_refresh(&wanted, &saved, item) || saved != webp
                 })
                 .collect();

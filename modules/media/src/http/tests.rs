@@ -542,7 +542,7 @@ async fn anh_thu_nho_qua_worker_va_tham_so_w() {
         assert_eq!((original.status(), original.body().len()), (StatusCode::OK, png.len()));
         assert_eq!(original.header(header::CONTENT_TYPE), "image/png");
 
-        // Bản WebP cùng cỡ (D-186): địa chỉ riêng, ETag riêng, cache lâu như bản JPEG.
+        // Bản WebP cùng cỡ (D-192): địa chỉ riêng, ETag riêng, cache lâu như bản JPEG.
         let webp_url = variants[0]["webp_url"].as_str().unwrap();
         assert_eq!(webp_url, format!("{}&format=webp", variants[0]["url"].as_str().unwrap()));
         assert!(variants[0]["webp_size"].as_u64().unwrap() > 0, "{variants}");

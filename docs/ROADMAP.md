@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–29 xong**, bước 30 đang làm (xong: deploy không gián đoạn, WebP, `SECURITY.md`, `CONTRIBUTING.md`, kiểm tài liệu EN / VI); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–29 xong**; đang làm 30–32 (bước 30 xong: deploy không gián đoạn, WebP, `SECURITY.md`, `CONTRIBUTING.md`, kiểm tài liệu EN / VI), nền đa khách 33–38 (D-185…D-189); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -536,10 +536,178 @@ Nhóm B — việc nhật ký quyết định đã ghi "để sau":
 
 Chờ chủ dự án quyết: định dạng AVIF cho ảnh thu nhỏ (cần thư viện mã hoá AVIF, nặng hơn WebP).
 
-## 33. Vận hành và hiệu năng (chủ dự án giao ngày 13/11/2026)
+## 33. Nền đa khách: khách hàng, vị trí dữ liệu, mặt điều khiển (D-185)
+
+Thiết kế: `docs/research/business-foundation.md`, trụ 1. Bắt đầu SAU nhóm A của bước 32 (dời bố
+cục module). Mọi mục chạy và có test trên cả SQLite và Postgres, ở cả chế độ `single` và nhiều khách.
+
+- [ ] Mặt điều khiển: sổ khách hàng (trạng thái, khách cha), vị trí dữ liệu (`shared` /
+      `dedicated`, database nào), tên miền → khách / nút; chế độ `single` mặc định (một khách,
+      mặt điều khiển và dữ liệu chung một database, không cấu hình gì thêm)
+- [ ] Ngữ cảnh khách hàng cho mọi request: suy từ tên miền, API key, access token, header của nhân
+      sự nền tảng; sổ kết nối database theo khách (mở lười, có giới hạn); extractor cho handler,
+      tool MCP; thiếu ngữ cảnh ở route cần khách thì lỗi rõ
+- [ ] Phân loại bảng: mặt điều khiển hay cấp khách hàng; mọi bảng cấp khách hàng của 13 module có
+      `tenant_id` (migration mới), khoá unique và index bắt đầu bằng nó; testkit và `cargo xtask
+      check` chặn bảng cấp khách hàng thiếu `tenant_id`
+- [ ] Mọi truy vấn của service lọc theo khách qua một công cụ của kernel; testkit có bài **rò rỉ
+      giữa khách** chạy cho mọi module (ghi ở khách A, đọc bằng người của khách B: không thấy gì)
+- [ ] Job, event, outbox, lịch chạy theo từng database; worker và bộ phát event duyệt mọi database
+      được giao; `autoxide migrate --all` cho cả đội database; dời một khách `shared` ↔ `dedicated`
+      bằng chép dữ liệu (mở rộng `autoxide copy`)
+- [ ] Đo đường nóng trước và sau (`scripts/loadtest.sh`); hướng dẫn viết module (EN + VI) có quy
+      tắc phân loại bảng và lọc theo khách
+- [ ] Mã hoá dữ liệu nhạy cảm khi lưu (dời từ bước 37, D-190 — kho secret theo khách cần nó):
+      secret TOTP của MFA (hiện lưu chữ thường trong `auth`), secret ký webhook và mọi secret module cần đọc lại được — mã hoá bằng khoá nằm ngoài
+      database (dẫn xuất từ `AUTOXIDE_SECRET_KEY`), có số phiên bản khoá để xoay khoá; một công cụ
+      dùng chung trong `kernel`, thuật toán chuẩn (AEAD) qua thư viện đã kiểm; migration mã hoá dữ
+      liệu cũ; bản backup không còn chứa các secret này ở dạng đọc được. Khi `AUTOXIDE_SECRET_KEY`
+      chưa đặt thì khoá gốc nằm trong database (`kernel/src/secret.rs`), mã hoá không bảo vệ được
+      bản backup: `autoxide doctor` và log lúc khởi động nói rõ điều đó. Ghi quyết định
+- [ ] Cấu hình và secret theo khách (D-190): thông tin kết nối đối tác của từng khách (cổng thanh
+      toán, SMTP, hoá đơn điện tử, khoá AI) lưu mã hoá bằng cơ chế trên; module đọc qua một trait
+      của kernel, không đọc biến môi trường cho thứ thuộc về khách
+- [ ] Mọi thứ ngoài bảng cũng theo khách (D-190): khoá file lưu trữ có tiền tố khách (khách
+      `dedicated` được bucket riêng); cache trong bộ nhớ (vd cache tìm theo ý nghĩa của `content`),
+      rate limiting, login throttling, idempotency key, con trỏ pagination có khách trong khoá;
+      token và URL đã ký mang khách, dùng ở khách khác thì bị từ chối
+- [ ] Tên miền riêng của khách (D-190): xác minh quyền sở hữu bằng bản ghi DNS TXT, trạng thái tên
+      miền, endpoint "có phục vụ tên miền này không" cho reverse proxy cấp chứng chỉ TLS tự động
+      (vd Caddy on-demand TLS); tài liệu deploy (EN + VI)
+- [ ] An toàn khi nhiều database (D-190): mỗi database ghi phiên bản migration của nó; database
+      chưa migrate xong thì chỉ các khách trên nó nhận lỗi `tenant_maintenance` (503), các khách khác
+      chạy bình thường; `migrate --all` chạy lại được từ chỗ dừng; worker chia lượt công bằng giữa
+      các khách trong database chung (một khách không chiếm hết job queue)
+
+## 34. Tổ chức, quyền theo độ sâu, danh tính (D-185)
+
+Thiết kế: trụ 2. Bắt đầu SAU bước 33.
+
+- [ ] Cây tổ chức trong khách hàng: loại nút tự đặt, độ sâu có giới hạn, bảng tổ tiên – con cháu,
+      dời nút (khoá dòng), vòng đời nút (chờ duyệt, hoạt động, tạm khoá, lưu trữ — khoá một nút thì
+      cả nhánh ngừng ghi)
+- [ ] Thành viên và quyền có độ sâu `own` / `unit` / `subtree` / `tenant`; `Principal` mang quyền
+      theo nút; công cụ lọc theo nhánh cho service; dữ liệu nghiệp vụ mang `org_id`; module mẫu
+      `notes` dùng làm ví dụ; testkit có bài rò rỉ giữa hai nhánh anh em
+- [ ] Cài đặt kế thừa theo cây (múi giờ, tiền tệ, ngôn ngữ, hồ sơ thuế, chính sách) và khuôn mẫu
+      để module áp cùng cách cho dữ liệu của mình (vd giá: chuỗi đặt, cửa hàng ghi đè)
+- [ ] Danh tính hai lớp: nhân sự là tài khoản toàn nền tảng (mặt điều khiển), một người làm cho
+      nhiều khách / nút; người mua là tài khoản theo từng khách; API key gắn với khách và nút
+- [ ] Uỷ quyền theo cây khách hàng: role ở khách cha có hiệu lực ở các khách con khi được cấp; vào
+      ngữ cảnh khách con bằng cùng API; audit ghi ở cả hai phía
+- [ ] Đăng nhập bằng link qua email (không cần mật khẩu): token dùng một lần, hết hạn ngắn, gắn
+      thiết bị yêu cầu khi được; MFA vẫn áp dụng; trả lời như nhau về thời gian dù email có hay
+      không (như D-154, D-162); tắt mặc định, bật bằng cấu hình
+- [ ] Mời người dùng qua email: quản trị viên mời kèm role định sẵn, người được mời đặt mật khẩu
+      (hay passkey) qua link dùng một lần; lời mời hết hạn, thu hồi được, có event cho audit; lệnh
+      CLI tương ứng
+- [ ] Nhân sự nền tảng vào dữ liệu của khách (D-190): chỉ khi có quyền vào cấp có thời hạn, ghi lý
+      do; mọi lần vào ghi audit mà quản trị của khách xem được (Luật BVDLCN 2025); khách tắt được
+      quyền vào hỗ trợ, trừ yêu cầu của cơ quan có thẩm quyền (có audit)
+
+## 35. Gói, quyền dùng tính năng, hạn mức, thuê bao (D-185)
+
+Thiết kế: trụ 3. Bắt đầu SAU bước 34. Giá, kỳ thanh toán, hạn mức là dữ liệu, không phải code.
+
+- [ ] Module khai tính năng (`Module::features`) và hạn mức (`Module::limits`), mặc định rỗng
+      (D-038); gói = tập module + tính năng + hạn mức + giá theo kỳ; dùng thử, gói thêm, ghi đè
+      riêng cho từng khách; API và tool MCP quản trị gói
+- [ ] Kernel cưỡng chế theo khách: module chưa bật thì route, tool MCP, job, event của nó bị chặn
+      (`module_not_enabled`); `has_feature`; hạn mức giữ chỗ / trả lại nguyên tử; số đo dùng ghi
+      lại cho tính tiền; test đồng thời trên cả hai database
+- [ ] Vòng đời thuê bao: dùng thử → đang dùng → quá hạn (ân hạn) → tạm khoá (chỉ đọc) → huỷ (cho
+      xuất dữ liệu) → xoá sau thời hạn lưu; thu hồi module giữ dữ liệu theo chính sách lưu; gia hạn
+      và nhắc nợ bằng job
+- [ ] Tính tiền thuê bao SaaS: hoá đơn theo kỳ, đánh số tuần tự, thu qua `PaymentGateway` (bước 36)
+      bằng tài khoản của nhà vận hành nền tảng
+- [ ] Cấp phát: khách tự đăng ký (kèm KYC khi gói yêu cầu, bước 37) → tạo khách → chọn vị trí dữ
+      liệu theo gói → migrate → dữ liệu mẫu → mời quản trị; lệnh CLI và API tương ứng
+
+## 36. Tiền, sổ cái, thuế, chứng từ (D-187, D-188)
+
+Thiết kế: trụ 4. Bắt đầu SAU bước 34 (làm song song với 35 được; mục tính tiền của 35 dùng cổng
+thanh toán của bước này). Core không bao giờ tự giữ tiền.
+
+- [ ] Số thập phân `rust_decimal` cho tính toán (ghi `STACK.md`), quy tắc làm tròn theo từng chỗ
+      dùng, chuyển qua lại với `Money` không mất đơn vị
+- [ ] Module `ledger`: tài khoản theo khách / nút / người bán, bút toán nợ = có, chỉ thêm, đảo
+      bút toán để sửa, số dư suy từ bút toán, khoá dòng khi ghi đồng thời; test đồng thời trên cả
+      hai database
+- [ ] Trait `PaymentGateway`, `PayoutGateway` trong kernel (như `TextModel`); nhận webhook của đối
+      tác: kiểm chữ ký, ghi nguyên văn, xử lý qua job, không trùng (mã tham chiếu D-184); đối soát
+      định kỳ sổ cái với sao kê đối tác; một bộ cài đặt giả cho test
+- [ ] Ba chế độ dòng tiền theo khách / sàn: tự thu, thu hộ qua đối tác, chia tại cổng — mỗi chế độ
+      sinh đúng bút toán (phải trả người bán, phí, thuế khấu trừ, tạm giữ tới hết hạn đổi trả)
+- [ ] Engine thuế: nhóm hàng hoá, biểu thuế theo vùng thuế với ngày hiệu lực, giá gồm / chưa gồm
+      thuế, hồ sơ thuế người bán, thuế khấu trừ thay; ảnh chụp thuế suất trên từng dòng chứng từ;
+      gói dữ liệu "vn" (GTGT, mức giảm tạm thời, thuế tiêu thụ đặc biệt, tỉ lệ khấu trừ hộ kinh
+      doanh) cập nhật bằng CLI / API; `autoxide doctor` cảnh báo thuế suất sắp hết hạn
+- [ ] Chứng từ: đánh số tuần tự không nhảy số theo phạm vi (khách / người bán / năm / ký hiệu), an
+      toàn đồng thời; trait `EInvoiceProvider` cho hoá đơn điện tử; phát hành thay người bán khi
+      được uỷ quyền
+- [ ] Lưu trữ và khoá sổ kế toán (D-190): chứng từ, sổ cái, hoá đơn giữ ít nhất 10 năm (Luật Kế
+      toán 88/2015, Điều 41; NĐ 174/2016) — xoá khách hay yêu cầu xoá dữ liệu cá nhân thì phần kế
+      toán được giữ lại (lưu trữ / xuất ra), phần còn lại xoá; khoá sổ theo kỳ (kỳ đã khoá không
+      nhận bút toán, sửa bằng bút toán ở kỳ mở)
+- [ ] Hoá đơn khởi tạo từ máy tính tiền (D-190): `EInvoiceProvider` hỗ trợ cả loại này cho bán lẻ
+      tại quầy (NĐ 123/2020 sửa bởi NĐ 70/2025: hộ kinh doanh doanh thu từ 1 tỷ đồng / năm từ
+      01/6/2025; ngưỡng theo lộ trình — để dạng dữ liệu, cần đối chiếu văn bản mới nhất)
+
+## 37. Tuân thủ pháp luật Việt Nam (D-186)
+
+Thiết kế: trụ 5 và mục 4 (đăng ký Bộ Công Thương). Bắt đầu SAU bước 34. Mỗi mục ghi căn cứ pháp lý
+trong quyết định của nó; quy định hay đổi để dạng dữ liệu có ngày hiệu lực.
+
+- [ ] Định danh (KYC): hồ sơ cá nhân / tổ chức, trait `IdentityVerifier` (VNeID qua nhà cung cấp,
+      eKYC), trạng thái và hạn, lưu tối thiểu (kết quả và mã tham chiếu, hạn chế lưu ảnh giấy tờ,
+      sinh trắc học); cổng chặn: nút loại người bán, người livestream, tiếp thị liên kết chưa xác
+      thực thì không được bán / phát (Luật TMĐT 122/2025, Điều 17, từ 01/7/2026)
+- [ ] Hồ sơ pháp lý website và logo Bộ Công Thương: hồ sơ chủ sở hữu theo khách và theo người bán;
+      loại website (bán hàng → thông báo, logo xanh; nền tảng trung gian / sàn → đăng ký, logo đỏ)
+      theo từng tên miền; danh sách kiểm tuân thủ là dữ liệu có phiên bản; API và `autoxide doctor`
+      báo thứ còn thiếu; xuất bộ hồ sơ (dữ liệu tờ khai, nháp đề án, quy chế); lưu trạng thái và
+      đoạn mã logo, endpoint công khai trả về cho giao diện
+- [ ] Trang bắt buộc có mẫu (module `content`): thông tin chủ sở hữu, chính sách bảo vệ dữ liệu cá
+      nhân, đổi trả, vận chuyển, thanh toán, kiểm hàng, giải quyết khiếu nại, điều khoản; với sàn
+      thêm quy chế hoạt động, mẫu hợp đồng với người bán, thông tin người bán trên trang sản phẩm
+      (EN + VI, nội dung mẫu ghi rõ cần người có chuyên môn pháp lý duyệt)
+- [ ] Báo vi phạm sở hữu trí tuệ / hàng giả: tiếp nhận → ẩn → phản hồi của người bị báo → quyết
+      định, có hạn xử lý, lưu vết; kênh khiếu nại của sàn; cung cấp thông tin người bán khi cơ quan
+      có thẩm quyền yêu cầu (có audit)
+- [ ] Xác thực tài khoản đăng nội dung (NĐ 147/2024): cờ "đã xác thực số điện thoại / định danh";
+      khách bật yêu cầu cho bình luận, đánh giá, livestream
+- [ ] Dữ liệu cá nhân (Luật 91/2025, NĐ 356/2025): sổ căn cứ xử lý / đồng ý theo mục đích; thời hạn
+      lưu theo loại dữ liệu; vị trí lưu theo khách (lưu tại Việt Nam chọn được); quy trình sự cố có
+      mốc 72 giờ kể từ khi phát hiện trong sổ tay vận hành
+- [ ] Văn bản pháp lý có phiên bản và bằng chứng chấp nhận (D-190): điều khoản, chính sách dữ liệu
+      cá nhân, quy chế sàn, hợp đồng với người bán, điều kiện giao dịch chung — mỗi bản có số phiên
+      bản và ngày hiệu lực; ghi ai chấp nhận bản nào, lúc nào, qua kênh nào (Luật Giao dịch điện tử
+      20/2023); bản mới thì yêu cầu chấp nhận lại khi cần
+- [ ] Bảo vệ người tiêu dùng (D-190; Luật 19/2023/QH15 + NĐ 55/2024, từ 01/7/2024): nền tảng
+      không chặn, không ẩn đánh giá trái quy định; minh bạch điều kiện giao dịch chung; kênh tiếp nhận
+      và hạn xử lý khiếu nại của người tiêu dùng — cần đối chiếu văn bản gốc từng điều
+- [ ] Gắn nhãn nội dung do AI tạo (D-190; Luật Trí tuệ nhân tạo 134/2025/QH15, từ 01/3/2026, và
+      nghị định hướng dẫn — cần đối chiếu): nội dung tạo hay sửa từ gợi ý AI mang dấu nguồn gốc
+      `ai_assisted`, API trả về để giao diện gắn nhãn khi công khai
+- [ ] Gửi SMS (D-190): trait `SmsSender` (nhà cung cấp SMS có brandname), mã một lần qua SMS để xác
+      thực số điện thoại theo NĐ 147/2024; một bộ cài đặt giả cho test
+
+## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
+
+Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 36 (báo cáo gộp cần số liệu tiền).
+
+- [ ] Kho báo cáo gộp: event của các khách con đổ về khách cha (hay một database báo cáo) gần thời
+      gian thực, mang `tenant_id`, `org_id`; báo cáo gộp nhiều cửa hàng, nhiều tiền tệ; người có quyền
+      ở cha mới xem
+- [ ] Cha thao tác trên con: vào ngữ cảnh con bằng cùng API (uỷ quyền của bước 34); job phân phối dữ
+      liệu cha → con (vd danh mục, bảng giá) gọi service của con, chạy lại được, không trùng
+- [ ] Tách một nhánh tổ chức thành khách riêng (database riêng) và gộp ngược lại, giữ ID và lịch sử;
+      test trên cả hai database
+
+## 39. Vận hành và hiệu năng (chủ dự án giao ngày 13/11/2026; số cũ 33, D-189)
 
 Khi đã có người dùng thật: biết sớm khi hệ thống kẹt, không mất dữ liệu, xử lý sự cố không phải
-đoán, và chịu được dữ liệu cỡ thật. Bắt đầu SAU nhóm A của bước 32 (gom file `kernel` và module).
+đoán, và chịu được dữ liệu cỡ thật. Bắt đầu SAU bước 38 (nền đa khách): backup, số đo, cảnh báo theo từng khách hàng và từng database.
 Làm nhóm A trước: số đo tồn đọng dùng để quan sát lúc chạy tải ở nhóm B. Mọi số đo ghi kèm máy,
 ngày, cỡ dữ liệu; mọi thay đổi chạy và có test trên cả hai database; không đổi tính đúng lấy tốc độ.
 
@@ -592,18 +760,15 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
       với ngưỡng 50 ms của D-110 (`docs/BENCHMARKS.md`, mục "Tìm theo ý nghĩa"); vượt ngưỡng thì
       chọn cách giảm (vector nhỏ hơn, chia nhiều nhân, hay index sau một trait) chạy được trên cả
       hai database, ghi quyết định; không vượt thì ghi số đo và giữ nguyên
+- [ ] Quan sát theo khách (D-190): log và trace mang trường `tenant_id`; **không** dùng `tenant_id`
+      làm nhãn số đo (trái luật code về nhãn); lượng dùng theo khách lấy từ số đo dùng của bước 35
 
-## 34. Năng lực còn thiếu của core (agent đề xuất, chủ dự án tách thành bước riêng ngày 13/11/2026)
+## 40. Năng lực còn thiếu của core (agent đề xuất; số cũ 34, D-189)
 
 So với những gì một lõi backend hiện đại thường có sẵn, core còn thiếu sáu năng lực chung, không
-gắn với ngành nào. Làm ngay được, song song với bước 30 và 31. Endpoint mới có OpenAPI và tool MCP
+gắn với ngành nào. Bắt đầu SAU bước 34 (cây tổ chức, danh tính): OIDC, SSE, tải thẳng lên S3 và rate limit phải theo khách hàng và tổ chức. Endpoint mới có OpenAPI và tool MCP
 tương ứng; thêm thư viện thì kiểm đúng phiên bản và ghi `STACK.md`; mọi mục chạy và có test trên
 cả SQLite và Postgres.
-
-Chỗ đụng với người khác: đăng nhập OIDC (sửa `auth`) và rate limit dùng chung (sửa `kernel`) đụng
-file bước 29 đang sửa — làm hai mục đó sau cùng, rebase thường xuyên; tải file thẳng lên S3 đụng
-`media` mà WebP của bước 30 cũng sửa; header bảo mật sửa chuỗi lớp HTTP của `kernel` mà deploy
-không gián đoạn của bước 30 cũng chạm — ai merge sau thì gộp cẩn thận.
 
 - [ ] Đăng nhập qua nhà cung cấp danh tính theo OpenID Connect (Google, Microsoft, GitHub qua
       OAuth 2.0, và một nhà cung cấp OIDC bất kỳ khai bằng cấu hình): PKCE, kiểm `state` / `nonce`,
@@ -632,32 +797,14 @@ không gián đoạn của bước 30 cũng chạm — ai merge sau thì gộp c
       chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
       quyết định
 
-## 35. Bảo vệ dữ liệu và tài khoản (agent đề xuất ngày 13/11/2026)
-
-Ba năng lực các backend lớn có sẵn mà core chưa có. Bắt đầu SAU khi bước 29 đã merge (sửa `auth`);
-mục mã hoá đụng `webhooks` và khoá của bước 33 (xoay khoá) — thống nhất cách làm với người làm
-bước 33. Mọi mục chạy và có test trên cả SQLite và Postgres, endpoint mới có OpenAPI và tool MCP.
-
-- [ ] Mã hoá dữ liệu nhạy cảm khi lưu: secret TOTP của MFA (hiện lưu chữ thường trong
-      `auth`), secret ký webhook và mọi secret module cần đọc lại được — mã hoá bằng khoá nằm ngoài
-      database (dẫn xuất từ `AUTOXIDE_SECRET_KEY`), có số phiên bản khoá để xoay khoá; một công cụ
-      dùng chung trong `kernel`, thuật toán chuẩn (AEAD) qua thư viện đã kiểm; migration mã hoá dữ
-      liệu cũ; bản backup không còn chứa các secret này ở dạng đọc được. Khi `AUTOXIDE_SECRET_KEY`
-      chưa đặt thì khoá gốc nằm trong database (`kernel/src/secret.rs`), mã hoá không bảo vệ được
-      bản backup: `autoxide doctor` và log lúc khởi động nói rõ điều đó. Ghi quyết định
-- [ ] Đăng nhập bằng link qua email (không cần mật khẩu): token dùng một lần, hết hạn ngắn, gắn
-      thiết bị yêu cầu khi được; MFA vẫn áp dụng; trả lời như nhau về thời gian dù email có hay
-      không (như D-154, D-162); tắt mặc định, bật bằng cấu hình
-- [ ] Mời người dùng qua email: quản trị viên mời kèm role định sẵn, người được mời đặt mật khẩu
-      (hay passkey) qua link dùng một lần; lời mời hết hạn, thu hồi được, có event cho audit; lệnh
-      CLI tương ứng
-
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.
 
-Chờ chủ dự án quyết (so với các backend lớn ngày 13/11/2026; không làm khi chưa có quyết định):
-nhóm người dùng / tổ chức (gần multi-tenant) · module thông báo (trong ứng dụng, web push) · đăng
-nhập thay người dùng để hỗ trợ · định dạng ảnh AVIF · thư viện số thập phân và module sổ cái (cuối
-bước 29). Đã cân nhắc và không làm: API dữ liệu tự sinh từ bảng, plugin WASM nạp lúc chạy, trang
-quản trị dựng sẵn (`docs/research/frameworks.md`, D-005, D-026).
+Module thương mại (sau nền 33–38, D-185): sản phẩm, giỏ hàng, đơn hàng, kho, vận chuyển, sàn —
+module nghiệp vụ, dùng `tenant_id` + `org_id` + engine thuế + sổ cái ngay từ đầu.
+
+Chờ chủ dự án quyết (không làm khi chưa có quyết định): module thông báo (trong ứng dụng, web push)
+· đăng nhập thay người dùng để hỗ trợ · định dạng ảnh AVIF. Đã cân nhắc và không làm: API dữ liệu tự
+sinh từ bảng, plugin WASM nạp lúc chạy, trang quản trị dựng sẵn (`docs/research/frameworks.md`,
+D-005, D-026). Thư viện số thập phân và module sổ cái: đã quyết ở D-187, D-188.

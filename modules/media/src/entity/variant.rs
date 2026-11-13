@@ -24,7 +24,7 @@ impl Model {
         storage_key(self.item_id, self.version_id, self.width, &self.content_type)
     }
 
-    /// Bản WebP (D-186), làm thêm bên cạnh bản JPEG / PNG cùng cỡ.
+    /// Bản WebP (D-192), làm thêm bên cạnh bản JPEG / PNG cùng cỡ.
     pub(crate) fn is_webp(&self) -> bool {
         self.content_type == WEBP
     }

@@ -28,7 +28,7 @@ gắn với một công ty hay một ngành. Module nghiệp vụ chủ dự án
 | API          | REST dưới `/api/v1` + OpenAPI; MCP endpoint cho AI agent. GraphQL thêm sau |
 | Database     | SQLite và Postgres, đổi bằng `DATABASE_URL`. Không cam kết MySQL     |
 | ID           | UUIDv7 cho mọi bảng, sinh ở phía ứng dụng                            |
-| Multi-tenant | Không có. Nhiều khách = mỗi khách một bản cài riêng                  |
+| Multi-tenant | Có (D-185): mặt điều khiển + `tenant_id`; dữ liệu chung hay riêng theo khách |
 | Deploy       | Docker trên VPS                                                      |
 | License      | MIT hoặc Apache-2.0, người dùng chọn (`LICENSE-MIT`, `LICENSE-APACHE`) |
 
@@ -82,7 +82,7 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | Lưu file       | `object_store` 0.14 (feature `aws-base` + `ring`, không `aws` để khỏi kéo aws-lc-rs) — một trait chung cho ổ đĩa cục bộ và S3 / R2 / dịch vụ tương thích S3, sau trait `Storage` của kernel. Kèm `reqwest` 0.13 (`rustls-no-provider`) và `rustls` 0.23 (`ring`) chỉ để chọn TLS; `bytes`, `futures-util`, `http-body-util` cho luồng byte (đều đã có sẵn qua axum). Test S3 chạy trên máy chủ giả lập `moto` trong Docker (D-066) |
 | Kích thước ảnh | `imagesize` 0.15 (MIT, không phụ thuộc gì; chỉ bật `jpeg`, `png`, `gif`, `webp`, `heif`) — đọc chiều rộng / cao từ header ảnh, không giải mã ảnh; module `media` dùng. Nhận loại thật theo chữ ký đầu file thì tự viết (D-089) |
 | Ảnh thu nhỏ | `image` 0.25 (MIT / Apache-2.0, thuần Rust; chỉ bật `jpeg`, `png`, `gif`, `webp`, không `rayon`) — giải mã, xoay theo EXIF, đổi cỡ, mã hoá JPEG / PNG cho ảnh thu nhỏ của module `media`, chạy trong job nền (D-093) |
-| Ảnh thu nhỏ WebP | `webp` 0.3 (MIT / Apache-2.0; không bật feature `img`) bọc `libwebp` qua `libwebp-sys` (crate MIT, mã C của libwebp BSD-3-Clause, biên dịch kèm bằng trình biên dịch C như SQLite) — mã hoá WebP nén mất dữ liệu, có kênh trong suốt, cho bản WebP bên cạnh bản JPEG / PNG (D-176, D-186). `image` chỉ mã hoá WebP không mất dữ liệu |
+| Ảnh thu nhỏ WebP | `webp` 0.3 (MIT / Apache-2.0; không bật feature `img`) bọc `libwebp` qua `libwebp-sys` (crate MIT, mã C của libwebp BSD-3-Clause, biên dịch kèm bằng trình biên dịch C như SQLite) — mã hoá WebP nén mất dữ liệu, có kênh trong suốt, cho bản WebP bên cạnh bản JPEG / PNG (D-176, D-192). `image` chỉ mã hoá WebP không mất dữ liệu |
 | Tìm không dấu | `unicode-normalization` 0.1 (MIT / Apache-2.0; đã có sẵn trong cây phụ thuộc qua `webauthn_rp`) — tách chữ khỏi dấu (NFD) để `search::fold` của kernel bỏ dấu: "da lat" tìm ra "Đà Lạt" (D-104) |
 | Slug | `slug` 0.1 (MIT / Apache-2.0; kéo theo `deunicode`) — tạo slug từ tiêu đề: bỏ dấu, `đ` → `d`, chữ thường nối bằng `-` ("Đường đến Đà Lạt" → `duong-den-da-lat`); module `content` dùng (D-102, D-105) |
 | i18n    | Tự viết: `locales/<ngôn ngữ>.json` mỗi crate, dịch theo `code` lỗi ở lớp HTTP, chọn theo `Accept-Language`; không dùng `rust-i18n` (D-057) |
@@ -159,7 +159,6 @@ repo này; giao diện là dự án riêng dùng API.
 | Microservice   | Tách sau khi có lý do cụ thể (tải khác biệt, nhiều đội)                 |
 | MySQL          | SeaORM vẫn chạy được, nhưng không test và không cam kết                 |
 | MongoDB        | Ngoài phạm vi: không ORM SQL nào phủ được                               |
-| Multi-tenant   | Ngoài phạm vi core                                                      |
 
 ## Công cụ
 

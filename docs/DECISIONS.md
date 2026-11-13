@@ -4432,7 +4432,133 @@ mã chỉ tạo một bản ghi, trên cả hai database.
 trả 409 khi nội dung khác — 422 khớp mã đã có cho cùng tình huống ở idempotency key; một bảng
 `reference` chung của kernel — module sẽ phải ghi hai bảng và join chéo, trái luật sở hữu bảng.
 
-## D-185 · Khoảng rút trước khi tắt: `AUTOXIDE_HTTP_DRAIN_SECONDS`, mặc định 0 — 2026-11-13 — agent quyết
+## D-185 · Nền cho kinh doanh đa mô hình: khách hàng, tổ chức, gói, tiền, tuân thủ — 2026-11-13 — chủ dự án quyết hướng, agent quyết cách làm
+
+Quyết định: core phục vụ bốn mô hình chủ dự án đặt — khách độc lập; một khách nhiều cửa hàng
+(chung hay khác database, báo cáo gộp); SaaS bán theo tính năng (gói, hạn mức, tính tiền, bật /
+tắt module theo khách); chuỗi cha-con nhiều cấp (chung hay khác database) — cùng mô hình sàn, chỉ
+bằng cấu hình cho từng khách. Thiết kế đầy đủ, nguồn tham khảo và căn cứ pháp lý:
+`docs/research/business-foundation.md`. Năm trụ:
+
+1. Khách hàng và vị trí dữ liệu: mặt điều khiển tách khỏi mặt ứng dụng (AWS SaaS); vị trí dữ liệu
+   `shared` / `dedicated` chọn theo từng khách (bridge); mọi bảng cấp khách hàng có `tenant_id`
+   kể cả trong database riêng (Salesforce); chế độ `single` mặc định cho người cài một cửa hàng.
+2. Cây tổ chức trong khách hàng, quyền có độ sâu `own` / `unit` / `subtree` / `tenant` (Dynamics
+   365); dữ liệu nghiệp vụ mang `org_id`; cài đặt kế thừa theo cây; tên miền gắn với nút; danh
+   tính hai lớp — nhân sự toàn nền tảng, người mua theo từng khách (Shopify); cây khách hàng
+   xuyên database với báo cáo gộp nhận qua event (Shopify Plus).
+3. Gói là dữ liệu; module khai tính năng và hạn mức; kernel cưỡng chế bật / tắt module, tính
+   năng, hạn mức; vòng đời thuê bao; cấp phát (Stripe Entitlements).
+4. Tiền, sổ cái, thuế, chứng từ — D-187, D-188.
+5. Tuân thủ pháp luật Việt Nam — D-186.
+
+Lý do: `tenant_id` và ngữ cảnh khách hàng chạm mọi bảng và mọi request; làm bây giờ (13 module, chưa
+có dữ liệu thật) rẻ hơn nhiều so với sau khi có module thương mại và khách thật. Chọn trộn
+`shared` / `dedicated` thay vì một kiểu vì chủ dự án cần cả hai (một database chung chia cửa hàng,
+và mỗi khách SaaS một database); `tenant_id` có mặt cả trong database riêng để code một kiểu và dời
+khách giữa hai kiểu bằng chép dữ liệu.
+
+Đã cân nhắc: mỗi khách một bản cài (D-006 cũ) — không làm được báo cáo gộp, quản trị chung, gói và
+tính tiền tập trung; mỗi khách một schema — chỉ Postgres có, trái Luật số một; chỉ dùng chung một
+database (pool thuần) — không đáp ứng khách cần database riêng; Postgres row-level security —
+SQLite không có.
+
+Thay: phần "Không có multi-tenant" của D-006. Việc làm: bước 33–38 của `docs/ROADMAP.md`.
+
+## D-186 · Tuân thủ pháp luật Việt Nam là luật thường trực của dự án — 2026-11-13 — chủ dự án quyết
+
+Quyết định: mọi thiết kế và mọi tính năng tuân thủ pháp luật Việt Nam hiện hành — thương mại điện
+tử (xác thực người bán trước khi bán; website bán hàng thông báo — logo xanh, nền tảng trung gian /
+sàn đăng ký — logo đỏ với Bộ Công Thương), bảo vệ dữ liệu cá nhân, an ninh mạng, xác thực tài khoản
+đăng nội dung, thuế (gồm khấu trừ thay của sàn), thanh toán, sở hữu trí tuệ. Chủ dự án nhắc rõ:
+AI quyết định nhưng phải theo luật nhà nước.
+
+Cách làm: (1) mỗi tính năng tuân thủ ghi căn cứ pháp lý (văn bản, điều, ngày hiệu lực) trong mục
+quyết định của nó; (2) quy định hay đổi — biểu thuế, danh mục hồ sơ, thời hạn — để dạng dữ liệu
+có ngày hiệu lực, cập nhật không cần sửa code; (3) AI không phải luật sư: chỗ các nguồn chưa
+thống nhất (vd nghị định hướng dẫn Luật TMĐT 2025) ghi "cần đối chiếu văn bản gốc / người có
+chuyên môn pháp lý" và không chặn công việc; trước khi chạy thật cho khách, chủ dự án cho người có
+chuyên môn xác nhận; (4) không làm tính năng giúp né luật.
+
+Lý do: sản phẩm phục vụ bán hàng và sàn tại Việt Nam; vi phạm có thể bị phạt theo doanh thu (Luật
+BVDLCN 2025) hay buộc dừng hoạt động.
+
+## D-187 · Dòng tiền: core không tự giữ tiền; ba chế độ qua đối tác có giấy phép — 2026-11-13 — agent quyết
+
+Quyết định: core không bao giờ nhận và giữ tiền của người mua thay người bán. Tiền chỉ đi qua đối
+tác có giấy phép (ngân hàng, tổ chức trung gian thanh toán) bằng trait `PaymentGateway` /
+`PayoutGateway`; core ghi nghĩa vụ bằng sổ cái kép (module `ledger`: chỉ thêm, sửa bằng bút toán
+đảo) và đối soát với sao kê của đối tác. Ba chế độ chọn theo từng khách / sàn: **tự thu** (tiền vào
+thẳng tài khoản người bán), **thu hộ qua đối tác** (đối tác có giấy phép thu, sổ cái ghi phải trả
+người bán, phí, thuế khấu trừ, giữ tới hết hạn đổi trả rồi chi hộ), **chia tại cổng**. Nhận
+webhook của đối tác: kiểm chữ ký, xử lý không trùng.
+
+Lý do: nhận tiền người mua rồi chi lại cho người bán là dịch vụ hỗ trợ thu hộ, chi hộ — loại trung
+gian thanh toán cần giấy phép của Ngân hàng Nhà nước (NĐ 52/2024/NĐ-CP; cần đối chiếu Điều 3, 22 và
+Thông tư 40/2024/TT-NHNN). Sàn có chức năng thanh toán phải khấu trừ thuế thay người bán (NĐ
+117/2025), nên chế độ dòng tiền quyết định nghĩa vụ thuế — ghi rõ trong cấu hình của khách.
+
+Đã cân nhắc: ví nội bộ giữ tiền người dùng — cần giấy phép ví điện tử / trung gian thanh toán; chỉ
+hỗ trợ tự thu — không đáp ứng sàn kiểu Shopee, Lazada.
+
+Thay: mục "module sổ cái kép chờ chủ dự án quyết" ở bước 29 — chủ dự án giao AI quyết (D-185).
+
+## D-188 · Thuế và chứng từ: engine thuế trong core, biểu thuế là dữ liệu có ngày hiệu lực, `rust_decimal` — 2026-11-13 — agent quyết
+
+Quyết định: core có engine thuế trung lập: nhóm hàng hoá, biểu thuế theo vùng thuế với ngày hiệu
+lực từ / tới, giá gồm / chưa gồm thuế, làm tròn, hồ sơ thuế của người bán (doanh nghiệp khấu trừ,
+hộ kinh doanh, miễn), thuế khấu trừ thay. Mỗi dòng chứng từ lưu ảnh chụp thuế suất lúc giao dịch.
+Gói dữ liệu "vn" (GTGT 0% / 5% / 10%, mức giảm tạm thời, thuế tiêu thụ đặc biệt, tỉ lệ khấu trừ
+của hộ kinh doanh trên sàn) cập nhật bằng CLI / API; `autoxide doctor` cảnh báo thuế suất sắp hết
+hạn. Tính toán dùng `rust_decimal`, lưu bằng `Money` (D-180). Chứng từ đánh số tuần tự không nhảy
+số theo phạm vi; hoá đơn điện tử qua trait `EInvoiceProvider`.
+
+Lý do: thuế theo mặt hàng và thay đổi theo luật — mức GTGT 8% (giảm 2%) chỉ tới hết 31/12/2026 —
+nên viết cứng trong code là sai ngay khi luật đổi; chứng từ cũ phải giữ đúng thuế suất lúc lập.
+Tính thuế, chiết khấu, tỉ giá cần số thập phân có quy tắc làm tròn rõ, số nguyên đơn vị nhỏ nhất
+không đủ cho phép nhân chia.
+
+Đã cân nhắc: tự viết số thập phân — trái "không tự chế"; gọi dịch vụ thuế bên ngoài — không có
+dịch vụ phổ biến cho thuế Việt Nam, và phải chạy được khi không có mạng.
+
+Thay: mục "thư viện số thập phân chờ chủ dự án quyết" ở bước 29 — chủ dự án giao AI quyết (D-185).
+
+## D-189 · Sắp lại lộ trình: nền đa khách đứng trước vận hành và năng lực còn thiếu — 2026-11-13 — agent quyết
+
+Quyết định: bước 33 (vận hành và hiệu năng) thành 39; bước 34 (năng lực còn thiếu) thành 40; bước 35
+(bảo vệ dữ liệu và tài khoản) tách: đăng nhập bằng link và mời người dùng vào 34, mã hoá dữ liệu
+nhạy cảm vào 37. Bước 33–38 mới là nền đa khách (D-185…D-188). Bước 30–32 giữ nguyên.
+
+Lý do: backup, số đo, OIDC, SSE, mã hoá đều phải biết ngữ cảnh khách hàng; dựng chúng trước nền đa
+khách thì phải sửa lại. Chưa ai bắt đầu bước 33–35 cũ (kiểm nhánh trên GitHub ngày 13/11/2026).
+
+## D-190 · Bổ sung nền đa khách sau rà soát: thứ ngoài bảng, secret theo khách, luật kế toán, giao dịch điện tử, người tiêu dùng, AI — 2026-11-13 — agent quyết
+
+Quyết định: thêm vào bước 33–39 các mục ở mục 7 của `docs/research/business-foundation.md`:
+(1) mọi thứ ngoài bảng cũng theo khách — khoá file, cache trong bộ nhớ, rate limiting, idempotency
+key, con trỏ pagination, token và URL đã ký; (2) cấu hình và secret theo khách, mã hoá khi lưu — mục
+mã hoá secret dời từ bước 37 lên 33 (thay phần đó của D-189); (3) tên miền riêng có xác minh DNS và
+endpoint cho TLS tự động; (4) phiên bản migration theo từng database, lỗi `tenant_maintenance`
+chỉ cho khách trên database chưa sẵn sàng, chia lượt job công bằng; (5) nhân sự nền tảng vào dữ
+liệu khách có thời hạn, lý do, audit khách xem được; (6) chứng từ kế toán giữ ít nhất 10 năm, khoá sổ
+theo kỳ; (7) hoá đơn từ máy tính tiền; (8) văn bản pháp lý có phiên bản và bằng chứng chấp nhận;
+(9) bảo vệ người tiêu dùng; (10) gắn nhãn nội dung AI (`ai_assisted`); (11) trait `SmsSender`;
+(12) log và trace mang `tenant_id`, không dùng làm nhãn số đo.
+
+Lý do: mỗi mục là chỗ mà nếu không đặt từ đầu thì dựng xong nền đa khách vẫn rò rỉ dữ liệu (cache,
+URL ký), không phục vụ được khách mang tài khoản đối tác riêng, hay vi phạm luật. Căn cứ pháp lý:
+Luật Kế toán 88/2015 Điều 41 và NĐ 174/2016 (lưu 10 năm); NĐ 123/2020 sửa bởi NĐ 70/2025 (hoá đơn từ
+máy tính tiền, từ 01/6/2025); Luật Giao dịch điện tử 20/2023; Luật Bảo vệ quyền lợi người tiêu dùng
+19/2023 và NĐ 55/2024 (từ 01/7/2024); Luật Trí tuệ nhân tạo 134/2025 (từ 01/3/2026); NĐ 147/2024.
+Nguồn là báo chí và công ty luật tổng hợp — cần đối chiếu văn bản gốc (D-186), nhất là nghị định
+hướng dẫn Luật Trí tuệ nhân tạo và ngưỡng doanh thu hoá đơn từ máy tính tiền.
+
+Đã cân nhắc: mỗi khách một khoá mã hoá để xoá được cả trong backup — phức tạp, chưa có luật buộc;
+khuyến mại, phí sàn theo ngành hàng, người bán nước ngoài — để cho module thương mại.
+
+Thay: phần "mã hoá dữ liệu nhạy cảm vào 37" của D-189.
+
+## D-191 · Khoảng rút trước khi tắt: `AUTOXIDE_HTTP_DRAIN_SECONDS`, mặc định 0 — 2026-11-13 — agent quyết
 
 Quyết định: nhận tín hiệu dừng thì `serve` bật cờ `http::Draining` (`/health/ready` trả 503
 `shutting_down`, không hỏi database; `/health/live` vẫn 200), vẫn phục vụ đủ
@@ -4453,7 +4579,7 @@ vẫn không đúng cho bộ cân bằng tải nào cụ thể; giữ `health_ro
 nhận cờ — hai cách cho một việc; `preStop` sleep của Kubernetes — chỉ có trên Kubernetes, còn
 `/health/ready` vẫn báo 200 trong lúc tắt.
 
-## D-186 · Bản WebP của ảnh thu nhỏ: thư viện `webp` (libwebp), địa chỉ `&format=webp`, trường `webp_url` — 2026-11-13 — agent quyết
+## D-192 · Bản WebP của ảnh thu nhỏ: thư viện `webp` (libwebp), địa chỉ `&format=webp`, trường `webp_url` — 2026-11-13 — agent quyết
 
 Quyết định (thực hiện D-176):
 
