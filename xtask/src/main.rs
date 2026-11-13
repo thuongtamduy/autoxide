@@ -1,7 +1,7 @@
 //! Công cụ cho người phát triển Autoxide. Chạy bằng `cargo xtask <lệnh>`.
 //!
-//! - `check` — kiểm luật ranh giới của workspace (xem `boundaries.rs`). `./gate.sh` gọi lệnh
-//!   này; vi phạm thì gate đỏ.
+//! - `check` — kiểm luật ranh giới của workspace (xem `boundaries.rs`), bản dịch i18n
+//!   (`i18n.rs`) và tài liệu EN / VI (`docs.rs`). `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
 //! - `new-module <module> <entity>` — sinh module mới từ khuôn `modules/notes` (xem
 //!   `scaffold.rs`).
 //! - `test-affected [--base <ref>]` — chạy test của crate bị sửa so với `main` và crate phụ
@@ -9,6 +9,7 @@
 
 mod affected;
 mod boundaries;
+mod docs;
 mod i18n;
 mod scaffold;
 mod workspace;
@@ -46,6 +47,7 @@ fn check() -> ExitCode {
     };
     let violations = match boundaries::check_workspace(&workspace).and_then(|mut violations| {
         violations.extend(i18n::check_translations(&workspace)?);
+        violations.extend(docs::check_docs(&workspace.root)?);
         Ok(violations)
     }) {
         Ok(violations) => violations,

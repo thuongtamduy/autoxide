@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–29 xong**, bước 30 đang làm (xong: deploy không gián đoạn, `SECURITY.md`, `CONTRIBUTING.md`); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–29 xong**, bước 30 đang làm (xong: deploy không gián đoạn, `SECURITY.md`, `CONTRIBUTING.md`, kiểm tài liệu EN / VI); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -438,11 +438,13 @@ Nhóm B — file của dự án mã nguồn mở:
       repo); trỏ `CLAUDE.md` cho người dùng AI agent
 - [ ] Quy tắc ứng xử (`CODE_OF_CONDUCT.md`, theo Contributor Covenant bản mới nhất) với địa chỉ
       liên hệ do chủ dự án đặt; mẫu issue (báo lỗi: phiên bản, database, cách tái hiện; đề xuất) và
-      mẫu PR (đã chạy `./gate.sh`, đã sửa EN + VI, đã thêm CHANGELOG) trong `.github/`
+      mẫu PR (đã chạy `./gate.sh`, đã sửa EN + VI, đã thêm CHANGELOG) trong `.github/` — mẫu
+      issue và PR đã xong; còn `CODE_OF_CONDUCT.md` chờ địa chỉ, có rồi thì thêm vào `REQUIRED`
+      của `xtask/src/docs.rs`
 - [ ] Bản phát hành đáng tin: workflow `Release` (sau nhóm A) đính kèm chứng thực nguồn gốc build
       (GitHub artifact attestation) và danh sách thành phần (SBOM) cho image Docker; `docs/DEPLOY.md`
       (EN + VI) có lệnh kiểm chứng thực trước khi chạy image
-- [ ] `cargo xtask check` hay test giữ các file trên không mất và hai bản EN / VI không lệch
+- [x] `cargo xtask check` hay test giữ các file trên không mất và hai bản EN / VI không lệch
       tiêu đề mục (cách làm như kiểm bản dịch i18n), để agent phiên sau không quên sửa một bên
 
 Nhóm C — sản phẩm (D-176):
