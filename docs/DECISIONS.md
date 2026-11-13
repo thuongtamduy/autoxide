@@ -4264,3 +4264,24 @@ người dùng ngoài nào cần cài qua npm.
 
 Đã cân nhắc: đăng npm — để sau, khi có người dùng ngoài cần; không làm SDK, mỗi client tự sinh —
 mỗi bên một bản lệch nhau, đúng thứ D-004 muốn tránh.
+
+## D-178 · Gom bước 30–36 của lộ trình thành 30–33 — 2026-11-13 — chủ dự án quyết
+
+Quyết định: bảy bước 30–36 (viết cùng ngày, theo lúc nghĩ ra) gom thành bốn bước theo khu vực code
+và theo điều phải chờ; không bỏ mục nào. Mục cũ nhắc số bước (D-175, D-176, D-177) đọc theo bảng:
+
+| Bước cũ                                   | Bước mới                                   |
+| ----------------------------------------- | ------------------------------------------ |
+| 30 nhóm A, WebP, nhóm B                   | 30 "Ra mắt công khai", nhóm A và C         |
+| 34 (file mã nguồn mở)                     | 30, nhóm B                                 |
+| 35 image ARM64                            | 30, nhóm A                                 |
+| 32 (cho người gọi API)                    | 31 "Hợp đồng API và chống hồi quy", nhóm A |
+| 36 (chống hồi quy)                        | 31, nhóm B                                 |
+| 30 nhóm C (bố cục)                        | 32 "Dọn bố cục và việc để lại", nhóm A     |
+| 35 còn lại (email, passkey, CSV, Markdown)| 32, nhóm B                                 |
+| 31 (vận hành sau ra mắt)                  | 33 "Vận hành và hiệu năng", nhóm A         |
+| 33 (hiệu năng ở quy mô thật)              | 33, nhóm B                                 |
+
+Lý do: bước 30 và 34 cùng sửa GitHub, CI, phát hành; 32 và 36 cùng sửa `xtask`, `testkit` và hợp
+đồng API; 30 nhóm C và 35 cùng sửa module sau khi bước 29 merge; 31 và 33 cùng cần bố cục mới và
+dùng chung số đo. Ít bước hơn thì ít lần phát hành và ít chỗ hai người sửa chung một file.
