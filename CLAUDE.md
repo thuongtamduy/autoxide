@@ -155,7 +155,8 @@ sẵn lệnh.
 - `unwrap` / `expect` trong test: viết trong `#[cfg(test)] mod tests` (clippy tự
   miễn) hoặc trong `tests/` với dòng `#![allow(…)]` đầu file như các file sẵn có.
   Trong `src/` không được tắt các lint này — `cargo xtask check` chặn.
-- Xong một bước: đánh dấu trong `docs/ROADMAP.md`, rồi `git commit` cục bộ. Không
+- Xong một mục: đánh dấu trong `docs/ROADMAP.md`, rồi `git commit` cục bộ. Xong trọn một
+  bước (mọi mục `[x]`) thì tự phát hành theo `docs/RELEASING.md` (D-171); ngoài lúc đó không
   push khi chủ dự án chưa yêu cầu.
 
 ## Bố cục workspace

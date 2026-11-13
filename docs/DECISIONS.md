@@ -4108,3 +4108,51 @@ rẽ nhánh sang `Actor::user`. Setter nhận giá trị trơn (`unique_key`, `r
 
 Kiểm: hành vi không đổi (cả 795 test xanh trên SQLite và trên Postgres, không test nào bị xoá),
 `docs/openapi.json` không đổi một byte.
+
+## D-171 · Agent tự phát hành sau mỗi bước lộ trình xong — 2026-11-13 — chủ dự án quyết
+
+Quyết định: xong trọn một bước của `docs/ROADMAP.md` (mọi mục `[x]`, gate xanh) thì agent tự phát
+hành, không hỏi: đưa nhánh lên `main` mới nhất, gate xanh lại, commit `release: vX.Y.Z`, PR rồi
+merge vào `main`, gắn tag, đẩy tag, tạo bản phát hành GitHub với ghi chú từ `CHANGELOG.md`, rồi
+`cargo clean`. Các bước cụ thể và cách xử lý khi hai phiên đụng nhau ở `docs/RELEASING.md`.
+
+- Chỉ phát hành ở ranh giới bước, không phát hành giữa bước; không phát hành khi `[Unreleased]`
+  trống.
+- Số phiên bản theo luật SemVer sẵn có của `RELEASING.md` (D-078).
+- Image Docker vẫn chỉ đăng khi có token của chủ dự án (D-107): thiếu token thì bỏ qua bước đó,
+  không dừng cả đợt phát hành.
+- Thiếu quyền đẩy lên GitHub (chưa đăng nhập `gh`, không có `GH_TOKEN`) thì dừng và báo, không
+  tìm đường vòng.
+
+Lý do: chủ dự án muốn agent làm xuyên suốt; trước đây mỗi bản phát hành phải chờ họ giao, nên
+`main` và bản phát hành đi sau code đã xong. Phát hành theo bước giữ nhịp đều và mỗi bản ứng với
+một phần lộ trình đọc được.
+
+Đã cân nhắc: phát hành sau mỗi commit — quá nhiều bản, và thay đổi phá vỡ của một bước bị chia
+nhỏ qua nhiều bản; bật lại workflow `Release` trên GitHub cho tự chạy khi đẩy tag — tốn phút chạy
+của repo riêng tư (D-107, chủ dự án quyết); phát hành theo lịch cố định — bản có thể chứa bước làm
+dở.
+
+Bổ sung: D-078 (quy trình), D-107 (phát hành chạy trên máy). Thay luật "không push khi chủ dự án
+chưa yêu cầu" trong `CLAUDE.md` cho trường hợp phát hành.
+
+## D-172 · Build dev và test chỉ giữ thông tin dòng code (`debug = "line-tables-only"`) — 2026-11-13 — agent quyết
+
+Quyết định: `Cargo.toml` gốc khai `[profile.dev] debug = "line-tables-only"` (profile `test` kế
+thừa). Backtrace và thông báo panic vẫn chỉ đúng file, dòng; mất thông tin biến cho debugger.
+Ai cần debugger xem biến thì tạm đổi thành `debug = true` trên máy mình, không commit.
+
+Lý do: thông tin debug đầy đủ chiếm phần lớn kích thước file test và thời gian link. Dự án có
+khoảng 104 nghìn dòng Rust, 518 thư viện, hơn 40 chương trình test, mỗi chương trình gói trọn
+thư viện. Đo ngày 2026-11-13 trên một máy dev Linux 12 nhân, cùng commit, trước và sau:
+
+| Đo                                      | `debug = true` (mặc định) | `line-tables-only` |
+| --------------------------------------- | ------------------------- | ------------------ |
+| `./gate.sh` sau `cargo clean`           | 566 s                     | 422 s              |
+| Trong đó build bản test                 | 254 s                     | 146 s              |
+| Sửa `kernel`, `cargo test --no-run`     | 257 s                     | 43 s               |
+| `target/` sau một lần gate              | 23 GB                     | 10 GB              |
+
+Đã cân nhắc: `debug = false` — nhanh hơn nữa nhưng backtrace mất số dòng, test đỏ khó tìm chỗ
+hỏng; trình link `mold` — người lạ clone về phải cài thêm; gộp các file `tests/*.rs` của mỗi
+crate thành một chương trình — giảm số lần link nhưng phải dời nhiều file, để sau nếu cần.

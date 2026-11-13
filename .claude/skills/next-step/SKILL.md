@@ -66,7 +66,8 @@ hứng, đừng nhảy cóc.
    ```
 
    Kết thúc thông điệp bằng dòng ghi công mà phiên làm việc yêu cầu.
-4. **Không push** khi chủ dự án chưa yêu cầu.
+4. Mục vừa xong là mục cuối của bước (mọi mục của bước đã `[x]`): **tự phát hành** theo
+   `docs/RELEASING.md` (D-171), không hỏi. Còn mục chưa xong thì **không push**.
 
 ## 6. Đi tiếp hay dừng
 
