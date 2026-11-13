@@ -359,7 +359,8 @@ Trong lúc làm, `./gate.sh --quick` kiểm một thay đổi ở một module t
 của các crate bạn đã sửa (và của các crate phụ thuộc vào chúng), chỉ trên SQLite. Trước khi
 merge, chạy `./gate.sh` đầy đủ; một thay đổi chỉ được nhận khi gate đầy đủ xanh trên cả
 SQLite và PostgreSQL. Không bao giờ commit secret — chỉ `.env.example` được nằm
-trong Git, `.env` thì không.
+trong Git, `.env` thì không. [`CONTRIBUTING.vi.md`](CONTRIBUTING.vi.md) hướng dẫn chuẩn
+bị máy, những luật quan trọng nhất và cách gửi thay đổi.
 
 ## Bảo mật
 

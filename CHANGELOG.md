@@ -17,6 +17,8 @@ endpoints are marked deprecated with a sunset date first.
   rolling updates.
 - `SECURITY.md` (and `SECURITY.vi.md`): which versions get security fixes, how to report a
   vulnerability privately, response times and what is out of scope.
+- `CONTRIBUTING.md` (and `CONTRIBUTING.vi.md`): setting up a machine, the two gates, the
+  rules that matter most, commits and pull requests, and the license of contributions.
 
 ### Changed
 

@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–29 xong**, bước 30 đang làm (xong: deploy không gián đoạn, `SECURITY.md`); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–29 xong**, bước 30 đang làm (xong: deploy không gián đoạn, `SECURITY.md`, `CONTRIBUTING.md`); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -432,7 +432,7 @@ Nhóm B — file của dự án mã nguồn mở:
 - [x] `SECURITY.md` (EN + VI): phiên bản còn được vá, cách báo lỗ hổng riêng tư (bật "Private
       vulnerability reporting" của GitHub — chủ dự án bấm), thời gian phản hồi dự kiến, những gì
       không tính là lỗ hổng; README trỏ tới nó
-- [ ] `CONTRIBUTING.md` (EN + VI) cho người đóng góp là người: dựng môi trường, hai mức gate
+- [x] `CONTRIBUTING.md` (EN + VI) cho người đóng góp là người: dựng môi trường, hai mức gate
       (D-173), luật quan trọng nhất tóm từ `CLAUDE.md` (hai database, ranh giới module, lỗi có
       `code`, test), cách viết commit và PR, license của phần đóng góp (MIT OR Apache-2.0, như
       repo); trỏ `CLAUDE.md` cho người dùng AI agent

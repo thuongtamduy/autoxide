@@ -365,7 +365,8 @@ While you work, `./gate.sh --quick` checks a change to one module in under a min
 the crates you changed (and of the crates that depend on them) on SQLite only. Before a
 change is merged, run the full `./gate.sh`; a change is accepted only when the full gate is
 green on both SQLite and PostgreSQL. Never commit secrets — only `.env.example`
-belongs in Git, never `.env`.
+belongs in Git, never `.env`. [`CONTRIBUTING.md`](CONTRIBUTING.md) explains how to set up
+your machine, the rules that matter most and how to send a change.
 
 ## Security
 
