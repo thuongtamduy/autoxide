@@ -16,6 +16,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
+use uuid::Uuid;
 
 /// Trait một module "khác" công bố; ở đây test đưa vào bằng `provide`.
 trait Greeting: Send + Sync {
@@ -107,6 +108,84 @@ async fn dung_app_goi_rest_voi_token_da_khai() {
         let health = app.get("/health/ready").send().await.unwrap();
         assert_eq!(health.status(), StatusCode::OK);
         assert!(!answer.header("x-request-id").is_empty());
+    })
+    .await
+    .unwrap();
+}
+
+/// Module chỉ có một route trả bên gọi: người dùng nào, qua API key nào.
+struct WhoAmI;
+
+impl Module for WhoAmI {
+    fn name(&self) -> &'static str {
+        "whoami"
+    }
+
+    fn routes(&self) -> OpenApiRouter {
+        OpenApiRouter::new().routes(routes!(who_am_i)).routes(routes!(count_bytes))
+    }
+}
+
+/// Count the bytes of the request body.
+#[utoipa::path(
+    post,
+    path = "/bytes",
+    responses((status = 200, description = "Number of bytes received.", body = usize))
+)]
+async fn count_bytes(body: String) -> Data<usize> {
+    Data { data: body.len() }
+}
+
+/// Who is calling: user id and API key id (`null` without one).
+#[utoipa::path(
+    get,
+    path = "/",
+    responses(
+        (status = 200, description = "User id, then API key id.", body = [Option<String>]),
+        (status = 401, description = "Not signed in.", body = autoxide_kernel::response::Problem),
+    )
+)]
+async fn who_am_i(principal: Principal) -> Data<Vec<Option<String>>> {
+    let key = principal.api_key_id().map(|id| id.to_string());
+    Data { data: vec![Some(principal.user_id().to_string()), key] }
+}
+
+/// `principal` khai bên gọi mà `user` không tả được, vd gọi bằng API key.
+#[tokio::test]
+async fn principal_dung_san_vd_api_key() {
+    TestDatabase::run(async |test| {
+        let agent = Principal::new(Uuid::from_u128(2), []).via_api_key(Uuid::from_u128(3));
+        let app = TestApp::builder(test)
+            .user("ada", 1, &[])
+            .principal("agent", agent)
+            .module(WhoAmI)
+            .build()
+            .await
+            .unwrap();
+
+        let ada = app.get("/api/v1/whoami").token("ada").send().await.unwrap();
+        assert_eq!(ada.json()["data"], serde_json::json!([Uuid::from_u128(1), null]));
+        let agent = app.get("/api/v1/whoami").token("agent").send().await.unwrap();
+        assert_eq!(agent.status(), StatusCode::OK, "{}", agent.text());
+        assert_eq!(
+            agent.json()["data"],
+            serde_json::json!([Uuid::from_u128(2), Uuid::from_u128(3)])
+        );
+    })
+    .await
+    .unwrap();
+}
+
+/// `body` gửi thân bất kỳ, kể cả gửi theo từng đoạn (không có `Content-Length`).
+#[tokio::test]
+async fn gui_than_theo_tung_doan() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test).module(WhoAmI).build().await.unwrap();
+        let parts = ["hello ", "world"].map(|part| Ok::<_, std::io::Error>(part.to_owned()));
+        let stream = axum::body::Body::from_stream(futures_util::stream::iter(parts));
+        let answer = app.post("/api/v1/whoami/bytes").body(stream).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        assert_eq!(answer.json()["data"], 11);
     })
     .await
     .unwrap();

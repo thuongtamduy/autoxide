@@ -80,7 +80,7 @@ pub struct TestAppBuilder<'a> {
     settings: Vec<(String, String)>,
     modules: Vec<Box<dyn Module>>,
     provided: Vec<Provision>,
-    users: HashMap<String, (Uuid, Vec<String>)>,
+    users: HashMap<String, Principal>,
 }
 
 // `for<'c>`: hàm nhận `StartContext` với lifetime bất kỳ — lifetime thật chỉ biết lúc
@@ -201,11 +201,17 @@ impl<'a> TestAppBuilder<'a> {
     }
 
     /// Thêm một người dùng giả: request mang `Authorization: Bearer <token>` được xác thực
-    /// là `user_id` với đúng các permission này. Khai ít nhất một `user` thì app dùng bộ xác
-    /// thực giả thay cho bộ một module công bố.
-    pub fn user(mut self, token: &str, user_id: u128, permissions: &[&str]) -> Self {
-        let permissions = permissions.iter().map(|p| (*p).to_owned()).collect();
-        self.users.insert(token.to_owned(), (Uuid::from_u128(user_id), permissions));
+    /// là `user_id` với đúng các permission này. Khai ít nhất một `user` (hay `principal`) thì
+    /// app dùng bộ xác thực giả thay cho bộ một module công bố.
+    pub fn user(self, token: &str, user_id: u128, permissions: &[&str]) -> Self {
+        let permissions = permissions.iter().map(|p| (*p).to_owned());
+        self.principal(token, Principal::new(Uuid::from_u128(user_id), permissions))
+    }
+
+    /// Như [`TestAppBuilder::user`], với `Principal` dựng sẵn — cho bên gọi mà `user` không tả
+    /// được, vd gọi bằng API key: `Principal::new(id, permissions).via_api_key(key_id)`.
+    pub fn principal(mut self, token: &str, principal: Principal) -> Self {
+        self.users.insert(token.to_owned(), principal);
         self
     }
 
@@ -272,8 +278,9 @@ impl Module for Provider {
     }
 }
 
-/// Bộ xác thực giả: token → người dùng và permission khai bằng [`TestAppBuilder::user`].
-struct FakeAuthenticator(HashMap<String, (Uuid, Vec<String>)>);
+/// Bộ xác thực giả: token → bên gọi khai bằng [`TestAppBuilder::user`] hay
+/// [`TestAppBuilder::principal`].
+struct FakeAuthenticator(HashMap<String, Principal>);
 
 #[async_trait::async_trait]
 impl Authenticator for FakeAuthenticator {
@@ -282,7 +289,7 @@ impl Authenticator for FakeAuthenticator {
             .and_then(|value| value.strip_prefix("Bearer "))
             .and_then(|token| self.0.get(token));
         match user {
-            Some((id, permissions)) => Ok(Principal::new(*id, permissions.iter().cloned())),
+            Some(principal) => Ok(principal.clone()),
             None => Err(Error::unauthenticated("auth.invalid_token", "The token is not valid.")),
         }
     }
@@ -317,6 +324,13 @@ impl TestRequest<'_> {
     /// Thân thô (tự đặt `Content-Type` bằng [`TestRequest::header`]).
     pub fn bytes(mut self, body: impl Into<Vec<u8>>) -> Self {
         self.body = Some(Body::from(body.into()));
+        self
+    }
+
+    /// Thân bất kỳ, vd `Body::from_stream(…)` để gửi theo từng đoạn, không có
+    /// `Content-Length` (tự đặt `Content-Type` bằng [`TestRequest::header`]).
+    pub fn body(mut self, body: Body) -> Self {
+        self.body = Some(body);
         self
     }
 

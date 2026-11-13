@@ -381,11 +381,11 @@ mod tests {
 
             let patch = |if_match: String, name: &str| {
                 let (admin, path, name) = (admin.clone(), path.clone(), name.to_owned());
-                let app = app.clone();
+                let app = &app;
                 async move {
                     let headers =
                         [("authorization", admin.as_str()), ("if-match", if_match.as_str())];
-                    call_with(&app, "PATCH", &path, &headers, Some(json!({"name": name}))).await
+                    call_with(app, "PATCH", &path, &headers, Some(json!({"name": name}))).await
                 }
             };
             let (status, headers, body) = patch(etag.clone(), "Ada L").await;

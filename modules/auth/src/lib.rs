@@ -281,6 +281,12 @@ pub(crate) mod testing {
         database
     }
 
+    /// Khoá ký access token cố định của test (`AUTOXIDE_AUTH_TOKEN_SECRET`).
+    pub const TOKEN_SECRET: &str = "test-key-test-key-test-key-test-key";
+    /// Passkey của test: tên miền và origin (`AUTOXIDE_AUTH_PASSKEY_RP_ID`, `…_ORIGINS`).
+    pub const PASSKEY_RP_ID: &str = "example.com";
+    pub const PASSKEY_ORIGIN: &str = "https://example.com";
+
     /// Mọi service của module trên database của test, với khoá ký cố định.
     pub struct Services {
         pub users: Arc<crate::user::UserService>,
@@ -293,7 +299,6 @@ pub(crate) mod testing {
         pub passkeys: Arc<crate::passkey::PasskeyService>,
         pub mails: Arc<FakeMailer>,
         pub database: Database,
-        pub authenticator: Arc<dyn autoxide_kernel::access::Authenticator>,
         pub personal_data: autoxide_kernel::privacy::PersonalDataExport,
     }
 
@@ -306,7 +311,7 @@ pub(crate) mod testing {
             outbox.clone(),
         ));
         let tokens = crate::token::AccessTokens::new(
-            b"test-key-test-key-test-key-test-key".to_vec(),
+            TOKEN_SECRET.as_bytes().to_vec(),
             std::time::Duration::from_secs(900),
         );
         let mfa = Arc::new(crate::mfa::MfaService::new(
@@ -354,11 +359,6 @@ pub(crate) mod testing {
             sessions.clone(),
             outbox,
         ));
-        let authenticator = Arc::new(crate::access::RequestAuthenticator {
-            sessions: sessions.clone(),
-            roles: roles.clone(),
-            api_keys: api_keys.clone(),
-        });
         let mails = Arc::new(FakeMailer::default());
         let translations = autoxide_kernel::i18n::Translations::new(vec![(
             "auth",
@@ -376,8 +376,8 @@ pub(crate) mod testing {
             url: None,
         });
         let passkey_config = crate::config::PasskeyConfig {
-            rp_id: "example.com".to_owned(),
-            origins: vec!["https://example.com".to_owned()],
+            rp_id: PASSKEY_RP_ID.to_owned(),
+            origins: vec![PASSKEY_ORIGIN.to_owned()],
         };
         let passkeys = Arc::new(
             crate::passkey::PasskeyService::new(
@@ -424,7 +424,6 @@ pub(crate) mod testing {
             verifications,
             mails,
             database,
-            authenticator,
         }
     }
 

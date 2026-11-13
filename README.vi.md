@@ -147,6 +147,9 @@ thoát với mã 1 khi có bước kiểm hỏng):
 cargo run -p autoxide -- doctor
 ```
 
+Module có thể thêm lệnh quản trị; `autoxide task` liệt kê chúng kèm tham số
+(`cargo run -p autoxide -- task`).
+
 Sau đó chạy máy chủ. Máy chủ từ chối chạy khi còn migration chưa áp dụng, và dừng êm
 khi nhận Ctrl-C hoặc `SIGTERM` (request đang chạy có `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`
 giây để xong):

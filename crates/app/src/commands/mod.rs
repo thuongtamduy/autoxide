@@ -9,6 +9,7 @@ pub mod jobs;
 pub mod migrate;
 pub mod openapi;
 pub mod serve;
+pub mod task;
 pub mod user;
 
 use std::future::Future;

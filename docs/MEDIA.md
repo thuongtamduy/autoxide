@@ -112,6 +112,14 @@ Until a copy is made, asking for it returns the original, briefly cached. Images
 million pixels, AVIF and SVG get no copies. Replacing the content makes new copies and
 deletes the old ones. Copies follow the item's visibility and trash.
 
+Changing `AUTOXIDE_MEDIA_IMAGE_WIDTHS` applies to new uploads. To give images uploaded
+before the same widths, run this once after restarting with the new setting; the worker
+makes the copies in the background (`dry_run=true` only counts):
+
+```bash
+autoxide task media.refresh_variants
+```
+
 ## Tags
 
 Besides its one folder, an item may carry up to 20 tags (each 1 to 50 characters, without

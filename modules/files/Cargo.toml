@@ -32,7 +32,6 @@ validator.workspace = true
 
 [dev-dependencies]
 autoxide-testkit.workspace = true
-tower.workspace = true
 
 [lints]
 workspace = true

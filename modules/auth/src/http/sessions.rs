@@ -200,7 +200,7 @@ mod tests {
     use crate::http::test_support::{PASSWORD, app, bearer, call, call_with};
 
     /// Đăng nhập `ada` từ một "thiết bị" (User-Agent); trả (Authorization, thân token).
-    async fn sign_in(app: &axum::Router, device: &str) -> (String, Value) {
+    async fn sign_in(app: &autoxide_testkit::TestApp, device: &str) -> (String, Value) {
         let body = json!({"email": "ada@example.com", "password": PASSWORD});
         let headers = [("user-agent", device)];
         let (status, _, login) = call_with(app, "POST", "/login", &headers, Some(body)).await;

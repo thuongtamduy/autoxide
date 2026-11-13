@@ -152,6 +152,9 @@ status 1 when a check failed):
 cargo run -p autoxide -- doctor
 ```
 
+Modules can add maintenance tasks; `autoxide task` lists them with their arguments
+(`cargo run -p autoxide -- task`).
+
 Then start the server. It refuses to start while a migration is pending, and
 stops gracefully on Ctrl-C or `SIGTERM` (requests in progress get
 `AUTOXIDE_HTTP_SHUTDOWN_SECONDS` to finish):

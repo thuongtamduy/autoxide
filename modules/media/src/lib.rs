@@ -18,6 +18,7 @@ mod http;
 mod jobs;
 mod migration;
 mod permissions;
+mod refresh;
 mod service;
 mod sniff;
 mod tags;
@@ -146,6 +147,10 @@ impl Module for MediaModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    }
+
+    fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
+        self.service.clone().map_or_else(Vec::new, |service| vec![refresh::task(service)])
     }
 
     fn tools(&self) -> Vec<Tool> {
