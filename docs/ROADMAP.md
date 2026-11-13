@@ -477,6 +477,32 @@ trước ranh giới file với người làm nhóm đó. Mọi mục chạy và
       nâng cấp khi nhiều máy chủ chạy hai phiên bản code cùng lúc (migration theo kiểu mở rộng
       trước, thu hẹp sau). Mỗi tình huống: dấu hiệu, lệnh kiểm, cách sửa
 
+## 32. Cho người gọi API (chủ dự án giao ngày 13/11/2026, D-177)
+
+Người viết giao diện (repo riêng, D-097), nhà phát triển ngoài và AI agent dùng API nhanh và không
+gọi sai. Bước này sửa `xtask`, `gate.sh`, tài liệu và thêm thư mục SDK — không đụng file của bước
+29–31, nên làm song song được. Ví dụ và test chạy trên cả SQLite và Postgres.
+
+- [ ] Gate chặn thay đổi phá vỡ của `/api/v1` (D-059): so `docs/openapi.json` với bản ở tag phát
+      hành gần nhất (`git show vX.Y.Z:docs/openapi.json`) và báo đỏ khi xoá endpoint hay method,
+      thêm tham số hay trường bắt buộc vào request, xoá trường hay đổi kiểu trong response, bỏ
+      giá trị của enum. Endpoint đã khai deprecated và quá ngày `sunset` thì được bỏ. Viết bằng
+      Rust trong `xtask` (thêm lệnh), có test cho từng loại thay đổi; thông báo nói rõ chỗ nào
+      phá và cách làm đúng (endpoint mới + deprecate endpoint cũ)
+- [ ] SDK TypeScript sinh từ `docs/openapi.json` (D-177: trong repo, không đăng npm), đủ kiểu cho
+      request, response, lỗi `Problem` và pagination; gate kiểm SDK khớp hợp đồng như cách test
+      đang kiểm `openapi.json`. Gate không bắt người lạ cài Node: nếu công cụ sinh cần Node thì chạy
+      qua image Docker ghim phiên bản (như gitleaks) hoặc chỉ kiểm trong CI — chọn và ghi quyết định
+- [ ] Hướng dẫn theo tình huống (EN + VI, thư mục mới trong `docs/`): website đọc bài và ảnh
+      (`srcset`, `body_media`, ETag / 304, cache), đăng nhập và làm mới token, API key cho máy,
+      gọi lại an toàn bằng `Idempotency-Key`, pagination, đọc lỗi (`code`, `errors`, `Retry-After`).
+      Mỗi tình huống có ví dụ `curl` và TypeScript dùng SDK
+- [ ] Hướng dẫn nối AI agent qua MCP (EN + VI), mở rộng đoạn ngắn trong README: tạo API key quyền
+      tối thiểu cho agent, cấu hình Claude Code và client MCP khác, danh sách tool theo module và
+      permission cần, giới hạn (rate limit theo API key, bản nháp chờ duyệt — D-109)
+- [ ] Ví dụ trong tài liệu được test: các ví dụ của hai mục trên chạy thật trên app dựng bằng
+      `TestApp` trong gate (hay một lệnh `xtask` gate gọi), để tài liệu không lệch code
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.
