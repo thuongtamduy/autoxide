@@ -1,6 +1,6 @@
 ---
 name: next-step
-description: Nhận và hoàn thành bước kế tiếp trong lộ trình Autoxide (docs/ROADMAP.md) theo đúng quy trình — đọc lộ trình, làm, chạy gate, đánh dấu, commit. Dùng khi chủ dự án nói "bắt đầu", "làm tiếp", "tiếp tục", "bước tiếp theo", "continue", "next step", khi mở một phiên mới mà chưa rõ đang ở đâu, hoặc ngay sau khi vừa xong một mục và cần biết làm gì kế. Không dùng cho việc lẻ chủ dự án giao trực tiếp ngoài lộ trình.
+description: Làm bước kế tiếp trong docs/ROADMAP.md theo đúng quy trình: đọc lộ trình, làm, chạy gate, đánh dấu, commit. Dùng khi chủ dự án nói "làm tiếp", "tiếp tục", "bước tiếp theo", "next step", hay khi mở phiên mới chưa rõ đang ở đâu. Không dùng cho việc lẻ ngoài lộ trình.
 ---
 
 # Làm bước kế tiếp của lộ trình
