@@ -4612,3 +4612,23 @@ bảo hộ quyền tác giả (Luật Sở hữu trí tuệ, Điều 15 — cầ
 API bên ngoài để tra — phải chạy khi không có mạng và không phụ thuộc dịch vụ của người khác.
 
 Thay: mục địa chỉ của bước 44 trong D-191 (bỏ bảng đối chiếu địa chỉ cũ).
+
+## D-194 · Đối chiếu với nền tảng thương mại điện tử đang chạy: thêm thông báo, VietQR, khách hàng, đa kênh, tiếp thị liên kết — 2026-11-13 — agent quyết
+
+Quyết định: thêm module nền `notifications` (bước 37; thay mục "module thông báo chờ chủ dự án quyết",
+chủ dự án đã giao AI quyết ở D-185); thêm vào bước 36 chuyển khoản VietQR tự khớp (trait `BankFeed`),
+tỉ giá có ngày hiệu lực, mẫu in chứng từ, xuất dữ liệu kế toán; vào 41 hàng số / dịch vụ / combo; vào
+42 nhập hàng từ nhà cung cấp; vào 45 chống bom hàng COD, trả góp, bảo hành; vào 46 báo cáo cho cơ quan
+thuế và kho của sàn. Thêm ba module, ba bước: `customers` (47), `channels` (48), `affiliate` (49).
+Thẻ quà tặng và số dư cửa hàng tắt mặc định, chỉ dùng mua hàng của chính khách, không rút ra tiền,
+tới khi đối chiếu NĐ 52/2024 về ví điện tử và thẻ trả trước. Để sau: B2B, đặt lịch, chat, thuê bao định
+kỳ, bán xuyên biên giới, quảng cáo trong sàn — ghi ở "Sau core".
+
+Lý do: chủ dự án hỏi còn thiếu gì so với mô hình thương mại điện tử. Mỗi mục là thứ người bán ở Việt
+Nam đang dùng hằng ngày, hay là nghĩa vụ luật: tin quảng cáo phải có đồng ý trước (NĐ 91/2020);
+người tiếp thị liên kết bị khấu trừ thuế khi nhận hoa hồng (ngưỡng và tỉ lệ đang thay đổi theo NĐ
+253/2026 — để dạng dữ liệu, cần đối chiếu). Thông báo là nền vì đơn hàng, KYC, thuê bao, bảo mật đều
+cần báo người dùng.
+
+Đã cân nhắc: gộp điểm thưởng vào `promotions` — điểm là nghĩa vụ kéo dài, khác chương trình giảm giá
+có hạn; gộp đa kênh vào `orders` — bộ nối từng sàn là phần lớn nhất, cần bật / tắt riêng theo gói.

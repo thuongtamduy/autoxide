@@ -417,8 +417,8 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 | 40 Năng lực còn thiếu | header bảo mật và MCP: ngay; còn lại: 34 | 35–39 |
 | 41 Sản phẩm | 35 và 36 | 37–40 |
 | 42 Kho · 43 Khuyến mại · 44 Vận chuyển | 41 | nhau |
-| 45 Giỏ hàng, đặt hàng, đơn hàng | 42, 43, 44 | — |
-| 46 Sàn | 45 và 37 | — |
+| 45 Giỏ hàng, đặt hàng, đơn hàng | 42, 43, 44 và 37 (thông báo) | — |
+| 46 Sàn · 47 Khách hàng · 48 Đa kênh · 49 Tiếp thị liên kết | 45 (46 và 49 cần thêm 37) | nhau |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
@@ -682,6 +682,16 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
 - [ ] Hoá đơn khởi tạo từ máy tính tiền (D-190): `EInvoiceProvider` hỗ trợ cả loại này cho bán lẻ
       tại quầy (NĐ 123/2020 sửa bởi NĐ 70/2025: hộ kinh doanh doanh thu từ 1 tỷ đồng / năm từ
       01/6/2025; ngưỡng theo lộ trình — để dạng dữ liệu, cần đối chiếu văn bản mới nhất)
+- [ ] Chuyển khoản VietQR tự khớp (D-194): sinh mã QR theo chuẩn VietQR với nội dung mang mã tham
+      chiếu, nhận biến động số dư qua trait `BankFeed` (ngân hàng hay dịch vụ đọc sao kê), khớp tự
+      động theo mã và số tiền, sai lệch vào hàng chờ xử lý tay; tiền vào thẳng tài khoản của người
+      bán / khách (chế độ tự thu, D-187)
+- [ ] Tỉ giá có ngày hiệu lực theo cặp tiền (nhập tay hay lấy từ nguồn qua trait); chứng từ ngoại tệ
+      lưu ảnh chụp tỉ giá; báo cáo gộp nhiều tiền tệ (bước 38) dùng bảng này
+- [ ] Mẫu in chứng từ (hoá đơn bán lẻ, phiếu giao hàng, phiếu nhập, phiếu thu): mẫu theo khách và
+      i18n, xuất HTML và PDF — chọn thư viện sau khi kiểm, ghi `STACK.md`
+- [ ] Xuất dữ liệu kế toán: sổ nhật ký chung và chứng từ theo kỳ ra CSV / Excel theo định dạng nhập
+      của phần mềm kế toán phổ biến, để kế toán của khách không nhập lại tay
 
 ## 37. Tuân thủ pháp luật Việt Nam (D-186)
 
@@ -721,6 +731,11 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       `ai_assisted`, API trả về để giao diện gắn nhãn khi công khai
 - [ ] Gửi SMS (D-190): trait `SmsSender` (nhà cung cấp SMS có brandname), mã một lần qua SMS để xác
       thực số điện thoại theo NĐ 147/2024; một bộ cài đặt giả cho test
+- [ ] Module nền `notifications` (D-194; thay mục "module thông báo chờ quyết"): kênh email, SMS,
+      Zalo ZNS (trait), web push, trong ứng dụng; mẫu theo i18n và theo khách; tuỳ chọn nhận của người
+      dùng; **tách tin giao dịch và tin quảng cáo** — tin quảng cáo chỉ gửi khi đã đồng ý trước, từ
+      chối là dừng ngay, khung giờ gửi là dữ liệu (NĐ 91/2020: tin nhắn 7h–22h, chỉ một tin đăng ký
+      đầu tiên — cần đối chiếu bản thay thế đang dự thảo); `newsletter` dùng chung sổ đồng ý
 
 ## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
 
@@ -869,6 +884,9 @@ bước 35.
       và SEO bằng AI chỉ thành bản nháp, đánh dấu `ai_assisted` (bước 37)
 - [ ] API hợp đồng cho module khác (`catalog::api`): đọc sản phẩm / biến thể / giá tại một thời
       điểm để chụp vào chứng từ; event khi giá hay trạng thái đổi; tool MCP như REST
+- [ ] Loại sản phẩm: hàng vật lý, hàng số (giao file bằng link ký có hạn qua `files`, giới hạn lượt
+      tải), dịch vụ (không giao hàng); combo / bộ sản phẩm trừ kho từng thành phần; sản phẩm tương tự
+      theo ý nghĩa (embedding sẵn có của module `ai`)
 
 ## 42. Kho (`inventory`)
 
@@ -884,6 +902,8 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
 - [ ] Giá vốn bình quân gia quyền theo kho cho báo cáo lãi gộp; lô và hạn dùng (bán trước hết hạn
       trước), số serial — bật theo sản phẩm
 - [ ] Nhận event của `orders` (xác nhận, huỷ, trả hàng nhập lại kho) — chịu được nhận lại event
+- [ ] Nhập hàng (D-194): nhà cung cấp, đơn đặt hàng nhà cung cấp, nhận hàng một phần, công nợ phải
+      trả nhà cung cấp vào sổ cái, trả hàng cho nhà cung cấp — chuỗi bán lẻ cần cho việc hằng ngày
 
 ## 43. Khuyến mại (`promotions`)
 
@@ -936,6 +956,11 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       (Luật 19/2023); dùng lại `comments` nếu hợp, không thì module `reviews` — ghi quyết định
 - [ ] Báo cáo bán hàng theo cửa hàng / kênh / sản phẩm / thời gian, theo quyền độ sâu; event cho kho
       báo cáo gộp (bước 38)
+- [ ] Chống "bom hàng" COD (D-194): tỉ lệ nhận hàng thành công của người mua trong khách (chỉ dữ
+      liệu của chính khách, có căn cứ xử lý theo Luật BVDLCN), quy tắc buộc trả trước khi rủi ro cao,
+      danh sách chặn có lý do và thời hạn; không chia sẻ danh sách giữa các khách
+- [ ] Trả góp qua đối tác (trait của bước 36); bảo hành theo số serial hay theo đơn: phiếu bảo hành,
+      tiếp nhận, trạng thái xử lý, hạn bảo hành
 
 ## 46. Sàn (`marketplace`)
 
@@ -951,12 +976,57 @@ Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nú
       117/2025), lệnh chi qua `PayoutGateway`; bảng đối soát cho người bán; sổ cái khớp từng đồng
 - [ ] Tranh chấp người mua – người bán, sàn phân xử, có hạn xử lý; điểm và chế tài người bán; báo cáo
       cho cơ quan có thẩm quyền khi được yêu cầu (có audit)
+- [ ] Cung cấp thông tin người bán và doanh thu cho cơ quan thuế theo kỳ (NĐ 117/2025 — cần đối
+      chiếu mẫu và hạn); kho của sàn (sàn nhận hàng của người bán, đóng gói, giao — tồn theo người bán
+      trong kho của sàn)
+
+## 47. Khách hàng và giữ chân khách (`customers`)
+
+Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (bước 34); module này giữ hồ sơ bán hàng.
+
+- [ ] Hồ sơ khách: lịch sử mua (từ event của `orders`), tổng chi, nhóm và phân khúc theo quy tắc,
+      nhãn, ghi chú của nhân viên; nhóm khách dùng cho bảng giá (bước 41) và khuyến mại (bước 43)
+- [ ] Điểm thưởng và hạng thành viên: sổ điểm chỉ thêm, điểm có hạn dùng, quy tắc tích / đổi là dữ
+      liệu; điểm chưa dùng là nghĩa vụ ghi trong sổ cái
+- [ ] Thẻ quà tặng và số dư cửa hàng: chỉ dùng mua hàng của chính khách đó, không rút ra tiền,
+      không chuyển ra ngoài — **tắt mặc định**, chỉ bật sau khi đối chiếu NĐ 52/2024 về ví điện tử /
+      thẻ trả trước (D-194); số dư là nghĩa vụ trong sổ cái
+- [ ] Danh sách yêu thích, sản phẩm vừa xem; nhắc giỏ hàng bỏ dở qua `notifications` — chỉ khi người
+      mua đã đồng ý nhận tin quảng cáo (bước 37); giới thiệu bạn bè có thưởng
+
+## 48. Bán đa kênh (`channels`)
+
+Bắt đầu SAU bước 45. Người bán ở Việt Nam bán cùng lúc trên website, Shopee, Lazada, TikTok Shop,
+Facebook / Zalo; một kho, một danh sách sản phẩm, đơn từ mọi nơi về một chỗ.
+
+- [ ] Trait `SalesChannel` (đăng sản phẩm, cập nhật giá và tồn, lấy đơn, cập nhật trạng thái giao)
+      và bộ giả cho test; bộ nối từng sàn là module riêng, làm khi có tài khoản thử (D-191)
+- [ ] Liên kết sản phẩm / biến thể với mã trên từng kênh; giá riêng theo kênh; đồng bộ tồn có phần
+      để dành cho từng kênh, không bán quá khi nhiều kênh cùng bán
+- [ ] Đơn từ kênh khác vào `orders` với kênh nguồn, trừ kho chung, không trùng khi kênh gửi lại;
+      báo cáo theo kênh; đối soát tiền sàn trả với sổ cái
+
+## 49. Tiếp thị liên kết và bán qua livestream (`affiliate`)
+
+Bắt đầu SAU bước 45 và 37. Luật TMĐT 2025 buộc xác thực danh tính người livestream và người tiếp thị
+liên kết (bước 37).
+
+- [ ] Người tiếp thị đăng ký có KYC (cổng chặn bước 37), link và mã riêng, thời hạn ghi nhận đơn, quy
+      tắc hoa hồng theo sản phẩm / danh mục là dữ liệu có ngày hiệu lực
+- [ ] Hoa hồng ghi sổ cái khi đơn hoàn tất, trừ lại khi trả hàng; chi trả qua `PayoutGateway` có khấu
+      trừ thuế thu nhập cá nhân theo hồ sơ thuế (tỉ lệ và ngưỡng là dữ liệu — các nguồn đang khác nhau
+      giữa 2 triệu và 5 triệu đồng / lần, NĐ 253/2026 — cần đối chiếu); chứng từ khấu trừ cho người nhận
+- [ ] Phiên livestream: người phát đã xác thực, sản phẩm gắn trong phiên, đơn ghi nhận theo phiên,
+      lưu vết phiên theo yêu cầu của luật
 
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.
 
-Chờ chủ dự án quyết (không làm khi chưa có quyết định): module thông báo (trong ứng dụng, web push)
-· đăng nhập thay người dùng để hỗ trợ · định dạng ảnh AVIF. Đã cân nhắc và không làm: API dữ liệu tự
+Để sau (D-194): bán sỉ B2B (báo giá, công nợ, hạn mức tín dụng) · đặt lịch dịch vụ · chat chăm sóc
+khách · sản phẩm thuê bao định kỳ · bán xuyên biên giới nhiều tiền tệ · quảng cáo trong sàn.
+
+Chờ chủ dự án quyết (không làm khi chưa có quyết định): đăng nhập thay người dùng để hỗ trợ · định
+dạng ảnh AVIF. Đã cân nhắc và không làm: API dữ liệu tự
 sinh từ bảng, plugin WASM nạp lúc chạy, trang quản trị dựng sẵn (`docs/research/frameworks.md`,
 D-005, D-026). Thư viện số thập phân và module sổ cái: đã quyết ở D-187, D-188.
