@@ -83,7 +83,8 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 - [Rust](https://rustup.rs) — `rustup` installs the exact toolchain pinned in
   `rust-toolchain.toml` the first time you run `cargo`
-- A C compiler (SQLite is compiled from source and bundled into the binary)
+- A C compiler (SQLite and libwebp are compiled from source and bundled into the binary;
+  on Debian or Ubuntu: `sudo apt install build-essential`)
 - To run the full quality gate: [Docker](https://docs.docker.com/get-docker/) and
   [`cargo-deny`](https://github.com/EmbarkStudios/cargo-deny)
   (`cargo install cargo-deny --locked`)

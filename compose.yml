@@ -3,6 +3,7 @@
 # Đặt secret trong file `.env` cạnh file này (không commit), ví dụ:
 #   POSTGRES_PASSWORD=<openssl rand -hex 24>
 #   AUTOXIDE_AUTH_TOKEN_SECRET=<openssl rand -base64 48>
+#   AUTOXIDE_SECRET_KEY=<openssl rand -base64 48>
 # rồi chạy:  docker compose up -d --build
 
 x-autoxide: &autoxide
@@ -13,6 +14,8 @@ x-autoxide: &autoxide
   environment:
     DATABASE_URL: postgres://autoxide:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/autoxide
     AUTOXIDE_AUTH_TOKEN_SECRET: ${AUTOXIDE_AUTH_TOKEN_SECRET:?set AUTOXIDE_AUTH_TOKEN_SECRET in .env}
+    # Không bắt buộc (rỗng = chưa đặt): thiếu thì khoá nằm trong database và máy chủ cảnh báo.
+    AUTOXIDE_SECRET_KEY: ${AUTOXIDE_SECRET_KEY:-}
     AUTOXIDE_MAIL_SMTP_URL: ${AUTOXIDE_MAIL_SMTP_URL:-}
     AUTOXIDE_MAIL_FROM: ${AUTOXIDE_MAIL_FROM:-Autoxide <noreply@localhost>}
   volumes:

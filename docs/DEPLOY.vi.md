@@ -23,17 +23,21 @@ git clone <URL của repository> autoxide
 cd autoxide
 ```
 
-Tạo file `.env` cạnh `compose.yml` chứa hai secret. Không bao giờ commit file này.
+Tạo file `.env` cạnh `compose.yml` chứa ba secret. Không bao giờ commit file này.
 
 ```bash
-printf 'POSTGRES_PASSWORD=%s\nAUTOXIDE_AUTH_TOKEN_SECRET=%s\n' \
-  "$(openssl rand -hex 24)" "$(openssl rand -base64 48 | tr -d '\n')" > .env
+printf 'POSTGRES_PASSWORD=%s\nAUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+  "$(openssl rand -hex 24)" "$(openssl rand -base64 48 | tr -d '\n')" \
+  "$(openssl rand -base64 48 | tr -d '\n')" > .env
 chmod 600 .env
 ```
 
 - `POSTGRES_PASSWORD` bảo vệ database.
 - `AUTOXIDE_AUTH_TOKEN_SECRET` ký access token. Giữ nguyên giá trị: đổi nó thì mọi người
   bị đăng xuất.
+- `AUTOXIDE_SECRET_KEY` ký các token sống ngắn (biểu mẫu, chống spam) và làm khoá băm địa
+  chỉ IP của người lạ. Để ngoài database thì bản sao database (bản backup) không làm lộ các
+  địa chỉ đó.
 
 ### 2. Khởi động
 
@@ -180,7 +184,8 @@ Chỉ khôi phục bản backup do chính bạn tạo.
 ### 1. Build
 
 Cài Rust từ [rustup.rs](https://rustup.rs) (đúng phiên bản được chọn theo
-`rust-toolchain.toml`), rồi:
+`rust-toolchain.toml`) và một trình biên dịch C — SQLite và libwebp được biên dịch vào binary
+(trên Debian hay Ubuntu: `sudo apt install build-essential`) — rồi:
 
 ```bash
 cargo build --release --locked -p autoxide
@@ -191,7 +196,7 @@ sudo install -m 755 target/release/autoxide /usr/local/bin/autoxide
 
 ```bash
 sudo useradd --system --home-dir /var/lib/autoxide --create-home autoxide
-sudo -u autoxide sh -c 'cd /var/lib/autoxide && printf "AUTOXIDE_AUTH_TOKEN_SECRET=%s\n" "$(openssl rand -base64 48 | tr -d "\n")" > .env && chmod 600 .env'
+sudo -u autoxide sh -c 'cd /var/lib/autoxide && printf "AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n" "$(openssl rand -base64 48 | tr -d "\n")" "$(openssl rand -base64 48 | tr -d "\n")" > .env && chmod 600 .env'
 ```
 
 Autoxide đọc `.env` trong thư mục nó chạy và giữ mọi thứ nó ghi trong `data/` ở đó:
@@ -344,7 +349,8 @@ Chỉ một máy chủ, không có bộ cân bằng tải thì để khoảng r�
 
 ## Kiểm trước khi chạy thật
 
-- [ ] `AUTOXIDE_AUTH_TOKEN_SECRET` là một chuỗi ngẫu nhiên dài, giữ bí mật
+- [ ] `AUTOXIDE_AUTH_TOKEN_SECRET` và `AUTOXIDE_SECRET_KEY` là chuỗi ngẫu nhiên dài, giữ bí mật
+      (`autoxide doctor` cảnh báo khi thiếu)
 - [ ] Có TLS phía trước (reverse proxy), port 8080 không mở ra internet
 - [ ] `AUTOXIDE_HTTP_CLIENT_IP_HEADER` đặt theo header của proxy
 - [ ] Đã cấu hình SMTP, để đặt lại mật khẩu và xác minh email chạy được

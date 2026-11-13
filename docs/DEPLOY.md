@@ -23,17 +23,21 @@ git clone <repository URL> autoxide
 cd autoxide
 ```
 
-Create a file named `.env` next to `compose.yml` with two secrets. Never commit it.
+Create a file named `.env` next to `compose.yml` with three secrets. Never commit it.
 
 ```bash
-printf 'POSTGRES_PASSWORD=%s\nAUTOXIDE_AUTH_TOKEN_SECRET=%s\n' \
-  "$(openssl rand -hex 24)" "$(openssl rand -base64 48 | tr -d '\n')" > .env
+printf 'POSTGRES_PASSWORD=%s\nAUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+  "$(openssl rand -hex 24)" "$(openssl rand -base64 48 | tr -d '\n')" \
+  "$(openssl rand -base64 48 | tr -d '\n')" > .env
 chmod 600 .env
 ```
 
 - `POSTGRES_PASSWORD` protects the database.
 - `AUTOXIDE_AUTH_TOKEN_SECRET` signs access tokens. Keep it stable: changing it signs
   everyone out.
+- `AUTOXIDE_SECRET_KEY` signs short-lived tokens (forms, anti-spam) and keys the hashes of
+  visitors' IP addresses. Kept outside the database, a copy of the database (a backup)
+  does not reveal those addresses.
 
 ### 2. Start
 
@@ -181,7 +185,8 @@ Restore only backups you made yourself.
 ### 1. Build
 
 Install Rust from [rustup.rs](https://rustup.rs) (the right version is picked from
-`rust-toolchain.toml`), then:
+`rust-toolchain.toml`) and a C compiler — SQLite and libwebp are compiled into the binary
+(on Debian or Ubuntu: `sudo apt install build-essential`) — then:
 
 ```bash
 cargo build --release --locked -p autoxide
@@ -192,7 +197,7 @@ sudo install -m 755 target/release/autoxide /usr/local/bin/autoxide
 
 ```bash
 sudo useradd --system --home-dir /var/lib/autoxide --create-home autoxide
-sudo -u autoxide sh -c 'cd /var/lib/autoxide && printf "AUTOXIDE_AUTH_TOKEN_SECRET=%s\n" "$(openssl rand -base64 48 | tr -d "\n")" > .env && chmod 600 .env'
+sudo -u autoxide sh -c 'cd /var/lib/autoxide && printf "AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n" "$(openssl rand -base64 48 | tr -d "\n")" "$(openssl rand -base64 48 | tr -d "\n")" > .env && chmod 600 .env'
 ```
 
 Autoxide reads `.env` from the directory it runs in and keeps everything it writes in
@@ -348,7 +353,8 @@ send requests, and the drain would only delay the stop.
 
 ## Checklist before going live
 
-- [ ] `AUTOXIDE_AUTH_TOKEN_SECRET` set to a long random value, kept secret
+- [ ] `AUTOXIDE_AUTH_TOKEN_SECRET` and `AUTOXIDE_SECRET_KEY` set to long random values, kept
+      secret (`autoxide doctor` warns when one is missing)
 - [ ] TLS in front (reverse proxy), port 8080 not reachable from the internet
 - [ ] `AUTOXIDE_HTTP_CLIENT_IP_HEADER` set to your proxy's header
 - [ ] SMTP configured, so password reset and email verification work

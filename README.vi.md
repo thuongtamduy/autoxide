@@ -79,7 +79,8 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
 
 - [Rust](https://rustup.rs) — `rustup` tự cài đúng toolchain ghim trong
   `rust-toolchain.toml` ở lần đầu bạn chạy `cargo`
-- Một trình biên dịch C (SQLite được biên dịch từ mã nguồn và đóng gói kèm binary)
+- Một trình biên dịch C (SQLite và libwebp được biên dịch từ mã nguồn và đóng gói kèm binary;
+  trên Debian hay Ubuntu: `sudo apt install build-essential`)
 - Để chạy gate chất lượng đầy đủ: [Docker](https://docs.docker.com/get-docker/) và
   [`cargo-deny`](https://github.com/EmbarkStudios/cargo-deny)
   (`cargo install cargo-deny --locked`)
