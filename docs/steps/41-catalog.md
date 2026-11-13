@@ -491,3 +491,18 @@ Hạ tầng đã có trong kernel và `comments` (D-202); bước này chỉ kha
 - **Test:** `hoi_dap_san_pham_dong_va_an_khi_luu_tru`, `nguoi_quan_ly_san_pham_co_nhan_seller`,
   `nguoi_quan_ly_nhanh_khac_khong_co_nhan_seller`, `alt_san_pham_theo_ngon_ngu_lui_ve_media` — cả hai
   database.
+
+## Bổ sung theo D-204 (hàng đặt trước)
+
+- Biến thể thêm chế độ bán `sale_mode`: `in_stock` (mặc định) / `backorder` (thay cờ `allow_backorder`, giữ
+  cờ cũ đọc được cho tới khi `inventory` và `orders` chuyển hết) / `preorder`. Chuyển bằng migration mới:
+  `allow_backorder = true` → `backorder`.
+- `preorder` cần `preorder_available_on` (ngày dự kiến có hàng, theo múi giờ của nút) và có thể có
+  `preorder_limit` (tổng suất đặt trước, NULL = không giới hạn), `preorder_ends_at` (hết nhận đặt), lời
+  nhắn công khai theo ngôn ngữ. Kiểm: ngày có hàng phải sau hôm nay, `preorder_limit > 0`; sai thì gom lỗi
+  một lần (D-083), mã `catalog.preorder_date_invalid`, `catalog.preorder_limit_invalid`.
+- `VariantSnapshot` thêm `sale_mode`, `preorder_available_on`; đọc công khai trả nhãn trạng thái
+  `preorder` kèm ngày để giao diện hiện "Đặt trước — dự kiến giao từ …"; JSON-LD dùng
+  `availability = PreOrder`, `availabilityStarts`.
+- Event `catalog.preorder_date_changed` (trước / sau) để `orders` báo người mua khi ngày dời.
+- Test: `chuyen_allow_backorder_sang_sale_mode`, `dat_truoc_phai_co_ngay_sau_hom_nay`.

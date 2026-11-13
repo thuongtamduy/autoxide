@@ -436,6 +436,7 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 | 50 Công khai repo | chủ dự án nói đã công khai repo (D-199) | mọi bước |
 | 51 Hợp đồng cho giao diện (D-200) | nhúng bản ghi: sau 33; hộp việc, tìm, số liệu, hoạt động: sau 34; menu: sau 35 | 36–49 — nên làm trước 41 để module thương mại khai luôn phần của mình |
 | 52 Trải nghiệm quản trị nâng cao (D-201) | 51 | 41–49 |
+| 53 Hỗ trợ khách hàng (D-204) | 37 (thông báo, vụ việc khiếu nại) | 41–49 |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
@@ -966,6 +967,9 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
 - [ ] Tình trạng hàng công khai theo cửa hàng (D-200): endpoint công khai trả mức `in_stock` / `low`
       (kèm số khi dưới ngưỡng, ngưỡng là cấu hình) / `out` cho biến thể × cửa hàng, không lộ số tồn lớn;
       `catalog` lọc "chỉ hàng có sẵn ở cửa hàng X" qua `api` của `inventory`; có ETag, cache ngắn
+- [ ] Hàng đặt trước (D-204): biến thể có chế độ bán `preorder` với ngày dự kiến có hàng và giới hạn số
+      suất (bước 41 khai); giữ suất không vượt giới hạn khi nhiều người đặt cùng lúc; hàng về thì chia cho
+      đơn đặt trước theo thứ tự đặt
 
 ## 43. Khuyến mại (`promotions`)
 
@@ -1050,6 +1054,9 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       (tiền hoàn, cách gửi trả và phí, thời gian hoàn, hạn — không ghi); thao tác bằng token xem đơn vãng
       lai (huỷ, đổi địa chỉ có OTP lần hai, mở hỗ trợ) qua cùng service, giới hạn tra / gửi lại OTP / hạn
       token là cấu hình, che số điện thoại và địa chỉ tới cấp phường
+- [ ] Hàng đặt trước trong đơn (D-204): tách lần giao hàng sẵn và hàng đặt trước, người mua đồng ý điều
+      kiện và thấy ngày giao dự kiến trước khi đặt, dời ngày thì báo và cho huỷ miễn phí, ngừng bán đặt
+      trước thì huỷ và hoàn tiền tự động; nút "mở hỗ trợ" của đơn tạo phiếu ở `support` (bước 53)
 - [ ] Nút "Đánh giá này hữu ích" (D-203): mỗi người một phiếu, rút lại được, đếm cùng transaction,
       `sort=helpful` phân trang bằng con trỏ; không tự bỏ phiếu cho mình, người bán không bỏ phiếu cho sản
       phẩm của mình; không có nút "không hữu ích"
@@ -1103,6 +1110,9 @@ Facebook / Zalo; một kho, một danh sách sản phẩm, đơn từ mọi nơi
       để dành cho từng kênh, không bán quá khi nhiều kênh cùng bán
 - [ ] Đơn từ kênh khác vào `orders` với kênh nguồn, trừ kho chung, không trùng khi kênh gửi lại;
       báo cáo theo kênh; đối soát tiền sàn trả với sổ cái
+- [ ] Nguồn cấp sản phẩm cho Google Merchant Center và danh mục của Meta (D-204): tệp XML / CSV dựng bằng
+      job theo cửa hàng, ngôn ngữ, tiền tệ; link công khai có token; báo lỗi từng sản phẩm (thiếu GTIN,
+      ảnh); không lộ số tồn hay giá vốn
 
 ## 49. Tiếp thị liên kết và bán qua livestream (`affiliate`)
 
@@ -1208,6 +1218,29 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
       số; lọc theo `actor_kind` và theo key; dòng của lệnh nhận `202 approval_required` giữ `approval_id`
 - [ ] Sức khoẻ người bán và sức khoẻ tuân thủ: chỉ số so với ngưỡng (ngưỡng là dữ liệu có ngày hiệu lực),
       vi phạm, hạn phải xử lý; huy hiệu người bán tin cậy tính từ số liệu thật, công bố tiêu chí
+
+## 53. Hỗ trợ khách hàng (`support`) (chủ dự án giao ngày 13/11/2026, D-204)
+
+Đặc tả: [`docs/steps/53-support.md`](steps/53-support.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 37; song song được với 41–49. Phiếu hỗ trợ, không phải chat thời gian thực (vẫn để sau,
+D-194). Khiếu nại có hạn luật định vẫn ở `compliance` (bước 37), tranh chấp ở `marketplace` (bước 46):
+`support` chuyển phiếu sang đó, không làm lại.
+
+- [ ] Phiếu và tin nhắn: tạo từ website (có tài khoản; vãng lai qua OTP email / số điện thoại; từ token
+      xem đơn của bước 45), nhân viên ghi hộ; trạng thái qua một máy trạng thái; tin nhắn chỉ thêm, ghi
+      chú nội bộ có nhắc tên, đính kèm qua `media`; người mua vãng lai xem bằng token phiếu, gộp phiếu vào
+      tài khoản sau khi đăng ký
+- [ ] Phạm vi theo nút tổ chức (bước 34): nhân viên thấy phiếu của nút mình và nhánh dưới; người bán trên
+      sàn chỉ thấy phiếu gian hàng mình; nhóm nhân viên, quy tắc tự phân công là dữ liệu, chia vòng
+- [ ] Hạn trả lời (SLA) theo ưu tiên, tính theo giờ làm việc và ngày nghỉ của nút, dừng khi chờ người
+      mua; job đánh dấu quá hạn; nguồn việc cho hộp việc (bước 51); báo cáo thời gian phản hồi, tỉ lệ quá
+      hạn, mức hài lòng
+- [ ] Gắn phiếu với đơn, sản phẩm qua sổ đối tượng (D-123); câu trả lời mẫu có biến; chuyển phiếu thành
+      khiếu nại người tiêu dùng của `compliance` (gọi lại không tạo hai vụ việc) hay lên sàn
+- [ ] Tool MCP (cùng permission như REST); gợi ý trả lời bằng AI chỉ là bản nháp (D-109); email trả lời
+      vào lại phiếu qua trait `InboundMail` (tắt mặc định); hướng dẫn `docs/SUPPORT.md` (EN + VI); test
+      trên cả hai database
 
 ## Sau core (chưa mở)
 

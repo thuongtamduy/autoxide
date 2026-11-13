@@ -4953,3 +4953,34 @@ xem sắp xếp có thuộc phạm vi không).
 Đã cân nhắc: cho khách vãng lai bỏ phiếu theo IP băm — dễ dồn phiếu, mất ý nghĩa; nút "không hữu ích" như
 một số sàn — dễ bị dùng để hạ đánh giá xấu; tính "hữu ích" bằng đếm `COUNT(*)` lúc đọc — chậm trên sản phẩm
 nhiều đánh giá, không dùng được cho con trỏ.
+
+## D-204 · Thêm module `support` (bước 53), hàng đặt trước, nguồn cấp sản phẩm cho Google / Meta — 2026-11-13 — chủ dự án quyết
+
+Quyết định: chủ dự án đồng ý cả ba chỗ còn hở của phần thương mại mà agent rà ra:
+
+1. **Module `support` — hỗ trợ khách hàng, bước 53 mới** (đặc tả `docs/steps/53-support.md`): phiếu hỗ
+   trợ và tin nhắn, người mua có tài khoản hay vãng lai (OTP), phạm vi theo nút tổ chức, hạn trả lời theo
+   giờ làm việc, phân công, câu trả lời mẫu, tool MCP, gợi ý AI chỉ là bản nháp. Bắt đầu sau bước 37, song
+   song với 41–49. `CLAUDE.md` thêm `support` vào danh sách module được dựng. Ranh giới: khiếu nại có hạn
+   luật định vẫn là vụ việc `consumer_complaint` của `compliance` (bước 37), tranh chấp vẫn ở `marketplace`
+   (bước 46), trả hàng vẫn ở `orders` — `support` chỉ chuyển sang, không làm lại. Nút "mở hỗ trợ" của đơn
+   (D-202) gọi `SupportIntake` thay cho event `orders.support_requested`. Thứ tự đăng ký: `support` cùng
+   nhóm với `newsletter`, `comments` (sau `notifications`, trước `plans`).
+2. **Hàng đặt trước** (mục mới ở bước 42 và 45, bổ sung đặc tả 41, 42, 45): biến thể có `sale_mode =
+   preorder` (thay cờ `allow_backorder` bằng `sale_mode` gồm `in_stock` / `backorder` / `preorder`), ngày dự
+   kiến có hàng, giới hạn suất giữ bằng `UPDATE` có điều kiện; hàng về chia theo thứ tự đặt; người mua thấy
+   ngày giao và đồng ý điều kiện trước khi đặt; dời ngày thì được huỷ miễn phí. Thanh toán: trả hết lúc đặt
+   hay khi hàng về; **chưa làm tiền cọc một phần** (cần nghĩa vụ cọc trong sổ cái).
+3. **Nguồn cấp sản phẩm cho Google Merchant Center và danh mục của Meta** (mục mới ở bước 48, bổ sung đặc
+   tả 48): tệp XML / CSV dựng bằng job theo cửa hàng, ngôn ngữ, tiền tệ, phục vụ bằng link có token, báo
+   lỗi từng sản phẩm; nằm trong `channels` vì cùng việc "đưa sản phẩm ra kênh bán", không cần module mới.
+
+Lý do: Luật 19/2023 buộc có kênh tiếp nhận và giải quyết khiếu nại, đặc tả 45 đã có nút "mở hỗ trợ",
+nhưng chưa module nào giữ yêu cầu hỗ trợ thường ngày (ai nhận, trạng thái, hạn); dồn vào `compliance` thì
+lẫn việc vận hành hằng ngày với hồ sơ pháp lý. Hàng đặt trước và nguồn cấp sản phẩm là việc hằng ngày của
+cửa hàng ở Việt Nam (ra mắt sản phẩm, chạy quảng cáo Google / Facebook) mà lộ trình chưa có.
+
+Đã cân nhắc: chat thời gian thực thay cho phiếu — vẫn để sau (D-194), phiếu đủ cho kênh luật định và làm
+nền cho chat về sau; dùng `comments` làm phiếu — phiếu là riêng tư, có phân công và hạn, khác bình luận
+công khai; module `feeds` riêng — trùng việc với `channels`; tiền cọc đặt trước ngay bây giờ — cần thiết
+kế nghĩa vụ trong sổ cái, để khi làm bước 45 hay sau.

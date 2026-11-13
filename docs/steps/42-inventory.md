@@ -404,3 +404,18 @@ bước như `newsletter`, đồng ý riêng cho mục đích "thông báo có h
 `inventory.level_changed` từ 0 lên trên 0 ở đúng cửa hàng (hay bất kỳ kho bán online khi bỏ
 `store_id`), gửi một lần qua `notifications`, rồi đánh dấu đã gửi. Bảng `inventory_restock_alerts` cấp
 khách hàng. Test: một đợt có hàng chỉ gửi một lần dù event đến lại.
+
+## Bổ sung theo D-204 (hàng đặt trước)
+
+- Biến thể `preorder` (bước 41): giữ chỗ được dù `available` âm, dòng giữ đánh dấu `preordered = true`
+  (bên cạnh `backordered`). Tổng suất đặt trước đang giữ hay đã xác nhận không được vượt `preorder_limit`:
+  bảng `inventory_preorder_counters` (`tenant_id`, `variant_id`, `reserved`, `limit` chép từ catalog,
+  `updated_at`; pk (`tenant_id`, `variant_id`)), tăng bằng `UPDATE … SET reserved = reserved + q WHERE
+  reserved + q <= limit` (không đọc rồi ghi) — 0 dòng thì `inventory.preorder_sold_out` (409). Trả chỗ khi
+  huỷ / hết hạn thì trừ lại.
+- Hàng về (nhập kho, chuyển kho tới): job `inventory.allocate_preorders` chia tồn mới cho các dòng đặt
+  trước **theo thứ tự đặt** (id UUIDv7), phát `inventory.preorder_allocated` từng dòng để `orders` chuyển
+  đơn sang chuẩn bị hàng. Nhận lại event nhập kho không chia hai lần (khoá theo id biến động kho).
+- Đặt trước không làm `available` công khai thành "còn hàng": mức công khai là `preorder`.
+- Test (cả hai database): `dat_truoc_khong_vuot_gioi_han_khi_dong_thoi` (100 người, giới hạn 10),
+  `hang_ve_chia_theo_thu_tu_dat`, `huy_dat_truoc_tra_lai_suat`.

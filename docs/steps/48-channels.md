@@ -333,3 +333,36 @@ lệnh nhận được, tiêm lỗi `RateLimited` / `Unauthorized`, phát webhoo
   người bán tự quyết nhập thêm hàng hay huỷ).
 - Kéo đơn hay chỉ webhook khi kênh có cả hai: khuyến nghị cả hai (webhook nhanh, kéo đơn để không sót).
 - Giá trị mặc định của debounce, chu kỳ đối chiếu — đo với bộ nối giả có độ trễ rồi chốt; ghi quyết định.
+
+## Bổ sung theo D-204 (nguồn cấp sản phẩm cho Google, Meta)
+
+Quảng cáo mua sắm của Google (Merchant Center) và danh mục sản phẩm của Meta (Facebook / Instagram) đọc
+**nguồn cấp sản phẩm** (product feed) — một tệp do website công bố, họ tải định kỳ. Khác bộ nối sàn: không
+nhận đơn, không cần tài khoản API, chỉ công bố dữ liệu công khai.
+
+- **Bảng.** `channels_feeds`: `id`, `tenant_id`, `org_id` (cửa hàng), `format` (`google_merchant_xml` /
+  `meta_csv`), `locale`, `currency`, `filter` JSON (danh mục, nhãn, loại trừ sản phẩm), `token_hash`,
+  `media_id` NULL (tệp đã dựng, lưu qua `media` riêng tư hay `files`), `item_count`, `error_count`,
+  `built_at` NULL, `created_at`, `updated_at`; index (`tenant_id`, `org_id`). `channels_feed_issues`:
+  `tenant_id`, `feed_id`, `variant_id`, `code`, `field` (lỗi từng sản phẩm, vd thiếu GTIN, thiếu ảnh) — xoá
+  và ghi lại mỗi lần dựng.
+- **Dựng tệp bằng job** `channels.build_feed` (lịch theo cấu hình của nguồn, mặc định mỗi 6 giờ, và khi
+  có event giá / tồn / trạng thái sản phẩm thì gom lại dựng một lần sau 15 phút): đọc qua `api` của
+  `catalog` (tên, mô tả, ảnh, GTIN, thương hiệu, biến thể, đường dẫn — dữ liệu JSON-LD của D-201),
+  `inventory` (mức công khai `in_stock` / `out` / `preorder` — không lộ số tồn), `promotions` (giá khuyến
+  mại không cần mã và hạn của nó). Ghi theo lô, không giữ cả danh mục trong bộ nhớ. Chỉ sản phẩm
+  `active`, công khai ở cửa hàng đó.
+- **Phục vụ.** `GET /api/v1/channels/public/feeds/{id}.{xml|csv}?token=` (công khai, token dài, đổi được;
+  `ETag`, `Last-Modified`, `Cache-Control`). Không có dữ liệu cá nhân hay giá vốn trong tệp.
+- **Quản trị.** `GET/POST/PATCH/DELETE /feeds`, `POST /feeds/{id}/rotate-token`, `POST /feeds/{id}/build`,
+  `GET /feeds/{id}/issues` (`channels.feeds.manage`). Tool MCP `list_feed_issues` (`read_only`),
+  `build_feed`.
+- **Đúng chuẩn.** Trường bắt buộc theo đặc tả của Google Merchant Center và Meta Commerce tại thời điểm làm
+  (tra tài liệu chính thức, ghi phiên bản trong DECISIONS); giá kèm mã tiền tệ, tiền là số nguyên đơn vị
+  nhỏ nhất đổi sang chuỗi đúng định dạng; giá gạch là giá ngay trước khuyến mại (Luật Giá, D-201 — cần
+  đối chiếu).
+- **Mã lỗi:** `channels.feed_not_found` (404 — cả khi token sai, không lộ có nguồn hay không),
+  `channels.feed_format_unknown` (422), `channels.feed_building` (409 — đang dựng, thử lại sau).
+- **Test** (cả hai database): `feed_chi_co_san_pham_cong_khai_cua_cua_hang`,
+  `feed_khong_lo_so_ton_va_gia_von`, `feed_token_sai_tra_404`, `feed_bao_loi_tung_san_pham_thieu_gtin`,
+  `feed_gia_khuyen_mai_kem_han`, `feed_dung_dinh_dang_xml_google` (so với tệp mẫu).
