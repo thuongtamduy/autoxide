@@ -149,17 +149,8 @@ Phiên bản thư viện ở đây **mới hơn kiến thức có sẵn của mo
 
 ## Gate — định nghĩa "xong"
 
-Một bước chỉ xong khi `./gate.sh` xanh. Gate gồm, theo thứ tự:
-
-```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo xtask check                                    # ranh giới workspace, license, lint
-cargo deny check                                     # license, lỗ hổng, nguồn thư viện
-gitleaks git .                                       # secret: cả lịch sử và thay đổi chưa commit
-cargo test --workspace                               # SQLite
-TEST_DATABASE_URL=postgres://… cargo test --workspace  # Postgres (gate tự dựng bằng Docker)
-```
+Một bước chỉ xong khi `./gate.sh` xanh — các bước (theo thứ tự) và biến môi trường ghi ở đầu
+file đó; chạy riêng một bước thì chép đúng lệnh trong script.
 
 Trong các test đó có ba bài giữ tài liệu khớp code: `.env.example` (cấu hình),
 `docs/openapi.json` (hợp đồng API, kèm kiểm mỗi endpoint đủ mô tả) và luật sở hữu
