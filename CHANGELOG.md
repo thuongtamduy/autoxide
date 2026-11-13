@@ -9,6 +9,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-13
+
 ### Added
 
 - `autoxide doctor [--json]`: checks the configuration, the database, the migrations, the
@@ -434,7 +436,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/thuongtamduy/autoxide/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/thuongtamduy/autoxide/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/thuongtamduy/autoxide/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/thuongtamduy/autoxide/compare/v0.4.0...v0.5.0
