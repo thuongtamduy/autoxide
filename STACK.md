@@ -28,7 +28,7 @@ gắn với một công ty hay một ngành. Module nghiệp vụ chủ dự án
 | API          | REST dưới `/api/v1` + OpenAPI; MCP endpoint cho AI agent. GraphQL thêm sau |
 | Database     | SQLite và Postgres, đổi bằng `DATABASE_URL`. Không cam kết MySQL     |
 | ID           | UUIDv7 cho mọi bảng, sinh ở phía ứng dụng                            |
-| Multi-tenant | Không có. Nhiều khách = mỗi khách một bản cài riêng                  |
+| Multi-tenant | Có (D-185): mặt điều khiển + `tenant_id`; dữ liệu chung hay riêng theo khách |
 | Deploy       | Docker trên VPS                                                      |
 | License      | MIT hoặc Apache-2.0, người dùng chọn (`LICENSE-MIT`, `LICENSE-APACHE`) |
 
@@ -158,7 +158,6 @@ repo này; giao diện là dự án riêng dùng API.
 | Microservice   | Tách sau khi có lý do cụ thể (tải khác biệt, nhiều đội)                 |
 | MySQL          | SeaORM vẫn chạy được, nhưng không test và không cam kết                 |
 | MongoDB        | Ngoài phạm vi: không ORM SQL nào phủ được                               |
-| Multi-tenant   | Ngoài phạm vi core                                                      |
 
 ## Công cụ
 
