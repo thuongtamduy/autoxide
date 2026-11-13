@@ -4558,6 +4558,81 @@ khuyến mại, phí sàn theo ngành hàng, người bán nước ngoài — đ
 
 Thay: phần "mã hoá dữ liệu nhạy cảm vào 37" của D-189.
 
+## D-191 · Module thương mại: sáu module, bước 41–46 — 2026-11-13 — chủ dự án giao, agent quyết cách làm
+
+Quyết định: chủ dự án giao dựng module thương mại. Sáu module, mỗi module một crate: `catalog` (41),
+`inventory` (42), `promotions` (43), `shipping` (44), `orders` gồm giỏ hàng và đặt hàng (45),
+`marketplace` (46). Thiết kế ở mục 8 của `docs/research/business-foundation.md`. Nhất quán giữa
+module bằng giữ chỗ có hạn theo mã tham chiếu → xác nhận → trả lại, không có transaction xuyên
+module. `shipping` không phụ thuộc `orders` (nhận và báo qua event). Bộ nối đối tác cụ thể là module
+riêng sau trait của core, làm khi chủ dự án cấp tài khoản thử. Hạn mức khuyến mại, danh mục hàng có
+điều kiện, đơn vị hành chính là dữ liệu có ngày hiệu lực.
+
+Lý do: tách theo nghiệp vụ để khách chỉ bật module cần (bước 35) — website bán hàng không cần
+`marketplace`, cửa hàng chỉ bán tại quầy không cần `shipping`. Giữ chỗ thay transaction chung vì luật
+kiến trúc 1 (module sở hữu bảng của mình) và vì chạy đúng cả khi module nằm ở database khác. Luật
+khuyến mại vừa đổi (Thông tư 39/2025, NĐ 239/2026) và địa chỉ hành chính vừa đổi (hai cấp từ
+01/7/2025) cho thấy những thứ này phải là dữ liệu.
+
+Đã cân nhắc: một module `commerce` lớn — không bật / tắt riêng được, file và bảng quá nhiều cho một
+crate; giỏ hàng là module riêng — gắn chặt với đặt hàng, tách ra chỉ thêm hợp đồng; viết sẵn bộ nối
+VNPay, GHN… trong core — cần secret thật, và core phải trung lập với đối tác.
+
+Thay: mục "Module thương mại" trong phần "Sau core" của lộ trình (D-185).
+
+## D-192 · Rà bước 30–40: thứ tự, phụ thuộc, đường nâng cấp — 2026-11-13 — agent quyết
+
+Quyết định: lộ trình có bảng thứ tự và phụ thuộc ngay trước bước 30. Bước 33 bắt đầu sau bước 31 (gate
+chặn thay đổi phá vỡ và test nâng cấp giữ an toàn khi mọi bảng đổi) và nhóm A của bước 32; ở chế độ
+`single`, `/api/v1` không đổi và migration gán dữ liệu có sẵn cho khách mặc định; bước 34 chuyển tài
+khoản có sẵn thành nhân sự của khách mặc định. Bước 35: mục tính tiền chờ bước 36, mục cấp phát chờ
+bước 37. Bước 40: header bảo mật và MCP làm được ngay; bốn mục còn lại sau bước 34. Bước 32 làm được
+ngay (bước 29 đã merge); dời file `media` sau khi WebP của bước 30 merge.
+
+Lý do: chủ dự án hỏi lộ trình đã đúng thứ tự để phát triển chưa (13/11/2026, khi teammate mới làm
+bước 30). Rà thấy: trạng thái ghi sai ("đang làm 30–32"); bước 33 thiếu đường nâng cấp cho bản cài
+cũ; hai mục của 35 phụ thuộc 36 / 37 mà không ghi; bước 40 bị chặn cả bước dù hai mục không cần nền
+đa khách — teammate thứ ba có việc làm ngay.
+
+## D-193 · Đơn vị hành chính Việt Nam là phần nền: module `address`, chỉ danh mục sau sáp nhập — 2026-11-13 — chủ dự án quyết
+
+Quyết định: nền có module `address` (bước 34) giữ danh mục đơn vị hành chính Việt Nam **sau sáp
+nhập** — hai cấp tỉnh / thành → xã / phường / đặc khu, 34 tỉnh và 3.321 xã theo QĐ 19/2025/QĐ-TTg,
+hiệu lực 01/7/2025. Chủ dự án yêu cầu chỉ lấy danh mục sau gộp: không có cấp huyện, không bảng đối
+chiếu địa chỉ cũ → mới. Dữ liệu dùng chung mọi khách, lấy từ nguồn chính thức (ghi nguồn và ngày),
+có ngày hiệu lực, cập nhật bằng task. `api` công bố kiểu `Address` và trait tra cứu / kiểm; mọi module
+cần địa chỉ (tổ chức, KYC, hồ sơ pháp lý, người mua, kho, vận chuyển) dùng nó, không tự làm bảng địa chỉ.
+
+Lý do: nhiều phần của nền cần địa chỉ chuẩn trước khi có module thương mại (KYC và hồ sơ đăng ký Bộ
+Công Thương ở bước 37, cửa hàng và kho là nút tổ chức ở bước 34); để trong `shipping` (bước 44) thì
+các phần đó phải chờ hoặc tự làm lại. Danh mục nhà nước là văn bản hành chính, không thuộc đối tượng
+bảo hộ quyền tác giả (Luật Sở hữu trí tuệ, Điều 15 — cần đối chiếu), dùng được trong repo công khai.
+
+Đã cân nhắc: đặt trong `kernel` — dữ liệu riêng của một nước, core phải dùng được cho mọi nước; gọi
+API bên ngoài để tra — phải chạy khi không có mạng và không phụ thuộc dịch vụ của người khác.
+
+Thay: mục địa chỉ của bước 44 trong D-191 (bỏ bảng đối chiếu địa chỉ cũ).
+
+## D-194 · Đối chiếu với nền tảng thương mại điện tử đang chạy: thêm thông báo, VietQR, khách hàng, đa kênh, tiếp thị liên kết — 2026-11-13 — agent quyết
+
+Quyết định: thêm module nền `notifications` (bước 37; thay mục "module thông báo chờ chủ dự án quyết",
+chủ dự án đã giao AI quyết ở D-185); thêm vào bước 36 chuyển khoản VietQR tự khớp (trait `BankFeed`),
+tỉ giá có ngày hiệu lực, mẫu in chứng từ, xuất dữ liệu kế toán; vào 41 hàng số / dịch vụ / combo; vào
+42 nhập hàng từ nhà cung cấp; vào 45 chống bom hàng COD, trả góp, bảo hành; vào 46 báo cáo cho cơ quan
+thuế và kho của sàn. Thêm ba module, ba bước: `customers` (47), `channels` (48), `affiliate` (49).
+Thẻ quà tặng và số dư cửa hàng tắt mặc định, chỉ dùng mua hàng của chính khách, không rút ra tiền,
+tới khi đối chiếu NĐ 52/2024 về ví điện tử và thẻ trả trước. Để sau: B2B, đặt lịch, chat, thuê bao định
+kỳ, bán xuyên biên giới, quảng cáo trong sàn — ghi ở "Sau core".
+
+Lý do: chủ dự án hỏi còn thiếu gì so với mô hình thương mại điện tử. Mỗi mục là thứ người bán ở Việt
+Nam đang dùng hằng ngày, hay là nghĩa vụ luật: tin quảng cáo phải có đồng ý trước (NĐ 91/2020);
+người tiếp thị liên kết bị khấu trừ thuế khi nhận hoa hồng (ngưỡng và tỉ lệ đang thay đổi theo NĐ
+253/2026 — để dạng dữ liệu, cần đối chiếu). Thông báo là nền vì đơn hàng, KYC, thuê bao, bảo mật đều
+cần báo người dùng.
+
+Đã cân nhắc: gộp điểm thưởng vào `promotions` — điểm là nghĩa vụ kéo dài, khác chương trình giảm giá
+có hạn; gộp đa kênh vào `orders` — bộ nối từng sàn là phần lớn nhất, cần bật / tắt riêng theo gói.
+
 ## D-195 · Khoảng rút trước khi tắt: `AUTOXIDE_HTTP_DRAIN_SECONDS`, mặc định 0 — 2026-11-13 — agent quyết
 
 Quyết định: nhận tín hiệu dừng thì `serve` bật cờ `http::Draining` (`/health/ready` trả 503

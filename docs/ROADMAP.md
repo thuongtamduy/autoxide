@@ -3,7 +3,8 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–29 xong**; đang làm 30–32 (bước 30: phần trong repo xong, chờ chủ dự án công khai repo rồi kiểm lần chạy đầu của workflow), nền đa khách 33–38 (D-185…D-189); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–29 xong**; bước 30 đang làm (phần trong repo xong, chờ chủ dự án công khai repo rồi kiểm lần chạy đầu của workflow); 31 trở đi chưa bắt đầu — thứ tự và phụ thuộc ở
+bảng ngay trước bước 30 (D-192); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -401,6 +402,26 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 - Module sổ cái kép (`ledger`: mỗi giao dịch có bút toán nợ và có cân nhau, chỉ thêm, số dư suy ra
   từ bút toán): module nghiệp vụ mới, `CLAUDE.md` chỉ cho dựng module chủ dự án đã giao.
 
+## Thứ tự và phụ thuộc từ bước 30 (D-192)
+
+| Bước | Bắt đầu khi | Song song được với |
+|---|---|---|
+| 30 Ra mắt công khai | ngay (đang làm) | 31, 32 |
+| 31 Hợp đồng API, chống hồi quy | ngay | 30, 32 |
+| 32 Dọn bố cục | ngay; `media` của nhóm A làm sau khi WebP (30) merge | 30, 31 |
+| 33 Khách hàng, vị trí dữ liệu | 31 và nhóm A của 32 xong (31 giữ API và bản nâng cấp không vỡ khi mọi bảng đổi) | hai mục độc lập của 40 |
+| 34 Tổ chức, quyền, danh tính | 33 | — |
+| 35 Gói, thuê bao · 36 Tiền, thuế · 37 Tuân thủ | 34 | nhau; hai mục cuối của 35 chờ 36 và 37 |
+| 38 Xuyên database, báo cáo gộp | 34 và 36 | 39, 40, 41–45 |
+| 39 Vận hành, hiệu năng | 38 | 40, 41–46 |
+| 40 Năng lực còn thiếu | header bảo mật và MCP: ngay; còn lại: 34 | 35–39 |
+| 41 Sản phẩm | 35 và 36 | 37–40 |
+| 42 Kho · 43 Khuyến mại · 44 Vận chuyển | 41 | nhau |
+| 45 Giỏ hàng, đặt hàng, đơn hàng | 42, 43, 44 và 37 (thông báo) | — |
+| 46 Sàn · 47 Khách hàng · 48 Đa kênh · 49 Tiếp thị liên kết | 45 (46 và 49 cần thêm 37) | nhau |
+
+Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
+
 ## 30. Ra mắt công khai (chủ dự án giao ngày 13/11/2026, D-175, D-176)
 
 Đưa Autoxide tới tay người lạ: repo công khai, CI và phát hành tự động, image Docker có chứng
@@ -513,7 +534,8 @@ Nhóm B — chống hồi quy:
 
 ## 32. Dọn bố cục và việc để lại (agent đề xuất ngày 13/11/2026)
 
-Bắt đầu SAU khi bước 29 đã merge vào `main` (đụng cùng module). Làm nhóm A trước: nhóm B sửa đúng
+Bước 29 đã merge — làm được ngay; riêng dời file của `media` làm sau khi WebP (bước 30) merge vì
+cùng sửa module đó. Làm nhóm A trước: nhóm B sửa đúng
 các module nhóm A dời file. Mỗi mục có test trên cả hai database và dòng CHANGELOG.
 
 Nhóm A — bố cục:
@@ -542,8 +564,10 @@ Chờ chủ dự án quyết: định dạng AVIF cho ảnh thu nhỏ (cần th�
 
 ## 33. Nền đa khách: khách hàng, vị trí dữ liệu, mặt điều khiển (D-185)
 
-Thiết kế: `docs/research/business-foundation.md`, trụ 1. Bắt đầu SAU nhóm A của bước 32 (dời bố
-cục module). Mọi mục chạy và có test trên cả SQLite và Postgres, ở cả chế độ `single` và nhiều khách.
+Thiết kế: `docs/research/business-foundation.md`, trụ 1. Bắt đầu SAU bước 31 và nhóm A của bước 32.
+Mọi mục chạy và có test trên cả SQLite và Postgres, ở cả chế độ `single` và nhiều khách. Ở chế độ
+`single`, `/api/v1` không đổi (gate chặn thay đổi phá vỡ của bước 31 kiểm) và bản cài cũ nâng cấp
+được: migration gán mọi dữ liệu có sẵn cho khách mặc định, test nâng cấp của bước 31 phải xanh.
 
 - [ ] Mặt điều khiển: sổ khách hàng (trạng thái, khách cha), vị trí dữ liệu (`shared` /
       `dedicated`, database nào), tên miền → khách / nút; chế độ `single` mặc định (một khách,
@@ -596,7 +620,17 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 - [ ] Cài đặt kế thừa theo cây (múi giờ, tiền tệ, ngôn ngữ, hồ sơ thuế, chính sách) và khuôn mẫu
       để module áp cùng cách cho dữ liệu của mình (vd giá: chuỗi đặt, cửa hàng ghi đè)
 - [ ] Danh tính hai lớp: nhân sự là tài khoản toàn nền tảng (mặt điều khiển), một người làm cho
-      nhiều khách / nút; người mua là tài khoản theo từng khách; API key gắn với khách và nút
+      nhiều khách / nút; người mua là tài khoản theo từng khách; API key gắn với khách và nút.
+      Nâng cấp: tài khoản, role và API key có sẵn thành nhân sự của khách mặc định, giữ quyền cũ
+- [ ] Địa chỉ và đơn vị hành chính Việt Nam (module nền `address`, D-193): chỉ danh mục sau sáp nhập
+      — hai cấp tỉnh / thành → xã / phường / đặc khu, 34 tỉnh và 3.321 xã theo QĐ 19/2025/QĐ-TTg,
+      hiệu lực 01/7/2025; không có cấp huyện, không đối chiếu địa chỉ cũ. Dữ liệu dùng chung mọi
+      khách (mặt điều khiển), lấy từ nguồn chính thức, ghi nguồn và ngày; mỗi đơn vị có mã, tên, loại,
+      mã cấp trên, ngày hiệu lực từ / tới; cập nhật bằng task khi nhà nước đổi (không sửa code).
+      Kiểu `Address` trong `api` (quốc gia, mã tỉnh, mã xã, dòng địa chỉ, kèm tên tại thời điểm ghi);
+      kiểm mã xã thuộc đúng tỉnh; endpoint công khai danh sách tỉnh, xã theo tỉnh, tìm theo tên (không
+      dấu cũng tìm được), có ETag / cache. Nút tổ chức (cửa hàng, kho, người bán), hồ sơ KYC và hồ sơ
+      pháp lý (bước 37), sổ địa chỉ người mua (bước 44) đều dùng kiểu này
 - [ ] Uỷ quyền theo cây khách hàng: role ở khách cha có hiệu lực ở các khách con khi được cấp; vào
       ngữ cảnh khách con bằng cùng API; audit ghi ở cả hai phía
 - [ ] Đăng nhập bằng link qua email (không cần mật khẩu): token dùng một lần, hết hạn ngắn, gắn
@@ -611,7 +645,8 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 
 ## 35. Gói, quyền dùng tính năng, hạn mức, thuê bao (D-185)
 
-Thiết kế: trụ 3. Bắt đầu SAU bước 34. Giá, kỳ thanh toán, hạn mức là dữ liệu, không phải code.
+Thiết kế: trụ 3. Bắt đầu SAU bước 34; mục tính tiền chờ `PaymentGateway` của bước 36, mục cấp phát
+chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh toán, hạn mức là dữ liệu, không phải code.
 
 - [ ] Module khai tính năng (`Module::features`) và hạn mức (`Module::limits`), mặc định rỗng
       (D-038); gói = tập module + tính năng + hạn mức + giá theo kỳ; dùng thử, gói thêm, ghi đè
@@ -656,6 +691,16 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
 - [ ] Hoá đơn khởi tạo từ máy tính tiền (D-190): `EInvoiceProvider` hỗ trợ cả loại này cho bán lẻ
       tại quầy (NĐ 123/2020 sửa bởi NĐ 70/2025: hộ kinh doanh doanh thu từ 1 tỷ đồng / năm từ
       01/6/2025; ngưỡng theo lộ trình — để dạng dữ liệu, cần đối chiếu văn bản mới nhất)
+- [ ] Chuyển khoản VietQR tự khớp (D-194): sinh mã QR theo chuẩn VietQR với nội dung mang mã tham
+      chiếu, nhận biến động số dư qua trait `BankFeed` (ngân hàng hay dịch vụ đọc sao kê), khớp tự
+      động theo mã và số tiền, sai lệch vào hàng chờ xử lý tay; tiền vào thẳng tài khoản của người
+      bán / khách (chế độ tự thu, D-187)
+- [ ] Tỉ giá có ngày hiệu lực theo cặp tiền (nhập tay hay lấy từ nguồn qua trait); chứng từ ngoại tệ
+      lưu ảnh chụp tỉ giá; báo cáo gộp nhiều tiền tệ (bước 38) dùng bảng này
+- [ ] Mẫu in chứng từ (hoá đơn bán lẻ, phiếu giao hàng, phiếu nhập, phiếu thu): mẫu theo khách và
+      i18n, xuất HTML và PDF — chọn thư viện sau khi kiểm, ghi `STACK.md`
+- [ ] Xuất dữ liệu kế toán: sổ nhật ký chung và chứng từ theo kỳ ra CSV / Excel theo định dạng nhập
+      của phần mềm kế toán phổ biến, để kế toán của khách không nhập lại tay
 
 ## 37. Tuân thủ pháp luật Việt Nam (D-186)
 
@@ -695,6 +740,11 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       `ai_assisted`, API trả về để giao diện gắn nhãn khi công khai
 - [ ] Gửi SMS (D-190): trait `SmsSender` (nhà cung cấp SMS có brandname), mã một lần qua SMS để xác
       thực số điện thoại theo NĐ 147/2024; một bộ cài đặt giả cho test
+- [ ] Module nền `notifications` (D-194; thay mục "module thông báo chờ quyết"): kênh email, SMS,
+      Zalo ZNS (trait), web push, trong ứng dụng; mẫu theo i18n và theo khách; tuỳ chọn nhận của người
+      dùng; **tách tin giao dịch và tin quảng cáo** — tin quảng cáo chỉ gửi khi đã đồng ý trước, từ
+      chối là dừng ngay, khung giờ gửi là dữ liệu (NĐ 91/2020: tin nhắn 7h–22h, chỉ một tin đăng ký
+      đầu tiên — cần đối chiếu bản thay thế đang dự thảo); `newsletter` dùng chung sổ đồng ý
 
 ## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
 
@@ -711,8 +761,8 @@ Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 3
 ## 39. Vận hành và hiệu năng (chủ dự án giao ngày 13/11/2026; số cũ 33, D-189)
 
 Khi đã có người dùng thật: biết sớm khi hệ thống kẹt, không mất dữ liệu, xử lý sự cố không phải
-đoán, và chịu được dữ liệu cỡ thật. Bắt đầu SAU bước 38 (nền đa khách): backup, số đo, cảnh báo theo từng khách hàng và từng database.
-Làm nhóm A trước: số đo tồn đọng dùng để quan sát lúc chạy tải ở nhóm B. Mọi số đo ghi kèm máy,
+đoán, và chịu được dữ liệu cỡ thật. Bắt đầu SAU bước 38 (nền đa khách): backup, số đo, cảnh báo
+theo từng khách hàng và từng database. Làm nhóm A trước: số đo tồn đọng dùng để quan sát lúc chạy tải ở nhóm B. Mọi số đo ghi kèm máy,
 ngày, cỡ dữ liệu; mọi thay đổi chạy và có test trên cả hai database; không đổi tính đúng lấy tốc độ.
 
 Nhóm A — vận hành:
@@ -770,7 +820,9 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
 ## 40. Năng lực còn thiếu của core (agent đề xuất; số cũ 34, D-189)
 
 So với những gì một lõi backend hiện đại thường có sẵn, core còn thiếu sáu năng lực chung, không
-gắn với ngành nào. Bắt đầu SAU bước 34 (cây tổ chức, danh tính): OIDC, SSE, tải thẳng lên S3 và rate limit phải theo khách hàng và tổ chức. Endpoint mới có OpenAPI và tool MCP
+gắn với ngành nào. Header bảo mật và MCP đầy đủ hơn không phụ thuộc nền đa khách: làm được ngay.
+Bốn mục còn lại (OIDC, tải thẳng lên S3, SSE, rate limit) bắt đầu SAU bước 34 vì phải theo khách hàng
+và tổ chức. Endpoint mới có OpenAPI và tool MCP
 tương ứng; thêm thư viện thì kiểm đúng phiên bản và ghi `STACK.md`; mọi mục chạy và có test trên
 cả SQLite và Postgres.
 
@@ -801,14 +853,189 @@ cả SQLite và Postgres.
       chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
       quyết định
 
+## Giai đoạn module thương mại (chủ dự án giao ngày 13/11/2026, D-191)
+
+Module nghiệp vụ, không phải core: khái niệm sản phẩm, đơn hàng, kho không vào `kernel`. Thiết kế:
+`docs/research/business-foundation.md`, mục 8. Luật chung cho bước 41–46:
+
+- Mỗi module một crate, sở hữu bảng của mình; mọi bảng có `tenant_id`, dữ liệu theo cửa hàng / kho /
+  người bán có `org_id`; quyền theo độ sâu của bước 34. Tiền là `Money`; thuế qua engine thuế, mọi
+  chứng từ lưu ảnh chụp giá, thuế, thông tin sản phẩm lúc giao dịch.
+- Nhất quán giữa module bằng **giữ chỗ → xác nhận → trả lại** (tồn kho, mã giảm giá, hạn mức): giữ
+  chỗ có hạn và mã tham chiếu (vd `order_id`), gọi lại không trùng, job trả chỗ hết hạn; không có
+  transaction xuyên module. Việc phụ đi qua event (outbox).
+- Thứ tự đăng ký module: `catalog` → `inventory`, `promotions`, `shipping` → `orders` →
+  `marketplace`. `shipping` không phụ thuộc `orders`: nhận đơn qua event, báo trạng thái lại qua event.
+- Bộ nối với đối tác cụ thể (cổng thanh toán, hãng vận chuyển, nhà cung cấp hoá đơn, SMS, eKYC) là
+  module riêng sau trait của core; core chỉ có trait và bộ giả cho test. Viết bộ nối thật cần tài
+  khoản thử của đối tác — secret thật, nên dừng hỏi chủ dự án.
+- Quy định hay đổi (hạn mức khuyến mại, danh mục hàng có điều kiện, đơn vị hành chính) là dữ liệu có
+  ngày hiệu lực (D-186). Mỗi bước có test đồng thời trên cả hai database cho mọi chỗ giữ chỗ.
+
+## 41. Sản phẩm (`catalog`)
+
+Bắt đầu SAU bước 35 và 36. Khai hạn mức (số sản phẩm) và tính năng (nhiều biến thể, bảng giá) theo
+bước 35.
+
+- [ ] Sản phẩm và biến thể: tuỳ chọn (màu, cỡ…), SKU và mã vạch duy nhất trong khách, trạng thái
+      (nháp, đang bán, ngừng bán, lưu trữ), ảnh qua `Media`, nội dung nhiều ngôn ngữ, cân nặng và
+      kích thước (cho vận chuyển), nhóm thuế của engine thuế; slug và đường dẫn công khai
+- [ ] Danh mục sản phẩm dạng cây và thuộc tính theo danh mục; **thuộc tính bắt buộc theo danh mục là
+      dữ liệu** (vd xuất xứ, hạn dùng, thông tin nhãn hàng hoá theo NĐ 43/2017 và NĐ 111/2021 — cần
+      đối chiếu); danh mục hàng cấm và hàng kinh doanh có điều kiện là dữ liệu, kèm giấy tờ phải có
+- [ ] Bảng giá: giá theo cửa hàng / nhóm khách (B2B), kế thừa theo cây (chuỗi đặt, cửa hàng ghi
+      đè — bước 34), giá có ngày hiệu lực, **lịch sử giá** (khuyến mại cần "giá ngay trước khi khuyến
+      mại"); giá niêm yết bằng Đồng Việt Nam, gồm thuế khi bán cho người tiêu dùng (Luật Giá 16/2023 —
+      cần đối chiếu)
+- [ ] Đọc công khai cho website: danh sách, lọc theo danh mục / thuộc tính / khoảng giá, tìm kiếm
+      (hợp đồng tìm kiếm sẵn có của kernel), ETag và cache như `content`; sitemap
+- [ ] Nhập / xuất CSV bằng job (kiểm từng dòng, báo lỗi theo dòng, chống CSV injection); gợi ý mô tả
+      và SEO bằng AI chỉ thành bản nháp, đánh dấu `ai_assisted` (bước 37)
+- [ ] API hợp đồng cho module khác (`catalog::api`): đọc sản phẩm / biến thể / giá tại một thời
+      điểm để chụp vào chứng từ; event khi giá hay trạng thái đổi; tool MCP như REST
+- [ ] Loại sản phẩm: hàng vật lý, hàng số (giao file bằng link ký có hạn qua `files`, giới hạn lượt
+      tải), dịch vụ (không giao hàng); combo / bộ sản phẩm trừ kho từng thành phần; sản phẩm tương tự
+      theo ý nghĩa (embedding sẵn có của module `ai`)
+
+## 42. Kho (`inventory`)
+
+Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều request cùng lúc, trên cả hai database.
+
+- [ ] Kho là nút tổ chức loại `warehouse` hay cửa hàng (bước 34); tồn theo biến thể × kho; **sổ biến
+      động kho chỉ thêm** (nhập, xuất, điều chỉnh, chuyển), tồn hiện tại suy từ sổ và giữ bằng khoá
+      dòng của kernel
+- [ ] Giữ chỗ tồn: giữ có hạn theo `order_id` → xác nhận khi đặt hàng → trả lại khi huỷ hay hết hạn
+      (job); chọn kho theo quy tắc (gần người mua, đủ hàng); test đồng thời "100 người mua 1 cái cuối"
+- [ ] Chuyển kho (đang đi đường), kiểm kê (chênh lệch thành bút toán điều chỉnh có lý do), cảnh báo
+      tồn thấp (event), cho phép bán khi hết hàng hay không theo sản phẩm
+- [ ] Giá vốn bình quân gia quyền theo kho cho báo cáo lãi gộp; lô và hạn dùng (bán trước hết hạn
+      trước), số serial — bật theo sản phẩm
+- [ ] Nhận event của `orders` (xác nhận, huỷ, trả hàng nhập lại kho) — chịu được nhận lại event
+- [ ] Nhập hàng (D-194): nhà cung cấp, đơn đặt hàng nhà cung cấp, nhận hàng một phần, công nợ phải
+      trả nhà cung cấp vào sổ cái, trả hàng cho nhà cung cấp — chuỗi bán lẻ cần cho việc hằng ngày
+
+## 43. Khuyến mại (`promotions`)
+
+Bắt đầu SAU bước 41. Luật khuyến mại đổi thường xuyên: hạn mức là dữ liệu có ngày hiệu lực, không viết
+cứng (Thông tư 39/2025/TT-BCT trần 50% giá ngay trước khuyến mại, có ngoại lệ chương trình tập trung
+quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản hiện hành).
+
+- [ ] Mã giảm giá và giảm tự động: theo sản phẩm, danh mục, giá trị đơn, nhóm khách; mua X tặng Y;
+      miễn phí vận chuyển; khung thời gian; quy tắc cộng dồn; giới hạn lượt dùng tổng và mỗi người
+- [ ] Giữ chỗ lượt dùng và số lượng flash sale như tồn kho (giữ → xác nhận → trả lại), test đồng thời
+- [ ] API cho `orders`: tính giảm giá cho một giỏ, trả từng dòng giảm kèm lý do (người mua thấy rõ
+      điều kiện — Luật 19/2023)
+- [ ] Kiểm tuân thủ: chặn chương trình vượt hạn mức đang hiệu lực; xuất dữ liệu thông báo khuyến mại
+      gửi Sở Công Thương nơi tổ chức; lưu vết chương trình đã chạy
+
+## 44. Vận chuyển (`shipping`)
+
+Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua event, báo trạng thái qua event.
+
+- [ ] Sổ địa chỉ của người mua dùng `Address` của module nền `address` (bước 34, D-193); địa chỉ
+      nước ngoài dạng chung
+- [ ] Phí vận chuyển của khách tự đặt: vùng theo tỉnh, bậc cân nặng / kích thước, miễn phí từ một
+      giá trị đơn, nhận tại cửa hàng (chuỗi); API báo giá cho `orders`
+- [ ] Trait `ShippingCarrier` (báo giá, tạo vận đơn, huỷ, in nhãn, theo dõi) và bộ giả cho test;
+      webhook trạng thái của hãng: kiểm chữ ký, không trùng, ánh xạ về trạng thái chung
+- [ ] Vận đơn: một đơn nhiều kiện, giao một phần, giao thất bại, hoàn hàng; event cho `orders`
+- [ ] Thu hộ khi giao (COD): tiền do hãng vận chuyển thu và chuyển trả theo hợp đồng với hãng; sổ cái
+      ghi phải thu từ hãng, đối soát với bảng kê COD của hãng; lệch thì báo
+
+## 45. Giỏ hàng, đặt hàng, đơn hàng (`orders`)
+
+Bắt đầu SAU bước 42, 43, 44. Gọi `catalog`, `inventory`, `promotions`, `shipping` qua `api` của chúng;
+tiền qua `PaymentGateway` và sổ cái của bước 36.
+
+- [ ] Giỏ hàng cho người mua và khách vãng lai (gộp khi đăng nhập); giá, giảm giá, thuế, phí vận
+      chuyển luôn tính lại ở máy chủ, không tin số từ client
+- [ ] Đặt hàng: báo giá cuối → giữ tồn và lượt khuyến mại → tạo đơn với số đơn tuần tự (đánh số chứng
+      từ của bước 36) → thanh toán theo chế độ dòng tiền của khách (tự thu / thu hộ qua đối tác /
+      chia tại cổng / COD); `Idempotency-Key` bắt buộc; hết hạn thanh toán thì trả chỗ
+- [ ] Vòng đời đơn: chờ thanh toán → đã xác nhận → đang chuẩn bị → đang giao → đã giao → hoàn tất;
+      huỷ theo quy tắc; mọi chuyển trạng thái qua service, ghi event và bút toán sổ cái tương ứng
+- [ ] Đổi trả và hoàn tiền: yêu cầu trả trong thời hạn chính sách, duyệt, nhận hàng về (nhập kho),
+      hoàn tiền qua cổng, bút toán đảo, hoá đơn điều chỉnh / thay thế (NĐ 123/2020 sửa bởi NĐ 70/2025
+      — cần đối chiếu)
+- [ ] Hoá đơn điện tử cho đơn (qua `EInvoiceProvider`), kể cả hoá đơn từ máy tính tiền cho bán tại
+      quầy; mail xác nhận đơn và cập nhật trạng thái qua job, nội dung theo i18n
+- [ ] Bán tại quầy (POS) qua API cho chuỗi cửa hàng: đơn tạo tại cửa hàng, tiền mặt / thẻ / QR, trừ
+      kho của cửa hàng đó
+- [ ] Đánh giá sau mua: chỉ người đã mua, có kiểm duyệt nhưng không chặn hay ẩn đánh giá trái quy định
+      (Luật 19/2023); dùng lại `comments` nếu hợp, không thì module `reviews` — ghi quyết định
+- [ ] Báo cáo bán hàng theo cửa hàng / kênh / sản phẩm / thời gian, theo quyền độ sâu; event cho kho
+      báo cáo gộp (bước 38)
+- [ ] Chống "bom hàng" COD (D-194): tỉ lệ nhận hàng thành công của người mua trong khách (chỉ dữ
+      liệu của chính khách, có căn cứ xử lý theo Luật BVDLCN), quy tắc buộc trả trước khi rủi ro cao,
+      danh sách chặn có lý do và thời hạn; không chia sẻ danh sách giữa các khách
+- [ ] Trả góp qua đối tác (trait của bước 36); bảo hành theo số serial hay theo đơn: phiếu bảo hành,
+      tiếp nhận, trạng thái xử lý, hạn bảo hành
+
+## 46. Sàn (`marketplace`)
+
+Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nút loại `seller` (bước 34).
+
+- [ ] Người bán đăng ký: hồ sơ, KYC qua cổng chặn của bước 37 (chưa xác thực thì không đăng bán),
+      chấp nhận quy chế sàn và hợp đồng với người bán có phiên bản (bước 37), giấy tờ cho ngành hàng
+      có điều kiện; gian hàng của người bán; thông tin người bán hiện trên trang sản phẩm
+- [ ] Duyệt sản phẩm của người bán: hàng cấm, hàng có điều kiện thiếu giấy tờ, báo vi phạm (bước 37)
+- [ ] Phí sàn theo ngành hàng là dữ liệu có ngày hiệu lực; một lần đặt hàng tách thành đơn theo
+      từng người bán; người bán tự giao hay sàn giao
+- [ ] Chi trả cho người bán: tạm giữ tới hết hạn đổi trả, trừ phí sàn và thuế khấu trừ thay (NĐ
+      117/2025), lệnh chi qua `PayoutGateway`; bảng đối soát cho người bán; sổ cái khớp từng đồng
+- [ ] Tranh chấp người mua – người bán, sàn phân xử, có hạn xử lý; điểm và chế tài người bán; báo cáo
+      cho cơ quan có thẩm quyền khi được yêu cầu (có audit)
+- [ ] Cung cấp thông tin người bán và doanh thu cho cơ quan thuế theo kỳ (NĐ 117/2025 — cần đối
+      chiếu mẫu và hạn); kho của sàn (sàn nhận hàng của người bán, đóng gói, giao — tồn theo người bán
+      trong kho của sàn)
+
+## 47. Khách hàng và giữ chân khách (`customers`)
+
+Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (bước 34); module này giữ hồ sơ bán hàng.
+
+- [ ] Hồ sơ khách: lịch sử mua (từ event của `orders`), tổng chi, nhóm và phân khúc theo quy tắc,
+      nhãn, ghi chú của nhân viên; nhóm khách dùng cho bảng giá (bước 41) và khuyến mại (bước 43)
+- [ ] Điểm thưởng và hạng thành viên: sổ điểm chỉ thêm, điểm có hạn dùng, quy tắc tích / đổi là dữ
+      liệu; điểm chưa dùng là nghĩa vụ ghi trong sổ cái
+- [ ] Thẻ quà tặng và số dư cửa hàng: chỉ dùng mua hàng của chính khách đó, không rút ra tiền,
+      không chuyển ra ngoài — **tắt mặc định**, chỉ bật sau khi đối chiếu NĐ 52/2024 về ví điện tử /
+      thẻ trả trước (D-194); số dư là nghĩa vụ trong sổ cái
+- [ ] Danh sách yêu thích, sản phẩm vừa xem; nhắc giỏ hàng bỏ dở qua `notifications` — chỉ khi người
+      mua đã đồng ý nhận tin quảng cáo (bước 37); giới thiệu bạn bè có thưởng
+
+## 48. Bán đa kênh (`channels`)
+
+Bắt đầu SAU bước 45. Người bán ở Việt Nam bán cùng lúc trên website, Shopee, Lazada, TikTok Shop,
+Facebook / Zalo; một kho, một danh sách sản phẩm, đơn từ mọi nơi về một chỗ.
+
+- [ ] Trait `SalesChannel` (đăng sản phẩm, cập nhật giá và tồn, lấy đơn, cập nhật trạng thái giao)
+      và bộ giả cho test; bộ nối từng sàn là module riêng, làm khi có tài khoản thử (D-191)
+- [ ] Liên kết sản phẩm / biến thể với mã trên từng kênh; giá riêng theo kênh; đồng bộ tồn có phần
+      để dành cho từng kênh, không bán quá khi nhiều kênh cùng bán
+- [ ] Đơn từ kênh khác vào `orders` với kênh nguồn, trừ kho chung, không trùng khi kênh gửi lại;
+      báo cáo theo kênh; đối soát tiền sàn trả với sổ cái
+
+## 49. Tiếp thị liên kết và bán qua livestream (`affiliate`)
+
+Bắt đầu SAU bước 45 và 37. Luật TMĐT 2025 buộc xác thực danh tính người livestream và người tiếp thị
+liên kết (bước 37).
+
+- [ ] Người tiếp thị đăng ký có KYC (cổng chặn bước 37), link và mã riêng, thời hạn ghi nhận đơn, quy
+      tắc hoa hồng theo sản phẩm / danh mục là dữ liệu có ngày hiệu lực
+- [ ] Hoa hồng ghi sổ cái khi đơn hoàn tất, trừ lại khi trả hàng; chi trả qua `PayoutGateway` có khấu
+      trừ thuế thu nhập cá nhân theo hồ sơ thuế (tỉ lệ và ngưỡng là dữ liệu — các nguồn đang khác nhau
+      giữa 2 triệu và 5 triệu đồng / lần, NĐ 253/2026 — cần đối chiếu); chứng từ khấu trừ cho người nhận
+- [ ] Phiên livestream: người phát đã xác thực, sản phẩm gắn trong phiên, đơn ghi nhận theo phiên,
+      lưu vết phiên theo yêu cầu của luật
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.
 
-Module thương mại (sau nền 33–38, D-185): sản phẩm, giỏ hàng, đơn hàng, kho, vận chuyển, sàn —
-module nghiệp vụ, dùng `tenant_id` + `org_id` + engine thuế + sổ cái ngay từ đầu.
+Để sau (D-194): bán sỉ B2B (báo giá, công nợ, hạn mức tín dụng) · đặt lịch dịch vụ · chat chăm sóc
+khách · sản phẩm thuê bao định kỳ · bán xuyên biên giới nhiều tiền tệ · quảng cáo trong sàn.
 
-Chờ chủ dự án quyết (không làm khi chưa có quyết định): module thông báo (trong ứng dụng, web push)
-· đăng nhập thay người dùng để hỗ trợ · định dạng ảnh AVIF. Đã cân nhắc và không làm: API dữ liệu tự
+Chờ chủ dự án quyết (không làm khi chưa có quyết định): đăng nhập thay người dùng để hỗ trợ · định
+dạng ảnh AVIF. Đã cân nhắc và không làm: API dữ liệu tự
 sinh từ bảng, plugin WASM nạp lúc chạy, trang quản trị dựng sẵn (`docs/research/frameworks.md`,
 D-005, D-026). Thư viện số thập phân và module sổ cái: đã quyết ở D-187, D-188.
