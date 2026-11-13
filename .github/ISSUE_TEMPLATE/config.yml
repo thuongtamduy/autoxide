@@ -1,0 +1,4 @@
+# Issue mới phải đi qua một mẫu. Lỗ hổng bảo mật thì báo riêng: GitHub tự hiện lối "Report a
+# security vulnerability" trong trang chọn mẫu khi repo có SECURITY.md và bật private
+# vulnerability reporting, nên không cần link cứng (link cứng phải ghi tên chủ repo).
+blank_issues_enabled: false

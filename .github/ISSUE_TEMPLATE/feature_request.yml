@@ -1,0 +1,36 @@
+name: Feature proposal
+description: Propose a change or a new feature for the core or a module.
+labels: ["proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The core stays neutral about business domains (no orders, stock or patients in the core: those belong in modules),
+        and work follows [docs/ROADMAP.md](../blob/main/docs/ROADMAP.md). Describing the problem first lets us agree
+        on a design before anyone writes code. You may write in English or Vietnamese (tiếng Việt cũng được).
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what stops you today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Endpoints, settings or module changes you have in mind. It must work on both SQLite and PostgreSQL.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you send a pull request?
+      options:
+        - "Yes"
+        - With help
+        - "No"

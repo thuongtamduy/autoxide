@@ -1,0 +1,65 @@
+name: Bug report
+description: Something does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Security problems go through [SECURITY.md](../blob/main/SECURITY.md), not here.
+        You may write in English or Vietnamese (tiếng Việt cũng được).
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `autoxide --version`, or the Docker image tag, or the commit.
+      placeholder: "0.11.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      options:
+        - SQLite
+        - PostgreSQL
+        - Both
+        - Not related to the database
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it?
+      options:
+        - Docker image
+        - Docker Compose (compose.yml from this repository)
+        - Binary built from source
+        - cargo run
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Requests (curl or similar), commands and the settings that matter. Remove secrets, tokens and personal data.
+      placeholder: |
+        1. Set AUTOXIDE_… to …
+        2. curl -X POST http://127.0.0.1:8080/api/v1/…
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The response body (with its `code`), the status and relevant log lines.
+      render: text
+    validations:
+      required: true
