@@ -4,7 +4,7 @@ Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQL
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
 Trạng thái: **bước 0–30 xong** (phần cần repo công khai ở bước 50); bước 50 chờ chủ dự án công khai repo (D-199); 31 trở đi chưa bắt đầu — thứ tự và phụ thuộc ở
-bảng ngay trước bước 30 (D-192); bản phát hành mới nhất `v0.12.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199):
+bảng ngay trước bước 30 (D-192); bước 51 thêm theo thiết kế giao diện 2 (D-200); bản phát hành mới nhất `v0.12.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -420,6 +420,7 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 | 45 Giỏ hàng, đặt hàng, đơn hàng | 42, 43, 44 và 37 (thông báo) | — |
 | 46 Sàn · 47 Khách hàng · 48 Đa kênh · 49 Tiếp thị liên kết | 45 (46 và 49 cần thêm 37) | nhau |
 | 50 Công khai repo | chủ dự án nói đã công khai repo (D-199) | mọi bước |
+| 51 Hợp đồng cho giao diện (D-200) | nhúng bản ghi: sau 33; hộp việc, tìm, số liệu, hoạt động: sau 34; menu: sau 35 | 36–49 — nên làm trước 41 để module thương mại khai luôn phần của mình |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
@@ -636,6 +637,10 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 - [ ] Mời người dùng qua email: quản trị viên mời kèm role định sẵn, người được mời đặt mật khẩu
       (hay passkey) qua link dùng một lần; lời mời hết hạn, thu hồi được, có event cho audit; lệnh
       CLI tương ứng
+- [ ] Hồ sơ công khai của nút (D-200): tên hiển thị, địa chỉ (`Address`), giờ mở cửa theo ngày, có
+      nhận hàng tại quầy hay không, tên miền gắn với nút; endpoint công khai danh sách cửa hàng của khách
+      theo tên miền (chỉ nút bật "hiện công khai"), có ETag / cache — website dùng cho "cửa hàng gần bạn"
+      và chọn nơi nhận hàng
 - [ ] Nhân sự nền tảng vào dữ liệu của khách (D-190): chỉ khi có quyền vào cấp có thời hạn, ghi lý
       do; mọi lần vào ghi audit mà quản trị của khách xem được (Luật BVDLCN 2025); khách tắt được
       quyền vào hỗ trợ, trừ yêu cầu của cơ quan có thẩm quyền (có audit)
@@ -929,6 +934,9 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
 - [ ] Nhận event của `orders` (xác nhận, huỷ, trả hàng nhập lại kho) — chịu được nhận lại event
 - [ ] Nhập hàng (D-194): nhà cung cấp, đơn đặt hàng nhà cung cấp, nhận hàng một phần, công nợ phải
       trả nhà cung cấp vào sổ cái, trả hàng cho nhà cung cấp — chuỗi bán lẻ cần cho việc hằng ngày
+- [ ] Tình trạng hàng công khai theo cửa hàng (D-200): endpoint công khai trả mức `in_stock` / `low`
+      (kèm số khi dưới ngưỡng, ngưỡng là cấu hình) / `out` cho biến thể × cửa hàng, không lộ số tồn lớn;
+      `catalog` lọc "chỉ hàng có sẵn ở cửa hàng X" qua `api` của `inventory`; có ETag, cache ngắn
 
 ## 43. Khuyến mại (`promotions`)
 
@@ -945,6 +953,9 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
       điều kiện — Luật 19/2023)
 - [ ] Kiểm tuân thủ: chặn chương trình vượt hạn mức đang hiệu lực; xuất dữ liệu thông báo khuyến mại
       gửi Sở Công Thương nơi tổ chức; lưu vết chương trình đã chạy
+- [ ] Giá khi áp mã cho từng sản phẩm (D-200): endpoint công khai trả các mã công khai áp được cho một
+      sản phẩm / biến thể, giá sau mã, điều kiện, số lượt còn lại — để trang sản phẩm hiện "còn X với mã
+      …"; giá niêm yết vẫn là giá không mã (mã phải nhập thì không hiện như giá đã giảm)
 
 ## 44. Vận chuyển (`shipping`)
 
@@ -961,6 +972,8 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
 - [ ] Vận đơn: một đơn nhiều kiện, giao một phần, giao thất bại, hoàn hàng; event cho `orders`
 - [ ] Thu hộ khi giao (COD): tiền do hãng vận chuyển thu và chuyển trả theo hợp đồng với hãng; sổ cái
       ghi phải thu từ hãng, đối soát với bảng kê COD của hãng; lệch thì báo
+- [ ] Ước tính phí giao công khai (D-200): theo tỉnh và một sản phẩm / số lượng, chưa cần giỏ, cho trang
+      sản phẩm; cùng bảng phí với báo giá của `orders`, ghi rõ "ước tính", ngưỡng miễn phí
 
 ## 45. Giỏ hàng, đặt hàng, đơn hàng (`orders`)
 
@@ -1076,6 +1089,35 @@ khai là tự chạy.
       và SBOM; `docs/RELEASING.md` bỏ phần "Khi repo còn riêng tư"
 - [ ] Thử cài như người lạ bằng image đã đăng (cả SQLite và Postgres), sửa README /
       `docs/DEPLOY.md` (EN + VI cùng commit) theo chỗ vấp
+
+## 51. Hợp đồng cho khung quản trị và mặt tiền (thiết kế giao diện 2, D-200)
+
+Đặc tả: [`docs/steps/51-ui-contracts.md`](steps/51-ui-contracts.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+Thiết kế: [`docs/research/ui-design.md`](research/ui-design.md).
+
+Giao diện (repo riêng, D-097) dựng menu, hộp việc, tìm kiếm, trang tổng quan từ dữ liệu của core để
+cùng một giao diện phục vụ mọi mô hình kinh doanh. Module khai phần của mình (mặc định rỗng, D-038);
+kernel gom và lọc theo khách, gói, permission ở nút đang chọn. Kernel không có danh sách phân hệ viết cứng.
+Bước 41–49 khai phần của module mình ngay trong bước đó nếu phần tương ứng của bước 51 đã xong.
+
+- [ ] Nhúng bản ghi của module khác vào nội dung: node `embed` (`kind`, `id`) trong thân bài của
+      `content`, kiểm qua sổ đối tượng (D-123) khi lưu, đọc công khai trả kèm tiêu đề, tóm tắt, đường dẫn,
+      ảnh của đối tượng còn công khai; `Resource` thêm `image`. `content` không biết khái niệm sản phẩm
+- [ ] Sổ điều hướng: `Module::navigation` (nhóm phân hệ, mục, permission, tính năng, nguồn số đếm,
+      thứ tự); nhóm trùng phải khai giống nhau; endpoint trả menu đã lọc — ẩn khi module chưa bật hay
+      thiếu permission, **khoá (vẫn hiện) khi thiếu tính năng của gói**; nhãn theo i18n; ETag; tool MCP
+- [ ] Hộp việc: trait `WorkSource` (đếm, liệt kê việc chờ theo phạm vi nút), việc tính từ dữ liệu của
+      module, không có bảng việc riêng; endpoint gom sắp theo mức gấp và hạn, endpoint số đếm cho menu;
+      hạn thời gian mỗi nguồn, nguồn chậm không làm hỏng cả hộp; cache số đếm có khách trong khoá; khác
+      hộp thư của `notifications`
+- [ ] Tìm xuyên phân hệ: trait `FinderSource`; endpoint gom kết quả theo loại đối tượng, không dấu vẫn
+      tìm được (`kernel::search`), chỉ chạy nguồn người gọi có quyền, mỗi nguồn áp phạm vi nút
+- [ ] Số liệu tóm tắt cho trang tổng quan của phân hệ: trait `SummaryMetric` (tiền, số đếm, tỉ lệ) theo
+      phạm vi nút; số nặng đọc từ bảng dẫn xuất, không quét bảng giao dịch mỗi lần mở trang
+- [ ] Hoạt động gần đây (module `audit`): câu đọc được theo i18n key mà module khai trên `EventInfo`,
+      chỉ hiện bản ghi người gọi có quyền đọc ở nút của bản ghi
+- [ ] Khai menu, nguồn việc, nguồn tìm, số liệu cho mọi module đang có; MODULE_GUIDE (EN + VI) mục
+      "khai phần của module cho giao diện"; test rò rỉ giữa hai nhánh anh em cho số đếm và kết quả tìm
 
 ## Sau core (chưa mở)
 

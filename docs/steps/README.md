@@ -1,6 +1,6 @@
-# Đặc tả từng bước (30–49)
+# Đặc tả từng bước (30–51)
 
-Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49 có một file đặc tả ở đây. Đặc tả nói **cách làm**:
+Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51, có một file đặc tả ở đây (bước 50 chỉ là việc của chủ dự án). Đặc tả nói **cách làm**:
 
 - bảng dữ liệu, API, permission, event, mã lỗi;
 - thứ tự commit, test bắt buộc, tiêu chí xong;
@@ -38,6 +38,7 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49 có một file đặc t�
 | 38 | [38-cross-database-reporting.md](38-cross-database-reporting.md) | `reporting`, phân phối cha → con, tách / gộp khách |
 | 39 | [39-operations-performance.md](39-operations-performance.md) | Backup, số đo, cảnh báo, đo tải |
 | 40 | [40-core-capabilities.md](40-core-capabilities.md) | Header bảo mật, MCP, OIDC, tải thẳng S3, SSE, rate limit |
+| 51 | [51-ui-contracts.md](51-ui-contracts.md) | Sổ điều hướng, hộp việc, tìm xuyên phân hệ, số liệu tóm tắt, hoạt động, nhúng bản ghi trong nội dung (D-200) |
 | 41–49 | [41](41-catalog.md) · [42](42-inventory.md) · [43](43-promotions.md) · [44](44-shipping.md) · [45](45-orders.md) · [46](46-marketplace.md) · [47](47-customers.md) · [48](48-channels.md) · [49](49-affiliate.md) | Module thương mại |
 
 ## Luật chung đã chốt (D-198)
@@ -132,6 +133,8 @@ sau dùng lại, không làm lại.
 | `Module::{description, mcp_resources, prompts}`, `autoxide_kernel::net` (chặn SSRF, dời từ `webhooks`) | 40 | OIDC, MCP |
 | `Subscription::optional`, `autoxide_kernel::csv` (dời từ `forms`), `autoxide_kernel::slug` (dời từ `content`) | 41 (commit chuẩn bị) | 42–49 |
 | `tenancy::contact_key` (HMAC số điện thoại / email theo khách) | 45 | 47 |
+| `Resource::image`, node `embed` của `content` | 51 (sau 33) | 41 (`catalog.product`) |
+| `navigation` (`Module::navigation`), `work::WorkSource`, `finder::FinderSource`, `summary::SummaryMetric`, `EventInfo::activity` | 51 (sau 34–35) | 41–49 |
 
 ## Việc chỉ chủ dự án làm được
 

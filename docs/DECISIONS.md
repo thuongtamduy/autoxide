@@ -4797,3 +4797,35 @@ Lý do: chủ dự án chưa muốn công khai. Tách phần phụ thuộc ra m�
 rút khi tắt) được phát hành.
 
 Thay: phần công khai của D-175 (tới khi chủ dự án quyết công khai).
+
+## D-200 · Thiết kế giao diện 2: quản trị đa phân hệ, mặt tiền bán hàng; bước 51 cho phần core còn thiếu — 2026-11-13 — chủ dự án giao hướng, agent quyết nội dung
+
+Quyết định: giao diện (repo riêng, D-097) theo thiết kế 2 (`docs/research/ui-design.md`):
+
+1. Trang quản trị có mười hai phân hệ trên một thanh dọc; quản trị nội dung chỉ là một phân hệ. Menu
+   con là hàng tab dưới thanh tiêu đề. Ngữ cảnh "khách › nút tổ chức" ở góc trên trái quyết phạm vi mọi
+   số liệu. Ctrl + K tìm xuyên phân hệ. Mỗi phân hệ có trang tổng quan; trang Tổng quan chung có hộp
+   việc gom từ mọi phân hệ.
+2. Một mục menu hiện khi module đã bật cho khách và người dùng có permission ở nút đang chọn; thiếu
+   tính năng của gói thì **vẫn hiện, kèm nhãn khoá**.
+3. Website công khai là mặt tiền bán hàng của một khách (trang chủ, danh mục, sản phẩm, giỏ và đặt
+   hàng, gian hàng người bán, bài viết có gắn sản phẩm, tài khoản người mua); blog thành một mục.
+4. Phần core còn thiếu thành **bước 51** (sổ điều hướng, hộp việc, tìm xuyên phân hệ, số liệu tóm
+   tắt, hoạt động gần đây, nhúng bản ghi trong nội dung) và bốn mục thêm vào bước 34 (hồ sơ công khai
+   của nút), 42 (tình trạng hàng công khai theo cửa hàng), 43 (giá khi áp mã cho từng sản phẩm), 44
+   (ước tính phí giao công khai). Đặc tả: `docs/steps/51-ui-contracts.md` và mục "Bổ sung theo D-200"
+   ở cuối đặc tả 34, 42, 43, 44.
+5. Kernel không có danh sách phân hệ viết cứng: nhóm menu do module khai (core trung lập với nghiệp vụ);
+   việc trong hộp việc tính từ dữ liệu của module, không có bảng việc riêng.
+
+Lý do: chủ dự án thấy thiết kế 1 coi trang quản trị là CMS, trong khi lộ trình đã mở sang nền đa khách
+và thương mại (13/11/2026). Menu, khoá theo gói và hộp việc phụ thuộc dữ liệu chỉ core có (module bật,
+permission theo nút, quyền dùng); viết cứng ở giao diện thì mỗi mô hình kinh doanh cần một giao diện.
+Đối chiếu với đặc tả 33–47 cho thấy phần lớn API của mặt tiền đã có (giỏ hàng, tách đơn theo người bán,
+đồng ý, chấp nhận văn bản, trang người bán công khai); chỉ thêm những mục ở trên.
+
+Đã cân nhắc: gom menu, hộp việc vào module `notifications` — hộp thư thông báo là tin đã gửi cho một
+người, còn hộp việc là trạng thái hiện tại của dữ liệu, xử lý xong thì tự hết; một endpoint `/public/site`
+gom cấu hình website từ nhiều module — phải trả JSON không kiểu, mất mô tả OpenAPI; để giao diện gọi ba
+endpoint có cache (cửa hàng, menu, logo Bộ Công Thương) là đủ. Đánh số lại để bước 51 đứng trước 41 —
+đổi số của 11 bước và 11 file đặc tả; thay bằng ghi trong bảng phụ thuộc rằng 51 nên làm trước 41.

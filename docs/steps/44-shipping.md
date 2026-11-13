@@ -416,3 +416,10 @@ hãng bằng `FakeCarrier`.
 - Đọc bảng kê CSV theo một định dạng chung (cột `tracking_number`, `cod_amount`, `fee`) và để bộ nối
   từng hãng đổi định dạng riêng — khuyến nghị vậy.
 - Ghi vào `docs/DECISIONS.md` (skill `record-decision`).
+
+## Bổ sung theo D-200 (thiết kế giao diện 2)
+
+**Ước tính phí giao công khai.** `GET /public/shipping/estimate?product_id&variant_id&quantity&province_code`
+(công khai) chạy cùng `quote` với một giỏ ảo một dòng, giao tới mã tỉnh (chưa cần xã), trả các phương thức,
+phí, thời gian dự kiến, ngưỡng miễn phí. Response ghi rõ `estimate: true`; phí thật luôn tính lại khi đặt
+hàng. Cache ngắn theo (sản phẩm, tỉnh). Test: kết quả bằng `quote` của giỏ một dòng cùng tỉnh.
