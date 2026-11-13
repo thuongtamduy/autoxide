@@ -5,7 +5,7 @@
 //! - Ảnh được xoay đúng chiều theo EXIF trước khi thu nhỏ; giữ tỉ lệ.
 //! - Ảnh không trong suốt → JPEG (chất lượng 82); ảnh có kênh trong suốt → PNG. Mỗi cỡ có thêm
 //!   một bản WebP nén mất dữ liệu (chất lượng [`WEBP_QUALITY`], giữ kênh trong suốt) — nhẹ hơn
-//!   nhiều, website lấy qua `?w=…&format=webp` (D-176, D-192). Bản JPEG / PNG vẫn làm cho client
+//!   nhiều, website lấy qua `?w=…&format=webp` (D-176, D-196). Bản JPEG / PNG vẫn làm cho client
 //!   không đọc được WebP.
 //! - Ảnh quá [`MAX_PIXELS`] pixel không được giải mã (chặn "bom giải nén"); ảnh hỏng thì
 //!   bỏ qua, ghi log, không thử lại mãi.
@@ -42,7 +42,7 @@ pub(crate) const MAX_PIXELS: u64 = 40_000_000;
 /// Loại ảnh làm được ảnh thu nhỏ.
 pub(crate) const SOURCES: [&str; 4] = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const JPEG_QUALITY: u8 = 82;
-/// Chất lượng WebP (0–100 của libwebp); đo ở D-192.
+/// Chất lượng WebP (0–100 của libwebp); đo ở D-196.
 const WEBP_QUALITY: f32 = 80.0;
 
 /// Một ảnh thu nhỏ.

@@ -4558,7 +4558,7 @@ khuyến mại, phí sàn theo ngành hàng, người bán nước ngoài — đ
 
 Thay: phần "mã hoá dữ liệu nhạy cảm vào 37" của D-189.
 
-## D-191 · Khoảng rút trước khi tắt: `AUTOXIDE_HTTP_DRAIN_SECONDS`, mặc định 0 — 2026-11-13 — agent quyết
+## D-195 · Khoảng rút trước khi tắt: `AUTOXIDE_HTTP_DRAIN_SECONDS`, mặc định 0 — 2026-11-13 — agent quyết
 
 Quyết định: nhận tín hiệu dừng thì `serve` bật cờ `http::Draining` (`/health/ready` trả 503
 `shutting_down`, không hỏi database; `/health/live` vẫn 200), vẫn phục vụ đủ
@@ -4579,7 +4579,7 @@ vẫn không đúng cho bộ cân bằng tải nào cụ thể; giữ `health_ro
 nhận cờ — hai cách cho một việc; `preStop` sleep của Kubernetes — chỉ có trên Kubernetes, còn
 `/health/ready` vẫn báo 200 trong lúc tắt.
 
-## D-192 · Bản WebP của ảnh thu nhỏ: thư viện `webp` (libwebp), địa chỉ `&format=webp`, trường `webp_url` — 2026-11-13 — agent quyết
+## D-196 · Bản WebP của ảnh thu nhỏ: thư viện `webp` (libwebp), địa chỉ `&format=webp`, trường `webp_url` — 2026-11-13 — agent quyết
 
 Quyết định (thực hiện D-176):
 
@@ -4628,7 +4628,7 @@ rộng.
 đọc WebP; WebP không mất dữ liệu cho ảnh trong suốt — nặng gấp nhiều lần bản có mất dữ liệu;
 AVIF — nhẹ hơn nữa (D-168) nhưng mã hoá chậm hơn nhiều và cần thêm thư viện C lớn, để sau.
 
-## D-193 · Workflow GitHub tự chạy chỉ khi repo công khai; image hai kiến trúc, chứng thực và SBOM; quy tắc ứng xử — 2026-11-13 — agent quyết
+## D-197 · Workflow GitHub tự chạy chỉ khi repo công khai; image hai kiến trúc, chứng thực và SBOM; quy tắc ứng xử — 2026-11-13 — agent quyết
 
 Quyết định (thực hiện D-175):
 

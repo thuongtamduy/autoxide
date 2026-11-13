@@ -2,7 +2,7 @@
 # được hỗ trợ và mới nhất, cộng quét secret trong toàn bộ lịch sử git (D-074). `./gate.sh` trên
 # máy vẫn là định nghĩa "xong" (D-173); CI là lưới thứ hai (D-175).
 #
-# Mọi job chỉ chạy khi repo công khai (D-193): repo riêng tư thì GitHub tính phí runner, nên
+# Mọi job chỉ chạy khi repo công khai (D-197): repo riêng tư thì GitHub tính phí runner, nên
 # job bị bỏ qua trước khi xin runner — không tốn phút nào.
 name: CI
 

@@ -847,7 +847,7 @@ mod tests {
 
     use super::*;
 
-    /// Bản công khai mang cả địa chỉ JPEG lẫn WebP của từng cỡ (D-192); `alt` của bài thay
+    /// Bản công khai mang cả địa chỉ JPEG lẫn WebP của từng cỡ (D-196); `alt` của bài thay
     /// `alt` của thư viện media khi có.
     #[test]
     fn anh_cong_khai_co_ban_webp() {

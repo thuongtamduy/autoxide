@@ -1,5 +1,5 @@
 # Kiểm lỗ hổng thư viện mỗi ngày, kể cả khi không ai commit: lỗ hổng mới được công bố
-# cho thư viện đang dùng thì job đỏ (D-078). Chỉ chạy khi repo công khai (D-193).
+# cho thư viện đang dùng thì job đỏ (D-078). Chỉ chạy khi repo công khai (D-197).
 name: Security audit
 
 on:

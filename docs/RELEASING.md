@@ -30,7 +30,7 @@ dòng tiếng Anh vào mục `## [Unreleased]` của `CHANGELOG.md`, dưới `Ad
 ## Các bước phát hành
 
 Agent chỉ chuẩn bị bản phát hành và đẩy tag; workflow `Release` (`.github/workflows/release.yml`,
-D-175, D-193) chạy lại gate, build và đăng image Docker (`linux/amd64` và `linux/arm64`) lên
+D-175, D-197) chạy lại gate, build và đăng image Docker (`linux/amd64` và `linux/arm64`) lên
 `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` bằng `GITHUB_TOKEN`, đính kèm chứng thực nguồn gốc build
 và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú từ `CHANGELOG.md`. Workflow chỉ chạy khi
 repo công khai; `./gate.sh` trên máy vẫn là gate bắt buộc trước khi đẩy tag.

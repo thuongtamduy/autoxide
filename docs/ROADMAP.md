@@ -415,22 +415,22 @@ Nhóm A — repo công khai, CI, phát hành (D-175):
       cá nhân. Agent không tự đổi chế độ công khai
       — 13/11/2026 agent đã quét: gitleaks toàn lịch sử mọi nhánh xanh, file không chứa IP thật,
       tên máy hay đường dẫn riêng; email cá nhân trong metadata commit: chủ dự án chọn giữ
-      nguyên (D-193). Còn chờ chủ dự án bấm công khai
+      nguyên (D-197). Còn chờ chủ dự án bấm công khai
 - [ ] Ba workflow tự chạy lại: `ci.yml` (push lên `main`, pull request), `audit.yml` (lịch),
       `release.yml` (tag `vX.Y.Z`) — trigger cũ có trong `git log -p -- .github/workflows`; chạy
       xanh trên GitHub; bỏ ghi chú "TẮT tự chạy (D-107)" ở đầu các file — trigger đã bật lại, job
-      chỉ chạy khi repo công khai (D-193); còn chờ lần chạy xanh đầu tiên sau khi công khai
+      chỉ chạy khi repo công khai (D-197); còn chờ lần chạy xanh đầu tiên sau khi công khai
 - [ ] `release.yml` đăng image `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` bằng `GITHUB_TOKEN`
       (`packages: write`), gói image để công khai; thử với bản phát hành kế tiếp. `docs/RELEASING.md`
       sửa theo: agent chỉ còn đẩy tag, bản phát hành và image do workflow làm — workflow và
-      `RELEASING.md` đã sửa (D-193); còn chờ bản phát hành đầu tiên sau khi công khai, và chủ
+      `RELEASING.md` đã sửa (D-197); còn chờ bản phát hành đầu tiên sau khi công khai, và chủ
       repo đổi gói image sang Public một lần
 - [ ] Secret scanning và push protection của GitHub bật; Dependabot alerts bật; gitleaks trong
       `./gate.sh` giữ nguyên — chủ dự án bật trong Settings → Code security sau khi công khai,
       cùng "Private vulnerability reporting" mà `SECURITY.md` dựa vào
 - [ ] Image Docker cho máy ARM64 (`linux/arm64`) trong workflow `Release` khi repo đã công khai
       (máy build ARM của GitHub miễn phí cho repo công khai; D-078 để sau vì build giả lập quá lâu)
-      — đã có trong `release.yml` (D-193); còn chờ bản phát hành đầu tiên sau khi công khai
+      — đã có trong `release.yml` (D-197); còn chờ bản phát hành đầu tiên sau khi công khai
 
 Nhóm B — file của dự án mã nguồn mở:
 
@@ -447,7 +447,7 @@ Nhóm B — file của dự án mã nguồn mở:
 - [ ] Bản phát hành đáng tin: workflow `Release` (sau nhóm A) đính kèm chứng thực nguồn gốc build
       (GitHub artifact attestation) và danh sách thành phần (SBOM) cho image Docker; `docs/DEPLOY.md`
       (EN + VI) có lệnh kiểm chứng thực trước khi chạy image — đã có trong `release.yml` và
-      `DEPLOY.md` (D-193); còn chờ bản phát hành đầu tiên để kiểm bằng `gh attestation verify`
+      `DEPLOY.md` (D-197); còn chờ bản phát hành đầu tiên để kiểm bằng `gh attestation verify`
 - [x] `cargo xtask check` hay test giữ các file trên không mất và hai bản EN / VI không lệch
       tiêu đề mục (cách làm như kiểm bản dịch i18n), để agent phiên sau không quên sửa một bên
 
