@@ -18,6 +18,9 @@ endpoints are marked deprecated with a sunset date first.
 - `cargo xtask new-module <module> <entity>` creates a new module from the `notes` sample.
 - `autoxide-testkit`: `TestApp` builds modules the way the binary does on a test database and
   calls them through REST and a real MCP client.
+- `content`: a public entry carries `body_media`, the images used in its body (in order of
+  appearance, without repeats) with their size and smaller copies, so a website can build
+  `srcset` and reserve room for them. An image that is no longer public is left out.
 
 ### Changed
 

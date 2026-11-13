@@ -514,6 +514,41 @@ mod publishing {
         .unwrap();
     }
 
+    /// Bản công khai kèm ảnh trong thân bài, theo thứ tự xuất hiện và không lặp (D-168); ảnh
+    /// thôi công khai sau khi đăng thì không còn trong danh sách.
+    #[tokio::test]
+    async fn anh_trong_than_bai_cua_ban_cong_khai() {
+        TestDatabase::run(async |test| {
+            let (content, media, _) = service(test, config(&[])).await;
+            let ada = editor();
+            let (first, second) = (media.add(true), media.add(true));
+            let image = |id: Uuid| json!({"type": "image", "attrs": {"mediaId": id.to_string()}});
+            let mut with_images = post("Gallery");
+            with_images.fields.body = Some(json!({"type": "doc", "content": [
+                image(second),
+                {"type": "blockquote", "content": [image(first)]},
+                image(second),
+            ]}));
+            let gallery = content.create(&ada, with_images).await.unwrap();
+            content.publish(&ada, gallery.id, None, None, false).await.unwrap();
+            let plain = content.create(&ada, post("Plain")).await.unwrap();
+            content.publish(&ada, plain.id, None, None, false).await.unwrap();
+
+            let body_media = async |path: &str| {
+                let Resolved::Entry(row) = resolve(&content, path).await.unwrap() else { panic!() };
+                let view = content.public_views(vec![*row]).await.unwrap().remove(0);
+                view.body_media.into_iter().map(|item| item.id).collect::<Vec<_>>()
+            };
+            assert_eq!(body_media("/blog/gallery").await, [second, first]);
+            assert!(body_media("/blog/plain").await.is_empty());
+
+            media.0.lock().unwrap().insert(second, autoxide_media::api::MediaVisibility::Private);
+            assert_eq!(body_media("/blog/gallery").await, [first]);
+        })
+        .await
+        .unwrap();
+    }
+
     /// Chuyển hướng làm tay: tới địa chỉ, tới mục; chặn vòng lặp và địa chỉ đang có nội dung.
     #[tokio::test]
     async fn chuyen_huong_lam_tay() {
