@@ -1,6 +1,6 @@
 ---
 name: check-library-api
-description: Tra API thật của một thư viện Rust ở đúng phiên bản Autoxide đang ghim, trước khi viết code dùng nó. Dùng mỗi khi sắp gọi một hàm, trait, macro hay feature flag của thư viện mà chưa từng dùng trong repo này; khi thêm hoặc nâng phiên bản một thư viện; khi trình biên dịch báo "no method named", "cannot find", "unresolved import", "trait bound not satisfied", "unrecognized feature" ở code gọi thư viện; hoặc khi định viết theo trí nhớ về SeaORM, axum, utoipa, sqlx, tokio, hmac, sha2, argon2, tower-http. Các thư viện này mới hơn kiến thức có sẵn của model — viết theo trí nhớ là viết sai.
+description: Tra API thật của thư viện Rust ở đúng phiên bản đang ghim trước khi viết code dùng nó. Dùng khi sắp gọi API thư viện chưa từng dùng trong repo, khi thêm hay nâng thư viện, khi trình biên dịch báo "no method named", "unresolved import", "trait bound not satisfied" ở code gọi thư viện. Không viết theo trí nhớ.
 ---
 
 # Tra API thư viện đúng phiên bản

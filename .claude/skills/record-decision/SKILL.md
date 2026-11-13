@@ -1,6 +1,6 @@
 ---
 name: record-decision
-description: Ghi một quyết định có ảnh hưởng lâu dài vào docs/DECISIONS.md của Autoxide đúng mẫu, chỉ thêm không sửa. Dùng mỗi khi agent sắp hoặc vừa tự quyết một việc như đổi hay thêm thư viện, nâng phiên bản Rust hoặc thư viện lớn, thêm hay đổi một quy ước, cần ngoại lệ cho một luật trong CLAUDE.md, chọn giữa hai cách thiết kế, hoặc bỏ một mục khỏi lộ trình; cũng dùng khi chủ dự án chốt một điều mới ("chốt", "quyết định", "đổi sang", "record this decision"). Không dùng cho chi tiết cài đặt thường ngày mà đọc code là thấy.
+description: Ghi quyết định có ảnh hưởng lâu dài vào docs/DECISIONS.md đúng mẫu, chỉ thêm không sửa. Dùng khi đổi hay thêm thư viện, đổi quy ước, cần ngoại lệ cho luật trong CLAUDE.md, chọn giữa hai thiết kế, bỏ mục lộ trình, hoặc chủ dự án "chốt" một điều. Không dùng cho chi tiết cài đặt thường ngày.
 ---
 
 # Ghi một quyết định

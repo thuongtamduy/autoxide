@@ -43,10 +43,8 @@ Thấy đang lạc thì dừng việc đó, quay lại lộ trình và nói rõ 
 
 **Autoxide dùng để làm gì:** làm nền cho một **sản phẩm mới** (không phải bản viết
 lại của hệ thống nào có sẵn). **Ai dùng:** mọi người đều dùng được — không gắn với
-một công ty hay một ngành. **Mã nguồn mở, công khai toàn bộ.** **Module đầu
-tiên:** `media` (thư viện media, D-091) rồi `content` (nội dung, D-096, D-098) — chủ dự án
-chọn cả hai. Tiếp theo: `forms`, `newsletter`, `comments` (D-112), sau phần nền chung cho dữ
-liệu người đọc gửi lên. Giao diện là repo riêng, công khai (D-096, D-097).
+một công ty hay một ngành. **Mã nguồn mở, công khai toàn bộ.** Giao diện là repo riêng,
+công khai (D-096, D-097).
 
 Hệ quả cho agent:
 
@@ -54,10 +52,9 @@ Hệ quả cho agent:
   (đơn hàng, kho, bệnh nhân…) vào core. Thứ đó thuộc về module.
 - Người lạ phải tự cài và dùng được: cấu hình có giá trị mặc định hợp lý, thông báo
   lỗi rõ, tài liệu cài đặt đủ để làm theo mà không cần hỏi ai.
-- Không dựng module nghiệp vụ nào ngoài những module chủ dự án đã giao (`media`,
-  `content`, `forms`, `newsletter`, `comments`, và module mẫu `notes`) khi chủ dự án chưa
-  quyết. Khái niệm của `content` (bài
-  viết, trang, slug…) không vào core.
+- Chỉ dựng module nghiệp vụ chủ dự án đã giao: `media` (D-091), `content` (D-096, D-098),
+  `forms`, `newsletter`, `comments` (D-112), và module mẫu `notes`. Khái niệm của `content`
+  (bài viết, trang, slug…) không vào core.
 - Repo là công khai: mọi file, commit message, comment và tài liệu đều viết với
   giả định người lạ sẽ đọc. Không ghi tên máy chủ, IP, đường dẫn riêng hay thông
   tin cá nhân của chủ dự án. **Công khai không áp cho secret** — secret không bao
@@ -71,8 +68,8 @@ queue, test, lệnh CLI, tài liệu hướng dẫn.
 
 - Một tính năng chỉ chạy trên một database là **chưa xong**, kể cả khi gate của
   database kia xanh.
-- Không dùng kiểu dữ liệu, hàm hay cú pháp chỉ một bên có. Buộc phải rẽ nhánh thì
-  giấu sau một trait và viết test cho cả hai nhánh (chi tiết: mục "Luật dữ liệu").
+- Không dùng kiểu dữ liệu, hàm hay cú pháp chỉ một bên có. Buộc phải rẽ nhánh (vd claim
+  job) thì giấu sau một trait và viết test cho cả hai nhánh.
 - Test mới phải chạy trên cả hai. Không đánh dấu bỏ qua test cho một database.
 - Không thấy cách làm chạy được trên cả hai thì đổi thiết kế, không hạ yêu cầu.
   Muốn bỏ yêu cầu này cho một trường hợp cụ thể thì phải dừng lại hỏi chủ dự án.
@@ -125,27 +122,16 @@ bởi người:
 
 ## Chia agent và subagent
 
-Dự án làm bằng Claude Code. Chủ dự án **cho phép chia agent và subagent, bao nhiêu
-cũng được**, tuỳ tài nguyên máy và độ khó của việc. Trước khi chia, chạy skill
-`split-work`. Ba luật cứng:
-
-- Số agent **co giãn theo máy của người đang dev**, không có con số cố định: đo CPU
-  và RAM còn rảnh trước mỗi lần chia, rồi tăng hay giảm theo việc máy có bị quá
-  tải không. Không ghi số đo của một máy cụ thể vào repo.
-- Mỗi agent biên dịch một git worktree riêng; chia theo ranh giới crate; file dùng
-  chung (`Cargo.toml` gốc, lộ trình, nhật ký quyết định) do agent chính giữ.
-- Agent chính chịu trách nhiệm kết quả: tự kiểm lại báo cáo của subagent và chạy
-  gate trên bản đã gộp trước khi commit.
+Được chia, bao nhiêu tuỳ máy và độ khó — chạy skill `split-work` trước (cách đo, cách chia).
+Luật cứng: số agent theo CPU/RAM còn rảnh, không ghi số đo của máy nào vào repo; mỗi agent
+biên dịch một worktree riêng, file dùng chung do agent chính giữ; agent chính kiểm lại báo
+cáo của subagent và chạy gate trên bản đã gộp trước khi commit.
 
 ## Không đoán API thư viện
 
-Phiên bản thư viện ở đây **mới hơn kiến thức có sẵn của model** (SeaORM 2, utoipa
-6, sqlx 0.9, hmac 0.13, argon2 0.6…). Trước khi dùng một API:
-
-- đọc tài liệu đúng phiên bản đang ghim: `cargo doc -p <crate> --no-deps` hoặc mã
-  nguồn trong `~/.cargo/registry/src/`;
-- để trình biên dịch xác nhận (`cargo check`) trước khi viết tiếp phần dựa vào nó;
-- không chép cú pháp từ trí nhớ về phiên bản cũ rồi coi là đúng.
+Thư viện ở đây **mới hơn kiến thức có sẵn của model** (SeaORM 2, utoipa 6, sqlx 0.9…).
+Dùng API chưa từng dùng trong repo thì tra đúng phiên bản đang ghim bằng skill
+`check-library-api` và để `cargo check` xác nhận; không viết theo trí nhớ.
 
 ## Gate — định nghĩa "xong"
 
@@ -235,9 +221,7 @@ sẵn lệnh.
 - **Tiền:** số nguyên đơn vị nhỏ nhất + mã tiền tệ. Không `f32`/`f64`, không kiểu
   thập phân của database.
 - **Thời gian:** lưu UTC.
-- **Hai database:** không dùng tính năng chỉ SQLite hoặc chỉ Postgres có. Chỗ buộc
-  phải rẽ nhánh theo database (vd claim job) thì giấu sau một trait và test cả
-  hai nhánh.
+- **Hai database:** xem "Luật số một".
 - **Đọc và ghi tách kết nối.** Đọc qua `Database::read()`, ghi qua
   `Database::write()`; nhiều lệnh ghi đi cùng nhau thì `Database::begin_write()`
   (không tự gọi `begin()` trên kết nối). Kết nối đọc bị cấm ghi trên cả hai

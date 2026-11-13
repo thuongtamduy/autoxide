@@ -1,6 +1,6 @@
 ---
 name: split-work
-description: Quyết định có chia việc cho subagent hay không, chia bao nhiêu, và chia thế nào cho an toàn trong dự án Autoxide (Claude Code). Dùng trước khi gọi Agent / subagent / workflow, khi một mục của lộ trình lớn hoặc gồm nhiều phần độc lập, khi cần rà soát code bằng một cặp mắt khác, khi cần tìm hiểu nhiều thư viện hay nhiều vùng code cùng lúc, hoặc khi chủ dự án nói "chia agent", "chạy song song", "dùng subagent", "parallel". Không dùng cho việc nhỏ làm xong trong vài lệnh.
+description: Quyết định có chia việc cho subagent không, chia bao nhiêu và chia sao cho an toàn. Dùng trước khi gọi Agent / subagent / workflow, khi một mục lớn có nhiều phần độc lập, khi cần rà soát bằng cặp mắt khác, hoặc chủ dự án nói "chia agent", "chạy song song". Không dùng cho việc nhỏ.
 ---
 
 # Chia việc cho subagent
