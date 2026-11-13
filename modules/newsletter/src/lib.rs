@@ -254,7 +254,7 @@ pub(crate) mod testing {
 
     /// Service trên database (đã migrate) của test; chống spam không chờ 3 giây.
     pub async fn service(test: &TestDatabase, config: NewsletterConfig) -> Harness {
-        let antispam = AntispamConfig { min_fill: Duration::ZERO, ..AntispamConfig::default() };
+        let antispam = AntispamConfig::default().min_fill(Duration::ZERO);
         service_with(test, config, antispam).await
     }
 

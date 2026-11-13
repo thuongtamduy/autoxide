@@ -167,8 +167,7 @@ async fn khong_double_opt_in_va_bi_giu_lai() {
         assert_eq!(subscriptions(&h.database).await[0].status, "confirmed");
         assert!(h.mailer.sent().is_empty());
 
-        let slow =
-            AntispamConfig { min_fill: Duration::from_secs(60), ..AntispamConfig::default() };
+        let slow = AntispamConfig::default().min_fill(Duration::from_secs(60));
         let strict = service_with(test, config(), slow).await;
         subscribe(&strict.service, "bob@example.com", &["deals"], "203.0.113.10").await.unwrap();
         let held = subscriptions(&strict.database)

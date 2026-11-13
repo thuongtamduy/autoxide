@@ -282,8 +282,7 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
             move |_: Principal, input: ListUsersInput| {
                 let state = list.clone();
                 async move {
-                    let page =
-                        PageInput { limit: input.limit, cursor: input.cursor, order: input.order };
+                    let page = PageInput::new(input.limit, input.cursor, input.order);
                     let page = state.users.list(input.search.as_deref(), &page.page()?).await?;
                     Ok::<Page<UserResponse>, Error>(page.map(UserResponse::from))
                 }

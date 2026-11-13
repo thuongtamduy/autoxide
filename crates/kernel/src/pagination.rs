@@ -61,6 +61,7 @@ pub enum Order {
 /// Query parameters shared by every list endpoint.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
+#[non_exhaustive]
 pub struct PageQuery {
     /// Maximum number of items to return, 1 to 200. Defaults to 50.
     #[param(value_type = Option<u32>, minimum = 1, maximum = 200, example = 50)]
@@ -73,6 +74,13 @@ pub struct PageQuery {
     /// order (and `sort`, where offered) while following `next_cursor`.
     #[param(value_type = Option<Order>, inline)]
     pub order: Option<String>,
+}
+
+impl PageQuery {
+    /// The query parameters exactly as a client sends them (all text, each optional).
+    pub const fn new(limit: Option<String>, cursor: Option<String>, order: Option<String>) -> Self {
+        PageQuery { limit, cursor, order }
+    }
 }
 
 /// Yêu cầu một trang, đã kiểm.
@@ -253,6 +261,7 @@ pub struct Page<T> {
 
 /// How to get the next page.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[non_exhaustive]
 pub struct Pagination {
     /// The limit that was applied to this page.
     #[schema(example = 50)]
@@ -260,6 +269,13 @@ pub struct Pagination {
     /// Pass this as `cursor` to get the next page. `null` means this is the last
     /// page.
     pub next_cursor: Option<String>,
+}
+
+impl Pagination {
+    /// The applied limit and the cursor of the next page (`None` on the last page).
+    pub const fn new(limit: u32, next_cursor: Option<String>) -> Self {
+        Pagination { limit, next_cursor }
+    }
 }
 
 impl<T> Page<T> {

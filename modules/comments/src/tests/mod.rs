@@ -29,7 +29,7 @@ pub(super) const KIND: &str = "content.entry";
 pub(super) const POST: &str = "public-1";
 
 pub(super) fn visitor(ip: &str) -> ClientInfo {
-    ClientInfo { ip: Some(ip.parse::<IpAddr>().unwrap()), ..ClientInfo::default() }
+    ClientInfo::from_ip(ip.parse::<IpAddr>().unwrap())
 }
 
 pub(super) async fn token(service: &CommentsService, kind: &str) -> String {

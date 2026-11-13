@@ -126,18 +126,16 @@ impl NewsletterService {
                 "{preheader}{body}\n<hr>\n<p style=\"font-size:12px;color:#666666\">{footer}</p>\n"
             )
         });
-        Ok(Mail {
-            to: to.to_owned(),
-            subject,
-            text,
-            html,
-            headers: vec![
-                ("List-Unsubscribe".to_owned(), format!("<{unsubscribe}>")),
-                ("List-Unsubscribe-Post".to_owned(), "List-Unsubscribe=One-Click".to_owned()),
-            ],
-            dedupe_key: delivery_id.map(delivery_key),
-            ..Mail::default()
-        })
+        let mut mail = Mail::new(to, subject, text)
+            .header("List-Unsubscribe", format!("<{unsubscribe}>"))
+            .header("List-Unsubscribe-Post", "List-Unsubscribe=One-Click");
+        if let Some(html) = html {
+            mail = mail.html(html);
+        }
+        if let Some(id) = delivery_id {
+            mail = mail.dedupe_key(delivery_key(id));
+        }
+        Ok(mail)
     }
 }
 

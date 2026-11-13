@@ -116,12 +116,8 @@ async fn database(test: &TestDatabase) -> Database {
 }
 
 fn text(provider: Box<dyn providers::Provider>, book: Arc<UsageBook>) -> Text {
-    let capabilities = autoxide_kernel::ai::Capabilities {
-        enabled: true,
-        provider: "x".into(),
-        model: "model-x".into(),
-        images: true,
-    };
+    let capabilities =
+        autoxide_kernel::ai::Capabilities::enabled("x".into(), "model-x".into()).images(true);
     Text { provider: Some(provider), capabilities, book }
 }
 
@@ -135,14 +131,10 @@ fn schema() -> Value {
 }
 
 fn prompt(input: Vec<Part>) -> Prompt {
-    Prompt {
-        purpose: "test.title",
-        instructions: "Write a title.".into(),
-        input,
-        output_schema: schema(),
-        effort: Effort::Low,
-        max_output_tokens: 500,
-    }
+    Prompt::new("test.title", "Write a title.".into(), schema())
+        .input(input)
+        .effort(Effort::Low)
+        .max_output_tokens(500)
 }
 
 fn anthropic_answer(text: &str, stop: &str) -> Value {
@@ -391,7 +383,7 @@ async fn cong_token_dong_thoi() {
             .map(|_| {
                 let book = book.clone();
                 tokio::spawn(async move {
-                    let usage = autoxide_kernel::ai::Usage { input_tokens: 3, output_tokens: 2 };
+                    let usage = autoxide_kernel::ai::Usage::new(3, 2);
                     book.record("test.parallel", usage).await
                 })
             })

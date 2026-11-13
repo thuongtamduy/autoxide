@@ -120,15 +120,11 @@ mod tests {
 
     #[test]
     fn audit_khong_giu_email_cua_mail_bi_tu_choi() {
-        let event = Delivered {
-            id: uuid::Uuid::now_v7(),
-            module: "mail",
-            name: "mail.delivery_failed".to_owned(),
-            actor: autoxide_kernel::event::Actor::system(),
-            subject: None,
-            payload: json!({"to": " Ada@Example.com", "dedupe_key": null, "code": "550"}),
-            occurred_at: Utc::now(),
-        };
+        let event = Delivered::new(
+            "mail",
+            "mail.delivery_failed".to_owned(),
+            json!({"to": " Ada@Example.com", "dedupe_key": null, "code": "550"}),
+        );
         let stored = redacted(&event);
         let expected = autoxide_kernel::secret::sha256("ada@example.com");
         assert_eq!(stored["to"], format!("sha256:{expected}"));
@@ -182,15 +178,14 @@ mod database_tests {
             let database = database(test).await;
             let recorder = Recorder::new(database.clone());
             let user = Uuid::now_v7();
-            let event = Delivered {
-                id: Uuid::now_v7(),
-                module: "notes",
-                name: "notes.note_renamed".to_owned(),
-                actor: Actor::user(user),
-                subject: Some("notes.note:1".to_owned()),
-                payload: json!({"before": {"title": "a"}, "after": {"title": "b"}}),
-                occurred_at: Utc::now().trunc_subsecs(6),
-            };
+            let event = Delivered::new(
+                "notes",
+                "notes.note_renamed".to_owned(),
+                json!({"before": {"title": "a"}, "after": {"title": "b"}}),
+            )
+            .actor(Actor::user(user))
+            .subject(Some("notes.note:1".to_owned()))
+            .occurred_at(Utc::now().trunc_subsecs(6));
 
             recorder.handle(&event).await.unwrap();
             recorder.handle(&event).await.unwrap();
@@ -219,14 +214,11 @@ mod database_tests {
             let recorder = Recorder::new(database.clone());
             let user = Uuid::now_v7();
             let subject = Some(format!("auth.user:{user}"));
-            let happened = |name: &str, subject: Option<String>, payload| Delivered {
-                id: Uuid::now_v7(),
-                module: "auth",
-                name: name.to_owned(),
-                actor: Actor::user(user),
-                subject,
-                payload,
-                occurred_at: Utc::now().trunc_subsecs(6),
+            let happened = |name: &str, subject: Option<String>, payload| {
+                Delivered::new("auth", name.to_owned(), payload)
+                    .actor(Actor::user(user))
+                    .subject(subject)
+                    .occurred_at(Utc::now().trunc_subsecs(6))
             };
             let created = happened(
                 "auth.user_created",

@@ -78,8 +78,11 @@ pub trait Event: Serialize {
     const NAME: &'static str;
 }
 
-/// Ai gây ra một thay đổi. Ghi kèm mọi event (để audit biết "ai").
+/// Ai gây ra một thay đổi. Ghi kèm mọi event (để audit biết "ai"). Dựng bằng
+/// [`Actor::system`], [`Actor::user`], [`Actor::api_key`], [`Actor::public`] hay từ
+/// `&Principal`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub struct Actor {
     /// Người dùng; `None` khi là hệ thống (lệnh CLI, job…).
     pub user_id: Option<Uuid>,
@@ -99,6 +102,11 @@ impl Actor {
     /// Người dùng `user_id` (không qua API key).
     pub fn user(user_id: Uuid) -> Self {
         Actor { user_id: Some(user_id), ..Actor::default() }
+    }
+
+    /// User `user_id` acting through API key `api_key_id`.
+    pub const fn api_key(user_id: Uuid, api_key_id: Uuid) -> Self {
+        Actor { user_id: Some(user_id), api_key_id: Some(api_key_id), public: false }
     }
 
     /// Người lạ chưa đăng nhập.
@@ -128,8 +136,9 @@ impl From<&crate::access::Principal> for Actor {
     }
 }
 
-/// Một event đang được giao cho bên nhận.
+/// Một event đang được giao cho bên nhận. Bên nhận đọc; test dựng bằng [`Delivered::new`].
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct Delivered {
     pub id: Uuid,
     /// Module phát event.
@@ -140,6 +149,46 @@ pub struct Delivered {
     pub subject: Option<String>,
     pub payload: serde_json::Value,
     pub occurred_at: DateTime<Utc>,
+}
+
+impl Delivered {
+    /// Event `name` of module `module`, with a new id, done by the system just now, about no
+    /// particular record.
+    pub fn new(module: &'static str, name: impl Into<String>, payload: serde_json::Value) -> Self {
+        Delivered {
+            id: Uuid::now_v7(),
+            module,
+            name: name.into(),
+            actor: Actor::system(),
+            subject: None,
+            payload,
+            occurred_at: Utc::now(),
+        }
+    }
+
+    /// Sets the event id.
+    pub const fn id(mut self, id: Uuid) -> Self {
+        self.id = id;
+        self
+    }
+
+    /// Sets who caused the change.
+    pub const fn actor(mut self, actor: Actor) -> Self {
+        self.actor = actor;
+        self
+    }
+
+    /// Sets the changed record, as `<kind>:<id>`.
+    pub fn subject(mut self, subject: Option<String>) -> Self {
+        self.subject = subject;
+        self
+    }
+
+    /// Sets when the change happened.
+    pub const fn occurred_at(mut self, occurred_at: DateTime<Utc>) -> Self {
+        self.occurred_at = occurred_at;
+        self
+    }
 }
 
 /// Bên nhận event. Trả lỗi thì event được giao lại sau.

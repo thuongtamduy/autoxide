@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::{Actor, Delivered, EventHandler};
+use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::pagination::{Order, PageRequest};
 use autoxide_kernel::privacy::{PersonalData, USER_DELETED};
 use autoxide_kernel::resource::{Resource, ResourceResolver};
@@ -261,27 +261,23 @@ struct Entries;
 #[async_trait::async_trait]
 impl ResourceResolver for Entries {
     async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
-        Ok(Some(Resource {
-            public: !id.starts_with("00000000"),
-            title: "A new post".to_owned(),
-            summary: "What it is about.".to_owned(),
-            url: Some("/blog/a-new-post".to_owned()),
-            locale: Some("en".to_owned()),
-            owner_user_ids: Vec::new(),
-        }))
+        Ok(Some(
+            Resource::new("A new post")
+                .public(!id.starts_with("00000000"))
+                .summary("What it is about.")
+                .url(Some("/blog/a-new-post".to_owned()))
+                .locale(Some("en".to_owned())),
+        ))
     }
 }
 
 fn published(entry: Uuid, kind: &str) -> Delivered {
-    Delivered {
-        id: Uuid::now_v7(),
-        module: "content",
-        name: ENTRY_PUBLISHED.to_owned(),
-        actor: Actor::system(),
-        subject: Some(format!("content.entry:{entry}")),
-        payload: json!({"published": {"entry_id": entry, "kind": kind, "locale": "en"}}),
-        occurred_at: chrono::Utc::now(),
-    }
+    Delivered::new(
+        "content",
+        ENTRY_PUBLISHED.to_owned(),
+        json!({"published": {"entry_id": entry, "kind": kind, "locale": "en"}}),
+    )
+    .subject(Some(format!("content.entry:{entry}")))
 }
 
 /// Bài mới: event giao hai lần (kể cả song song) chỉ sinh một chiến dịch mỗi danh sách; chế độ
@@ -362,15 +358,11 @@ async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
         let weekly = h.service.create_list(&owner, input).await.unwrap();
         let exported = h.service.export(owner.user_id()).await.unwrap();
         assert_eq!(exported["lists"][0]["key"], "weekly");
-        let deleted = Delivered {
-            id: Uuid::now_v7(),
-            module: "auth",
-            name: USER_DELETED.to_owned(),
-            actor: Actor::system(),
-            subject: None,
-            payload: json!({"before": {"id": owner.user_id()}}),
-            occurred_at: chrono::Utc::now(),
-        };
+        let deleted = Delivered::new(
+            "auth",
+            USER_DELETED.to_owned(),
+            json!({"before": {"id": owner.user_id()}}),
+        );
         h.service.handle(&deleted).await.unwrap();
         h.service.handle(&deleted).await.unwrap();
         assert_eq!(h.service.get_list(&owner, weekly.row.id).await.unwrap().row.created_by, None);

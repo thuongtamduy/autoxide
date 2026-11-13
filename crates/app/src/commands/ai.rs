@@ -68,19 +68,17 @@ async fn report(text: Arc<dyn TextModel>, embedder: Arc<dyn Embedder>) -> (Strin
     let mut healthy = true;
     let capabilities = text.capabilities();
     if capabilities.enabled {
-        let prompt = Prompt {
-            purpose: "ai.check",
-            instructions: "Reply with the word `ok` in the field `answer`.".to_owned(),
-            input: vec![Part::Text("Health check.".to_owned())],
-            output_schema: json!({
-                "type": "object",
-                "properties": {"answer": {"type": "string"}},
-                "required": ["answer"],
-                "additionalProperties": false
-            }),
-            effort: Effort::Low,
-            max_output_tokens: 1024,
-        };
+        let schema = json!({
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+            "additionalProperties": false
+        });
+        let instructions = "Reply with the word `ok` in the field `answer`.".to_owned();
+        let prompt = Prompt::new("ai.check", instructions, schema)
+            .input(vec![Part::Text("Health check.".to_owned())])
+            .effort(Effort::Low)
+            .max_output_tokens(1024);
         match text.generate(prompt).await {
             Ok(done) => lines.push_str(&format!(
                 "Text generation: works ({} {}, answered by {}, {} tokens).\n",

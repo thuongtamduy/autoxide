@@ -200,7 +200,7 @@ pub(crate) mod testing {
         test: &TestDatabase,
         config: FormsConfig,
     ) -> (Arc<FormsService>, Arc<FakeMailer>, Database) {
-        let antispam = AntispamConfig { min_fill: Duration::ZERO, ..AntispamConfig::default() };
+        let antispam = AntispamConfig::default().min_fill(Duration::ZERO);
         service_with(test, config, antispam).await
     }
 

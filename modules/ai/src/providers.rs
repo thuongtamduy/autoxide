@@ -201,10 +201,7 @@ impl Anthropic {
             + count("cache_read_input_tokens").unwrap_or(0);
         Ok(Raw {
             output: parse_output(&text),
-            usage: Usage {
-                input_tokens: input,
-                output_tokens: count("output_tokens").unwrap_or(0),
-            },
+            usage: Usage::new(input, count("output_tokens").unwrap_or(0)),
             model: answer.get("model").and_then(Value::as_str).unwrap_or_default().to_owned(),
         })
     }
@@ -322,10 +319,10 @@ impl OpenAi {
         };
         Ok(Raw {
             output: parse_output(text),
-            usage: Usage {
-                input_tokens: count("prompt_tokens").unwrap_or(0),
-                output_tokens: count("completion_tokens").unwrap_or(0),
-            },
+            usage: Usage::new(
+                count("prompt_tokens").unwrap_or(0),
+                count("completion_tokens").unwrap_or(0),
+            ),
             model: answer.get("model").and_then(Value::as_str).unwrap_or_default().to_owned(),
         })
     }

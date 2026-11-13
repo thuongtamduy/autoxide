@@ -61,13 +61,8 @@ async fn setup_with_database(
 }
 
 fn welcome(to: &str) -> Mail {
-    Mail {
-        to: to.to_owned(),
-        subject: "Welcome".to_owned(),
-        text: "Hello Ada, your account is ready.".to_owned(),
-        html: Some("<p>Hello Ada, your account is ready.</p>".to_owned()),
-        ..Mail::default()
-    }
+    Mail::new(to, "Welcome", "Hello Ada, your account is ready.")
+        .html("<p>Hello Ada, your account is ready.</p>".to_owned())
 }
 
 #[tokio::test]

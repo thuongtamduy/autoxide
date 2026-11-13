@@ -53,8 +53,7 @@ pub(crate) fn all(service: &Arc<AuditService>) -> Vec<Tool> {
             move |_: Principal, input: ListEntriesInput| {
                 let service = list.clone();
                 async move {
-                    let page =
-                        PageInput { limit: input.limit, cursor: input.cursor, order: input.order };
+                    let page = PageInput::new(input.limit, input.cursor, input.order);
                     let filter = Filter {
                         actor_user_id: input.actor_user_id,
                         subject: input.subject,
@@ -81,7 +80,7 @@ pub(crate) fn all(service: &Arc<AuditService>) -> Vec<Tool> {
 mod tests {
     use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
     use autoxide_kernel::database::Database;
-    use autoxide_kernel::event::{Actor, Delivered, EventHandler};
+    use autoxide_kernel::event::{Delivered, EventHandler};
     use autoxide_kernel::migration::{Migrator, ModuleMigrations};
     use autoxide_testkit::TestDatabase;
     use serde_json::json;
@@ -103,15 +102,7 @@ mod tests {
                 .unwrap();
             let recorder = crate::recorder::Recorder::new(database.clone());
             for (module, name) in [("auth", "auth.user_updated"), ("files", "files.file_deleted")] {
-                let event = Delivered {
-                    id: Uuid::now_v7(),
-                    module,
-                    name: name.to_owned(),
-                    actor: Actor::system(),
-                    subject: None,
-                    payload: json!({"after": {"x": 1}}),
-                    occurred_at: chrono::Utc::now(),
-                };
+                let event = Delivered::new(module, name.to_owned(), json!({"after": {"x": 1}}));
                 recorder.handle(&event).await.unwrap();
             }
             let tools = all(&Arc::new(AuditService::new(database)));

@@ -46,8 +46,9 @@ pub enum Part {
     },
 }
 
-/// Một yêu cầu sinh kết quả có cấu trúc.
+/// Một yêu cầu sinh kết quả có cấu trúc. Dựng bằng [`Prompt::new`].
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Prompt {
     /// `<module>.<việc>` (vd `content.translate`): dùng cho hạn mức, log và metrics — là một
     /// tập nhỏ cố định do code khai, không bao giờ là dữ liệu người dùng.
@@ -63,15 +64,60 @@ pub struct Prompt {
     pub max_output_tokens: u32,
 }
 
+impl Prompt {
+    /// A request with no input yet, [`Effort::Low`] and at most
+    /// [`DEFAULT_MAX_OUTPUT_TOKENS`](Self::DEFAULT_MAX_OUTPUT_TOKENS) output tokens.
+    pub const fn new(purpose: &'static str, instructions: String, output_schema: Value) -> Self {
+        Prompt {
+            purpose,
+            instructions,
+            input: Vec::new(),
+            output_schema,
+            effort: Effort::Low,
+            max_output_tokens: Self::DEFAULT_MAX_OUTPUT_TOKENS,
+        }
+    }
+
+    /// Output token limit of [`Prompt::new`].
+    pub const DEFAULT_MAX_OUTPUT_TOKENS: u32 = 1024;
+
+    /// Sets the data to process.
+    pub fn input(mut self, input: Vec<Part>) -> Self {
+        self.input = input;
+        self
+    }
+
+    /// Sets how much effort the model spends thinking.
+    pub const fn effort(mut self, effort: Effort) -> Self {
+        self.effort = effort;
+        self
+    }
+
+    /// Sets the maximum number of output tokens.
+    pub const fn max_output_tokens(mut self, max_output_tokens: u32) -> Self {
+        self.max_output_tokens = max_output_tokens;
+        self
+    }
+}
+
 /// Số token một lời gọi đã dùng (để tính hạn mức và chi phí).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Usage {
     pub input_tokens: u64,
     pub output_tokens: u64,
 }
 
+impl Usage {
+    /// Tokens read and written by one call.
+    pub const fn new(input_tokens: u64, output_tokens: u64) -> Self {
+        Usage { input_tokens, output_tokens }
+    }
+}
+
 /// Kết quả của [`TextModel::generate`].
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct Generation {
     /// Đã khớp `output_schema` (đã được kiểm lại, không tin nhà cung cấp).
     pub output: Value,
@@ -80,8 +126,17 @@ pub struct Generation {
     pub model: String,
 }
 
-/// Mô hình đang dùng làm được gì.
+impl Generation {
+    /// A result: the output, the tokens used and the model that answered.
+    pub const fn new(output: Value, usage: Usage, model: String) -> Self {
+        Generation { output, usage, model }
+    }
+}
+
+/// Mô hình đang dùng làm được gì. Dựng bằng [`Capabilities::disabled`] hay
+/// [`Capabilities::enabled`].
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub struct Capabilities {
     /// AI đã được bật và cấu hình.
     pub enabled: bool,
@@ -90,6 +145,30 @@ pub struct Capabilities {
     pub model: String,
     /// Nhận ảnh làm đầu vào (cho gợi ý alt text).
     pub images: bool,
+}
+
+impl Capabilities {
+    /// AI is off: no provider, no model, no images (same as `Default`).
+    pub const fn disabled() -> Self {
+        Capabilities {
+            enabled: false,
+            provider: String::new(),
+            model: String::new(),
+            images: false,
+        }
+    }
+
+    /// AI is on with this provider and model; images are not accepted until
+    /// [`images`](Self::images) says so.
+    pub const fn enabled(provider: String, model: String) -> Self {
+        Capabilities { enabled: true, provider, model, images: false }
+    }
+
+    /// Sets whether the model accepts images as input.
+    pub const fn images(mut self, images: bool) -> Self {
+        self.images = images;
+        self
+    }
 }
 
 /// Mô hình sinh chữ.

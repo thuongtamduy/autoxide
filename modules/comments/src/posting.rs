@@ -270,17 +270,14 @@ impl CommentsService {
         let checked = self
             .guard
             .check(
-                &Check {
-                    scope: &scope,
-                    principal,
-                    client,
-                    honeypot: input.trap.as_deref(),
-                    form_token: input.form_token.as_deref(),
-                    challenge: input.challenge.as_deref(),
-                    email: if guest { email.as_deref() } else { None },
-                    content: Some(&body),
-                    duplicate,
-                },
+                &Check::new(&scope, client)
+                    .principal(principal)
+                    .honeypot(input.trap.as_deref())
+                    .form_token(input.form_token.as_deref())
+                    .challenge(input.challenge.as_deref())
+                    .email(if guest { email.as_deref() } else { None })
+                    .content(Some(&body))
+                    .duplicate(duplicate),
                 &limits,
             )
             .await?;
@@ -564,11 +561,10 @@ impl CommentsService {
     /// Giới hạn số lần (theo IP băm, email, người dùng), trên bảng `comments_throttle`.
     fn limits(&self) -> Result<Limits, Error> {
         let throttle = |limit: u32| Throttle::new(self.database.clone(), MODULE, limit, HOUR);
-        Ok(Limits {
-            ip: Some(throttle(self.config.per_ip_per_hour)?),
-            email: Some(throttle(self.config.per_email_per_hour)?),
-            user: Some(throttle(self.config.per_user_per_hour)?),
-        })
+        Ok(Limits::default()
+            .ip(Some(throttle(self.config.per_ip_per_hour)?))
+            .email(Some(throttle(self.config.per_email_per_hour)?))
+            .user(Some(throttle(self.config.per_user_per_hour)?)))
     }
 }
 

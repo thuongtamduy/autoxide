@@ -143,17 +143,14 @@ impl FormsService {
         let checked = self
             .guard
             .check(
-                &Check {
-                    scope: &scope,
-                    principal: trusted,
-                    client,
-                    honeypot: input.trap.as_deref(),
-                    form_token: input.form_token.as_deref(),
-                    challenge: input.challenge.as_deref(),
-                    email: email.as_deref(),
-                    content: Some(&answers.text),
-                    duplicate,
-                },
+                &Check::new(&scope, client)
+                    .principal(trusted)
+                    .honeypot(input.trap.as_deref())
+                    .form_token(input.form_token.as_deref())
+                    .challenge(input.challenge.as_deref())
+                    .email(email.as_deref())
+                    .content(Some(&answers.text))
+                    .duplicate(duplicate),
                 &limits,
             )
             .await?;
@@ -249,14 +246,13 @@ impl FormsService {
             own.and_then(|own| u32::try_from(own).ok()).filter(|own| *own > 0).unwrap_or(default)
         };
         let throttle = |limit: u32| Throttle::new(self.database.clone(), "forms", limit, HOUR);
-        Ok(Limits {
-            ip: Some(throttle(limit(form.row.ip_limit_per_hour, self.config.per_ip_per_hour))?),
-            email: Some(throttle(limit(
+        Ok(Limits::default()
+            .ip(Some(throttle(limit(form.row.ip_limit_per_hour, self.config.per_ip_per_hour))?))
+            .email(Some(throttle(limit(
                 form.row.email_limit_per_hour,
                 self.config.per_email_per_hour,
-            ))?),
-            user: Some(throttle(self.config.per_user_per_hour)?),
-        })
+            ))?))
+            .user(Some(throttle(self.config.per_user_per_hour)?)))
     }
 }
 

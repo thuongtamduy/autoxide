@@ -20,8 +20,9 @@ pub const DELIVERY_FAILED: &str = "mail.delivery_failed";
 pub const ALLOWED_HEADERS: [&str; 4] =
     ["List-Unsubscribe", "List-Unsubscribe-Post", "List-Id", "Auto-Submitted"];
 
-/// Một mail cần gửi. Dựng bằng `Mail { to, subject, text, ..Mail::default() }`.
+/// Một mail cần gửi. Dựng bằng [`Mail::new`] rồi các hàm đặt từng trường.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub struct Mail {
     /// Địa chỉ người nhận (`ada@example.com` hoặc `Ada <ada@example.com>`).
     pub to: String,
@@ -40,6 +41,43 @@ pub struct Mail {
 }
 
 impl Mail {
+    /// A plain-text mail to `to`, without HTML, reply address, extra headers or dedupe key.
+    pub fn new(to: impl Into<String>, subject: impl Into<String>, text: impl Into<String>) -> Self {
+        Mail {
+            to: to.into(),
+            subject: subject.into(),
+            text: text.into(),
+            html: None,
+            reply_to: None,
+            headers: Vec::new(),
+            dedupe_key: None,
+        }
+    }
+
+    /// Sets the HTML body.
+    pub fn html(mut self, html: String) -> Self {
+        self.html = Some(html);
+        self
+    }
+
+    /// Sets the address replies go to.
+    pub fn reply_to(mut self, reply_to: String) -> Self {
+        self.reply_to = Some(reply_to);
+        self
+    }
+
+    /// Adds one extra header; only names in [`ALLOWED_HEADERS`] are sent.
+    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.headers.push((name.into(), value.into()));
+        self
+    }
+
+    /// Sets the key that keeps the same mail from being queued twice.
+    pub fn dedupe_key(mut self, dedupe_key: String) -> Self {
+        self.dedupe_key = Some(dedupe_key);
+        self
+    }
+
     /// Lỗi của các header riêng: tên ngoài [`ALLOWED_HEADERS`], giá trị có ký tự xuống dòng
     /// (chèn header giả) hay dài quá 998 ký tự (giới hạn một dòng của RFC 5322).
     pub fn header_problems(&self) -> Vec<FieldError> {
@@ -138,12 +176,7 @@ impl MailTemplate {
         params: &[(&str, &str)],
     ) -> Mail {
         let rendered = self.render(translations, language, params);
-        Mail {
-            to: to.to_owned(),
-            subject: rendered.subject,
-            text: rendered.text,
-            ..Mail::default()
-        }
+        Mail::new(to, rendered.subject, rendered.text)
     }
 }
 

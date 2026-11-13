@@ -15,7 +15,7 @@ dùng, đừng tự chế cách khác.
 | Giới hạn số lần | `Throttle::new(db, "<module>", limit, window)`, bảng `throttle_migration` | D-116 |
 | Token dùng một lần (xác nhận email…) | `OneTimeTokens::new("<module>")`, bảng `tokens_migration` | D-117 |
 | Chống spam bài gửi công khai | `context.require::<SpamGuard>()?`, bảng `antispam_migration` | D-119, D-120 |
-| Gửi mail | `dyn Mailer`, `Mail { …, reply_to, headers, dedupe_key, ..Mail::default() }` | D-121 |
+| Gửi mail | `dyn Mailer`, `Mail::new(to, subject, text).reply_to(…).header(…).dedupe_key(…)` (D-170) | D-121 |
 | Mail bị từ chối hẳn | nghe event `autoxide_kernel::mail::DELIVERY_FAILED` | D-121 |
 | Event do người lạ gây ra | `Actor::public()`; bảng event thêm `outbox_actor_migration` | D-122 |
 | Tra đối tượng của module khác | `context.resources()` → `resolve("content.entry", id)` | D-123 |
@@ -45,7 +45,7 @@ autoxide_kernel::tokens::tokens_migration("m00f_create_tokens", "newsletter"),
 - Phạm vi (`scope`): `forms:<key của form>`, `newsletter:subscribe`, `comments:<target_type>`.
 - Hai pha:
   1. Kiểm dữ liệu của module (báo mọi lỗi một lần, D-083) → dò trùng nếu cần (`content_hash`) →
-     `guard.check(&Submission { … }, &limits).await?`. Mọi việc gọi mạng ở pha này.
+     `guard.check(&Submission::new(scope, client).email(…).content(…), &limits).await?` (D-170). Mọi việc gọi mạng ở pha này.
   2. `Verdict::Discard` → không ghi gì, trả lời như thành công. `Accept` / `Quarantine` → mở
      transaction, tạo bản ghi (`Quarantine` thì lưu ở trạng thái chờ / spam, kèm lý do), ghi event
      bằng `Actor::public()` (hoặc `Actor::from(&principal)`), rồi

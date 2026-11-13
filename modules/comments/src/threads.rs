@@ -47,10 +47,7 @@ impl CommentsService {
     ) -> Result<Page<ThreadRoot>, Error> {
         let target = self.target(kind, id).await?;
         if target.hidden {
-            return Ok(Page {
-                data: Vec::new(),
-                pagination: Pagination { limit: page.limit(), next_cursor: None },
-            });
+            return Ok(Page { data: Vec::new(), pagination: Pagination::new(page.limit(), None) });
         }
         let select = comment::Entity::find()
             .filter(comment::Column::TargetType.eq(kind))

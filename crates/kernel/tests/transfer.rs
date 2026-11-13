@@ -201,10 +201,7 @@ async fn chep_qua_lai_giu_nguyen_moi_kieu() {
         let copied = copy_modules(&first, &middle, &["shop"]).await.unwrap();
         assert_eq!(
             copied,
-            [
-                CopiedTable { table: "shop_item".to_owned(), rows: 250 },
-                CopiedTable { table: "shop_tag".to_owned(), rows: 250 },
-            ]
+            [CopiedTable::new("shop_item", 250), CopiedTable::new("shop_tag", 250),]
         );
         copy_modules(&middle, &last, &["shop"]).await.unwrap();
 

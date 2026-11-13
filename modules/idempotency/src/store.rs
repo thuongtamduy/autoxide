@@ -108,11 +108,9 @@ impl IdempotencyStore for Store {
                     .transpose()
                     .map_err(Error::internal)?
                     .unwrap_or_default();
-                return Ok(Begin::Replay(StoredResponse {
-                    status: u16::try_from(status).map_err(Error::internal)?,
-                    headers,
-                    body: row.body.unwrap_or_default(),
-                }));
+                let status = u16::try_from(status).map_err(Error::internal)?;
+                let body = row.body.unwrap_or_default();
+                return Ok(Begin::Replay(StoredResponse::new(status, headers, body)));
             }
             if row.locked_until > now {
                 return Ok(Begin::InProgress);
@@ -506,7 +504,7 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(store.begin("s", "k", "f", soon).await.unwrap(), Begin::Started { id });
-            let stored = StoredResponse { status: 201, headers: vec![], body: b"ok".to_vec() };
+            let stored = StoredResponse::new(201, vec![], b"ok".to_vec());
             store.complete(id, stored.clone()).await.unwrap();
             assert_eq!(store.begin("s", "k", "f", soon).await.unwrap(), Begin::Replay(stored));
             // Người gọi khác dùng cùng key: không đụng nhau.
@@ -521,12 +519,7 @@ mod tests {
                 .exec(database.write())
                 .await
                 .unwrap();
-            let context = JobContext {
-                id: Uuid::now_v7(),
-                kind: CLEANUP.to_owned(),
-                payload: serde_json::Value::Null,
-                attempt: 1,
-            };
+            let context = JobContext::new(CLEANUP, serde_json::Value::Null, 1);
             Cleanup::new(database.clone()).run(&context).await.unwrap();
             assert!(matches!(
                 store.begin("s", "k", "different", soon).await.unwrap(),

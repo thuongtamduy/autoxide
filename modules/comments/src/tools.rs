@@ -113,11 +113,11 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
                         search: input.q,
                     };
                     let page = page_request(
-                        PageQuery {
-                            limit: input.limit.map(|limit| limit.to_string()),
-                            cursor: input.cursor,
-                            order: input.order,
-                        },
+                        PageQuery::new(
+                            input.limit.map(|limit| limit.to_string()),
+                            input.cursor,
+                            input.order,
+                        ),
                         problems,
                     )?;
                     let found = service.queue(&principal, &filter, &page).await?;

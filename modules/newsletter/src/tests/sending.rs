@@ -1,9 +1,8 @@
 //! Gửi chiến dịch, huỷ một chạm, trang lựa chọn, bounce, hẹn giờ.
 
-use autoxide_kernel::event::{Actor, Delivered, EventHandler};
+use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_testkit::TestDatabase;
 use serde_json::json;
-use uuid::Uuid;
 
 use super::{
     assert_once_each, campaign, count_events, emails, import, list, next_job, run_job, send,
@@ -325,15 +324,7 @@ async fn bounce_chan_dia_chi() {
         send(&h.service, draft.row.id).await;
         drain(&h).await;
         let mail = h.mailer.to(&people[0]).remove(0);
-        let failed = Delivered {
-            id: Uuid::now_v7(),
-            module: "mail",
-            name: autoxide_kernel::mail::DELIVERY_FAILED.to_owned(),
-            actor: Actor::system(),
-            subject: None,
-            payload: json!({"to": format!("Reader <{}>", people[0]), "dedupe_key": mail.dedupe_key, "code": "550"}),
-            occurred_at: chrono::Utc::now(),
-        };
+        let failed = Delivered::new("mail", autoxide_kernel::mail::DELIVERY_FAILED.to_owned(), json!({"to": format!("Reader <{}>", people[0]), "dedupe_key": mail.dedupe_key, "code": "550"}));
         let handler = DeliveryFailures(h.service.clone());
         handler.handle(&failed).await.unwrap();
         handler.handle(&failed).await.unwrap();

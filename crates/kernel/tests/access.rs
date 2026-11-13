@@ -52,7 +52,7 @@ fn app(authenticator: Option<Arc<dyn Authenticator>>) -> Router {
         &config,
         OpenApiRouter::new(),
         vec![("notes", routes)],
-        http::Extras { authenticator, ..Default::default() },
+        http::Extras::default().authenticator(authenticator),
     )
     .router
 }

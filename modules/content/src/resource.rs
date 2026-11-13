@@ -32,22 +32,13 @@ impl ResourceResolver for EntryResolver {
         // `false` và không đưa tiêu đề, tóm tắt của bản nháp ra ngoài — module khác có thể chép
         // chúng vào mail gửi người lạ (D-150).
         Ok(Some(match published::Entity::find_by_id(id).one(read).await? {
-            Some(live) => Resource {
-                public: true,
-                title: live.title,
-                summary: live.excerpt,
-                url: Some(live.path),
-                locale: Some(live.locale),
-                owner_user_ids: owners,
-            },
-            None => Resource {
-                public: false,
-                title: String::new(),
-                summary: String::new(),
-                url: None,
-                locale: Some(draft.locale),
-                owner_user_ids: owners,
-            },
+            Some(live) => Resource::new(live.title)
+                .public(true)
+                .summary(live.excerpt)
+                .url(Some(live.path))
+                .locale(Some(live.locale))
+                .owner_user_ids(owners),
+            None => Resource::new(String::new()).locale(Some(draft.locale)).owner_user_ids(owners),
         }))
     }
 }

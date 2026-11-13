@@ -57,12 +57,11 @@ impl FakeTextModel {
 #[async_trait::async_trait]
 impl TextModel for FakeTextModel {
     fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            enabled: self.enabled,
-            provider: "fake".to_owned(),
-            model: "fake-model".to_owned(),
-            images: self.images,
-        }
+        let mut capabilities =
+            Capabilities::enabled("fake".to_owned(), "fake-model".to_owned()).images(self.images);
+        // Bản đã tắt vẫn khai tên giả, như trước.
+        capabilities.enabled = self.enabled;
+        capabilities
     }
 
     fn ready(&self) -> Result<(), Error> {
@@ -84,11 +83,7 @@ impl TextModel for FakeTextModel {
                 "The fake answer has the wrong shape.",
             ));
         }
-        Ok(Generation {
-            output,
-            usage: Usage { input_tokens: 1, output_tokens: 1 },
-            model: "fake-model".to_owned(),
-        })
+        Ok(Generation::new(output, Usage::new(1, 1), "fake-model".to_owned()))
     }
 }
 

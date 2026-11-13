@@ -109,7 +109,7 @@ impl Fanout {
             }
             Err(error) => return Err(error.into()),
         }
-        let options = EnqueueOptions { max_attempts: Some(MAX_ATTEMPTS), ..Default::default() };
+        let options = EnqueueOptions::default().max_attempts(MAX_ATTEMPTS);
         self.jobs.enqueue(&transaction, &Send { delivery_id: id }, options).await?;
         transaction.commit().await?;
         Ok(())

@@ -207,17 +207,12 @@ impl NewsletterService {
         let checked = self
             .guard
             .check(
-                &Check {
-                    scope: SCOPE,
-                    principal: trusted,
-                    client,
-                    honeypot: input.trap.as_deref(),
-                    form_token: input.form_token.as_deref(),
-                    challenge: input.challenge.as_deref(),
-                    email: Some(&email),
-                    content: None,
-                    duplicate: false,
-                },
+                &Check::new(SCOPE, client)
+                    .principal(trusted)
+                    .honeypot(input.trap.as_deref())
+                    .form_token(input.form_token.as_deref())
+                    .challenge(input.challenge.as_deref())
+                    .email(Some(&email)),
                 &self.limits()?,
             )
             .await?;
@@ -275,9 +270,10 @@ impl NewsletterService {
     pub(crate) async fn apply_subscription(&self, job: &SubscribeJob) -> Result<(), Error> {
         let now = now();
         let actor = match job.actor_user_id {
-            Some(user_id) => {
-                Actor { user_id: Some(user_id), api_key_id: job.actor_api_key_id, public: false }
-            }
+            Some(user_id) => match job.actor_api_key_id {
+                Some(api_key_id) => Actor::api_key(user_id, api_key_id),
+                None => Actor::user(user_id),
+            },
             None => Actor::public(),
         };
         let transaction = self.database.begin_write().await?;
@@ -395,11 +391,10 @@ impl NewsletterService {
     /// Giới hạn số lần đăng ký (theo IP băm, email, người dùng), trên bảng `newsletter_throttle`.
     fn limits(&self) -> Result<Limits, Error> {
         let throttle = |limit: u32| Throttle::new(self.database.clone(), MODULE, limit, HOUR);
-        Ok(Limits {
-            ip: Some(throttle(self.config.per_ip_per_hour)?),
-            email: Some(throttle(self.config.per_email_per_hour)?),
-            user: Some(throttle(self.config.per_user_per_hour)?),
-        })
+        Ok(Limits::default()
+            .ip(Some(throttle(self.config.per_ip_per_hour)?))
+            .email(Some(throttle(self.config.per_email_per_hour)?))
+            .user(Some(throttle(self.config.per_user_per_hour)?)))
     }
 
     /// Xác nhận bằng token trong mail: các đăng ký đang chờ thành `confirmed`. Trả các danh sách

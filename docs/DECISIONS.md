@@ -4086,3 +4086,25 @@ phải sửa binary. Bỏ khoảng 600 dòng dựng app lặp lại trong test c
 Đã cân nhắc: tham số kiểu `--tên giá_trị` qua `clap` cho từng lệnh — module phải phụ thuộc
 `clap` và khai kiểu riêng; tự chạy `refresh_variants` khi khởi động thấy cấu hình đổi — phải lưu
 cấu hình cũ, và việc nặng chạy ngầm lúc khởi động khó đoán.
+
+## D-170 · Hàm tạo cho các kiểu module dựng bằng literal, rồi `#[non_exhaustive]` — 2026-11-13 — agent quyết
+
+Đóng phần "còn lại" của D-167. 25 kiểu (`ai::{Prompt, Usage, Generation, Capabilities}`,
+`antispam::{Submission, Limits, AntispamConfig}`, `event::{Actor, Delivered}`,
+`http::{Extras, ClientInfo}`, `StoredResponse`, `job::{EnqueueOptions, JobContext, JobRecord}`,
+`Mail`, `PageInput`, `PageQuery`, `Pagination`, `Resource`, `StoredFile`,
+`config::{ConfigError, LogConfig, TraceConfig}`, `CopiedTable`) có hàm tạo và được đánh dấu
+`#[non_exhaustive]`; mọi chỗ dựng ngoài kernel (kể cả `crates/kernel/tests` và benchmark) đã đổi.
+
+Quy ước cho hàm tạo của kernel (áp cho kiểu mới về sau): `new(…)` nhận các trường người gọi luôn
+phải cho; setter nối chuỗi mang đúng tên trường, không tiền tố `with_`, nhận giá trị của trường và
+trả `Self` (như `Deprecation::new().sunset()` đã có); `const fn` khi được.
+
+Mặc định đã chọn: `Prompt::new` dùng `Effort::Low` và `Prompt::DEFAULT_MAX_OUTPUT_TOKENS = 1024`;
+mọi chỗ gọi hiện có vẫn ghi tường minh `effort` và `max_output_tokens` (mỗi chỗ một giới hạn khác).
+`Actor::api_key(user_id, api_key_id)` nhận `Uuid`, không nhận `Option` — chỗ có thể không có key
+rẽ nhánh sang `Actor::user`. Setter nhận giá trị trơn (`unique_key`, `run_at`, `html`,
+`dedupe_key`): chỗ có `Option` chỉ gọi setter khi có giá trị — hành vi giữ nguyên.
+
+Kiểm: hành vi không đổi (cả 795 test xanh trên SQLite và trên Postgres, không test nào bị xoá),
+`docs/openapi.json` không đổi một byte.

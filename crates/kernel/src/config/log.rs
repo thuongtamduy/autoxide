@@ -35,12 +35,18 @@ pub enum LogFormat {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct LogConfig {
     pub level: LogLevel,
     pub format: LogFormat,
 }
 
 impl LogConfig {
+    /// Logs at `level` and above, written as `format`.
+    pub const fn new(level: LogLevel, format: LogFormat) -> Self {
+        LogConfig { level, format }
+    }
+
     pub fn read(reader: &mut ConfigReader) -> Result<Self, Invalid> {
         let level = reader.get_with(&LEVEL, |raw| match raw {
             "trace" => Ok(LogLevel::Trace),

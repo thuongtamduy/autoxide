@@ -94,11 +94,9 @@ fn router() -> axum::Router {
     let config = HttpConfig::read(&mut reader);
     let (config, _) = reader.finish(config).unwrap();
     let modules = Modules::new(vec![Box::new(Notes)]).unwrap();
-    let extras = http::Extras {
-        authenticator: Some(Arc::new(FakeAuthenticator)),
-        tools: modules.tools().unwrap(),
-        ..Default::default()
-    };
+    let extras = http::Extras::default()
+        .authenticator(Some(Arc::new(FakeAuthenticator)))
+        .tools(modules.tools().unwrap());
     http::build(&config, axum::Router::new().into(), Vec::new(), extras).router
 }
 

@@ -55,7 +55,7 @@ fn contact(key: &str) -> FormInput {
 }
 
 fn visitor(ip: &str) -> ClientInfo {
-    ClientInfo { ip: Some(ip.parse::<IpAddr>().unwrap()), ..ClientInfo::default() }
+    ClientInfo::from_ip(ip.parse::<IpAddr>().unwrap())
 }
 
 async fn token(service: &FormsService, key: &str) -> String {
@@ -315,8 +315,7 @@ async fn bay_qua_nhanh_qua_nhieu_tra_loi_giong_bai_nhan() {
         assert_eq!(count(&database).await, 2);
 
         // Quá nhanh (token vừa phát chưa đủ 60 giây): lưu ở `spam`, cùng câu trả lời, không event.
-        let slow =
-            AntispamConfig { min_fill: Duration::from_secs(60), ..AntispamConfig::default() };
+        let slow = AntispamConfig::default().min_fill(Duration::from_secs(60));
         let (strict, mailer, database) = service_with(test, config, slow).await;
         let fast =
             send(&strict, "contact", &visitor("198.51.100.1"), answers("Dee", "dee@example.com"))
@@ -497,15 +496,8 @@ async fn event_khong_mang_cau_tra_loi_va_mail_bao() {
         assert_eq!(payload["after"]["form_key"], "contact");
 
         // Event giao hai lần: hai lời gọi `send` cùng `dedupe_key` (module `mail` bỏ lần sau).
-        let delivered = Delivered {
-            id: Uuid::now_v7(),
-            module: "forms",
-            name: "forms.submission_received".to_owned(),
-            actor: Actor::public(),
-            subject: None,
-            payload,
-            occurred_at: chrono::Utc::now(),
-        };
+        let delivered = Delivered::new("forms", "forms.submission_received".to_owned(), payload)
+            .actor(Actor::public());
         let notifier = crate::notify::Notifier(service.clone());
         notifier.handle(&delivered).await.unwrap();
         notifier.handle(&delivered).await.unwrap();
@@ -735,15 +727,11 @@ async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
         let exported = service.export(owner.user_id()).await.unwrap();
         assert_eq!(exported["forms"][0]["key"], "contact");
 
-        let deleted = Delivered {
-            id: Uuid::now_v7(),
-            module: "auth",
-            name: USER_DELETED.to_owned(),
-            actor: Actor::system(),
-            subject: None,
-            payload: json!({"before": {"id": owner.user_id()}}),
-            occurred_at: chrono::Utc::now(),
-        };
+        let deleted = Delivered::new(
+            "auth",
+            USER_DELETED.to_owned(),
+            json!({"before": {"id": owner.user_id()}}),
+        );
         service.handle(&deleted).await.unwrap();
         service.handle(&deleted).await.unwrap();
         assert_eq!(service.get_form(&owner, form.row.id).await.unwrap().row.created_by, None);

@@ -141,8 +141,7 @@ async fn chong_spam_cung_mot_cau_tra_loi_token_hong_la_loi() {
         );
 
         // Quá nhanh: lưu ở `spam`, người gửi thấy như bài chờ duyệt.
-        let slow =
-            AntispamConfig { min_fill: Duration::from_secs(600), ..AntispamConfig::default() };
+        let slow = AntispamConfig::default().min_fill(Duration::from_secs(600));
         let h2 = service_with(test, config(), slow).await;
         let fast =
             as_guest(&h2.service, &visitor("192.0.2.1"), guest("Bot", "Nhanh quá")).await.unwrap();

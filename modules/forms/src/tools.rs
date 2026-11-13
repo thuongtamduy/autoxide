@@ -247,11 +247,11 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                         "`open`, `closed`",
                         &mut problems,
                     );
-                    let paging = PageQuery {
-                        limit: input.limit.map(|limit| limit.to_string()),
-                        cursor: input.cursor,
-                        order: None,
-                    };
+                    let paging = PageQuery::new(
+                        input.limit.map(|limit| limit.to_string()),
+                        input.cursor,
+                        None,
+                    );
                     let page = page_request(paging, problems)?;
                     let found = service.list_forms(&principal, state, &page).await?;
                     Ok::<Page<FormResponse>, Error>(found.map(FormResponse::from))
@@ -373,11 +373,11 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                         search: input.q,
                     };
                     let page = page_request(
-                        PageQuery {
-                            limit: input.limit.map(|limit| limit.to_string()),
-                            cursor: input.cursor,
-                            order: input.order,
-                        },
+                        PageQuery::new(
+                            input.limit.map(|limit| limit.to_string()),
+                            input.cursor,
+                            input.order,
+                        ),
                         problems,
                     )?;
                     let found =

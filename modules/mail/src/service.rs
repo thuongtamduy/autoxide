@@ -84,10 +84,10 @@ impl Mailer for MailService {
             return Err(Error::validation(problems));
         }
         // Khoá chống trùng của bên gửi thành `unique_key` của job: chạy lại không gửi hai lần.
-        let options = EnqueueOptions {
-            unique_key: mail.dedupe_key.as_ref().map(|key| format!("mail:{key}")),
-            ..EnqueueOptions::default()
-        };
+        let mut options = EnqueueOptions::default();
+        if let Some(key) = &mail.dedupe_key {
+            options = options.unique_key(format!("mail:{key}"));
+        }
         let job = SendMail {
             to: mail.to,
             subject: mail.subject,

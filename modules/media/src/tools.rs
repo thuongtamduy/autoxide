@@ -148,11 +148,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                         tag: input.tag,
                         sort: input.sort,
                     };
-                    let paging = PageQuery {
-                        limit: input.limit.map(|limit| limit.to_string()),
-                        cursor: input.cursor,
-                        order: input.order,
-                    };
+                    let paging = PageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, input.order);
                     let mut problems = Vec::new();
                     let filter = query.filter(&mut problems);
                     let page = crate::http::page_request(paging, problems)?;
@@ -276,11 +272,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             move |principal: Principal, input: ListTagsInput| {
                 let service = list_tags.clone();
                 async move {
-                    let paging = PageQuery {
-                        limit: input.limit.map(|limit| limit.to_string()),
-                        cursor: input.cursor,
-                        order: Some("asc".to_owned()),
-                    };
+                    let paging = PageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, Some("asc".to_owned()));
                     let page = crate::http::page_request(paging, Vec::new())?;
                     let tags = service
                         .list_tags(&principal, input.q.as_deref(), TagSort::Name, &page)

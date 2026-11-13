@@ -112,7 +112,7 @@ impl Storage for ObjectStorage {
             Ok(result) => {
                 let size = result.meta.size;
                 let content = result.into_stream().map_err(storage_error).boxed();
-                Ok(Some(StoredFile { size, content }))
+                Ok(Some(StoredFile::new(size, content)))
             }
             Err(object_store::Error::NotFound { .. }) => Ok(None),
             Err(error) => Err(storage_error(error)),
@@ -130,7 +130,7 @@ impl Storage for ObjectStorage {
             Ok(result) => {
                 let size = result.range.end - result.range.start;
                 let content = result.into_stream().map_err(storage_error).boxed();
-                Ok(Some(StoredFile { size, content }))
+                Ok(Some(StoredFile::new(size, content)))
             }
             Err(object_store::Error::NotFound { .. }) => Ok(None),
             Err(error) => Err(storage_error(error)),

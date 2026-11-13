@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–26 xong**, đang làm bước 27; bản phát hành mới nhất `v0.8.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–27 xong**; bản phát hành mới nhất `v0.8.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -338,8 +338,8 @@ Mượn cái hay của framework khác ([`docs/research/frameworks.md`](research
 - [x] `Module::tasks` + `autoxide task`: lệnh quản trị do module khai — D-169
 - [x] Hợp đồng ổn định: danh sách public dependency, `#[non_exhaustive]` cho kiểu sẽ lớn thêm,
       chính sách deprecate API Rust; hướng dẫn viết module ở repo riêng (EN + VI) — D-167
-- [ ] Hàm tạo / builder cho các kiểu module đang dựng bằng literal, rồi `#[non_exhaustive]`
-      (danh sách ở D-167)
+- [x] Hàm tạo / builder cho các kiểu module đang dựng bằng literal, rồi `#[non_exhaustive]`
+      (danh sách ở D-167) — D-170
 
 ## Sau core (chưa mở)
 

@@ -13,8 +13,9 @@ use uuid::Uuid;
 
 use crate::error::Error;
 
-/// Điều module khác được biết về một đối tượng.
+/// Điều module khác được biết về một đối tượng. Dựng bằng [`Resource::new`].
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub struct Resource {
     /// Người lạ có xem được không (vd bài đã đăng).
     pub public: bool,
@@ -28,6 +29,50 @@ pub struct Resource {
     pub locale: Option<String>,
     /// Người dùng "sở hữu" đối tượng (vd tác giả), để báo cho họ khi cần.
     pub owner_user_ids: Vec<Uuid>,
+}
+
+impl Resource {
+    /// A private object titled `title`, with no summary, path, language or owners.
+    pub fn new(title: impl Into<String>) -> Self {
+        Resource {
+            public: false,
+            title: title.into(),
+            summary: String::new(),
+            url: None,
+            locale: None,
+            owner_user_ids: Vec::new(),
+        }
+    }
+
+    /// Sets whether strangers may see the object.
+    pub const fn public(mut self, public: bool) -> Self {
+        self.public = public;
+        self
+    }
+
+    /// Sets the summary strangers see.
+    pub fn summary(mut self, summary: impl Into<String>) -> Self {
+        self.summary = summary.into();
+        self
+    }
+
+    /// Sets the public path (without the domain).
+    pub fn url(mut self, url: Option<String>) -> Self {
+        self.url = url;
+        self
+    }
+
+    /// Sets the language (BCP 47).
+    pub fn locale(mut self, locale: Option<String>) -> Self {
+        self.locale = locale;
+        self
+    }
+
+    /// Sets the users who own the object.
+    pub fn owner_user_ids(mut self, owner_user_ids: Vec<Uuid>) -> Self {
+        self.owner_user_ids = owner_user_ids;
+        self
+    }
 }
 
 /// Bộ tra một loại đối tượng.

@@ -51,6 +51,7 @@ pub struct NoInput {}
 /// the REST list endpoints.
 #[derive(Debug, Default, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct PageInput {
     /// Maximum number of items to return, 1 to 200. Defaults to 50.
     #[schema(minimum = 1, maximum = 200)]
@@ -62,6 +63,11 @@ pub struct PageInput {
 }
 
 impl PageInput {
+    /// Paging with this limit, cursor and order (each optional, as a client sends them).
+    pub const fn new(limit: Option<u32>, cursor: Option<String>, order: Option<String>) -> Self {
+        PageInput { limit, cursor, order }
+    }
+
     /// Yêu cầu trang đã kiểm, như của REST.
     pub fn page(self) -> Result<PageRequest, Error> {
         PageRequest::try_from(PageQuery {

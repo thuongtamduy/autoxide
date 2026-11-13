@@ -584,7 +584,10 @@ impl NewsletterService {
             Some(after) => format!("newsletter.prepare:{id}:{run}:{after}"),
             None => format!("newsletter.prepare:{id}:{run}"),
         };
-        let options = EnqueueOptions { run_at, unique_key: Some(key), ..EnqueueOptions::default() };
+        let mut options = EnqueueOptions::default().unique_key(key);
+        if let Some(run_at) = run_at {
+            options = options.run_at(run_at);
+        }
         self.jobs.enqueue(connection, &PrepareJob { campaign_id: id, run, after }, options).await?;
         Ok(())
     }
@@ -598,11 +601,11 @@ impl NewsletterService {
         seq: u32,
         run_at: Option<DateTime<Utc>>,
     ) -> Result<(), Error> {
-        let options = EnqueueOptions {
-            run_at,
-            unique_key: Some(format!("newsletter.send:{id}:{run}:{seq}")),
-            ..EnqueueOptions::default()
-        };
+        let mut options =
+            EnqueueOptions::default().unique_key(format!("newsletter.send:{id}:{run}:{seq}"));
+        if let Some(run_at) = run_at {
+            options = options.run_at(run_at);
+        }
         self.jobs.enqueue(connection, &SendJob { campaign_id: id, run, seq }, options).await?;
         Ok(())
     }
