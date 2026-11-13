@@ -401,6 +401,53 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 - Module sổ cái kép (`ledger`: mỗi giao dịch có bút toán nợ và có cân nhau, chỉ thêm, số dư suy ra
   từ bút toán): module nghiệp vụ mới, `CLAUDE.md` chỉ cho dựng module chủ dự án đã giao.
 
+## 30. Sẵn sàng ra mắt (chủ dự án giao ngày 13/11/2026, D-175, D-176)
+
+Sau bước 29 lộ trình của core hết mục: bước này đưa Autoxide tới tay người lạ — repo công khai,
+image Docker có sẵn, ảnh nhẹ, deploy không gián đoạn, cài được chỉ bằng README. Nhóm A và B làm
+song song với bước 29; nhóm C chỉ bắt đầu khi bước 29 đã merge vào `main` (đụng cùng file).
+
+Nhóm A — repo công khai, CI, image Docker (D-175):
+
+- [ ] Chủ dự án công khai repo (Settings → Change visibility); trước đó agent xác nhận gitleaks
+      quét toàn lịch sử xanh và không file nào chứa tên máy chủ, IP, đường dẫn riêng hay thông tin
+      cá nhân. Agent không tự đổi chế độ công khai
+- [ ] Ba workflow tự chạy lại: `ci.yml` (push lên `main`, pull request), `audit.yml` (lịch),
+      `release.yml` (tag `vX.Y.Z`) — trigger cũ có trong `git log -p -- .github/workflows`; chạy
+      xanh trên GitHub; bỏ ghi chú "TẮT tự chạy (D-107)" ở đầu các file
+- [ ] `release.yml` đăng image `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` bằng `GITHUB_TOKEN`
+      (`packages: write`), gói image để công khai; thử với bản phát hành kế tiếp. `docs/RELEASING.md`
+      sửa theo: agent chỉ còn đẩy tag, bản phát hành và image do workflow làm
+- [ ] Secret scanning và push protection của GitHub bật; Dependabot alerts bật; gitleaks trong
+      `./gate.sh` giữ nguyên
+
+Nhóm A — WebP (D-176):
+
+- [ ] `media`: bản nhỏ WebP bên cạnh JPEG / PNG. Chọn bộ mã hoá sau khi kiểm thư viện đúng phiên
+      bản ghim (kiểu nén mất dữ liệu cho ảnh chụp, có alpha cho ảnh trong suốt); website nhận được
+      WebP qua API công khai (`PublicMedia`, `body_media`, `srcset`) mà client cũ không hỏng; ảnh đã
+      có làm lại bằng `autoxide task media.refresh_variants`; đo dung lượng và thời gian mã hoá
+      trên ảnh thử của D-168, ghi vào quyết định; hướng dẫn `docs/MEDIA.md` (EN + VI)
+
+Nhóm B — vận hành:
+
+- [ ] Deploy không gián đoạn: nhận tín hiệu dừng thì `/health/ready` trả 503 trong một khoảng
+      cấu hình được (biến mới qua `Setting`, sinh lại `.env.example`) trước khi ngừng nhận kết nối,
+      `/health/live` vẫn 200; rồi mới tới `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`. Test; `docs/DEPLOY.md`
+      (EN + VI)
+- [ ] Thử cài như người lạ: máy hay container sạch, làm đúng README tiếng Anh bằng image Docker đã
+      đăng (cả SQLite và Postgres), ghi mọi chỗ vấp rồi sửa README / `docs/DEPLOY.md` (EN + VI cùng
+      commit)
+
+Nhóm C — bố cục (chỉ sau khi bước 29 đã merge):
+
+- [ ] Áp quy ước "File layout" của hướng dẫn viết module cho `newsletter`, `comments`, `media`,
+      `forms`: phần service chia theo tính năng, test dài thành thư mục `tests/`; không đổi hành vi,
+      đếm số test trước và sau phải bằng nhau
+- [ ] `kernel`: gom các file nằm phẳng trong `src/` thành nhóm (vd hợp đồng cho module: `ai`,
+      `mail`, `storage`, `search`, `privacy`…), giữ nguyên đường dẫn công khai bằng `pub use` để
+      module ở repo riêng không phải sửa (D-167)
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.

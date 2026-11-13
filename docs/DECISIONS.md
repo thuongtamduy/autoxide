@@ -4218,3 +4218,36 @@ tài khoản từ chối thứ trước đây nhận (thay đổi phá vỡ).
 
 Đã cân nhắc: dùng `validator` cho cả ba module — nhận tên miền không dấu chấm, không hợp với form
 công khai; thư viện email đầy đủ RFC 5322 — thêm thư viện cho vài chục dòng.
+
+## D-175 · Công khai repo; bật lại CI và phát hành tự động trên GitHub — 2026-11-13 — chủ dự án quyết
+
+Quyết định: repo `autoxide` chuyển sang công khai (đúng mục tiêu "mã nguồn mở, công khai toàn
+bộ" trong `CLAUDE.md`). Khi đã công khai:
+
+- Ba workflow tự chạy lại: `CI` theo push lên `main` và pull request, `Security audit` theo lịch,
+  `Release` khi đẩy tag `vX.Y.Z` — Release build và đăng image Docker lên GitHub Container
+  Registry bằng `GITHUB_TOKEN` của workflow, không cần token cá nhân, gói image để công khai.
+- Bật secret scanning và push protection của GitHub (miễn phí cho repo công khai), giữ gitleaks
+  trong `./gate.sh` (D-108).
+- `./gate.sh` trên máy vẫn là định nghĩa "xong" (D-173); CI là lưới thứ hai.
+
+Lý do: repo công khai thì GitHub Actions miễn phí, nên lý do tắt CI (D-107) không còn; người lạ
+cần image Docker để cài mà không phải dựng toolchain Rust — README đã hứa image ở
+`ghcr.io/<owner>/autoxide` nhưng chưa bản nào được đăng.
+
+Thay: D-107. Việc làm cụ thể: bước 30 của `docs/ROADMAP.md`.
+
+## D-176 · Ảnh thu nhỏ định dạng WebP trong module `media` — 2026-11-13 — chủ dự án quyết
+
+Quyết định: module `media` sinh thêm bản nhỏ định dạng WebP bên cạnh JPEG / PNG, và được thêm
+thư viện mã hoá WebP nếu thư viện đang có không đủ. Chọn thư viện, cách website nhận WebP (vd
+`variants` kèm định dạng, hay theo header `Accept`) và làm lại ảnh đã có (`autoxide task
+media.refresh_variants`) do agent làm bước 30 quyết và ghi thành mục mới.
+
+Lý do: đo ở D-168 — WebP nhẹ hơn JPEG cùng cỡ khoảng 60–70%; bản nhỏ PNG của ảnh có vùng trong
+suốt 1,2 MB ở 1920 px, WebP có alpha khoảng 55 KB.
+
+Cần kiểm trước khi chọn (skill `check-library-api`, đúng phiên bản ghim): `image` 0.25 (đã có,
+feature `webp`) giải mã được WebP, nhưng bộ mã hoá của nó có thể chỉ có kiểu không mất dữ liệu;
+kiểu nén mất dữ liệu (cho số đo trên) có thể cần thư viện khác, vd bọc `libwebp` bằng C — xét
+license qua `cargo deny` và việc build image Docker. Thêm thư viện thì ghi `STACK.md`.
