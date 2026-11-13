@@ -4738,3 +4738,29 @@ khai như phần còn lại.
 đầu tiên gọi API để hỏi repo có công khai không — chính job đó cũng tốn phút; build đa nền tảng
 bằng QEMU trên một máy — chậm gấp nhiều lần (D-078); `cosign` tự cài thay cho `actions/attest`
 — thêm một công cụ, còn `gh attestation verify` người dùng đã có cùng GitHub CLI.
+
+## D-198 · Repo tạm giữ riêng tư; phần cần repo công khai tách thành bước 50 — 2026-11-13 — chủ dự án quyết
+
+Quyết định: chủ dự án giữ repo `autoxide` **riêng tư** cho tới khi tự quyết công khai. Thay phần
+"chuyển sang công khai" của D-175 trong thời gian đó; mục tiêu lâu dài "mã nguồn mở, công khai
+toàn bộ" trong `CLAUDE.md` không đổi, và file trong repo vẫn viết với giả định người lạ sẽ đọc.
+
+Hệ quả:
+
+- Các mục của bước 30 chỉ làm được khi repo công khai (bấm công khai, CI chạy xanh trên GitHub,
+  workflow `Release` đăng image amd64 + arm64 kèm chứng thực và SBOM, bật secret scanning / push
+  protection / private vulnerability reporting, thử cài bằng image đã đăng) chuyển sang **bước 50
+  "Công khai repo"** ở cuối lộ trình. Agent không làm bước 50 khi chủ dự án chưa nói đã công khai.
+- Workflow giữ nguyên như D-197: tự chạy khi repo công khai, còn riêng tư thì bỏ qua, không tốn
+  phí. Không cần sửa gì khi công khai.
+- Trong lúc riêng tư, phát hành từ máy (`docs/RELEASING.md`, phần "Khi repo còn riêng tư"): agent
+  đẩy commit release và tag, tạo bản phát hành GitHub bằng tay; image Docker chỉ đăng khi chủ dự
+  án đưa token có quyền `write:packages` (amd64, không chứng thực).
+- Bước 30 xong với phần trong repo, và mục "thử cài như người lạ" làm theo đường build từ mã nguồn
+  trong README / `docs/DEPLOY.md`.
+
+Lý do: chủ dự án chưa muốn công khai. Tách phần phụ thuộc ra một bước riêng để lộ trình không kẹt
+ở bước 30 (agent chọn bước có số nhỏ nhất còn mục chưa xong), và các tính năng đã làm (WebP, khoảng
+rút khi tắt) được phát hành.
+
+Thay: phần công khai của D-175 (tới khi chủ dự án quyết công khai).

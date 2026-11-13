@@ -3,8 +3,8 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–29 xong**; bước 30 đang làm (phần trong repo xong, chờ chủ dự án công khai repo rồi kiểm lần chạy đầu của workflow); 31 trở đi chưa bắt đầu — thứ tự và phụ thuộc ở
-bảng ngay trước bước 30 (D-192); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–29 xong**; bước 30 đang làm (còn: thử cài như người lạ); bước 50 chờ chủ dự án công khai repo (D-198); 31 trở đi chưa bắt đầu — thứ tự và phụ thuộc ở
+bảng ngay trước bước 30 (D-192); bản phát hành mới nhất `v0.11.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-198):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -419,6 +419,7 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 | 42 Kho · 43 Khuyến mại · 44 Vận chuyển | 41 | nhau |
 | 45 Giỏ hàng, đặt hàng, đơn hàng | 42, 43, 44 và 37 (thông báo) | — |
 | 46 Sàn · 47 Khách hàng · 48 Đa kênh · 49 Tiếp thị liên kết | 45 (46 và 49 cần thêm 37) | nhau |
+| 50 Công khai repo | chủ dự án nói đã công khai repo (D-198) | mọi bước |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
@@ -429,29 +430,18 @@ thực, file của một dự án mã nguồn mở, ảnh nhẹ, deploy không g
 Không đụng code của bước 29 (trừ `media` và `kernel/src/http/health.rs`), nên làm ngay được.
 Tài liệu cho người ngoài viết tiếng Anh kèm bản tiếng Việt cùng nội dung.
 
-Nhóm A — repo công khai, CI, phát hành (D-175):
+Nhóm A — CI và phát hành (D-175, D-197, D-198; phần cần repo công khai ở bước 50):
 
-- [ ] Chủ dự án công khai repo (Settings → Change visibility); trước đó agent xác nhận gitleaks
-      quét toàn lịch sử xanh và không file nào chứa tên máy chủ, IP, đường dẫn riêng hay thông tin
-      cá nhân. Agent không tự đổi chế độ công khai
-      — 13/11/2026 agent đã quét: gitleaks toàn lịch sử mọi nhánh xanh, file không chứa IP thật,
-      tên máy hay đường dẫn riêng; email cá nhân trong metadata commit: chủ dự án chọn giữ
-      nguyên (D-197). Còn chờ chủ dự án bấm công khai
-- [ ] Ba workflow tự chạy lại: `ci.yml` (push lên `main`, pull request), `audit.yml` (lịch),
-      `release.yml` (tag `vX.Y.Z`) — trigger cũ có trong `git log -p -- .github/workflows`; chạy
-      xanh trên GitHub; bỏ ghi chú "TẮT tự chạy (D-107)" ở đầu các file — trigger đã bật lại, job
-      chỉ chạy khi repo công khai (D-197); còn chờ lần chạy xanh đầu tiên sau khi công khai
-- [ ] `release.yml` đăng image `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` bằng `GITHUB_TOKEN`
-      (`packages: write`), gói image để công khai; thử với bản phát hành kế tiếp. `docs/RELEASING.md`
-      sửa theo: agent chỉ còn đẩy tag, bản phát hành và image do workflow làm — workflow và
-      `RELEASING.md` đã sửa (D-197); còn chờ bản phát hành đầu tiên sau khi công khai, và chủ
-      repo đổi gói image sang Public một lần
-- [ ] Secret scanning và push protection của GitHub bật; Dependabot alerts bật; gitleaks trong
-      `./gate.sh` giữ nguyên — chủ dự án bật trong Settings → Code security sau khi công khai,
-      cùng "Private vulnerability reporting" mà `SECURITY.md` dựa vào
-- [ ] Image Docker cho máy ARM64 (`linux/arm64`) trong workflow `Release` khi repo đã công khai
-      (máy build ARM của GitHub miễn phí cho repo công khai; D-078 để sau vì build giả lập quá lâu)
-      — đã có trong `release.yml` (D-197); còn chờ bản phát hành đầu tiên sau khi công khai
+- [x] Agent xác nhận gitleaks quét toàn lịch sử mọi nhánh xanh và không file nào chứa tên máy chủ,
+      IP, đường dẫn riêng hay thông tin cá nhân (13/11/2026); email cá nhân trong metadata commit:
+      chủ dự án chọn giữ nguyên (D-197)
+- [x] Ba workflow có lại trigger tự chạy (`ci.yml` push lên `main` và pull request, `audit.yml`
+      theo lịch, `release.yml` theo tag `vX.Y.Z`), bỏ ghi chú "TẮT tự chạy (D-107)"; mọi job chỉ
+      chạy khi repo công khai, riêng tư thì bỏ qua không tốn phí (D-197)
+- [x] `release.yml` đăng image `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` cho `linux/amd64` và
+      `linux/arm64` (máy build gốc, không giả lập) bằng `GITHUB_TOKEN`, kèm chứng thực nguồn gốc
+      build và SBOM đã ký; `docs/DEPLOY.md` (EN + VI) có lệnh kiểm chứng thực; `docs/RELEASING.md`
+      có hai đường: workflow khi công khai, phát hành từ máy khi còn riêng tư (D-198)
 
 Nhóm B — file của dự án mã nguồn mở:
 
@@ -465,10 +455,6 @@ Nhóm B — file của dự án mã nguồn mở:
 - [x] Quy tắc ứng xử (`CODE_OF_CONDUCT.md`, theo Contributor Covenant bản mới nhất) với địa chỉ
       liên hệ do chủ dự án đặt; mẫu issue (báo lỗi: phiên bản, database, cách tái hiện; đề xuất) và
       mẫu PR (đã chạy `./gate.sh`, đã sửa EN + VI, đã thêm CHANGELOG) trong `.github/`
-- [ ] Bản phát hành đáng tin: workflow `Release` (sau nhóm A) đính kèm chứng thực nguồn gốc build
-      (GitHub artifact attestation) và danh sách thành phần (SBOM) cho image Docker; `docs/DEPLOY.md`
-      (EN + VI) có lệnh kiểm chứng thực trước khi chạy image — đã có trong `release.yml` và
-      `DEPLOY.md` (D-197); còn chờ bản phát hành đầu tiên để kiểm bằng `gh attestation verify`
 - [x] `cargo xtask check` hay test giữ các file trên không mất và hai bản EN / VI không lệch
       tiêu đề mục (cách làm như kiểm bản dịch i18n), để agent phiên sau không quên sửa một bên
 
@@ -483,9 +469,9 @@ Nhóm C — sản phẩm (D-176):
       cấu hình được (biến mới qua `Setting`, sinh lại `.env.example`) trước khi ngừng nhận kết nối,
       `/health/live` vẫn 200; rồi mới tới `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`. Test; `docs/DEPLOY.md`
       (EN + VI)
-- [ ] Thử cài như người lạ: máy hay container sạch, làm đúng README tiếng Anh bằng image Docker đã
-      đăng (cả SQLite và Postgres), ghi mọi chỗ vấp rồi sửa README / `docs/DEPLOY.md` (EN + VI cùng
-      commit)
+- [ ] Thử cài như người lạ: máy hay container sạch, làm đúng README tiếng Anh theo đường build từ
+      mã nguồn (cả SQLite và Postgres), ghi mọi chỗ vấp rồi sửa README / `docs/DEPLOY.md` (EN + VI
+      cùng commit). Thử bằng image đã đăng: bước 50
 
 ## 31. Hợp đồng API và chống hồi quy (chủ dự án giao ngày 13/11/2026, D-177)
 
@@ -1027,6 +1013,25 @@ liên kết (bước 37).
       giữa 2 triệu và 5 triệu đồng / lần, NĐ 253/2026 — cần đối chiếu); chứng từ khấu trừ cho người nhận
 - [ ] Phiên livestream: người phát đã xác thực, sản phẩm gắn trong phiên, đơn ghi nhận theo phiên,
       lưu vết phiên theo yêu cầu của luật
+
+## 50. Công khai repo (chờ chủ dự án, D-175, D-197, D-198)
+
+Chủ dự án giữ repo riêng tư (D-198). **Agent không làm bước này khi chủ dự án chưa nói repo đã
+công khai**; khi đó các bước khác vẫn đi tiếp bình thường. Workflow đã viết sẵn (D-197), công
+khai là tự chạy.
+
+- [ ] Chủ dự án công khai repo (Settings → Change visibility); ngay trước đó agent quét lại
+      gitleaks toàn lịch sử và tìm tên máy chủ, IP, đường dẫn riêng, thông tin cá nhân. Agent không
+      tự đổi chế độ công khai
+- [ ] Chủ dự án bật trong Settings → Code security: secret scanning, push protection, Dependabot
+      alerts, private vulnerability reporting (`SECURITY.md` dựa vào nó); gitleaks trong `./gate.sh`
+      giữ nguyên
+- [ ] `CI` và `Security audit` chạy xanh trên GitHub
+- [ ] Bản phát hành kế tiếp qua workflow `Release`: image amd64 + arm64 đăng lên `ghcr.io`, chủ
+      repo đổi gói image sang Public một lần; `gh attestation verify` xác nhận chứng thực nguồn gốc
+      và SBOM; `docs/RELEASING.md` bỏ phần "Khi repo còn riêng tư"
+- [ ] Thử cài như người lạ bằng image đã đăng (cả SQLite và Postgres), sửa README /
+      `docs/DEPLOY.md` (EN + VI cùng commit) theo chỗ vấp
 
 ## Sau core (chưa mở)
 

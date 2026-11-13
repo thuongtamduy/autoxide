@@ -33,7 +33,9 @@ Agent chỉ chuẩn bị bản phát hành và đẩy tag; workflow `Release` (`
 D-175, D-197) chạy lại gate, build và đăng image Docker (`linux/amd64` và `linux/arm64`) lên
 `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` bằng `GITHUB_TOKEN`, đính kèm chứng thực nguồn gốc build
 và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú từ `CHANGELOG.md`. Workflow chỉ chạy khi
-repo công khai; `./gate.sh` trên máy vẫn là gate bắt buộc trước khi đẩy tag.
+repo công khai; `./gate.sh` trên máy vẫn là gate bắt buộc trước khi đẩy tag. **Repo đang riêng
+tư (D-198): workflow bị bỏ qua, làm bước 1–6 rồi theo "Khi repo còn riêng tư" bên dưới thay cho
+bước 7.**
 
 1. Đưa nhánh lên `main` mới nhất: `git fetch origin`, rồi `git rebase origin/main`. Phiên
    khác có thể đã merge trong lúc mình làm — xem "Khi hai phiên đụng nhau" bên dưới.
@@ -76,6 +78,34 @@ repo công khai; `./gate.sh` trên máy vẫn là gate bắt buộc trước khi
    chọn tag); không xoá tag đã đẩy. Lỗi nằm ở code thì phát hành bản vá `X.Y.Z+1`.
 8. `cargo clean`: mỗi lần đổi phiên bản, cargo build lại cả workspace thành một bộ file mới
    mà không xoá bộ cũ, `target/` phình thêm hàng chục GB.
+
+## Khi repo còn riêng tư
+
+Chủ dự án giữ repo riêng tư (D-198), nên đẩy tag không kích hoạt gì. Sau bước 6:
+
+1. Tạo bản phát hành trên GitHub, ghi chú là phần `## [X.Y.Z]` của `CHANGELOG.md`:
+
+   ```bash
+   awk '/^## \[X.Y.Z\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md > notes.md
+   gh release create vX.Y.Z --title "Autoxide vX.Y.Z" --notes-file notes.md --verify-tag
+   ```
+
+   Không có `gh` hay quyền tạo bản phát hành thì dừng ở tag đã đẩy và báo chủ dự án tạo bản phát
+   hành trên trang Releases (chọn tag, dán phần `## [X.Y.Z]` của `CHANGELOG.md`).
+2. Image Docker chỉ khi chủ dự án muốn và đưa token GitHub có quyền `write:packages` — thiếu thì
+   bỏ qua và báo lại, không tự tạo hay lưu token. Chỉ build được `linux/amd64`, không kèm chứng
+   thực:
+
+   ```bash
+   docker build -t ghcr.io/<owner>/autoxide:X.Y.Z -t ghcr.io/<owner>/autoxide:X.Y .
+   echo "$TOKEN" | docker login ghcr.io -u <owner> --password-stdin
+   docker push ghcr.io/<owner>/autoxide:X.Y.Z
+   docker push ghcr.io/<owner>/autoxide:X.Y
+   ```
+
+3. Bước 8 (`cargo clean`) như trên.
+
+Khi chủ dự án công khai repo (bước 50 của lộ trình), bỏ phần này.
 
 Lần đầu workflow đăng image, gói trên GitHub Container Registry mặc định là riêng tư: chủ repo
 vào trang của gói (Packages → autoxide → Package settings → Change visibility) đổi thành Public
