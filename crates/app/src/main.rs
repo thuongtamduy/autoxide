@@ -55,6 +55,15 @@ enum Command {
     /// change is missed.
     Copy(commands::copy::Arguments),
 
+    /// Check this installation step by step and say how to fix what is wrong.
+    ///
+    /// Checks the configuration, the database (reading and writing), the migrations, the
+    /// signing key, then what each module declares: file storage, the SMTP server, whether
+    /// an administrator exists… Changes nothing (a test file written to the storage is
+    /// deleted again). Exits with status 1 when a check failed, 2 when the configuration is
+    /// invalid; warnings do not fail.
+    Doctor(commands::doctor::Arguments),
+
     /// Inspect and retry background jobs that failed for good (the dead-letter queue).
     Jobs(commands::jobs::Arguments),
 
@@ -97,6 +106,7 @@ fn main() -> ExitCode {
         Command::Backup(arguments) => commands::backup::backup(&arguments),
         Command::Config(arguments) => commands::config::run(&arguments),
         Command::Copy(arguments) => commands::copy::run(&arguments),
+        Command::Doctor(arguments) => commands::doctor::run(&arguments),
         Command::Jobs(arguments) => commands::jobs::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
         Command::Openapi => commands::openapi::run(),

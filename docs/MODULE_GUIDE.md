@@ -5,8 +5,8 @@
 Business features live in modules, not in the core. A module is one crate under
 `modules/<name>` that owns its tables, declares what it needs from the core through the
 `Module` trait, and is registered in exactly one place. The sample module
-[`modules/notes`](../modules/notes) uses every part of the contract; start from a copy
-of it.
+[`modules/notes`](../modules/notes) uses every part of the contract;
+`cargo xtask new-module` starts a new module from it.
 
 ## Rules that the gate enforces
 
@@ -30,9 +30,16 @@ of it.
 
 ### 1. Create the crate
 
-Copy `modules/notes` to `modules/<name>` and replace `notes` everywhere: the crate name
-(`autoxide-<name>`) in `Cargo.toml`, `Module::name`, table names, permission names,
-event names, error codes and the keys in `locales/vi.json`. Then:
+Generate it from the sample module:
+
+```bash
+cargo xtask new-module bookmarks bookmark   # <module: plural> <entity: one record>
+```
+
+This copies `modules/notes` to `modules/bookmarks` and renames every `notes` / `note` (in
+every case: crate name, `Module::name`, tables, permissions, events, error codes, types,
+file names). The result passes the gate as it is; then rewrite the tables, the service,
+the descriptions and `locales/vi.json` for your feature. To register it:
 
 1. add `autoxide-<name> = { path = "modules/<name>" }` under `[workspace.dependencies]`
    in the root `Cargo.toml`;
@@ -167,6 +174,10 @@ A module that keeps data about users takes part in data export and account delet
   `context.jobs()` to enqueue.
 - A route that needs a larger request body than the default declares it in
   `Module::body_limits`.
+- Anything an installer can get wrong (a directory that is not writable, an external
+  service that does not answer, missing initial data) gets a check in `Module::checks`:
+  a `Check` whose `Probe` returns a `Finding` (ok, warning or failed, with a hint). It runs
+  in `autoxide doctor`; it must not change data. See `modules/files/src/doctor.rs`.
 
 ### 10. Translations
 
@@ -178,10 +189,31 @@ error is made.
 
 Tests that touch the database use `TestDatabase::run(async |test| { … })` from
 `autoxide-testkit`: every test gets an empty database, SQLite or PostgreSQL depending
-on `TEST_DATABASE_URL`, and the gate runs both. `modules/notes/src/tests.rs` shows how
-to build the module the way the binary does and call it through REST and a real MCP
-client. Anything written concurrently (unique names, single-use tokens, counters) needs
-a concurrency test.
+on `TEST_DATABASE_URL`, and the gate runs both.
+
+`TestApp` builds your module the way the binary does — configuration, migrations,
+`start`, routes, MCP tools and every HTTP layer of the core — and calls it:
+
+```rust
+let app = TestApp::builder(test)
+    .setting("AUTOXIDE_NOTES_SOMETHING", "42")         // like an environment variable
+    .provide::<dyn Storage>(Arc::new(MemoryStorage::default())) // stand-in for another module
+    .user("ada", 0xada, &["notes.read", "notes.write"]) // token "ada" → these permissions
+    .module(crate::module())
+    .build()
+    .await
+    .unwrap();
+
+let answer = app.post("/api/v1/notes").token("ada").json(json!({"title": "Hi"})).send().await.unwrap();
+assert_eq!(answer.status(), StatusCode::CREATED);
+
+let client = app.mcp("ada").await.unwrap();             // a real MCP client
+let result = client.call_tool(tool("notes.list_notes", json!({}))).await.unwrap();
+```
+
+`app.database()`, `app.modules()` and `app.api::<dyn Trait>()` give access to the rest.
+`modules/notes/src/tests.rs` is the full example. Anything written concurrently (unique
+names, single-use tokens, counters) needs a concurrency test.
 
 ### 12. Finish
 

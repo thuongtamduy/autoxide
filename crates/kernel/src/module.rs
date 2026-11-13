@@ -141,6 +141,13 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Bước kiểm bản cài đặt cho `autoxide doctor` (D-166): nơi lưu ghi được không, máy chủ
+    /// ngoài có trả lời không, thiếu dữ liệu ban đầu không… Gọi sau `start`. Tên khai ngắn
+    /// (`storage`); kernel thêm tiền tố `<module>.`. Bước kiểm chỉ đọc, hoặc dọn thứ đã ghi thử.
+    fn checks(&self) -> Vec<crate::doctor::Check> {
+        Vec::new()
+    }
+
     /// Route cần thân request lớn hơn giới hạn chung (`AUTOXIDE_HTTP_BODY_LIMIT_BYTES`),
     /// vd tải file lên. Gọi sau `configure` (giới hạn có thể lấy từ cấu hình của module).
     fn body_limits(&self) -> Vec<crate::http::BodyLimit> {
@@ -639,6 +646,15 @@ impl Modules {
             subscriptions,
             Arc::clone(&self.wake),
         ))
+    }
+
+    /// Bước kiểm của từng module kèm tên module, theo thứ tự đăng ký (`autoxide doctor`). Gọi
+    /// sau [`start`](Self::start).
+    pub fn checks(&self) -> Vec<(&'static str, crate::doctor::Check)> {
+        self.modules
+            .iter()
+            .flat_map(|module| module.checks().into_iter().map(|check| (module.name(), check)))
+            .collect()
     }
 
     /// Route của từng module kèm tên module, theo thứ tự đăng ký. Gọi sau

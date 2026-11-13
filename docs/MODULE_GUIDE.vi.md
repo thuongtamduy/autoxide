@@ -5,8 +5,8 @@
 Tính năng nghiệp vụ nằm trong module, không nằm trong core. Một module là một crate
 ở `modules/<tên>`, sở hữu các bảng của mình, khai với core những gì nó cần qua trait
 `Module`, và được đăng ký ở đúng một chỗ. Module mẫu
-[`modules/notes`](../modules/notes) dùng mọi phần của hợp đồng; hãy bắt đầu từ một bản
-sao của nó.
+[`modules/notes`](../modules/notes) dùng mọi phần của hợp đồng;
+`cargo xtask new-module` tạo module mới từ nó.
 
 ## Những luật gate kiểm
 
@@ -29,9 +29,16 @@ sao của nó.
 
 ### 1. Tạo crate
 
-Chép `modules/notes` sang `modules/<tên>` rồi thay `notes` ở mọi chỗ: tên crate
-(`autoxide-<tên>`) trong `Cargo.toml`, `Module::name`, tên bảng, tên permission, tên
-event, mã lỗi và khoá trong `locales/vi.json`. Rồi:
+Sinh nó từ module mẫu:
+
+```bash
+cargo xtask new-module bookmarks bookmark   # <module: số nhiều> <entity: một bản ghi>
+```
+
+Lệnh này chép `modules/notes` sang `modules/bookmarks` và đổi mọi `notes` / `note` (mọi
+kiểu viết hoa: tên crate, `Module::name`, bảng, permission, event, mã lỗi, kiểu, tên
+file). Kết quả qua được gate ngay; sau đó viết lại bảng, service, mô tả và
+`locales/vi.json` cho đúng tính năng. Để đăng ký:
 
 1. thêm `autoxide-<tên> = { path = "modules/<tên>" }` vào `[workspace.dependencies]`
    của `Cargo.toml` gốc;
@@ -166,6 +173,10 @@ Module giữ dữ liệu về người dùng tham gia việc xuất dữ liệu 
 - Việc nền: `Module::jobs` (bộ chạy), `Module::schedules` (job định kỳ), và
   `context.jobs()` để đưa job vào hàng đợi.
 - Route cần thân request lớn hơn mặc định thì khai trong `Module::body_limits`.
+- Thứ người cài có thể làm sai (thư mục không ghi được, dịch vụ ngoài không trả lời,
+  thiếu dữ liệu ban đầu) thì có một bước kiểm trong `Module::checks`: một `Check` có
+  `Probe` trả `Finding` (ok, warning hay failed, kèm gợi ý sửa). Nó chạy trong
+  `autoxide doctor`; không được thay đổi dữ liệu. Xem `modules/files/src/doctor.rs`.
 
 ### 10. Bản dịch
 
@@ -176,9 +187,31 @@ Mọi `code` lỗi và khoá mẫu mail có câu tiếng Việt trong `locales/v
 
 Test chạm database dùng `TestDatabase::run(async |test| { … })` của
 `autoxide-testkit`: mỗi test một database trống, SQLite hay PostgreSQL tuỳ
-`TEST_DATABASE_URL`, và gate chạy cả hai. `modules/notes/src/tests.rs` cho thấy cách
-dựng module như binary dựng và gọi nó qua REST và qua một client MCP thật. Thứ gì ghi
-đồng thời (tên không trùng, token dùng một lần, bộ đếm) cần một test đồng thời.
+`TEST_DATABASE_URL`, và gate chạy cả hai.
+
+`TestApp` dựng module như binary dựng — cấu hình, migration, `start`, route, tool MCP và
+mọi lớp HTTP của core — rồi gọi nó:
+
+```rust
+let app = TestApp::builder(test)
+    .setting("AUTOXIDE_NOTES_SOMETHING", "42")         // như một biến môi trường
+    .provide::<dyn Storage>(Arc::new(MemoryStorage::default())) // thay cho module khác
+    .user("ada", 0xada, &["notes.read", "notes.write"]) // token "ada" → các permission này
+    .module(crate::module())
+    .build()
+    .await
+    .unwrap();
+
+let answer = app.post("/api/v1/notes").token("ada").json(json!({"title": "Hi"})).send().await.unwrap();
+assert_eq!(answer.status(), StatusCode::CREATED);
+
+let client = app.mcp("ada").await.unwrap();             // một client MCP thật
+let result = client.call_tool(tool("notes.list_notes", json!({}))).await.unwrap();
+```
+
+`app.database()`, `app.modules()` và `app.api::<dyn Trait>()` cho truy cập phần còn lại.
+`modules/notes/src/tests.rs` là ví dụ đầy đủ. Thứ gì ghi đồng thời (tên không trùng, token
+dùng một lần, bộ đếm) cần một test đồng thời.
 
 ### 12. Hoàn tất
 

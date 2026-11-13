@@ -199,11 +199,12 @@ impl Upload {
             .0
             .take()
             .ok_or_else(|| Error::internal("file storage: upload already finished"))?;
-        if let Err(error) = writer.shutdown().await {
-            abort(writer).await;
-            return Err(Error::internal(format!("file storage: {error}")));
-        }
-        Ok(())
+        // Không gọi `abort` sau `shutdown` hỏng: `shutdown` đã chuyển writer sang trạng thái
+        // `Flush` (object_store 0.14, `BufWriter::poll_shutdown`), và `abort` ở trạng thái đó
+        // panic ("Already shut down"); upload nhiều phần (nếu có) đã bị `finish` bên trong tiêu
+        // thụ, nên không còn gì để huỷ từ đây. Lỗi này lộ ra khi `autoxide doctor` thử ghi vào
+        // thư mục không ghi được (D-166).
+        writer.shutdown().await.map_err(|error| Error::internal(format!("file storage: {error}")))
     }
 }
 

@@ -1,0 +1,313 @@
+//! Lệnh `autoxide doctor`: kiểm bản cài đặt từng bước và nói cách sửa (D-166).
+//!
+//! Thứ tự: cấu hình → database (đọc và ghi) → migration → khoá ký → từng bước kiểm module khai
+//! (`Module::checks`). Bước nền hỏng thì các bước dựa vào nó không chạy (báo `skipped`), để
+//! người đọc thấy đúng một nguyên nhân thay vì một loạt lỗi kéo theo.
+
+use std::process::ExitCode;
+
+use autoxide_kernel::database::Database;
+use autoxide_kernel::doctor::{Finding, Status};
+use autoxide_kernel::module::Modules;
+use autoxide_kernel::secret::SecretKey;
+use serde::Serialize;
+
+use super::{EXIT_FAILURE, EXIT_INVALID_CONFIGURATION};
+use crate::settings::{self, Settings};
+
+#[derive(Debug, clap::Args)]
+pub struct Arguments {
+    /// Print the report as JSON (for scripts and AI agents) instead of text.
+    #[arg(long)]
+    json: bool,
+}
+
+/// Một dòng của báo cáo.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct Line {
+    name: String,
+    /// `ok`, `warning`, `failed`, hoặc `skipped` (không chạy vì bước nền trước đó hỏng).
+    status: &'static str,
+    message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hint: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct Report {
+    healthy: bool,
+    checks: Vec<Line>,
+}
+
+pub fn run(arguments: &Arguments) -> ExitCode {
+    let (report, configuration_valid) = match settings::load() {
+        Ok(settings) => match super::block_on(async { Ok(diagnose(settings).await) }) {
+            Ok(lines) => (lines, true),
+            Err(error) => return super::report_failure(&error),
+        },
+        Err(errors) => {
+            let finding = Finding::failed(errors.to_string()).with_hint(
+                "Settings come from environment variables and `.env`; see `.env.example` for \
+                 every setting and its default.",
+            );
+            (vec![line("configuration", Some(finding))], false)
+        }
+    };
+    let healthy = report.iter().all(|line| matches!(line.status, "ok" | "warning"));
+    if arguments.json {
+        let report = Report { healthy, checks: report };
+        match serde_json::to_string_pretty(&report) {
+            Ok(json) => println!("{json}"),
+            Err(error) => return super::report_failure(&error.to_string()),
+        }
+    } else {
+        print!("{}", render(&report, healthy));
+    }
+    if !configuration_valid {
+        ExitCode::from(EXIT_INVALID_CONFIGURATION)
+    } else if healthy {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(EXIT_FAILURE)
+    }
+}
+
+/// Cảnh báo vẫn tính là đạt: chạy được, chỉ nên sửa.
+fn passes(finding: &Finding) -> bool {
+    finding.status != Status::Failed
+}
+
+/// `None`: bước không chạy vì bước nền trước đó hỏng.
+fn line(name: &str, finding: Option<Finding>) -> Line {
+    match finding {
+        Some(finding) => Line {
+            name: name.to_owned(),
+            status: match finding.status {
+                Status::Ok => "ok",
+                Status::Warning => "warning",
+                Status::Failed => "failed",
+            },
+            message: finding.message,
+            hint: finding.hint,
+        },
+        None => Line {
+            name: name.to_owned(),
+            status: "skipped",
+            message: "Not run: an earlier check failed.".to_owned(),
+            hint: None,
+        },
+    }
+}
+
+/// Chạy mọi bước sau khi cấu hình đã hợp lệ.
+async fn diagnose(settings: Settings) -> Vec<Line> {
+    let Settings { config, mut modules, .. } = settings;
+    let mut lines = vec![line("configuration", Some(Finding::ok("The configuration is valid.")))];
+    let database = match Database::connect(&config.database).await {
+        Ok(database) => database,
+        Err(error) => {
+            lines.push(line(
+                "database",
+                Some(Finding::failed(error.to_string()).with_hint(
+                    "Check DATABASE_URL, that the database server is running and that this \
+                     server can reach it.",
+                )),
+            ));
+            lines.extend(skipped(["migrations", "secret_key"]));
+            return lines;
+        }
+    };
+    let database_ok = probe_database(&database).await;
+    let usable = passes(&database_ok);
+    lines.push(line("database", Some(database_ok)));
+    let migrations = if usable { Some(probe_migrations(&modules, &database).await) } else { None };
+    let migrated = migrations.as_ref().is_some_and(passes);
+    lines.push(line("migrations", migrations));
+    // Module chạy trên bảng chưa có thì mọi bước sau chỉ báo lỗi kéo theo.
+    if migrated && let Err(error) = modules.start(&database) {
+        lines.push(line(
+            "modules",
+            Some(Finding::failed(error.to_string()).with_hint(
+                "A module could not start; the message names it and what it is missing.",
+            )),
+        ));
+        lines.extend(skipped(["secret_key"]));
+    } else if migrated {
+        lines.push(line("secret_key", Some(probe_secret_key(&modules))));
+        for (module, check) in modules.checks() {
+            let name = format!("{module}.{}", check.name);
+            lines.push(line(&name, Some(check.run().await)));
+        }
+    } else {
+        lines.extend(skipped(["secret_key"]));
+    }
+    let _ = database.close().await;
+    lines
+}
+
+/// Các bước không chạy được vì bước nền hỏng. Bước kiểm của module chỉ có sau `start`, nên ở
+/// đây chỉ liệt kê các bước của chính lệnh.
+fn skipped<const N: usize>(names: [&str; N]) -> Vec<Line> {
+    names.iter().map(|name| line(name, None)).collect()
+}
+
+/// Hỏi cả kết nối ghi và kết nối đọc (hai pool, có thể hai máy chủ).
+async fn probe_database(database: &Database) -> Finding {
+    match database.ping().await {
+        Ok(()) => {
+            Finding::ok(format!("Connected to {:?} for reading and writing.", database.backend()))
+        }
+        Err(error) => Finding::failed(format!("the database does not answer: {error}"))
+            .with_hint("Check DATABASE_URL (and DATABASE_READ_URL if set)."),
+    }
+}
+
+async fn probe_migrations(modules: &Modules, database: &Database) -> Finding {
+    let pending = match modules.migrator() {
+        Ok(migrator) => migrator.pending(database).await.map_err(|error| error.to_string()),
+        Err(error) => Err(error.to_string()),
+    };
+    match pending {
+        Ok(pending) if pending.is_empty() => Finding::ok("Every migration has been applied."),
+        Ok(pending) => {
+            let names: Vec<String> =
+                pending.iter().map(|state| format!("{}/{}", state.module, state.name)).collect();
+            // Bản cài mới có hàng chục migration: nêu vài cái đầu là đủ biết chuyện gì.
+            const SHOWN: usize = 5;
+            let mut listed = names.iter().take(SHOWN).cloned().collect::<Vec<_>>().join(", ");
+            if names.len() > SHOWN {
+                listed.push_str(&format!(" and {} more", names.len() - SHOWN));
+            }
+            Finding::failed(format!("{} migration(s) have not been applied: {listed}", names.len()))
+                .with_hint("Run `autoxide migrate up`.")
+        }
+        Err(error) => Finding::failed(error),
+    }
+}
+
+fn probe_secret_key(modules: &Modules) -> Finding {
+    match modules.api::<SecretKey>() {
+        Some(key) if !key.is_configured() => Finding::warning(
+            "AUTOXIDE_SECRET_KEY is not set: the signing key is kept in the database, so a copy \
+             of the database is enough to work visitors' IP blocks back out of stored hashes.",
+        )
+        .with_hint("Set AUTOXIDE_SECRET_KEY (the same on every server) before going live."),
+        _ => Finding::ok("The signing key is configured outside the database."),
+    }
+}
+
+/// Báo cáo chữ: một dòng mỗi bước, gợi ý sửa thụt vào bên dưới.
+fn render(lines: &[Line], healthy: bool) -> String {
+    let mut out = String::new();
+    for Line { name, status, message, hint } in lines {
+        out.push_str(&format!("{status:<8} {name}: {message}\n"));
+        if let Some(hint) = hint {
+            out.push_str(&format!("         → {hint}\n"));
+        }
+    }
+    let warnings = lines.iter().filter(|line| line.status == "warning").count();
+    out.push_str(&match (healthy, warnings) {
+        (true, 0) => "\nNo problems found.\n".to_owned(),
+        (true, count) => {
+            format!("\nNo failed checks; {count} warning(s) to look at before going live.\n")
+        }
+        (false, _) => {
+            "\nFix the failed checks above, then run `autoxide doctor` again.\n".to_owned()
+        }
+    });
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use autoxide_kernel::config::ConfigSource;
+    use autoxide_testkit::TestDatabase;
+
+    use super::*;
+
+    fn settings(database_url: &str, dir: &std::path::Path) -> Settings {
+        let files = dir.join("files").display().to_string();
+        let mail = dir.join("mail").display().to_string();
+        let source = ConfigSource::from_pairs([
+            ("DATABASE_URL", database_url),
+            ("AUTOXIDE_FILES_DIR", files.as_str()),
+            ("AUTOXIDE_MAIL_FILE_DIR", mail.as_str()),
+        ]);
+        crate::settings::read(&source).unwrap()
+    }
+
+    fn statuses(lines: &[Line]) -> Vec<(&str, &str)> {
+        lines.iter().map(|line| (line.name.as_str(), line.status)).collect()
+    }
+
+    /// Bản cài mới: báo migration chưa áp dụng (kèm lệnh), bỏ qua các bước sau. Áp dụng xong
+    /// thì chạy bước kiểm của từng module; chỉ có cảnh báo thì vẫn đạt — trên cả hai database.
+    #[tokio::test]
+    async fn ban_cai_moi_roi_sau_khi_migrate() {
+        TestDatabase::run(async |test| {
+            let dir =
+                std::env::temp_dir().join(format!("autoxide-doctor-{}", uuid::Uuid::now_v7()));
+
+            let lines = diagnose(settings(test.url(), &dir)).await;
+            assert_eq!(
+                statuses(&lines),
+                [
+                    ("configuration", "ok"),
+                    ("database", "ok"),
+                    ("migrations", "failed"),
+                    ("secret_key", "skipped")
+                ]
+            );
+            assert_eq!(lines[2].hint.as_deref(), Some("Run `autoxide migrate up`."));
+            assert!(lines[2].message.contains(" more"), "{}", lines[2].message);
+
+            let setup = settings(test.url(), &dir);
+            let database = Database::connect(&setup.config.database).await.unwrap();
+            setup.modules.migrator().unwrap().up(&database).await.unwrap();
+            database.close().await.unwrap();
+
+            let lines = diagnose(settings(test.url(), &dir)).await;
+            let found = statuses(&lines);
+            for expected in [
+                ("migrations", "ok"),
+                ("secret_key", "warning"),
+                ("auth.administrator", "warning"),
+                ("files.storage", "ok"),
+                ("mail.smtp", "warning"),
+            ] {
+                assert!(found.contains(&expected), "{expected:?} not in {found:?}");
+            }
+            assert!(lines.iter().all(|line| line.status != "failed"), "{lines:?}");
+            let text = render(&lines, true);
+            assert!(text.contains("→ Run `autoxide user create"), "{text}");
+            assert!(
+                text.ends_with("No failed checks; 3 warning(s) to look at before going live.\n"),
+                "{text}"
+            );
+            let _ = std::fs::remove_dir_all(dir);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[test]
+    fn json_cho_ai_agent() {
+        let report = Report {
+            healthy: false,
+            checks: vec![
+                line("migrations", Some(Finding::failed("1 pending").with_hint("Run it."))),
+                line("secret_key", None),
+            ],
+        };
+        assert_eq!(
+            serde_json::to_value(&report).unwrap(),
+            serde_json::json!({
+                "healthy": false,
+                "checks": [
+                    {"name": "migrations", "status": "failed", "message": "1 pending", "hint": "Run it."},
+                    {"name": "secret_key", "status": "skipped", "message": "Not run: an earlier check failed."}
+                ]
+            })
+        );
+    }
+}

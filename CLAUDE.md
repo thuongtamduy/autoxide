@@ -173,6 +173,8 @@ sẵn lệnh.
 - Test chạm database lấy database qua `TestDatabase::run(async |database| { … })`
   của crate `autoxide-testkit`: mỗi test một database trống, tự chọn SQLite hay
   Postgres theo `TEST_DATABASE_URL`. Không tự mở kết nối tới một database cố định.
+  Test gọi module qua REST hay MCP dựng app bằng `TestApp::builder(test)` của testkit
+  (D-164), không tự ghép router.
 - `unwrap` / `expect` trong test: viết trong `#[cfg(test)] mod tests` (clippy tự
   miễn) hoặc trong `tests/` với dòng `#![allow(…)]` đầu file như các file sẵn có.
   Trong `src/` không được tắt các lint này — `cargo xtask check` chặn.

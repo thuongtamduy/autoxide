@@ -10,6 +10,7 @@ pub mod antispam;
 mod builtin;
 pub mod config;
 pub mod database;
+pub mod doctor;
 pub mod error;
 pub mod event;
 pub mod http;

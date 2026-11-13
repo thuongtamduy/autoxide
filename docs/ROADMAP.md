@@ -330,11 +330,11 @@ Giao diện quản trị ở repo riêng (D-096, D-097); bước này chỉ làm
 
 Mượn cái hay của framework khác ([`docs/research/frameworks.md`](research/frameworks.md)).
 
-- [ ] `TestApp` trong `autoxide-testkit`: dựng module như binary trên `TestDatabase`, gọi REST và
+- [x] `TestApp` trong `autoxide-testkit`: dựng module như binary trên `TestDatabase`, gọi REST và
       MCP với quyền tuỳ chọn; `notes` dùng nó; hướng dẫn (EN + VI)
 - [ ] Các module còn lại chuyển sang `TestApp` (một cách làm cho mỗi việc)
-- [ ] `cargo xtask new-module <tên>`: sinh module mới từ khuôn `notes`, qua được gate
-- [ ] `Module::checks` + `autoxide doctor`: kiểm cấu hình, database, migration và kiểm của module
+- [x] `cargo xtask new-module <tên>`: sinh module mới từ khuôn `notes`, qua được gate
+- [x] `Module::checks` + `autoxide doctor`: kiểm cấu hình, database, migration và kiểm của module
 - [ ] `Module::tasks` + `autoxide task`: lệnh quản trị do module khai
 - [ ] Hợp đồng ổn định: danh sách public dependency, `#[non_exhaustive]` cho kiểu sẽ lớn thêm,
       chính sách deprecate API Rust; hướng dẫn viết module ở repo riêng (EN + VI)

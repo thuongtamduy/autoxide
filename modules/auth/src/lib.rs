@@ -13,6 +13,7 @@ pub mod api;
 mod api_key;
 mod cleanup;
 mod config;
+mod doctor;
 mod events;
 mod http;
 mod mfa;
@@ -65,6 +66,7 @@ struct AuthModule {
     state: Option<http::HttpState>,
     cleanup: Option<Arc<cleanup::Cleanup>>,
     resets: Option<Arc<reset::PasswordResets>>,
+    administrator: Option<Arc<doctor::Administrator>>,
 }
 
 impl Module for AuthModule {
@@ -89,6 +91,7 @@ impl Module for AuthModule {
         let database = context.database().clone();
         let outbox = context.outbox()?;
         self.cleanup = Some(Arc::new(cleanup::Cleanup::new(database.clone())));
+        self.administrator = Some(Arc::new(doctor::Administrator { database: database.clone() }));
         let users = Arc::new(UserService::new(database.clone(), Passwords::new(), outbox.clone()));
         let secret = match config.token_secret {
             Some(secret) => secret,
@@ -221,6 +224,16 @@ impl Module for AuthModule {
 
     fn schedules(&self) -> Vec<Schedule> {
         vec![cleanup::schedule()]
+    }
+
+    fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {
+        self.administrator.clone().map_or_else(Vec::new, |probe| {
+            vec![autoxide_kernel::doctor::Check::new(
+                "administrator",
+                "An active account with the `admin` role exists, so someone can manage the server.",
+                probe,
+            )]
+        })
     }
 
     fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {

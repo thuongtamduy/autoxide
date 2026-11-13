@@ -143,6 +143,15 @@ to choose your own, pipe it in and add `--password-stdin`:
 cargo run -p autoxide -- user create --email you@example.com --name "Your Name" --admin
 ```
 
+Check the installation. `doctor` goes through the configuration, the database,
+the migrations, file storage, the SMTP server and the administrator account, and
+says how to fix each problem (`--json` for scripts and AI agents; it exits with
+status 1 when a check failed):
+
+```bash
+cargo run -p autoxide -- doctor
+```
+
 Then start the server. It refuses to start while a migration is pending, and
 stops gracefully on Ctrl-C or `SIGTERM` (requests in progress get
 `AUTOXIDE_HTTP_SHUTDOWN_SECONDS` to finish):

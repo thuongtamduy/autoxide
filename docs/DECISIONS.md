@@ -3933,3 +3933,51 @@ module do máy kiểm, hai database có test thật, OpenAPI + MCP cho AI agent)
 khác, phải hỗ trợ dải phiên bản Rust cũ, mất luật tự kiểm; re-export axum / SeaORM / utoipa từ
 kernel — derive macro của chúng sinh đường dẫn cố định nên module vẫn phải khai trực tiếp; plugin
 WASM, trang admin, auto-CRUD, ORM tự viết, DI lúc biên dịch — xem bản khảo sát.
+
+## D-165 · Lệnh sinh module: chép khuôn `notes` rồi đổi tên — 2026-11-13 — agent quyết
+
+Quyết định: `cargo xtask new-module <module> <entity>` (vd `bookmarks bookmark`) chép
+`modules/notes` sang `modules/<module>`, trừ `benches/` (bộ đo của core, D-071), và thay sáu dạng
+chữ `notes` / `note` / `Notes` / `Note` / `NOTES` / `NOTE` bằng dạng tương ứng của tên mới trong
+nội dung và tên file, trong **một lượt quét** (tên mới chứa `note` không bị thay lần hai). Mô tả
+trong `Cargo.toml` và chú thích đầu `lib.rs` được viết lại. Tên được kiểm theo D-038 (chữ thường,
+số, `_`; không trùng; không là tiền tố bảng của module khác; không là tên dành riêng) và số ít phải
+khác số nhiều. Lệnh không tự đăng ký module vào binary: nó in ba dòng cần thêm (như hướng dẫn).
+
+Lý do: `notes` đã dùng đủ hợp đồng module và đi qua gate mỗi lần chạy, nên khuôn không cũ đi âm
+thầm. Test `sinh_tu_khuon_notes_that` sinh thật từ `notes` mỗi lần gate chạy: khuôn đổi hình dạng
+(mất header, đổi phần bench) thì test đỏ trước khi người dùng gặp lỗi. Đã thử sinh `bookmarks`
+rồi chạy clippy, `cargo xtask check` và test trên cả hai database: xanh.
+
+Đã cân nhắc: bộ template riêng có chỗ điền (`{{name}}`) — hai nguồn sự thật, template dễ hỏng mà
+không ai biết vì nó không được biên dịch; `cargo-generate` — thêm công cụ ngoài cho người dùng
+cài; tự sửa `Cargo.toml` và `modules.rs` — `notes` cố ý không đăng ký trong binary (core trung lập),
+và người viết module mới nên tự quyết thứ tự đăng ký.
+
+## D-166 · `autoxide doctor` và `Module::checks` — 2026-11-13 — agent quyết
+
+Quyết định:
+
+- Kernel có `autoxide_kernel::doctor`: `Check` (tên ngắn, mô tả, `Arc<dyn Probe>`), `Probe`
+  (`async fn probe() -> Finding`), `Finding` (`ok` / `warning` / `failed`, câu tiếng Anh, gợi ý
+  sửa). Mỗi bước tối đa 10 giây. Module khai qua `Module::checks` (mặc định rỗng, D-038); kernel
+  thêm tiền tố `<module>.`. Bước kiểm không thay đổi dữ liệu thật — thứ ghi thử thì dọn ngay.
+- Lệnh `autoxide doctor [--json]`: cấu hình → database (ping cả kết nối đọc và ghi) → migration
+  → khởi động module → khoá ký (D-153) → bước kiểm của module. Bước nền hỏng thì bước sau báo
+  `skipped`, để thấy đúng một nguyên nhân. Mã thoát: 0 khi không có bước `failed` (cảnh báo vẫn
+  đạt), 1 khi có, 2 khi cấu hình sai (như mọi lệnh).
+- Bước kiểm đầu tiên: `auth.administrator` (chưa có admin hoạt động → cảnh báo kèm lệnh tạo),
+  `files.storage` (ghi, đọc lại, xoá một file thử), `mail.smtp` (SMTP trả lời `NOOP`; chưa cấu
+  hình thì cảnh báo mail chỉ ghi ra file).
+- Không gọi nhà cung cấp AI: `autoxide ai check` đã có và tốn token; doctor không được tốn tiền.
+
+Lý do: người lạ tự cài phải tự biết mình thiếu gì (mục tiêu ở `CLAUDE.md`); AI agent vận hành
+cần kết quả có cấu trúc (`--json`). Mượn `cargo loco doctor` và system checks của Django (D-164).
+
+Phát hiện kèm: bước `files.storage` lộ ra một lỗi có sẵn — ghi một file nhỏ thất bại (thư mục
+không ghi được, S3 từ chối) thì `Upload::finish` gọi `BufWriter::abort` sau `shutdown`, và
+object_store 0.14 panic ("Already shut down") ở trạng thái đó. Đã bỏ lời gọi `abort` sau
+`shutdown`; test `noi_luu_khong_ghi_duoc_thi_hong_kem_goi_y` giữ lỗi không quay lại.
+
+Đã cân nhắc: gộp vào `/health/ready` — health check phải rẻ và chạy liên tục, còn doctor ghi thử
+file và nối SMTP; báo lỗi đầu tiên rồi dừng — người cài phải chạy lại nhiều lần mới thấy hết.

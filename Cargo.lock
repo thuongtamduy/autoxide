@@ -388,6 +388,7 @@ dependencies = [
  "getrandom 0.4.3",
  "rmcp",
  "sea-orm",
+ "serde",
  "serde_json",
  "tokio",
  "tower",
@@ -724,9 +725,14 @@ version = "0.7.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
+ "axum",
+ "rmcp",
  "sea-orm",
  "serde_json",
  "tokio",
+ "tower",
+ "utoipa",
+ "utoipa-axum",
  "uuid",
 ]
 

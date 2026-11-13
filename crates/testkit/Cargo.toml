@@ -1,6 +1,6 @@
 [package]
 name = "autoxide-testkit"
-description = "Test support for Autoxide: an isolated database per test, on SQLite or Postgres."
+description = "Test support for Autoxide: an isolated database per test (SQLite or Postgres) and the app built around it."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,10 +10,23 @@ publish.workspace = true
 [dependencies]
 async-trait.workspace = true
 autoxide-kernel.workspace = true
+axum.workspace = true
+# Client MCP thật cho `TestApp::mcp` (testkit chỉ là dev-dependency, nên feature client không
+# lọt vào binary).
+rmcp = { workspace = true, features = [
+  "client",
+  "transport-streamable-http-client-reqwest",
+  "reqwest-tls-no-provider",
+] }
 sea-orm.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
+tower.workspace = true
+utoipa.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+utoipa-axum.workspace = true
 
 [lints]
 workspace = true

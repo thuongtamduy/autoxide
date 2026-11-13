@@ -10,6 +10,7 @@
 pub mod api;
 mod cleanup;
 mod config;
+mod doctor;
 mod entity;
 mod events;
 mod http;
@@ -49,6 +50,8 @@ struct FilesModule {
     config: Option<FilesConfig>,
     /// Có sau `start`.
     service: Option<Arc<FileService>>,
+    /// Bước kiểm của `autoxide doctor`; có sau `start`.
+    probe: Option<Arc<doctor::StorageProbe>>,
 }
 
 impl Module for FilesModule {
@@ -89,13 +92,18 @@ impl Module for FilesModule {
             .config
             .clone()
             .ok_or_else(|| Error::internal("module `files` started before it was configured"))?;
-        match &config.backend {
+        let location = match &config.backend {
             Backend::Local { dir } => {
                 tracing::info!(directory = %dir.display(), "files are stored on local disk");
+                format!("local disk at {}", dir.display())
             }
-            Backend::S3(s3) => tracing::info!(bucket = %s3.bucket, "files are stored in S3"),
-        }
+            Backend::S3(s3) => {
+                tracing::info!(bucket = %s3.bucket, "files are stored in S3");
+                format!("S3 bucket `{}`", s3.bucket)
+            }
+        };
         let storage: Arc<dyn Storage> = Arc::new(ObjectStorage::open(&config.backend)?);
+        self.probe = Some(Arc::new(doctor::StorageProbe { storage: storage.clone(), location }));
         let outbox = context.outbox()?;
         let database = context.database().clone();
         let service = Arc::new(FileService::new(database, storage.clone(), outbox, config.limits));
@@ -113,6 +121,16 @@ impl Module for FilesModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    }
+
+    fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {
+        self.probe.clone().map_or_else(Vec::new, |probe| {
+            vec![autoxide_kernel::doctor::Check::new(
+                "storage",
+                "Files can be written, read back and deleted where they are stored.",
+                probe,
+            )]
+        })
     }
 
     fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {

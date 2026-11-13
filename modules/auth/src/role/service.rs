@@ -490,6 +490,14 @@ pub(crate) async fn count_active_admins<C: ConnectionTrait>(connection: &C) -> R
         .filter(role::Column::AllPermissions.eq(true))
         .exec(connection)
         .await?;
+    count_active_admins_unlocked(connection).await
+}
+
+/// Như [`count_active_admins`] nhưng không khoá: chỉ đọc, dùng được trên kết nối đọc (vd lệnh
+/// `autoxide doctor`). Không dùng để quyết một thay đổi về quyền — đếm này có thể cũ ngay sau đó.
+pub(crate) async fn count_active_admins_unlocked<C: ConnectionTrait>(
+    connection: &C,
+) -> Result<u64, Error> {
     let count = user_role::Entity::find()
         .filter(
             user_role::Column::RoleId.in_subquery(

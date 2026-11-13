@@ -1,27 +1,16 @@
 //! Test của module mẫu, trên database gate đang chọn (gate chạy cả SQLite và Postgres).
-//! Dựng module như binary dựng: migration → start → route + tool → lớp HTTP của kernel;
-//! gọi qua REST và qua client MCP thật.
+//! `TestApp` của testkit dựng module như binary dựng: migration → start → route + tool → lớp
+//! HTTP của kernel; gọi qua REST và qua client MCP thật.
 
 use std::sync::Arc;
 
-use autoxide_kernel::access::{Authenticator, Principal};
-use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
 use autoxide_kernel::database::Database;
-use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::module::Modules;
-use autoxide_testkit::TestDatabase;
-use axum::Router;
-use axum::body::Body;
-use axum::http::{Request, StatusCode, header};
-use rmcp::ServiceExt as _;
-use rmcp::model::CallToolRequestParams;
+use autoxide_testkit::{TestApp, TestDatabase, tool};
+use axum::http::{Method, StatusCode};
 use rmcp::service::{RoleClient, RunningService};
-use rmcp::transport::StreamableHttpClientTransport;
-use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
-use tower::ServiceExt as _;
 use uuid::Uuid;
 
 use crate::api::Notes;
@@ -31,85 +20,38 @@ use crate::service::{NewNote, NoteChanges};
 const ADA: Uuid = Uuid::from_u128(0xada);
 const BOB: Uuid = Uuid::from_u128(0xb0b);
 
-struct FakeAuthenticator;
-
-#[async_trait::async_trait]
-impl Authenticator for FakeAuthenticator {
-    async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
-        let both = ["notes.read".to_owned(), "notes.write".to_owned()];
-        match authorization {
-            Some("Bearer ada") => Ok(Principal::new(ADA, both)),
-            Some("Bearer bob") => Ok(Principal::new(BOB, ["notes.read".to_owned()])),
-            _ => Err(Error::internal("unknown test token")),
-        }
-    }
+async fn app(test: &TestDatabase) -> TestApp {
+    TestApp::builder(test)
+        .user("ada", 0xada, &["notes.read", "notes.write"])
+        .user("bob", 0xb0b, &["notes.read"])
+        .module(crate::module())
+        .build()
+        .await
+        .unwrap()
 }
 
-struct App {
-    router: Router,
-    openapi: utoipa::openapi::OpenApi,
-    modules: Modules,
-    database: Database,
-}
-
-async fn app(test: &TestDatabase) -> App {
-    let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
-    let mut reader = ConfigReader::new(&source);
-    let config = Config::read(&mut reader);
-    let (config, _) = reader.finish(config).unwrap();
-    let database = Database::connect(&config.database).await.unwrap();
-    let mut modules = Modules::new(vec![Box::new(crate::module())]).unwrap();
-    modules.migrator().unwrap().up(&database).await.unwrap();
-    modules.start(&database).unwrap();
-    let extras = autoxide_kernel::http::Extras {
-        authenticator: Some(Arc::new(FakeAuthenticator)),
-        tools: modules.tools().unwrap(),
-        translations: modules.translations().clone(),
-        ..Default::default()
-    };
-    let api = autoxide_kernel::http::build(
-        &config.http,
-        utoipa_axum::router::OpenApiRouter::new(),
-        modules.routes(),
-        extras,
-    );
-    App { router: api.router, openapi: api.openapi, modules, database }
-}
-
+/// Gọi `/api/v1/notes{uri}` bằng tiếng Việt; trả trạng thái và thân JSON.
 async fn rest(
-    app: &App,
+    app: &TestApp,
     method: &str,
     uri: &str,
     who: &str,
     body: Option<Value>,
 ) -> (StatusCode, Value) {
-    let request = Request::builder()
-        .method(method)
-        .uri(format!("/api/v1/notes{uri}"))
-        .header(header::AUTHORIZATION, format!("Bearer {who}"))
-        .header(header::ACCEPT_LANGUAGE, "vi")
-        .header(header::CONTENT_TYPE, "application/json");
-    let body = body.map_or_else(Body::empty, |body| Body::from(body.to_string()));
-    let response = app.router.clone().oneshot(request.body(body).unwrap()).await.unwrap();
-    let status = response.status();
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let json = if bytes.is_empty() { Value::Null } else { serde_json::from_slice(&bytes).unwrap() };
-    (status, json)
+    let method = Method::from_bytes(method.as_bytes()).unwrap();
+    let mut request = app
+        .request(method, &format!("/api/v1/notes{uri}"))
+        .token(who)
+        .header("accept-language", "vi");
+    if let Some(body) = body {
+        request = request.json(body);
+    }
+    let answer = request.send().await.unwrap();
+    (answer.status(), answer.json())
 }
 
-async fn mcp(app: &App, who: &str) -> RunningService<RoleClient, ()> {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let url = format!("http://{}/mcp", listener.local_addr().unwrap());
-    let router = app.router.clone();
-    tokio::spawn(async move { axum::serve(listener, router).await });
-    autoxide_kernel::tls::install_crypto_provider();
-    let config = StreamableHttpClientTransportConfig::with_uri(url).auth_header(who);
-    ().serve(StreamableHttpClientTransport::from_config(config)).await.unwrap()
-}
-
-fn tool(name: &str, arguments: Value) -> CallToolRequestParams {
-    let arguments = arguments.as_object().cloned().unwrap_or_default();
-    CallToolRequestParams::new(name.to_owned()).with_arguments(arguments)
+async fn mcp(app: &TestApp, who: &str) -> RunningService<RoleClient, ()> {
+    app.mcp(who).await.unwrap()
 }
 
 async fn events(database: &Database) -> Vec<String> {
@@ -164,7 +106,7 @@ async fn rest_va_mcp_dung_chung_service() {
 
         // Mỗi lệnh ghi thành công đúng một event (audit log đọc từ đây).
         assert_eq!(
-            events(&app.database).await,
+            events(app.database()).await,
             [
                 "notes.note_created",
                 "notes.note_created",
@@ -240,7 +182,7 @@ async fn tao_trung_ten_dong_thoi_chi_mot_thanh_cong() {
     TestDatabase::run(async |test| {
         let app = app(test).await;
         let service = crate::service::NoteService::new(
-            app.database.clone(),
+            app.database().clone(),
             autoxide_kernel::event::Outbox::standalone("notes"),
         );
         let service = Arc::new(service);
@@ -284,7 +226,7 @@ async fn module_khac_dung_trait_cong_bo() {
         let (_, created) = rest(&app, "POST", "", "ada", Some(json!({"title": "Shared"}))).await;
         let id: Uuid = created["data"]["id"].as_str().unwrap().parse().unwrap();
 
-        let notes = app.modules.api::<dyn Notes>().unwrap();
+        let notes = app.modules().api::<dyn Notes>().unwrap();
 
         let found = notes.find(id).await.unwrap().unwrap();
         assert_eq!((found.owner_id, found.title.as_str()), (ADA, "Shared"));
@@ -301,8 +243,8 @@ async fn tai_lieu_openapi_du_mo_ta() {
     TestDatabase::run(async |test| {
         let app = app(test).await;
 
-        assert_eq!(autoxide_kernel::http::lint(&app.openapi), Vec::<String>::new());
-        assert!(app.openapi.paths.paths.contains_key("/api/v1/notes/{id}"));
+        assert_eq!(autoxide_kernel::http::lint(app.openapi()), Vec::<String>::new());
+        assert!(app.openapi().paths.paths.contains_key("/api/v1/notes/{id}"));
     })
     .await
     .unwrap();
@@ -323,7 +265,7 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
             if who == "bob" {
                 assert_eq!(status, StatusCode::FORBIDDEN);
                 let service = crate::service::NoteService::new(
-                    app.database.clone(),
+                    app.database().clone(),
                     Outbox::standalone("notes"),
                 );
                 let note = NewNote { title: title.to_owned(), body: String::new() };
@@ -333,15 +275,15 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
             }
         }
         // Bộ phát event dựng được dù chưa có module tài khoản nào khai event xoá.
-        app.modules.dispatcher(&app.database).unwrap();
+        app.modules().dispatcher(app.database()).unwrap();
 
-        let exported = app.modules.personal_data().export(ADA).await.unwrap();
+        let exported = app.modules().personal_data().export(ADA).await.unwrap();
         let titles: Vec<_> =
             exported["notes"].as_array().unwrap().iter().map(|n| n["title"].clone()).collect();
         assert_eq!(titles, vec![json!("one"), json!("two")]);
 
         let service =
-            crate::service::NoteService::new(app.database.clone(), Outbox::standalone("notes"));
+            crate::service::NoteService::new(app.database().clone(), Outbox::standalone("notes"));
         let deleted = Delivered {
             id: Uuid::now_v7(),
             module: "auth",
@@ -353,9 +295,9 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
         };
         service.handle(&deleted).await.unwrap();
         service.handle(&deleted).await.unwrap();
-        let exported = app.modules.personal_data().export(ADA).await.unwrap();
+        let exported = app.modules().personal_data().export(ADA).await.unwrap();
         assert_eq!(exported["notes"], json!([]));
-        let exported = app.modules.personal_data().export(BOB).await.unwrap();
+        let exported = app.modules().personal_data().export(BOB).await.unwrap();
         assert_eq!(exported["notes"].as_array().unwrap().len(), 1);
     })
     .await
@@ -371,7 +313,7 @@ async fn sua_dong_thoi_cung_phien_ban_chi_mot_nguoi_thang() {
     TestDatabase::run(async |test| {
         let app = app(test).await;
         let service = Arc::new(crate::service::NoteService::new(
-            app.database.clone(),
+            app.database().clone(),
             Outbox::standalone("notes"),
         ));
         let note = NewNote { title: "Shared".to_owned(), body: String::new() };

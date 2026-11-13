@@ -9,6 +9,21 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- `autoxide doctor [--json]`: checks the configuration, the database, the migrations, the
+  signing key, file storage (writes, reads back and deletes a test file), the SMTP server and
+  whether an administrator exists, and says how to fix each problem.
+- Module contract: `Module::checks` declares checks for `autoxide doctor` (default: none).
+- `cargo xtask new-module <module> <entity>` creates a new module from the `notes` sample.
+- `autoxide-testkit`: `TestApp` builds modules the way the binary does on a test database and
+  calls them through REST and a real MCP client.
+
+### Fixed
+
+- Files: a failed upload of a small file (unwritable directory, storage refusing it) no longer
+  crashes the request with a panic; it returns an error.
+
 ## [0.7.0] - 2026-11-12
 
 ### Added

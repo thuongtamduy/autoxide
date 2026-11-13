@@ -139,6 +139,14 @@ muốn tự chọn mật khẩu thì đưa nó vào standard input và thêm `--
 cargo run -p autoxide -- user create --email you@example.com --name "Your Name" --admin
 ```
 
+Kiểm bản cài đặt. `doctor` đi qua cấu hình, database, migration, nơi lưu file, máy chủ
+SMTP và tài khoản quản trị, và nói cách sửa từng lỗi (`--json` cho script và AI agent;
+thoát với mã 1 khi có bước kiểm hỏng):
+
+```bash
+cargo run -p autoxide -- doctor
+```
+
 Sau đó chạy máy chủ. Máy chủ từ chối chạy khi còn migration chưa áp dụng, và dừng êm
 khi nhận Ctrl-C hoặc `SIGTERM` (request đang chạy có `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`
 giây để xong):

@@ -6,6 +6,7 @@
 
 pub mod api;
 mod config;
+mod doctor;
 mod service;
 mod transport;
 
@@ -38,6 +39,8 @@ struct MailModule {
     config: Option<MailConfig>,
     /// Có sau `start`.
     sender: Option<Arc<Sender>>,
+    /// Bước kiểm của `autoxide doctor`; có sau `start`.
+    probe: Option<Arc<doctor::SmtpProbe>>,
 }
 
 impl Module for MailModule {
@@ -85,11 +88,22 @@ impl Module for MailModule {
             );
         }
         let transport = Arc::new(Transport::new(config.smtp_url.as_deref(), config.file_dir)?);
+        self.probe = Some(Arc::new(doctor::SmtpProbe { transport: transport.clone() }));
         let database = context.database().clone();
         self.sender =
             Some(Arc::new(Sender::new(transport, config.from, database, context.outbox()?)));
         let service = MailService::new(context.database().clone(), context.jobs());
         context.provide::<dyn Mailer>(Arc::new(service))
+    }
+
+    fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {
+        self.probe.clone().map_or_else(Vec::new, |probe| {
+            vec![autoxide_kernel::doctor::Check::new(
+                "smtp",
+                "Mail can be handed to the configured SMTP server.",
+                probe,
+            )]
+        })
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {
