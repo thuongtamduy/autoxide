@@ -437,6 +437,7 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 | 51 Hợp đồng cho giao diện (D-200) | nhúng bản ghi: sau 33; hộp việc, tìm, số liệu, hoạt động: sau 34; menu: sau 35 | 36–49 — nên làm trước 41 để module thương mại khai luôn phần của mình |
 | 52 Trải nghiệm quản trị nâng cao (D-201) | 51 | 41–49 |
 | 53 Hỗ trợ khách hàng (D-204) | 37 (thông báo, vụ việc khiếu nại) | 41–49 |
+| 54 Phân quyền chuẩn hàng đầu (D-205) | 34; P6, P7 cần P12 của 51; P1 làm ở bước 31 | 41–49, 53 |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
@@ -538,6 +539,12 @@ Nhóm B — chống hồi quy:
       `STACK.md`
 - [ ] Response thật khớp hợp đồng: test HTTP qua `TestApp` kiểm mỗi response (thân và mã) khớp
       schema của endpoint đó trong `docs/openapi.json`, để tài liệu không hứa điều code không làm
+- [ ] Hợp đồng quyền đọc được bằng máy (D-205, đặc tả 54 mục P1): mỗi operation OpenAPI có
+      `x-permissions` hay `x-public`, sinh từ một khai báo cạnh handler; `Permission` có mức rủi ro
+      (`read` / `write` / `destructive` / `sensitive_data` / `money`)
+- [ ] Test độ phủ phân quyền trong gate (D-205): mọi operation không công khai trả 401 khi không token và
+      403 khi token không có quyền; operation thiếu khai báo quyền làm gate đỏ; tool MCP `read_only` chỉ
+      đòi quyền mức `read`
 
 ## 32. Dọn bố cục và việc để lại (agent đề xuất ngày 13/11/2026)
 
@@ -1242,9 +1249,38 @@ D-194). Khiếu nại có hạn luật định vẫn ở `compliance` (bước 3
       vào lại phiếu qua trait `InboundMail` (tắt mặc định); hướng dẫn `docs/SUPPORT.md` (EN + VI); test
       trên cả hai database
 
+## 54. Phân quyền chuẩn hàng đầu (chủ dự án giao ngày 13/11/2026, D-205)
+
+Đặc tả: [`docs/steps/54-authorization.md`](steps/54-authorization.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 34. Mô hình: RBAC theo cây tổ chức có độ sâu (bước 34) + chia sẻ bản ghi một bước + deny
+và rào + điều kiện theo ngữ cảnh — luật là dữ liệu có kiểu, không ngôn ngữ chính sách tự do. Đối chiếu với
+Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe và chuẩn OpenID AuthZEN.
+
+- [ ] Một hàm quyết định duy nhất, thu hồi tức thì (quyền không nằm trong token; cache theo phiên bản quyền
+      của khách); test so khớp "lọc danh sách = kiểm từng bản ghi" sinh ngẫu nhiên trên cả hai database
+- [ ] Deny thắng allow trên role; rào quyền tối đa cho khách con (kể cả admin của khách con); API key chi
+      tiết: hạn bắt buộc, chọn tài nguyên, dải IP, lần dùng cuối, xoay vòng, quản trị duyệt key
+- [ ] Xác thực lại cho việc nhạy cảm (passkey / MFA gần đây, RFC 9470); điều kiện theo IP và khung giờ
+      trên gán role
+- [ ] Chia sẻ bản ghi có hạn cho người, nhóm, nút, key (module khai quan hệ `viewer` / `editor`…), không
+      trao quyền mình không có
+- [ ] Quyền theo trường dữ liệu: trường cá nhân / nhạy cảm / tài chính phân loại trong OpenAPI, bị che khi
+      thiếu `<module>.read_personal`, đọc dữ liệu nhạy cảm có audit (Luật 91/2025) — áp cho `auth`,
+      `comments`, `forms`, `newsletter`
+- [ ] Nâng quyền đúng lúc (role đủ điều kiện, kích hoạt có lý do, hạn, duyệt); tài khoản khẩn cấp; lệnh hai
+      người và cặp quyền xung đột do module khai, ngưỡng là dữ liệu
+- [ ] Giải thích và mô phỏng (vì sao có / không có quyền, thử role nháp), "ai có quyền trên bản ghi này",
+      quyền không dùng 90 ngày, rà soát quyền định kỳ vào hộp việc
+- [ ] Endpoint theo chuẩn OpenID AuthZEN Authorization API 1.0; agent hành động thay người dùng có vết
+      `on_behalf_of`; số đo quyết định quyền; hướng dẫn `docs/ACCESS.md` (EN + VI)
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.
+
+Để sau (D-205): ứng dụng bên thứ ba qua OAuth 2.0 với phạm vi là tên permission (chợ ứng dụng) · đồng bộ
+người dùng và nhóm từ hệ thống doanh nghiệp qua SCIM 2.0.
 
 Để sau (D-201, theo nghiên cứu): khách thử nghiệm (sandbox) cách ly, khách duyệt từng lần nhân sự nền
 tảng xin vào dữ liệu, nhóm nút ngoài cây cho báo cáo, quản trị trên điện thoại có thanh đáy và tóm tắt

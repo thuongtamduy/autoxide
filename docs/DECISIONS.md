@@ -4984,3 +4984,33 @@ cửa hàng ở Việt Nam (ra mắt sản phẩm, chạy quảng cáo Google / 
 nền cho chat về sau; dùng `comments` làm phiếu — phiếu là riêng tư, có phân công và hạn, khác bình luận
 công khai; module `feeds` riêng — trùng việc với `channels`; tiền cọc đặt trước ngay bây giờ — cần thiết
 kế nghĩa vụ trong sổ cái, để khi làm bước 45 hay sau.
+
+## D-205 · Phân quyền chuẩn hàng đầu: bước 54 mới, hợp đồng quyền và test độ phủ ở bước 31 — 2026-11-13 — chủ dự án giao, agent quyết cách làm
+
+Quyết định: chủ dự án yêu cầu phân quyền theo chuẩn các nền tảng lớn và vượt họ. Mô hình chốt: **RBAC theo
+cây tổ chức có độ sâu (bước 34) + chia sẻ bản ghi một bước + deny và rào + điều kiện theo ngữ cảnh**, luật
+là dữ liệu có kiểu do module khai — không ngôn ngữ chính sách tự do, không thư viện chính sách ngoài.
+
+1. Bước 31 thêm hai mục làm ngay: hợp đồng quyền đọc được bằng máy (`x-permissions` / `x-public` trên mỗi
+   operation OpenAPI, `Permission` có mức rủi ro) và test độ phủ trong gate (mọi operation không công khai
+   trả 401 / 403 đúng; thiếu khai báo là đỏ). Rà soát ngày 13/11/2026 cho thấy 224 endpoint, 69 tool MCP
+   đều kiểm quyền, nhưng chỉ `media` có test cho từng endpoint — endpoint mới quên kiểm quyền sẽ lọt.
+2. Bước 54 mới (đặc tả `docs/steps/54-authorization.md`), sau bước 34: một hàm quyết định duy nhất và thu
+   hồi tức thì (quyền không nằm trong token, cache theo `kernel_access_version`); test so khớp lọc danh sách
+   với kiểm từng bản ghi; deny thắng allow; rào quyền tối đa cho khách con; API key chi tiết (hạn bắt buộc,
+   tài nguyên, IP, duyệt); xác thực lại theo RFC 9470; chia sẻ bản ghi có hạn; quyền theo trường dữ liệu
+   (che dữ liệu cá nhân, audit đọc dữ liệu nhạy cảm); nâng quyền đúng lúc; lệnh hai người; mô phỏng, "ai có
+   quyền", quyền không dùng, rà soát định kỳ; endpoint theo OpenID AuthZEN Authorization API 1.0 (chuẩn cuối
+   01/2026); agent hành động thay người dùng có vết.
+3. Để sau: OAuth 2.0 cho ứng dụng bên thứ ba, SCIM 2.0.
+
+Lý do: mỗi phần lấy từ một nền tảng đã chứng minh ở quy mô lớn — Dynamics 365 (độ sâu), Google Zanzibar
+(quan hệ, "ai có quyền"), AWS IAM (deny, SCP, mô phỏng, quyền không dùng), GitHub (token chi tiết, xác thực
+lại), Microsoft Entra PIM (nâng quyền đúng lúc, rà soát), Salesforce (quyền theo trường). Phần vượt trội là
+thứ họ không có cùng lúc: thu hồi tức thì ở mọi đường, lọc danh sách được chứng minh khớp kiểm từng bản ghi,
+độ phủ được gate chứng minh, giải thích được mọi quyết định, và sinh ra cho AI agent — trên cả hai database.
+
+Đã cân nhắc: đồ thị quan hệ đầy đủ kiểu Zanzibar / OpenFGA — mạnh nhưng bài toán "liệt kê bản ghi được
+xem" chậm và cần dịch vụ riêng; ngôn ngữ chính sách Cedar (`cedar-policy`) hay OPA — người thường khó đọc,
+điều kiện tự do không dịch được thành một câu SQL chạy trên cả hai database, thêm thư viện lớn; nhét phạm
+vi vào JWT — mất thu hồi tức thì.
