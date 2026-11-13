@@ -5,7 +5,7 @@
 
 mod commands;
 #[cfg(test)]
-mod media_e2e;
+mod e2e;
 mod modules;
 mod observability;
 mod runtime;

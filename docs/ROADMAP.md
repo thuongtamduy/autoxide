@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–27 xong**; bản phát hành mới nhất `v0.9.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–28 xong**; bản phát hành mới nhất `v0.9.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -350,9 +350,9 @@ Từ lượt rà soát kiến trúc cùng ngày: bỏ code lặp, giữ luật h
 - [x] `content`: handler không đọc database (`describe`, `preview_entry` vào service); `cargo xtask
       check` chặn handler gọi database
 - [x] `content`: gom file theo nhóm, tách `tests.rs` thành thư mục
-- [ ] Quy ước bố cục module (theo lớp hay theo tính năng) trong hướng dẫn viết module (EN + VI)
-- [ ] `kernel`: tách bộ đăng ký `Modules` khỏi `module.rs`
-- [ ] `crates/app`: test đầu-cuối `media_e2e` ra khỏi chỗ code của binary
+- [x] Quy ước bố cục module (theo lớp hay theo tính năng) trong hướng dẫn viết module (EN + VI)
+- [x] `kernel`: tách bộ đăng ký `Modules` khỏi `module.rs`
+- [x] `crates/app`: test đầu-cuối `media_e2e` ra khỏi chỗ code của binary
 
 ## Sau core (chưa mở)
 

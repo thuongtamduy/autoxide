@@ -19,7 +19,8 @@ Tính năng nghiệp vụ nằm trong module, không nằm trong core. Một mod
 - **Cả hai database.** Mọi thứ chạy trên SQLite và PostgreSQL. Không dùng kiểu dữ
   liệu, hàm hay cú pháp chỉ một bên có. Test chạy trên cả hai.
 - **Logic ở service.** Handler REST và tool MCP nhận đầu vào, kiểm permission, gọi một
-  hàm của service rồi trả kết quả. Chúng không bao giờ chạm database.
+  hàm của service rồi trả kết quả. Chúng không bao giờ chạm database: `cargo xtask check`
+  chặn handler hay tool mở kết nối.
 - **Lỗi có `code` ổn định** mang tiền tố module (`notes.title_taken`) và có bản dịch
   tiếng Việt trong `locales/vi.json`.
 
@@ -49,6 +50,15 @@ file). Kết quả qua được gate ngay; sau đó viết lại bảng, service
 
 `Cargo.toml` của crate khai thư viện dạng `<thư viện>.workspace = true`, kèm
 `license.workspace = true` và `[lints] workspace = true`.
+
+**Bố cục file.** Bắt đầu với mỗi vai một file, như `notes`: `lib.rs` (cài đặt `Module`),
+`api.rs` (hợp đồng cho module khác), `config.rs`, `permissions.rs`, `events.rs`, `entity.rs`,
+`migration/`, `service.rs`, `http.rs`, `tools.rs` và `tests.rs`. Khi module vượt khoảng 5.000
+dòng, chia phần service theo tính năng, mỗi tính năng một thư mục (`session/`, `user/` của
+`auth`; `entries/`, `publishing/` của `content`), còn `lib.rs`, `api.rs`, `config.rs`,
+`permissions.rs`, `events.rs`, `entity/`, `migration/`, `http/` và `tools.rs` giữ ở trên cùng,
+để module nào cũng đọc theo một cách. Test dài quá khoảng 1.000 dòng thì vào thư mục `tests/`,
+mỗi tính năng một file.
 
 ### 2. Bảng: migration và entity
 
