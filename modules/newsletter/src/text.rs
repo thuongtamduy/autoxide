@@ -107,56 +107,6 @@ impl Localized {
     }
 }
 
-/// Email chuẩn hoá: bỏ khoảng trắng hai đầu, viết thường.
-pub(crate) fn normalize_email(email: &str) -> String {
-    email.trim().to_lowercase()
-}
-
-/// Email có dạng `phần-trước@tên.miền` hợp lý (không đầy đủ RFC 5322 — đủ để chặn chữ rác).
-/// Độ dài đếm theo BYTE như bên gửi mail (`lettre`): phần trước `@` tối đa 64 byte, tên miền 254
-/// byte, mỗi nhãn 63 byte — địa chỉ nhận ở đây thì gửi mail được. Cả địa chỉ tối đa 320 byte nên
-/// vừa cột `VARCHAR(320)` trên cả hai database.
-pub(crate) fn is_email(text: &str) -> bool {
-    let Some((local, domain)) = text.split_once('@') else { return false };
-    let local_ok = (1..=64).contains(&local.len())
-        && !local.starts_with('.')
-        && !local.ends_with('.')
-        && !local.contains("..")
-        && local
-            .chars()
-            .all(|c| !c.is_whitespace() && !c.is_control() && !"<>()[]\\,;:\"@".contains(c));
-    let labels: Vec<&str> = domain.split('.').collect();
-    let domain_ok = text.len() <= 320
-        && domain.len() <= 254
-        && labels.len() >= 2
-        && labels.iter().all(|label| {
-            (1..=63).contains(&label.len())
-                && !label.starts_with('-')
-                && !label.ends_with('-')
-                && label.chars().all(|c| c.is_alphanumeric() || c == '-')
-        });
-    local_ok && domain_ok
-}
-
-/// Email đã chuẩn hoá của `raw`; sai dạng thì thêm lỗi `field` và trả `None`.
-pub(crate) fn checked_email(
-    raw: &str,
-    field: &str,
-    problems: &mut Vec<FieldError>,
-) -> Option<String> {
-    let email = normalize_email(raw);
-    if is_email(&email) {
-        Some(email)
-    } else {
-        problems.push(FieldError::new(
-            field,
-            "email",
-            "must be an email address like `name@example.com`",
-        ));
-        None
-    }
-}
-
 /// `key` của danh sách: chữ thường và số, nhóm nối bằng `-`, tối đa 50 ký tự.
 pub(crate) fn is_valid_key(key: &str) -> bool {
     !key.is_empty()
@@ -216,21 +166,25 @@ mod tests {
 
     #[test]
     fn email_va_key() {
-        assert!(is_email("ada@example.com"));
+        assert!(autoxide_kernel::email::is_valid("ada@example.com"));
         for bad in
             ["", "ada", "ada@", "@example.com", "a b@example.com", "ada@example", "a..b@x.io"]
         {
-            assert!(!is_email(bad), "{bad}");
+            assert!(!autoxide_kernel::email::is_valid(bad), "{bad}");
         }
-        assert_eq!(normalize_email("  Ada@Example.COM "), "ada@example.com");
+        assert_eq!(autoxide_kernel::email::normalize("  Ada@Example.COM "), "ada@example.com");
         // Đếm byte như bên gửi mail: 33 chữ `é` là 66 byte.
-        assert!(is_email(&format!("{}@example.com", "é".repeat(32))));
-        assert!(!is_email(&format!("{}@example.com", "é".repeat(33))));
-        assert!(!is_email(&format!("a@{}.com", "é".repeat(32))));
+        assert!(autoxide_kernel::email::is_valid(&format!("{}@example.com", "é".repeat(32))));
+        assert!(!autoxide_kernel::email::is_valid(&format!("{}@example.com", "é".repeat(33))));
+        assert!(!autoxide_kernel::email::is_valid(&format!("a@{}.com", "é".repeat(32))));
         // Kiểm sau khi chuẩn hoá: `İ` viết thường dài ra (2 → 3 byte).
         let mut problems = Vec::new();
         assert_eq!(
-            checked_email(&format!("{}@x.io", "İ".repeat(30)), "email", &mut problems),
+            autoxide_kernel::email::checked(
+                &format!("{}@x.io", "İ".repeat(30)),
+                "email",
+                &mut problems
+            ),
             None
         );
         assert_eq!(problems.len(), 1);

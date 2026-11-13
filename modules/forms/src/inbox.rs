@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 use autoxide_kernel::access::Principal;
-use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Order, Page, PageRequest, fetch_page};
 use chrono::{DateTime, Utc};
@@ -448,8 +448,9 @@ async fn rows_of_email<C: ConnectionTrait>(
 /// Có câu trả lời nào (chuỗi, hay một phần tử của mảng) đúng bằng `email` sau khi chuẩn hoá.
 fn answers_contain(data: &str, email: &str) -> Result<bool, Error> {
     let data: Map<String, Value> = from_json(data)?;
-    let equal =
-        |value: &Value| value.as_str().is_some_and(|text| fields::normalize_email(text) == email);
+    let equal = |value: &Value| {
+        value.as_str().is_some_and(|text| autoxide_kernel::email::normalize(text) == email)
+    };
     Ok(data.values().any(|value| match value {
         Value::Array(items) => items.iter().any(equal),
         other => equal(other),
@@ -458,14 +459,7 @@ fn answers_contain(data: &str, email: &str) -> Result<bool, Error> {
 
 /// Email của yêu cầu xuất / xoá, đã chuẩn hoá; sai dạng thì 422.
 fn checked_email(email: &str) -> Result<String, Error> {
-    let email = fields::normalize_email(email);
-    if fields::is_email(&email) {
-        Ok(email)
-    } else {
-        Err(Error::validation(vec![FieldError::new(
-            "email",
-            "email",
-            "must be an email address like `name@example.com`",
-        )]))
-    }
+    let mut problems = Vec::new();
+    autoxide_kernel::email::checked(email, "email", &mut problems)
+        .ok_or_else(|| Error::validation(problems))
 }

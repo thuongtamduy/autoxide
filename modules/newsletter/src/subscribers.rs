@@ -311,7 +311,8 @@ impl NewsletterService {
         let mut seen = HashSet::new();
         for (index, person) in input.people.into_iter().enumerate() {
             let field = |name: &str| format!("subscribers[{index}].{name}");
-            let email = text::checked_email(&person.email, &field("email"), &mut problems);
+            let email =
+                autoxide_kernel::email::checked(&person.email, &field("email"), &mut problems);
             let name = text::line(person.name.as_deref(), &field("name"), NAME_MAX, &mut problems);
             if let Some(attributes) = &person.attributes {
                 check_attributes(attributes, &field("attributes"), &mut problems)?;
@@ -788,5 +789,6 @@ fn check_attributes(
 /// Email của yêu cầu xuất / xoá, đã chuẩn hoá; sai dạng thì 422.
 fn required_email(email: &str) -> Result<String, Error> {
     let mut problems = Vec::new();
-    text::checked_email(email, "email", &mut problems).ok_or_else(|| Error::validation(problems))
+    autoxide_kernel::email::checked(email, "email", &mut problems)
+        .ok_or_else(|| Error::validation(problems))
 }

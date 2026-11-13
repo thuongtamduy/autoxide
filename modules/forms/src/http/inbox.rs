@@ -374,7 +374,7 @@ pub(crate) async fn get_email_data(
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<EmailDataResponse>, Error> {
     let found = service.submissions_of_email(&principal, query.email()?).await?;
-    let email = crate::fields::normalize_email(query.email()?);
+    let email = autoxide_kernel::email::normalize(query.email()?);
     let submissions = found.into_iter().map(SubmissionResponse::from).collect();
     Ok(Data { data: EmailDataResponse { email, submissions } })
 }

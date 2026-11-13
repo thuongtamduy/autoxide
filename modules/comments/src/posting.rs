@@ -175,7 +175,7 @@ impl CommentsService {
             None
         };
         let email = match input.email.as_deref().map(str::trim).filter(|raw| !raw.is_empty()) {
-            Some(raw) => text::checked_email(raw, "email", &mut problems),
+            Some(raw) => autoxide_kernel::email::checked(raw, "email", &mut problems),
             None => {
                 if input.notify_replies {
                     problems.push(FieldError::new(

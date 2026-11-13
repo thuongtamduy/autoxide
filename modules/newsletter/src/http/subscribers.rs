@@ -427,7 +427,7 @@ pub(crate) async fn get_email_data(
     let found = service.email_data(&principal, email).await?;
     Ok(Data {
         data: EmailDataResponse {
-            email: crate::text::normalize_email(email),
+            email: autoxide_kernel::email::normalize(email),
             subscriber: found.subscriber.map(Into::into),
             deliveries: found.deliveries.into_iter().map(Into::into).collect(),
             suppression: found.suppression.map(Into::into),

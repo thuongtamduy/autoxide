@@ -373,50 +373,6 @@ pub(crate) fn clean_name(raw: &str, field: &str, problems: &mut Vec<FieldError>)
     name
 }
 
-pub(crate) fn normalize_email(email: &str) -> String {
-    email.trim().to_lowercase()
-}
-
-pub(crate) fn is_email(text: &str) -> bool {
-    let Some((local, domain)) = text.split_once('@') else { return false };
-    let local_ok = (1..=64).contains(&local.chars().count())
-        && !local.starts_with('.')
-        && !local.ends_with('.')
-        && !local.contains("..")
-        && local
-            .chars()
-            .all(|c| !c.is_whitespace() && !c.is_control() && !"<>()[]\\,;:\"@".contains(c));
-    let labels: Vec<&str> = domain.split('.').collect();
-    let domain_ok = text.len() <= 320
-        && labels.len() >= 2
-        && labels.iter().all(|label| {
-            (1..=63).contains(&label.chars().count())
-                && !label.starts_with('-')
-                && !label.ends_with('-')
-                && label.chars().all(|c| c.is_alphanumeric() || c == '-')
-        });
-    local_ok && domain_ok
-}
-
-/// Email đã chuẩn hoá; sai dạng thì thêm lỗi ở `field`.
-pub(crate) fn checked_email(
-    raw: &str,
-    field: &str,
-    problems: &mut Vec<FieldError>,
-) -> Option<String> {
-    let email = normalize_email(raw);
-    if is_email(&email) {
-        Some(email)
-    } else {
-        problems.push(FieldError::new(
-            field,
-            "email",
-            "must be an email address like `name@example.com`",
-        ));
-        None
-    }
-}
-
 /// ID của đích do module sở hữu cấp: 1–100 ký tự chữ, số, `-`, `_`, `.`, `:`.
 pub(crate) fn is_target_id(id: &str) -> bool {
     (1..=100).contains(&id.len())
@@ -496,8 +452,8 @@ mod tests {
 
     #[test]
     fn email_va_ten() {
-        assert!(is_email("ada@example.com"));
-        assert!(!is_email("ada@example"));
+        assert!(autoxide_kernel::email::is_valid("ada@example.com"));
+        assert!(!autoxide_kernel::email::is_valid("ada@example"));
         let mut problems = Vec::new();
         assert_eq!(clean_name("  Ada   Lovelace ", "name", &mut problems), "Ada Lovelace");
         assert!(problems.is_empty());

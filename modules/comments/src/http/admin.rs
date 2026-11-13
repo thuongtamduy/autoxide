@@ -502,7 +502,7 @@ pub(crate) async fn get_email_data(
     let found = service.email_data(&principal, query.email()?).await?;
     Ok(Data {
         data: EmailDataResponse {
-            email: crate::text::normalize_email(query.email()?),
+            email: autoxide_kernel::email::normalize(query.email()?),
             comments: found.comments.into_iter().map(CommentDetail::from).collect(),
             follows: found
                 .subscriptions

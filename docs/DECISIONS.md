@@ -4201,3 +4201,20 @@ người lạ phải cài; giới hạn số job của cargo (`CARGO_BUILD_JOBS`
 rảnh, `renice` chỉ nhường CPU khi có việc khác cần.
 
 Bổ sung: luật Gate trong `CLAUDE.md`; D-171 (phát hành vẫn cần gate đầy đủ).
+
+## D-174 · Một cách kiểm email cho dữ liệu người đọc gửi lên: `autoxide_kernel::email` — 2026-11-13 — agent quyết
+
+Quyết định: `autoxide_kernel::email` có `normalize`, `is_valid`, `checked` và `invalid`; `forms`,
+`comments`, `newsletter` dùng nó thay cho ba bản tự viết. Luật: cả địa chỉ tối đa 254 byte
+(RFC 5321), phần trước `@` 1–64 byte, tên miền có ít nhất một dấu chấm, mỗi nhãn 1–63 byte chữ,
+số hoặc `-`; độ dài đếm theo byte như bên gửi mail (`lettre`). `auth` chỉ dùng chung `normalize`
+và giữ cách kiểm của `validator` cho tài khoản.
+
+Lý do: lượt rà soát kiến trúc ngày 2026-11-13 thấy ba bản đã lệch nhau — `comments` đếm ký tự,
+`forms` và `newsletter` đếm byte; `newsletter` nhận địa chỉ tới 320 byte (không gửi mail tới được),
+`forms` giới hạn 254 — nên cùng một địa chỉ có chỗ nhận, chỗ báo sai. `auth` giữ cách riêng vì
+tài khoản cần nhận địa chỉ nội bộ (`admin@localhost`) mà luật trên từ chối; đổi sẽ làm API tạo
+tài khoản từ chối thứ trước đây nhận (thay đổi phá vỡ).
+
+Đã cân nhắc: dùng `validator` cho cả ba module — nhận tên miền không dấu chấm, không hợp với form
+công khai; thư viện email đầy đủ RFC 5322 — thêm thư viện cho vài chục dòng.

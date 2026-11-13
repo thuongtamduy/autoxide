@@ -106,7 +106,7 @@ impl NewsletterService {
     ) -> Result<suppression::Model, Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
         let mut problems = Vec::new();
-        let email = text::checked_email(email, "email", &mut problems);
+        let email = autoxide_kernel::email::checked(email, "email", &mut problems);
         let note = text::line(note, "note", 255, &mut problems);
         let Some(email) = email.filter(|_| problems.is_empty()) else {
             return Err(Error::validation(problems));
@@ -159,7 +159,7 @@ impl NewsletterService {
     ) -> Result<BounceOutcome, Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
         let mut problems = Vec::new();
-        let email = text::checked_email(email, "email", &mut problems);
+        let email = autoxide_kernel::email::checked(email, "email", &mut problems);
         let note = text::line(note, "reason", 255, &mut problems);
         let Some(email) = email.filter(|_| problems.is_empty()) else {
             return Err(Error::validation(problems));
@@ -266,7 +266,7 @@ impl EventHandler for DeliveryFailures {
             (Some(start), Some(end)) if start < end => &to[start + 1..end],
             _ => to,
         };
-        let email = text::normalize_email(address);
+        let email = autoxide_kernel::email::normalize(address);
         let code = event.payload.get("code").and_then(|code| code.as_str()).map(str::to_owned);
         let delivery_id = event
             .payload
@@ -287,7 +287,7 @@ impl EventHandler for DeliveryFailures {
             .one(service.database.read())
             .await?
             .is_some();
-        if (delivery_id.is_some() || known) && text::is_email(&email) {
+        if (delivery_id.is_some() || known) && autoxide_kernel::email::is_valid(&email) {
             let note = code.map(|code| format!("smtp {code}"));
             service.bounce(Actor::system(), &email, BounceKind::Hard, note).await?;
         }
