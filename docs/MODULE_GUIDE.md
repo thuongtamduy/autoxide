@@ -20,7 +20,7 @@ Business features live in modules, not in the core. A module is one crate under
   function or syntax only one of them has. Tests run on both.
 - **Logic in the service.** REST handlers and MCP tools take input, check the
   permission, call one service method and return its result. They never touch the
-  database.
+  database: `cargo xtask check` stops a handler or tool that opens a connection.
 - **Errors have a stable `code`** with the module prefix (`notes.title_taken`) and a
   Vietnamese translation in `locales/vi.json`.
 
@@ -50,6 +50,15 @@ the descriptions and `locales/vi.json` for your feature. To register it:
 
 The crate's `Cargo.toml` lists dependencies as `<library>.workspace = true`, with
 `license.workspace = true` and `[lints] workspace = true`.
+
+**File layout.** Start with one file per role, as in `notes`: `lib.rs` (the `Module`
+implementation), `api.rs` (the contract for other modules), `config.rs`, `permissions.rs`,
+`events.rs`, `entity.rs`, `migration/`, `service.rs`, `http.rs`, `tools.rs` and `tests.rs`.
+When the module passes about 5,000 lines, group the service code by feature instead, one
+folder per feature (`session/`, `user/` in `auth`; `entries/`, `publishing/` in `content`),
+and keep `lib.rs`, `api.rs`, `config.rs`, `permissions.rs`, `events.rs`, `entity/`,
+`migration/`, `http/` and `tools.rs` at the top, so every module reads the same way. Tests
+longer than about 1,000 lines go in a `tests/` folder, one file per feature.
 
 ### 2. Tables: migrations and entities
 

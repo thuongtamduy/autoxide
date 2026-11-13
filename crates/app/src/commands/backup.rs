@@ -507,13 +507,13 @@ mod tests {
             let scratch = Scratch::new();
             let files_a = scratch.0.join("files-a");
             let storage = [("AUTOXIDE_FILES_DIR", files_a.display().to_string())];
-            let runtime = crate::media_e2e::start(test.url(), &storage).await;
-            let token = crate::media_e2e::admin_token(&runtime, "root@example.com").await;
+            let runtime = crate::e2e::media::start(test.url(), &storage).await;
+            let token = crate::e2e::media::admin_token(&runtime, "root@example.com").await;
             let auth = format!("Bearer {token}");
             let png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR\x00\x00\x00\x07\x00\x00\x00\x05\x08\x06\x00\x00\x00\x00\x00\x00\x00";
             let headers = [("authorization", auth.as_str()), ("content-type", "image/png")];
             let (_, _, uploaded) =
-                crate::media_e2e::call(&runtime, "POST", "/api/v1/media?name=a.png", &headers, png.to_vec())
+                crate::e2e::media::call(&runtime, "POST", "/api/v1/media?name=a.png", &headers, png.to_vec())
                     .await;
             let id: uuid::Uuid = uploaded["data"]["id"].as_str().unwrap().parse().unwrap();
             let headers = [
@@ -523,7 +523,7 @@ mod tests {
             ];
             let change = br#"{"alt": "Seven by five", "visibility": "public"}"#.to_vec();
             let (status, _, _) =
-                crate::media_e2e::call(&runtime, "PATCH", &format!("/api/v1/media/{id}"), &headers, change)
+                crate::e2e::media::call(&runtime, "PATCH", &format!("/api/v1/media/{id}"), &headers, change)
                     .await;
             assert_eq!(status, axum::http::StatusCode::OK);
             runtime.database.close().await.unwrap();
