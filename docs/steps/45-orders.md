@@ -611,3 +611,47 @@ sản phẩm qua `catalog::api` rồi hỏi `Orders::delivered_lines(tenant, aut
   `token_xem_don_het_han_sau_30_phut`, `huy_don_vang_lai_cung_chinh_sach`,
   `doi_dia_chi_can_otp_lan_hai`, `response_che_so_dien_thoai_va_dia_chi`,
   `thao_tac_vang_lai_goi_lai_cung_idempotency_key` — cả hai database.
+
+## Bổ sung theo D-203 (nút "Đánh giá này hữu ích")
+
+`sort=helpful` của danh sách đánh giá công khai (mục D-201) cần dữ liệu "bao nhiêu người thấy đánh giá này
+hữu ích". Phần này nằm trong thư mục `reviews/` của `orders`, bật cùng tính năng `orders.reviews`.
+
+- **Bảng.**
+  - `orders_review_votes`: `tenant_id`, `review_id`, `user_id`, `created_at`. Khoá chính (`tenant_id`,
+    `review_id`, `user_id`); index (`tenant_id`, `user_id`) để xoá theo tài khoản.
+  - `orders_reviews` thêm `helpful_count` INT mặc định 0 (migration mới), đổi trong CÙNG transaction với
+    phiếu bằng `UPDATE … SET helpful_count = helpful_count ± 1` (không đọc rồi ghi). Thêm index
+    (`tenant_id`, `product_id`, `status`, `helpful_count`, `id`) cho `sort=helpful`.
+- **Endpoint.**
+  - `PUT /public/reviews/{id}/helpful` (đăng nhập, `orders.buy`): bỏ phiếu. Gửi lại khi đã bỏ phiếu thì
+    trả 200 như lần đầu, không đếm thêm (`INSERT … ON CONFLICT DO NOTHING`, chỉ tăng đếm khi chèn được
+    dòng).
+  - `DELETE /public/reviews/{id}/helpful`: rút phiếu; chưa bỏ phiếu thì không đổi gì.
+  - Cả hai trả `{helpful_count, voted_by_me}`.
+  - Đánh giá công khai trả thêm `helpful_count`; có đăng nhập thì thêm `voted_by_me`, lấy cho cả trang
+    bằng một câu truy vấn.
+- **Sắp xếp.** `sort=helpful`: `helpful_count` giảm dần rồi `id` giảm dần, phân trang bằng `fetch_page_by`
+  (con trỏ mang cả hai). Mặc định vẫn là `newest`: thứ tự "hữu ích" là người đọc tự chọn, không dùng để
+  đẩy đánh giá xấu xuống (Luật 19/2023 — cần đối chiếu văn bản gốc).
+- **Chặn bỏ phiếu sai.**
+  - Không bỏ phiếu cho đánh giá của chính mình: `orders.review_vote_own` (409).
+  - Người có `orders.reviews.moderate` hay quyền quản lý sản phẩm ở nút bán sản phẩm đó không được bỏ
+    phiếu (người bán không tự đẩy đánh giá tốt lên): `orders.review_vote_not_allowed` (403).
+  - Chỉ đánh giá `published`; còn lại trả 404 `orders.review_not_found`.
+  - Không có nút "không hữu ích" (tránh dồn phiếu hạ đánh giá xấu).
+  - Throttle theo người dùng: `AUTOXIDE_ORDERS_REVIEW_VOTES_PER_HOUR` (mặc định 60), quá thì 429.
+- **Ẩn và xoá.** Đánh giá bị ẩn giữ nguyên phiếu (mở lại thì số cũ quay về), không nhận phiếu mới. Tài
+  khoản bị xoá (`privacy::USER_DELETED`): xoá phiếu của người đó và trừ đếm trong cùng transaction; nhận
+  lại event thì không trừ hai lần.
+- **Event, MCP.** Không phát event cho từng phiếu (quá nhiều, không cần audit). `list_reviews` trả kèm
+  `helpful_count`; không có tool bỏ phiếu (việc của người mua trên website).
+- **Mã lỗi mới**, kèm bản dịch `vi`: `orders.review_vote_own`, `orders.review_vote_not_allowed`,
+  `orders.review_not_found` (nếu chưa có).
+- **Test** — cả hai database:
+  - `phieu_huu_ich_moi_nguoi_mot_lan`
+  - `khong_bo_phieu_cho_danh_gia_cua_minh`
+  - `nguoi_ban_khong_bo_phieu_cho_san_pham_cua_minh`
+  - `dem_huu_ich_dung_khi_bo_phieu_dong_thoi` (nhiều người cùng lúc, cùng người gửi lặp)
+  - `sap_theo_huu_ich_lat_trang_khong_trung_khong_sot`
+  - `xoa_tai_khoan_xoa_phieu_va_tru_dem`

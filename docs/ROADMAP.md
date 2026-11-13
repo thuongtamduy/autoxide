@@ -1050,6 +1050,9 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       (tiền hoàn, cách gửi trả và phí, thời gian hoàn, hạn — không ghi); thao tác bằng token xem đơn vãng
       lai (huỷ, đổi địa chỉ có OTP lần hai, mở hỗ trợ) qua cùng service, giới hạn tra / gửi lại OTP / hạn
       token là cấu hình, che số điện thoại và địa chỉ tới cấp phường
+- [ ] Nút "Đánh giá này hữu ích" (D-203): mỗi người một phiếu, rút lại được, đếm cùng transaction,
+      `sort=helpful` phân trang bằng con trỏ; không tự bỏ phiếu cho mình, người bán không bỏ phiếu cho sản
+      phẩm của mình; không có nút "không hữu ích"
 
 ## 46. Sàn (`marketplace`)
 
