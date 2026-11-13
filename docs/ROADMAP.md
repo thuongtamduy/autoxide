@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–27 xong**; bản phát hành mới nhất `v0.8.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–27 xong**; bản phát hành mới nhất `v0.9.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
