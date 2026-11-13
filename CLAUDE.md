@@ -9,6 +9,7 @@ Autoxide: lõi backend Rust, core trước, module cắm vào sau.
 
 - **Dùng gì, vì sao** → [`STACK.md`](STACK.md)
 - **Làm gì tiếp** → [`docs/ROADMAP.md`](docs/ROADMAP.md)
+- **Làm một bước thế nào** → [`docs/steps/`](docs/steps/README.md) (đặc tả bước 30–49)
 - **Đã quyết gì** → [`docs/DECISIONS.md`](docs/DECISIONS.md)
 
 ## Mục tiêu — không được quên

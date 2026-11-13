@@ -4739,6 +4739,39 @@ khai như phần còn lại.
 bằng QEMU trên một máy — chậm gấp nhiều lần (D-078); `cosign` tự cài thay cho `actions/attest`
 — thêm một công cụ, còn `gh attestation verify` người dùng đã có cùng GitHub CLI.
 
+## D-198 · Đặc tả từng bước trong `docs/steps/`, luật chung giữa các bước; giữ nguyên lịch sử git — 2026-11-13 — chủ dự án quyết hướng, agent quyết nội dung
+
+Quyết định: mỗi bước 30–49 có một file đặc tả trong `docs/steps/` (bảng dữ liệu, API, permission, event,
+mã lỗi, thứ tự commit, test bắt buộc, tiêu chí xong, chỗ dễ sai, căn cứ pháp lý); `docs/steps/README.md`
+giữ luật chung giữa các bước và thắng khi một đặc tả lệch. Luật chung chốt:
+
+1. Hàm chạm database nhận `&TenantContext` (nguồn duy nhất của `Database`); hàm không chạm database nhận
+   `TenantId`. Khách mặc định có ID cố định — ngoại lệ có chủ đích của luật UUIDv7; `NO_TENANT` cho job
+   của cả database; header `Autoxide-Tenant`.
+2. Cây tổ chức (`kernel_org_units`, `kernel_org_closure`) ở kernel, vì lọc theo nhánh cần subquery
+   trong câu SQL của mọi module (luật kiến trúc 1); nút gốc của khách có ID bằng tenant ID.
+3. Thanh toán nằm trong `ledger`, không có module `payments`; chuỗi băm sổ cái không băm `tenant_id`;
+   `kernel_sequences` là bảng cấp khách hàng ở mọi database dữ liệu.
+4. Thứ tự đăng ký: `address` → `organizations` → `auth`…; `tax` → `ledger` → `invoices` → `compliance`
+   → `notifications` → `newsletter`, `comments` → `plans` (sau mọi module nền, module trước hỏi qua
+   `EntitlementsHandle`) → thương mại → `reporting`.
+5. Module đăng ký trước cần gọi module sau thì công bố "điểm cắm" trong `api` của mình; nhận event của
+   module có thể chưa cài bằng `Subscription::optional` (dựng ở commit chuẩn bị của bước 41, cùng
+   `autoxide_kernel::csv` và `::slug`). Tên event do module phát quyết.
+6. API mới của kernel có bảng "bước nào dựng" trong README; bước cần trước thì dựng, bước sau dùng lại.
+7. **Chủ dự án quyết: giữ nguyên lịch sử git khi công khai repo** (email tác giả commit, dòng
+   `Claude-Session:`) — không viết lại, agent bước 30 không hỏi lại.
+
+Lý do: chủ dự án yêu cầu (13/11/2026) lộ trình đủ chi tiết để teammate làm đầy đủ và đúng, không dùng
+tài liệu ngoài repo. Đặc tả do tám agent viết song song theo một bảng tên chung; agent chính đối chiếu
+chéo, sửa chỗ lệch tên event giữa bước 44 và 45, và chốt các điểm các agent đề xuất khác nhau ở trên.
+Ghi chú: D-177 viết "agent làm bước 32 quyết" theo số cũ — theo bảng đánh số lại của D-178 đó là bước 31
+(SDK TypeScript).
+
+Đã cân nhắc: viết chi tiết thẳng vào `ROADMAP.md` — file đã hơn 900 dòng, agent đọc một bước phải nạp cả
+lộ trình; truyền khách ngầm bằng `task_local` — mất khi `tokio::spawn`, quên khách không bị trình biên
+dịch bắt; cây tổ chức trong module `organizations` — module khác không được viết subquery vào bảng của nó.
+
 ## D-199 · Repo tạm giữ riêng tư; phần cần repo công khai tách thành bước 50 — 2026-11-13 — chủ dự án quyết
 
 Quyết định: chủ dự án giữ repo `autoxide` **riêng tư** cho tới khi tự quyết công khai. Thay phần
