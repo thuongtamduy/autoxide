@@ -223,7 +223,9 @@ names, single-use tokens, counters) needs a concurrency test.
 
 1. If the API changed, regenerate the contract:
    `cargo run -p autoxide -- openapi > docs/openapi.json`.
-2. Run `./gate.sh` until it is green.
+2. While you work, `./gate.sh --quick` runs the tests of your module (and of the crates that
+   depend on it) on SQLite in under a minute.
+3. Run the full `./gate.sh` until it is green: every test on SQLite and PostgreSQL.
 
 ## A module in its own repository
 

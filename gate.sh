@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# Gate của Autoxide: định nghĩa "xong". Một thay đổi chỉ được commit khi lệnh
-# này xanh. Chạy:  ./gate.sh
+# Gate của Autoxide: định nghĩa "xong". Hai mức (D-173):
+#
+#   ./gate.sh --quick   gate nhanh, trước mỗi commit lúc đang làm một bước: như dưới đây
+#                       nhưng chỉ chạy test của crate bị sửa (so với origin/main) và crate
+#                       phụ thuộc vào chúng, chỉ trên SQLite, không cần Docker.
+#   ./gate.sh           gate đầy đủ: bắt buộc trước khi merge vào main và trước khi phát hành.
+#
+# Cả hai chạy ở mức ưu tiên CPU thấp (`renice`) để máy vẫn dùng được trong lúc build.
 #
 # Theo thứ tự (dừng ở bước đỏ đầu tiên):
 #   1. định dạng            cargo fmt --check
@@ -36,6 +42,20 @@
 
 set -euo pipefail
 cd "$(dirname "$0")"
+
+QUICK=0
+case "${1:-}" in
+  "") ;;
+  --quick) QUICK=1 ;;
+  *)
+    echo "usage: ./gate.sh [--quick]" >&2
+    exit 2
+    ;;
+esac
+
+# Ưu tiên CPU thấp cho cả script và mọi tiến trình con (cargo, rustc, test): việc khác trên máy
+# được chạy trước, gate dùng phần CPU còn thừa. Không có `renice` thì chạy bình thường.
+renice -n 10 -p $$ >/dev/null 2>&1 || true
 
 POSTGRES_IMAGE="${GATE_POSTGRES_IMAGE:-postgres:16-alpine}"
 S3_IMAGE="${GATE_S3_IMAGE:-motoserver/moto:5.2.5}"
@@ -103,6 +123,16 @@ leaks=(--no-banner --redact --config .gitleaks.toml)
 gitleaks_run git . "${leaks[@]}"
 gitleaks_run git . "${leaks[@]}" --pre-commit --staged
 gitleaks_run git . "${leaks[@]}" --pre-commit
+
+# --- Gate nhanh: test của crate bị ảnh hưởng, chỉ SQLite ---------------------------
+
+if [ "$QUICK" = 1 ]; then
+  step "tests on SQLite, changed crates only (cargo xtask test-affected)"
+  cargo xtask test-affected
+  printf '\n\033[32mgate --quick: green — fmt, clippy, boundaries, dependencies, secrets, tests of changed crates on SQLite\033[0m\n'
+  printf 'Not checked: PostgreSQL, S3, crates you did not touch. Run ./gate.sh before merging into main.\n'
+  exit 0
+fi
 
 # --- S3 cho test lưu file (dùng ở bước 6 và 7) -------------------------------------
 

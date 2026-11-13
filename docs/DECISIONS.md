@@ -4156,3 +4156,48 @@ thư viện. Đo ngày 2026-11-13 trên một máy dev Linux 12 nhân, cùng com
 Đã cân nhắc: `debug = false` — nhanh hơn nữa nhưng backtrace mất số dòng, test đỏ khó tìm chỗ
 hỏng; trình link `mold` — người lạ clone về phải cài thêm; gộp các file `tests/*.rs` của mỗi
 crate thành một chương trình — giảm số lần link nhưng phải dời nhiều file, để sau nếu cần.
+
+## D-173 · Gate hai mức: `./gate.sh --quick` lúc dev, gate đầy đủ trước khi merge và phát hành — 2026-11-13 — chủ dự án quyết
+
+Quyết định:
+
+- `./gate.sh --quick` — trước mỗi commit trong lúc làm một bước: fmt, clippy, `cargo xtask
+  check`, `cargo deny`, gitleaks như gate đầy đủ, nhưng test chỉ chạy cho crate bị sửa so với
+  `origin/main` và mọi crate phụ thuộc vào chúng, **chỉ trên SQLite**, không cần Docker
+  (`cargo xtask test-affected`). Sửa file dùng chung (`Cargo.toml` gốc, `Cargo.lock`,
+  `rust-toolchain.toml`, `.cargo/`…) thì chạy test mọi crate; chỉ sửa tài liệu thì không chạy
+  test nào.
+- `./gate.sh` (đầy đủ, như trước) — bắt buộc khi xong một bước, trước khi merge vào `main` và
+  trước khi phát hành (D-171). Luật số một không đổi: `main` và mọi bản phát hành luôn xanh
+  trên cả SQLite và Postgres.
+- Cả hai mức chạy ở ưu tiên CPU thấp (`renice -n 10`): việc khác trên máy chạy trước.
+
+Lý do: chủ dự án thấy mỗi lần dev mà chạy gate đầy đủ thì tốn thời gian và làm máy giật. Sau
+D-172, phần tốn nhất của gate không còn là build mà là chạy toàn bộ test hai lần. Đo ngày
+2026-11-13 trên một máy dev Linux 12 nhân, cache build còn nóng:
+
+| Thay đổi                   | `./gate.sh` đầy đủ        | `./gate.sh --quick`                              |
+| -------------------------- | ------------------------- | ------------------------------------------------ |
+| Không phải build lại gì    | 186 s                     | —                                                |
+| Sửa một module (`content`) | trên 186 s                | khoảng 27 s (kiểm tĩnh 10–13 s, build và test 16–17 s) |
+| Sửa `kernel`               | trên 186 s, cộng build lại cả workspace | khoảng 167 s (clippy 12 s, build và test cả 17 crate trên SQLite 155 s) |
+
+Sửa `kernel` (hay `testkit`) thì mọi crate phụ thuộc nên gate nhanh chỉ bớt được phần Postgres.
+
+Đánh đổi chủ dự án chấp nhận: lỗi chỉ có trên Postgres lộ ra lúc xong bước thay vì lúc commit.
+
+Cách chọn test: không dùng `cargo test -p <crate>`, vì chọn vài crate thì cargo hợp feature
+thư viện khác lúc build cả workspace và build lại sqlx, sea-orm… thành bộ file thứ hai (đo:
+87 s chỉ cho `content`); cách gom feature cả workspace (`resolver.feature-unification`) còn là
+tính năng nightly ở cargo 1.99. `test-affected` build cả workspace (chung cache với gate đầy
+đủ) rồi chỉ chạy các file test của crate được chọn. Lệnh này bỏ các biến `cargo run` đặt cho
+xtask (`CARGO_PKG_*`, `CARGO_MANIFEST_DIR`…) trước khi gọi cargo: build script của `ring` theo
+dõi chúng, để nguyên thì mỗi lần đổi qua lại giữa `cargo xtask` và cargo gọi thẳng lại build
+lại khoảng 36 crate. Doc-test không chạy ở gate nhanh (hiện workspace không có doc-test nào).
+
+Đã cân nhắc: gate nhanh chạy cả Postgres cho crate bị sửa — chậm hơn khoảng một phút mỗi lần và
+cần Docker, chủ dự án chọn chỉ SQLite; `cargo-nextest` hoặc `cargo-hakari` — thêm công cụ
+người lạ phải cài; giới hạn số job của cargo (`CARGO_BUILD_JOBS`) — chậm hẳn kể cả khi máy
+rảnh, `renice` chỉ nhường CPU khi có việc khác cần.
+
+Bổ sung: luật Gate trong `CLAUDE.md`; D-171 (phát hành vẫn cần gate đầy đủ).

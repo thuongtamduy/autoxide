@@ -43,14 +43,15 @@ hứng, đừng nhảy cóc.
 ## 4. Chạy gate
 
 ```bash
-./gate.sh
+./gate.sh --quick   # mỗi mục, trước khi commit: crate bị sửa, chỉ SQLite
+./gate.sh           # mục cuối của bước, trước khi phát hành: đầy đủ, cả hai database
 ```
 
 - Đỏ thì sửa code. Không nới gate, không tắt lint, không đánh dấu test bỏ qua.
 - `gate.sh` chưa tồn tại (đang ở bước 0): tạo nó là một mục của bước 0; trước đó
   chạy tay `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`,
   `cargo test --workspace`.
-- Gate phải xanh trên **cả SQLite và Postgres** mới tính là xong.
+- Bước chỉ xong khi gate **đầy đủ** xanh trên **cả SQLite và Postgres** (D-173).
 
 ## 5. Đánh dấu và commit
 

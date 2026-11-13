@@ -135,8 +135,12 @@ Dùng API chưa từng dùng trong repo thì tra đúng phiên bản đang ghim 
 
 ## Gate — định nghĩa "xong"
 
-Một bước chỉ xong khi `./gate.sh` xanh — các bước (theo thứ tự) và biến môi trường ghi ở đầu
-file đó; chạy riêng một bước thì chép đúng lệnh trong script.
+Hai mức (D-173), các bước và biến môi trường ghi ở đầu `gate.sh`:
+
+- **`./gate.sh --quick`** — trước mỗi commit lúc đang làm một bước: test của crate bị sửa và
+  crate phụ thuộc vào chúng, chỉ trên SQLite.
+- **`./gate.sh`** — gate đầy đủ, cả SQLite và Postgres. Một bước chỉ xong, và chỉ được merge
+  vào `main` hay phát hành, khi gate này xanh.
 
 Trong các test đó có ba bài giữ tài liệu khớp code: `.env.example` (cấu hình),
 `docs/openapi.json` (hợp đồng API, kèm kiểm mỗi endpoint đủ mô tả) và luật sở hữu

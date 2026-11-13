@@ -360,7 +360,9 @@ Vietnamese translation alongside.
 
 ## Contributing
 
-Run `./gate.sh` before you commit; a change is accepted only when the gate is
+While you work, `./gate.sh --quick` checks a change to one module in under a minute: it runs the tests of
+the crates you changed (and of the crates that depend on them) on SQLite only. Before a
+change is merged, run the full `./gate.sh`; a change is accepted only when the full gate is
 green on both SQLite and PostgreSQL. Never commit secrets — only `.env.example`
 belongs in Git, never `.env`.
 
