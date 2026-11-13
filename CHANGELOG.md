@@ -41,6 +41,12 @@ endpoints are marked deprecated with a sunset date first.
 - `compose.yml` gives the server 40 seconds to stop (`stop_grace_period`) instead of Docker's
   10, so requests in progress get the full `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`.
 
+### Fixed
+
+- The installation guide (`docs/DEPLOY.md`) now says a C compiler is needed to build, and
+  generates `AUTOXIDE_SECRET_KEY` with the other secrets, so a server installed by following
+  it no longer warns about a missing key; `compose.yml` passes `AUTOXIDE_SECRET_KEY` through.
+
 ## [0.11.0] - 2026-11-13
 
 ### Added

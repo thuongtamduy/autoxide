@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–29 xong**; bước 30 đang làm (còn: thử cài như người lạ); bước 50 chờ chủ dự án công khai repo (D-198); 31 trở đi chưa bắt đầu — thứ tự và phụ thuộc ở
+Trạng thái: **bước 0–30 xong** (phần cần repo công khai ở bước 50); bước 50 chờ chủ dự án công khai repo (D-198); 31 trở đi chưa bắt đầu — thứ tự và phụ thuộc ở
 bảng ngay trước bước 30 (D-192); bản phát hành mới nhất `v0.11.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-198):
 `./gate.sh` cục bộ là gate duy nhất.
 
@@ -469,7 +469,7 @@ Nhóm C — sản phẩm (D-176):
       cấu hình được (biến mới qua `Setting`, sinh lại `.env.example`) trước khi ngừng nhận kết nối,
       `/health/live` vẫn 200; rồi mới tới `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`. Test; `docs/DEPLOY.md`
       (EN + VI)
-- [ ] Thử cài như người lạ: máy hay container sạch, làm đúng README tiếng Anh theo đường build từ
+- [x] Thử cài như người lạ: máy hay container sạch, làm đúng README tiếng Anh theo đường build từ
       mã nguồn (cả SQLite và Postgres), ghi mọi chỗ vấp rồi sửa README / `docs/DEPLOY.md` (EN + VI
       cùng commit). Thử bằng image đã đăng: bước 50
 
