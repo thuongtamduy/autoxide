@@ -612,7 +612,9 @@ không gián đoạn của bước 30 cũng chạm — ai merge sau thì gộp c
       `Referrer-Policy`, `X-Frame-Options` hay `frame-ancestors`, HSTS khi cấu hình chạy sau
       HTTPS, CSP chặt cho trang tài liệu API): một lớp trong `kernel/src/http/`, cấu hình được,
       có test; hai endpoint trả file đang tự đặt header thì dùng chung lớp này
-- [ ] Đẩy event theo thời gian thực bằng Server-Sent Events: một endpoint stream các event mà người
+- [ ] Đẩy event theo thời gian thực bằng Server-Sent Events — stream event do module phát, KHÔNG
+      tự đẩy mọi thay đổi của bảng ("realtime theo bảng" mà `docs/research/frameworks.md` đã không
+      mượn); ghi quyết định nêu khác biệt đó. Một endpoint stream các event mà người
       gọi có permission được xem (lọc theo tên event và theo quyền đọc bản ghi), nối lại bằng
       `Last-Event-ID` không mất event trong khoảng giữ, giới hạn số kết nối; chạy đúng khi nhiều
       máy chủ (đọc từ bảng event, không chỉ từ bộ nhớ một tiến trình)
@@ -625,6 +627,32 @@ không gián đoạn của bước 30 cũng chạm — ai merge sau thì gộp c
       chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
       quyết định
 
+## 35. Bảo vệ dữ liệu và tài khoản (agent đề xuất ngày 13/11/2026)
+
+Ba năng lực các backend lớn có sẵn mà core chưa có. Bắt đầu SAU khi bước 29 đã merge (sửa `auth`);
+mục mã hoá đụng `webhooks` và khoá của bước 33 (xoay khoá) — thống nhất cách làm với người làm
+bước 33. Mọi mục chạy và có test trên cả SQLite và Postgres, endpoint mới có OpenAPI và tool MCP.
+
+- [ ] Mã hoá dữ liệu nhạy cảm khi lưu: secret TOTP của MFA (hiện lưu chữ thường trong
+      `auth`), secret ký webhook và mọi secret module cần đọc lại được — mã hoá bằng khoá nằm ngoài
+      database (dẫn xuất từ `AUTOXIDE_SECRET_KEY`), có số phiên bản khoá để xoay khoá; một công cụ
+      dùng chung trong `kernel`, thuật toán chuẩn (AEAD) qua thư viện đã kiểm; migration mã hoá dữ
+      liệu cũ; bản backup không còn chứa các secret này ở dạng đọc được. Khi `AUTOXIDE_SECRET_KEY`
+      chưa đặt thì khoá gốc nằm trong database (`kernel/src/secret.rs`), mã hoá không bảo vệ được
+      bản backup: `autoxide doctor` và log lúc khởi động nói rõ điều đó. Ghi quyết định
+- [ ] Đăng nhập bằng link qua email (không cần mật khẩu): token dùng một lần, hết hạn ngắn, gắn
+      thiết bị yêu cầu khi được; MFA vẫn áp dụng; trả lời như nhau về thời gian dù email có hay
+      không (như D-154, D-162); tắt mặc định, bật bằng cấu hình
+- [ ] Mời người dùng qua email: quản trị viên mời kèm role định sẵn, người được mời đặt mật khẩu
+      (hay passkey) qua link dùng một lần; lời mời hết hạn, thu hồi được, có event cho audit; lệnh
+      CLI tương ứng
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.
+
+Chờ chủ dự án quyết (so với các backend lớn ngày 13/11/2026; không làm khi chưa có quyết định):
+nhóm người dùng / tổ chức (gần multi-tenant) · module thông báo (trong ứng dụng, web push) · đăng
+nhập thay người dùng để hỗ trợ · định dạng ảnh AVIF · thư viện số thập phân và module sổ cái (cuối
+bước 29). Đã cân nhắc và không làm: API dữ liệu tự sinh từ bảng, plugin WASM nạp lúc chạy, trang
+quản trị dựng sẵn (`docs/research/frameworks.md`, D-005, D-026).
