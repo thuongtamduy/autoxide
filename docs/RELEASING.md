@@ -47,11 +47,15 @@ CI trên GitHub đã tắt (D-107): mọi bước chạy trên máy của ngư�
    gh pr merge <số PR> --rebase --delete-branch
    ```
 
-6. Gắn tag lên commit `release: vX.Y.Z` của `main` và đẩy lên:
+6. Gắn tag lên **đúng commit `release: vX.Y.Z`** của `main` — không phải commit mới nhất: người
+   khác có thể vừa merge thêm sau commit release (v0.11.0 từng bị gắn nhầm như vậy). Kiểm commit
+   tìm được đúng là commit release rồi mới đẩy:
 
    ```bash
    git fetch origin && git switch main && git merge --ff-only origin/main
-   git tag -a vX.Y.Z -m "Autoxide vX.Y.Z"
+   release=$(git log origin/main --format=%H --grep='^release: vX.Y.Z$' -n 1)
+   git log -1 --format='%h %s' "$release"        # phải in ra "… release: vX.Y.Z"
+   git tag -a vX.Y.Z -m "Autoxide vX.Y.Z" "$release"
    git push origin vX.Y.Z
    ```
 
