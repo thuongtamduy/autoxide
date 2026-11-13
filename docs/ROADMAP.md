@@ -4,7 +4,7 @@ Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQL
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
 Trạng thái: **bước 0–30 xong** (phần cần repo công khai ở bước 50); bước 50 chờ chủ dự án công khai repo (D-199); 31 trở đi chưa bắt đầu — thứ tự và phụ thuộc ở
-bảng ngay trước bước 30 (D-192); bản phát hành mới nhất `v0.11.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199):
+bảng ngay trước bước 30 (D-192); bản phát hành mới nhất `v0.12.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án

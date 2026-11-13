@@ -9,6 +9,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-13
+
 ### Added
 
 - `AUTOXIDE_HTTP_DRAIN_SECONDS` (default `0`): on shutdown the server keeps handling requests
@@ -526,7 +528,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/thuongtamduy/autoxide/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/thuongtamduy/autoxide/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/thuongtamduy/autoxide/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/thuongtamduy/autoxide/compare/v0.8.0...v0.9.0
