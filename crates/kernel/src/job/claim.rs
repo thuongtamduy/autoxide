@@ -22,6 +22,7 @@ use crate::error::Error;
 
 /// Một job vừa được claim.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct ClaimedJob {
     pub id: Uuid,
     pub kind: String,

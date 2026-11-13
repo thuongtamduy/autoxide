@@ -148,6 +148,7 @@ pub fn redact_password(url: &str) -> String {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct DatabaseConfig {
     /// Database chính: mọi lệnh ghi đi vào đây.
     pub url: DatabaseUrl,

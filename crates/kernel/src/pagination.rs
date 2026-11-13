@@ -94,6 +94,7 @@ enum Position {
 /// Giá trị của cột sắp xếp (ngoài ID) mà con trỏ mang theo. Con trỏ ghi kèm loại giá trị
 /// (`{"i": …}`, `{"s": …}`, `{"t": …}`), để một chuỗi trông như ngày không bị đọc nhầm.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum SortValue {
     #[serde(rename = "i")]
     Integer(i64),

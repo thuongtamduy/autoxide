@@ -49,6 +49,7 @@ impl<T: Serialize> IntoResponse for Tagged<T> {
 
 /// Header `If-Match` của request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum IfMatch {
     /// Không gửi header.
     Missing,

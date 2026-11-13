@@ -3981,3 +3981,45 @@ object_store 0.14 panic ("Already shut down") ở trạng thái đó. Đã bỏ 
 
 Đã cân nhắc: gộp vào `/health/ready` — health check phải rẻ và chạy liên tục, còn doctor ghi thử
 file và nối SMTP; báo lỗi đầu tiên rồi dừng — người cài phải chạy lại nhiều lần mới thấy hết.
+
+## D-167 · Hợp đồng module: liệt kê thư viện công khai, `#[non_exhaustive]`, chính sách deprecate — 2026-11-13 — agent quyết
+
+Theo D-164. Rà soát (một agent chỉ đọc, kiểm lại bằng trình biên dịch) mọi struct có field `pub`
+và mọi enum công khai của kernel.
+
+Quyết định:
+
+- `docs/MODULE_GUIDE.md` (EN + VI) có mục "Stability of the module contract": bảng thư viện có
+  kiểu lộ ra trong hợp đồng (axum 0.8, sea-orm / sea-orm-migration 2, utoipa 6, utoipa-axum 0.3,
+  tokio 1, serde 1, uuid 1, chrono 0.4, async-trait 0.1, validator 0.21); thư viện trong bảng lên
+  phiên bản lớn = thay đổi phá vỡ hợp đồng (bản minor khi còn `0.x`, ghi ở **Changed**); `Module`
+  chỉ thêm hàm có thân mặc định (D-038); thứ sắp bỏ thì `#[deprecated]` ít nhất một bản phát hành
+  trước khi xoá. Thêm mục "A module in its own repository" (phụ thuộc kernel qua git tag).
+- Đánh dấu `#[non_exhaustive]` ngay cho kiểu sẽ lớn thêm mà không chỗ nào ngoài kernel dựng bằng
+  literal hay `match` đủ nhánh: `Config`, `DatabaseConfig`, `HttpConfig`, `ProcessConfig`,
+  `RateLimit`, `Setting`, `FieldError`, `BodyLimit`, `Deprecation`, `Health`, `Api`, `ClaimedJob`,
+  `Schedule`, `mail::Rendered`, `MigrationState`, `Created`, `Problem`, `ProblemField`,
+  `tokens::{Issued, Consumed, Recent}`, `IssuedToken`; enum `Effort`, `EmbedKind`, `FailMode`,
+  `ChallengeKind`, `ChallengeOutcome`, `Classification`, `CorsOrigins`, `LogFormat`,
+  `ProcessRole`, `ErrorKind`, `Language`, `idempotency::Begin`, `JobStatus`, `SortValue`,
+  `IfMatch`.
+- **Cố ý để exhaustive:** `ai::Part`, `antispam::Verdict` (bên dùng phải xử lý từng loại; nhánh
+  `_` sẽ lặng lẽ bỏ dữ liệu hay cho spam lọt), `DatabaseBackend` (hai database là luật, D-015),
+  envelope `Data`, `Page`, `Tagged` và newtype `ValidJson` (hình dạng là hợp đồng API), các tập
+  đóng (`Order`, `LogLevel`, `Origin`, `doctor::Status`, `Disposition`, `Shutdown`,
+  `throttle::Outcome`, `antispam::Claim`).
+- **Còn lại (mục riêng của bước 27):** module đang dựng bằng literal trong code chạy thật, cần
+  hàm tạo / builder trước rồi mới `#[non_exhaustive]`: `ai::{Prompt, Usage, Generation,
+  Capabilities}`, `antispam::{Submission, Limits}`, `event::Actor`, `http::Extras`,
+  `idempotency::StoredResponse`, `job::EnqueueOptions`, `mail::Mail`, `mcp::PageInput`,
+  `pagination::{PageQuery, Pagination}`, `resource::Resource`, `storage::StoredFile`,
+  `config::ConfigError`; và chỉ test dựng bằng literal: `event::Delivered`, `job::{JobContext,
+  JobRecord}`, `http::ClientInfo`, `AntispamConfig`, `LogConfig`, `TraceConfig`, `CopiedTable`.
+
+Lý do: đang ở `0.x`, thêm `#[non_exhaustive]` bây giờ rẻ; sau `1.0` mỗi field hay variant mới của
+những kiểu này mới không còn là thay đổi phá vỡ. Làm phần không đụng module trước để mỗi bước nhỏ
+và gate xác nhận được.
+
+Đã cân nhắc: đánh dấu hết một lượt — phải sửa ~100 chỗ trong 12 module cùng lúc; `cargo
+semver-checks` ngay trong gate — khi còn `0.x` mọi bản minor được phép phá vỡ nên công cụ chỉ bắt
+được lỗi ở bản vá; để dành cho lúc chủ dự án quyết công bố framework (D-164).

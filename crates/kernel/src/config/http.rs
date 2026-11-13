@@ -192,6 +192,7 @@ fn parse_ranges(raw: &str) -> Result<Vec<IpRange>, String> {
 
 /// Những origin (nguồn trang web) được trình duyệt cho gọi API.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum CorsOrigins {
     /// Không origin nào: chỉ trang cùng origin với API gọi được từ trình duyệt.
     #[default]
@@ -236,6 +237,7 @@ fn parse_bool(raw: &str) -> Result<bool, String> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct HttpConfig {
     pub address: SocketAddr,
     pub request_timeout: Duration,
@@ -258,6 +260,7 @@ pub struct HttpConfig {
 
 /// Giới hạn số request của một địa chỉ client.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct RateLimit {
     /// Số request trung bình mỗi phút; `0` là tắt.
     pub per_minute: u32,

@@ -26,6 +26,7 @@ use super::API_PREFIX;
 ///     .successor("/api/v2/notes/{id}");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Deprecation {
     pub method: Method,
     /// Đường dẫn trong module, như khi khai route (`/`, `/{id}`).

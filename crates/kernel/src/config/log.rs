@@ -26,6 +26,7 @@ pub enum LogLevel {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum LogFormat {
     /// Dòng chữ cho người đọc.
     Text,

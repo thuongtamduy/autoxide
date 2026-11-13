@@ -14,6 +14,7 @@ use crate::error::Error;
 
 /// Một ngôn ngữ được hỗ trợ.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Language {
     /// Tiếng Anh: mặc định, câu nằm ngay trong code.
     En,

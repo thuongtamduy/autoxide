@@ -15,6 +15,7 @@
 /// assert_eq!(HTTP_BIND.default, Some("127.0.0.1:8080"));
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Setting {
     /// Tên biến môi trường. Tên chuẩn ngành nếu có (`DATABASE_URL`), còn lại
     /// mang tiền tố `AUTOXIDE_`.

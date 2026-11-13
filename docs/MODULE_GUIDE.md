@@ -221,6 +221,60 @@ names, single-use tokens, counters) needs a concurrency test.
    `cargo run -p autoxide -- openapi > docs/openapi.json`.
 2. Run `./gate.sh` until it is green.
 
+## A module in its own repository
+
+A module does not have to live in this repository. Keep it in its own crate and
+depend on the core by a release tag:
+
+```toml
+[dependencies]
+autoxide-kernel = { git = "https://github.com/<owner>/autoxide", tag = "vX.Y.Z" }
+
+[dev-dependencies]
+autoxide-testkit = { git = "https://github.com/<owner>/autoxide", tag = "vX.Y.Z" }
+```
+
+Use the Rust version of that release (`rust-toolchain.toml`) or newer, and the same
+major versions of the public dependencies (table below), or the compiler reports two
+copies of the same type. To run it, add the crate to a checkout
+of Autoxide (`crates/app/Cargo.toml` and `crates/app/src/modules.rs`, step 1).
+
+`cargo xtask check` only runs inside this repository, so a module kept elsewhere follows
+its rules by hand: the two public items, the table prefix, no foreign key to another
+module, every route through `routes!`, translated error codes. Keep the table-ownership
+test (`autoxide_testkit::schema_ownership_violations`) and `TestApp` tests on both
+databases.
+
+## Stability of the module contract
+
+What a module builds on is the **module contract**: the public items of
+`autoxide-kernel` and `autoxide-testkit`, and the libraries whose types appear in them.
+
+| Library | Version | Seen in |
+| --- | --- | --- |
+| `axum` | 0.8 | handlers, extractors |
+| `sea-orm`, `sea-orm-migration` | 2 | entities, `Database`, `Module::migrations` |
+| `utoipa` | 6 | `ToSchema`, `#[utoipa::path]` |
+| `utoipa-axum` | 0.3 | `Module::routes` (`OpenApiRouter`) |
+| `tokio` | 1 | async runtime |
+| `serde`, `serde_json` | 1 | bodies, events, tool arguments |
+| `uuid` | 1 (v7) | ids |
+| `chrono` | 0.4 | times |
+| `async-trait` | 0.1 | traits called through `dyn` |
+| `validator` | 0.21 | `ValidJson<T>` |
+
+Rules the core follows:
+
+- While the version is `0.x`, a breaking change to the contract comes only in a minor
+  release (`0.7` → `0.8`) and is listed under **Changed** or **Removed** in
+  `CHANGELOG.md`. A new major version of a library in the table is such a change.
+- `Module` only grows by functions with a default body: a module written for an older
+  release keeps compiling.
+- Public types that will grow are `#[non_exhaustive]`: build them with their
+  constructor, not a struct literal, and match their enums with a `_` arm.
+- A public item that is going away is `#[deprecated]` (with what to use instead) for at
+  least one release before it is removed.
+
 ## Checklist
 
 - [ ] Crate added to the workspace and registered in `crates/app/src/modules.rs`

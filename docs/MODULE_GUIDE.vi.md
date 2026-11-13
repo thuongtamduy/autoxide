@@ -219,6 +219,58 @@ dùng một lần, bộ đếm) cần một test đồng thời.
    `cargo run -p autoxide -- openapi > docs/openapi.json`.
 2. Chạy `./gate.sh` tới khi xanh.
 
+## Module ở repo riêng
+
+Module không nhất thiết nằm trong repo này. Để nó trong crate riêng và phụ thuộc vào
+core theo tag phát hành:
+
+```toml
+[dependencies]
+autoxide-kernel = { git = "https://github.com/<owner>/autoxide", tag = "vX.Y.Z" }
+
+[dev-dependencies]
+autoxide-testkit = { git = "https://github.com/<owner>/autoxide", tag = "vX.Y.Z" }
+```
+
+Dùng phiên bản Rust của bản phát hành đó (`rust-toolchain.toml`) hoặc mới hơn, và cùng
+phiên bản lớn của các thư viện công khai (bảng bên dưới), nếu không trình biên dịch báo
+hai bản của cùng một kiểu. Để chạy, thêm crate vào một bản
+checkout của Autoxide (`crates/app/Cargo.toml` và `crates/app/src/modules.rs`, bước 1).
+
+`cargo xtask check` chỉ chạy trong repo này, nên module để ở nơi khác tự giữ luật của
+nó: hai thứ công khai, tiền tố bảng, không foreign key sang module khác, mọi route qua
+`routes!`, mã lỗi có bản dịch. Giữ test sở hữu bảng
+(`autoxide_testkit::schema_ownership_violations`) và test `TestApp` trên cả hai database.
+
+## Độ ổn định của hợp đồng module
+
+Thứ module dựa vào là **hợp đồng module**: các thứ công khai của `autoxide-kernel` và
+`autoxide-testkit`, cùng các thư viện có kiểu xuất hiện trong đó.
+
+| Thư viện | Phiên bản | Gặp ở |
+| --- | --- | --- |
+| `axum` | 0.8 | handler, extractor |
+| `sea-orm`, `sea-orm-migration` | 2 | entity, `Database`, `Module::migrations` |
+| `utoipa` | 6 | `ToSchema`, `#[utoipa::path]` |
+| `utoipa-axum` | 0.3 | `Module::routes` (`OpenApiRouter`) |
+| `tokio` | 1 | runtime async |
+| `serde`, `serde_json` | 1 | thân request, event, tham số tool |
+| `uuid` | 1 (v7) | ID |
+| `chrono` | 0.4 | thời gian |
+| `async-trait` | 0.1 | trait gọi qua `dyn` |
+| `validator` | 0.21 | `ValidJson<T>` |
+
+Luật core tự giữ:
+
+- Khi phiên bản còn `0.x`, thay đổi phá vỡ hợp đồng chỉ đến ở bản minor (`0.7` → `0.8`)
+  và được ghi ở mục **Changed** hoặc **Removed** của `CHANGELOG.md`. Một thư viện trong
+  bảng lên phiên bản lớn mới là một thay đổi như vậy.
+- `Module` chỉ lớn thêm bằng hàm có thân mặc định: module viết cho bản cũ vẫn biên dịch.
+- Kiểu công khai sẽ còn lớn thêm được đánh dấu `#[non_exhaustive]`: dựng chúng bằng hàm
+  tạo, không bằng struct literal, và `match` enum của chúng có nhánh `_`.
+- Thứ công khai sắp bỏ được đánh dấu `#[deprecated]` (nói dùng gì thay) ít nhất một bản
+  phát hành trước khi xoá.
+
 ## Danh sách kiểm
 
 - [ ] Crate đã thêm vào workspace và đăng ký trong `crates/app/src/modules.rs`

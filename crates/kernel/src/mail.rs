@@ -94,6 +94,7 @@ pub struct MailTemplate {
 
 /// Tiêu đề và nội dung đã điền, bằng một ngôn ngữ.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Rendered {
     pub subject: String,
     pub text: String,

@@ -32,6 +32,7 @@ use validator::{ValidationErrors, ValidationErrorsKind};
 
 /// Loại lỗi; quyết định mã trạng thái HTTP.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ErrorKind {
     /// Request không đọc được (JSON hỏng, thiếu tham số, sai kiểu). HTTP 400.
     BadRequest,
@@ -87,6 +88,7 @@ impl ErrorKind {
 
 /// Lỗi của một trường trong dữ liệu đầu vào.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct FieldError {
     /// Đường dẫn tới trường: `name`, `address.city`, `items[2].quantity`.
     pub field: String,

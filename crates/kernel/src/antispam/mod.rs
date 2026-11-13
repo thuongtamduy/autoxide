@@ -80,6 +80,7 @@ pub(crate) const FAIL_MODE: Setting = Setting::new(
 
 /// Khi nhà cung cấp đề hay bộ phân loại lỗi.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FailMode {
     Quarantine,
     Reject,
@@ -87,6 +88,7 @@ pub enum FailMode {
 
 /// Loại đề chống bot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ChallengeKind {
     None,
     /// ALTCHA v2, `cost` vòng SHA-256 mỗi lần thử.
@@ -146,6 +148,7 @@ impl AntispamConfig {
 
 /// Kết quả của một đề (proof-of-work, CAPTCHA…).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ChallengeOutcome {
     Passed,
     /// Không gửi lời giải mà đề là bắt buộc.
@@ -198,6 +201,7 @@ impl ChallengeVerifier for NoChallenge {
 
 /// Kết luận của bộ phân loại nội dung.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Classification {
     Ham,
     Spam,
@@ -320,6 +324,7 @@ impl std::fmt::Debug for SpamGuard {
 
 /// Token form vừa phát cho website.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct IssuedToken {
     pub token: String,
     pub expires_at: DateTime<Utc>,

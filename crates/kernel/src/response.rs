@@ -43,6 +43,7 @@ impl<T: Serialize> IntoResponse for Data<T> {
 /// `Location: /api/v1/auth/users/<id>`. Tài liệu OpenAPI khai header này cho mọi
 /// response 201 (`http::build`).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Created<T> {
     pub path: String,
     pub data: T,
@@ -74,6 +75,7 @@ impl<T: Serialize> IntoResponse for Created<T> {
 
 /// An error, as RFC 9457 Problem Details. Branch on `code`; show `detail` to people.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[non_exhaustive]
 pub struct Problem {
     /// Always `about:blank`: the problem is identified by `code`, not by a URI.
     #[serde(rename = "type")]
@@ -98,6 +100,7 @@ pub struct Problem {
 
 /// One invalid field of the request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[non_exhaustive]
 pub struct ProblemField {
     /// Path to the field: `name`, `address.city`, `items[2].quantity`.
     #[schema(example = "name")]

@@ -101,6 +101,7 @@ impl JobQueue {
 
 /// Trạng thái của một job, cho người vận hành.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum JobStatus {
     /// Chờ chạy hoặc đang chạy.
     Pending,

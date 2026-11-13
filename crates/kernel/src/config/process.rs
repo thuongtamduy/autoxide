@@ -20,6 +20,7 @@ pub const JOB_CONCURRENCY: Setting = Setting::new(
 
 /// Tiến trình `serve` làm việc gì.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ProcessRole {
     /// API và việc nền.
     All,
@@ -42,6 +43,7 @@ impl ProcessRole {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ProcessConfig {
     pub role: ProcessRole,
     pub job_concurrency: u64,

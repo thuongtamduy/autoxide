@@ -82,6 +82,7 @@ pub use server::{Shutdown, serve, shutdown_signal};
 pub const API_PREFIX: &str = "/api/v1";
 
 /// Router đã ghép xong, kèm tài liệu OpenAPI của mọi route trong nó.
+#[non_exhaustive]
 pub struct Api {
     pub router: Router,
     pub openapi: OpenApi,

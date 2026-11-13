@@ -16,6 +16,7 @@ use crate::error::Error;
 /// Mức độ kỹ khi mô hình suy nghĩ: đổi lấy chi phí và thời gian. Mỗi nhà cung cấp tự đổi sang
 /// tham số của mình (hay bỏ qua nếu không có).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Effort {
     Low,
     Medium,
@@ -34,6 +35,8 @@ impl Effort {
 
 /// Một phần dữ liệu đưa cho mô hình.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// Cố ý KHÔNG `#[non_exhaustive]` (D-167): thêm một loại dữ liệu mới phải buộc bên cài
+// `TextModel` xử lý nó; nhánh `_` sẽ lặng lẽ bỏ dữ liệu khỏi yêu cầu.
 pub enum Part {
     Text(String),
     /// Ảnh raster (`image/jpeg`, `image/png`, `image/gif`, `image/webp`).
@@ -109,6 +112,7 @@ pub trait TextModel: Send + Sync {
 
 /// Đoạn chữ được tính embedding để làm gì (một số mô hình cần biết; mô hình khác bỏ qua).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum EmbedKind {
     /// Nội dung được lập index.
     Document,

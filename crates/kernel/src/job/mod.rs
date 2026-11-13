@@ -98,6 +98,7 @@ impl std::fmt::Debug for JobRegistration {
 /// Lịch định kỳ: cứ mỗi `every`, đưa một job loại `kind` vào hàng đợi. Nhiều worker
 /// chạy cùng lúc vẫn chỉ có một job cho mỗi khoảng.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct Schedule {
     /// Tên lịch, duy nhất trong module: `<module>.<tên>`.
     pub name: &'static str,

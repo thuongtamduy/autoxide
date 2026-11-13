@@ -19,6 +19,14 @@ endpoints are marked deprecated with a sunset date first.
 - `autoxide-testkit`: `TestApp` builds modules the way the binary does on a test database and
   calls them through REST and a real MCP client.
 
+### Changed
+
+- Module contract: public kernel types that will grow (configuration, `Problem`, `Created`,
+  `BodyLimit`, `Deprecation`, `Schedule`, `ErrorKind`, `Language`, `SortValue` and others) are
+  `#[non_exhaustive]`: build them with their constructors and match their enums with a `_` arm.
+  `docs/MODULE_GUIDE.md` now lists the libraries that are part of the contract and the rules
+  for changing it.
+
 ### Fixed
 
 - Files: a failed upload of a small file (unwritable directory, storage refusing it) no longer

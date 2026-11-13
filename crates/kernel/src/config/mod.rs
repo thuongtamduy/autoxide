@@ -34,6 +34,7 @@ pub use trace::TraceConfig;
 
 /// Cấu hình của kernel. Mỗi mục của lộ trình thêm nhóm của mình vào đây.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Config {
     pub database: DatabaseConfig,
     pub http: HttpConfig,

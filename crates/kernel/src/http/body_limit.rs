@@ -28,6 +28,7 @@ use crate::error::{Error, ErrorKind};
 /// let limit = BodyLimit::new(Method::POST, "/", 25 * 1024 * 1024);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BodyLimit {
     pub method: Method,
     /// Đường dẫn trong module, như khi khai route (`/`, `/{id}`).

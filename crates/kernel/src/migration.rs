@@ -82,6 +82,7 @@ impl fmt::Debug for ModuleMigrations {
 
 /// Trạng thái của một migration.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct MigrationState {
     pub module: &'static str,
     pub name: String,

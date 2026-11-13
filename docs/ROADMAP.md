@@ -336,8 +336,10 @@ Mượn cái hay của framework khác ([`docs/research/frameworks.md`](research
 - [x] `cargo xtask new-module <tên>`: sinh module mới từ khuôn `notes`, qua được gate
 - [x] `Module::checks` + `autoxide doctor`: kiểm cấu hình, database, migration và kiểm của module
 - [ ] `Module::tasks` + `autoxide task`: lệnh quản trị do module khai
-- [ ] Hợp đồng ổn định: danh sách public dependency, `#[non_exhaustive]` cho kiểu sẽ lớn thêm,
-      chính sách deprecate API Rust; hướng dẫn viết module ở repo riêng (EN + VI)
+- [x] Hợp đồng ổn định: danh sách public dependency, `#[non_exhaustive]` cho kiểu sẽ lớn thêm,
+      chính sách deprecate API Rust; hướng dẫn viết module ở repo riêng (EN + VI) — D-167
+- [ ] Hàm tạo / builder cho các kiểu module đang dựng bằng literal, rồi `#[non_exhaustive]`
+      (danh sách ở D-167)
 
 ## Sau core (chưa mở)
 

@@ -43,6 +43,7 @@ type Checked = (Instant, Result<(), String>);
 
 /// Health of the service.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[non_exhaustive]
 pub struct Health {
     /// Always `ok`; a service that is not healthy answers with an error instead.
     #[schema(example = "ok")]

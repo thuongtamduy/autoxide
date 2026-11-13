@@ -25,6 +25,7 @@ use crate::secret::{random_token, sha256};
 
 /// Token vừa phát: giá trị gửi cho người dùng (không lưu ở đâu cả) và hạn dùng.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Issued {
     pub id: Uuid,
     pub token: String,
@@ -33,6 +34,7 @@ pub struct Issued {
 
 /// Token vừa được dùng.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Consumed {
     pub id: Uuid,
     pub subject: String,
@@ -41,6 +43,7 @@ pub struct Consumed {
 
 /// Token phát gần đây cho một đối tượng (để bên gọi quyết định có phát thêm không).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Recent {
     pub data: Option<String>,
     pub created_at: DateTime<Utc>,

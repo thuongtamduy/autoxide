@@ -25,6 +25,7 @@ pub struct StoredResponse {
 
 /// Kết quả khi bắt đầu một request mang idempotency key.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Begin {
     /// Lần đầu: chạy request, rồi gọi [`IdempotencyStore::complete`] (hay `abandon`)
     /// với `id` này.
