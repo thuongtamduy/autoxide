@@ -56,8 +56,9 @@ Hệ quả cho agent:
   lỗi rõ, tài liệu cài đặt đủ để làm theo mà không cần hỏi ai.
 - Chỉ dựng module nghiệp vụ chủ dự án đã giao: `media` (D-091), `content` (D-096, D-098),
   `forms`, `newsletter`, `comments` (D-112), module mẫu `notes`, module nền `address` (đơn vị
-  hành chính, D-193), và module thương mại của bước
-  41–46: `catalog`, `inventory`, `promotions`, `shipping`, `orders`, `marketplace` (D-191). Khái niệm của `content` (bài viết, trang, slug…) và của thương
+  hành chính, D-193) và `notifications` (D-194), và module thương mại của bước 41–49: `catalog`,
+  `inventory`, `promotions`, `shipping`, `orders`, `marketplace` (D-191), `customers`, `channels`,
+  `affiliate` (D-194). Khái niệm của `content` (bài viết, trang, slug…) và của thương
   mại (sản phẩm, đơn hàng, kho…) không vào core.
 - Repo là công khai: mọi file, commit message, comment và tài liệu đều viết với
   giả định người lạ sẽ đọc. Không ghi tên máy chủ, IP, đường dẫn riêng hay thông
