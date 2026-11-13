@@ -181,8 +181,13 @@ async fn start(db: &Database, second_migration: bool) -> (Modules, Router) {
         .authenticator(Some(Arc::new(FakeAuthenticator)))
         .tools(modules.tools().unwrap())
         .translations(modules.translations().clone());
-    let router =
-        http::build(&config, http::health_routes(db.clone()), modules.routes(), extras).router;
+    let router = http::build(
+        &config,
+        http::health_routes(db.clone(), http::Draining::default()),
+        modules.routes(),
+        extras,
+    )
+    .router;
     (modules, router)
 }
 

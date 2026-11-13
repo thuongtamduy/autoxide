@@ -152,7 +152,8 @@ Module có thể thêm lệnh quản trị; `autoxide task` liệt kê chúng k�
 
 Sau đó chạy máy chủ. Máy chủ từ chối chạy khi còn migration chưa áp dụng, và dừng êm
 khi nhận Ctrl-C hoặc `SIGTERM` (request đang chạy có `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`
-giây để xong):
+giây để xong; sau bộ cân bằng tải thì xem
+[cập nhật không làm rơi request](docs/DEPLOY.vi.md#cập-nhật-không-làm-rơi-request)):
 
 ```bash
 cargo run -p autoxide -- serve

@@ -24922,7 +24922,7 @@
           "health"
         ],
         "summary": "Readiness probe: can the service handle requests?",
-        "description": "Checks that the database answers. Stop sending traffic when this fails.",
+        "description": "Checks that the database answers. Stop sending traffic when this fails. While the process\nis shutting down (`AUTOXIDE_HTTP_DRAIN_SECONDS`), it fails even though requests are still\nhandled, so load balancers move traffic away before the server stops accepting connections.",
         "operationId": "health_ready",
         "parameters": [
           {
@@ -24950,7 +24950,7 @@
             }
           },
           "503": {
-            "description": "A dependency is unavailable; code `not_ready`.",
+            "description": "Not ready: code `not_ready` when the database does not answer, `shutting_down` while the process is shutting down.",
             "content": {
               "application/json": {
                 "schema": {

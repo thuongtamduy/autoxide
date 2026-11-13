@@ -45,6 +45,7 @@
   "rate_limited": "Quá nhiều request từ địa chỉ của bạn. Hãy chờ {seconds} giây rồi thử lại, và gửi chậm hơn để tránh lỗi này.",
   "reference_reused": "Mã tham chiếu `{reference}` đã được dùng cho một request khác. Hãy dùng mã mới cho lệnh mới, hoặc gửi lại đúng nội dung cũ để nhận kết quả lần trước.",
   "request_timeout": "Máy chủ không xử lý xong request trong {seconds} giây. Hãy thử lại sau.",
+  "shutting_down": "Máy chủ đang tắt: hãy gửi request tới một máy chủ khác.",
   "task_argument_invalid": "Tham số `{name}` của lệnh phải là `true` hoặc `false`, không phải `{value}`.",
   "too_many_requests": "Quá nhiều request. Hãy chờ rồi thử lại.",
   "unauthenticated": "Bạn cần đăng nhập để làm việc này.",

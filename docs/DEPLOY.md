@@ -278,6 +278,7 @@ into a new database.
 | `AUTOXIDE_FILES_S3_BUCKET` and `AWS_…` | Store files in S3 or an S3-compatible service; also add a bucket lifecycle rule that aborts incomplete multipart uploads after a day |
 | `AUTOXIDE_AUTH_PASSWORD_RESET_URL`, `AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` | Link mails to your own pages |
 | `AUTOXIDE_AUTH_PASSKEY_RP_ID`, `AUTOXIDE_AUTH_PASSKEY_ORIGINS` | Turn on passkey sign-in for your domain |
+| `AUTOXIDE_HTTP_DRAIN_SECONDS` | Behind a load balancer: how long to keep serving while `/health/ready` says `503` on shutdown, see [below](#updating-without-dropping-requests) |
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` to run the API and background work in separate processes |
 | `AUTOXIDE_HTTP_METRICS` | Prometheus metrics at `/metrics`, on the API port: when you turn it on, block `/metrics` in your reverse proxy (Caddy: `respond /metrics 404`) and scrape it from the machine itself |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Send traces to an OpenTelemetry collector |
@@ -293,6 +294,36 @@ that each runs once. Set the same `AUTOXIDE_AUTH_TOKEN_SECRET` everywhere. To sc
 API and the background work separately, run some processes with
 `AUTOXIDE_PROCESS_ROLE=api` and at least one with `worker`. SQLite allows one server
 process.
+
+### Updating without dropping requests
+
+When a server is told to stop (`SIGTERM`, as Docker, systemd and Kubernetes send), it
+goes through two phases:
+
+1. **Drain** for `AUTOXIDE_HTTP_DRAIN_SECONDS` (default `0`): it keeps handling every
+   request, but `/health/ready` answers `503` with code `shutting_down`, so your load
+   balancer stops sending it new requests. `/health/live` stays `200`: the process must
+   not be restarted.
+2. **Stop**: it stops accepting connections and gives requests in progress up to
+   `AUTOXIDE_HTTP_SHUTDOWN_SECONDS` (default `30`) to finish.
+
+For a rolling update behind a load balancer:
+
+- Point the load balancer's health check (or the Kubernetes `readinessProbe`) at
+  `/health/ready`, and the `livenessProbe` at `/health/live`.
+- Set `AUTOXIDE_HTTP_DRAIN_SECONDS` longer than the load balancer needs to take a server
+  out: its check interval times the number of failed checks it waits for. A check every
+  5 seconds that gives up after 2 failures needs more than 10, so `15`.
+- Give the process time for both phases before it is killed: Docker Compose
+  `stop_grace_period`, Kubernetes `terminationGracePeriodSeconds`, systemd
+  `TimeoutStopSec` must be at least drain + shutdown (`45s` for `15` + `30`). Docker waits
+  only 10 seconds by default; the `compose.yml` in this repository sets `40s`, enough for
+  no drain — raise it when you set one.
+- Start the new servers and wait until their `/health/ready` answers `200` before stopping
+  the old ones.
+
+With a single server and no load balancer, keep the drain at `0`: there is nowhere else to
+send requests, and the drain would only delay the stop.
 
 ## Checklist before going live
 

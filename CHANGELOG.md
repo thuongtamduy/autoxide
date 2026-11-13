@@ -9,6 +9,21 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- `AUTOXIDE_HTTP_DRAIN_SECONDS` (default `0`): on shutdown the server keeps handling requests
+  this long while `/health/ready` answers 503 with code `shutting_down`, so a load balancer
+  stops sending it requests before it stops accepting connections. `docs/DEPLOY.md` explains
+  rolling updates.
+
+### Changed
+
+- `autoxide_kernel::http::health_routes` takes a second argument, the `http::Draining` flag
+  that makes `/health/ready` answer 503 while shutting down; pass `Draining::default()` where
+  the server is not stopped by a signal (tests).
+- `compose.yml` gives the server 40 seconds to stop (`stop_grace_period`) instead of Docker's
+  10, so requests in progress get the full `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`.
+
 ## [0.11.0] - 2026-11-13
 
 ### Added

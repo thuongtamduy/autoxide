@@ -157,7 +157,8 @@ Modules can add maintenance tasks; `autoxide task` lists them with their argumen
 
 Then start the server. It refuses to start while a migration is pending, and
 stops gracefully on Ctrl-C or `SIGTERM` (requests in progress get
-`AUTOXIDE_HTTP_SHUTDOWN_SECONDS` to finish):
+`AUTOXIDE_HTTP_SHUTDOWN_SECONDS` to finish; behind a load balancer, see
+[updating without dropping requests](docs/DEPLOY.md#updating-without-dropping-requests)):
 
 ```bash
 cargo run -p autoxide -- serve

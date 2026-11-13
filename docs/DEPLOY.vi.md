@@ -278,6 +278,7 @@ database mới.
 | `AUTOXIDE_FILES_S3_BUCKET` và `AWS_…` | Lưu file trên S3 hay dịch vụ tương thích S3; nên đặt thêm lifecycle rule cho bucket để huỷ multipart upload dở sau một ngày |
 | `AUTOXIDE_AUTH_PASSWORD_RESET_URL`, `AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` | Mail dẫn tới trang của bạn |
 | `AUTOXIDE_AUTH_PASSKEY_RP_ID`, `AUTOXIDE_AUTH_PASSKEY_ORIGINS` | Bật đăng nhập bằng passkey cho tên miền của bạn |
+| `AUTOXIDE_HTTP_DRAIN_SECONDS` | Sau bộ cân bằng tải: lúc tắt, phục vụ thêm bao lâu trong khi `/health/ready` trả `503`, xem [bên dưới](#cập-nhật-không-làm-rơi-request) |
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` để chạy API và việc nền ở tiến trình riêng |
 | `AUTOXIDE_HTTP_METRICS` | Metrics Prometheus ở `/metrics`, cùng cổng với API: khi bật, hãy chặn `/metrics` ở reverse proxy (Caddy: `respond /metrics 404`) và lấy số đo ngay trên máy chủ |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Gửi trace tới một OpenTelemetry collector |
@@ -292,6 +293,34 @@ dùng chung database (và S3 cho file), và job nền được nhận sao cho m�
 lần. Đặt cùng `AUTOXIDE_AUTH_TOKEN_SECRET` ở mọi nơi. Muốn tăng API và việc nền riêng
 rẽ, chạy vài tiến trình với `AUTOXIDE_PROCESS_ROLE=api` và ít nhất một tiến trình
 `worker`. SQLite chỉ cho một tiến trình máy chủ.
+
+### Cập nhật không làm rơi request
+
+Khi được bảo dừng (`SIGTERM`, tín hiệu Docker, systemd và Kubernetes gửi), máy chủ đi qua
+hai giai đoạn:
+
+1. **Rút** trong `AUTOXIDE_HTTP_DRAIN_SECONDS` giây (mặc định `0`): vẫn xử lý mọi request,
+   nhưng `/health/ready` trả `503` với mã `shutting_down`, để bộ cân bằng tải thôi gửi
+   request mới tới. `/health/live` vẫn `200`: không được khởi động lại tiến trình.
+2. **Dừng**: ngừng nhận kết nối và cho request đang chạy tối đa
+   `AUTOXIDE_HTTP_SHUTDOWN_SECONDS` giây (mặc định `30`) để xong.
+
+Để cập nhật lần lượt từng máy chủ sau bộ cân bằng tải:
+
+- Trỏ health check của bộ cân bằng tải (hay `readinessProbe` của Kubernetes) tới
+  `/health/ready`, còn `livenessProbe` tới `/health/live`.
+- Đặt `AUTOXIDE_HTTP_DRAIN_SECONDS` dài hơn thời gian bộ cân bằng tải cần để gỡ một máy
+  chủ: khoảng giữa hai lần kiểm nhân với số lần hỏng nó chờ. Kiểm 5 giây một lần và bỏ sau
+  2 lần hỏng thì cần hơn 10, vậy đặt `15`.
+- Cho tiến trình đủ thời gian cho cả hai giai đoạn trước khi bị giết: `stop_grace_period`
+  của Docker Compose, `terminationGracePeriodSeconds` của Kubernetes, `TimeoutStopSec` của
+  systemd phải ít nhất bằng rút + dừng (`45s` cho `15` + `30`). Mặc định Docker chỉ chờ
+  10 giây; `compose.yml` trong repo này đặt `40s`, đủ khi không rút — đặt khoảng rút thì
+  tăng nó lên.
+- Chạy máy chủ mới và chờ `/health/ready` của chúng trả `200` rồi mới dừng máy chủ cũ.
+
+Chỉ một máy chủ, không có bộ cân bằng tải thì để khoảng rút là `0`: không có nơi nào khác
+để gửi request, rút chỉ làm việc dừng chậm thêm.
 
 ## Kiểm trước khi chạy thật
 

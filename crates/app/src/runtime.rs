@@ -26,6 +26,8 @@ pub struct Runtime {
     pub dispatcher: Dispatcher,
     /// Worker chạy job; `serve` chạy nó nền; `autoxide jobs` dùng nó để xem, chạy lại.
     pub worker: Worker,
+    /// Cờ "đang tắt" mà `/health/ready` đọc; `serve` bật nó khi nhận tín hiệu dừng.
+    pub draining: http::Draining,
 }
 
 /// Có đòi database đã áp dụng đủ migration trước khi khởi động không.
@@ -75,7 +77,8 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
             return Err(error.to_string());
         }
     };
-    let mut root = http::health_routes(database.clone());
+    let draining = http::Draining::default();
+    let mut root = http::health_routes(database.clone(), draining.clone());
     if config.http.metrics {
         // Bộ thu số đo là toàn tiến trình: bật một lần, ở đây.
         match Metrics::install() {
@@ -112,7 +115,7 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         .body_limits(modules.body_limits())
         .tools(tools);
     let api = http::build(&config.http, root, routes, extras);
-    Ok(Runtime { config, database, modules, api, dispatcher, worker })
+    Ok(Runtime { config, database, modules, api, dispatcher, worker, draining })
 }
 
 /// Lỗi nếu database còn migration chưa áp dụng; thông báo nêu từng migration và

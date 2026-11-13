@@ -4431,3 +4431,24 @@ mã chỉ tạo một bản ghi, trên cả hai database.
 Đã cân nhắc: kéo dài thời hạn idempotency key — bảng đó lưu cả response, không hợp để giữ mãi;
 trả 409 khi nội dung khác — 422 khớp mã đã có cho cùng tình huống ở idempotency key; một bảng
 `reference` chung của kernel — module sẽ phải ghi hai bảng và join chéo, trái luật sở hữu bảng.
+
+## D-185 · Khoảng rút trước khi tắt: `AUTOXIDE_HTTP_DRAIN_SECONDS`, mặc định 0 — 2026-11-13 — agent quyết
+
+Quyết định: nhận tín hiệu dừng thì `serve` bật cờ `http::Draining` (`/health/ready` trả 503
+`shutting_down`, không hỏi database; `/health/live` vẫn 200), vẫn phục vụ đủ
+`AUTOXIDE_HTTP_DRAIN_SECONDS` (0–600, mặc định `0`), rồi mới tới graceful shutdown cũ
+(`AUTOXIDE_HTTP_SHUTDOWN_SECONDS` đếm từ lúc đó). Việc ghép nằm ở `commands/serve.rs` (bọc future
+tín hiệu dừng), `http::serve` không đổi. `health_routes(database, draining)` nhận thêm cờ — thay
+đổi phá vỡ của kernel, ghi trong CHANGELOG (bản `0.x`). `compose.yml` đặt `stop_grace_period: 40s`
+vì Docker mặc định giết tiến trình sau 10 giây, ngắn hơn 30 giây app chờ request đang chạy.
+
+Lý do: bộ cân bằng tải chỉ biết gỡ một máy chủ sau vài lần kiểm `/health/ready` hỏng; nếu máy chủ
+ngừng nhận kết nối ngay khi nhận `SIGTERM`, request gửi tới trong khoảng đó bị từ chối. Mặc định
+`0` vì một máy chủ không có bộ cân bằng tải (cách cài phổ biến nhất của người lạ) không có nơi nào
+khác để chuyển request — rút chỉ làm Ctrl-C chậm đi; ai chạy nhiều máy chủ đặt theo
+`docs/DEPLOY.md`.
+
+Đã cân nhắc: mặc định khác 0 (vd 5 giây) — người chạy một máy chủ chờ vô ích mỗi lần dừng, và
+vẫn không đúng cho bộ cân bằng tải nào cụ thể; giữ `health_routes(database)` và thêm hàm thứ hai
+nhận cờ — hai cách cho một việc; `preStop` sleep của Kubernetes — chỉ có trên Kubernetes, còn
+`/health/ready` vẫn báo 200 trong lúc tắt.

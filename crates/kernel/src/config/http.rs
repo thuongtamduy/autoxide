@@ -39,6 +39,17 @@ pub const SHUTDOWN_SECONDS: Setting = Setting::new(
 )
 .with_default("30");
 
+pub const DRAIN_SECONDS: Setting = Setting::new(
+    "AUTOXIDE_HTTP_DRAIN_SECONDS",
+    "On shutdown, how long to keep handling requests while `/health/ready` answers 503, before \
+     the server stops accepting connections. Load balancers then stop sending new requests in \
+     time, so a rolling deploy drops none. Set it longer than your load balancer needs to mark \
+     an instance down (health check interval times failure threshold, for example `15`). `0` \
+     stops accepting connections at once, for a single instance with no load balancer. \
+     AUTOXIDE_HTTP_SHUTDOWN_SECONDS starts counting after this.",
+)
+.with_default("0");
+
 pub const API_DOCS: Setting = Setting::new(
     "AUTOXIDE_HTTP_API_DOCS",
     "Serve an interactive API reference at `/api/docs` (`true` or `false`). The page loads its \
@@ -244,6 +255,8 @@ pub struct HttpConfig {
     pub body_limit: usize,
     pub cors_origins: CorsOrigins,
     pub shutdown_grace: Duration,
+    /// Khoảng rút trước khi ngừng nhận kết nối: `/health/ready` trả 503, request vẫn được phục vụ.
+    pub drain: Duration,
     pub api_docs: bool,
     pub metrics: bool,
     pub rate_limit: RateLimit,
@@ -281,6 +294,7 @@ impl HttpConfig {
         let cors_origins = reader.optional_with(&CORS_ORIGINS, CorsOrigins::parse);
         let shutdown_grace =
             reader.get_with(&SHUTDOWN_SECONDS, |raw| parse_in_range(raw, 0u64, 600));
+        let drain = reader.get_with(&DRAIN_SECONDS, |raw| parse_in_range(raw, 0u64, 600));
         let api_docs = reader.get_with(&API_DOCS, parse_bool);
         let metrics = reader.get_with(&METRICS, parse_bool);
         let per_minute =
@@ -311,6 +325,7 @@ impl HttpConfig {
             body_limit: body_limit?,
             cors_origins: cors_origins?.unwrap_or_default(),
             shutdown_grace: Duration::from_secs(shutdown_grace?),
+            drain: Duration::from_secs(drain?),
             api_docs: api_docs?,
             metrics: metrics?,
             rate_limit: RateLimit { per_minute: per_minute?, burst: burst? },
@@ -342,6 +357,7 @@ mod tests {
         assert_eq!(config.body_limit, 1024 * 1024);
         assert_eq!(config.cors_origins, CorsOrigins::None);
         assert_eq!(config.shutdown_grace, Duration::from_secs(30));
+        assert_eq!(config.drain, Duration::ZERO);
         assert!(!config.api_docs);
         assert!(!config.metrics);
         assert_eq!(config.rate_limit, RateLimit { per_minute: 600, burst: 60 });
@@ -365,6 +381,7 @@ mod tests {
             ("AUTOXIDE_HTTP_BODY_LIMIT_BYTES", "2048"),
             ("AUTOXIDE_HTTP_CORS_ORIGINS", "https://app.example.com, http://localhost:5173"),
             ("AUTOXIDE_HTTP_SHUTDOWN_SECONDS", "0"),
+            ("AUTOXIDE_HTTP_DRAIN_SECONDS", "15"),
         ])
         .unwrap();
         assert_eq!(config.address.to_string(), "0.0.0.0:9000");
@@ -378,6 +395,7 @@ mod tests {
             ])
         );
         assert_eq!(config.shutdown_grace, Duration::ZERO);
+        assert_eq!(config.drain, Duration::from_secs(15));
         assert_eq!(
             read(&[("AUTOXIDE_HTTP_CORS_ORIGINS", "*")]).unwrap().cors_origins,
             CorsOrigins::Any
@@ -392,9 +410,11 @@ mod tests {
             ("AUTOXIDE_HTTP_BODY_LIMIT_BYTES", "10"),
             ("AUTOXIDE_HTTP_CORS_ORIGINS", "https://ok.example.com,example.com/path"),
             ("AUTOXIDE_HTTP_SHUTDOWN_SECONDS", "never"),
+            ("AUTOXIDE_HTTP_DRAIN_SECONDS", "601"),
         ])
         .unwrap_err();
-        assert!(message.contains("invalid configuration (5 problems):"), "{message}");
+        assert!(message.contains("invalid configuration (6 problems):"), "{message}");
+        assert!(message.contains("AUTOXIDE_HTTP_DRAIN_SECONDS:"), "{message}");
         assert!(message.contains("AUTOXIDE_HTTP_ADDRESS: must be an IP address and a port"));
         assert!(message.contains("`example.com/path` does not"), "{message}");
     }

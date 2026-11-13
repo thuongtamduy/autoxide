@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–29 xong**, bước 30 chưa bắt đầu; bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–29 xong**, bước 30 đang làm (nhóm C: deploy không gián đoạn xong); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -413,6 +413,9 @@ Nhóm A — repo công khai, CI, phát hành (D-175):
 - [ ] Chủ dự án công khai repo (Settings → Change visibility); trước đó agent xác nhận gitleaks
       quét toàn lịch sử xanh và không file nào chứa tên máy chủ, IP, đường dẫn riêng hay thông tin
       cá nhân. Agent không tự đổi chế độ công khai
+      — 13/11/2026 agent đã quét: gitleaks toàn lịch sử mọi nhánh xanh, file không chứa IP thật,
+      tên máy hay đường dẫn riêng; còn lại: metadata của một số commit mang email cá nhân của chủ
+      dự án — chủ dự án chọn giữ, hay viết lại lịch sử sang địa chỉ `noreply` của GitHub
 - [ ] Ba workflow tự chạy lại: `ci.yml` (push lên `main`, pull request), `audit.yml` (lịch),
       `release.yml` (tag `vX.Y.Z`) — trigger cũ có trong `git log -p -- .github/workflows`; chạy
       xanh trên GitHub; bỏ ghi chú "TẮT tự chạy (D-107)" ở đầu các file
@@ -449,7 +452,7 @@ Nhóm C — sản phẩm (D-176):
       WebP qua API công khai (`PublicMedia`, `body_media`, `srcset`) mà client cũ không hỏng; ảnh đã
       có làm lại bằng `autoxide task media.refresh_variants`; đo dung lượng và thời gian mã hoá
       trên ảnh thử của D-168, ghi vào quyết định; hướng dẫn `docs/MEDIA.md` (EN + VI)
-- [ ] Deploy không gián đoạn: nhận tín hiệu dừng thì `/health/ready` trả 503 trong một khoảng
+- [x] Deploy không gián đoạn: nhận tín hiệu dừng thì `/health/ready` trả 503 trong một khoảng
       cấu hình được (biến mới qua `Setting`, sinh lại `.env.example`) trước khi ngừng nhận kết nối,
       `/health/live` vẫn 200; rồi mới tới `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`. Test; `docs/DEPLOY.md`
       (EN + VI)

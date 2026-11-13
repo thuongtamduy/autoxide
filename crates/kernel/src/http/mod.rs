@@ -70,7 +70,7 @@ pub use deprecation::Deprecation;
 pub use disposition::{Disposition, content_disposition};
 pub use extract::ValidJson;
 pub(crate) use extract::{contains_nul_escape, nul_refused, value_contains_nul};
-pub use health::{Health, health_routes};
+pub use health::{Draining, Health, health_routes};
 pub use mcp::MCP_PATH;
 pub use metrics::metrics_routes;
 pub(crate) use openapi::untranslated_text;

@@ -88,8 +88,10 @@ enum Command {
     /// Run the HTTP server until it receives Ctrl-C or SIGTERM.
     ///
     /// Refuses to start while a migration has not been applied: run
-    /// `autoxide migrate up` first. On shutdown, requests in progress get up to
-    /// `AUTOXIDE_HTTP_SHUTDOWN_SECONDS` to finish.
+    /// `autoxide migrate up` first. On shutdown, it first keeps handling requests for
+    /// `AUTOXIDE_HTTP_DRAIN_SECONDS` while `/health/ready` answers 503, then stops accepting
+    /// connections and gives requests in progress up to `AUTOXIDE_HTTP_SHUTDOWN_SECONDS` to
+    /// finish.
     Serve,
 
     /// List or run the maintenance tasks that modules declare.

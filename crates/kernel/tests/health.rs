@@ -21,7 +21,7 @@ async fn start(database: &TestDatabase) -> (Api, Database) {
     let db = Database::connect(&config.database).await.unwrap();
     let api = http::build(
         &config.http,
-        http::health_routes(db.clone()),
+        http::health_routes(db.clone(), http::Draining::default()),
         Vec::new(),
         http::Extras::default(),
     );
@@ -97,6 +97,37 @@ async fn health_check_co_trong_tai_lieu_openapi() {
         assert_eq!(live["summary"], "Liveness probe: is the process running?");
         assert!(document["paths"]["/health/ready"]["get"]["responses"]["503"].is_object());
         assert_eq!(http::lint(&api.openapi), Vec::<String>::new());
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn dang_tat_thi_chua_san_sang_nhung_van_song() {
+    TestDatabase::run(async |database| {
+        let source = ConfigSource::from_pairs([("DATABASE_URL", database.url())]);
+        let mut reader = ConfigReader::new(&source);
+        let config = Config::read(&mut reader);
+        let config = reader.finish(config).unwrap().0;
+        let db = Database::connect(&config.database).await.unwrap();
+        let draining = http::Draining::default();
+        let api = http::build(
+            &config.http,
+            http::health_routes(db.clone(), draining.clone()),
+            Vec::new(),
+            http::Extras::default(),
+        );
+        assert_eq!(get(&api, "/health/ready").await.0, StatusCode::OK);
+
+        draining.start();
+        let (status, content_type, body) = get(&api, "/health/ready").await;
+
+        assert!(draining.is_draining());
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(content_type, "application/problem+json");
+        assert_eq!(body["code"], "shutting_down");
+        // Kết quả "sẵn sàng" vừa hỏi còn trong bộ nhớ đệm, nhưng không được che việc đang tắt.
+        assert_eq!(get(&api, "/health/live").await.0, StatusCode::OK);
     })
     .await
     .unwrap();

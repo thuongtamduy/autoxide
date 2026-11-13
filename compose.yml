@@ -53,6 +53,9 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    # Docker mặc định chỉ chờ 10 giây rồi giết tiến trình; cho đủ khoảng rút
+    # (AUTOXIDE_HTTP_DRAIN_SECONDS) + AUTOXIDE_HTTP_SHUTDOWN_SECONDS (mặc định 0 + 30).
+    stop_grace_period: 40s
 
 volumes:
   postgres:

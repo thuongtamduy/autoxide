@@ -56,7 +56,7 @@ where
 {
     // Tách `runtime` thành từng phần: router được chuyển hẳn (move) cho máy chủ,
     // còn database phải giữ lại để đóng sau khi máy chủ dừng.
-    let Runtime { config, database, modules, api, dispatcher, worker } = runtime;
+    let Runtime { config, database, modules, api, dispatcher, worker, draining } = runtime;
     let address = listener.local_addr().map_err(|error| format!("http: {error}"))?;
     let role = config.process.role;
     tracing::info!(%address, modules = ?modules.names(), ?role, "listening");
@@ -77,6 +77,18 @@ where
         }));
     }
 
+    // Tín hiệu dừng tới thì chưa ngừng nhận kết nối ngay: bật cờ để `/health/ready` trả 503, vẫn
+    // phục vụ thêm `drain` để bộ cân bằng tải kịp chuyển request sang tiến trình khác. Hết khoảng
+    // đó future này mới xong, và `http::serve` mới bắt đầu tắt (đếm `shutdown_grace` từ lúc ấy).
+    let drain = config.http.drain;
+    let shutdown = async move {
+        shutdown.await;
+        draining.start();
+        if !drain.is_zero() {
+            tracing::info!(drain_seconds = drain.as_secs(), "shutting down: draining");
+            tokio::time::sleep(drain).await;
+        }
+    };
     let outcome = http::serve(listener, api.router, shutdown, config.http.shutdown_grace).await;
     match outcome {
         Ok(Shutdown::Graceful) => tracing::info!("stopped"),
@@ -240,6 +252,53 @@ mod tests {
             assert!(live.starts_with("HTTP/1.1 200 OK\r\n"), "{live}");
             assert!(!docs.contains("/api/v1/notes"), "{docs}");
             assert_eq!(server.await.unwrap(), Ok(()));
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Trong khoảng rút: `/health/ready` trả 503 `shutting_down`, mà máy chủ vẫn nhận kết nối mới
+    /// và vẫn sống; hết khoảng rút thì dừng êm.
+    #[tokio::test]
+    async fn khi_tat_rut_truoc_roi_moi_ngung_nhan_ket_noi() {
+        TestDatabase::run(async |database| {
+            let source = ConfigSource::from_pairs([
+                ("DATABASE_URL", database.url()),
+                ("AUTOXIDE_HTTP_ADDRESS", "127.0.0.1:0"),
+                ("AUTOXIDE_HTTP_DRAIN_SECONDS", "2"),
+            ]);
+            let settings = settings::read_with(&source, vec![Box::new(Notes)]).unwrap();
+            let db = Database::connect(&settings.config.database).await.unwrap();
+            settings.modules.migrator().unwrap().up(&db).await.unwrap();
+            db.close().await.unwrap();
+
+            let (runtime, listener) = prepare(settings).await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+            let server = tokio::spawn(run_server(runtime, listener, async {
+                let _ = stopped.await;
+            }));
+            assert!(get(address, "/health/ready").await.starts_with("HTTP/1.1 200 OK\r\n"));
+
+            let started = std::time::Instant::now();
+            stop.send(()).unwrap();
+            // Cờ được bật trong task của máy chủ: chờ tới khi nó thấy tín hiệu.
+            let mut ready = get(address, "/health/ready").await;
+            while ready.starts_with("HTTP/1.1 200") && started.elapsed().as_secs() < 1 {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                ready = get(address, "/health/ready").await;
+            }
+            let live = get(address, "/health/live").await;
+
+            assert!(ready.starts_with("HTTP/1.1 503 Service Unavailable\r\n"), "{ready}");
+            assert!(ready.contains(r#""code":"shutting_down""#), "{ready}");
+            assert!(live.starts_with("HTTP/1.1 200 OK\r\n"), "{live}");
+            assert!(started.elapsed().as_secs() < 2, "kiểm xong trước khi hết khoảng rút");
+            assert_eq!(server.await.unwrap(), Ok(()));
+            assert!(
+                started.elapsed() >= std::time::Duration::from_secs(2),
+                "dừng trước khi rút xong"
+            );
         })
         .await
         .unwrap();

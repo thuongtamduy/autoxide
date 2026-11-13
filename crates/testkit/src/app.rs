@@ -252,7 +252,7 @@ impl<'a> TestAppBuilder<'a> {
             .body_limits(modules.body_limits())
             .tools(modules.tools().map_err(|e| fail("tools", e))?)
             .translations(modules.translations().clone());
-        let root = http::health_routes(database.clone());
+        let root = http::health_routes(database.clone(), http::Draining::default());
         let api = http::build(&config.http, root, modules.routes(), extras);
         if !api.schema_conflicts.is_empty() {
             return Err(fail("openapi", api.schema_conflicts.join(", ")));
