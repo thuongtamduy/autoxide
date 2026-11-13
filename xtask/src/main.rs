@@ -4,7 +4,10 @@
 //!   này; vi phạm thì gate đỏ.
 //! - `new-module <module> <entity>` — sinh module mới từ khuôn `modules/notes` (xem
 //!   `scaffold.rs`).
+//! - `test-affected [--base <ref>]` — chạy test của crate bị sửa so với `main` và crate phụ
+//!   thuộc vào chúng, trên SQLite; phần test của `./gate.sh --quick` (xem `affected.rs`).
 
+mod affected;
 mod boundaries;
 mod i18n;
 mod scaffold;
@@ -13,7 +16,8 @@ mod workspace;
 use std::process::ExitCode;
 
 const USAGE: &str = "usage: cargo xtask check
-       cargo xtask new-module <module> <entity>   e.g. new-module bookmarks bookmark";
+       cargo xtask new-module <module> <entity>   e.g. new-module bookmarks bookmark
+       cargo xtask test-affected [--base <ref>]   default base: origin/main";
 
 fn main() -> ExitCode {
     // `skip(1)`: phần tử đầu của args là tên chương trình.
@@ -23,6 +27,8 @@ fn main() -> ExitCode {
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         ["check"] => check(),
         ["new-module", module, entity] => new_module(module, entity),
+        ["test-affected"] => test_affected(None),
+        ["test-affected", "--base", base] => test_affected(Some(base)),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::FAILURE
@@ -92,6 +98,17 @@ fn new_module(module: &str, entity: &str) -> ExitCode {
         }
         Err(error) => {
             eprintln!("xtask new-module: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn test_affected(base: Option<&str>) -> ExitCode {
+    let result = workspace::load().and_then(|workspace| affected::run(&workspace, base));
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("xtask test-affected: {error}");
             ExitCode::FAILURE
         }
     }

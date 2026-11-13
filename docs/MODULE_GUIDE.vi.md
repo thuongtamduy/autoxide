@@ -221,7 +221,9 @@ dùng một lần, bộ đếm) cần một test đồng thời.
 
 1. Nếu API đổi, sinh lại hợp đồng:
    `cargo run -p autoxide -- openapi > docs/openapi.json`.
-2. Chạy `./gate.sh` tới khi xanh.
+2. Trong lúc làm, `./gate.sh --quick` chạy test của module (và của các crate phụ thuộc vào
+   nó) trên SQLite trong chưa tới một phút.
+3. Chạy `./gate.sh` đầy đủ tới khi xanh: mọi test trên SQLite và PostgreSQL.
 
 ## Module ở repo riêng
 

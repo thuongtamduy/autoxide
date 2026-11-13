@@ -354,7 +354,9 @@ dụng, mô tả API) viết bằng tiếng Anh, kèm bản dịch tiếng Việ
 
 ## Đóng góp
 
-Chạy `./gate.sh` trước khi commit; một thay đổi chỉ được nhận khi gate xanh trên cả
+Trong lúc làm, `./gate.sh --quick` kiểm một thay đổi ở một module trong chưa tới một phút: nó chạy test
+của các crate bạn đã sửa (và của các crate phụ thuộc vào chúng), chỉ trên SQLite. Trước khi
+merge, chạy `./gate.sh` đầy đủ; một thay đổi chỉ được nhận khi gate đầy đủ xanh trên cả
 SQLite và PostgreSQL. Không bao giờ commit secret — chỉ `.env.example` được nằm
 trong Git, `.env` thì không.
 
