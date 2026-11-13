@@ -4829,3 +4829,34 @@ người, còn hộp việc là trạng thái hiện tại của dữ liệu, x�
 gom cấu hình website từ nhiều module — phải trả JSON không kiểu, mất mô tả OpenAPI; để giao diện gọi ba
 endpoint có cache (cửa hàng, menu, logo Bộ Công Thương) là đủ. Đánh số lại để bước 51 đứng trước 41 —
 đổi số của 11 bước và 11 file đặc tả; thay bằng ghi trong bảng phụ thuộc rằng 51 nên làm trước 41.
+
+## D-201 · Áp kết quả nghiên cứu các sản phẩm hàng đầu vào thiết kế 2; thêm mục bước 51 và bước 52 — 2026-11-13 — chủ dự án giao, agent quyết nội dung
+
+Quyết định: chủ dự án yêu cầu tham khảo các website và trang quản trị hàng đầu thế giới rồi mang điều
+tốt nhất về (`docs/research/ui-design.md` mục 5 ghi nguồn và bằng chứng). Áp như sau:
+
+1. Bước 51 thêm P7–P13: schema bộ lọc công bố trong OpenAPI và view đã lưu; thao tác hàng loạt chung
+   (`ids` hoặc `filter` + `expected_count`, job, kết quả từng bản ghi); tìm có toán tử, phạm vi và mở thẳng
+   theo mã; hộp việc theo người (khoá ổn định, lý do, hoãn, giao) và việc thiết lập; `/me/can` giải thích
+   quyền; agent là người dùng thật (loại API key, `actor_kind`, lệnh rủi ro trả `202 approval_required`
+   chờ người duyệt, như nhau cho REST và MCP); dòng hoạt động và ghi chú nội bộ dùng chung cho mọi bản ghi.
+   Mục P10 thay phần "có thêm bỏ qua việc hay không" mà đặc tả 51 để agent tự quyết.
+2. Bước 52 mới (sau 51): bàn kỹ thuật (nhật ký request, lần giao webhook, chạy lại job), `restore` và
+   `dry_run`, lọc bằng lời thường qua AI (chỉ ra tham số đã kiểm), thông báo có lý do và trạng thái, ghim,
+   sức khoẻ người bán và tuân thủ.
+3. Mặt tiền: thêm mục vào bước 41 (gợi ý tìm hai tầng dấu, từ đồng nghĩa, sắp xếp bán chạy / đánh giá, số
+   đếm bộ lọc, thẻ có biến thể và điểm, dữ liệu JSON-LD), 42 (báo khi có hàng lại theo cửa hàng), 43 (mã
+   dùng được cho giỏ kèm lý do; số lượt còn lại chỉ khi là số thật), 44 (ngày giao tuyệt đối, giờ chốt,
+   lịch là dữ liệu; giờ sẵn sàng khi nhận tại cửa hàng), 45 (mua không cần tài khoản trọn vẹn, trạng thái
+   thanh toán công khai bằng token, tra và gắn đơn vãng lai bằng OTP, người nhận hộ, cách trả hàng, đánh
+   giá có ảnh và tóm tắt AI chờ duyệt).
+4. Để sau, ghi ở "Sau core": khách thử nghiệm cách ly, khách duyệt từng lần nhân sự nền tảng xin vào dữ
+   liệu, nhóm nút ngoài cây, quản trị trên điện thoại.
+
+Lý do: những điều trên có bằng chứng (Baymard, tài liệu chính thức) hoặc là mẫu chung của nhiều sản phẩm
+đầu ngành, và cần dữ liệu chỉ core có (quyền theo nút, quyền dùng, audit, job). Agent hay retry và cần
+người duyệt cho lệnh rủi ro, nên "lệnh chờ duyệt" đi vào core thay vì từng giao diện tự làm.
+
+Đã cân nhắc: đối chiếu đơn vị hành chính cũ sang mới (nghiên cứu đề xuất) — trái D-193 do chủ dự án quyết,
+không làm; chuyển menu con sang thanh bên như Vercel 2026 — giữ hàng tab của D-200, xem lại khi có số đo;
+dồn mọi mục vào bước 51 — bước quá lớn, tách phần "nên có" sang bước 52.

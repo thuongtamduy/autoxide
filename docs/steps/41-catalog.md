@@ -446,3 +446,18 @@ lý trước khi chạy thật (D-186):
 - Chặn cứng hay chỉ cảnh báo luật "VND + gồm thuế" khi vùng thuế của khách không phải Việt Nam —
   khuyến nghị chỉ áp khi vùng thuế của nút là `VN`.
 - Ghi mọi lựa chọn ở trên vào `docs/DECISIONS.md` bằng skill `record-decision`.
+
+## Bổ sung theo D-201 (nghiên cứu các website bán hàng hàng đầu)
+
+- **Gợi ý tìm công khai:** `GET /public/search/suggest?q&locale&limit` gom qua trait `SuggestSource`
+  (catalog: từ khoá, danh mục "trong …", sản phẩm có giá; content: bài viết; organizations: cửa hàng).
+  Xếp hạng hai tầng tính trong ứng dụng: khớp đúng dấu trên `name_key` trước, khớp không dấu trên
+  `search_key` sau (tiếng Việt: "dấu / dàu / dãu" khác nghĩa). Từ đồng nghĩa theo khách
+  (`catalog_synonyms`, cấp khách hàng). Gợi ý tối đa 10 trên máy tính, 8 trên điện thoại.
+- **Sắp xếp và lọc:** `sort=best_selling|rating` (cột trên `catalog_storefront_entries`, cập nhật từ event
+  của `orders` và đánh giá); `facets=true` trả số đếm theo từng giá trị lọc, tối đa 50 giá trị mỗi thuộc
+  tính, câu đếm có index, chạy cả hai database; lọc thương hiệu và số sao tối thiểu.
+- **Thẻ sản phẩm:** storefront entry thêm tóm tắt biến thể ("3 cỡ"), điểm và số đánh giá, đơn giá theo
+  đơn vị cơ sở cho hàng tiêu hao.
+- **JSON-LD:** `by-slug` trả đủ GTIN, thương hiệu, URL từng biến thể để website dựng `Product` /
+  `ProductGroup` / `Offer`; giá trong Offer là giá không cần mã; giá gạch là giá ngay trước khuyến mại.

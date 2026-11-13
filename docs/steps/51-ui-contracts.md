@@ -214,3 +214,79 @@ phù hợp; `docs/openapi.json` mô tả đủ từng endpoint; `./gate.sh` xanh
 
 Tên chính xác của endpoint và kiểu; mặc định hạn thời gian mỗi nguồn; thời gian cache số đếm; có thêm
 "bỏ qua việc" (snooze) hay không — nếu thêm thì là bảng cấp khách hàng có `tenant_id`, ghi quyết định.
+
+## Bổ sung theo D-201 (nghiên cứu các trang quản trị hàng đầu)
+
+Bảy mục thêm vào bước 51, làm sau P1–P6, cùng luật: hàm mới của `Module` có mặc định rỗng, chạy và có
+test trên cả hai database, áp như nhau cho REST và MCP.
+
+### P7 — Schema bộ lọc và view đã lưu
+
+- Mỗi endpoint danh sách khai **schema bộ lọc** (tên tham số, kiểu, giá trị cho phép, toán tử) bằng một
+  phần mở rộng trong OpenAPI (`x-autoxide-filters`), sinh từ cùng kiểu Rust với `IntoParams` — không
+  viết hai lần. Giao diện và agent dựng chip lọc từ đó.
+- `GET/POST/PATCH/DELETE /api/v1/me/views` (bảng `kernel_saved_views`, cấp khách hàng, có `tenant_id`):
+  `resource` (id danh sách, vd `orders.list`), `params` (kiểm theo schema khi lưu — sai thì 422 liệt kê
+  từng tham số), `columns`, `group_by`, `density`, `scope` (`personal` / `node` / `tenant`, kèm `org_id`),
+  `owner`. View phạm vi nút cần permission `kernel.views.share`. View hệ thống do module khai, không xoá được.
+
+### P8 — Thao tác hàng loạt
+
+- Module khai `BulkAction { id, permission, run }`. `POST /api/v1/kernel/bulk/{resource}/{action}`
+  nhận **một trong hai**: `ids` (tối đa 500) hoặc `filter` + `expected_count`; số khớp lúc chạy khác
+  `expected_count` thì 409 `kernel.bulk_count_changed`. `Idempotency-Key` bắt buộc.
+- Chạy bằng job; mỗi bản ghi kiểm quyền riêng ở nút của nó; kết quả từng bản ghi (`ok` / `skipped`
+  kèm lý do / `failed` kèm `code`) đọc ở `GET /api/v1/kernel/jobs/{id}` có phần trăm tiến độ, đẩy qua
+  SSE nếu bước 40 đã có.
+
+### P9 — Tìm nâng cao và mở thẳng
+
+- `FinderSource` nhận truy vấn đã phân tích: từ khoá còn lại + toán tử `is:<loại>`, `<trường>:<giá trị>`,
+  so sánh `>`, `<`, khoảng `..`, phủ định `-`. Toán tử nào nguồn không hiểu thì bỏ, ghi vào `ignored`.
+- Tham số `scope=node|subtree|accessible` cho tìm và cho danh sách; `accessible` = mọi nút người gọi có
+  quyền (bước 34 `/me/memberships`).
+- `GET /api/v1/kernel/resolve?code=` — module đăng ký bộ nhận dạng mã (số đơn, mã vận đơn, số hoá đơn);
+  trả bản ghi đầu tiên người gọi được xem, không trả gì nếu không có quyền (không lộ sự tồn tại).
+
+### P10 — Hộp việc theo người, việc thiết lập
+
+- `WorkItem` có `key` ổn định (`<nguồn>:<id bản ghi>`) và `reason` (permission, nút). Bảng
+  `kernel_work_states` (cấp khách hàng): `key`, `user_id`, `snoozed_until`, `assignee_id`. `POST
+  /api/v1/me/work/{key}/snooze {until}`, `POST …/assign {user_id}` (người nhận phải có quyền của nguồn).
+  Việc tự hết khi dữ liệu không còn khớp; trạng thái mồ côi dọn bằng job.
+- `SetupStep` (đăng ký như `WorkSource`): `id`, `label`, `models` (mô hình áp dụng), `blocking`
+  (chặn bán), `done(tenant) -> bool` tính từ dữ liệu. `GET /api/v1/kernel/setup` trả danh sách và tiến độ.
+
+### P11 — Giải thích quyền
+
+`POST /api/v1/me/can` nhận tối đa 50 cặp `{permission, org_id}`; mỗi cặp trả `allowed` và khi không:
+`reason` (`missing_permission`, `module_not_enabled`, `feature_not_in_plan`, `quota_exceeded`),
+`required_feature`, `upgrade_to` (gói rẻ nhất có tính năng), `grantors` (tối đa 5 người cấp được ở nút
+đó — chỉ trả cho người gọi có quyền xem thành viên). Kết quả khớp đúng logic kiểm quyền thật: test so
+từng lý do với lỗi thật mà endpoint tương ứng trả.
+
+### P12 — Agent là người dùng, lệnh cần duyệt
+
+- API key có `kind`: `human` (mặc định), `agent`, `service`. Audit ghi `actor_kind`; danh sách audit lọc
+  được theo nó.
+- Module đánh dấu lệnh rủi ro: `Command::requires_approval_for(ActorKind::Agent)`. Agent gọi lệnh đó
+  thì nhận `202` mã `approval_required` kèm `approval_request` (`id`, `summary`, `expires_at`, mặc định
+  24 giờ, đường dẫn duyệt). Người có cùng permission duyệt (`POST /api/v1/kernel/approvals/{id}/approve`)
+  thì lệnh chạy với `Idempotency-Key` gốc; từ chối hay hết hạn thì agent nhận lý do. Bảng
+  `kernel_approval_requests` cấp khách hàng. Như nhau cho REST và tool MCP (luật kiến trúc 8). Yêu cầu
+  đang chờ vào hộp việc (P2).
+
+### P13 — Dòng hoạt động và ghi chú trên mọi bản ghi
+
+- `GET /api/v1/kernel/records/{kind}/{id}/activity` gộp audit của bản ghi và ghi chú, chỉ khi người gọi
+  đọc được bản ghi (hỏi bộ tra của sổ đối tượng, D-123).
+- `POST …/notes {body}` — ghi chú nội bộ (bảng `kernel_record_notes`, cấp khách hàng); `@` nhắc người
+  có quyền đọc bản ghi, gửi thông báo qua `notifications` nếu đã có. Module `customers` (bước 47) dùng
+  chỗ này thay vì tự có ghi chú.
+
+### Test thêm
+
+`views_params_sai_schema_bi_tu_choi`, `bulk_filter_dem_lech_thi_409`, `bulk_moi_ban_ghi_kiem_quyen_rieng`,
+`resolve_khong_lo_ban_ghi_ngoai_quyen`, `work_snooze_het_han_thi_hien_lai`, `can_tra_dung_ly_do_nhu_loi_that`,
+`agent_goi_lenh_rui_ro_nhan_202_approval_required`, `approval_het_han_khong_chay_lenh`,
+`activity_khong_lo_ban_ghi_ngoai_quyen` — trên cả hai database.

@@ -4,7 +4,7 @@ Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQL
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
 Trạng thái: **bước 0–30 xong** (phần cần repo công khai ở bước 50); bước 50 chờ chủ dự án công khai repo (D-199); 31 trở đi chưa bắt đầu — thứ tự và phụ thuộc ở
-bảng ngay trước bước 30 (D-192); bước 51 thêm theo thiết kế giao diện 2 (D-200); bản phát hành mới nhất `v0.12.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199):
+bảng ngay trước bước 30 (D-192); bước 51 thêm theo thiết kế giao diện 2 (D-200), bước 52 theo nghiên cứu các sản phẩm hàng đầu (D-201); bản phát hành mới nhất `v0.12.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -421,6 +421,7 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 | 46 Sàn · 47 Khách hàng · 48 Đa kênh · 49 Tiếp thị liên kết | 45 (46 và 49 cần thêm 37) | nhau |
 | 50 Công khai repo | chủ dự án nói đã công khai repo (D-199) | mọi bước |
 | 51 Hợp đồng cho giao diện (D-200) | nhúng bản ghi: sau 33; hộp việc, tìm, số liệu, hoạt động: sau 34; menu: sau 35 | 36–49 — nên làm trước 41 để module thương mại khai luôn phần của mình |
+| 52 Trải nghiệm quản trị nâng cao (D-201) | 51 | 41–49 |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
@@ -908,6 +909,11 @@ bước 35.
       cần đối chiếu)
 - [ ] Đọc công khai cho website: danh sách, lọc theo danh mục / thuộc tính / khoảng giá, tìm kiếm
       (hợp đồng tìm kiếm sẵn có của kernel), ETag và cache như `content`; sitemap
+- [ ] Tìm và lọc như các site hàng đầu (D-201): gợi ý tìm công khai gom sản phẩm, danh mục, bài viết,
+      cửa hàng qua một trait; khớp đúng dấu xếp trước khớp không dấu; từ đồng nghĩa theo khách; sắp xếp
+      bán chạy và đánh giá; số đếm theo từng giá trị lọc (có giới hạn, có index, cả hai database); thẻ
+      sản phẩm có tóm tắt biến thể, điểm đánh giá, đơn giá theo đơn vị cơ sở; dữ liệu cho JSON-LD
+      (GTIN, thương hiệu, URL từng biến thể, giá gạch là giá ngay trước khuyến mại)
 - [ ] Nhập / xuất CSV bằng job (kiểm từng dòng, báo lỗi theo dòng, chống CSV injection); gợi ý mô tả
       và SEO bằng AI chỉ thành bản nháp, đánh dấu `ai_assisted` (bước 37)
 - [ ] API hợp đồng cho module khác (`catalog::api`): đọc sản phẩm / biến thể / giá tại một thời
@@ -934,6 +940,8 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
 - [ ] Nhận event của `orders` (xác nhận, huỷ, trả hàng nhập lại kho) — chịu được nhận lại event
 - [ ] Nhập hàng (D-194): nhà cung cấp, đơn đặt hàng nhà cung cấp, nhận hàng một phần, công nợ phải
       trả nhà cung cấp vào sổ cái, trả hàng cho nhà cung cấp — chuỗi bán lẻ cần cho việc hằng ngày
+- [ ] Báo khi có hàng lại theo cửa hàng (D-201): người mua đăng ký (xác nhận hai bước, đồng ý riêng cho
+      mục đích này), nghe event tồn kho rồi gửi qua `notifications`; mỗi người một lần mỗi đợt có hàng
 - [ ] Tình trạng hàng công khai theo cửa hàng (D-200): endpoint công khai trả mức `in_stock` / `low`
       (kèm số khi dưới ngưỡng, ngưỡng là cấu hình) / `out` cho biến thể × cửa hàng, không lộ số tồn lớn;
       `catalog` lọc "chỉ hàng có sẵn ở cửa hàng X" qua `api` của `inventory`; có ETag, cache ngắn
@@ -953,6 +961,8 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
       điều kiện — Luật 19/2023)
 - [ ] Kiểm tuân thủ: chặn chương trình vượt hạn mức đang hiệu lực; xuất dữ liệu thông báo khuyến mại
       gửi Sở Công Thương nơi tổ chức; lưu vết chương trình đã chạy
+- [ ] Mã dùng được cho một giỏ (D-201): trả mã dùng được và mã chưa đủ điều kiện kèm lý do ("thêm X
+      để dùng"); giao diện thay ô nhập mã mở sẵn bằng bộ chọn; số lượt còn lại chỉ hiện khi là số thật
 - [ ] Giá khi áp mã cho từng sản phẩm (D-200): endpoint công khai trả các mã công khai áp được cho một
       sản phẩm / biến thể, giá sau mã, điều kiện, số lượt còn lại — để trang sản phẩm hiện "còn X với mã
       …"; giá niêm yết vẫn là giá không mã (mã phải nhập thì không hiện như giá đã giảm)
@@ -972,6 +982,9 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
 - [ ] Vận đơn: một đơn nhiều kiện, giao một phần, giao thất bại, hoàn hàng; event cho `orders`
 - [ ] Thu hộ khi giao (COD): tiền do hãng vận chuyển thu và chuyển trả theo hợp đồng với hãng; sổ cái
       ghi phải thu từ hãng, đối soát với bảng kê COD của hãng; lệch thì báo
+- [ ] Ngày giao dự kiến là ngày cụ thể (D-201): khoảng ngày tuyệt đối kèm giờ chốt đơn trong ngày, tính
+      theo múi giờ của khách; ngày làm việc, giờ chốt, ngày lễ là dữ liệu có ngày hiệu lực; nhận tại
+      cửa hàng trả giờ sẵn sàng (thời gian chuẩn bị + giờ mở cửa của bước 34) và số ngày giữ hàng
 - [ ] Ước tính phí giao công khai (D-200): theo tỉnh và một sản phẩm / số lượng, chưa cần giỏ, cho trang
       sản phẩm; cùng bảng phí với báo giá của `orders`, ghi rõ "ước tính", ngưỡng miễn phí
 
@@ -1003,6 +1016,12 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [ ] Chống "bom hàng" COD (D-194): tỉ lệ nhận hàng thành công của người mua trong khách (chỉ dữ
       liệu của chính khách, có căn cứ xử lý theo Luật BVDLCN), quy tắc buộc trả trước khi rủi ro cao,
       danh sách chặn có lý do và thời hạn; không chia sẻ danh sách giữa các khách
+- [ ] Mua không cần tài khoản cho trọn (D-201): báo giá giỏ có `free_shipping_remaining`; trạng thái
+      thanh toán công khai bằng token (hỏi định kỳ hay SSE) cho màn QR; tra đơn vãng lai bằng số đơn +
+      OTP số điện thoại; gắn các đơn vãng lai vào tài khoản mới sau khi xác thực số điện thoại; người
+      nhận hộ khi nhận tại cửa hàng; cách trả hàng (lấy tận nơi / bưu cục / cửa hàng) và thời gian hoàn
+      tiền theo phương thức thanh toán; đánh giá lọc theo có ảnh / số sao / sắp xếp, bộ sưu tập ảnh của
+      người mua, tóm tắt AI chỉ là bản nháp nhân viên duyệt và gắn nhãn (D-109)
 - [ ] Trả góp qua đối tác (trait của bước 36); bảo hành theo số serial hay theo đơn: phiếu bảo hành,
       tiếp nhận, trạng thái xử lý, hạn bảo hành
 
@@ -1118,10 +1137,54 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       chỉ hiện bản ghi người gọi có quyền đọc ở nút của bản ghi
 - [ ] Khai menu, nguồn việc, nguồn tìm, số liệu cho mọi module đang có; MODULE_GUIDE (EN + VI) mục
       "khai phần của module cho giao diện"; test rò rỉ giữa hai nhánh anh em cho số đếm và kết quả tìm
+- [ ] View đã lưu (D-201): `/me/views` lưu tham số lọc, sắp xếp, cột, nhóm, mật độ của một danh sách;
+      phạm vi cá nhân / nút / khách; tham số kiểm theo **schema bộ lọc mà mỗi endpoint danh sách công bố**
+      trong OpenAPI (máy và agent dựng được chip lọc mà không viết cứng)
+- [ ] Thao tác hàng loạt chung (D-201): nhận `ids[]` hoặc `filter` kèm `expected_count` (lệch thì từ
+      chối), `Idempotency-Key` bắt buộc, chạy bằng job có tiến độ (SSE của bước 40), trả kết quả từng
+      bản ghi; module khai hành động hàng loạt của mình
+- [ ] Tìm nâng cao (D-201): toán tử `is:`, `status:`, so sánh số, phủ định; tham số phạm vi
+      `node | subtree | accessible`; endpoint `resolve` đổi một mã (số đơn, mã vận đơn, ID) thành bản
+      ghi người gọi được xem
+- [ ] Hộp việc theo người (D-201): mỗi việc có khoá ổn định, "vì sao bạn thấy" (permission, nút), hoãn
+      tới một thời điểm, giao cho người khác — bảng cấp khách hàng có `tenant_id`; việc thiết lập theo mô
+      hình (`SetupStep`, trạng thái tính từ dữ liệu, bước pháp lý chặn bán được đánh dấu)
+- [ ] Giải thích quyền (D-201): `POST /me/can` kiểm nhiều cặp (permission, nút) một lần, trả lý do
+      `missing_permission` / `module_not_enabled` / `feature_not_in_plan` / `quota_exceeded` và gói mở
+      được — giao diện hiện "vì sao bị khoá, ai cấp được, nâng gói mở gì"
+- [ ] Agent là người dùng thật (D-201): loại API key `agent`; `actor_kind` (người / agent / hệ thống) trong
+      audit; lệnh rủi ro (hoàn tiền, chi trả, khoá sổ, xoá dữ liệu) do agent gọi trả `202
+      approval_required` kèm yêu cầu duyệt có hạn, người có quyền duyệt thì lệnh chạy — như nhau cho REST
+      và MCP; việc chờ duyệt vào hộp việc
+- [ ] Dòng hoạt động và ghi chú nội bộ trên mọi bản ghi (D-201): gộp audit, ghi chú (nhắc tên bằng @,
+      người được nhắc nhận thông báo), khoá bằng loại đối tượng của sổ đối tượng (D-123); một chỗ dùng
+      chung thay cho mỗi module tự làm ghi chú
+
+## 52. Trải nghiệm quản trị nâng cao (D-201)
+
+Đặc tả: [`docs/steps/52-admin-experience.md`](steps/52-admin-experience.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 51. Những điều nên có theo nghiên cứu các trang quản trị hàng đầu (Stripe, Shopify,
+Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
+
+- [ ] Bàn kỹ thuật cho nhà phát triển và agent: nhật ký request theo khách (API key, đường dẫn mẫu,
+      status, `code`, có hạn lưu, không lưu thân request), danh sách lần giao webhook kèm gửi lại, event
+      theo bản ghi, chạy lại job trong dead-letter queue
+- [ ] Hoàn tác an toàn: lưu trữ / ẩn có `restore`; lệnh ghi lớn có `dry_run` trả trước những gì sẽ đổi
+- [ ] AI trong quản trị (D-109): đổi câu lời thường thành bộ lọc đã kiểm theo schema (`ai/filters/parse`),
+      trợ lý dùng tool MCP với đúng quyền người dùng, mọi lệnh ghi là bản nháp chờ duyệt
+- [ ] Thông báo: lý do nhận, trạng thái xong / lưu, bộ lọc, cấu hình kênh theo loại event; ghim màn hình
+      hay dùng (`/me/pins`)
+- [ ] Sức khoẻ người bán và sức khoẻ tuân thủ: chỉ số so với ngưỡng (ngưỡng là dữ liệu có ngày hiệu lực),
+      vi phạm, hạn phải xử lý; huy hiệu người bán tin cậy tính từ số liệu thật, công bố tiêu chí
 
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.
+
+Để sau (D-201, theo nghiên cứu): khách thử nghiệm (sandbox) cách ly, khách duyệt từng lần nhân sự nền
+tảng xin vào dữ liệu, nhóm nút ngoài cây cho báo cáo, quản trị trên điện thoại có thanh đáy và tóm tắt
+cuối ngày.
 
 Để sau (D-194): bán sỉ B2B (báo giá, công nợ, hạn mức tín dụng) · đặt lịch dịch vụ · chat chăm sóc
 khách · sản phẩm thuê bao định kỳ · bán xuyên biên giới nhiều tiền tệ · quảng cáo trong sàn.

@@ -358,3 +358,11 @@ lý** trước khi chạy thật (D-186):
 `catalog` hiện giá đã giảm; mã phải nhập thì giá niêm yết giữ nguyên và giao diện hiện thêm dòng "còn X
 với mã …" — không trình bày như giá đã giảm sẵn (Luật 19/2023, minh bạch điều kiện). Test: mã hết lượt
 không còn trong danh sách; giá sau mã khớp kết quả `evaluate` của giỏ một dòng.
+
+## Bổ sung theo D-201
+
+**Mã dùng được cho một giỏ.** `GET /public/promotions/eligible?cart_id` trả hai danh sách: mã dùng được
+(kèm số giảm cho giỏ này) và mã `public` chưa đủ điều kiện kèm `reason` có tham số ("thêm 120.000 ₫",
+"giỏ chưa có sản phẩm áp dụng", "chỉ cho đơn đầu tiên"). Website thay ô nhập mã mở sẵn bằng bộ chọn,
+ô nhập tự do nằm sau một liên kết. `remaining_uses` chỉ trả khi chương trình có giới hạn lượt, lấy từ số
+giữ chỗ thật (không làm tròn, không số giả).

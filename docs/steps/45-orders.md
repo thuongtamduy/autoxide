@@ -521,3 +521,20 @@ cổng thanh toán, hoá đơn điện tử, `Notifier` là bộ giả của tes
 - Một `PUT /carts/{id}` gộp hay nhiều endpoint con: khuyến nghị nhiều endpoint con như trên (mỗi thay
   đổi một lỗi rõ), giữ nhất quán.
 - Ngưỡng mặc định của quy tắc COD (khuyến nghị: không có quy tắc nào bật sẵn; khách tự đặt).
+
+## Bổ sung theo D-201
+
+- Báo giá giỏ có `free_shipping_remaining` (theo từng nơi bán).
+- `GET /public/payments/{token}` trạng thái thanh toán cho màn QR (token sống bằng hạn thanh toán; hỏi
+  định kỳ, hay SSE nếu bước 40 đã có). QR luôn trỏ tới tài khoản của đối tác có giấy phép hay của người
+  bán, không bao giờ của nền tảng (D-187).
+- Tra đơn vãng lai: `POST /public/orders/lookup {number, phone}` → OTP qua SMS (bước 37) → token xem đơn.
+  Gắn đơn vãng lai vào tài khoản: sau khi người mua xác thực số điện thoại, `POST /me/orders/claim` gắn
+  mọi đơn vãng lai cùng số đó trong khách.
+- Nhận tại cửa hàng: liên hệ của đơn có người nhận hộ (tên, số điện thoại); quá `hold_days` thì job huỷ và
+  trả chỗ.
+- Trả hàng: `return_method` (`pickup` / `drop_off` / `in_store`), thời gian hoàn tiền dự kiến theo phương
+  thức thanh toán.
+- Đánh giá công khai: lọc `has_media`, `rating`, `sort=newest|helpful`; `GET …/reviews/media` gom ảnh của
+  người mua; tóm tắt AI là bản nháp nhân viên duyệt rồi mới hiện, gắn nhãn AI, không lược bỏ ý kiến tiêu
+  cực (Luật 19/2023, Luật Trí tuệ nhân tạo 134/2025 — cần đối chiếu văn bản gốc).
