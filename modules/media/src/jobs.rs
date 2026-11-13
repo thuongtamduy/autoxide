@@ -119,10 +119,11 @@ impl MediaService {
     }
 }
 
-/// `media/<item_id>/<version_id>` (bản gốc) hay `media/<item_id>/<version_id>_w<rộng>`
+/// `media/<item_id>/<version_id>` (bản gốc) hay `media/<item_id>/<version_id>_w<rộng>[.webp]`
 /// (ảnh thu nhỏ) → ID item và phiên bản.
 fn parse_key(key: &str) -> Option<(Uuid, Uuid)> {
     let (item, rest) = key.strip_prefix(KEY_PREFIX)?.split_once('/')?;
+    let rest = rest.strip_suffix(".webp").unwrap_or(rest);
     let version = match rest.split_once("_w") {
         Some((version, width))
             if !width.is_empty() && width.bytes().all(|b| b.is_ascii_digit()) =>
@@ -150,6 +151,7 @@ mod tests {
         let (item, version) = (Uuid::now_v7(), Uuid::now_v7());
         assert_eq!(parse_key(&format!("media/{item}/{version}")), Some((item, version)));
         assert_eq!(parse_key(&format!("media/{item}/{version}_w640")), Some((item, version)));
+        assert_eq!(parse_key(&format!("media/{item}/{version}_w640.webp")), Some((item, version)));
         assert_eq!(parse_key(&format!("media/{item}/{version}_wx")), None);
         assert_eq!(parse_key("files/x"), None);
         assert_eq!(parse_key("media/x/y"), None);

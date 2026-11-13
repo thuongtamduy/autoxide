@@ -22,7 +22,7 @@ use uuid::Uuid;
 use crate::entity::api_folder;
 use crate::folders::Folder;
 use crate::service::{FolderFilter, Item, ItemDetails, MediaService, Visibility, content_url};
-use crate::variants::Variant;
+use crate::variants::VariantPair;
 
 pub(crate) use assist::AltSuggestionResponse;
 pub(crate) use folders::FolderResponse;
@@ -111,16 +111,29 @@ pub(crate) struct VariantResponse {
     size: u64,
     /// Where to load it: the item's `url` with `&w=<width>`.
     url: String,
+    /// The same copy as WebP, usually far smaller: `url` with `&format=webp`. Offer it in a
+    /// `<picture>` `<source type="image/webp">`, or in `srcset` when every browser you serve
+    /// reads WebP. `null` while it is not made yet (images uploaded before WebP copies existed
+    /// get one after `autoxide task media.refresh_variants`).
+    #[schema(
+        example = "/api/v1/media/0190f5a2-7c4e-7d1a-9b3c-2f1e0d9c8b7a/content?v=0190f5a2-7c4e-7d1a-9b3c-2f1e0d9c8b7b&w=640&format=webp"
+    )]
+    webp_url: Option<String>,
+    /// Size of the WebP copy in bytes; `null` like `webp_url`.
+    webp_size: Option<u64>,
 }
 
 impl VariantResponse {
-    fn new(item_url: &str, variant: Variant) -> Self {
+    fn new(item_url: &str, copy: VariantPair) -> Self {
+        let VariantPair { main, webp } = copy;
         VariantResponse {
-            url: format!("{item_url}&w={}", variant.width),
-            width: variant.width,
-            height: variant.height,
-            content_type: variant.content_type,
-            size: u64::try_from(variant.size).unwrap_or_default(),
+            url: format!("{item_url}&w={}", main.width),
+            webp_url: webp.as_ref().map(|webp| format!("{item_url}&w={}&format=webp", webp.width)),
+            webp_size: webp.map(|webp| u64::try_from(webp.size).unwrap_or_default()),
+            width: main.width,
+            height: main.height,
+            content_type: main.content_type,
+            size: u64::try_from(main.size).unwrap_or_default(),
         }
     }
 }

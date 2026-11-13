@@ -17,11 +17,18 @@ endpoints are marked deprecated with a sunset date first.
   rolling updates.
 - `SECURITY.md` (and `SECURITY.vi.md`): which versions get security fixes, how to report a
   vulnerability privately, response times and what is out of scope.
+- Media: every smaller copy of an image also gets a WebP version, usually 55–60% lighter than
+  the JPEG for photos and over 90% lighter than the PNG for images with transparency. Each
+  entry of `variants` has `webp_url` (the copy's `url` plus `&format=webp`) and `webp_size`;
+  the content module's public `featured_media` and `body_media` carry `webp_url` too. Run
+  `autoxide task media.refresh_variants` once to add WebP copies to images uploaded before.
 - `CONTRIBUTING.md` (and `CONTRIBUTING.vi.md`): setting up a machine, the two gates, the
   rules that matter most, commits and pull requests, and the license of contributions.
 
 ### Changed
 
+- `autoxide_media::api::MediaVariant` has a new field, `webp_url`.
+- Building Autoxide compiles `libwebp` (C), like SQLite: a C compiler was already required.
 - `autoxide_kernel::http::health_routes` takes a second argument, the `http::Draining` flag
   that makes `/health/ready` answer 503 while shutting down; pass `Draining::default()` where
   the server is not stopped by a signal (tests).

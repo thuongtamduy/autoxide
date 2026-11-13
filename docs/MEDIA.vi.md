@@ -118,6 +118,29 @@ bản thu nhỏ ở nền (`dry_run=true` thì chỉ đếm):
 autoxide task media.refresh_variants
 ```
 
+### Bản WebP
+
+Bên cạnh mỗi bản JPEG hay PNG, job còn làm một bản WebP cùng cỡ, thường nhẹ hơn nhiều: với
+một ảnh chụp thử, nhẹ hơn bản JPEG khoảng 55–60%, và với ảnh có phần trong suốt thì nhẹ hơn
+bản PNG trên 90% (3,3 MB xuống 80 KB ở 1920 px). Mỗi mục của `variants` cho địa chỉ của nó ở
+`webp_url` (`url` của bản đó thêm `&format=webp`) và dung lượng ở `webp_size`. Để trình duyệt
+tự chọn: trình duyệt đọc được WebP lấy `<source>`, trình duyệt khác lấy `<img>`:
+
+```html
+<picture>
+  <source type="image/webp"
+          srcset="…&w=320&format=webp 320w, …&w=640&format=webp 640w" sizes="100vw">
+  <img src="…&w=640" srcset="…&w=320 320w, …&w=640 640w" sizes="100vw" alt="…">
+</picture>
+```
+
+Bản công khai của module nội dung (`featured_media`, `body_media`) mang cùng `webp_url`.
+`webp_url` là `null` khi bản WebP chưa làm xong; xin địa chỉ có `&format=webp` trước lúc đó thì
+nhận bản JPEG hay PNG, cache ngắn. Ảnh có bản thu nhỏ làm từ trước khi có bản WebP nhận chúng
+bằng đúng lệnh trên: `autoxide task media.refresh_variants` (lệnh cũng xếp những ảnh chỉ thiếu
+bản WebP). Làm bản WebP tốn thời gian của job nền gấp khoảng ba lần bản JPEG (thêm chừng một
+phần tư giây cho mỗi ảnh chụp với các cỡ mặc định); request không bị chậm đi.
+
 ## Nhãn
 
 Ngoài một thư mục, item mang được tối đa 20 nhãn (mỗi nhãn 1 tới 50 ký tự, không có `,`).

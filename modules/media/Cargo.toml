@@ -17,6 +17,7 @@ chrono.workspace = true
 futures-util.workspace = true
 image.workspace = true
 imagesize.workspace = true
+webp.workspace = true
 metrics.workspace = true
 sea-orm.workspace = true
 serde.workspace = true

@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–29 xong**, bước 30 đang làm (xong: deploy không gián đoạn, `SECURITY.md`, `CONTRIBUTING.md`, kiểm tài liệu EN / VI); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–29 xong**, bước 30 đang làm (xong: deploy không gián đoạn, WebP, `SECURITY.md`, `CONTRIBUTING.md`, kiểm tài liệu EN / VI); bản phát hành mới nhất `v0.11.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -449,7 +449,7 @@ Nhóm B — file của dự án mã nguồn mở:
 
 Nhóm C — sản phẩm (D-176):
 
-- [ ] `media`: bản nhỏ WebP bên cạnh JPEG / PNG. Chọn bộ mã hoá sau khi kiểm thư viện đúng phiên
+- [x] `media`: bản nhỏ WebP bên cạnh JPEG / PNG. Chọn bộ mã hoá sau khi kiểm thư viện đúng phiên
       bản ghim (kiểu nén mất dữ liệu cho ảnh chụp, có alpha cho ảnh trong suốt); website nhận được
       WebP qua API công khai (`PublicMedia`, `body_media`, `srcset`) mà client cũ không hỏng; ảnh đã
       có làm lại bằng `autoxide task media.refresh_variants`; đo dung lượng và thời gian mã hoá

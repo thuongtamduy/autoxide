@@ -44,8 +44,11 @@ pub struct MediaRef {
 pub struct MediaVariant {
     pub width: i32,
     pub height: i32,
-    /// `url` của item kèm `&w=<width>`.
+    /// `url` của item kèm `&w=<width>`: bản JPEG (PNG với ảnh có vùng trong suốt).
     pub url: String,
+    /// Bản WebP cùng cỡ (`url` kèm `&format=webp`), nhẹ hơn nhiều; `None` khi chưa làm (ảnh tải
+    /// lên trước khi có WebP, tới khi chạy `autoxide task media.refresh_variants`).
+    pub webp_url: Option<String>,
 }
 
 #[async_trait::async_trait]

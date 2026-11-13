@@ -9,6 +9,7 @@ use autoxide_kernel::storage::Storage;
 use autoxide_testkit::ai::FakeTextModel;
 use autoxide_testkit::{TestApp, TestDatabase, TestResponse, tool};
 use axum::http::{Method, StatusCode, header};
+use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 
 use crate::sniff::samples;
@@ -486,7 +487,8 @@ async fn tool_mcp_theo_permission() {
 }
 
 /// Ảnh thu nhỏ qua đường thật: tải lên → worker chạy job → item có `variants` → `?w=` trả
-/// bản nhỏ (JPEG, mở trong trang); cỡ chưa có thì trả bản gốc với cache ngắn.
+/// bản nhỏ (JPEG, mở trong trang), `&format=webp` trả bản WebP; cỡ chưa có thì trả bản gốc với
+/// cache ngắn, bản WebP chưa có thì bản JPEG với cache ngắn.
 #[tokio::test]
 async fn anh_thu_nho_qua_worker_va_tham_so_w() {
     use image::ImageFormat;
@@ -539,6 +541,48 @@ async fn anh_thu_nho_qua_worker_va_tham_so_w() {
             send(&app, "GET", &other, &[("authorization", auth.as_str())], Vec::new()).await;
         assert_eq!((original.status(), original.body().len()), (StatusCode::OK, png.len()));
         assert_eq!(original.header(header::CONTENT_TYPE), "image/png");
+
+        // Bản WebP cùng cỡ (D-186): địa chỉ riêng, ETag riêng, cache lâu như bản JPEG.
+        let webp_url = variants[0]["webp_url"].as_str().unwrap();
+        assert_eq!(webp_url, format!("{}&format=webp", variants[0]["url"].as_str().unwrap()));
+        assert!(variants[0]["webp_size"].as_u64().unwrap() > 0, "{variants}");
+        let webp_url = webp_url.trim_start_matches("/api/v1/media").to_owned();
+        let webp =
+            send(&app, "GET", &webp_url, &[("authorization", auth.as_str())], Vec::new()).await;
+        assert_eq!(webp.status(), StatusCode::OK);
+        assert_eq!(webp.header(header::CONTENT_TYPE), "image/webp");
+        assert_eq!(webp.header(header::CACHE_CONTROL), "private, max-age=31536000, immutable");
+        assert_ne!(webp.header(header::ETAG), etag);
+        assert_eq!(image::guess_format(webp.body()).unwrap(), ImageFormat::WebP);
+        assert_eq!(image::load_from_memory(webp.body()).unwrap().width(), 100);
+
+        // `format` lạ: báo rõ thay vì lặng lẽ trả JPEG.
+        let wrong = webp_url.replace("format=webp", "format=avif");
+        let wrong =
+            send(&app, "GET", &wrong, &[("authorization", auth.as_str())], Vec::new()).await;
+        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(wrong.json()["errors"][0]["field"], "format");
+
+        // Bản WebP chưa có (ảnh làm trước khi có WebP): gửi bản JPEG cùng cỡ, cache ngắn — địa
+        // chỉ sẽ ra WebP khi bản đó được làm.
+        let database = app.http.database().write();
+        let backend = database.get_database_backend();
+        database
+            .execute_raw(Statement::from_string(
+                backend,
+                "DELETE FROM media_variant WHERE content_type = 'image/webp'",
+            ))
+            .await
+            .unwrap();
+        let fallback =
+            send(&app, "GET", &webp_url, &[("authorization", auth.as_str())], Vec::new()).await;
+        assert_eq!(fallback.status(), StatusCode::OK);
+        assert_eq!(fallback.header(header::CONTENT_TYPE), "image/jpeg");
+        assert_eq!(fallback.header(header::CACHE_CONTROL), "private, no-cache");
+        let got =
+            send(&app, "GET", &format!("/{id}"), &[("authorization", auth.as_str())], Vec::new())
+                .await;
+        assert_eq!(got.json()["data"]["variants"][0]["webp_url"], Value::Null);
     })
     .await
     .unwrap();

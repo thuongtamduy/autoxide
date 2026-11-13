@@ -3,7 +3,10 @@
 //! cỡ nhỏ hơn ảnh gốc). Website dùng chúng cho `srcset`.
 //!
 //! - Ảnh được xoay đúng chiều theo EXIF trước khi thu nhỏ; giữ tỉ lệ.
-//! - Ảnh không trong suốt → JPEG (chất lượng 82); ảnh có kênh trong suốt → PNG.
+//! - Ảnh không trong suốt → JPEG (chất lượng 82); ảnh có kênh trong suốt → PNG. Mỗi cỡ có thêm
+//!   một bản WebP nén mất dữ liệu (chất lượng [`WEBP_QUALITY`], giữ kênh trong suốt) — nhẹ hơn
+//!   nhiều, website lấy qua `?w=…&format=webp` (D-176, D-186). Bản JPEG / PNG vẫn làm cho client
+//!   không đọc được WebP.
 //! - Ảnh quá [`MAX_PIXELS`] pixel không được giải mã (chặn "bom giải nén"); ảnh hỏng thì
 //!   bỏ qua, ghi log, không thử lại mãi.
 //! - Giải mã / đổi cỡ chạy trên thread riêng (`spawn_blocking`), không chặn thread async.
@@ -29,7 +32,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::entity::item;
-use crate::entity::variant::{self, storage_key};
+use crate::entity::variant::{self, WEBP, storage_key};
 use crate::service::{Item, MediaService, now};
 
 pub(crate) const MAKE_VARIANTS: &str = "media.make_variants";
@@ -39,6 +42,8 @@ pub(crate) const MAX_PIXELS: u64 = 40_000_000;
 /// Loại ảnh làm được ảnh thu nhỏ.
 pub(crate) const SOURCES: [&str; 4] = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const JPEG_QUALITY: u8 = 82;
+/// Chất lượng WebP (0–100 của libwebp); đo ở D-186.
+const WEBP_QUALITY: f32 = 80.0;
 
 /// Một ảnh thu nhỏ.
 pub(crate) type Variant = variant::Model;
@@ -130,7 +135,8 @@ impl MediaService {
         Ok(())
     }
 
-    /// Làm ảnh thu nhỏ cho phiên bản `version_id` của item `item_id`; trả số ảnh đã làm.
+    /// Làm ảnh thu nhỏ cho phiên bản `version_id` của item `item_id`; trả số cỡ đã làm (mỗi cỡ
+    /// một bản JPEG / PNG và một bản WebP).
     /// Item đã đổi nội dung hay không còn thì không làm gì (job của phiên bản mới lo).
     pub(crate) async fn make_variants(
         &self,
@@ -161,7 +167,7 @@ impl MediaService {
         let mut written = Vec::new();
         for copy in &rendered {
             let width = i32::try_from(copy.width).map_err(Error::internal)?;
-            let key = storage_key(item_id, version_id, width);
+            let key = storage_key(item_id, version_id, width, copy.content_type);
             let body = futures_util::stream::iter([Ok(Bytes::from(copy.bytes.clone()))]);
             self.storage.put(&key, Box::pin(body)).await?;
             written.push(key);
@@ -176,8 +182,10 @@ impl MediaService {
             }
         }
         saved?;
-        tracing::info!(media_item_id = %item_id, copies = rendered.len(), "smaller copies of an image made");
-        Ok(rendered.len())
+        // Đếm theo cỡ (mỗi cỡ hai file: JPEG / PNG và WebP).
+        let sizes = rendered.iter().filter(|copy| copy.content_type != WEBP).count();
+        tracing::info!(media_item_id = %item_id, sizes, "smaller copies of an image made");
+        Ok(sizes)
     }
 
     /// Lưu dòng của các ảnh thu nhỏ nếu item còn ở phiên bản `version_id`. `false`: đã đổi.
@@ -220,22 +228,34 @@ impl MediaService {
         Ok(true)
     }
 
-    /// Ảnh thu nhỏ rộng `width` của nội dung hiện tại của `item`, nếu đã làm.
-    pub(crate) async fn variant(&self, item: &Item, width: u32) -> Result<Option<Variant>, Error> {
+    /// Ảnh thu nhỏ rộng `width` của nội dung hiện tại của `item`, nếu đã làm: bản WebP khi
+    /// `webp`, không thì bản JPEG / PNG.
+    pub(crate) async fn variant(
+        &self,
+        item: &Item,
+        width: u32,
+        webp: bool,
+    ) -> Result<Option<Variant>, Error> {
         let Ok(width) = i32::try_from(width) else {
             return Ok(None);
+        };
+        let format = if webp {
+            variant::Column::ContentType.eq(WEBP)
+        } else {
+            variant::Column::ContentType.ne(WEBP)
         };
         Ok(variant::Entity::find()
             .filter(variant::Column::ItemId.eq(item.id))
             .filter(variant::Column::VersionId.eq(item.version_id))
             .filter(variant::Column::Width.eq(width))
+            .filter(format)
             .one(self.database.read())
             .await?)
     }
 }
 
-/// Ảnh thu nhỏ của nội dung hiện tại của từng item trong `items`, theo chiều rộng tăng dần.
-/// Một câu query.
+/// Ảnh thu nhỏ của nội dung hiện tại của từng item trong `items`, theo chiều rộng tăng dần
+/// (cả bản JPEG / PNG lẫn bản WebP; [`pair`] ghép chúng theo cỡ). Một câu query.
 pub(crate) async fn variants_of<C: ConnectionTrait>(
     connection: &C,
     items: &[Item],
@@ -257,6 +277,22 @@ pub(crate) async fn variants_of<C: ConnectionTrait>(
         }
     }
     Ok(found)
+}
+
+/// Một cỡ ảnh thu nhỏ: bản JPEG / PNG và bản WebP cùng cỡ (nếu đã làm).
+#[derive(Debug, Clone)]
+pub(crate) struct VariantPair {
+    pub main: Variant,
+    pub webp: Option<Variant>,
+}
+
+/// Ghép các dòng của một item (theo chiều rộng tăng dần) thành từng cỡ. Bản WebP không có bản
+/// JPEG / PNG cùng cỡ thì bỏ (không xảy ra: hai bản luôn được lưu cùng transaction).
+pub(crate) fn pair(rows: Vec<Variant>) -> Vec<VariantPair> {
+    let (webp, main): (Vec<Variant>, Vec<Variant>) = rows.into_iter().partition(Variant::is_webp);
+    let mut webp: std::collections::HashMap<i32, Variant> =
+        webp.into_iter().map(|copy| (copy.width, copy)).collect();
+    main.into_iter().map(|main| VariantPair { webp: webp.remove(&main.width), main }).collect()
 }
 
 /// Giải mã `original` (có giới hạn chống "bom giải nén"), xoay theo EXIF.
@@ -297,7 +333,25 @@ fn encode(image: &DynamicImage, transparent: bool) -> Result<(Vec<u8>, &'static 
     }
 }
 
-/// Giải mã `original`, xoay theo EXIF, làm một bản cho mỗi chiều rộng nhỏ hơn ảnh.
+/// Mã hoá WebP nén mất dữ liệu; ảnh có kênh trong suốt giữ kênh đó (cũng nén mất dữ liệu).
+fn encode_webp(image: &DynamicImage, transparent: bool) -> Result<Vec<u8>, String> {
+    // `libwebp` nhận pixel thô RGB / RGBA 8 bit; bộ đệm phải đúng `rộng × cao × số kênh` byte
+    // (`webp` kiểm, panic nếu sai) — `to_rgb8` / `to_rgba8` luôn cho đúng như vậy.
+    let encoded = if transparent {
+        let pixels = image.to_rgba8();
+        webp::Encoder::from_rgba(&pixels, pixels.width(), pixels.height())
+            .encode_simple(false, WEBP_QUALITY)
+    } else {
+        let pixels = image.to_rgb8();
+        webp::Encoder::from_rgb(&pixels, pixels.width(), pixels.height())
+            .encode_simple(false, WEBP_QUALITY)
+    };
+    // `WebPMemory` là vùng nhớ của libwebp; chép ra `Vec` của Rust để giữ và gửi đi.
+    encoded.map(|memory| memory.to_vec()).map_err(|error| format!("webp: {error:?}"))
+}
+
+/// Giải mã `original`, xoay theo EXIF, làm hai bản (JPEG / PNG và WebP) cho mỗi chiều rộng nhỏ
+/// hơn ảnh.
 fn render(original: &[u8], widths: &[u32]) -> Result<Vec<Rendered>, String> {
     let image = decode(original)?;
     let transparent = image.color().has_alpha();
@@ -306,12 +360,10 @@ fn render(original: &[u8], widths: &[u32]) -> Result<Vec<Rendered>, String> {
         // `resize` giữ tỉ lệ, vừa trong khung `wanted` × (rất cao).
         let smaller = image.resize(wanted, u32::MAX, FilterType::CatmullRom);
         let (bytes, content_type) = encode(&smaller, transparent)?;
-        rendered.push(Rendered {
-            width: smaller.width(),
-            height: smaller.height(),
-            content_type,
-            bytes,
-        });
+        let (width, height) = (smaller.width(), smaller.height());
+        rendered.push(Rendered { width, height, content_type, bytes });
+        let bytes = encode_webp(&smaller, transparent)?;
+        rendered.push(Rendered { width, height, content_type: WEBP, bytes });
     }
     Ok(rendered)
 }
@@ -364,13 +416,30 @@ mod tests {
         let copies = render(&png, &[200, 640, 1000, 2000]).unwrap();
         let sizes: Vec<(u32, u32, &str)> =
             copies.iter().map(|c| (c.width, c.height, c.content_type)).collect();
-        assert_eq!(sizes, [(200, 100, "image/jpeg"), (640, 320, "image/jpeg")]);
-        let decoded = image::load_from_memory(&copies[0].bytes).unwrap();
-        assert_eq!((decoded.width(), decoded.height()), (200, 100));
+        assert_eq!(
+            sizes,
+            [
+                (200, 100, "image/jpeg"),
+                (200, 100, "image/webp"),
+                (640, 320, "image/jpeg"),
+                (640, 320, "image/webp")
+            ]
+        );
+        for copy in &copies[..2] {
+            let decoded = image::load_from_memory(&copy.bytes).unwrap();
+            assert_eq!((decoded.width(), decoded.height()), (200, 100));
+        }
+        assert_eq!(image::guess_format(&copies[1].bytes).unwrap(), ImageFormat::WebP);
 
         let transparent = samples::encoded(400, 400, ImageFormat::Png, true);
         let copies = render(&transparent, &[100]).unwrap();
         assert_eq!(copies[0].content_type, "image/png");
+        assert_eq!(copies[1].content_type, "image/webp");
+        // Bản WebP giữ kênh trong suốt (mẫu có alpha 128 ở mọi điểm).
+        let webp = image::load_from_memory(&copies[1].bytes).unwrap();
+        assert!(webp.color().has_alpha());
+        let alpha = webp.to_rgba8().get_pixel(50, 50)[3];
+        assert!((120..=136).contains(&alpha), "alpha {alpha}");
         assert!(render(b"not an image", &[100]).is_err());
     }
 

@@ -100,6 +100,9 @@ http-body-util = "0.1"
 # Tạo ảnh thu nhỏ trong module `media` (D-093): giải mã JPEG / PNG / GIF / WebP, đổi cỡ,
 # mã hoá JPEG / PNG. Thuần Rust, chỉ bật đúng các định dạng cần, không `rayon`.
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+# Mã hoá WebP có mất dữ liệu (kèm alpha) cho ảnh thu nhỏ của `media` (D-176, D-186): `image`
+# chỉ mã hoá WebP không mất dữ liệu. Bọc `libwebp` (C, BSD-3-Clause, biên dịch kèm như SQLite).
+webp = { version = "0.3", default-features = false }
 # Slug của module `content` (D-102): chuyển chữ Unicode sang ASCII ("Đà Lạt" → "da-lat").
 slug = "0.1"
 # Bỏ dấu khi tìm theo chữ ("da lat" ra "Đà Lạt"): tách chữ và dấu (NFD) rồi bỏ dấu

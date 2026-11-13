@@ -120,6 +120,31 @@ makes the copies in the background (`dry_run=true` only counts):
 autoxide task media.refresh_variants
 ```
 
+### WebP copies
+
+Next to each JPEG or PNG copy the job also makes a WebP copy of the same size, usually far
+lighter: on a test photo about 55–60% smaller than the JPEG, and for an image with
+transparency over 90% smaller than the PNG (3.3 MB down to 80 KB at 1920 px). Each entry of
+`variants` gives its address in `webp_url` (the copy's `url` plus `&format=webp`) and its
+size in `webp_size`. Let the browser pick: browsers that read WebP take the `<source>`, the
+others the `<img>`:
+
+```html
+<picture>
+  <source type="image/webp"
+          srcset="…&w=320&format=webp 320w, …&w=640&format=webp 640w" sizes="100vw">
+  <img src="…&w=640" srcset="…&w=320 320w, …&w=640 640w" sizes="100vw" alt="…">
+</picture>
+```
+
+The public views of the content module (`featured_media`, `body_media`) carry the same
+`webp_url`. `webp_url` is `null` while the WebP copy is not made; an address with
+`&format=webp` asked for before then returns the JPEG or PNG copy, briefly cached. Images
+whose copies were made before WebP copies existed get them from the same command:
+`autoxide task media.refresh_variants` (it also queues images that only lack WebP). Making
+the WebP copies takes the background job about three times as long as the JPEG ones (about
+a quarter of a second more per photo for the default widths); requests are not slowed.
+
 ## Tags
 
 Besides its one folder, an item may carry up to 20 tags (each 1 to 50 characters, without

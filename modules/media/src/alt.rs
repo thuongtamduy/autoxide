@@ -131,6 +131,8 @@ impl MediaService {
             .get(&item.id)
             .into_iter()
             .flatten()
+            // Bản JPEG / PNG: loại ảnh mọi nhà cung cấp AI đều nhận.
+            .filter(|copy| !copy.is_webp())
             .filter(|copy| {
                 copy.width.max(copy.height) <= i32::try_from(AI_MAX_SIDE).unwrap_or(i32::MAX)
             })

@@ -19351,6 +19351,16 @@
             }
           },
           {
+            "name": "format",
+            "in": "query",
+            "description": "`webp`: with `w`, the WebP copy of that width (much smaller; the variant's\n`webp_url`). Until it is made, the JPEG or PNG copy is sent instead, so the address\nalways shows an image. Ignored without `w`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "webp"
+          },
+          {
             "name": "Range",
             "in": "header",
             "description": "One byte range, e.g. `bytes=0-1023`, `bytes=1024-` or `bytes=-500`. Several ranges are answered with the whole content.",
@@ -19475,6 +19485,16 @@
           },
           "416": {
             "description": "The range is outside the content; code `media.range_not_satisfiable`. `Content-Range: bytes */<size>` gives the size.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`format` is not `webp`; see `errors`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19745,6 +19765,16 @@
             }
           },
           {
+            "name": "format",
+            "in": "query",
+            "description": "`webp`: with `w`, the WebP copy of that width (much smaller; the variant's\n`webp_url`). Until it is made, the JPEG or PNG copy is sent instead, so the address\nalways shows an image. Ignored without `w`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "webp"
+          },
+          {
             "name": "Accept-Language",
             "in": "header",
             "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
@@ -19766,6 +19796,9 @@
           },
           "404": {
             "description": "No media item has this id that you may load."
+          },
+          "422": {
+            "description": "`format` is not `webp`."
           },
           "default": {
             "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
@@ -37776,7 +37809,15 @@
             "format": "int32"
           },
           "url": {
-            "type": "string"
+            "type": "string",
+            "description": "JPEG copy (PNG for images with transparency)."
+          },
+          "webp_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The same copy as WebP, usually far smaller: offer it in a `<picture>`\n`<source type=\"image/webp\">`. `null` while it is not made yet."
           },
           "width": {
             "type": "integer",
@@ -40152,6 +40193,23 @@
           "url": {
             "type": "string",
             "description": "Where to load it: the item's `url` with `&w=<width>`."
+          },
+          "webp_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Size of the WebP copy in bytes; `null` like `webp_url`.",
+            "minimum": 0
+          },
+          "webp_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The same copy as WebP, usually far smaller: `url` with `&format=webp`. Offer it in a\n`<picture>` `<source type=\"image/webp\">`, or in `srcset` when every browser you serve\nreads WebP. `null` while it is not made yet (images uploaded before WebP copies existed\nget one after `autoxide task media.refresh_variants`).",
+            "example": "/api/v1/media/0190f5a2-7c4e-7d1a-9b3c-2f1e0d9c8b7a/content?v=0190f5a2-7c4e-7d1a-9b3c-2f1e0d9c8b7b&w=640&format=webp"
           },
           "width": {
             "type": "integer",

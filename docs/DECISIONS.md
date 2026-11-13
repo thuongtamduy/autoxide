@@ -4452,3 +4452,52 @@ khác để chuyển request — rút chỉ làm Ctrl-C chậm đi; ai chạy nh
 vẫn không đúng cho bộ cân bằng tải nào cụ thể; giữ `health_routes(database)` và thêm hàm thứ hai
 nhận cờ — hai cách cho một việc; `preStop` sleep của Kubernetes — chỉ có trên Kubernetes, còn
 `/health/ready` vẫn báo 200 trong lúc tắt.
+
+## D-186 · Bản WebP của ảnh thu nhỏ: thư viện `webp` (libwebp), địa chỉ `&format=webp`, trường `webp_url` — 2026-11-13 — agent quyết
+
+Quyết định (thực hiện D-176):
+
+- Thư viện: `webp` 0.3 (bọc `libwebp` C qua `libwebp-sys`, biên dịch kèm), không bật feature
+  `img`. Mã hoá nén mất dữ liệu, chất lượng 80 (`WEBP_QUALITY`), ảnh có kênh trong suốt giữ kênh
+  đó (`alpha_compression`). Gọi qua `Encoder::from_rgb` / `from_rgba(…).encode_simple(false, q)`
+  — trả `Result`, không dùng `encode()` vì nó `unwrap` bên trong.
+- Mỗi cỡ hai bản: JPEG / PNG như cũ (cho client không đọc WebP) và WebP. Bảng `media_variant`
+  thêm dòng có `content_type = 'image/webp'`; migration `m0007` đổi unique index thành (item,
+  phiên bản, chiều rộng, `content_type`). Khoá nơi lưu của bản WebP là khoá cũ thêm `.webp`;
+  job dọn mồ côi hiểu đuôi này. Hai bản lưu cùng transaction.
+- Website nhận WebP bằng địa chỉ riêng: `…/content?v=…&w=<rộng>&format=webp`, ETag riêng
+  (`-webp`), cache một năm như bản JPEG. Mỗi mục `variants` (REST của `media`, `MediaVariant` của
+  `api`, `PublicVariant` của `content` cho `featured_media` / `body_media`) thêm `webp_url` (và
+  `webp_size` ở REST của `media`), `null` khi chưa làm. Xin `format=webp` khi bản WebP chưa có
+  thì nhận bản JPEG / PNG cùng cỡ, cache ngắn — địa chỉ trong `<source type="image/webp">` luôn
+  ra ảnh. `format` khác `webp` là lỗi `validation_failed` (422).
+- Ảnh đã có: `autoxide task media.refresh_variants` xếp làm lại cả ảnh chỉ thiếu bản WebP.
+
+Số đo (`render` trên ảnh chụp thật 4000 × 2250 — ảnh mẫu `lake.jpg` đi kèm crate `webp` — và
+chính ảnh đó phủ mặt nạ trong suốt hình elip để giống ảnh cắt nền; build release, máy Linux
+4 CPU, một thread):
+
+| Ảnh, rộng      | JPEG / PNG        | WebP            | Nhẹ hơn | Mã hoá JPEG / PNG → WebP |
+| -------------- | ----------------: | --------------: | ------: | ------------------------ |
+| ảnh chụp, 320  | JPEG 8,6 KB       | 4,0 KB          | 54%     | 1,4 ms → 4,7 ms          |
+| ảnh chụp, 640  | JPEG 26,9 KB      | 11,5 KB         | 57%     | 5,2 ms → 16 ms           |
+| ảnh chụp, 1280 | JPEG 94,7 KB      | 38,8 KB         | 59%     | 20 ms → 64 ms            |
+| ảnh chụp, 1920 | JPEG 208 KB       | 85,9 KB         | 59%     | 45 ms → 143 ms           |
+| cắt nền, 320   | PNG 88 KB         | 5,2 KB          | 94%     | 1,3 ms → 11 ms           |
+| cắt nền, 1280  | PNG 1,37 MB       | 38 KB           | 97%     | 17 ms → 168 ms           |
+| cắt nền, 1920  | PNG 3,31 MB       | 80 KB           | 98%     | 43 ms → 399 ms           |
+
+Với bốn cỡ mặc định, bản WebP thêm khoảng 0,23 s (ảnh chụp) đến 0,6 s (ảnh cắt nền) cho job
+nền của mỗi ảnh; request không chậm đi.
+
+Lý do: `image-webp` (bộ mã hoá của `image`) chỉ có kiểu không mất dữ liệu — ảnh chụp không nhẹ
+đi; bộ mã hoá thuần Rust có kiểu mất dữ liệu (`zenwebp`) mang license AGPL, không hợp với repo
+MIT / Apache. Địa chỉ riêng thay vì đọc header `Accept`: CDN nào cũng cache đúng (không cần
+`Vary: Accept`), website chọn bằng `<picture>`, và `url` cũ không đổi hành vi. Trường mới thay
+vì thêm mục WebP vào `variants`: client cũ dựng `srcset` từ mọi mục sẽ thấy hai mục cùng chiều
+rộng.
+
+Đã cân nhắc: theo `Accept` trên cùng địa chỉ — nhiều CDN bỏ qua `Vary` hay cache theo cả chuỗi
+`Accept`, ảnh sai loại đến trình duyệt cũ; chỉ làm WebP, bỏ JPEG — email và vài client cũ không
+đọc WebP; WebP không mất dữ liệu cho ảnh trong suốt — nặng gấp nhiều lần bản có mất dữ liệu;
+AVIF — nhẹ hơn nữa (D-168) nhưng mã hoá chậm hơn nhiều và cần thêm thư viện C lớn, để sau.

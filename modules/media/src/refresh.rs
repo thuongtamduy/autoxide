@@ -1,6 +1,7 @@
 //! Lệnh `autoxide task media.refresh_variants` (D-169): sau khi đổi
 //! `AUTOXIDE_MEDIA_IMAGE_WIDTHS`, ảnh đã tải lên trước đó vẫn giữ bộ ảnh thu nhỏ cũ. Lệnh này tìm
-//! các ảnh có bộ ảnh thu nhỏ không còn khớp cấu hình và xếp job làm lại (job sẵn có, D-093).
+//! các ảnh có bộ ảnh thu nhỏ không còn khớp cấu hình — hay thiếu bản WebP (ảnh làm trước D-186)
+//! — và xếp job làm lại (job sẵn có, D-093).
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -21,8 +22,9 @@ pub(crate) fn task(service: Arc<MediaService>) -> Task {
     Task::new(
         "refresh_variants",
         "Queue new smaller copies for every image whose copies no longer match \
-         AUTOXIDE_MEDIA_IMAGE_WIDTHS (run it after changing that setting). The worker makes them \
-         in the background; nothing else changes.",
+         AUTOXIDE_MEDIA_IMAGE_WIDTHS (run it after changing that setting) or have no WebP copy \
+         yet (images processed before WebP copies were added). The worker makes them in the background; \
+         nothing else changes.",
         Arc::new(Refresh(service)),
     )
     .argument(TaskArgument::optional(
@@ -73,11 +75,14 @@ impl MediaService {
             let outdated: Vec<&Item> = items
                 .iter()
                 .filter(|item| {
-                    let saved: BTreeSet<i32> = made
-                        .get(&item.id)
-                        .map(|rows| rows.iter().map(|row| row.width).collect())
-                        .unwrap_or_default();
-                    needs_refresh(&wanted_widths(&self.config.image_widths, item), &saved, item)
+                    let rows = made.get(&item.id).map(Vec::as_slice).unwrap_or_default();
+                    let saved: BTreeSet<i32> =
+                        rows.iter().filter(|row| !row.is_webp()).map(|row| row.width).collect();
+                    let webp: BTreeSet<i32> =
+                        rows.iter().filter(|row| row.is_webp()).map(|row| row.width).collect();
+                    let wanted = wanted_widths(&self.config.image_widths, item);
+                    // Ảnh làm trước khi có bản WebP (D-186): cỡ nào thiếu WebP thì làm lại cả bộ.
+                    needs_refresh(&wanted, &saved, item) || saved != webp
                 })
                 .collect();
             checked += items.len();
@@ -201,6 +206,37 @@ mod tests {
             // Bỏ bớt cỡ: ảnh thu nhỏ ở cỡ đã bỏ là lệch.
             let narrower = with_widths(&media, &[100]);
             assert_eq!(narrower.refresh_variants(true).await.unwrap(), (2, 1));
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Ảnh làm trước khi có bản WebP (chỉ có JPEG / PNG): lệnh thấy thiếu, xếp làm lại; làm
+    /// xong thì đủ — trên cả hai database.
+    #[tokio::test]
+    async fn anh_chua_co_webp_thi_xep_lam_lai() {
+        TestDatabase::run(async |test| {
+            let (media, _, _) = service(test, limits()).await;
+            let photo = media
+                .upload(
+                    &editor(),
+                    upload("photo.png", "image/png"),
+                    body(&encoded(300, 240, ImageFormat::Png, false)),
+                )
+                .await
+                .unwrap()
+                .item;
+            assert_eq!(media.make_variants(photo.id, photo.version_id).await.unwrap(), 2);
+            assert_eq!(media.refresh_variants(true).await.unwrap(), (1, 0));
+
+            let backend = media.database.write().get_database_backend();
+            let sql = "DELETE FROM media_variant WHERE content_type = 'image/webp'";
+            let deleted = media.database.write().execute_raw(Statement::from_string(backend, sql));
+            assert_eq!(deleted.await.unwrap().rows_affected(), 2);
+            assert_eq!(media.refresh_variants(true).await.unwrap(), (1, 1));
+
+            assert_eq!(media.make_variants(photo.id, photo.version_id).await.unwrap(), 2);
+            assert_eq!(media.refresh_variants(true).await.unwrap(), (1, 0));
         })
         .await
         .unwrap();

@@ -133,7 +133,8 @@ pub(crate) struct ItemChanges {
 pub(crate) struct ItemDetails {
     pub item: Item,
     pub tags: Vec<String>,
-    pub variants: Vec<crate::variants::Variant>,
+    /// Ảnh thu nhỏ theo cỡ, hẹp trước.
+    pub variants: Vec<crate::variants::VariantPair>,
 }
 
 pub(crate) struct MediaService {
@@ -222,7 +223,7 @@ impl MediaService {
             .into_iter()
             .map(|item| ItemDetails {
                 tags: tags.remove(&item.id).unwrap_or_default(),
-                variants: variants.remove(&item.id).unwrap_or_default(),
+                variants: crate::variants::pair(variants.remove(&item.id).unwrap_or_default()),
                 item,
             })
             .collect())
@@ -704,14 +705,15 @@ impl crate::api::Media for MediaService {
             .filter_map(|id| found.remove(id))
             .map(|item| {
                 let url = content_url(&item);
-                let variants = copies
-                    .remove(&item.id)
-                    .unwrap_or_default()
+                let variants = crate::variants::pair(copies.remove(&item.id).unwrap_or_default())
                     .into_iter()
                     .map(|copy| crate::api::MediaVariant {
-                        url: format!("{url}&w={}", copy.width),
-                        width: copy.width,
-                        height: copy.height,
+                        url: format!("{url}&w={}", copy.main.width),
+                        webp_url: copy
+                            .webp
+                            .map(|webp| format!("{url}&w={}&format=webp", webp.width)),
+                        width: copy.main.width,
+                        height: copy.main.height,
                     })
                     .collect();
                 MediaRef {

@@ -21,11 +21,26 @@ impl ActiveModelBehavior for ActiveModel {}
 
 impl Model {
     pub(crate) fn storage_key(&self) -> String {
-        storage_key(self.item_id, self.version_id, self.width)
+        storage_key(self.item_id, self.version_id, self.width, &self.content_type)
+    }
+
+    /// Bản WebP (D-186), làm thêm bên cạnh bản JPEG / PNG cùng cỡ.
+    pub(crate) fn is_webp(&self) -> bool {
+        self.content_type == WEBP
     }
 }
 
-/// Khoá ở nơi lưu: `media/<item_id>/<version_id>_w<width>`, cạnh khoá của bản gốc.
-pub(crate) fn storage_key(item_id: Uuid, version_id: Uuid, width: i32) -> String {
-    format!("{}_w{width}", crate::entity::item::storage_key(item_id, version_id))
+/// Loại nội dung của bản WebP.
+pub(crate) const WEBP: &str = "image/webp";
+
+/// Khoá ở nơi lưu: `media/<item_id>/<version_id>_w<width>` (JPEG / PNG, cạnh khoá của bản gốc)
+/// hay `…_w<width>.webp` (bản WebP cùng cỡ).
+pub(crate) fn storage_key(
+    item_id: Uuid,
+    version_id: Uuid,
+    width: i32,
+    content_type: &str,
+) -> String {
+    let suffix = if content_type == WEBP { ".webp" } else { "" };
+    format!("{}_w{width}{suffix}", crate::entity::item::storage_key(item_id, version_id))
 }

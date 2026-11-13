@@ -15,7 +15,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
-use autoxide_kernel::error::{Error, ErrorKind};
+use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::http::{Disposition, content_disposition};
 use autoxide_kernel::response::Problem;
 use autoxide_kernel::version::{IfMatch, Tagged, if_none_match};
@@ -47,6 +47,26 @@ pub(crate) struct VersionQuery {
     /// Width of a smaller copy (one of the item's `variants`). Until that copy is made, or
     /// when the image is narrower, the original is sent.
     w: Option<u32>,
+    /// `webp`: with `w`, the WebP copy of that width (much smaller; the variant's
+    /// `webp_url`). Until it is made, the JPEG or PNG copy is sent instead, so the address
+    /// always shows an image. Ignored without `w`.
+    #[param(value_type = Option<String>, example = "webp")]
+    format: Option<String>,
+}
+
+impl VersionQuery {
+    /// `format=webp`? Giá trị khác là lỗi, báo rõ thay vì lặng lẽ trả JPEG.
+    fn webp(&self) -> Result<bool, Error> {
+        match self.format.as_deref() {
+            None => Ok(false),
+            Some(raw) if raw.eq_ignore_ascii_case("webp") => Ok(true),
+            Some(_) => Err(Error::validation(vec![FieldError::new(
+                "format",
+                "invalid",
+                "must be `webp`, or left out for the JPEG or PNG copy",
+            )])),
+        }
+    }
 }
 
 /// Download the content of a media item.
@@ -78,6 +98,7 @@ pub(crate) struct VersionQuery {
         (status = 401, description = "A token was sent but is not valid; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 404, description = "No media item has this id that you may load; code `media.item_not_found`.", body = Problem),
         (status = 416, description = "The range is outside the content; code `media.range_not_satisfiable`. `Content-Range: bytes */<size>` gives the size.", body = Problem),
+        (status = 422, description = "`format` is not `webp`; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn get_content(
@@ -103,6 +124,7 @@ pub(crate) async fn get_content(
         (status = 200, description = "The headers of the content (`Content-Length`, `Content-Type`, `ETag`…)."),
         (status = 304, description = "Not modified: the `ETag` in `If-None-Match` is current."),
         (status = 404, description = "No media item has this id that you may load."),
+        (status = 422, description = "`format` is not `webp`."),
     )
 )]
 pub(crate) async fn head_content(
@@ -168,19 +190,33 @@ async fn serve(
     request: &HeaderMap,
     with_body: bool,
 ) -> Result<Response, Error> {
+    let webp = query.webp()?;
     let item = service.viewable(principal.as_ref(), id).await?;
-    // Ảnh thu nhỏ xin bằng `w`, nếu đã làm xong; không thì bản gốc.
-    let copy = match query.w {
-        Some(width) => service.variant(&item, width).await?,
+    // Ảnh thu nhỏ xin bằng `w`, nếu đã làm xong; không thì bản gốc. Xin bản WebP mà chưa có thì
+    // gửi bản JPEG / PNG cùng cỡ: địa chỉ trong `<source type="image/webp">` vẫn ra ảnh.
+    let mut copy = match query.w {
+        Some(width) if webp => service.variant(&item, width, true).await?,
+        Some(width) => service.variant(&item, width, false).await?,
         None => None,
     };
+    let fallback = webp && copy.is_none();
+    if let (true, Some(width)) = (fallback, query.w) {
+        copy = service.variant(&item, width, false).await?;
+    }
+    // Bản xin chưa làm xong (sẽ có): bản đang gửi là tạm, không được cache lâu dưới địa chỉ này.
     let pending = query.w.is_some_and(|width| {
-        copy.is_none()
+        (copy.is_none() || fallback)
             && crate::variants::wanted_widths(&service.config.image_widths, &item).contains(&width)
     });
     let (etag, content_type, size) = match &copy {
         Some(copy) => (
-            format!("\"{}-w{}\"", item.version_id, copy.width),
+            // Bản WebP có ETag riêng: hai bản cùng cỡ là hai nội dung khác nhau.
+            format!(
+                "\"{}-w{}{}\"",
+                item.version_id,
+                copy.width,
+                if copy.is_webp() { "-webp" } else { "" }
+            ),
             copy.content_type.clone(),
             u64::try_from(copy.size).unwrap_or_default(),
         ),
@@ -196,7 +232,6 @@ async fn serve(
         Ok(())
     };
     set(header::ETAG, etag.clone())?;
-    // Ảnh thu nhỏ chưa làm xong: bản gốc tạm thời, không được cache lâu dưới địa chỉ này.
     let version = if pending { None } else { query.v.as_deref() };
     set(header::CACHE_CONTROL, cache_control(&item, version))?;
     if if_none_match(request, &etag) {

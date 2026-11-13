@@ -894,13 +894,22 @@ async fn anh_thu_nho_theo_phien_ban() {
         // Cấu hình test: rộng 100 và 200; ảnh rộng 150 nên chỉ có bản 100.
         assert_eq!(media.make_variants(item.id, item.version_id).await.unwrap(), 1);
         let copies = media.describe_one(item.clone()).await.unwrap().variants;
-        assert_eq!(copies.iter().map(|c| (c.width, c.height)).collect::<Vec<_>>(), [(100, 60)]);
-        assert_eq!(copies[0].content_type, "image/jpeg");
-        let copy_key = copies[0].storage_key();
-        let stored = media.read_key(&copy_key, None).await.unwrap();
-        let bytes: Vec<bytes::Bytes> = stored.content.try_collect().await.unwrap();
-        let decoded = image::load_from_memory(&bytes.concat()).unwrap();
-        assert_eq!((decoded.width(), decoded.height()), (100, 60));
+        let sizes: Vec<_> = copies.iter().map(|c| (c.main.width, c.main.height)).collect();
+        assert_eq!(sizes, [(100, 60)]);
+        assert_eq!(copies[0].main.content_type, "image/jpeg");
+        let copy_key = copies[0].main.storage_key();
+        let webp = copies[0].webp.clone().expect("a WebP copy next to the JPEG one");
+        assert_eq!((webp.width, webp.height, webp.content_type.as_str()), (100, 60, "image/webp"));
+        let webp_key = webp.storage_key();
+        assert_eq!(webp_key, format!("{copy_key}.webp"));
+        for (key, format) in [(&copy_key, ImageFormat::Jpeg), (&webp_key, ImageFormat::WebP)] {
+            let stored = media.read_key(key, None).await.unwrap();
+            let bytes: Vec<bytes::Bytes> = stored.content.try_collect().await.unwrap();
+            let bytes = bytes.concat();
+            assert_eq!(image::guess_format(&bytes).unwrap(), format);
+            let decoded = image::load_from_memory(&bytes).unwrap();
+            assert_eq!((decoded.width(), decoded.height()), (100, 60));
+        }
         // Chạy lại job (vd thử lại): không nhân đôi.
         media.make_variants(item.id, item.version_id).await.unwrap();
         assert_eq!(media.describe_one(item.clone()).await.unwrap().variants.len(), 1);
@@ -922,17 +931,20 @@ async fn anh_thu_nho_theo_phien_ban() {
             media.replace(&ada, item.id, Some("image/png"), body(&bigger), None).await.unwrap();
         assert!(media.describe_one(new.clone()).await.unwrap().variants.is_empty());
         assert!(storage.get(&copy_key).await.unwrap().is_none());
+        assert!(storage.get(&webp_key).await.unwrap().is_none());
         assert_eq!(media.make_variants(item.id, item.version_id).await.unwrap(), 0);
         assert_eq!(media.make_variants(new.id, new.version_id).await.unwrap(), 2);
         let copies = media.describe_one(new.clone()).await.unwrap().variants;
         assert_eq!(
-            copies.iter().map(|c| c.content_type.as_str()).collect::<Vec<_>>(),
+            copies.iter().map(|c| c.main.content_type.as_str()).collect::<Vec<_>>(),
             ["image/png", "image/png"]
         );
+        assert!(copies.iter().all(|c| c.webp.as_ref().is_some_and(|w| w.width == c.main.width)));
 
         // Dọn mồ côi giữ bản thu nhỏ của phiên bản hiện tại.
         assert_eq!(media.clean_orphans(Utc::now() + chrono::Duration::days(2)).await.unwrap(), 0);
-        assert_eq!(storage.keys_with_prefix(&format!("media/{}/", new.id)).await.unwrap().len(), 3);
+        // Bản gốc, và mỗi cỡ hai bản (PNG, WebP).
+        assert_eq!(storage.keys_with_prefix(&format!("media/{}/", new.id)).await.unwrap().len(), 5);
 
         media.trash(&ada, new.id).await.unwrap();
         media.purge(&ada, new.id).await.unwrap();

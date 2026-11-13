@@ -42,7 +42,11 @@ pub(crate) struct PublicMedia {
 pub(crate) struct PublicVariant {
     width: i32,
     height: i32,
+    /// JPEG copy (PNG for images with transparency).
     url: String,
+    /// The same copy as WebP, usually far smaller: offer it in a `<picture>`
+    /// `<source type="image/webp">`. `null` while it is not made yet.
+    webp_url: Option<String>,
 }
 
 fn media(item: Option<autoxide_media::api::MediaRef>, alt: &str) -> Option<PublicMedia> {
@@ -55,7 +59,12 @@ fn media(item: Option<autoxide_media::api::MediaRef>, alt: &str) -> Option<Publi
         variants: item
             .variants
             .into_iter()
-            .map(|copy| PublicVariant { width: copy.width, height: copy.height, url: copy.url })
+            .map(|copy| PublicVariant {
+                width: copy.width,
+                height: copy.height,
+                url: copy.url,
+                webp_url: copy.webp_url,
+            })
             .collect(),
     })
 }
@@ -830,4 +839,51 @@ pub(crate) async fn preview_token(
 ) -> Result<Data<PreviewToken>, Error> {
     let (token, expires_at) = service.preview_token(&principal, id).await?;
     Ok(Data { data: PreviewToken { token, expires_at } })
+}
+
+#[cfg(test)]
+mod tests {
+    use autoxide_media::api::{MediaRef, MediaVariant, MediaVisibility};
+
+    use super::*;
+
+    /// Bản công khai mang cả địa chỉ JPEG lẫn WebP của từng cỡ (D-186); `alt` của bài thay
+    /// `alt` của thư viện media khi có.
+    #[test]
+    fn anh_cong_khai_co_ban_webp() {
+        let id = Uuid::now_v7();
+        let item = MediaRef {
+            id,
+            visibility: MediaVisibility::Public,
+            content_type: "image/png".to_owned(),
+            width: Some(1200),
+            height: Some(800),
+            alt: "library alt".to_owned(),
+            url: "/u?v=1".to_owned(),
+            variants: vec![
+                MediaVariant {
+                    width: 320,
+                    height: 213,
+                    url: "/u?v=1&w=320".to_owned(),
+                    webp_url: Some("/u?v=1&w=320&format=webp".to_owned()),
+                },
+                MediaVariant {
+                    width: 640,
+                    height: 427,
+                    url: "/u?v=1&w=640".to_owned(),
+                    webp_url: None,
+                },
+            ],
+        };
+        let public = serde_json::to_value(media(Some(item), "entry alt")).unwrap();
+        assert_eq!(public["alt"], "entry alt");
+        assert_eq!(
+            public["variants"],
+            serde_json::json!([
+                {"width": 320, "height": 213, "url": "/u?v=1&w=320", "webp_url": "/u?v=1&w=320&format=webp"},
+                {"width": 640, "height": 427, "url": "/u?v=1&w=640", "webp_url": null},
+            ])
+        );
+        assert!(media(None, "x").is_none());
+    }
 }
