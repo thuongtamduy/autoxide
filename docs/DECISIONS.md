@@ -4531,3 +4531,29 @@ nhạy cảm vào 37. Bước 33–38 mới là nền đa khách (D-185…D-188)
 
 Lý do: backup, số đo, OIDC, SSE, mã hoá đều phải biết ngữ cảnh khách hàng; dựng chúng trước nền đa
 khách thì phải sửa lại. Chưa ai bắt đầu bước 33–35 cũ (kiểm nhánh trên GitHub ngày 13/11/2026).
+
+## D-190 · Bổ sung nền đa khách sau rà soát: thứ ngoài bảng, secret theo khách, luật kế toán, giao dịch điện tử, người tiêu dùng, AI — 2026-11-13 — agent quyết
+
+Quyết định: thêm vào bước 33–39 các mục ở mục 7 của `docs/research/business-foundation.md`:
+(1) mọi thứ ngoài bảng cũng theo khách — khoá file, cache trong bộ nhớ, rate limiting, idempotency
+key, con trỏ pagination, token và URL đã ký; (2) cấu hình và secret theo khách, mã hoá khi lưu — mục
+mã hoá secret dời từ bước 37 lên 33 (thay phần đó của D-189); (3) tên miền riêng có xác minh DNS và
+endpoint cho TLS tự động; (4) phiên bản migration theo từng database, lỗi `tenant_maintenance`
+chỉ cho khách trên database chưa sẵn sàng, chia lượt job công bằng; (5) nhân sự nền tảng vào dữ
+liệu khách có thời hạn, lý do, audit khách xem được; (6) chứng từ kế toán giữ ít nhất 10 năm, khoá sổ
+theo kỳ; (7) hoá đơn từ máy tính tiền; (8) văn bản pháp lý có phiên bản và bằng chứng chấp nhận;
+(9) bảo vệ người tiêu dùng; (10) gắn nhãn nội dung AI (`ai_assisted`); (11) trait `SmsSender`;
+(12) log và trace mang `tenant_id`, không dùng làm nhãn số đo.
+
+Lý do: mỗi mục là chỗ mà nếu không đặt từ đầu thì dựng xong nền đa khách vẫn rò rỉ dữ liệu (cache,
+URL ký), không phục vụ được khách mang tài khoản đối tác riêng, hay vi phạm luật. Căn cứ pháp lý:
+Luật Kế toán 88/2015 Điều 41 và NĐ 174/2016 (lưu 10 năm); NĐ 123/2020 sửa bởi NĐ 70/2025 (hoá đơn từ
+máy tính tiền, từ 01/6/2025); Luật Giao dịch điện tử 20/2023; Luật Bảo vệ quyền lợi người tiêu dùng
+19/2023 và NĐ 55/2024 (từ 01/7/2024); Luật Trí tuệ nhân tạo 134/2025 (từ 01/3/2026); NĐ 147/2024.
+Nguồn là báo chí và công ty luật tổng hợp — cần đối chiếu văn bản gốc (D-186), nhất là nghị định
+hướng dẫn Luật Trí tuệ nhân tạo và ngưỡng doanh thu hoá đơn từ máy tính tiền.
+
+Đã cân nhắc: mỗi khách một khoá mã hoá để xoá được cả trong backup — phức tạp, chưa có luật buộc;
+khuyến mại, phí sàn theo ngành hàng, người bán nước ngoài — để cho module thương mại.
+
+Thay: phần "mã hoá dữ liệu nhạy cảm vào 37" của D-189.
