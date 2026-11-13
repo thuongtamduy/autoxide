@@ -96,10 +96,9 @@ pub(crate) async fn describe(
     entries: Vec<Entry>,
 ) -> Result<Vec<EntryResponse>, Error> {
     let ids: Vec<Uuid> = entries.iter().map(|entry| entry.id).collect();
-    let read = service.database.read();
-    let mut terms = crate::terms::term_ids_of(read, &ids).await?;
-    let mut authors = crate::authors::author_ids_of(read, &ids).await?;
-    let outdated = crate::translate::outdated(read, &entries).await?;
+    let mut terms = service.term_ids(&ids).await?;
+    let mut authors = service.author_ids(&ids).await?;
+    let outdated = service.outdated_translations(&entries).await?;
     Ok(entries
         .into_iter()
         .map(|entry| {

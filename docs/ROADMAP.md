@@ -341,6 +341,19 @@ Mượn cái hay của framework khác ([`docs/research/frameworks.md`](research
 - [x] Hàm tạo / builder cho các kiểu module đang dựng bằng literal, rồi `#[non_exhaustive]`
       (danh sách ở D-167) — D-170
 
+## 28. Dọn cấu trúc (chủ dự án giao ngày 13/11/2026)
+
+Từ lượt rà soát kiến trúc cùng ngày: bỏ code lặp, giữ luật handler, module lớn dễ tìm.
+
+- [x] Kiểm email một chỗ: `autoxide_kernel::email` cho `forms`, `comments`, `newsletter`; `auth`
+      dùng chung phần chuẩn hoá
+- [x] `content`: handler không đọc database (`describe`, `preview_entry` vào service); `cargo xtask
+      check` chặn handler gọi database
+- [ ] `content`: gom file theo nhóm, tách `tests.rs` thành thư mục
+- [ ] Quy ước bố cục module (theo lớp hay theo tính năng) trong hướng dẫn viết module (EN + VI)
+- [ ] `kernel`: tách bộ đăng ký `Modules` khỏi `module.rs`
+- [ ] `crates/app`: test đầu-cuối `media_e2e` ra khỏi chỗ code của binary
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.

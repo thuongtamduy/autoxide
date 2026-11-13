@@ -19,6 +19,8 @@
 //! 6. `api-self-contained` — `api` không kéo phần bên trong ra ngoài.
 //! 7. `module-routes` — route của module đăng ký qua `.routes(routes!(…))` để luôn
 //!    có tài liệu OpenAPI; không dùng `.route(…)` trần.
+//! 8. `handler-database` — handler (`src/http…`) và tool MCP (`src/tools…`) không tự
+//!    đọc hay ghi database: việc đó thuộc service (luật kiến trúc 5 và 8 của CLAUDE.md).
 //!
 //! Luật 4–6 đọc mã nguồn theo dòng, dựa vào việc `cargo fmt` đã chuẩn hoá định
 //! dạng (gate chạy fmt trước). Đây là lưới chặn lỗi vô ý, không phải bộ phân
@@ -276,11 +278,20 @@ pub fn check_module_source(
     let mut violations = Vec::new();
     let is_lib = file == "src/lib.rs";
     let is_api = file == "src/api.rs" || file.starts_with("src/api/");
+    let is_entry_point = !file.ends_with("/tests.rs")
+        && !file.contains("/tests/")
+        && (file == "src/http.rs"
+            || file.starts_with("src/http/")
+            || file == "src/tools.rs"
+            || file.starts_with("src/tools/"));
+    // Test nằm cuối file trong `#[cfg(test)] mod tests`: từ đó trở xuống không phải handler.
+    let mut in_tests = false;
 
     for (index, line) in text.lines().enumerate() {
         if line.trim_start().starts_with("//") {
             continue;
         }
+        in_tests = in_tests || line.trim() == "#[cfg(test)]";
         let location = format!("{}/{}:{}", module.dir, file, index + 1);
         let mut report = |rule: &'static str, message: String| {
             violations.push(Violation { rule, location: location.clone(), message });
@@ -319,6 +330,14 @@ pub fn check_module_source(
                 ),
             );
         }
+        if is_entry_point && !in_tests && touches_database(line) {
+            report(
+                "handler-database",
+                "handlers and MCP tools only call the service layer; move this database access \
+                 into a service method"
+                    .to_owned(),
+            );
+        }
         if is_api && uses_path_outside(line, "crate", "api") {
             report(
                 "api-self-contained",
@@ -329,6 +348,12 @@ pub fn check_module_source(
         }
     }
     violations
+}
+
+/// Dòng mở kết nối database để đọc hay ghi (`service.database.read()`, `begin_write()`…).
+fn touches_database(line: &str) -> bool {
+    line.contains("database")
+        && [".read()", ".write()", "begin_write("].iter().any(|call| line.contains(call))
 }
 
 /// Các lời gọi thêm route mà KHÔNG kèm tài liệu OpenAPI. (`.routes(` — có `s` — là
@@ -640,6 +665,37 @@ let version = env!(\"CARGO_PKG_VERSION\");
 
     fn check(file: &str, text: &str) -> Vec<Violation> {
         check_module_source(&auth(), file, text, &["autoxide_audit".to_owned()])
+    }
+
+    #[test]
+    fn handler_va_tool_goi_database_bi_bao() {
+        for (file, line) in [
+            ("src/http.rs", "    let read = service.database.read();"),
+            (
+                "src/http/entries.rs",
+                "    let rows = Entity::find().all(state.database.read()).await?;",
+            ),
+            ("src/tools.rs", "    let transaction = service.database.begin_write().await?;"),
+            ("src/tools/notes.rs", "    let connection = self.database.write();"),
+        ] {
+            assert_eq!(rules(&check(file, line)), ["handler-database"], "{file}: {line}");
+        }
+    }
+
+    #[test]
+    fn database_trong_service_va_test_khong_bi_bao() {
+        let line = "    let read = self.database.read();";
+        for file in ["src/service.rs", "src/http/tests.rs", "src/tools/tests/mod.rs"] {
+            assert_eq!(check(file, line), [], "{file}");
+        }
+        // Test ở cuối file handler, và dòng chỉ nhắc tới database mà không mở kết nối.
+        let text =
+            "fn handler() {}\n\n#[cfg(test)]\nmod tests {\n    let r = app.database.read();\n}\n";
+        assert_eq!(check("src/http.rs", text), []);
+        assert_eq!(
+            check("src/http.rs", "    let events = recorded_events(&services.database).await;"),
+            []
+        );
     }
 
     #[test]

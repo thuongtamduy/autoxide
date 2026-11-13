@@ -121,6 +121,11 @@ pub(crate) async fn authors_of<C: ConnectionTrait>(
 }
 
 impl ContentService {
+    /// ID tác giả của từng mục trong `ids`, theo thứ tự (để API trả mục kèm tác giả).
+    pub(crate) async fn author_ids(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, Vec<Uuid>>, Error> {
+        author_ids_of(self.database.read(), ids).await
+    }
+
     pub(crate) async fn list_authors(
         &self,
         principal: &Principal,
