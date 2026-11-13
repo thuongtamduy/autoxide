@@ -18,6 +18,7 @@ use std::sync::Arc;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::rows;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -380,7 +381,7 @@ impl SessionService {
         let (new_token, new_row) =
             new_refresh_token(user.id, row.family_id, now, expires_at, session)?;
         let transaction = self.database.begin_write().await?;
-        // Chạm dòng người dùng TRƯỚC (Postgres khoá dòng này tới hết transaction): đổi mật
+        // Khoá dòng người dùng TRƯỚC (Postgres khoá dòng này tới hết transaction): đổi mật
         // khẩu hay khoá tài khoản cũng ghi dòng này trước khi thu hồi phiên, nên hai việc
         // nối đuôi nhau — token mới không lọt qua lệnh thu hồi (D-079). Tài khoản vừa bị
         // khoá thì dừng ở đây.
@@ -592,23 +593,21 @@ impl SessionService {
     }
 }
 
-/// Ghi "không đổi gì" lên dòng người dùng `user_id`: trên Postgres dòng bị khoá tới hết
-/// transaction, nên refresh, thu hồi phiên, khoá tài khoản hay đổi mật khẩu của cùng người
-/// dùng nối đuôi nhau thay vì chen nhau (D-079). SQLite chỉ có một bên ghi tại một lúc nên
-/// vốn đã nối đuôi. Trả số dòng đã chạm.
-async fn touch_user<C: ConnectionTrait>(
+/// Khoá dòng người dùng `user_id` tới hết transaction (`rows::lock_one`, D-181): refresh, thu
+/// hồi phiên, khoá tài khoản hay đổi mật khẩu của cùng người dùng nối đuôi nhau thay vì chen nhau
+/// (D-079) — Postgres bằng `FOR UPDATE`, SQLite vốn chỉ có một bên ghi. `true` nếu có dòng
+/// (và, với `only_active`, tài khoản chưa bị khoá).
+async fn lock_user_row<C: ConnectionTrait>(
     connection: &C,
     user_id: Uuid,
     only_active: bool,
-) -> Result<u64, Error> {
+) -> Result<bool, Error> {
     use crate::user::entity::{Column as User, Entity as Users};
-    let mut update = Users::update_many()
-        .col_expr(User::UpdatedAt, Expr::col(User::UpdatedAt))
-        .filter(User::Id.eq(user_id));
+    let mut select = Users::find_by_id(user_id);
     if only_active {
-        update = update.filter(User::DisabledAt.is_null());
+        select = select.filter(User::DisabledAt.is_null());
     }
-    Ok(update.exec(connection).await?.rows_affected)
+    Ok(rows::lock_one(connection, select).await?.is_some())
 }
 
 /// Điều chứng minh người dùng khi mở phiên (xem `SessionService::start_session`).
@@ -625,27 +624,24 @@ enum Proof {
 
 /// Khoá dòng người dùng `user_id` trong `connection` trước khi cấp quyền mới (phiên, API key):
 /// `true` nếu tài khoản còn hoạt động và — khi có `password_hash` — mật khẩu vẫn là mật khẩu
-/// vừa kiểm. Một câu `UPDATE` có điều kiện: chạy như nhau trên SQLite và Postgres, và chờ
-/// transaction đang đổi mật khẩu / khoá tài khoản xong rồi mới xét (D-156).
+/// vừa kiểm. Khoá dòng có điều kiện (`rows::lock_one`): chạy như nhau trên SQLite và Postgres,
+/// và chờ transaction đang đổi mật khẩu / khoá tài khoản xong rồi mới xét (D-156, D-181).
 pub(crate) async fn lock_grant<C: ConnectionTrait>(
     connection: &C,
     user_id: Uuid,
     password_hash: Option<&str>,
 ) -> Result<bool, Error> {
     use crate::user::entity::{Column as User, Entity as Users};
-    let mut update = Users::update_many()
-        .col_expr(User::UpdatedAt, Expr::col(User::UpdatedAt))
-        .filter(User::Id.eq(user_id))
-        .filter(User::DisabledAt.is_null());
+    let mut select = Users::find_by_id(user_id).filter(User::DisabledAt.is_null());
     if let Some(hash) = password_hash {
-        update = update.filter(User::PasswordHash.eq(hash));
+        select = select.filter(User::PasswordHash.eq(hash));
     }
-    Ok(update.exec(connection).await?.rows_affected > 0)
+    Ok(rows::lock_one(connection, select).await?.is_some())
 }
 
-/// Khoá dòng người dùng `user_id` (xem [`touch_user`]).
+/// Khoá dòng người dùng `user_id` (xem [`lock_user_row`]).
 async fn lock_user<C: ConnectionTrait>(connection: &C, user_id: Uuid) -> Result<(), Error> {
-    touch_user(connection, user_id, false).await.map(|_| ())
+    lock_user_row(connection, user_id, false).await.map(|_| ())
 }
 
 /// Khoá dòng người dùng `user_id` nếu tài khoản còn hoạt động; `false` nếu đã bị khoá
@@ -654,7 +650,7 @@ async fn lock_active_user<C: ConnectionTrait>(
     connection: &C,
     user_id: Uuid,
 ) -> Result<bool, Error> {
-    Ok(touch_user(connection, user_id, true).await? > 0)
+    lock_user_row(connection, user_id, true).await
 }
 
 /// Refresh token còn dùng được của người dùng `user_id`: mỗi phiên đúng một dòng.

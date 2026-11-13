@@ -3,15 +3,17 @@
 //! - Đường dẫn do máy chủ tính: trang = đường dẫn công khai của trang cha + `/` + slug (trang
 //!   gốc: `/` + slug); bài = `/<tiền tố>/` + slug. Không có tên miền hay tiền tố ngôn ngữ.
 //! - Mọi thay đổi cây / đường dẫn của một ngôn ngữ (đăng, gỡ, chuyển, xoá) bắt đầu
-//!   transaction bằng việc cập nhật dòng của ngôn ngữ đó trong `content_tree_locks`: trên
-//!   Postgres câu đó khoá dòng, nên các thay đổi chạy lần lượt — hai lệnh chuyển chéo nhau
-//!   không cùng qua được bước kiểm vòng lặp; SQLite vốn chỉ có một người ghi.
+//!   transaction bằng việc khoá dòng của ngôn ngữ đó trong `content_tree_locks`
+//!   (`rows::lock_one`, D-181; cột `version` không còn dùng): các thay đổi chạy lần lượt —
+//!   hai lệnh chuyển chéo nhau không cùng qua được bước kiểm vòng lặp; SQLite vốn chỉ có một
+//!   người ghi.
 
 use std::collections::HashMap;
 
 use autoxide_kernel::error::Error;
+use autoxide_kernel::rows;
 use chrono::{DateTime, Utc};
-use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
+use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
 
@@ -30,11 +32,7 @@ pub(crate) async fn lock_tree<C: ConnectionTrait>(
     .on_conflict(OnConflict::column(tree_lock::Column::Locale).do_nothing().to_owned())
     .exec_without_returning(transaction)
     .await?;
-    tree_lock::Entity::update_many()
-        .col_expr(tree_lock::Column::Version, Expr::col(tree_lock::Column::Version).add(1))
-        .filter(tree_lock::Column::Locale.eq(locale))
-        .exec(transaction)
-        .await?;
+    rows::lock_one(transaction, tree_lock::Entity::find_by_id(locale)).await?;
     Ok(())
 }
 

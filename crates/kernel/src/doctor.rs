@@ -75,16 +75,24 @@ pub struct Check {
     /// Câu tiếng Anh nói bước này kiểm gì.
     pub description: &'static str,
     probe: Arc<dyn Probe>,
+    timeout: Duration,
 }
 
 impl Check {
     pub fn new(name: &'static str, description: &'static str, probe: Arc<dyn Probe>) -> Self {
-        Check { name, description, probe }
+        Check { name, description, probe, timeout: CHECK_TIMEOUT }
     }
 
-    /// Chạy bước kiểm, tối đa [`CHECK_TIMEOUT`].
+    /// Cho bước kiểm nhiều thời gian hơn [`CHECK_TIMEOUT`] (vd đọc lại cả một bảng lớn).
+    pub fn with_timeout(mut self, limit: Duration) -> Self {
+        self.timeout = limit;
+        self
+    }
+
+    /// Chạy bước kiểm, tối đa [`CHECK_TIMEOUT`] (hoặc thời gian đặt bằng
+    /// [`with_timeout`](Self::with_timeout)).
     pub async fn run(&self) -> Finding {
-        self.run_within(CHECK_TIMEOUT).await
+        self.run_within(self.timeout).await
     }
 
     async fn run_within(&self, limit: Duration) -> Finding {

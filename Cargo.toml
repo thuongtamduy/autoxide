@@ -199,3 +199,10 @@ tower = { version = "0.5", features = ["util"] }
 # `debug = true` trên máy mình, không commit.
 [profile.dev]
 debug = "line-tables-only"
+
+# Bản release vẫn kiểm tràn số nguyên (D-179): mặc định của Rust chỉ kiểm ở bản dev, bản release
+# cộng tràn `i64` sẽ âm thầm quay vòng (số dư dương lớn thành âm). Kiểm tràn biến lỗi đó thành
+# panic có log thay vì dữ liệu sai; tiền đi qua `Money` còn trả lỗi trước cả khi tràn. Số đo
+# trước / sau ở D-179.
+[profile.release]
+overflow-checks = true

@@ -19,6 +19,7 @@ use autoxide_kernel::pagination::{
     Page, PageRequest, Pagination, SortValue, fetch_page, fetch_page_by,
 };
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
+use autoxide_kernel::rows;
 use autoxide_kernel::storage::{Storage, StoredFile};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
@@ -561,8 +562,7 @@ impl EventHandler for MediaService {
     }
 }
 
-/// "Chạm" thư mục `folder` (cập nhật mà không đổi gì) trong `transaction`: khoá dòng đó tới
-/// hết transaction, nên lệnh xoá thư mục chạy cùng lúc phải chờ rồi thấy item / thư mục con
+/// Khoá dòng thư mục `folder` tới hết `transaction` (`rows::lock_one`, D-181), nên lệnh xoá thư mục chạy cùng lúc phải chờ rồi thấy item / thư mục con
 /// mới (D-086). `false` nếu thư mục không còn. Thư mục gốc luôn có.
 pub(crate) async fn touch_folder<C: ConnectionTrait>(
     transaction: &C,
@@ -571,12 +571,7 @@ pub(crate) async fn touch_folder<C: ConnectionTrait>(
     if folder == crate::entity::ROOT {
         return Ok(true);
     }
-    let touched = folder::Entity::update_many()
-        .col_expr(folder::Column::UpdatedAt, Expr::col(folder::Column::UpdatedAt))
-        .filter(folder::Column::Id.eq(folder))
-        .exec(transaction)
-        .await?;
-    Ok(touched.rows_affected == 1)
+    Ok(rows::lock_one(transaction, folder::Entity::find_by_id(folder)).await?.is_some())
 }
 
 /// Kiểm tên (bỏ khoảng trắng hai đầu; 1 tới 255 ký tự; không `/`, `\` hay ký tự điều

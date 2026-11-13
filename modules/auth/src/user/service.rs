@@ -4,6 +4,7 @@
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::rows;
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
@@ -535,13 +536,9 @@ pub(crate) fn user_disabled() -> Error {
     )
 }
 
-/// Khoá dòng người dùng `id` tới hết transaction (câu `UPDATE` không đổi gì).
+/// Khoá dòng người dùng `id` tới hết transaction (`rows::lock_one`, D-181).
 async fn lock_row(transaction: &DatabaseTransaction, id: Uuid) -> Result<(), Error> {
-    Entity::update_many()
-        .col_expr(Column::UpdatedAt, Expr::col(Column::UpdatedAt))
-        .filter(Column::Id.eq(id))
-        .exec(transaction)
-        .await?;
+    rows::lock_one(transaction, Entity::find_by_id(id)).await?;
     Ok(())
 }
 

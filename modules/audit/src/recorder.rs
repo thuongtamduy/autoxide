@@ -2,7 +2,7 @@
 //!
 //! Event mang `{"before": …, "after": …}` thì hai phần đó vào cột `before` / `after`;
 //! phần còn lại (nếu có) vào `details`. Event bị giao lại (giao ít nhất một lần) thì
-//! dòng đã có — bỏ qua, không lỗi.
+//! dòng đã có — bỏ qua, không lỗi. Mỗi dòng nối vào chuỗi băm (`crate::chain`, D-183).
 
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
@@ -10,9 +10,10 @@ use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::deleted_user;
 use chrono::{SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde_json::Value;
 
+use crate::chain::{self, Link};
 use crate::entity;
 
 pub(crate) struct Recorder {
@@ -29,29 +30,50 @@ impl Recorder {
 impl EventHandler for Recorder {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         let (before, after, details) = split(&redacted(event));
-        let inserted = entity::ActiveModel {
-            id: Set(event.id),
-            module: Set(event.module.to_owned()),
-            action: Set(event.name.clone()),
-            actor_user_id: Set(event.actor.user_id),
-            actor_api_key_id: Set(event.actor.api_key_id),
-            actor_kind: Set(Some(event.actor.kind().to_owned())),
-            subject: Set(event.subject.clone()),
-            before: Set(before),
-            after: Set(after),
-            details: Set(details),
-            occurred_at: Set(event.occurred_at),
-            recorded_at: Set(Utc::now().trunc_subsecs(6)),
-        }
-        .insert(self.database.write())
-        .await;
-        match inserted {
-            Ok(_) => {}
-            // Đã ghi ở lần giao trước: đúng như mong muốn.
-            Err(error) if matches!(error.sql_err(), Some(SqlErr::UniqueConstraintViolation(_))) => {
-            }
-            Err(error) => return Err(error.into()),
-        }
+        let payload_hash =
+            chain::payload_hash(before.as_deref(), after.as_deref(), details.as_deref());
+        // Lưu và băm ở độ chính xác micro giây — độ chính xác của cả hai database.
+        let row = entity::Model {
+            id: event.id,
+            module: event.module.to_owned(),
+            action: event.name.clone(),
+            actor_user_id: event.actor.user_id,
+            actor_api_key_id: event.actor.api_key_id,
+            actor_kind: Some(event.actor.kind().to_owned()),
+            subject: event.subject.clone(),
+            before,
+            after,
+            details,
+            occurred_at: event.occurred_at.trunc_subsecs(6),
+            recorded_at: Utc::now().trunc_subsecs(6),
+            sequence: None,
+            payload_hash: Some(payload_hash),
+            chain_hash: None,
+        };
+        // Nối vào chuỗi: khoá đầu chuỗi, thêm dòng, dời đầu chuỗi — một transaction. Các dòng
+        // nối đuôi nhau; deadlock / bận thì chạy lại cả transaction.
+        let (row, database) = (&row, &self.database);
+        database
+            .write_with_retry(move || async move {
+                let transaction = database.begin_write().await?;
+                let head = chain::lock_head(&transaction).await?;
+                // Kiểm SAU khi khoá: hai lần giao cùng một event không cùng qua được.
+                if entity::Entity::find_by_id(row.id).one(&transaction).await?.is_some() {
+                    // Đã ghi ở lần giao trước: đúng như mong muốn.
+                    return Ok(());
+                }
+                let sequence = head.sequence + 1;
+                let payload_hash = row.payload_hash.as_deref().unwrap_or_default();
+                let hash = chain::chain_hash(&head.hash, &Link::of(row, sequence, payload_hash));
+                let mut active = row.clone().into_active_model();
+                active.sequence = Set(Some(sequence));
+                active.chain_hash = Set(Some(hash.clone()));
+                active.insert(&transaction).await?;
+                chain::advance(&transaction, sequence, &hash).await?;
+                transaction.commit().await?;
+                Ok(())
+            })
+            .await?;
         if deleted_user(event).is_some() {
             self.forget(event).await?;
         }
@@ -62,7 +84,8 @@ impl EventHandler for Recorder {
 impl Recorder {
     /// Tài khoản bị xoá: bỏ phần dữ liệu (`before`, `after`, `details` — có email, tên) của
     /// mọi dòng cùng `subject` với event xoá (các event về chính tài khoản đó), chỉ giữ ai
-    /// làm gì lúc nào (D-080, D-149). Chạy lại vô hại.
+    /// làm gì lúc nào (D-080, D-149). Chạy lại vô hại. `payload_hash` giữ nguyên nên chuỗi băm
+    /// vẫn kiểm được (D-183).
     async fn forget(&self, event: &Delivered) -> Result<(), Error> {
         let Some(subject) = &event.subject else {
             return Ok(());

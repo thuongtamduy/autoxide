@@ -3,9 +3,11 @@
 //!
 //! Không module nào gọi audit trực tiếp: mọi module phát event về thay đổi của mình
 //! (`autoxide_kernel::event`), audit đăng ký nhận MỌI event và ghi mỗi event thành
-//! một dòng. Thêm module mới không phải sửa audit (D-055).
+//! một dòng. Thêm module mới không phải sửa audit (D-055). Các dòng nối thành chuỗi băm;
+//! `autoxide doctor` báo dòng đầu tiên bị sửa (D-183).
 
 pub mod api;
+mod chain;
 mod entity;
 mod http;
 mod migration;
@@ -35,6 +37,7 @@ struct AuditModule {
     /// Có sau `start`.
     recorder: Option<Arc<Recorder>>,
     service: Option<Arc<AuditService>>,
+    chain: Option<Arc<chain::ChainProbe>>,
 }
 
 impl Module for AuditModule {
@@ -49,6 +52,7 @@ impl Module for AuditModule {
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         self.recorder = Some(Arc::new(Recorder::new(context.database().clone())));
         self.service = Some(Arc::new(AuditService::new(context.database().clone())));
+        self.chain = Some(Arc::new(chain::ChainProbe { database: context.database().clone() }));
         Ok(())
     }
 
@@ -66,6 +70,21 @@ impl Module for AuditModule {
 
     fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {
         self.service.as_ref().map_or_else(Vec::new, tools::all)
+    }
+
+    fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {
+        self.chain.clone().map_or_else(Vec::new, |probe| {
+            vec![
+                autoxide_kernel::doctor::Check::new(
+                    "chain",
+                    "No audit log entry was changed, removed or inserted after it was written \
+                     (hash chain, D-183).",
+                    probe,
+                )
+                // Đọc cả audit log: lâu hơn bước kiểm thường.
+                .with_timeout(chain::VERIFY_TIMEOUT),
+            ]
+        })
     }
 
     fn subscriptions(&self) -> Vec<Subscription> {
