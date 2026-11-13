@@ -15,6 +15,8 @@ endpoints are marked deprecated with a sunset date first.
   this long while `/health/ready` answers 503 with code `shutting_down`, so a load balancer
   stops sending it requests before it stops accepting connections. `docs/DEPLOY.md` explains
   rolling updates.
+- `SECURITY.md` (and `SECURITY.vi.md`): which versions get security fixes, how to report a
+  vulnerability privately, response times and what is out of scope.
 
 ### Changed
 

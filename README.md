@@ -367,6 +367,12 @@ change is merged, run the full `./gate.sh`; a change is accepted only when the f
 green on both SQLite and PostgreSQL. Never commit secrets — only `.env.example`
 belongs in Git, never `.env`.
 
+## Security
+
+Found a vulnerability? Please do not open a public issue: report it privately as
+described in [`SECURITY.md`](SECURITY.md), which also lists the versions that receive
+security fixes.
+
 ## License
 
 Licensed under either of

@@ -361,6 +361,11 @@ merge, chạy `./gate.sh` đầy đủ; một thay đổi chỉ được nhận 
 SQLite và PostgreSQL. Không bao giờ commit secret — chỉ `.env.example` được nằm
 trong Git, `.env` thì không.
 
+## Bảo mật
+
+Tìm thấy lỗ hổng? Đừng mở issue công khai: hãy báo riêng theo
+[`SECURITY.vi.md`](SECURITY.vi.md), nơi cũng ghi những phiên bản được vá bảo mật.
+
 ## License
 
 Phát hành theo một trong hai license, bạn tự chọn:
