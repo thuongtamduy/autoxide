@@ -44,7 +44,9 @@ Thấy đang lạc thì dừng việc đó, quay lại lộ trình và nói rõ 
 **Autoxide dùng để làm gì:** làm nền cho một **sản phẩm mới** (không phải bản viết
 lại của hệ thống nào có sẵn). **Ai dùng:** mọi người đều dùng được — không gắn với
 một công ty hay một ngành. **Mã nguồn mở, công khai toàn bộ.** Giao diện là repo riêng,
-công khai (D-096, D-097).
+công khai (D-096, D-097). **Phục vụ mọi mô hình kinh doanh bằng cấu hình theo từng khách**:
+khách độc lập, một khách nhiều cửa hàng, SaaS bán theo tính năng, chuỗi cha-con nhiều cấp, sàn
+(D-185; thiết kế ở `docs/research/business-foundation.md`).
 
 Hệ quả cho agent:
 
@@ -53,8 +55,9 @@ Hệ quả cho agent:
 - Người lạ phải tự cài và dùng được: cấu hình có giá trị mặc định hợp lý, thông báo
   lỗi rõ, tài liệu cài đặt đủ để làm theo mà không cần hỏi ai.
 - Chỉ dựng module nghiệp vụ chủ dự án đã giao: `media` (D-091), `content` (D-096, D-098),
-  `forms`, `newsletter`, `comments` (D-112), và module mẫu `notes`. Khái niệm của `content`
-  (bài viết, trang, slug…) không vào core.
+  `forms`, `newsletter`, `comments` (D-112), module mẫu `notes`, và module thương mại theo lộ
+  trình sau nền đa khách (D-185). Khái niệm của `content` (bài viết, trang, slug…) và của thương
+  mại (sản phẩm, đơn hàng, kho…) không vào core.
 - Repo là công khai: mọi file, commit message, comment và tài liệu đều viết với
   giả định người lạ sẽ đọc. Không ghi tên máy chủ, IP, đường dẫn riêng hay thông
   tin cá nhân của chủ dự án. **Công khai không áp cho secret** — secret không bao
@@ -73,6 +76,20 @@ queue, test, lệnh CLI, tài liệu hướng dẫn.
 - Test mới phải chạy trên cả hai. Không đánh dấu bỏ qua test cho một database.
 - Không thấy cách làm chạy được trên cả hai thì đổi thiết kế, không hạ yêu cầu.
   Muốn bỏ yêu cầu này cho một trường hợp cụ thể thì phải dừng lại hỏi chủ dự án.
+
+## Luật số hai: tuân thủ pháp luật Việt Nam
+
+Chủ dự án yêu cầu (D-186): **AI quyết định nhưng phải theo luật nhà nước hiện hành** — thương mại
+điện tử (xác thực người bán trước khi bán; website bán hàng thông báo, sàn đăng ký với Bộ Công
+Thương), bảo vệ dữ liệu cá nhân, an ninh mạng, xác thực tài khoản đăng nội dung, thuế, thanh toán,
+sở hữu trí tuệ.
+
+- Tính năng tuân thủ ghi căn cứ (văn bản, điều, ngày hiệu lực) trong quyết định của nó.
+- Quy định hay đổi (biểu thuế, danh mục hồ sơ, thời hạn) là dữ liệu có ngày hiệu lực, không viết
+  cứng trong code.
+- Core không bao giờ tự giữ tiền của người mua: tiền đi qua đối tác có giấy phép (D-187).
+- AI không phải luật sư: nguồn chưa thống nhất thì ghi "cần đối chiếu văn bản gốc / người có
+  chuyên môn pháp lý", không chặn công việc. Không làm tính năng giúp né luật.
 
 ## Agent tự quyết
 
@@ -226,6 +243,9 @@ sẵn lệnh.
 - **Tiền:** số nguyên đơn vị nhỏ nhất + mã tiền tệ. Không `f32`/`f64`, không kiểu
   thập phân của database.
 - **Thời gian:** lưu UTC.
+- **Đa khách (D-185, từ bước 33):** bảng cấp khách hàng có `tenant_id` (kể cả khi khách có
+  database riêng); mọi truy vấn lọc theo khách qua công cụ của kernel; dữ liệu nghiệp vụ theo tổ
+  chức có `org_id`. Không bao giờ trả dữ liệu của khách hay nhánh mà người gọi không có quyền.
 - **Hai database:** xem "Luật số một".
 - **Đọc và ghi tách kết nối.** Đọc qua `Database::read()`, ghi qua
   `Database::write()`; nhiều lệnh ghi đi cùng nhau thì `Database::begin_write()`
@@ -298,5 +318,4 @@ giải thích ngắn bằng tiếng Việt trong ngoặc.
 ## Phạm vi
 
 Làm theo thứ tự trong `docs/ROADMAP.md`. Không dựng thứ nằm ở bảng "Chưa làm, đã
-cân nhắc" của `STACK.md` (GraphQL, microservice, MySQL, MongoDB, multi-tenant,
-passkey) khi chủ dự án chưa mở.
+cân nhắc" của `STACK.md` (GraphQL, microservice, MySQL, MongoDB) khi chủ dự án chưa mở.
