@@ -401,13 +401,14 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 - Module sổ cái kép (`ledger`: mỗi giao dịch có bút toán nợ và có cân nhau, chỉ thêm, số dư suy ra
   từ bút toán): module nghiệp vụ mới, `CLAUDE.md` chỉ cho dựng module chủ dự án đã giao.
 
-## 30. Sẵn sàng ra mắt (chủ dự án giao ngày 13/11/2026, D-175, D-176)
+## 30. Ra mắt công khai (chủ dự án giao ngày 13/11/2026, D-175, D-176)
 
-Sau bước 29 lộ trình của core hết mục: bước này đưa Autoxide tới tay người lạ — repo công khai,
-image Docker có sẵn, ảnh nhẹ, deploy không gián đoạn, cài được chỉ bằng README. Nhóm A và B làm
-song song với bước 29; nhóm C chỉ bắt đầu khi bước 29 đã merge vào `main` (đụng cùng file).
+Đưa Autoxide tới tay người lạ: repo công khai, CI và phát hành tự động, image Docker có chứng
+thực, file của một dự án mã nguồn mở, ảnh nhẹ, deploy không gián đoạn, cài được chỉ bằng README.
+Không đụng code của bước 29 (trừ `media` và `kernel/src/http/health.rs`), nên làm ngay được.
+Tài liệu cho người ngoài viết tiếng Anh kèm bản tiếng Việt cùng nội dung.
 
-Nhóm A — repo công khai, CI, image Docker (D-175):
+Nhóm A — repo công khai, CI, phát hành (D-175):
 
 - [ ] Chủ dự án công khai repo (Settings → Change visibility); trước đó agent xác nhận gitleaks
       quét toàn lịch sử xanh và không file nào chứa tên máy chủ, IP, đường dẫn riêng hay thông tin
@@ -420,17 +421,34 @@ Nhóm A — repo công khai, CI, image Docker (D-175):
       sửa theo: agent chỉ còn đẩy tag, bản phát hành và image do workflow làm
 - [ ] Secret scanning và push protection của GitHub bật; Dependabot alerts bật; gitleaks trong
       `./gate.sh` giữ nguyên
+- [ ] Image Docker cho máy ARM64 (`linux/arm64`) trong workflow `Release` khi repo đã công khai
+      (máy build ARM của GitHub miễn phí cho repo công khai; D-078 để sau vì build giả lập quá lâu)
 
-Nhóm A — WebP (D-176):
+Nhóm B — file của dự án mã nguồn mở:
+
+- [ ] `SECURITY.md` (EN + VI): phiên bản còn được vá, cách báo lỗ hổng riêng tư (bật "Private
+      vulnerability reporting" của GitHub — chủ dự án bấm), thời gian phản hồi dự kiến, những gì
+      không tính là lỗ hổng; README trỏ tới nó
+- [ ] `CONTRIBUTING.md` (EN + VI) cho người đóng góp là người: dựng môi trường, hai mức gate
+      (D-173), luật quan trọng nhất tóm từ `CLAUDE.md` (hai database, ranh giới module, lỗi có
+      `code`, test), cách viết commit và PR, license của phần đóng góp (MIT OR Apache-2.0, như
+      repo); trỏ `CLAUDE.md` cho người dùng AI agent
+- [ ] Quy tắc ứng xử (`CODE_OF_CONDUCT.md`, theo Contributor Covenant bản mới nhất) với địa chỉ
+      liên hệ do chủ dự án đặt; mẫu issue (báo lỗi: phiên bản, database, cách tái hiện; đề xuất) và
+      mẫu PR (đã chạy `./gate.sh`, đã sửa EN + VI, đã thêm CHANGELOG) trong `.github/`
+- [ ] Bản phát hành đáng tin: workflow `Release` (sau nhóm A) đính kèm chứng thực nguồn gốc build
+      (GitHub artifact attestation) và danh sách thành phần (SBOM) cho image Docker; `docs/DEPLOY.md`
+      (EN + VI) có lệnh kiểm chứng thực trước khi chạy image
+- [ ] `cargo xtask check` hay test giữ các file trên không mất và hai bản EN / VI không lệch
+      tiêu đề mục (cách làm như kiểm bản dịch i18n), để agent phiên sau không quên sửa một bên
+
+Nhóm C — sản phẩm (D-176):
 
 - [ ] `media`: bản nhỏ WebP bên cạnh JPEG / PNG. Chọn bộ mã hoá sau khi kiểm thư viện đúng phiên
       bản ghim (kiểu nén mất dữ liệu cho ảnh chụp, có alpha cho ảnh trong suốt); website nhận được
       WebP qua API công khai (`PublicMedia`, `body_media`, `srcset`) mà client cũ không hỏng; ảnh đã
       có làm lại bằng `autoxide task media.refresh_variants`; đo dung lượng và thời gian mã hoá
       trên ảnh thử của D-168, ghi vào quyết định; hướng dẫn `docs/MEDIA.md` (EN + VI)
-
-Nhóm B — vận hành:
-
 - [ ] Deploy không gián đoạn: nhận tín hiệu dừng thì `/health/ready` trả 503 trong một khoảng
       cấu hình được (biến mới qua `Setting`, sinh lại `.env.example`) trước khi ngừng nhận kết nối,
       `/health/live` vẫn 200; rồi mới tới `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`. Test; `docs/DEPLOY.md`
@@ -439,7 +457,57 @@ Nhóm B — vận hành:
       đăng (cả SQLite và Postgres), ghi mọi chỗ vấp rồi sửa README / `docs/DEPLOY.md` (EN + VI cùng
       commit)
 
-Nhóm C — bố cục (chỉ sau khi bước 29 đã merge):
+## 31. Hợp đồng API và chống hồi quy (chủ dự án giao ngày 13/11/2026, D-177)
+
+Người viết giao diện (repo riêng, D-097), nhà phát triển ngoài và AI agent dùng API không gọi sai;
+hợp đồng, tài liệu và database của bản cũ không bao giờ âm thầm lệch khỏi code. Bước này sửa
+`xtask`, `testkit`, `gate.sh`, tài liệu và thêm thư mục SDK — làm ngay được; riêng test nâng cấp
+cần image Docker của bản cũ (bước 30). Test chạy trên cả SQLite và Postgres; thư viện chỉ cho test
+khai ở `[dev-dependencies]`.
+
+Nhóm A — hợp đồng và người gọi API:
+
+- [ ] Gate chặn thay đổi phá vỡ của `/api/v1` (D-059): so `docs/openapi.json` với bản ở tag phát
+      hành gần nhất (`git show vX.Y.Z:docs/openapi.json`) và báo đỏ khi xoá endpoint hay method,
+      thêm tham số hay trường bắt buộc vào request, xoá trường hay đổi kiểu trong response, bỏ
+      giá trị của enum. Endpoint đã khai deprecated và quá ngày `sunset` thì được bỏ. Viết bằng
+      Rust trong `xtask` (thêm lệnh), có test cho từng loại thay đổi; thông báo nói rõ chỗ nào
+      phá và cách làm đúng (endpoint mới + deprecate endpoint cũ)
+- [ ] SDK TypeScript sinh từ `docs/openapi.json` (D-177: trong repo, không đăng npm), đủ kiểu cho
+      request, response, lỗi `Problem` và pagination; gate kiểm SDK khớp hợp đồng như cách test
+      đang kiểm `openapi.json`. Gate không bắt người lạ cài Node: nếu công cụ sinh cần Node thì chạy
+      qua image Docker ghim phiên bản (như gitleaks) hoặc chỉ kiểm trong CI — chọn và ghi quyết định
+- [ ] Hướng dẫn theo tình huống (EN + VI, thư mục mới trong `docs/`): website đọc bài và ảnh
+      (`srcset`, `body_media`, ETag / 304, cache), đăng nhập và làm mới token, API key cho máy,
+      gọi lại an toàn bằng `Idempotency-Key`, pagination, đọc lỗi (`code`, `errors`, `Retry-After`).
+      Mỗi tình huống có ví dụ `curl` và TypeScript dùng SDK
+- [ ] Hướng dẫn nối AI agent qua MCP (EN + VI), mở rộng đoạn ngắn trong README: tạo API key quyền
+      tối thiểu cho agent, cấu hình Claude Code và client MCP khác, danh sách tool theo module và
+      permission cần, giới hạn (rate limit theo API key, bản nháp chờ duyệt — D-109)
+- [ ] Ví dụ trong tài liệu được test: các ví dụ của hai mục trên chạy thật trên app dựng bằng
+      `TestApp` trong gate (hay một lệnh `xtask` gate gọi), để tài liệu không lệch code
+
+Nhóm B — chống hồi quy:
+
+- [ ] Test nâng cấp từ bản phát hành trước: dựng database bằng image Docker của bản trước, ghi dữ
+      liệu mẫu qua API của nó, rồi chạy bản hiện tại trên database đó (migration, đọc lại dữ liệu,
+      vài lệnh ghi) — trên cả SQLite và Postgres; chạy trong CI và trước mỗi lần phát hành
+- [ ] Migration thật của mọi module chạy vòng up → down → up trên database trống và trên database
+      có dữ liệu, trên cả hai database (hiện chỉ có test cơ chế bằng bảng mẫu,
+      `crates/kernel/tests/migration.rs`)
+- [ ] Property test cho các bộ kiểm đầu vào: thân bài ProseMirror (`content`), slug, email
+      (`autoxide_kernel::email`), con trỏ pagination, CSV chống injection, chữ và link của bình
+      luận (chống XSS) — sinh đầu vào ngẫu nhiên, không panic, giữ bất biến; thêm thư viện thì ghi
+      `STACK.md`
+- [ ] Response thật khớp hợp đồng: test HTTP qua `TestApp` kiểm mỗi response (thân và mã) khớp
+      schema của endpoint đó trong `docs/openapi.json`, để tài liệu không hứa điều code không làm
+
+## 32. Dọn bố cục và việc để lại (agent đề xuất ngày 13/11/2026)
+
+Bắt đầu SAU khi bước 29 đã merge vào `main` (đụng cùng module). Làm nhóm A trước: nhóm B sửa đúng
+các module nhóm A dời file. Mỗi mục có test trên cả hai database và dòng CHANGELOG.
+
+Nhóm A — bố cục:
 
 - [ ] Áp quy ước "File layout" của hướng dẫn viết module cho `newsletter`, `comments`, `media`,
       `forms`: phần service chia theo tính năng, test dài thành thư mục `tests/`; không đổi hành vi,
@@ -448,11 +516,29 @@ Nhóm C — bố cục (chỉ sau khi bước 29 đã merge):
       `mail`, `storage`, `search`, `privacy`…), giữ nguyên đường dẫn công khai bằng `pub use` để
       module ở repo riêng không phải sửa (D-167)
 
-## 31. Vận hành sau ra mắt (chủ dự án giao ngày 13/11/2026)
+Nhóm B — việc nhật ký quyết định đã ghi "để sau":
 
-Khi đã có người dùng thật: biết sớm khi hệ thống kẹt, không mất dữ liệu khi có sự cố, xử lý được
-sự cố mà không phải đoán. Bắt đầu SAU nhóm C của bước 30 (gom file `kernel`), hoặc thống nhất
-trước ranh giới file với người làm nhóm đó. Mọi mục chạy và có test trên cả SQLite và Postgres.
+- [ ] `auth`: đổi email thì gửi thêm mail báo tới địa chỉ cũ (kèm cách báo "không phải tôi" — vd
+      khoá phiên và đặt lại mật khẩu), để chủ tài khoản biết khi tài khoản bị chiếm (đã ghi để sau
+      ở mục về xác minh email trong `docs/DECISIONS.md`); mail qua job, không làm chậm request
+- [ ] `auth`: quản trị viên xem và gỡ passkey của người khác (permission riêng, ghi event cho
+      audit), và lệnh CLI gỡ passkey của một tài khoản cho khi admin duy nhất mất thiết bị —
+      `autoxide user reset-mfa` (D-159) hiện chỉ tắt TOTP, không gỡ passkey
+- [ ] `forms`: xuất CSV lớn bằng job ghi file vào `Storage`, trả link tải có hạn; xuất đồng bộ hiện
+      tại giữ cho số bài nhỏ (cách xuất đang có: `modules/forms/src/csv.rs`)
+- [ ] `comments`: Markdown giới hạn (đậm, nghiêng, link, trích dẫn, code) với bộ lọc HTML chống
+      XSS — thêm thư viện thì đo và ghi `STACK.md`; giữ test XSS sẵn có; chữ thường cũ hiển thị như cũ
+
+Chờ chủ dự án quyết: định dạng AVIF cho ảnh thu nhỏ (cần thư viện mã hoá AVIF, nặng hơn WebP).
+
+## 33. Vận hành và hiệu năng (chủ dự án giao ngày 13/11/2026)
+
+Khi đã có người dùng thật: biết sớm khi hệ thống kẹt, không mất dữ liệu, xử lý sự cố không phải
+đoán, và chịu được dữ liệu cỡ thật. Bắt đầu SAU nhóm A của bước 32 (gom file `kernel` và module).
+Làm nhóm A trước: số đo tồn đọng dùng để quan sát lúc chạy tải ở nhóm B. Mọi số đo ghi kèm máy,
+ngày, cỡ dữ liệu; mọi thay đổi chạy và có test trên cả hai database; không đổi tính đúng lấy tốc độ.
+
+Nhóm A — vận hành:
 
 - [ ] Backup tự động theo lịch: job định kỳ (qua `Schedule` của kernel) tạo bản backup như
       `autoxide backup` (`crates/app/src/commands/backup.rs`) rồi ghi vào `Storage` (ổ đĩa hay
@@ -477,39 +563,8 @@ trước ranh giới file với người làm nhóm đó. Mọi mục chạy và
       nâng cấp khi nhiều máy chủ chạy hai phiên bản code cùng lúc (migration theo kiểu mở rộng
       trước, thu hẹp sau). Mỗi tình huống: dấu hiệu, lệnh kiểm, cách sửa
 
-## 32. Cho người gọi API (chủ dự án giao ngày 13/11/2026, D-177)
-
-Người viết giao diện (repo riêng, D-097), nhà phát triển ngoài và AI agent dùng API nhanh và không
-gọi sai. Bước này sửa `xtask`, `gate.sh`, tài liệu và thêm thư mục SDK — không đụng file của bước
-29–31, nên làm song song được. Ví dụ và test chạy trên cả SQLite và Postgres.
-
-- [ ] Gate chặn thay đổi phá vỡ của `/api/v1` (D-059): so `docs/openapi.json` với bản ở tag phát
-      hành gần nhất (`git show vX.Y.Z:docs/openapi.json`) và báo đỏ khi xoá endpoint hay method,
-      thêm tham số hay trường bắt buộc vào request, xoá trường hay đổi kiểu trong response, bỏ
-      giá trị của enum. Endpoint đã khai deprecated và quá ngày `sunset` thì được bỏ. Viết bằng
-      Rust trong `xtask` (thêm lệnh), có test cho từng loại thay đổi; thông báo nói rõ chỗ nào
-      phá và cách làm đúng (endpoint mới + deprecate endpoint cũ)
-- [ ] SDK TypeScript sinh từ `docs/openapi.json` (D-177: trong repo, không đăng npm), đủ kiểu cho
-      request, response, lỗi `Problem` và pagination; gate kiểm SDK khớp hợp đồng như cách test
-      đang kiểm `openapi.json`. Gate không bắt người lạ cài Node: nếu công cụ sinh cần Node thì chạy
-      qua image Docker ghim phiên bản (như gitleaks) hoặc chỉ kiểm trong CI — chọn và ghi quyết định
-- [ ] Hướng dẫn theo tình huống (EN + VI, thư mục mới trong `docs/`): website đọc bài và ảnh
-      (`srcset`, `body_media`, ETag / 304, cache), đăng nhập và làm mới token, API key cho máy,
-      gọi lại an toàn bằng `Idempotency-Key`, pagination, đọc lỗi (`code`, `errors`, `Retry-After`).
-      Mỗi tình huống có ví dụ `curl` và TypeScript dùng SDK
-- [ ] Hướng dẫn nối AI agent qua MCP (EN + VI), mở rộng đoạn ngắn trong README: tạo API key quyền
-      tối thiểu cho agent, cấu hình Claude Code và client MCP khác, danh sách tool theo module và
-      permission cần, giới hạn (rate limit theo API key, bản nháp chờ duyệt — D-109)
-- [ ] Ví dụ trong tài liệu được test: các ví dụ của hai mục trên chạy thật trên app dựng bằng
-      `TestApp` trong gate (hay một lệnh `xtask` gate gọi), để tài liệu không lệch code
-
-## 33. Hiệu năng ở quy mô thật (chủ dự án giao ngày 13/11/2026)
-
-Các bài đo hiện có (`docs/BENCHMARKS.md`) chạy trên database gần như trống và chỉ đi qua `notes`
-và `auth`; đường đọc công khai mà website gọi nhiều nhất chưa từng được đo. Bắt đầu SAU nhóm C của
-bước 30 (dời file module, đụng truy vấn và migration) và sau bước 31 (số đo hàng đợi để quan sát
-lúc chạy tải); đo ảnh sau khi WebP của bước 30 xong. Mọi số đo ghi kèm máy, ngày, cỡ dữ liệu; mọi
-thay đổi chạy và có test trên cả SQLite và Postgres; không đổi tính đúng lấy tốc độ.
+Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên database gần như trống, chỉ đi qua
+`notes` và `auth`):
 
 - [ ] Bộ dữ liệu lớn để đo: một lệnh (vd trong `xtask` hay `scripts/`) sinh nhanh dữ liệu cỡ thật
       trên cả hai database — vd 100 nghìn bài nhiều ngôn ngữ có danh mục, thẻ, tác giả; 50 nghìn
@@ -532,68 +587,6 @@ thay đổi chạy và có test trên cả SQLite và Postgres; không đổi t�
       với ngưỡng 50 ms của D-110 (`docs/BENCHMARKS.md`, mục "Tìm theo ý nghĩa"); vượt ngưỡng thì
       chọn cách giảm (vector nhỏ hơn, chia nhiều nhân, hay index sau một trait) chạy được trên cả
       hai database, ghi quyết định; không vượt thì ghi số đo và giữ nguyên
-
-## 34. Sẵn sàng làm dự án mã nguồn mở (agent đề xuất ngày 13/11/2026, theo D-175)
-
-Repo sắp công khai (bước 30) nhưng chưa có những file một dự án mã nguồn mở cần để người lạ báo
-lỗi, đóng góp và tin bản phát hành. Làm ngay được, không đụng code của bước 29–33; tài liệu cho
-người ngoài viết tiếng Anh kèm bản tiếng Việt cùng nội dung.
-
-- [ ] `SECURITY.md` (EN + VI): phiên bản còn được vá, cách báo lỗ hổng riêng tư (bật "Private
-      vulnerability reporting" của GitHub — chủ dự án bấm), thời gian phản hồi dự kiến, những gì
-      không tính là lỗ hổng; README trỏ tới nó
-- [ ] `CONTRIBUTING.md` (EN + VI) cho người đóng góp là người: dựng môi trường, hai mức gate
-      (D-173), luật quan trọng nhất tóm từ `CLAUDE.md` (hai database, ranh giới module, lỗi có
-      `code`, test), cách viết commit và PR, license của phần đóng góp (MIT OR Apache-2.0, như
-      repo); trỏ `CLAUDE.md` cho người dùng AI agent
-- [ ] Quy tắc ứng xử (`CODE_OF_CONDUCT.md`, theo Contributor Covenant bản mới nhất) với địa chỉ
-      liên hệ do chủ dự án đặt; mẫu issue (báo lỗi: phiên bản, database, cách tái hiện; đề xuất) và
-      mẫu PR (đã chạy `./gate.sh`, đã sửa EN + VI, đã thêm CHANGELOG) trong `.github/`
-- [ ] Bản phát hành đáng tin: workflow `Release` (sau bước 30) đính kèm chứng thực nguồn gốc build
-      (GitHub artifact attestation) và danh sách thành phần (SBOM) cho image Docker; `docs/DEPLOY.md`
-      (EN + VI) có lệnh kiểm chứng thực trước khi chạy image
-- [ ] `cargo xtask check` hay test giữ các file trên không mất và hai bản EN / VI không lệch
-      tiêu đề mục (cách làm như kiểm bản dịch i18n), để agent phiên sau không quên sửa một bên
-
-## 35. Việc đã để lại (agent đề xuất ngày 13/11/2026)
-
-Những việc nhật ký quyết định đã ghi "để sau" mà vẫn có ích cho người dùng. Mỗi mục một module;
-làm sau nhóm C của bước 30 với `forms`, `comments` (bố cục đổi). Mỗi mục có test trên cả hai
-database và dòng CHANGELOG.
-
-- [ ] `auth`: đổi email thì gửi thêm mail báo tới địa chỉ cũ (kèm cách báo "không phải tôi" — vd
-      khoá phiên và đặt lại mật khẩu), để chủ tài khoản biết khi tài khoản bị chiếm (đã ghi để sau
-      ở mục về xác minh email trong `docs/DECISIONS.md`); mail qua job, không làm chậm request
-- [ ] `auth`: quản trị viên xem và gỡ passkey của người khác (permission riêng, ghi event cho
-      audit), và lệnh CLI gỡ passkey của một tài khoản cho khi admin duy nhất mất thiết bị —
-      `autoxide user reset-mfa` (D-159) hiện chỉ tắt TOTP, không gỡ passkey
-- [ ] `forms`: xuất CSV lớn bằng job ghi file vào `Storage`, trả link tải có hạn; xuất đồng bộ hiện
-      tại giữ cho số bài nhỏ (cách xuất đang có: `modules/forms/src/csv.rs`)
-- [ ] `comments`: Markdown giới hạn (đậm, nghiêng, link, trích dẫn, code) với bộ lọc HTML chống
-      XSS — thêm thư viện thì đo và ghi `STACK.md`; giữ test XSS sẵn có; chữ thường cũ hiển thị như cũ
-- [ ] Image Docker cho máy ARM64 (`linux/arm64`) trong workflow `Release` khi repo đã công khai
-      (máy build ARM của GitHub miễn phí cho repo công khai; D-078 để sau vì build giả lập quá lâu)
-
-Chờ chủ dự án quyết: định dạng AVIF cho ảnh thu nhỏ (cần thư viện mã hoá AVIF, nặng hơn WebP).
-
-## 36. Chống hồi quy (agent đề xuất ngày 13/11/2026)
-
-Test hiện tại kiểm code mới trên database mới; chưa có gì chứng minh bản mới chạy được trên
-database của bản cũ, hay response thật khớp hợp đồng OpenAPI. Làm sau bước 30 (cần image Docker
-của bản cũ cho mục 1).
-
-- [ ] Test nâng cấp từ bản phát hành trước: dựng database bằng image Docker của bản trước, ghi dữ
-      liệu mẫu qua API của nó, rồi chạy bản hiện tại trên database đó (migration, đọc lại dữ liệu,
-      vài lệnh ghi) — trên cả SQLite và Postgres; chạy trong CI và trước mỗi lần phát hành
-- [ ] Migration thật của mọi module chạy vòng up → down → up trên database trống và trên database
-      có dữ liệu, trên cả hai database (hiện chỉ có test cơ chế bằng bảng mẫu,
-      `crates/kernel/tests/migration.rs`)
-- [ ] Property test cho các bộ kiểm đầu vào: thân bài ProseMirror (`content`), slug, email
-      (`autoxide_kernel::email`), con trỏ pagination, CSV chống injection, chữ và link của bình
-      luận (chống XSS) — sinh đầu vào ngẫu nhiên, không panic, giữ bất biến; thêm thư viện thì ghi
-      `STACK.md`
-- [ ] Response thật khớp hợp đồng: test HTTP qua `TestApp` kiểm mỗi response (thân và mã) khớp
-      schema của endpoint đó trong `docs/openapi.json`, để tài liệu không hứa điều code không làm
 
 ## Sau core (chưa mở)
 
