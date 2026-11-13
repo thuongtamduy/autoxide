@@ -59,6 +59,9 @@ thêm khách hay đổi mô hình, và **tuân thủ pháp luật Việt Nam hi�
   cha.
 - **Cài đặt kế thừa theo cây** (múi giờ, tiền tệ, hồ sơ thuế, chính sách): nút con dùng giá trị
   của tổ tiên gần nhất trừ khi tự đặt.
+- **Địa chỉ chuẩn** (module nền `address`, D-193): đơn vị hành chính Việt Nam sau sáp nhập (hai cấp,
+  34 tỉnh, 3.321 xã) dùng chung mọi khách; nút tổ chức, KYC, hồ sơ pháp lý, người mua dùng chung một
+  kiểu `Address`.
 - **Tên miền gắn với nút**: mỗi cửa hàng một tên miền; trang công khai biết mình thuộc nút nào.
 - **Danh tính hai lớp**: nhân sự (quản trị, nhân viên, người bán) là tài khoản toàn nền tảng
   trong mặt điều khiển — một người làm cho nhiều khách / nhiều nút; **người mua** là tài khoản
@@ -183,8 +186,9 @@ thiếu dời sau để dựng sẵn trên nền đa khách):
    phiên bản, bảo vệ người tiêu dùng, gắn nhãn nội dung AI, SMS, gỡ vi phạm.
 6. **38** cây khách hàng xuyên database, báo cáo gộp, phân phối dữ liệu cha → con.
 
-Module thương mại (sản phẩm, giỏ hàng, đơn hàng, kho, vận chuyển, sàn) là module nghiệp vụ, dựng
-**sau** nền, dùng `tenant_id` + `org_id` + engine thuế + sổ cái ngay từ đầu.
+Module thương mại (sản phẩm, kho, khuyến mại, vận chuyển, giỏ hàng và đơn hàng, sàn) là module
+nghiệp vụ, dựng **sau** nền ở bước 41–46, dùng `tenant_id` + `org_id` + engine thuế + sổ cái ngay từ
+đầu — xem mục 8.
 
 **Cái giá biết trước**: bước 33 sửa mọi bảng của 13 module (migration mới, không sửa migration
 cũ); đường nóng mỗi request đọc thêm ngữ cảnh khách và quyền theo nút (đo trước / sau); người
@@ -214,6 +218,40 @@ Rà lại thiết kế trên thấy những chỗ sau sẽ phải sửa về sau
 trong backup — phức tạp và chưa có yêu cầu luật buộc; khuyến mại phải đăng ký, phí sàn theo ngành
 hàng, người bán nước ngoài — thuộc module thương mại.
 
+## 8. Module thương mại (D-191)
+
+Sáu module, mỗi module một crate, dựng trên nền 33–37:
+
+| Bước | Module | Làm gì | Dựa vào nền |
+|---|---|---|---|
+| 41 | `catalog` | Sản phẩm, biến thể, danh mục, thuộc tính bắt buộc theo danh mục, bảng giá theo cửa hàng / nhóm khách, lịch sử giá | Cây tổ chức (giá kế thừa), engine thuế (nhóm thuế), gói (hạn mức số sản phẩm) |
+| 42 | `inventory` | Tồn theo kho, sổ biến động chỉ thêm, giữ chỗ chống bán quá, chuyển kho, kiểm kê, giá vốn, lô / hạn dùng | Kho là nút tổ chức; khoá dòng của kernel |
+| 43 | `promotions` | Mã giảm giá, giảm tự động, flash sale, giới hạn lượt; hạn mức luật là dữ liệu; xuất hồ sơ thông báo khuyến mại | Giữ chỗ như tồn kho |
+| 44 | `shipping` | Địa chỉ Việt Nam hai cấp, phí theo vùng / cân nặng, trait hãng vận chuyển, vận đơn, COD và đối soát | Sổ cái (COD), event |
+| 45 | `orders` | Giỏ hàng, đặt hàng, thanh toán theo chế độ dòng tiền, vòng đời đơn, đổi trả và hoàn tiền, hoá đơn điện tử, bán tại quầy, đánh giá, báo cáo | Cổng thanh toán, sổ cái, chứng từ, hoá đơn điện tử |
+| 46 | `marketplace` | Người bán đăng ký có KYC, duyệt sản phẩm, phí sàn, tách đơn theo người bán, chi trả sau hạn đổi trả có khấu trừ thuế, tranh chấp | KYC, văn bản có phiên bản, thu hộ qua đối tác, thuế khấu trừ thay |
+
+**Nhất quán giữa module không dùng transaction chung.** Đặt hàng là một chuỗi bước: giữ tồn → giữ
+lượt khuyến mại → tạo đơn → thanh toán → xác nhận. Mỗi bên giữ chỗ có hạn theo `order_id`; một bước
+hỏng thì các chỗ đã giữ được trả lại (bằng lệnh, hay job khi hết hạn). Gọi lại với cùng `order_id`
+không tạo chỗ thứ hai. Cách này giữ đúng luật "module sở hữu bảng của mình", và vẫn chạy khi một
+module sau này tách sang database khác.
+
+**Bộ nối với đối tác cụ thể** (VNPay, MoMo, GHN, GHTK, Viettel Post, nhà cung cấp hoá đơn điện tử,
+SMS brandname, eKYC) là module riêng cắm sau trait của core. Viết chúng cần tài khoản thử của đối tác,
+nên làm khi chủ dự án cấp.
+
+Điểm luật riêng của thương mại (đối chiếu ngày 13/11/2026, cần xác nhận văn bản gốc):
+
+- Địa chỉ: chính quyền địa phương hai cấp từ 01/7/2025, danh mục 34 tỉnh và 3.321 xã theo QĐ
+  19/2025/QĐ-TTg. Đây là phần nền (module `address`, bước 34, D-193), chỉ dùng danh mục sau sáp
+  nhập.
+- Khuyến mại: Thông tư 39/2025/TT-BCT đặt trần 50% giá ngay trước khuyến mại (ngoại lệ cho chương
+  trình tập trung quốc gia); NĐ 239/2026 bỏ các điều về hạn mức trong NĐ 81/2018 và giao Bộ Công
+  Thương quy định — vì vậy hạn mức là dữ liệu.
+- Giá niêm yết bằng Đồng Việt Nam (Luật Giá 16/2023); nhãn hàng hoá (NĐ 43/2017, NĐ 111/2021); hàng
+  cấm và hàng kinh doanh có điều kiện là danh mục dữ liệu.
+
 ## Nguồn
 
 Kiến trúc:
@@ -239,4 +277,6 @@ Pháp lý (báo chí và công ty luật tổng hợp; đối chiếu văn bản
 - Hoá đơn từ máy tính tiền, NĐ 70/2025 — [Sapo](https://www.sapo.vn/blog/nghi-dinh-so-70-2025-nd-cp), [Thời báo Tài chính](https://thoibaotaichinhvietnam.vn/ho-ca-nhan-kinh-doanh-chu-dong-ra-soat-doanh-thu-ap-dung-hoa-don-dien-tu-tu-may-tinh-tien-175242.html)
 - Luật Bảo vệ quyền lợi người tiêu dùng 2023 — [Bộ Công Thương](https://moit.gov.vn/tin-tuc/bao-chi-voi-nguoi-dan/luat-bao-ve-quyen-loi-nguoi-tieu-dung-nam-2023-va-van-ban-huong-dan-luat-huong-toi-muc-tieu-nang-cao-trach-nhiem-bao-ve-.html), [LuatVietnam](https://luatvietnam.vn/thuong-mai/luat-bao-ve-quyen-loi-nguoi-tieu-dung-2023-so-19-2023-qh15-259732-d1.html)
 - Luật Trí tuệ nhân tạo 2025 — [Cần Thơ PBGDPL](https://pbgdpl.cantho.gov.vn/mot-so-diem-moi-cua-luat-tri-tue-nhan-tao), [LSVN](https://lsvn.vn/doanh-nghiep-can-lam-gi-khi-luat-tri-tue-nhan-tao-2025-co-hieu-luc-a169962.html)
+- Đơn vị hành chính hai cấp, QĐ 19/2025/QĐ-TTg — [SGGP](https://www.sggp.org.vn/ban-hanh-bang-danh-muc-va-ma-so-cua-34-tinh-thanh-moi-post802486.html), [Nhà Đầu tư](https://nhadautu.vn/hom-nay-34-tinh-thanh-chinh-thuc-van-hanh-chinh-quyen-dia-phuong-2-cap-d97356.html)
+- Khuyến mại, Thông tư 39/2025 và NĐ 239/2026 — [Sài Gòn Times](https://thesaigontimes.vn/saigontimes/tu-1-7-doanh-nghiep-khong-duoc-khuyen-mai-qua-50-gia-ban/), [KPMG](https://assets.kpmg.com/content/dam/kpmgsites/vn/pdf/2026/07/decree-239-on-trade-promotion-vi.pdf.coredownload.inline.pdf), [LuatVietnam](https://luatvietnam.vn/doanh-nghiep/muc-giam-gia-toi-da-voi-hang-hoa-khuyen-mai-561-97084-article.html)
 - Thông báo / đăng ký website TMĐT — [Cổng dịch vụ công Bộ Công Thương](https://dichvucong.moit.gov.vn/TTHCOnlineDetail.aspx?DocId=115), [LTV Law](https://ltvlaw.com/tin-tuc/dang-ky-website-cung-cap-dich-vu-tmdt), [Siglaw](https://siglaw.com.vn/thu-tuc-thong-bao-website-thuong-mai-dien-tu.html)
