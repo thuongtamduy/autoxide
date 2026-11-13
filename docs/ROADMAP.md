@@ -3,7 +3,7 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–26 xong**; bản phát hành mới nhất `v0.7.0`. CI trên GitHub đã tắt (D-107):
+Trạng thái: **bước 0–26 xong**, đang làm bước 27; bản phát hành mới nhất `v0.7.0`. CI trên GitHub đã tắt (D-107):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -325,6 +325,19 @@ Giao diện quản trị ở repo riêng (D-096, D-097); bước này chỉ làm
 - [x] `autoxide jobs retry` một job `webhooks.send` đã hỏng thì gửi lại thật
 - [x] Đặt lại mật khẩu: trả lời trong cùng khoảng thời gian dù email có hay không (việc chạy trong job)
 - [x] Đo tải (`scripts/loadtest.sh`) rồi tối ưu xác thực mỗi request nếu đo được lợi — đo: không lợi, không làm (D-163)
+
+## 27. Cửa cho người viết module, core sẵn sàng thành framework (chủ dự án giao ngày 13/11/2026, D-164)
+
+Mượn cái hay của framework khác ([`docs/research/frameworks.md`](research/frameworks.md)).
+
+- [ ] `TestApp` trong `autoxide-testkit`: dựng module như binary trên `TestDatabase`, gọi REST và
+      MCP với quyền tuỳ chọn; `notes` dùng nó; hướng dẫn (EN + VI)
+- [ ] Các module còn lại chuyển sang `TestApp` (một cách làm cho mỗi việc)
+- [ ] `cargo xtask new-module <tên>`: sinh module mới từ khuôn `notes`, qua được gate
+- [ ] `Module::checks` + `autoxide doctor`: kiểm cấu hình, database, migration và kiểm của module
+- [ ] `Module::tasks` + `autoxide task`: lệnh quản trị do module khai
+- [ ] Hợp đồng ổn định: danh sách public dependency, `#[non_exhaustive]` cho kiểu sẽ lớn thêm,
+      chính sách deprecate API Rust; hướng dẫn viết module ở repo riêng (EN + VI)
 
 ## Sau core (chưa mở)
 

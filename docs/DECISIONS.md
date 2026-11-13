@@ -3904,3 +3904,32 @@ Sửa kèm script đo: tắt giới hạn theo API key (`AUTOXIDE_HTTP_RATE_LIMI
 D-109) — trước đó bài đo API key chỉ đo câu trả lời 429; thêm `LOADTEST_BINARY` để đo binary có
 sẵn. Các tối ưu khác để lại ở D-158 (throttle, ghi event, hỏi khi rảnh, mutex rate limiter, log)
 chưa có số đo cho thấy chúng là điểm nghẽn: không làm.
+
+## D-164 · Autoxide là sản phẩm có cửa cho module; mượn cái hay của framework khác; core chuẩn để sau nâng thành framework — 2026-11-13 — chủ dự án quyết
+
+Quyết định:
+
+- **Giữ Autoxide là sản phẩm** (một binary, D-005), không công bố thành framework lúc này.
+  Người khác viết được module mà không phải sửa core (cửa đã có: trait `Module`, D-038) — bước 27
+  làm cửa đó dễ đi hơn.
+- **Mượn cái hay của framework khác** khi nó hợp với luật trong `CLAUDE.md`: test harness dựng
+  sẵn (Loco, Cot), lệnh sinh module (Loco / Rails), `doctor` (Loco), kiểm lúc khởi động do
+  module khai (Django system checks), lệnh CLI do module khai (Loco tasks, Django management
+  commands), module ở repo riêng (Django reusable apps, Rails engines). Danh sách và lý do:
+  [`docs/research/frameworks.md`](research/frameworks.md).
+- **Core chuẩn để sau này nâng thành framework rẻ:** hợp đồng module (kernel + testkit + các thư
+  viện lộ ra trong nó) được liệt kê rõ; kiểu công khai sẽ lớn thêm thì đánh dấu
+  `#[non_exhaustive]`; API Rust bỏ đi thì `#[deprecated]` trước một bản phát hành rồi mới xoá.
+- Công bố thành framework (`publish` lên crates.io) chỉ khi chủ dự án quyết, sau khi: core xong
+  lộ trình; có người ngoài thật sự viết module; `cargo-semver-checks` vào quy trình phát hành;
+  luật của `cargo xtask check` chạy được trong repo của người viết module.
+
+Lý do: thứ làm Autoxide mạnh là luật được gate kiểm trong repo này; ra khỏi repo thì mất. Ở sân
+framework, Loco đã 1.0 và có cộng đồng; ở sân sản phẩm, Autoxide có lợi thế riêng (ranh giới
+module do máy kiểm, hai database có test thật, OpenAPI + MCP cho AI agent). PocketBase cho thấy
+"sản phẩm trước, chế độ thư viện sau" là con đường đã chạy được.
+
+Đã cân nhắc: thành framework ngay — mỗi thay đổi của kernel thành thay đổi phá vỡ cho người
+khác, phải hỗ trợ dải phiên bản Rust cũ, mất luật tự kiểm; re-export axum / SeaORM / utoipa từ
+kernel — derive macro của chúng sinh đường dẫn cố định nên module vẫn phải khai trực tiếp; plugin
+WASM, trang admin, auto-CRUD, ORM tự viết, DI lúc biên dịch — xem bản khảo sát.
