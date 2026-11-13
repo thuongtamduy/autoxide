@@ -21,6 +21,8 @@ pub(crate) struct PublicView {
     pub row: Published,
     pub featured: Option<MediaRef>,
     pub og: Option<MediaRef>,
+    /// Ảnh trong thân bài (node `image`) còn công khai, theo thứ tự xuất hiện.
+    pub body_media: Vec<MediaRef>,
     /// (ngôn ngữ, đường dẫn) của các bản dịch khác đang công khai.
     pub translations: Vec<(String, String)>,
     pub terms: Vec<TermRef>,
@@ -38,11 +40,16 @@ impl ContentService {
         let mut authors = crate::authors::authors_of(self.database.read(), &ids).await?;
         // Ảnh đại diện của tác giả cũng tra qua `media`: ảnh riêng tư thì không lộ cả ID.
         let avatars = authors.values().flatten().filter_map(|author| author.avatar_media_id);
+        // Ảnh trong thân bài: website cần kích thước và các bản nhỏ của chúng cho `srcset`
+        // (D-168). Tra chung một lượt với ảnh đại diện.
+        let body_images: Vec<Vec<Uuid>> =
+            rows.iter().map(|row| crate::body::stored_image_ids(&row.body)).collect();
         let media_ids: Vec<Uuid> = rows
             .iter()
             .flat_map(|row| [row.featured_media_id, row.og_media_id])
             .flatten()
             .chain(avatars)
+            .chain(body_images.iter().flatten().copied())
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
@@ -78,7 +85,8 @@ impl ContentService {
         }
         Ok(rows
             .into_iter()
-            .map(|row| {
+            .zip(body_images)
+            .map(|(row, images)| {
                 let translations = siblings
                     .iter()
                     .filter(|other| {
@@ -90,6 +98,7 @@ impl ContentService {
                 PublicView {
                     featured: row.featured_media_id.and_then(|id| media.get(&id).cloned()),
                     og: row.og_media_id.and_then(|id| media.get(&id).cloned()),
+                    body_media: images.iter().filter_map(|id| media.get(id).cloned()).collect(),
                     translations,
                     terms: terms.remove(&row.entry_id).unwrap_or_default(),
                     authors: authors.remove(&row.entry_id).unwrap_or_default(),

@@ -123,6 +123,11 @@ pub(crate) struct PublicEntryResponse {
     word_count: i32,
     reading_time_minutes: i32,
     featured_media: Option<PublicMedia>,
+    /// The images used in `body` (nodes of type `image`), in order of appearance: find one by
+    /// the `mediaId` of the node to get its size and smaller copies for `srcset`. An image
+    /// that is no longer public is left out. `alt` here is the one of the media library; the
+    /// node carries its own.
+    body_media: Vec<PublicMedia>,
     seo: PublicSeo,
     /// The date shown as the publication date.
     published_at: DateTime<Utc>,
@@ -144,9 +149,10 @@ pub(crate) struct PublicEntryResponse {
 }
 
 pub(crate) fn public_entry(view: PublicView) -> PublicEntryResponse {
-    let PublicView { row, featured, og, translations, terms, authors } = view;
+    let PublicView { row, featured, og, body_media, translations, terms, authors } = view;
     PublicEntryResponse {
         featured_media: media(featured, &row.featured_media_alt),
+        body_media: body_media.into_iter().filter_map(|item| media(Some(item), "")).collect(),
         seo: PublicSeo {
             og_image: media(og, ""),
             meta_title: row.meta_title,

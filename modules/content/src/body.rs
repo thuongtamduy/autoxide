@@ -59,6 +59,38 @@ struct Checker<'a> {
     info: BodyInfo,
 }
 
+/// ID các ảnh (node `image`) trong thân bài đã lưu `body`, theo thứ tự xuất hiện, không lặp.
+///
+/// Thân bài đã lưu thì đã qua [`check`], nên ở đây chỉ đi cây; JSON hỏng hay node lạ coi như
+/// không có ảnh. Thân bài không có chữ `"image"` thì khỏi phải đọc JSON (đường nóng của danh
+/// sách bài công khai).
+pub(crate) fn stored_image_ids(body: &str) -> Vec<Uuid> {
+    if !body.contains("\"image\"") {
+        return Vec::new();
+    }
+    let Ok(root) = serde_json::from_str::<Value>(body) else {
+        return Vec::new();
+    };
+    let mut found = Vec::new();
+    // Duyệt bằng ngăn xếp (không đệ quy): đẩy con theo thứ tự ngược để lấy ra đúng thứ tự.
+    let mut pending = vec![&root];
+    while let Some(node) = pending.pop() {
+        if node.get("type").and_then(Value::as_str) == Some("image") {
+            let id = node
+                .pointer("/attrs/mediaId")
+                .and_then(Value::as_str)
+                .and_then(|id| Uuid::parse_str(id).ok());
+            if let Some(id) = id.filter(|id| !found.contains(id)) {
+                found.push(id);
+            }
+        }
+        if let Some(children) = node.get("content").and_then(Value::as_array) {
+            pending.extend(children.iter().rev());
+        }
+    }
+    found
+}
+
 /// Kiểm `body`; trả thông tin trích được, hoặc mọi lỗi (trường tên `body…`).
 pub(crate) fn check(
     body: &Value,
@@ -515,6 +547,9 @@ mod tests {
         ]});
         let info = check(&body, 100_000, &hosts()).unwrap();
         assert_eq!(info.media_ids.into_iter().collect::<Vec<_>>(), [image]);
+        assert_eq!(stored_image_ids(&body.to_string()), [image]);
+        assert!(stored_image_ids("{\"type\": \"doc\", \"content\": []}").is_empty());
+        assert!(stored_image_ids("\"image\" but not JSON").is_empty());
         assert!(info.plain_text.starts_with("Đà Lạt\nXin chào bạn"), "{}", info.plain_text);
         assert!(info.plain_text.contains("Hồ Xuân Hương"));
         assert_eq!(info.word_count, 12);

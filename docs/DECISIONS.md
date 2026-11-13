@@ -4023,3 +4023,33 @@ và gate xác nhận được.
 Đã cân nhắc: đánh dấu hết một lượt — phải sửa ~100 chỗ trong 12 module cùng lúc; `cargo
 semver-checks` ngay trong gate — khi còn `0.x` mọi bản minor được phép phá vỡ nên công cụ chỉ bắt
 được lỗi ở bản vá; để dành cho lúc chủ dự án quyết công bố framework (D-164).
+
+## D-168 · Bản công khai kèm ảnh trong thân bài (`body_media`) — 2026-11-13 — agent quyết
+
+Bối cảnh: thử một bài viết có ảnh 6000 × 4000 trong thân bài. Ảnh đại diện có `srcset` vì bản
+công khai trả `featured_media` kèm kích thước và các bản nhỏ; ảnh trong thân bài thì node `image`
+chỉ có `mediaId`, và khách không đọc được `GET /api/v1/media/{id}`. Website vì thế chỉ biết địa
+chỉ bản gốc: mọi thiết bị tải ảnh gốc (đo được 4,2 MB cho một ảnh), không giữ được chỗ cho ảnh
+(thiếu chiều rộng, chiều cao) và địa chỉ không mang phiên bản nên chỉ cache 60 giây.
+
+Quyết định: `PublicEntryResponse` có thêm `body_media`: các ảnh mà node `image` trong `body`
+dùng, theo thứ tự xuất hiện, không lặp, cùng dạng `PublicMedia` với `featured_media` (địa chỉ
+có phiên bản, kích thước, các bản nhỏ). Ảnh không còn công khai thì không có trong danh sách,
+như `featured_media`. `alt` ở đây là của thư viện media; node `image` vẫn mang `alt` riêng.
+
+Cách làm: `public_views` gom ID ảnh trong thân bài của mọi dòng vào cùng lượt `Media::find_many`
+đã có cho ảnh đại diện và ảnh tác giả: số câu query không đổi theo số bài. Thân bài không có
+chữ `"image"` thì không đọc JSON.
+
+Lý do: thêm trường, không đổi trường cũ, nên không phá client nào; website không cần quyền gì
+thêm; core đã có sẵn mọi dữ liệu.
+
+Đã cân nhắc: chép kích thước vào node `image` lúc lưu — cũ đi khi ảnh bị thay nội dung, và
+không có các bản nhỏ (job nền làm sau khi tải lên); mở `GET /api/v1/media/{id}` cho khách với
+ảnh công khai — website phải gọi thêm một lần cho mỗi ảnh; website tự đoán `?w=` — sai với ảnh
+nhỏ hơn cỡ xin, và vẫn thiếu kích thước.
+
+Chưa làm (ghi lại để chủ dự án quyết, đo trong cùng lần thử): các bản nhỏ chỉ có JPEG / PNG.
+Với ảnh thử, WebP nhẹ hơn JPEG cùng cỡ khoảng 60–70%, AVIF khoảng 70–80%; bản nhỏ PNG của ảnh
+có vùng trong suốt nặng gần bằng ảnh gốc (1,2 MB ở 1920 px, trong khi WebP có alpha khoảng
+55 KB). Thêm định dạng mới cần thêm thư viện mã hoá (xem ghi chú đầu `variants.rs`).

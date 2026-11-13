@@ -31298,6 +31298,7 @@
                 "body_schema_version",
                 "word_count",
                 "reading_time_minutes",
+                "body_media",
                 "seo",
                 "published_at",
                 "first_published_at",
@@ -31326,6 +31327,13 @@
                 },
                 "body": {
                   "$ref": "#/components/schemas/BodyNode"
+                },
+                "body_media": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicMedia"
+                  },
+                  "description": "The images used in `body` (nodes of type `image`), in order of appearance: find one by\nthe `mediaId` of the node to get its size and smaller copies for `srcset`. An image\nthat is no longer public is left out. `alt` here is the one of the media library; the\nnode carries its own."
                 },
                 "body_schema_version": {
                   "type": "integer",
@@ -35391,6 +35399,7 @@
                 "body_schema_version",
                 "word_count",
                 "reading_time_minutes",
+                "body_media",
                 "seo",
                 "published_at",
                 "first_published_at",
@@ -35419,6 +35428,13 @@
                 },
                 "body": {
                   "$ref": "#/components/schemas/BodyNode"
+                },
+                "body_media": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicMedia"
+                  },
+                  "description": "The images used in `body` (nodes of type `image`), in order of appearance: find one by\nthe `mediaId` of the node to get its size and smaller copies for `srcset`. An image\nthat is no longer public is left out. `alt` here is the one of the media library; the\nnode carries its own."
                 },
                 "body_schema_version": {
                   "type": "integer",
@@ -37182,6 +37198,7 @@
           "body_schema_version",
           "word_count",
           "reading_time_minutes",
+          "body_media",
           "seo",
           "published_at",
           "first_published_at",
@@ -37210,6 +37227,13 @@
           },
           "body": {
             "$ref": "#/components/schemas/BodyNode"
+          },
+          "body_media": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicMedia"
+            },
+            "description": "The images used in `body` (nodes of type `image`), in order of appearance: find one by\nthe `mediaId` of the node to get its size and smaller copies for `srcset`. An image\nthat is no longer public is left out. `alt` here is the one of the media library; the\nnode carries its own."
           },
           "body_schema_version": {
             "type": "integer",
