@@ -387,3 +387,20 @@ Cả SQLite và Postgres, qua `TestDatabase::run` / `TestApp`; `dyn Catalog`, `d
   khuyến nghị gộp theo dòng tồn trong mỗi transaction.
 - Mặc định `allow_split` — khuyến nghị tắt (một đơn một kho, dễ giao).
 - Ghi mọi lựa chọn vào `docs/DECISIONS.md` (skill `record-decision`).
+
+## Bổ sung theo D-200 (thiết kế giao diện 2)
+
+**Tình trạng hàng công khai.** `GET /public/availability?variant_ids&store_id` (công khai) trả cho mỗi biến
+thể × cửa hàng một mức: `in_stock`, `low` (kèm `quantity` khi tồn khả dụng dưới
+`AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD`, mặc định 5), `out`; bỏ `store_id` thì trả mọi cửa hàng có
+`pickup` (bước 34). Không bao giờ trả số tồn trên ngưỡng. `api` thêm hàm lọc tập biến thể còn hàng ở một
+cửa hàng để `catalog` làm bộ lọc "chỉ hàng có sẵn ở cửa hàng X". Cache ngắn (vài giây) và ETag theo phiên
+bản sổ biến động. Test: số tồn lớn không lộ; mức đổi ngay sau khi giữ chỗ.
+
+## Bổ sung theo D-201
+
+**Báo khi có hàng lại.** `POST /public/restock-alerts {variant_id, store_id?, contact}` — xác nhận hai
+bước như `newsletter`, đồng ý riêng cho mục đích "thông báo có hàng" (bước 37). Nghe
+`inventory.level_changed` từ 0 lên trên 0 ở đúng cửa hàng (hay bất kỳ kho bán online khi bỏ
+`store_id`), gửi một lần qua `notifications`, rồi đánh dấu đã gửi. Bảng `inventory_restock_alerts` cấp
+khách hàng. Test: một đợt có hàng chỉ gửi một lần dù event đến lại.

@@ -23,6 +23,8 @@ use utoipa_axum::routes;
 
 use crate::service::CommentsService;
 
+#[cfg(test)]
+pub(crate) use views::PublicComment;
 pub(crate) use views::{CommentDetail, TargetResponse};
 
 pub(crate) fn routes(service: Arc<CommentsService>) -> OpenApiRouter {

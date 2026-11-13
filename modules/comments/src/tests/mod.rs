@@ -7,9 +7,12 @@
 //! - `moderation.rs`: báo cáo đồng thời giữ lại đúng một lần, duyệt / xoá hẳn và số đếm, mail
 //!   báo trả lời, xuất / xoá theo email, tài khoản bị xoá, dọn theo thời hạn, event của module
 //!   sở hữu đích, event không mang email hay chữ.
+//! - `questions.rs`: hỏi đáp (D-202) — nhãn tác giả, tài khoản đã xác thực, tìm đúng dấu xếp
+//!   trước, số câu hỏi, câu hỏi chưa trả lời, event vòng đời của module sở hữu.
 
 mod moderation;
 mod posting;
+mod questions;
 
 use std::net::IpAddr;
 
@@ -18,12 +21,14 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::pagination::{Order, PageRequest};
-use sea_orm::{ConnectionTrait, EntityTrait, Statement};
+use autoxide_kernel::resource::{ResourceChange, ResourceEvent};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, Statement};
 
 use crate::config::{CommentsConfig, Mode};
-use crate::entity::target;
+use crate::entity::{comment, target};
 use crate::posting::{NewComment, Posted};
 use crate::service::CommentsService;
+use crate::service::Status;
 
 pub(super) const KIND: &str = "content.entry";
 pub(super) const POST: &str = "public-1";
@@ -85,14 +90,38 @@ pub(super) fn open_config() -> CommentsConfig {
     CommentsConfig { guest_mode: Mode::Post, user_mode: Mode::Post, ..crate::testing::config() }
 }
 
-/// (đang hiện, chờ duyệt) của đích.
+/// (đang hiện, chờ duyệt) của đích. Kiểm luôn số câu hỏi (bình luận gốc) đã lưu khớp số đếm
+/// lại từ bảng — mọi đường đổi trạng thái trong các test đều đi qua đây (D-202).
 pub(super) async fn counts(database: &Database, id: &str) -> (i32, i32) {
     let row = target::Entity::find_by_id((KIND.to_owned(), id.to_owned()))
         .one(database.read())
         .await
         .unwrap()
         .unwrap();
+    let roots = |status: Status| {
+        comment::Entity::find()
+            .filter(comment::Column::TargetType.eq(KIND))
+            .filter(comment::Column::TargetId.eq(id))
+            .filter(comment::Column::Depth.eq(0))
+            .filter(comment::Column::Status.eq(status.as_str()))
+            .count(database.read())
+    };
+    let stored = (row.published_thread_count, row.pending_thread_count);
+    let counted = (roots(Status::Published).await.unwrap(), roots(Status::Pending).await.unwrap());
+    assert_eq!(
+        (i64::from(stored.0), i64::from(stored.1)),
+        (counted.0 as i64, counted.1 as i64),
+        "stored question counts drift from the table"
+    );
     (row.published_count, row.pending_count)
+}
+
+/// Event vòng đời mà `content` khai (`Module::resource_events`), như kernel đưa cho `comments`.
+pub(super) fn content_events() -> Vec<ResourceEvent> {
+    vec![
+        ResourceEvent::new("content.entry_archived", KIND, ResourceChange::Closed),
+        ResourceEvent::new("content.entry_deleted", KIND, ResourceChange::Removed),
+    ]
 }
 
 /// (tên, payload) của mọi event đã ghi, theo thứ tự.

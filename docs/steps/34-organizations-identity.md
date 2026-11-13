@@ -556,3 +556,21 @@ Ghi DECISIONS cho mỗi lựa chọn có ảnh hưởng lâu dài (skill `record
    dấu `email_verified_at` như tài khoản thường; bước 37 thêm cờ xác thực số điện thoại.
 7. Thêm `Permission::scoped_without_own()` hay coi `own` = `unit` cho permission trên chính nút —
    khuyến nghị cách sau (đơn giản, ghi trong mô tả permission).
+
+## Bổ sung theo D-200 (thiết kế giao diện 2)
+
+**Hồ sơ công khai của nút.** Module `organizations` thêm cho mỗi nút: `public` (mặc định tắt), tên hiển thị,
+`Address`, giờ mở cửa theo thứ trong tuần (và ngày nghỉ đặc biệt), `pickup` (nhận hàng tại quầy), tên miền
+gắn với nút. `GET /api/v1/organizations/public/stores` (công khai; khách suy từ tên miền như mọi endpoint
+công khai) trả các nút `public` của khách, sắp theo thứ tự khách đặt, `ETag` / `Cache-Control` như
+`/api/v1/address`. Không trả thành viên, cài đặt nội bộ hay nút không công khai. Test: nút không công khai
+không lộ; hai khách cùng database không thấy cửa hàng của nhau.
+
+## Bổ sung theo D-202 (tạo tài khoản từ số đã xác thực)
+
+`auth` thêm `POST /api/v1/auth/phone-signups {lookup_token, display_name?}` (công khai, rate limit theo IP):
+lấy số điện thoại đã qua OTP từ token xem đơn của `orders` (trait `OrderLookups` do `orders` công bố ở
+bước 45 — đăng ký `auth` trước thì lấy qua chỗ giữ của kernel hay `Subscription::optional`, agent bước 45
+chọn), tạo tài khoản trong khách với số đó đã xác thực, đăng nhập bằng passkey (bước 12) hay OTP; không bắt
+buộc mật khẩu. Số đã thuộc một tài khoản → 409 `auth.phone_taken` (gợi ý đăng nhập). Phần này làm ở bước
+45 khi `orders` có token xem đơn; ghi ở đây vì danh tính và đăng nhập thuộc `auth`.

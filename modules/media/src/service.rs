@@ -43,7 +43,7 @@ pub(crate) type Item = item::Model;
 
 /// Độ dài tối đa, theo ký tự.
 pub(crate) const NAME_MAX_LENGTH: usize = 255;
-const ALT_MAX_LENGTH: usize = 1000;
+pub(crate) const ALT_MAX_LENGTH: usize = 1000;
 const TITLE_MAX_LENGTH: usize = 255;
 const CAPTION_MAX_LENGTH: usize = 2000;
 /// Số item trùng nội dung báo lại khi tải lên.
@@ -128,11 +128,13 @@ pub(crate) struct ItemChanges {
     pub tags: Option<Vec<String>>,
 }
 
-/// Một item kèm nhãn và ảnh thu nhỏ của nó — những gì API trả về.
+/// Một item kèm nhãn, bản dịch `alt` và ảnh thu nhỏ của nó — những gì API trả về.
 #[derive(Debug, Clone)]
 pub(crate) struct ItemDetails {
     pub item: Item,
     pub tags: Vec<String>,
+    /// `alt` theo ngôn ngữ (ngôn ngữ → alt), D-202.
+    pub alts: std::collections::BTreeMap<String, String>,
     /// Ảnh thu nhỏ theo cỡ, hẹp trước.
     pub variants: Vec<crate::variants::VariantPair>,
 }
@@ -213,16 +215,19 @@ impl MediaService {
         }
     }
 
-    /// Kèm nhãn và ảnh thu nhỏ cho từng item (thêm hai, ba câu query cho cả danh sách).
+    /// Kèm nhãn, bản dịch `alt` và ảnh thu nhỏ cho từng item (thêm ba, bốn câu query cho cả
+    /// danh sách).
     pub(crate) async fn describe(&self, items: Vec<Item>) -> Result<Vec<ItemDetails>, Error> {
         let read = self.database.read();
         let ids: Vec<Uuid> = items.iter().map(|item| item.id).collect();
         let mut tags = crate::tags::tags_of(read, &ids).await?;
+        let mut alts = crate::alts::alts_of(read, &ids).await?;
         let mut variants = crate::variants::variants_of(read, &items).await?;
         Ok(items
             .into_iter()
             .map(|item| ItemDetails {
                 tags: tags.remove(&item.id).unwrap_or_default(),
+                alts: alts.remove(&item.id).unwrap_or_default(),
                 variants: crate::variants::pair(variants.remove(&item.id).unwrap_or_default()),
                 item,
             })
@@ -454,6 +459,7 @@ impl MediaService {
             .filter(crate::entity::item_tag::Column::ItemId.eq(item.id))
             .exec(&transaction)
             .await?;
+        crate::alts::delete_alts(&transaction, item.id).await?;
         let copies = crate::entity::variant::Entity::find()
             .filter(crate::entity::variant::Column::ItemId.eq(item.id))
             .all(&transaction)
@@ -680,6 +686,26 @@ pub(crate) fn too_large(max: u64) -> Error {
 
 #[async_trait::async_trait]
 impl crate::api::Media for MediaService {
+    async fn find_many_in(
+        &self,
+        ids: &[Uuid],
+        locale: &str,
+    ) -> Result<Vec<crate::api::MediaRef>, Error> {
+        let mut found = self.find_many(ids).await?;
+        // Ngôn ngữ không được khai thì không có bản dịch nào: giữ `alt` mặc định.
+        let Ok(locale) = self.alt_locale(locale) else {
+            return Ok(found);
+        };
+        let ids: Vec<Uuid> = found.iter().map(|item| item.id).collect();
+        let mut translated = crate::alts::alts_in(self.database.read(), &ids, &locale).await?;
+        for item in &mut found {
+            if let Some(alt) = translated.remove(&item.id) {
+                item.alt = alt;
+            }
+        }
+        Ok(found)
+    }
+
     async fn find_many(&self, ids: &[Uuid]) -> Result<Vec<crate::api::MediaRef>, Error> {
         use crate::api::{MAX_IDS, MediaRef, MediaVisibility};
 

@@ -2,7 +2,7 @@
 //! không bao giờ lộ bản nháp (D-102). Ghép thêm ảnh (qua `media`: ảnh không còn công khai coi
 //! như không có), các bản dịch đang công khai (cho `hreflang`), danh mục, thẻ, tác giả.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use autoxide_kernel::error::Error;
 use autoxide_media::api::{MediaRef, MediaVisibility};
@@ -39,25 +39,32 @@ impl ContentService {
         let ids: Vec<Uuid> = rows.iter().map(|row| row.entry_id).collect();
         let mut authors = crate::taxonomy::authors::authors_of(self.database.read(), &ids).await?;
         // Ảnh đại diện của tác giả cũng tra qua `media`: ảnh riêng tư thì không lộ cả ID.
-        let avatars = authors.values().flatten().filter_map(|author| author.avatar_media_id);
+        let avatars: Vec<Uuid> =
+            authors.values().flatten().filter_map(|author| author.avatar_media_id).collect();
         // Ảnh trong thân bài: website cần kích thước và các bản nhỏ của chúng cho `srcset`
-        // (D-168). Tra chung một lượt với ảnh đại diện.
+        // (D-168). Ảnh tra theo ngôn ngữ của bài, để `alt` là bản dịch của ngôn ngữ đó nếu có
+        // (D-202); ảnh đại diện tra chung với ngôn ngữ mặc định.
         let body_images: Vec<Vec<Uuid>> =
             rows.iter().map(|row| crate::entries::body::stored_image_ids(&row.body)).collect();
-        let media_ids: Vec<Uuid> = rows
-            .iter()
-            .flat_map(|row| [row.featured_media_id, row.og_media_id])
-            .flatten()
-            .chain(avatars)
-            .chain(body_images.iter().flatten().copied())
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect();
-        let mut media: HashMap<Uuid, MediaRef> = HashMap::new();
-        for chunk in media_ids.chunks(autoxide_media::api::MAX_IDS) {
-            for item in self.media.find_many(chunk).await? {
-                if item.visibility == MediaVisibility::Public {
-                    media.insert(item.id, item);
+        let mut wanted: BTreeMap<String, BTreeSet<Uuid>> = BTreeMap::new();
+        for (row, images) in rows.iter().zip(&body_images) {
+            let ids = wanted.entry(row.locale.clone()).or_default();
+            ids.extend([row.featured_media_id, row.og_media_id].into_iter().flatten());
+            ids.extend(images.iter().copied());
+        }
+        if !avatars.is_empty() {
+            wanted.entry(self.config.default_locale.clone()).or_default().extend(avatars);
+        }
+        let mut media: HashMap<(String, Uuid), MediaRef> = HashMap::new();
+        let mut public: HashSet<Uuid> = HashSet::new();
+        for (locale, ids) in wanted {
+            let ids: Vec<Uuid> = ids.into_iter().collect();
+            for chunk in ids.chunks(autoxide_media::api::MAX_IDS) {
+                for item in self.media.find_many_in(chunk, &locale).await? {
+                    if item.visibility == MediaVisibility::Public {
+                        public.insert(item.id);
+                        media.insert((locale.clone(), item.id), item);
+                    }
                 }
             }
         }
@@ -83,7 +90,7 @@ impl ContentService {
         )
         .await?;
         for author in authors.values_mut().flatten() {
-            if author.avatar_media_id.is_some_and(|id| !media.contains_key(&id)) {
+            if author.avatar_media_id.is_some_and(|id| !public.contains(&id)) {
                 author.avatar_media_id = None;
             }
         }
@@ -99,10 +106,11 @@ impl ContentService {
                     })
                     .map(|other| (other.locale.clone(), other.path.clone()))
                     .collect();
+                let image = |id: Uuid| media.get(&(row.locale.clone(), id)).cloned();
                 PublicView {
-                    featured: row.featured_media_id.and_then(|id| media.get(&id).cloned()),
-                    og: row.og_media_id.and_then(|id| media.get(&id).cloned()),
-                    body_media: images.iter().filter_map(|id| media.get(id).cloned()).collect(),
+                    featured: row.featured_media_id.and_then(image),
+                    og: row.og_media_id.and_then(image),
+                    body_media: images.iter().filter_map(|id| image(*id)).collect(),
                     translations,
                     terms: terms.remove(&row.entry_id).unwrap_or_default(),
                     authors: authors.remove(&row.entry_id).unwrap_or_default(),

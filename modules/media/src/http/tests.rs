@@ -453,6 +453,7 @@ async fn tool_mcp_theo_permission() {
                 "media.get",
                 "media.list",
                 "media.list_tags",
+                "media.set_alt",
                 "media.suggest_alt",
                 "media.trash",
                 "media.update",
@@ -473,7 +474,16 @@ async fn tool_mcp_theo_permission() {
         let update =
             json!({"id": item["id"], "updated_at": item["updated_at"], "alt": "Two by two"});
         let updated = writer.call_tool(call("media.update", update.clone())).await.unwrap();
-        assert_eq!(updated.structured_content.unwrap()["data"]["alt"], "Two by two");
+        let updated = updated.structured_content.unwrap();
+        assert_eq!(updated["data"]["alt"], "Two by two");
+        let translated = writer
+            .call_tool(call(
+                "media.set_alt",
+                json!({"id": item["id"], "updated_at": updated["data"]["updated_at"], "locale": "vi", "alt": "Hai nhân hai"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(translated.structured_content.unwrap()["data"]["alts"], json!({"vi": "Hai nhân hai"}));
         // Lần hai với `updated_at` cũ: từ chối.
         let stale = writer.call_tool(call("media.update", update)).await.unwrap();
         assert_eq!(stale.is_error, Some(true));
@@ -705,6 +715,60 @@ async fn tai_len_qua_mcp() {
         let broken = client.call_tool(call(json!({"name": "x.png", "content_base64": "%%%"}))).await.unwrap();
         assert_eq!(broken.is_error, Some(true));
         client.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// `alt` theo ngôn ngữ qua REST (D-202): `PUT` / `DELETE /{id}/alts/{locale}` bắt buộc `If-Match`,
+/// trả item kèm `alts` và `ETag` mới; ngôn ngữ không khai bị từ chối với mã riêng.
+#[tokio::test]
+async fn alt_theo_ngon_ngu_qua_rest() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let item = upload(&app, "a.png", "image/png", &samples::png(1, 1)).await;
+        let id = item["id"].as_str().unwrap().to_owned();
+        let auth = as_user("admin");
+        let got =
+            send(&app, "GET", &format!("/{id}"), &[("authorization", auth.as_str())], Vec::new())
+                .await;
+        assert_eq!(got.json()["data"]["alts"], json!({}));
+        let etag = got.header(header::ETAG).to_owned();
+        let body = |alt: &str| serde_json::to_vec(&json!({"alt": alt})).unwrap();
+        let json_auth = [("authorization", auth.as_str()), ("content-type", "application/json")];
+        let path = format!("/{id}/alts/vi");
+
+        let missing = send(&app, "PUT", &path, &json_auth, body("Ảnh")).await;
+        assert_eq!(missing.status(), StatusCode::PRECONDITION_REQUIRED);
+        let with_match = [json_auth[0], json_auth[1], ("if-match", etag.as_str())];
+        let set = send(&app, "PUT", &path, &with_match, body("Ảnh vuông")).await;
+        assert_eq!(set.status(), StatusCode::OK, "{}", set.json());
+        assert_eq!(set.json()["data"]["alts"], json!({"vi": "Ảnh vuông"}));
+        let new_etag = set.header(header::ETAG).to_owned();
+        assert_ne!(new_etag, etag);
+        let stale = send(&app, "PUT", &path, &with_match, body("Khác")).await;
+        assert_eq!(stale.status(), StatusCode::PRECONDITION_FAILED);
+        let french = [json_auth[0], json_auth[1], ("if-match", "*")];
+        let refused = send(&app, "PUT", &format!("/{id}/alts/fr"), &french, body("Image")).await;
+        assert_eq!(
+            (refused.status(), refused.json()["code"].clone()),
+            (StatusCode::UNPROCESSABLE_ENTITY, json!("media.unsupported_locale"))
+        );
+
+        let removal = [("authorization", auth.as_str()), ("if-match", new_etag.as_str())];
+        let removed = send(&app, "DELETE", &path, &removal, Vec::new()).await;
+        assert_eq!(removed.status(), StatusCode::OK, "{}", removed.json());
+        assert_eq!(removed.json()["data"]["alts"], json!({}));
+        let reader = as_user("reader");
+        let denied = send(
+            &app,
+            "DELETE",
+            &path,
+            &[("authorization", reader.as_str()), ("if-match", "*")],
+            Vec::new(),
+        )
+        .await;
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
     })
     .await
     .unwrap();

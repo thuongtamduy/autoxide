@@ -143,6 +143,10 @@ impl CommentsService {
             "{body} {}",
             before.author_name.as_deref().unwrap_or_default()
         )));
+        row.match_key = Set(autoxide_kernel::search::exact_key(&format!(
+            "{body} {}",
+            before.author_name.as_deref().unwrap_or_default()
+        )));
         row.content_hash = Set(autoxide_kernel::antispam::content_hash(&body));
         row.body = Set(body);
         row.edited_at = Set(Some(now));
@@ -309,6 +313,7 @@ pub(crate) async fn soft_delete<C: ConnectionTrait>(
     row.edit_token_hash = Set(None);
     row.hold_reason = Set(None);
     row.search_key = Set(String::new());
+    row.match_key = Set(String::new());
     row.content_hash = Set(autoxide_kernel::antispam::content_hash(""));
     row.updated_at = Set(now);
     if matches!(how, Deletion::Erased) {

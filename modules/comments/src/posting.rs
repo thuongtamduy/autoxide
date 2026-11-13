@@ -92,6 +92,14 @@ fn guests_not_allowed() -> Error {
     )
 }
 
+pub(crate) fn verification_required() -> Error {
+    Error::forbidden(
+        "comments.verification_required",
+        "Only accounts with a verified phone number or identity may write here. Sign in and \
+         verify your account first.",
+    )
+}
+
 fn parent_not_found() -> Error {
     Error::not_found(
         "comments.parent_not_found",
@@ -139,6 +147,17 @@ impl CommentsService {
                 return Err(guests_not_allowed());
             }
             None => {}
+        }
+        // Loại đích chỉ cho tài khoản đã xác thực (NĐ 147/2024, D-202): khách bị từ chối, người
+        // dùng hỏi qua điểm nối của kernel (module giữ trạng thái xác thực, bước 37).
+        if self.config.verified_only.contains(&kind) {
+            let verified = match principal {
+                Some(principal) => self.verification.is_verified(principal.user_id()).await?,
+                None => false,
+            };
+            if !verified {
+                return Err(verification_required());
+            }
         }
         let moderator = principal.is_some_and(|principal| principal.has(&COMMENTS_MODERATE));
 
@@ -204,6 +223,12 @@ impl CommentsService {
 
         // Đích có thật, công khai (sổ đối tượng — có thể gọi module khác), đang mở.
         let resource = self.resolve_target(&kind, &target_id).await?;
+        // Nhãn của tác giả trên đích (vd `seller`, `verified_buyer`), tính một lần lúc ghi qua
+        // sổ đối tượng — có thể gọi module khác nên ở NGOÀI transaction (D-202).
+        let badges = match principal {
+            Some(principal) => self.resources.badges(&kind, &target_id, principal).await?.join(","),
+            None => String::new(),
+        };
         let now = now();
         if !self.target(&kind, &target_id).await?.is_open(now) {
             return Err(target_closed());
@@ -308,6 +333,8 @@ impl CommentsService {
                     locale: locale.map(str::to_owned),
                     content_hash,
                     search_key: String::new(),
+                    match_key: String::new(),
+                    badges,
                     reply_count: 0,
                     report_count: 0,
                     reports_held_at: None,
@@ -375,6 +402,11 @@ impl CommentsService {
                 "{body} {}",
                 name.as_deref().unwrap_or_default()
             )),
+            match_key: autoxide_kernel::search::exact_key(&format!(
+                "{body} {}",
+                name.as_deref().unwrap_or_default()
+            )),
+            badges,
             body,
             status: status.as_str().to_owned(),
             hold_reason,

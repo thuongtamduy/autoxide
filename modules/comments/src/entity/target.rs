@@ -21,6 +21,10 @@ pub struct Model {
     pub published_count: i32,
     /// Số bình luận chờ duyệt.
     pub pending_count: i32,
+    /// Số bình luận gốc (câu hỏi) đang hiện (D-202).
+    pub published_thread_count: i32,
+    /// Số bình luận gốc chờ duyệt.
+    pub pending_thread_count: i32,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }

@@ -1,0 +1,145 @@
+# Thiết kế giao diện 2: khung quản trị đa phân hệ và mặt tiền bán hàng
+
+Thiết kế ngày 13/11/2026 (D-200). Giao diện là repo riêng (D-096, D-097); core chỉ có API (luật kiến
+trúc 9). File này ghi lại **giao diện cần gì từ core**, để agent làm các bước sau không phải đoán. Bản vẽ
+chi tiết nằm ở canvas thiết kế của chủ dự án, không nằm trong repo.
+
+Đây là tài liệu nội bộ (tiếng Việt) cho chủ dự án và agent.
+
+## 1. Vì sao làm lại
+
+Thiết kế 1 (12/11/2026) coi trang quản trị là một CMS: menu chỉ có nội dung, media, bình luận, form.
+Sau khi lộ trình mở rộng sang nền đa khách (bước 33–40) và module thương mại (bước 41–49), quản trị nội
+dung chỉ còn là **một phân hệ trong mười hai**. Website công khai cũng đổi từ blog sang **mặt tiền bán
+hàng** của một khách, blog thành một mục "góc bài viết".
+
+## 2. Khung quản trị
+
+### 2.1 Mười hai phân hệ
+
+Thanh dọc bên trái, mỗi mục là một phân hệ gom các module cùng nghiệp vụ. Thứ tự cố định cho mọi khách;
+cấu hình chỉ ẩn bớt, không đảo chỗ.
+
+| # | Phân hệ | Module | Bước | Hiện với mô hình |
+|---|---|---|---|---|
+| 1 | Tổng quan | kernel | 51 | mọi mô hình |
+| 2 | Bán hàng | `orders`, `shipping` | 44–45 | có bán hàng |
+| 3 | Sản phẩm | `catalog`, `inventory` | 41–42 | có bán hàng |
+| 4 | Tiếp thị | `promotions`, `newsletter`, `forms` | 20–21, 43 | mọi mô hình |
+| 5 | Nội dung | `content`, `media`, `comments` | 16–17, 22 | mọi mô hình |
+| 6 | Khách hàng | tài khoản người mua, `customers` | 34, 47 | mọi mô hình |
+| 7 | Sàn | `marketplace` | 46 | sàn |
+| 8 | Tài chính | `ledger`, `tax`, `invoices` | 36 | có bán hàng |
+| 9 | Báo cáo | `reporting` | 38, 45 | có bán hàng |
+| 10 | Tổ chức | `organizations`, `auth` | 34 | mọi mô hình |
+| 11 | Tuân thủ | `compliance` | 37 | mọi mô hình |
+| 12 | Cài đặt | kernel, `plans`, module kết nối | 33, 35 | mọi mô hình |
+
+Ngoài ra có **mặt điều khiển** của nền tảng (khách hàng, gói, cấp phát, đội database, thuê bao, vào
+dữ liệu của khách để hỗ trợ) — một khung riêng cho nhân sự vận hành, khách không thấy.
+
+### 2.2 Ba điều quyết định một mục menu có hiện không
+
+1. **Module đã bật cho khách** (bước 35). Chưa bật thì mục không hiện; API trả `module_not_enabled`.
+2. **Permission ở nút tổ chức đang chọn** (bước 34). Không có quyền thì không hiện.
+3. **Tính năng trong gói** (bước 35). Có module nhưng tính năng thuộc gói cao hơn thì mục **vẫn hiện**,
+   kèm nhãn khoá, để người dùng biết nâng gói sẽ mở được gì; bấm vào chỉ giải thích.
+
+Vì cả ba đều là dữ liệu của core, menu phải do core trả về (bước 51), không viết cứng ở giao diện.
+
+### 2.3 Luật của khung
+
+- Menu con của phân hệ là một hàng tab dưới thanh tiêu đề (thiết kế ban đầu dùng một cột bên trái —
+  bỏ vì tốn chỗ).
+- Ngữ cảnh "khách › nút tổ chức" luôn ở góc trên bên trái; đổi nút là đổi phạm vi mọi số liệu, danh
+  sách và kết quả tìm.
+- Ctrl + K tìm xuyên mọi phân hệ, trong phạm vi và permission của người dùng.
+- Mỗi phân hệ có trang tổng quan: hành động chính, 4 số liệu, "cần xử lý", bảng dữ liệu gần đây, danh
+  sách màn hình con có mô tả.
+- Trang Tổng quan chung: số liệu từ các phân hệ đã bật, **hộp việc** gom việc chờ của mọi phân hệ (sắp
+  theo mức gấp), hạn mức gói, hoạt động gần đây.
+- Mọi màn hình dùng chung một kiểu bảng, bộ lọc, ngăn chi tiết, thông báo — như API dùng chung envelope.
+
+### 2.4 Màn hình mẫu đã vẽ
+
+Tổng quan; trang tổng quan của 11 phân hệ; Đơn hàng (bảng, thao tác hàng loạt, ngăn chi tiết có thuế
+chụp lúc đặt, dòng tiền, bút toán sổ cái); Bài viết (theo từng website, nút sở hữu, nhãn AI, trang bắt
+buộc); Cây tổ chức (thành viên theo độ sâu quyền, cài đặt kế thừa); Tuân thủ (hồ sơ Bộ Công Thương theo
+tên miền, KYC, dữ liệu cá nhân, văn bản có phiên bản, báo vi phạm); Nền tảng.
+
+## 3. Mặt tiền bán hàng
+
+Bảy màn hình mẫu cho một chuỗi có sàn: trang chủ, danh mục, sản phẩm, giỏ hàng và đặt hàng (bốn bước),
+gian hàng người bán, bài viết có gắn sản phẩm, tài khoản người mua. Website chỉ có nội dung (không bán)
+dùng lại trang chủ, bài viết và tài khoản.
+
+Điều giao diện cần mà các bước 34–47 đã có trong đặc tả: danh sách và lọc sản phẩm công khai (41), mã
+giảm giá công khai kèm điều kiện (43), sổ địa chỉ và báo giá vận chuyển (44), giỏ hàng, đặt hàng có
+`Idempotency-Key`, đơn của tôi, đổi trả, đánh giá chỉ từ người đã mua (45), tách đơn theo người bán và
+thanh toán một lần, trang công khai của người bán (46), đồng ý theo mục đích, chấp nhận văn bản có
+phiên bản, xác thực số điện thoại, logo Bộ Công Thương (37), xuất và xoá dữ liệu cá nhân (đã có).
+
+## 4. Phần core còn thiếu (D-200)
+
+| Giao diện cần | Đi vào |
+|---|---|
+| Menu theo khách, quyền, gói (mục khoá hiện kèm tính năng cần) | bước 51 |
+| Hộp việc chung và số đếm trên menu | bước 51 |
+| Tìm xuyên phân hệ (Ctrl + K) | bước 51 |
+| Số liệu tóm tắt cho trang tổng quan của phân hệ | bước 51 |
+| Hoạt động gần đây đọc được (từ audit, lọc theo quyền đọc) | bước 51 (module `audit`) |
+| Nhúng bản ghi của module khác vào nội dung (sản phẩm trong bài) — `content` vẫn không biết sản phẩm | bước 51; `catalog` đăng ký loại đối tượng ở bước 41 |
+| Danh sách cửa hàng công khai: tên, địa chỉ, giờ mở cửa, có nhận tại quầy | bước 34 |
+| Tình trạng hàng công khai theo cửa hàng (còn / sắp hết / hết), lọc "có sẵn ở cửa hàng" | bước 42 |
+| Ước tính phí giao theo tỉnh ngay trên trang sản phẩm, chưa cần giỏ | bước 44 |
+| Giá khi áp mã cho từng sản phẩm, để trang sản phẩm hiện "còn X với mã …" | bước 43 |
+
+Hộp việc (việc nhân sự phải xử lý, tính từ dữ liệu của module) khác **hộp thư thông báo** của module
+`notifications` (bước 37, `/me/inbox`, tin đã gửi cho một người). Hai thứ không gộp.
+
+## 5. Tham khảo các sản phẩm hàng đầu (D-201)
+
+Nghiên cứu ngày 13/11/2026: tài liệu chính thức của Shopify (Polaris, setup guide, index table), Stripe
+(Dashboard, Workbench, MCP, Organizations), Linear (views, inbox, triage, agents), GitHub (command
+palette, notifications, Primer), Vercel (điều hướng 2026), Atlassian, Odoo 18 (chatter, activities),
+Salesforce SLDS, Google Access Approval; Baymard Institute (tìm kiếm, trang sản phẩm, giỏ, checkout,
+cửa hàng, tài khoản, đổi trả, accessibility), web.dev (Core Web Vitals, passkey), Google Search Central
+(structured data), IKEA và Thế Giới Di Động (tồn theo cửa hàng), Etsy (tiêu chí người bán tin cậy), Shopee
+(trả hàng). Số liệu trích từ trang đã mở được; trang trả phí hay không mở được thì không dùng làm căn cứ.
+
+### Đưa vào thiết kế quản trị
+
+| Điều | Học từ | Ở đâu |
+|---|---|---|
+| View đã lưu thay tab trạng thái cố định; lệch thì "Tuỳ chỉnh", lưu được; bộ lọc trên đường dẫn | Shopify, Linear, Zendesk, Stripe | mọi bảng (mẫu: Đơn hàng) |
+| Chọn trang này khác "chọn cả N kết quả khớp bộ lọc"; chạy bằng job, kết quả từng bản ghi | Shopify | thanh thao tác hàng loạt |
+| Ctrl + K có chế độ lệnh `>`, toán tử `is:` `status:`, chọn phạm vi, dán mã để mở thẳng | GitHub, Stripe | bảng lệnh |
+| Hộp việc nhóm Quá hạn / Hôm nay / Sắp tới, "vì sao bạn thấy", hoãn, giao | Odoo, Linear, GitHub | Tổng quan, "Cần xử lý" |
+| Danh sách việc thiết lập theo mô hình, bước pháp lý chặn bán được đánh dấu | Shopify setup guide | Tổng quan |
+| Agent là người dùng thật: key riêng, audit ghi loại người thực hiện, lệnh rủi ro chờ người duyệt | Stripe MCP, Linear agents | Đơn hàng (đề xuất hoàn tiền), hộp việc |
+| Thiếu quyền hay thiếu gói thì nói vì sao, ai cấp được, gói nào mở | Primer | mục khoá, nút bị vô hiệu |
+| Dòng hoạt động và ghi chú nội bộ có @ trên mọi bản ghi | Odoo chatter, SLDS | ngăn chi tiết |
+| Thông báo kèm Hoàn tác cho thao tác đảo được | Primer | toàn khung |
+| Trang tổng quan phân hệ gọn: bỏ danh sách màn hình (trùng menu), ghi chú thu gọn | nhận định từ nghiên cứu | 11 phân hệ |
+
+### Đưa vào thiết kế mặt tiền
+
+| Điều | Bằng chứng | Ở đâu |
+|---|---|---|
+| Gợi ý tìm: từ khoá, "trong danh mục", sản phẩm có giá, bài viết, cửa hàng; không dấu vẫn ra, đúng dấu xếp trước | Baymard: 56% site không đáp ứng đủ; 34% người dùng tìm nội dung không phải sản phẩm | đầu trang |
+| Phí và ngưỡng miễn phí giao cạnh nút mua, thanh tiến độ ở giỏ | Baymard: 40% bỏ giỏ vì phí phát sinh | sản phẩm, giỏ |
+| Ngày giao là ngày cụ thể kèm giờ chốt; nhận tại cửa hàng ghi giờ sẵn sàng | Baymard: 41% site không hiện ngày giao | sản phẩm, đặt hàng |
+| Mua không cần tài khoản là lựa chọn chính; mời tạo tài khoản và passkey ở màn xong | Baymard: 18% bỏ giỏ khi bị buộc tạo tài khoản; adidas: 47% tạo passkey | đặt hàng |
+| Bộ chọn "Mã của bạn" kèm lý do chưa dùng được, ô nhập mã sau một liên kết | Baymard | giỏ |
+| Màn QR: mở app ngân hàng, lưu ảnh QR, sao chép số tài khoản và nội dung, trạng thái tiền về | thói quen thanh toán ở Việt Nam | xong |
+| Đánh giá: bộ sưu tập ảnh, lọc có ảnh, tóm tắt AI có nhãn chỉ từ người đã mua | Baymard; Amazon | sản phẩm |
+| Báo khi có hàng ở một cửa hàng; lưu sản phẩm không cần đăng nhập | IKEA; Baymard: 89% site không cho lưu khi chưa có tài khoản | sản phẩm |
+| Sắp xếp "Đánh giá cao", lọc theo số sao, thẻ ghi số biến thể | Baymard: 69% thiếu bốn kiểu sắp xếp tối thiểu | danh mục |
+| Huy hiệu người bán tin cậy tách khỏi huy hiệu xác thực, có tiêu chí công khai | Etsy Star Seller | gian hàng |
+
+### Không làm
+
+- **Đối chiếu địa chỉ cũ (ba cấp) sang mới:** trái D-193, do chủ dự án quyết; giữ chỉ danh mục sau sáp
+  nhập. Người gõ tên cũ vẫn tìm được phường, xã theo tên mới nhờ tìm không dấu.
+- **Đổi hàng tab ngang của menu con sang thanh bên** như Vercel 2026: giữ hàng tab (mục 2.3); xem lại khi
+  có số đo trên giao diện thật.

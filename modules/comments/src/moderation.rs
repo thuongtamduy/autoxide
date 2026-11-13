@@ -32,6 +32,8 @@ pub(crate) struct QueueFilter {
     pub target_id: Option<String>,
     /// Chữ hay tên chứa chuỗi này (không phân biệt hoa thường, dấu).
     pub search: Option<String>,
+    /// Chỉ bình luận gốc chưa có trả lời đang hiện (câu hỏi chưa trả lời, D-202).
+    pub unanswered: bool,
 }
 
 /// Một lệnh cấm mới.
@@ -90,6 +92,11 @@ impl CommentsService {
         }
         if let Some(id) = filter.target_id.as_deref().filter(|id| !id.is_empty()) {
             select = select.filter(comment::Column::TargetId.eq(id));
+        }
+        if filter.unanswered {
+            select = select
+                .filter(comment::Column::Depth.eq(0))
+                .filter(comment::Column::ReplyCount.eq(0));
         }
         if let Some(search) = filter.search.as_deref().filter(|search| !search.trim().is_empty()) {
             select = select

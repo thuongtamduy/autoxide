@@ -1,4 +1,5 @@
 {
+  "media.unsupported_locale": "Chỉ dịch được mô tả thay thế sang các ngôn ngữ máy chủ khai trong AUTOXIDE_MEDIA_ALT_LOCALES: {locales}.",
   "media.item_not_found": "Không có item media `{id}`.",
   "media.item_in_trash": "Item media `{id}` đang ở thùng rác. Hãy khôi phục trước bằng `POST /api/v1/media/{id}/restore`.",
   "media.item_not_in_trash": "Item media `{id}` không ở thùng rác. Hãy chuyển vào thùng rác trước bằng `DELETE /api/v1/media/{id}`.",

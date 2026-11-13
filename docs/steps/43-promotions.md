@@ -349,3 +349,20 @@ lý** trước khi chạy thật (D-186):
 - Mua X tặng Y: hàng tặng là dòng riêng giá 0 (`gifts`) hay giảm 100% dòng có sẵn — khuyến nghị dòng
   riêng (tồn kho và hoá đơn rõ ràng); chốt với đặc tả bước 45.
 - Ghi vào `docs/DECISIONS.md` (skill `record-decision`).
+
+## Bổ sung theo D-200 (thiết kế giao diện 2)
+
+**Giá khi áp mã cho một sản phẩm.** `GET /public/promotions/for-product/{product_id}?variant_id&store_id`
+(công khai) trả các mã `public` đang chạy áp được cho sản phẩm: mã, giá sau mã cho số lượng 1, điều kiện
+(dùng chung `terms` với `GET /public/promotions`), số lượt còn lại. Giảm tự động (không cần mã) thì
+`catalog` hiện giá đã giảm; mã phải nhập thì giá niêm yết giữ nguyên và giao diện hiện thêm dòng "còn X
+với mã …" — không trình bày như giá đã giảm sẵn (Luật 19/2023, minh bạch điều kiện). Test: mã hết lượt
+không còn trong danh sách; giá sau mã khớp kết quả `evaluate` của giỏ một dòng.
+
+## Bổ sung theo D-201
+
+**Mã dùng được cho một giỏ.** `GET /public/promotions/eligible?cart_id` trả hai danh sách: mã dùng được
+(kèm số giảm cho giỏ này) và mã `public` chưa đủ điều kiện kèm `reason` có tham số ("thêm 120.000 ₫",
+"giỏ chưa có sản phẩm áp dụng", "chỉ cho đơn đầu tiên"). Website thay ô nhập mã mở sẵn bằng bộ chọn,
+ô nhập tự do nằm sau một liên kết. `remaining_uses` chỉ trả khi chương trình có giới hạn lượt, lấy từ số
+giữ chỗ thật (không làm tròn, không số giả).

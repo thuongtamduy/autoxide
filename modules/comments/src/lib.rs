@@ -42,6 +42,7 @@ use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
+use autoxide_kernel::resource::ResourceEvent;
 use autoxide_kernel::secret::SecretKey;
 use axum::http::Method;
 use utoipa_axum::router::OpenApiRouter;
@@ -64,8 +65,8 @@ struct CommentsModule {
     config: Option<CommentsConfig>,
     /// Có sau `start`.
     service: Option<Arc<CommentsService>>,
-    /// Event "đã lưu trữ / đã xoá" của module sở hữu đích có trong chương trình.
-    owner_events: Vec<&'static str>,
+    /// Event vòng đời của module sở hữu đích, cho các loại đích đang bật (D-202).
+    owner_events: Vec<ResourceEvent>,
 }
 
 impl Module for CommentsModule {
@@ -99,16 +100,9 @@ impl Module for CommentsModule {
             .config
             .clone()
             .ok_or_else(|| Error::internal("module `comments` started before it was configured"))?;
-        // Nghe event của module sở hữu đích bằng tên — chỉ khi module đó có trong chương trình
-        // (đăng ký nhận một event không ai khai là lỗi khởi động) và loại đích được bật.
-        self.owner_events = targets::OWNER_EVENTS
-            .iter()
-            .filter(|(name, kind, _)| {
-                context.events().contains(name)
-                    && config.target_types.iter().any(|known| known == kind)
-            })
-            .map(|(name, _, _)| *name)
-            .collect();
+        // Nghe event vòng đời do module sở hữu đích khai (`Module::resource_events`) cho các loại
+        // đích được bật — kernel đã kiểm event có thật, nên không cần biết module nào có mặt.
+        self.owner_events = targets::owner_events(context.resource_events(), &config.target_types);
         let parts = Parts {
             database: context.database().clone(),
             outbox: context.outbox()?,
@@ -117,6 +111,7 @@ impl Module for CommentsModule {
             mailer: context.require::<dyn Mailer>()?,
             translations: context.translations().clone(),
             resources: context.resources(),
+            verification: context.posting_verification(),
         };
         let service = Arc::new(CommentsService::new(parts, config));
         context.personal_data(service.clone())?;
@@ -137,9 +132,12 @@ impl Module for CommentsModule {
             // Tài khoản bị xoá: xoá mềm bình luận, bỏ `user_id` (`privacy.rs`).
             Subscription::new(autoxide_kernel::privacy::USER_DELETED, service.clone()),
         ];
-        for name in &self.owner_events {
-            subscriptions
-                .push(Subscription::new(name, Arc::new(targets::OwnerEvents(service.clone()))));
+        let owner = Arc::new(targets::OwnerEvents {
+            service: service.clone(),
+            events: self.owner_events.clone(),
+        });
+        for event in &self.owner_events {
+            subscriptions.push(Subscription::new(event.event, owner.clone()));
         }
         subscriptions
     }
@@ -178,7 +176,7 @@ pub(crate) mod testing {
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
-    use autoxide_kernel::access::Principal;
+    use autoxide_kernel::access::{PostingVerification, Principal};
     use autoxide_kernel::antispam::{AntispamConfig, SpamGuard};
     use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
     use autoxide_kernel::database::Database;
@@ -289,6 +287,7 @@ pub(crate) mod testing {
             mailer: mailer.clone(),
             translations,
             resources,
+            verification: PostingVerification::default(),
         };
         Harness { service: Arc::new(CommentsService::new(parts, config)), mailer, database }
     }

@@ -37,6 +37,19 @@ pub fn fold(text: &str) -> String {
         .collect()
 }
 
+/// Dạng đem so khi tìm "khớp đúng dấu": như [`normalize`], rồi gộp chữ và dấu về một dạng
+/// (Unicode NFC) — "Ảnh" gõ trên máy này và máy kia ra cùng chuỗi, còn "anh" thì khác. Dùng làm
+/// tầng xếp trước khi tìm (D-202): tiếng Việt "dấu / dầu / dâu" khác nghĩa.
+pub fn exact_key(text: &str) -> String {
+    normalize(text).nfc().collect()
+}
+
+/// Điều kiện "cột `column` (đã lưu dạng [`exact_key`]) chứa `text` đúng dấu".
+pub fn contains_exact<C: ColumnTrait>(column: C, text: &str) -> Expr {
+    let pattern = format!("%{}%", escape_like(&exact_key(text)));
+    column.like(LikeExpr::new(pattern).escape('\\'))
+}
+
 /// Điều kiện "cột `column` (đã lưu dạng [`fold`]) chứa `text`" — `text` có dấu hay không
 /// đều được.
 pub fn contains<C: ColumnTrait>(column: C, text: &str) -> Expr {
@@ -67,5 +80,8 @@ mod tests {
         assert_eq!(fold(" Đường đến Đà Lạt "), "duong den da lat");
         assert_eq!(fold("Ảnh ĐẸP, Crème brûlée"), "anh dep, creme brulee");
         assert_eq!(fold("東京"), "東京", "scripts without accents stay as they are");
+        // "Ả" viết sẵn một ký tự hay "A" + dấu hỏi rời: cùng khoá.
+        assert_eq!(exact_key(" A\u{0309}nh ĐẸP "), exact_key("ảnh đẹp"));
+        assert_ne!(exact_key("ảnh"), exact_key("anh"));
     }
 }

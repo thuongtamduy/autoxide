@@ -357,3 +357,42 @@ async fn chuyen_huong_lam_tay() {
     .await
     .unwrap();
 }
+
+/// Ảnh của bản công khai tra theo ngôn ngữ của bài (D-202): `alt` là bản dịch của ngôn ngữ đó
+/// khi `media` có, không thì bản mặc định — ở đây bộ `media` giả trả `[<ngôn ngữ>]`.
+#[tokio::test]
+async fn anh_cua_ban_cong_khai_theo_ngon_ngu_cua_bai() {
+    TestDatabase::run(async |test| {
+        let (content, media, _) = service(test, config(&[])).await;
+        let ada = editor();
+        let photo = media.add(true);
+        let mut english = post("Hob");
+        english.fields.featured_media_id = Some(Some(photo));
+        let english = content.create(&ada, english).await.unwrap();
+        content.publish(&ada, english.id, None, None, false).await.unwrap();
+        let mut vietnamese = post("Bếp từ");
+        vietnamese.locale = Some("vi".to_owned());
+        vietnamese.fields.featured_media_id = Some(Some(photo));
+        let vietnamese = content.create(&ada, vietnamese).await.unwrap();
+        content.publish(&ada, vietnamese.id, None, None, false).await.unwrap();
+
+        let mut rows = Vec::new();
+        for id in [english.id, vietnamese.id] {
+            let row = <crate::entity::published::Entity as sea_orm::EntityTrait>::find_by_id(id)
+                .one(content.database.read())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(row.locale, if id == english.id { "en" } else { "vi" });
+            rows.push(row);
+        }
+        let views = content.public_views(rows).await.unwrap();
+        let alts: Vec<String> = views
+            .into_iter()
+            .map(|view| view.featured.map(|item| item.alt).unwrap_or_default())
+            .collect();
+        assert_eq!(alts, ["[en]", "[vi]"]);
+    })
+    .await
+    .unwrap();
+}

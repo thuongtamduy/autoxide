@@ -11,6 +11,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use autoxide_kernel::access::PostingVerification;
 use autoxide_kernel::antispam::SpamGuard;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
@@ -42,6 +43,7 @@ pub(crate) struct CommentsService {
     pub(crate) mailer: Arc<dyn Mailer>,
     pub(crate) translations: Translations,
     pub(crate) resources: ResourceDirectory,
+    pub(crate) verification: PostingVerification,
     pub(crate) tokens: OneTimeTokens,
     pub(crate) config: CommentsConfig,
 }
@@ -55,6 +57,7 @@ pub(crate) struct Parts {
     pub mailer: Arc<dyn Mailer>,
     pub translations: Translations,
     pub resources: ResourceDirectory,
+    pub verification: PostingVerification,
 }
 
 impl CommentsService {
@@ -67,6 +70,7 @@ impl CommentsService {
             mailer: parts.mailer,
             translations: parts.translations,
             resources: parts.resources,
+            verification: parts.verification,
             tokens: OneTimeTokens::new(MODULE),
             config,
         }
@@ -169,6 +173,8 @@ pub(crate) async fn ensure_target<C: ConnectionTrait>(
         closes_at: Set(closes_at),
         published_count: Set(0),
         pending_count: Set(0),
+        published_thread_count: Set(0),
+        pending_thread_count: Set(0),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -214,7 +220,8 @@ pub(crate) fn delta(from: Option<Status>, to: Option<Status>, status: Status) ->
     i32::from(to == Some(status)) - i32::from(from == Some(status))
 }
 
-/// Phần số đếm của đích trong [`shift_counts`] (không đụng `reply_count`).
+/// Phần số đếm của đích trong [`shift_counts`] (không đụng `reply_count`). Bình luận gốc đổi
+/// thêm số câu hỏi (`…_thread_count`, D-202) trong cùng câu lệnh.
 pub(crate) async fn shift_target_counts<C: ConnectionTrait>(
     connection: &C,
     row: &comment::Model,
@@ -224,6 +231,7 @@ pub(crate) async fn shift_target_counts<C: ConnectionTrait>(
     let (published, pending) =
         (delta(from, to, Status::Published), delta(from, to, Status::Pending));
     if published != 0 || pending != 0 {
+        let root = i32::from(row.depth == 0);
         target::Entity::update_many()
             .col_expr(
                 target::Column::PublishedCount,
@@ -232,6 +240,14 @@ pub(crate) async fn shift_target_counts<C: ConnectionTrait>(
             .col_expr(
                 target::Column::PendingCount,
                 Expr::col(target::Column::PendingCount).add(pending),
+            )
+            .col_expr(
+                target::Column::PublishedThreadCount,
+                Expr::col(target::Column::PublishedThreadCount).add(published * root),
+            )
+            .col_expr(
+                target::Column::PendingThreadCount,
+                Expr::col(target::Column::PendingThreadCount).add(pending * root),
             )
             .filter(target::Column::TargetType.eq(row.target_type.as_str()))
             .filter(target::Column::TargetId.eq(row.target_id.as_str()))
@@ -259,6 +275,11 @@ pub(crate) async fn display_names<C: ConnectionTrait>(
         .into_iter()
         .map(|row| (row.user_id, row.display_name))
         .collect())
+}
+
+/// Mã nhãn đã lưu của bình luận (cột `badges`), theo thứ tự lưu.
+pub(crate) fn badges_of(row: &comment::Model) -> Vec<String> {
+    row.badges.split(',').filter(|code| !code.is_empty()).map(str::to_owned).collect()
 }
 
 /// Một bình luận kèm tên hiển thị của tác giả.

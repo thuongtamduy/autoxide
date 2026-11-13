@@ -54,6 +54,10 @@ pub struct Modules {
     personal_data: PersonalDataExport,
     /// Loại đối tượng các module đăng ký lúc khởi động.
     resources: crate::resource::ResourceDirectory,
+    /// Event vòng đời các module khai (`Module::resource_events`), đã kiểm.
+    resource_events: Vec<crate::resource::ResourceEvent>,
+    /// Bộ hỏi tài khoản đã xác thực (một module đăng ký lúc khởi động, D-202).
+    verification: crate::access::PostingVerification,
     /// Sổ module đã cài (module `kernel` phục vụ); điền ở cuối [`start`](Self::start).
     catalog: crate::module_catalog::ModuleCatalog,
 }
@@ -91,6 +95,7 @@ impl Modules {
             problems.extend(errors);
             EventCatalog::default()
         });
+        let resource_events = checked_resource_events(&modules, &events, &mut problems);
         for module in &modules {
             for deprecation in module.deprecations() {
                 problems.extend(deprecation.problems(module.name()));
@@ -111,6 +116,8 @@ impl Modules {
                 wake: Arc::new(tokio::sync::Notify::new()),
                 personal_data: PersonalDataExport::default(),
                 resources: crate::resource::ResourceDirectory::default(),
+                resource_events,
+                verification: crate::access::PostingVerification::default(),
                 apis: Apis::default(),
                 catalog,
             })
@@ -157,6 +164,8 @@ impl Modules {
                 apis: &mut apis,
                 personal_data: &self.personal_data,
                 resources: &self.resources,
+                resource_events: &self.resource_events,
+                verification: &self.verification,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
@@ -409,6 +418,48 @@ impl Modules {
     }
 }
 
+/// Event vòng đời mọi module khai, sau khi kiểm: event phải do chính module đó khai, loại phải
+/// thuộc module đó, một event chỉ khai một lần. Lỗi thêm vào `problems`.
+fn checked_resource_events(
+    modules: &[Box<dyn Module>],
+    events: &EventCatalog,
+    problems: &mut Vec<String>,
+) -> Vec<crate::resource::ResourceEvent> {
+    let mut found: Vec<crate::resource::ResourceEvent> = Vec::new();
+    for module in modules {
+        let name = module.name();
+        let own = |text: &str| {
+            text.strip_prefix(name).and_then(|rest| rest.strip_prefix('.')).is_some_and(|rest| {
+                !rest.is_empty()
+                    && rest
+                        .chars()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+            })
+        };
+        for declared in module.resource_events() {
+            if !own(declared.kind) {
+                problems.push(format!(
+                    "module `{name}` declares a lifecycle event for resource type `{}`; it must \
+                     be `{name}.<lower_case_name>`",
+                    declared.kind
+                ));
+            }
+            if !own(declared.event) || !events.contains(declared.event) {
+                problems.push(format!(
+                    "module `{name}` declares `{}` as a lifecycle event, but does not declare \
+                     that event in `Module::events`",
+                    declared.event
+                ));
+            }
+            if found.iter().any(|known| known.event == declared.event) {
+                problems.push(format!("lifecycle event `{}` is declared twice", declared.event));
+            }
+            found.push(declared);
+        }
+    }
+    found
+}
+
 impl fmt::Debug for Modules {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Modules").field(&self.names()).finish()
@@ -447,6 +498,40 @@ mod tests {
             self.limit = reader.get(&LIMIT)?;
             Ok(())
         }
+    }
+
+    /// Module sở hữu đối tượng `shop.item`, khai event vòng đời.
+    struct Shop(Vec<crate::resource::ResourceEvent>);
+
+    impl Module for Shop {
+        fn name(&self) -> &'static str {
+            "shop"
+        }
+
+        fn events(&self) -> Vec<crate::event::EventInfo> {
+            vec![crate::event::EventInfo::new("shop.item_deleted", "An item was deleted.")]
+        }
+
+        fn resource_events(&self) -> Vec<crate::resource::ResourceEvent> {
+            self.0.clone()
+        }
+    }
+
+    #[test]
+    fn event_vong_doi_duoc_kiem_luc_khoi_dong() {
+        use crate::resource::{ResourceChange, ResourceEvent};
+        let good = ResourceEvent::new("shop.item_deleted", "shop.item", ResourceChange::Removed);
+        let modules = Modules::new(vec![Box::new(Shop(vec![good]))]).unwrap();
+        assert_eq!(modules.resource_events, [good]);
+        for bad in [
+            ResourceEvent::new("shop.item_gone", "shop.item", ResourceChange::Removed),
+            ResourceEvent::new("shop.item_deleted", "media.item", ResourceChange::Removed),
+        ] {
+            let error = Modules::new(vec![Box::new(Shop(vec![bad]))]).unwrap_err();
+            assert!(error.to_string().contains("lifecycle event"), "{error}");
+        }
+        let error = Modules::new(vec![Box::new(Shop(vec![good, good]))]).unwrap_err();
+        assert!(error.to_string().contains("declared twice"), "{error}");
     }
 
     /// Module đọc một biến bắt buộc.

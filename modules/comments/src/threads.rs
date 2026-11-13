@@ -5,12 +5,15 @@
 //!   trước) và `reply_count`.
 //! - Trả lời: cursor, cũ trước mặc định.
 //! - Đích bị ẩn (`hidden`) thì không có gì công khai.
+//! - Tìm (`q`, D-202): bình luận gốc có chữ hay tên khớp, không phân biệt hoa thường và dấu;
+//!   khớp ĐÚNG dấu xếp trước khớp không dấu (`fetch_page_tiers`), trong mỗi tầng theo `order`.
 //!
 //! Trả lời đầu của mỗi bình luận gốc lấy bằng một câu truy vấn nhỏ có index `(root_id, status,
 //! id)` cho mỗi bình luận gốc có trả lời (tối đa 200 / trang); chưa đo thấy chậm.
 
 use autoxide_kernel::error::Error;
-use autoxide_kernel::pagination::{Page, PageRequest, Pagination, fetch_page};
+use autoxide_kernel::pagination::{Page, PageRequest, Pagination, fetch_page, fetch_page_tiers};
+use autoxide_kernel::search;
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -37,13 +40,15 @@ fn visible_root() -> Condition {
 }
 
 impl CommentsService {
-    /// Một trang bình luận gốc của đích, mỗi cái kèm tối đa `replies` trả lời đầu.
+    /// Một trang bình luận gốc của đích, mỗi cái kèm tối đa `replies` trả lời đầu. `search`:
+    /// chỉ bình luận gốc có chữ hay tên chứa chuỗi này (đã kiểm độ dài), đúng dấu xếp trước.
     pub(crate) async fn thread(
         &self,
         kind: &str,
         id: &str,
         page: &PageRequest,
         replies: u32,
+        search: Option<&str>,
     ) -> Result<Page<ThreadRoot>, Error> {
         let target = self.target(kind, id).await?;
         if target.hidden {
@@ -54,9 +59,27 @@ impl CommentsService {
             .filter(comment::Column::TargetId.eq(id))
             .filter(comment::Column::Depth.eq(0))
             .filter(visible_root());
-        let Page { data: roots, pagination } =
-            fetch_page(select, comment::Column::Id, |row| row.id, page, self.database.read())
-                .await?;
+        let Page { data: roots, pagination } = match search {
+            None => {
+                fetch_page(select, comment::Column::Id, |row| row.id, page, self.database.read())
+                    .await?
+            }
+            Some(text) => {
+                let tiers = [
+                    Condition::all().add(search::contains_exact(comment::Column::MatchKey, text)),
+                    Condition::all().add(search::contains(comment::Column::SearchKey, text)),
+                ];
+                fetch_page_tiers(
+                    select,
+                    &tiers,
+                    comment::Column::Id,
+                    |row| row.id,
+                    page,
+                    self.database.read(),
+                )
+                .await?
+            }
+        };
         let replies = replies.min(REPLIES_MAX);
         let mut all = Vec::new();
         let mut counts = Vec::new();

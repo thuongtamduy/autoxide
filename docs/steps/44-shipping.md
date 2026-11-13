@@ -416,3 +416,18 @@ hãng bằng `FakeCarrier`.
 - Đọc bảng kê CSV theo một định dạng chung (cột `tracking_number`, `cod_amount`, `fee`) và để bộ nối
   từng hãng đổi định dạng riêng — khuyến nghị vậy.
 - Ghi vào `docs/DECISIONS.md` (skill `record-decision`).
+
+## Bổ sung theo D-200 (thiết kế giao diện 2)
+
+**Ước tính phí giao công khai.** `GET /public/shipping/estimate?product_id&variant_id&quantity&province_code`
+(công khai) chạy cùng `quote` với một giỏ ảo một dòng, giao tới mã tỉnh (chưa cần xã), trả các phương thức,
+phí, thời gian dự kiến, ngưỡng miễn phí. Response ghi rõ `estimate: true`; phí thật luôn tính lại khi đặt
+hàng. Cache ngắn theo (sản phẩm, tỉnh). Test: kết quả bằng `quote` của giỏ một dòng cùng tỉnh.
+
+## Bổ sung theo D-201
+
+**Ngày giao dự kiến.** `Quote` và ước tính công khai trả `eta: {earliest_date, latest_date, order_by}`
+(ngày tuyệt đối theo múi giờ của khách, `order_by` = giờ chốt hôm nay nếu còn). Ngày làm việc, giờ chốt
+theo phương thức, ngày lễ là dữ liệu có ngày hiệu lực (`shipping_calendars`). Nhận tại cửa hàng trả
+`ready_at` = giờ đặt + `prep_hours` lùi tới giờ mở cửa kế tiếp (hồ sơ công khai của nút, bước 34) và
+`hold_days`. Khoảng dài hơn 7 ngày thì ghi rõ lý do (hàng đặt trước, vùng xa).

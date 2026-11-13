@@ -163,6 +163,23 @@ Publish a trait in `src/api.rs` and provide it in `Module::start` with
 services work the same way: `dyn Mailer` (send mail; module `mail`) and `dyn Storage`
 (store files; module `files`).
 
+### Records other modules attach things to
+
+Modules such as `comments` attach data to records of other modules without depending on them
+(`autoxide_kernel::resource`):
+
+- `context.resource_type("shop.item", resolver)` in `Module::start` lets others ask whether an
+  item exists and is public, and get its title and path.
+- `Module::resource_events` declares which of your events (from `Module::events`, subject
+  `<kind>:<id>`) mean `ResourceChange::Closed` (takes nothing new) or `ResourceChange::Removed`
+  (gone: close and hide what is attached). The kernel checks them at start.
+- `context.badge_source(kind, &["seller"], resolver)` computes badges of an author on a record of
+  any kind, e.g. `seller` for someone who manages a product. Each badge of a kind comes from one
+  module; badges are stable codes, never sentences.
+- `context.posting_verifier(…)` (one module in the whole program) answers whether an account is
+  verified to post content (phone or identity); `context.posting_verification()` asks it. With no
+  verifier registered every signed-in account counts as verified.
+
 ### Personal data
 
 A module that keeps data about users takes part in data export and account deletion

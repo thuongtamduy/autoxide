@@ -378,6 +378,78 @@ where
     Ok(Page { data: rows, pagination: Pagination { limit: request.limit, next_cursor } })
 }
 
+/// Tên "cột" trong con trỏ của [`fetch_page_tiers`].
+const TIER: &str = "tier";
+
+/// Như [`fetch_page`], nhưng chia dòng thành nhiều tầng xếp hạng: mọi dòng khớp `tiers[0]` đứng
+/// trước, rồi các dòng khớp `tiers[1]` (mà không khớp tầng trước)… Trong mỗi tầng sắp theo ID
+/// như [`fetch_page`]; dòng không khớp tầng nào bị bỏ. Dùng cho tìm kiếm "khớp đúng dấu xếp
+/// trước khớp không dấu" (D-202): hạng phụ thuộc chữ người dùng gõ nên không lưu thành cột được.
+///
+/// Con trỏ mang tầng và ID của dòng cuối. Một trang chạy tối đa `tiers.len()` câu truy vấn, mỗi
+/// câu đi theo index của bộ lọc chung như [`fetch_page`].
+pub async fn fetch_page_tiers<E, C>(
+    select: Select<E>,
+    tiers: &[Condition],
+    id_column: E::Column,
+    id_of: impl Fn(&E::Model) -> Uuid,
+    request: &PageRequest,
+    connection: &C,
+) -> Result<Page<E::Model>, Error>
+where
+    E: EntityTrait,
+    C: ConnectionTrait,
+{
+    let (start, after) = match &request.position {
+        None => (0, None),
+        Some(Position::Key(KeyCursor { column, value: SortValue::Integer(tier), id }))
+            if column == TIER && usize::try_from(*tier).is_ok_and(|tier| tier < tiers.len()) =>
+        {
+            (usize::try_from(*tier).unwrap_or_default(), Some(*id))
+        }
+        Some(_) => return Err(wrong_cursor()),
+    };
+    let wanted = request.limit as usize + 1;
+    let mut rows: Vec<(usize, E::Model)> = Vec::new();
+    for tier in start..tiers.len() {
+        let mut condition = Condition::all().add(tiers[tier].clone());
+        for earlier in &tiers[..tier] {
+            condition = condition.add(earlier.clone().not());
+        }
+        let mut page = select.clone().filter(condition);
+        if let (true, Some(id)) = (tier == start, after) {
+            page = match request.order {
+                Order::Asc => page.filter(id_column.gt(id)),
+                Order::Desc => page.filter(id_column.lt(id)),
+            };
+        }
+        let page = match request.order {
+            Order::Asc => page.order_by_asc(id_column),
+            Order::Desc => page.order_by_desc(id_column),
+        };
+        let missing = (wanted - rows.len()) as u64;
+        let found = page.limit(missing).all(connection).await?;
+        rows.extend(found.into_iter().map(|row| (tier, row)));
+        if rows.len() >= wanted {
+            break;
+        }
+    }
+    let has_more = rows.len() >= wanted;
+    rows.truncate(request.limit as usize);
+    let next_cursor = has_more.then(|| rows.last()).flatten().map(|(tier, row)| {
+        KeyCursor {
+            column: TIER.to_owned(),
+            value: SortValue::Integer(i64::try_from(*tier).unwrap_or_default()),
+            id: id_of(row),
+        }
+        .encode()
+    });
+    Ok(Page {
+        data: rows.into_iter().map(|(_, row)| row).collect(),
+        pagination: Pagination { limit: request.limit, next_cursor },
+    })
+}
+
 /// Giá trị trong con trỏ có đúng kiểu của cột không. Con trỏ do client gửi lại nên có thể
 /// bị sửa: so chữ với cột số làm Postgres báo lỗi (500) còn SQLite thì không — kiểm trước
 /// để cả hai cùng trả `invalid_cursor` (D-149).

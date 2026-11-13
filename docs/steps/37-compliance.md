@@ -758,3 +758,17 @@ Ghi `docs/DECISIONS.md` (skill `record-decision`) cho mỗi mục đã chốt; m
    để trait `DoNotContactList` cho bước sau, ghi ở "Sau core".
 8. **Gói quy tắc `vn` ban đầu**: nội dung danh sách kiểm, hạn, lý do ẩn — viết từ nguồn ở `business-foundation.md`,
    mọi mục `needs_legal_review: true`.
+
+## Bổ sung theo D-202 (điểm nối xác thực tài khoản đã có trong kernel)
+
+- Kernel đã có `autoxide_kernel::access::PostingVerifier` (`is_verified(user_id)`) và chỗ giữ
+  `PostingVerification`; `comments` hỏi nó cho các loại đích trong `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES`
+  (khách luôn bị từ chối ở đó, lỗi `comments.verification_required`). Chưa ai đăng ký thì mọi tài khoản
+  đăng nhập tính là đã xác thực.
+- Bước này: `compliance` đăng ký `context.posting_verifier(…)` trong `start`, cài bằng
+  `AccountVerification::level` ≥ mức `posting.comments` của khách (khi bước 33 đã có, thêm tham số khách
+  vào trait của kernel bằng một hàm mới có cài đặt mặc định — D-038). Thay phần C2 ở trên: `comments`
+  **không** `require::<dyn PostingGate>` và **không** dời thứ tự đăng ký; `posting.comments` khác `none`
+  thì `compliance` coi mọi loại đích của `comments` là "chỉ tài khoản đã xác thực" — ghi trong
+  `docs/COMMENTS.md` cách hai cấu hình kết hợp.
+- Test: `comments_dung_trang_thai_xac_thuc_that` (đăng ký bộ hỏi thật, người chưa xác thực số bị từ chối).

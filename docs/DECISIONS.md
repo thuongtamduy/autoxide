@@ -4797,3 +4797,141 @@ Lý do: chủ dự án chưa muốn công khai. Tách phần phụ thuộc ra m�
 rút khi tắt) được phát hành.
 
 Thay: phần công khai của D-175 (tới khi chủ dự án quyết công khai).
+
+## D-200 · Thiết kế giao diện 2: quản trị đa phân hệ, mặt tiền bán hàng; bước 51 cho phần core còn thiếu — 2026-11-13 — chủ dự án giao hướng, agent quyết nội dung
+
+Quyết định: giao diện (repo riêng, D-097) theo thiết kế 2 (`docs/research/ui-design.md`):
+
+1. Trang quản trị có mười hai phân hệ trên một thanh dọc; quản trị nội dung chỉ là một phân hệ. Menu
+   con là hàng tab dưới thanh tiêu đề. Ngữ cảnh "khách › nút tổ chức" ở góc trên trái quyết phạm vi mọi
+   số liệu. Ctrl + K tìm xuyên phân hệ. Mỗi phân hệ có trang tổng quan; trang Tổng quan chung có hộp
+   việc gom từ mọi phân hệ.
+2. Một mục menu hiện khi module đã bật cho khách và người dùng có permission ở nút đang chọn; thiếu
+   tính năng của gói thì **vẫn hiện, kèm nhãn khoá**.
+3. Website công khai là mặt tiền bán hàng của một khách (trang chủ, danh mục, sản phẩm, giỏ và đặt
+   hàng, gian hàng người bán, bài viết có gắn sản phẩm, tài khoản người mua); blog thành một mục.
+4. Phần core còn thiếu thành **bước 51** (sổ điều hướng, hộp việc, tìm xuyên phân hệ, số liệu tóm
+   tắt, hoạt động gần đây, nhúng bản ghi trong nội dung) và bốn mục thêm vào bước 34 (hồ sơ công khai
+   của nút), 42 (tình trạng hàng công khai theo cửa hàng), 43 (giá khi áp mã cho từng sản phẩm), 44
+   (ước tính phí giao công khai). Đặc tả: `docs/steps/51-ui-contracts.md` và mục "Bổ sung theo D-200"
+   ở cuối đặc tả 34, 42, 43, 44.
+5. Kernel không có danh sách phân hệ viết cứng: nhóm menu do module khai (core trung lập với nghiệp vụ);
+   việc trong hộp việc tính từ dữ liệu của module, không có bảng việc riêng.
+
+Lý do: chủ dự án thấy thiết kế 1 coi trang quản trị là CMS, trong khi lộ trình đã mở sang nền đa khách
+và thương mại (13/11/2026). Menu, khoá theo gói và hộp việc phụ thuộc dữ liệu chỉ core có (module bật,
+permission theo nút, quyền dùng); viết cứng ở giao diện thì mỗi mô hình kinh doanh cần một giao diện.
+Đối chiếu với đặc tả 33–47 cho thấy phần lớn API của mặt tiền đã có (giỏ hàng, tách đơn theo người bán,
+đồng ý, chấp nhận văn bản, trang người bán công khai); chỉ thêm những mục ở trên.
+
+Đã cân nhắc: gom menu, hộp việc vào module `notifications` — hộp thư thông báo là tin đã gửi cho một
+người, còn hộp việc là trạng thái hiện tại của dữ liệu, xử lý xong thì tự hết; một endpoint `/public/site`
+gom cấu hình website từ nhiều module — phải trả JSON không kiểu, mất mô tả OpenAPI; để giao diện gọi ba
+endpoint có cache (cửa hàng, menu, logo Bộ Công Thương) là đủ. Đánh số lại để bước 51 đứng trước 41 —
+đổi số của 11 bước và 11 file đặc tả; thay bằng ghi trong bảng phụ thuộc rằng 51 nên làm trước 41.
+
+## D-201 · Áp kết quả nghiên cứu các sản phẩm hàng đầu vào thiết kế 2; thêm mục bước 51 và bước 52 — 2026-11-13 — chủ dự án giao, agent quyết nội dung
+
+Quyết định: chủ dự án yêu cầu tham khảo các website và trang quản trị hàng đầu thế giới rồi mang điều
+tốt nhất về (`docs/research/ui-design.md` mục 5 ghi nguồn và bằng chứng). Áp như sau:
+
+1. Bước 51 thêm P7–P13: schema bộ lọc công bố trong OpenAPI và view đã lưu; thao tác hàng loạt chung
+   (`ids` hoặc `filter` + `expected_count`, job, kết quả từng bản ghi); tìm có toán tử, phạm vi và mở thẳng
+   theo mã; hộp việc theo người (khoá ổn định, lý do, hoãn, giao) và việc thiết lập; `/me/can` giải thích
+   quyền; agent là người dùng thật (loại API key, `actor_kind`, lệnh rủi ro trả `202 approval_required`
+   chờ người duyệt, như nhau cho REST và MCP); dòng hoạt động và ghi chú nội bộ dùng chung cho mọi bản ghi.
+   Mục P10 thay phần "có thêm bỏ qua việc hay không" mà đặc tả 51 để agent tự quyết.
+2. Bước 52 mới (sau 51): bàn kỹ thuật (nhật ký request, lần giao webhook, chạy lại job), `restore` và
+   `dry_run`, lọc bằng lời thường qua AI (chỉ ra tham số đã kiểm), thông báo có lý do và trạng thái, ghim,
+   sức khoẻ người bán và tuân thủ.
+3. Mặt tiền: thêm mục vào bước 41 (gợi ý tìm hai tầng dấu, từ đồng nghĩa, sắp xếp bán chạy / đánh giá, số
+   đếm bộ lọc, thẻ có biến thể và điểm, dữ liệu JSON-LD), 42 (báo khi có hàng lại theo cửa hàng), 43 (mã
+   dùng được cho giỏ kèm lý do; số lượt còn lại chỉ khi là số thật), 44 (ngày giao tuyệt đối, giờ chốt,
+   lịch là dữ liệu; giờ sẵn sàng khi nhận tại cửa hàng), 45 (mua không cần tài khoản trọn vẹn, trạng thái
+   thanh toán công khai bằng token, tra và gắn đơn vãng lai bằng OTP, người nhận hộ, cách trả hàng, đánh
+   giá có ảnh và tóm tắt AI chờ duyệt).
+4. Để sau, ghi ở "Sau core": khách thử nghiệm cách ly, khách duyệt từng lần nhân sự nền tảng xin vào dữ
+   liệu, nhóm nút ngoài cây, quản trị trên điện thoại.
+
+Lý do: những điều trên có bằng chứng (Baymard, tài liệu chính thức) hoặc là mẫu chung của nhiều sản phẩm
+đầu ngành, và cần dữ liệu chỉ core có (quyền theo nút, quyền dùng, audit, job). Agent hay retry và cần
+người duyệt cho lệnh rủi ro, nên "lệnh chờ duyệt" đi vào core thay vì từng giao diện tự làm.
+
+Đã cân nhắc: đối chiếu đơn vị hành chính cũ sang mới (nghiên cứu đề xuất) — trái D-193 do chủ dự án quyết,
+không làm; chuyển menu con sang thanh bên như Vercel 2026 — giữ hàng tab của D-200, xem lại khi có số đo;
+dồn mọi mục vào bước 51 — bước quá lớn, tách phần "nên có" sang bước 52.
+
+## D-202 · API còn thiếu cho thiết kế giao diện 2: hỏi đáp, `alt` theo ngôn ngữ, trả hàng, đơn vãng lai, nhật ký lệnh MCP — 2026-11-13 — chủ dự án giao, agent quyết cách làm
+
+Quyết định: năm khoảng trống rà ra từ thiết kế 2 (đề bài `docs/prompts/ui-api-gaps.md`) làm như sau.
+Phần A và B có code ngay (module `comments`, `media` đã có); C, D, E chỉ vào đặc tả, làm khi lộ trình tới
+bước đó. Mọi thay đổi API là **thêm** (D-059): endpoint, tham số, trường mới; không đổi hành vi hay hình
+dạng của endpoint đang có.
+
+**A. Hỏi đáp sản phẩm dựng trên `comments`** (không module mới): câu hỏi là bình luận gốc, trả lời là
+trả lời trong luồng.
+
+1. Kernel thêm ba điểm nối trung lập (theo mẫu sổ đối tượng D-123, mặc định rỗng — D-038):
+   - `Module::resource_events` → `ResourceEvent { event, kind, change: Closed | Removed }`: module sở hữu
+     khai event nào nghĩa là "thôi nhận tương tác" / "đã gỡ". Kernel kiểm lúc khởi động (event do chính
+     module khai, loại thuộc module đó, không trùng) và đưa cho mọi module qua
+     `StartContext::resource_events`. `comments` bỏ hằng số viết cứng `targets::OWNER_EVENTS`; `content`
+     khai `entry_archived → Closed`, `entry_deleted → Removed` (giữ đúng hành vi cũ). Bước 41 khai lưu
+     trữ / xoá sản phẩm là `Removed` (đóng và ẩn hỏi đáp).
+   - Bộ tính nhãn tác giả `BadgeResolver` trong `ResourceDirectory`: `context.badge_source(kind, codes,
+     resolver)` — module nào cũng đăng ký được cho loại của module khác (`orders` tính `verified_buyer`
+     cho `catalog.product`), mỗi nhãn của một loại chỉ một module tính, nhãn ngoài danh sách khai bị bỏ.
+     `comments` gọi lúc ghi (ngoài transaction), lưu mã vào cột `badges`, đường đọc không gọi chéo module.
+     Response công khai trả `badges: ["seller"]` — mã ổn định, giao diện tự dịch.
+   - `access::PostingVerifier` + chỗ giữ `PostingVerification` (một module đăng ký qua
+     `StartContext::posting_verifier`, thấy cả khi module đó khởi động sau): "tài khoản đã xác thực để
+     đăng nội dung chưa". **Bước 37 chưa có**, nên chưa module nào đăng ký: khi đó mọi tài khoản đăng nhập
+     tính là đã xác thực — giữ hành vi trước D-202. Bước 37 (mục NĐ 147/2024) đăng ký bộ hỏi thật:
+     `compliance` cài `PostingVerifier` dựa trên `PostingGate` / `AccountVerification` của đặc tả 37 (tên
+     đó thuộc `compliance`, nên điểm nối của kernel mang tên khác). Phần C2 của đặc tả 37 đổi theo:
+     `comments` không `require::<dyn PostingGate>` và không phải dời thứ tự đăng ký.
+2. `comments`: cấu hình `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` (mặc định rỗng — không đổi gì): ở loại
+   đích này khách bị từ chối và người dùng phải qua bộ hỏi xác thực, lỗi `comments.verification_required`
+   (403). Căn cứ: NĐ 147/2024/NĐ-CP về xác thực tài khoản đăng nội dung — **cần đối chiếu văn bản gốc**
+   xem hỏi đáp trên website bán hàng có thuộc phạm vi không; vì vậy là cấu hình theo loại đích.
+3. Tìm `q` trên `GET /public/threads`: chỉ bình luận gốc, không phân biệt hoa thường và dấu; khớp đúng dấu
+   (cột mới `match_key` = `search::exact_key`, NFC + chữ thường) xếp trước khớp không dấu (`search_key`).
+   Hạng phụ thuộc chữ gõ nên không lưu thành cột được: kernel thêm `pagination::fetch_page_tiers` (con trỏ
+   mang tầng và ID; mỗi trang tối đa một câu truy vấn mỗi tầng) — một cách làm cho mọi "xếp hai tầng"
+   về sau (gợi ý tìm của bước 41).
+4. Số đếm: `comments_targets` thêm `published_thread_count` / `pending_thread_count` (đổi cùng
+   transaction, cùng câu `UPDATE n = n + k` với số cũ); `GET /public/counts` thêm `thread_count`, đích thêm
+   `thread_count` và `pending_thread_count` (quản trị).
+5. MCP: `comments.unanswered` (`comments.read`, như `GET /?status=published&unanswered=true` — tham số mới)
+   và `comments.answer` (`comments.post`, gọi chính `CommentsService::post` như `POST /public/comments`).
+   "Chưa trả lời" là chưa có trả lời đang hiện (`reply_count = 0`), không phân biệt ai trả lời.
+
+**B. `alt` theo ngôn ngữ** (`media`): bảng mới `media_alt_translations` (`media_id`, `locale`, `alt`,
+`updated_at`; khoá (`media_id`, `locale`)) bằng migration mới; chưa có `tenant_id` vì `media_item` chưa
+theo khách — bước 33 thêm cho cả hai. `media_item.alt` giữ nghĩa bản ngôn ngữ mặc định. Item trả thêm
+`alts`; `PUT` / `DELETE /{id}/alts/{locale}` (bắt buộc `If-Match`, event `media.item_updated` kèm `alts`);
+tool `media.set_alt`; ngôn ngữ kiểm theo `AUTOXIDE_MEDIA_ALT_LOCALES` (mặc định `en,vi`), sai thì
+`media.unsupported_locale`. Trait `Media` thêm `find_many_in(ids, locale)` có cài đặt mặc định; `content`
+tra ảnh của bản công khai theo ngôn ngữ của bài. Gợi ý bằng AI: endpoint sẵn có
+`POST /{id}/alt-suggestions` đã nhận `locale` và chỉ trả bản nháp (D-109) — không thêm endpoint. Xoá hẳn
+ảnh thì xoá bản dịch cùng transaction.
+
+**C, D** vào đặc tả bước 45 (mục "Bổ sung theo D-202"): ảnh kèm yêu cầu trả hàng (kiểm chủ sở hữu qua trait
+của `media`), lý do bắt buộc ảnh là chính sách theo nút, `POST /me/orders/{id}/returns/preview` không ghi;
+thao tác bằng token xem đơn (huỷ, đổi địa chỉ có OTP lần hai, mở hỗ trợ) qua cùng service, giới hạn là
+cấu hình, che số điện thoại và địa chỉ. Tạo tài khoản từ số đã xác thực thuộc **`auth` (bước 34)** — danh
+tính và đăng nhập là việc của `auth`; `orders` chỉ gọi `claim` sau đó.
+
+**E** vào đặc tả bước 52: lệnh MCP ghi `mcp:<tool>` vào đường dẫn mẫu, không ghi tham số; lọc theo
+`actor_kind` và key; giữ `approval_id` khi lệnh nhận `202 approval_required`.
+
+Lý do: dùng lại `comments` (đã có kiểm duyệt, chống spam, luồng, số đếm, tool) rẻ và đúng hơn một module
+hỏi đáp mới; nhãn và event vòng đời là dữ liệu do module sở hữu khai nên thêm loại đích không phải sửa
+`comments`. Nhãn tính lúc ghi vì trang sản phẩm đọc nhiều gấp bội ghi và đường đọc không được gọi chéo
+module. Bộ hỏi xác thực là chỗ giữ của kernel thay vì `provide` / `require` vì thứ tự đăng ký không được
+lặng lẽ làm mất kiểm tra pháp lý (module đăng ký sau vẫn có hiệu lực).
+
+Đã cân nhắc: module `questions` riêng — lặp lại toàn bộ kiểm duyệt của `comments`; cột JSON cho `alt` theo
+ngôn ngữ trên `media_item` — khó lọc, khó xoá một ngôn ngữ, đổi hình dạng bảng đang có; xếp hạng tìm
+bằng `CASE WHEN … LIKE` trong `ORDER BY` — con trỏ theo ID không giữ được thứ tự, phải dùng `OFFSET`
+(luật cấm); kiểm `verified_only` bằng tên role — trái luật kiến trúc 7.
