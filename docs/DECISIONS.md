@@ -4251,3 +4251,16 @@ Cần kiểm trước khi chọn (skill `check-library-api`, đúng phiên bản
 feature `webp`) giải mã được WebP, nhưng bộ mã hoá của nó có thể chỉ có kiểu không mất dữ liệu;
 kiểu nén mất dữ liệu (cho số đo trên) có thể cần thư viện khác, vd bọc `libwebp` bằng C — xét
 license qua `cargo deny` và việc build image Docker. Thêm thư viện thì ghi `STACK.md`.
+
+## D-177 · SDK TypeScript nằm trong repo, không đăng npm — 2026-11-13 — chủ dự án quyết
+
+Quyết định: SDK TypeScript sinh từ `docs/openapi.json` (nguồn sinh SDK theo D-004) nằm trong repo
+này, không đăng lên npm. Giao diện (repo riêng, D-097) và người ngoài dùng nó bằng cách chép hoặc
+trỏ tới thư mục / bản phát hành trên GitHub. Công cụ sinh, thư mục và cách gate kiểm SDK khớp hợp
+đồng do agent làm bước 32 quyết và ghi thành mục mới.
+
+Lý do: đăng npm cần tài khoản và token của chủ dự án và thêm một kênh phát hành phải giữ; chưa có
+người dùng ngoài nào cần cài qua npm.
+
+Đã cân nhắc: đăng npm — để sau, khi có người dùng ngoài cần; không làm SDK, mỗi client tự sinh —
+mỗi bên một bản lệch nhau, đúng thứ D-004 muốn tránh.
