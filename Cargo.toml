@@ -192,3 +192,10 @@ tracing-opentelemetry = { version = "0.34", default-features = false }
 # --- Chỉ dùng trong test ---
 # `ServiceExt::oneshot`: gửi một request thẳng vào router, không cần mở port.
 tower = { version = "0.5", features = ["util"] }
+
+# Bản build để dev và test chỉ giữ thông tin dòng code (đủ để backtrace và panic chỉ đúng file,
+# dòng), bỏ thông tin biến cho debugger: `target/` nhỏ đi và biên dịch, link nhanh hơn (D-172).
+# `test` kế thừa `dev` nên không cần khai riêng. Cần debugger xem biến thì tạm đổi thành
+# `debug = true` trên máy mình, không commit.
+[profile.dev]
+debug = "line-tables-only"
