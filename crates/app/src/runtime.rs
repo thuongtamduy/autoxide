@@ -104,14 +104,13 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
     } else {
         (Vec::new(), None, Vec::new())
     };
-    let extras = http::Extras {
-        authenticator,
-        idempotency: modules.api::<dyn IdempotencyStore>(),
-        translations: modules.translations().clone(),
-        deprecations: modules.deprecations(),
-        body_limits: modules.body_limits(),
-        tools,
-    };
+    let extras = http::Extras::default()
+        .authenticator(authenticator)
+        .idempotency(modules.api::<dyn IdempotencyStore>())
+        .translations(modules.translations().clone())
+        .deprecations(modules.deprecations())
+        .body_limits(modules.body_limits())
+        .tools(tools);
     let api = http::build(&config.http, root, routes, extras);
     Ok(Runtime { config, database, modules, api, dispatcher, worker })
 }

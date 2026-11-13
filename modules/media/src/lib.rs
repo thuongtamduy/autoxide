@@ -198,16 +198,16 @@ pub(crate) mod testing {
 
         async fn get(&self, key: &str) -> Result<Option<StoredFile>, Error> {
             let bytes = self.0.lock().unwrap().get(key).cloned();
-            Ok(bytes.map(|bytes| StoredFile {
-                size: bytes.len() as u64,
+            Ok(bytes.map(|bytes| {
                 // Chia thành khúc 3 byte để thử việc cắt khoảng qua nhiều khúc.
-                content: futures_util::stream::iter(
+                let content = futures_util::stream::iter(
                     bytes
                         .chunks(3)
                         .map(|chunk| Ok(Bytes::copy_from_slice(chunk)))
                         .collect::<Vec<_>>(),
                 )
-                .boxed(),
+                .boxed();
+                StoredFile::new(bytes.len() as u64, content)
             }))
         }
 

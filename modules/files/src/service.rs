@@ -454,8 +454,6 @@ mod tests {
     /// nội dung file của người đó bị xoá (nhận lại event cũng không sao).
     #[tokio::test]
     async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
-        use autoxide_kernel::event::Actor;
-
         TestDatabase::run(async |test| {
             let (files, _) = service(test, no_limits()).await;
             let (ada, bob) = (uploader(Uuid::now_v7()), uploader(Uuid::now_v7()));
@@ -467,15 +465,11 @@ mod tests {
             assert_eq!(exported.as_array().unwrap().len(), 2);
             assert_eq!(exported[0]["name"], "a.txt");
 
-            let deleted = Delivered {
-                id: Uuid::now_v7(),
-                module: "auth",
-                name: autoxide_kernel::privacy::USER_DELETED.to_owned(),
-                actor: Actor::system(),
-                subject: None,
-                payload: json!({"before": {"id": ada.user_id()}}),
-                occurred_at: Utc::now(),
-            };
+            let deleted = Delivered::new(
+                "auth",
+                autoxide_kernel::privacy::USER_DELETED.to_owned(),
+                json!({"before": {"id": ada.user_id()}}),
+            );
             files.handle(&deleted).await.unwrap();
             files.handle(&deleted).await.unwrap();
             assert_eq!(files.export(ada.user_id()).await.unwrap(), json!([]));

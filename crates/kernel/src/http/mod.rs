@@ -96,8 +96,10 @@ pub struct Api {
 /// route `root` ở gốc (ngoài `/api/v1`, vd [`health_routes`]), và bọc các lớp xử lý
 /// chung quanh tất cả.
 ///
-/// Những thứ dùng chung cho mọi request, ngoài route.
+/// Những thứ dùng chung cho mọi request, ngoài route. Dựng bằng `Extras::default()` rồi các
+/// hàm đặt từng trường.
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct Extras {
     /// Bộ xác thực một module đã công bố; handler nhận
     /// [`Principal`](crate::access::Principal) dùng nó. `None`: chưa module nào xác
@@ -116,6 +118,44 @@ pub struct Extras {
     /// Bản dịch thông báo lỗi (mặc định: chỉ bản dịch của kernel thì dùng
     /// `Translations::new(Vec::new())`; rỗng thì mọi lỗi bằng tiếng Anh).
     pub translations: Translations,
+}
+
+impl Extras {
+    /// Sets the authenticator a module published.
+    pub fn authenticator(mut self, authenticator: Option<Arc<dyn Authenticator>>) -> Self {
+        self.authenticator = authenticator;
+        self
+    }
+
+    /// Sets the store for idempotency keys.
+    pub fn idempotency(mut self, idempotency: Option<Arc<dyn IdempotencyStore>>) -> Self {
+        self.idempotency = idempotency;
+        self
+    }
+
+    /// Sets the deprecated endpoints: `(module name, declaration)`.
+    pub fn deprecations(mut self, deprecations: Vec<(&'static str, Deprecation)>) -> Self {
+        self.deprecations = deprecations;
+        self
+    }
+
+    /// Sets the per-route request body limits: `(module name, declaration)`.
+    pub fn body_limits(mut self, body_limits: Vec<(&'static str, BodyLimit)>) -> Self {
+        self.body_limits = body_limits;
+        self
+    }
+
+    /// Sets the MCP tools of the modules, with full names.
+    pub fn tools(mut self, tools: Vec<crate::mcp::Tool>) -> Self {
+        self.tools = tools;
+        self
+    }
+
+    /// Sets the translations of error messages.
+    pub fn translations(mut self, translations: Translations) -> Self {
+        self.translations = translations;
+        self
+    }
 }
 
 pub fn build(

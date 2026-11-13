@@ -88,10 +88,8 @@ impl MediaService {
                 for item in outdated {
                     let job = MakeVariants { item_id: item.id, version_id: item.version_id };
                     // Chạy lệnh hai lần trước khi worker kịp làm: không xếp trùng.
-                    let options = EnqueueOptions {
-                        unique_key: Some(format!("refresh:{}:{}", item.id, item.version_id)),
-                        ..EnqueueOptions::default()
-                    };
+                    let options = EnqueueOptions::default()
+                        .unique_key(format!("refresh:{}:{}", item.id, item.version_id));
                     self.jobs.enqueue(&transaction, &job, options).await?;
                 }
                 transaction.commit().await?;

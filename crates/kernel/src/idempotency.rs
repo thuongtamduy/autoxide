@@ -16,11 +16,19 @@ use crate::error::Error;
 
 /// Response đã lưu của một lệnh ghi.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct StoredResponse {
     pub status: u16,
     /// Các header cần trả lại y hệt (`content-type`, `location`…).
     pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
+}
+
+impl StoredResponse {
+    /// A saved response: status code, headers to send back as they were, and body.
+    pub const fn new(status: u16, headers: Vec<(String, String)>, body: Vec<u8>) -> Self {
+        StoredResponse { status, headers, body }
+    }
 }
 
 /// Kết quả khi bắt đầu một request mang idempotency key.

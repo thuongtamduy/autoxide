@@ -148,6 +148,7 @@ pub(super) async fn attach(
 ///
 /// Đừng lưu `ip` thô: băm nó trước (xem `autoxide_kernel::http::ip_hash` khi có).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ClientInfo {
     /// Địa chỉ đã giải theo số proxy tin cậy; `None` khi không biết (vd request không qua
     /// socket, trong test).
@@ -156,6 +157,13 @@ pub struct ClientInfo {
     /// Header `Origin` (trình duyệt gửi khi gọi từ trang khác hoặc gửi form).
     pub origin: Option<String>,
     pub referer: Option<String>,
+}
+
+impl ClientInfo {
+    /// A caller known only by its address (no `User-Agent`, `Origin` or `Referer`).
+    pub const fn from_ip(ip: IpAddr) -> Self {
+        ClientInfo { ip: Some(ip), user_agent: None, origin: None, referer: None }
+    }
 }
 
 impl<S: Send + Sync> FromRequestParts<S> for ClientInfo {

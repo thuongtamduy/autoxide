@@ -245,14 +245,13 @@ impl<'a> TestAppBuilder<'a> {
         } else {
             Some(Arc::new(FakeAuthenticator(self.users)))
         };
-        let extras = Extras {
-            authenticator,
-            idempotency: modules.api::<dyn IdempotencyStore>(),
-            deprecations: modules.deprecations(),
-            body_limits: modules.body_limits(),
-            tools: modules.tools().map_err(|e| fail("tools", e))?,
-            translations: modules.translations().clone(),
-        };
+        let extras = Extras::default()
+            .authenticator(authenticator)
+            .idempotency(modules.api::<dyn IdempotencyStore>())
+            .deprecations(modules.deprecations())
+            .body_limits(modules.body_limits())
+            .tools(modules.tools().map_err(|e| fail("tools", e))?)
+            .translations(modules.translations().clone());
         let root = http::health_routes(database.clone());
         let api = http::build(&config.http, root, modules.routes(), extras);
         if !api.schema_conflicts.is_empty() {

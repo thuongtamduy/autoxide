@@ -97,8 +97,9 @@ pub enum ChallengeKind {
     },
 }
 
-/// Cấu hình chống spam.
+/// Cấu hình chống spam. Dựng bằng `AntispamConfig::default()` rồi các hàm đặt từng trường.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct AntispamConfig {
     pub challenge: ChallengeKind,
     pub min_fill: StdDuration,
@@ -118,6 +119,30 @@ impl Default for AntispamConfig {
 }
 
 impl AntispamConfig {
+    /// Sets the challenge visitors must solve.
+    pub const fn challenge(mut self, challenge: ChallengeKind) -> Self {
+        self.challenge = challenge;
+        self
+    }
+
+    /// Sets the shortest time between getting a form token and sending the form.
+    pub const fn min_fill(mut self, min_fill: StdDuration) -> Self {
+        self.min_fill = min_fill;
+        self
+    }
+
+    /// Sets how long a form token stays valid.
+    pub const fn token_max_age(mut self, token_max_age: StdDuration) -> Self {
+        self.token_max_age = token_max_age;
+        self
+    }
+
+    /// Sets what happens when a check cannot run.
+    pub const fn fail_mode(mut self, fail_mode: FailMode) -> Self {
+        self.fail_mode = fail_mode;
+        self
+    }
+
     pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<Self, Invalid> {
         let kind = reader.get_with(&CHALLENGE, |raw| match raw {
             "none" | "altcha" => Ok(raw.to_owned()),
@@ -237,8 +262,9 @@ impl ContentClassifier for NoClassifier {
     }
 }
 
-/// Một bài gửi cần xét.
+/// Một bài gửi cần xét. Dựng bằng [`Submission::new`].
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct Submission<'a> {
     /// Phạm vi: form nào (vd `forms:contact`, `newsletter:subscribe`); khớp với phạm vi của
     /// token form.
@@ -260,8 +286,69 @@ pub struct Submission<'a> {
     pub duplicate: bool,
 }
 
+impl<'a> Submission<'a> {
+    /// A submission to form `scope` from `client`, with nothing else filled in yet.
+    pub const fn new(scope: &'a str, client: &'a ClientInfo) -> Self {
+        Submission {
+            scope,
+            principal: None,
+            client,
+            honeypot: None,
+            form_token: None,
+            challenge: None,
+            email: None,
+            content: None,
+            duplicate: false,
+        }
+    }
+
+    /// Sets the signed-in caller, if any.
+    pub const fn principal(mut self, principal: Option<&'a Principal>) -> Self {
+        self.principal = principal;
+        self
+    }
+
+    /// Sets the value of the trap field.
+    pub const fn honeypot(mut self, honeypot: Option<&'a str>) -> Self {
+        self.honeypot = honeypot;
+        self
+    }
+
+    /// Sets the form token.
+    pub const fn form_token(mut self, form_token: Option<&'a str>) -> Self {
+        self.form_token = form_token;
+        self
+    }
+
+    /// Sets the answer to the challenge.
+    pub const fn challenge(mut self, challenge: Option<&'a str>) -> Self {
+        self.challenge = challenge;
+        self
+    }
+
+    /// Sets the email the sender gave.
+    pub const fn email(mut self, email: Option<&'a str>) -> Self {
+        self.email = email;
+        self
+    }
+
+    /// Sets the text content.
+    pub const fn content(mut self, content: Option<&'a str>) -> Self {
+        self.content = content;
+        self
+    }
+
+    /// Sets whether the module saw the same content recently.
+    pub const fn duplicate(mut self, duplicate: bool) -> Self {
+        self.duplicate = duplicate;
+        self
+    }
+}
+
 /// Giới hạn số lần, trên bảng `<module>_throttle` của module. Thiếu thì không giới hạn kiểu đó.
+/// Dựng bằng `Limits::default()` rồi các hàm đặt từng trường.
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct Limits {
     /// Theo khối IP băm (của người lạ).
     pub ip: Option<Throttle>,
@@ -269,6 +356,26 @@ pub struct Limits {
     pub email: Option<Throttle>,
     /// Theo người dùng đã đăng nhập.
     pub user: Option<Throttle>,
+}
+
+impl Limits {
+    /// Sets the limit per hashed IP block.
+    pub fn ip(mut self, ip: Option<Throttle>) -> Self {
+        self.ip = ip;
+        self
+    }
+
+    /// Sets the limit per email the sender gave.
+    pub fn email(mut self, email: Option<Throttle>) -> Self {
+        self.email = email;
+        self
+    }
+
+    /// Sets the limit per signed-in user.
+    pub fn user(mut self, user: Option<Throttle>) -> Self {
+        self.user = user;
+        self
+    }
 }
 
 /// Kết luận cho một bài.

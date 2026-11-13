@@ -16,6 +16,7 @@ pub const SERVICE_NAME: Setting =
         .with_default("autoxide");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct TraceConfig {
     /// Địa chỉ gốc của collector (không kèm `/v1/traces`); `None` thì không xuất trace.
     pub otlp_endpoint: Option<String>,
@@ -23,6 +24,11 @@ pub struct TraceConfig {
 }
 
 impl TraceConfig {
+    /// Traces sent to the collector at `otlp_endpoint` (none when `None`) under `service_name`.
+    pub fn new(otlp_endpoint: Option<String>, service_name: impl Into<String>) -> Self {
+        TraceConfig { otlp_endpoint, service_name: service_name.into() }
+    }
+
     pub fn read(reader: &mut ConfigReader) -> Result<Self, Invalid> {
         let otlp_endpoint = reader.optional_with(&OTLP_ENDPOINT, |raw| {
             let host = raw.strip_prefix("http://").unwrap_or_default();

@@ -145,10 +145,9 @@ async fn job_trong_transaction_bi_huy_thi_khong_ton_tai() {
 async fn hen_gio_va_chong_trung() {
     TestDatabase::run(async |test| {
         let (database, modules, recorder) = setup(test, Vec::new()).await;
-        let later = Some(Utc::now() + chrono::Duration::hours(1));
-        enqueue(&database, "later", EnqueueOptions { run_at: later, ..Default::default() }).await;
-        let unique =
-            || EnqueueOptions { unique_key: Some("daily".to_owned()), ..Default::default() };
+        let later = Utc::now() + chrono::Duration::hours(1);
+        enqueue(&database, "later", EnqueueOptions::default().run_at(later)).await;
+        let unique = || EnqueueOptions::default().unique_key("daily");
 
         assert!(enqueue(&database, "once", unique()).await.is_some());
         assert!(enqueue(&database, "twice", unique()).await.is_none());
@@ -168,8 +167,7 @@ async fn trung_khoa_giua_transaction_khong_hong_transaction() {
     TestDatabase::run(async |test| {
         let (database, modules, recorder) = setup(test, Vec::new()).await;
         let queue = JobQueue::new("reports");
-        let unique =
-            |key: &str| EnqueueOptions { unique_key: Some(key.to_owned()), ..Default::default() };
+        let unique = |key: &str| EnqueueOptions::default().unique_key(key);
         enqueue(&database, "first", unique("a")).await;
 
         let transaction = database.begin_write().await.unwrap();
@@ -263,7 +261,7 @@ async fn loi_thi_thu_lai_roi_vao_dead_letter_queue_va_chay_lai_duoc() {
     TestDatabase::run(async |test| {
         let (database, modules, recorder) = setup(test, Vec::new()).await;
         recorder.fail.store(true, Ordering::SeqCst);
-        let options = EnqueueOptions { max_attempts: Some(3), ..Default::default() };
+        let options = EnqueueOptions::default().max_attempts(3);
         let id = enqueue(&database, "ada", options).await.unwrap();
         let worker = modules.worker(&database, 4).unwrap();
 
@@ -374,7 +372,7 @@ async fn job_cham_khong_giu_cac_job_khac() {
 async fn panic_va_tien_trinh_chet_vao_dead_letter_queue() {
     TestDatabase::run(async |test| {
         let (database, modules, _) = setup(test, Vec::new()).await;
-        let once = || EnqueueOptions { max_attempts: Some(1), ..Default::default() };
+        let once = || EnqueueOptions::default().max_attempts(1);
         enqueue(&database, "panic", once()).await;
         let worker = modules.worker(&database, 4).unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 1);

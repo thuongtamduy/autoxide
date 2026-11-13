@@ -68,7 +68,7 @@ impl TextModel for Text {
                     elapsed_ms = started.elapsed().as_millis() as u64,
                     "AI answer"
                 );
-                return Ok(Generation { output: raw.output, usage: raw.usage, model: raw.model });
+                return Ok(Generation::new(raw.output, raw.usage, raw.model));
             }
             // Ghi vị trí lỗi (không ghi nội dung) để người vận hành biết mô hình yếu tới đâu.
             tracing::warn!(purpose, attempt, problems = problems.len(), first = %problems[0], "AI answer has the wrong shape");

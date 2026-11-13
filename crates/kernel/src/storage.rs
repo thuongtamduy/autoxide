@@ -21,10 +21,18 @@ use crate::error::Error;
 pub type ByteStream = Pin<Box<dyn Stream<Item = Result<Bytes, Error>> + Send>>;
 
 /// Một file đọc ra: kích thước và nội dung.
+#[non_exhaustive]
 pub struct StoredFile {
     /// Số byte.
     pub size: u64,
     pub content: ByteStream,
+}
+
+impl StoredFile {
+    /// A file of `size` bytes, read from `content`.
+    pub fn new(size: u64, content: ByteStream) -> Self {
+        StoredFile { size, content }
+    }
 }
 
 /// Nơi lưu file của chương trình. Khoá (`key`) là đường dẫn tương đối gồm chữ, số,

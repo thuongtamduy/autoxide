@@ -145,7 +145,7 @@ impl ContentService {
         .insert(&transaction)
         .await?;
         let job = RunSchedule { schedule_id: row.id };
-        let options = EnqueueOptions { run_at: Some(run_at), ..Default::default() };
+        let options = EnqueueOptions::default().run_at(run_at);
         self.jobs.enqueue(&transaction, &job, options).await?;
         let change = Change { before: None, after: Some(schedule_summary(&row)), published: None };
         self.outbox

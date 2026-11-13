@@ -319,10 +319,10 @@ async fn body_qua_lon_bi_tu_choi() {
 async fn route_khai_gioi_han_rieng() {
     let mut config = default_config();
     config.body_limit = 1024;
-    let extras = http::Extras {
-        body_limits: vec![("notes", http::BodyLimit::new(axum::http::Method::POST, "/echo", 4096))],
-        ..Default::default()
-    };
+    let extras = http::Extras::default().body_limits(vec![(
+        "notes",
+        http::BodyLimit::new(axum::http::Method::POST, "/echo", 4096),
+    )]);
     let api = http::build(&config, OpenApiRouter::new(), vec![("notes", notes_routes())], extras);
     let echo = |body: String| {
         Request::builder()
@@ -666,7 +666,7 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for LogBuffer {
 /// Gửi `request` với log JSON ở mức `level` được bắt lại; trả về các dòng log.
 async fn logged(level: LogLevel, request: Request<Body>) -> Vec<serde_json::Value> {
     let buffer = LogBuffer::default();
-    let config = LogConfig { level, format: LogFormat::Json };
+    let config = LogConfig::new(level, LogFormat::Json);
     let subscriber = autoxide_kernel::logging::subscriber(&config, buffer.clone(), Vec::new());
     // Bộ nhận log này chỉ có hiệu lực trên thread hiện tại, tới khi `_guard` bị drop.
     // `tracing` nhớ, cho cả process, "dòng log này có ai nghe không". Khi chỉ một bộ nhận
@@ -841,14 +841,13 @@ async fn tat_rate_limiting_thi_khong_gioi_han() {
 }
 
 fn localized_app() -> Router {
-    let extras = http::Extras {
-        translations: autoxide_kernel::i18n::Translations::new(vec![(
+    let extras = http::Extras::default().translations(
+        autoxide_kernel::i18n::Translations::new(vec![(
             "notes",
             vec![("vi", r#"{"notes.note_not_found": "Không có ghi chú {id}."}"#)],
         )])
         .unwrap(),
-        ..Default::default()
-    };
+    );
     http::build(&default_config(), OpenApiRouter::new(), vec![("notes", notes_routes())], extras)
         .router
 }
@@ -893,7 +892,7 @@ async fn endpoint_deprecated_co_header_va_danh_dau_trong_tai_lieu() {
     let deprecation = http::Deprecation::new(axum::http::Method::GET, "/{id}", "2026-11-01")
         .sunset("2027-05-01")
         .successor("/api/v2/notes/{id}");
-    let extras = http::Extras { deprecations: vec![("notes", deprecation)], ..Default::default() };
+    let extras = http::Extras::default().deprecations(vec![("notes", deprecation)]);
     let api = http::build(
         &default_config(),
         OpenApiRouter::new(),

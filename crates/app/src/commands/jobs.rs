@@ -113,15 +113,11 @@ mod tests {
 
     #[test]
     fn in_job_hong() {
-        let job = JobRecord {
-            id: Uuid::nil(),
-            kind: "reports.send".to_owned(),
-            attempts: 10,
-            max_attempts: 10,
-            run_at: DateTime::<Utc>::UNIX_EPOCH,
-            failed_at: Some(DateTime::<Utc>::UNIX_EPOCH),
-            last_error: Some("internal_error: the mail server is down".to_owned()),
-        };
+        let job = JobRecord::new(Uuid::nil(), "reports.send", DateTime::<Utc>::UNIX_EPOCH)
+            .attempts(10)
+            .max_attempts(10)
+            .failed_at(Some(DateTime::<Utc>::UNIX_EPOCH))
+            .last_error(Some("internal_error: the mail server is down".to_owned()));
 
         assert_eq!(
             render("reports", &[job]),

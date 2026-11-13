@@ -309,7 +309,7 @@ async fn etag_resolve_theo_ca_cau_tra_loi() {
 /// vẫn thấy `ai_reviewed` (tính từ thời điểm xác nhận).
 #[tokio::test]
 async fn da_duyet_ai_van_hien_sau_xoa_tai_khoan() {
-    use autoxide_kernel::event::{Actor, Delivered, EventHandler};
+    use autoxide_kernel::event::{Delivered, EventHandler};
 
     TestDatabase::run(async |test| {
         let (content, _, _) = crate::testing::service(test, crate::testing::config(&[])).await;
@@ -318,15 +318,11 @@ async fn da_duyet_ai_van_hien_sau_xoa_tai_khoan() {
         input.fields.ai_generated = Some(true);
         let entry = content.create(&ada, input).await.unwrap();
         content.publish(&ada, entry.id, None, None, true).await.unwrap();
-        let deleted = Delivered {
-            id: uuid::Uuid::now_v7(),
-            module: "auth",
-            name: autoxide_kernel::privacy::USER_DELETED.to_owned(),
-            actor: Actor::system(),
-            subject: None,
-            payload: json!({"before": {"id": ada.user_id()}}),
-            occurred_at: chrono::Utc::now(),
-        };
+        let deleted = Delivered::new(
+            "auth",
+            autoxide_kernel::privacy::USER_DELETED.to_owned(),
+            json!({"before": {"id": ada.user_id()}}),
+        );
         content.handle(&deleted).await.unwrap();
         content.handle(&deleted).await.unwrap();
         let (resolution, _) =

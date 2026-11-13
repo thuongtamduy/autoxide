@@ -106,7 +106,6 @@ mod tests {
     use autoxide_kernel::event::Actor;
     use autoxide_testkit::TestDatabase;
     use sea_orm::Statement;
-    use uuid::Uuid;
 
     use crate::session::LoginOutcome;
     use crate::user::NewUser;
@@ -170,12 +169,7 @@ mod tests {
             services.sessions.login("bob@example.com", "wrong", None).await.unwrap_err();
             assert_eq!(count(&database, "auth_refresh_token").await, 3);
 
-            let context = JobContext {
-                id: Uuid::now_v7(),
-                kind: KIND.to_owned(),
-                payload: serde_json::Value::Null,
-                attempt: 1,
-            };
+            let context = JobContext::new(KIND, serde_json::Value::Null, 1);
             Cleanup::new(database.clone()).run(&context).await.unwrap();
 
             // Còn token mới nhất (chưa hết hạn) và số đếm vừa ghi của bob.

@@ -56,11 +56,9 @@ async fn app(test: &TestDatabase) -> (Router, Modules, Database) {
     let mut modules = Modules::new(vec![Box::new(autoxide_notes::module())]).unwrap();
     modules.migrator().unwrap().up(&database).await.unwrap();
     modules.start(&database).unwrap();
-    let extras = autoxide_kernel::http::Extras {
-        authenticator: Some(Arc::new(Writer)),
-        translations: modules.translations().clone(),
-        ..Default::default()
-    };
+    let extras = autoxide_kernel::http::Extras::default()
+        .authenticator(Some(Arc::new(Writer)))
+        .translations(modules.translations().clone());
     let routes = modules.routes();
     let router = autoxide_kernel::http::build(
         &config.http,

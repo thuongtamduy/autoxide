@@ -225,11 +225,10 @@ pub(crate) mod testing {
     #[async_trait::async_trait]
     impl ResourceResolver for Entries {
         async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
-            Ok((id.starts_with("public") || id.starts_with("draft")).then(|| Resource {
-                public: id.starts_with("public"),
-                title: "Hello world".to_owned(),
-                url: Some(format!("/posts/{id}")),
-                ..Resource::default()
+            Ok((id.starts_with("public") || id.starts_with("draft")).then(|| {
+                Resource::new("Hello world")
+                    .public(id.starts_with("public"))
+                    .url(Some(format!("/posts/{id}")))
             }))
         }
     }
@@ -253,7 +252,7 @@ pub(crate) mod testing {
 
     /// Service trên database (đã migrate) của test; chống spam không chờ 3 giây.
     pub async fn service(test: &TestDatabase, config: CommentsConfig) -> Harness {
-        let antispam = AntispamConfig { min_fill: Duration::ZERO, ..AntispamConfig::default() };
+        let antispam = AntispamConfig::default().min_fill(Duration::ZERO);
         service_with(test, config, antispam).await
     }
 

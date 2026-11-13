@@ -2,7 +2,7 @@
 
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::ErrorKind;
-use autoxide_kernel::event::{Actor, Delivered, EventHandler};
+use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::pagination::{Order, PageQuery, PageRequest};
 use autoxide_kernel::privacy::PersonalData;
 use autoxide_kernel::storage::Storage;
@@ -412,7 +412,7 @@ async fn danh_sach_loc_sap_lat_trang() {
         let mut cursor = None;
         let mut seen = Vec::new();
         loop {
-            let query = PageQuery { limit: Some("1".into()), cursor, order: Some("desc".into()) };
+            let query = PageQuery::new(Some("1".into()), cursor, Some("desc".into()));
             let request = PageRequest::try_from(query).unwrap();
             let page = media.list(&ada, &filter, &request).await.unwrap();
             seen.extend(page.data.into_iter().map(|item| item.name));
@@ -719,15 +719,11 @@ async fn du_lieu_ca_nhan() {
         let exported = media.export(ada.user_id()).await.unwrap();
         assert_eq!(exported[0]["name"], "a.png");
 
-        let deleted = Delivered {
-            id: Uuid::now_v7(),
-            module: "auth",
-            name: autoxide_kernel::privacy::USER_DELETED.to_owned(),
-            actor: Actor::system(),
-            subject: None,
-            payload: json!({"before": {"id": ada.user_id()}}),
-            occurred_at: Utc::now(),
-        };
+        let deleted = Delivered::new(
+            "auth",
+            autoxide_kernel::privacy::USER_DELETED.to_owned(),
+            json!({"before": {"id": ada.user_id()}}),
+        );
         media.handle(&deleted).await.unwrap();
         media.handle(&deleted).await.unwrap();
         assert_eq!(media.get(&ada, item.id).await.unwrap().uploaded_by, None);

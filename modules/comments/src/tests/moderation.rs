@@ -3,14 +3,13 @@
 
 use std::sync::Arc;
 
-use autoxide_kernel::event::{Actor, Delivered, EventHandler};
+use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::pagination::Order;
 use autoxide_kernel::privacy::{PersonalData, USER_DELETED};
 use autoxide_testkit::TestDatabase;
 use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, PaginatorTrait, Set};
 use serde_json::json;
-use uuid::Uuid;
 
 use super::{
     KIND, POST, as_guest, counts, events, guest, member, open_config, page, signed, visitor,
@@ -24,15 +23,7 @@ use crate::targets::OwnerEvents;
 use crate::testing::{admin, config, service};
 
 fn delivered(name: &str, subject: Option<String>, payload: serde_json::Value) -> Delivered {
-    Delivered {
-        id: Uuid::now_v7(),
-        module: "test",
-        name: name.to_owned(),
-        actor: Actor::system(),
-        subject,
-        payload,
-        occurred_at: chrono::Utc::now(),
-    }
+    Delivered::new("test", name.to_owned(), payload).subject(subject)
 }
 
 /// Nhiều báo cáo tới cùng lúc vượt ngưỡng: bình luận về chờ duyệt ĐÚNG MỘT LẦN (số đếm, event).

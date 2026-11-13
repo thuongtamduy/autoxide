@@ -117,15 +117,9 @@ async fn setup(test: &TestDatabase, allow_http: bool) -> Setup {
 }
 
 fn event(name: &str) -> Delivered {
-    Delivered {
-        id: Uuid::now_v7(),
-        module: "demo",
-        name: name.to_owned(),
-        actor: Actor::user(Uuid::from_u128(0xada)),
-        subject: Some("demo.thing:1".to_owned()),
-        payload: json!({"after": {"size": 3}}),
-        occurred_at: chrono::Utc::now(),
-    }
+    Delivered::new("demo", name.to_owned(), json!({"after": {"size": 3}}))
+        .actor(Actor::user(Uuid::from_u128(0xada)))
+        .subject(Some("demo.thing:1".to_owned()))
 }
 
 async fn deliveries(database: &Database) -> Vec<delivery::Model> {
@@ -133,12 +127,7 @@ async fn deliveries(database: &Database) -> Vec<delivery::Model> {
 }
 
 fn job(delivery_id: Uuid, attempt: i32) -> JobContext {
-    JobContext {
-        id: Uuid::now_v7(),
-        kind: crate::delivery::SEND_KIND.to_owned(),
-        payload: json!({"delivery_id": delivery_id}),
-        attempt,
-    }
+    JobContext::new(crate::delivery::SEND_KIND, json!({"delivery_id": delivery_id}), attempt)
 }
 
 #[tokio::test]

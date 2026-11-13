@@ -86,12 +86,9 @@ impl Module for AiModule {
                         Provider::OpenAi => Box::new(providers::OpenAi::new(text)?),
                     };
                     tracing::info!(provider = text.provider.name(), model = %text.model, "AI text generation is on");
-                    let capabilities = Capabilities {
-                        enabled: true,
-                        provider: text.provider.name().to_owned(),
-                        model: text.model.clone(),
-                        images: text.images,
-                    };
+                    let capabilities =
+                        Capabilities::enabled(text.provider.name().to_owned(), text.model.clone())
+                            .images(text.images);
                     (Some(provider), capabilities)
                 }
             };

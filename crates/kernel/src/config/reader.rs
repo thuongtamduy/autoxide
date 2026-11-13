@@ -31,6 +31,7 @@ pub struct Invalid;
 
 /// Một vấn đề trong cấu hình.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ConfigError {
     /// Tên biến, hoặc đường dẫn file `.env`.
     pub subject: String,
@@ -39,6 +40,11 @@ pub struct ConfigError {
 }
 
 impl ConfigError {
+    /// A problem with `subject` (a variable name or a file path): what is wrong and how to fix it.
+    pub fn new(subject: impl Into<String>, problem: impl Into<String>) -> Self {
+        ConfigError { subject: subject.into(), problem: problem.into() }
+    }
+
     pub(super) fn file(path: &Path, problem: String) -> Self {
         ConfigError { subject: path.display().to_string(), problem }
     }

@@ -267,11 +267,11 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
                         author_id: input.author_id,
                         ..Default::default()
                     };
-                    let paging = PageQuery {
-                        limit: input.limit.map(|limit| limit.to_string()),
-                        cursor: input.cursor,
-                        order: input.order,
-                    };
+                    let paging = PageQuery::new(
+                        input.limit.map(|limit| limit.to_string()),
+                        input.cursor,
+                        input.order,
+                    );
                     let mut problems = Vec::new();
                     let filter = query.filter(&mut problems);
                     let page = page_request(paging, problems)?;
@@ -380,8 +380,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             move |principal: Principal, input: ListRevisionsInput| {
                 let service = revisions.clone();
                 async move {
-                    let page = PageInput { limit: input.limit, cursor: input.cursor, order: None }
-                        .page()?;
+                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
                     let found = service.list_revisions(&principal, input.id, &page).await?;
                     Ok::<Page<RevisionResponse>, Error>(found.map(|row| revision(row, false)))
                 }

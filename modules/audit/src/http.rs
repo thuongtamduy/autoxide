@@ -187,15 +187,14 @@ mod tests {
     }
 
     fn event(name: &str, actor: Uuid, subject: &str) -> Delivered {
-        Delivered {
-            id: Uuid::now_v7(),
-            module: "auth",
-            name: name.to_owned(),
-            actor: Actor::user(actor),
-            subject: Some(subject.to_owned()),
-            payload: json!({"before": {"name": "a"}, "after": {"name": "b"}}),
-            occurred_at: Utc::now().trunc_subsecs(6),
-        }
+        Delivered::new(
+            "auth",
+            name.to_owned(),
+            json!({"before": {"name": "a"}, "after": {"name": "b"}}),
+        )
+        .actor(Actor::user(actor))
+        .subject(Some(subject.to_owned()))
+        .occurred_at(Utc::now().trunc_subsecs(6))
     }
 
     async fn get(app: &TestApp, uri: &str, as_who: &str) -> (StatusCode, Value) {

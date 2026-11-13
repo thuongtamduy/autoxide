@@ -290,10 +290,8 @@ impl ContentService {
         // xếp chồng job mỗi giờ.
         let day = chrono::Utc::now().format("%Y-%m-%d");
         for entry_id in &missing {
-            let options = EnqueueOptions {
-                unique_key: Some(format!("content.index:{entry_id}:{day}")),
-                ..Default::default()
-            };
+            let options =
+                EnqueueOptions::default().unique_key(format!("content.index:{entry_id}:{day}"));
             self.jobs.enqueue(&transaction, &IndexJob { entry_id: *entry_id }, options).await?;
         }
         transaction.commit().await?;

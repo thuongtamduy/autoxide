@@ -8,8 +8,10 @@ use uuid::Uuid;
 use super::{Job, foreign_kind, module_of, table_name};
 use crate::error::Error;
 
-/// Tuỳ chọn khi đưa job vào hàng đợi.
+/// Tuỳ chọn khi đưa job vào hàng đợi. Dựng bằng `EnqueueOptions::default()` rồi các hàm đặt
+/// từng trường.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct EnqueueOptions {
     /// Chạy từ lúc này; `None`: ngay.
     pub run_at: Option<DateTime<Utc>>,
@@ -17,6 +19,26 @@ pub struct EnqueueOptions {
     pub max_attempts: Option<i32>,
     /// Khoá chống trùng: đã có job mang khoá này thì không thêm job mới.
     pub unique_key: Option<String>,
+}
+
+impl EnqueueOptions {
+    /// Runs the job no earlier than `run_at`.
+    pub const fn run_at(mut self, run_at: DateTime<Utc>) -> Self {
+        self.run_at = Some(run_at);
+        self
+    }
+
+    /// Runs the job at most `max_attempts` times.
+    pub const fn max_attempts(mut self, max_attempts: i32) -> Self {
+        self.max_attempts = Some(max_attempts);
+        self
+    }
+
+    /// Adds no job when one with this key already exists.
+    pub fn unique_key(mut self, unique_key: impl Into<String>) -> Self {
+        self.unique_key = Some(unique_key.into());
+        self
+    }
 }
 
 /// Hàng đợi job của một module. Lấy bằng `StartContext::jobs()`; clone rẻ.
@@ -112,6 +134,7 @@ pub enum JobStatus {
 
 /// Một job, cho người vận hành xem.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct JobRecord {
     pub id: Uuid,
     pub kind: String,
@@ -120,6 +143,46 @@ pub struct JobRecord {
     pub run_at: DateTime<Utc>,
     pub failed_at: Option<DateTime<Utc>>,
     pub last_error: Option<String>,
+}
+
+impl JobRecord {
+    /// Job `id` of kind `kind` due at `run_at`, not tried yet, with
+    /// [`DEFAULT_MAX_ATTEMPTS`](super::DEFAULT_MAX_ATTEMPTS).
+    pub fn new(id: Uuid, kind: impl Into<String>, run_at: DateTime<Utc>) -> Self {
+        JobRecord {
+            id,
+            kind: kind.into(),
+            attempts: 0,
+            max_attempts: super::DEFAULT_MAX_ATTEMPTS,
+            run_at,
+            failed_at: None,
+            last_error: None,
+        }
+    }
+
+    /// Sets how many times the job ran.
+    pub const fn attempts(mut self, attempts: i32) -> Self {
+        self.attempts = attempts;
+        self
+    }
+
+    /// Sets the most times the job may run.
+    pub const fn max_attempts(mut self, max_attempts: i32) -> Self {
+        self.max_attempts = max_attempts;
+        self
+    }
+
+    /// Sets when the job failed for good.
+    pub const fn failed_at(mut self, failed_at: Option<DateTime<Utc>>) -> Self {
+        self.failed_at = failed_at;
+        self
+    }
+
+    /// Sets the error of the last run.
+    pub fn last_error(mut self, last_error: Option<String>) -> Self {
+        self.last_error = last_error;
+        self
+    }
 }
 
 /// Tối đa `limit` job trạng thái `status` của module `module`, mới nhất trước.

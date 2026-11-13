@@ -134,11 +134,11 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             move |principal: Principal, input: ListListsInput| {
                 let service = lists.clone();
                 async move {
-                    let paging = PageQuery {
-                        limit: input.limit.map(|limit| limit.to_string()),
-                        cursor: input.cursor,
-                        order: None,
-                    };
+                    let paging = PageQuery::new(
+                        input.limit.map(|limit| limit.to_string()),
+                        input.cursor,
+                        None,
+                    );
                     let page = page_request(paging, Vec::new())?;
                     let found = service.list_lists(&principal, &page).await?;
                     let ids: Vec<Uuid> = found.data.iter().map(|list| list.row.id).collect();
@@ -171,11 +171,11 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                             &mut problems,
                         ),
                     };
-                    let paging = PageQuery {
-                        limit: input.limit.map(|limit| limit.to_string()),
-                        cursor: input.cursor,
-                        order: None,
-                    };
+                    let paging = PageQuery::new(
+                        input.limit.map(|limit| limit.to_string()),
+                        input.cursor,
+                        None,
+                    );
                     let page = page_request(paging, problems)?;
                     let found = service.list_subscribers(&principal, &filter, &page).await?;
                     Ok::<Page<SubscriberResponse>, Error>(found.map(Into::into))

@@ -1150,11 +1150,11 @@ mod public {
             let titles: Vec<&str> = page1.data.iter().map(|row| row.title.as_str()).collect();
             assert_eq!(titles, ["Cà phê trứng", "Bún chả"]);
             let cursor = page1.pagination.next_cursor.clone().unwrap();
-            let query = autoxide_kernel::pagination::PageQuery {
-                limit: Some("2".into()),
-                cursor: Some(cursor),
-                order: Some("desc".into()),
-            };
+            let query = autoxide_kernel::pagination::PageQuery::new(
+                Some("2".into()),
+                Some(cursor),
+                Some("desc".into()),
+            );
             let next = PageRequest::try_from(query).unwrap();
             let page2 = content.public_posts(&filter, &next).await.unwrap();
             assert_eq!(
@@ -1282,7 +1282,7 @@ mod public {
 }
 
 mod privacy {
-    use autoxide_kernel::event::{Actor, Delivered, EventHandler};
+    use autoxide_kernel::event::{Delivered, EventHandler};
     use autoxide_kernel::privacy::PersonalData;
     use chrono::{Duration, Utc};
 
@@ -1331,15 +1331,11 @@ mod privacy {
                 json!({"authors": [], "entries": []})
             );
 
-            let deleted = Delivered {
-                id: Uuid::now_v7(),
-                module: "auth",
-                name: autoxide_kernel::privacy::USER_DELETED.to_owned(),
-                actor: Actor::system(),
-                subject: None,
-                payload: json!({"before": {"id": ada.user_id()}}),
-                occurred_at: Utc::now(),
-            };
+            let deleted = Delivered::new(
+                "auth",
+                autoxide_kernel::privacy::USER_DELETED.to_owned(),
+                json!({"before": {"id": ada.user_id()}}),
+            );
             content.handle(&deleted).await.unwrap();
             content.handle(&deleted).await.unwrap();
 
@@ -2515,7 +2511,7 @@ mod translation_recovery {
 /// chạy trên cả SQLite và Postgres.
 mod bao_mat {
     use autoxide_kernel::access::Principal;
-    use autoxide_kernel::event::{Actor, Delivered, EventHandler};
+    use autoxide_kernel::event::{Delivered, EventHandler};
     use chrono::{Duration, Utc};
     use sea_orm::EntityTrait;
 
@@ -2892,15 +2888,11 @@ mod bao_mat {
             content.publish(&ada, entry.id, None, None, true).await.unwrap();
             content.set_review_request(&ada, entry.id, None, false).await.unwrap();
 
-            let deleted = Delivered {
-                id: Uuid::now_v7(),
-                module: "auth",
-                name: autoxide_kernel::privacy::USER_DELETED.to_owned(),
-                actor: Actor::system(),
-                subject: None,
-                payload: json!({"before": {"id": ada.user_id()}}),
-                occurred_at: Utc::now(),
-            };
+            let deleted = Delivered::new(
+                "auth",
+                autoxide_kernel::privacy::USER_DELETED.to_owned(),
+                json!({"before": {"id": ada.user_id()}}),
+            );
             content.handle(&deleted).await.unwrap();
             content.handle(&deleted).await.unwrap();
 

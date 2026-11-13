@@ -210,11 +210,10 @@ fn seo_prompt(entry: &Entry, terms: &[(Uuid, String)]) -> Prompt {
         title = entry.title,
         excerpt = entry.excerpt,
     );
-    Prompt {
-        purpose: "content.suggest_seo",
+    Prompt::new(
+        "content.suggest_seo",
         instructions,
-        input: vec![Part::Text(input)],
-        output_schema: json!({
+        json!({
             "type": "object",
             "properties": {
                 "meta_title": {"type": "string"},
@@ -225,9 +224,10 @@ fn seo_prompt(entry: &Entry, terms: &[(Uuid, String)]) -> Prompt {
             "required": ["meta_title", "meta_description", "excerpt", "term_ids"],
             "additionalProperties": false
         }),
-        effort: Effort::Low,
-        max_output_tokens: 2000,
-    }
+    )
+    .input(vec![Part::Text(input)])
+    .effort(Effort::Low)
+    .max_output_tokens(2000)
 }
 
 /// Các trường của mục (không kể thân bài).

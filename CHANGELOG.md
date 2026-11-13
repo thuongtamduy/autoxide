@@ -18,6 +18,10 @@ endpoints are marked deprecated with a sunset date first.
 ### Changed
 
 - `autoxide-testkit`: every module's HTTP tests use `TestApp`.
+- Module contract: the types modules used to build with struct literals now have constructors
+  and builders (`Mail::new(..)`, `Prompt::new(..)`, `EnqueueOptions::default().unique_key(..)`,
+  `Submission::new(..)`, `Delivered::new(..)` and others) and are `#[non_exhaustive]`: build
+  them with those instead of struct literals.
 
 ## [0.8.0] - 2026-11-13
 

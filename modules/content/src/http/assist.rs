@@ -428,10 +428,7 @@ impl From<crate::semantic::Hit> for SearchHit {
 fn page_of(hits: Vec<crate::semantic::Hit>, limit: Option<u32>) -> Page<SearchHit> {
     Page {
         data: hits.into_iter().map(SearchHit::from).collect(),
-        pagination: autoxide_kernel::pagination::Pagination {
-            limit: limit.unwrap_or(10),
-            next_cursor: None,
-        },
+        pagination: autoxide_kernel::pagination::Pagination::new(limit.unwrap_or(10), None),
     }
 }
 

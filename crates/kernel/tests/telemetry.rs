@@ -30,7 +30,7 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 
 #[test]
 fn khong_cau_hinh_collector_thi_khong_xuat_gi() {
-    let config = TraceConfig { otlp_endpoint: None, service_name: "x".to_owned() };
+    let config = TraceConfig::new(None, "x");
     assert!(TraceExport::start(&config).unwrap().is_none());
 }
 
@@ -47,12 +47,9 @@ fn span_duoc_gui_toi_collector_va_noi_vao_trace_cua_ben_goi() {
         .with_state(Arc::clone(&received));
     runtime.spawn(async move { axum::serve(listener, collector).await.unwrap() });
 
-    let config = TraceConfig {
-        otlp_endpoint: Some(format!("http://{address}")),
-        service_name: "autoxide-test".to_owned(),
-    };
+    let config = TraceConfig::new(Some(format!("http://{address}")), "autoxide-test");
     let (layer, export) = TraceExport::start(&config).unwrap().unwrap();
-    let log = LogConfig { level: LogLevel::Info, format: LogFormat::Text };
+    let log = LogConfig::new(LogLevel::Info, LogFormat::Text);
     let subscriber = logging::subscriber(&log, std::io::sink, vec![layer]);
 
     // Request đến mang `traceparent` của bên gọi (chuẩn W3C Trace Context).

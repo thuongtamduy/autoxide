@@ -52,14 +52,28 @@ pub trait Job: Serialize {
     const KIND: &'static str;
 }
 
-/// Một job đang được chạy.
+/// Một job đang được chạy. Worker dựng; test dựng bằng [`JobContext::new`].
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct JobContext {
     pub id: Uuid,
     pub kind: String,
     pub payload: Value,
     /// Lần chạy thứ mấy (bắt đầu từ 1).
     pub attempt: i32,
+}
+
+impl JobContext {
+    /// Run number `attempt` (from 1) of a job of kind `kind` with `payload`, under a new id.
+    pub fn new(kind: impl Into<String>, payload: Value, attempt: i32) -> Self {
+        JobContext { id: Uuid::now_v7(), kind: kind.into(), payload, attempt }
+    }
+
+    /// Sets the job id.
+    pub const fn id(mut self, id: Uuid) -> Self {
+        self.id = id;
+        self
+    }
 }
 
 /// Bộ chạy một loại job. Trả lỗi thì job được chạy lại sau (backoff).

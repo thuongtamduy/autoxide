@@ -191,7 +191,7 @@ impl MediaService {
         if let Some(tag) = filter.tag.as_deref().filter(|tag| !tag.trim().is_empty()) {
             let Some(tag_id) = crate::tags::find_tag(self.database.read(), tag).await? else {
                 // Không có nhãn đó: không item nào mang nó.
-                let pagination = Pagination { limit: page.limit(), next_cursor: None };
+                let pagination = Pagination::new(page.limit(), None);
                 return Ok(Page { data: Vec::new(), pagination });
             };
             select = select.filter(crate::tags::has_tag(tag_id));

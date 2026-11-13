@@ -32,7 +32,7 @@ use crate::testing::{FakeMailer, Harness, admin};
 use crate::text::Localized;
 
 pub(crate) fn visitor(ip: &str) -> ClientInfo {
-    ClientInfo { ip: Some(ip.parse::<IpAddr>().unwrap()), ..ClientInfo::default() }
+    ClientInfo::from_ip(ip.parse::<IpAddr>().unwrap())
 }
 
 /// Tạo danh sách công khai `key`.

@@ -177,7 +177,7 @@ impl ContentService {
             }
             Err(error) => return Err(error.into()),
         };
-        let options = EnqueueOptions { max_attempts: Some(MAX_ATTEMPTS), ..Default::default() };
+        let options = EnqueueOptions::default().max_attempts(MAX_ATTEMPTS);
         self.jobs.enqueue(&transaction, &TranslateJob { request_id: request.id }, options).await?;
         self.outbox
             .record(
@@ -618,11 +618,10 @@ fn batch_prompt(batch: &[Segment], from: &str, to: &str, size: usize) -> Prompt 
     );
     // Câu trả lời dài cỡ đầu vào (chữ có dấu tốn token hơn): dành gấp đôi, có trần.
     let expected = u32::try_from(size / CHARS_PER_TOKEN).unwrap_or(u32::MAX);
-    Prompt {
-        purpose: "content.translate",
+    Prompt::new(
+        "content.translate",
         instructions,
-        input: vec![Part::Text(Value::Array(items).to_string())],
-        output_schema: json!({
+        json!({
             "type": "object",
             "properties": {
                 "segments": {
@@ -638,9 +637,10 @@ fn batch_prompt(batch: &[Segment], from: &str, to: &str, size: usize) -> Prompt 
             "required": ["segments"],
             "additionalProperties": false
         }),
-        effort: Effort::Medium,
-        max_output_tokens: expected.saturating_mul(2).saturating_add(1000).min(64_000),
-    }
+    )
+    .input(vec![Part::Text(Value::Array(items).to_string())])
+    .effort(Effort::Medium)
+    .max_output_tokens(expected.saturating_mul(2).saturating_add(1000).min(64_000))
 }
 
 /// Dữ liệu của yêu cầu cho event và audit.

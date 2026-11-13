@@ -284,15 +284,11 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
 
         let service =
             crate::service::NoteService::new(app.database().clone(), Outbox::standalone("notes"));
-        let deleted = Delivered {
-            id: Uuid::now_v7(),
-            module: "auth",
-            name: autoxide_kernel::privacy::USER_DELETED.to_owned(),
-            actor: Actor::system(),
-            subject: None,
-            payload: json!({"before": {"id": ADA}}),
-            occurred_at: chrono::Utc::now(),
-        };
+        let deleted = Delivered::new(
+            "auth",
+            autoxide_kernel::privacy::USER_DELETED.to_owned(),
+            json!({"before": {"id": ADA}}),
+        );
         service.handle(&deleted).await.unwrap();
         service.handle(&deleted).await.unwrap();
         let exported = app.modules().personal_data().export(ADA).await.unwrap();

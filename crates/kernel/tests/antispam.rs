@@ -55,25 +55,15 @@ fn make_guard(database: &Database, config: AntispamConfig) -> SpamGuard {
 }
 
 fn quick() -> AntispamConfig {
-    AntispamConfig { min_fill: Duration::ZERO, ..AntispamConfig::default() }
+    AntispamConfig::default().min_fill(Duration::ZERO)
 }
 
 fn client(ip: &str) -> ClientInfo {
-    ClientInfo { ip: Some(ip.parse().unwrap()), ..ClientInfo::default() }
+    ClientInfo::from_ip(ip.parse().unwrap())
 }
 
 fn submission<'a>(client: &'a ClientInfo, token: Option<&'a str>) -> Submission<'a> {
-    Submission {
-        scope: "demo:contact",
-        principal: None,
-        client,
-        honeypot: None,
-        form_token: token,
-        challenge: None,
-        email: None,
-        content: Some("Hello"),
-        duplicate: false,
-    }
+    Submission::new("demo:contact", client).form_token(token).content(Some("Hello"))
 }
 
 #[tokio::test]
@@ -122,10 +112,7 @@ async fn bay_token_va_qua_nhanh() {
         assert_eq!(content_hash("  Hello\n WORLD "), content_hash("hello world"));
 
         // Token sống 1 giây: sau 2 giây là hết hạn.
-        let short = make_guard(
-            &database,
-            AntispamConfig { token_max_age: Duration::from_secs(1), ..quick() },
-        );
+        let short = make_guard(&database, quick().token_max_age(Duration::from_secs(1)));
         let token = short.issue("demo:contact").await.unwrap().token;
         tokio::time::sleep(Duration::from_millis(2100)).await;
         assert_eq!(
@@ -145,7 +132,7 @@ async fn gioi_han_theo_ip_va_nguoi_dung() {
         let throttle = |limit| {
             Throttle::new(database.clone(), "demo", limit, Duration::from_secs(3600)).unwrap()
         };
-        let limits = Limits { ip: Some(throttle(2)), email: None, user: Some(throttle(1)) };
+        let limits = Limits::default().ip(Some(throttle(2))).user(Some(throttle(1)));
         // Cùng khối /24: chung bộ đếm.
         for ip in ["203.0.113.9", "203.0.113.10"] {
             let token = guard.issue("demo:contact").await.unwrap().token;
@@ -244,7 +231,7 @@ async fn gui_lai_token_da_dung_khong_dem_gioi_han() {
         let (database, _) = setup(test).await;
         let guard = make_guard(&database, quick());
         let email = Throttle::new(database.clone(), "demo", 2, Duration::from_secs(3600)).unwrap();
-        let limits = Limits { ip: None, email: Some(email), user: None };
+        let limits = Limits::default().email(Some(email));
         let visitor = client("203.0.113.9");
         let token = guard.issue("demo:contact").await.unwrap().token;
         let mut sent = submission(&visitor, Some(&token));
@@ -355,10 +342,7 @@ async fn de_altcha() {
     use autoxide_kernel::antispam::ChallengeKind;
     TestDatabase::run(async |test| {
         let (database, _) = setup(test).await;
-        let guard = make_guard(
-            &database,
-            AntispamConfig { challenge: ChallengeKind::Altcha { cost: 20 }, ..quick() },
-        );
+        let guard = make_guard(&database, quick().challenge(ChallengeKind::Altcha { cost: 20 }));
         let visitor = client("203.0.113.9");
         let first = guard.issue("demo:contact").await.unwrap();
         let challenge = first.challenge.clone().unwrap();

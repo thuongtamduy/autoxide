@@ -208,11 +208,12 @@ async fn sap_theo_cot_khac_lat_trang_khong_trung_khong_sot() {
             let mut cursor: Option<String> = None;
             let mut seen = Vec::new();
             loop {
-                let query = PageQuery {
-                    limit: Some("2".to_owned()),
-                    cursor: cursor.clone(),
-                    order: Some(if order == Order::Asc { "asc" } else { "desc" }.to_owned()),
-                };
+                let direction = if order == Order::Asc { "asc" } else { "desc" };
+                let query = PageQuery::new(
+                    Some("2".to_owned()),
+                    cursor.clone(),
+                    Some(direction.to_owned()),
+                );
                 let request = PageRequest::try_from(query).unwrap();
                 let page = fetch_page_by(
                     item::Entity::find(),
@@ -264,7 +265,7 @@ async fn sap_theo_cot_khac_lat_trang_khong_trung_khong_sot() {
         let forged = serde_json::json!({"c": "kind", "v": {"i": 5}, "id": ids[0]});
         let forged = base64::engine::general_purpose::URL_SAFE_NO_PAD
             .encode(serde_json::to_vec(&forged).unwrap());
-        let query = PageQuery { limit: None, cursor: Some(forged), order: None };
+        let query = PageQuery::new(None, Some(forged), None);
         let request = PageRequest::try_from(query).unwrap();
         let wrong_type = fetch_page_by(
             item::Entity::find(),

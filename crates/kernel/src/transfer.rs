@@ -46,9 +46,17 @@ impl From<sea_orm::DbErr> for TransferError {
 
 /// Kết quả chép một bảng.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct CopiedTable {
     pub table: String,
     pub rows: u64,
+}
+
+impl CopiedTable {
+    /// Table `table`, with `rows` rows copied.
+    pub fn new(table: impl Into<String>, rows: u64) -> Self {
+        CopiedTable { table: table.into(), rows }
+    }
 }
 
 /// Kiểu của một cột, chung cho hai database.

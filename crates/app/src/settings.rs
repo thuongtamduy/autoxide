@@ -34,12 +34,8 @@ fn read_all(reader: &mut ConfigReader, modules: &mut Modules) -> Result<Config, 
 
 /// Đăng ký `modules`; tên module sai được báo như một lỗi cấu hình.
 fn register(modules: Vec<Box<dyn Module>>) -> Result<Modules, ConfigErrors> {
-    Modules::new(modules).map_err(|error| {
-        ConfigErrors::from(ConfigError {
-            subject: "modules".to_owned(),
-            problem: error.message().to_owned(),
-        })
-    })
+    Modules::new(modules)
+        .map_err(|error| ConfigErrors::from(ConfigError::new("modules", error.message())))
 }
 
 /// Đọc và kiểm toàn bộ cấu hình từ `source` cho các module `modules`.
