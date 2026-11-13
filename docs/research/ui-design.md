@@ -143,3 +143,28 @@ cửa hàng, tài khoản, đổi trả, accessibility), web.dev (Core Web Vital
   nhập. Người gõ tên cũ vẫn tìm được phường, xã theo tên mới nhờ tìm không dấu.
 - **Đổi hàng tab ngang của menu con sang thanh bên** như Vercel 2026: giữ hàng tab (mục 2.3); xem lại khi
   có số đo trên giao diện thật.
+
+## 6. Trợ giúp trong giao diện (13/11/2026)
+
+Chủ dự án yêu cầu học cách các sản phẩm lớn đặt hướng dẫn ngay cạnh tính năng. Nguồn: Carbon (IBM) tách
+"tooltip" khỏi "toggletip"; Shopify Polaris chỉ dùng tooltip cho thông tin phụ, không giấu thông tin bắt
+buộc; Atlassian có bảng trợ giúp theo trang mở từ nút "?"; nghiên cứu của Nielsen Norman Group cho thấy
+hướng dẫn dạo đầu (product tour) thường bị bỏ qua, trợ giúp đúng lúc người dùng cần thì hiệu quả hơn.
+
+| Mẫu | Dùng khi | Thiết kế 2 |
+|---|---|---|
+| Nút ⓘ (toggletip): bấm hoặc chạm mới mở, có tiêu đề, giải thích, ví dụ, "Tìm hiểu thêm" | Thuật ngữ, cách tính số liệu, quy định pháp luật, lựa chọn có hệ quả | Cạnh tiêu đề mục; trên điện thoại thành tấm trượt từ đáy có nút "Đã hiểu" |
+| Chú thích khi rê chuột (tooltip) | Chỉ cho nút chỉ có biểu tượng; chỉ trên máy có chuột | Nút sáng / tối, thông báo, trợ giúp |
+| Bảng "Trợ giúp" theo trang | Bài hướng dẫn của đúng trang, phím tắt, hỏi trợ lý AI, có gì mới, liên hệ | Nút "?" ở đầu mọi trang quản trị |
+| Thẻ giới thiệu tính năng mới | Một tính năng vừa ra, tắt được, không chặn thao tác | Đơn hàng: "Lưu view" |
+| "Cần giúp?" ở trang đặt hàng | Người mua kẹt giữa chừng: gọi, nhắn tin, tra cứu đơn, chính sách | Mặt tiền, chỉ ở trang đặt hàng |
+
+Luật viết nội dung trợ giúp:
+
+- Không giấu thông tin bắt buộc, lỗi hay cảnh báo trong ⓘ — những thứ đó hiện thẳng trên trang.
+- Mỗi hộp tối đa ba câu và một ví dụ; dài hơn là dấu hiệu giao diện cần sửa, không phải cần thêm chữ.
+- Nêu căn cứ pháp luật khi có, kèm "cần đối chiếu văn bản gốc" nếu nguồn chưa thống nhất.
+- Định nghĩa số liệu lấy từ máy chủ (cùng nơi tính số), để chữ giải thích không lệch với con số.
+- Không làm hướng dẫn dạo đầu bắt buộc; gợi ý đã tắt thì không hiện lại (lưu theo người dùng).
+
+Phần máy chủ cần thêm: đề bài cho teammate ở `docs/prompts/ui-help-api.md`.
