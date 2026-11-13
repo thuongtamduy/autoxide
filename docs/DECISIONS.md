@@ -4935,3 +4935,21 @@ lặng lẽ làm mất kiểm tra pháp lý (module đăng ký sau vẫn có hi�
 ngôn ngữ trên `media_item` — khó lọc, khó xoá một ngôn ngữ, đổi hình dạng bảng đang có; xếp hạng tìm
 bằng `CASE WHEN … LIKE` trong `ORDER BY` — con trỏ theo ID không giữ được thứ tự, phải dùng `OFFSET`
 (luật cấm); kiểm `verified_only` bằng tên role — trái luật kiến trúc 7.
+
+## D-203 · Nút "Đánh giá này hữu ích" cho đánh giá sản phẩm (bước 45) — 2026-11-13 — chủ dự án giao, agent quyết cách làm
+
+Quyết định: đặc tả bước 45 thêm phiếu "hữu ích" cho đánh giá. Bảng `orders_review_votes` (mỗi người một
+phiếu cho mỗi đánh giá); cột `orders_reviews.helpful_count` đổi cùng transaction với phiếu; `PUT` / `DELETE
+/public/reviews/{id}/helpful` (đăng nhập, gửi lại không đếm thêm); `sort=helpful` phân trang bằng con trỏ
+(`fetch_page_by`). Mặc định vẫn sắp theo mới nhất. Không có phiếu "không hữu ích". Người viết đánh giá không
+tự bỏ phiếu cho mình; người quản lý đánh giá hay sản phẩm ở nút bán không bỏ phiếu cho sản phẩm của mình.
+Không phát event cho từng phiếu.
+
+Lý do: đặc tả D-201 đã có `sort=helpful` nhưng chưa có dữ liệu để sắp. Số đếm lưu sẵn để trang sản phẩm
+không phải đếm lại mỗi lần mở. Chặn người bán bỏ phiếu và bỏ phiếu "không hữu ích" để thứ tự này không thành
+cách đẩy đánh giá xấu xuống (Luật 19/2023 cấm chặn hay ẩn đánh giá trái quy định — cần đối chiếu văn bản gốc
+xem sắp xếp có thuộc phạm vi không).
+
+Đã cân nhắc: cho khách vãng lai bỏ phiếu theo IP băm — dễ dồn phiếu, mất ý nghĩa; nút "không hữu ích" như
+một số sàn — dễ bị dùng để hạ đánh giá xấu; tính "hữu ích" bằng đếm `COUNT(*)` lúc đọc — chậm trên sản phẩm
+nhiều đánh giá, không dùng được cho con trỏ.
