@@ -503,6 +503,36 @@ gọi sai. Bước này sửa `xtask`, `gate.sh`, tài liệu và thêm thư m�
 - [ ] Ví dụ trong tài liệu được test: các ví dụ của hai mục trên chạy thật trên app dựng bằng
       `TestApp` trong gate (hay một lệnh `xtask` gate gọi), để tài liệu không lệch code
 
+## 33. Hiệu năng ở quy mô thật (chủ dự án giao ngày 13/11/2026)
+
+Các bài đo hiện có (`docs/BENCHMARKS.md`) chạy trên database gần như trống và chỉ đi qua `notes`
+và `auth`; đường đọc công khai mà website gọi nhiều nhất chưa từng được đo. Bắt đầu SAU nhóm C của
+bước 30 (dời file module, đụng truy vấn và migration) và sau bước 31 (số đo hàng đợi để quan sát
+lúc chạy tải); đo ảnh sau khi WebP của bước 30 xong. Mọi số đo ghi kèm máy, ngày, cỡ dữ liệu; mọi
+thay đổi chạy và có test trên cả SQLite và Postgres; không đổi tính đúng lấy tốc độ.
+
+- [ ] Bộ dữ liệu lớn để đo: một lệnh (vd trong `xtask` hay `scripts/`) sinh nhanh dữ liệu cỡ thật
+      trên cả hai database — vd 100 nghìn bài nhiều ngôn ngữ có danh mục, thẻ, tác giả; 50 nghìn
+      ảnh kèm bản nhỏ; 1 triệu bình luận; vài nghìn người dùng — chỉ ghi qua service hay đúng định
+      dạng bảng của module, không dùng cho dữ liệu thật
+- [ ] Đo tải đường đọc công khai trên bộ dữ liệu đó, mở rộng `scripts/loadtest.sh`: một bài
+      (`/public/resolve`), danh sách bài và theo danh mục (`/public/posts`, `/public/terms/…`),
+      `/public/sitemap`, `/public/feed`, `/public/search`, ảnh và bản nhỏ, bình luận của bài
+      (`/public/threads`, `/public/comments`). Đặt ngưỡng p95 mỗi đường, ghi vào `docs/BENCHMARKS.md`
+- [ ] Rà index bằng `EXPLAIN` (SQLite `EXPLAIN QUERY PLAN`, Postgres `EXPLAIN ANALYZE`) cho mọi
+      truy vấn danh sách, lọc, đếm của các module trên bộ dữ liệu lớn; index thiếu thêm bằng
+      migration mới (không sửa migration cũ); ghi bảng truy vấn → kế hoạch trước / sau
+- [ ] Nén response (gzip, brotli): đo cỡ và thời gian trên JSON thật (danh sách, `openapi.json`
+      hơn 1 MB), rồi quyết nén trong app (`tower-http`) hay để reverse proxy làm; không nén lại
+      file đã nén (ảnh). Ghi quyết định; sửa `docs/DEPLOY.md` (EN + VI) theo
+- [ ] Cache cho CDN: `Cache-Control`, `ETag`, `Vary` đúng cho mọi endpoint công khai; file media có
+      địa chỉ mang phiên bản thì cache dài hạn (`immutable`); nội dung riêng tư hay xem trước không
+      bao giờ được cache chung; hướng dẫn đặt CDN trước Autoxide trong `docs/DEPLOY.md` (EN + VI)
+- [ ] Tìm theo ý nghĩa khi dữ liệu lớn: đo cách duyệt hết vector hiện tại trên bộ dữ liệu lớn so
+      với ngưỡng 50 ms của D-110 (`docs/BENCHMARKS.md`, mục "Tìm theo ý nghĩa"); vượt ngưỡng thì
+      chọn cách giảm (vector nhỏ hơn, chia nhiều nhân, hay index sau một trait) chạy được trên cả
+      hai database, ghi quyết định; không vượt thì ghi số đo và giữ nguyên
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.
