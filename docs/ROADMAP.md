@@ -533,6 +533,68 @@ thay đổi chạy và có test trên cả SQLite và Postgres; không đổi t�
       chọn cách giảm (vector nhỏ hơn, chia nhiều nhân, hay index sau một trait) chạy được trên cả
       hai database, ghi quyết định; không vượt thì ghi số đo và giữ nguyên
 
+## 34. Sẵn sàng làm dự án mã nguồn mở (agent đề xuất ngày 13/11/2026, theo D-175)
+
+Repo sắp công khai (bước 30) nhưng chưa có những file một dự án mã nguồn mở cần để người lạ báo
+lỗi, đóng góp và tin bản phát hành. Làm ngay được, không đụng code của bước 29–33; tài liệu cho
+người ngoài viết tiếng Anh kèm bản tiếng Việt cùng nội dung.
+
+- [ ] `SECURITY.md` (EN + VI): phiên bản còn được vá, cách báo lỗ hổng riêng tư (bật "Private
+      vulnerability reporting" của GitHub — chủ dự án bấm), thời gian phản hồi dự kiến, những gì
+      không tính là lỗ hổng; README trỏ tới nó
+- [ ] `CONTRIBUTING.md` (EN + VI) cho người đóng góp là người: dựng môi trường, hai mức gate
+      (D-173), luật quan trọng nhất tóm từ `CLAUDE.md` (hai database, ranh giới module, lỗi có
+      `code`, test), cách viết commit và PR, license của phần đóng góp (MIT OR Apache-2.0, như
+      repo); trỏ `CLAUDE.md` cho người dùng AI agent
+- [ ] Quy tắc ứng xử (`CODE_OF_CONDUCT.md`, theo Contributor Covenant bản mới nhất) với địa chỉ
+      liên hệ do chủ dự án đặt; mẫu issue (báo lỗi: phiên bản, database, cách tái hiện; đề xuất) và
+      mẫu PR (đã chạy `./gate.sh`, đã sửa EN + VI, đã thêm CHANGELOG) trong `.github/`
+- [ ] Bản phát hành đáng tin: workflow `Release` (sau bước 30) đính kèm chứng thực nguồn gốc build
+      (GitHub artifact attestation) và danh sách thành phần (SBOM) cho image Docker; `docs/DEPLOY.md`
+      (EN + VI) có lệnh kiểm chứng thực trước khi chạy image
+- [ ] `cargo xtask check` hay test giữ các file trên không mất và hai bản EN / VI không lệch
+      tiêu đề mục (cách làm như kiểm bản dịch i18n), để agent phiên sau không quên sửa một bên
+
+## 35. Việc đã để lại (agent đề xuất ngày 13/11/2026)
+
+Những việc nhật ký quyết định đã ghi "để sau" mà vẫn có ích cho người dùng. Mỗi mục một module;
+làm sau nhóm C của bước 30 với `forms`, `comments` (bố cục đổi). Mỗi mục có test trên cả hai
+database và dòng CHANGELOG.
+
+- [ ] `auth`: đổi email thì gửi thêm mail báo tới địa chỉ cũ (kèm cách báo "không phải tôi" — vd
+      khoá phiên và đặt lại mật khẩu), để chủ tài khoản biết khi tài khoản bị chiếm (đã ghi để sau
+      ở mục về xác minh email trong `docs/DECISIONS.md`); mail qua job, không làm chậm request
+- [ ] `auth`: quản trị viên xem và gỡ passkey của người khác (permission riêng, ghi event cho
+      audit), và lệnh CLI gỡ passkey của một tài khoản cho khi admin duy nhất mất thiết bị —
+      `autoxide user reset-mfa` (D-159) hiện chỉ tắt TOTP, không gỡ passkey
+- [ ] `forms`: xuất CSV lớn bằng job ghi file vào `Storage`, trả link tải có hạn; xuất đồng bộ hiện
+      tại giữ cho số bài nhỏ (cách xuất đang có: `modules/forms/src/csv.rs`)
+- [ ] `comments`: Markdown giới hạn (đậm, nghiêng, link, trích dẫn, code) với bộ lọc HTML chống
+      XSS — thêm thư viện thì đo và ghi `STACK.md`; giữ test XSS sẵn có; chữ thường cũ hiển thị như cũ
+- [ ] Image Docker cho máy ARM64 (`linux/arm64`) trong workflow `Release` khi repo đã công khai
+      (máy build ARM của GitHub miễn phí cho repo công khai; D-078 để sau vì build giả lập quá lâu)
+
+Chờ chủ dự án quyết: định dạng AVIF cho ảnh thu nhỏ (cần thư viện mã hoá AVIF, nặng hơn WebP).
+
+## 36. Chống hồi quy (agent đề xuất ngày 13/11/2026)
+
+Test hiện tại kiểm code mới trên database mới; chưa có gì chứng minh bản mới chạy được trên
+database của bản cũ, hay response thật khớp hợp đồng OpenAPI. Làm sau bước 30 (cần image Docker
+của bản cũ cho mục 1).
+
+- [ ] Test nâng cấp từ bản phát hành trước: dựng database bằng image Docker của bản trước, ghi dữ
+      liệu mẫu qua API của nó, rồi chạy bản hiện tại trên database đó (migration, đọc lại dữ liệu,
+      vài lệnh ghi) — trên cả SQLite và Postgres; chạy trong CI và trước mỗi lần phát hành
+- [ ] Migration thật của mọi module chạy vòng up → down → up trên database trống và trên database
+      có dữ liệu, trên cả hai database (hiện chỉ có test cơ chế bằng bảng mẫu,
+      `crates/kernel/tests/migration.rs`)
+- [ ] Property test cho các bộ kiểm đầu vào: thân bài ProseMirror (`content`), slug, email
+      (`autoxide_kernel::email`), con trỏ pagination, CSV chống injection, chữ và link của bình
+      luận (chống XSS) — sinh đầu vào ngẫu nhiên, không panic, giữ bất biến; thêm thư viện thì ghi
+      `STACK.md`
+- [ ] Response thật khớp hợp đồng: test HTTP qua `TestApp` kiểm mỗi response (thân và mã) khớp
+      schema của endpoint đó trong `docs/openapi.json`, để tài liệu không hứa điều code không làm
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.
