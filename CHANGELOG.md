@@ -9,6 +9,20 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- Comments as product questions and answers: authors get badges such as `seller` or
+  `verified_buyer` (codes in `badges`, computed by the module owning the target); `q` on
+  `GET /api/v1/comments/public/threads` searches a target's top-level comments ignoring accents,
+  exact-accent matches first; counts carry `thread_count`; `unanswered=true` on the moderation list
+  and the MCP tools `comments.unanswered` and `comments.answer`; `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES`
+  takes comments on some kinds only from verified accounts (`comments.verification_required`).
+- Media: alt text per language — `PUT` / `DELETE /api/v1/media/{id}/alts/{locale}`, `alts` on every
+  item, the MCP tool `media.set_alt`, languages from `AUTOXIDE_MEDIA_ALT_LOCALES` (default `en,vi`).
+  The content module's public images use the alt text in the post's language when there is one.
+- For module authors: `Module::resource_events`, `StartContext::badge_source`,
+  `StartContext::posting_verifier` and `pagination::fetch_page_tiers` (see `docs/MODULE_GUIDE.md`).
+
 ## [0.12.0] - 2026-11-13
 
 ### Added

@@ -10,6 +10,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::EventInfo;
 use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::module::{Module, StartContext};
+use autoxide_kernel::resource::{ResourceChange, ResourceEvent};
 use autoxide_testkit::{TestApp, TestDatabase, TestResponse, tool};
 use axum::http::{Method, StatusCode, header};
 use serde_json::{Value, json};
@@ -28,6 +29,13 @@ impl Module for TestContent {
         vec![
             EventInfo::new("content.entry_archived", "Archived."),
             EventInfo::new("content.entry_deleted", "Deleted."),
+        ]
+    }
+
+    fn resource_events(&self) -> Vec<ResourceEvent> {
+        vec![
+            ResourceEvent::new("content.entry_archived", "content.entry", ResourceChange::Closed),
+            ResourceEvent::new("content.entry_deleted", "content.entry", ResourceChange::Removed),
         ]
     }
 
@@ -208,7 +216,7 @@ async fn vong_doi_qua_http() {
             assert!(!thread.text().contains(private), "the thread shows `{private}`");
         }
         let counts = send(&app, "GET", "/comments/public/counts?target_type=content.entry&target_ids=public-1,public-2", None, &[], None).await;
-        assert_eq!(counts.json()["data"], json!([{"target_id": "public-1", "count": 1}, {"target_id": "public-2", "count": 0}]));
+        assert_eq!(counts.json()["data"], json!([{"target_id": "public-1", "count": 1, "thread_count": 1}, {"target_id": "public-2", "count": 0, "thread_count": 0}]));
         let target = send(&app, "GET", "/comments/public/targets/content.entry/public-1", None, &[], None).await;
         assert_eq!((target.json()["data"]["state"].as_str(), target.json()["data"]["comment_count"].as_i64(), &target.json()["data"]["pending_count"]), (Some("open"), Some(1), &Value::Null));
 
@@ -307,12 +315,12 @@ async fn tool_mcp() {
             .map(|tool| tool.name.to_string())
             .collect();
         names.sort();
-        assert_eq!(names, ["comments.get", "comments.queue"]);
+        assert_eq!(names, ["comments.get", "comments.queue", "comments.unanswered"]);
         reader.cancel().await.unwrap();
 
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 4);
+        assert_eq!(tools.len(), 6);
         for tool in &tools {
             assert!(
                 !serde_json::to_string(&tool.input_schema).unwrap().contains("$ref"),
@@ -342,6 +350,69 @@ async fn tool_mcp() {
                 .await;
         assert!(!failed, "{approved}");
         assert_eq!(approved["data"]["status"], "published");
+
+        // Hỏi đáp (D-202): câu hỏi chưa trả lời, trả lời bằng tài khoản của người gọi.
+        let (failed, open) =
+            call("comments.unanswered", json!({"target_type": "content.entry"})).await;
+        assert!(!failed, "{open}");
+        assert_eq!(open["data"][0]["id"], id);
+        let (no_profile, refused) =
+            call("comments.answer", json!({"id": id, "body": "Trả lời"})).await;
+        assert!(no_profile, "a display name is needed first: {refused}");
+        let named = send(
+            &app,
+            "PUT",
+            "/comments/profile",
+            Some("admin"),
+            &[],
+            Some(json!({"display_name": "Quản trị"})),
+        )
+        .await;
+        assert_eq!(named.status(), StatusCode::OK, "{}", named.json());
+        let (failed, answer) = call("comments.answer", json!({"id": id, "body": "Trả lời"})).await;
+        assert!(!failed, "{answer}");
+        assert_eq!(
+            (answer["data"]["parent_id"].clone(), answer["data"]["status"].as_str()),
+            (id.clone(), Some("published"))
+        );
+        let (_, open) = call("comments.unanswered", json!({})).await;
+        assert_eq!(open["data"], json!([]), "answered now");
+        let listed = send(
+            &app,
+            "GET",
+            "/comments?status=published&unanswered=true",
+            Some("reader"),
+            &[],
+            None,
+        )
+        .await;
+        assert_eq!(listed.json()["data"], json!([]));
+        let wrong =
+            send(&app, "GET", "/comments?unanswered=maybe", Some("reader"), &[], None).await;
+        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let found = send(
+            &app,
+            "GET",
+            "/comments/public/threads?target_type=content.entry&target_id=public-1&q=CHO%20DUYET",
+            None,
+            &[],
+            None,
+        )
+        .await;
+        assert_eq!(found.json()["data"][0]["id"], id, "{}", found.json());
+        let too_long = send(
+            &app,
+            "GET",
+            &format!(
+                "/comments/public/threads?target_type=content.entry&target_id=public-1&q={}",
+                "a".repeat(101)
+            ),
+            None,
+            &[],
+            None,
+        )
+        .await;
+        assert_eq!(too_long.status(), StatusCode::UNPROCESSABLE_ENTITY);
         let (stale, _) =
             call("comments.moderate", json!({"id": id, "status": "spam", "version": version}))
                 .await;

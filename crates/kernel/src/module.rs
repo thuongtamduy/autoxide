@@ -113,6 +113,15 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Event vòng đời của các loại đối tượng module sở hữu (D-202): event nào nghĩa là đối tượng
+    /// thôi nhận tương tác mới hay đã bị gỡ, để module gắn dữ liệu vào đối tượng (vd `comments`)
+    /// đóng / ẩn phần của mình mà không biết module sở hữu. Event phải nằm trong
+    /// [`events`](Self::events) của chính module, loại phải là `<tên module>.<loại>`, chủ thể của
+    /// event là `<loại>:<id>`. Kernel kiểm lúc khởi động.
+    fn resource_events(&self) -> Vec<crate::resource::ResourceEvent> {
+        Vec::new()
+    }
+
     /// Các event module muốn nhận (của mọi module, kể cả chính nó). Gọi sau `start`.
     fn subscriptions(&self) -> Vec<Subscription> {
         Vec::new()
@@ -189,6 +198,8 @@ pub struct StartContext<'a> {
     apis: &'a mut Apis,
     personal_data: &'a PersonalDataExport,
     resources: &'a crate::resource::ResourceDirectory,
+    resource_events: &'a [crate::resource::ResourceEvent],
+    verification: &'a crate::access::PostingVerification,
 }
 
 impl StartContext<'_> {
@@ -257,6 +268,37 @@ impl StartContext<'_> {
     /// module khởi động sau đăng ký.
     pub fn resources(&self) -> crate::resource::ResourceDirectory {
         self.resources.clone()
+    }
+
+    /// Đăng ký bộ tính nhãn tác giả cho loại đối tượng `kind` (của module nào cũng được), với
+    /// mọi nhãn `codes` nó có thể trả (xem [`crate::resource`], D-202).
+    pub fn badge_source(
+        &mut self,
+        kind: &'static str,
+        codes: &'static [&'static str],
+        resolver: Arc<dyn crate::resource::BadgeResolver>,
+    ) -> Result<(), Error> {
+        self.resources.register_badges(self.module, kind, codes, resolver)
+    }
+
+    /// Event vòng đời mọi module đã khai qua [`Module::resource_events`] — có đủ ngay từ module
+    /// khởi động đầu tiên.
+    pub fn resource_events(&self) -> &[crate::resource::ResourceEvent] {
+        self.resource_events
+    }
+
+    /// Đăng ký bộ hỏi "tài khoản đã xác thực để đăng nội dung chưa" (NĐ 147/2024, D-202). Chỉ
+    /// một module trong chương trình đăng ký.
+    pub fn posting_verifier(
+        &mut self,
+        verifier: Arc<dyn crate::access::PostingVerifier>,
+    ) -> Result<(), Error> {
+        self.verification.register(self.module, verifier)
+    }
+
+    /// Chỗ hỏi tài khoản đã xác thực chưa (thấy cả bộ hỏi do module khởi động sau đăng ký).
+    pub fn posting_verification(&self) -> crate::access::PostingVerification {
+        self.verification.clone()
     }
 
     /// Công bố một trait cho module khác dùng. `T` là kiểu `dyn Trait` khai trong

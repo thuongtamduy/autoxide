@@ -1,5 +1,6 @@
 //! Entity (SeaORM) của các bảng `media_…`. Chỉ dùng trong module này.
 
+pub(crate) mod alt_translation;
 pub(crate) mod folder;
 pub(crate) mod item;
 pub(crate) mod item_tag;

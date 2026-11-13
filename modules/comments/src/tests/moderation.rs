@@ -12,7 +12,8 @@ use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, PaginatorTrait, Se
 use serde_json::json;
 
 use super::{
-    KIND, POST, as_guest, counts, events, guest, member, open_config, page, signed, visitor,
+    KIND, POST, as_guest, content_events, counts, events, guest, member, open_config, page, signed,
+    visitor,
 };
 use crate::config::CommentsConfig;
 use crate::entity::{comment, profile, subscription};
@@ -341,7 +342,7 @@ async fn du_lieu_ca_nhan() {
         assert_eq!(counts(&h.database, POST).await, (1, 0));
         // Luồng vẫn còn chỗ của bình luận gốc (có trả lời).
         assert_eq!(
-            h.service.thread(KIND, POST, &page(Order::Desc), 3).await.unwrap().data.len(),
+            h.service.thread(KIND, POST, &page(Order::Desc), 3, None).await.unwrap().data.len(),
             1
         );
 
@@ -463,7 +464,10 @@ async fn event_cua_chu_dich_dong_va_an() {
             .comment
             .row
             .id;
-        let handler = OwnerEvents(Arc::clone(&h.service));
+        let handler = OwnerEvents {
+            service: Arc::clone(&h.service),
+            events: crate::targets::owner_events(&content_events(), &h.service.config.target_types),
+        };
         let subject = Some(format!("{KIND}:{POST}"));
         let archived = delivered("content.entry_archived", subject.clone(), json!({}));
         handler.handle(&archived).await.unwrap();
@@ -479,16 +483,23 @@ async fn event_cua_chu_dich_dong_va_an() {
             "comments.target_closed"
         );
         assert_eq!(
-            h.service.thread(KIND, POST, &page(Order::Desc), 3).await.unwrap().data.len(),
+            h.service.thread(KIND, POST, &page(Order::Desc), 3, None).await.unwrap().data.len(),
             1,
             "closed, still shown"
         );
 
         handler.handle(&delivered("content.entry_deleted", subject, json!({}))).await.unwrap();
-        assert!(h.service.thread(KIND, POST, &page(Order::Desc), 3).await.unwrap().data.is_empty());
+        assert!(
+            h.service
+                .thread(KIND, POST, &page(Order::Desc), 3, None)
+                .await
+                .unwrap()
+                .data
+                .is_empty()
+        );
         assert_eq!(
             h.service.counts(KIND, &[POST.to_owned()]).await.unwrap(),
-            [(POST.to_owned(), 0)]
+            [(POST.to_owned(), 0, 0)]
         );
         assert_eq!(h.service.public_comment(id).await.unwrap_err().code(), "comments.not_found");
 

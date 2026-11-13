@@ -5248,7 +5248,7 @@
           "comments"
         ],
         "summary": "List comments for moderation.",
-        "description": "Requires `comments.read`. By default the comments waiting for approval, newest first; filter\nby status, target and text. Follow `pagination.next_cursor` with the same filters for more.",
+        "description": "Requires `comments.read`. By default the comments waiting for approval, newest first; filter\nby status, target and text, or list unanswered questions (`status=published&unanswered=true`). Follow `pagination.next_cursor` with the same filters for more.",
         "operationId": "comments_list_comments",
         "parameters": [
           {
@@ -5293,6 +5293,15 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "unanswered",
+            "in": "query",
+            "description": "`true`: only top-level comments without a shown reply yet, e.g. unanswered questions\n(use with `status=published`). Defaults to `false` (no such filter).",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -6823,7 +6832,7 @@
           "comments"
         ],
         "summary": "Count the comments of many targets (public).",
-        "description": "No sign-in needed. Shown comments of up to 100 targets of one kind, in the order asked;\nunknown targets count 0.",
+        "description": "No sign-in needed. Shown comments (all, and top-level only) of up to 100 targets of one kind,\nin the order asked; unknown and hidden targets count 0.",
         "operationId": "comments_count_comments",
         "parameters": [
           {
@@ -7056,7 +7065,7 @@
           "comments"
         ],
         "summary": "List the comments of a target (public).",
-        "description": "No sign-in needed. Shown top-level comments, newest first (`order=asc`: oldest first), each\nwith its first replies (oldest first) and `reply_count`. A top-level comment deleted by its\nauthor stays (with `deleted: true`, no text) while it has replies. Follow\n`pagination.next_cursor` with the same parameters for more.",
+        "description": "No sign-in needed. Shown top-level comments, newest first (`order=asc`: oldest first), each\nwith its first replies (oldest first) and `reply_count`. A top-level comment deleted by its\nauthor stays (with `deleted: true`, no text) while it has replies. With `q`, only matching\ntop-level comments, exact-accent matches first (questions and answers on a product use the\nsame thread: a question is a top-level comment, answers are its replies). Follow\n`pagination.next_cursor` with the same parameters for more.",
         "operationId": "comments_list_comment_thread",
         "parameters": [
           {
@@ -7089,6 +7098,16 @@
               "maximum": 10,
               "minimum": 0
             }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only top-level comments (e.g. questions) whose text or author name contains this, 1 to\n100 characters, ignoring case and accents. Matches with the exact accents come first,\nthen the others; within each group the usual `order` applies.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "bảo hành"
           },
           {
             "name": "limit",
@@ -19311,6 +19330,354 @@
         ]
       }
     },
+    "/api/v1/media/{id}/alts/{locale}": {
+      "put": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Set the text alternative of a media item in one language.",
+        "description": "Requires `media.write`. The item's `alt` stays the default; readers in `locale` get this\ntext instead (e.g. a bilingual storefront). `locale` must be one of the languages the server\nlists in `AUTOXIDE_MEDIA_ALT_LOCALES`. `If-Match` is required. To draft the text with AI,\nuse `POST /api/v1/media/{id}/alt-suggestions` with the same `locale`, then send it here.",
+        "operationId": "media_set_media_alt_translation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the media item.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "path",
+            "description": "BCP 47 language code, e.g. `vi`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the item since; otherwise `412`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaAltTranslation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The item after the change, with `alts`.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MediaItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No media item has this id; code `media.item_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item is in the trash; code `media.item_in_trash`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "`If-Match` does not match: the item changed since you read it. Get it again and retry; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The language is not offered (code `media.unsupported_locale`) or the text is too long; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Remove the text alternative of a media item in one language.",
+        "description": "Requires `media.write`. Readers in `locale` get the item's default `alt` again. Removing a\ntranslation that does not exist changes nothing. `If-Match` is required.",
+        "operationId": "media_delete_media_alt_translation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the media item.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "path",
+            "description": "BCP 47 language code, e.g. `vi`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the item since; otherwise `412`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The item after the change, with `alts`.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the record: send it back in `If-Match` when changing it."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MediaItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `media.write`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No media item has this id; code `media.item_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The item is in the trash; code `media.item_in_trash`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "`If-Match` does not match: the item changed since you read it. Get it again and retry; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The language is not offered; code `media.unsupported_locale`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/media/{id}/content": {
       "get": {
         "tags": [
@@ -25836,7 +26203,8 @@
         "description": "The comment count of a target.",
         "required": [
           "target_id",
-          "count"
+          "count",
+          "thread_count"
         ],
         "properties": {
           "count": {
@@ -25846,6 +26214,11 @@
           },
           "target_id": {
             "type": "string"
+          },
+          "thread_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Shown top-level comments only (e.g. the number of questions on a product tab)."
           }
         }
       },
@@ -25871,6 +26244,7 @@
           "root_id",
           "status",
           "author_kind",
+          "badges",
           "email_verified",
           "body",
           "body_html",
@@ -25896,6 +26270,13 @@
               "null"
             ],
             "description": "Guest name or the user's display name."
+          },
+          "badges": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Codes of what the author was on the target when writing (`seller`, `verified_buyer`…)."
           },
           "body": {
             "type": "string"
@@ -26123,6 +26504,7 @@
           "target_types",
           "guests_allowed",
           "signed_in_only_types",
+          "verified_only_types",
           "max_length",
           "max_links",
           "edit_minutes",
@@ -26176,6 +26558,13 @@
             "type": "string",
             "description": "Ask `GET /api/v1/antispam/token?scope=comments:<target_type>` for a form token each\ntime the comment box is shown.",
             "example": "comments:{target_type}"
+          },
+          "verified_only_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Kinds where only verified accounts (phone number or identity) may comment or answer;\nshow \"verify your account\" instead of the comment box to others."
           }
         }
       },
@@ -26198,7 +26587,8 @@
           "target_id",
           "state",
           "hidden",
-          "comment_count"
+          "comment_count",
+          "thread_count"
         ],
         "properties": {
           "closes_at": {
@@ -26226,6 +26616,14 @@
             "format": "int32",
             "description": "Comments waiting for approval (`null` in the public answer)."
           },
+          "pending_thread_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Top-level comments waiting for approval (`null` in the public answer)."
+          },
           "state": {
             "$ref": "#/components/schemas/CommentTargetState",
             "description": "What applies now."
@@ -26235,6 +26633,11 @@
           },
           "target_type": {
             "type": "string"
+          },
+          "thread_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Shown top-level comments, e.g. questions on a product (0 when hidden)."
           }
         }
       },
@@ -27437,6 +27840,7 @@
               "root_id",
               "status",
               "author_kind",
+              "badges",
               "email_verified",
               "body",
               "body_html",
@@ -27462,6 +27866,13 @@
                   "null"
                 ],
                 "description": "Guest name or the user's display name."
+              },
+              "badges": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Codes of what the author was on the target when writing (`seller`, `verified_buyer`…)."
               },
               "body": {
                 "type": "string"
@@ -27632,6 +28043,7 @@
               "target_types",
               "guests_allowed",
               "signed_in_only_types",
+              "verified_only_types",
               "max_length",
               "max_links",
               "edit_minutes",
@@ -27685,6 +28097,13 @@
                 "type": "string",
                 "description": "Ask `GET /api/v1/antispam/token?scope=comments:<target_type>` for a form token each\ntime the comment box is shown.",
                 "example": "comments:{target_type}"
+              },
+              "verified_only_types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Kinds where only verified accounts (phone number or identity) may comment or answer;\nshow \"verify your account\" instead of the comment box to others."
               }
             }
           }
@@ -27705,7 +28124,8 @@
               "target_id",
               "state",
               "hidden",
-              "comment_count"
+              "comment_count",
+              "thread_count"
             ],
             "properties": {
               "closes_at": {
@@ -27733,6 +28153,14 @@
                 "format": "int32",
                 "description": "Comments waiting for approval (`null` in the public answer)."
               },
+              "pending_thread_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int32",
+                "description": "Top-level comments waiting for approval (`null` in the public answer)."
+              },
               "state": {
                 "$ref": "#/components/schemas/CommentTargetState",
                 "description": "What applies now."
@@ -27742,6 +28170,11 @@
               },
               "target_type": {
                 "type": "string"
+              },
+              "thread_count": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Shown top-level comments, e.g. questions on a product (0 when hidden)."
               }
             }
           }
@@ -28861,6 +29294,7 @@
               "size",
               "sha256",
               "alt",
+              "alts",
               "title",
               "caption",
               "visibility",
@@ -28874,7 +29308,20 @@
             "properties": {
               "alt": {
                 "type": "string",
-                "description": "Text alternative for screen readers (the `alt` of an `<img>`); empty when unset."
+                "description": "Text alternative for screen readers (the `alt` of an `<img>`); empty when unset. This is\nthe default language's text, used for any language without a translation in `alts`."
+              },
+              "alts": {
+                "type": "object",
+                "description": "Translations of `alt` by language (BCP 47 code → text), set with\n`PUT /api/v1/media/{id}/alts/{locale}`. Show `alts[locale]` when present, else `alt`.",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "propertyNames": {
+                  "type": "string"
+                },
+                "example": {
+                  "vi": "Bếp từ đôi màu đen trên mặt bếp gỗ"
+                }
               },
               "caption": {
                 "type": "string",
@@ -29691,6 +30138,7 @@
               "target_id",
               "root_id",
               "author",
+              "badges",
               "body",
               "body_html",
               "deleted",
@@ -29700,6 +30148,16 @@
             "properties": {
               "author": {
                 "$ref": "#/components/schemas/CommentAuthor"
+              },
+              "badges": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Stable codes of what the author was on the target when writing, e.g. `seller` (manages\nthe product) or `verified_buyer` (received it); empty for most comments. Show your own\nlabel for each code.",
+                "example": [
+                  "verified_buyer"
+                ]
               },
               "body": {
                 "type": "string",
@@ -31082,7 +31540,8 @@
               "description": "The comment count of a target.",
               "required": [
                 "target_id",
-                "count"
+                "count",
+                "thread_count"
               ],
               "properties": {
                 "count": {
@@ -31092,6 +31551,11 @@
                 },
                 "target_id": {
                   "type": "string"
+                },
+                "thread_count": {
+                  "type": "integer",
+                  "format": "int32",
+                  "description": "Shown top-level comments only (e.g. the number of questions on a product tab)."
                 }
               }
             }
@@ -33005,6 +33469,21 @@
           }
         }
       },
+      "MediaAltTranslation": {
+        "type": "object",
+        "description": "A translation of an item's text alternative.",
+        "required": [
+          "alt"
+        ],
+        "properties": {
+          "alt": {
+            "type": "string",
+            "description": "Text alternative in this language, up to 1000 characters.",
+            "example": "Bếp từ đôi màu đen trên mặt bếp gỗ"
+          }
+        },
+        "additionalProperties": false
+      },
       "MediaItemResponse": {
         "type": "object",
         "description": "A media item. Its content is at `url`.",
@@ -33015,6 +33494,7 @@
           "size",
           "sha256",
           "alt",
+          "alts",
           "title",
           "caption",
           "visibility",
@@ -33028,7 +33508,20 @@
         "properties": {
           "alt": {
             "type": "string",
-            "description": "Text alternative for screen readers (the `alt` of an `<img>`); empty when unset."
+            "description": "Text alternative for screen readers (the `alt` of an `<img>`); empty when unset. This is\nthe default language's text, used for any language without a translation in `alts`."
+          },
+          "alts": {
+            "type": "object",
+            "description": "Translations of `alt` by language (BCP 47 code → text), set with\n`PUT /api/v1/media/{id}/alts/{locale}`. Show `alts[locale]` when present, else `alt`.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "example": {
+              "vi": "Bếp từ đôi màu đen trên mặt bếp gỗ"
+            }
           },
           "caption": {
             "type": "string",
@@ -34207,6 +34700,7 @@
                 "root_id",
                 "status",
                 "author_kind",
+                "badges",
                 "email_verified",
                 "body",
                 "body_html",
@@ -34232,6 +34726,13 @@
                     "null"
                   ],
                   "description": "Guest name or the user's display name."
+                },
+                "badges": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Codes of what the author was on the target when writing (`seller`, `verified_buyer`…)."
                 },
                 "body": {
                   "type": "string"
@@ -35121,6 +35622,7 @@
                 "size",
                 "sha256",
                 "alt",
+                "alts",
                 "title",
                 "caption",
                 "visibility",
@@ -35134,7 +35636,20 @@
               "properties": {
                 "alt": {
                   "type": "string",
-                  "description": "Text alternative for screen readers (the `alt` of an `<img>`); empty when unset."
+                  "description": "Text alternative for screen readers (the `alt` of an `<img>`); empty when unset. This is\nthe default language's text, used for any language without a translation in `alts`."
+                },
+                "alts": {
+                  "type": "object",
+                  "description": "Translations of `alt` by language (BCP 47 code → text), set with\n`PUT /api/v1/media/{id}/alts/{locale}`. Show `alts[locale]` when present, else `alt`.",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "example": {
+                    "vi": "Bếp từ đôi màu đen trên mặt bếp gỗ"
+                  }
                 },
                 "caption": {
                   "type": "string",
@@ -35327,6 +35842,7 @@
                 "target_id",
                 "root_id",
                 "author",
+                "badges",
                 "body",
                 "body_html",
                 "deleted",
@@ -35336,6 +35852,16 @@
               "properties": {
                 "author": {
                   "$ref": "#/components/schemas/CommentAuthor"
+                },
+                "badges": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Stable codes of what the author was on the target when writing, e.g. `seller` (manages\nthe product) or `verified_buyer` (received it); empty for most comments. Show your own\nlabel for each code.",
+                  "example": [
+                    "verified_buyer"
+                  ]
                 },
                 "body": {
                   "type": "string",
@@ -37143,6 +37669,7 @@
           "target_id",
           "root_id",
           "author",
+          "badges",
           "body",
           "body_html",
           "deleted",
@@ -37152,6 +37679,16 @@
         "properties": {
           "author": {
             "$ref": "#/components/schemas/CommentAuthor"
+          },
+          "badges": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Stable codes of what the author was on the target when writing, e.g. `seller` (manages\nthe product) or `verified_buyer` (received it); empty for most comments. Show your own\nlabel for each code.",
+            "example": [
+              "verified_buyer"
+            ]
           },
           "body": {
             "type": "string",

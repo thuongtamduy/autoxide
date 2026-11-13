@@ -538,3 +538,76 @@ cổng thanh toán, hoá đơn điện tử, `Notifier` là bộ giả của tes
 - Đánh giá công khai: lọc `has_media`, `rating`, `sort=newest|helpful`; `GET …/reviews/media` gom ảnh của
   người mua; tóm tắt AI là bản nháp nhân viên duyệt rồi mới hiện, gắn nhãn AI, không lược bỏ ý kiến tiêu
   cực (Luật 19/2023, Luật Trí tuệ nhân tạo 134/2025 — cần đối chiếu văn bản gốc).
+
+## Bổ sung theo D-202 (API còn thiếu của thiết kế giao diện 2)
+
+### Nhãn `verified_buyer` cho hỏi đáp
+
+`context.badge_source("catalog.product", &["verified_buyer"], resolver)`: resolver lấy các biến thể của
+sản phẩm qua `catalog::api` rồi hỏi `Orders::delivered_lines(tenant, author.user_id(), variant_id)` (hàm
+đã có ở mục "Kiểu và trait"); có ít nhất một dòng đã giao thì trả `verified_buyer`. Chỉ đọc bảng của
+`orders`. Test: `nguoi_da_nhan_hang_co_nhan_verified_buyer`, `don_bi_huy_khong_cho_nhan`.
+
+### C. Trả hàng kèm ảnh, xem trước tiền hoàn
+
+- **Bảng.** `orders_returns` thêm `media_ids` text (danh sách UUID, tối đa 6) bằng migration mới.
+  `orders_policies` thêm `return_photo_reasons` text (mã lý do bắt buộc ảnh, mặc định
+  `damaged,wrong_item`), kế thừa theo cây như các cột khác; mã lý do là danh sách của đặc tả này
+  (`changed_mind`, `damaged`, `wrong_item`, `not_as_described`, `missing_parts`, `other`).
+- **Ảnh của người mua.** Mỗi `media_id` kiểm qua trait của `media` (mở rộng `Media` bằng
+  `uploaded_by(ids) -> HashMap<Uuid, Option<Uuid>>` có cài đặt mặc định, hay trả `uploaded_by` trong
+  `MediaRef` theo cách không phá vỡ) — phải do chính người mua tải lên, không trong thùng rác; không đọc
+  bảng của `media`. Người mua tải ảnh qua endpoint tải lên dành cho người mua của `media` (ảnh `private`,
+  hạn mức theo người dùng) — nếu `media` chưa có thì bước này thêm `POST /api/v1/media/me/uploads`
+  (permission `media.upload_own`, chỉ ảnh, ≤ 10 MiB) vào `media`.
+- **Lỗi** (gom chung một lần, D-083): `orders.return_photos_required` (lý do cần ảnh mà thiếu, trường
+  `media_ids`), `orders.return_photo_not_owned` (ảnh không phải của người mua), `orders.return_too_many_photos`.
+- **Xem trước.** `POST /me/orders/{id}/returns/preview {lines: [{line_id, qty}], reason_code,
+  return_method?}` (`orders.buy`, chỉ đơn của mình; không ghi, không event, không giữ chỗ) trả:
+  `refund: {amount, currency}` của các dòng đã chọn (giá đã trả sau giảm giá phân bổ, cộng phí vận chuyển
+  khi lỗi do người bán theo chính sách), `methods: [{method, fee: {amount, currency}, available}]` (phí theo
+  `shipping` qua `api`, `in_store` chỉ khi có cửa hàng nhận), `refund_eta: {min_days, max_days, channel}`
+  theo phương thức thanh toán của đơn (bảng dữ liệu theo phương thức, có ngày hiệu lực), `deadline_at` (hạn
+  đổi trả), `photos_required: bool`. Tiền là số nguyên đơn vị nhỏ nhất + mã tiền tệ. Lỗi giống
+  `POST …/returns` (`orders.return_window_closed`, `orders.return_qty_exceeded`…) nhưng là 422 không ghi.
+- **Event.** `orders.return_requested` thêm `photo_count` (không có ID ảnh).
+- **MCP.** `decide_return` trả kèm `media_ids` để nhân viên xem ảnh; không có tool xem trước (việc của
+  người mua).
+- **Test:** `ly_do_hong_vo_bat_buoc_anh`, `anh_cua_nguoi_khac_bi_tu_choi`,
+  `xem_truoc_tien_hoan_khong_ghi_gi`, `chinh_sach_anh_ke_thua_theo_cay` — cả hai database.
+
+### D. Thao tác trên đơn vãng lai sau khi tra cứu
+
+- **Token xem đơn.** `POST /public/orders/lookup {number, phone}` → OTP SMS → `POST
+  /public/orders/lookup/{id}/confirm {code}` trả `access_token` (băm lưu ở `orders_lookup_tokens`:
+  `id`, `tenant_id`, `order_id`, `phone_hash`, `token_hash`, `expires_at`, `otp_confirmed_at`, `created_at`).
+  Token gửi bằng header `Authorization: Order <token>`, chỉ mở đúng một đơn.
+- **Thao tác** (mỗi cái gọi CÙNG service với đường có tài khoản, nhận `Idempotency-Key`):
+  - `POST /public/orders/{id}/cancel {reason}` — cùng chính sách `buyer_cancel_until`;
+  - `POST /public/orders/{id}/address` — đổi địa chỉ giao khi đơn chưa rời kho (trạng thái trước
+    `shipped`), cần OTP lần hai: `POST /public/orders/{id}/address/otp` rồi gửi `{address, code}`;
+    phí giao tính lại, chênh lệch thì trả 409 `orders.address_change_needs_payment`;
+  - `POST /public/orders/{id}/support {message}` — mở yêu cầu hỗ trợ kèm sẵn mã đơn (event
+    `orders.support_requested`, kênh nhận là `notifications`).
+- **Giới hạn (cấu hình, có mặc định).** `AUTOXIDE_ORDERS_LOOKUP_PER_HOUR` (mặc định 5, theo cặp mã đơn +
+  số điện thoại băm, và 20 theo IP băm) qua `autoxide_kernel::throttle`; `AUTOXIDE_ORDERS_LOOKUP_RESEND_SECONDS`
+  (mặc định 60, gửi lại OTP sớm hơn → 429 `orders.lookup_resend_too_soon` có `retry_after`);
+  `AUTOXIDE_ORDERS_LOOKUP_TOKEN_MINUTES` (mặc định 30). Trả lời "không thấy đơn" và "sai số điện thoại"
+  giống hệt nhau (không dò được số đơn).
+- **Bảo vệ dữ liệu cá nhân.** Response cho token xem đơn che số điện thoại (`090•••567`: giữ 3 số đầu, 3
+  số cuối), tên người nhận chỉ chữ cái đầu của họ và đệm, địa chỉ chỉ tới cấp phường / xã (không số nhà,
+  đường); người mua có tài khoản thì thấy đầy đủ. Căn cứ: Luật Bảo vệ dữ liệu cá nhân 2025 (Luật
+  91/2025/QH15), NĐ 13/2023/NĐ-CP (nguyên tắc tối thiểu hoá) — **cần đối chiếu văn bản gốc**.
+- **Tạo tài khoản từ số đã xác thực.** Thuộc **`auth` (bước 34)**: trang xem đơn gọi
+  `POST /api/v1/auth/phone-signups {lookup_token}` — `auth` hỏi `orders` (trait `OrderLookups::verified_phone(
+  token)` do `orders` công bố) để lấy số đã qua OTP, tạo tài khoản đăng nhập bằng passkey hay OTP (không
+  bắt buộc mật khẩu), đánh dấu số đã xác thực; rồi giao diện gọi `POST /me/orders/claim` của `orders` để
+  gộp mọi đơn vãng lai cùng số. `orders` không tạo tài khoản.
+- **Mã lỗi mới:** `orders.lookup_failed` (404, chung cho không thấy / sai số), `orders.lookup_resend_too_soon`
+  (429), `orders.lookup_token_invalid` (401), `orders.address_locked` (409, hàng đã rời kho),
+  `orders.address_change_needs_payment` (409). Thêm bản dịch `vi`.
+- **MCP.** Không có tool cho token xem đơn (đường của người mua vãng lai); nhân viên dùng tool sẵn có.
+- **Test:** `tra_don_sai_so_va_khong_co_don_tra_loi_giong_nhau`, `gui_lai_otp_phai_cho`,
+  `token_xem_don_het_han_sau_30_phut`, `huy_don_vang_lai_cung_chinh_sach`,
+  `doi_dia_chi_can_otp_lan_hai`, `response_che_so_dien_thoai_va_dia_chi`,
+  `thao_tac_vang_lai_goi_lai_cung_idempotency_key` — cả hai database.

@@ -198,6 +198,12 @@ Bổ sung (chủ dự án giao thêm ngày 12/11/2026):
 - [x] Nhãn song song với thư mục; quản lý nhãn (D-094)
 - [x] Tải lên qua MCP (base64, tối đa 1 MiB) (D-095)
 
+Bổ sung (D-202):
+
+- [x] `alt` theo ngôn ngữ: bảng `media_alt_translations`, item trả `alts`, `PUT` / `DELETE
+      /{id}/alts/{locale}`, tool `set_alt`, ngôn ngữ theo `AUTOXIDE_MEDIA_ALT_LOCALES`, `Media::find_many_in`
+      lùi về `alt` mặc định; `content` tra ảnh công khai theo ngôn ngữ của bài; test trên cả hai database
+
 
 ## 17. Module `content` — nội dung (chủ dự án chọn ngày 12/11/2026, D-096, D-098, D-101)
 
@@ -294,6 +300,14 @@ Mỗi mục một commit, gate xanh trên cả hai database.
 - [x] Báo email khi có trả lời (chọn nhận, email đã xác minh); giữ dữ liệu theo thời hạn
 - [x] Dữ liệu cá nhân; tool MCP
 - [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
+
+Bổ sung (D-202, cho hỏi đáp sản phẩm của thiết kế giao diện 2):
+
+- [x] Hỏi đáp trên `comments`: event vòng đời do module sở hữu đích khai (`Module::resource_events`, thay
+      danh sách viết cứng), nhãn tác giả `seller` / `verified_buyer` qua bộ tính nhãn của kernel (tính lúc
+      ghi, lưu cùng bình luận), loại đích chỉ cho tài khoản đã xác thực (điểm nối `PostingVerifier`, NĐ
+      147/2024), tìm `q` đúng dấu xếp trước (`fetch_page_tiers`), số câu hỏi tách khỏi số bình luận, tool
+      MCP `unanswered` / `answer`; test trên cả hai database
 
 ## 23. Đóng các giới hạn còn để lại của D-150 (chủ dự án giao ngày 12/11/2026)
 
@@ -645,6 +659,9 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 - [ ] Nhân sự nền tảng vào dữ liệu của khách (D-190): chỉ khi có quyền vào cấp có thời hạn, ghi lý
       do; mọi lần vào ghi audit mà quản trị của khách xem được (Luật BVDLCN 2025); khách tắt được
       quyền vào hỗ trợ, trừ yêu cầu của cơ quan có thẩm quyền (có audit)
+- [ ] Tạo tài khoản từ số điện thoại đã xác thực qua tra đơn vãng lai (D-202; làm cùng bước 45 khi
+      `orders` có token xem đơn): `POST /api/v1/auth/phone-signups`, đăng nhập bằng passkey hay OTP, không
+      bắt buộc mật khẩu
 
 ## 35. Gói, quyền dùng tính năng, hạn mức, thuê bao (D-185)
 
@@ -733,7 +750,8 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       định, có hạn xử lý, lưu vết; kênh khiếu nại của sàn; cung cấp thông tin người bán khi cơ quan
       có thẩm quyền yêu cầu (có audit)
 - [ ] Xác thực tài khoản đăng nội dung (NĐ 147/2024): cờ "đã xác thực số điện thoại / định danh";
-      khách bật yêu cầu cho bình luận, đánh giá, livestream
+      khách bật yêu cầu cho bình luận, đánh giá, livestream; đăng ký `PostingVerifier` của kernel (D-202)
+      để `comments` (`AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES`) dùng trạng thái thật
 - [ ] Dữ liệu cá nhân (Luật 91/2025, NĐ 356/2025): sổ căn cứ xử lý / đồng ý theo mục đích; thời hạn
       lưu theo loại dữ liệu; vị trí lưu theo khách (lưu tại Việt Nam chọn được); quy trình sự cố có
       mốc 72 giờ kể từ khi phát hiện trong sổ tay vận hành
@@ -921,6 +939,9 @@ bước 35.
 - [ ] Loại sản phẩm: hàng vật lý, hàng số (giao file bằng link ký có hạn qua `files`, giới hạn lượt
       tải), dịch vụ (không giao hàng); combo / bộ sản phẩm trừ kho từng thành phần; sản phẩm tương tự
       theo ý nghĩa (embedding sẵn có của module `ai`)
+- [ ] Hỏi đáp và ảnh song ngữ (D-202): đăng ký `catalog.product` vào sổ đối tượng, bộ tính nhãn
+      `seller` (permission quản lý sản phẩm ở nút sở hữu) và event vòng đời (lưu trữ / xoá → đóng và ẩn
+      hỏi đáp); `catalog_product_media` ghi đè `alt` theo ngôn ngữ như `media_alt_translations`
 
 ## 42. Kho (`inventory`)
 
@@ -1024,6 +1045,11 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       người mua, tóm tắt AI chỉ là bản nháp nhân viên duyệt và gắn nhãn (D-109)
 - [ ] Trả góp qua đối tác (trait của bước 36); bảo hành theo số serial hay theo đơn: phiếu bảo hành,
       tiếp nhận, trạng thái xử lý, hạn bảo hành
+- [ ] Bổ sung theo D-202: nhãn `verified_buyer` cho hỏi đáp sản phẩm (bộ tính nhãn của kernel); trả
+      hàng kèm ảnh (lý do bắt buộc ảnh là chính sách theo nút) và `POST /me/orders/{id}/returns/preview`
+      (tiền hoàn, cách gửi trả và phí, thời gian hoàn, hạn — không ghi); thao tác bằng token xem đơn vãng
+      lai (huỷ, đổi địa chỉ có OTP lần hai, mở hỗ trợ) qua cùng service, giới hạn tra / gửi lại OTP / hạn
+      token là cấu hình, che số điện thoại và địa chỉ tới cấp phường
 
 ## 46. Sàn (`marketplace`)
 
@@ -1175,6 +1201,8 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
       trợ lý dùng tool MCP với đúng quyền người dùng, mọi lệnh ghi là bản nháp chờ duyệt
 - [ ] Thông báo: lý do nhận, trạng thái xong / lưu, bộ lọc, cấu hình kênh theo loại event; ghim màn hình
       hay dùng (`/me/pins`)
+- [ ] Nhật ký lệnh của agent (D-202): lệnh MCP ghi `mcp:<tên tool>` vào đường dẫn mẫu, không ghi tham
+      số; lọc theo `actor_kind` và theo key; dòng của lệnh nhận `202 approval_required` giữ `approval_id`
 - [ ] Sức khoẻ người bán và sức khoẻ tuân thủ: chỉ số so với ngưỡng (ngưỡng là dữ liệu có ngày hiệu lực),
       vi phạm, hạn phải xử lý; huy hiệu người bán tin cậy tính từ số liệu thật, công bố tiêu chí
 

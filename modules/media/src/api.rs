@@ -58,6 +58,14 @@ pub trait Media: Send + Sync {
     /// lỗi.
     async fn find_many(&self, ids: &[Uuid]) -> Result<Vec<MediaRef>, Error>;
 
+    /// Như [`find_many`](Self::find_many), với `alt` bằng ngôn ngữ `locale` (mã BCP 47, vd ngôn
+    /// ngữ của bài đang đọc): bản dịch nếu item có, không thì `alt` mặc định (D-202). Thêm một
+    /// câu query cho mọi ID.
+    async fn find_many_in(&self, ids: &[Uuid], locale: &str) -> Result<Vec<MediaRef>, Error> {
+        let _ = locale;
+        self.find_many(ids).await
+    }
+
     /// Item `id`, hay `None` nếu không có / đang trong thùng rác.
     async fn find(&self, id: Uuid) -> Result<Option<MediaRef>, Error> {
         Ok(self.find_many(&[id]).await?.into_iter().next())

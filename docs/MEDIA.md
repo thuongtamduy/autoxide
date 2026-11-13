@@ -68,6 +68,12 @@ in between, `412` (code `precondition_failed`) — read it again and retry.
 - `PUT /api/v1/media/{id}/content` — replace the content, keeping the id (and every place
   that uses the item). Same checks as an upload. The `url`, `version_id` and `ETag` change;
   the old content is deleted.
+- `PUT /api/v1/media/{id}/alts/{locale}` with `{"alt": "…"}` — the alt text in one language
+  (e.g. `vi` on a bilingual site); `DELETE /api/v1/media/{id}/alts/{locale}` removes it. The
+  item's own `alt` stays the default for every language without a translation; the item answers
+  all translations in `alts`. Languages allowed: `AUTOXIDE_MEDIA_ALT_LOCALES` (default `en,vi`);
+  others are refused with `media.unsupported_locale`. Deleting an item for good deletes its
+  translations.
 
 ## Serve the content
 
@@ -177,15 +183,17 @@ empty folders can be deleted — items in the trash count (`409`, `media.folder_
 that language. It sends a small copy (at most 1280 px), re-encoded without metadata even when
 the original is small, never the original file; private images only
 when `AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true`. Nothing is saved: store what a person accepts with
-`PATCH`. `decorative: true` means the image adds no information — leave its alt text empty.
-`media.alt` has one language; the alt text per language lives in the image nodes of a post
-body. Turning AI on: [`AI.md`](AI.md).
+`PATCH` (default language) or `PUT /api/v1/media/{id}/alts/{locale}` (other languages).
+`decorative: true` means the image adds no information — leave its alt text empty. A post body
+may also set an alt text on its own image nodes, which wins over the item's. Turning AI on:
+[`AI.md`](AI.md).
 
 ## AI agents (MCP)
 
-Tools `media.list`, `media.get`, `media.update`, `media.trash`, `media.list_tags`,
-`media.upload` and `media.suggest_alt`, with the same permissions as the REST endpoints. `media.update` takes the
-`updated_at` you read instead of `If-Match`. `media.upload` takes the content as base64, up
+Tools `media.list`, `media.get`, `media.update`, `media.set_alt`, `media.trash`,
+`media.list_tags`, `media.upload` and `media.suggest_alt`, with the same permissions as the REST
+endpoints. `media.update` and `media.set_alt` take the `updated_at` you read instead of
+`If-Match`. `media.upload` takes the content as base64, up
 to 1 MiB once decoded — but the whole tool call must also fit
 `AUTOXIDE_HTTP_BODY_LIMIT_BYTES` (1 MiB by default), and base64 is a third larger, so with
 the default limit files of up to about 750 KiB fit; upload larger files through REST.
@@ -197,7 +205,9 @@ item public — so give it only to people who may also read the library.
 
 Other modules read media through the `autoxide_media::api::Media` trait (register after
 `media`): `find_many(&ids)` returns, in two queries for any number of ids, the id, visibility, type,
-image size, `alt`, `url` and smaller copies of each item not in the trash. Keep only the item id in your own tables.
+image size, `alt`, `url` and smaller copies of each item not in the trash. `find_many_in(&ids, locale)`
+does the same with `alt` in that language when the item has a translation (one more query), else
+the default. Keep only the item id in your own tables.
 
 ## When an account is deleted
 

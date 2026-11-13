@@ -62,3 +62,18 @@ SAU bước 51. Mục AI cần module `ai` (bước 18) và P7 của bước 51 
 
 Hạn lưu mặc định của nhật ký request; ghi nhật ký bằng outbox hay hàng đợi trong bộ nhớ có giới hạn (đo
 trước); danh sách chỉ số sức khoẻ người bán đầu tiên. Ghi vào `docs/DECISIONS.md`.
+
+## Bổ sung theo D-202 (nhật ký lệnh của agent)
+
+- Lệnh gọi qua MCP ghi `mcp:<tên tool>` (vd `mcp:comments.answer`) vào cột đường dẫn mẫu của
+  `kernel_request_log`, phương thức `MCP`; **không ghi tham số** của tool (có thể chứa dữ liệu cá nhân).
+  Ghi ở lớp MCP của kernel (`mcp.rs`), một dòng cho mỗi lần gọi tool, kể cả khi tool trả lỗi.
+- Cột mới `actor_kind` (`human` / `agent` / `system`, P12 bước 51) và `api_key_id`; `GET
+  /api/v1/kernel/devtools/requests` lọc theo `actor_kind`, `api_key_id`, `path` (chính xác, vd
+  `mcp:orders.refund`), `status`, khoảng thời gian; phân trang bằng `fetch_page`, index (`tenant_id`,
+  `actor_kind`, `id`) và (`tenant_id`, `api_key_id`, `id`).
+- Lệnh nhận `202 approval_required` (P12 bước 51): dòng nhật ký giữ `approval_id` để giao diện nối tới
+  yêu cầu duyệt; khi lệnh được duyệt và chạy, dòng mới ghi cùng `approval_id`.
+- Tool MCP `kernel.request_log` (`kernel.devtools.read`, `read_only`) như REST.
+- **Test:** `lenh_mcp_ghi_dung_ten_tool`, `tham_so_tool_khong_lot_vao_nhat_ky`,
+  `loc_nhat_ky_theo_actor_kind_va_key`, `lenh_cho_duyet_giu_approval_id` — cả hai database.

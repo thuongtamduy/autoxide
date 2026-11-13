@@ -163,6 +163,23 @@ Công bố một trait trong `src/api.rs` và cung cấp nó trong `Module::star
 theo cách đó: `dyn Mailer` (gửi mail; module `mail`) và `dyn Storage` (lưu file; module
 `files`).
 
+### Bản ghi mà module khác gắn dữ liệu vào
+
+Module như `comments` gắn dữ liệu vào bản ghi của module khác mà không phụ thuộc module đó
+(`autoxide_kernel::resource`):
+
+- `context.resource_type("shop.item", resolver)` trong `Module::start` cho module khác hỏi bản ghi
+  có không, có công khai không, lấy tiêu đề và đường dẫn.
+- `Module::resource_events` khai event nào của bạn (trong `Module::events`, chủ thể `<loại>:<id>`)
+  nghĩa là `ResourceChange::Closed` (không nhận thêm gì) hay `ResourceChange::Removed` (đã gỡ: đóng và
+  ẩn mọi thứ gắn vào). Kernel kiểm lúc khởi động.
+- `context.badge_source(kind, &["seller"], resolver)` tính nhãn của tác giả trên bản ghi của loại bất
+  kỳ, vd `seller` cho người quản lý sản phẩm. Mỗi nhãn của một loại do một module tính; nhãn là mã ổn
+  định, không phải câu chữ.
+- `context.posting_verifier(…)` (một module trong cả chương trình) trả lời tài khoản đã xác thực để
+  đăng nội dung chưa (số điện thoại hay định danh); `context.posting_verification()` để hỏi. Chưa ai
+  đăng ký thì mọi tài khoản đăng nhập tính là đã xác thực.
+
 ### Dữ liệu cá nhân
 
 Module giữ dữ liệu về người dùng tham gia việc xuất dữ liệu và xoá tài khoản (xem

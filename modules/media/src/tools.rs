@@ -95,6 +95,22 @@ pub(crate) struct UpdateMediaInput {
     tags: Option<Vec<String>>,
 }
 
+/// The text alternative of a media item in one language.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SetAltInput {
+    /// Id of the media item.
+    id: Uuid,
+    /// The `updated_at` of the item as you last read it. The change is refused if the
+    /// item changed since; read it again and retry.
+    updated_at: DateTime<Utc>,
+    /// BCP 47 language code, one the server offers (e.g. `vi`).
+    locale: String,
+    /// Text alternative in this language, up to 1000 characters; `null` removes the
+    /// translation (readers in this language get the default `alt` again).
+    alt: Option<String>,
+}
+
 /// A small file to add to the media library.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -130,6 +146,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
     let (list, get, update, trash) =
         (service.clone(), service.clone(), service.clone(), service.clone());
     let (upload, list_tags, alt) = (service.clone(), service.clone(), service.clone());
+    let set_alt = service.clone();
     vec![
         Tool::new(
             "list",
@@ -204,6 +221,29 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                     };
                     let item = service
                         .update(&principal, input.id, changes, Some(input.updated_at))
+                        .await?;
+                    crate::http::describe(&service, item).await
+                }
+            },
+        )
+        .requires(MEDIA_WRITE),
+        Tool::new(
+            "set_alt",
+            "Set (or, with `alt: null`, remove) the text alternative of a media item in one \
+             language, e.g. `vi` on a bilingual site; the item's own `alt` stays the default for \
+             other languages. Pass the `updated_at` you read; the change is refused if someone \
+             changed the item since.",
+            move |principal: Principal, input: SetAltInput| {
+                let service = set_alt.clone();
+                async move {
+                    let item = service
+                        .set_alt(
+                            &principal,
+                            input.id,
+                            &input.locale,
+                            input.alt.as_deref(),
+                            Some(input.updated_at),
+                        )
                         .await?;
                     crate::http::describe(&service, item).await
                 }

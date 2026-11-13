@@ -40,6 +40,7 @@ pub(crate) fn routes(service: Arc<MediaService>) -> OpenApiRouter {
         .routes(routes!(items::restore_item))
         .routes(routes!(items::purge_item))
         .routes(routes!(assist::suggest_alt))
+        .routes(routes!(items::set_alt, items::delete_alt))
         .routes(routes!(content::get_content, content::head_content, content::replace_content))
         .with_state(service)
 }
@@ -67,8 +68,13 @@ pub(crate) struct MediaItemResponse {
     /// Height in pixels; only for raster images.
     #[schema(example = 1080)]
     height: Option<i32>,
-    /// Text alternative for screen readers (the `alt` of an `<img>`); empty when unset.
+    /// Text alternative for screen readers (the `alt` of an `<img>`); empty when unset. This is
+    /// the default language's text, used for any language without a translation in `alts`.
     alt: String,
+    /// Translations of `alt` by language (BCP 47 code → text), set with
+    /// `PUT /api/v1/media/{id}/alts/{locale}`. Show `alts[locale]` when present, else `alt`.
+    #[schema(example = json!({"vi": "Bếp từ đôi màu đen trên mặt bếp gỗ"}))]
+    alts: std::collections::BTreeMap<String, String>,
     /// Title; empty when unset.
     title: String,
     /// Caption; empty when unset.
@@ -140,10 +146,11 @@ impl VariantResponse {
 
 impl From<ItemDetails> for MediaItemResponse {
     fn from(details: ItemDetails) -> Self {
-        let ItemDetails { item, tags, variants } = details;
+        let ItemDetails { item, tags, alts, variants } = details;
         let url = content_url(&item);
         MediaItemResponse {
             tags,
+            alts,
             variants: variants
                 .into_iter()
                 .map(|variant| VariantResponse::new(&url, variant))

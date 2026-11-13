@@ -565,3 +565,12 @@ gắn với nút. `GET /api/v1/organizations/public/stores` (công khai; khách 
 công khai) trả các nút `public` của khách, sắp theo thứ tự khách đặt, `ETag` / `Cache-Control` như
 `/api/v1/address`. Không trả thành viên, cài đặt nội bộ hay nút không công khai. Test: nút không công khai
 không lộ; hai khách cùng database không thấy cửa hàng của nhau.
+
+## Bổ sung theo D-202 (tạo tài khoản từ số đã xác thực)
+
+`auth` thêm `POST /api/v1/auth/phone-signups {lookup_token, display_name?}` (công khai, rate limit theo IP):
+lấy số điện thoại đã qua OTP từ token xem đơn của `orders` (trait `OrderLookups` do `orders` công bố ở
+bước 45 — đăng ký `auth` trước thì lấy qua chỗ giữ của kernel hay `Subscription::optional`, agent bước 45
+chọn), tạo tài khoản trong khách với số đó đã xác thực, đăng nhập bằng passkey (bước 12) hay OTP; không bắt
+buộc mật khẩu. Số đã thuộc một tài khoản → 409 `auth.phone_taken` (gợi ý đăng nhập). Phần này làm ở bước
+45 khi `orders` có token xem đơn; ghi ở đây vì danh tính và đăng nhập thuộc `auth`.

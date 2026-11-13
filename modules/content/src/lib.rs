@@ -34,6 +34,7 @@ use autoxide_kernel::job::{JobRegistration, Schedule};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
+use autoxide_kernel::resource::{ResourceChange, ResourceEvent};
 use autoxide_media::api::Media;
 use utoipa_axum::router::OpenApiRouter;
 
@@ -71,6 +72,14 @@ impl Module for ContentModule {
 
     fn events(&self) -> Vec<EventInfo> {
         events::all()
+    }
+
+    fn resource_events(&self) -> Vec<ResourceEvent> {
+        // Bài lưu trữ: thôi nhận bình luận mới, bình luận cũ vẫn hiện. Bài xoá: ẩn luôn (D-202).
+        vec![
+            ResourceEvent::new("content.entry_archived", resource::ENTRY, ResourceChange::Closed),
+            ResourceEvent::new("content.entry_deleted", resource::ENTRY, ResourceChange::Removed),
+        ]
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -203,6 +212,15 @@ pub(crate) mod testing {
                     })
                 })
                 .collect())
+        }
+
+        /// `alt` theo ngôn ngữ: `[<ngôn ngữ>]`, để test thấy ảnh được tra theo ngôn ngữ nào.
+        async fn find_many_in(&self, ids: &[Uuid], locale: &str) -> Result<Vec<MediaRef>, Error> {
+            let mut found = self.find_many(ids).await?;
+            for item in &mut found {
+                item.alt = format!("[{locale}]");
+            }
+            Ok(found)
         }
     }
 

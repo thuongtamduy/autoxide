@@ -461,3 +461,33 @@ lý trước khi chạy thật (D-186):
   đơn vị cơ sở cho hàng tiêu hao.
 - **JSON-LD:** `by-slug` trả đủ GTIN, thương hiệu, URL từng biến thể để website dựng `Product` /
   `ProductGroup` / `Offer`; giá trong Offer là giá không cần mã; giá gạch là giá ngay trước khuyến mại.
+
+## Bổ sung theo D-202 (hỏi đáp sản phẩm, ảnh song ngữ)
+
+Hạ tầng đã có trong kernel và `comments` (D-202); bước này chỉ khai phần của `catalog`.
+
+- **Đích `catalog.product`.** Trong `start`: `context.resource_type("catalog.product", resolver)` — bộ tra
+  trả `Resource::new(tên).public(trạng thái active và kênh online)` với `url` đường dẫn công khai; sản phẩm
+  nháp / ngừng bán / lưu trữ thì `public = false` (`comments` trả `comments.target_not_found`).
+- **Event vòng đời.** `Module::resource_events` khai `catalog.product_archived` và
+  `catalog.product_deleted` (event đã có trong bảng event của đặc tả này; chủ thể `catalog.product:<id>`)
+  với `ResourceChange::Removed`: lưu trữ hay xoá sản phẩm thì `comments` đóng **và ẩn** hỏi đáp. Bán lại
+  sản phẩm đã lưu trữ thì không tự mở lại (người quản lý mở bằng `PUT /api/v1/comments/targets/…`).
+- **Nhãn `seller`.** `context.badge_source("catalog.product", &["seller"], resolver)`: tác giả có
+  `catalog.products.write` (hay permission quản lý sản phẩm thực tế của bước này) ở nút tổ chức sở hữu
+  sản phẩm (phạm vi theo bước 34, `Scope::covers(product.org_id)`). Không gọi `orders`.
+- **Cấu hình mặc định cho hỏi đáp.** `docs/` hướng dẫn đặt `AUTOXIDE_COMMENTS_TARGET_TYPES` gồm
+  `catalog.product`, `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES=catalog.product` (NĐ 147/2024 — cần đối chiếu
+  phạm vi) và `AUTOXIDE_COMMENTS_MODERATION_BY_TYPE=catalog.product:user=pre` (câu hỏi chờ duyệt).
+  `comments` phải đăng ký SAU `catalog` (sổ đối tượng có cả loại đăng ký sau, nhưng event vòng đời và
+  bộ tra nên có trước request đầu tiên).
+- **Ảnh song ngữ.** `catalog_product_media.alt` giữ nghĩa bản ngôn ngữ mặc định của khách; thêm bảng
+  `catalog_product_media_alts` (`tenant_id`, `product_id`, `media_id`, `locale`, `alt`, `updated_at`; khoá
+  (`tenant_id`, `product_id`, `media_id`, `locale`)), ngôn ngữ kiểm theo ngôn ngữ cấu hình của nội dung
+  sản phẩm. Đọc công khai theo `locale`: bản ghi đè của sản phẩm → `alts[locale]` của `media`
+  (`Media::find_many_in`) → `alt` của sản phẩm → `alt` mặc định của `media`. Endpoint:
+  `PUT` / `DELETE /products/{id}/media/{media_id}/alts/{locale}` (`If-Match`, permission ghi sản phẩm),
+  lỗi `catalog.unsupported_locale` (422). Xoá ảnh khỏi sản phẩm thì xoá bản ghi đè cùng transaction.
+- **Test:** `hoi_dap_san_pham_dong_va_an_khi_luu_tru`, `nguoi_quan_ly_san_pham_co_nhan_seller`,
+  `nguoi_quan_ly_nhanh_khac_khong_co_nhan_seller`, `alt_san_pham_theo_ngon_ngu_lui_ve_media` — cả hai
+  database.

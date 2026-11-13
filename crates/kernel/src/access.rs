@@ -215,6 +215,79 @@ pub trait Authenticator: Send + Sync {
     async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error>;
 }
 
+/// Hỏi "tài khoản này đã xác thực (số điện thoại / định danh) để đăng nội dung chưa" — điểm nối
+/// cho yêu cầu xác thực tài khoản đăng nội dung của Nghị định 147/2024/NĐ-CP (D-202). Module giữ
+/// trạng thái xác thực (bước 37) đăng ký bằng
+/// [`StartContext::posting_verifier`](crate::module::StartContext::posting_verifier); module nhận
+/// nội dung của người dùng (vd `comments`) hỏi qua [`PostingVerification`].
+//
+// `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
+#[async_trait::async_trait]
+pub trait PostingVerifier: Send + Sync {
+    /// Người dùng `user_id` đã xác thực để đăng nội dung chưa.
+    async fn is_verified(&self, user_id: Uuid) -> Result<bool, Error>;
+}
+
+/// Chỗ giữ bộ [`PostingVerifier`] duy nhất của chương trình. Clone rẻ: mọi bản clone thấy cùng
+/// một chỗ, kể cả khi module đăng ký khởi động SAU module hỏi.
+///
+/// Chưa module nào đăng ký thì mọi tài khoản đăng nhập được tính là đã xác thực — giữ hành vi
+/// trước D-202; khách (không tài khoản) thì bên hỏi tự từ chối.
+#[derive(Clone, Default)]
+pub struct PostingVerification {
+    // Ghi một lần lúc khởi động; đọc mỗi lần hỏi. Không giữ khoá qua `await`.
+    verifier: Arc<std::sync::RwLock<Option<Registered>>>,
+}
+
+/// Bộ hỏi đã đăng ký và module đăng ký nó.
+type Registered = (&'static str, Arc<dyn PostingVerifier>);
+
+impl std::fmt::Debug for PostingVerification {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PostingVerification").field("registered", &self.is_registered()).finish()
+    }
+}
+
+impl PostingVerification {
+    /// Đăng ký bộ hỏi của module `module`. Chỉ một module được đăng ký.
+    pub fn register(
+        &self,
+        module: &'static str,
+        verifier: Arc<dyn PostingVerifier>,
+    ) -> Result<(), Error> {
+        let mut slot = self.verifier.write().map_err(|_| poisoned_verification())?;
+        if let Some((owner, _)) = slot.as_ref() {
+            return Err(Error::internal(format!(
+                "module `{module}` registers an account verifier, but module `{owner}` already \
+                 does; there is exactly one"
+            )));
+        }
+        *slot = Some((module, verifier));
+        Ok(())
+    }
+
+    /// Đã có module đăng ký bộ hỏi chưa.
+    pub fn is_registered(&self) -> bool {
+        self.verifier.read().is_ok_and(|slot| slot.is_some())
+    }
+
+    /// Người dùng `user_id` đã xác thực chưa; `true` khi chưa module nào đăng ký bộ hỏi.
+    pub async fn is_verified(&self, user_id: Uuid) -> Result<bool, Error> {
+        let verifier = {
+            let slot = self.verifier.read().map_err(|_| poisoned_verification())?;
+            slot.as_ref().map(|(_, verifier)| verifier.clone())
+        };
+        match verifier {
+            Some(verifier) => verifier.is_verified(user_id).await,
+            None => Ok(true),
+        }
+    }
+}
+
+fn poisoned_verification() -> Error {
+    Error::internal("the account verification slot is unusable after a panic")
+}
+
 // Handler viết `principal: Principal` thì axum gọi hàm này trước khi chạy handler:
 // request không xác thực được bị trả lỗi ngay, handler không bao giờ chạy.
 impl<S: Send + Sync> FromRequestParts<S> for Principal {
@@ -257,6 +330,29 @@ mod tests {
     use crate::error::ErrorKind;
 
     const READ: Permission = Permission::new("notes.read", "Read notes.");
+
+    struct OnlyOne(Uuid);
+
+    #[async_trait::async_trait]
+    impl PostingVerifier for OnlyOne {
+        async fn is_verified(&self, user_id: Uuid) -> Result<bool, Error> {
+            Ok(user_id == self.0)
+        }
+    }
+
+    #[tokio::test]
+    async fn xac_thuc_tai_khoan_mac_dinh_cho_qua_khi_chua_ai_dang_ky() {
+        let slot = PostingVerification::default();
+        let early = slot.clone();
+        let (verified, other) = (Uuid::now_v7(), Uuid::now_v7());
+        assert!(!slot.is_registered());
+        assert!(slot.is_verified(other).await.unwrap(), "no verifier: as before D-202");
+        slot.register("auth", Arc::new(OnlyOne(verified))).unwrap();
+        assert!(slot.register("compliance", Arc::new(OnlyOne(verified))).is_err(), "one only");
+        assert!(early.is_registered(), "clones see a later registration");
+        assert!(early.is_verified(verified).await.unwrap());
+        assert!(!early.is_verified(other).await.unwrap());
+    }
     const WRITE: Permission = Permission::new("notes.write", "Write notes.");
 
     #[test]

@@ -37,15 +37,32 @@ pub(crate) struct QueueQuery {
     pub target_id: Option<String>,
     /// Only comments whose text or author name contains this, ignoring case and accents.
     pub q: Option<String>,
+    /// `true`: only top-level comments without a shown reply yet, e.g. unanswered questions
+    /// (use with `status=published`). Defaults to `false` (no such filter).
+    #[param(value_type = Option<bool>)]
+    pub unanswered: Option<String>,
 }
 
 impl QueueQuery {
     pub(crate) fn filter(&self, problems: &mut Vec<FieldError>) -> QueueFilter {
+        let unanswered = match self.unanswered.as_deref().map(str::trim) {
+            None | Some("" | "false") => false,
+            Some("true") => true,
+            Some(_) => {
+                problems.push(FieldError::new(
+                    "unanswered",
+                    "invalid",
+                    "must be `true` or `false`",
+                ));
+                false
+            }
+        };
         QueueFilter {
             status: choice(self.status.as_deref(), "status", STATUSES, problems),
             target_type: self.target_type.clone(),
             target_id: self.target_id.clone(),
             search: self.q.clone(),
+            unanswered,
         }
     }
 }
@@ -53,7 +70,7 @@ impl QueueQuery {
 /// List comments for moderation.
 ///
 /// Requires `comments.read`. By default the comments waiting for approval, newest first; filter
-/// by status, target and text. Follow `pagination.next_cursor` with the same filters for more.
+/// by status, target and text, or list unanswered questions (`status=published&unanswered=true`). Follow `pagination.next_cursor` with the same filters for more.
 #[utoipa::path(
     get,
     path = "/",

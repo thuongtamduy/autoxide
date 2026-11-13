@@ -3,8 +3,9 @@
 //! sổ đối tượng của kernel (D-123, vd `content.entry`) thì đích phải có và công khai.
 //!
 //! Mở / đóng / ẩn theo đích (quản trị viên, tool MCP), tự đóng sau `closes_at`, và nghe event
-//! "đã lưu trữ / đã xoá" của module sở hữu **bằng tên** (chỉ khi module đó có trong chương trình)
-//! để đóng và ẩn bình luận. Số đếm nằm ở `comments_targets`, đếm theo lô tối đa 100 đích.
+//! vòng đời mà module sở hữu khai qua `Module::resource_events` (D-202): `Closed` → đóng,
+//! `Removed` → đóng và ẩn. `comments` không viết cứng tên event của module nào. Số đếm nằm ở
+//! `comments_targets`, đếm theo lô tối đa 100 đích.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -12,7 +13,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
-use autoxide_kernel::resource::Resource;
+use autoxide_kernel::resource::{Resource, ResourceChange, ResourceEvent};
 use chrono::{DateTime, Utc};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde_json::json;
@@ -22,13 +23,6 @@ use crate::events::{self, Change};
 use crate::permissions::{COMMENTS_MANAGE, COMMENTS_READ};
 use crate::service::{CommentsService, ensure_target, now};
 use crate::text;
-
-/// Event của module sở hữu đích mà `comments` nghe: (tên event, loại đích, ẩn bình luận?).
-/// Chủ thể của event phải là `<loại đích>:<id>`.
-pub(crate) const OWNER_EVENTS: [(&str, &str, bool); 2] = [
-    ("content.entry_archived", "content.entry", false),
-    ("content.entry_deleted", "content.entry", true),
-];
 
 /// Số đích tối đa của một lần đếm.
 pub(crate) const COUNTS_MAX: usize = 100;
@@ -44,6 +38,9 @@ pub(crate) struct Target {
     pub closes_at: Option<DateTime<Utc>>,
     pub published_count: i32,
     pub pending_count: i32,
+    /// Số bình luận gốc (câu hỏi) đang hiện / chờ duyệt.
+    pub published_threads: i32,
+    pub pending_threads: i32,
     /// `None` khi chưa có dòng nào (chưa có bình luận, chưa ai đặt trạng thái).
     pub updated_at: Option<DateTime<Utc>>,
 }
@@ -58,6 +55,8 @@ impl Target {
             closes_at: row.closes_at,
             published_count: row.published_count,
             pending_count: row.pending_count,
+            published_threads: row.published_thread_count,
+            pending_threads: row.pending_thread_count,
             updated_at: Some(row.updated_at),
         }
     }
@@ -71,6 +70,8 @@ impl Target {
             closes_at: None,
             published_count: 0,
             pending_count: 0,
+            published_threads: 0,
+            pending_threads: 0,
             updated_at: None,
         }
     }
@@ -161,12 +162,13 @@ impl CommentsService {
         self.target(kind, id).await
     }
 
-    /// Số bình luận đang hiện của nhiều đích cùng loại (tối đa [`COUNTS_MAX`]); đích ẩn đếm 0.
+    /// Số bình luận đang hiện của nhiều đích cùng loại (tối đa [`COUNTS_MAX`]), theo thứ tự
+    /// hỏi: (ID, mọi bình luận, bình luận gốc); đích ẩn đếm 0.
     pub(crate) async fn counts(
         &self,
         kind: &str,
         ids: &[String],
-    ) -> Result<Vec<(String, i32)>, Error> {
+    ) -> Result<Vec<(String, i32, i32)>, Error> {
         if ids.is_empty() || ids.len() > COUNTS_MAX {
             return Err(Error::validation(vec![FieldError::new(
                 "target_ids",
@@ -177,15 +179,28 @@ impl CommentsService {
         for id in ids {
             self.check_target(kind, id)?;
         }
-        let found: HashMap<String, i32> = target::Entity::find()
+        let found: HashMap<String, (i32, i32)> = target::Entity::find()
             .filter(target::Column::TargetType.eq(kind))
             .filter(target::Column::TargetId.is_in(ids.to_vec()))
             .all(self.database.read())
             .await?
             .into_iter()
-            .map(|row| (row.target_id, if row.hidden { 0 } else { row.published_count }))
+            .map(|row| {
+                let counts = if row.hidden {
+                    (0, 0)
+                } else {
+                    (row.published_count, row.published_thread_count)
+                };
+                (row.target_id, counts)
+            })
             .collect();
-        Ok(ids.iter().map(|id| (id.clone(), found.get(id).copied().unwrap_or(0))).collect())
+        Ok(ids
+            .iter()
+            .map(|id| {
+                let (all, threads) = found.get(id).copied().unwrap_or((0, 0));
+                (id.clone(), all, threads)
+            })
+            .collect())
     }
 
     /// Mở / đóng / ẩn đích. Cần `comments.manage`. `expected`: phiên bản đã đọc (`If-Match`).
@@ -287,29 +302,47 @@ impl CommentsService {
     }
 }
 
-/// Bên nhận event "đã lưu trữ / đã xoá" của module sở hữu đích.
-pub(crate) struct OwnerEvents(pub Arc<CommentsService>);
+/// Event vòng đời `comments` nghe: những event module sở hữu đã khai cho loại đích đang bật.
+pub(crate) fn owner_events(
+    declared: &[ResourceEvent],
+    target_types: &[String],
+) -> Vec<ResourceEvent> {
+    declared
+        .iter()
+        .filter(|event| target_types.iter().any(|known| known == event.kind))
+        .copied()
+        .collect()
+}
+
+/// Bên nhận event vòng đời của module sở hữu đích (`Module::resource_events`, D-202).
+pub(crate) struct OwnerEvents {
+    pub service: Arc<CommentsService>,
+    pub events: Vec<ResourceEvent>,
+}
 
 #[async_trait::async_trait]
 impl EventHandler for OwnerEvents {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
-        let Some((_, kind, hide)) = OWNER_EVENTS.iter().find(|(name, _, _)| *name == event.name)
+        let Some(declared) = self.events.iter().find(|declared| declared.event == event.name)
         else {
             return Ok(());
         };
-        let service = &self.0;
+        let service = &self.service;
+        let kind = declared.kind;
         if !service.config.target_types.iter().any(|known| known == kind) {
             return Ok(());
         }
         let id = event
             .subject
             .as_deref()
-            .and_then(|subject| subject.strip_prefix(kind))
-            .and_then(|rest| rest.strip_prefix(':'))
+            .and_then(|subject| declared.id_in(subject))
             .filter(|id| text::is_target_id(id));
         let Some(id) = id else {
             return Ok(());
         };
+        // Kiểu `ResourceChange` có thể thêm biến thể về sau (`non_exhaustive`): biến thể lạ
+        // tính như `Closed` — chỉ đóng, không ẩn.
+        let hide = matches!(declared.change, ResourceChange::Removed);
         let change = TargetChange {
             state: Some("closed".to_owned()),
             hidden: hide.then_some(true),

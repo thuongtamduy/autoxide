@@ -9,6 +9,7 @@
 //! cho module khác, hai job định kỳ (dọn thùng rác, dọn nội dung mồ côi).
 
 mod alt;
+mod alts;
 pub mod api;
 mod config;
 mod entity;
@@ -260,6 +261,7 @@ pub(crate) mod testing {
             trash_days: 30,
             image_widths: vec![100, 200],
             ai_send_private: send_private,
+            alt_locales: vec!["en".to_owned(), "vi".to_owned()],
         };
         let service = MediaService::new(
             database.clone(),

@@ -3,6 +3,7 @@
 
 mod m0001_create_comments;
 mod m0008_name_key_lookalikes;
+mod m0009_questions;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -24,5 +25,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::tokens::tokens_migration("m0007_create_tokens", "comments"),
         // Khoá tên so theo dạng "khung": tên giả chữ Latin bằng chữ Kirin / Hy Lạp (D-151).
         Box::new(m0008_name_key_lookalikes::Migration),
+        // Hỏi đáp: nhãn tác giả, khoá tìm đúng dấu, số câu hỏi theo đích (D-202).
+        Box::new(m0009_questions::Migration),
     ]
 }

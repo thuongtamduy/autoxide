@@ -38,6 +38,15 @@ pub(crate) const SIGNED_IN_ONLY: Setting = Setting::new(
 )
 .with_example("media.item");
 
+pub(crate) const VERIFIED_ONLY: Setting = Setting::new(
+    "AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES",
+    "Comma-separated target kinds where only verified accounts may comment or answer (e.g. \
+     product questions, Vietnam's Decree 147/2024): guests are refused, and signed-in users are \
+     checked with the module that keeps account verification. With no such module installed, \
+     every signed-in account counts as verified.",
+)
+.with_example("catalog.product");
+
 pub(crate) const GUEST_MODERATION: Setting = Setting::new(
     "AUTOXIDE_COMMENTS_GUEST_MODERATION",
     "When a guest's comment needs approval: `pre` (always), `first_time` (guests have no account \
@@ -207,6 +216,8 @@ pub(crate) struct CommentsConfig {
     pub target_types: Vec<String>,
     pub allow_guests: bool,
     pub signed_in_only: Vec<String>,
+    /// Loại đích chỉ tài khoản đã xác thực được viết (D-202).
+    pub verified_only: Vec<String>,
     pub guest_mode: Mode,
     pub user_mode: Mode,
     /// (loại đích, `true` = khách) → chế độ.
@@ -240,6 +251,7 @@ impl Default for CommentsConfig {
             target_types: vec!["content.entry".to_owned()],
             allow_guests: true,
             signed_in_only: Vec::new(),
+            verified_only: Vec::new(),
             guest_mode: Mode::Pre,
             user_mode: Mode::FirstTime,
             mode_overrides: BTreeMap::new(),
@@ -277,6 +289,8 @@ impl CommentsConfig {
         let guests = reader.get_with(&ALLOW_GUESTS, flag);
         let signed_in_only =
             reader.optional_with(&SIGNED_IN_ONLY, kinds).map(Option::unwrap_or_default);
+        let verified_only =
+            reader.optional_with(&VERIFIED_ONLY, kinds).map(Option::unwrap_or_default);
         let guest_mode = reader.get_with(&GUEST_MODERATION, mode);
         let user_mode = reader.get_with(&USER_MODERATION, mode);
         let overrides =
@@ -317,6 +331,7 @@ impl CommentsConfig {
             target_types,
             allow_guests: guests?,
             signed_in_only: signed_in_only?,
+            verified_only: verified_only?,
             guest_mode: guest_mode?,
             user_mode: user_mode?,
             mode_overrides,

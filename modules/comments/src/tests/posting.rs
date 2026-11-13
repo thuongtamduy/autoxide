@@ -467,7 +467,7 @@ async fn sua_trong_thoi_han_va_xoa_mem() {
             (gone.status.as_str(), gone.body.as_str(), gone.reply_count),
             ("deleted", "", 1)
         );
-        let thread = h.service.thread(KIND, POST, &page(Order::Desc), 3).await.unwrap();
+        let thread = h.service.thread(KIND, POST, &page(Order::Desc), 3, None).await.unwrap();
         let shown: Vec<_> = thread
             .data
             .iter()
@@ -650,7 +650,7 @@ async fn cursor_cua_luong() {
         let mut seen = Vec::new();
         let mut request = PageRequest::first(2, Order::Desc);
         loop {
-            let found = h.service.thread(KIND, POST, &request, 2).await.unwrap();
+            let found = h.service.thread(KIND, POST, &request, 2, None).await.unwrap();
             seen.extend(found.data.iter().map(|root| root.root.row.id));
             for root in &found.data {
                 if root.root.row.id == roots[0] {
@@ -667,7 +667,7 @@ async fn cursor_cua_luong() {
         let mut newest_first = roots.clone();
         newest_first.reverse();
         assert_eq!(seen, newest_first);
-        let oldest = h.service.thread(KIND, POST, &page(Order::Asc), 0).await.unwrap();
+        let oldest = h.service.thread(KIND, POST, &page(Order::Asc), 0, None).await.unwrap();
         assert_eq!(oldest.data.iter().map(|root| root.root.row.id).collect::<Vec<_>>(), roots);
         assert!(oldest.data[0].replies.is_empty());
         let replies =
@@ -678,7 +678,7 @@ async fn cursor_cua_luong() {
         let held = service(test, config()).await;
         as_guest(&held.service, &visitor("203.0.113.3"), guest("Ada", "Chờ")).await.unwrap();
         assert_eq!(
-            held.service.thread(KIND, POST, &page(Order::Desc), 3).await.unwrap().data.len(),
+            held.service.thread(KIND, POST, &page(Order::Desc), 3, None).await.unwrap().data.len(),
             5
         );
     })
