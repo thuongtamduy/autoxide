@@ -4739,7 +4739,7 @@ khai như phần còn lại.
 bằng QEMU trên một máy — chậm gấp nhiều lần (D-078); `cosign` tự cài thay cho `actions/attest`
 — thêm một công cụ, còn `gh attestation verify` người dùng đã có cùng GitHub CLI.
 
-## D-198 · Repo tạm giữ riêng tư; phần cần repo công khai tách thành bước 50 — 2026-11-13 — chủ dự án quyết
+## D-199 · Repo tạm giữ riêng tư; phần cần repo công khai tách thành bước 50 — 2026-11-13 — chủ dự án quyết
 
 Quyết định: chủ dự án giữ repo `autoxide` **riêng tư** cho tới khi tự quyết công khai. Thay phần
 "chuyển sang công khai" của D-175 trong thời gian đó; mục tiêu lâu dài "mã nguồn mở, công khai

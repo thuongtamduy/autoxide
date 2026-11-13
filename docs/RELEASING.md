@@ -34,7 +34,7 @@ D-175, D-197) chạy lại gate, build và đăng image Docker (`linux/amd64` v�
 `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` bằng `GITHUB_TOKEN`, đính kèm chứng thực nguồn gốc build
 và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú từ `CHANGELOG.md`. Workflow chỉ chạy khi
 repo công khai; `./gate.sh` trên máy vẫn là gate bắt buộc trước khi đẩy tag. **Repo đang riêng
-tư (D-198): workflow bị bỏ qua, làm bước 1–6 rồi theo "Khi repo còn riêng tư" bên dưới thay cho
+tư (D-199): workflow bị bỏ qua, làm bước 1–6 rồi theo "Khi repo còn riêng tư" bên dưới thay cho
 bước 7.**
 
 1. Đưa nhánh lên `main` mới nhất: `git fetch origin`, rồi `git rebase origin/main`. Phiên
@@ -81,7 +81,7 @@ bước 7.**
 
 ## Khi repo còn riêng tư
 
-Chủ dự án giữ repo riêng tư (D-198), nên đẩy tag không kích hoạt gì. Sau bước 6:
+Chủ dự án giữ repo riêng tư (D-199), nên đẩy tag không kích hoạt gì. Sau bước 6:
 
 1. Tạo bản phát hành trên GitHub, ghi chú là phần `## [X.Y.Z]` của `CHANGELOG.md`:
 

@@ -3,8 +3,8 @@
 Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
 Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
 
-Trạng thái: **bước 0–30 xong** (phần cần repo công khai ở bước 50); bước 50 chờ chủ dự án công khai repo (D-198); 31 trở đi chưa bắt đầu — thứ tự và phụ thuộc ở
-bảng ngay trước bước 30 (D-192); bản phát hành mới nhất `v0.11.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-198):
+Trạng thái: **bước 0–30 xong** (phần cần repo công khai ở bước 50); bước 50 chờ chủ dự án công khai repo (D-199); 31 trở đi chưa bắt đầu — thứ tự và phụ thuộc ở
+bảng ngay trước bước 30 (D-192); bản phát hành mới nhất `v0.11.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199):
 `./gate.sh` cục bộ là gate duy nhất.
 
 ## 0. Khung dự án
@@ -419,7 +419,7 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 | 42 Kho · 43 Khuyến mại · 44 Vận chuyển | 41 | nhau |
 | 45 Giỏ hàng, đặt hàng, đơn hàng | 42, 43, 44 và 37 (thông báo) | — |
 | 46 Sàn · 47 Khách hàng · 48 Đa kênh · 49 Tiếp thị liên kết | 45 (46 và 49 cần thêm 37) | nhau |
-| 50 Công khai repo | chủ dự án nói đã công khai repo (D-198) | mọi bước |
+| 50 Công khai repo | chủ dự án nói đã công khai repo (D-199) | mọi bước |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
@@ -430,7 +430,7 @@ thực, file của một dự án mã nguồn mở, ảnh nhẹ, deploy không g
 Không đụng code của bước 29 (trừ `media` và `kernel/src/http/health.rs`), nên làm ngay được.
 Tài liệu cho người ngoài viết tiếng Anh kèm bản tiếng Việt cùng nội dung.
 
-Nhóm A — CI và phát hành (D-175, D-197, D-198; phần cần repo công khai ở bước 50):
+Nhóm A — CI và phát hành (D-175, D-197, D-199; phần cần repo công khai ở bước 50):
 
 - [x] Agent xác nhận gitleaks quét toàn lịch sử mọi nhánh xanh và không file nào chứa tên máy chủ,
       IP, đường dẫn riêng hay thông tin cá nhân (13/11/2026); email cá nhân trong metadata commit:
@@ -441,7 +441,7 @@ Nhóm A — CI và phát hành (D-175, D-197, D-198; phần cần repo công kha
 - [x] `release.yml` đăng image `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` cho `linux/amd64` và
       `linux/arm64` (máy build gốc, không giả lập) bằng `GITHUB_TOKEN`, kèm chứng thực nguồn gốc
       build và SBOM đã ký; `docs/DEPLOY.md` (EN + VI) có lệnh kiểm chứng thực; `docs/RELEASING.md`
-      có hai đường: workflow khi công khai, phát hành từ máy khi còn riêng tư (D-198)
+      có hai đường: workflow khi công khai, phát hành từ máy khi còn riêng tư (D-199)
 
 Nhóm B — file của dự án mã nguồn mở:
 
@@ -1014,9 +1014,9 @@ liên kết (bước 37).
 - [ ] Phiên livestream: người phát đã xác thực, sản phẩm gắn trong phiên, đơn ghi nhận theo phiên,
       lưu vết phiên theo yêu cầu của luật
 
-## 50. Công khai repo (chờ chủ dự án, D-175, D-197, D-198)
+## 50. Công khai repo (chờ chủ dự án, D-175, D-197, D-199)
 
-Chủ dự án giữ repo riêng tư (D-198). **Agent không làm bước này khi chủ dự án chưa nói repo đã
+Chủ dự án giữ repo riêng tư (D-199). **Agent không làm bước này khi chủ dự án chưa nói repo đã
 công khai**; khi đó các bước khác vẫn đi tiếp bình thường. Workflow đã viết sẵn (D-197), công
 khai là tự chạy.
 
