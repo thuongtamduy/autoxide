@@ -772,3 +772,75 @@ Ghi `docs/DECISIONS.md` (skill `record-decision`) cho mỗi mục đã chốt; m
   thì `compliance` coi mọi loại đích của `comments` là "chỉ tài khoản đã xác thực" — ghi trong
   `docs/COMMENTS.md` cách hai cấu hình kết hợp.
 - Test: `comments_dung_trang_thai_xac_thuc_that` (đăng ký bộ hỏi thật, người chưa xác thực số bị từ chối).
+
+## Bổ sung theo D-206 (mẫu mail và thông báo động, khách tự soạn)
+
+Không có module `email` riêng: gửi mail vẫn là `mail` (`dyn Mailer`), nơi khách sửa mẫu vẫn là
+`notifications_templates` (B2), chiến dịch vẫn là `newsletter`. Bước này thêm **một bộ dựng mẫu dùng
+chung** để mẫu do khách tự soạn có biến, điều kiện, vòng lặp, và mail HTML hiển thị đúng ở mọi trình đọc.
+
+### Bộ dựng mẫu trong kernel (`autoxide_kernel::template`)
+
+- **Ngôn ngữ mẫu an toàn cho người dùng tự viết** (mẫu là dữ liệu không tin cậy):
+  - biến `{{ customer.name }}`, điều kiện `{% if %}`, vòng lặp `{% for line in order.lines %}`, bộ lọc
+    định dạng của kernel (`money`, `date`, `number` theo ngôn ngữ và múi giờ của nút);
+  - **không** đọc tệp, gọi mạng, gọi hàm tuỳ ý, nạp mẫu khác ngoài danh sách khối dựng sẵn;
+  - giới hạn: độ dài mẫu (`AUTOXIDE_TEMPLATE_MAX_BYTES`, mặc định 64 KiB), số bước chạy, độ sâu vòng lặp,
+    độ dài kết quả — vượt thì lỗi `template.limit_exceeded`, không treo worker;
+  - mặc định **thoát HTML** mọi giá trị chèn vào bản HTML; muốn chèn HTML phải là khối dựng sẵn của hệ
+    thống (vd bảng dòng hàng), không có bộ lọc `raw` cho dữ liệu người dùng.
+- **Thư viện:** cần một thư viện mẫu (vài chục dòng tự viết không đủ cho điều kiện, vòng lặp, giới hạn
+  chạy). Ứng viên: `liquid` (cú pháp Liquid — Shopify dùng cho mẫu thông báo; chủ cửa hàng quen) và
+  `minijinja` (có vùng cách ly và giới hạn chạy). Agent làm bước này đo (thời gian dựng 1 000 mẫu, kích
+  thước binary), tra API bằng skill `check-library-api`, chọn một, ghi `STACK.md` và DECISIONS. Chỉ một
+  ngôn ngữ mẫu trong cả dự án.
+- **Bố cục HTML:** khung mail chung (logo, màu chủ đạo, chân thư có địa chỉ người gửi theo hồ sơ pháp lý
+  của nút) viết bằng MJML, dựng bằng `mrml` (MJML viết bằng Rust) để chạy đúng trên Outlook, Gmail, điện
+  thoại. Khách chỉnh logo / màu / chân thư bằng dữ liệu, không sửa MJML. **Luôn kèm bản chữ thuần** sinh
+  từ cùng mẫu.
+- **Hợp đồng biến:** loại thông báo khai **schema biến** (JSON Schema, cùng chỗ với `NotificationKind`)
+  và một bộ dữ liệu mẫu để xem trước. Lưu mẫu thì kiểm: cú pháp đúng, chỉ dùng biến có trong schema, biến
+  bắt buộc của loại đó có mặt (vd link đặt lại mật khẩu) — sai thì gom lỗi một lần (D-083) với vị trí dòng,
+  cột: `template.syntax_error`, `template.unknown_variable`, `template.required_variable_missing`.
+- Kernel chỉ dựng chữ, không biết khái niệm đơn hàng hay sản phẩm: dữ liệu do module khai báo loại đưa vào.
+
+### `notifications` (B1–B4) dùng bộ dựng mẫu
+
+- `notifications_templates` thêm `format` (`plain` mặc định — giữ mẫu cũ / `template`), `subject`,
+  `body_html` NULL, `body_text`, `version`, `published_at`; bản nháp và bản đang dùng tách nhau, mỗi lần
+  xuất bản tăng `version`, giữ 20 bản gần nhất để quay lại (`POST …/rollback {version}`).
+- `POST /templates/{kind}/{channel}/{locale}/preview` dựng bằng dữ liệu mẫu của loại hay dữ liệu người gọi
+  gửi (chỉ khoá có trong schema); `POST …/test-send {to}` gửi thử tới **địa chỉ đã xác minh của chính người
+  gọi** (không gửi tới địa chỉ tuỳ ý — chống dùng làm công cụ gửi thư rác), có throttle.
+- Kênh SMS / ZNS / push dùng phần `short` của cùng bộ dựng (không HTML); ZNS vẫn đi theo mẫu đã duyệt của
+  Zalo, bộ dựng chỉ điền `zns_params`.
+- Dựng mẫu ở worker `deliver`, **ngoài transaction**; lỗi dựng (mẫu hỏng sau khi lưu do dữ liệu bất
+  thường) → dùng mẫu mặc định trong code, ghi `error_code = template_fallback`, cảnh báo cho quản trị —
+  không bỏ tin giao dịch hay bảo mật.
+- Mẫu tin **quảng cáo** không thể bỏ chân thư huỷ nhận và nhãn quảng cáo: bộ dựng tự chèn, mẫu không gỡ
+  được. Không chèn điểm ảnh theo dõi hay link theo dõi vào mẫu mặc định; khách bật đo mở thư thì phải có
+  căn cứ xử lý trong sổ của `compliance` (Luật 91/2025 — cần đối chiếu).
+
+### `newsletter` dùng bộ dựng mẫu
+
+- Chiến dịch thêm `format` (`static` mặc định — hành vi cũ / `template`); biến được phép: thông tin người
+  nhận đã có (`subscriber.name`, `subscriber.email` che bớt), danh sách, link huỷ — không gì khác. Dựng
+  từng người nhận trong job gửi theo lô, dùng chung một mẫu đã biên dịch.
+- Endpoint chiến dịch hiện có giữ nguyên hành vi (D-059); thêm trường mới, không đổi trường cũ.
+
+### API, MCP, quyền, test
+
+- REST thêm ở `notifications`: `GET /kinds/{kind}/schema` (schema biến + dữ liệu mẫu), `PUT …/draft`,
+  `POST …/publish`, `POST …/rollback`, `POST …/preview`, `POST …/test-send`, `GET /branding` / `PUT
+  /branding` (logo, màu, chân thư theo nút). Permission: `notifications.templates.manage` (đã có),
+  `notifications.branding.manage` (mới).
+- MCP: `preview_template` (`read_only`), `update_template_draft`; xuất bản qua REST hay tool
+  `publish_template` có `approval_required` cho key `agent` (P12 bước 51). AI gợi ý mẫu (D-109) chỉ là
+  bản nháp.
+- Event: `notifications.template_published`, `…template_rolled_back`, `…branding_updated`.
+- Test (cả hai database): `mau_nguoi_dung_khong_doc_duoc_bien_ngoai_schema`,
+  `mau_vong_lap_vo_han_bi_cat_theo_gioi_han`, `gia_tri_chen_vao_html_luon_duoc_thoat`,
+  `mau_quang_cao_luon_co_chan_thu_huy_nhan`, `luu_mau_thieu_bien_bat_buoc_bi_tu_choi_mot_lan`,
+  `gui_thu_chi_toi_dia_chi_cua_nguoi_goi`, `mau_hong_luc_gui_dung_mau_mac_dinh`,
+  `xuat_ban_va_quay_lai_phien_ban`, `ban_tin_ca_nhan_hoa_moi_nguoi_nhan`,
+  `html_dung_tren_mau_mjml_va_co_ban_chu_thuan`.

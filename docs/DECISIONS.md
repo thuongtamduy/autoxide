@@ -5014,3 +5014,23 @@ thứ họ không có cùng lúc: thu hồi tức thì ở mọi đường, lọ
 xem" chậm và cần dịch vụ riêng; ngôn ngữ chính sách Cedar (`cedar-policy`) hay OPA — người thường khó đọc,
 điều kiện tự do không dịch được thành một câu SQL chạy trên cả hai database, thêm thư viện lớn; nhét phạm
 vi vào JWT — mất thu hồi tức thì.
+
+## D-206 · Mẫu mail và thông báo động: bộ dựng mẫu dùng chung, không module `email` riêng — 2026-11-13 — chủ dự án đồng ý, agent quyết cách làm
+
+Quyết định: không viết module `email`. Thêm `autoxide_kernel::template` — bộ dựng mẫu an toàn cho mẫu do
+khách tự soạn (biến, điều kiện, vòng lặp; không đọc tệp / mạng; giới hạn kích thước và số bước chạy; luôn
+thoát HTML; kiểm biến theo JSON Schema mà loại thông báo khai) — và khung mail HTML viết bằng MJML (dựng
+bằng `mrml`), luôn kèm bản chữ thuần. `notifications` (bước 37) dùng nó cho mẫu theo khách (nháp, xuất bản,
+quay lại phiên bản, xem trước, gửi thử tới địa chỉ của chính người gọi, thương hiệu theo nút); `newsletter`
+dùng nó để cá nhân hoá chiến dịch. Thư viện ngôn ngữ mẫu chọn giữa `liquid` và `minijinja` bằng đo khi làm,
+ghi `STACK.md`; chỉ một ngôn ngữ mẫu trong dự án. Mục mới ở bước 37, đặc tả ở cuối `docs/steps/37-compliance.md`.
+
+Lý do: gửi mail (`mail`), mẫu theo khách (`notifications_templates`, bước 37) và chiến dịch (`newsletter`)
+đã có chỗ; module mới sẽ thành hai nơi giữ mẫu. Phần thiếu thật là ngôn ngữ mẫu an toàn và HTML chạy đúng
+mọi trình đọc mail — đặt ở kernel để mọi module dùng một cách. Làm cùng bước 37 vì sổ đồng ý (tin quảng
+cáo luôn có chân thư huỷ nhận) và mẫu theo khách (cần `tenant_id`, bước 33) nằm ở đó.
+
+Đã cân nhắc: module `email` riêng có trình soạn kéo thả — giao diện thuộc repo riêng (D-097), core chỉ cần
+mẫu và API xem trước; Handlebars / Tera — Tera không có vùng cách ly cho mẫu không tin cậy, Handlebars không
+có giới hạn chạy rõ ràng; tự viết ngôn ngữ mẫu — vòng lặp, điều kiện, giới hạn và báo lỗi theo dòng cột vượt
+xa "vài chục dòng"; gửi thử tới địa chỉ tuỳ ý — thành công cụ gửi thư rác.

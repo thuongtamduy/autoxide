@@ -780,6 +780,10 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       dùng; **tách tin giao dịch và tin quảng cáo** — tin quảng cáo chỉ gửi khi đã đồng ý trước, từ
       chối là dừng ngay, khung giờ gửi là dữ liệu (NĐ 91/2020: tin nhắn 7h–22h, chỉ một tin đăng ký
       đầu tiên — cần đối chiếu bản thay thế đang dự thảo); `newsletter` dùng chung sổ đồng ý
+- [ ] Mẫu mail và thông báo động khách tự soạn (D-206): bộ dựng mẫu an toàn dùng chung trong kernel (biến,
+      điều kiện, vòng lặp, giới hạn chạy, luôn thoát HTML, kiểm biến theo schema lúc lưu); mail HTML theo
+      khung MJML có thương hiệu của khách, luôn kèm bản chữ thuần; nháp / xuất bản / quay lại phiên bản,
+      xem trước, gửi thử tới địa chỉ của chính người gọi; `newsletter` cá nhân hoá từng người nhận
 
 ## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
 
