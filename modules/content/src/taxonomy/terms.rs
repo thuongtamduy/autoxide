@@ -667,7 +667,7 @@ impl ContentService {
         }
         match input.slug.as_deref().map(str::trim) {
             Some(slug) if !slug.is_empty() => {
-                if !crate::slug::is_valid(slug) {
+                if !crate::entries::slug::is_valid(slug) {
                     problems.push(FieldError::new(
                         "slug",
                         "invalid",
@@ -676,7 +676,9 @@ impl ContentService {
                 }
                 text.slug = slug.to_owned();
             }
-            _ if text.slug.is_empty() => text.slug = crate::slug::from_title(&text.name, id),
+            _ if text.slug.is_empty() => {
+                text.slug = crate::entries::slug::from_title(&text.name, id)
+            }
             _ => {}
         }
         Ok(text)
@@ -711,5 +713,5 @@ pub(crate) fn term_not_found(id: Uuid) -> Error {
 /// Khoá chung cho cây danh mục (mọi ngôn ngữ dùng một cây): dùng lại bảng khoá cây trang với
 /// một khoá không thể trùng mã ngôn ngữ BCP 47.
 async fn lock_categories(transaction: &DatabaseTransaction) -> Result<(), Error> {
-    crate::paths::lock_tree(transaction, "#categories").await
+    crate::publishing::paths::lock_tree(transaction, "#categories").await
 }

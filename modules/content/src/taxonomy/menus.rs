@@ -50,7 +50,7 @@ pub(crate) struct PublicNode {
     /// Đường dẫn trong site (mục nội dung) hay địa chỉ (`url`).
     pub href: String,
     pub entry_id: Option<Uuid>,
-    pub term: Option<crate::terms::TermRef>,
+    pub term: Option<crate::taxonomy::terms::TermRef>,
     pub children: Vec<PublicNode>,
 }
 
@@ -221,7 +221,7 @@ impl ContentService {
         let items = self.menu_items(found.id).await?;
         let entry_ids: Vec<Uuid> = items.iter().filter_map(|item| item.target_entry_id).collect();
         let live: HashMap<Uuid, String> =
-            crate::paths::paths(self.database.read(), &entry_ids).await?;
+            crate::publishing::paths::paths(self.database.read(), &entry_ids).await?;
         let term_ids: Vec<Uuid> = items.iter().filter_map(|item| item.target_term_id).collect();
         let terms = self.term_refs(&term_ids, &found.locale).await?;
         let nodes = public_nodes(&tree(items), &live, &terms);
@@ -249,7 +249,7 @@ impl ContentService {
         &self,
         ids: &[Uuid],
         locale: &str,
-    ) -> Result<HashMap<Uuid, crate::terms::TermRef>, Error> {
+    ) -> Result<HashMap<Uuid, crate::taxonomy::terms::TermRef>, Error> {
         let mut found = HashMap::new();
         for id in ids {
             if let Ok(term) = self.term_for_menu(*id, locale).await {
@@ -259,7 +259,11 @@ impl ContentService {
         Ok(found)
     }
 
-    async fn term_for_menu(&self, id: Uuid, locale: &str) -> Result<crate::terms::TermRef, Error> {
+    async fn term_for_menu(
+        &self,
+        id: Uuid,
+        locale: &str,
+    ) -> Result<crate::taxonomy::terms::TermRef, Error> {
         let texts = crate::entity::term_translation::Entity::find()
             .filter(crate::entity::term_translation::Column::TermId.eq(id))
             .all(self.database.read())
@@ -269,8 +273,8 @@ impl ContentService {
             .find(|text| text.locale == locale)
             .or_else(|| texts.iter().find(|text| text.locale == self.config.default_locale))
             .or_else(|| texts.first())
-            .ok_or_else(|| crate::terms::term_not_found(id))?;
-        Ok(crate::terms::TermRef {
+            .ok_or_else(|| crate::taxonomy::terms::term_not_found(id))?;
+        Ok(crate::taxonomy::terms::TermRef {
             id,
             taxonomy: chosen.taxonomy.clone(),
             name: chosen.name.clone(),
@@ -378,7 +382,7 @@ fn flatten(
             let valid = (lower.starts_with("https://")
                 || lower.starts_with("http://")
                 || lower.starts_with("mailto:")
-                || crate::paths::is_site_link(url))
+                || crate::publishing::paths::is_site_link(url))
                 && !url.chars().any(|c| c.is_whitespace() || c.is_control());
             if !valid {
                 problems.push(FieldError::new(
@@ -421,7 +425,7 @@ fn tree(items: Vec<MenuItem>) -> Vec<Node> {
 fn public_nodes(
     nodes: &[Node],
     live: &HashMap<Uuid, String>,
-    terms: &HashMap<Uuid, crate::terms::TermRef>,
+    terms: &HashMap<Uuid, crate::taxonomy::terms::TermRef>,
 ) -> Vec<PublicNode> {
     nodes
         .iter()

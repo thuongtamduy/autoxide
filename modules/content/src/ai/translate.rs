@@ -22,12 +22,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
+use crate::ai::segments::{self, Segment};
 use crate::entity::{entry, revision, translation_request};
+use crate::entries::revisions::{self, Reason, Snapshot};
 use crate::entries::{EntryFields, is_unique_violation};
 use crate::events::{self, Change};
 use crate::permissions::{self, CONTENT_READ};
-use crate::revisions::{self, Reason, Snapshot};
-use crate::segments::{self, Segment};
 use crate::service::{ContentService, entry_not_found, invalid, now};
 
 pub(crate) const TRANSLATE: &str = "content.translate";

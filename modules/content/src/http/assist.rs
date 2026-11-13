@@ -17,9 +17,9 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::seo::{Finding, Level, Suggestion};
+use crate::ai::seo::{Finding, Level, Suggestion};
+use crate::ai::translate::TranslationRequest;
 use crate::service::ContentService;
-use crate::translate::TranslationRequest;
 
 /// How serious a finding is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -354,13 +354,18 @@ pub(crate) struct SearchParams {
 }
 
 impl SearchParams {
-    fn query(self) -> Result<crate::semantic::SearchQuery, Error> {
+    fn query(self) -> Result<crate::ai::semantic::SearchQuery, Error> {
         let mut problems = Vec::new();
         let kind = super::choice(self.kind.as_deref(), "kind", "`post`, `page`", &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        Ok(crate::semantic::SearchQuery { q: self.q, locale: self.locale, kind, limit: self.limit })
+        Ok(crate::ai::semantic::SearchQuery {
+            q: self.q,
+            locale: self.locale,
+            kind,
+            limit: self.limit,
+        })
     }
 }
 
@@ -399,8 +404,8 @@ pub(crate) struct SearchHit {
     matched_by: Vec<MatchedBy>,
 }
 
-impl From<crate::semantic::Hit> for SearchHit {
-    fn from(hit: crate::semantic::Hit) -> Self {
+impl From<crate::ai::semantic::Hit> for SearchHit {
+    fn from(hit: crate::ai::semantic::Hit) -> Self {
         SearchHit {
             kind: crate::entries::Kind::parse(&hit.kind).unwrap_or(crate::entries::Kind::Post),
             status: hit.status.as_deref().map(|status| match status {
@@ -425,7 +430,7 @@ impl From<crate::semantic::Hit> for SearchHit {
 }
 
 /// Kết quả tìm dưới dạng `Page` (top-k: không có trang kế), cùng envelope với mọi danh sách.
-fn page_of(hits: Vec<crate::semantic::Hit>, limit: Option<u32>) -> Page<SearchHit> {
+fn page_of(hits: Vec<crate::ai::semantic::Hit>, limit: Option<u32>) -> Page<SearchHit> {
     Page {
         data: hits.into_iter().map(SearchHit::from).collect(),
         pagination: autoxide_kernel::pagination::Pagination::new(limit.unwrap_or(10), None),

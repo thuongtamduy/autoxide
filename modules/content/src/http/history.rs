@@ -18,8 +18,8 @@ use validator::Validate;
 
 use super::entries::{EntryResponse, tagged};
 use super::page_request;
-use crate::revisions::Revision;
-use crate::schedules::{Action, Schedule};
+use crate::entries::revisions::Revision;
+use crate::publishing::schedules::{Action, Schedule};
 use crate::service::ContentService;
 
 /// A revision: a full copy of the editable fields of an entry at one moment.

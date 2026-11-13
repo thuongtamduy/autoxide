@@ -491,7 +491,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             move |principal: Principal, input: SearchInput| {
                 let service = search.clone();
                 async move {
-                    let query = crate::semantic::SearchQuery {
+                    let query = crate::ai::semantic::SearchQuery {
                         q: input.q,
                         locale: input.locale,
                         kind: None,

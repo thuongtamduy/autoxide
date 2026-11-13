@@ -17,7 +17,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::page_request;
-use crate::redirects::{Redirect, RedirectInput};
+use crate::publishing::redirects::{Redirect, RedirectInput};
 use crate::service::ContentService;
 
 /// A redirect from an old address.

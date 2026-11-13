@@ -400,7 +400,7 @@ impl ContentService {
         }
         match input.slug.as_deref().map(str::trim) {
             Some(slug) if !slug.is_empty() => {
-                if !crate::slug::is_valid(slug) {
+                if !crate::entries::slug::is_valid(slug) {
                     problems.push(FieldError::new(
                         "slug",
                         "invalid",
@@ -410,7 +410,7 @@ impl ContentService {
                 row.slug = slug.to_owned();
             }
             _ if row.slug.is_empty() => {
-                row.slug = crate::slug::from_title(&row.display_name, row.id)
+                row.slug = crate::entries::slug::from_title(&row.display_name, row.id)
             }
             _ => {}
         }

@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn sua_module_chay_module_va_binary() {
         assert_eq!(
-            changed(&["modules/content/src/body.rs"]),
+            changed(&["modules/content/src/entries/body.rs"]),
             crates(&["autoxide", "autoxide-content"])
         );
     }

@@ -14,8 +14,8 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::menus::{ItemInput, Menu, Node};
 use crate::service::ContentService;
+use crate::taxonomy::menus::{ItemInput, Menu, Node};
 
 /// A navigation menu.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
