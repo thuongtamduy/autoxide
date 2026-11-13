@@ -173,12 +173,14 @@ lại để hồ sơ **đủ và đúng** ngay từ đầu:
 Các bước 33–38 của `docs/ROADMAP.md` (làm theo thứ tự; vận hành, hiệu năng và năng lực còn
 thiếu dời sau để dựng sẵn trên nền đa khách):
 
-1. **33** khách hàng, vị trí dữ liệu, mặt điều khiển, `tenant_id` trên mọi bảng cấp khách hàng.
+1. **33** khách hàng, vị trí dữ liệu, mặt điều khiển, `tenant_id` trên mọi bảng cấp khách hàng,
+   mã hoá secret và cấu hình theo khách, tên miền riêng.
 2. **34** cây tổ chức, quyền theo độ sâu, danh tính hai lớp, uỷ quyền, đăng nhập bằng link, mời
    người dùng.
 3. **35** gói, quyền dùng, hạn mức, thuê bao, tính tiền SaaS, cấp phát.
 4. **36** sổ cái, số thập phân, thanh toán qua đối tác, thuế, chứng từ, hoá đơn điện tử.
-5. **37** tuân thủ: KYC, hồ sơ và logo Bộ Công Thương, dữ liệu cá nhân, mã hoá, gỡ vi phạm.
+5. **37** tuân thủ: KYC, hồ sơ và logo Bộ Công Thương, dữ liệu cá nhân, văn bản pháp lý có
+   phiên bản, bảo vệ người tiêu dùng, gắn nhãn nội dung AI, SMS, gỡ vi phạm.
 6. **38** cây khách hàng xuyên database, báo cáo gộp, phân phối dữ liệu cha → con.
 
 Module thương mại (sản phẩm, giỏ hàng, đơn hàng, kho, vận chuyển, sàn) là module nghiệp vụ, dựng
@@ -188,6 +190,29 @@ Module thương mại (sản phẩm, giỏ hàng, đơn hàng, kho, vận chuy�
 cũ); đường nóng mỗi request đọc thêm ngữ cảnh khách và quyền theo nút (đo trước / sau); người
 viết module phải phân loại bảng (mặt điều khiển / cấp khách hàng) và chọn bảng nào có `org_id` —
 hướng dẫn viết module ghi quy tắc, `cargo xtask check` và testkit kiểm.
+
+## 7. Bổ sung sau rà soát (D-190)
+
+Rà lại thiết kế trên thấy những chỗ sau sẽ phải sửa về sau nếu không đặt từ đầu:
+
+| Chỗ hở | Vì sao phải làm từ đầu | Bước |
+|---|---|---|
+| Mọi thứ ngoài bảng cũng theo khách: khoá file lưu trữ, cache trong bộ nhớ, rate limiting, idempotency key, con trỏ pagination, token và URL đã ký | `tenant_id` trên bảng chưa đủ: cache tìm theo ý nghĩa của `content` hay một URL ký của `media` dùng chung giữa các khách là rò rỉ dữ liệu | 33 |
+| Cấu hình và secret theo khách (khoá cổng thanh toán, SMTP, hoá đơn điện tử, AI của từng khách), mã hoá khi lưu | Khách SaaS và người bán trên sàn mang tài khoản đối tác của chính họ; biến môi trường chỉ có một bộ cho cả máy chủ. Vì vậy mục mã hoá secret dời từ 37 lên 33 | 33 |
+| Tên miền riêng: xác minh bằng DNS TXT, endpoint cho reverse proxy cấp TLS tự động | Mô hình 2 cần mỗi cửa hàng một tên miền; không xác minh thì ai cũng gắn được tên miền của người khác | 33 |
+| Nhiều database lệch phiên bản migration; job queue chung bị một khách chiếm | Đội database không bao giờ migrate xong cùng lúc; một khách lớn không được làm chậm khách khác | 33 |
+| Nhân sự nền tảng vào dữ liệu của khách: có thời hạn, có lý do, khách xem được audit | Luật BVDLCN 2025: xử lý dữ liệu cá nhân phải có căn cứ và để lại vết | 34 |
+| Lưu chứng từ kế toán ít nhất 10 năm, khoá sổ theo kỳ | Luật Kế toán 88/2015, Điều 41; NĐ 174/2016. Xoá khách hay xoá dữ liệu cá nhân không được xoá phần kế toán | 36 |
+| Hoá đơn khởi tạo từ máy tính tiền | NĐ 123/2020 sửa bởi NĐ 70/2025: hộ kinh doanh doanh thu từ 1 tỷ đồng / năm, từ 01/6/2025; ngưỡng hạ dần theo lộ trình — để dạng dữ liệu | 36 |
+| Văn bản pháp lý có phiên bản và bằng chứng chấp nhận | Luật Giao dịch điện tử 20/2023: điều khoản, quy chế sàn, hợp đồng với người bán là hợp đồng điện tử; phải chứng minh được ai chấp nhận bản nào | 37 |
+| Bảo vệ người tiêu dùng | Luật 19/2023/QH15 + NĐ 55/2024 (từ 01/7/2024): nghĩa vụ của nền tảng số, không chặn đánh giá, điều kiện giao dịch chung, khiếu nại | 37 |
+| Gắn nhãn nội dung do AI tạo | Luật Trí tuệ nhân tạo 134/2025/QH15 (từ 01/3/2026): nội dung AI tạo hay sửa đưa ra công chúng phải được thông báo rõ. Core đã có gợi ý AI cho `content`, nên phải ghi nguồn gốc | 37 |
+| Gửi SMS | NĐ 147/2024 xác thực bằng số điện thoại cần mã một lần qua SMS; core mới có email | 37 |
+| Quan sát theo khách | Log và trace mang `tenant_id`; không dùng nó làm nhãn số đo vì số khách không giới hạn | 39 |
+
+Đã cân nhắc và không đưa vào core: mỗi khách một khoá mã hoá riêng để "xoá bằng cách huỷ khoá" cả
+trong backup — phức tạp và chưa có yêu cầu luật buộc; khuyến mại phải đăng ký, phí sàn theo ngành
+hàng, người bán nước ngoài — thuộc module thương mại.
 
 ## Nguồn
 
@@ -210,4 +235,8 @@ Pháp lý (báo chí và công ty luật tổng hợp; đối chiếu văn bản
 - NĐ 147/2024 xác thực tài khoản — [LuatVietnam](https://luatvietnam.vn/tin-van-ban-moi/tu-25-12-2024-tai-khoan-mang-xa-hoi-da-xac-thuc-bang-so-dien-thoai-moi-duoc-dang-bai-186-99855-article.html)
 - NĐ 52/2024 thanh toán không dùng tiền mặt — [Thư viện Pháp luật](https://thuvienphapluat.vn/van-ban/Tien-te-Ngan-hang/Nghi-dinh-52-2024-ND-CP-thanh-toan-khong-dung-tien-mat-427855.aspx)
 - Thuế GTGT 2026 và mức giảm 8% tới 31/12/2026 — [Thư viện Pháp luật](https://thuvienphapluat.vn/phap-luat/chinh-thuc-giam-thue-gtgt-tu-10-xuong-8-tu-ngay-172025-den-het-31122026-mo-rong-doi-tuong-giam-thue-221915.html)
+- Lưu trữ chứng từ kế toán 10 năm — [MISA meInvoice](https://www.meinvoice.vn/tin-tuc/6704/luu-tru-hoa-don-dien-tu-khoa-hoc-an-toan/), [Kế toán Thuận Thiên](https://ketoanthuanthien.vn/hoi-dap/quy-dinh-ve-thoi-han-luu-tru-hoa-don-dien-tu-la-bao-lau/)
+- Hoá đơn từ máy tính tiền, NĐ 70/2025 — [Sapo](https://www.sapo.vn/blog/nghi-dinh-so-70-2025-nd-cp), [Thời báo Tài chính](https://thoibaotaichinhvietnam.vn/ho-ca-nhan-kinh-doanh-chu-dong-ra-soat-doanh-thu-ap-dung-hoa-don-dien-tu-tu-may-tinh-tien-175242.html)
+- Luật Bảo vệ quyền lợi người tiêu dùng 2023 — [Bộ Công Thương](https://moit.gov.vn/tin-tuc/bao-chi-voi-nguoi-dan/luat-bao-ve-quyen-loi-nguoi-tieu-dung-nam-2023-va-van-ban-huong-dan-luat-huong-toi-muc-tieu-nang-cao-trach-nhiem-bao-ve-.html), [LuatVietnam](https://luatvietnam.vn/thuong-mai/luat-bao-ve-quyen-loi-nguoi-tieu-dung-2023-so-19-2023-qh15-259732-d1.html)
+- Luật Trí tuệ nhân tạo 2025 — [Cần Thơ PBGDPL](https://pbgdpl.cantho.gov.vn/mot-so-diem-moi-cua-luat-tri-tue-nhan-tao), [LSVN](https://lsvn.vn/doanh-nghiep-can-lam-gi-khi-luat-tri-tue-nhan-tao-2025-co-hieu-luc-a169962.html)
 - Thông báo / đăng ký website TMĐT — [Cổng dịch vụ công Bộ Công Thương](https://dichvucong.moit.gov.vn/TTHCOnlineDetail.aspx?DocId=115), [LTV Law](https://ltvlaw.com/tin-tuc/dang-ky-website-cung-cap-dich-vu-tmdt), [Siglaw](https://siglaw.com.vn/thu-tuc-thong-bao-website-thuong-mai-dien-tu.html)

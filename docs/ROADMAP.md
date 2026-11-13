@@ -552,6 +552,27 @@ cục module). Mọi mục chạy và có test trên cả SQLite và Postgres, �
       bằng chép dữ liệu (mở rộng `autoxide copy`)
 - [ ] Đo đường nóng trước và sau (`scripts/loadtest.sh`); hướng dẫn viết module (EN + VI) có quy
       tắc phân loại bảng và lọc theo khách
+- [ ] Mã hoá dữ liệu nhạy cảm khi lưu (dời từ bước 37, D-190 — kho secret theo khách cần nó):
+      secret TOTP của MFA (hiện lưu chữ thường trong `auth`), secret ký webhook và mọi secret module cần đọc lại được — mã hoá bằng khoá nằm ngoài
+      database (dẫn xuất từ `AUTOXIDE_SECRET_KEY`), có số phiên bản khoá để xoay khoá; một công cụ
+      dùng chung trong `kernel`, thuật toán chuẩn (AEAD) qua thư viện đã kiểm; migration mã hoá dữ
+      liệu cũ; bản backup không còn chứa các secret này ở dạng đọc được. Khi `AUTOXIDE_SECRET_KEY`
+      chưa đặt thì khoá gốc nằm trong database (`kernel/src/secret.rs`), mã hoá không bảo vệ được
+      bản backup: `autoxide doctor` và log lúc khởi động nói rõ điều đó. Ghi quyết định
+- [ ] Cấu hình và secret theo khách (D-190): thông tin kết nối đối tác của từng khách (cổng thanh
+      toán, SMTP, hoá đơn điện tử, khoá AI) lưu mã hoá bằng cơ chế trên; module đọc qua một trait
+      của kernel, không đọc biến môi trường cho thứ thuộc về khách
+- [ ] Mọi thứ ngoài bảng cũng theo khách (D-190): khoá file lưu trữ có tiền tố khách (khách
+      `dedicated` được bucket riêng); cache trong bộ nhớ (vd cache tìm theo ý nghĩa của `content`),
+      rate limiting, login throttling, idempotency key, con trỏ pagination có khách trong khoá;
+      token và URL đã ký mang khách, dùng ở khách khác thì bị từ chối
+- [ ] Tên miền riêng của khách (D-190): xác minh quyền sở hữu bằng bản ghi DNS TXT, trạng thái tên
+      miền, endpoint "có phục vụ tên miền này không" cho reverse proxy cấp chứng chỉ TLS tự động
+      (vd Caddy on-demand TLS); tài liệu deploy (EN + VI)
+- [ ] An toàn khi nhiều database (D-190): mỗi database ghi phiên bản migration của nó; database
+      chưa migrate xong thì chỉ các khách trên nó nhận lỗi `tenant_maintenance` (503), các khách khác
+      chạy bình thường; `migrate --all` chạy lại được từ chỗ dừng; worker chia lượt công bằng giữa
+      các khách trong database chung (một khách không chiếm hết job queue)
 
 ## 34. Tổ chức, quyền theo độ sâu, danh tính (D-185)
 
@@ -575,6 +596,9 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 - [ ] Mời người dùng qua email: quản trị viên mời kèm role định sẵn, người được mời đặt mật khẩu
       (hay passkey) qua link dùng một lần; lời mời hết hạn, thu hồi được, có event cho audit; lệnh
       CLI tương ứng
+- [ ] Nhân sự nền tảng vào dữ liệu của khách (D-190): chỉ khi có quyền vào cấp có thời hạn, ghi lý
+      do; mọi lần vào ghi audit mà quản trị của khách xem được (Luật BVDLCN 2025); khách tắt được
+      quyền vào hỗ trợ, trừ yêu cầu của cơ quan có thẩm quyền (có audit)
 
 ## 35. Gói, quyền dùng tính năng, hạn mức, thuê bao (D-185)
 
@@ -616,6 +640,13 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
 - [ ] Chứng từ: đánh số tuần tự không nhảy số theo phạm vi (khách / người bán / năm / ký hiệu), an
       toàn đồng thời; trait `EInvoiceProvider` cho hoá đơn điện tử; phát hành thay người bán khi
       được uỷ quyền
+- [ ] Lưu trữ và khoá sổ kế toán (D-190): chứng từ, sổ cái, hoá đơn giữ ít nhất 10 năm (Luật Kế
+      toán 88/2015, Điều 41; NĐ 174/2016) — xoá khách hay yêu cầu xoá dữ liệu cá nhân thì phần kế
+      toán được giữ lại (lưu trữ / xuất ra), phần còn lại xoá; khoá sổ theo kỳ (kỳ đã khoá không
+      nhận bút toán, sửa bằng bút toán ở kỳ mở)
+- [ ] Hoá đơn khởi tạo từ máy tính tiền (D-190): `EInvoiceProvider` hỗ trợ cả loại này cho bán lẻ
+      tại quầy (NĐ 123/2020 sửa bởi NĐ 70/2025: hộ kinh doanh doanh thu từ 1 tỷ đồng / năm từ
+      01/6/2025; ngưỡng theo lộ trình — để dạng dữ liệu, cần đối chiếu văn bản mới nhất)
 
 ## 37. Tuân thủ pháp luật Việt Nam (D-186)
 
@@ -643,13 +674,18 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
 - [ ] Dữ liệu cá nhân (Luật 91/2025, NĐ 356/2025): sổ căn cứ xử lý / đồng ý theo mục đích; thời hạn
       lưu theo loại dữ liệu; vị trí lưu theo khách (lưu tại Việt Nam chọn được); quy trình sự cố có
       mốc 72 giờ kể từ khi phát hiện trong sổ tay vận hành
-- [ ] Mã hoá dữ liệu nhạy cảm khi lưu: secret TOTP của MFA (hiện lưu chữ thường trong
-      `auth`), secret ký webhook và mọi secret module cần đọc lại được — mã hoá bằng khoá nằm ngoài
-      database (dẫn xuất từ `AUTOXIDE_SECRET_KEY`), có số phiên bản khoá để xoay khoá; một công cụ
-      dùng chung trong `kernel`, thuật toán chuẩn (AEAD) qua thư viện đã kiểm; migration mã hoá dữ
-      liệu cũ; bản backup không còn chứa các secret này ở dạng đọc được. Khi `AUTOXIDE_SECRET_KEY`
-      chưa đặt thì khoá gốc nằm trong database (`kernel/src/secret.rs`), mã hoá không bảo vệ được
-      bản backup: `autoxide doctor` và log lúc khởi động nói rõ điều đó. Ghi quyết định
+- [ ] Văn bản pháp lý có phiên bản và bằng chứng chấp nhận (D-190): điều khoản, chính sách dữ liệu
+      cá nhân, quy chế sàn, hợp đồng với người bán, điều kiện giao dịch chung — mỗi bản có số phiên
+      bản và ngày hiệu lực; ghi ai chấp nhận bản nào, lúc nào, qua kênh nào (Luật Giao dịch điện tử
+      20/2023); bản mới thì yêu cầu chấp nhận lại khi cần
+- [ ] Bảo vệ người tiêu dùng (D-190; Luật 19/2023/QH15 + NĐ 55/2024, từ 01/7/2024): nền tảng
+      không chặn, không ẩn đánh giá trái quy định; minh bạch điều kiện giao dịch chung; kênh tiếp nhận
+      và hạn xử lý khiếu nại của người tiêu dùng — cần đối chiếu văn bản gốc từng điều
+- [ ] Gắn nhãn nội dung do AI tạo (D-190; Luật Trí tuệ nhân tạo 134/2025/QH15, từ 01/3/2026, và
+      nghị định hướng dẫn — cần đối chiếu): nội dung tạo hay sửa từ gợi ý AI mang dấu nguồn gốc
+      `ai_assisted`, API trả về để giao diện gắn nhãn khi công khai
+- [ ] Gửi SMS (D-190): trait `SmsSender` (nhà cung cấp SMS có brandname), mã một lần qua SMS để xác
+      thực số điện thoại theo NĐ 147/2024; một bộ cài đặt giả cho test
 
 ## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
 
@@ -719,6 +755,8 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
       với ngưỡng 50 ms của D-110 (`docs/BENCHMARKS.md`, mục "Tìm theo ý nghĩa"); vượt ngưỡng thì
       chọn cách giảm (vector nhỏ hơn, chia nhiều nhân, hay index sau một trait) chạy được trên cả
       hai database, ghi quyết định; không vượt thì ghi số đo và giữ nguyên
+- [ ] Quan sát theo khách (D-190): log và trace mang trường `tenant_id`; **không** dùng `tenant_id`
+      làm nhãn số đo (trái luật code về nhãn); lượng dùng theo khách lấy từ số đo dùng của bước 35
 
 ## 40. Năng lực còn thiếu của core (agent đề xuất; số cũ 34, D-189)
 
