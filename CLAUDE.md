@@ -9,7 +9,7 @@ Autoxide: lõi backend Rust, core trước, module cắm vào sau.
 
 - **Dùng gì, vì sao** → [`STACK.md`](STACK.md)
 - **Làm gì tiếp** → [`docs/ROADMAP.md`](docs/ROADMAP.md)
-- **Làm một bước thế nào** → [`docs/steps/`](docs/steps/README.md) (đặc tả bước 30–49)
+- **Làm một bước thế nào** → [`docs/steps/`](docs/steps/README.md) (đặc tả bước 30–56)
 - **Đã quyết gì** → [`docs/DECISIONS.md`](docs/DECISIONS.md)
 
 ## Mục tiêu — không được quên
@@ -59,7 +59,7 @@ Hệ quả cho agent:
   `forms`, `newsletter`, `comments` (D-112), module mẫu `notes`, module nền `address` (đơn vị
   hành chính, D-193) và `notifications` (D-194), và module thương mại của bước 41–49: `catalog`,
   `inventory`, `promotions`, `shipping`, `orders`, `marketplace` (D-191), `customers`, `channels`,
-  `affiliate` (D-194), cùng `support` (hỗ trợ khách hàng, bước 53, D-204). Khái niệm của `content`
+  `affiliate` (D-194), cùng `support` (hỗ trợ khách hàng, bước 53, D-204) và `imports` (chuyển dữ liệu, bước 56, D-219). Khái niệm của `content`
   (bài viết, trang, slug…) và của thương mại (sản phẩm, đơn hàng, kho…) không vào core.
 - Repo là công khai: mọi file, commit message, comment và tài liệu đều viết với
   giả định người lạ sẽ đọc. Không ghi tên máy chủ, IP, đường dẫn riêng hay thông

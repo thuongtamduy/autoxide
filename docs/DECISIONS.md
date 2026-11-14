@@ -5179,3 +5179,24 @@ Quyết định: theo luật "đặc tả của module cung cấp hợp đồng 
 
 Lý do: ba đặc tả viết song song nên lệch (B-b3, B-b10, B-3.2d, B-c12); để lệch thì bước 46 sẽ ghi hai bút
 toán cho cùng một đồng tiền.
+
+## D-219 · Giao diện cửa hàng qua API (bước 55) và chuyển dữ liệu từ nền tảng khác (bước 56) — 2026-11-13 — agent quyết
+
+Quyết định: thêm bước 55 — vị trí hiển thị và banner trong `content` (lịch hiển thị, theo cửa hàng /
+nhánh, link tới đối tượng của module đăng ký sau qua điểm cắm `ContentLinks`, tự ẩn khi chương trình
+khuyến mại kết thúc), bộ sưu tập sản phẩm trong `catalog` (chọn tay hay theo quy tắc, sắp bán chạy từ
+event tuỳ chọn của `orders`), thông tin cửa hàng công khai là cài đặt kế thừa của nút trong
+`organizations`. Thêm bước 56 — module `imports`: nhập file xuất của Shopify, WooCommerce, Haravan, Sapo,
+KiotViet bằng hồ sơ ánh xạ cột là dữ liệu có phiên bản, chạy thử trước, chạy lại không trùng, chuyển
+hướng 301 từ đường dẫn cũ, không mang đồng ý quảng cáo và mật khẩu cũ. Đo hành vi người xem để sau (cần
+đồng ý cookie; hiện dùng công cụ ngoài).
+
+Lý do: chủ dự án hỏi hệ thống đã có biến thể, bảng giá, khuyến mại, voucher, banner và các module hỗ
+trợ như hệ thống lớn chưa (13/11/2026). Rà lộ trình thấy banner, bộ sưu tập, thông tin cửa hàng và chuyển
+dữ liệu từ nền tảng khác chưa có ở đâu, trong khi các nền tảng thương mại điện tử đều có và mọi khách
+chuyển nhà đều cần. Banner đặt trong `content` vì website không bán hàng cũng dùng; bộ sưu tập trong
+`catalog` vì là truy vấn trên sản phẩm.
+
+Đã cân nhắc: module `storefront` riêng — chỉ gom vài bảng của ba module, thêm hợp đồng mà không bớt phụ
+thuộc; nhập qua API của nền tảng cũ — cần tài khoản đối tác, để làm như bộ nối (D-191); trình dựng trang
+kéo thả — trái D-026 (core chỉ có API).
