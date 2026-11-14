@@ -152,7 +152,9 @@ Permission `content.manage`.
   terms or authors of an entry needs the right to edit it, not `content.read`.
 - **Menus** (`/api/v1/content/menus/{key}?locale=`): a tree of items (at most 4 levels, 200
   items), each pointing to an entry, a term, or an address. `PUT` replaces the whole tree
-  (`If-Match: *` to create one).
+  (`If-Match: *` to create one). **Deprecated** (sunset 14 May 2027): website menus moved to the
+  `menus` module, whose items can point to objects of any module; copy yours with
+  `autoxide task menus.import_content_menus` ([`MENUS.md`](MENUS.md)).
 
 ## The website: public endpoints
 
@@ -162,7 +164,7 @@ No sign-in needed. Only published versions are ever returned — drafts never.
 | ----------------------------------------------------- | ---------------------------------------------------------- |
 | `GET /public/resolve?locale=&path=`                   | What lives at an address: `entry`, `redirect` or `gone`    |
 | `GET /public/posts?locale=&term_id=&author_id=&q=`    | Published posts, newest first, paged (`q`: at most 200 characters) |
-| `GET /public/menus/{key}?locale=`                     | A menu with computed `href`s; unpublished targets hidden   |
+| `GET /public/menus/{key}?locale=`                     | A menu with computed `href`s; deprecated, use `GET /api/v1/menus/public/{key}` |
 | `GET /public/terms/{taxonomy}/{slug}?locale=`         | A category or tag page                                     |
 | `GET /public/authors/{slug}`                          | An author page                                             |
 | `GET /public/sitemap?locale=`                         | Every published address, with `hreflang` alternates, paged |

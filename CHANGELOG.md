@@ -25,6 +25,23 @@ endpoints are marked deprecated with a sunset date first.
   Flags are part of the personal data export and are deleted with the account.
 - For module authors: `Module::resource_events`, `StartContext::badge_source`,
   `StartContext::posting_verifier` and `pagination::fetch_page_tiers` (see `docs/MODULE_GUIDE.md`).
+- Website menus (`menus` module, `docs/MENUS.md`): `GET`/`POST /api/v1/menus`, `GET`/`PUT`/`DELETE
+  /api/v1/menus/{id}` (`If-Match` required to replace items), and the public
+  `GET /api/v1/menus/public/{key}` with `ETag` and caching (`AUTOXIDE_MENUS_PUBLIC_CACHE_SECONDS`). Items
+  link to addresses or to objects of any module (`ref`), take sub-items by themselves (`auto_children`),
+  and carry icons, highlights, dated badges and a featured object. MCP tools `menus.*`; permissions
+  `menus.read`, `menus.manage`; `autoxide task menus.import_content_menus` copies the content module's
+  menus.
+- The resource directory looks up many objects at once in a language (`ResourceResolver::resolve_many`),
+  gives pictures (`Resource::image`) and sub-items (`has_children`, `children`). The content module
+  registers categories and tags as `content.term` (public path `/<post prefix>/category/<slug>` or
+  `/…/tag/<slug>`).
+
+### Deprecated
+
+- The content module's menu endpoints (`GET /api/v1/content/menus`, `GET`/`PUT
+  /api/v1/content/menus/{key}`, `GET /api/v1/content/public/menus/{key}`), sunset 2027-05-14: use the
+  `menus` module.
 
 ## [0.12.0] - 2026-11-13
 

@@ -169,7 +169,10 @@ Module như `comments` gắn dữ liệu vào bản ghi của module khác mà k
 (`autoxide_kernel::resource`):
 
 - `context.resource_type("shop.item", resolver)` trong `Module::start` cho module khác hỏi bản ghi
-  có không, có công khai không, lấy tiêu đề và đường dẫn.
+  có không, có công khai không, lấy tiêu đề, đường dẫn và ảnh (`Resource::image`). Cài `resolve_many`
+  (nhiều ID một câu query, tiêu đề theo ngôn ngữ) khi module khác tra bản ghi của bạn theo lô, vd menu
+  của website; loại có cây (danh mục) trả `true` ở `has_children` và liệt kê mục con ở `children`. Cả
+  ba có mặc định nên bộ tra cũ vẫn chạy.
 - `Module::resource_events` khai event nào của bạn (trong `Module::events`, chủ thể `<loại>:<id>`)
   nghĩa là `ResourceChange::Closed` (không nhận thêm gì) hay `ResourceChange::Removed` (đã gỡ: đóng và
   ẩn mọi thứ gắn vào). Kernel kiểm lúc khởi động.

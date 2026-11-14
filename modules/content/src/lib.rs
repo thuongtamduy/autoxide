@@ -7,6 +7,7 @@
 //! `docs/CONTENT.md`.
 
 mod ai;
+pub mod api;
 mod config;
 mod entity;
 mod entries;
@@ -30,12 +31,14 @@ use autoxide_kernel::access::Permission;
 use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{EventInfo, Subscription};
+use autoxide_kernel::http::Deprecation;
 use autoxide_kernel::job::{JobRegistration, Schedule};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
 use autoxide_kernel::resource::{ResourceChange, ResourceEvent};
 use autoxide_media::api::Media;
+use axum::http::Method;
 use utoipa_axum::router::OpenApiRouter;
 
 use crate::ai::{semantic, translate};
@@ -82,6 +85,26 @@ impl Module for ContentModule {
         ]
     }
 
+    fn deprecations(&self) -> Vec<Deprecation> {
+        // Menu của website chuyển sang module `menus` (D-238); hành vi cũ giữ tới ngày sunset.
+        const SINCE: &str = "2026-11-14";
+        const SUNSET: &str = "2027-05-14";
+        vec![
+            Deprecation::new(Method::GET, "/menus", SINCE)
+                .sunset(SUNSET)
+                .successor("/api/v1/menus"),
+            Deprecation::new(Method::GET, "/menus/{key}", SINCE)
+                .sunset(SUNSET)
+                .successor("/api/v1/menus/{id}"),
+            Deprecation::new(Method::PUT, "/menus/{key}", SINCE)
+                .sunset(SUNSET)
+                .successor("/api/v1/menus/{id}"),
+            Deprecation::new(Method::GET, "/public/menus/{key}", SINCE)
+                .sunset(SUNSET)
+                .successor("/api/v1/menus/public/{key}"),
+        ]
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(ContentConfig::read(reader)?);
         Ok(())
@@ -111,6 +134,9 @@ impl Module for ContentModule {
         context.personal_data(service.clone())?;
         context
             .resource_type(resource::ENTRY, Arc::new(resource::EntryResolver(service.clone())))?;
+        context.resource_type(resource::TERM, Arc::new(resource::TermResolver(service.clone())))?;
+        // Menu cũ cho module `menus` nhập sang (D-238).
+        context.provide::<dyn api::LegacyMenus>(service.clone())?;
         self.service = Some(service);
         Ok(())
     }
