@@ -74,6 +74,9 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
     tạm dừng và tiếp tục, bounce, mail cho bài mới ([`docs/NEWSLETTER.vi.md`](docs/NEWSLETTER.vi.md))
 20. Bình luận: bình luận hai cấp gắn vào đích bất kỳ, cho người dùng đăng nhập hoặc khách,
     kiểm duyệt theo pipeline cố định, báo cáo, cấm, mail báo trả lời ([`docs/COMMENTS.vi.md`](docs/COMMENTS.vi.md))
+21. Menu của website: thanh menu chính, bảng xổ lớn, chân trang; mục trỏ tới địa chỉ hay tới đối
+    tượng của module bất kỳ, tự lấy mục con, nhãn có hạn, endpoint công khai có cache
+    ([`docs/MENUS.vi.md`](docs/MENUS.vi.md))
 
 ## Yêu cầu
 
@@ -347,6 +350,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   trang xác nhận và trang lựa chọn của website, chiến dịch, bounce, lưu ý pháp lý
 - [`docs/COMMENTS.vi.md`](docs/COMMENTS.vi.md) — dùng module bình luận: đích, luồng và ô bình
   luận của website, kiểm duyệt, báo cáo và cấm, mail báo trả lời, lưu ý pháp lý
+- [`docs/MENUS.vi.md`](docs/MENUS.vi.md) — dùng module menu: mục, đối tượng của module khác, nhãn,
+  endpoint công khai và cache, chuyển từ menu của module nội dung
 - [`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md) — cách viết một module, bắt đầu
   từ module mẫu [`modules/notes`](modules/notes) (mặc định không đăng ký)
 

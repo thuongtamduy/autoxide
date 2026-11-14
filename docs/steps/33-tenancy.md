@@ -250,6 +250,8 @@ database (hết hạn, hàng đợi, giữ lại theo thời hạn) **không** b
 | forms | `forms_forms`, `forms_form_versions`, `forms_submissions` | T | `key` → `(tenant_id, key)`; `(form_id, version)` → thêm `tenant_id`; `created`/`retention` → `_sweep_idx` |
 | idempotency | `idempotency_record` | T | `(scope, key)` → `(tenant_id, scope, key)`; `expires` → `_sweep_idx` |
 | mail | (chỉ `mail_events`, `mail_jobs`) | T | như bảng helper |
+| menus | `menus_menus` | T | `(key, locale)` → `(tenant_id, key, locale)` (bước 34 thêm `org_id` sau `tenant_id`, D-238) |
+| menus | `menus_items` | T | `(menu_id, position)` → thêm `tenant_id` đầu |
 | media | `media_folder` | T | `(parent_id, name_key)` → `(tenant_id, parent_id, name_key)` (giữ nguyên ngữ nghĩa NULL của thư mục gốc) |
 | media | `media_tag`, `media_variant` | T | `name_key` → `(tenant_id, name_key)`; `(item_id, version_id, width)` → thêm `tenant_id` |
 | media | `media_lock` | T | PK `name` → `(tenant_id, name)`; dòng `folder_tree` gieo mỗi khách |

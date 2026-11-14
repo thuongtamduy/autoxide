@@ -6,6 +6,8 @@
 //! - Đăng ký: `context.resource_type("content.entry", resolver)?` trong `Module::start`.
 //! - Tra: `context.resources()` (lấy lúc khởi động, giữ lại) rồi `resolve(loại, id)`. Sổ có cả
 //!   các loại do module khởi động SAU đăng ký.
+//! - Tra nhiều đối tượng một lần, theo ngôn ngữ: `resolve_many(loại, ids, locale)`; nhóm con của
+//!   loại có cây (vd danh mục): `children(loại, id, locale, limit)` (D-238, `menus` dùng).
 //!
 //! Hai thứ đi kèm (D-202), cũng trung lập với nghiệp vụ:
 //!
@@ -17,6 +19,7 @@
 //!   (`context.badge_source(…)`), vd `seller` cho người quản lý sản phẩm, `verified_buyer` cho
 //!   người đã nhận hàng. Bên hỏi nhận mã nhãn ổn định, không biết module nào tính ra.
 
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use uuid::Uuid;
@@ -89,6 +92,8 @@ pub struct Resource {
     pub locale: Option<String>,
     /// Người dùng "sở hữu" đối tượng (vd tác giả), để báo cho họ khi cần.
     pub owner_user_ids: Vec<Uuid>,
+    /// Ảnh đại diện (ID trong thư viện `media`), khi có. Bên hỏi tự kiểm ảnh có công khai không.
+    pub image: Option<Uuid>,
 }
 
 impl Resource {
@@ -101,6 +106,7 @@ impl Resource {
             url: None,
             locale: None,
             owner_user_ids: Vec::new(),
+            image: None,
         }
     }
 
@@ -133,6 +139,27 @@ impl Resource {
         self.owner_user_ids = owner_user_ids;
         self
     }
+
+    /// Sets the representative image (an ID in the media library).
+    pub const fn image(mut self, image: Option<Uuid>) -> Self {
+        self.image = image;
+        self
+    }
+}
+
+/// Chỉ tới một đối tượng trong sổ: loại (`<module>.<loại>`) và ID. Dựng bằng [`ResourceRef::new`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct ResourceRef {
+    pub kind: String,
+    pub id: String,
+}
+
+impl ResourceRef {
+    /// The object `id` of type `kind`.
+    pub fn new(kind: impl Into<String>, id: impl Into<String>) -> Self {
+        ResourceRef { kind: kind.into(), id: id.into() }
+    }
 }
 
 /// Bộ tra một loại đối tượng.
@@ -142,6 +169,46 @@ impl Resource {
 pub trait ResourceResolver: Send + Sync {
     /// Đối tượng `id`; `None` khi không có.
     async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error>;
+
+    /// Nhiều đối tượng một lần, với tiêu đề, đường dẫn theo ngôn ngữ `locale` khi loại có bản
+    /// dịch (thiếu bản dịch thì bộ tra tự chọn ngôn ngữ mặc định của nó). Đối tượng không có thì
+    /// vắng trong kết quả. Mặc định gọi [`resolve`](Self::resolve) từng cái, bỏ qua `locale`;
+    /// loại hay được tra theo lô (vd mục menu) nên cài bằng một câu query.
+    async fn resolve_many(
+        &self,
+        ids: &[String],
+        locale: Option<&str>,
+    ) -> Result<HashMap<String, Resource>, Error> {
+        let _ = locale;
+        let mut found = HashMap::new();
+        for id in ids {
+            if found.contains_key(id) {
+                continue;
+            }
+            if let Some(resource) = self.resolve(id).await? {
+                found.insert(id.clone(), resource);
+            }
+        }
+        Ok(found)
+    }
+
+    /// Loại này có cây không (vd danh mục có danh mục con): có thì [`children`](Self::children)
+    /// trả nhóm con. Mặc định `false`.
+    fn has_children(&self) -> bool {
+        false
+    }
+
+    /// Tối đa `limit` đối tượng con trực tiếp của `id`, theo thứ tự hiển thị của module sở hữu,
+    /// chỉ những cái người lạ xem được. Mặc định rỗng.
+    async fn children(
+        &self,
+        id: &str,
+        locale: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ResourceRef>, Error> {
+        let _ = (id, locale, limit);
+        Ok(Vec::new())
+    }
 }
 
 type Entry = (&'static str, Arc<dyn ResourceResolver>);
@@ -212,13 +279,53 @@ impl ResourceDirectory {
     /// Đối tượng `id` thuộc loại `kind`. `Ok(None)` khi không có đối tượng đó; lỗi khi không
     /// có bộ tra cho loại này (hỏi [`knows`](Self::knows) trước nếu loại có thể chưa có).
     pub async fn resolve(&self, kind: &str, id: &str) -> Result<Option<Resource>, Error> {
+        self.resolver(kind)?.resolve(id).await
+    }
+
+    /// Nhiều đối tượng loại `kind` một lần, theo ngôn ngữ `locale`: ID → đối tượng; ID không có
+    /// thì vắng. Lỗi khi không có bộ tra cho loại này. Có thể gọi module khác: gọi NGOÀI
+    /// transaction ghi.
+    pub async fn resolve_many(
+        &self,
+        kind: &str,
+        ids: &[String],
+        locale: Option<&str>,
+    ) -> Result<HashMap<String, Resource>, Error> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        self.resolver(kind)?.resolve_many(ids, locale).await
+    }
+
+    /// Loại `kind` có cây không (có [`children`](Self::children)); `false` cả khi chưa đăng ký.
+    pub fn has_children(&self, kind: &str) -> bool {
+        self.resolver(kind).is_ok_and(|resolver| resolver.has_children())
+    }
+
+    /// Tối đa `limit` đối tượng con công khai của `id` (loại `kind`). Lỗi khi không có bộ tra
+    /// cho loại này.
+    pub async fn children(
+        &self,
+        kind: &str,
+        id: &str,
+        locale: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ResourceRef>, Error> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let mut found = self.resolver(kind)?.children(id, locale, limit).await?;
+        found.truncate(limit);
+        Ok(found)
+    }
+
+    fn resolver(&self, kind: &str) -> Result<Arc<dyn ResourceResolver>, Error> {
         let resolver = {
             let entries = self.entries.read().map_err(|_| poisoned())?;
             entries.iter().find(|(name, _)| *name == kind).map(|(_, resolver)| resolver.clone())
         };
-        let resolver = resolver
-            .ok_or_else(|| Error::internal(format!("no module resolves resource type `{kind}`")))?;
-        resolver.resolve(id).await
+        resolver
+            .ok_or_else(|| Error::internal(format!("no module resolves resource type `{kind}`")))
     }
 
     /// Đăng ký bộ tính nhãn của module `module` cho loại `kind` — loại của module nào cũng
@@ -314,6 +421,76 @@ mod tests {
                 ..Resource::default()
             }))
         }
+    }
+
+    /// Loại có cây: `p` có hai con `c1`, `c2`; tra theo lô và theo ngôn ngữ.
+    struct Tree;
+
+    #[async_trait::async_trait]
+    impl ResourceResolver for Tree {
+        async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
+            Ok(Some(Resource::new(id.to_uppercase()).public(true)))
+        }
+
+        async fn resolve_many(
+            &self,
+            ids: &[String],
+            locale: Option<&str>,
+        ) -> Result<HashMap<String, Resource>, Error> {
+            let suffix = locale.unwrap_or("-");
+            Ok(ids
+                .iter()
+                .map(|id| (id.clone(), Resource::new(format!("{id}@{suffix}")).public(true)))
+                .collect())
+        }
+
+        fn has_children(&self) -> bool {
+            true
+        }
+
+        async fn children(
+            &self,
+            id: &str,
+            _: Option<&str>,
+            _: usize,
+        ) -> Result<Vec<ResourceRef>, Error> {
+            Ok(if id == "p" {
+                vec![ResourceRef::new("shop.tree", "c1"), ResourceRef::new("shop.tree", "c2")]
+            } else {
+                Vec::new()
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn tra_theo_lo_va_nhom_con() {
+        let directory = ResourceDirectory::default();
+        directory.register("content", "content.entry", Arc::new(Fixed)).unwrap();
+        directory.register("shop", "shop.tree", Arc::new(Tree)).unwrap();
+
+        // Mặc định: tra từng cái, bỏ ID không có, không trùng.
+        let ids = vec!["1".to_owned(), "2".to_owned(), "1".to_owned()];
+        let found = directory.resolve_many("content.entry", &ids, Some("vi")).await.unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found["1"].title, "One");
+        assert!(directory.resolve_many("forms.form", &ids, None).await.is_err());
+        assert!(directory.resolve_many("forms.form", &[], None).await.unwrap().is_empty());
+
+        // Cài riêng: theo ngôn ngữ.
+        let found = directory.resolve_many("shop.tree", &ids, Some("vi")).await.unwrap();
+        assert_eq!(found["2"].title, "2@vi");
+
+        assert!(!directory.has_children("content.entry"), "default: no tree");
+        assert!(directory.has_children("shop.tree"));
+        assert!(!directory.has_children("forms.form"), "unknown kinds have no tree");
+        assert!(directory.children("content.entry", "1", None, 5).await.unwrap().is_empty());
+        let children = directory.children("shop.tree", "p", None, 1).await.unwrap();
+        assert_eq!(children, [ResourceRef::new("shop.tree", "c1")], "cut at the limit");
+        assert!(directory.children("shop.tree", "p", None, 0).await.unwrap().is_empty());
+        assert!(directory.children("forms.form", "p", None, 5).await.is_err());
+
+        let image = Uuid::now_v7();
+        assert_eq!(Resource::new("A").image(Some(image)).image, Some(image));
     }
 
     #[tokio::test]

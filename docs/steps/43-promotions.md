@@ -582,7 +582,8 @@ Số **mục** theo danh sách bước 43 trong ROADMAP.
 6. Ví voucher: `grant_voucher`, `vouchers_of`, lưu, nhập mã nhận, cấp tay, hết hạn, dữ liệu cá nhân → **mục 8**.
 7. Ai trả tiền, tham gia chương trình của sàn; quy tắc trả hàng / huỷ cho `orders` → **mục 6**, **mục 9**.
 8. `api.rs`, REST `/evaluate`, tool MCP, endpoint công khai (danh sách, theo sản phẩm, mã dùng được cho giỏ,
-   flash sale), event giá sau giảm tự động, nhắc flash sale → **mục 4**, **mục 12**, **mục 13**.
+   flash sale), event giá sau giảm tự động, nhắc flash sale; loại `promotions.promotion` trong sổ đối tượng
+   (`resolve_many`, ảnh, chỉ công khai khi đang chạy) cho menu của website (D-238) → **mục 4**, **mục 12**, **mục 13**.
 9. Kiểm tuân thủ khi `activate` và `activation-check`, thời hạn, thông báo theo nơi nhận, xuất dữ liệu thông
    báo, lưu vết; chạy thử, xung đột, lịch, số liệu → **mục 10**, **mục 11**, **mục 14**.
 10. `docs/PROMOTIONS.md` + `.vi.md`, OpenAPI, `.env.example`, `docs/BENCHMARKS.md`, CHANGELOG, ROADMAP.

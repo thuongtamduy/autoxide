@@ -277,7 +277,8 @@ là dữ liệu theo khách (bảng `marketplace_settings`: `tenant_id` pk, `pay
 
 1. Khung crate, permission, cấu hình, `api.rs`, đăng ký. → chuẩn bị
 2. Người bán: hồ sơ, nút `seller`, vòng đời, `SellerGate`, giấy tờ, trang công khai, nghe event
-   `compliance`. → **mục 1**
+   `compliance`; loại `marketplace.seller` trong sổ đối tượng (`resolve_many`, ảnh đại diện) để menu của website
+   trỏ tới gian hàng (D-238). → **mục 1**
 3. Duyệt sản phẩm + `ListingGate` + báo vi phạm. → **mục 2**
 4. Phí có ngày hiệu lực + `SellerSplitter` cắm vào `orders` (tách đơn theo người bán, tự giao / sàn
    giao). → **mục 3**

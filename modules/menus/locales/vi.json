@@ -1,0 +1,9 @@
+{
+  "menus.children_unsupported": "Có mục tự lấy mục con từ một loại đối tượng không có mục con; xem `errors`.",
+  "menus.import_source_missing": "Chưa cài module `content`, nên không có menu cũ để nhập.",
+  "menus.menu_exists": "Đã có menu `{key}` ở ngôn ngữ `{locale}`; hãy thay mục của menu đó thay vì tạo lại.",
+  "menus.menu_not_found": "Không có menu `{id}`.",
+  "menus.public_menu_not_found": "Không có menu `{key}` ở ngôn ngữ `{locale}`.",
+  "menus.ref_not_found": "Có mục trỏ tới một đối tượng không tồn tại; xem `errors`.",
+  "menus.ref_unknown_kind": "Có mục trỏ tới một loại đối tượng không module nào cung cấp; xem `errors`."
+}

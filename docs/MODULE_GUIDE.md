@@ -169,7 +169,10 @@ Modules such as `comments` attach data to records of other modules without depen
 (`autoxide_kernel::resource`):
 
 - `context.resource_type("shop.item", resolver)` in `Module::start` lets others ask whether an
-  item exists and is public, and get its title and path.
+  item exists and is public, and get its title, path and picture (`Resource::image`). Implement
+  `resolve_many` (many ids in one query, titles in a language) when others look up your items in
+  batches, e.g. website menus; a type with a tree (categories) returns `true` from `has_children`
+  and lists sub-items in `children`. All three have defaults, so older resolvers keep working.
 - `Module::resource_events` declares which of your events (from `Module::events`, subject
   `<kind>:<id>`) mean `ResourceChange::Closed` (takes nothing new) or `ResourceChange::Removed`
   (gone: close and hide what is attached). The kernel checks them at start.

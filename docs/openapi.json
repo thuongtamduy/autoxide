@@ -12040,7 +12040,7 @@
           "content"
         ],
         "summary": "List menus.",
-        "description": "Requires `content.read`. Every menu in every language, by key.",
+        "description": "Requires `content.read`. Every menu in every language, by key.\n\n**Deprecated** since 2026-11-14. It will be removed on 2027-05-14. Use `/api/v1/menus` instead.",
         "operationId": "content_list_content_menus",
         "parameters": [
           {
@@ -12098,6 +12098,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [
           {
             "bearer": []
@@ -12111,7 +12112,7 @@
           "content"
         ],
         "summary": "Get a menu.",
-        "description": "Requires `content.read`.",
+        "description": "Requires `content.read`.\n\n**Deprecated** since 2026-11-14. It will be removed on 2027-05-14. Use `/api/v1/menus/{id}` instead.",
         "operationId": "content_get_content_menu",
         "parameters": [
           {
@@ -12205,6 +12206,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [
           {
             "bearer": []
@@ -12216,7 +12218,7 @@
           "content"
         ],
         "summary": "Create or replace a menu.",
-        "description": "Requires `content.manage`. Replaces the whole item tree. `If-Match` is required: the\nmenu's `ETag`, or `*` (needed to create a new menu).",
+        "description": "Requires `content.manage`. Replaces the whole item tree. `If-Match` is required: the\nmenu's `ETag`, or `*` (needed to create a new menu).\n\n**Deprecated** since 2026-11-14. It will be removed on 2027-05-14. Use `/api/v1/menus/{id}` instead.",
         "operationId": "content_put_content_menu",
         "parameters": [
           {
@@ -12362,6 +12364,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [
           {
             "bearer": []
@@ -12529,7 +12532,7 @@
           "content"
         ],
         "summary": "Get a navigation menu (public).",
-        "description": "No sign-in needed. Items pointing to entries that are not published are left out, with\ntheir sub-items. A menu missing in the language falls back to the default language.",
+        "description": "No sign-in needed. Items pointing to entries that are not published are left out, with\ntheir sub-items. A menu missing in the language falls back to the default language.\n\n**Deprecated** since 2026-11-14. It will be removed on 2027-05-14. Use `/api/v1/menus/public/{key}` instead.",
         "operationId": "content_get_public_content_menu",
         "parameters": [
           {
@@ -12605,6 +12608,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [
           {},
           {
@@ -20685,6 +20689,704 @@
         ]
       }
     },
+    "/api/v1/menus": {
+      "get": {
+        "tags": [
+          "menus"
+        ],
+        "summary": "List website menus.",
+        "description": "Requires `menus.read`. Every menu in every language, newest first by default; follow\n`pagination.next_cursor` for more.",
+        "operationId": "menus_list_menus",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1
+            },
+            "example": 50
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of menus.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SiteMenuSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `menus.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The paging parameters are invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "menus"
+        ],
+        "summary": "Create a website menu.",
+        "description": "Requires `menus.manage`. One menu per key and language: the website shows the menu `main`\nin Vietnamese from the menu with key `main` and locale `vi`. All problems with the items\nare reported at once, each with its place (e.g. `items[0].children[1].ref.id`).",
+        "operationId": "menus_create_menu",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSiteMenuRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created; `Location` is the new menu.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SiteMenu"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `menus.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A menu with this key and language exists; code `menus.menu_exists`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid values; see `errors`. Code `menus.ref_unknown_kind` when every problem is a `ref` of a kind no module provides, `menus.ref_not_found` when every problem is a missing object, `menus.children_unsupported` when every problem is `auto_children` on a kind without sub-items; otherwise `validation_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/menus/public/{key}": {
+      "get": {
+        "tags": [
+          "menus"
+        ],
+        "summary": "Get a website menu, ready to show (public).",
+        "description": "No sign-in needed. Labels, links and pictures are worked out in the menu's language. Items\npointing to objects that are not public are left out with their sub-items, headings with\nnothing left under them are left out, `auto_children` are filled in, and badges show only\nin their date range. Best sellers of a category are not part of the menu: call the\nproduct list of the catalog with the item's `ref`.",
+        "operationId": "menus_get_public_menu",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Key of the menu, e.g. `main`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "Omitted: the default language. A menu missing in this language falls back to the\ndefault language; `locale` in the answer says which one was returned.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "vi"
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The menu.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "How long the answer may be reused: until the next badge starts or ends, at most `AUTOXIDE_MENUS_PUBLIC_CACHE_SECONDS`."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Fingerprint of the whole answer; send it in `If-None-Match` to get 304."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PublicSiteMenu"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The menu has not changed since the `ETag` sent in `If-None-Match`."
+          },
+          "404": {
+            "description": "No menu has this key, in this language or the default one; code `menus.public_menu_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The language is not supported; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/menus/{id}": {
+      "get": {
+        "tags": [
+          "menus"
+        ],
+        "summary": "Get a website menu.",
+        "description": "Requires `menus.read`. The items as saved, without working out titles and links (see\n`GET /api/v1/menus/public/{key}` for that).",
+        "operationId": "menus_get_menu",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the menu.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The menu.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Version of the menu: send it in `If-Match` when replacing its items."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SiteMenu"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `menus.read`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No menu has this id; code `menus.menu_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "menus"
+        ],
+        "summary": "Replace the items of a website menu.",
+        "description": "Requires `menus.manage`. Replaces the whole item tree. `If-Match` is required: the menu's\n`ETag` (or `*` to replace it whatever its version). If someone changed the menu since you\nread it, nothing is saved and the answer is 412.",
+        "operationId": "menus_replace_menu_items",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the menu.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Required: the `ETag` you read, or `*`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceSiteMenuItemsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The menu as saved.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "New version of the menu."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SiteMenu"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `menus.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No menu has this id; code `menus.menu_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The menu changed since you read it; code `precondition_failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid values; see `errors` and the codes listed for `POST /api/v1/menus`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "`If-Match` is missing; code `precondition_required`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "menus"
+        ],
+        "summary": "Delete a website menu.",
+        "description": "Requires `menus.manage`. Deletes the menu and all its items; it cannot be restored.",
+        "operationId": "menus_delete_menu",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the menu.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing permission `menus.manage`; code `permission_denied`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No menu has this id (or it was already deleted); code `menus.menu_not_found`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/newsletter/bounces": {
       "post": {
         "tags": [
@@ -27493,6 +28195,35 @@
         },
         "additionalProperties": false
       },
+      "CreateSiteMenuRequest": {
+        "type": "object",
+        "description": "A new menu.",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SiteMenuItemInput"
+            }
+          },
+          "key": {
+            "type": "string",
+            "description": "1 to 64 lower-case letters, digits, `-` or `_`; unique per language. The website asks\nfor a menu by its key.",
+            "example": "main"
+          },
+          "locale": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The menu's language; omitted: the default language.",
+            "example": "vi"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateSuppressionRequest": {
         "type": "object",
         "description": "An address to suppress by hand.",
@@ -30629,6 +31360,41 @@
           }
         }
       },
+      "Data_PublicSiteMenu": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A website menu ready to show: links worked out, hidden targets left out.",
+            "required": [
+              "key",
+              "locale",
+              "items"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PublicSiteMenuItem"
+                }
+              },
+              "key": {
+                "type": "string",
+                "example": "main"
+              },
+              "locale": {
+                "type": "string",
+                "description": "The language actually returned (the default language when the menu is not translated).",
+                "example": "vi"
+              }
+            }
+          }
+        }
+      },
       "Data_PublicTermPage": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -31126,6 +31892,55 @@
                   "format": "uuid"
                 },
                 "description": "Up to 5 existing categories or tags of the entry's language that fit; never new ones."
+              }
+            }
+          }
+        }
+      },
+      "Data_SiteMenu": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A website menu as saved.",
+            "required": [
+              "id",
+              "key",
+              "locale",
+              "items",
+              "created_at",
+              "updated_at"
+            ],
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SiteMenuItem"
+                }
+              },
+              "key": {
+                "type": "string",
+                "example": "main"
+              },
+              "locale": {
+                "type": "string",
+                "example": "vi"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
               }
             }
           }
@@ -33988,6 +34803,43 @@
           }
         }
       },
+      "MenuBadge": {
+        "type": "object",
+        "description": "A small label on an item, e.g. \"-50%\" or \"New\".",
+        "required": [
+          "text",
+          "tone"
+        ],
+        "properties": {
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Shown from this moment; omitted: at once."
+          },
+          "text": {
+            "type": "string",
+            "description": "1 to 20 characters, in the menu's language.",
+            "example": "-50%"
+          },
+          "tone": {
+            "type": "string",
+            "description": "`sale`, `brand`, `new` or `neutral`.",
+            "example": "sale"
+          },
+          "until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Hidden from this moment on; omitted: never."
+          }
+        },
+        "additionalProperties": false
+      },
       "MenuItemInput": {
         "type": "object",
         "description": "A menu item to set. Give exactly one of `entry_id`, `term_id` and `url`.",
@@ -34140,6 +34992,24 @@
             "format": "date-time"
           }
         }
+      },
+      "MenuTarget": {
+        "type": "object",
+        "description": "An object of a module, as a resource type (`<module>.<type>`, e.g. `content.entry`,\n`content.term`) and its id.",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "example": "content.term"
+          }
+        },
+        "additionalProperties": false
       },
       "MfaChallengeResponse": {
         "type": "object",
@@ -36793,6 +37663,56 @@
           }
         }
       },
+      "Page_SiteMenuSummary": {
+        "type": "object",
+        "description": "One page of a list.",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A menu in the list.",
+              "required": [
+                "id",
+                "key",
+                "locale",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "key": {
+                  "type": "string",
+                  "example": "main"
+                },
+                "locale": {
+                  "type": "string",
+                  "example": "vi"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            "description": "The items of this page, in the requested order."
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
       "Page_SitemapItem": {
         "type": "object",
         "description": "One page of a list.",
@@ -38494,6 +39414,92 @@
           }
         }
       },
+      "PublicMenuBadge": {
+        "type": "object",
+        "description": "A small label on a menu item.",
+        "required": [
+          "text",
+          "tone"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "example": "-50%"
+          },
+          "tone": {
+            "type": "string",
+            "description": "`sale`, `brand`, `new` or `neutral`."
+          }
+        }
+      },
+      "PublicMenuFeature": {
+        "type": "object",
+        "description": "An object featured in a drop-down panel.",
+        "required": [
+          "ref",
+          "title",
+          "summary"
+        ],
+        "properties": {
+          "href": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "image": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PublicMenuImage",
+                "description": "Its picture, when it has a public one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ref": {
+            "$ref": "#/components/schemas/PublicMenuTarget"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "PublicMenuImage": {
+        "type": "object",
+        "description": "A public picture.",
+        "required": [
+          "url",
+          "alt"
+        ],
+        "properties": {
+          "alt": {
+            "type": "string"
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "url": {
+            "type": "string",
+            "description": "Address of the picture; it changes when the picture changes, so it may be cached long."
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "PublicMenuItem": {
         "type": "object",
         "description": "An item of a public menu.",
@@ -38532,6 +39538,23 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "PublicMenuTarget": {
+        "type": "object",
+        "description": "An object of a module, as a resource type and an id.",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "example": "content.term"
           }
         }
       },
@@ -38582,6 +39605,106 @@
               {
                 "$ref": "#/components/schemas/PublicMedia",
                 "description": "Image for social sharing; `null` when none (use `featured_media`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PublicSiteMenu": {
+        "type": "object",
+        "description": "A website menu ready to show: links worked out, hidden targets left out.",
+        "required": [
+          "key",
+          "locale",
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicSiteMenuItem"
+            }
+          },
+          "key": {
+            "type": "string",
+            "example": "main"
+          },
+          "locale": {
+            "type": "string",
+            "description": "The language actually returned (the default language when the menu is not translated).",
+            "example": "vi"
+          }
+        }
+      },
+      "PublicSiteMenuItem": {
+        "type": "object",
+        "description": "An item of a public menu.",
+        "required": [
+          "label",
+          "children"
+        ],
+        "properties": {
+          "badge": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PublicMenuBadge",
+                "description": "A small label shown next to the item, only while it is in its date range."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicSiteMenuItem"
+            }
+          },
+          "feature": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PublicMenuFeature",
+                "description": "An object to feature in the item's drop-down panel."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "highlight": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How to set the item apart: `accent`, `brand`, `sale` or `muted`."
+          },
+          "href": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where the item links to: a path on the website or an address. `null` for a heading that\nonly groups sub-items (e.g. a column of a mega menu)."
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name of an icon from a fixed set; see the item schema of `PUT /api/v1/menus/{id}`."
+          },
+          "label": {
+            "type": "string",
+            "description": "The label set on the item, or else the title of the object it points to."
+          },
+          "ref": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PublicMenuTarget",
+                "description": "The object the item points to, for websites that fetch more about it (e.g. best sellers\nof a product category)."
               },
               {
                 "type": "null"
@@ -38922,6 +40045,22 @@
             "type": "string",
             "description": "1 to 50 characters, without `,`; unique, ignoring case.",
             "example": "brand"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplaceSiteMenuItemsRequest": {
+        "type": "object",
+        "description": "The whole item tree of a menu.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SiteMenuItemInput"
+            }
           }
         },
         "additionalProperties": false
@@ -39456,6 +40595,249 @@
           "password": {
             "type": "string",
             "description": "12 to 128 characters."
+          }
+        }
+      },
+      "SiteMenu": {
+        "type": "object",
+        "description": "A website menu as saved.",
+        "required": [
+          "id",
+          "key",
+          "locale",
+          "items",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SiteMenuItem"
+            }
+          },
+          "key": {
+            "type": "string",
+            "example": "main"
+          },
+          "locale": {
+            "type": "string",
+            "example": "vi"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SiteMenuItem": {
+        "type": "object",
+        "description": "A menu item as saved.",
+        "required": [
+          "id",
+          "label",
+          "auto_children",
+          "children"
+        ],
+        "properties": {
+          "auto_children": {
+            "type": "boolean"
+          },
+          "auto_children_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "badge": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MenuBadge"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SiteMenuItem"
+            }
+          },
+          "feature": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MenuTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "highlight": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "description": "Empty when the item shows the title of its `ref`."
+          },
+          "ref": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MenuTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SiteMenuItemInput": {
+        "type": "object",
+        "description": "A menu item to save. It links to at most one of `url` and `ref`; with neither it is a\nheading that groups its sub-items (e.g. a column of a mega menu).",
+        "properties": {
+          "auto_children": {
+            "type": "boolean",
+            "description": "Also list the object's own sub-items (e.g. the sub-categories of a category) after the\nitem's children. Only for objects that have sub-items, and only above the 4th level."
+          },
+          "auto_children_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How many sub-items `auto_children` takes, 1 to 50; default 12."
+          },
+          "badge": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MenuBadge"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SiteMenuItemInput"
+            },
+            "description": "Sub-items. Menus nest at most 4 levels and hold at most 200 items in all."
+          },
+          "feature": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MenuTarget",
+                "description": "An object to feature in the item's drop-down panel (title, summary, link, picture)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "highlight": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sets the item apart: `accent`, `brand`, `sale` or `muted`."
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "One of: `bag`, `bolt`, `book`, `calendar`, `cart`, `category`, `chat`, `fire`, `gift`,\n`grid`, `heart`, `help`, `home`, `info`, `mail`, `map_pin`, `news`, `percent`, `phone`,\n`search`, `shop`, `sparkles`, `star`, `store`, `tag`, `truck`, `user`."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Up to 200 characters. Needed unless `ref` is given; empty with `ref` shows the title of\nthe object, in the menu's language."
+          },
+          "ref": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MenuTarget",
+                "description": "The object to link to. It must exist; the public menu leaves the item out (with its\nsub-items) while the object is not public."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "An `https://`, `http://` or `mailto:` address, or a path starting with a single `/`."
+          }
+        },
+        "additionalProperties": false
+      },
+      "SiteMenuSummary": {
+        "type": "object",
+        "description": "A menu in the list.",
+        "required": [
+          "id",
+          "key",
+          "locale",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string",
+            "example": "main"
+          },
+          "locale": {
+            "type": "string",
+            "example": "vi"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

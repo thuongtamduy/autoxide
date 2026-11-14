@@ -187,8 +187,8 @@ pub enum MetricValue { Money(Money), Count(u64), Ratio { numerator: u64, denomin
 
 ### P6 — Nhúng bản ghi của module khác trong nội dung
 
-- `Resource` của sổ đối tượng (D-123) thêm `image: Option<Uuid>` (ID media) — thêm trường, không phá
-  vỡ (`#[non_exhaustive]`).
+- `Resource` của sổ đối tượng (D-123) thêm `image: Option<Uuid>` (ID media) — **đã làm cùng D-238** (kèm
+  `resolve_many`, `children`); P6 còn node `embed` của `content`.
 - Thân bài viết của `content` (ProseMirror JSON) có loại node `embed` với `attrs { kind, id }`. Khi lưu,
   `content` kiểm `kind` đã đăng ký và đối tượng tồn tại qua sổ đối tượng; khi đọc công khai, trả kèm
   `embeds: { "<kind>:<id>": {title, summary, url, image} }` cho các đối tượng `public`, bỏ đối tượng
@@ -439,7 +439,8 @@ Cấu hình: hạn thời gian mỗi nguồn (P2–P4, mặc định 300 ms), `A
 
 ## Thứ tự làm
 
-1. P6 (làm được ngay sau 33): `Resource::image`, node `embed` của `content`, test lưu / đọc.
+1. P6 (làm được ngay sau 33): node `embed` của `content` (dùng `resolve_many` theo lô), test lưu / đọc.
+   `Resource::image` đã có (D-238).
 2. P1: kiểu và `Module::navigation`, kiểm xung đột nhóm, endpoint, tool MCP; khai menu cho mọi module
    đang có.
 3. P2: `WorkSource`, endpoint hộp việc và số đếm, hạn thời gian, cache; nguồn việc cho `comments`

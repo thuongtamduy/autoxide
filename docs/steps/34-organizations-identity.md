@@ -521,9 +521,11 @@ mục xong:
    `api::Invitations`). → mục 12.
 10. **Quyền vào hỗ trợ của nhân sự nền tảng**, kể cả khách tự thu hồi (D-211). → mục 13.
 11. **Hồ sơ công khai của nút**: trường hồ sơ, `GET /public/stores` (D-200), `PATCH …/public-profile`
-    (đợt 2). → mục 7.
-12. **`content`, `media`, `forms` theo nút và website** (D-208): `org_id`, quyền scoped, đọc công khai theo
-    website, bộ lọc `owner_org` / `site`. → mục 3.
+    (đợt 2); loại cửa hàng công khai trong sổ đối tượng (`organizations.store`, `resolve_many`, ảnh bìa) để menu
+    của website trỏ tới (D-238). → mục 7.
+12. **`content`, `media`, `forms`, `menus` theo nút và website** (D-208, D-238): `org_id`, quyền scoped, đọc công
+    khai theo website, bộ lọc `owner_org` / `site`; `menus` thêm `?site=` cho `GET /api/v1/menus/public/{key}` và
+    lấy ngôn ngữ của website. → mục 3.
 13. **Tài khoản**: `POST /me/reauth`, `locale` / `time_zone` / `name` qua `PATCH /me`, `requires_mfa` theo
     role, `last_login_at`. → mục 9.
 14. Đo đường nóng (`scripts/loadtest.sh`, `GET /auth/me` bằng access token và API key; trước bước 4 và

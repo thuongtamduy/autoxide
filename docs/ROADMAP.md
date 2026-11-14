@@ -16,7 +16,7 @@ thuộc đã xong.
 | Giai đoạn | Bước, theo thứ tự | Vì sao ở đây |
 |---|---|---|
 | A. Hợp đồng và nền lõi | 31, 32 → 33 → 34 → 35, 36, 37 (song song) → 40 | giữ API không vỡ trước khi sửa mọi bảng; đa khách, tổ chức, tiền, tuân thủ là nền của mọi thứ sau |
-| B. Lớp cho giao diện và phân quyền | 51 → 54 → 52 | module thương mại khai luôn phần của mình (51 nên xong trước 41); 54 cần P12 của 51 |
+| B. Lớp cho giao diện và phân quyền | 51 → 68 → 54 → 52 | module thương mại khai luôn phần của mình (51 nên xong trước 41); 68 (menu của website) sau P6 của 51, trước 41; 54 cần P12 của 51 |
 | C. Vận hành | 38 → 39 | báo cáo xuyên database, backup, hiệu năng trước khi có dữ liệu thương mại thật |
 | D. Module nền dùng chung | 53, 57, 58, 67, 66, 65 | hỗ trợ khách (45 và 61 dùng), phân tích (64 dùng), tự động hoá, trang dựng từ khối và AI tạo trang, SCIM, chợ ứng dụng |
 | E. Thương mại | 41 → 42, 43, 44 → 45 → 46, 47, 48, 49, 55 → 56, 59, 60, 61, 62, 63, 64 | module nghiệp vụ cắm vào core đã xong |
@@ -44,6 +44,7 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 | 50 Công khai repo | chủ dự án nói đã công khai repo (D-199) | mọi bước |
 | 51 Hợp đồng cho giao diện (D-200) | nhúng bản ghi: sau 33; hộp việc, tìm, số liệu, hoạt động: sau 34; menu: sau 35 | 36–49 — nên làm trước 41 để module thương mại khai luôn phần của mình |
 | 52 Trải nghiệm quản trị nâng cao (D-201) | 51 | 41–49 |
+| 68 Menu của website (D-238) | phần chính: đã làm trước theo lệnh chủ dự án; theo khách: 33; theo website: 34; gỡ menu cũ: sau 2027-05-14 | 51–67 |
 | 53 Hỗ trợ khách hàng (D-204) | 37 (thông báo, vụ việc khiếu nại) | 41–49 |
 | 54 Phân quyền chuẩn hàng đầu (D-205) | 34; P6, P7 cần P12 của 51; P1 làm ở bước 31 | 41–49, 53 |
 | 55 Giao diện cửa hàng (D-219, D-236) | 41 (banner và thông tin cửa hàng làm được từ sau 34); khối vùng banner: 67 | 42–49 |
@@ -169,9 +170,10 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
 - [ ] Ngữ cảnh khách hàng cho mọi request: suy từ tên miền, API key, access token, header của nhân
       sự nền tảng; sổ kết nối database theo khách (mở lười, có giới hạn); extractor cho handler,
       tool MCP; thiếu ngữ cảnh ở route cần khách thì lỗi rõ
-- [ ] Phân loại bảng: mặt điều khiển hay cấp khách hàng; mọi bảng cấp khách hàng của 13 module có
+- [ ] Phân loại bảng: mặt điều khiển hay cấp khách hàng; mọi bảng cấp khách hàng của 14 module có
       `tenant_id` (migration mới), khoá unique và index bắt đầu bằng nó; testkit và `cargo xtask
-      check` chặn bảng cấp khách hàng thiếu `tenant_id`
+      check` chặn bảng cấp khách hàng thiếu `tenant_id`; sổ đối tượng nhận khách ở `resolve`,
+      `resolve_many`, `children` và cache menu công khai của `menus` theo khách (D-238)
 - [ ] Mọi truy vấn của service lọc theo khách qua một công cụ của kernel; testkit có bài **rò rỉ
       giữa khách** chạy cho mọi module (ghi ở khách A, đọc bằng người của khách B: không thấy gì)
 - [ ] Job, event, outbox, lịch chạy theo từng database; worker và bộ phát event duyệt mọi database
@@ -219,7 +221,8 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
       thừa (`memberships?inherited=true`); testkit có bài rò rỉ giữa hai nhánh anh em
 - [ ] Nội dung theo website và nút (D-208): `org_id` cho `content`, `media` (`forms` tuỳ chọn), quyền của chúng
       theo độ sâu; đọc công khai lọc theo website (tên miền → nút), menu và ngôn ngữ bật theo website; bộ lọc
-      quản trị `owner_org`, `site`
+      quản trị `owner_org`, `site`; `menus` cũng có `org_id`, `?site=` ở menu công khai và ngôn ngữ của website
+      (D-238)
 - [ ] Cài đặt kế thừa theo cây (múi giờ, tiền tệ, ngôn ngữ, hồ sơ thuế, chính sách) và khuôn mẫu để module áp
       cùng cách cho dữ liệu của mình (vd giá: chuỗi đặt, cửa hàng ghi đè)
 - [ ] Đơn vị hành chính VN (module nền `address`, D-193) sau sáp nhập: tỉnh → xã / phường / đặc khu, 34 tỉnh,
@@ -230,7 +233,8 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
       (37), sổ địa chỉ người mua (44); endpoint công khai tỉnh, xã theo tỉnh, tìm không dấu, ETag / cache
 - [ ] Hồ sơ công khai của nút (D-200): tên hiển thị, `Address`, giờ mở cửa theo ngày và ngày đặc biệt, nhận hàng
       tại quầy, ảnh, tên miền gắn với nút; ghi qua `PATCH …/public-profile`; endpoint công khai cửa hàng theo
-      tên miền (chỉ nút "hiện công khai"), ETag / cache — cho "cửa hàng gần bạn", chọn nơi nhận hàng
+      tên miền (chỉ nút "hiện công khai"), ETag / cache — cho "cửa hàng gần bạn", chọn nơi nhận hàng; loại
+      cửa hàng công khai trong sổ đối tượng để menu của website trỏ tới (D-238)
 - [ ] Danh tính hai lớp: nhân sự là tài khoản toàn nền tảng (mặt điều khiển), một người làm cho nhiều khách /
       nút; người mua là tài khoản theo từng khách; API key gắn với khách và nút. Nâng cấp: tài khoản, role và
       API key có sẵn thành nhân sự của khách mặc định, giữ quyền cũ
@@ -428,7 +432,7 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
 
 - [ ] Nhúng bản ghi của module khác vào nội dung (P6): node `embed` (`kind`, `id`) của `content`, kiểm qua
       sổ đối tượng (D-123) khi lưu, đọc công khai trả tiêu đề, tóm tắt, đường dẫn, ảnh của đối tượng còn
-      công khai; `Resource` thêm `image`. `content` không biết khái niệm sản phẩm
+      công khai (`Resource.image` và `resolve_many` đã có, D-238). `content` không biết khái niệm sản phẩm
 - [ ] Sổ điều hướng (P1): `Module::navigation` (nhóm, mục, permission, tính năng, nguồn số đếm, thứ tự); nhóm
       trùng phải khai giống nhau; menu ẩn khi module chưa bật hay thiếu permission, **khoá (vẫn hiện) khi
       thiếu tính năng của gói**; nhãn theo i18n; ETag; tool MCP
@@ -470,6 +474,27 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       xuất chung và đích `content`, `media`, `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý)
 - [ ] Khai menu, nguồn việc, nguồn tìm, số liệu cho mọi module đang có; MODULE_GUIDE (EN + VI) mục "khai phần
       của module cho giao diện"; test rò rỉ giữa hai nhánh anh em cho số đếm và kết quả tìm
+
+## 68. Menu của website (`menus`, chủ dự án quyết ngày 14/11/2026, D-238)
+
+Đặc tả: [`docs/steps/68-menus.md`](steps/68-menus.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+Đề bài: [`docs/prompts/menus-module.md`](prompts/menus-module.md).
+
+Menu của website (thanh danh mục, bảng xổ lớn, chân trang) là module riêng: mục menu trỏ tới địa chỉ hay tới bản ghi
+của mọi module qua sổ đối tượng. Không nhầm với sổ điều hướng (P1 của bước 51), là menu của trang quản trị. Phần
+chính làm trước bước 33 theo lệnh của chủ dự án; phần theo khách, theo website làm cùng bước 33, 34.
+
+- [x] Kernel mở rộng sổ đối tượng theo D-038: `Resource.image`, `ResourceRef`, `resolve_many` (tra theo lô, theo
+      ngôn ngữ), `has_children`, `children`; `content` đăng ký `content.term` (có cây) và tra `content.entry` theo lô
+- [x] Module `menus`: menu theo `key` và ngôn ngữ; mục trỏ `url` / đối tượng / nhóm tiêu đề; tự lấy nhóm con có giới
+      hạn; biểu tượng, làm nổi, nhãn có hạn, ô gợi ý; 4 tầng, 200 mục; lỗi gom một lần với mã riêng
+- [x] API quản trị (`menus.read`, `menus.manage`, `If-Match` bắt buộc khi thay cây) và tool MCP dùng chung service;
+      API công khai trả cây đã giải, bỏ đối tượng không còn công khai, thiếu ngôn ngữ thì dùng ngôn ngữ mặc định,
+      `ETag` + cache trong bộ nhớ có thời hạn (rút tới mốc nhãn bật / tắt)
+- [x] Chuyển từ menu của `content`: bốn endpoint cũ deprecated (sunset 2027-05-14), lệnh
+      `menus.import_content_menus` chạy lại không nhân đôi, `menus` không đọc bảng của `content`
+- [ ] Gỡ menu cũ của `content` khi qua 2027-05-14: bốn endpoint, trait `LegacyMenus`, bảng `content_menus` và
+      `content_menu_items` (migration mới), mục menu trong `docs/CONTENT.md`
 
 ## 54. Phân quyền chuẩn hàng đầu (chủ dự án giao ngày 13/11/2026, D-205)
 
@@ -677,7 +702,8 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 - [ ] Trang có thân `layout` (cây khối JSON) cạnh thân `rich`: kiểm từ chối mặc định, theo cỡ màn hình, theo ngôn
       ngữ; sửa từng phần bằng JSON Patch + `If-Match`; khoá sửa; nháp, lịch sử, xem trước, hẹn giờ dùng lại `content`
 - [ ] Khối nền (bố cục, chữ, media, FAQ, thanh thông báo, đếm ngược, popup thu email có đồng ý) và khối của
-      `forms`, `newsletter`, `comments`, `media`; chân trang pháp lý tự gắn cho website bán hàng
+      `forms`, `newsletter`, `comments`, `media`, `menus` (`menus.menu`, D-238); chân trang pháp lý tự gắn cho
+      website bán hàng
 - [ ] Đọc công khai trả bố cục kèm dữ liệu khối, một lần gọi mỗi loại khối, khối lỗi không hỏng trang, ETag;
       đo p99 trang 50 khối trên cả hai database
 - [ ] Bộ giao diện của website (token màu, chữ, khoảng cách, kế thừa theo nút, kiểm tương phản), khu dùng chung
@@ -785,6 +811,9 @@ bước 35.
 - [ ] Hỏi đáp và ảnh song ngữ (D-202): `catalog.product` trong sổ đối tượng, nhãn `seller` (permission quản lý
       sản phẩm ở nút sở hữu), event vòng đời (lưu trữ / xoá → đóng và ẩn hỏi đáp); `catalog_product_media`
       ghi đè `alt` theo ngôn ngữ như `media_alt_translations`
+- [ ] Danh mục trong menu của website (D-238): `catalog.category` trong sổ đối tượng (`resolve_many` theo ngôn ngữ,
+      `children` theo thứ tự hiển thị, chỉ danh mục đang hiện), `catalog.product` có `image`; khối "Bán chạy" của
+      bảng xổ là danh sách sản phẩm công khai lọc theo danh mục, sắp `best_selling`
 - [ ] Tạo sản phẩm nháp từ ảnh bằng AI (tên, mô tả, danh mục trong cây của khách, thuộc tính, SEO — D-229);
       khối `catalog.product_grid`, `product_card`, `collection` cho trang dựng từ khối (bước 67)
 
@@ -854,7 +883,8 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 - [ ] Công khai và nhắc: event giá sau giảm tự động cho danh sách công khai; flash sale công khai với suất
       còn là số thật; nhắc khi flash sale bắt đầu (đồng ý riêng cho một lần nhắc, D-225)
 - [ ] Chạy thử chương trình trên giỏ mẫu, kiểm xung đột, lịch, số liệu chương trình (D-222)
-- [ ] Khối `promotions.flash_sale`, `promotions.voucher_claim` cho trang dựng từ khối (D-229, bước 67)
+- [ ] Khối `promotions.flash_sale`, `promotions.voucher_claim` cho trang dựng từ khối (D-229, bước 67);
+      `promotions.promotion` trong sổ đối tượng (chỉ công khai khi đang chạy) để menu của website trỏ tới (D-238)
 
 ## 44. Vận chuyển (`shipping`)
 
@@ -941,7 +971,8 @@ Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nú
 
 - [ ] Người bán đăng ký: hồ sơ, KYC qua cổng chặn của bước 37 (chưa xác thực thì không đăng bán),
       chấp nhận quy chế sàn và hợp đồng với người bán có phiên bản (bước 37), giấy tờ cho ngành hàng
-      có điều kiện; gian hàng của người bán; thông tin người bán hiện trên trang sản phẩm
+      có điều kiện; gian hàng của người bán; thông tin người bán hiện trên trang sản phẩm; `marketplace.seller`
+      trong sổ đối tượng để menu của website trỏ tới gian hàng (D-238)
 - [ ] Duyệt sản phẩm của người bán: hàng cấm, hàng có điều kiện thiếu giấy tờ, báo vi phạm (bước 37)
 - [ ] Phí sàn theo ngành hàng là dữ liệu có ngày hiệu lực; một lần đặt hàng tách thành đơn theo
       từng người bán; người bán tự giao hay sàn giao
@@ -1192,7 +1223,7 @@ ký điện tử (59), gọi điện trong chat (61), bán ứng dụng trả ph
 Đã viết đặc tả (D-233): hợp đồng tool MCP và `cargo semver-checks` (31), báo yêu thích (47), banner gian hàng
 người bán (55), EDI (59), người bán nước ngoài (63). Sau đó: chủ đề theo lịch, đầu / chân trang (67, D-234); trường
 tự định nghĩa, nhãn, đổi câu chữ (51), loại nội dung (67), mã theo dõi và đồng ý cookie (37) (D-235); kiểu vị trí
-banner (55, D-236); rà lộ trình lần hai (D-237).
+banner (55, D-236); rà lộ trình lần hai (D-237); module `menus` cho menu của website (68, D-238).
 
 Để sau: (trống — ý tưởng mới ghi một dòng ở đây, chưa viết đặc tả, cho tới khi xong giai đoạn A).
 

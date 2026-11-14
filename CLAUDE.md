@@ -56,8 +56,8 @@ Hệ quả cho agent:
 - Người lạ phải tự cài và dùng được: cấu hình có giá trị mặc định hợp lý, thông báo
   lỗi rõ, tài liệu cài đặt đủ để làm theo mà không cần hỏi ai.
 - Chỉ dựng module nghiệp vụ chủ dự án đã giao: `media` (D-091), `content` (D-096, D-098),
-  `forms`, `newsletter`, `comments` (D-112), module mẫu `notes`, module nền `address` (đơn vị
-  hành chính, D-193) và `notifications` (D-194), và module thương mại của bước 41–49: `catalog`,
+  `forms`, `newsletter`, `comments` (D-112), `menus` (menu của website, bước 68, D-238), module mẫu
+  `notes`, module nền `address` (đơn vị hành chính, D-193) và `notifications` (D-194), và module thương mại của bước 41–49: `catalog`,
   `inventory`, `promotions`, `shipping`, `orders`, `marketplace` (D-191), `customers`, `channels`,
   `affiliate` (D-194), cùng `support` (hỗ trợ khách hàng, bước 53, D-204), `imports` (chuyển dữ liệu,
   bước 56, D-219), `analytics` (bước 57), `automations` (bước 58, D-220), `wholesale`, `bookings`,

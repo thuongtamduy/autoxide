@@ -5753,3 +5753,96 @@ hay một lời gọi trái luật thứ tự đăng ký.
 Đã cân nhắc: giữ tỉ giá ở `invoices` và cho `ledger` nhận tỉ giá do bên gọi truyền vào — mọi bên gọi `post` phải tự
 tra tỉ giá, dễ lệch; gộp hẳn báo có hàng lại vào `inventory` (bỏ phần của `customers`) — báo yêu thích có luật riêng
 (giảm giá, 7 ngày, gom lô) đã chốt ở D-233, chỉ cần chống trùng.
+
+## D-238 · Module `menus`: menu của website tách khỏi `content`, mục menu trỏ tới đối tượng của mọi module (bước 68) — 2026-11-14 — chủ dự án quyết
+
+Chủ dự án quyết (14/11/2026, đề bài `docs/prompts/menus-module.md`): menu **trên website** (thanh danh mục, bảng
+xổ lớn, menu chân trang, menu phụ) là một module riêng, `menus`. Menu trỏ tới bản ghi của mọi module (bài viết,
+danh mục nội dung, danh mục sản phẩm, khuyến mại, gian hàng, cửa hàng), nên đặt trong `content` là sai chỗ. Thiết
+kế "kết hợp" (chủ dự án đồng ý): người quản trị dựng menu, toàn quyền thứ tự và lối vào đặc biệt; mục menu trỏ
+tới một đối tượng của sổ đối tượng và có thể tự lấy nhóm con. **Không gộp** với sổ điều hướng của bước 51
+(`Module::navigation`), là menu của trang quản trị.
+
+Quyết định thay phần menu của `content` ở bước 17: thiết kế và endpoint menu của D-096, D-102, D-105. Giữ luật từ
+chối link `//host` của D-149 ở module mới.
+
+Quyết định:
+
+1. **Kernel, sổ đối tượng (D-123), theo D-038** (hàm mới đều có mặc định, module cũ không sửa):
+   - `Resource.image: Option<Uuid>` (ID media), làm luôn phần này của P6 bước 51;
+   - kiểu `ResourceRef { kind, id }`;
+   - `ResourceResolver::resolve_many(ids, locale)`: tra nhiều đối tượng một lần, theo ngôn ngữ. Mặc định gọi
+     `resolve` từng cái;
+   - `ResourceResolver::children(id, locale, limit)`: mặc định rỗng;
+   - `ResourceResolver::has_children()`: mặc định `false`; loại có cây trả `true`.
+
+   Thêm hai hàm ngoài đề bài, vì hai lý do. Menu 200 mục mà tra từng cái là hàng trăm câu query. Tên danh mục
+   lại theo ngôn ngữ, trong khi `resolve(id)` không nhận ngôn ngữ.
+2. **`content` đăng ký `content.term`** (danh mục, thẻ):
+   - tên lấy theo ngôn ngữ, thiếu thì dùng ngôn ngữ mặc định;
+   - `children` trả danh mục con;
+   - đường dẫn công khai `/<AUTOXIDE_CONTENT_POST_PATH_PREFIX>/category/<slug>` (thẻ: `/…/tag/<slug>`). Website
+     hiện trang danh sách bằng `GET /api/v1/content/public/terms/{taxonomy}/{slug}`. Trước đây danh mục chưa có
+     đường dẫn công khai nào; đây là đường dẫn chuẩn từ nay.
+
+   `content.entry` trả thêm `image` (ảnh đại diện của bản công khai) và tra nhiều bài bằng một câu query.
+3. **Module `menus`, bảng và API.**
+   - Bảng `menus_menus`, `menus_items`. Mục menu có đúng một trong ba kiểu đích:
+     - `url`: `https://`, `http://`, `mailto:` hay đường dẫn `/…`; từ chối `//host`;
+     - `ref_kind` + `ref_id`;
+     - không có đích: nhóm tiêu đề.
+   - Trình bày:
+     - `label`: bỏ trống thì lấy tiêu đề của đối tượng;
+     - `auto_children` (1 tới 50 mục con);
+     - `icon`, `highlight`: tập cố định;
+     - nhãn: `badge_text`, `badge_tone` (`sale`, `brand`, `new`, `neutral`), `badge_from`, `badge_until`;
+     - ô gợi ý `feature_kind` + `feature_id`.
+   - Giới hạn: 4 cấp, 200 mục.
+   - API quản trị `/api/v1/menus` (`menus.read`, `menus.manage`): danh sách, đọc, tạo (201), thay cả cây (`PUT`,
+     bắt buộc `If-Match`), xoá. Tool MCP gọi cùng service.
+   - Lỗi lưu gom một lần (D-083): `menus.ref_unknown_kind`, `menus.ref_not_found`, `menus.children_unsupported`.
+4. **API công khai `GET /api/v1/menus/public/{key}?locale`.**
+   - Trả cây đã giải. Bỏ mục trỏ tới đối tượng không còn công khai, kèm mục con; bỏ nhóm không còn mục con. Mở
+     `auto_children`. Nhãn đã lọc theo hạn. Thiếu ngôn ngữ thì dùng ngôn ngữ mặc định.
+   - Mỗi mục kèm `ref` (loại, ID) để giao diện gọi thêm khi cần. Khối "Bán chạy" của bảng xổ **không** thuộc
+     module này: giao diện gọi danh sách sản phẩm công khai của `catalog` (lọc theo danh mục, sắp `best_selling`).
+   - `ETag` là dấu vân tay của cả câu trả lời; kernel tự trả 304.
+   - **Làm mới cache bằng thời hạn ngắn, không nghe event.** Bản đã giải nằm trong bộ nhớ, tối đa
+     `AUTOXIDE_MENUS_PUBLIC_CACHE_SECONDS` (mặc định 60; 0 là tắt). Cùng số đó đi vào `Cache-Control: max-age`.
+     Hai mốc rút ngắn thời hạn: menu được sửa thì xoá cache ngay; nhãn sắp tới hạn bật hay tắt thì hết hạn đúng
+     lúc đó. Đối tượng đổi tên hay đổi đường dẫn thì hiện sau tối đa một thời hạn cache.
+   - Ngôn ngữ: `AUTOXIDE_MENUS_LOCALES`, `AUTOXIDE_MENUS_DEFAULT_LOCALE`, giống cách của `content`.
+5. **Làm trước bước 33 theo lệnh của chủ dự án.**
+   - Chưa có `tenant_id` / `org_id` và tham số `site`:
+     - bước 33 thêm `tenant_id` cho bảng `menus_*` cùng mọi module, và thêm khách vào `resolve`, `resolve_many`,
+       `children`;
+     - bước 34 thêm `org_id` (website hay nút sở hữu, H1) và `?site=`.
+   - Các module sau đăng ký loại đối tượng trong bước của mình:
+     - `catalog.category` (41, có `children`);
+     - `promotions.promotion` (43);
+     - `marketplace.seller` (46);
+     - cửa hàng công khai (34).
+6. **Chuyển từ menu của `content` (D-059).**
+   - Bốn endpoint menu của `content` khai deprecated từ 2026-11-14, sunset 2027-05-14 (sáu tháng), kèm endpoint
+     thay thế; hành vi không đổi.
+   - `content` công bố trait `autoxide_content::api::LegacyMenus` để đọc menu cũ. Lệnh
+     `autoxide task menus.import_content_menus` nhập menu mà `menus` chưa có cùng (`key`, `locale`); chạy lại không
+     nhân đôi, không đè menu đã sửa. Mục trỏ bài thành `content.entry`, mục trỏ danh mục / thẻ thành `content.term`.
+   - `menus` không đọc bảng của `content`. Không có `content` thì `menus` vẫn chạy, chỉ lệnh nhập báo không có
+     nguồn.
+   - Qua ngày sunset thì gỡ endpoint, và gỡ bảng `content_menus*` bằng migration mới.
+   - Khối `content.menu` của bước 67 (D-234) đổi thành `menus.menu`, do module này khai.
+
+Lý do:
+- Menu của sàn thương mại trỏ tới danh mục sản phẩm, khuyến mại, gian hàng; `content` không được biết những thứ đó.
+  Sổ đối tượng cho `menus` trỏ tới loại của mọi module mà không phụ thuộc chúng.
+- Cache theo thời hạn ngắn đủ đúng (đổi tên danh mục hiện sau một phút) và không buộc `menus` phải biết event
+  đổi tên của từng module.
+
+Đã cân nhắc:
+- Giữ menu trong `content` và thêm cột cho mỗi loại đích: mỗi module thương mại phải sửa `content`.
+- Menu sinh hoàn toàn tự động từ cây danh mục: mất thứ tự tay và lối vào đặc biệt (chủ dự án loại).
+- Nghe event đổi tên của mọi module để xoá cache: `menus` phải biết tên event của module khác, và dễ sót.
+- Một trait chung cho mọi module có menu cũ: chỉ `content` có, nên dùng trait riêng của `content` là đủ.
+
+Thay: phần menu của D-096, D-102, D-105 (bước 17).

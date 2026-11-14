@@ -29,6 +29,9 @@ không đọc bảng `catalog_…`.
 - Module sẵn có: `media` (`dyn Media`), `files` (`dyn Storage`), `ai` (`dyn TextModel`, `dyn Embedder`).
 - Hạ tầng hỏi đáp đã có trong kernel và `comments` (D-202): sổ đối tượng (`context.resource_type`),
   `Module::resource_events`, `context.badge_source`; bước này chỉ khai phần của `catalog`.
+- Module `menus` (bước 68, D-238) đã có: menu của website trỏ tới danh mục sản phẩm qua sổ đối tượng; bước
+  này đăng ký `catalog.category` (có cây) và trả khối "Bán chạy" bằng danh sách sản phẩm công khai lọc theo
+  danh mục, sắp `best_selling`.
 
 ## Phạm vi
 
@@ -541,7 +544,9 @@ Số mục theo danh sách việc của bước 41 trong ROADMAP.
 10. Hàng số (quyền tải, URL ký), dịch vụ, combo, hàng đặt trước (`sale_mode`) → **mục 11**; sản phẩm
     tương tự, "thường mua cùng" → **mục 12**.
 11. Hỏi đáp (`catalog.product` trong sổ đối tượng, nhãn `seller`, event vòng đời), `alt` theo ngôn ngữ →
-    **mục 13**.
+    **mục 13**. Cho menu của website (D-238): `catalog.product` có `image`; loại `catalog.category` với
+    `resolve_many` theo ngôn ngữ, `has_children` = `true`, `children` theo thứ tự hiển thị, chỉ danh mục đang
+    hiện; test `danh_muc_trong_so_doi_tuong` (lô, ngôn ngữ, con có giới hạn).
 12. Tài liệu `docs/CATALOG.md` + `docs/CATALOG.vi.md`, sinh lại `docs/openapi.json`, `.env.example`,
     CHANGELOG, đánh dấu ROADMAP.
 

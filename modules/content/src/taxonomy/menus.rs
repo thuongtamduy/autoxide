@@ -456,3 +456,43 @@ fn menu_not_found(key: &str, locale: &str) -> Error {
         .with_param("key", key)
         .with_param("locale", locale)
 }
+
+// Menu cũ cho module `menus` nhập sang (D-238). Không kiểm quyền: chỉ module khác gọi, qua lệnh
+// của người vận hành máy chủ.
+#[async_trait::async_trait]
+impl crate::api::LegacyMenus for ContentService {
+    async fn legacy_menus(&self) -> Result<Vec<crate::api::LegacyMenu>, Error> {
+        let menus = menu::Entity::find()
+            .order_by_asc(menu::Column::Key)
+            .order_by_asc(menu::Column::Locale)
+            .all(self.database.read())
+            .await?;
+        let mut found = Vec::with_capacity(menus.len());
+        for row in menus {
+            let items = legacy_items(tree(self.menu_items(row.id).await?));
+            found.push(crate::api::LegacyMenu { key: row.key, locale: row.locale, items });
+        }
+        Ok(found)
+    }
+}
+
+fn legacy_items(nodes: Vec<Node>) -> Vec<crate::api::LegacyMenuItem> {
+    use crate::api::LegacyTarget;
+    nodes
+        .into_iter()
+        .filter_map(|node| {
+            let item = node.item;
+            let target = match (item.target_entry_id, item.target_term_id, item.target_url) {
+                (Some(id), _, _) => LegacyTarget::Entry(id),
+                (_, Some(id), _) => LegacyTarget::Term(id),
+                (_, _, Some(url)) => LegacyTarget::Url(url),
+                _ => return None,
+            };
+            Some(crate::api::LegacyMenuItem {
+                label: item.label,
+                target,
+                children: legacy_items(node.children),
+            })
+        })
+        .collect()
+}

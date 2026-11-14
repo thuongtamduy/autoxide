@@ -337,3 +337,37 @@ async fn da_duyet_ai_van_hien_sau_xoa_tai_khoan() {
     .await
     .unwrap();
 }
+
+/// Menu cũ vẫn chạy như trước nhưng báo deprecated, sunset và endpoint thay thế (D-238, D-059).
+#[tokio::test]
+async fn menu_cu_bao_deprecated() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let body = json!({"items": [{"label": "Home", "url": "/"}]});
+        let put =
+            send(&app, "PUT", "/menus/main", Some("admin"), &[("if-match", "*")], Some(body)).await;
+        assert_eq!(put.status(), StatusCode::OK, "{}", put.json());
+        for (method, uri, who) in [
+            ("GET", "/menus", Some("admin")),
+            ("GET", "/menus/main", Some("admin")),
+            ("GET", "/public/menus/main?locale=en", None),
+        ] {
+            let response = send(&app, method, uri, who, &[], None).await;
+            assert_eq!(response.status(), StatusCode::OK, "{uri}");
+            assert!(response.headers().contains_key("deprecation"), "{uri}");
+            assert!(response.header("sunset").contains("2027"), "{uri}");
+            assert!(response.header(header::LINK).contains("/api/v1/menus"), "{uri}");
+        }
+        assert!(put.headers().contains_key("deprecation"));
+        let document = serde_json::to_value(app.openapi()).unwrap();
+        assert_eq!(
+            document["paths"]["/api/v1/content/public/menus/{key}"]["get"]["deprecated"],
+            true
+        );
+        assert!(
+            document["paths"]["/api/v1/content/public/posts"]["get"].get("deprecated").is_none()
+        );
+    })
+    .await
+    .unwrap();
+}
