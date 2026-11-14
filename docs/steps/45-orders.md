@@ -221,7 +221,9 @@ Trả lời tự động (D-230): `orders` gắn một `FactSource` vào `Suppor
 `support`: ý định `orders.order_status` (tham số số đơn) trả mẫu câu i18n "Đơn {number} đang {status}, dự kiến
 giao {eta}" — chỉ khi đơn thuộc tài khoản hay số điện thoại đã xác thực của người hỏi, không thì `None`.
 
-Khối cho trang (D-229, bước 67): `orders` khai `orders.add_to_cart`, `orders.buy_now`, `orders.reviews` qua
+Khối cho trang (D-229, bước 67): `orders` khai `orders.add_to_cart`, `orders.buy_now`, `orders.reviews`,
+`orders.cart_link` (biểu tượng giỏ cho đầu trang của website — D-234; số món do giao diện tự đếm từ giỏ, không vào
+dữ liệu cache) qua
 `Module::blocks()` và gắn `BlockData` (giá, còn hàng, điểm đánh giá — chỉ dữ liệu công khai).
 
 `OrderExtensions` vì `start` chạy theo thứ tự đăng ký: `orders` không `require` được trait của module

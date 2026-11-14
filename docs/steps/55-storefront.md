@@ -155,6 +155,11 @@ Thông tin cửa hàng là **cài đặt kế thừa của nút** do `organizati
 
 Giá trị theo ngôn ngữ thì khoá có hậu tố `.<locale>`.
 
+Dùng cho khung website (D-234, bước 67 có trước): `organizations` khai khối `organizations.store_info` qua
+`Module::blocks()` (chọn trường hiện: tên, liên hệ, địa chỉ, giờ mở cửa, "đang mở cửa") kèm `BlockData` theo lô, và
+công bố logo đã kế thừa qua trait để theme của `content` dùng khi logo theme để trống — một chỗ đặt logo cho trang,
+mail, hoá đơn.
+
 Quy tắc của bộ sưu tập `rule` là JSON có schema cố định, kiểm ở service:
 
 ```json

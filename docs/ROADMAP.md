@@ -53,7 +53,7 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 | 59 Bán sỉ B2B (D-221) | 45, 47 | 46, 48, 49 |
 | 60 Đặt lịch dịch vụ (D-221) | 34, 36 (37 cho nhắc lịch) | 41–49 |
 | 61 Chat chăm sóc khách (D-221) | 40 (SSE), 53 | 41–49 |
-| 67 Trang dựng từ khối, AI tạo trang (D-229, D-231) | 51, 37 (nhãn AI, đồng ý, chân trang pháp lý); thử A/B: 57 | 41–49 (module thương mại khai khối ở bước của nó) |
+| 67 Trang dựng từ khối, AI tạo trang (D-229, D-231, D-234) | 51, 37 (nhãn AI, đồng ý, chân trang pháp lý); thử A/B: 57 | 41–49 (module thương mại khai khối ở bước của nó) |
 | 62 Sản phẩm bán theo kỳ (D-221) | 45, 36 | 46–49 |
 | 63 Đa tiền tệ (D-221) | 36, 41, 44, 45 | 46–49 |
 | 64 Quảng cáo trong sàn (D-221) | 46, 57 | 47–49 |
@@ -672,6 +672,12 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
       đo p99 trang 50 khối trên cả hai database
 - [ ] Bộ giao diện của website (token màu, chữ, khoảng cách, kế thừa theo nút, kiểm tương phản), khu dùng chung
       nhiều trang, thư viện trang mẫu theo ngành
+- [ ] Chủ đề theo mùa, ngày lễ, khung giờ (D-234): bản chủ đề ghi đè một phần theme gốc theo lịch (một lần, hằng
+      ngày, hằng tuần, theo múi giờ của website), ưu tiên khi trùng, thư viện chủ đề mẫu, chép sang năm sau, xem
+      trước ở một thời điểm; hiệu ứng trang trí chỉ trong danh sách cho phép, không chạy ở trang thanh toán
+- [ ] Đầu trang và chân trang của cả website (D-234): bố cục khối có nháp / đăng, theo ngôn ngữ, kế thừa theo nút,
+      bản chủ đề kèm được bản riêng; `GET /public/site` một lời gọi cho khung website, cache tới đúng mốc đổi chủ
+      đề, không query khi cache nóng; đo p99 trên cả hai database
 - [ ] AI tạo trang và sửa tiếp bằng trò chuyện (job, kết quả qua bộ kiểm, thử lại có giới hạn, bản nháp
       `ai_assisted`, lịch sử trò chuyện để hoàn tác); bộ nháp chiến dịch từ một chương trình khuyến mại
 - [ ] Kiểm tra sức khoẻ website vào hộp việc: thiếu SEO / alt, link gãy, khối tham chiếu bản ghi đã ẩn, đường dẫn
