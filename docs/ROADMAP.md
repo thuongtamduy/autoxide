@@ -57,7 +57,7 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 | 62 Sản phẩm bán theo kỳ (D-221) | 45, 36 | 46–49 |
 | 63 Đa tiền tệ (D-221) | 36, 41, 44, 45 | 46–49 |
 | 64 Quảng cáo trong sàn (D-221) | 46, 57 | 47–49 |
-| 65 Chợ ứng dụng OAuth (D-221) | 54, 33 | 41–49 |
+| 65 Chợ ứng dụng OAuth (D-221) | 54, 33; bán ứng dụng trả phí: 35, 36 | 41–49 |
 | 66 SCIM (D-221) | 34, 40 (OIDC) | 35–49 |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
@@ -147,7 +147,7 @@ Nhóm B — việc nhật ký quyết định đã ghi "để sau":
 - [ ] `comments`: Markdown giới hạn (đậm, nghiêng, link, trích dẫn, code) với bộ lọc HTML chống
       XSS — thêm thư viện thì đo và ghi `STACK.md`; giữ test XSS sẵn có; chữ thường cũ hiển thị như cũ
 
-Chờ chủ dự án quyết: định dạng AVIF cho ảnh thu nhỏ (cần thư viện mã hoá AVIF, nặng hơn WebP).
+AVIF cho ảnh thu nhỏ: đã chuyển sang bước 39, đo trước rồi mới quyết (D-232).
 
 ## 33. Nền đa khách: khách hàng, vị trí dữ liệu, mặt điều khiển (D-185)
 
@@ -482,6 +482,10 @@ Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe v
       quyền không dùng 90 ngày, rà soát quyền định kỳ vào hộp việc
 - [ ] Endpoint theo chuẩn OpenID AuthZEN Authorization API 1.0; agent hành động thay người dùng có vết
       `on_behalf_of`; số đo quyết định quyền; hướng dẫn `docs/ACCESS.md` (EN + VI)
+- [ ] Khách duyệt từng lần khi nhân sự nền tảng xin vào dữ liệu (D-232): `per_request` mặc định, tối đa 4 giờ,
+      duyệt qua yêu cầu duyệt, `legal_request` như D-211
+- [ ] "Xem như" người dùng chỉ đọc thay cho đăng nhập thay (D-232): người mua phải cấp phép, không xem người
+      quyền cao hơn, mọi lệnh ghi bị chặn kể cả qua MCP, không trả secret, audit hai id
 
 ## 52. Trải nghiệm quản trị nâng cao (D-201)
 
@@ -502,6 +506,8 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
       dùng (`/me/pins`)
 - [ ] Sức khoẻ người bán và sức khoẻ tuân thủ: chỉ số so với ngưỡng (ngưỡng là dữ liệu có ngày hiệu lực), vi
       phạm, hạn phải xử lý; huy hiệu người bán tin cậy tính từ số liệu thật, công bố tiêu chí
+- [ ] Quản trị trên điện thoại (D-232): gợi ý `mobile` trên sổ điều hướng (tối đa 5 mục thanh đáy); tóm tắt
+      cuối ngày tự bật theo giờ của người dùng (số liệu, việc gấp, cảnh báo bất thường)
 
 ## Giai đoạn C — Vận hành
 
@@ -519,6 +525,9 @@ Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 3
 - [ ] Tách một nhánh tổ chức thành khách riêng (database riêng) và gộp ngược lại, giữ ID và lịch sử;
       test trên cả hai database
 - [ ] Đối chiếu thiết kế 2 (D-210): tách / gộp khách qua API chỉ cho nhân sự nền tảng, khách chỉ gửi yêu cầu
+- [ ] Khách thử nghiệm (sandbox, D-232): sao cấu hình không sao dữ liệu cá nhân, đối tác buộc dùng bộ giả, mail
+      chỉ tới nhân viên, `noindex`, tự hết hạn; đẩy trang / theme / mẫu / luật sang khách thật thành bản nháp
+- [ ] Nhóm nút ngoài cây cho báo cáo (D-232): nhóm tự do của `organizations`, nhóm không cấp quyền
 
 ## 39. Vận hành và hiệu năng (chủ dự án giao ngày 13/11/2026; số cũ 33, D-189)
 
@@ -580,6 +589,8 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
       hai database, ghi quyết định; không vượt thì ghi số đo và giữ nguyên
 - [ ] Quan sát theo khách (D-190): log và trace mang trường `tenant_id`; **không** dùng `tenant_id`
       làm nhãn số đo (trái luật code về nhãn); lượng dùng theo khách lấy từ số đo dùng của bước 35
+- [ ] Ảnh AVIF (D-232): đo so với WebP trên bộ ảnh mẫu; chỉ thêm (job, tắt mặc định) khi nhẹ hơn ≥ 20% ở chất
+      lượng tương đương, không thì ghi "không làm" kèm số đo
 
 ## Giai đoạn D — Module nền dùng chung
 
@@ -688,6 +699,8 @@ Bắt đầu SAU bước 54 và 33. Ứng dụng bên ngoài cắm vào như Sho
       tên permission, thu hồi và kiểm tra token, siêu dữ liệu máy chủ (RFC 7009, 7636, 7662, 8414)
 - [ ] Đăng ký ứng dụng, nền tảng duyệt ứng dụng công khai, khách cài / đồng ý / gỡ (token mất hiệu lực ngay),
       webhook theo ứng dụng, audit `actor_kind = app`; test trên cả hai database
+- [ ] Bán ứng dụng trả phí (D-232): thuê bao tháng, dùng thử; nền tảng là bên bán (hoá đơn thuê bao của 35), chia
+      doanh thu cho nhà phát triển qua `PayoutGateway` (36); nhà phát triển nước ngoài chờ đối chiếu thuế
 
 ## Giai đoạn E — Module thương mại (chủ dự án giao ngày 13/11/2026, D-191)
 
@@ -893,6 +906,8 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       nhận, trạng thái xử lý, hạn bảo hành
 - [ ] Khối `orders.add_to_cart`, `buy_now`, `reviews` cho trang dựng từ khối (D-229); câu trả lời tự động về
       trạng thái đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
+- [ ] Trả trước một phần cho hàng đặt trước (D-232): tỉ lệ hay số tiền, phần còn lại thu khi sẵn sàng giao,
+      người bán huỷ hoàn đủ, người mua huỷ theo điều kiện công bố; không mặc định là "đặt cọc" (BLDS Điều 328)
 
 ## 46. Sàn (`marketplace`)
 
@@ -1035,6 +1050,10 @@ Bắt đầu SAU bước 45 và 47. Bán cho doanh nghiệp trên cùng hệ th�
 - [ ] Báo giá có hạn, chấp nhận thành đơn với giá đã chốt; đặt nhanh theo SKU / CSV
 - [ ] Trả chậm theo điều khoản, hạn mức tín dụng không vượt khi đặt đồng thời, công nợ trong sổ cái, tuổi nợ,
       nhắc nợ, chặn đơn trả chậm khi quá hạn; hoá đơn ghi mã số thuế công ty; test trên cả hai database
+- [ ] Hợp đồng khung (D-232): cam kết số lượng / giá trị, đơn gọi hàng trừ cam kết nguyên tử; mời thầu nhiều
+      người bán trên sàn, giá niêm phong tới hạn, trao thầu thành báo giá / hợp đồng; không dùng cho mua sắm công
+- [ ] Ký hợp đồng điện tử trong `compliance` (D-232): `SignatureProvider` + bộ giả, ký `simple` (OTP + đồng ý) hay
+      `digital` (chữ ký số qua nhà cung cấp được cấp phép), mã băm chống sửa tệp; dùng cho 59, 46, 49
 
 ## 60. Đặt lịch dịch vụ (`bookings`) (chủ dự án giao ngày 14/11/2026, D-221)
 
@@ -1061,6 +1080,8 @@ Bắt đầu SAU bước 40 (SSE) và 53 (`support`).
 - [ ] Chống lạm dụng (chặn, báo vi phạm, xác thực tài khoản khi khách bật), hạn lưu là cấu hình; câu phức tạp:
       AI soạn nháp cho nhân viên; câu đơn giản đã có câu trả lời chính xác: trả lời tự động qua `AutoResponder`
       của `support` (D-230); test trên cả hai database
+- [ ] Gọi điện trong chat (D-232): `VoiceProvider` + bộ giả, yêu cầu gọi lại vào hộp việc, nhật ký cuộc gọi,
+      ghi âm tắt mặc định và phải thông báo trước; bộ nối thật cần tài khoản — dừng hỏi chủ dự án
 
 ## 62. Sản phẩm bán theo kỳ (`recurring`) (chủ dự án giao ngày 14/11/2026, D-221)
 
@@ -1125,15 +1146,12 @@ GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `ST
 Đã đưa lên lộ trình (D-221): bán sỉ B2B (bước 59), đặt lịch dịch vụ (60), chat chăm sóc khách (61), sản
 phẩm bán theo kỳ (62), đa tiền tệ (63), quảng cáo trong sàn (64), chợ ứng dụng OAuth (65), SCIM (66).
 
-Để sau (D-201, theo nghiên cứu): khách thử nghiệm (sandbox) cách ly, khách duyệt từng lần nhân sự nền
-tảng xin vào dữ liệu, nhóm nút ngoài cây cho báo cáo, quản trị trên điện thoại có thanh đáy và tóm tắt
-cuối ngày.
+Đã đưa vào các bước (D-232): khách thử nghiệm và nhóm nút cho báo cáo (38), AVIF (39), trả trước một phần (45),
+quản trị trên điện thoại (52), duyệt từng lần truy cập hỗ trợ và "xem như" chỉ đọc (54), hợp đồng khung, mời thầu và
+ký điện tử (59), gọi điện trong chat (61), bán ứng dụng trả phí (65).
 
-Để sau: bán qua ứng dụng trả phí trên chợ ứng dụng (chia doanh thu) · tiền cọc một phần cho hàng đặt trước
-· đấu thầu và hợp đồng khung B2B · gọi điện / tổng đài trong chat. (Đo hành vi người xem đã thành bước 57
-`analytics` không cookie, D-220.)
+Để sau: (trống — ý tưởng mới ghi một dòng ở đây, chưa viết đặc tả, cho tới khi xong giai đoạn A).
 
-Chờ chủ dự án quyết (không làm khi chưa có quyết định): đăng nhập thay người dùng để hỗ trợ · định
-dạng ảnh AVIF. Đã cân nhắc và không làm: API dữ liệu tự
+Đã cân nhắc và không làm: API dữ liệu tự
 sinh từ bảng, plugin WASM nạp lúc chạy, trang quản trị dựng sẵn (`docs/research/frameworks.md`,
 D-005, D-026). Thư viện số thập phân và module sổ cái: đã quyết ở D-187, D-188.

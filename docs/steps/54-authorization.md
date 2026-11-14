@@ -1,8 +1,9 @@
 # Bước 54 — Phân quyền chuẩn hàng đầu (kernel, `auth`)
 
-> Lộ trình: `docs/ROADMAP.md` bước 54 (và hai mục ở bước 31) · Quyết định: D-205 · Nền: D-046 (RBAC),
-> đặc tả 33 (khách), 34 (quyền theo độ sâu), 35 (gói), 37 (dữ liệu cá nhân, KYC), 51 (P11 `/me/can`,
-> P12 lệnh chờ duyệt)
+> Lộ trình: `docs/ROADMAP.md` bước 54 (và hai mục ở bước 31) · Quyết định: D-205, D-232 (khách duyệt từng lần
+> vào hỗ trợ, xem như người dùng) · Nền: D-046 (RBAC), D-190, D-211 (quyền vào hỗ trợ), đặc tả 33 (khách),
+> 34 (quyền theo độ sâu, quyền vào hỗ trợ), 35 (gói), 37 (dữ liệu cá nhân, KYC), 51 (P11 `/me/can`, P12 lệnh
+> chờ duyệt), 52 (nhật ký request)
 
 ## Mục tiêu
 
@@ -11,6 +12,9 @@ sách luôn khớp với kiểm từng bản ghi** (chứng minh bằng test), *
 chứng minh không endpoint nào hở), **giải thích và mô phỏng được mọi quyết định**, và **sinh ra cho AI
 agent** (quyền tối thiểu, hành động thay người dùng có vết, lệnh rủi ro chờ người duyệt) — chạy như nhau trên
 SQLite và Postgres, mã nguồn mở.
+
+Khách kiểm soát ai vào dữ liệu của mình: nhân sự nền tảng chỉ vào khi khách **duyệt từng lần** (mặc định cho khách
+mới), và để gỡ lỗi quyền, hiển thị thì có **xem như người dùng** — chỉ đọc, không bao giờ làm thay (D-232).
 
 ## Nền tảng lớn đang làm gì, ta lấy gì, ta hơn ở đâu
 
@@ -27,6 +31,7 @@ SQLite và Postgres, mã nguồn mở.
 | Shopify, Stripe | Quyền nhân viên theo cửa hàng; key hạn chế; ứng dụng bên thứ ba có phạm vi | Đã có ở 34 (theo nút) và P4 | — |
 | OpenID AuthZEN Authorization API 1.0 (chuẩn cuối 01/2026) | API chuẩn để hỏi "chủ thể X được làm Y trên Z không" | Endpoint AuthZEN (P10) | Cổng API, dịch vụ khác, agent hỏi Autoxide bằng chuẩn mở thay vì API riêng |
 | OAuth 2.0 Step-up (RFC 9470), Token Exchange (RFC 8693) | Đòi xác thực mạnh hơn; hành động thay người khác có chuỗi `act` | P5, P10 | Audit ghi "agent A thay người dùng B" |
+| Shopify (tài khoản cộng tác), Salesforce (Grant Login Access, Login As) | Đối tác / hỗ trợ xin quyền vào, chủ cửa hàng duyệt; quản trị đăng nhập thay người dùng | Khách duyệt từng lần (P12), xem như người dùng (P13) | Xem như **chỉ đọc**, không bao giờ làm thay; người mua phải tự cấp phép; mọi request ghi cả hai danh tính (D-232) |
 
 ## Bắt đầu khi
 
@@ -35,6 +40,8 @@ SQLite và Postgres, mã nguồn mở.
   P8 làm cùng mục dữ liệu cá nhân của bước 37 nếu bước đó chưa xong.
 - Song song được với 41–49; module thương mại khai phần của mình (P3, P7, P8) ngay trong bước của nó khi
   bước 54 đã có, không thì bước 54 khai thay cho module đang có.
+- P12, P13 (D-232) làm cuối bước, sau P5 (step-up): cần quyền vào hỗ trợ của bước 34 (mục 13), yêu cầu duyệt
+  (P12 bước 51) và nhật ký request (`kernel_request_log`, mục 1 bước 52).
 
 ## Thiết kế
 
@@ -115,7 +122,9 @@ nguồn sự thật; điều kiện SQL được sinh từ cùng mô tả luật
 ### P8 — Quyền theo trường dữ liệu, dữ liệu cá nhân
 
 - Trường của schema trả về được phân loại: `#[schema(extensions(("x-data-class", "personal")))]` —
-  `personal` (email, số điện thoại, địa chỉ), `sensitive` (giấy tờ, sức khoẻ), `financial` (giá vốn, công nợ).
+  `personal` (email, số điện thoại, địa chỉ), `sensitive` (giấy tờ, sức khoẻ), `financial` (giá vốn, công nợ),
+  `secret` (bí mật MFA, API key, token thanh toán, băm mật khẩu — không bao giờ trả trong phiên xem như, P13,
+  D-232).
 - Không có permission `<module>.read_personal` (hay `read_financial`) thì service trả trường đó đã che
   (`a•••@example.com`, `090•••567`) — che ở service, không phải ở handler, nên REST và MCP như nhau.
 - Đọc dữ liệu `sensitive` ghi audit (ai, lúc nào, bản ghi nào) — căn cứ Luật 91/2025/QH15, NĐ 356/2025
@@ -157,6 +166,136 @@ nguồn sự thật; điều kiện SQL được sinh từ cùng mô tả luật
   transaction → cache cũ tự hết. Đo p99 thời gian quyết định; mục tiêu < 1 ms khi trúng cache.
 - Số đo `access_denied_total{module, reason}` (nhãn tập nhỏ cố định); cảnh báo khi một key bị từ chối dồn dập.
 
+### P12 — Khách duyệt từng lần khi nhân sự nền tảng xin vào (D-232)
+
+Nền là quyền vào hỗ trợ của bước 34 (`auth_support_grant`, `POST /support-grants`, khách tự thu hồi — D-190,
+D-211). Bước này thêm chính sách theo khách và đường "xin → khách duyệt → cấp". Không có module mới.
+
+- **Chế độ** `auth.support_access_mode` — chính sách của cả khách, không theo nút, lưu ở `kernel_tenant_settings`
+  (bước 33); thay khoá cài đặt theo cây `auth.support_access` (bool) của bước 34:
+
+  | Chế độ | Nhân sự nền tảng vào bằng `basis = support` thế nào |
+  |---|---|
+  | `disabled` | Không vào được (`auth.support_access_disabled`, như khoá cũ = `false`) |
+  | `per_request` (**mặc định cho khách mới**) | Chỉ qua yêu cầu vào được quản trị của khách duyệt; cấp thẳng → 409 `auth.support_request_required` |
+  | `standing` | Như cách cũ của D-190 / D-211: `auth.support.grant` cấp thẳng có thời hạn; yêu cầu vào vẫn dùng được |
+
+  `legal_request` đi được ở **mọi** chế độ (dưới). Khách mới: `Module::seed_tenant` của `auth` ghi
+  `per_request`; thiếu dòng cũng đọc là `per_request`. Khách đang có (`Module::upgrades`): đọc
+  `auth.support_access` ở nút gốc qua API cài đặt theo cây của bước 34 — `true` → `standing`, `false` →
+  `disabled` — để nâng cấp không đổi ngầm hành vi; khoá cũ thôi khai, CHANGELOG ghi.
+- **Đổi chế độ:** chỉ chủ khách — người có `auth.support_access.manage` ở độ sâu `tenant` (mặc định chỉ role `admin`
+  dựng sẵn); permission có `risk = sensitive_data` nên đòi xác nhận lại danh tính (P5, token `/me/reauth` của bước
+  34); event `auth.support_access_mode_changed {from, to}` (audit). Không đổi qua `PUT /units/{id}/settings` của
+  `organizations` (đường đó không đòi chủ khách, không step-up). Chuyển sang `disabled`: thu hồi mọi lần cấp
+  `support` còn hạn và huỷ yêu cầu đang chờ của khách đó (job `auth.revoke_support_access`, vì lần cấp nằm ở
+  database mặt điều khiển).
+- **Yêu cầu vào** (`per_request`, dùng được cả ở `standing`): nhân sự nền tảng có `auth.support.request` ở khách
+  vận hành gửi `POST /api/v1/auth/support-requests {tenant_id, role_id, scope, hours, reason, ticket_reference?}`:
+  `reason` 10–500 ký tự (bắt buộc), `scope` `read` / `write`, `hours` 1–4 (trần cố định 4 giờ theo D-232, không
+  phải cấu hình; vượt → `auth.support_duration_exceeded` với `{max} = 4`), `ticket_reference` (mã phiếu hỗ trợ,
+  ≤ 64 ký tự, tuỳ chọn). `role_id` là role của khách vận hành, như lần cấp của bước 34.
+  1. Transaction ở mặt điều khiển: dòng `auth_support_requests` (`pending`, `expires_at` = +24 giờ) + job
+     `auth.open_support_approval` (unique_key `support_request:<id>`). Trả 201.
+  2. Job mở ngữ cảnh khách được xin vào, trong một transaction ở database của khách: yêu cầu duyệt loại
+     `support_access` (`kernel_approval_requests`, P12 bước 51, `expires_at` 24 giờ, tóm tắt gồm người xin, lý do,
+     phạm vi, thời lượng, mã phiếu) + event `auth.support_access_requested`; rồi ghi `approval_id` vào dòng ở mặt
+     điều khiển. Chạy lại thì thấy yêu cầu duyệt đã có (mã tham chiếu = ID yêu cầu vào), chỉ ghi lại `approval_id`.
+  3. Quản trị của khách nhận thông báo (`notifications` nghe `auth.support_access_requested`, gửi cho người có
+     `auth.support_access.approve` ở gốc — tìm bằng `who-can` của P9, loại tin `Security`, không tắt được) và thấy
+     mục trong hộp việc (yêu cầu duyệt đang chờ của P12 bước 51).
+  4. Duyệt / từ chối bằng `POST /api/v1/kernel/approvals/{id}/approve|reject` của bước 51. Người duyệt cần
+     `auth.support_access.approve` ở độ sâu `tenant` (loại `support_access` khai permission duyệt riêng, vì người
+     xin là nhân sự ở khách vận hành, không có permission ở khách này); permission này `risk = sensitive_data` nên
+     đòi step-up — vì thế không duyệt được bằng API key hay tool MCP `decide_approval` (P5).
+  5. `auth` nghe `kernel.approval_decided`: duyệt → trong một transaction ở mặt điều khiển tạo `auth_support_grant`
+     (`basis = support`, `scope` và giờ đúng như đã duyệt, `starts_at` = lúc duyệt, `request_id` unique — nhận lại
+     event không tạo lần cấp thứ hai) và đổi yêu cầu sang `approved`; event `auth.support_access_granted` ghi vào
+     outbox của khách qua job `auth.mirror_event` sẵn có. Từ chối → `rejected` kèm lý do. Yêu cầu đã `cancelled` /
+     `expired` thì bỏ qua, không cấp.
+- **Hết hạn:** lần cấp hết `expires_at` thì mất quyền ở request kế (như bước 34). Job `auth.support_access_sweep`
+  (5 phút một lần, unique_key có khe thời gian) đổi yêu cầu chưa duyệt quá 24 giờ sang `expired` và ghi event
+  `auth.support_access_expired` cho lần cấp vừa hết hạn (vào outbox của khách qua `auth.mirror_event`), để nhật ký
+  của khách có mốc kết thúc. Khách thu hồi sớm
+  bằng `DELETE /support-access/{id}` của bước 34 (D-211); người xin huỷ yêu cầu chưa duyệt bằng
+  `POST /support-requests/{id}/cancel`.
+- **Phạm vi:** `read` → permission hiệu lực của lần cấp chỉ còn permission `risk = read` của role (P1), lệnh ghi
+  trả 403 `auth.support_access_read_only`; `write` → đủ permission của role. Lần cấp cũ (trước bước này) là `write`.
+- **`legal_request`** (yêu cầu của cơ quan có thẩm quyền) vẫn qua `POST /support-grants` của bước 34, không cần
+  khách duyệt, ở mọi chế độ kể cả `disabled` (D-211): bắt buộc `legal_reference` (số, ngày văn bản), audit, khách
+  thấy trong `GET /support-access` và nhật ký phiên. Văn bản cấm thông báo cho khách thì người cấp đặt
+  `withhold_notice = true`: lần cấp, nhật ký phiên và event không hiện cho khách (kể cả ở bàn kỹ thuật của bước 52)
+  cho tới khi người có `auth.support.grant` gỡ cờ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**
+  về trường hợp được giữ kín và thời hạn.
+- **Mọi request trong phiên vào mang cả hai danh tính:** nhân sự nền tảng (`actor_id`, `actor_kind = support`) và
+  lần cấp (`support_grant_id`, nối tới người duyệt của khách). Lớp ghi nhật ký request của bước 52 ghi **mọi**
+  request (cả đọc) của phiên vào `kernel_request_log` với cột `support_grant_id`; các dòng này giữ theo hạn lưu
+  audit, không theo hạn 14 ngày của nhật ký request. Khách xem bằng `GET /support-access/{id}/requests`.
+
+| Method, path (`/api/v1/auth`) | Permission | Ghi chú |
+|---|---|---|
+| `GET /support-access/mode` | `auth.support_access.read` | `{mode, updated_by, updated_at}` |
+| `PUT /support-access/mode` `{mode}` | `auth.support_access.manage` (độ sâu `tenant`, step-up) | audit; `disabled` thu hồi lần cấp `support` còn hạn |
+| `GET /support-access` (bước 34) | `auth.support_access.read` | thêm yêu cầu vào và trạng thái, `scope`, `ticket_reference`; ẩn lần cấp `withhold_notice` |
+| `GET /support-access/{id}/requests` | `auth.support_access.read` | nhật ký phiên: thời điểm, phương thức, đường dẫn mẫu, status, người bị xem như (P13); phân trang `fetch_page` |
+| `POST /support-requests` | `auth.support.request` (ở khách vận hành) | 201 + `Location`; `disabled` → 403 `auth.support_access_disabled` |
+| `GET /support-requests?tenant_id=&status=` · `GET /support-requests/{id}` | `auth.support.request` (ở khách vận hành) | người xin thấy trạng thái, lý do từ chối |
+| `POST /support-requests/{id}/cancel` | người xin | chỉ khi `pending`, không thì 409 `auth.support_request_closed` |
+| `POST /support-grants` (bước 34) | `auth.support.grant` | `basis = support`: chỉ ở `standing` (`per_request` → 409 `auth.support_request_required`); thêm `scope` (mặc định `write`), `withhold_notice` (chỉ với `legal_request`) |
+
+Tool MCP: không có (như bước 34 — việc nhạy cảm chỉ qua REST có người). Event mới (ghi ở outbox của khách được
+vào): `auth.support_access_mode_changed`, `auth.support_access_requested`, `auth.support_access_expired`; dùng lại
+`auth.support_access_granted`, `support_access_started`, `support_access_revoked` của bước 34. Job mới:
+`auth.open_support_approval`, `auth.support_access_sweep`, `auth.revoke_support_access` (đều chịu chạy lại).
+
+### P13 — Xem như người dùng, chỉ đọc (D-232)
+
+Thay cho "đăng nhập thay người dùng": **chỉ đọc, không bao giờ làm thay; không có chế độ act-as.** Dùng để gỡ lỗi
+quyền và hiển thị: người có `auth.view_as` thấy giao diện / dữ liệu đúng như một người dùng khác thấy.
+
+- **Ai được xem ai** (kiểm lúc mở phiên và **lại ở mỗi request**, hai `Principal` đều nằm trong cache của P11):
+
+  | Người bị xem | Điều kiện |
+  |---|---|
+  | Nhân viên cùng khách (`realm = staff`, có membership ở khách) | Người xem có quyền bao trùm người bị xem (`require_covers` của bước 34 trên mọi membership của người bị xem); không bao giờ xem như người giữ role `admin` ở nút gốc (chủ khách). Người bị xem nhận thông báo (`notifications` nghe `auth.view_as_started`, loại `Security`) |
+  | Người mua (`realm = customer`) | Chỉ khi người mua đã cấp phép từ tài khoản của họ ("Cho phép hỗ trợ xem tài khoản"): mã 6 chữ số, hiệu lực 30 phút, dùng một lần — dữ liệu cá nhân |
+  | Bất kỳ ai, người xem là nhân sự nền tảng | Chỉ khi đang có lần cấp `basis = support` còn hạn ở khách đó (P12; ở `per_request` là lần đã được duyệt) và role của lần cấp có `auth.view_as`; rồi theo đúng hai dòng trên. Lần cấp `legal_request` không mở được phiên xem như |
+
+  Không xem như chính mình (`auth.view_as_self`). `auth.view_as` có `risk = sensitive_data` nên mở phiên đòi step-up
+  (P5); khi lọc lần cấp hỗ trợ phạm vi `read` (P12), `auth.view_as` vẫn giữ vì phiên luôn chỉ đọc.
+- **Cấp phép của người mua:** `POST /api/v1/auth/me/view-as-consent` (đăng nhập, `realm = customer`) trả `{code,
+  expires_at}`; mã lưu băm trong kho token dùng một lần `OneTimeTokens` của `auth` (D-117, mục đích
+  `view_as_consent`, băm của `user_id` + mã); tạo mã mới thu hồi mã cũ. Mở phiên tiêu thụ mã (`consume` — đúng một
+  bên thắng khi đua). Sai mã đếm bằng `Throttle` (D-116) theo người mua: sai 5 lần thì thu hồi mã.
+  `DELETE /me/view-as-consent` rút phép: thu hồi mã chưa dùng và kết thúc phiên đang mở trên tài khoản đó.
+- **Phiên `view_as`** là token riêng, không có refresh token: JWT ký như access token, `sub` = người bị xem, `act =
+  {sub: người xem}` (nghĩa `act` của RFC 8693), `vas` = ID phiên, `exp` tối đa 30 phút kể từ lúc mở; không gia hạn
+  ngầm — hết hạn thì mở phiên mới (người mua phải cấp mã mới). Mỗi request đọc dòng `auth_view_as_sessions` (một
+  câu theo khoá chính) để kết thúc có hiệu lực ngay; phiên đã kết thúc / hết hạn → 401 `auth.view_as_session_ended`.
+  Người xem kết thúc bất cứ lúc nào bằng `DELETE /api/v1/auth/view-as/current`.
+- **Chỉ đọc ở kernel, không ở từng handler:** với token `view_as`, mọi request `POST` / `PUT` / `PATCH` / `DELETE`
+  và mọi tool MCP không `read_only` trả 403 `auth.view_as_read_only` trước khi tới handler — ngoại lệ duy nhất là
+  `DELETE /view-as/current`. Ghi phụ của request đọc (đánh dấu đã xem, `last_used_at`, bộ đếm quyền dùng của P9)
+  không chạy trong phiên xem như.
+- **Không bao giờ trả secret:** trong phiên, service bỏ mọi trường `x-data-class: secret` (P8) — bí mật MFA, API key,
+  token thanh toán, mật khẩu — kể cả khi người bị xem tự xem được.
+- **Audit:** mỗi request ghi `kernel_request_log` (bước 52) với người dùng = người xem (người thật), thêm
+  `view_as_session_id` và `view_as_target_id`; lọc được theo hai cột này; giữ theo hạn lưu audit. Event
+  `auth.view_as_started {session_id, actor_id, target_id, target_realm, support_grant_id?, expires_at}`,
+  `auth.view_as_ended {session_id, ended_by: actor|target|revoked}`, `auth.view_as_consent_issued {user_id,
+  expires_at}`. Trong lần vào hỗ trợ, dòng nhật ký có cả `support_grant_id` — hiện trong nhật ký phiên của P12.
+- **Báo cho giao diện:** mọi response trong phiên có header `Autoxide-View-As: session="<id>", target="<user id>",
+  expires="<RFC 3339>"` (Dictionary của Structured Field Values, RFC 9651) để giao diện hiện băng cảnh báo.
+
+| Method, path (`/api/v1/auth`) | Permission | Ghi chú |
+|---|---|---|
+| `POST /view-as` `{target_user_id, consent_code?}` | `auth.view_as` (step-up) | 201 `{token, session_id, expires_at, target: {id, realm, name}}`; người mua thiếu mã → 403 `auth.view_as_consent_required` |
+| `DELETE /view-as/current` | token `view_as` | kết thúc ngay; event `auth.view_as_ended` |
+| `POST /me/view-as-consent` · `DELETE /me/view-as-consent` | đăng nhập, `realm = customer` | tài khoản nhân sự gọi → 403 `auth.view_as_consent_customer_only` |
+
+Tool MCP: không có tool mở phiên (cần step-up, như P12). Tool `read_only` gọi được bằng token `view_as`; tool khác
+bị chặn như trên. Job: `auth.cleanup` sẵn có xoá dòng `auth_view_as_sessions` quá hạn lưu audit (event giữ).
+
 ## Bảng dữ liệu (mọi bảng có `tenant_id` trừ khi ghi khác)
 
 | Bảng | Cột chính |
@@ -170,11 +309,19 @@ nguồn sự thật; điều kiện SQL được sinh từ cùng mô tả luật
 | `kernel_tenant_guardrails` (mặt điều khiển) | `tenant_id`, `max_permissions` text, `set_by_tenant_id`, `updated_at` |
 | `kernel_permission_usage` | `tenant_id`, `day`, `subject_kind`, `subject_id`, `permission`, `count` |
 | `auth_access_reviews` · `auth_access_review_items` | lịch, người duyệt, kết quả từng mục |
+| `kernel_tenant_settings` (dòng mới, bước 33) | `auth.support_access_mode` = `disabled` / `per_request` / `standing` (P12, D-232) |
+| `auth_support_requests` (mặt điều khiển, P12) | `id`, `tenant_id` (khách được xin vào), `staff_user_id`, `role_id`, `scope` (`read`/`write`), `hours` (1–4), `reason`, `ticket_reference` NULL, `status` (`pending`/`approved`/`rejected`/`expired`/`cancelled`), `approval_id` NULL, `decided_by` NULL, `decided_at` NULL, `decision_reason` NULL, `expires_at`, `created_at`; index (`tenant_id`, `status`, `expires_at`), (`tenant_id`, `staff_user_id`, `id`) |
+| `auth_support_grant` (thêm cột, bước 34) | `scope` (`read`/`write`, mặc định `write`), `request_id` NULL unique, `withhold_notice` BOOL mặc định `false` (P12) |
+| `auth_view_as_sessions` (P13) | `id`, `tenant_id`, `actor_user_id`, `actor_kind` (`staff`/`support`), `support_grant_id` NULL, `target_user_id`, `target_realm`, `started_at`, `expires_at`, `ended_at` NULL, `ended_by` NULL (`actor`/`target`/`revoked`); index (`tenant_id`, `target_user_id`, `id`), (`tenant_id`, `actor_user_id`, `id`) |
+| `kernel_request_log` (thêm cột, bước 52) | `support_grant_id` NULL, `view_as_session_id` NULL, `view_as_target_id` NULL; index (`tenant_id`, `support_grant_id`, `id`), (`tenant_id`, `view_as_session_id`, `id`); dòng có một trong ba cột giữ theo hạn lưu audit (P12, P13) |
 
 ## Permission mới
 
 `kernel.access.simulate`, `kernel.access.evaluate`, `kernel.access.review`, `auth.roles.activate` (tự kích
 hoạt role đủ điều kiện), `auth.api_keys.approve`; `<module>.read_personal` cho module giữ dữ liệu cá nhân.
+P12, P13 (D-232): `auth.support_access.manage` (đổi chế độ; `sensitive_data`, chỉ độ sâu `tenant`),
+`auth.support_access.approve` (duyệt yêu cầu vào; `sensitive_data`), `auth.support.request` (ở khách vận hành),
+`auth.view_as` (`sensitive_data`).
 
 ## Mã lỗi (kèm bản dịch `vi`)
 
@@ -184,6 +331,23 @@ hoạt role đủ điều kiện), `auth.api_keys.approve`; `<module>.read_perso
 `auth.api_key_expiry_required` (422), `auth.api_key_pending` (401), `kernel.share_escalation` (403 — chia
 quyền mình không có), `kernel.share_kind_unknown` (422).
 
+P12, P13 (D-232; dùng lại `auth.support_access_disabled`, `auth.support_duration_exceeded` của bước 34):
+
+| Mã | HTTP | Câu tiếng Việt |
+|---|---|---|
+| `auth.support_request_required` | 409 | Khách hàng này duyệt từng lần vào hỗ trợ; tạo yêu cầu bằng `POST /api/v1/auth/support-requests`. |
+| `auth.support_request_not_found` | 404 | Không có yêu cầu vào hỗ trợ `{id}`. |
+| `auth.support_request_closed` | 409 | Yêu cầu vào hỗ trợ `{id}` đã ở trạng thái `{status}`; tạo yêu cầu mới nếu vẫn cần. |
+| `auth.support_access_read_only` | 403 | Lần vào hỗ trợ này chỉ được đọc; gửi yêu cầu phạm vi `write` nếu cần sửa. |
+| `auth.view_as_read_only` | 403 | Đang xem như người dùng khác nên chỉ được đọc; kết thúc phiên xem để thao tác. |
+| `auth.view_as_target_not_covered` | 403 | Không xem như được `{user}`: người đó có quyền bạn không có hoặc là chủ khách hàng. |
+| `auth.view_as_consent_required` | 403 | Người mua `{user}` chưa cho phép hỗ trợ xem tài khoản; nhờ họ tạo mã trong tài khoản của mình. |
+| `auth.view_as_consent_invalid` | 403 | Mã cho phép xem không đúng, đã dùng hoặc đã hết hạn. |
+| `auth.view_as_consent_customer_only` | 403 | Chỉ tài khoản người mua mới tạo mã cho phép xem. |
+| `auth.view_as_support_grant_required` | 403 | Nhân sự nền tảng chỉ xem như người dùng trong một lần vào hỗ trợ còn hạn. |
+| `auth.view_as_self` | 422 | Không xem như chính mình. |
+| `auth.view_as_session_ended` | 401 | Phiên xem như người dùng đã kết thúc hoặc hết hạn; dùng lại token của chính bạn. |
+
 ## Thứ tự làm
 
 1. (Bước 31) P1: `risk`, `x-permissions` / `x-public`, test độ phủ trong gate.
@@ -192,6 +356,9 @@ quyền mình không có), `kernel.share_kind_unknown` (422).
 4. P8 (trường dữ liệu) cho `auth`, `comments`, `forms`, `newsletter`.
 5. P6, P7 (cần P12 bước 51) → P9 → P10.
 6. Tài liệu `docs/ACCESS.md` (EN + VI): mô hình, cách khai quyền cho module, ví dụ cho từng mô hình kinh doanh.
+7. (D-232, cần P5, P12 bước 51, nhật ký request bước 52) P12: chế độ vào hỗ trợ + nâng cấp khách cũ → yêu cầu vào,
+   duyệt, phạm vi, hết hạn → `legal_request` giữ kín. Rồi P13: trường `secret` (P8) → token và phiên `view_as`,
+   chặn ghi ở kernel và MCP → cấp phép của người mua → audit, header. Thêm cả hai vào `docs/ACCESS.md`.
 
 ## Test bắt buộc (cả hai database)
 
@@ -201,6 +368,24 @@ nhiên), `deny_thang_allow`, `rao_khach_con_chan_ca_admin`, `chia_se_khong_trao_
 `key_het_han_hay_ngoai_ip_bi_tu_choi`, `viec_nhay_cam_doi_xac_thuc_lai`, `kich_hoat_role_het_han_tu_thu_hoi`,
 `nguoi_tao_lenh_khong_tu_duyet`, `truong_ca_nhan_bi_che_khi_thieu_quyen_ca_rest_va_mcp`,
 `mo_phong_role_nhap_khong_luu_gi`, `authzen_evaluation_dung_chuan`, `quyet_dinh_dong_thoi_khi_dang_doi_role`.
+
+P12 (D-232): `khach_moi_mac_dinh_duyet_tung_lan`, `nang_cap_giu_che_do_cu_cua_khach_dang_co`,
+`doi_che_do_can_chu_khach_va_xac_nhan_lai`, `duyet_tung_lan_chan_cap_thang`,
+`yeu_cau_duoc_duyet_cap_dung_pham_vi_va_thoi_luong`, `pham_vi_read_chan_lenh_ghi`, `yeu_cau_qua_4_gio_bi_tu_choi`,
+`yeu_cau_chua_duyet_het_han_sau_24_gio`, `tu_choi_thi_khong_co_quyen_vao`, `duyet_khong_lam_duoc_bang_api_key`,
+`tat_ho_tro_thu_hoi_lan_cap_con_han`, `yeu_cau_co_tham_quyen_khong_can_duyet_va_hien_trong_nhat_ky`,
+`yeu_cau_co_tham_quyen_giu_kin_khong_hien_cho_khach`, `nhat_ky_phien_vao_ghi_moi_request_ca_hai_danh_tinh`;
+đồng thời: `duyet_dong_thoi_va_nhan_lai_event_chi_mot_lan_cap` (hai người duyệt cùng lúc + event giao lại: đúng một
+`auth_support_grant`), `duyet_va_huy_dong_thoi` (huỷ thắng thì không có lần cấp; duyệt thắng thì huỷ trả 409).
+
+P13 (D-232): `view_as_chan_lenh_ghi_ca_rest_va_mcp` (đọc `docs/openapi.json` và danh sách tool: mọi operation ghi,
+mọi tool không `read_only` trả 403 `auth.view_as_read_only`), `view_as_khong_xem_duoc_nguoi_quyen_cao_hon`,
+`view_as_khong_xem_duoc_chu_khach`, `view_as_kiem_lai_khi_nguoi_bi_xem_duoc_nang_quyen`,
+`view_as_nguoi_mua_chua_cap_phep_bi_tu_choi`, `ma_cap_phep_het_han_hay_da_dung_bi_tu_choi`,
+`ma_cap_phep_sai_5_lan_bi_thu_hoi`, `view_as_khong_tra_secret`, `view_as_het_30_phut_khong_gia_han`,
+`ket_thuc_view_as_co_hieu_luc_ngay`, `nhan_su_nen_tang_view_as_chi_trong_lan_vao_con_han`,
+`view_as_audit_du_hai_id_va_co_header`, `nguoi_bi_xem_nhan_thong_bao`; đồng thời:
+`ma_cap_phep_dung_dong_thoi_chi_mot_phien` (16 request cùng mã: đúng một phiên).
 
 ## Tiêu chí xong
 
@@ -214,6 +399,17 @@ Mọi mục bước 54 `[x]`; gate xanh trên cả hai database; test độ ph�
 - Chia sẻ thành đồ thị lồng nhau — mất câu SQL một bước, chậm và khó giải thích.
 - Ngôn ngữ chính sách tự do — người dùng không đọc được, khó kiểm, khó chạy trên hai database.
 - Che dữ liệu ở handler — MCP lộ (luật 8).
+- Chặn ghi của `view_as` ở từng handler — sót một endpoint là làm thay được; chặn ở lớp xác thực của kernel cho
+  REST và MCP, test đọc từ `docs/openapi.json` (P13). Nhớ chừa `DELETE /view-as/current`, không thì không thoát
+  được phiên.
+- Cho token `view_as` refresh token hay gia hạn khi còn dùng — phiên kéo dài vô hạn (P13).
+- Chỉ kiểm "quyền bao trùm" lúc mở phiên — người bị xem được nâng quyền giữa phiên thì người xem thấy quá phần mình
+  (P13: kiểm lại mỗi request).
+- Ghi lần cấp ở mặt điều khiển và yêu cầu duyệt ở database của khách trong hai transaction lồng nhau — có thể là
+  hai database; đi qua job / event chịu chạy lại, khoá trùng bằng `request_id` (P12).
+- Đổi chế độ qua API cài đặt theo cây của `organizations` — bỏ qua kiểm chủ khách và step-up (P12).
+- Giữ kín `legal_request` ở `GET /support-access` mà quên bàn kỹ thuật (`/kernel/devtools/requests`) và audit của
+  khách — lộ qua đường khác (P12).
 
 ## Agent làm bước này tự quyết
 
@@ -226,3 +422,7 @@ nhóm của `organizations`; danh sách `risk` mặc định của permission đ
 - RFC 9470 OAuth 2.0 Step Up Authentication Challenge; RFC 8693 OAuth 2.0 Token Exchange.
 - NIST RBAC (ANSI INCITS 359), NIST SP 800-162 (ABAC).
 - Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ 356/2025 (P8) — cần đối chiếu văn bản gốc.
+- Khách duyệt từng lần, xem như người dùng (P12, P13, D-232): Luật 91/2025/QH15 (hiệu lực 01/01/2026), NĐ
+  356/2025/NĐ-CP — xử lý dữ liệu cá nhân phải có căn cứ, mục đích, để lại vết; người mua tự cấp phép trước khi bị
+  xem như. Trường hợp cơ quan có thẩm quyền yêu cầu và được giữ kín không báo cho khách (`withhold_notice`) — **cần
+  đối chiếu văn bản gốc / người có chuyên môn pháp lý** (điều khoản cụ thể, thời hạn giữ kín).

@@ -328,7 +328,9 @@ scoped, `organizations.units.manage` scoped, `organizations.types.manage`,
 Khoá cài đặt do `organizations` khai: `organizations.timezone` (IANA, mặc định `UTC`),
 `organizations.currency` (`Currency::parse`), `organizations.language` (`Language` của kernel,
 mặc định `en`). `auth` khai `auth.customer_registration` (bool, mặc định `true`) và
-`auth.support_access` (bool, mặc định `true`). Hồ sơ thuế do module `tax` khai ở bước 36 bằng
+`auth.support_access` (bool, mặc định `true`) — bước 54 thay bằng `auth.support_access_mode`
+(`disabled` / `per_request` / `standing`; khách đang có: `true` → `standing`, `false` → `disabled`; khách mới mặc
+định `per_request` — D-232). Hồ sơ thuế do module `tax` khai ở bước 36 bằng
 cùng cơ chế; module khác (vd giá ở bước 41) dùng khuôn `OrgTree::ancestors` + `tenancy::nearest`
 trên bảng của chính mình.
 
@@ -355,7 +357,7 @@ trên bảng của chính mình.
 | `GET /delegations?direction=incoming\|outgoing` · `POST /delegations` `{child_tenant_id, role_id, org_id?, expires_at?, reason}` · `DELETE /delegations/{id}` | `auth.delegations.read` / `auth.delegations.manage` (ở khách cha) | khách con phải là con cháu trong `kernel_tenants`; con xem được (incoming), chỉ cha hay nền tảng thu hồi |
 | `GET /support-access` | `auth.support_access.read` (ở khách) | quản trị của khách xem mọi lần cấp và lần vào |
 | `DELETE /support-access/{id}` | `auth.support_access.revoke` (ở khách) | khách tự thu hồi một lần cấp còn hạn; lần cấp `legal_request` không thu hồi được từ phía khách (D-211) |
-| `POST /support-grants` `{tenant_id, staff_user_id, role_id, basis, reason, legal_reference?, hours}` · `DELETE /support-grants/{id}` · `GET /support-grants?tenant_id=` | `auth.support.grant` (ở khách vận hành) | khách tắt `auth.support_access` → chỉ `legal_request` được; trần giờ `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` (D-211 giữ như cũ) |
+| `POST /support-grants` `{tenant_id, staff_user_id, role_id, basis, reason, legal_reference?, hours}` · `DELETE /support-grants/{id}` · `GET /support-grants?tenant_id=` | `auth.support.grant` (ở khách vận hành) | khách tắt `auth.support_access` (từ bước 54: chế độ `disabled`; `per_request` thì mỗi lần cấp cần khách duyệt — D-232) → chỉ `legal_request` được; trần giờ `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` (D-211 giữ như cũ) |
 | `POST /phone-signups` `{lookup_token, display_name?}` | công khai, rate limit theo IP | làm ở bước 45 — mục "Tạo tài khoản từ số đã xác thực" dưới (D-202) |
 
 **Tính `Principal`** (đường nóng, mặt điều khiển): một câu `auth_user_role ⋈ auth_role ⟕

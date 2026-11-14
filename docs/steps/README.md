@@ -80,6 +80,7 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 67,
   - danh mục đơn vị hành chính của `address`
   - dữ liệu luật dùng chung: `catalog_restriction_rules`, `promotions_legal_limits`, `promotions_notice_rules`
   - trang mẫu dùng chung: dòng `tenant_id` NULL của `content_page_templates` (bước 67)
+  - chợ ứng dụng trả phí: bảng `apps_*` về giá, phí, chia doanh thu, chi trả nhà phát triển (bước 65, gom xuyên khách)
   - `invoices_archives` (bản lưu kế toán còn sau khi xoá khách)
 - `kernel_sequences` (đánh số chứng từ) là bảng **cấp khách hàng**, có ở mọi database dữ liệu: số phải cấp
   trong cùng transaction với chứng từ.
@@ -153,6 +154,9 @@ sau dùng lại, không làm lại.
 | `navigation` (`Module::navigation`), `work::WorkSource`, `finder::FinderSource`, `summary::SummaryMetric`, `EventInfo::activity` | 51 (sau 34–35) | 41–49 |
 | `x-autoxide-filters`, `kernel_saved_views`, `BulkAction`, `resolve`, `kernel_work_states`, `SetupStep`, `/me/can`, `ApiKeyKind`, `ActorKind`, `kernel_approval_requests`, `kernel_record_notes` | 51 (D-201) | 41–49, 52 |
 | `blocks` (`BlockType`, `Module::blocks`, `BlockData`, `GET /kernel/blocks`) | 67 (D-229) | 41, 43, 45 (khai khối) |
+| `voice::VoiceProvider` + bộ giả (D-232) | 61 | — |
+| `signature::SignatureProvider` + bộ giả (D-232) | 59 (luồng ký trong `compliance`) | 46, 49 |
+| `entitlement::AddonBilling` (D-232) | 65 | 35 (`plans` cộng dòng phí thêm) |
 
 ## Việc chỉ chủ dự án làm được
 

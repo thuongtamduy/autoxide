@@ -3,7 +3,7 @@
 > Lộ trình: `docs/ROADMAP.md` bước 39 · Thiết kế: `docs/research/business-foundation.md` mục 7
 > (dòng "Quan sát theo khách") · Quyết định: D-073 (định dạng backup), D-076 (đo tải qua API thật),
 > D-110 (ngưỡng 50 ms của tìm theo ý nghĩa), D-113 (khoá ký của kernel), D-158 (job queue, event,
-> backup sau rà soát), D-185, D-189, D-190
+> backup sau rà soát), D-185, D-189, D-190, D-196 (WebP), D-232 (AVIF đo trước)
 
 ## Mục tiêu
 
@@ -14,6 +14,7 @@ cỡ thật (không phải database trống), index được rà bằng `EXPLAIN
 được nén và cache đúng cho CDN, và mọi log / trace mang `tenant_id` để tra sự cố của một khách.
 Phục vụ mọi mô hình kinh doanh (D-185): đơn vị backup và số đo là **database**; tra theo **khách**
 đi qua log, trace, CLI và số đo dùng của bước 35 — không qua nhãn số đo.
+Ảnh AVIF chỉ thêm khi đo được lợi đủ lớn so với WebP đang có; không đạt thì ghi quyết định "không làm" (D-232).
 
 ## Bắt đầu khi
 
@@ -34,7 +35,8 @@ Sửa: `crates/kernel` (`builtin.rs`, `job/worker.rs`, `job/mod.rs`, `metrics.rs
 `crates/kernel/src/backup.rs` và `crates/kernel/src/ops.rs`, `crates/app/src/commands/{backup,doctor,
 jobs}.rs`, `modules/auth/src/{token.rs,config.rs}`, `modules/webhooks` (khoá ký chồng), `modules/content`,
 `modules/media`, `modules/comments` (cache header, index, task sinh dữ liệu đo), `scripts/loadtest.sh`,
-`docs/BENCHMARKS.md`, `docs/DEPLOY.md` + `docs/DEPLOY.vi.md`, `.env.example`, `CHANGELOG.md`.
+`docs/BENCHMARKS.md`, `docs/DEPLOY.md` + `docs/DEPLOY.vi.md`, `.env.example`, `CHANGELOG.md`; nếu AVIF đạt
+ngưỡng (D-232): `modules/media/src/{variants,jobs,config}.rs`, `modules/content` (`avif_url`), `STACK.md`.
 File mới: `deploy/grafana/autoxide-dashboard.json`, `deploy/prometheus/autoxide-alerts.yml`,
 `scripts/bench-seed.sh`.
 
@@ -121,6 +123,9 @@ job kế tiếp đánh `failed` rồi mới mở bản mới.
 Nhóm B thêm index thiếu bằng **migration mới** của module sở hữu bảng (không sửa migration cũ), index
 bắt đầu bằng `tenant_id` (luật của bước 33).
 
+Bản AVIF (nếu làm, D-232) không cần bảng mới: là dòng `media_variant` có `content_type = 'image/avif'` — unique
+index (item, phiên bản, chiều rộng, `content_type`) của `m0007` (D-196) đã cho mỗi cỡ một bản mỗi loại.
+
 ### API REST
 
 - `GET /api/v1/kernel/ops/backlog` — permission mới `kernel.ops.read` ("See queue backlogs, dead
@@ -149,6 +154,7 @@ Cần `outbox_migration` cho module `kernel` (bảng `kernel_events`) nếu bư�
 | Kind | Lịch | Việc |
 |---|---|---|
 | `kernel.backup` | `Schedule::new("kernel.backup", "kernel.backup", interval)` khi interval > 0 | mở dòng `running` (unique `active_key`), `write_backup` vào `StorageSink` dưới `kernel/backups/<database_key>/<id>/`, cập nhật dòng + event, rồi xoá bản cũ quá `KEEP` (chỉ bản `succeeded`; luôn giữ bản tốt mới nhất). Timeout riêng `JobRegistration::timeout(6 h)` |
+| `media.make_avif` (D-232, nếu làm) | job, xếp sau khi `media.make_variants` lưu xong, chỉ khi `AUTOXIDE_MEDIA_AVIF=true`; `unique_key = "avif:{item}:{version}"` | mã hoá AVIF từ ảnh gốc cho mỗi cỡ đã có, lưu dòng `media_variant` + file `…_w<rộng>.avif` trong một transaction; ảnh hỏng → log, kết thúc `Ok`, không thử lại |
 | (không phải job) | task nền mỗi `AUTOXIDE_METRICS_BACKLOG_SECONDS` | `ops::backlog` cho mọi database được giao rồi `ops::publish`; chạy ở tiến trình có vai `worker` hay `all` |
 
 Worker gia hạn lease: job có `timeout` > `LEASE` thì một task con `UPDATE <module>_jobs SET
@@ -169,6 +175,7 @@ thì huỷ job. Lịch chạy theo từng database (bước 33), nên mỗi data
 | `AUTOXIDE_WEBHOOKS_SECRET_OVERLAP_HOURS` | `24` | sau khi xoay secret của webhook, ký bằng cả secret cũ trong chừng này giờ (0–168) |
 | `AUTOXIDE_HTTP_COMPRESSION` | `true` | (chỉ khi quyết nén trong app) |
 | `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` | `60` | `s-maxage` cho endpoint công khai (0–86400) |
+| `AUTOXIDE_MEDIA_AVIF` | `false` | (chỉ khi AVIF đạt ngưỡng, D-232) sinh thêm bản AVIF của ảnh thu nhỏ bằng job nền |
 
 Ngưỡng cảnh báo "backup quá cũ" của `autoxide doctor` = 2 × interval (không thêm biến); interval = 0
 thì doctor cảnh báo "không có backup tự động".
@@ -221,9 +228,45 @@ và event theo module, dead-letter, pool, tuổi backup. Biến chọn `database
 
 ### Nén response, cache cho CDN, tìm theo ý nghĩa — xem "Thứ tự làm" nhóm B.
 
+### Ảnh AVIF — đo trước rồi mới quyết (D-232)
+
+**Đo trước** (chưa thêm thư viện vào workspace; đo trong một crate tạm không commit, chỉ commit số đo):
+
+- Bộ ảnh mẫu: ảnh sản phẩm (nền trắng, có ảnh cắt nền trong suốt), ảnh có chữ (ảnh chụp màn hình, banner có
+  chữ), ảnh nền / phong cảnh (ảnh chụp lớn, như `lake.jpg` của D-196) — ảnh CC0 hay tự làm, ghi nguồn và license
+  trong `docs/BENCHMARKS.md`. Mỗi ảnh ở bốn cỡ mặc định của `AUTOXIDE_MEDIA_IMAGE_WIDTHS`.
+- Ứng viên: crate mã hoá AVIF bản ổn định mới nhất, tra bằng skill `check-library-api`; ưu tiên Rust thuần
+  (vd `ravif` trên `rav1e`, hay feature `avif` của `image` đang ghim). Bản bọc C (`libavif`) chỉ xét khi không có
+  bản Rust thuần đạt. License phải hợp MIT / Apache (`cargo deny` của gate quyết).
+- So với WebP chất lượng 80 hiện có (D-196): **cỡ file ở chất lượng tương đương** — chọn mức chất lượng AVIF để
+  điểm SSIM (hay SSIMULACRA2) không thấp hơn bản WebP của cùng ảnh, rồi so cỡ; **thời gian mã hoá** mỗi cỡ và
+  tổng bốn cỡ (build release, một thread và số thread mặc định); **RAM đỉnh** (`/usr/bin/time -v`, max RSS);
+  **thời gian biên dịch thêm** (`cargo build --release` sạch có / không crate) và cỡ binary thêm. Công cụ chấm
+  điểm chạy ngoài repo, không thêm vào workspace.
+- Ghi số vào `docs/BENCHMARKS.md` kèm máy, ngày, phiên bản crate, tốc độ / chất lượng đã chọn.
+
+**Ngưỡng quyết** (agent đặt, ghi DECISIONS kèm số đo): làm khi trung vị trên bộ ảnh tiết kiệm **≥ 20%** dung
+lượng so với WebP ở chất lượng tương đương **và** thời gian mã hoá chấp nhận được khi chạy bằng job — tổng bốn
+cỡ của một ảnh ≤ 10 s ở một thread trên máy đo, RAM đỉnh ≤ 512 MiB. Không đạt một điều kiện nào: ghi quyết định
+"không làm AVIF" kèm số đo vào `docs/DECISIONS.md`, dừng mục này (không thêm thư viện, không thêm cấu hình).
+
+**Nếu làm:**
+
+- Biến thể AVIF sinh **bằng job `media.make_avif` sau khi tải lên** — không bao giờ trên đường request tải lên
+  hay trong job `media.make_variants` (job đó giữ thời gian như cũ). Mã hoá trong `spawn_blocking`, từ ảnh gốc
+  đã xoay theo EXIF (không từ bản JPEG đã nén, tránh mất chất lượng hai lần), cùng giới hạn `MAX_PIXELS`.
+- `AUTOXIDE_MEDIA_AVIF` mặc định `false`: tắt thì không xếp job, không sinh; bản AVIF đã có vẫn phục vụ.
+  `autoxide task media.refresh_variants` xếp `media.make_avif` cho ảnh còn thiếu khi bật.
+- Phục vụ theo cách của WebP (D-196): địa chỉ riêng `…/content?v=…&w=<rộng>&format=avif`, ETag riêng (`-avif`),
+  cache một năm; mỗi mục `variants` thêm `avif_url` (và `avif_size` ở REST của `media`), `MediaVariant` của `api`
+  và `PublicVariant` của `content` cũng thêm — `null` khi chưa có. Không chọn loại theo header `Accept` (lý do ở
+  D-196: CDN và `Vary`). Xin `format=avif` khi chưa có bản AVIF → trả bản WebP cùng cỡ (không có thì JPEG / PNG),
+  cache ngắn. WebP vẫn là định dạng mặc định; `url` cũ không đổi hành vi. Thêm thư viện vào `STACK.md`.
+- Khoá nơi lưu: khoá của bản nhỏ thêm `.avif`; job dọn mồ côi (`parse_key`) hiểu thêm đuôi này.
+
 ## Thứ tự làm
 
-Mỗi dòng một commit (chạy `./gate.sh --quick` trước mỗi commit). Mã `A1…B7` ánh xạ tới mục `- [ ]`
+Mỗi dòng một commit (chạy `./gate.sh --quick` trước mỗi commit). Mã `A1…B8` ánh xạ tới mục `- [ ]`
 của ROADMAP theo đúng thứ tự xuất hiện.
 
 **Nhóm A — vận hành**
@@ -300,7 +343,12 @@ của ROADMAP theo đúng thứ tự xuất hiện.
     (`dispatcher.rs`), span tool MCP mang trường `tenant_id` (và `org_id` khi có); thuộc tính OTLP
     `autoxide.tenant_id`; tài liệu: tra một khách bằng log / trace, lượng dùng theo khách lấy từ
     số đo dùng của bước 35 (`plans`), tồn đọng theo khách từ `ops/backlog`.
-17. Cuối: CHANGELOG, đánh dấu ROADMAP, gate đầy đủ, phát hành theo `docs/RELEASING.md`.
+17. (B8) Đo AVIF (D-232): bộ ảnh mẫu, crate ứng viên, số đo vào `docs/BENCHMARKS.md`; quyết theo ngưỡng, ghi
+    `docs/DECISIONS.md` (skill `record-decision`). Không đạt → dừng ở đây, mục B8 xong với quyết định "không làm".
+18. (B8, chỉ khi đạt) Job `media.make_avif`, `AUTOXIDE_MEDIA_AVIF`, `format=avif`, `avif_url` (`media`,
+    `content`), dọn mồ côi hiểu `.avif`, `STACK.md`, `docs/openapi.json` + `.env.example` sinh lại, tài liệu media
+    (EN + VI).
+19. Cuối: CHANGELOG, đánh dấu ROADMAP, gate đầy đủ, phát hành theo `docs/RELEASING.md`.
 
 ## Test bắt buộc
 
@@ -337,10 +385,16 @@ Mọi test chạm database dùng `TestDatabase::run` (tự chạy trên SQLite v
   `nen_json_lon_khi_client_nhan_br`, `etag_van_304_sau_khi_nen`.
 - `logging`: `log_request_mang_tenant_id` (bắt log bằng subscriber thử, kiểm trường).
 - Test đồng thời: backup song song (trên) và gia hạn lease khi hai worker tranh — chạy trên cả hai database.
+- `media` (chỉ khi làm AVIF, D-232; cả hai database): `avif_tat_thi_khong_sinh`,
+  `avif_bat_thi_job_sinh_dung_mot_lan` (xếp hai lần, chạy lại job → mỗi cỡ một dòng `image/avif`),
+  `avif_khong_sinh_tren_request_tai_len` (ngay sau khi tải lên chưa có bản AVIF; có sau khi worker chạy),
+  `avif_anh_hong_khong_lam_hong_job_khac` (ảnh hỏng kết thúc `Ok`, job ảnh khác trong cùng lượt vẫn sinh),
+  `hai_worker_cung_job_avif_mot_ban` (đồng thời), `format_avif_chua_co_tra_ban_webp`,
+  `don_mo_coi_hieu_duoi_avif`.
 
 ## Tiêu chí xong
 
-- [ ] Mọi mục `- [ ]` của bước 39 trong ROADMAP xong theo bảng ánh xạ A1–A6, B1–B7.
+- [ ] Mọi mục `- [ ]` của bước 39 trong ROADMAP xong theo bảng ánh xạ A1–A6, B1–B8 (B8 = AVIF, D-232).
 - [ ] Backup theo lịch chạy, giữ đúng N bản, bản hỏng có log + `backup_runs_total{outcome="failed"}`;
       `autoxide doctor` cảnh báo khi cũ; backup không giữ transaction ghi (`begin_snapshot`).
 - [ ] Diễn tập restore xanh trên SQLite và Postgres (và chép chéo); quy trình restore trong DEPLOY EN + VI.
@@ -353,6 +407,8 @@ Mọi test chạm database dùng `TestDatabase::run` (tự chạy trên SQLite v
 - [ ] Quyết định ghi bằng `record-decision`: job dài + gia hạn lease, backup theo lịch vào Storage
       (mặc định không chép file), nhãn `database` có giới hạn, nén, cache CDN, (tìm theo ý nghĩa nếu đổi).
 - [ ] `.env.example` và `docs/openapi.json` sinh lại; CHANGELOG `[Unreleased]`; ROADMAP đánh dấu.
+- [ ] AVIF (D-232): số đo trong BENCHMARKS và quyết định trong DECISIONS — "làm" (kèm test trên) hay "không
+      làm" (kèm số đo).
 - [ ] `./gate.sh` đầy đủ xanh; phát hành theo `docs/RELEASING.md` (D-171).
 
 ## Chỗ dễ sai
@@ -389,6 +445,13 @@ Mọi test chạm database dùng `TestDatabase::run` (tự chạy trên SQLite v
 - **EXPLAIN** khác cú pháp và ý nghĩa giữa hai database; Postgres cần `ANALYZE` sau khi nạp dữ liệu,
   không thì kế hoạch sai. So kế hoạch trên dữ liệu cỡ thật, không trên database trống.
 - **`tenant_id` trong log**: thêm vào span, không ghi thân request hay email (luật code).
+- **AVIF chặn worker** (D-232): mã hoá AV1 nặng CPU hơn WebP nhiều lần; job AVIF chạy dài làm chậm job khác của
+  `media`. Đo thời gian thật trên bộ ảnh; job dài hơn lease thì dùng `JobRegistration::timeout` (mục A1); giữ việc
+  mã hoá trong `spawn_blocking`, không chặn thread async.
+- **Nhầm hai chiều AVIF**: nhận ảnh AVIF tải lên (giải mã — vẫn không có bản nhỏ, không có bộ giải mã Rust thuần)
+  khác với xuất bản AVIF (mã hoá). Mục này chỉ thêm chiều mã hoá.
+- **So cỡ không cùng chất lượng**: AVIF ở chất lượng thấp luôn nhẹ hơn — chỉ so khi điểm chất lượng ngang WebP; ảnh
+  có chữ dễ lộ nhoè ở AVIF chất lượng thấp, xem riêng nhóm ảnh này.
 
 ## Căn cứ pháp lý
 
@@ -403,6 +466,9 @@ Mọi test chạm database dùng `TestDatabase::run` (tự chạy trên SQLite v
   khách (khách chọn "lưu tại Việt Nam" ở bước 33 thì backup của database đó cũng phải ở Việt Nam);
   DEPLOY nhắc điều này. Điều khoản cụ thể và nghĩa vụ lưu nhật ký hệ thống: **cần đối chiếu văn bản
   gốc / người có chuyên môn pháp lý** — không chặn công việc (D-186).
+- AVIF (D-232): license của crate mã hoá phải hợp MIT / Apache (sở hữu trí tuệ, Luật số hai). AV1 do AOMedia cấp
+  phép bằng sáng chế miễn phí, nhưng có bên ngoài tuyên bố nhóm bằng sáng chế cho AV1 — cần đối chiếu người có
+  chuyên môn pháp lý; không chặn việc đo.
 - Chứng từ kế toán giữ ≥ 10 năm (Luật Kế toán 88/2015 Điều 41, D-190): xoay vòng backup KHÔNG phải
   nơi lưu chứng từ — việc giữ 10 năm nằm ở module `invoices` / `ledger` (bước 36), sổ tay ghi rõ.
 
@@ -417,5 +483,7 @@ Mọi test chạm database dùng `TestDatabase::run` (tự chạy trên SQLite v
   của từng module, để module tự ghi bảng của mình). Ghi DECISIONS.
 - Gauge chỉ ở tiến trình `worker` hay mọi tiến trình (khuyến nghị: `worker` / `all`, tránh N chuỗi trùng).
 - Cách giảm của tìm theo ý nghĩa nếu vượt ngưỡng. Ghi DECISIONS.
+- AVIF (D-232): crate, mức chất lượng / tốc độ mã hoá, và có làm hay không theo ngưỡng ở mục "Ảnh AVIF". Ghi
+  DECISIONS cả khi không làm.
 - Có thêm `promtool check rules` vào gate qua Docker hay không (khuyến nghị: có nếu image nhỏ và
   ghim phiên bản; nếu thêm, ghi đầu `gate.sh`).

@@ -5546,3 +5546,40 @@ giữ an toàn cho người mua, mức D cho người chấp nhận rủi ro nh�
 Đã cân nhắc: chia A/B ngẫu nhiên theo lần tải — trang nhảy khi F5, số liệu sai; đặt cookie A/B cho khách chưa đồng ý
 — trái hướng không cookie của bước 57; cho mức D mặc định — rủi ro lộ dữ liệu người mua, rơi vào mọi khách dùng
 Autoxide.
+
+## D-232 · Đưa 11 mục "để sau / chờ quyết" vào các bước có sẵn — 2026-11-14 — chủ dự án trao quyền, agent quyết
+
+Chủ dự án yêu cầu viết đặc tả cho 11 mục ở phần "Sau core" của lộ trình và **trao quyền quyết định cho agent**, kể
+cả ba mục trước đây "chờ chủ dự án quyết". Agent quyết: **không mở bước mới**; mỗi mục gắn vào bước cùng chủ đề,
+đặt cuối danh sách của bước đó (làm sau phần chính của bước), để giai đoạn A không bị đẩy lùi.
+
+| # | Mục | Bước | Quyết định chính |
+|---|---|---|---|
+| 1 | Khách thử nghiệm (sandbox) | 38 | Sao cấu hình, không sao dữ liệu cá nhân; mọi đối tác buộc dùng bộ giả; mail chỉ tới nhân viên đã xác minh; `noindex`; tự hết hạn; đẩy sang khách thật thành **bản nháp** |
+| 2 | Khách duyệt từng lần khi nhân sự nền tảng xin vào | 54 | `support_access_mode` `disabled` / `per_request` (**mặc định**) / `standing`; duyệt qua P12; tối đa 4 giờ; `legal_request` như D-211 |
+| 3 | Nhóm nút ngoài cây cho báo cáo | 38 | Nhóm tự do trong `organizations`; **nhóm không cấp quyền** — báo cáo là giao của nhóm với phạm vi người xem |
+| 4 | Quản trị trên điện thoại | 52 | Gợi ý `mobile` trên sổ điều hướng (tối đa 5 mục thanh đáy); tóm tắt cuối ngày tự bật, theo giờ của người dùng |
+| 5 | Bán ứng dụng trả phí, chia doanh thu | 65 | Miễn phí hay thuê bao tháng; nền tảng là bên bán, thu qua hoá đơn thuê bao (35), chi nhà phát triển qua `PayoutGateway` (36); nhà phát triển nước ngoài chờ đối chiếu thuế |
+| 6 | Trả trước một phần cho hàng đặt trước | 45 | Gọi là "trả trước một phần", **không** mặc định là "đặt cọc" theo BLDS 2015 Điều 328; người bán huỷ hoàn đủ; người mua huỷ theo điều kiện công bố trước |
+| 7 | Đấu thầu và hợp đồng khung B2B | 59 | Hợp đồng khung có cam kết trừ nguyên tử; mời thầu nhiều người bán chỉ trên sàn, giá niêm phong tới hạn; không dùng cho mua sắm công |
+| 8 | Gọi điện / tổng đài trong chat | 61 | Trait `VoiceProvider` + bộ giả; yêu cầu gọi lại vào hộp việc; ghi âm tắt mặc định, phải thông báo trước |
+| 9 | Đăng nhập thay người dùng | 54 | Thay bằng **"xem như" chỉ đọc**, không bao giờ làm thay; người mua phải cấp phép (mã 30 phút); không xem người quyền cao hơn; audit hai id |
+| 10 | Ảnh AVIF | 39 | **Đo trước**: chỉ thêm khi nhẹ hơn WebP ≥ 20% ở chất lượng tương đương; sinh bằng job, tắt mặc định; không đạt thì ghi "không làm" kèm số đo |
+| 11 | Ký hợp đồng điện tử | 59 (trong `compliance`) | Trait `SignatureProvider` + bộ giả; ký `simple` (OTP + đồng ý, lưu bằng chứng) hay `digital` (chữ ký số qua nhà cung cấp được cấp phép); core không dựng PDF; mã băm chống sửa tệp |
+
+Bộ nối đối tác thật (tổng đài, chữ ký số) vẫn theo luật cũ: cần tài khoản thử và secret thật thì dừng hỏi chủ dự án.
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật 91/2025/QH15, NĐ 356/2025 (sandbox, xem
+như, ghi âm, truy cập hỗ trợ); Bộ luật Dân sự 2015 Điều 328 (đặt cọc); NĐ 123/2020 sửa bởi NĐ 70/2025 (hoá đơn khoản
+thu trước); Luật Đấu thầu 22/2023/QH15 (phạm vi mua sắm công); Luật Giao dịch điện tử 20/2023/QH15 và nghị định về
+chữ ký điện tử, dịch vụ tin cậy (ký hợp đồng); quy định thuế nhà thầu (chi cho nhà phát triển nước ngoài).
+
+Thay: các dòng "Để sau (D-201…)", "Để sau: bán qua ứng dụng trả phí…" và "Chờ chủ dự án quyết: đăng nhập thay người
+dùng · AVIF" ở mục "Sau core" của lộ trình; câu "Ký hợp đồng điện tử vẫn chờ chủ dự án quyết hướng" của D-221.
+
+Lý do: cả 11 mục là tính năng các nền tảng lớn đều có; gắn vào bước cùng chủ đề thì dùng lại hạ tầng sẵn có (phân
+phối cha → con, yêu cầu duyệt, sổ điều hướng, `PayoutGateway`, luồng đặt trước, báo giá B2B), không thêm module.
+
+Đã cân nhắc: mở bước 68+ cho từng mục — thêm bước mà không thêm giá trị, phần lõi chờ lâu hơn; "đăng nhập thay người
+dùng" có quyền ghi như một số nền tảng — rủi ro lạm quyền và dữ liệu cá nhân, "xem như chỉ đọc" đủ cho việc gỡ lỗi;
+module `contracts` riêng cho ký điện tử — `compliance` đã sở hữu văn bản pháp lý có phiên bản.

@@ -252,8 +252,10 @@ từng lý do với lỗi thật mà endpoint tương ứng trả.
 - Module đánh dấu lệnh rủi ro: `Command::requires_approval_for(ActorKind::Agent)`; `ModuleTool` thêm
   `requires_approval_for_agent` (A-c12). Agent gọi lệnh đó thì nhận `202` mã `approval_required` kèm
   `approval_request` (`id`, `summary`, `expires_at`, mặc định 24 giờ, đường dẫn duyệt). Người có cùng
-  permission duyệt thì lệnh chạy với `Idempotency-Key` gốc; từ chối hay hết hạn thì agent nhận lý do. Bảng
-  `kernel_approval_requests` cấp khách hàng. Như nhau cho REST và tool MCP (luật kiến trúc 8). Yêu cầu
+  permission duyệt thì lệnh chạy với `Idempotency-Key` gốc; từ chối hay hết hạn thì agent nhận lý do. Mỗi **loại**
+  yêu cầu duyệt khai permission của người duyệt (mặc định: cùng permission với lệnh); loại mà người xin không có
+  quyền ở khách — vd `support_access` của bước 54, nhân sự nền tảng xin vào — khai permission duyệt riêng
+  (`auth.support_access.approve`, D-232). Bảng `kernel_approval_requests` cấp khách hàng. Như nhau cho REST và tool MCP (luật kiến trúc 8). Yêu cầu
   đang chờ vào hộp việc (P2).
 - **Yêu cầu duyệt đầy đủ (D-213, A-c2).** `GET /api/v1/kernel/approvals?status=`,
   `GET /api/v1/kernel/approvals/{id}`, `POST /api/v1/kernel/approvals/{id}/approve`, `POST …/reject {reason}`;
