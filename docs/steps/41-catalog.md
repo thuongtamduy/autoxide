@@ -6,7 +6,7 @@
 > Nguồn đối chiếu thiết kế: `docs/prompts/ui-trace-roadmap.md` (mã `A-…` / `B-…` trỏ tới
 > `docs/research/ui-trace/`) và `docs/prompts/ui-phase2-api.md` (màn tương ứng ở
 > `docs/research/ui-traceability.md`, đợt 2).
-> Đã gộp các quyết định: D-201, D-202, D-204, D-208…D-218, D-222, D-223…D-227 (D-228).
+> Đã gộp các quyết định: D-201, D-202, D-204, D-208…D-218, D-222, D-223…D-227 ; thêm thẳng vào thân: D-229 (D-228).
 
 ## Mục tiêu
 
@@ -320,6 +320,23 @@ tác = một lần đổi mới về giá cũ.
   lỗi một lần (D-083), mã `catalog.preorder_date_invalid`, `catalog.preorder_limit_invalid`.
 - Đọc công khai trả nhãn trạng thái `preorder` kèm ngày để giao diện hiện "Đặt trước — dự kiến giao từ
   …"; JSON-LD dùng `availability = PreOrder`, `availabilityStarts`.
+
+### Tạo sản phẩm từ ảnh (D-229)
+
+`POST /products/from-images` `{media_ids[] (1–8, ảnh trong `media` của khách), locale, category_id?}`
+(`catalog.products.write`, tính năng `catalog.ai_from_images`) chạy bằng job: gửi ảnh cho `TextModel` (cần
+`Capabilities.images`; không có → 503 `catalog.ai_images_unavailable`), nhận theo JSON Schema: tên, mô tả ngắn và
+dài, danh mục gợi ý (chỉ trong cây danh mục của khách), giá trị thuộc tính theo thuộc tính của danh mục đó, từ
+khoá SEO. Kết quả là **sản phẩm `draft`** với `ai_assisted = true` (D-109) — không bao giờ tự mở bán; giá, tồn,
+SKU để trống cho người nhập; thuộc tính bắt buộc AI không chắc thì để trống (`readiness` báo thiếu). Nhiều ảnh
+của nhiều sản phẩm thì qua `imports` (bước 56). Test: `tao_tu_anh_chi_la_nhap`, `danh_muc_ngoai_cay_bi_bo`,
+`khong_co_anh_trong_media_bi_tu_choi`.
+
+### Khối cho trang (D-229, bước 67)
+
+`catalog` khai `catalog.product_grid` (theo danh mục / bộ sưu tập / danh sách tay, số cột, sắp xếp),
+`catalog.product_card`, `catalog.collection` qua `Module::blocks()` và gắn `BlockData`: một lần gọi trả thẻ sản
+phẩm công khai (giá sau giảm tự động, tình trạng hàng) cho mọi khối cùng loại; sản phẩm hết công khai → `None`.
 
 ### API REST
 

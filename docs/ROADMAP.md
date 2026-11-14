@@ -18,7 +18,7 @@ thuộc đã xong.
 | A. Hợp đồng và nền lõi | 31, 32 → 33 → 34 → 35, 36, 37 (song song) → 40 | giữ API không vỡ trước khi sửa mọi bảng; đa khách, tổ chức, tiền, tuân thủ là nền của mọi thứ sau |
 | B. Lớp cho giao diện và phân quyền | 51 → 54 → 52 | module thương mại khai luôn phần của mình (51 nên xong trước 41); 54 cần P12 của 51 |
 | C. Vận hành | 38 → 39 | báo cáo xuyên database, backup, hiệu năng trước khi có dữ liệu thương mại thật |
-| D. Module nền dùng chung | 53, 57, 58, 66, 65 | hỗ trợ khách (45 và 61 dùng), phân tích (64 dùng), tự động hoá, SCIM, chợ ứng dụng |
+| D. Module nền dùng chung | 53, 57, 58, 67, 66, 65 | hỗ trợ khách (45 và 61 dùng), phân tích (64 dùng), tự động hoá, trang dựng từ khối và AI tạo trang, SCIM, chợ ứng dụng |
 | E. Thương mại | 41 → 42, 43, 44 → 45 → 46, 47, 48, 49, 55 → 56, 59, 60, 61, 62, 63, 64 | module nghiệp vụ cắm vào core đã xong |
 | Chờ chủ dự án | 50 | chỉ làm khi chủ dự án nói repo đã công khai |
 
@@ -53,6 +53,7 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 | 59 Bán sỉ B2B (D-221) | 45, 47 | 46, 48, 49 |
 | 60 Đặt lịch dịch vụ (D-221) | 34, 36 (37 cho nhắc lịch) | 41–49 |
 | 61 Chat chăm sóc khách (D-221) | 40 (SSE), 53 | 41–49 |
+| 67 Trang dựng từ khối, AI tạo trang (D-229) | 51, 37 (nhãn AI, đồng ý, chân trang pháp lý) | 41–49 (module thương mại khai khối ở bước của nó) |
 | 62 Sản phẩm bán theo kỳ (D-221) | 45, 36 | 46–49 |
 | 63 Đa tiền tệ (D-221) | 36, 41, 44, 45 | 46–49 |
 | 64 Quảng cáo trong sàn (D-221) | 46, 57 | 47–49 |
@@ -606,6 +607,9 @@ D-194). Khiếu nại có hạn luật định vẫn ở `compliance` (bước 3
 - [ ] Tool MCP (cùng permission như REST); gợi ý trả lời bằng AI chỉ là bản nháp (D-109); email trả lời
       vào lại phiếu qua trait `InboundMail` (tắt mặc định); hướng dẫn `docs/SUPPORT.md` (EN + VI); test
       trên cả hai database
+- [ ] Trả lời tự động câu hỏi đơn giản (D-230): chỉ gửi câu trả lời mẫu đã duyệt hay mẫu câu dựng từ dữ liệu
+      chính xác (`FactSource` của module sau), mô hình chỉ phân loại; luật quyết trong Rust, không bao giờ tự động
+      cho khiếu nại / hoàn tiền / dữ liệu cá nhân; tắt mặc định, nhãn và "gặp nhân viên"; câu phức tạp → nháp
 
 ## 57. Phân tích truy cập và hành vi (`analytics`) (chủ dự án giao ngày 14/11/2026, D-220)
 
@@ -633,6 +637,30 @@ MCP đã có, chạy với quyền của người tạo luật.
       động rủi ro chờ duyệt; chống vòng lặp và giới hạn số lần chạy; nhật ký từng lần chạy, chạy lại
 - [ ] Chạy thử khô, danh mục kích hoạt và hành động người gọi dùng được, mẫu luật do module khai; agent tạo
       luật thì chờ duyệt; người tạo mất quyền thì luật tự tắt; test trên cả hai database
+- [ ] Cảnh báo bất thường (D-229): kích hoạt theo số liệu tóm tắt so với ngưỡng hay mức nền 4 tuần (doanh thu
+      tụt, sắp hết hàng theo tốc độ bán, tỉ lệ bom hàng tăng), thống kê tất định, một lần báo mỗi kỳ
+
+## 67. Trang dựng từ khối, AI tạo trang, bộ giao diện website (chủ dự án giao ngày 14/11/2026, D-229)
+
+Đặc tả: [`docs/steps/67-page-builder.md`](steps/67-page-builder.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 51 và 37. Kéo thả là giao diện ở repo riêng; core cho dữ liệu trang và API. AI chỉ ghép khối có
+sẵn, không sinh code; kết quả luôn là bản nháp.
+
+- [ ] Sổ khối của kernel: `Module::blocks()` (tên, nhóm, schema props, gợi ý cho AI, tính năng của gói),
+      `BlockData` trả dữ liệu theo lô; `GET /kernel/blocks` chỉ khối của module đang bật
+- [ ] Trang có thân `layout` (cây khối JSON) cạnh thân `rich`: kiểm từ chối mặc định, theo cỡ màn hình, theo ngôn
+      ngữ; sửa từng phần bằng JSON Patch + `If-Match`; khoá sửa; nháp, lịch sử, xem trước, hẹn giờ dùng lại `content`
+- [ ] Khối nền (bố cục, chữ, media, FAQ, thanh thông báo, đếm ngược, popup thu email có đồng ý) và khối của
+      `forms`, `newsletter`, `comments`, `media`; chân trang pháp lý tự gắn cho website bán hàng
+- [ ] Đọc công khai trả bố cục kèm dữ liệu khối, một lần gọi mỗi loại khối, khối lỗi không hỏng trang, ETag;
+      đo p99 trang 50 khối trên cả hai database
+- [ ] Bộ giao diện của website (token màu, chữ, khoảng cách, kế thừa theo nút, kiểm tương phản), khu dùng chung
+      nhiều trang, thư viện trang mẫu theo ngành
+- [ ] AI tạo trang và sửa tiếp bằng trò chuyện (job, kết quả qua bộ kiểm, thử lại có giới hạn, bản nháp
+      `ai_assisted`, lịch sử trò chuyện để hoàn tác); bộ nháp chiến dịch từ một chương trình khuyến mại
+- [ ] Kiểm tra sức khoẻ website vào hộp việc: thiếu SEO / alt, link gãy, khối tham chiếu bản ghi đã ẩn, đường dẫn
+      404 nhiều → gợi ý chuyển hướng; tool MCP như REST; hướng dẫn EN + VI cho người viết module khai khối
 
 ## 66. Đồng bộ nhân viên qua SCIM 2.0 (chủ dự án giao ngày 14/11/2026, D-221)
 
@@ -716,6 +744,8 @@ bước 35.
 - [ ] Hỏi đáp và ảnh song ngữ (D-202): `catalog.product` trong sổ đối tượng, nhãn `seller` (permission quản lý
       sản phẩm ở nút sở hữu), event vòng đời (lưu trữ / xoá → đóng và ẩn hỏi đáp); `catalog_product_media`
       ghi đè `alt` theo ngôn ngữ như `media_alt_translations`
+- [ ] Tạo sản phẩm nháp từ ảnh bằng AI (tên, mô tả, danh mục trong cây của khách, thuộc tính, SEO — D-229);
+      khối `catalog.product_grid`, `product_card`, `collection` cho trang dựng từ khối (bước 67)
 
 ## 42. Kho (`inventory`)
 
@@ -783,6 +813,7 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 - [ ] Công khai và nhắc: event giá sau giảm tự động cho danh sách công khai; flash sale công khai với suất
       còn là số thật; nhắc khi flash sale bắt đầu (đồng ý riêng cho một lần nhắc, D-225)
 - [ ] Chạy thử chương trình trên giỏ mẫu, kiểm xung đột, lịch, số liệu chương trình (D-222)
+- [ ] Khối `promotions.flash_sale`, `promotions.voucher_claim` cho trang dựng từ khối (D-229, bước 67)
 
 ## 44. Vận chuyển (`shipping`)
 
@@ -806,6 +837,7 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
       tại cửa hàng trả giờ sẵn sàng (chuẩn bị + giờ mở cửa của bước 34) và thời hạn giữ hàng chờ nhận
 - [ ] Ước tính phí giao công khai (D-200): theo tỉnh và một sản phẩm / số lượng, chưa cần giỏ, cho trang sản
       phẩm; cùng bảng phí với báo giá của `orders`, ghi rõ "ước tính", ngưỡng miễn phí
+- [ ] Câu trả lời tự động về hành trình vận đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
 
 ## 45. Giỏ hàng, đặt hàng, đơn hàng (`orders`)
 
@@ -853,6 +885,8 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       hạn; không chia sẻ danh sách giữa các khách
 - [ ] Trả góp qua đối tác (trait của bước 36); bảo hành theo số serial hay theo đơn: phiếu bảo hành, tiếp
       nhận, trạng thái xử lý, hạn bảo hành
+- [ ] Khối `orders.add_to_cart`, `buy_now`, `reviews` cho trang dựng từ khối (D-229); câu trả lời tự động về
+      trạng thái đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
 
 ## 46. Sàn (`marketplace`)
 
@@ -1018,8 +1052,9 @@ Bắt đầu SAU bước 40 (SSE) và 53 (`support`).
 - [ ] Cuộc trò chuyện giữa người mua và cửa hàng / người bán, gắn với sản phẩm hay đơn; tin nhắn chỉ thêm, gửi
       lại không trùng, thu hồi trong thời hạn ngắn; hộp thư chung, phân công, đã đọc
 - [ ] Tin mới thời gian thực qua SSE, người không online nhận thông báo gom lô; chuyển thành phiếu hỗ trợ
-- [ ] Chống lạm dụng (chặn, báo vi phạm, xác thực tài khoản khi khách bật), hạn lưu là cấu hình, gợi ý trả lời
-      bằng AI chỉ là bản nháp; test trên cả hai database
+- [ ] Chống lạm dụng (chặn, báo vi phạm, xác thực tài khoản khi khách bật), hạn lưu là cấu hình; câu phức tạp:
+      AI soạn nháp cho nhân viên; câu đơn giản đã có câu trả lời chính xác: trả lời tự động qua `AutoResponder`
+      của `support` (D-230); test trên cả hai database
 
 ## 62. Sản phẩm bán theo kỳ (`recurring`) (chủ dự án giao ngày 14/11/2026, D-221)
 
