@@ -53,7 +53,7 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 | 59 Bán sỉ B2B (D-221) | 45, 47 | 46, 48, 49 |
 | 60 Đặt lịch dịch vụ (D-221) | 34, 36 (37 cho nhắc lịch) | 41–49 |
 | 61 Chat chăm sóc khách (D-221) | 40 (SSE), 53 | 41–49 |
-| 67 Trang dựng từ khối, AI tạo trang (D-229) | 51, 37 (nhãn AI, đồng ý, chân trang pháp lý) | 41–49 (module thương mại khai khối ở bước của nó) |
+| 67 Trang dựng từ khối, AI tạo trang (D-229, D-231) | 51, 37 (nhãn AI, đồng ý, chân trang pháp lý); thử A/B: 57 | 41–49 (module thương mại khai khối ở bước của nó) |
 | 62 Sản phẩm bán theo kỳ (D-221) | 45, 36 | 46–49 |
 | 63 Đa tiền tệ (D-221) | 36, 41, 44, 45 | 46–49 |
 | 64 Quảng cáo trong sàn (D-221) | 46, 57 | 47–49 |
@@ -661,6 +661,12 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
       `ai_assisted`, lịch sử trò chuyện để hoàn tác); bộ nháp chiến dịch từ một chương trình khuyến mại
 - [ ] Kiểm tra sức khoẻ website vào hộp việc: thiếu SEO / alt, link gãy, khối tham chiếu bản ghi đã ẩn, đường dẫn
       404 nhiều → gợi ý chuyển hướng; tool MCP như REST; hướng dẫn EN + VI cho người viết module khai khối
+- [ ] Thử A/B hai phiên bản trang (D-231, sau bước 57): chia cố định theo người xem (F5 không đổi), bot thấy bản
+      gốc, chỉ thử bố cục và nội dung (không thử giá), số liệu và độ tin cậy, người chọn bản thắng
+- [ ] AI tạo ảnh (D-231): `ImageModel` mặc định tắt, chỉ banner / ảnh nền / minh hoạ, cờ `ai_generated` và nhãn,
+      `catalog` chặn làm ảnh sản phẩm
+- [ ] Khối mã tự viết (D-231): mặc định tắt; mức cách ly (iframe `sandbox`, CSP theo host) chủ cửa hàng bật; mức
+      không cách ly cần cả máy chủ và chủ cửa hàng bật, không trên trang thanh toán / tài khoản; audit, sổ script
 
 ## 66. Đồng bộ nhân viên qua SCIM 2.0 (chủ dự án giao ngày 14/11/2026, D-221)
 

@@ -332,6 +332,11 @@ SKU để trống cho người nhập; thuộc tính bắt buộc AI không ch�
 của nhiều sản phẩm thì qua `imports` (bước 56). Test: `tao_tu_anh_chi_la_nhap`, `danh_muc_ngoai_cay_bi_bo`,
 `khong_co_anh_trong_media_bi_tu_choi`.
 
+Ảnh do AI **tạo** (`media.ai_generated = true`, bước 67) không gắn được vào sản phẩm hay biến thể: 422
+`catalog.ai_image_not_allowed` (D-231) — ảnh sản phẩm phải là ảnh thật để người mua không hiểu sai về hàng (Luật
+19/2023). Ảnh thật do AI **đọc** để gợi ý nội dung (mục trên) thì dùng bình thường. Test:
+`anh_ai_tao_khong_gan_vao_san_pham`.
+
 ### Khối cho trang (D-229, bước 67)
 
 `catalog` khai `catalog.product_grid` (theo danh mục / bộ sưu tập / danh sách tay, số cột, sắp xếp),
