@@ -102,12 +102,28 @@ Ký hiệu: **thiếu** là không có ở đâu; **hở** là đặc tả dùng
 | Trạng thái "Chờ xác nhận" | 45 | lệch | Màn Đơn hàng dùng trạng thái này (theo H2 của đề bài trước) nhưng bảng trạng thái của bước 45 chưa có. |
 | Cách tính của báo cáo kênh | 48 | hở | `GET /reports/channels` cần chốt ba điều: phí và thực nhận tính theo kỳ bảng kê hay theo ngày đặt (màn chọn: doanh thu theo ngày đặt, phí theo bảng kê có kỳ nằm trong khoảng); có trả số đơn huỷ hoặc trả không; có tách kênh tự có (website, quầy) với kênh ngoài không. |
 
+### Từ đợt sửa theo nghiên cứu (xem `docs/research/storefront-benchmark.md`)
+
+| Mục | Bước | Loại | Nội dung |
+|---|---|---|---|
+| Thuộc tính đồ bếp có cấu trúc | 41 | thiếu | Các thuộc tính cùng nhãn và cùng đơn vị cho cả ngành hàng: số người ăn theo cỡ, "trong hộp có gì" và "không kèm", hướng dẫn dùng và chăm sóc (kèm tệp PDF), kích thước và khối lượng kiện. |
+| Quan hệ "Dùng kèm" | 41 | thiếu | Hàng bổ sung có giá theo biến thể (vd nắp theo cỡ chảo). Tách khỏi "hàng thay thế" (Có thể bạn thích). |
+| Mã áp cho biến thể nào | 43 | hở | Điều kiện của mã trả về số lượt còn và danh sách biến thể được áp, để trang tự ẩn mã ở cỡ không áp. |
+| Đánh giá theo người bán | 45, 46 | thiếu | Endpoint gộp đánh giá mọi sản phẩm của một người bán: phân bố sao, số có ảnh theo từng mức sao, lọc, sắp xếp, phân trang bằng con trỏ, lượt hữu ích. |
+| Tóm tắt trang "Tôi" | 47, 34 | thiếu | Một endpoint trả số liệu tài khoản (đơn chưa xong, lượt tải còn, điểm, bảo hành còn hạn, tranh chấp đang mở), để khỏi gọi 9 API khi mở trang. |
+| Xác nhận đơn qua SMS | 45, `notifications` | hở | Email không còn bắt buộc khi đặt hàng giao tận nơi (theo khuyến nghị giảm số ô phải nhập). Đặc tả việc gửi xác nhận đơn qua SMS khi khách không có email. Phần tra đơn bằng mã đơn và số điện thoại đã có. |
+| Hoá đơn công ty cần email | 36 | hở | Ghi rõ: xuất hoá đơn cho công ty thì bắt buộc email nhận hoá đơn. |
+
 ## Căn cứ cần đối chiếu (agent đã ghi trên màn)
 
 - Mức giảm tối đa 50% và trường hợp chương trình khuyến mại tập trung quốc gia: Thông tư 39/2025/TT-BCT, NĐ 81/2018 sửa bởi NĐ 128/2024.
 - Người tiếp thị phải xác thực danh tính: Luật Thương mại điện tử 2025.
 - Thời hạn giữ dữ liệu khi đặt lịch tư vấn: Luật 91/2025.
 - GTGT của hàng số và dịch vụ đào tạo: Luật 48/2024.
+- Livestream trên điện thoại: phần công khai thông tin được thu gọn sau một nút, dòng tóm tắt (ai bán, hoa hồng
+  của người dẫn, đối tác thanh toán) luôn hiện. Cần đối chiếu xem cách này đã đủ yêu cầu công khai chưa.
+- Trang sản phẩm: chi tiết điều kiện khuyến mại nằm trong mục mở rộng, còn phạm vi và hạn luôn hiện. Cần đối chiếu
+  yêu cầu công khai thông tin khuyến mại.
 
 ## Báo cáo khi xong
 
