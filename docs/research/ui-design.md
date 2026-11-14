@@ -208,6 +208,12 @@ Phần máy chủ cần thêm: đề bài cho teammate ở `docs/prompts/ui-help
   - nút hữu ích và báo vi phạm;
   - tên người mua rút gọn.
 - **Hỏi đáp:** ô tìm cạnh nút "Đặt câu hỏi" mở tại chỗ; câu trả lời ghi vai trò ("Cửa hàng", "Đã mua").
+- **Số tiền không bao giờ bị bẻ dòng:**
+  - giữa số và "₫" dùng khoảng trắng không ngắt (NBSP);
+  - ô chứa số và giá đặt `white-space: nowrap`;
+  - thiếu chỗ thì cả con số xuống dòng và căn phải.
+
+  Kiểm cả với phông hiển thị rộng hơn (iPhone), vì công cụ quét chạy Chromium.
 - **Đặt hàng trên điện thoại:** tóm tắt đơn thu gọn thành một dải ở đầu trang; thanh tổng tiền và nút tiếp
   tục cố định ở đáy màn hình.
 - **Trang chiến dịch có phong cách riêng:**
