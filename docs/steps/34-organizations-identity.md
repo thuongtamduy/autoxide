@@ -599,3 +599,17 @@ buộc mật khẩu. Số đã thuộc một tài khoản → 409 `auth.phone_ta
 - **Nhỏ (A-c11).** `GET /api/v1/auth/memberships?org_id&inherited=true` (membership hiệu lực kể cả kế thừa từ
   nút trên). **Thấp (A-b10):** chính sách bắt buộc MFA theo role (`auth_roles.requires_mfa`),
   `auth_user.last_login_at`.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- **Ghi hồ sơ công khai của nút.** `PATCH /api/v1/organizations/{id}/public-profile` (`organizations.profile.manage`,
+  theo độ sâu): `public`, `display_name`, `Address`, `opening_hours[]` (thứ, giờ mở, giờ đóng — nhiều khoảng một
+  ngày được), `special_days[]` (ngày, đóng cửa hay giờ riêng, ghi chú), `pickup`, `cover_media_id?`, `logo_media_id?`
+  (ID của `media`, chỉ giữ ID). Kiểm: giờ đóng sau giờ mở, ngày đặc biệt không trùng; xoá ETag của
+  `/public/stores`. Event `organizations.public_profile_updated`. Lỗi `organizations.invalid_opening_hours` (422).
+- **Tự đổi tên hiển thị.** `PATCH /api/v1/auth/me` (đã có cho `locale`, `time_zone`) nhận thêm `name` (1–100 ký tự,
+  bỏ khoảng trắng đầu cuối); cập nhật `search_text`; event `auth.user_updated`.
+- **Gỡ danh tính OIDC** đã có ở bước 40 (`DELETE /api/v1/auth/me/identities/{id}`, chặn cách đăng nhập cuối
+  `auth.identity_last_method`) — không thêm gì.

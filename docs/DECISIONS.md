@@ -5348,3 +5348,81 @@ Stripe / commercetools (luật tách khỏi cách đưa tới người mua).
   giới hạn.
 - Bảng giá suy ra tính lúc đọc — nhanh viết nhưng chậm đường nóng và mất lịch sử giá thật (cần cho trần 50%);
   ghi sẵn thành dòng giá.
+
+## D-223 · Danh sách lý do theo khách: một cách làm cho mọi module — 2026-11-14 — agent quyết
+
+Quyết định: mọi danh sách "lý do" khách cần chọn (điều chỉnh tồn, ẩn đánh giá, từ chối trả hàng, lý do trả hàng
+cho phép, chênh lệch tiền két, khớp dòng lệch COD…) đi qua một tiện ích của kernel, mục P18 của bước 51:
+- module khai danh sách và bộ mã mặc định qua `Module::reason_lists()` (cài đặt mặc định trả rỗng — D-038); tên
+  danh sách `<module>.<việc>`, mã `snake_case`, nhãn mặc định là i18n key `<module>.reason.<việc>.<mã>`;
+- khách thêm mã, đổi nhãn, tắt mã mặc định, sắp thứ tự (`kernel_reason_codes`: `tenant_id`, `list`, `code`,
+  `labels` JSON, `active`, `position`, `builtin`, `updated_at`; unique (`tenant_id`, `list`, `code`));
+- mã mặc định đánh dấu `legal` (vd lý do ẩn đánh giá theo gói `vn` của bước 37) không tắt được;
+- service kiểm bằng `ReasonCodes::ensure(tenant, list, code)`; dòng dữ liệu lưu mã, không lưu nhãn — đổi nhãn
+  không sửa lịch sử; mã đã dùng không xoá được, chỉ tắt.
+
+Lý do: đợt 2 của thiết kế lộ ra ít nhất sáu danh sách lý do ở bốn module; mỗi module tự làm bảng riêng thì sáu
+cách làm, sáu bộ endpoint. Một tiện ích chung giữ "mỗi việc một cách làm" và giao diện học một lần.
+
+Đã cân nhắc: viết cứng danh sách trong code — khách không thêm được lý do của mình; mỗi module một bảng — lặp và
+lệch nhau.
+
+## D-224 · `ActorKind` thống nhất cho audit, nhật ký lệnh và event — 2026-11-14 — agent quyết
+
+Quyết định: kernel có một enum `ActorKind` (`#[non_exhaustive]`): `human`, `agent` (API key loại agent), `service`
+(API key loại dịch vụ), `system` (job, lịch), `support` (nhân sự hỗ trợ của nền tảng vào khách theo D-211),
+`app` (ứng dụng OAuth, bước 65), `scim` (bước 66). `Principal` mang nó; audit, `kernel_request_log` (bước 52) và
+envelope event (bước 40) ghi cùng giá trị; danh sách audit lọc `actor_kind=` (nhiều giá trị). Thay các tập con
+đang ghi rải rác ở 36, 51, 52, 65, 66.
+
+Lý do: khách cần thấy việc nào do người, việc nào do AI agent hay nhân sự nền tảng làm; một tập giá trị cho mọi
+nơi thì lọc được xuyên suốt.
+
+## D-225 · Khuyến mại: thời hạn bắt buộc, thông báo theo nơi nhận, kiểm trước khi bật, "Lưu mã", nhắc flash sale — 2026-11-14 — agent quyết
+
+Quyết định:
+- **`ends_at` vẫn bắt buộc.** Luật Thương mại 2005 Điều 97 yêu cầu công bố thời gian bắt đầu, kết thúc khuyến mại;
+  NĐ 81/2018 (sửa bởi NĐ 128/2024) giới hạn tổng số ngày giảm giá cho một loại hàng trong năm. "Miễn phí giao
+  không thời hạn" là **chính sách phí giao** của bước 44 (miễn phí từ một giá trị đơn), không phải chương trình
+  khuyến mại. `promotions_legal_limits` thêm `max_days_per_program?`, `max_days_per_year?` (dữ liệu, có ngày hiệu
+  lực); `activate` kiểm.
+- **Thông báo theo nơi nhận:** bảng `promotions_notices` (một dòng mỗi cơ quan nhận: tỉnh theo `address`, trạng
+  thái, số tiếp nhận, ngày nộp) thay ba cột `notice_*`; `notice_status` của chương trình suy ra (mọi nơi đã nộp).
+- **Kiểm trước khi bật:** `POST /promotions/{id}/activation-check` (không ghi) trả danh sách điều kiện, mỗi điều
+  kiện `code`, `ok`, `params`; `activate` lỗi thì trả cùng danh sách trong `errors[]` của `Problem` — không lưu
+  "lỗi lần bật cuối".
+- **"Lưu mã" của website = lưu voucher (D-222):** chương trình muốn có nút "Lưu" là chương trình `voucher` có
+  `claimable`; coupon công khai đã hiện sẵn ở bộ chọn mã của giỏ (D-201). Không làm `/me/saved-promotions`.
+- **Nhắc khi flash sale bắt đầu:** người mua bấm "Nhắc tôi" (`promotions.use`) tạo một dòng
+  `promotions_reminders`; job gửi qua `notifications` trước giờ mở `REMINDER_LEAD_MINUTES` (10). Lần bấm là đồng
+  ý riêng cho đúng một lần nhắc đó (ghi bằng chứng đồng ý theo bước 37), không thành đồng ý nhận quảng cáo.
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật Thương mại 36/2005 Điều 97; NĐ 81/2018
+sửa bởi NĐ 128/2024 (thời hạn giảm giá, nơi nhận thông báo, miễn phí giao có phải thông báo không); NĐ 239/2026;
+Luật 91/2025 về đồng ý cho mục đích cụ thể.
+
+## D-226 · Che số điện thoại, email của khách; cơ sở tính điểm thưởng — 2026-11-14 — agent quyết
+
+Quyết định:
+- Danh sách và chi tiết khách (`customers`, cả REST, MCP và xuất danh sách) trả số điện thoại, email **đã che**
+  (`09•• ••• 412`, `n•••@gmail.com`). Xem đủ: `GET /customers/{id}/contact` với permission
+  `customers.contact.reveal`; mỗi lần xem ghi audit (người xem, hồ sơ, lý do tuỳ chọn). Xuất danh sách có cột liên
+  hệ đầy đủ cũng cần permission này. Người mua xem dữ liệu của chính mình không bị che.
+- Điểm thưởng tính trên **số tiền người mua thực trả cho hàng hoá**: sau mọi khoản giảm (kể cả coupon, voucher),
+  gồm thuế (giá bán lẻ gồm thuế), không gồm phí giao, không gồm phần trả bằng điểm hay thẻ quà tặng; trừ phần
+  hoàn khi trả hàng. Cố định, ghi trong tài liệu; không là tuỳ chọn của khách.
+
+Căn cứ: Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 (tối thiểu hoá, kiểm soát truy cập) — **cần đối chiếu văn bản
+gốc**. Lý do điểm: một định nghĩa duy nhất thì người mua, nhân viên và sổ cái cùng số.
+
+## D-227 · Chênh lệch tiền két khi đóng ca — 2026-11-14 — agent quyết
+
+Quyết định: đóng ca (bước 45) tính `variance = counted − expected`; khác 0 thì bắt buộc `variance_reason` (danh
+sách lý do `orders.cash_variance`, D-223) và ghi chú. Chênh lệch ghi sổ cái ngay khi đóng ca vào tài khoản **chờ
+xử lý** của cửa hàng: thiếu → `suspense.cash_shortage`, thừa → `suspense.cash_overage` (ánh xạ sang hệ thống tài
+khoản kế toán theo bước 36 — tài sản thiếu chờ xử lý / tài sản thừa chờ giải quyết); người quản lý xử lý sau bằng
+bút toán từ sổ cái. Vượt ngưỡng `cash_variance_approval_minor` (cài đặt kế thừa) thì đóng ca cần người duyệt
+(P12 bước 51).
+
+Căn cứ: chế độ kế toán doanh nghiệp (TT 200/2014, TT 133/2016 — tài khoản 1381 / 3381) — **cần đối chiếu**.
+Lý do: tiền két lệch là sự thật kế toán, phải vào sổ; quyết nguyên nhân là việc của người, không để phần mềm đoán.

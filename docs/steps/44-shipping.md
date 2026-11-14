@@ -440,3 +440,23 @@ theo phương thức, ngày lễ là dữ liệu có ngày hiệu lực (`shippi
   `orders` ghi dòng thuế đó lên hoá đơn. Căn cứ Luật Thuế GTGT 48/2024/QH15 — **cần đối chiếu văn bản gốc**.
 - **COD (D-216).** Event `shipping.cod_settled` mang `seller_org_id` và tài khoản nhận (đối tác thu hộ hay
   người bán), để `ledger` ghi đúng chỗ.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- **Lịch giao.** `shipping_calendars` (`id`, `tenant_id`, `org_id`, `name`, `time_zone` (mặc định
+  `Asia/Ho_Chi_Minh`), `working_weekdays` (bitmask), `updated_at`) và `shipping_calendar_days` (`calendar_id`,
+  `date`, `kind` `closed`/`special_hours`, `cutoff_minute?`, `note`; unique (`tenant_id`, `calendar_id`, `date`)).
+  `GET/POST /calendars`, `PATCH /calendars/{id}`, `PUT/DELETE /calendars/{id}/days/{date}`
+  (`shipping.rates.manage`). Ngày nghỉ lễ do khách nhập khi có thông báo chính thức; task
+  `shipping.load_holidays pack=vn year=` nạp gói ngày nghỉ dùng chung nếu đã có (dữ liệu, không viết cứng).
+- **Giờ chốt "giao trong ngày".** Phương thức có `calendar_id?`, `cutoff_minute?` (phút từ 0 giờ theo múi giờ lịch,
+  vd 660 = 11:00), `same_day`; ngày giao dự kiến tính theo lịch và giờ chốt.
+- **Trạng thái tài khoản hãng.** `shipping_carrier_accounts` thêm `check_status` (`never`/`ok`/`failed`),
+  `checked_at?`, `check_error_code?`; cập nhật bởi `POST …/test` và khi gọi thật nhận `Unauthorized`.
+- **Khớp dòng lệch COD.** `POST /cod/discrepancies/{id}/refresh-tracking` (lấy lại hành trình từ hãng, ngoài
+  transaction ghi, cập nhật vận đơn) và `resolve` nhận `resolution_code` (danh sách `shipping.cod_resolution`,
+  D-223: `carrier_corrected`, `delivered_confirmed`, `returned_confirmed`, `written_off`) + `note` bắt buộc; ghi audit;
+  `written_off` sinh bút toán theo bước 36.
+- **Thời hạn giữ hàng chờ nhận:** phương thức nhận tại cửa hàng có `hold_days`; bước 45 dùng (dưới).

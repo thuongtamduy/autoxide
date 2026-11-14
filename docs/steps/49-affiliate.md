@@ -342,3 +342,11 @@ Cả SQLite và Postgres; `TestApp` với `orders` và module nền thật; `Ide
 - Thời hạn lưu nhật ký phiên mặc định khi nghị định chưa rõ (khuyến nghị 5 năm, là cấu hình; ghi "cần
   đối chiếu").
 - Có cho người tiếp thị tự đặt mã riêng không: khuyến nghị có, kiểm trùng và từ cấm (dữ liệu).
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- **Ngày chuyển khoản.** `mark-paid` nhận `paid_on` (`date`, bắt buộc, không sau hôm nay, không trước ngày tạo kỳ chi)
+  cùng `bank_reference`; ngày này là ngày chi trên chứng từ khấu trừ thuế và bút toán. Ngưỡng khấu trừ thuế TNCN
+  (2 hay 5 triệu đồng mỗi lần chi) giữ là dữ liệu — **cần đối chiếu văn bản gốc**.

@@ -582,3 +582,27 @@ Quy tắc cho `orders` (đặc tả 45) dùng ảnh chụp `Evaluation`:
 - Voucher: `chi_chu_vi_dung_duoc`, `cap_lai_cung_source_ref_khong_nhan_doi`, `huy_don_tra_voucher_con_han`,
   `xoa_tai_khoan_thu_hoi_voucher`, `voucher_trong_xuat_du_lieu_ca_nhan`.
 - Hiệu năng: bench ở mục 10 (không là test đỏ / xanh của gate; số đo ghi tài liệu).
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+Theo D-225:
+- `ends_at` giữ bắt buộc; "miễn phí giao không thời hạn" là quy tắc phí của bước 44. `promotions_legal_limits` thêm
+  `max_days_per_program?`, `max_days_per_year?`; `activate` cộng số ngày các chương trình giảm giá đã chạy cho cùng
+  biến thể trong năm (theo `promotions_versions` và mục tiêu) — vượt → `promotions.exceeds_duration_limit` (422).
+- `promotions_notices` (`id`, `tenant_id`, `promotion_id`, `authority_code` (tỉnh theo `address`), `status`
+  `pending`/`submitted`/`not_required`, `reference?`, `submitted_at?`, `submitted_by?`; unique (`tenant_id`,
+  `promotion_id`, `authority_code`)) thay ba cột `notice_status`, `notice_reference`, `notice_submitted_at`. Nơi
+  nhận suy từ nơi bán của chương trình (cửa hàng áp dụng, hay "toàn quốc" khi bán online — quy tắc là dữ liệu
+  `promotions_notice_rules`). `PATCH /promotions/{id}/notices/{authority_code}`; xuất dữ liệu theo từng nơi.
+- `POST /promotions/{id}/activation-check` (`promotions.publish`, không ghi): `checks[]` (`code`, `ok`, `params`) —
+  trần giảm, thời hạn, thông báo từng nơi, mục tiêu, ngân sách / funding, xung đột (cảnh báo). `activate` lỗi trả
+  cùng danh sách trong `errors[]`.
+- Nút "Lưu mã" = `POST /public/promotions/{id}/claim` của voucher (D-222). Không có `/me/saved-promotions`.
+- Nhắc flash sale: `POST/DELETE /public/promotions/{id}/reminders` (`promotions.use`); `promotions_reminders`
+  (`tenant_id`, `promotion_id`, `user_id`, `channel`, `consent_id`, `remind_at`, `sent_at?`; unique (`tenant_id`,
+  `promotion_id`, `user_id`)); job `promotions.send_reminders` mỗi phút gửi qua `notifications`, đánh dấu `sent_at`
+  có điều kiện (không gửi hai lần). Tối đa `MAX_REMINDERS_PER_USER` (50) lời nhắc chưa gửi.
+- Test: `khong_bat_duoc_khi_thieu_ends_at`, `vuot_so_ngay_giam_gia_trong_nam`, `thong_bao_hai_tinh_mot_tinh_chua_nop`,
+  `kiem_truoc_khi_bat_khong_ghi`, `nhac_flash_sale_gui_mot_lan_khi_hai_worker`.

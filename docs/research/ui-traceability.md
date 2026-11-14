@@ -68,25 +68,35 @@ Nhận xét chung:
 - [x] Bản đồ phân hệ: thêm Kênh bán (48) và Tiếp thị liên kết (49); Khách hàng thêm điểm và hạng; Tài
       chính thêm hàng chờ sai lệch; Sản phẩm thêm Nhập hàng (B-a18)
 
-### Đợt 2: vẽ màn hình còn thiếu, xếp theo vai trò
+### Đợt 2: vẽ màn hình còn thiếu, xếp theo vai trò (xong 14/11/2026: quản trị bản 42, website bản 32)
 
-- [ ] Người bán trên sàn: trung tâm người bán (B-a2); vận hành sàn (B-a3)
-- [ ] Kế toán: sổ cái, hàng chờ sai lệch, hoá đơn điện tử, thuế, khoá sổ (B-a4)
-- [ ] Cửa hàng: nhận tại quầy (B-a5); ca thu ngân (B-a11)
-- [ ] Đổi trả và đánh giá phía nhân viên (B-a6)
-- [ ] Kho và nhập hàng (B-a7); vận chuyển (B-a8)
-- [ ] Khuyến mại (B-a9); sản phẩm và giá (B-a10)
-- [ ] Khách hàng và CRM (B-a12); kênh bán (B-a13); tiếp thị liên kết và livestream (B-a14)
-- [ ] Người mua: các mục tài khoản và checkout còn thiếu (B-a15)
-- [ ] Đăng nhập và tài khoản của tôi (A-a3); trạng thái toàn khung: tạm khoá, chỉ đọc, bảo trì (A-a4)
-- [ ] Cài đặt: Job (A-a11), Tên miền và Kết nối (A-a12), Gói và thuê bao phía khách (A-a16)
-- [ ] Tổ chức: lời mời, uỷ quyền, cài đặt nút, hồ sơ công khai (A-a13); quyền vào hỗ trợ phía khách (A-a14)
-- [ ] Nền tảng: gói và giá, thuê bao, cấp phát, sức khoẻ, đội database (A-a15)
-- [ ] Biểu mẫu, bản tin, bình luận: các module đã chạy mà chưa có màn hình (A-a17)
-- [ ] Nội dung: trình soạn và media theo khung 2; trang, danh mục, tác giả, menu, chuyển hướng, lịch sử
-      (A-a18)
-- [ ] Tuân thủ còn thiếu (A-a19); nhân sự, webhook, audit (A-a20); việc, hoạt động, ghim, xem trước
-      `dry_run` (A-a21)
+- [x] Người bán trên sàn: trung tâm người bán (B-a2); vận hành sàn (B-a3)
+- [x] Kế toán: sổ cái, hàng chờ sai lệch, hoá đơn điện tử, thuế, khoá sổ (B-a4)
+- [x] Cửa hàng: nhận tại quầy (B-a5); ca thu ngân (B-a11)
+- [x] Đổi trả và đánh giá phía nhân viên (B-a6)
+- [x] Kho và nhập hàng (B-a7); vận chuyển (B-a8)
+- [x] Khuyến mại (B-a9); sản phẩm và giá (B-a10)
+- [x] Khách hàng và CRM (B-a12); kênh bán (B-a13); tiếp thị liên kết và livestream (B-a14)
+- [ ] Người mua (B-a15). Đã có: Đã lưu, Điểm và hạng, Bảo hành, Giới thiệu bạn, Báo có hàng, trang
+      Khuyến mại (flash sale, mã), trang Bán trên Chợ Bếp Mộc. Còn: tải hàng số, tranh chấp với người bán;
+      checkout thêm trả góp, dùng điểm, mã người tiếp thị, giỏ chỉ có hàng số hay dịch vụ.
+- [x] Đăng nhập và tài khoản của tôi (A-a3); trạng thái toàn khung: tạm khoá, chỉ đọc, bảo trì, module
+      chưa bật (A-a4)
+- [x] Cài đặt: Job (A-a11), Tên miền và Kết nối (A-a12), Gói và thuê bao phía khách (A-a16)
+- [x] Tổ chức: lời mời, uỷ quyền, cài đặt nút, hồ sơ công khai (A-a13); quyền vào hỗ trợ phía khách (A-a14)
+- [x] Nền tảng: gói và giá, thuê bao, cấp phát, sức khoẻ, đội database (A-a15)
+- [x] Biểu mẫu, bản tin, bình luận: các module đã chạy mà chưa có màn hình (A-a17)
+- [ ] Nội dung (A-a18). Đã có: trang, danh mục, tác giả, menu, chuyển hướng, lịch sử phiên bản. Còn: vẽ
+      lại trình soạn bài và thư viện media theo khung 2 (đang dùng bản của thiết kế 1).
+- [x] Tuân thủ còn thiếu (A-a19); nhân sự, webhook, audit (A-a20)
+- [ ] Việc, hoạt động, ghim, xem trước `dry_run` (A-a21): đã có; còn ô lọc bằng lời thường.
+
+Chỗ trống API và đặc tả mà các màn đợt 2 lộ ra: `docs/prompts/ui-phase2-api.md`.
+
+### Đợt 3: phần còn lại
+
+- [ ] Phần còn thiếu của B-a15, A-a18 và A-a21 ở trên.
+- [ ] Báo cáo theo kênh bán (bước 48); trang công khai của phiên livestream (bước 49).
 
 Mọi màn hình mới theo luật đã đặt: dùng bộ kiểu dáng có sẵn của hai thiết kế, có trợ giúp ⓘ ở chỗ khó
 hiểu, và qua bộ kiểm tra tự động gồm:
@@ -95,4 +105,9 @@ hiểu, và qua bộ kiểm tra tự động gồm:
 - chế độ tối;
 - nhiều khách khác nhau.
 
-Không còn chữ đè, tràn ngang hay chữ bị cắt thì mới đăng.
+Không còn chữ đè, tràn ngang hay chữ bị cắt thì mới đăng. Từ đợt 2 bộ kiểm tra đo thêm:
+- **lấn lề:** nhãn hay nút vượt quá phần bên trong của khung chứa, làm lề hai bên không đều;
+- **thẻ lẻ:** lưới nhiều cột mà hàng cuối chỉ còn một thẻ.
+
+Nhóm có số thẻ cố định thì dùng số cột chia hết số thẻ ở mọi khổ, hoặc xếp kiểu giãn đều. Khổ máy tính
+bảng (768–1100) được kiểm như khổ điện thoại.

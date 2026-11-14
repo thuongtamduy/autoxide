@@ -753,3 +753,14 @@ Ghi mỗi quyết định vào `docs/DECISIONS.md` (skill `record-decision`).
 - **Phí sàn và khấu trừ thay (B-3.2e, f).** Hoá đơn phí sàn tách thuế GTGT riêng; khấu trừ thay chỉ áp cho
   hộ và cá nhân kinh doanh, doanh nghiệp tự kê khai (theo `tax_profile.kind`). Căn cứ NĐ 117/2025/NĐ-CP —
   **cần đối chiếu văn bản gốc**.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- **Trạng thái niêm phong.** Bút toán trả `sealed_at` (từ `ledger_entry_seals`, NULL là chưa vào chuỗi băm) và
+  `sequence`. `GET /api/v1/ledger/books/{id}/seal-status?period_id` trả `total`, `sealed`, `oldest_unsealed_at` —
+  đếm bằng index, không quét bảng. `autoxide doctor` cảnh báo khi bút toán chưa niêm phong quá 10 phút.
+- **Số dư theo đối tượng cho module khác.** `Ledger::balances(tenant, keys: &[AccountKey], as_of)` (tối đa 500
+  khoá, một query) — `inventory` dùng cho cột "đang nợ" của nhà cung cấp, không đọc bảng sổ cái.
+  `Counterparty.kind` thêm `supplier`.

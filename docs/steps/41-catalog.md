@@ -569,3 +569,16 @@ dòng giá `reference = bulk:<change>:<variant>`, chạy lại không nhân đô
 
 **Nhanh:** đọc giá chỉ là chọn dòng có index (`tenant_id`, `price_list_id`, `variant_id`, `valid_from`); không tính
 công thức lúc đọc; job ghi theo lô 500 biến thể, mỗi lô một transaction ngắn.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- **Trạng thái của lần nhập / xuất CSV.** `catalog_transfers.status` ∈ `queued` / `running` / `succeeded` /
+  `succeeded_with_errors` / `rejected` (tệp sai định dạng, quá giới hạn — không dòng nào được ghi) / `failed`
+  (lỗi hệ thống, chạy lại được). Chuyển trạng thái chỉ theo chiều đó.
+- **Sản phẩm chưa đủ điều kiện mở bán.** Cột dẫn xuất `catalog_products.readiness` (`ready` / `missing_attributes` /
+  `missing_documents` / `restricted`) tính lại khi sản phẩm, thuộc tính bắt buộc của danh mục hay giấy tờ đổi (và job
+  hằng ngày cho giấy tờ hết hạn); index (`tenant_id`, `org_id`, `readiness`). `GET /products?readiness=` và
+  `GET /products/counts?group_by=status,readiness` cho số liệu đầu trang. Chuyển sang `active` khi chưa `ready` →
+  lỗi đã có (`catalog.required_attributes_missing`…).

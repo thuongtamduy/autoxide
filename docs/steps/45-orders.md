@@ -724,3 +724,25 @@ endpoint trả 404 `orders.support_unavailable` và đơn không hiện nút (đ
   NĐ 123/2020 (sửa bởi NĐ 70/2025) và cần người có chuyên môn xác nhận trước khi chạy thật (D-222).
 - **Test:** `voucher_cua_nguoi_khac_bi_tu_choi`, `doi_phuong_thuc_thanh_toan_tinh_lai_giam`,
   `tra_mot_phan_hoan_theo_ti_le_tong_khop`, `tra_mon_dieu_kien_tru_gia_tri_qua`, `huy_don_tra_voucher_vao_vi`.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- **Giữ hàng chờ nhận.** Khi `pickup/ready`: `pickup_hold_until = ready_at + hold_days` (theo lịch của 44); job
+  `orders.expire_pickups` mỗi giờ: quá hạn → `pickup_expired`, nhắc người mua một lần trước 24 giờ; hết hạn thì huỷ,
+  trả kho và hoàn tiền theo chính sách của nút (`pickup_expired_action` `cancel_refund` mặc định / `keep_waiting`).
+- **Đóng ca có chênh lệch (D-227).** `orders_pos_shifts` thêm `variance_minor`, `variance_reason?`,
+  `variance_note?`, `ledger_entry_id?`; `close` bắt buộc lý do khi chênh lệch ≠ 0; vượt ngưỡng thì cần duyệt (P12).
+- **Danh sách lý do (D-223):** `orders.review_hidden` (mặc định từ gói `vn` của bước 37, đánh dấu `legal`),
+  `orders.return_rejected`, `orders.return_reason` (giá trị của `allowed_return_reasons` lấy từ đây),
+  `orders.cash_variance`.
+- **Đánh giá mới, chưa xem.** Mỗi nhân viên lưu mốc đã xem bằng `/api/v1/me/flags` (key `orders.reviews.seen_at`,
+  D-207); `GET /reviews?created_after=` và `GET /reviews/count?status&created_after` (index `tenant_id`, `org_id`,
+  `created_at`). Không thêm bảng.
+- **Bản nháp tóm tắt đánh giá bằng AI (D-109).** `orders_review_summaries` (`id`, `tenant_id`, `product_id`,
+  `locale`, `body`, `status` `draft`/`approved`/`rejected`/`superseded`, `source_review_count`, `source_until`,
+  `model`, `generated_at`, `reviewed_by?`, `reviewed_at?`; unique bản `approved` mỗi (`product_id`, `locale`) qua cột
+  khoá). `POST /products/{id}/review-summaries` (job gọi `TextModel` ngoài transaction, JSON Schema), `POST
+  /review-summaries/{id}/approve|reject` (`orders.reviews.moderate`). Công khai chỉ trả bản `approved`, kèm nhãn AI;
+  không lược ý kiến tiêu cực (kiểm bằng hướng dẫn trong `instructions`, người duyệt chịu trách nhiệm cuối).

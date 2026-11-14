@@ -372,3 +372,14 @@ nhận đơn, không cần tài khoản API, chỉ công bố dữ liệu công 
 - Giá theo kênh tính theo % trên giá cửa hàng = **bảng giá suy ra** của `catalog` có cột `channel` (đặc tả 41);
   `price_rule.markup_bp` và `rounding_minor` của bước này thay bằng tham chiếu `price_list_id` và
   `catalog_rounding_rules` — một cách làm. Giá cố định cho một tin đăng (`price_rule` = `Money`) giữ ở đây.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- **Trạng thái đơn kênh:** thêm `resolved` (người đóng xung đột hay đơn bán quá bằng `resolve`, kèm
+  `resolution_code` — danh sách `channels.inbound_resolution`, D-223 — và ghi chú) và `cancelled_by_channel`
+  (kênh huỷ trước khi nhập, hay sau khi nhập thì đơn của `orders` cũng huỷ). Đơn `oversold` có hàng lại và nhập được
+  → `imported`.
+- **Chế độ `reserved`:** số đẩy lên kênh = phần giữ riêng còn lại + phần chia theo tỉ lệ từ tồn chung (`share_bp`,
+  mặc định 0 với `reserved`) − `buffer_qty`, không âm.

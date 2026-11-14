@@ -380,3 +380,14 @@ Cả SQLite và Postgres, `TestApp` với `orders` và module nền thật; `Not
 - Điểm thưởng là cách thanh toán (Tender `points`), không phải khuyến mại; voucher đổi từ điểm là khuyến mại.
 - **Test:** `voucher_sinh_nhat_moi_nam_mot_lan`, `doi_diem_lay_voucher_khong_nhan_doi`,
   `cap_voucher_loi_hoan_diem`.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- **Che liên hệ (D-226).** `phone_masked`, `email_masked` trong mọi danh sách, chi tiết, tool MCP, xuất danh sách;
+  `GET /customers/{id}/contact` (`customers.contact.reveal`) trả đầy đủ, ghi audit mỗi lần; tool
+  `customers.reveal_contact` cùng service.
+- **Cơ sở tính điểm (D-226):** tiền người mua thực trả cho hàng hoá, sau mọi giảm giá, gồm thuế, không gồm phí giao,
+  không gồm phần trả bằng điểm / thẻ quà tặng; trừ phần hoàn. `customers_order_facts.net_*` tính đúng định nghĩa
+  này (`orders` gửi `goods_paid_*` trong event).
