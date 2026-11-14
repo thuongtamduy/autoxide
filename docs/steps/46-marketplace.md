@@ -379,3 +379,18 @@ Cả SQLite và Postgres; `TestApp` với `orders` và các module nền thật,
   /me/followed-sellers/{slug}`; bảng `marketplace_followers` (`tenant_id`, `seller_org_id`, `user_id`,
   `created_at`); báo hàng mới của gian hàng qua `notifications` loại `Marketing` — cần đồng ý riêng.
 - **Huy hiệu tin cậy (D-214, B-b11).** Chỉ chỉ số có dữ liệu thật; không "tỉ lệ trả lời tin nhắn".
+
+## Bổ sung theo D-222 (ai trả tiền giảm giá)
+
+- **Quyết toán theo `funding`.** Phần giảm người bán trả trừ vào doanh thu của người bán. Phần sàn trả
+  (`platform`): người bán vẫn nhận như không có khoản giảm đó; sàn ghi chi phí khuyến mại (tài khoản
+  `expense.promotion.platform` trong `ledger`, đặt tên theo D-218). Phần nhãn hàng / đối tác thanh toán trả: khoản
+  phải thu của sàn từ bên đó.
+- **Gốc tính phí sàn** là dữ liệu có ngày hiệu lực theo sàn (`fee_base`: `after_seller_discount` mặc định — giá
+  sau khoản giảm người bán trả, trước khoản giảm sàn trả); bảng đối soát cho người bán hiện từng phần.
+- **Voucher sàn và voucher người bán.** Người bán tạo chương trình của mình trong phạm vi nút `seller`; sàn tạo
+  chương trình toàn sàn, có thể chia `funding` với người bán (người bán đồng ý qua `promotions_participations`,
+  không áp tự động). Người bán đăng ký flash sale / ngày hội của sàn bằng `promotions.participate`.
+- **Trần pháp luật** cộng khoản giảm của sàn và của người bán trên một đơn vị (đặc tả 43 mục 11 — cần đối chiếu).
+- **Test:** `quyet_toan_voucher_san_nguoi_ban_nhan_du`, `quyet_toan_voucher_shop_tru_doanh_thu`,
+  `phi_san_tinh_tren_gia_sau_giam_cua_nguoi_ban`, `chia_funding_sai_bi_tu_choi`.

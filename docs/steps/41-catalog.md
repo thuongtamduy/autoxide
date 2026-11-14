@@ -519,3 +519,53 @@ Hạ tầng đã có trong kernel và `comments` (D-202); bước này chỉ kha
   `sale_price_minor`, `sale_ends_at` cập nhật từ event của `promotions`; lọc `on_sale=true`.
 - **Thường mua cùng (B-c14, thấp).** Bảng dẫn xuất `catalog_co_purchases` (cặp sản phẩm, số lần cùng đơn
   trong 90 ngày) cập nhật từ `orders.order_completed`; `GET /public/products/{id}/frequently-bought-together`.
+
+## Bổ sung theo D-222 (bảng giá theo các nền tảng lớn)
+
+**Thứ tự chọn bảng giá chung.** `catalog_price_lists` thêm ngay trong migration đầu các cột NULL được
+`company_id?` (bước 59), `channel?` (bước 48), `market?` (bước 63) — chưa dùng thì để NULL, khỏi thêm migration
+sau. `PriceQuery` thêm `company_id: Option<Uuid>`, `channel: Option<String>`, `market: Option<String>`. Bảng hợp
+lệ: `active`, cùng `currency`, nút là cửa hàng hay tổ tiên, mỗi cột lọc khớp hay NULL. Thứ tự (một cách duy
+nhất, tất định): nút gần cửa hàng nhất → khớp `company_id` → khớp `customer_group` → khớp `channel` → khớp
+`market` → `priority` → `id`. Giá thành viên = bảng giá theo nhóm khách (nhóm do bước 47 cấp). Không có chế độ
+"chọn bảng rẻ nhất" (D-222).
+
+**Bảng giá suy ra theo công thức.** Cột `derived_from?` (bảng giá gốc, chỉ một tầng: bảng gốc không được là
+bảng suy ra), `adjust_bp` (có dấu: −1500 = −15%), `adjust_minor?`, `rounding_rule_id?`. Khi bảng gốc có dòng giá
+mới, job `catalog.derive_prices` ghi dòng giá thật vào bảng suy ra (`source = derived`, `reference =
+derived:<id dòng gốc>` — chạy lại không nhân đôi), cùng `valid_from`. Đọc giá không tính gì thêm; lịch sử giá
+(cần cho trần 50%) là dòng thật. Dòng tay trong bảng suy ra (`source = manual`) đang hiệu lực thì job bỏ qua
+biến thể đó cho tới khi dòng tay hết `valid_to`. `catalog_prices` thêm cột `source` (`manual` / `derived` /
+`bulk` / `import`).
+
+**Quy tắc làm tròn giá đẹp.** `catalog_rounding_rules` (`id`, `tenant_id`, `name`, `step_minor` (vd 1.000),
+`mode` (`up` / `down` / `nearest`), `ending_minor?` (vd 9.000 → 129.000, 199.000)). Dùng cho bảng giá suy ra, đổi
+giá hàng loạt, giá theo kênh (48) và quy đổi tiền tệ (63). Làm tròn bằng số nguyên, không số thực.
+
+**Sàn giá.** `catalog_price_guards` (`id`, `tenant_id`, `org_id`, `category_id?`, `min_price_minor?`,
+`min_margin_bp?`, `action` (`warn` / `block`)); quy tắc của nút gần nhất, danh mục gần nhất thắng. Giá vốn không
+gọi `inventory` (đăng ký sau `catalog`): `catalog_variant_costs` (`tenant_id`, `org_id`, `variant_id`,
+`unit_cost_minor`, `currency`, `updated_at`) là bảng dẫn xuất từ event `inventory.cost_changed`
+(`Subscription::optional`). Ghi giá dưới sàn: `block` → 422 `catalog.price_below_floor`; `warn` → ghi được,
+response có `warnings`. `Catalog::price_floors(tenant, org_id, variant_ids)` cho `promotions` kiểm lúc
+`activate` và cắt khi tính (đặc tả 43).
+
+**Đổi giá hàng loạt.** `catalog_price_changes` (`id`, `tenant_id`, `price_list_id`, `filter` (JSON: danh mục,
+thuộc tính / thương hiệu, sản phẩm), `operation` (`set` / `percent` / `amount`), `value`, `rounding_rule_id?`,
+`valid_from`, `valid_to?` (giá tạm thời: hết hạn thì giá cũ tự hiệu lực lại theo luật chọn dòng), `status`
+(`draft` / `previewed` / `approved` / `applied` / `cancelled`), `affected`, `created_by`, `approved_by?`).
+`POST /price-lists/{id}/changes` → `POST …/changes/{id}/preview` (số biến thể, 20 dòng mẫu trước / sau, các vi phạm
+sàn giá; không ghi giá) → `POST …/approve` (permission `catalog.prices.approve`; cài đặt kế thừa
+`price_change_requires_second_person` bật thì người duyệt khác người tạo — 403 `catalog.self_approval`) → job ghi
+dòng giá `reference = bulk:<change>:<variant>`, chạy lại không nhân đôi. Hoàn tác = một lần đổi mới về giá cũ.
+
+**Lỗi mới:** `catalog.price_below_floor` (422), `catalog.derived_chain` (422, bảng gốc là bảng suy ra),
+`catalog.self_approval` (403), `catalog.price_change_not_previewed` (409). Thêm bản dịch.
+
+**Test** (cả hai database): `chon_bang_gia_theo_thu_tu_cu_the` (bảng có đủ năm chiều, đổi từng chiều),
+`bang_suy_ra_ghi_dong_gia_that_va_khong_nhan_doi`, `dong_tay_ghim_gia_trong_bang_suy_ra`,
+`lam_tron_duoi_9000`, `gia_duoi_san_bi_chan_hoac_canh_bao`, `doi_gia_hang_loat_xem_truoc_khong_ghi`,
+`gia_tam_thoi_het_han_tro_ve_gia_cu`, `nguoi_tao_khong_tu_duyet`.
+
+**Nhanh:** đọc giá chỉ là chọn dòng có index (`tenant_id`, `price_list_id`, `variant_id`, `valid_from`); không tính
+công thức lúc đọc; job ghi theo lô 500 biến thể, mỗi lô một transaction ngắn.

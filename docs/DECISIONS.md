@@ -5273,3 +5273,78 @@ dùng hỏi tới khi chọn nền tảng.
 Đã cân nhắc: gộp bán theo kỳ vào `plans` — khác người trả tiền và khác cách ghi sổ, chỉ dùng chung bộ tính lịch
 kỳ; module `fx` riêng cho đa tiền tệ — tiền tệ đã có trong `money`, tỉ giá thuộc `ledger`; WebSocket cho chat —
 SSE của bước 40 đủ cho tin đến, gửi tin vẫn là REST, một cách làm.
+
+## D-222 · Bảng giá và khuyến mại theo các nền tảng lớn; chương trình, coupon, voucher, thẻ quà tặng — 2026-11-14 — chủ dự án quyết
+
+Quyết định: chủ dự án đồng ý toàn bộ đề xuất sau khi đối chiếu đặc tả 41 và 43 với commercetools (Product
+Discount / Cart Discount / Discount Code, chế độ cộng dồn, nhóm "lợi nhất"), Shopify (ba lớp giảm giá,
+`combinesWith`), Stripe (Coupon là luật, Promotion Code là mã trỏ tới luật), Salesforce B2C (lớp, độc quyền
+theo lớp / toàn giỏ, thứ hạng) và Shopee (voucher shop / voucher sàn, kho voucher, voucher vận chuyển).
+
+**1. Bốn khái niệm, mỗi tên một nghĩa trong toàn hệ thống** (tên kiểu, bảng, API, tài liệu đều theo):
+
+| Tên | Là gì | Ai dùng được |
+|---|---|---|
+| Chương trình khuyến mại (`promotion`) | **Luật**: điều kiện, lợi ích, thời gian, ngân sách, cộng dồn, ai trả tiền. Đến tay người mua bằng một trong ba cách: `automatic`, `code`, `voucher` | — |
+| Coupon — mã giảm giá (`code`) | Chuỗi mã người mua gõ hay chọn để mở một chương trình `code`. Mã chung (`SALE50`) hay lô mã riêng mỗi mã một lượt | **Ai có mã cũng dùng được**, kể cả khách vãng lai |
+| Voucher — phiếu ưu đãi đã cấp (`voucher`) | Một quyền dùng một lần **nằm trong ví của một tài khoản**, có hạn riêng; có được do bấm "Lưu", nhập mã nhận, được tặng (sinh nhật, đổi điểm, sau khi mua, bù lỗi, giới thiệu bạn) | **Chỉ đúng tài khoản được cấp**; không chuyển, không đổi ra tiền |
+| Thẻ quà tặng (`gift card`, bước 47) | Tiền trả trước, là **cách thanh toán**, không phải khuyến mại; tắt mặc định (NĐ 52/2024) | — |
+
+Luật phân định: mã gắn với một người thì là voucher, không làm coupon "chỉ một người dùng". Coupon và voucher
+đều là khoản **giảm giá** (không phải tiền): cùng chịu trần pháp luật, cùng ghi "ai trả tiền", cùng hiện trên
+hoá đơn là khoản giảm. Mã dùng để **nhận** voucher (`claim`) khác mã dùng để **giảm** (`redeem`), cùng bảng mã.
+
+**2. Bảng giá (đặc tả 41):** thứ tự chọn bảng giá chung (nút gần nhất → công ty B2B → nhóm khách → kênh →
+thị trường → `priority` → `id`), cột cho bước 48 / 59 / 63 có sẵn từ migration đầu; bảng giá suy ra theo
+công thức (một tầng, ghi thành dòng giá thật bằng job); quy tắc làm tròn giá đẹp dùng chung; chặn / cảnh báo
+giá dưới sàn (giá tối thiểu, biên lợi nhuận trên giá vốn lấy qua event của `inventory`); đổi giá hàng loạt có
+xem trước, duyệt, hẹn giờ, giá tạm thời.
+
+**3. Khuyến mại (đặc tả 43):** ba lớp `product` / `order` / `shipping`, `exclusivity` `none` / `class` /
+`global` thay cờ `exclusive`, `combines_with`, `stop_after`; chế độ cộng dồn `priority` (mặc định) hay
+`best_for_buyer` (so tập cộng dồn với từng chương trình độc quyền, có giới hạn, vẫn tất định); ai trả tiền
+(`platform` / `seller` / `brand` / `payment_partner`, chia theo basis point); ngân sách tiền; lượt theo ngày,
+khung giờ; loại mới `tiered`, `bundle_price`, `add_on`, `gift_choice` và mua X tặng Y mở rộng; điều kiện mở rộng
+qua một bảng điều kiện chung; chống lạm dụng theo nhiều khoá người mua; ví voucher và `grant_voucher` cho
+module khác; đăng ký tham gia chương trình của sàn; chạy thử, kiểm xung đột, lịch, số liệu chương trình; mục
+tiêu tốc độ đo được.
+
+**4. Module khác:** 45 (dữ liệu giỏ mới, chia tiền giảm khi trả hàng, quà khi trả, hoá đơn), 46 (quyết toán theo
+người trả tiền giảm, gốc tính phí sàn), 47 (cấp voucher sinh nhật / đổi điểm / sau khi mua / giới thiệu; phân
+khúc và hạng vào giỏ), 48 (giá theo kênh là bảng giá suy ra), 53 và 58 (cấp voucher bù lỗi / theo quy trình).
+
+Nhẹ và nhanh (ràng buộc thiết kế, kiểm bằng số đo):
+- trang danh sách không chạy luật khuyến mại: giá sau giảm tự động ghi sẵn vào `catalog_storefront_entries`
+  theo event; giá suy ra ghi sẵn thành dòng giá;
+- `evaluate` chạy trong bộ nhớ trên chỉ mục chương trình đang chạy theo (khách, cửa hàng), nạp lại theo số phiên
+  bản; chỉ xét chương trình có mục tiêu trùng giỏ. Mục tiêu: giỏ 50 dòng, 500 chương trình đang chạy, p99 < 5 ms
+  phần tính, ghi số đo vào `docs/BENCHMARKS.md`;
+- mọi bộ đếm (lượt, ngân sách, suất, ví voucher, lượt theo ngày) đổi bằng `UPDATE` có điều kiện trong một
+  transaction, khoá theo thứ tự cố định; chạy được và có test đồng thời trên cả SQLite và Postgres.
+
+Căn cứ pháp lý — **cần người có chuyên môn pháp lý xác nhận trước khi chạy thật** (D-186), mọi con số là dữ
+liệu có ngày hiệu lực:
+- Luật Thương mại 36/2005/QH11, Điều 92: các hình thức khuyến mại, trong đó "bán hàng, cung ứng dịch vụ có kèm
+  theo phiếu mua hàng, phiếu sử dụng dịch vụ" — voucher cấp sau khi mua thuộc hình thức này; quy tắc thông báo
+  theo hình thức là dữ liệu `promotions_notice_rules`.
+- Thông tư 39/2025/TT-BCT và NĐ 239/2026 (sửa NĐ 81/2018): trần giảm giá 50% giá ngay trước khuyến mại. Trên sàn,
+  khi voucher sàn và voucher của người bán cùng áp, mặc định **cộng mọi khoản giảm trên một đơn vị rồi so trần**
+  (cách an toàn) — chưa rõ trần tính riêng cho từng thương nhân hay gộp.
+- NĐ 123/2020 (sửa bởi NĐ 70/2025) về hoá đơn: cách ghi khoản giảm giá, hàng khuyến mại, phần giảm do sàn hay đối
+  tác thanh toán trả — bước 45 làm theo dữ liệu, cần đối chiếu.
+- Luật 19/2023/QH15: điều kiện của coupon / voucher hiện rõ trước khi dùng; số lượt / suất còn là số thật.
+- Luật Bảo vệ dữ liệu cá nhân: ví voucher là dữ liệu cá nhân — có trong xuất dữ liệu, xoá tài khoản thì thu hồi
+  voucher chưa dùng; khoá chống lạm dụng chỉ lưu bản băm.
+
+Lý do: người dùng thường lẫn "voucher" và "coupon"; mỗi nền tảng gọi một kiểu. Chốt theo **ai dùng được** (ai có
+mã hay chỉ người được cấp) thì dễ hiểu, khớp thói quen ở Việt Nam ("kho voucher", "nhập mã") và khớp mô hình
+Stripe / commercetools (luật tách khỏi cách đưa tới người mua).
+
+Đã cân nhắc:
+- Gọi mọi thứ là "voucher" như nhiều sàn Việt Nam — mất phân biệt mã ai cũng dùng được và quyền của một người,
+  khiến hạn mức, chống lạm dụng và dữ liệu cá nhân xử lý lẫn lộn.
+- Chọn bảng giá "rẻ nhất" (như một số nền tảng B2B) — khó đoán, người bán không kiểm soát; giữ "cụ thể nhất".
+- Tìm tổ hợp khuyến mại tối ưu toàn cục — bài toán tổ hợp, chậm và khó giải thích; `best_for_buyer` chỉ so có
+  giới hạn.
+- Bảng giá suy ra tính lúc đọc — nhanh viết nhưng chậm đường nóng và mất lịch sử giá thật (cần cho trần 50%);
+  ghi sẵn thành dòng giá.

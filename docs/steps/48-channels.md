@@ -366,3 +366,9 @@ nhận đơn, không cần tài khoản API, chỉ công bố dữ liệu công 
 - **Test** (cả hai database): `feed_chi_co_san_pham_cong_khai_cua_cua_hang`,
   `feed_khong_lo_so_ton_va_gia_von`, `feed_token_sai_tra_404`, `feed_bao_loi_tung_san_pham_thieu_gtin`,
   `feed_gia_khuyen_mai_kem_han`, `feed_dung_dinh_dang_xml_google` (so với tệp mẫu).
+
+## Bổ sung theo D-222
+
+- Giá theo kênh tính theo % trên giá cửa hàng = **bảng giá suy ra** của `catalog` có cột `channel` (đặc tả 41);
+  `price_rule.markup_bp` và `rounding_minor` của bước này thay bằng tham chiếu `price_list_id` và
+  `catalog_rounding_rules` — một cách làm. Giá cố định cho một tin đăng (`price_rule` = `Money`) giữ ở đây.

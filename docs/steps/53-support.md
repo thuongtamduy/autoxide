@@ -250,3 +250,9 @@ nơi.
 Thuật toán cắt trích dẫn thư; danh sách loại mặc định; có tách `support_teams` hay dùng nhóm của
 `organizations`; mặc định SLA (khuyến nghị phản hồi đầu 8 giờ làm việc, giải quyết 3 ngày làm việc). Ghi
 vào `docs/DECISIONS.md`.
+
+## Bổ sung theo D-222
+
+Nhân viên tặng voucher bù lỗi từ phiếu hỗ trợ: gọi `Promotions::grant_voucher` (`source = compensation`,
+`source_ref = ticket:<id>`), permission `promotions.vouchers.grant`; phiếu ghi voucher đã tặng. `promotions` chưa
+cài thì ẩn hành động này.
