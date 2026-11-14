@@ -81,6 +81,38 @@ Vì cả ba đều là dữ liệu của core, menu phải do core trả về (b
   theo mức gấp), hạn mức gói, hoạt động gần đây.
 - Mọi màn hình dùng chung một kiểu bảng, bộ lọc, ngăn chi tiết, thông báo — như API dùng chung envelope.
 
+**Bổ sung sau rà soát R4 (14/11/2026).** Gốc phần lớn lỗi là mỗi màn tự khai menu.
+
+- **Điều hướng hai bậc, một nguồn.**
+  - Thanh bên trỏ tới phân hệ.
+  - Dải trên cùng là các **màn** của phân hệ, thứ tự cố định, giống nhau ở mọi màn trong phân hệ. Phân hệ chỉ
+    có một màn thì không có dải này.
+  - Tab bên trong một màn nằm ngay dưới tiêu đề.
+  - Số đếm trên menu là việc đang chờ, lấy cùng nguồn với hộp việc.
+  - Mục menu trỏ thẳng vào một tab được (`#tab`).
+- **Điện thoại:**
+  - thanh đáy gồm Tổng quan, Đơn, Việc, Tìm, Phân hệ;
+  - "Tìm" mở bảng lệnh;
+  - "Phân hệ" mở tấm từ đáy liệt kê mọi phân hệ, có nút sáng / tối;
+  - giao diện theo cài đặt sáng / tối của máy khi người dùng chưa chọn.
+- **Bảng lệnh:** Ctrl K / ⌘K mở ở mọi màn, con trỏ vào ô gõ, Esc đóng, tìm không cần dấu.
+- **Thanh bên:** phần giữa tự cuộn; Bản đồ, Trợ giúp, Thu gọn luôn thấy, kể cả màn thấp.
+- **Đầu trang:**
+  - tab đầu là trang tổng của màn;
+  - tab khác lấy tên tab làm tiêu đề;
+  - nút đầu trang thuộc về tab;
+  - nút chính ở phải cùng trên máy tính, đứng đầu trên điện thoại; nút phụ vào menu "⋯";
+  - mô tả dài gập sau 2 dòng.
+- **Bảng thành thẻ (≤900px):** mọi ô có nhãn cột; tiêu đề và nhãn trạng thái ở dòng đầu, các ô còn lại xếp lưới 2
+  cột (điện thoại) hoặc 4 cột (máy tính bảng). Bảng rộng hơn khung thì mờ mép phải để báo còn cột.
+- **Dải cuộn ngang** (menu, tab, chip): mờ mép phía còn mục; mục đang mở tự cuộn vào giữa.
+- **Ngăn chi tiết:** nút thao tác dính đáy ngăn.
+- **Biểu mẫu:**
+  - gom mọi lỗi, đánh dấu từng ô sai, ghi lỗi dưới ô, đưa con trỏ về ô sai đầu tiên;
+  - gợi ý trong ô viết "Ví dụ: …";
+  - lựa chọn xuống dòng, không giấu trong dải cuộn.
+- **Thông báo:** thao tác đảo được thì thông báo kèm "Hoàn tác" trong 6 giây.
+
 ### 2.4 Màn hình mẫu đã vẽ
 
 Tổng quan; trang tổng quan của 11 phân hệ; Đơn hàng (bảng, thao tác hàng loạt, ngăn chi tiết có thuế

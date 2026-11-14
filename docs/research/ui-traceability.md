@@ -106,8 +106,26 @@ Chỗ trống API và đặc tả mà các màn đợt 2 lộ ra: `docs/prompts/
       - tab hiện đủ trên điện thoại;
       - ba trang chiến dịch có phong cách riêng: dày khuyến mại, tối giản, sang trọng.
 
-Chỗ trống API và đặc tả của đợt 3: `docs/prompts/ui-phase3-api.md`. Menu động lấy từ backend: chờ chủ dự án
-chọn cách.
+Chỗ trống API và đặc tả của đợt 3: `docs/prompts/ui-phase3-api.md`. Menu động lấy từ backend: chủ dự án chọn
+module `menus` riêng (đề bài `docs/prompts/menus-module.md`).
+
+### Đợt 4: rà soát sâu và sửa theo bằng chứng (14/11/2026)
+
+- [x] Website: các mục "để đợt sau" của `storefront-benchmark.md` (hàng thay thế, hỏi đáp, ngày giao, "Hôm nay nấu
+      gì?", nhận hàng, đổi trả có video, đánh giá có thưởng, sắp theo % giảm).
+- [x] Quản trị, màn "Website › Menu": dựng theo đề bài module `menus`. 13 điểm cần chốt đã ghi vào đề bài.
+- [x] Quản trị, rà soát R4 trên 32 màn ở 390, 768, 1024, 1280 và 1440px, gồm thanh bên ở màn thấp: 11 lỗi nặng,
+      khoảng 25 lỗi vừa lặp lại. Sửa phần chung trước:
+      - một nguồn cho thanh bên, menu con, thanh đáy, bảng lệnh và bảng "Phân hệ";
+      - điều hướng hai bậc;
+      - bảng thành thẻ có nhãn cột;
+      - đầu trang theo tab;
+      - lỗi theo từng ô, thông báo kèm Hoàn tác, mẫu "đang tải";
+      - "₫" không rớt dòng;
+      - vùng chạm 44px, chữ từ 12px.
+
+      Sau đó sửa từng màn viết tay. Quy ước mới ghi ở `ui-design.md` mục 2.3; API còn thiếu ghi ở
+      `ui-phase3-api.md`, mục "Từ rà soát trang quản trị".
 
 Mọi màn hình mới theo luật đã đặt: dùng bộ kiểu dáng có sẵn của hai thiết kế, có trợ giúp ⓘ ở chỗ khó
 hiểu, và qua bộ kiểm tra tự động gồm:
