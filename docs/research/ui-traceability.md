@@ -48,24 +48,24 @@ Nhận xét chung:
 
 ## Việc thiết kế
 
-### Đợt 1: sửa màn hình đang có cho khớp đặc tả
+### Đợt 1: sửa màn hình đang có cho khớp đặc tả (xong 14/11/2026: quản trị bản 39, website bản 28)
 
-- [ ] Hộp việc: bỏ "Đã xử lý", thay bằng hành động thật, Hoãn và **Giao cho…**; sửa chữ ở bản đồ (A-a1)
-- [ ] Đơn hàng: trạng thái theo bảng của 45, gồm "Chờ xác nhận" theo H2; "Đổi trả" thành view; thêm Đã
+- [x] Hộp việc: bỏ "Đã xử lý", thay bằng hành động thật, Hoãn và **Giao cho…**; sửa chữ ở bản đồ (A-a1)
+- [x] Đơn hàng: trạng thái theo bảng của 45, gồm "Chờ xác nhận" theo H2; "Đổi trả" thành view; thêm Đã
       giao, Giao thất bại, Đã huỷ; đơn tại quầy thành "Đã giao". Sổ cái theo 45 và 46. Hoá đơn lập khi
       giao. Khấu trừ thay chỉ cho hộ và cá nhân (B-a1)
-- [ ] Tổ chức: mời thành viên không chọn độ sâu, độ sâu đi theo role; "Tách thành khách riêng" thành
+- [x] Tổ chức: mời thành viên không chọn độ sâu, độ sâu đi theo role; "Tách thành khách riêng" thành
       "Gửi yêu cầu tách" (A-a2, A-a7)
-- [ ] Nền tảng: tách "Tạm khoá hẳn" khỏi "Chỉ đọc"; thời hạn hỗ trợ 1 / 4 / 8 giờ; nút đội database
+- [x] Nền tảng: tách "Tạm khoá hẳn" khỏi "Chỉ đọc"; thời hạn hỗ trợ 1 / 4 / 8 giờ; nút đội database
       hiện dry-run (A-a6)
-- [ ] Tạo API key: thêm xác nhận lại danh tính và hạn dùng (A-a9)
-- [ ] Tuân thủ: yêu cầu tự phục vụ chỉ để theo dõi; KYC dùng trạng thái của đặc tả (A-a10)
-- [ ] Bỏ "tỉ lệ mở / bấm" của bản tin (A-a8)
-- [ ] Gian hàng và tài khoản: bỏ tiêu chí "trả lời tin nhắn" và nút "Nhắn người bán" (B-a19)
-- [ ] Checkout: tạo tài khoản sau khi đặt hàng phải qua OTP số điện thoại (B-a16)
-- [ ] Dữ liệu mẫu: điểm sao, thứ trong tuần, giá thớt, ngày xác thực người bán, thứ tự hoàn tiền, tên
+- [x] Tạo API key: thêm xác nhận lại danh tính và hạn dùng (A-a9)
+- [x] Tuân thủ: yêu cầu tự phục vụ chỉ để theo dõi; KYC dùng trạng thái của đặc tả (A-a10)
+- [x] Bỏ "tỉ lệ mở / bấm" của bản tin (A-a8)
+- [x] Gian hàng và tài khoản: bỏ tiêu chí "trả lời tin nhắn" và nút "Nhắn người bán" (B-a19)
+- [x] Checkout: tạo tài khoản sau khi đặt hàng phải qua OTP số điện thoại (B-a16)
+- [x] Dữ liệu mẫu: điểm sao, thứ trong tuần, giá thớt, ngày xác thực người bán, thứ tự hoàn tiền, tên
       permission, nội dung chuyển khoản, ký hiệu hoá đơn máy tính tiền, mã số thuế 12 số (A-a22, B-a17)
-- [ ] Bản đồ phân hệ: thêm Kênh bán (48) và Tiếp thị liên kết (49); Khách hàng thêm điểm và hạng; Tài
+- [x] Bản đồ phân hệ: thêm Kênh bán (48) và Tiếp thị liên kết (49); Khách hàng thêm điểm và hạng; Tài
       chính thêm hàng chờ sai lệch; Sản phẩm thêm Nhập hàng (B-a18)
 
 ### Đợt 2: vẽ màn hình còn thiếu, xếp theo vai trò
