@@ -121,6 +121,10 @@ pub struct SellerSummary { pub org_id: OrgId, pub status: SellerStatus, pub disp
 #[async_trait] pub trait Sellers: Send + Sync {
     async fn find(&self, tenant: TenantId, seller: OrgId) -> Result<Option<SellerSummary>, Error>;
     async fn ensure_can_sell(&self, tenant: TenantId, seller: OrgId) -> Result<(), Error>;
+    /// Người bán đang hoạt động, đã xác thực và đủ giấy tờ cho mọi danh mục trong `category_ids` — mời thầu của
+    /// bước 59 dùng (D-232). Trả danh sách người bán đủ điều kiện, phân trang.
+    async fn eligible_for_categories(&self, tenant: TenantId, category_ids: &[Uuid], page: PageRequest)
+        -> Result<Page<SellerSummary>, Error>;
 }
 /// Thông tin người bán bắt buộc hiện trên trang sản phẩm (dữ liệu công khai, không có dữ liệu cá nhân thừa).
 #[async_trait] pub trait SellerDisclosure: Send + Sync {

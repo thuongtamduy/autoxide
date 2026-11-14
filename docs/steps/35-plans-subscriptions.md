@@ -287,6 +287,13 @@ và báo `over_limit` trong `GET /entitlements`. Thu hồi module: dữ liệu g
 dữ liệu chỉ mất khi khách bị xoá. Mọi chuyển trạng thái: khoá dòng thuê bao (`rows::lock_one`), kiểm
 trạng thái hiện tại rồi mới đổi — job và event thanh toán đến cùng lúc không đè nhau.
 
+### Phí ứng dụng trả phí trên hoá đơn thuê bao (D-232, bước 65)
+
+Kernel thêm điểm cắm `entitlement::AddonBilling` (module góp bằng `StartContext::contribute`): khi lập kỳ thanh
+toán, `plans` hỏi mọi `AddonBilling` các dòng phí thêm của khách trong kỳ (vd thuê bao ứng dụng của `apps`) và đưa
+vào cùng hoá đơn thuê bao; gói theo năm thì phí thêm lập kỳ `addons` hằng tháng. `plans` không tính giá ứng dụng —
+chỉ cộng dòng do bên góp trả, gọi lại cùng kỳ không thêm dòng trùng.
+
 ### API REST (`/api/v1/plans`)
 
 "Vận hành" = permission giữ ở khách vận hành (bước 34); "khách" = permission ở khách hiện tại.

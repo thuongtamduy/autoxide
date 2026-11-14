@@ -3,7 +3,7 @@
 > Lộ trình: `docs/ROADMAP.md` bước 45 · Thiết kế: `docs/research/business-foundation.md` mục 3 (trụ 4),
 > mục 8, mục 9 · Quyết định: D-180, D-181, D-182, D-184, D-185, D-186, D-187, D-188, D-190, D-191, D-194
 > Đã gộp các quyết định: D-201, D-202, D-203, D-204, D-209, D-213, D-215, D-216, D-218, D-222, D-223,
-> D-227 ; thêm thẳng vào thân: D-229, D-230 (D-228).
+> D-227 ; thêm thẳng vào thân: D-229, D-230, D-232 (D-228).
 > Mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/` (nguồn: `docs/prompts/ui-trace-roadmap.md`); phần của
 > đợt 2 có nguồn `docs/prompts/ui-phase2-api.md`, màn tương ứng ở `docs/research/ui-traceability.md`.
 
@@ -19,8 +19,9 @@ giá sau mua đúng Luật 19/2023, chống bom hàng COD, trả góp qua đối
 
 Cùng bước này: mua không cần tài khoản trọn vẹn — trạng thái thanh toán công khai, tra đơn bằng OTP, thao
 tác trên đơn vãng lai, gắn đơn vào tài khoản (D-201, D-202); nhận tại cửa hàng có người nhận hộ và hạn giữ
-hàng; hàng đặt trước (D-204); coupon và voucher kèm phần ai trả tiền giảm (D-222); trả hàng kèm ảnh và xem
-trước tiền hoàn (D-202); đánh giá có phiếu "hữu ích" và bản nháp tóm tắt AI chờ duyệt (D-201, D-203).
+hàng; hàng đặt trước (D-204), có trả trước một phần (D-232); coupon và voucher kèm phần ai trả tiền giảm
+(D-222); trả hàng kèm ảnh và xem trước tiền hoàn (D-202); đánh giá có phiếu "hữu ích" và bản nháp tóm tắt AI
+chờ duyệt (D-201, D-203).
 
 `orders` là module nghiệp vụ (không vào `kernel`). Bước 46–49 (`marketplace`, `customers`, `channels`,
 `affiliate`) cắm vào `orders` qua `orders::api` mà không sửa `orders`.
@@ -62,9 +63,9 @@ NGOÀI phạm vi: bộ nối cổng thanh toán / trả góp thật (module riê
 án); tách đơn theo người bán, phí sàn, chi trả (bước 46 — `orders` chỉ có điểm cắm); điểm, thẻ quà
 tặng (47); đơn từ kênh ngoài (48, qua `OrderIntake`); hoa hồng (49); POS chạy ngoại tuyến phía client
 (client lo; máy chủ chỉ chống trùng bằng `reference`); bán sỉ B2B, thuê bao định kỳ (để sau, D-194);
-tiền cọc một phần cho hàng đặt trước (cần sổ cái ghi nghĩa vụ cọc — để sau, ghi trong DECISIONS khi làm;
-D-204); tạo tài khoản từ số đã xác thực (thuộc `auth`, D-202); endpoint xuất đơn riêng (xuất qua xuất
-chung của bước 51, D-213).
+điều khoản đặt cọc theo Bộ luật Dân sự 2015 Điều 328 cho hàng đặt trước (chính sách riêng của khách, ghi trong
+điều kiện giao dịch; core chỉ có "trả trước một phần" — D-232); tạo tài khoản từ số đã xác thực (thuộc `auth`,
+D-202); endpoint xuất đơn riêng (xuất qua xuất chung của bước 51, D-213).
 
 ## Thiết kế
 
@@ -115,9 +116,9 @@ thanh toán; giao diện hỏi định kỳ, hay dùng SSE nếu bước 40 đã
 
 Trạng thái (`status`): `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`,
 `delivery_failed`, `completed`, `cancelled`. Hai trường phụ: `payment_status` (`unpaid`,
-`cod_pending`, `paid`, `partially_refunded`, `refunded`) và `fulfillment_status` (`unfulfilled`,
-`partial`, `fulfilled`, `returned_partial`, `returned`). Bảng chuyển là một hằng số trong
-`lifecycle/transitions.rs`, mọi chuyển đi qua `Lifecycle::apply` (khoá dòng đơn bằng
+`partially_paid` (đã trả trước một phần, D-232), `cod_pending`, `paid`, `partially_refunded`, `refunded`) và
+`fulfillment_status` (`unfulfilled`, `partial`, `fulfilled`, `returned_partial`, `returned`). Bảng chuyển là
+một hằng số trong `lifecycle/transitions.rs`, mọi chuyển đi qua `Lifecycle::apply` (khoá dòng đơn bằng
 `rows::lock_one`, kiểm bảng, ghi `orders_status_history`, event, job sổ cái — một transaction, bọc
 `write_with_retry`). Không có `UPDATE status` nào ngoài hàm này (một test đọc mã nguồn của crate kiểm điều đó — xem
 "Test bắt buộc").
@@ -126,12 +127,12 @@ Trạng thái (`status`): `pending_payment`, `confirmed`, `preparing`, `shipping
 |---|---|---|---|
 | (mới) | `pending_payment` | checkout | thanh toán online / VietQR / chuyển khoản tay |
 | (mới) | `confirmed` | checkout; POS; `OrderIntake::import` | COD đủ điều kiện; POS đi tiếp ngay `confirmed → delivered` trong cùng transaction; đơn kênh |
-| `pending_payment` | `confirmed` | thanh toán xong (event bước 36); nhân viên xác nhận chuyển khoản tay | đủ tiền; `payment_status = paid` |
+| `pending_payment` | `confirmed` | thanh toán xong (event bước 36); nhân viên xác nhận chuyển khoản tay | đủ tiền; `payment_status = paid` — đơn trả trước một phần: đủ khoản phải trả lúc đặt, `payment_status = partially_paid` (D-232) |
 | `pending_payment` | `cancelled` | người mua; nhân viên; job hết hạn | không có khoản đã thu |
 | `confirmed` | `preparing` | nhân viên | — |
 | `confirmed` | `delivered` | job (hàng số), nhân viên (nhận tại cửa hàng, dịch vụ) | đơn không cần vận chuyển |
 | `confirmed`, `preparing` | `cancelled` | người mua (tới trạng thái mà `buyer_cancel_until` cho: `confirmed` hay `preparing`, D-209), nhân viên; hết hạn chờ nhận đơn (`acceptance_hours`) | đã thu thì tạo hoàn tiền toàn phần |
-| `preparing` | `shipping` | event `shipping.shipment_status_changed` (trạng thái đã lấy hàng); nhân viên (tự giao) | ít nhất một kiện đã đi |
+| `preparing` | `shipping` | event `shipping.shipment_status_changed` (trạng thái đã lấy hàng); nhân viên (tự giao) | ít nhất một kiện đã đi; kiện có hàng đặt trước của đơn trả trước một phần chỉ đi khi phần còn lại đã trả hay chuyển COD (D-232) |
 | `shipping` | `delivered` | event `shipping.shipment_delivered`; nhân viên (tự giao) | mọi kiện đã giao |
 | `shipping` | `delivery_failed` | event `shipping.shipment_delivery_failed` / `shipping.shipment_returned` | ghi thống kê COD |
 | `delivery_failed` | `shipping` | nhân viên giao lại | yêu cầu vận đơn mới |
@@ -240,7 +241,7 @@ Comment trong code giải thích lý do này cho người đọc quen TypeScript
 | `invoices` 36 | `Invoices::issue(tenant, InvoiceRequest { reference, kind: Sales/CashRegister, seller_org_id, buyer, lines, original: Option }) -> InvoiceId`, `Invoices::adjust(tenant, AdjustRequest { reference, original, lines, reason })`; event `invoices.invoice_issued` | hoá đơn |
 | kernel 36 | `numbering::next(&transaction, &SequenceKey { tenant, series: "orders.order", scope: org_id, period: year }) -> Result<u64>`; `PaymentGateway::{create_payment, refund, status}` (có phương thức `installment`); VietQR: `vietqr::payload(...)` | số đơn, thanh toán |
 | kernel 51 | `WorkSource` (P2), yêu cầu duyệt (P12), `/api/v1/me/flags` (P14, D-207), `Module::exports` (P16, D-213), `Module::reason_lists` + `ReasonCodes::ensure` (P18, D-223); `context.badge_source` (D-202) | hộp việc, đóng ca, xuất, lý do, nhãn |
-| `compliance` 37 | `LegalDocuments::require_accepted(tenant, subject, "terms_of_sale")`, `AccountVerification::is_verified(tenant, user)`, `ProcessingBasis::register(...)`; chứng cứ chấp nhận điều kiện đặt trước (D-204) | checkout, đánh giá, COD |
+| `compliance` 37 | `LegalDocuments::require_accepted(tenant, subject, "terms_of_sale")`, `AccountVerification::is_verified(tenant, user)`, `ProcessingBasis::register(...)`; chứng cứ chấp nhận điều kiện đặt trước (D-204), gồm điều kiện trả trước một phần (D-232) | checkout, đánh giá, COD |
 | `notifications` 37 | `Notifier::send(tenant, Notification { reference, recipient, template, category: Transactional, locale, data })`; OTP qua SMS (bước 37) | thư xác nhận, trạng thái, OTP tra đơn |
 | `media` | mở rộng `Media` bằng `uploaded_by(ids) -> HashMap<Uuid, Option<Uuid>>` có cài đặt mặc định, hay trả `uploaded_by` trong `MediaRef` theo cách không phá vỡ; `POST /api/v1/media/me/uploads` (D-202) | ảnh trả hàng |
 | `support` 53 (tuỳ chọn) | `SupportIntake::open` (D-204) | nút "mở hỗ trợ" của đơn |
@@ -261,11 +262,12 @@ tính năng (`m0001_carts`, `m0002_checkout_orders`, …), mỗi cái có `down`
 | `orders_cart_lines` | `tenant_id`, `cart_id`, `variant_id`, `quantity` INT, `added_at`, `updated_at` | pk (`tenant_id`, `cart_id`, `variant_id`) |
 | `orders_checkouts` | `id` (= `order_id` sẽ tạo; cũng là id nhóm khi tách theo người bán), `tenant_id`, `owner_key` (`user:<id>` hay `cart:<id>`), `reference`, `reference_fingerprint`, `cart_id`, `state` (`reserving/placed/failed`), `failure_code` NULL, `holds` text (JSON các ref đã giữ), `order_ids` text, `created_at`, `updated_at` | unique (`tenant_id`, `owner_key`, `reference`); index (`tenant_id`, `state`, `created_at`) |
 | `orders_orders` | `id`, `tenant_id`, `org_id` (nút bán: cửa hàng / người bán), `checkout_id` NULL, `number` VARCHAR(40), `channel` (`web/pos/<kênh>`), `external_ref` NULL (kênh), `buyer_user_id` NULL, `buyer_key` (HMAC theo khách của SĐT chuẩn hoá — chống bom hàng), `contact` text (tên, SĐT, email; người nhận hộ khi nhận tại cửa hàng: tên, SĐT — D-201), `ship_to` text NULL, `pickup_org_id` NULL, trường nhận tại cửa hàng (mục "Nhận tại cửa hàng"), `status`, `payment_status`, `fulfillment_status`, `payment_method`, `funds_flow`, `subtotal_*`, `discount_*`, `shipping_fee_*`, `tax_*`, `total_*`, `paid_*`, `refunded_*`, `currency`, `payment_due_at` NULL (= `expires_at` của `ledger`, D-218), `attribution` text NULL, `stock_shortage` BOOL default false, `invoice_request` text NULL (MST, tên công ty), `terms_version` NULL, `note` NULL, `placed_at`, `confirmed_at`, `delivered_at`, `completed_at`, `cancelled_at`, `cancel_reason` NULL, `created_at`, `updated_at` | unique (`tenant_id`, `number`); unique (`tenant_id`, `channel`, `external_ref`); index (`tenant_id`, `org_id`, `placed_at`, `id`), (`tenant_id`, `buyer_user_id`, `id`), (`tenant_id`, `status`, `payment_due_at`), (`tenant_id`, `status`, `delivered_at`), (`tenant_id`, `buyer_key`) |
-| `orders_lines` | `id`, `tenant_id`, `order_id`, `parent_line_id` NULL (thành phần combo), `variant_id`, `product_id`, `category_id`, `seller_org_id`, `kind`, `snapshot` text (SKU, tên, thuộc tính, ảnh, `warranty_months`), `sale_mode` và `preorder_available_on` NULL (chụp lúc đặt, D-204), `quantity`, `unit_price_*` (gồm thuế, trước giảm), `list_price_before_promo_*`, `discount_*`, `net_*` (gồm thuế, sau giảm), `tax_*`, `discounts` text (JSON dòng giảm kèm lý do, `funding` — ai trả, bao nhiêu — và nguồn `automatic` / `code` / `voucher` + id, D-222), `warehouse_org_id` NULL, `returned_quantity` INT default 0 | index (`tenant_id`, `order_id`), (`tenant_id`, `variant_id`, `order_id`), (`tenant_id`, `product_id`) |
+| `orders_lines` | `id`, `tenant_id`, `order_id`, `parent_line_id` NULL (thành phần combo), `variant_id`, `product_id`, `category_id`, `seller_org_id`, `kind`, `snapshot` text (SKU, tên, thuộc tính, ảnh, `warranty_months`), `sale_mode` và `preorder_available_on` NULL (chụp lúc đặt, D-204), `advance_*` NULL (phần trả trước của dòng) và `preorder_commit_at` NULL (mốc chốt sản xuất / nhập hàng chụp lúc đặt) (D-232), `quantity`, `unit_price_*` (gồm thuế, trước giảm), `list_price_before_promo_*`, `discount_*`, `net_*` (gồm thuế, sau giảm), `tax_*`, `discounts` text (JSON dòng giảm kèm lý do, `funding` — ai trả, bao nhiêu — và nguồn `automatic` / `code` / `voucher` + id, D-222), `warehouse_org_id` NULL, `returned_quantity` INT default 0 | index (`tenant_id`, `order_id`), (`tenant_id`, `variant_id`, `order_id`), (`tenant_id`, `product_id`) |
 | `orders_line_taxes` | `tenant_id`, `line_id`, `tax_code`, `rate` VARCHAR(20) (chuỗi thập phân như `TaxEngine` trả, vd `"0.08"`), `base_*`, `amount_*` | pk (`tenant_id`, `line_id`, `tax_code`) |
 | `orders_status_history` | `id`, `tenant_id`, `order_id`, `from_status` NULL, `to_status`, `cause` (`buyer/staff/system/payment/shipping/channel`), `actor_id` NULL, `reason` NULL, `at` | index (`tenant_id`, `order_id`, `id`) — chỉ thêm |
-| `orders_payments` | `id`, `tenant_id`, `order_id`, `method` (`gateway/installment/vietqr/cod/cash/card_terminal/bank_transfer/channel/tender:<kind>`), `gateway` NULL, `external_id` NULL, `reference` (ref gửi đối tác), `amount_*`, `status` (`pending/succeeded/failed/expired/refunded_partial/refunded`), `action` text NULL (URL / payload QR), `installment` text NULL (đối tác, kỳ hạn), `succeeded_at` NULL, `created_at`, `updated_at` | unique (`tenant_id`, `reference`); unique (`tenant_id`, `gateway`, `external_id`); index (`tenant_id`, `order_id`) |
+| `orders_payments` | `id`, `tenant_id`, `order_id`, `purpose` (`order` mặc định / `advance` / `balance` — trả trước, phần còn lại, D-232), `method` (`gateway/installment/vietqr/cod/cash/card_terminal/bank_transfer/channel/tender:<kind>`), `gateway` NULL, `external_id` NULL, `reference` (ref gửi đối tác), `amount_*`, `status` (`pending/succeeded/failed/expired/refunded_partial/refunded`), `action` text NULL (URL / payload QR), `installment` text NULL (đối tác, kỳ hạn), `succeeded_at` NULL, `created_at`, `updated_at` | unique (`tenant_id`, `reference`); unique (`tenant_id`, `gateway`, `external_id`); index (`tenant_id`, `order_id`) |
 | `orders_refunds` | `id`, `tenant_id`, `order_id`, `return_id` NULL, `payment_id`, `reference`, `reference_fingerprint`, `amount_*`, `status` (`pending/succeeded/failed/manual`), `external_id` NULL, `reason`, `created_by`, `created_at`, `updated_at` | unique (`tenant_id`, `reference`); index (`tenant_id`, `order_id`) |
+| `orders_advance_plans` | `tenant_id`, `order_id`, `advance_*` (tổng phải trả trước của các dòng đặt trước), `upfront_*` (phải trả lúc đặt = hàng sẵn + trả trước), `balance_*` (= tổng đơn − `upfront`), `balance_method` (`payment_link/cod`), `terms` text (JSON chụp điều kiện đã công bố lúc đặt: tỉ lệ / số tiền, trần, sàn, mốc chốt từng dòng, tỉ lệ và trần giữ lại khi người mua huỷ, hạn trả phần còn lại, việc làm khi quá hạn), `terms_sha256`, `status` (`awaiting_advance/advance_paid/balance_requested/balance_paid/balance_cod/balance_overdue/cancelled`), `balance_attempt` INT default 0, `balance_requested_at` NULL, `balance_due_at` NULL, `created_at`, `updated_at` (D-232) | pk (`tenant_id`, `order_id`); index (`tenant_id`, `status`, `balance_due_at`) |
 | `orders_completion_holds` | `tenant_id`, `order_id`, `reference`, `created_at` | pk (`tenant_id`, `order_id`, `reference`) |
 | `orders_fulfillments` | `id`, `tenant_id`, `order_id`, `shipment_ref` NULL (id vận đơn của `shipping`), `lines` text, `cod_*` NULL, `status` (`requested/picked_up/delivered/failed/returned`), `created_at`, `updated_at` — đơn có hàng sẵn lẫn hàng đặt trước có hai lần giao (D-204) | index (`tenant_id`, `order_id`); unique (`tenant_id`, `shipment_ref`) |
 | `orders_returns` | `id`, `tenant_id`, `order_id`, `org_id`, `number`, `status` (`requested/approved/rejected/received/refunded/closed`), `reason_code` (mã của danh sách lý do `orders.return_reason`, D-223), `buyer_note`, `resolution` (`refund/exchange`), `return_method` (`pickup/drop_off/in_store`, D-201), `media_ids` text (danh sách UUID ảnh, tối đa 6 — D-202), `lines` text (line_id, qty, tình trạng khi nhận: `restock/damaged`), `refund_*` NULL, `requested_at`, `deadline_at`, `decided_by` NULL, `decided_at` NULL, `created_at`, `updated_at` | unique (`tenant_id`, `number`); index (`tenant_id`, `org_id`, `status`, `id`), (`tenant_id`, `order_id`) |
@@ -282,7 +284,7 @@ tính năng (`m0001_carts`, `m0002_checkout_orders`, …), mỗi cái có `down`
 | `orders_cod_blocks` | `id`, `tenant_id`, `buyer_key`, `reason_code`, `note`, `expires_at`, `created_by`, `created_at`, `lifted_at` NULL | index (`tenant_id`, `buyer_key`, `expires_at`) |
 | `orders_warranties` | `id`, `tenant_id`, `org_id`, `order_line_id`, `serial` NULL, `buyer_user_id` NULL, `starts_at`, `ends_at`, `status` (`active/expired/void`) | unique (`tenant_id`, `order_line_id`, `serial`) (serial NULL → `-`); index (`tenant_id`, `serial`) |
 | `orders_warranty_claims` | `id`, `tenant_id`, `warranty_id`, `org_id` (nơi nhận), `number`, `status` (`received/inspecting/repairing/replacing/ready/returned/rejected`), `issue`, `resolution` NULL, `due_at`, `created_at`, `updated_at` | unique (`tenant_id`, `number`); index (`tenant_id`, `org_id`, `status`, `id`) |
-| `orders_policies` | `tenant_id`, `org_id`, `return_window_days`, `buyer_cancel_until` (`pending_payment/confirmed/preparing`, D-209), `allowed_return_reasons` (danh sách mã của `orders.return_reason`, D-209, D-223), `return_photo_reasons` text (mã lý do bắt buộc ảnh, mặc định `damaged,wrong_item` — D-202), `acceptance_hours` (0 = tự xác nhận, D-209), `cod_enabled`, `cod_max_*` NULL, `invoice_timing` (`on_confirm/on_delivered/on_complete/on_request`, mặc định `on_delivered` — D-215), `preorder_payment` (`full/on_arrival`, D-204), `pickup_expired_action` (`cancel_refund` mặc định / `keep_waiting`), `number_prefix`, `updated_at` — chính sách đơn theo D-209, D-215 (B-b5, B-b6, B-c8) | pk (`tenant_id`, `org_id`); giá trị hiệu lực theo cây bằng khuôn cài đặt kế thừa của bước 34 |
+| `orders_policies` | `tenant_id`, `org_id`, `return_window_days`, `buyer_cancel_until` (`pending_payment/confirmed/preparing`, D-209), `allowed_return_reasons` (danh sách mã của `orders.return_reason`, D-209, D-223), `return_photo_reasons` text (mã lý do bắt buộc ảnh, mặc định `damaged,wrong_item` — D-202), `acceptance_hours` (0 = tự xác nhận, D-209), `cod_enabled`, `cod_max_*` NULL, `invoice_timing` (`on_confirm/on_delivered/on_complete/on_request`, mặc định `on_delivered` — D-215), `advance_invoice_timing` (`with_order` mặc định / `on_advance`, D-232), `preorder_payment` (`full/on_arrival/partial`, D-204, D-232), trường trả trước một phần (`preorder_advance_bp` NULL, `preorder_advance_fixed_*` NULL, `preorder_advance_min_*` NULL, `preorder_advance_max_*` NULL, `preorder_commit_days` NULL, `preorder_cancel_retention_bp` default 0, `preorder_cancel_retention_max_*` NULL, `preorder_balance_due_hours` default 72, `preorder_balance_cod` BOOL default false, `preorder_balance_overdue_action` (`cancel_per_terms` mặc định / `cancel_full_refund`), `preorder_max_delay_days` default 30 — mục "Trả trước một phần cho hàng đặt trước", D-232), `pickup_expired_action` (`cancel_refund` mặc định / `keep_waiting`), `number_prefix`, `updated_at` — chính sách đơn theo D-209, D-215 (B-b5, B-b6, B-c8) | pk (`tenant_id`, `org_id`); giá trị hiệu lực theo cây bằng khuôn cài đặt kế thừa của bước 34 |
 
 `active_buyer_key` / `open_key` / cột khoá của `orders_review_summaries`: cột mang giá trị khi dòng đang
 "hoạt động", NULL khi không — unique trên cột NULL được cả hai database cho nhiều NULL, thay cho index một
@@ -326,7 +328,8 @@ dữ liệu lưu mã, không lưu nhãn:
 - Dòng đơn chụp `sale_mode` và `preorder_available_on` lúc đặt; một đơn có hàng sẵn lẫn hàng đặt trước thì
   tách thành hai lần giao (`orders_fulfillments`) — hàng sẵn đi trước, không chờ.
 - **Thanh toán:** theo chính sách của nút `preorder_payment` (`full` trả hết lúc đặt / `on_arrival` trả khi
-  hàng về, chỉ với COD hay thanh toán khi có hàng). Không làm tiền cọc một phần (xem "Phạm vi").
+  hàng về, chỉ với COD hay thanh toán khi có hàng / `partial` trả trước một phần — mục "Trả trước một phần cho
+  hàng đặt trước", D-232).
 - **Thông tin bắt buộc trước khi đặt:** báo giá giỏ trả `preorder: {available_on, message}` cho từng dòng;
   checkout yêu cầu `accept_preorder_terms = true` khi giỏ có hàng đặt trước (lưu vào chứng cứ chấp nhận của
   bước 37). Thời gian giao dự kiến phải hiện rõ trước khi đặt.
@@ -334,6 +337,74 @@ dữ liệu lưu mã, không lưu nhãn:
   dịch), cho **huỷ không mất phí** và hoàn tiền đủ khi ngày mới trễ hơn ngày đã hứa; người bán ngừng bán đặt
   trước → huỷ các dòng chưa chia hàng, hoàn tiền tự động. Nghe `inventory.preorder_allocated` → chuyển dòng
   sang `processing`.
+
+### Trả trước một phần cho hàng đặt trước (D-232)
+
+Gọi là **"trả trước một phần"** (thanh toán trước một phần giá), **không** gọi và không mặc định xử lý như
+"đặt cọc" theo Bộ luật Dân sự 2015 Điều 328 (đặt cọc có chế tài: bên nhận cọc từ chối giao kết thì trả cọc và
+một khoản tương đương). Khách muốn điều khoản đặt cọc thật thì đó là chính sách riêng của họ, ghi rõ trong
+điều kiện giao dịch — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**. Mã, tên trường, nhãn giao
+diện và mẫu thông báo đều dùng `advance` / "trả trước", không dùng `deposit` / "cọc".
+
+- **Chính sách (`orders_policies`, kế thừa theo cây).** `preorder_payment = partial` cần **đúng một** trong
+  `preorder_advance_bp` (tỉ lệ, 1–9999; vd 3000 = 30%) hay `preorder_advance_fixed_*` (số tiền cố định cho
+  phần đặt trước của đơn); `preorder_advance_min_*` / `preorder_advance_max_*` là sàn / trần (NULL = không
+  giới hạn). Sai → `orders.preorder_advance_invalid` (422), gom lỗi một lần (D-083).
+- **Tính tiền** (một hàm thuần trong `checkout/`, có test thuộc tính): phần đặt trước = Σ `net` các dòng đặt
+  trước + phần phí giao và giảm cấp đơn chia cho chúng bằng `Money::allocate`; `advance` = tỉ lệ × phần đặt
+  trước làm tròn **xuống** đơn vị nhỏ nhất (hay số cố định), kẹp vào [sàn, trần], không vượt phần đặt trước;
+  chia xuống dòng bằng `Money::allocate` (`orders_lines.advance_*`). `upfront` = phần hàng sẵn + `advance`;
+  `balance` = tổng đơn − `upfront` — **tính bằng phép trừ**, không nhân tỉ lệ lần nữa, nên tổng thu luôn bằng
+  giá đơn từng đồng. `advance` bằng phần đặt trước thì đơn coi như `full`.
+- **Công bố trước khi đặt.** Báo giá giỏ trả thêm cho mỗi dòng đặt trước `preorder.advance: {amount,
+  commit_at, retention_bp, retention_max}` và cho cả giỏ `advance: {upfront, balance, balance_due_hours,
+  balance_methods}`. `accept_preorder_terms = true` (đã có, D-204) là đồng ý cả điều kiện này: `terms` và
+  `terms_sha256` chụp vào `orders_advance_plans` trong transaction tạo đơn và ghi vào chứng cứ chấp nhận của
+  bước 37. Đổi chính sách sau khi đặt không áp ngược cho đơn đã đặt.
+- **Mốc chốt** của dòng (`preorder_commit_at`, chụp lúc đặt): `preorder_ends_at` của biến thể (hết nhận đặt =
+  lúc người bán chốt số lượng sản xuất / nhập hàng); biến thể không có thì `preorder_available_on −
+  preorder_commit_days`; cả hai không có thì không có mốc (huỷ luôn hoàn đủ).
+- **Dòng tiền (D-187).** Phần trả trước đi qua đối tác có giấy phép như mọi thanh toán: `payment_actions[]`
+  của checkout có số tiền `upfront`; `orders_payments.purpose = advance`, `reference = orders:<order_id>:advance`.
+  Ghi sổ là nghĩa vụ với người mua: Nợ `clearing.gateway` / Có `orders.customer_advance` (mục "Chỗ dễ sai").
+  Đủ `upfront` → `confirmed`, `payment_status = partially_paid`, plan `advance_paid`.
+- **Thu phần còn lại khi hàng sẵn sàng.** Nghe `inventory.preorder_allocated`: khi mọi dòng đặt trước còn hiệu
+  lực của đơn đã chia hàng → plan `balance_requested`, `balance_due_at = now + preorder_balance_due_hours`,
+  event `orders.preorder_balance_requested` (cùng transaction) và job `orders.request_preorder_balance`:
+  - `balance_method = payment_link`: tạo thanh toán ở `ledger` (`purpose = balance`, `reference =
+    orders:<order_id>:balance:<balance_attempt>`), báo người mua qua `notifications` (tin giao dịch) kèm link
+    còn hạn. Mỗi link sống bằng hạn thanh toán của `ledger` (D-218); hết hạn mà chưa quá `balance_due_at` thì
+    người mua mở lại bằng `POST /me/orders/{id}/payments` (hay nhân viên gửi lại bằng `POST /{id}/payment-link`):
+    lần thử mới tăng `balance_attempt`, chỉ khi lần trước đã `expired` / `failed`.
+  - `balance_method = cod` (chỉ khi `preorder_balance_cod = true` và đơn đủ điều kiện COD của mục chống bom
+    hàng; người mua chọn lúc checkout bằng `preorder_balance_method`): plan `balance_cod`, kiện hàng đặt trước
+    mang `cod = balance`, ghi sổ khi `shipping.cod_collected` như COD thường.
+  - Chưa `balance_paid` / `balance_cod` thì không yêu cầu vận đơn cho hàng đặt trước: 409
+    `orders.balance_unpaid`.
+- **Quá hạn phần còn lại.** Job `orders.expire_preorder_balances` (mỗi giờ): plan `balance_requested` quá
+  `balance_due_at` → `balance_overdue`, event `orders.preorder_balance_overdue`, rồi theo
+  `preorder_balance_overdue_action` đã chụp: `cancel_per_terms` (mặc định — huỷ các dòng đặt trước, hoàn
+  phần trả trước theo điều kiện người mua huỷ sau mốc, như dưới) hay `cancel_full_refund`. Thanh toán phần còn
+  lại tới sau khi đã huỷ → hoàn tự động (`late_payment`), như thanh toán muộn của đơn thường.
+- **Huỷ.**
+  - Người bán huỷ, ngừng bán đặt trước, hay dời ngày quá `preorder_max_delay_days` so với ngày đã hứa → huỷ
+    các dòng đặt trước chưa giao, hoàn **toàn bộ** phần trả trước của chúng tự động (không phụ thuộc mốc).
+    Dời ngày trong giới hạn: người mua huỷ được miễn phí, hoàn đủ (mục "Hàng đặt trước").
+  - Người mua huỷ (`POST /me/orders/{id}/cancel` hay đường vãng lai, cùng `buyer_cancel_until`): theo điều kiện
+    đã chụp lúc đặt. Mặc định: trước `preorder_commit_at` của dòng → hoàn đủ; sau mốc → giữ lại
+    `min(advance của dòng × retention_bp, retention_max, advance của dòng)`, hoàn phần còn lại. Mặc định
+    `preorder_cancel_retention_bp = 0` (luôn hoàn đủ) — khách tự đặt tỉ lệ. Phần hàng sẵn đã giao thì chỉ
+    huỷ các dòng đặt trước chưa chia hàng.
+  - Hoàn đi qua `orders_refunds` và `orders.refund` như mọi hoàn tiền (bút toán đảo, `orders.refund_completed`);
+    phần giữ lại ghi Nợ `orders.customer_advance` / Có `orders.cancellation_income`.
+- **Hoá đơn.** Khoản trả trước không đổi thời điểm lập hoá đơn của đơn (`invoice_timing`); khách cần lập hoá
+  đơn ngay khi thu tiền trước thì đặt `advance_invoice_timing = on_advance` (hoá đơn cuối trừ phần đã lập). Thời
+  điểm lập hoá đơn với khoản thu trước — **cần đối chiếu** NĐ 123/2020 sửa bởi NĐ 70/2025 (Điều 9) và người có
+  chuyên môn trước khi chạy thật; vì vậy để là dữ liệu, không viết cứng.
+- **Không thu hai lần.** `POST /checkout` và `POST /me/orders/{id}/payments` nhận `Idempotency-Key`; mỗi lần
+  thử có `reference` riêng (unique ở `orders_payments` và `ledger`); một lần thử mới chỉ mở khi lần trước đã hết
+  hạn / hỏng (khoá dòng plan bằng `rows::lock_one`). Hai lần thử cùng thành công (đối tác báo muộn) → lần sau hoàn
+  tự động, không cộng vào đơn.
 
 ### Nhận tại cửa hàng (D-201, B-c7, đợt 2)
 
@@ -470,13 +541,13 @@ ghi theo luật 5 (`ValidJson`, service gom lỗi).
 | Method + path | Permission | Ghi chú |
 |---|---|---|
 | `POST /carts` | công khai / `orders.buy` | tạo giỏ cho nút bán của tên miền (`TenantContext`); vãng lai nhận `cart_token` |
-| `GET /carts/{id}` | chủ giỏ | giỏ + **báo giá tính lại** (dòng, giảm kèm lý do, thuế, phí, tổng, `quote_token`, mã bị từ chối kèm lý do, `free_shipping_remaining` theo từng nơi bán — D-201, `preorder: {available_on, message}` mỗi dòng đặt trước — D-204) |
+| `GET /carts/{id}` | chủ giỏ | giỏ + **báo giá tính lại** (dòng, giảm kèm lý do, thuế, phí, tổng, `quote_token`, mã bị từ chối kèm lý do, `free_shipping_remaining` theo từng nơi bán — D-201, `preorder: {available_on, message, advance?}` mỗi dòng đặt trước — D-204; `advance` của giỏ khi trả trước một phần — D-232) |
 | `PUT /carts/{id}/lines/{variant_id}` | chủ giỏ | `{quantity}`; 0 = xoá; quá trần → 422 `orders.quantity_invalid`; hết hàng (sản phẩm không cho bán khi hết) → 409 `orders.out_of_stock` (chỉ báo, chưa giữ chỗ) |
 | `GET /carts/{id}/promotions` | chủ giỏ | mã / voucher dùng được và chưa đủ điều kiện cho giỏ (D-201, D-222, D-228) |
 | `PUT /carts/{id}/codes` · `PUT /carts/{id}/vouchers` · `PUT /carts/{id}/delivery` · `PUT /carts/{id}/attribution` | chủ giỏ (voucher: chỉ người đăng nhập) | mã giảm (coupon); voucher trong ví (D-222); địa chỉ (`address_id` hay `Address`) + phương thức giao / nhận tại cửa hàng; mã tiếp thị liên kết / phiên livestream |
 | `POST /carts/{id}/merge` | `orders.buy` + `Cart-Token` | gộp giỏ vãng lai vào giỏ của người mua (cộng số lượng, chặn ở trần) |
 | `GET /carts?status=abandoned` | xem "Agent tự quyết" | giỏ bỏ dở (B-b9) |
-| `POST /checkout` | công khai / `orders.buy` | header `Idempotency-Key` **bắt buộc**; thân `{cart_id, quote_token, payment_method, contact, invoice_request?, accept_terms_version, accept_preorder_terms?, note?}` → 201 `{orders[], payment_actions[]}` (D-216); `accept_preorder_terms = true` bắt buộc khi giỏ có hàng đặt trước (D-204); gửi lại → 200 kết quả cũ |
+| `POST /checkout` | công khai / `orders.buy` | header `Idempotency-Key` **bắt buộc**; thân `{cart_id, quote_token, payment_method, contact, invoice_request?, accept_terms_version, accept_preorder_terms?, preorder_balance_method?, note?}` → 201 `{orders[], payment_actions[]}` (D-216); `accept_preorder_terms = true` bắt buộc khi giỏ có hàng đặt trước (D-204); trả trước một phần: `payment_actions[]` mang `upfront`, `preorder_balance_method` = `payment_link` (mặc định) / `cod` (D-232); gửi lại → 200 kết quả cũ |
 | `GET /public/payments/{token}` | công khai + token | trạng thái thanh toán cho màn QR; token sống bằng hạn thanh toán (D-201) |
 | `GET /me/orders` · `GET /me/orders/{id}` | `orders.buy` | danh sách / chi tiết của chính mình (`Page`) |
 | `GET /me/orders/{id}/documents` | `orders.buy` (bản vãng lai: token xem đơn) | hoá đơn, phiếu bảo hành, biên bản trả hàng (B-c5) |
@@ -484,16 +555,16 @@ ghi theo luật 5 (`ValidJson`, service gom lỗi).
 | `GET /lookup/{number}` | công khai + `access` (link ký trong thư) | tra đơn vãng lai |
 | `POST /public/orders/lookup` · `POST /public/orders/lookup/{id}/confirm` | công khai | `{number, phone}` → OTP SMS; `{code}` → `access_token` (D-202) |
 | `POST /public/orders/{id}/cancel` · `POST /public/orders/{id}/address/otp` · `POST /public/orders/{id}/address` · `POST /public/orders/{id}/support` | token xem đơn | huỷ `{reason}`; đổi địa chỉ có OTP lần hai `{address, code}`; mở hỗ trợ `{message}` — cùng service với đường có tài khoản, nhận `Idempotency-Key` (D-202, D-204) |
-| `POST /me/orders/{id}/cancel` | `orders.buy` | theo `buyer_cancel_until` |
-| `POST /me/orders/{id}/payments` | `orders.buy` | thanh toán lại / đổi phương thức trước `payment_due_at` |
+| `POST /me/orders/{id}/cancel` | `orders.buy` | theo `buyer_cancel_until`; đơn trả trước một phần hoàn theo điều kiện đã chụp lúc đặt (D-232) |
+| `POST /me/orders/{id}/payments` | `orders.buy` | thanh toán lại / đổi phương thức trước `payment_due_at`; trả phần còn lại của đơn trả trước một phần trước `balance_due_at` (`Idempotency-Key`, D-232) |
 | `POST /me/orders/{id}/returns` | `orders.buy` | yêu cầu trả trong hạn, kèm `return_method`, `media_ids`; 201 |
 | `POST /me/orders/{id}/returns/preview` | `orders.buy` | xem trước tiền hoàn, cách gửi trả và phí, thời gian hoàn, hạn — không ghi (D-202) |
 | `GET /` · `GET /{id}` | `orders.read` | lọc `status`, `payment_status`, `org_id`, `channel`, `from`/`to`, `number`, `pickup_org_id`, `pickup_status`; `Tagged` có ETag |
 | `POST /{id}/transitions` | `orders.manage` | `{to, reason?}`, `If-Match` bắt buộc (`if_match.required()?`) |
-| `POST /{id}/shipments` | `orders.manage` | yêu cầu vận đơn (kiện, dòng, COD) → event `orders.fulfillment_requested` (payload `after.shipment` là `ShipmentRequest` của bước 44) |
+| `POST /{id}/shipments` | `orders.manage` | yêu cầu vận đơn (kiện, dòng, COD) → event `orders.fulfillment_requested` (payload `after.shipment` là `ShipmentRequest` của bước 44); hàng đặt trước chưa trả phần còn lại → 409 `orders.balance_unpaid` (D-232) |
 | `POST /{id}/pickup/ready` · `POST /{id}/pickup/handover` | xem "Agent tự quyết" | gửi mã nhận 6 số; giao `{code \| proxy_name, proxy_phone}` (B-c7) |
 | `POST /{id}/payments/manual` | `orders.manage` | ghi nhận chuyển khoản tay / thẻ tại quầy, có `reference` (D-184) |
-| `POST /{id}/payment-link` | xem "Agent tự quyết" | gửi lại link thanh toán còn hạn của `ledger` (B-b9) |
+| `POST /{id}/payment-link` | xem "Agent tự quyết" | gửi lại link thanh toán còn hạn của `ledger` (B-b9), kể cả link phần còn lại của đơn trả trước một phần (D-232) |
 | `POST /{id}/refunds` | `orders.refund` | `{amount, reason, reference}`; qua cổng nếu khoản gốc qua cổng, không thì `manual` |
 | `POST /{id}/lines/{line_id}/serials` | `orders.manage` | ghi số serial khi chuẩn bị hàng (mở bảo hành theo serial) |
 | `POST /{id}/invoice` | `orders.manage` / `orders.buy` (của mình) | xin xuất hoá đơn (MST) khi `invoice_timing = on_request` |
@@ -520,7 +591,8 @@ Cùng service, cùng permission với REST (luật 8): `list_orders`, `get_order
 `transition_order`, `request_shipment`, `record_manual_payment`, `refund_order` (`destructive`),
 `list_returns`, `decide_return` (trả kèm `media_ids` để nhân viên xem ảnh — D-202), `sales_report`
 (`read_only`), `list_reviews` (trả kèm `helpful_count` — D-203), `reply_review`, `moderate_review`,
-`lookup_warranty` (`read_only`), `update_warranty_claim`. Không có tool cho checkout của người mua hay POS
+`lookup_warranty` (`read_only`), `update_warranty_claim`. `get_order` trả kèm khối `advance` (trả trước, phần
+còn lại, hạn, trạng thái — D-232). Không có tool cho checkout của người mua hay POS
 (giao diện người dùng cuối, không phải việc của agent quản trị), cho xem trước tiền hoàn, bỏ phiếu "hữu
 ích" hay token xem đơn (việc của người mua; nhân viên dùng tool sẵn có).
 
@@ -534,7 +606,8 @@ nhận đơn — D-209), `orders.fulfillment_requested`, `orders.return_pickup_r
 `photo_count`, không có ID ảnh — D-202), `orders.return_received` (dòng nhập lại kho / hỏng), `orders.invoice_linked`,
 `orders.cart_abandoned` (người mua, tóm tắt giỏ — cho bước 47), `orders.review_published`,
 `orders.review_moderated`, `orders.pos_shift_closed`, `orders.warranty_claim_changed`,
-`orders.cod_block_changed`. Không mang secret, token, `Cart-Token`. Không có event cho từng phiếu "hữu
+`orders.cod_block_changed`, `orders.preorder_balance_requested` (số tiền, hạn — cho thông báo),
+`orders.preorder_balance_overdue` (D-232). Không mang secret, token, `Cart-Token`. Không có event cho từng phiếu "hữu
 ích" (D-203) và không có `orders.support_requested` (D-204).
 
 Nghe: event thanh toán xong của bước 36 (lọc `purpose = "orders"`), `shipping.shipment_*`,
@@ -558,6 +631,8 @@ Nghe: event thanh toán xong của bước 36 (lọc `purpose = "orders"`), `shi
 | `orders.mark_abandoned_carts` | mỗi 10 phút | giỏ có người mua / email, không đổi quá `abandoned_after_minutes` → `orders.cart_abandoned` một lần |
 | `orders.purge_carts` | mỗi ngày | xoá giỏ quá `cart_ttl_days` |
 | `orders.expire_warranties` | mỗi ngày | `active` quá `ends_at` → `expired` |
+| `orders.request_preorder_balance` | enqueue khi plan sang `balance_requested`, `unique_key = <order_id>:balance:<attempt>` | tạo thanh toán phần còn lại ở `ledger` (ngoài transaction), báo người mua kèm link (D-232) |
+| `orders.expire_preorder_balances` | mỗi giờ | plan `balance_requested` quá `balance_due_at` → `balance_overdue`, rồi theo `preorder_balance_overdue_action` (lô 100, D-232) |
 
 ### Cấu hình (`Setting`, tiền tố `AUTOXIDE_ORDERS_`)
 
@@ -567,8 +642,8 @@ Nghe: event thanh toán xong của bước 36 (lọc `purpose = "orders"`), `shi
 cặp mã đơn + số điện thoại băm; 20 theo IP băm), `LOOKUP_RESEND_SECONDS` (60), `LOOKUP_TOKEN_MINUTES` (30),
 `REVIEW_VOTES_PER_HOUR` (60). Hạn thanh toán không có biến riêng: đọc từ `ledger`
 (`AUTOXIDE_LEDGER_PAYMENT_EXPIRY_MINUTES`, D-218). Chính sách kinh doanh (hạn đổi trả, huỷ, COD, hoá đơn, tiền
-tố số đơn, chờ nhận đơn, lý do trả, ảnh bắt buộc, đặt trước, giữ hàng chờ nhận) là dữ liệu theo nút trong
-`orders_policies`, không phải biến môi trường. Sinh lại `.env.example`.
+tố số đơn, chờ nhận đơn, lý do trả, ảnh bắt buộc, đặt trước, trả trước một phần — D-232, giữ hàng chờ nhận)
+là dữ liệu theo nút trong `orders_policies`, không phải biến môi trường. Sinh lại `.env.example`.
 
 Tính năng (`Module::features`): `orders.pos`, `orders.reviews`, `orders.installment`,
 `orders.warranty`, `orders.cod_risk`. Hạn mức (`Module::limits`): `orders.orders_per_month` (đo dùng,
@@ -634,11 +709,16 @@ giữ chỗ khi tạo đơn qua `Entitlements::reserve`, trả lại khi checkou
 | `orders.warranty_not_found` | 404 | Không tìm thấy bảo hành cho số serial hoặc đơn này. |
 | `orders.warranty_expired` | 409 | Bảo hành đã hết hạn ngày {date}. |
 | `orders.serial_invalid` | 422 | Số serial {serial} không hợp lệ cho dòng hàng này. |
+| `orders.preorder_advance_invalid` | 422 | Trả trước một phần cần đúng một trong tỉ lệ hoặc số tiền cố định, trong khoảng sàn và trần. |
+| `orders.balance_unpaid` | 409 | Đơn còn {amount} chưa thanh toán; chưa giao được hàng đặt trước. |
+| `orders.balance_overdue` | 409 | Đã quá hạn thanh toán phần còn lại của đơn. |
 
 Nguồn mã mới: đặt trước (D-204; `preorder_sold_out` đến từ `inventory`, `preorder_closed` khi quá
 `preorder_ends_at`); ảnh trả hàng — trường `media_ids`, gom chung một lần (D-202, D-083); tra đơn vãng lai
 (D-202; `lookup_failed` chung cho không thấy đơn / sai số, `lookup_resend_too_soon` có `retry_after`);
-`support_unavailable` (D-204); phiếu "hữu ích" (D-203). Câu tiếng Việt là bản gợi ý — đặc tả gốc chỉ nêu ý.
+`support_unavailable` (D-204); phiếu "hữu ích" (D-203); trả trước một phần (D-232; `balance_overdue` khi trả
+phần còn lại sau `balance_due_at`, phương thức không dùng được dùng lại `orders.payment_method_unavailable`).
+Câu tiếng Việt là bản gợi ý — đặc tả gốc chỉ nêu ý.
 
 ## Thứ tự làm
 
@@ -672,7 +752,10 @@ Mỗi dòng là một commit (chạy `./gate.sh --quick` trước mỗi commit);
 13. Báo cáo bán hàng + kiểm payload event đủ cho bước 38; khai xuất đơn qua `Module::exports`. → **mục 12**
 14. Chống bom hàng COD (kèm `contact_key` của kernel). → **mục 13**
 15. Trả góp + bảo hành. → **mục 14**
-16. Hướng dẫn (nếu có tài liệu người ngoài), `docs/openapi.json`, `.env.example`, CHANGELOG, ROADMAP.
+16. Trả trước một phần cho hàng đặt trước: cột chính sách, `orders_advance_plans`, tính `advance` / `upfront` /
+    `balance`, công bố trong báo giá và chụp điều kiện, thu phần còn lại (link / COD), quá hạn, huỷ và hoàn theo
+    mốc, bút toán `orders.customer_advance` (D-232). → **mục 4**
+17. Hướng dẫn (nếu có tài liệu người ngoài), `docs/openapi.json`, `.env.example`, CHANGELOG, ROADMAP.
 
 ## Test bắt buộc
 
@@ -708,6 +791,14 @@ cổng thanh toán, hoá đơn điện tử, `Notifier` là bộ giả của tes
 - Hàng đặt trước (D-204): `don_tron_hang_san_va_dat_truoc_tach_hai_lan_giao`,
   `doi_ngay_dat_truoc_bao_nguoi_mua_va_cho_huy_mien_phi`, `dat_truoc_phai_dong_y_dieu_kien`,
   `ngung_dat_truoc_huy_va_hoan_tien_tu_dong`.
+- Trả trước một phần (D-232): `tra_truoc_dung_ti_le_va_kep_tran_san`, `phan_con_lai_thu_khi_hang_san_sang`,
+  `phan_con_lai_cod_khi_chinh_sach_cho_phep`, `chua_tra_phan_con_lai_khong_giao_hang_dat_truoc`,
+  `nguoi_ban_huy_hoan_du_tra_truoc`, `ngung_dat_truoc_hoac_doi_ngay_qua_gioi_han_hoan_du`,
+  `nguoi_mua_huy_truoc_moc_hoan_du`, `nguoi_mua_huy_sau_moc_giu_lai_theo_ti_le_co_tran`,
+  `link_phan_con_lai_qua_han_theo_chinh_sach`, `thanh_toan_phan_con_lai_goi_lai_khong_thu_hai_lan` (cùng
+  `Idempotency-Key` gửi song song; hai lần thử cùng thành công → lần sau tự hoàn),
+  `tong_tien_thu_bang_gia_don_tung_dong` (thuộc tính: mọi tỉ lệ, trần, sàn, đơn trộn hàng sẵn — `upfront +
+  balance = total`, bút toán cân), `doi_chinh_sach_sau_khi_dat_khong_ap_nguoc`.
 - Trả hàng kèm ảnh, xem trước (D-202): `ly_do_hong_vo_bat_buoc_anh`, `anh_cua_nguoi_khac_bi_tu_choi`,
   `xem_truoc_tien_hoan_khong_ghi_gi`, `chinh_sach_anh_ke_thua_theo_cay`.
 - Đơn vãng lai (D-202): `tra_don_sai_so_va_khong_co_don_tra_loi_giong_nhau`, `gui_lai_otp_phai_cho`,
@@ -738,8 +829,9 @@ cổng thanh toán, hoá đơn điện tử, `Notifier` là bộ giả của tes
       thời trên cả hai database.
 - [ ] `docs/openapi.json`, `.env.example` sinh lại; `cargo xtask check` xanh (dịch đủ `vi.json`).
 - [ ] Quyết định ghi vào `docs/DECISIONS.md`: đánh giá đặt ở `orders`; quy ước "giữ chỗ gọi trực tiếp,
-      xác nhận / trả qua event"; `OrderExtensions`; bảng bút toán theo chế độ dòng tiền; căn cứ pháp
-      lý của đánh giá, đổi trả, hoá đơn điều chỉnh, chống bom hàng.
+      xác nhận / trả qua event"; `OrderExtensions`; bảng bút toán theo chế độ dòng tiền (gồm
+      `orders.customer_advance`, `orders.cancellation_income` — D-232); căn cứ pháp lý của đánh giá, đổi trả,
+      hoá đơn điều chỉnh, chống bom hàng, trả trước một phần.
 - [ ] `CHANGELOG.md` (Added); đánh dấu ROADMAP; `./gate.sh` đầy đủ xanh; phát hành theo
       `docs/RELEASING.md` khi cả bước xong.
 
@@ -759,6 +851,15 @@ cổng thanh toán, hoá đơn điện tử, `Notifier` là bộ giả của tes
     chia khi nghe `orders.order_completed` — `orders` không ghi doanh thu của người bán.
   - Hoàn tiền: bút toán đảo đúng phần đã ghi, mã tham chiếu trỏ về bút toán gốc; không sửa bút toán cũ.
   - Chênh lệch tiền két khi đóng ca: `suspense.cash_shortage` / `suspense.cash_overage` (D-227).
+  - Khoản người mua trả trước (D-232): tên theo bộ của đặc tả 36 cho `buyer_prepayments` ở trên là
+    `orders.customer_advance` (mục đích riêng của module, tiền tố `orders.`; ánh xạ số hiệu tài khoản là dữ liệu
+    của `ledger`, vd dư Có TK 131 "người mua trả tiền trước" — **cần đối chiếu** TT 99/2025, TT 133/2016).
+    Trả trước một phần và phần còn lại online: Nợ `clearing.gateway` / Có `orders.customer_advance`; phần còn
+    lại COD: Nợ `clearing.carrier_cod` / Có `orders.customer_advance`; doanh thu khi `delivered` như trên.
+    Hoàn: Nợ `orders.customer_advance` / Có `clearing.gateway`. Phần giữ lại khi người mua huỷ sau mốc: Nợ
+    `orders.customer_advance` / Có `orders.cancellation_income` (thu nhập khác — thuế GTGT của khoản này
+    **cần đối chiếu**). Chế độ `PartnerCollect` / `GatewaySplit`: phần trả trước theo bảng của đặc tả 36 (Có
+    `payable.seller_held[S]`), huỷ thì hoàn từ tài khoản thu hộ của đối tác.
 - **Hết hạn chỗ giữ trước khi huỷ đơn**: chỗ giữ phải sống tới `payment_due_at + HOLD_GRACE_MINUTES`;
   `expire_unpaid` chạy mỗi phút nên đơn luôn bị huỷ trước. Thanh toán tới sau khi đã huỷ → không mở
   lại đơn, tạo hoàn tiền tự động (`late_payment`).
@@ -782,6 +883,11 @@ cổng thanh toán, hoá đơn điện tử, `Notifier` là bộ giả của tes
   `Money::allocate` (tổng không lệch một đồng); thuế lấy nguyên từ `TaxEngine`, không tự nhân lại.
   Tổng đơn = Σ net dòng + phí giao − giảm phí giao; kiểm bằng test thuộc tính. Hoàn khi trả hàng cũng chia
   bằng `Money::allocate`, tổng hoàn không vượt tiền đã trả (D-222).
+- **Trả trước một phần (D-232)**: không gọi là "cọc", không áp chế tài đặt cọc; `balance` tính bằng phép trừ
+  (`total − upfront`), không nhân tỉ lệ hai lần — lệch một đồng là lỗi; điều kiện huỷ đọc từ `terms` đã chụp,
+  không đọc chính sách hiện tại; phần giữ lại không vượt phần trả trước của dòng; `balance_due_at` là hạn của
+  nghĩa vụ trả phần còn lại, **không** phải hạn thanh toán thứ hai — mỗi link vẫn sống bằng hạn của `ledger`
+  (D-218); core không giữ tiền, kể cả phần giữ lại (D-187).
 - **Unique có NULL**: dùng cột khoá "đang hoạt động" thay vì index một phần.
 - **SQLite một người ghi**: saga gồm nhiều transaction ngắn — không mở transaction dài bao cả saga.
 - **Đánh giá**: không có đường ẩn đánh giá nào ngoài `moderation` với lý do trong danh sách
@@ -825,6 +931,13 @@ cổng thanh toán, hoá đơn điện tử, `Notifier` là bộ giả của tes
 - NĐ 147/2024: khách bật yêu cầu xác thực tài khoản cho đánh giá.
 - NĐ 52/2024: tiền đi qua đối tác có giấy phép; `orders` không giữ tiền (D-187); QR không bao giờ trỏ tới tài
   khoản của nền tảng (D-201, D-216).
+- Trả trước một phần cho hàng đặt trước (D-232): Bộ luật Dân sự 2015 Điều 328 (đặt cọc) — core **không** coi
+  khoản trả trước là đặt cọc; điều khoản đặt cọc là chính sách riêng của khách — **cần đối chiếu văn bản gốc /
+  người có chuyên môn pháp lý**. Công bố điều kiện huỷ, phần giữ lại trước khi đặt và lưu bằng chứng đồng ý:
+  Luật 19/2023/QH15 (điều kiện giao dịch chung), Luật Giao dịch điện tử 20/2023 — cần đối chiếu điều cụ thể.
+  Thời điểm lập hoá đơn với khoản thu trước: NĐ 123/2020 sửa bởi NĐ 70/2025, Điều 9 — **cần đối chiếu**, để
+  dạng dữ liệu (`advance_invoice_timing`). Thuế GTGT của phần giữ lại khi người mua huỷ: Luật Thuế GTGT
+  48/2024/QH15 và văn bản hướng dẫn — **cần đối chiếu**.
 - Bảo hành: Luật 19/2023 (trách nhiệm bảo hành) — thời hạn do người bán công bố, lưu theo dòng.
 - Tóm tắt đánh giá bằng AI: gắn nhãn AI, không lược ý kiến tiêu cực — Luật 19/2023, Luật Trí tuệ nhân tạo
   134/2025 — cần đối chiếu văn bản gốc (D-201).
@@ -842,6 +955,8 @@ cổng thanh toán, hoá đơn điện tử, `Notifier` là bộ giả của tes
 - Một `PUT /carts/{id}` gộp hay nhiều endpoint con: khuyến nghị nhiều endpoint con như trên (mỗi thay
   đổi một lỗi rõ), giữ nhất quán.
 - Ngưỡng mặc định của quy tắc COD (khuyến nghị: không có quy tắc nào bật sẵn; khách tự đặt).
+- Mặc định của trả trước một phần: `preorder_balance_due_hours` (khuyến nghị 72), `preorder_max_delay_days`
+  (khuyến nghị 30), `preorder_cancel_retention_bp` (0 — luôn hoàn đủ tới khi khách tự đặt) (D-232).
 - Cách mở rộng `Media` để kiểm người tải lên: hàm `uploaded_by(ids)` có cài đặt mặc định, hay trường
   `uploaded_by` trong `MediaRef` theo cách không phá vỡ (D-202).
 - Permission chưa ghi cho `GET /carts?status=abandoned`, `POST /{id}/payment-link`, `POST /{id}/pickup/*`,
