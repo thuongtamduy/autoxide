@@ -35,6 +35,21 @@ cấu hình chỉ ẩn bớt, không đảo chỗ.
 | 11 | Tuân thủ | `compliance` | 37 | mọi mô hình |
 | 12 | Cài đặt | kernel, `plans`, module kết nối | 33, 35 | mọi mô hình |
 
+Phần của bước 47–49 nằm trong các phân hệ trên, không thêm phân hệ thứ mười ba (đối chiếu thiết kế 2, B-b12):
+
+| Bước | Phần | Phân hệ | Hiện với mô hình |
+|---|---|---|---|
+| 47 | Hồ sơ khách (CRM), nhóm và phân khúc, điểm thưởng, hạng thành viên, thẻ quà tặng | 6 Khách hàng | mọi mô hình có bán hàng |
+| 48 | Kênh bán (Shopee, Lazada, TikTok Shop…), liên kết sản phẩm, phân bổ tồn, nguồn cấp sản phẩm Google / Meta | 2 Bán hàng (đơn từ kênh), 3 Sản phẩm (liên kết, nguồn cấp) | có bán hàng |
+| 49 | Tiếp thị liên kết (người tiếp thị, link, hoa hồng, chi trả), phiên livestream | 4 Tiếp thị | có bán hàng |
+
+Hai vai trò có khung riêng ngoài nhân viên của khách (B-b12):
+
+| Vai trò | Thấy gì | Bước |
+|---|---|---|
+| Người bán trên sàn | Khung quản trị thu gọn trong phạm vi gian hàng của mình (nút người bán): sản phẩm, đơn, trả hàng, tranh chấp, đối soát, phiếu hỗ trợ, sức khoẻ gian hàng; không thấy dữ liệu người bán khác | 46, 52, 53 |
+| Người tiếp thị | Trang riêng: link và mã của mình, đơn ghi nhận, hoa hồng chờ / được chi, chứng từ khấu trừ thuế; không thấy dữ liệu người mua | 49 |
+
 Ngoài ra có **mặt điều khiển** của nền tảng (khách hàng, gói, cấp phát, đội database, thuê bao, vào
 dữ liệu của khách để hỗ trợ) — một khung riêng cho nhân sự vận hành, khách không thấy.
 
@@ -143,3 +158,28 @@ cửa hàng, tài khoản, đổi trả, accessibility), web.dev (Core Web Vital
   nhập. Người gõ tên cũ vẫn tìm được phường, xã theo tên mới nhờ tìm không dấu.
 - **Đổi hàng tab ngang của menu con sang thanh bên** như Vercel 2026: giữ hàng tab (mục 2.3); xem lại khi
   có số đo trên giao diện thật.
+
+## 6. Trợ giúp trong giao diện (13/11/2026)
+
+Chủ dự án yêu cầu học cách các sản phẩm lớn đặt hướng dẫn ngay cạnh tính năng. Nguồn: Carbon (IBM) tách
+"tooltip" khỏi "toggletip"; Shopify Polaris chỉ dùng tooltip cho thông tin phụ, không giấu thông tin bắt
+buộc; Atlassian có bảng trợ giúp theo trang mở từ nút "?"; nghiên cứu của Nielsen Norman Group cho thấy
+hướng dẫn dạo đầu (product tour) thường bị bỏ qua, trợ giúp đúng lúc người dùng cần thì hiệu quả hơn.
+
+| Mẫu | Dùng khi | Thiết kế 2 |
+|---|---|---|
+| Nút ⓘ (toggletip): bấm hoặc chạm mới mở, có tiêu đề, giải thích, ví dụ, "Tìm hiểu thêm" | Thuật ngữ, cách tính số liệu, quy định pháp luật, lựa chọn có hệ quả | Cạnh tiêu đề mục; trên điện thoại thành tấm trượt từ đáy có nút "Đã hiểu" |
+| Chú thích khi rê chuột (tooltip) | Chỉ cho nút chỉ có biểu tượng; chỉ trên máy có chuột | Nút sáng / tối, thông báo, trợ giúp |
+| Bảng "Trợ giúp" theo trang | Bài hướng dẫn của đúng trang, phím tắt, hỏi trợ lý AI, có gì mới, liên hệ | Nút "?" ở đầu mọi trang quản trị |
+| Thẻ giới thiệu tính năng mới | Một tính năng vừa ra, tắt được, không chặn thao tác | Đơn hàng: "Lưu view" |
+| "Cần giúp?" ở trang đặt hàng | Người mua kẹt giữa chừng: gọi, nhắn tin, tra cứu đơn, chính sách | Mặt tiền, chỉ ở trang đặt hàng |
+
+Luật viết nội dung trợ giúp:
+
+- Không giấu thông tin bắt buộc, lỗi hay cảnh báo trong ⓘ — những thứ đó hiện thẳng trên trang.
+- Mỗi hộp tối đa ba câu và một ví dụ; dài hơn là dấu hiệu giao diện cần sửa, không phải cần thêm chữ.
+- Nêu căn cứ pháp luật khi có, kèm "cần đối chiếu văn bản gốc" nếu nguồn chưa thống nhất.
+- Định nghĩa số liệu lấy từ máy chủ (cùng nơi tính số), để chữ giải thích không lệch với con số.
+- Không làm hướng dẫn dạo đầu bắt buộc; gợi ý đã tắt thì không hiện lại (lưu theo người dùng).
+
+Phần máy chủ cần thêm: đề bài cho teammate ở `docs/prompts/ui-help-api.md`.

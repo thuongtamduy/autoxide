@@ -134,13 +134,21 @@ pub trait SummaryMetric: Send + Sync {
     fn group(&self) -> &'static str;               // nhóm điều hướng của P1
     fn permission(&self) -> &'static Permission;
     fn label(&self) -> &'static str;               // i18n key
+    /// i18n key của câu định nghĩa (D-207): tính từ lúc nào, múi giờ nào, gồm thuế không, trừ hoàn
+    /// tiền không, COD tính lúc nào — đúng như code của `value`. Mặc định `None` (D-038).
+    fn definition(&self) -> Option<&'static str> { None }
     async fn value(&self, tenant: &TenantContext, scope: &Scope) -> Result<MetricValue, Error>;
 }
 pub enum MetricValue { Money(Money), Count(u64), Ratio { numerator: u64, denominator: u64 } }
 ```
 
 - `GET /api/v1/kernel/summary?group&org_id` → các số liệu của nhóm (hoặc của mọi nhóm khi bỏ `group`,
-  cho trang Tổng quan), mỗi số kèm `note` tuỳ chọn. Hạn thời gian mỗi số như P2.
+  cho trang Tổng quan), mỗi số kèm `note` tuỳ chọn và `definition` (D-207: câu định nghĩa đã dịch theo
+  ngôn ngữ của request, `null` khi số liệu không khai; mô tả trường trong OpenAPI). Hạn thời gian mỗi
+  số như P2.
+- Gate (D-207): `cargo xtask check` hay test của app kiểm mọi `SummaryMetric` của module đang có đều khai
+  `definition` và key đó có bản dịch `vi` (như kiểm `code` lỗi). Câu định nghĩa nằm cạnh code tính số,
+  không viết riêng ở repo giao diện, để hộp ⓘ "Doanh thu hôm nay tính thế nào?" luôn đúng.
 - Số liệu nặng (doanh thu theo ngày) đọc từ bảng dẫn xuất của module hay của `reporting` (bước 38),
   không quét bảng giao dịch mỗi lần mở trang.
 
@@ -290,3 +298,69 @@ từng lý do với lỗi thật mà endpoint tương ứng trả.
 `resolve_khong_lo_ban_ghi_ngoai_quyen`, `work_snooze_het_han_thi_hien_lai`, `can_tra_dung_ly_do_nhu_loi_that`,
 `agent_goi_lenh_rui_ro_nhan_202_approval_required`, `approval_het_han_khong_chay_lenh`,
 `activity_khong_lo_ban_ghi_ngoai_quyen` — trên cả hai database.
+
+## Bổ sung theo D-207 (trợ giúp trong giao diện)
+
+### P14 — Cờ theo người dùng (đã làm, D-207)
+
+Bảng `kernel_user_flags` của module nội bộ `kernel` (`id`, `user_id`, `key` ≤ 100 ký tự `a-z0-9._-`,
+`value` ≤ 200 ký tự, `updated_at`; duy nhất (`user_id`, `key`)). API dưới `/api/v1/me` (tiền tố dành
+riêng cho endpoint "của tôi" do kernel phục vụ; `me` là tên module bị cấm):
+
+- `GET /api/v1/me/flags?prefix=hint.` — cờ của chính người gọi, theo thứ tự khoá;
+- `PUT /api/v1/me/flags/{key}` `{ "value": "dismissed" }` — ghi đè, gọi lại an toàn (`ON CONFLICT`);
+- `DELETE /api/v1/me/flags/{key}` — 204, kể cả khi không có.
+
+Chỉ cần đăng nhập, không permission; không endpoint đọc cờ người khác. Tối đa `AUTOXIDE_USER_FLAGS_MAX`
+(500) cờ mỗi người, vượt → 409 `kernel.flag_limit_reached`. Cờ có trong bản xuất dữ liệu cá nhân
+(`PersonalData`) và bị xoá khi nhận `privacy::USER_DELETED` — cơ chế đã có của kernel, không chờ bước 37.
+**Bước 33** thêm `tenant_id` cho bảng này như mọi bảng cấp khách hàng, cùng test
+`flag_cua_khach_nay_khong_lo_sang_khach_khac`.
+
+Test đã có (cả hai database): `flag_ghi_lai_cung_key_la_ghi_de`, `khong_doc_duoc_flag_cua_nguoi_khac`,
+`key_sai_dinh_dang_bi_tu_choi`, `vuot_han_muc_flag_bao_loi_ro`, `xoa_tai_khoan_xoa_flag`,
+`put_dong_thoi_cung_key_chi_mot_dong`, `loc_theo_tien_to_khong_coi_gach_duoi_la_ky_tu_dai_dien`,
+`co_cua_toi_qua_http`.
+
+### P4 — Định nghĩa số liệu (chưa làm)
+
+Xem `SummaryMetric::definition` và trường `definition` ở mục P4 phía trên; làm cùng P4.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+### P15 — Job API chung (D-213, A-b2, A-c1)
+
+`GET /api/v1/kernel/jobs?status=&kind=&org_id=` (job người gọi được xem: của mình, hay theo permission
+`kernel.jobs.read` trong phạm vi nút), `GET /api/v1/kernel/jobs/{id}` (`status`, `progress` {done, total},
+`result`, `file` {url ký có hạn, size, expires_at}), `POST /api/v1/kernel/jobs/{id}/retry`
+(`kernel.jobs.manage`, có audit). File kết quả giữ `AUTOXIDE_JOBS_FILE_RETENTION_DAYS` (mặc định 7). P8
+dùng endpoint này cho tiến độ thao tác hàng loạt.
+
+### P16 — Xuất danh sách theo bộ lọc (D-213, A-b8, B-c6)
+
+`POST /api/v1/kernel/exports {resource, params, columns, format: csv}`: `params` kiểm theo schema bộ lọc của
+P7, chạy bằng job (P15), ghi CSV qua `autoxide_kernel::csv` (chống CSV injection), xong thì báo qua
+`notifications`. Module khai danh sách xuất được qua `Module::exports` (`resource`, cột, permission, hàm đọc
+theo lô) — mặc định rỗng (D-038). Thay cho xuất riêng của `forms`, `catalog` (41:237), `orders`.
+
+### P12 bổ sung — Yêu cầu duyệt đầy đủ (D-213, A-c2)
+
+`GET /api/v1/kernel/approvals?status=`, `GET /api/v1/kernel/approvals/{id}`, `POST …/approve`, `POST
+…/reject {reason}`; event `kernel.approval_decided` (agent biết kết quả mà không hỏi lại liên tục); tool MCP
+`list_approvals`, `get_approval` (`read_only`), `decide_approval`. `ModuleTool` thêm
+`requires_approval_for_agent` (A-c12).
+
+### P7 bổ sung — Bộ lọc nội dung (A-c5)
+
+Bài viết: `review=pending`, `scheduled=true`, `ai_generated=true`, `missing_locale=<locale>`; media:
+`missing_alt=true` (kể cả thiếu bản dịch `alt` của một ngôn ngữ, D-202). Khai trong schema bộ lọc như mọi
+bộ lọc khác.
+
+### Nhỏ (A-c10, A-c11)
+
+- `DELETE /api/v1/me/work/{key}/snooze` (bỏ hoãn).
+- `GET /api/v1/kernel/settings` thêm `last_used_at`, `last_error` cho mỗi cài đặt có nối ra ngoài; `POST
+  /api/v1/kernel/settings/{name}/test` gọi thử qua trait của module (không trong transaction ghi).
+- P10: hộp việc không có "Đã xử lý" (D-212).

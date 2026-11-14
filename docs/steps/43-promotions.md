@@ -366,3 +366,12 @@ không còn trong danh sách; giá sau mã khớp kết quả `evaluate` của g
 "giỏ chưa có sản phẩm áp dụng", "chỉ cho đơn đầu tiên"). Website thay ô nhập mã mở sẵn bằng bộ chọn,
 ô nhập tự do nằm sau một liên kết. `remaining_uses` chỉ trả khi chương trình có giới hạn lượt, lấy từ số
 giữ chỗ thật (không làm tròn, không số giả).
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Giảm tự động và flash sale công khai (B-b7, B-c10).** Phát event khi giá sau giảm tự động của biến thể
+  đổi (cho `catalog_storefront_entries`); `GET /public/promotions/flash-sales` trả giờ bắt đầu / kết thúc và
+  **suất còn** (số thật, không làm giả độ khan hiếm — Luật 19/2023); điều kiện `first_order_only` (đơn đầu
+  của người mua trong khách, hỏi `orders` qua `api`).

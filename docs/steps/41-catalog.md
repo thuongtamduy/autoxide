@@ -506,3 +506,16 @@ Hạ tầng đã có trong kernel và `comments` (D-202); bước này chỉ kha
   `availability = PreOrder`, `availabilityStarts`.
 - Event `catalog.preorder_date_changed` (trước / sau) để `orders` báo người mua khi ngày dời.
 - Test: `chuyen_allow_backorder_sang_sale_mode`, `dat_truoc_phai_co_ngay_sau_hom_nay`.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Sản phẩm của người bán trên website của chuỗi (B-b4, B-c3).** `GET /public/products?seller=&sold_by=`
+  có `facets` cho người bán; `ProductCard.seller` (`org_id`, tên, slug, huy hiệu); cột `warranty_months`
+  trên sản phẩm; điểm cắm `CatalogExtensions::set_listing_gate` mà đặc tả 46 đang giả định (người bán chưa
+  KYC thì sản phẩm không lên danh sách).
+- **Giá sau giảm tự động trên danh sách công khai (B-b7, B-c10).** `catalog_storefront_entries` thêm
+  `sale_price_minor`, `sale_ends_at` cập nhật từ event của `promotions`; lọc `on_sale=true`.
+- **Thường mua cùng (B-c14, thấp).** Bảng dẫn xuất `catalog_co_purchases` (cặp sản phẩm, số lần cùng đơn
+  trong 90 ngày) cập nhật từ `orders.order_completed`; `GET /public/products/{id}/frequently-bought-together`.

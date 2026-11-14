@@ -449,3 +449,10 @@ Ghi quyết định vào `docs/DECISIONS.md` (skill `record-decision`).
   pháp lý — chọn và ghi quyết định.
 - **Route mặt điều khiển cho tách / gộp**: chỉ CLI ở bước này, hay thêm API cho nhân sự nền tảng — theo việc
   bước 33 đã dựng nhóm route nào.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Tách / gộp (D-210).** Route mặt điều khiển `POST …/relocations` (dry-run mặc định) chỉ cho nhân sự nền
+  tảng; khách chỉ gửi yêu cầu (vào hộp việc của nhân sự nền tảng). Tiến độ qua job API chung (D-213).

@@ -77,3 +77,15 @@ trước); danh sách chỉ số sức khoẻ người bán đầu tiên. Ghi v�
 - Tool MCP `kernel.request_log` (`kernel.devtools.read`, `read_only`) như REST.
 - **Test:** `lenh_mcp_ghi_dung_ten_tool`, `tham_so_tool_khong_lot_vao_nhat_ky`,
   `loc_nhat_ky_theo_actor_kind_va_key`, `lenh_cho_duyet_giu_approval_id` — cả hai database.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Tên endpoint bàn kỹ thuật (A-c10).** `GET /api/v1/kernel/devtools/requests` (đã ghi ở mục D-202),
+  `POST /api/v1/webhooks/deliveries/{id}/redeliver`, `GET /api/v1/kernel/devtools/events?object=<kind>:<id>`
+  — **đọc từ audit**, vì outbox bị dọn sau khi giao. Permission đọc `kernel.devtools.read`, ghi (gửi lại,
+  chạy lại job) `kernel.devtools.manage`. Nhật ký request lưu thêm `request_id`, `trace_id` để nối với OTLP.
+- **Trợ lý AI trong quản trị (A-c12).** `POST /api/v1/ai/assistant/messages {page, text}`: chạy tool MCP với
+  **quyền của người gọi**, chỉ tool `read_only` khi khách chưa bật ghi; lệnh ghi thành bản nháp hay yêu cầu
+  duyệt (D-109, P12). Trả lời kèm danh sách tool đã gọi để người dùng kiểm.

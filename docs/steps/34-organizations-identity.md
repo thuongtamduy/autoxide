@@ -57,8 +57,9 @@ mới), `CHANGELOG.md`, `.env.example`, `docs/openapi.json`.
 NGOÀI phạm vi: kho báo cáo gộp, cha thao tác dữ liệu con bằng job phân phối, tách / gộp nhánh (bước
 38); KYC, cờ "đã xác thực số điện thoại" (37); gói, hạn mức (35 — bước này chỉ để chỗ gọi
 `reserve`); hồ sơ khách hàng CRM, điểm thưởng (47); sổ địa chỉ người mua (44); hạn mức theo nút
-(vd số nhân sự mỗi cửa hàng). `org_id` chỉ thêm vào `notes`; `content`, `media`, `forms`,
-`newsletter`, `comments` giữ dữ liệu cấp khách (quyền của chúng chỉ có độ sâu `tenant`).
+(vd số nhân sự mỗi cửa hàng). `org_id` thêm vào `notes`, và vào `content`, `media` (`forms` tuỳ chọn)
+theo mục "Bổ sung theo đối chiếu thiết kế 2" ở cuối file (D-208, thay câu cũ "chỉ `notes`"); `newsletter`,
+`comments` giữ dữ liệu cấp khách (quyền của chúng chỉ có độ sâu `tenant`).
 
 ## Thiết kế
 
@@ -574,3 +575,27 @@ bước 45 — đăng ký `auth` trước thì lấy qua chỗ giữ của kerne
 chọn), tạo tài khoản trong khách với số đó đã xác thực, đăng nhập bằng passkey (bước 12) hay OTP; không bắt
 buộc mật khẩu. Số đã thuộc một tài khoản → 409 `auth.phone_taken` (gợi ý đăng nhập). Phần này làm ở bước
 45 khi `orders` có token xem đơn; ghi ở đây vì danh tính và đăng nhập thuộc `auth`.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Nội dung theo website và nút (D-208, A-b1, A-c3).** Thay câu "`org_id` chỉ thêm vào `notes`…" ở mục
+  Phạm vi: `content` và `media` thêm `org_id` (nút sở hữu, mặc định nút gốc khi nâng cấp), `forms` thêm
+  `org_id` NULL được; quyền `content.*`, `media.*`, `forms.*` thành `scoped()`; đọc công khai lọc theo
+  website (tên miền → nút qua `kernel_tenant_domains.org_id`, bài của nút và nhánh trên được chia sẻ xuống
+  thì hiện); menu và ngôn ngữ bật theo website; bộ lọc quản trị `owner_org`, `site`. `newsletter`,
+  `comments` vẫn cấp khách. Media riêng của người bán trên sàn dùng chính mục này. Test:
+  `bai_cua_cua_hang_a_khong_hien_tren_website_cua_cua_hang_b`, `nguoi_ban_chi_thay_media_cua_minh`.
+- **Xác nhận lại danh tính (A-b6, A-c4).** `POST /api/v1/auth/me/reauth {method: passkey|totp|email_link}`
+  trả token ngắn hạn (`AUTOXIDE_AUTH_REAUTH_MINUTES`, mặc định 10) dùng một lần cho lệnh nhạy cảm (tạo API
+  key, đổi email, tắt MFA, đổi role admin) thay cho `current_password` — tài khoản chỉ có passkey cũng làm
+  được. Bước 54 (P5, step-up) dùng chính token này.
+- **Ngôn ngữ và múi giờ ưa thích (A-b4).** `auth_user.locale`, `auth_user.time_zone` (IANA), `PATCH
+  /api/v1/auth/me`; mail và `notifications` gửi chậm (job) dùng hai giá trị này thay cho ngôn ngữ của
+  request gốc. Thay mục đã hoãn ở D-062.
+- **Khách tự thu hồi quyền vào hỗ trợ (D-211, A-b5).** `DELETE /api/v1/auth/support-access/{id}`
+  (`auth.support_access.revoke` ở khách); trần giờ giữ như cũ; lần cấp `legal_request` không thu hồi được.
+- **Nhỏ (A-c11).** `GET /api/v1/auth/memberships?org_id&inherited=true` (membership hiệu lực kể cả kế thừa từ
+  nút trên). **Thấp (A-b10):** chính sách bắt buộc MFA theo role (`auth_roles.requires_mfa`),
+  `auth_user.last_login_at`.

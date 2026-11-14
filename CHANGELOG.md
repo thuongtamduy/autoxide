@@ -20,6 +20,9 @@ endpoints are marked deprecated with a sunset date first.
 - Media: alt text per language — `PUT` / `DELETE /api/v1/media/{id}/alts/{locale}`, `alts` on every
   item, the MCP tool `media.set_alt`, languages from `AUTOXIDE_MEDIA_ALT_LOCALES` (default `en,vi`).
   The content module's public images use the alt text in the post's language when there is one.
+- Interface flags per account: `GET` / `PUT` / `DELETE /api/v1/me/flags` remember dismissed hints or the
+  last "what's new" seen, for the signed-in user only (at most `AUTOXIDE_USER_FLAGS_MAX`, default 500).
+  Flags are part of the personal data export and are deleted with the account.
 - For module authors: `Module::resource_events`, `StartContext::badge_source`,
   `StartContext::posting_verifier` and `pagination::fetch_page_tiers` (see `docs/MODULE_GUIDE.md`).
 

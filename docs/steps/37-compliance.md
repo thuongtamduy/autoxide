@@ -844,3 +844,26 @@ chung** để mẫu do khách tự soạn có biến, điều kiện, vòng lặ
   `gui_thu_chi_toi_dia_chi_cua_nguoi_goi`, `mau_hong_luc_gui_dung_mau_mac_dinh`,
   `xuat_ban_va_quay_lai_phien_ban`, `ban_tin_ca_nhan_hoa_moi_nguoi_nhan`,
   `html_dung_tren_mau_mjml_va_co_ban_chu_thuan`.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Sổ yêu cầu của chủ thể dữ liệu (D-217, A-b3, A-c8).** Bảng `compliance_subject_requests` (`id`,
+  `tenant_id`, `kind` (`access`/`erasure`/`rectification`/`objection`/`restriction`), `channel`
+  (`email`/`post`/`phone`/`authority`/`other`), `subject` (email / số / user_id), `received_at`, `due_at`,
+  `status` (`received`/`in_progress`/`fulfilled`/`rejected`), `reason`, `job_id`, `handled_by`). API: `GET/POST
+  /api/v1/compliance/subject-requests`, `POST …/{id}/fulfil` (chạy job xuất / xoá dùng cơ chế sẵn có), việc
+  vào hộp việc kèm hạn. Hạn trả lời là dữ liệu có ngày hiệu lực (Luật 91/2025/QH15, NĐ 356/2025 — **cần
+  đối chiếu văn bản gốc**). Không áp cho yêu cầu người dùng tự làm trong tài khoản.
+- **KYC cần bổ sung (A-c9).** Trạng thái `needs_info` và `POST /api/v1/compliance/kyc/profiles/{id}/request-info
+  {fields, message}`; người nộp nhận thông báo, nộp bổ sung đưa hồ sơ về `pending`.
+- **Văn bản và sự cố (A-c9).** `GET /api/v1/compliance/documents/{id}/acceptance-stats` (số người đã chấp
+  nhận theo phiên bản); sự cố có bản nháp thông báo gửi cơ quan và gửi người bị ảnh hưởng (AI chỉ là bản nháp,
+  D-109), mốc 72 giờ như mục đã có.
+- **"Chặn bán" (A-3.5).** **Cần đối chiếu** NĐ 52/2013/NĐ-CP sửa bởi NĐ 85/2021/NĐ-CP và Luật Thương mại điện
+  tử 2025: bán trước khi thông báo website với Bộ Công Thương bị **cấm** hay chỉ **bị phạt**. Nếu cấm: thêm
+  cổng chặn đặt hàng (`compliance.website_not_notified`, 403) gọi từ checkout của bước 45. Nếu không: nhãn
+  trong danh sách kiểm đổi thành "bắt buộc theo luật", không chặn. Agent bước 37 ghi kết quả đối chiếu vào
+  DECISIONS trước khi chọn.
+- **Thấp (A-b10).** Báo cáo đã lưu và lịch gửi qua email (dùng xuất chung của bước 51, D-213).

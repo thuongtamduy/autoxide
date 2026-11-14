@@ -60,6 +60,8 @@ pub struct Modules {
     verification: crate::access::PostingVerification,
     /// Sổ module đã cài (module `kernel` phục vụ); điền ở cuối [`start`](Self::start).
     catalog: crate::module_catalog::ModuleCatalog,
+    /// Cờ theo người dùng của module `kernel`, phục vụ dưới `/api/v1/me` (D-207).
+    user_flags: crate::user_flags::Handle,
 }
 
 impl Modules {
@@ -71,14 +73,17 @@ impl Modules {
     /// được thứ chúng công bố.
     pub fn new(modules: Vec<Box<dyn Module>>) -> Result<Self, ModuleError> {
         let mut problems = Vec::new();
-        for reserved in [crate::builtin::NAME, crate::antispam::module::NAME] {
+        // `me`: tiền tố `/api/v1/me` của các endpoint "của tôi" do kernel phục vụ.
+        for reserved in [crate::builtin::NAME, crate::antispam::module::NAME, crate::user_flags::ME]
+        {
             if modules.iter().any(|module| module.name() == reserved) {
                 problems.push(format!("module name `{reserved}` is reserved for the kernel"));
             }
         }
         let catalog = crate::module_catalog::ModuleCatalog::default();
+        let user_flags = crate::user_flags::Handle::default();
         let mut all: Vec<Box<dyn Module>> = vec![
-            Box::new(crate::builtin::KernelModule::new(catalog.clone())),
+            Box::new(crate::builtin::KernelModule::new(catalog.clone(), user_flags.clone())),
             Box::new(crate::antispam::module::AntispamModule::default()),
         ];
         all.extend(modules);
@@ -120,6 +125,7 @@ impl Modules {
                 verification: crate::access::PostingVerification::default(),
                 apis: Apis::default(),
                 catalog,
+                user_flags,
             })
         } else {
             Err(ModuleError(problems.join("; ")))
@@ -403,8 +409,15 @@ impl Modules {
 
     /// Route của từng module kèm tên module, theo thứ tự đăng ký. Gọi sau
     /// [`start`](Self::start).
+    /// Ngoài route của từng module còn có `("me", …)`: endpoint "của tôi" do kernel phục vụ dưới
+    /// `/api/v1/me` (cờ theo người dùng, D-207) — `me` là tên dành riêng, không module nào dùng.
     pub fn routes(&self) -> Vec<(&'static str, OpenApiRouter)> {
-        self.modules.iter().map(|module| (module.name(), module.routes())).collect()
+        let mut routes: Vec<(&'static str, OpenApiRouter)> =
+            self.modules.iter().map(|module| (module.name(), module.routes())).collect();
+        if let Some(flags) = self.user_flags.get() {
+            routes.push((crate::user_flags::ME, crate::user_flags::routes(flags)));
+        }
+        routes
     }
 
     /// Migrator chạy migration của mọi module.
@@ -639,7 +652,8 @@ mod tests {
         // Chỉ biến của hai module nội bộ `kernel` và `antispam`.
         let names: Vec<&str> = reader.values().iter().map(|value| value.setting.name).collect();
         let internal = |name: &&str| {
-            ["AUTOXIDE_SECRET_KEY", "AUTOXIDE_HTTP_PUBLIC_URL"].contains(name)
+            ["AUTOXIDE_SECRET_KEY", "AUTOXIDE_HTTP_PUBLIC_URL", "AUTOXIDE_USER_FLAGS_MAX"]
+                .contains(name)
                 || name.starts_with("AUTOXIDE_ANTISPAM_")
         };
         assert!(names.iter().all(internal), "{names:?}");
