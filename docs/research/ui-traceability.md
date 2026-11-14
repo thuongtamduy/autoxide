@@ -77,7 +77,7 @@ Nhận xét chung:
 - [x] Kho và nhập hàng (B-a7); vận chuyển (B-a8)
 - [x] Khuyến mại (B-a9); sản phẩm và giá (B-a10)
 - [x] Khách hàng và CRM (B-a12); kênh bán (B-a13); tiếp thị liên kết và livestream (B-a14)
-- [ ] Người mua (B-a15). Đã có: Đã lưu, Điểm và hạng, Bảo hành, Giới thiệu bạn, Báo có hàng, trang
+- [x] Người mua (B-a15), xong ở đợt 3. Đã có: Đã lưu, Điểm và hạng, Bảo hành, Giới thiệu bạn, Báo có hàng, trang
       Khuyến mại (flash sale, mã), trang Bán trên Chợ Bếp Mộc. Còn: tải hàng số, tranh chấp với người bán;
       checkout thêm trả góp, dùng điểm, mã người tiếp thị, giỏ chỉ có hàng số hay dịch vụ.
 - [x] Đăng nhập và tài khoản của tôi (A-a3); trạng thái toàn khung: tạm khoá, chỉ đọc, bảo trì, module
@@ -86,17 +86,28 @@ Nhận xét chung:
 - [x] Tổ chức: lời mời, uỷ quyền, cài đặt nút, hồ sơ công khai (A-a13); quyền vào hỗ trợ phía khách (A-a14)
 - [x] Nền tảng: gói và giá, thuê bao, cấp phát, sức khoẻ, đội database (A-a15)
 - [x] Biểu mẫu, bản tin, bình luận: các module đã chạy mà chưa có màn hình (A-a17)
-- [ ] Nội dung (A-a18). Đã có: trang, danh mục, tác giả, menu, chuyển hướng, lịch sử phiên bản. Còn: vẽ
+- [x] Nội dung (A-a18), xong ở đợt 3. Đã có: trang, danh mục, tác giả, menu, chuyển hướng, lịch sử phiên bản. Còn: vẽ
       lại trình soạn bài và thư viện media theo khung 2 (đang dùng bản của thiết kế 1).
 - [x] Tuân thủ còn thiếu (A-a19); nhân sự, webhook, audit (A-a20)
-- [ ] Việc, hoạt động, ghim, xem trước `dry_run` (A-a21): đã có; còn ô lọc bằng lời thường.
+- [x] Việc, hoạt động, ghim, xem trước `dry_run` (A-a21); ô lọc bằng lời thường xong ở đợt 3.
 
 Chỗ trống API và đặc tả mà các màn đợt 2 lộ ra: `docs/prompts/ui-phase2-api.md`.
 
-### Đợt 3: phần còn lại
+### Đợt 3: phần còn lại (xong 14/11/2026)
 
-- [ ] Phần còn thiếu của B-a15, A-a18 và A-a21 ở trên.
-- [ ] Báo cáo theo kênh bán (bước 48); trang công khai của phiên livestream (bước 49).
+- [x] Phần còn thiếu của B-a15 (tải hàng số, tranh chấp phía người mua, dùng điểm, mã người tiếp thị, trả góp
+      qua đối tác, giỏ chỉ có hàng số), A-a18 (trình soạn bài và thư viện media theo khung 2) và A-a21 (ô lọc
+      bằng lời thường)
+- [x] Báo cáo theo kênh bán (bước 48); trang công khai của phiên livestream (bước 49)
+- [x] Thêm ngoài danh sách:
+      - thanh danh mục có bảng xổ;
+      - đánh giá và hỏi đáp có lọc, sắp xếp, nút hữu ích;
+      - tóm tắt đơn thu gọn khi đặt hàng trên điện thoại;
+      - tab hiện đủ trên điện thoại;
+      - ba trang chiến dịch có phong cách riêng: dày khuyến mại, tối giản, sang trọng.
+
+Chỗ trống API và đặc tả của đợt 3: `docs/prompts/ui-phase3-api.md`. Menu động lấy từ backend: chờ chủ dự án
+chọn cách.
 
 Mọi màn hình mới theo luật đã đặt: dùng bộ kiểu dáng có sẵn của hai thiết kế, có trợ giúp ⓘ ở chỗ khó
 hiểu, và qua bộ kiểm tra tự động gồm:
