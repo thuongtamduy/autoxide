@@ -221,6 +221,11 @@ Trả lời tự động (D-230): `orders` gắn một `FactSource` vào `Suppor
 `support`: ý định `orders.order_status` (tham số số đơn) trả mẫu câu i18n "Đơn {number} đang {status}, dự kiến
 giao {eta}" — chỉ khi đơn thuộc tài khoản hay số điện thoại đã xác thực của người hỏi, không thì `None`.
 
+Trường tự định nghĩa (D-235, bước 51 P19): `orders` khai đích `orders.order` với cả mức `buyer_input` — khách thêm ô
+người mua nhập lúc đặt hàng (vd "giờ nhận hàng mong muốn", "mã số thuế công ty") mà không sửa code. `POST /checkout`
+nhận `custom_fields`, kiểm bằng `CustomFields::validate` cùng bộ gom lỗi của checkout; chỉ trường `buyer_input` được
+người mua ghi, trường `internal` chỉ nhân sự. Mẫu mail xác nhận đơn đọc được các trường này (biến của bước 37).
+
 Khối cho trang (D-229, bước 67): `orders` khai `orders.add_to_cart`, `orders.buy_now`, `orders.reviews`,
 `orders.cart_link` (biểu tượng giỏ cho đầu trang của website — D-234; số món do giao diện tự đếm từ giỏ, không vào
 dữ liệu cache) qua

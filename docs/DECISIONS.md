@@ -5651,3 +5651,35 @@ thương hiệu và an toàn; giá trị chọn sẵn ở máy chủ và cache t
 mở đường chèn mã, đã có khối mã tự viết cách ly (D-231) cho nhu cầu đặc biệt; để giao diện tự tính lịch — mỗi giao
 diện tính một kiểu, lệch múi giờ, cache CDN không biết lúc nào hết hạn; bảng riêng cho chủ đề mẫu — dữ liệu đi theo
 bản phát hành, nhúng binary đủ; lịch theo âm lịch tự tính — thêm thư viện cho vài ngày mỗi năm, ngày cụ thể đủ.
+
+## D-235 · Khách tự chỉnh không cần code: trường tự định nghĩa, nhãn, đổi câu chữ, loại nội dung, mã theo dõi và đồng ý cookie — 2026-11-14 — chủ dự án đồng ý đề xuất, agent quyết chi tiết
+
+Chủ dự án hỏi còn gì hỗ trợ "động" cho khách và người dùng CMS. Rà đặc tả thấy đã có: gói và tính năng (35), cây tổ
+chức và cài đặt kế thừa (34), tên miền, ngôn ngữ (33, 34), role tự tạo, menu, form, webhook (đã code), giao diện và
+chủ đề theo lịch (67, D-234), mẫu mail (37), số chứng từ (36), thuộc tính sản phẩm (41), bộ lọc đã lưu và thao tác
+hàng loạt (51), tự động hoá (58). Còn thiếu năm thứ, thêm vào bước có sẵn (không mở bước mới):
+
+| # | Việc | Bước | Quyết định chính |
+|---|---|---|---|
+| 1 | Trường tự định nghĩa trên bản ghi | 51 (P19) | Kernel giữ định nghĩa và bộ kiểm; module chọn tham gia bằng `Module::custom_field_targets()`; giá trị là cột JSON trên bản ghi của module (không nối bảng khi đọc); chỉ trường `filterable` vào bảng `<module>_custom_index` ghi cùng transaction, lọc bằng subquery thường — không toán tử JSON riêng của database; mức hiện `internal` / `public` / `buyer_input`; không nhận regex của khách |
+| 2 | Loại nội dung tự định nghĩa | 67 | `content_types` + mục `kind = custom`; trường là P19 (không có bộ trường thứ hai); dùng lại nháp, lịch sử, bản dịch, SEO; trang chi tiết dựng sẵn, khối `content.type_list` |
+| 3 | Mã theo dõi quảng cáo + đồng ý cookie | 37 (A6) | Nhà cung cấp cho sẵn, khách chỉ điền mã ID (không dán script); không tải gì trước khi đồng ý đúng nhóm; từ chối dễ như đồng ý; bằng chứng đồng ý ẩn danh; nhà cung cấp tự vào danh sách bên nhận dữ liệu; đi kèm `/public/site` qua điểm cắm `SiteExtensions` |
+| 4 | Nhãn gắn bản ghi | 51 (P20) | Bảng của kernel (lọc cần subquery, như `kernel_org_closure`); loại bản ghi khai `taggable`; gắn cần quyền ghi bản ghi; nhãn nội bộ, không công khai. Thẻ công khai của `content` và nhãn của `media` (D-094) giữ nguyên |
+| 5 | Đổi câu chữ hiển thị theo khách | 51 (P21) | Chỉ key module khai đổi được và không gian `ui.*` cho giao diện; giữ đúng chỗ điền; mã lỗi và câu `legal` không đổi được; đọc qua cache bộ nhớ theo khách |
+
+Kèm: `orders.order` hỗ trợ `buyer_input` để khách thêm ô người mua nhập lúc đặt hàng (45). Thêm vào bảng "API mới
+của kernel" ở `docs/steps/README.md`.
+
+Căn cứ của mục 3 — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật BVDLCN 91/2025/QH15, NĐ
+356/2025/NĐ-CP (đồng ý, chuyển dữ liệu ra nước ngoài), Luật BVQLNTD 19/2023/QH15. Chưa chắc: cookie đo lường có cần
+đồng ý hay dùng căn cứ khác; hồ sơ đánh giá tác động khi bật pixel của nền tảng nước ngoài. Thiết kế chọn mức chặt
+(hỏi trước) — không chặn công việc.
+
+Lý do: mọi nền tảng lớn đều cho khách tự làm năm việc này; đặt ở kernel phần dùng chung (định nghĩa trường, nhãn,
+câu chữ) thì mỗi module không tự làm một kiểu; giữ tốc độ bằng giá trị nằm trên bản ghi, index riêng chỉ cho trường
+lọc, cache theo khách cho câu chữ và định nghĩa.
+
+Đã cân nhắc: kiểu "entity–attribute–value" (mỗi giá trị một dòng) cho trường tự định nghĩa — đọc bản ghi phải nối và
+gom nhiều dòng, chậm; cột JSON có index của database — Postgres có, SQLite khác hẳn, vi phạm luật số một; cho khách
+dán script theo dõi — đã có khối mã tự viết cách ly (D-231) cho nhu cầu đặc biệt, còn mã theo dõi phổ biến cần gắn
+với đồng ý nên phải có cấu trúc; chuyển nhãn của `media` sang P20 — phá hợp đồng API đã phát hành, không đem lại gì.
