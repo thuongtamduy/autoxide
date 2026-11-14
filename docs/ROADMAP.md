@@ -4,7 +4,7 @@ Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và Postgres**; agen
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
 Trạng thái: **bước 0–30 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); bước 50 chờ
-chủ dự án công khai repo (D-199); bản phát hành mới nhất `v0.12.0`. CI trên GitHub chỉ chạy khi repo công khai
+chủ dự án công khai repo (D-199); bản phát hành mới nhất `v0.13.0`. CI trên GitHub chỉ chạy khi repo công khai
 (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
 **Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
