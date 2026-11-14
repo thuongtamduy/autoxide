@@ -62,7 +62,7 @@ cách hỏi người tải lên: thêm vào `media` (mục "Đổi trả", D-202
 NGOÀI phạm vi: bộ nối cổng thanh toán / trả góp thật (module riêng, cần secret thật — dừng hỏi chủ dự
 án); tách đơn theo người bán, phí sàn, chi trả (bước 46 — `orders` chỉ có điểm cắm); điểm, thẻ quà
 tặng (47); đơn từ kênh ngoài (48, qua `OrderIntake`); hoa hồng (49); POS chạy ngoại tuyến phía client
-(client lo; máy chủ chỉ chống trùng bằng `reference`); bán sỉ B2B, thuê bao định kỳ (để sau, D-194);
+(client lo; máy chủ chỉ chống trùng bằng `reference`); bán sỉ B2B (bước 59), sản phẩm bán theo kỳ (bước 62) — D-221;
 điều khoản đặt cọc theo Bộ luật Dân sự 2015 Điều 328 cho hàng đặt trước (chính sách riêng của khách, ghi trong
 điều kiện giao dịch; core chỉ có "trả trước một phần" — D-232); tạo tài khoản từ số đã xác thực (thuộc `auth`,
 D-202); endpoint xuất đơn riêng (xuất qua xuất chung của bước 51, D-213).

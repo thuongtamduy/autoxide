@@ -41,8 +41,11 @@ Sửa ngoài crate: `Cargo.toml`, `crates/app/Cargo.toml`, `crates/app/src/modul
 `docs/openapi.json`, `.env.example`, `CHANGELOG.md`, `docs/ROADMAP.md`.
 
 NGOÀI phạm vi: bộ nối `PayoutGateway` thật / cổng chia tiền thật (module riêng, cần secret thật); nộp
-hồ sơ lên cổng của cơ quan nhà nước (con người làm; hệ thống xuất dữ liệu); quảng cáo trong sàn, người
-bán nước ngoài (để sau, D-190, D-194); trang quy chế sàn và mẫu hợp đồng (nội dung mẫu ở bước 37).
+hồ sơ lên cổng của cơ quan nhà nước (con người làm; hệ thống xuất dữ liệu); quảng cáo trong sàn — làm ở
+bước 64 (module `ads`, D-221); người bán nước ngoài — làm ở bước 63 (D-233): tắt mặc định, điều kiện là gói
+luật có ngày hiệu lực; bước đó thêm `residency`, quốc gia vào `marketplace_sellers` bằng migration mới và mở
+rộng `SellerGate`, `SellerDisclosure`, chi trả ngoại tệ — bước này chỉ làm người bán trong nước; trang quy
+chế sàn và mẫu hợp đồng (nội dung mẫu ở bước 37).
 
 ## Thiết kế
 
@@ -59,7 +62,8 @@ trạng thái `active` **và** `compliance` báo KYC còn hạn **và** đã ch�
 Người bán đăng ký: tài khoản nhân sự (toàn nền tảng, bước 34) tạo hồ sơ → `marketplace` tạo nút
 `seller` dưới nút sàn qua `OrgDirectory` (người đăng ký thành thành viên với role chủ gian hàng), hồ sơ
 pháp lý theo người bán qua `compliance`, gian hàng (tên, slug, logo, mô tả, địa chỉ lấy hàng
-`Address`, cách giao: `self` / `platform`).
+`Address`, cách giao: `self` / `platform`). Role chủ gian hàng gồm quyền quản lý banner của `content` ở độ sâu `unit`
+tại nút `seller` — cho banner trong gian hàng của bước 55 (D-233).
 
 ### Điểm cắm vào module khác
 

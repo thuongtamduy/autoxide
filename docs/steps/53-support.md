@@ -8,7 +8,7 @@
 
 Người mua (có tài khoản hay vãng lai) gửi được yêu cầu hỗ trợ — hỏi về đơn, sản phẩm, tài khoản, thanh
 toán — và nhân viên của cửa hàng nhận, phân công, trả lời, theo dõi hạn trả lời cho tới khi xong. Mỗi yêu
-cầu là một **phiếu** (ticket) gồm các tin nhắn qua lại. Không phải chat thời gian thực (để sau, D-194).
+cầu là một **phiếu** (ticket) gồm các tin nhắn qua lại. Chat thời gian thực là bước 61 (`conversations`, D-221), dùng chung bộ trả lời tự động của bước này.
 
 Phiếu thuộc về một nút tổ chức (cửa hàng, gian hàng của người bán trên sàn) để chuỗi và sàn chia việc theo
 nhánh như mọi dữ liệu khác (D-185).

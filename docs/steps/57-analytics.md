@@ -23,7 +23,7 @@ Làm: thu sự kiện từ website (endpoint công khai) và từ máy chủ (ev
 người khi có đồng ý; xoá theo hạn lưu.
 
 Không làm: bản đồ nhiệt, ghi lại phiên (session replay), dấu vân tay trình duyệt (fingerprinting — **cấm**),
-gửi dữ liệu cho mạng quảng cáo, thử nghiệm A/B (để sau).
+gửi dữ liệu cho mạng quảng cáo. Thử nghiệm A/B là bước 67 (D-231), đọc số gộp của bước này.
 
 ## Thiết kế
 

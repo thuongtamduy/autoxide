@@ -154,8 +154,7 @@ nguồn sự thật; điều kiện SQL được sinh từ cùng mô tả luật
   của mình.
 - **Hành động thay người dùng:** key loại `agent` (P12 bước 51) có thể gắn "thay mặt người dùng U"; quyền =
   giao của key và U; audit ghi chuỗi `actor = agent, on_behalf_of = U` (theo ý nghĩa `act` của RFC 8693).
-- Ứng dụng bên thứ ba qua OAuth 2.0 với phạm vi là tên permission — để sau (ghi ở "Sau core") tới khi có nhu
-  cầu chợ ứng dụng.
+- Ứng dụng bên thứ ba qua OAuth 2.0 với phạm vi là tên permission — bước 65 (`apps`, D-221).
 
 ### P11 — Thu hồi tức thì, nhanh, đo được
 

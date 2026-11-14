@@ -1,8 +1,8 @@
 # Bước 59 — Bán sỉ B2B (`wholesale`)
 
-> Lộ trình: `docs/ROADMAP.md` bước 59 · Quyết định: D-221, D-232 · Đặc tả liên quan: 36 (công nợ, hoá đơn), 41
-> (bảng giá theo nhóm khách), 45 (đơn hàng), 47 (khách hàng), 37 (văn bản pháp lý, KYC — nơi làm phần ký điện
-> tử), 46 (sàn, người bán)
+> Lộ trình: `docs/ROADMAP.md` bước 59 · Quyết định: D-221, D-232, D-233 · Đặc tả liên quan: 36 (công nợ, hoá
+> đơn), 41 (bảng giá theo nhóm khách), 45 (đơn hàng), 47 (khách hàng), 37 (văn bản pháp lý, KYC — nơi làm phần
+> ký điện tử), 46 (sàn, người bán), `modules/webhooks` (gửi chứng từ EDI ra, D-233)
 
 ## Mục tiêu
 
@@ -11,11 +11,14 @@ thiểu, báo giá có hạn, đặt hàng trả chậm (công nợ) trong hạn
 người mua, duyệt đơn nội bộ phía công ty mua. Thêm (D-232): hợp đồng khung có cam kết số lượng / giá trị và đơn
 gọi hàng theo hợp đồng; mời thầu nhiều người bán khi khách là sàn, giá niêm phong tới hạn; ký hợp đồng điện tử
 trong `compliance`, dùng chung cho hợp đồng khung, hợp đồng người bán (46) và thoả thuận tiếp thị liên kết (49).
+Thêm (D-233): trao đổi chứng từ B2B tự động (EDI) theo chuẩn mở UBL 2.1 — hệ thống của công ty mua gửi đơn
+vào, hệ thống nhận trả lời đơn, báo gửi hàng và tham chiếu hoá đơn ra, không ai phải gõ lại.
 
 ## Bắt đầu khi
 
 Bước 45 (đơn hàng) và 47 (khách hàng) xong; dùng sổ cái và hoá đơn của 36, bảng giá theo nhóm khách của 41.
-Phần ký điện tử cần 37 (`compliance`); phần mời thầu cần 46 (`marketplace`) (D-232).
+Phần ký điện tử cần 37 (`compliance`); phần mời thầu cần 46 (`marketplace`) (D-232). Phần EDI dùng `webhooks`
+(sẵn có) để gửi ra và `invoices` (36) cho tham chiếu hoá đơn (D-233).
 
 ## Phạm vi
 
@@ -24,10 +27,13 @@ lượng, số lượng tối thiểu / bội số, báo giá (yêu cầu → b�
 (trả trước / trả chậm N ngày), hạn mức tín dụng, tuổi nợ và nhắc nợ, duyệt đơn phía người mua, đặt hàng nhanh
 theo SKU / CSV. Hợp đồng khung và đơn gọi hàng; mời thầu nhiều người bán trên sàn (RFQ); ký hợp đồng điện tử
 trong module `compliance`: trait `SignatureProvider` ở kernel, bộ giả trong testkit, migration mới của
-`compliance` (D-232).
+`compliance` (D-232). EDI theo UBL 2.1 (OASIS): nhận `Order`, trả và gửi `OrderResponse`, gửi `DespatchAdvice` và
+tham chiếu hoá đơn; hồ sơ đối tác, nhật ký chứng từ; gửi ra qua endpoint loại `direct` mới của `webhooks` (D-233).
 
 Không làm: đấu thầu mua sắm công (Luật Đấu thầu 22/2023/QH15 — RFQ ở đây chỉ là mua bán giữa doanh nghiệp tư),
-EDI — để sau. Bộ nối nhà cung cấp chữ ký số thật (VNPT-CA, Viettel-CA, FPT-CA…; DocuSign cho quốc tế) là
+EDIFACT, ANSI X12 — bộ chuyển đổi là module riêng, làm khi có khách cần và có tài liệu / tài khoản thử → dừng
+lại hỏi chủ dự án (D-233); truyền qua mạng Peppol (AS4) hay AS2 — EDI ở đây vào bằng HTTPS + API key, ra bằng
+webhook có ký (D-233). Bộ nối nhà cung cấp chữ ký số thật (VNPT-CA, Viettel-CA, FPT-CA…; DocuSign cho quốc tế) là
 module riêng, cần tài khoản và secret → dừng lại hỏi chủ dự án (D-232). Core không dựng PDF: tệp cần ký do
 người dùng tải lên hay hệ thống khác tạo (D-232).
 
@@ -274,6 +280,143 @@ phát hành); `POST /me/acceptances` cho văn bản đó → `compliance.signatu
 
 `compliance` khai `Module::retention` cho tệp và bằng chứng ký (thời hạn lưu là dữ liệu — cần đối chiếu).
 
+### Trao đổi chứng từ B2B tự động — EDI theo UBL 2.1 (D-233)
+
+**Chuẩn.** Theo chuẩn mở, không tự chế: **UBL 2.1** của OASIS (cũng là ISO/IEC 19845:2015), dạng XML. Bước này
+làm bốn loại: `Order` (vào), `OrderResponse` (trả đồng bộ và gửi ra), `DespatchAdvice` (ra) và tham chiếu hoá
+đơn (ra). Hoá đơn GTGT hợp lệ vẫn là hoá đơn điện tử theo định dạng của cơ quan thuế do `invoices` (36) phát
+hành — EDI **không** phát hành UBL `Invoice` thay nó; "tham chiếu hoá đơn" là UBL 2.1 `AttachedDocument` mang ký
+hiệu, số, ngày, mã của cơ quan thuế, mã tra cứu và (tuỳ hồ sơ đối tác) đính kèm XML hoá đơn đã cấp mã. Mã trả lời
+theo danh mục mà Peppol BIS Ordering 3 dùng (`OrderResponseCode` UNCL 4343: `AB` đã nhận, `AP` chấp nhận, `CA`
+chấp nhận có thay đổi, `RE` từ chối; trạng thái dòng UNCL 1229) — kiểm lại danh mục khi làm. EDIFACT / ANSI X12
+là bộ chuyển đổi riêng (UBL ⇄ định dạng kia), làm khi có khách cần (D-233).
+
+**Hồ sơ đối tác** (`wholesale_edi_partners`, một hồ sơ cho mỗi cặp công ty mua – nút bán). Nhân sự bên bán
+(`wholesale.edi.manage`) tạo: công ty, định dạng `ubl-2.1`, định danh — mã số thuế lấy từ
+`wholesale_companies.tax_id`, GLN (GS1, 13 số, kiểm số kiểm tra) của bên mua và bên bán nếu có —, địa điểm giao
+(`delivery_locations`: mã địa điểm của đối tác hay GLN → `Address`), endpoint nhận chứng từ ra (`outbound_url`),
+loại chứng từ muốn nhận, có đính kèm XML hoá đơn không. `outbound_url` thành một endpoint loại `direct` của
+`webhooks` (xem dưới); secret ký trả **một lần** lúc tạo / đổi secret, không lưu ở `wholesale`. Hồ sơ mới ở
+`pending_key`: `admin` của công ty mua tạo API key loại `service` (bước 51 P12) có `wholesale.buy` rồi gọi
+`PUT /me/wholesale/edi/key {partner_id}` **bằng chính key đó** → ghi `inbound_api_key_id` = `api_key_id` của
+principal, hồ sơ `active`; một key chỉ gắn một hồ sơ (đã gắn chỗ khác → `wholesale.edi_key_in_use`). Cách này chứng
+minh công ty giữ key mà `wholesale` không phải đọc bảng của `auth` (D-046). Tạm khoá (`suspended`) → chứng từ vào
+bị từ chối, không gửi chứng từ ra.
+
+**Vào: `POST /api/v1/wholesale/edi/orders`** (`Content-Type: application/xml`, thân là UBL 2.1 `Order`):
+
+1. **Xác thực:** principal phải là API key `ActorKind::Service`, có `wholesale.buy`, là `inbound_api_key_id` của
+   một hồ sơ `active`, người sở hữu key là thành viên công ty; công ty và nút bán lấy từ **hồ sơ**, không từ XML.
+   Sai → `wholesale.edi_service_key_required` / `wholesale.edi_key_not_bound` (403).
+2. **Trước khi đọc XML:** `Content-Type` khác `application/xml` → 415; thân quá
+   `AUTOXIDE_WHOLESALE_EDI_MAX_BODY_KB` → 413 (đọc có giới hạn, không đọc hết rồi mới đo).
+3. **Đọc XML an toàn** (ngoài transaction): gặp `<!DOCTYPE` (khai DTD, entity nội hay ngoài) → từ chối ngay
+   `wholesale.edi_xml_forbidden` — không bao giờ mở DTD, không giải entity ngoài, không tải gì qua mạng hay đọc
+   file (chặn XXE, "billion laughs"); giới hạn độ sâu 32 tầng và số thuộc tính mỗi phần tử. XML hỏng →
+   `wholesale.edi_xml_malformed` kèm dòng, cột.
+4. **Kiểm theo schema UBL:** namespace `urn:oasis:names:specification:ubl:schema:xsd:Order-2`, `UBLVersionID` =
+   `2.1`, phần tử bắt buộc, số lần xuất hiện, kiểu (ngày, số lượng, mã tiền tệ ISO 4217, `unitCode` UN/ECE Rec 20)
+   theo **hồ sơ con** của Order mà bước này hỗ trợ — viết thành kiểu Rust có test so với tệp mẫu chính thức của
+   OASIS (không có trình kiểm XSD thuần Rust đủ dùng; không thêm thư viện C). Gom **mọi** lỗi, báo một lần (D-083):
+   `wholesale.edi_schema_invalid` (422), `errors[]` mỗi lỗi có `line`, `column`, `path` (XPath), `order_line_id`
+   (ID dòng đơn nếu lỗi nằm trong một dòng), `code`, `message`.
+5. **Đối chiếu bên:** `BuyerCustomerParty` / `SellerSupplierParty` (mã số thuế ở `PartyTaxScheme/CompanyID` hay
+   GLN ở `EndpointID` / `PartyIdentification/ID` `schemeID="0088"`) phải khớp hồ sơ → không thì
+   `wholesale.edi_party_mismatch`. `DocumentCurrencyCode` phải là tiền tệ của công ty / hợp đồng.
+6. **Chống trùng** theo ID chứng từ của đối tác (`Order/ID`) trong **phạm vi hồ sơ đối tác**: transaction ngắn
+   chèn `wholesale_edi_messages` (`in`, `order`, `dedupe_key` = `Order/ID`, `received`, `content_sha256`,
+   `processing_until` = now + `AUTOXIDE_WHOLESALE_EDI_PROCESSING_LEASE_SECONDS`). Đụng unique → đọc dòng cũ: cùng mã
+   băm và đã `processed` → trả lại đúng OrderResponse đã lưu (200, header `Idempotent-Replayed: true`); cùng mã băm
+   và còn trong hạn `processing_until` → `wholesale.edi_document_in_progress` (409, `Retry-After`); cùng mã băm, quá
+   hạn (lần trước chết giữa chừng) → giành lượt bằng `UPDATE … SET processing_until = :mới WHERE id = :id AND
+   processing_until < :now` (0 dòng → 409 như trên) rồi xử lý tiếp (bước 7 idempotent nên không tạo đơn thứ hai);
+   khác mã băm →
+   `wholesale.edi_document_reused` (422, như `idempotency_key_reused`). Chứng từ bị từ chối ở bước 3–5 ghi nhật
+   ký với `dedupe_key` = `id` của dòng, **không giữ** ID của đối tác — đối tác sửa rồi gửi lại cùng ID được nhận.
+7. **Tạo đơn qua cùng service như REST** (luật kiến trúc 8), ngoài transaction trên: có `Order/Contract/ID` = số
+   hợp đồng `active` của công ty → service đơn gọi hàng (call-off, `reference` = `wholesale.edi:<message_id>`);
+   không có → service đặt nhanh (`quick-order`, cùng `reference`). Dòng nhận diện biến thể bằng
+   `SellersItemIdentification/ID` (SKU) hay `StandardItemIdentification/ID` `schemeID="0160"` (GTIN). Luật nghiệp
+   vụ theo **từng dòng**: biến thể không có (`wholesale.edi_item_unknown`), đơn vị không khớp
+   (`wholesale.edi_unit_mismatch`), `min_qty` / `qty_step` (`wholesale.min_qty`), không trong hợp đồng
+   (`wholesale.variant_not_in_contract`), vượt cam kết (`wholesale.commitment_exceeded`), giá người mua ghi khác giá
+   của bên bán (`wholesale.edi_price_mismatch` — giá **luôn** theo bảng giá / hợp đồng của bên bán, giá trong XML
+   chỉ để đối chiếu). Dòng hỏng bị từ chối, dòng đúng thành đơn; hạn mức tín dụng, duyệt phía người mua, giữ cam
+   kết áp y như REST. Địa điểm giao: `Delivery/DeliveryLocation/ID` tra trong `delivery_locations`; không có phần
+   tử → địa chỉ giao mặc định của công ty; mã lạ → `wholesale.edi_delivery_location_unknown` (từ chối cả chứng từ
+   — không giao tới địa chỉ tự do trong XML).
+8. **Trả lời đồng bộ:** dựng UBL `OrderResponse` (`OrderReference` = `Order/ID`): mọi dòng nhận → `AB` (đã nhận,
+   trả lời nghiệp vụ gửi sau khi đơn được xác nhận); một phần dòng bị từ chối → `CA` kèm `OrderLine` từ chối và mã
+   lý do; mọi dòng bị từ chối → `RE`, không tạo đơn. Lưu nội dung vào `Storage`, rồi transaction ghi dòng nhật ký
+   `processed` (`response_code`, `line_results`, `order_id` / `call_off_id`, `response_key`) + outbox
+   `wholesale.edi_message_received` → commit → 201 + `Location: /api/v1/wholesale/edi/messages/{id}` (có đơn) hay
+   200 (`RE`), thân là XML `OrderResponse`.
+
+Lỗi xảy ra **trước khi có chứng từ hợp lệ** (bước 1–6) trả `Problem` (RFC 9457) như mọi endpoint. Thân XML ở bước
+8 là chứng từ, cùng loại ngoại lệ với tải tệp (`GET …/einvoice?format=xml` của 36, nguồn cấp của 48): OpenAPI khai
+`requestBody` và response `200` / `201` với content type `application/xml` (schema chuỗi, kèm ví dụ) (D-233).
+
+**Ra: OrderResponse, DespatchAdvice, tham chiếu hoá đơn.** `wholesale` nghe event, chỉ xử lý đơn có dòng nhật ký
+`in` của một hồ sơ `active` có bật loại chứng từ đó:
+
+| Event | Chứng từ ra | `dedupe_key` |
+|---|---|---|
+| `orders.order_confirmed` | `OrderResponse` `AP` (đúng như đơn) hay `CA` (thiếu hàng `stock_shortage`, dòng đã từ chối) | `order_response:<order_id>` |
+| `orders.order_cancelled` khi chưa gửi `OrderResponse` nghiệp vụ (duyệt bị từ chối, quá hạn trả) | `OrderResponse` `RE` | `order_response:<order_id>` (cùng khoá — mỗi đơn **đúng một** trả lời nghiệp vụ) |
+| `orders.order_status_changed` sang `shipping` | `DespatchAdvice` (dòng, số lượng của đơn; mã vận đơn nếu có) | `despatch_advice:<order_id>` |
+| `invoices.document_accepted` có nguồn là đơn đó | `AttachedDocument` tham chiếu hoá đơn | `invoice_reference:<document_id>` |
+
+Một transaction: chèn dòng nhật ký `out` `queued` (unique trên `dedupe_key` ⇒ event giao lại không tạo bản thứ
+hai) + job `wholesale.edi_send` (`unique_key` = id dòng) → commit. Job, **ngoài transaction**: đọc đơn / chứng từ
+qua `api` (`Orders::find`, `Invoices::document`), dựng XML, lưu vào `Storage`, băm, rồi gọi
+`DirectDeliveries::send` của `webhooks` với `delivery_id` = id dòng nhật ký → `sent`. `webhooks` ký (Standard
+Webhooks, như mọi webhook), thử lại có backoff, hết lượt vào dead-letter queue (`autoxide jobs retry`), và phát
+`webhooks.direct_delivered` / `webhooks.direct_failed` (subject `wholesale.edi_message:<id>`) → `wholesale` đổi
+dòng sang `delivered` / `failed` bằng `UPDATE … WHERE status = 'sent'` (giao lại vô hại). Gửi lại tay:
+`POST /edi/messages/{id}/resend` → `DirectDeliveries::redeliver` (cùng nội dung, cùng `delivery_id`).
+
+**Phần thêm vào `webhooks`** (migration **mới** có `down`; không sửa migration đã commit). Hôm nay `webhooks` chỉ
+chuyển event tới endpoint quản trị viên khai; EDI cần gửi **một thân do module khác dựng** tới một endpoint riêng:
+
+```rust
+// autoxide_webhooks::api (phác thảo — tra API thật bằng skill `check-library-api`)
+pub struct NewDirectEndpoint { pub owner: &'static str /* "wholesale" */, pub url: String, pub description: String }
+pub struct DirectEndpoint { pub id: Uuid, pub secret: Option<String> /* chỉ có lúc tạo / đổi secret */ }
+pub struct DirectDelivery { pub endpoint_id: Uuid, pub delivery_id: Uuid /* chống trùng */,
+    pub subject: String /* "wholesale.edi_message:<id>" */, pub content_type: String, pub body: String }
+#[async_trait] pub trait DirectDeliveries: Send + Sync {
+    async fn create_endpoint(&self, tenant: &TenantContext, endpoint: NewDirectEndpoint) -> Result<DirectEndpoint, Error>;
+    async fn update_endpoint(&self, tenant: &TenantContext, id: Uuid, url: Option<String>, disabled: Option<bool>) -> Result<(), Error>;
+    async fn rotate_secret(&self, tenant: &TenantContext, id: Uuid) -> Result<DirectEndpoint, Error>;
+    /// Idempotent theo (`endpoint_id`, `delivery_id`): ghi lần gửi + job trong transaction của `webhooks`.
+    async fn send(&self, tenant: &TenantContext, delivery: DirectDelivery) -> Result<(), Error>;
+    async fn redeliver(&self, tenant: &TenantContext, endpoint_id: Uuid, delivery_id: Uuid) -> Result<(), Error>;
+}
+```
+
+`webhooks_endpoint` thêm `kind` (`events` mặc định / `direct`) và `owner` (`''` / tên module); `webhooks_delivery`
+thêm `content_type` (mặc định `application/json`) và `subject` NULL; với `direct`, cột `event_id` giữ
+`delivery_id` (unique (`tenant_id`, `endpoint_id`, `event_id`) sẵn có chống trùng). `Fanout` **bỏ qua** endpoint
+`direct`; `/api/v1/webhooks` liệt kê chúng nhưng không cho sửa (`webhooks.endpoint_owned`) — sửa qua module sở hữu.
+URL đi qua cùng bộ chặn SSRF (`autoxide_kernel::net`). Event mới của `webhooks`: `webhooks.direct_delivered`,
+`webhooks.direct_failed` (payload: `endpoint_id`, `delivery_id`, `subject`, `attempts`, mã HTTP cuối — không thân).
+
+**Nhật ký chứng từ** (`wholesale_edi_messages`): mọi chứng từ vào / ra, kể cả bị từ chối. Nội dung (XML gốc, XML
+trả lời) nằm trong `Storage` ở `wholesale/edi/<tenant>/<id>.xml`, bảng chỉ giữ khoá, kích thước và SHA-256.
+`retain_until` = lúc tạo + `AUTOXIDE_WHOLESALE_EDI_RETENTION_DAYS`; job hằng ngày `wholesale.edi_purge` xoá tệp quá
+hạn, đặt `content_key` / `response_key` = NULL, **giữ** dòng và mã băm (vẫn chứng minh được đã nhận gì). Khai
+`Module::retention` (`wholesale.edi_documents`, `Accounting`, theo biến cấu hình — thời hạn cần đối chiếu Luật Kế
+toán).
+
+**Thư viện XML.** Ít phụ thuộc nhất có thể: một crate thuần Rust đọc và ghi XML (ứng viên: `quick-xml` — không mở
+DTD, không giải entity ngoài; hay `roxmltree` chỉ đọc, `allow_dtd = false` mặc định, ghi tự viết). Tra đúng phiên
+bản bằng skill `check-library-api`, kiểm bằng test XXE (không tin mô tả thư viện), ghi `STACK.md` (D-233).
+
+| Bảng | Cột chính | Khoá / index |
+|---|---|---|
+| `wholesale_edi_partners` | `id`, `tenant_id`, `org_id` (nút bán), `company_id`, `format` (`ubl-2.1`), `status` (`pending_key/active/suspended`), `buyer_gln` NULL, `seller_gln` NULL, `delivery_locations` JSON (mã / GLN → `Address`), `inbound_api_key_id` NULL, `outbound_endpoint_id` NULL (endpoint `direct` của `webhooks`), `outbound_url` NULL (để hiển thị), `outbound_documents` JSON (`order_response`, `despatch_advice`, `invoice_reference`), `attach_invoice_xml` BOOL, `created_by`, `created_at`, `updated_at` | unique (`tenant_id`,`company_id`,`org_id`); index (`tenant_id`,`inbound_api_key_id`), (`tenant_id`,`org_id`,`status`,`id`) |
+| `wholesale_edi_messages` | `id`, `tenant_id`, `org_id`, `partner_id`, `company_id`, `direction` (`in`/`out`), `doc_type` (`order`/`order_response`/`despatch_advice`/`invoice_reference`), `document_id` (ID trong chứng từ; `''` khi đọc không ra), `dedupe_key`, `in_reply_to` NULL (id dòng `in`), `status` (vào: `received/processed/rejected`; ra: `queued/sent/delivered/failed`), `response_code` NULL (`AB/AP/CA/RE`), `line_results` JSON NULL (ID dòng, kết quả, mã lý do), `errors` JSON NULL (dòng, cột, path, mã), `order_id` NULL, `call_off_id` NULL, `source_ref` NULL (`orders.order:<id>` / `invoices.document:<id>`), `content_key` NULL, `response_key` NULL, `content_sha256`, `size`, `processing_until` NULL, `retain_until`, `created_at`, `updated_at` | unique (`tenant_id`,`partner_id`,`direction`,`doc_type`,`dedupe_key`); index (`tenant_id`,`partner_id`,`id`), (`tenant_id`,`order_id`), (`tenant_id`,`org_id`,`status`,`id`), (`tenant_id`,`retain_until`) |
+
 ### API, MCP, quyền, lỗi
 
 - REST `/api/v1/wholesale`: `companies` (CRUD, duyệt đăng ký), `members`, `quotes` (+ `send`, `accept`, `convert`),
@@ -375,6 +518,64 @@ giao diện ký có `{token}`), `AUTOXIDE_COMPLIANCE_SIGNATURE_DEFAULT_DAYS` (14
 
 OTP sai / quá số lần dùng lại `compliance.otp_invalid`, `compliance.otp_attempts_exceeded` của 37.
 
+**REST thêm cho EDI** (`/api/v1/wholesale`, D-233):
+
+| Method + path | Permission | Ghi chú |
+|---|---|---|
+| `POST /edi/orders` | API key loại `service` đã gắn hồ sơ `active`, `wholesale.buy` | thân UBL 2.1 `Order` (`application/xml`); trả XML `OrderResponse`: 201 + `Location` khi có đơn, 200 khi `RE` hay gửi lại; lỗi trước khi có chứng từ hợp lệ là `Problem` |
+| `GET/POST /edi/partners`, `GET/PATCH /edi/partners/{id}` | `wholesale.edi.read` / `.manage` (theo nút bán) | `outbound_url` → endpoint `direct` của `webhooks`; secret trả một lần; `If-Match` |
+| `POST /edi/partners/{id}/rotate-secret` · `/suspend` · `/activate` | `wholesale.edi.manage` | |
+| `GET /edi/messages`, `GET /edi/messages/{id}` | `wholesale.edi.read` | lọc `partner_id`, `direction`, `doc_type`, `status`; `line_results`, `errors` |
+| `GET /edi/messages/{id}/content` · `/response` | `wholesale.edi.read` | XML gốc / XML trả lời; quá hạn lưu → `wholesale.edi_content_expired` |
+| `POST /edi/messages/{id}/resend` | `wholesale.edi.manage` | chỉ chứng từ `out` ở `failed` / `delivered` |
+| `PUT /me/wholesale/edi/key` | `wholesale.buy`, vai trò `admin` của công ty, gọi **bằng chính** API key `service` | `{partner_id}` — gắn key vào hồ sơ |
+| `GET /me/wholesale/edi/partners`, `GET /me/wholesale/edi/messages` | `wholesale.buy` (`admin`) | hồ sơ và nhật ký của công ty mình |
+
+**Tool MCP thêm cho EDI** (cùng service, cùng permission): `wholesale.list_edi_messages`, `get_edi_message`
+(`read_only`, không trả nội dung XML), `resend_edi_message` (lệnh ghi). Không có tool nhận chứng từ vào — agent đặt
+hàng bằng REST / tool đặt hàng sẵn có (D-233).
+
+**Event thêm cho EDI** (payload chỉ id, loại, trạng thái, mã trả lời — không nội dung chứng từ):
+`wholesale.edi_partner_changed`, `wholesale.edi_message_received` (`message_id`, `response_code`, `order_id`),
+`wholesale.edi_message_rejected`, `wholesale.edi_message_queued`, `wholesale.edi_message_delivered`,
+`wholesale.edi_message_failed`. `wholesale` nghe thêm `orders.order_confirmed`, `orders.order_status_changed`,
+`invoices.document_accepted`, `webhooks.direct_delivered`, `webhooks.direct_failed` (subject
+`wholesale.edi_message:`); `orders.order_cancelled` đã nghe (D-233).
+
+**Job thêm cho EDI:** `wholesale.edi_send` (`unique_key` = id dòng nhật ký), `wholesale.edi_purge` (hằng ngày;
+`unique_key` `wholesale.edi_purge:<ngày>`) (D-233).
+
+**Cấu hình thêm cho EDI:** `AUTOXIDE_WHOLESALE_EDI_MAX_BODY_KB` (1024), `AUTOXIDE_WHOLESALE_EDI_RETENTION_DAYS`
+(1825), `AUTOXIDE_WHOLESALE_EDI_PROCESSING_LEASE_SECONDS` (60) (D-233).
+
+**Permission thêm cho EDI:** `wholesale.edi.read`, `wholesale.edi.manage` (nhân sự bên bán, `scoped`). Bên mua dùng
+`wholesale.buy` như REST. Tính năng gói: `wholesale.edi` (D-233).
+
+**Mã lỗi thêm cho EDI** (EN ở chỗ tạo lỗi; VI trong `locales/vi.json` của crate; mã có HTTP "—" chỉ xuất hiện trong
+kết quả từng dòng của `OrderResponse` và `line_results`, D-233):
+
+| Mã | HTTP | Tiếng Việt |
+|---|---|---|
+| `wholesale.edi_service_key_required` | 403 | Chứng từ EDI phải gửi bằng API key loại `service`. |
+| `wholesale.edi_key_not_bound` | 403 | API key này chưa gắn với hồ sơ đối tác EDI nào đang hoạt động. |
+| `wholesale.edi_key_in_use` | 409 | API key này đã gắn với một hồ sơ đối tác EDI khác. |
+| `wholesale.edi_partner_not_found` | 404 | Không có hồ sơ đối tác EDI này. |
+| `wholesale.edi_media_type_unsupported` | 415 | Chỉ nhận chứng từ UBL 2.1 dạng XML (`Content-Type: application/xml`). |
+| `wholesale.edi_body_too_large` | 413 | Chứng từ vượt {max_kb} KB. |
+| `wholesale.edi_xml_forbidden` | 422 | Chứng từ có khai báo DOCTYPE / entity; không được phép. |
+| `wholesale.edi_xml_malformed` | 422 | XML không hợp lệ ở dòng {line}, cột {column}: {detail}. |
+| `wholesale.edi_schema_invalid` | 422 | Chứng từ không đúng UBL 2.1 {document}: {count} lỗi, xem `errors`. |
+| `wholesale.edi_party_mismatch` | 422 | Bên mua hoặc bên bán trong chứng từ không khớp hồ sơ đối tác. |
+| `wholesale.edi_delivery_location_unknown` | 422 | Không có địa điểm giao {location} trong hồ sơ đối tác. |
+| `wholesale.edi_document_reused` | 422 | ID chứng từ {document_id} đã dùng cho nội dung khác; hãy dùng ID mới. |
+| `wholesale.edi_document_in_progress` | 409 | Chứng từ {document_id} đang được xử lý; thử lại sau ít giây. |
+| `wholesale.edi_message_not_resendable` | 409 | Chứng từ đang ở trạng thái {status}, không gửi lại được. |
+| `wholesale.edi_content_expired` | 410 | Nội dung chứng từ đã hết hạn lưu ngày {retain_until}. |
+| `wholesale.edi_item_unknown` | — | Không tìm thấy sản phẩm {item} của dòng {line}. |
+| `wholesale.edi_unit_mismatch` | — | Đơn vị {unit} của dòng {line} không khớp đơn vị bán {expected}. |
+| `wholesale.edi_price_mismatch` | — | Giá dòng {line} ({price}) khác giá bên bán ({expected}). |
+| `webhooks.endpoint_owned` | 409 | Endpoint này do module {owner} quản lý; hãy sửa ở đó. |
+
 ## Thứ tự làm
 
 1. Công ty mua, thành viên, giá sỉ, báo giá, đặt nhanh.
@@ -386,6 +587,11 @@ OTP sai / quá số lần dùng lại `compliance.otp_invalid`, `compliance.otp_
    thực hiện, nhắc hết hạn, gia hạn.
 5. RFQ trên sàn (D-232): tạo, công bố, mời / mở theo ngành hàng, nộp niêm phong, mở cùng lúc, so sánh, trao thầu
    thành báo giá / hợp đồng, báo người không thắng; tài liệu ghi rõ không dùng cho mua sắm công.
+6. EDI (D-233): chọn thư viện XML (`check-library-api`, `STACK.md`) và test XXE trước; `webhooks` thêm endpoint
+   `direct`, `DirectDeliveries`, event `direct_*` (migration mới); hồ sơ đối tác + gắn key; nhận `Order`: đọc an
+   toàn, kiểm hồ sơ con UBL, đối chiếu bên, chống trùng, tạo đơn / call-off qua service sẵn có, `OrderResponse` đồng
+   bộ; nhật ký + `Storage` + hạn lưu; gửi `OrderResponse` / `DespatchAdvice` / tham chiếu hoá đơn qua `webhooks`;
+   OpenAPI khai `application/xml`.
 
 ## Test bắt buộc (cả hai database)
 
@@ -409,6 +615,20 @@ Ký điện tử trong `compliance` (D-232): `tep_doi_sau_khi_gui_ky_bi_tu_choi`
 `webhook_trung_khong_ghi_hai_lan`, `het_han_ky_khong_ky_duoc`, `bo_gia_khong_goi_mang`, `otp_sai_khong_ky_duoc`,
 `hai_nguoi_ky_cuoi_dong_thoi_hoan_tat_mot_lan`, `verify_bao_tep_bi_sua`, `van_ban_can_ky_khong_nhan_danh_dau`.
 
+EDI (D-233): `edi_sai_schema_bao_loi_theo_dong` (thiếu phần tử, sai kiểu ở hai dòng đơn: một lần 422, mỗi lỗi có
+`line`, `column`, `path`, `order_line_id`), `edi_gui_lai_cung_id_khong_tao_don_thu_hai` (gửi lại tuần tự trả đúng
+`OrderResponse` cũ; **đồng thời** hai request cùng ID → đúng một đơn, bên kia nhận bản phát lại hay
+`edi_document_in_progress`), `edi_cung_id_noi_dung_khac_bi_tu_choi`, `edi_xxe_bi_chan` (DOCTYPE có entity ngoài
+`file://` và `http://`, entity lồng nhau: 422 `edi_xml_forbidden`, không đọc file, không có kết nối ra),
+`edi_don_xac_nhan_sinh_dung_mot_order_response` (`orders.order_confirmed` giao lại hai lần, kể cả hai worker cùng
+lúc → một dòng nhật ký `out`, một lần gửi của `webhooks`), `edi_tu_choi_dinh_dang_khong_giu_id` (gửi sai rồi sửa,
+gửi lại cùng ID → được nhận), `edi_dong_sai_bi_tu_choi_dong_dung_thanh_don` (`CA`), `edi_moi_dong_sai_khong_tao_don`
+(`RE`), `edi_gia_theo_ben_ban_khong_theo_xml`, `edi_don_theo_hop_dong_thanh_goi_hang` (trừ cam kết như REST),
+`edi_key_khong_phai_service_bi_chan`, `edi_ben_mua_khong_khop_bi_tu_choi`, `edi_huy_truoc_xac_nhan_gui_re_mot_lan`,
+`edi_giao_hang_gui_despatch_advice_mot_lan`, `edi_hoa_don_duoc_cap_ma_gui_tham_chieu`,
+`edi_noi_dung_het_han_bi_xoa_giu_ma_bam`, `webhooks_endpoint_direct_khong_nhan_event`,
+`webhooks_gui_truc_tiep_khong_trung_theo_delivery_id`.
+
 ## Chỗ dễ sai
 
 - Trừ cam kết bằng đọc rồi ghi (đọc `remaining`, tính, ghi lại) — hai đơn cùng lúc vượt cam kết. Dùng
@@ -425,6 +645,18 @@ Ký điện tử trong `compliance` (D-232): `tep_doi_sau_khi_gui_ky_bi_tu_choi`
 - Cột tham gia unique để `''` cho mọi yêu cầu `simple` (`provider_reference`) — đụng unique; đặt bằng `id` của yêu
   cầu tới khi nhà cung cấp trả mã (D-232).
 - Coi RFQ là "đấu thầu" theo Luật Đấu thầu, hay để khách là cơ quan nhà nước dùng cho mua sắm công (D-232).
+- Để thư viện XML mở DTD / giải entity (XXE, "billion laughs"), hay đo kích thước sau khi đã đọc hết thân. Từ chối
+  mọi `<!DOCTYPE`, đọc có giới hạn, giới hạn độ sâu; test chứng minh (D-233).
+- Tin bên mua ghi trong XML để chọn công ty, hay dùng giá trong XML làm giá bán — công ty lấy từ API key, giá từ
+  bảng giá / hợp đồng của bên bán; XML chỉ để đối chiếu (D-233).
+- Chống trùng theo ID chứng từ trên toàn khách (hai đối tác trùng số đơn) hay giữ ID của chứng từ bị từ chối định
+  dạng (đối tác không gửi lại được bản sửa). Khoá là (hồ sơ đối tác, hướng, loại, `dedupe_key`) (D-233).
+- Đọc / ghi `Storage`, dựng XML, gọi `OrderIntake` hay `webhooks` trong transaction ghi (D-233).
+- Gửi `OrderResponse` nghiệp vụ hai lần (lúc xác nhận và lúc huỷ, hay khi event giao lại) — `AP` / `CA` / `RE` dùng
+  chung một `dedupe_key` theo đơn (D-233).
+- Trả XML cho lỗi xác thực / XML hỏng (phải là `Problem`), hay khai OpenAPI thân `application/json` cho endpoint
+  nhận XML (D-233).
+- Endpoint `direct` lọt vào `Fanout` → event nội bộ đi tới đối tác (D-233).
 
 ## Căn cứ pháp lý
 
@@ -438,9 +670,14 @@ Ký điện tử trong `compliance` (D-232): `tep_doi_sau_khi_gui_ky_bi_tu_choi`
 | Loại hợp đồng bắt buộc chữ ký số hay công chứng / chứng thực | Luật Công chứng, luật chuyên ngành | Cần người có chuyên môn pháp lý; core không tự kết luận (D-232) |
 | Mua sắm dùng vốn nhà nước phải theo đấu thầu | Luật Đấu thầu 22/2023/QH15 | RFQ không dùng cho mua sắm công — cần đối chiếu văn bản gốc (D-232) |
 | Dữ liệu cá nhân của người ký (email, số điện thoại, IP băm) | Luật 91/2025/QH15; NĐ 356/2025 | Tối thiểu hoá, thời hạn lưu là dữ liệu — cần đối chiếu (D-232) |
+| Chứng từ điện tử, thông điệp dữ liệu trao đổi giữa doanh nghiệp (EDI) | Luật Giao dịch điện tử 20/2023/QH15 | Giá trị pháp lý của đơn / trả lời đơn điện tử — cần đối chiếu văn bản gốc (D-233) |
+| Hoá đơn điện tử: định dạng do cơ quan thuế quy định | NĐ 123/2020/NĐ-CP, sửa bởi NĐ 70/2025/NĐ-CP | EDI chỉ gửi tham chiếu / bản đính kèm, không thay hoá đơn (D-233) |
+| Thời hạn lưu chứng từ EDI | Luật Kế toán 88/2015/QH13 Điều 41 | Mặc định 5 năm là cấu hình — cần người có chuyên môn kế toán xác nhận (D-233) |
 
 ## Agent làm bước này tự quyết
 
 Module riêng hay mở rộng `customers`; mặc định điều khoản thanh toán; cách tính tuổi nợ. Trả hàng có cộng lại
 cam kết không; phụ lục sửa đổi hợp đồng đang `active`; người mua có thấy số hồ sơ đã nộp trước hạn không; thời
-gian giữ call-off (D-232). Ghi vào DECISIONS.
+gian giữ call-off (D-232). Thư viện XML; `DespatchAdvice` theo đơn hay theo từng kiện (khi `shipping` cho đọc dòng
+của kiện); mã `schemeID` cho mã số thuế Việt Nam trong UBL; hồ sơ con của `Order` hỗ trợ (D-233). Ghi vào
+DECISIONS.
