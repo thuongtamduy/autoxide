@@ -207,10 +207,12 @@ Migration mới, có `down`.
 | `catalog_collection_items` | `tenant_id`, `collection_id`, `product_id`, `position` | unique (`tenant_id`, `collection_id`, `product_id`); index (`tenant_id`, `collection_id`, `position`) |
 | `catalog_product_stats` | `tenant_id`, `product_id`, `org_id`, `sold_30d`, `sold_total`, `updated_at` | unique (`tenant_id`, `product_id`, `org_id`) |
 
-Thông tin cửa hàng là **cài đặt kế thừa của nút** do `organizations` khai qua `Module::org_settings`
-(bước 34), không phải bảng mới:
-- `storefront.name`, `.logo_media_id`, `.icon_media_id`, `.phone`, `.email`;
-- `.address` (`Address`), `.opening_hours`, `.holidays`, `.social_links`.
+Thông tin cửa hàng có hai phần, mỗi thứ một chỗ (D-237):
+- **Thương hiệu** — **cài đặt kế thừa của nút** do `organizations` khai qua `Module::org_settings` (bước 34), không
+  phải bảng mới (chuỗi đặt, cửa hàng ghi đè): `storefront.name` (tên thương hiệu), `.logo_media_id`, `.icon_media_id`,
+  `.phone`, `.email`, `.social_links`.
+- **Địa điểm** — hồ sơ công khai của nút ở bước 34 (`display_name`, `Address`, giờ mở cửa, ngày đặc biệt,
+  `pickup`, ảnh bìa): không lặp lại ở đây.
 
 Giá trị theo ngôn ngữ thì khoá có hậu tố `.<locale>`.
 
@@ -256,7 +258,7 @@ Công khai (không cần đăng nhập, `public_cache` như `content`; khách su
 | `GET /api/v1/content/public/placements?keys=&locale=&org_id=&page_kind=&page_ref=` (D-236) | Nhiều vị trí của **một trang** trong một lời gọi (tối đa 10 `keys`): mỗi vị trí kèm `display`, `display_settings`, `accepts`, cỡ ảnh, `devices` và banner đã lọc theo trang (`page_ref` = `<kind>:<id>` của trang đang xem; banner không giới hạn trang luôn có). Cùng luật như dòng dưới; `max-age` là mốc gần nhất của mọi vị trí |
 | `GET /api/v1/content/public/placements/{key}?locale=&org_id=&page_kind=&page_ref=` | Banner `active`, trong khung giờ lúc gọi, của `org_id` và các nút tổ tiên (dùng `OrgTree`), sắp theo `position`. Ảnh dạng `PublicMedia` (có `variants`, `webp_url`), link đã dựng (`href`); banner có link không còn hiển thị được thì bỏ. Vị trí `seller_store.*`: `org_id` bắt buộc là nút `seller`, chỉ trả banner của đúng nút đó (không lấy tổ tiên) có `review_status` `approved` (D-233) |
 | `GET /api/v1/catalog/public/collections/{slug}?locale=` + phân trang sản phẩm | Bộ sưu tập và sản phẩm (cùng hình dạng thẻ sản phẩm của bước 41) |
-| `GET /api/v1/organizations/public/storefront?org_id=` | Thông tin cửa hàng đã kế thừa, cùng "đang mở cửa" tính theo múi giờ của nút. Bước 37 đã có thì kèm thông tin chủ sở hữu website và đoạn mã logo Bộ Công Thương của tên miền |
+| `GET /api/v1/organizations/public/storefront?org_id=` | Thông tin cửa hàng: thương hiệu đã kế thừa (`storefront.*`) ghép hồ sơ địa điểm của nút (bước 34), cùng "đang mở cửa" tính theo múi giờ của nút. Bước 37 đã có thì kèm thông tin chủ sở hữu website và đoạn mã logo Bộ Công Thương của tên miền |
 
 **Cache của vị trí banner.**
 - `max-age` = min(mặc định của `public_cache`, số giây tới mốc `starts_at` / `ends_at` gần nhất trong
@@ -324,7 +326,8 @@ Công khai (không cần đăng nhập, `public_cache` như `content`; khách su
    → mục 1 của ROADMAP.
 2. `content`: điểm cắm `ContentLinks`, endpoint công khai (cả đọc nhiều vị trí một lần, lọc theo trang — D-236), tính `max-age`, nhận event tuỳ chọn của
    `promotions`. → mục 2 và 5.
-3. `organizations`: khai cài đặt `storefront.*`, endpoint quản trị và công khai, "đang mở cửa". → mục 4.
+3. `organizations`: khai cài đặt `storefront.*` (thương hiệu), endpoint quản trị và công khai ghép hồ sơ địa điểm của
+   bước 34, "đang mở cửa". → mục 4.
 4. `catalog`: bộ sưu tập chọn tay, rồi theo quy tắc, rồi số bán và kiểu sắp `best_selling`; gắn
    `LinkTarget` cho sản phẩm và bộ sưu tập; đăng ký `catalog.category`, `catalog.collection` vào sổ đối tượng
    (D-236). → mục 3 và 5.

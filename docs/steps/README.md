@@ -111,7 +111,8 @@ kernel → address → organizations → auth (và các module sẵn có theo th
 - Module đăng ký trước không `require` được trait của module đăng ký sau.
 - Khi module trước cần gọi tới module sau, module trước công bố một "điểm cắm" trong `api` của nó.
   Ví dụ: `OrderExtensions` của `orders` cho `marketplace`, `customers`; `ListingGate` của `catalog` cho
-  `marketplace`; `ContentLinks` của `content` cho `catalog`, `promotions` (bước 55).
+  `marketplace`; `ContentLinks` của `content` cho `catalog`, `promotions` (bước 55); `SiteExtensions` của `content`
+  cho `compliance` (khung website, bước 67 — D-235).
 - Module sau gắn vào điểm cắm lúc `start`. Không có module sau thì điểm cắm rỗng.
 
 **Event giữa module thương mại.**

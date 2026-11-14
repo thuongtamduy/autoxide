@@ -24,9 +24,10 @@ Phần người bán nước ngoài cần thêm 37 (`compliance`) và 46 (`marke
 
 - **Tiền đã đúng từ đầu:** mọi số tiền là số nguyên đơn vị nhỏ nhất + mã ISO 4217 (`autoxide_kernel::money`); số
   chữ số thập phân theo bảng ISO (VND 0, USD 2, JPY 0, KWD 3) — kiểm lại khi làm.
-- **Tỉ giá** (`ledger_fx_rates`: cặp tiền, tỉ giá dạng phân số nguyên `numerator/denominator`, nguồn, `effective_at`):
-  nhập tay hay qua trait `ExchangeRateSource` (bộ nối Vietcombank / ngân hàng / dịch vụ tỉ giá là module riêng; bản giả
-  cho test). Không dùng số thực; làm tròn theo quy tắc ghi trong DECISIONS (nửa lên, ở bước cuối). Trait `ExchangeRateSource` là trait của kernel ở đặc tả 36; 36 hiện đặt bảng tỉ giá ở `invoices_exchange_rates`. Khi làm bước này chốt **một** chỗ — khuyến nghị dời về `ledger` vì `ledger` đăng ký trước `invoices` và chi trả cần tỉ giá — và ghi quyết định (D-233).
+- **Tỉ giá** dùng bảng `ledger_fx_rates` và `Ledger::exchange_rate` của bước 36 (D-237 đã chốt tỉ giá thuộc `ledger`):
+  tỉ giá là số thập phân `rust_decimal` lưu dạng chữ chuẩn hoá, có ngày hiệu lực, nhập tay hay qua trait
+  `ExchangeRateSource` của kernel (bộ nối Vietcombank / ngân hàng / dịch vụ tỉ giá là module riêng; bản giả cho test).
+  Không dùng số thực; làm tròn theo quy tắc của bước 36 (nửa lên, ở bước cuối, theo số chữ số của tiền tệ).
 - **Giá theo thị trường:** "thị trường" = (quốc gia, tiền tệ, ngôn ngữ) gắn với website / tên miền của nút (bước
   34, 55). Giá: bảng giá riêng cho thị trường (41) hay quy đổi tự động có làm tròn giá đẹp (99, 990…) — chọn
   theo thị trường. Báo giá giỏ chốt tỉ giá tại lúc đặt, lưu vào đơn.
@@ -133,7 +134,7 @@ fn capabilities(&self) -> PayoutCapabilities { PayoutCapabilities::domestic_vnd(
 ```
 
 `marketplace.build_payouts`: tổng VND của người bán → quy đổi sang `payout_currency` bằng tỉ giá hiệu lực của
-`ledger` (`ledger_fx_rates`, ngày dựng lệnh chi; phân số nguyên, làm tròn nửa lên ở bước cuối), lưu ảnh chụp tỉ
+`ledger` (`ledger_fx_rates`, ngày dựng lệnh chi; số thập phân, làm tròn nửa lên ở bước cuối), lưu ảnh chụp tỉ
 giá trên `marketplace_payouts`; gửi lại cùng `reference` dùng đúng số đã chụp, không quy đổi lại. Chưa có tỉ giá
 → bỏ qua người bán lần này, quyết toán vẫn `releasable`, cảnh báo (`ledger.fx_rate_missing` trong log, số đo
 `marketplace_payouts_skipped_total{reason}`). Khi `paid`: Nợ `seller_payable` (VND gốc) / Có `partner_collection`
@@ -182,7 +183,7 @@ tác có giấy phép chuyển tiền ra nước ngoài (D-187); `cross_border =
 
 ## Thứ tự làm
 
-1. Tỉ giá (`ledger_fx_rates`, nguồn tỉ giá), quy đổi bằng phân số nguyên, làm tròn theo bảng ISO.
+1. Quy đổi bằng tỉ giá của `ledger` (bước 36), làm tròn theo bảng ISO; thêm nguồn tỉ giá nếu cần.
 2. Thị trường, giá theo thị trường, chốt tỉ giá vào đơn, chặn ngoại tệ với người mua trong nước.
 3. Sổ cái ngoại tệ và chênh lệch tỉ giá; thuế xuất khẩu; vận chuyển quốc tế (`hs_code`, `origin_country`).
 4. Người bán nước ngoài (D-233): cài đặt sàn + kiểm gói luật; cột người bán (migration mới của `marketplace`);
