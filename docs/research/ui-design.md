@@ -66,6 +66,12 @@ Vì cả ba đều là dữ liệu của core, menu phải do core trả về (b
 
 - Menu con của phân hệ là một hàng tab dưới thanh tiêu đề (thiết kế ban đầu dùng một cột bên trái —
   bỏ vì tốn chỗ).
+- Thanh phân hệ (14/11/2026) theo kiểu của Shopify, Stripe, Linear bản mới:
+  - nền sáng cùng tông trang, mục đang mở nổi lên như một thẻ, dính cạnh trái khi cuộn;
+  - từ 1280px: rộng 232px, biểu tượng và tên cùng hàng; người dùng thu gọn được;
+  - hẹp hơn: thanh biểu tượng có chữ nhỏ;
+  - đáy thanh: Bản đồ, Trợ giúp, Thu gọn.
+  Điện thoại dùng thanh dưới đáy nền sáng mờ. Hàng tab và hàng chip chỉ cuộn ngang.
 - Ngữ cảnh "khách › nút tổ chức" luôn ở góc trên bên trái; đổi nút là đổi phạm vi mọi số liệu, danh
   sách và kết quả tìm.
 - Ctrl + K tìm xuyên mọi phân hệ, trong phạm vi và permission của người dùng.
@@ -183,3 +189,15 @@ Luật viết nội dung trợ giúp:
 - Không làm hướng dẫn dạo đầu bắt buộc; gợi ý đã tắt thì không hiện lại (lưu theo người dùng).
 
 Phần máy chủ cần thêm: đề bài cho teammate ở `docs/prompts/ui-help-api.md`.
+
+## 7. Bố cục cân đối (14/11/2026)
+
+- Nhóm có số thẻ cố định thì số cột phải chia hết số thẻ ở mọi khổ (danh mục 6 ô, trang danh mục 12 sản
+  phẩm), hoặc xếp kiểu giãn đều để thẻ cuối lấp chỗ trống. Không để một thẻ lẻ ở hàng cuối.
+- Nhãn, nút không được lấn ra lề khung chứa; chỗ thiếu bề rộng thì đổi bố cục (vd người bán thành hàng
+  ngang trên điện thoại) chứ không bóp chữ.
+- Đầu trang website: ô tìm chiếm phần giữa; khổ 721–1100 giữ một hàng. Trang thanh toán khép kín ở mọi
+  khổ: không ô tìm, không danh mục, không dòng khuyến mãi.
+- Bài viết có cột bên: cột chữ giữ bề rộng dễ đọc (720px), cột bên thẳng mép phải với ảnh bìa.
+- Bộ kiểm tra tự động đo thêm: lấn lề, thẻ lẻ, dải cuộn ngang mà kéo dọc được; quét ở 360, 390, 430, 768,
+  820, 1024, 1280, 1440px.
