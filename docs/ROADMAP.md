@@ -1040,6 +1040,11 @@ họ dữ liệu để vẽ trang chủ, trang danh mục, chân trang mà khôn
       không"; thiếu module thì link loại đó bị từ chối khi lưu
 - [ ] Tool MCP cho banner và bộ sưu tập (soạn, lên lịch, sắp xếp) như REST; AI chỉ gợi ý chữ, đánh dấu
       `ai_assisted` (bước 37); hướng dẫn cho người làm giao diện (EN + VI)
+- [ ] Kiểu vị trí banner (D-236): cách hiện (một banner, trượt, lưới, xếp dọc, dải chữ, popup), cỡ và tỉ lệ ảnh
+      kiểm khi lưu, thiết bị, loại trang dùng được; bộ vị trí chuẩn có sẵn cho khách mới (dải trên, banner chính,
+      giữa trang chủ, đầu danh mục, cột trái / phải, giữa nội dung, trên chân trang, popup); banner chọn trang hiện
+      (loại trang, danh mục / sản phẩm / bài cụ thể); banner dạng chữ màu theo theme; đọc nhiều vị trí một lần;
+      khối `content.placement` cho trang dựng từ khối và đầu trang
 - [ ] Banner trong gian hàng người bán trên sàn (D-233): người bán tự quản trong nút của mình, sàn duyệt theo
       chính sách, link chỉ tới hàng của chính người bán, không phải quảng cáo trong sàn
 
