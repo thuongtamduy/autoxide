@@ -5512,3 +5512,37 @@ phải tin mô hình tự viết đúng.
 
 Đã cân nhắc: để mô hình tự viết câu trả lời rồi gửi khi "tự tin" — mô hình có thể bịa (chính sách, ngày giao) mà
 vẫn tự tin; chỉ soạn nháp cho mọi câu — an toàn nhưng bỏ lợi ích chính chủ dự án muốn.
+
+## D-231 · Thử A/B trang, AI tạo ảnh, khối mã tự viết (bước 67) — 2026-11-14 — chủ dự án quyết
+
+Quyết định của chủ dự án cho ba việc D-229 để sau:
+
+1. **Thử A/B hai phiên bản trang: làm** (sau bước 57). Chia **cố định theo người xem**, không ngẫu nhiên theo
+   lần tải: `hash(thí nghiệm, mã người xem) mod 10000` so với tỉ lệ — cùng người F5 vẫn thấy cùng phiên bản. Mã
+   người xem: đã đăng nhập → tài khoản (mọi thiết bị, mọi ngày); chưa đăng nhập → khoá phiên ẩn danh trong ngày
+   của bước 57 (không cookie: hôm sau hay đổi mạng có thể đổi phiên bản — tài liệu ghi rõ). Bot luôn thấy bản gốc,
+   cùng URL. Chỉ thử bố cục và nội dung, **không thử giá / khuyến mại**. Người chọn bản thắng; hệ thống chỉ báo số
+   liệu và độ tin cậy.
+2. **AI tạo ảnh: làm theo khuyến nghị.** Trait `ImageModel` ở kernel, adapter ở module `ai`, mặc định tắt. Chỉ cho
+   banner, ảnh nền, ảnh minh hoạ; ảnh mang `ai_generated` và nhãn; **không bao giờ làm ảnh sản phẩm** (`catalog`
+   chặn); không tạo ảnh người thật nhận ra được hay thương hiệu của người khác.
+3. **Khối mã tự viết: chọn C, D bật được nếu muốn.** Ba mức `off` (mặc định) / `sandboxed` (C: HTML + CSS +
+   JavaScript trong iframe `sandbox` không `allow-same-origin`, CSP theo danh sách host — chủ cửa hàng bật) /
+   `unrestricted` (D: chèn thẳng vào trang — cần **cả** người cài máy chủ bật `AUTOXIDE_CONTENT_UNSANDBOXED_CODE`
+   **và** chủ cửa hàng bật có xác nhận lại danh tính; không bao giờ trên trang thanh toán, giỏ, tài khoản, đăng
+   nhập; người bán trên sàn không có mức D). Mọi mức: audit mỗi lần sửa, sổ script để rà, AI không bao giờ tạo hay
+   sửa khối này, agent sửa thì chờ duyệt.
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật 91/2025/QH15 và NĐ 356/2025 (chia người
+xem không cookie); Luật Trí tuệ nhân tạo 134/2025/QH15 (nhãn ảnh AI); Luật 19/2023/QH15 (ảnh sản phẩm, giá trung
+thực); luật an ninh mạng hiện hành; PCI DSS 4.0 yêu cầu 6.4.3 / 11.6.1 (chuẩn ngành về script trên trang thanh toán).
+
+Thay: dòng "để sau" về ba việc này trong D-229.
+
+Lý do: A/B cố định theo người là cách các công cụ lớn làm (người xem thấy trang ổn định, số liệu đúng); ảnh AI có
+ích cho banner nhưng gây hiểu sai nếu làm ảnh sản phẩm; mã tự viết cần cho tích hợp mà khối nhúng chưa có, mức C
+giữ an toàn cho người mua, mức D cho người chấp nhận rủi ro nhưng phải bật hai lớp và tránh trang thanh toán.
+
+Đã cân nhắc: chia A/B ngẫu nhiên theo lần tải — trang nhảy khi F5, số liệu sai; đặt cookie A/B cho khách chưa đồng ý
+— trái hướng không cookie của bước 57; cho mức D mặc định — rủi ro lộ dữ liệu người mua, rơi vào mọi khách dùng
+Autoxide.
