@@ -239,3 +239,12 @@ Cả SQLite và Postgres.
   WooCommerce.
 - **Có nhập đánh giá sản phẩm cũ không:** chỉ khi giữ được tên người viết và ngày, và ghi rõ "nhập từ
   <nền tảng>". Không được làm như đánh giá mới (Luật 19/2023: đánh giá phải trung thực).
+
+## Bổ sung theo D-220
+
+- Nguồn thêm **`autoxide`**: CSV cùng cột với xuất chung của bước 51 (P16), để chuyển dữ liệu giữa hai khách
+  hay sửa hàng loạt trên bảng tính rồi nhập lại.
+- Đích thêm ngoài thương mại: `content` (bài, trang, kèm chuyển hướng 301), `media` (tải từ URL qua
+  `autoxide_kernel::net`, kiểm loại thật như tải lên), `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý
+  đầy đủ). Phần này làm được khi bước 51 P16 đã có, không chờ bước 47.
+- Đây là cách nhập duy nhất của dự án (bước 51 P17 trỏ về đây); không module nào tự làm nhập riêng.

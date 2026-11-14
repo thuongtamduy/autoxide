@@ -5200,3 +5200,37 @@ chuyển nhà đều cần. Banner đặt trong `content` vì website không bá
 Đã cân nhắc: module `storefront` riêng — chỉ gom vài bảng của ba module, thêm hợp đồng mà không bớt phụ
 thuộc; nhập qua API của nền tảng cũ — cần tài khoản đối tác, để làm như bộ nối (D-191); trình dựng trang
 kéo thả — trái D-026 (core chỉ có API).
+
+## D-220 · Thêm `analytics` (bước 57), `automations` (bước 58), tìm kiếm thay được, đẩy di động — 2026-11-14 — chủ dự án quyết
+
+Quyết định: chủ dự án đồng ý các chỗ hở agent rà ra khi soát lộ trình:
+
+1. **Module `analytics`, bước 57 mới** (sau 37): số liệu truy cập tự lưu, mặc định không cookie (khoá phiên
+   HMAC xoay và xoá mỗi ngày, không lưu IP hay user agent đầy đủ), chỉ giữ số gộp lâu dài; theo dõi theo người
+   chỉ khi đồng ý qua sổ đồng ý của bước 37. Cấm dấu vân tay trình duyệt.
+2. **Module `automations`, bước 58 mới** (sau 51): luật "khi … thì …" — kích hoạt bằng event / lịch, điều kiện
+   là cây toán tử cố định, hành động là tool MCP chạy **với quyền hiện tại của người tạo luật**; hành động rủi
+   ro chờ duyệt (P12), chống vòng lặp, khoá chống chạy trùng, `Idempotency-Key` mỗi bước.
+3. **Nhập dữ liệu:** không làm khung nhập ở kernel — dùng module `imports` của bước 56 (D-219) làm cách nhập
+   duy nhất, mở rộng thêm nguồn `autoxide` (cùng cột với xuất chung P16 bước 51) và đích `content`, `media`,
+   `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý).
+4. **Bộ máy tìm kiếm thay được** (P7 bước 40): trait `SearchBackend`, mặc định trong database (chạy như nhau trên
+   hai database), backend ngoài là module riêng làm khi đo thấy cần.
+5. **Kênh đẩy di động** (`MobilePush`) cho `notifications` ở bước 37; bộ nối Firebase / Apple cần khoá thật —
+   khi đó dừng lại hỏi.
+
+Thay một phần D-219: câu "đo hành vi người xem để sau (cần đồng ý cookie; hiện dùng công cụ ngoài)" — chủ dự
+án đã duyệt làm `analytics` không cookie, không công cụ ngoài. D-219 do agent quyết nên thay được.
+
+`CLAUDE.md` thêm `analytics`, `automations` vào danh sách module được dựng. Thứ tự đăng ký: `analytics` cùng nhóm
+với `newsletter`, `comments`, `support`; `automations` đăng ký cuối cùng (sau `imports`, `reporting`) (nghe event và gọi tool của mọi module).
+Đặt lịch dịch vụ và ký hợp đồng điện tử vẫn chờ chủ dự án quyết hướng sản phẩm.
+
+Lý do: chủ cửa hàng nào cũng cần số liệu truy cập và tự động hoá; chuyển từ nền tảng khác cần nhập dữ liệu;
+sàn lớn cần tìm kiếm vượt giới hạn "chứa chuỗi" của kernel. Thiết kế giữ luật cũ: không gửi dữ liệu người đọc
+cho bên thứ ba, không đường thứ hai làm điều REST / MCP không làm được, mọi thứ chạy trên cả hai database.
+
+Đã cân nhắc: nhúng Google Analytics hay công cụ ngoài — gửi dữ liệu người đọc ra ngoài, cần đồng ý cookie; luật
+tự động hoá bằng ngôn ngữ kịch bản (Lua, JavaScript) — không kiểm được lúc lưu, khó giải thích, rủi ro bảo mật;
+chỉ dùng webhook cho tự động hoá — cần máy chủ ngoài, khó cho người không biết lập trình; tìm kiếm Postgres
+full-text — không có trên SQLite, trái luật số một.

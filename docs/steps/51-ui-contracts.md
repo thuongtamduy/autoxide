@@ -364,3 +364,18 @@ bộ lọc khác.
 - `GET /api/v1/kernel/settings` thêm `last_used_at`, `last_error` cho mỗi cài đặt có nối ra ngoài; `POST
   /api/v1/kernel/settings/{name}/test` gọi thử qua trait của module (không trong transaction ghi).
 - P10: hộp việc không có "Đã xử lý" (D-212).
+
+## Bổ sung theo D-220
+
+### P17 — Nhập dữ liệu: dùng module `imports` (bước 56), không làm ở kernel
+
+Một cách nhập cho cả dự án: module `imports` của bước 56 (chạy thử trước, ánh xạ cột là dữ liệu có phiên
+bản, chạy lại không trùng, lỗi theo dòng và cột, ghi qua `api` của module đích). D-220 mở rộng nó:
+
+- Thêm nguồn **`autoxide`**: định dạng CSV của chính Autoxide, **cùng cột với xuất chung (P16)** — xuất ở
+  khách này nhập được ở khách khác hay sau khi sửa trên bảng tính.
+- Thêm đích ngoài thương mại: `content` (bài, trang, kèm chuyển hướng 301 như bước 56 đã có), `media` (từ
+  URL qua `autoxide_kernel::net`, kiểm loại thật như tải lên), `newsletter` (người đăng ký **chỉ** kèm bằng chứng
+  đồng ý đầy đủ; không có thì không nhập — như bước 56 không mang đồng ý quảng cáo cũ).
+- Đích ngoài thương mại không phải chờ bước 47: phần nhập `content` / `media` / `newsletter` của `imports` làm
+  được khi bước 51 P16 (xuất chung) đã có; phần thương mại vẫn theo điều kiện bắt đầu của bước 56.
