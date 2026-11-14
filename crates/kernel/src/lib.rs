@@ -43,4 +43,5 @@ pub mod throttle;
 pub mod tls;
 pub mod tokens;
 pub mod transfer;
+mod user_flags;
 pub mod version;

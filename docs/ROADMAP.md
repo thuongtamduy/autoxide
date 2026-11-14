@@ -1209,6 +1209,12 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
 - [ ] Dòng hoạt động và ghi chú nội bộ trên mọi bản ghi (D-201): gộp audit, ghi chú (nhắc tên bằng @,
       người được nhắc nhận thông báo), khoá bằng loại đối tượng của sổ đối tượng (D-123); một chỗ dùng
       chung thay cho mỗi module tự làm ghi chú
+- [x] Cờ theo người dùng cho trợ giúp trong giao diện (D-207): `GET` / `PUT` / `DELETE /api/v1/me/flags`
+      (bảng `kernel_user_flags`), chỉ cờ của chính mình, hạn mức `AUTOXIDE_USER_FLAGS_MAX`, có trong bản
+      xuất dữ liệu và xoá khi xoá tài khoản; `tenant_id` thêm ở bước 33 cùng mọi bảng
+- [ ] Định nghĩa số liệu tóm tắt (D-207): `SummaryMetric::definition` (i18n key, mặc định `None`),
+      `GET /api/v1/kernel/summary` trả `definition` đã dịch; gate kiểm mọi số liệu đều khai và có bản dịch
+      — làm cùng mục số liệu tóm tắt (P4)
 
 ## 52. Trải nghiệm quản trị nâng cao (D-201)
 

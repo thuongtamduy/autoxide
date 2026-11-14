@@ -26,6 +26,7 @@
   "job_module_not_found": "Module `{module}` không có job queue. Các module có job queue: {modules}.",
   "job_not_found": "Module `{module}` không có job hỏng nào mang id `{id}`. Xem các job hỏng bằng `autoxide jobs failed`.",
   "kernel.module_not_found": "Không có module nào tên `{name}` được cài. `GET /api/v1/kernel/modules` liệt kê các module đã cài.",
+  "kernel.flag_limit_reached": "Bạn đã có {max} cờ giao diện, mức tối đa cho phép. Xoá các cờ không cần nữa bằng `DELETE /api/v1/me/flags/{key}` rồi thử lại.",
   "length_required": "Request cần header `content-length`.",
   "method_not_allowed": "Endpoint này không hỗ trợ HTTP method này. Xem header `allow`.",
   "money.allocation_invalid": "Chỉ chia được một số tiền theo ít nhất một tỉ lệ, và không được mọi tỉ lệ đều bằng 0.",

@@ -17288,6 +17288,284 @@
         ]
       }
     },
+    "/api/v1/me/flags": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "List my interface flags.",
+        "description": "Requires signing in, no permission: only the caller's own flags, sorted by key. Use them to\nremember per account (not per browser) which hints were dismissed or which news were seen.",
+        "operationId": "me_list_my_flags",
+        "parameters": [
+          {
+            "name": "prefix",
+            "in": "query",
+            "description": "Only flags whose key starts with this, e.g. `hint.`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "hint."
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The caller's flags, sorted by key (at most `AUTOXIDE_USER_FLAGS_MAX`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_UserFlag"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`prefix` is not a valid key prefix; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/flags/{key}": {
+      "put": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Set one of my interface flags.",
+        "description": "Requires signing in, no permission. Creates the flag or replaces its value: sending it again\nis safe. A user keeps at most `AUTOXIDE_USER_FLAGS_MAX` flags (500 by default).",
+        "operationId": "me_set_my_flag",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Lower-case letters, digits, `.`, `_` and `-`, up to 100 characters, e.g. `hint.saved_views`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserFlagValue"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The flag as stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_UserFlag"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The caller already keeps the most flags allowed; delete some first. Code `kernel.flag_limit_reached`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The key or the value is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Delete one of my interface flags.",
+        "description": "Requires signing in, no permission. Deleting a flag that does not exist changes nothing.",
+        "operationId": "me_delete_my_flag",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Key of the flag.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "vi"
+              ]
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The flag is gone (or never existed)."
+          },
+          "401": {
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The key is invalid; see `errors`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/media": {
       "get": {
         "tags": [
@@ -31466,6 +31744,40 @@
           }
         }
       },
+      "Data_UserFlag": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "A flag the interface keeps for the signed-in user, e.g. a dismissed hint.",
+            "required": [
+              "key",
+              "value",
+              "updated_at"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Lower-case letters, digits, `.`, `_` and `-`, up to 100 characters; group flags with a\nprefix, e.g. `hint.saved_views`.",
+                "example": "hint.saved_views"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "value": {
+                "type": "string",
+                "description": "Up to 200 characters, e.g. `dismissed` or the last version whose news were seen.",
+                "example": "dismissed"
+              }
+            }
+          }
+        }
+      },
       "Data_UserResponse": {
         "type": "object",
         "description": "Envelope of a single result.",
@@ -32056,6 +32368,43 @@
                 "updated_at": {
                   "type": "string",
                   "format": "date-time"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Data_Vec_UserFlag": {
+        "type": "object",
+        "description": "Envelope of a single result.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A flag the interface keeps for the signed-in user, e.g. a dismissed hint.",
+              "required": [
+                "key",
+                "value",
+                "updated_at"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "Lower-case letters, digits, `.`, `_` and `-`, up to 100 characters; group flags with a\nprefix, e.g. `hint.saved_views`.",
+                  "example": "hint.saved_views"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Up to 200 characters, e.g. `dismissed` or the last version whose news were seen.",
+                  "example": "dismissed"
                 }
               }
             }
@@ -40631,6 +40980,46 @@
           }
         ],
         "description": "The uploaded item, plus the items already in the library with exactly the same content."
+      },
+      "UserFlag": {
+        "type": "object",
+        "description": "A flag the interface keeps for the signed-in user, e.g. a dismissed hint.",
+        "required": [
+          "key",
+          "value",
+          "updated_at"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Lower-case letters, digits, `.`, `_` and `-`, up to 100 characters; group flags with a\nprefix, e.g. `hint.saved_views`.",
+            "example": "hint.saved_views"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "value": {
+            "type": "string",
+            "description": "Up to 200 characters, e.g. `dismissed` or the last version whose news were seen.",
+            "example": "dismissed"
+          }
+        }
+      },
+      "UserFlagValue": {
+        "type": "object",
+        "description": "The value of a flag.",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "type": "string",
+            "description": "Up to 200 characters, e.g. `dismissed`.",
+            "example": "dismissed"
+          }
+        },
+        "additionalProperties": false
       },
       "UserResponse": {
         "type": "object",

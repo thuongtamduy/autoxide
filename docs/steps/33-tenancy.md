@@ -558,7 +558,8 @@ từng bảng; nguồn sạch; khách khác không bị đụng) · `ten_mien_xa
 `allowed_chi_tra_200_cho_ten_mien_verified_cua_khach_active` · `setting_secret_khong_bao_gio_tra_ra` ·
 `rate_limit_va_idempotency_key_khong_dung_chung_giua_khach` · `token_ky_cua_khach_a_bi_tu_choi_o_khach_b` ·
 `con_tro_cua_khach_a_o_khach_b_chi_tra_du_lieu_b` · `tenant_context_dong_thoi` (nhiều request song song của
-nhiều khách trên hai placement không lẫn database).
+nhiều khách trên hai placement không lẫn database). · `flag_cua_khach_nay_khong_lo_sang_khach_khac` (bảng
+`kernel_user_flags` của D-207 thêm `tenant_id`; cùng `user_id` và `key` ở hai khách là hai dòng).
 
 **Mỗi module (B1–B13):** `khong_ro_ri_giua_khach` (gieo qua REST ở khách A, `leak_check` bằng khách B; một
 khách trên placement chung và một khách `dedicated`) · `trung_ten_o_hai_khach_duoc_phep` (cùng email / slug /

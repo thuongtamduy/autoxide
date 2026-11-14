@@ -5034,3 +5034,33 @@ cáo luôn có chân thư huỷ nhận) và mẫu theo khách (cần `tenant_id`
 mẫu và API xem trước; Handlebars / Tera — Tera không có vùng cách ly cho mẫu không tin cậy, Handlebars không
 có giới hạn chạy rõ ràng; tự viết ngôn ngữ mẫu — vòng lặp, điều kiện, giới hạn và báo lỗi theo dòng cột vượt
 xa "vài chục dòng"; gửi thử tới địa chỉ tuỳ ý — thành công cụ gửi thư rác.
+
+## D-207 · API cho trợ giúp trong giao diện: cờ theo người dùng, định nghĩa số liệu — 2026-11-14 — agent quyết
+
+Quyết định: làm theo đề bài `docs/prompts/ui-help-api.md`.
+
+1. **Cờ theo người dùng — đã làm.** Bảng `kernel_user_flags` của module nội bộ `kernel` (migration
+   `m0002_create_user_flags` có `down`): `id` (UUIDv7), `user_id`, `key` (1–100 ký tự `a-z0-9._-`),
+   `value` (≤ 200 ký tự), `updated_at`; duy nhất (`user_id`, `key`). API `GET /api/v1/me/flags?prefix=`,
+   `PUT /api/v1/me/flags/{key}` (ghi đè bằng `ON CONFLICT`, gọi lại an toàn), `DELETE …/{key}` (204 kể cả
+   khi không có). Chỉ cần đăng nhập, không permission, chỉ cờ của chính người gọi; không tool MCP (việc của
+   giao diện). Hạn mức `AUTOXIDE_USER_FLAGS_MAX` (mặc định 500) → 409 `kernel.flag_limit_reached`; hai
+   request tạo cờ mới cùng lúc có thể vượt mức vài cờ — chấp nhận, đây là hạn mức chống lạm dụng.
+   - `/api/v1/me` là tiền tố dành riêng cho endpoint "của tôi" do kernel phục vụ (sau này `/me/views`,
+     `/me/can`, `/me/work` của bước 51 và `/me/pins` của 52 cũng ở đây): `Modules::routes` thêm mục
+     `("me", …)`, tên module `me` bị cấm như `kernel` và `antispam`.
+   - Dữ liệu cá nhân: dùng cơ chế đã có của kernel (`PersonalData` trong bản xuất, nghe
+     `privacy::USER_DELETED`), không cần chờ bước 37.
+   - **Chưa có `tenant_id`**: chưa bảng nào có (bước 33 thêm cho mọi bảng cấp khách hàng cùng lúc). Test
+     `flag_cua_khach_nay_khong_lo_sang_khach_khac` chuyển sang danh sách test của bước 33.
+2. **Định nghĩa số liệu — chỉ vào đặc tả.** Trait `SummaryMetric` (P4 bước 51) chưa có code, nên
+   `fn definition(&self) -> Option<&'static str>` (mặc định `None`, D-038), trường `definition` của
+   `GET /api/v1/kernel/summary` và bài kiểm gate "mọi số liệu khai định nghĩa và có bản dịch" ghi vào đặc tả
+   51 mục P4; làm cùng P4.
+
+Lý do: lưu "đã xem gợi ý" ở trình duyệt thì đổi máy là hiện lại; lưu ở máy chủ cần một chỗ chung thay vì
+mỗi module tự làm. Câu định nghĩa số liệu nằm cạnh code tính số để giao diện không nói sai cách tính.
+
+Đã cân nhắc: đặt endpoint dưới `/api/v1/kernel/me/flags` — đúng quy tắc tiền tố module nhưng đường dẫn
+"của tôi" rải rác theo module; đặc tả 51 đã dùng `/api/v1/me/…` nên gom về một tiền tố; lưu cờ trong
+`auth` — kernel không được phụ thuộc module `auth`, và các endpoint `/me` khác của bước 51 là của kernel.
