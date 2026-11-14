@@ -676,3 +676,24 @@ mặc định trên placement riêng — phủ chế độ `multi` cho mọi tes
   mọi lệnh ghi trả 402 `plans.subscription_past_due`). Hai cờ độc lập, một middleware kiểm cả hai.
 - Test thêm: `cau_hinh_module_theo_khach_ghi_de_bien_moi_truong`, `khach_tam_khoa_khong_doc_duoc`,
   `khach_chi_doc_doc_duoc_khong_ghi_duoc`, `di_chuyen_khach_dry_run_khong_doi_gi`.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- **Gắn tên miền với nút.** `PATCH /api/v1/kernel/domains/{id} {org_id | null}` (`kernel.domains.manage`); `org_id`
+  phải là nút của khách hiện tại (hỏi `OrgDirectory` của bước 34, chưa cài thì chỉ nhận `null`); event
+  `kernel.domain_updated`. Tên miền đã `revoked` → 409 `kernel.domain_revoked`.
+- **Tên setting của kết nối đối tác.** `TenantSetting` thêm `group: Option<&'static str>`; mọi cấu hình kết nối
+  đối tác khai `group = "connection"` và đặt tên `<module>.connection.<loại>.<trường>` (trường bí mật đánh dấu
+  secret, vào kho secret, không bao giờ trả lại). `GET /api/v1/kernel/settings?group=connection` là nguồn của màn
+  "Kết nối đối tác"; kiểm thử dùng `POST /kernel/settings/{name}/test` đã có (bước 51). Tên cụ thể:
+
+  | Kết nối | Bước | Tên setting |
+  |---|---|---|
+  | SMS (OTP, brandname) | 37 | `compliance.connection.sms.provider`, `….sms.credentials` (secret), `….sms.brandname` |
+  | Xác thực danh tính (eKYC) | 37 | `compliance.connection.identity.provider`, `….identity.credentials` (secret) |
+  | Cổng thanh toán | 36 | `ledger.connection.payment.<mã cổng>.credentials` (secret), `….payment.<mã cổng>.enabled` |
+  | Chi trả (payout) | 36 | `ledger.connection.payout.<mã>.credentials` (secret) |
+  | Hoá đơn điện tử | 36 | `tax.connection.einvoice.provider`, `….einvoice.credentials` (secret), `….einvoice.serial` |
+  | Hãng vận chuyển | 44 | không dùng setting: nhiều tài khoản mỗi hãng nên giữ bảng `shipping_carrier_accounts`; màn liệt kê thêm từ `GET /api/v1/shipping/carrier-accounts` |

@@ -379,3 +379,24 @@ bản, chạy lại không trùng, lỗi theo dòng và cột, ghi qua `api` c�
   đồng ý đầy đủ; không có thì không nhập — như bước 56 không mang đồng ý quảng cáo cũ).
 - Đích ngoài thương mại không phải chờ bước 47: phần nhập `content` / `media` / `newsletter` của `imports` làm
   được khi bước 51 P16 (xuất chung) đã có; phần thương mại vẫn theo điều kiện bắt đầu của bước 56.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+### P18 — Danh sách lý do theo khách (D-223)
+
+- `Module::reason_lists() -> Vec<ReasonList>` (mặc định rỗng); `ReasonList { name, defaults: [ReasonDefault {
+  code, legal }] }`. Bảng `kernel_reason_codes` (mục D-223). Khởi động đồng bộ mã mặc định (thêm mới, không xoá).
+- `GET /api/v1/kernel/reasons/{list}?include_inactive` (người có permission đọc của module sở hữu danh sách hay
+  `kernel.reasons.manage`), `PUT /api/v1/kernel/reasons/{list}/{code}` (`labels`, `active`, `position`),
+  `kernel.reasons.manage`. Mã `legal` không tắt được (`kernel.reason_legal`, 409); mã sai định dạng
+  `kernel.reason_invalid` (422).
+- `ReasonCodes::ensure(tenant, list, code)` cho service (đọc qua cache theo khách, xoá khi ghi).
+- Test cả hai database: `ma_mac_dinh_tu_dong_co`, `khach_them_ma_rieng`, `ma_legal_khong_tat_duoc`,
+  `ma_da_tat_bi_tu_choi_khi_ghi`, `hai_khach_khong_thay_ma_cua_nhau`.
+
+### P12 bổ sung — `ActorKind` (D-224)
+
+Enum `ActorKind` của kernel (`human`, `agent`, `service`, `system`, `support`, `app`, `scim`); audit lọc
+`GET /api/v1/audit?actor_kind=agent,service`; index (`tenant_id`, `actor_kind`, `id`).

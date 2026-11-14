@@ -419,3 +419,18 @@ khách hàng. Test: một đợt có hàng chỉ gửi một lần dù event đ�
 - Đặt trước không làm `available` công khai thành "còn hàng": mức công khai là `preorder`.
 - Test (cả hai database): `dat_truoc_khong_vuot_gioi_han_khi_dong_thoi` (100 người, giới hạn 10),
   `hang_ve_chia_theo_thu_tu_dat`, `huy_dat_truoc_tra_lai_suat`.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- **Lý do điều chỉnh tồn** là danh sách `inventory.adjustment` (D-223), mặc định: `damaged`, `lost`, `found`,
+  `data_entry_fix`, `sample_use`, `expired`, `count_variance`. Kiểm kê dùng cùng danh sách.
+- **Ngưỡng "sắp hết hạn"** là cài đặt kế thừa theo nút `inventory.expiring_days` (mặc định 30). Lô trả
+  `expiry_state` (`ok` / `expiring` / `expired`) tính lúc đọc từ `expires_on` và ngưỡng; lọc `GET /lots?expiry_state=`
+  bằng khoảng ngày trên index (`tenant_id`, `level_id`, `expires_on`).
+- **Trạng thái ghi sổ của phiếu nhập / trả nhà cung cấp:** cột `ledger_status` (`pending` / `posted` / `failed`),
+  `ledger_entry_id?`, `ledger_posted_at?`, `ledger_error_code?` do job `inventory.post_receipt_to_ledger` cập nhật;
+  `ledger` chưa cài → `not_applicable`. `POST /receipts/{id}/retry-ledger` (`inventory.purchasing.manage`).
+- **Công nợ nhà cung cấp.** `GET /suppliers` trả `payable` của từng nhà cung cấp qua `Ledger::balances` (bước 36, một
+  lần gọi cho cả trang); `ledger` chưa cài thì trường vắng mặt.

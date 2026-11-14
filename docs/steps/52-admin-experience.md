@@ -89,3 +89,9 @@ trước); danh sách chỉ số sức khoẻ người bán đầu tiên. Ghi v�
 - **Trợ lý AI trong quản trị (A-c12).** `POST /api/v1/ai/assistant/messages {page, text}`: chạy tool MCP với
   **quyền của người gọi**, chỉ tool `read_only` khi khách chưa bật ghi; lệnh ghi thành bản nháp hay yêu cầu
   duyệt (D-109, P12). Trả lời kèm danh sách tool đã gọi để người dùng kiểm.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- `kernel_request_log.actor_kind` dùng `ActorKind` của D-224 (đủ bảy giá trị), không phải tập con.

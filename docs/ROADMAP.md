@@ -640,6 +640,8 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
 - [ ] Đối chiếu thiết kế 2 (D-210, D-218 mục 33): cấu hình nghiệp vụ của module theo khách (`Module::tenant_settings`
       cho `comments`, `forms`, `content`, `media`); `GET /kernel/tenants` có lọc và `expand`; API job di chuyển
       database chỉ cho nhân sự nền tảng, dry-run mặc định; tách "tạm khoá" (chặn mọi route) khỏi "chỉ đọc"
+- [ ] Đối chiếu đợt 2 (D-223…D-227): gắn tên miền với nút; cấu hình kết nối đối tác theo nhóm `connection` với
+      tên thống nhất
 
 ## 34. Tổ chức, quyền theo độ sâu, danh tính (D-185)
 
@@ -689,6 +691,8 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
       sâu, công khai theo website; xác nhận lại danh tính `POST /auth/me/reauth` thay `current_password`;
       ngôn ngữ và múi giờ ưa thích; khách tự thu hồi quyền vào hỗ trợ; `memberships?inherited=true`;
       bắt buộc MFA theo role, `last_login_at"
+- [ ] Đối chiếu đợt 2: ghi hồ sơ công khai của nút (giờ mở cửa, ngày đặc biệt, ảnh); tự đổi tên hiển thị qua
+      `PATCH /auth/me`
 
 ## 35. Gói, quyền dùng tính năng, hạn mức, thuê bao (D-185)
 
@@ -759,6 +763,8 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
       hạn thanh toán cho cả VietQR; `cod_remittance` (COD không về tài khoản nhà vận hành sàn); mã số thuế 12
       số (TT 86/2024 — cần đối chiếu); `GET /ledger/entries?source_module&source_id`; phí sàn tách GTGT,
       khấu trừ thay chỉ cho hộ / cá nhân (NĐ 117/2025 — cần đối chiếu)
+- [ ] Đối chiếu đợt 2: `sealed_at` và số đếm niêm phong theo kỳ; `Ledger::balances` theo nhiều đối tượng (công
+      nợ nhà cung cấp)
 
 ## 37. Tuân thủ pháp luật Việt Nam (D-186)
 
@@ -996,6 +1002,8 @@ bước 35.
       khách → kênh → thị trường → ưu tiên); bảng giá suy ra theo công thức ghi thành dòng giá thật; quy tắc làm
       tròn giá đẹp; sàn giá (giá tối thiểu, biên lợi nhuận trên giá vốn); đổi giá hàng loạt có xem trước, duyệt,
       hẹn giờ, giá tạm thời
+- [ ] Đối chiếu đợt 2: trạng thái của lần nhập / xuất CSV; `readiness` (thiếu thuộc tính, giấy tờ) để lọc và
+      đếm sản phẩm chưa mở bán được
 
 ## 42. Kho (`inventory`)
 
@@ -1023,6 +1031,8 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
 - [ ] Hàng đặt trước (D-204): biến thể có chế độ bán `preorder` với ngày dự kiến có hàng và giới hạn số
       suất (bước 41 khai); giữ suất không vượt giới hạn khi nhiều người đặt cùng lúc; hàng về thì chia cho
       đơn đặt trước theo thứ tự đặt
+- [ ] Đối chiếu đợt 2: lý do điều chỉnh tồn là danh sách theo khách; ngưỡng sắp hết hạn của lô; trạng thái ghi
+      sổ của phiếu nhập; công nợ nhà cung cấp qua `ledger`
 
 ## 43. Khuyến mại (`promotions`)
 
@@ -1060,6 +1070,8 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 - [ ] Chống lạm dụng theo nhiều khoá người mua (tài khoản, số điện thoại, địa chỉ — chỉ bản băm), giới hạn
       theo kỳ; quy tắc trả hàng (hoàn theo tỉ lệ, quà, voucher về ví khi huỷ); chạy thử, kiểm xung đột, lịch,
       số liệu chương trình; tính giỏ trong bộ nhớ, đo p99 < 5 ms cho 50 dòng × 500 chương trình
+- [ ] Đối chiếu đợt 2 (D-225): thời hạn bắt buộc và giới hạn số ngày giảm giá là dữ liệu; thông báo theo từng
+      nơi nhận; kiểm trước khi bật; nhắc khi flash sale bắt đầu (đồng ý riêng cho một lần nhắc)
 
 ## 44. Vận chuyển (`shipping`)
 
@@ -1083,6 +1095,8 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
       sản phẩm; cùng bảng phí với báo giá của `orders`, ghi rõ "ước tính", ngưỡng miễn phí
 - [ ] Đối chiếu thiết kế 2 (D-216): thuế GTGT trên phí giao (Luật 48/2024 — cần đối chiếu);
       `shipping.cod_settled` mang `seller_org_id` và nơi nhận tiền
+- [ ] Đối chiếu đợt 2: lịch giao và ngày nghỉ, giờ chốt giao trong ngày, trạng thái kiểm tài khoản hãng, khớp
+      dòng lệch COD có lý do và audit, thời hạn giữ hàng chờ nhận
 
 ## 45. Giỏ hàng, đặt hàng, đơn hàng (`orders`)
 
@@ -1138,6 +1152,8 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [ ] Coupon và voucher trong giỏ (D-222): mã và voucher tách nhau, điền dữ liệu điều kiện cho `promotions`,
       chụp khoản giảm kèm ai trả tiền vào đơn; trả hàng hoàn theo tỉ lệ, xử lý quà; hoá đơn ghi khoản giảm và
       hàng khuyến mại (cần đối chiếu NĐ 123/2020 sửa bởi NĐ 70/2025)
+- [ ] Đối chiếu đợt 2 (D-227): giữ hàng chờ nhận có hạn; đóng ca có chênh lệch ghi sổ cái; danh sách lý do theo
+      khách; đếm đánh giá mới theo mốc đã xem; bản nháp tóm tắt đánh giá bằng AI chờ duyệt
 
 ## 46. Sàn (`marketplace`)
 
@@ -1182,6 +1198,8 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
 - [ ] Đối chiếu thiết kế 2: gộp danh sách yêu thích của trình duyệt vào tài khoản khi đăng nhập
 - [ ] Tặng voucher (D-222): sinh nhật, đổi điểm lấy voucher, sau khi mua, giới thiệu bạn — qua `grant_voucher`,
       gọi lại không cấp thêm; phân khúc và hạng thành viên làm điều kiện khuyến mại
+- [ ] Đối chiếu đợt 2 (D-226): che số điện thoại / email, xem đủ cần permission và ghi audit; cơ sở tính điểm
+      thống nhất
 
 ## 48. Bán đa kênh (`channels`)
 
@@ -1199,6 +1217,8 @@ Facebook / Zalo; một kho, một danh sách sản phẩm, đơn từ mọi nơi
 - [ ] Nguồn cấp sản phẩm cho Google Merchant Center và danh mục của Meta (D-204): tệp XML / CSV dựng bằng
       job theo cửa hàng, ngôn ngữ, tiền tệ; link công khai có token; báo lỗi từng sản phẩm (thiếu GTIN,
       ảnh); không lộ số tồn hay giá vốn
+- [ ] Đối chiếu đợt 2: trạng thái đơn kênh sau khi xử lý (`resolved`, `cancelled_by_channel`); số đẩy lên kênh
+      ở chế độ `reserved`
 
 ## 49. Tiếp thị liên kết và bán qua livestream (`affiliate`)
 
@@ -1214,6 +1234,7 @@ liên kết (bước 37).
       giữa 2 triệu và 5 triệu đồng / lần, NĐ 253/2026 — cần đối chiếu); chứng từ khấu trừ cho người nhận
 - [ ] Phiên livestream: người phát đã xác thực, sản phẩm gắn trong phiên, đơn ghi nhận theo phiên,
       lưu vết phiên theo yêu cầu của luật
+- [ ] Đối chiếu đợt 2: `paid_on` khi đánh dấu đã chi
 
 ## 50. Công khai repo (chờ chủ dự án, D-175, D-197, D-199)
 
@@ -1297,6 +1318,7 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       có "Đã xử lý"
 - [ ] Nhập dữ liệu (D-220): không làm ở kernel — module `imports` (bước 56) thêm nguồn `autoxide` cùng cột với
       xuất chung và đích `content`, `media`, `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý)
+- [ ] Danh sách lý do theo khách (P18, D-223) và `ActorKind` thống nhất cho audit, nhật ký, event (D-224)
 
 ## 52. Trải nghiệm quản trị nâng cao (D-201)
 
@@ -1319,6 +1341,7 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
       vi phạm, hạn phải xử lý; huy hiệu người bán tin cậy tính từ số liệu thật, công bố tiêu chí
 - [ ] Đối chiếu thiết kế 2: tên endpoint bàn kỹ thuật, event theo bản ghi đọc từ audit, `kernel.devtools.manage`,
       `request_id` / `trace_id` trong nhật ký; trợ lý AI trong quản trị chạy tool MCP với quyền người gọi
+- [ ] Nhật ký lệnh dùng đủ `ActorKind` của D-224
 
 ## 53. Hỗ trợ khách hàng (`support`) (chủ dự án giao ngày 13/11/2026, D-204)
 
