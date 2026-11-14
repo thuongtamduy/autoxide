@@ -60,7 +60,8 @@ Hệ quả cho agent:
   hành chính, D-193) và `notifications` (D-194), và module thương mại của bước 41–49: `catalog`,
   `inventory`, `promotions`, `shipping`, `orders`, `marketplace` (D-191), `customers`, `channels`,
   `affiliate` (D-194), cùng `support` (hỗ trợ khách hàng, bước 53, D-204), `imports` (chuyển dữ liệu,
-  bước 56, D-219), `analytics` (bước 57) và `automations` (bước 58, D-220). Khái niệm của `content`
+  bước 56, D-219), `analytics` (bước 57), `automations` (bước 58, D-220), `wholesale`, `bookings`,
+  `conversations`, `recurring`, `ads`, `apps` (bước 59–65, D-221). Khái niệm của `content`
   (bài viết, trang, slug…) và của thương mại (sản phẩm, đơn hàng, kho…) không vào core.
 - Repo là công khai: mọi file, commit message, comment và tài liệu đều viết với
   giả định người lạ sẽ đọc. Không ghi tên máy chủ, IP, đường dẫn riêng hay thông
