@@ -5683,3 +5683,36 @@ lọc, cache theo khách cho câu chữ và định nghĩa.
 gom nhiều dòng, chậm; cột JSON có index của database — Postgres có, SQLite khác hẳn, vi phạm luật số một; cho khách
 dán script theo dõi — đã có khối mã tự viết cách ly (D-231) cho nhu cầu đặc biệt, còn mã theo dõi phổ biến cần gắn
 với đồng ý nên phải có cấu trúc; chuyển nhãn của `media` sang P20 — phá hợp đồng API đã phát hành, không đem lại gì.
+
+## D-236 · Kiểu vị trí banner, bộ vị trí chuẩn, chọn trang hiện, banner dạng chữ, khối vùng banner — 2026-11-14 — chủ dự án đồng ý đề xuất, agent quyết chi tiết
+
+Chủ dự án muốn banner có loại theo vị trí (trên, trái, phải, chính…). Đặc tả 55 đã có vị trí là dữ liệu khách tự
+đặt tên, nhưng vị trí chỉ có tên và số banner tối đa — giao diện phải tự đoán cách vẽ, người soạn không biết ảnh
+cỡ nào. Thêm vào **bước 55** (không mở bước mới):
+
+1. **Kiểu vị trí:** `display` (`single` / `carousel` / `grid` / `stack` / `strip` / `popup`) với cài đặt có schema
+   (trượt tự động ≥ 4 giây hay tắt; lưới 2–4 cột; popup có tần suất, độ trễ); `accepts` (`image` / `text` / `any`);
+   tỉ lệ và cỡ ảnh tối thiểu (máy tính, điện thoại) kiểm khi lưu bằng kích thước `media` đã lưu, sai lệch tỉ lệ
+   ≤ 2%; `devices`; `page_kinds` (loại trang vị trí dùng được).
+2. **Bộ vị trí chuẩn** gieo cho khách mới qua `Module::seed_tenant`: `top_strip`, `home_hero`, `home_middle`,
+   `category_top`, `sidebar_left`, `sidebar_right`, `inline`, `above_footer`, `popup` — khách sửa, tắt, xoá được;
+   không gieo lại.
+3. **Chọn trang hiện:** banner có `page_kinds` (tập con của vị trí) và `page_targets` (`{kind, id}` theo sổ đối
+   tượng, tối đa 50); `catalog` đăng ký thêm `catalog.category`, `catalog.collection`. Lọc trong bộ nhớ trên tối đa
+   50 banner đang hiệu lực của vị trí — câu truy vấn và index không đổi.
+4. **Banner dạng chữ:** `kind = text`, màu là tên token của theme (không mã màu tự do).
+5. **Đọc nhiều vị trí một lần:** `GET /api/v1/content/public/placements?keys=` (tối đa 10), `max-age` là mốc gần nhất.
+6. **Khối `content.placement`** cho trang dựng từ khối và đầu trang (D-234), khai ở `content` tại bước 55 khi sổ khối
+   của bước 67 đã có; một lần đọc cho mọi vùng banner của trang.
+
+Thứ tự banner cố định theo `position` khách sắp, không đảo ngẫu nhiên. Khối `announcement_bar` / `popup` của bước 67
+giữ nguyên vai trò: chữ cố định trong một trang (popup đó để thu email); vị trí banner là nội dung có lịch, quản lý
+một chỗ.
+
+Lý do: giao diện biết vẽ gì từ dữ liệu, người soạn biết ảnh cỡ nào, đổi banner không làm vỡ trang; khách mới có ngay
+bộ vị trí dùng được; giữ tốc độ vì một lời gọi cho cả trang và cache tới đúng mốc banner đổi.
+
+Đã cân nhắc: danh sách vị trí cố định trong code (`left`, `right`…) — mỗi giao diện bố cục một kiểu, cố định là bó
+khách; xoay vòng ngẫu nhiên hay theo trọng số — phá cache, F5 nhảy, cần thì làm bằng thử A/B của bước 67; banner
+chữ có màu tự do — phá thương hiệu, lệch theme; ghép vị trí banner vào khối `announcement_bar` — hai việc khác
+nhau (cố định so với có lịch), gộp làm mỗi khối nửa vời.

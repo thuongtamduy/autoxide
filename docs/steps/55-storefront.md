@@ -1,14 +1,16 @@
 # Bước 55 — Giao diện cửa hàng qua API: banner, bộ sưu tập, thông tin cửa hàng
 
 > Lộ trình: `docs/ROADMAP.md` bước 55 · Luật chung: `docs/steps/README.md` · Quyết định: D-219, D-026
-> (core chỉ có API), D-191 (module thương mại), D-195 / D-198 (luật chung giữa các bước)
+> (core chỉ có API), D-191 (module thương mại), D-195 / D-198 (luật chung giữa các bước), D-236 (kiểu vị trí, bộ vị
+> trí chuẩn, chọn trang hiện, banner dạng chữ, khối vùng banner)
 
 ## Mục tiêu
 
 Website và app của khách tự vẽ giao diện; core không có trang quản trị hay giao diện (D-026). Bước này cho
 giao diện **dữ liệu** để dựng trang chủ, trang danh mục, chân trang:
 
-- banner theo vị trí, có lịch;
+- banner theo vị trí, có lịch; vị trí có kiểu hiển thị (một banner, trượt, lưới, dải chữ, popup…), kích thước ảnh
+  khuyến nghị và bộ vị trí chuẩn có sẵn; banner chọn được trang nào hiện (D-236);
 - bộ sưu tập sản phẩm;
 - thông tin cửa hàng công khai.
 
@@ -26,6 +28,8 @@ giao diện **dữ liệu** để dựng trang chủ, trang danh mục, chân tr
   trước bước 41 nếu có người rảnh; khi đó link tới sản phẩm hay bộ sưu tập chờ `catalog` gắn vào điểm cắm.
 - **Bước 37:** dấu `ai_assisted`, thông tin chủ sở hữu và logo Bộ Công Thương cho chân trang. Thiếu bước 37
   thì bỏ hai phần đó, không chặn bước này.
+- **Bước 67:** khối `content.placement` (đặt vùng banner vào trang dựng từ khối, D-236) cần sổ khối của bước 67.
+  Bước 67 đi trước bước này theo thứ tự lộ trình; chưa có thì để khối lại, không chặn bước này.
 - **Bước 46:** banner trong gian hàng người bán cần nút `seller` và `marketplace` (D-233). Làm sau các mục khác
   của bước này; chưa có bước 46 thì để mục đó lại, không chặn bước này.
 
@@ -33,12 +37,16 @@ giao diện **dữ liệu** để dựng trang chủ, trang danh mục, chân tr
 
 - **`content`:**
   - bảng vị trí và banner, API quản trị và công khai, tool MCP;
+  - kiểu vị trí, bộ vị trí chuẩn gieo cho khách mới, chọn trang hiện, banner dạng chữ, khối `content.placement`
+    (D-236);
   - điểm cắm `ContentLinks` trong `content::api` (thêm `pub mod api` nếu bước 37 chưa thêm);
   - banner trong gian hàng người bán: vị trí `seller_store.*`, duyệt, chính sách của sàn, hạn mức (D-233).
 - **`catalog`:**
   - bảng bộ sưu tập, API quản trị và công khai, tool MCP;
   - gắn bộ dựng link cho sản phẩm và bộ sưu tập vào `ContentLinks`;
-  - số bán của sản phẩm cho kiểu sắp "bán chạy".
+  - số bán của sản phẩm cho kiểu sắp "bán chạy";
+  - đăng ký `catalog.category` và `catalog.collection` vào sổ đối tượng (bước 41 mới có `catalog.product`) để banner
+    chọn trang hiện (D-236).
 - **`organizations`:** hồ sơ công khai của nút (thông tin cửa hàng, giờ mở cửa) và endpoint công khai.
 - **`promotions`:** gắn bộ dựng link chương trình vào `ContentLinks`; phát event khi chương trình kết thúc
   (nếu bước 43 chưa có).
@@ -88,6 +96,57 @@ pub trait ContentLinks: Send + Sync {
 `content` công bố `dyn ContentLinks` trong `start`. Bên trong `content` giữ một sổ
 (`RwLock<HashMap<LinkKind, Arc<dyn LinkTarget>>>`) như `ResourceDirectory` của kernel. Loại `Url`, `Entry`,
 `Term` do `content` tự lo. `SellerStore` do `marketplace` gắn (D-233).
+
+### Kiểu vị trí, bộ vị trí chuẩn, chọn trang hiện (D-236)
+
+Vị trí không chỉ là một cái tên: nó nói cho giao diện **vẽ thế nào** và cho người soạn **ảnh cỡ nào**, để đổi
+banner không bao giờ làm vỡ giao diện.
+
+- **Kiểu hiển thị** (`display`): `single` (một banner), `carousel` (trượt), `grid` (lưới 2–4 ô), `stack` (xếp dọc,
+  hợp cột trái / phải), `strip` (dải chữ mỏng trên cùng), `popup` (khung nổi khuyến mại). Cài đặt theo kiểu
+  (`display_settings`, JSON có schema, kiểm khi lưu): `carousel` — `autoplay_seconds` (0 = tắt, nếu bật thì ≥ 4);
+  `grid` — `columns` (2–4); `popup` — `frequency` (`once_per_session` / `once_per_day` / `once_per_week`),
+  `delay_seconds` (0–60). Giao diện vẽ theo hợp đồng ở `docs/CONTENT.md`: luôn có nút đóng popup, không popup ở
+  trang giỏ hàng / thanh toán / đăng nhập / tài khoản, không tự trượt khi người xem bật giảm chuyển động.
+- **Loại banner nhận** (`accepts`): `image`, `text` hay `any`. `strip` chỉ nhận `text`.
+- **Kích thước ảnh** (`ratio_w`, `ratio_h`, `min_width`, `min_height`, đều tuỳ chọn): ảnh của banner (cả ảnh điện
+  thoại nếu vị trí khai tỉ lệ riêng `mobile_ratio_w`, `mobile_ratio_h`) phải đủ cỡ và đúng tỉ lệ (sai lệch ≤ 2%) —
+  kiểm khi lưu bằng kích thước `media` đã lưu, báo lỗi kèm cỡ cần. Banner gian hàng người bán (D-233) kiểm thêm
+  chính sách của sàn, lấy mức chặt hơn.
+- **Thiết bị** (`devices`): `all` / `desktop` / `mobile` — giao diện chỉ gọi vị trí hợp thiết bị.
+- **Trang được hiện** (`page_kinds`, JSON): tập loại trang vị trí này dùng được — `home`, `category`, `collection`,
+  `product`, `search`, `cart`, `content_entry`, `content_type` (bước 67), `landing` (trang dựng từ khối), `any`.
+- **Bộ vị trí chuẩn** gieo cho khách mới (`Module::seed_tenant` của bước 33; dòng có `preset_key`, khách sửa / tắt /
+  xoá được như vị trí tự tạo):
+
+  | `key` | Kiểu | Nhận | Tỉ lệ · cỡ tối thiểu | Trang |
+  |---|---|---|---|---|
+  | `top_strip` | `strip` | `text` | — | `any` |
+  | `home_hero` | `carousel` | `image` | 3:1 · 1800×600 (điện thoại 4:5 · 800×1000) | `home` |
+  | `home_middle` | `grid` (3) | `image` | 1:1 · 600×600 | `home` |
+  | `category_top` | `single` | `image` | 4:1 · 1600×400 | `category`, `collection` |
+  | `sidebar_left`, `sidebar_right` | `stack` | `image` | 1:2 · 300×600 | `category`, `collection`, `search`, `content_entry` |
+  | `inline` | `single` | `any` | 4:1 · 1200×300 | `content_entry`, `product`, `landing` |
+  | `above_footer` | `single` | `image` | 4:1 · 1600×400 | `any` |
+  | `popup` | `popup` (`once_per_day`, 5 giây) | `image` | 4:5 · 600×750 | `home`, `category`, `content_entry` |
+
+  Vị trí `seller_store.*` (D-233) mang kiểu `carousel` / `single`, ảnh theo chính sách của sàn.
+- **Banner chọn trang hiện** trong phạm vi của vị trí: `page_kinds` (tập con, trống = mọi loại của vị trí) và
+  `page_targets` (JSON, tối đa 50 cặp `{kind, id}` theo sổ đối tượng — vd `catalog.category`, `catalog.collection`,
+  `catalog.product`, `content.entry`; kiểm tồn tại khi lưu, `content.page_target_not_found`). Ví dụ: banner cột trái
+  chỉ ở danh mục "Điện thoại".
+- **Banner dạng chữ** (`kind = text`): `title` (≤ 120 ký tự), `cta_label?`, link như banner ảnh, `tone` (tên token màu
+  của theme — `primary`, `secondary`, `accent`, `neutral`; không mã màu tự do, đổi theme là dải chữ đổi theo); không
+  `media_id`. Hợp cho dải trên cùng: "Miễn phí giao hàng đơn từ 300.000đ — xem ngay".
+- **Khác với khối của bước 67:** khối `announcement_bar` / `popup` của trang dựng từ khối là chữ **cố định** trong một
+  trang (popup đó để thu email, có đồng ý); vị trí banner là nội dung **có lịch, xoay vòng, quản lý một chỗ** dùng
+  ở nhiều trang. Muốn dải trên cùng có lịch thì đặt khối `content.placement {key: "top_strip"}` vào đầu trang của
+  website (D-234).
+- **Khối `content.placement`** (khai ở `content` khi có sổ khối của bước 67): props `{key}`; `BlockData` gom mọi vị trí
+  trong một trang thành **một** lần đọc, trang dựng từ khối tính là `page_kind = landing` (hay `content_entry` /
+  `content_type` theo trang), áp đúng lọc trang như endpoint công khai. Trang đích tự làm có cột phải hay slider
+  dùng chung banner đã quản lý.
+- **Thứ tự cố định** theo `position` khách sắp — không đảo ngẫu nhiên: đảo phá cache và người xem F5 thấy nhảy.
 
 ### Banner trong gian hàng người bán trên sàn (D-233)
 
@@ -139,8 +198,8 @@ Migration mới, có `down`.
 
 | Bảng | Cột chính | Khoá / index |
 |---|---|---|
-| `content_placements` | `tenant_id`, `id`, `key` (vd `home_hero`, `[a-z0-9_]{1,64}`; riêng vị trí hệ thống `seller_store.top`, `seller_store.middle` — D-233), `name`, `description`, `max_items` (mặc định 10, ≤ 50), `audience` (`site` mặc định / `seller_store`, D-233), `created_at`, `updated_at`, `version` | unique (`tenant_id`, `key`) |
-| `content_banners` | `tenant_id`, `id`, `placement_id`, `org_id` (null = mọi cửa hàng của khách), `locale`, `title`, `subtitle`, `cta_label`, `media_id`, `mobile_media_id` null, `alt`, `link_kind`, `link_url` null, `link_target_id` null, `starts_at` null, `ends_at` null, `position`, `status` (`draft` / `active` / `archived`), `review_status` (`not_required` mặc định / `pending` / `approved` / `rejected`), `review_reason` null, `reviewed_by` null, `reviewed_at` null (bốn cột duyệt — D-233), `ai_assisted`, `created_by`, `created_at`, `updated_at`, `version` | index (`tenant_id`, `placement_id`, `locale`, `status`, `position`); index (`tenant_id`, `link_kind`, `link_target_id`); index (`tenant_id`, `review_status`, `id`) (hàng chờ duyệt, D-233) |
+| `content_placements` | `tenant_id`, `id`, `key` (vd `home_hero`, `[a-z0-9_]{1,64}`; riêng vị trí hệ thống `seller_store.top`, `seller_store.middle` — D-233), `name`, `description`, `max_items` (mặc định 10, ≤ 50), `audience` (`site` mặc định / `seller_store`, D-233), `display`, `display_settings` (JSON), `accepts`, `ratio_w?`, `ratio_h?`, `mobile_ratio_w?`, `mobile_ratio_h?`, `min_width?`, `min_height?`, `devices`, `page_kinds` (JSON), `preset_key?`, `active` (D-236), `created_at`, `updated_at`, `version` | unique (`tenant_id`, `key`) |
+| `content_banners` | `tenant_id`, `id`, `placement_id`, `org_id` (null = mọi cửa hàng của khách), `locale`, `kind` (`image` / `text`, D-236), `title`, `subtitle`, `cta_label`, `tone?` (banner chữ, D-236), `media_id` null (bắt buộc khi `image`), `mobile_media_id` null, `page_kinds` (JSON), `page_targets` (JSON) (D-236), `alt`, `link_kind`, `link_url` null, `link_target_id` null, `starts_at` null, `ends_at` null, `position`, `status` (`draft` / `active` / `archived`), `review_status` (`not_required` mặc định / `pending` / `approved` / `rejected`), `review_reason` null, `reviewed_by` null, `reviewed_at` null (bốn cột duyệt — D-233), `ai_assisted`, `created_by`, `created_at`, `updated_at`, `version` | index (`tenant_id`, `placement_id`, `locale`, `status`, `position`); index (`tenant_id`, `link_kind`, `link_target_id`); index (`tenant_id`, `review_status`, `id`) (hàng chờ duyệt, D-233) |
 | `content_seller_banner_policies` (D-233) | `tenant_id`, `org_id` (nút sàn), `review_mode` (`pre_approval` / `post`), `max_per_seller`, `image_min_width` null, `image_min_height` null, `image_max_bytes` null, `updated_by`, `updated_at`, `version` | pk (`tenant_id`, `org_id`) |
 | `content_seller_banner_counts` (D-233) | `tenant_id`, `org_id` (nút `seller`), `count` (banner chưa lưu trữ), `updated_at` | pk (`tenant_id`, `org_id`) |
 | `catalog_collections` | `tenant_id`, `id`, `org_id` null, `kind` (`manual` / `rule`), `rules` text (JSON đã kiểm), `sort` (`manual` / `newest` / `price_asc` / `price_desc` / `best_selling`), `media_id` null, `status`, `starts_at`, `ends_at`, `version`, thời điểm | index (`tenant_id`, `status`) |
@@ -194,7 +253,8 @@ Công khai (không cần đăng nhập, `public_cache` như `content`; khách su
 
 | Method + path | Trả về |
 |---|---|
-| `GET /api/v1/content/public/placements/{key}?locale=&org_id=` | Banner `active`, trong khung giờ lúc gọi, của `org_id` và các nút tổ tiên (dùng `OrgTree`), sắp theo `position`. Ảnh dạng `PublicMedia` (có `variants`, `webp_url`), link đã dựng (`href`); banner có link không còn hiển thị được thì bỏ. Vị trí `seller_store.*`: `org_id` bắt buộc là nút `seller`, chỉ trả banner của đúng nút đó (không lấy tổ tiên) có `review_status` `approved` (D-233) |
+| `GET /api/v1/content/public/placements?keys=&locale=&org_id=&page_kind=&page_ref=` (D-236) | Nhiều vị trí của **một trang** trong một lời gọi (tối đa 10 `keys`): mỗi vị trí kèm `display`, `display_settings`, `accepts`, cỡ ảnh, `devices` và banner đã lọc theo trang (`page_ref` = `<kind>:<id>` của trang đang xem; banner không giới hạn trang luôn có). Cùng luật như dòng dưới; `max-age` là mốc gần nhất của mọi vị trí |
+| `GET /api/v1/content/public/placements/{key}?locale=&org_id=&page_kind=&page_ref=` | Banner `active`, trong khung giờ lúc gọi, của `org_id` và các nút tổ tiên (dùng `OrgTree`), sắp theo `position`. Ảnh dạng `PublicMedia` (có `variants`, `webp_url`), link đã dựng (`href`); banner có link không còn hiển thị được thì bỏ. Vị trí `seller_store.*`: `org_id` bắt buộc là nút `seller`, chỉ trả banner của đúng nút đó (không lấy tổ tiên) có `review_status` `approved` (D-233) |
 | `GET /api/v1/catalog/public/collections/{slug}?locale=` + phân trang sản phẩm | Bộ sưu tập và sản phẩm (cùng hình dạng thẻ sản phẩm của bước 41) |
 | `GET /api/v1/organizations/public/storefront?org_id=` | Thông tin cửa hàng đã kế thừa, cùng "đang mở cửa" tính theo múi giờ của nút. Bước 37 đã có thì kèm thông tin chủ sở hữu website và đoạn mã logo Bộ Công Thương của tên miền |
 
@@ -202,6 +262,8 @@ Công khai (không cần đăng nhập, `public_cache` như `content`; khách su
 - `max-age` = min(mặc định của `public_cache`, số giây tới mốc `starts_at` / `ends_at` gần nhất trong
   tương lai của các banner trong vị trí đó). Nhờ vậy CDN không giữ banner đã hết giờ.
 - `ETag` từ `version` của các dòng trả về và mốc đó.
+- Lọc theo trang chạy trong bộ nhớ trên các banner đang hiệu lực của vị trí (tối đa `max_items`, ≤ 50) — câu truy
+  vấn không đổi, không thêm index; `page_kind` / `page_ref` nằm trong đường dẫn nên CDN tự cache riêng từng trang.
 
 ### Tool MCP · Event · Job · Permission · Mã lỗi
 
@@ -245,6 +307,12 @@ Công khai (không cần đăng nhập, `public_cache` như `content`; khách su
   | `content.banner_not_pending` (409, D-233) | "Banner không ở trạng thái chờ duyệt." |
   | `content.review_reason_required` (422, D-233) | "Từ chối banner cần nêu lý do." |
   | `content.seller_store_org_required` (422, D-233) | "Vị trí của gian hàng cần `org_id` của một người bán." |
+  | `content.banner_image_size_invalid` (422, D-236) | "Ảnh cho vị trí `{key}` cần tỉ lệ {ratio} và tối thiểu {min_width}×{min_height} px." |
+  | `content.banner_kind_not_allowed` (422, D-236) | "Vị trí `{key}` chỉ nhận banner dạng {accepts}." |
+  | `content.page_kind_not_allowed` (422, D-236) | "Vị trí `{key}` không dùng ở trang loại `{page_kind}`." |
+  | `content.page_target_not_found` (422, D-236) | "Không có trang `{kind}` `{id}` để gắn banner." |
+  | `content.placement_settings_invalid` (422, D-236) | "Cài đặt hiển thị của vị trí chưa hợp lệ: {count} lỗi (xem `errors`)." |
+  | `content.placement_keys_too_many` (422, D-236) | "Mỗi lần đọc tối đa {max} vị trí." |
   | `catalog.collection_not_found` | — |
   | `catalog.rule_invalid` | — |
   | `catalog.rule_needs_module` | — |
@@ -252,12 +320,14 @@ Công khai (không cần đăng nhập, `public_cache` như `content`; khách su
 ## Thứ tự làm
 
 1. `content`: bảng vị trí và banner, service, API quản trị; link loại `Url` / `Entry` / `Term`. Gồm test.
+   Kiểu vị trí, cỡ ảnh, trang được hiện, banner dạng chữ, bộ vị trí chuẩn gieo qua `seed_tenant` (D-236).
    → mục 1 của ROADMAP.
-2. `content`: điểm cắm `ContentLinks`, endpoint công khai, tính `max-age`, nhận event tuỳ chọn của
+2. `content`: điểm cắm `ContentLinks`, endpoint công khai (cả đọc nhiều vị trí một lần, lọc theo trang — D-236), tính `max-age`, nhận event tuỳ chọn của
    `promotions`. → mục 2 và 5.
 3. `organizations`: khai cài đặt `storefront.*`, endpoint quản trị và công khai, "đang mở cửa". → mục 4.
 4. `catalog`: bộ sưu tập chọn tay, rồi theo quy tắc, rồi số bán và kiểu sắp `best_selling`; gắn
-   `LinkTarget` cho sản phẩm và bộ sưu tập. → mục 3 và 5.
+   `LinkTarget` cho sản phẩm và bộ sưu tập; đăng ký `catalog.category`, `catalog.collection` vào sổ đối tượng
+   (D-236). → mục 3 và 5.
 5. `promotions`: gắn `LinkTarget` cho chương trình. → mục 5.
 6. Tool MCP, tài liệu cho người làm giao diện: thêm mục vào `docs/CONTENT.md` / `.vi.md` và tài liệu của
    `catalog`, có ví dụ trang chủ; CHANGELOG. → mục 6.
@@ -265,6 +335,7 @@ Công khai (không cần đăng nhập, `public_cache` như `content`; khách su
    `seller_store.*`, chính sách, bộ đếm hạn mức, kiểm link / chữ / ảnh, endpoint duyệt, `LinkTarget::owners`;
    `catalog` cài `owners` cho sản phẩm và bộ sưu tập; `marketplace` gắn `SellerStore` và thêm `content.manage`
    độ sâu `unit` vào role chủ gian hàng; tài liệu EN + VI. → mục 7.
+8. Khối `content.placement` cho trang dựng từ khối (D-236, cần sổ khối của bước 67). → mục 1.
 
 ## Test bắt buộc
 
@@ -289,6 +360,16 @@ Mọi test chạy trên cả SQLite và Postgres qua `TestDatabase::run` / `Test
 - `thong_tin_cua_hang_ke_thua`:
   - cửa hàng không đặt số điện thoại thì lấy của chuỗi;
   - "đang mở cửa" đúng theo múi giờ của nút, kể cả qua nửa đêm.
+- Kiểu vị trí và chọn trang (D-236):
+  - `anh_sai_ti_le_hay_qua_nho_bi_tu_choi_kem_co_can`, `anh_dien_thoai_kiem_ti_le_rieng`;
+  - `dai_chu_chi_nhan_banner_chu`, `banner_chu_khong_nhan_ma_mau_tu_do`;
+  - `banner_chi_hien_o_danh_muc_da_chon` (danh mục khác và trang chủ không thấy; banner không giới hạn trang vẫn
+    thấy), `page_kind_ngoai_pham_vi_vi_tri_bi_tu_choi`, `page_target_khong_ton_tai_bi_tu_choi`;
+  - `doc_nhieu_vi_tri_mot_lan_goi` (đếm query: không tăng theo số vị trí ngoài một lần mỗi bảng),
+    `max_age_la_moc_gan_nhat_cua_moi_vi_tri`;
+  - `khach_moi_co_bo_vi_tri_chuan`, `xoa_vi_tri_chuan_khong_gieo_lai`, `gieo_lai_khong_trung`;
+  - `cai_dat_carousel_duoi_4_giay_bi_tu_choi`, `thu_tu_co_dinh_khong_dao`;
+  - `khoi_placement_trong_trang_mot_lan_doc` (trang có 3 khối vị trí → một lần đọc).
 - Banner gian hàng người bán (D-233):
   - `nguoi_ban_khong_sua_duoc_banner_cua_nguoi_ban_khac`: đọc, sửa, xoá banner của nút `seller` anh em → 403 /
     404; danh sách không lộ; tạo banner với `org_id` của nút khác hay `null` → 403.
@@ -331,6 +412,10 @@ Mọi test chạy trên cả SQLite và Postgres qua `TestDatabase::run` / `Test
   - index có sẵn của `catalog` phải phủ;
   - đo bằng `EXPLAIN` trên bộ dữ liệu lớn (bước 39).
 - **`org_id` null nghĩa là "mọi cửa hàng của khách", không phải "không ai thấy".** Viết test riêng.
+- **Đảo banner ngẫu nhiên mỗi lần tải** (D-236): phá cache CDN, người xem thấy nhảy. Thứ tự cố định theo `position`.
+- **Gọi từng vị trí một** (D-236): trang có 6 vị trí thành 6 lời gọi — dùng `GET /public/placements?keys=`.
+- **Gieo lại bộ vị trí chuẩn đè lên chỉnh sửa của khách** (D-236): chỉ gieo khi tạo khách; khách đã xoá thì thôi.
+- **Kiểm cỡ ảnh bằng cách tải ảnh về:** dùng kích thước `media` đã lưu lúc tải lên, không đọc lại tệp.
 - **Banner trỏ tới sản phẩm bị xoá:** `resolve` trả thiếu ID đó thì bỏ banner khỏi kết quả công khai. Không
   báo lỗi cho người xem.
 - **Banner gian hàng lọt ra trang chung của sàn** (D-233): truy vấn vị trí `site` lấy banner của `org_id` và tổ

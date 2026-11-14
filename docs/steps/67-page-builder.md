@@ -2,7 +2,7 @@
 
 > Lộ trình: `docs/ROADMAP.md` bước 67 · Luật chung: `docs/steps/README.md` · Quyết định: D-229 (thiết kế bước
 > này), D-231 (thử A/B, AI tạo ảnh, khối mã tự viết), D-234 (chủ đề theo lịch, đầu trang /
-> chân trang của website), D-235 (loại nội dung tự định nghĩa), D-026 (core chỉ có API), D-102 (thân bài từ chối mặc định), D-109 (AI chỉ thành nháp), D-123 (sổ đối
+> chân trang của website), D-235 (loại nội dung tự định nghĩa), D-236 (khối vùng banner, khai ở bước 55), D-026 (core chỉ có API), D-102 (thân bài từ chối mặc định), D-109 (AI chỉ thành nháp), D-123 (sổ đối
 > tượng), D-208 (nội dung theo website và nút)
 
 ## Mục tiêu
@@ -99,6 +99,7 @@ Khối nền tối thiểu (khai ở `content`, trừ khi ghi khác):
 | Media | `image` (ID `media`), `gallery`, `video` (ID `media` hay nhúng từ host cho phép như D-102), `hero` (ảnh nền + tiêu đề + nút) |
 | Thu khách | `announcement_bar`, `countdown` (tới một mốc giờ UTC), `popup` (thu email: luôn kèm ô đồng ý của bước 37, tần suất hiện, không chặn đóng) |
 | Nhúng | `content.embed` (bản ghi qua sổ đối tượng, P6), `content.posts` (danh sách bài theo chuyên mục), `content.menu` (menu sẵn có của `content` theo `key`), `content.logo` (logo hiệu lực của chủ đề, link về trang chủ), `content.search_box` |
+| Banner | `content.placement {key}` (khai ở **bước 55** khi có vị trí banner — D-236): vùng banner có lịch, quản lý một chỗ, đặt vào trang hay đầu trang; khác `announcement_bar` / `popup` ở trên là chữ cố định của một trang |
 | Cửa hàng | `organizations.store_info` (khai ở `organizations` tại **bước 55** khi có thông tin cửa hàng: tên, liên hệ, địa chỉ, giờ mở cửa — chọn trường hiện) |
 | Module khác | `forms.embed`, `newsletter.signup`, `comments.thread`; bước 41+: `catalog.product_grid`, `catalog.product_card`, `catalog.collection`, `orders.add_to_cart`, `orders.buy_now`, `orders.cart_link`, `promotions.flash_sale`, `promotions.voucher_claim`, `orders.reviews` |
 | Pháp lý | `legal.footer` (khai ở `compliance`): thông tin chủ sở hữu, logo Bộ Công Thương — **tự gắn** cuối mọi trang của website bán hàng, không xoá được |
@@ -173,7 +174,7 @@ Khối nền tối thiểu (khai ở `content`, trừ khi ghi khác):
 - Có nháp và đăng: sửa vào `draft_layout`, `POST /site-regions/{id}/publish` mới thành bản công khai (đầu trang
   hiện trên mọi trang nên không đăng thẳng); lịch sử phiên bản như khu dùng chung.
 - Khối hay dùng trong đầu trang / chân trang: `content.logo`, `content.menu`, `content.search_box`,
-  `announcement_bar`, `organizations.store_info`, `newsletter.signup`; bước 41+ thêm `orders.cart_link`.
+  `announcement_bar`, `content.placement` (vd dải `top_strip` có lịch — bước 55, D-236), `organizations.store_info`, `newsletter.signup`; bước 41+ thêm `orders.cart_link`.
 - Bản chủ đề (mục 3a) có thể kèm đầu trang / chân trang riêng (vd đầu trang Tết có thanh thông báo nghỉ lễ); không
   kèm thì dùng khu của theme gốc.
 - Chân trang pháp lý (`legal.footer`) luôn gắn **dưới** khu `footer`, không nằm trong bố cục nên không xoá được.
