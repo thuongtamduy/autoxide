@@ -438,8 +438,10 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 | 52 Trải nghiệm quản trị nâng cao (D-201) | 51 | 41–49 |
 | 53 Hỗ trợ khách hàng (D-204) | 37 (thông báo, vụ việc khiếu nại) | 41–49 |
 | 54 Phân quyền chuẩn hàng đầu (D-205) | 34; P6, P7 cần P12 của 51; P1 làm ở bước 31 | 41–49, 53 |
-| 55 Phân tích truy cập (D-219) | 37 (đồng ý), 34 | 41–49 |
-| 56 Tự động hoá quy trình (D-219) | 51 (P12 duyệt, P15 job) | 41–49, 55 |
+| 55 Giao diện cửa hàng (D-219) | 41 (banner và thông tin cửa hàng làm được từ sau 34) | 42–49 |
+| 56 Chuyển dữ liệu từ nền tảng khác (D-219) | 47 | 48, 49 |
+| 57 Phân tích truy cập (D-220) | 37 (đồng ý), 34 | 41–49 |
+| 58 Tự động hoá quy trình (D-220) | 51 (P12 duyệt, P15 job) | 41–49, 57 |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
@@ -803,7 +805,7 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
 - [ ] Đối chiếu thiết kế 2 (D-217): sổ yêu cầu của chủ thể dữ liệu qua kênh khác, có hạn là dữ liệu (Luật
       91/2025 — cần đối chiếu); KYC `needs_info`; số người chấp nhận theo phiên bản văn bản; bản nháp thông
       báo sự cố; đối chiếu "bán trước khi thông báo website" bị cấm hay bị phạt rồi mới chọn chặn hay nhãn
-- [ ] Kênh đẩy cho ứng dụng di động (D-219): trait `MobilePushSender` (Firebase / Apple là module riêng,
+- [ ] Kênh đẩy cho ứng dụng di động (D-220): trait `MobilePushSender` (Firebase / Apple là module riêng,
       cần khoá — dừng lại hỏi), token thiết bị mã hoá, cùng luật đồng ý và khung giờ như web push
 
 ## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
@@ -919,7 +921,7 @@ cả SQLite và Postgres.
       chung qua database như `throttle` (D-116) hay một cách khác chạy trên cả hai database; đo
       chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
       quyết định
-- [ ] Bộ máy tìm kiếm thay được (D-219): trait `SearchBackend`, mặc định chạy trong database (bảng
+- [ ] Bộ máy tìm kiếm thay được (D-220): trait `SearchBackend`, mặc định chạy trong database (bảng
       `kernel_search_docs`, đúng dấu xếp trước), backend ngoài (Meilisearch, Typesense…) cắm vào không sửa
       module; module khai loại tài liệu tìm được; lọc theo khách và nút trong backend; lệnh dựng lại chỉ mục
 
@@ -1260,9 +1262,8 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       chối, event `kernel.approval_decided`, tool MCP); bộ lọc nội dung (`review`, `scheduled`,
       `ai_generated`, `missing_locale`, `missing_alt`); bỏ hoãn việc; thử cài đặt nối ngoài; hộp việc không
       có "Đã xử lý"
-- [ ] Nhập dữ liệu dùng chung (D-219): `POST /kernel/imports` mặc định chạy thử, báo lỗi theo dòng và cột,
-      chạy lại không tạo trùng, ghi qua cùng service như REST; module khai cột nhập được; bộ chuyển đổi từ
-      Shopify / WooCommerce / Haravan / Sapo là công cụ riêng làm sau
+- [ ] Nhập dữ liệu (D-220): không làm ở kernel — module `imports` (bước 56) thêm nguồn `autoxide` cùng cột với
+      xuất chung và đích `content`, `media`, `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý)
 
 ## 52. Trải nghiệm quản trị nâng cao (D-201)
 
@@ -1335,9 +1336,57 @@ Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe v
 - [ ] Endpoint theo chuẩn OpenID AuthZEN Authorization API 1.0; agent hành động thay người dùng có vết
       `on_behalf_of`; số đo quyết định quyền; hướng dẫn `docs/ACCESS.md` (EN + VI)
 
-## 55. Phân tích truy cập và hành vi (`analytics`) (chủ dự án giao ngày 14/11/2026, D-219)
+## 55. Giao diện cửa hàng qua API: banner, bộ sưu tập, thông tin cửa hàng (D-219)
 
-Đặc tả: [`docs/steps/55-analytics.md`](steps/55-analytics.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+Đặc tả: [`docs/steps/55-storefront.md`](steps/55-storefront.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 41. Website và app của khách tự vẽ giao diện (D-026: core chỉ có API); bước này cho
+họ dữ liệu để vẽ trang chủ, trang danh mục, chân trang mà không phải sửa code giao diện mỗi lần đổi.
+
+- [ ] Vị trí hiển thị và banner (`content`): vị trí theo khoá (vd `home_hero`), banner có ảnh máy tính
+      và điện thoại qua `Media`, tiêu đề, nút, link (địa chỉ, bài, danh mục, sản phẩm, bộ sưu tập,
+      chương trình khuyến mại), ngôn ngữ, khung giờ hiển thị, thứ tự, áp cho cửa hàng / nhánh (bước 34)
+- [ ] Đọc công khai `GET /api/v1/content/public/placements/{key}`: banner đang hiệu lực lúc gọi, ảnh có
+      `srcset` và WebP, cache tới mốc bắt đầu / kết thúc gần nhất; banner trỏ tới chương trình khuyến
+      mại tự ẩn khi chương trình kết thúc (event tuỳ chọn của `promotions`) — quảng cáo không được hứa
+      ưu đãi đã hết (Luật 19/2023, Luật Quảng cáo — cần đối chiếu)
+- [ ] Bộ sưu tập sản phẩm (`catalog`): chọn tay (có thứ tự) hay theo quy tắc (danh mục, thuộc tính,
+      khoảng giá, hàng mới, đang khuyến mại), sắp theo mới nhất / giá / bán chạy (số bán nhận từ event
+      tuỳ chọn của `orders`); trang công khai có slug, SEO, ảnh; dùng được trong menu và banner
+- [ ] Thông tin cửa hàng công khai (`organizations`): tên, logo, biểu tượng trang, liên hệ, địa chỉ
+      (`Address`), giờ mở cửa theo ngày và ngày nghỉ, mạng xã hội — kế thừa theo cây (chuỗi đặt, cửa
+      hàng ghi đè); chân trang lấy thêm thông tin chủ sở hữu và logo Bộ Công Thương từ bước 37
+- [ ] Liên kết tới đối tượng của module đăng ký sau (sản phẩm, bộ sưu tập, chương trình) qua điểm cắm
+      `ContentLinks` trong `content::api`: module đó gắn bộ dựng đường dẫn và bộ kiểm "còn hiển thị
+      không"; thiếu module thì link loại đó bị từ chối khi lưu
+- [ ] Tool MCP cho banner và bộ sưu tập (soạn, lên lịch, sắp xếp) như REST; AI chỉ gợi ý chữ, đánh dấu
+      `ai_assisted` (bước 37); hướng dẫn cho người làm giao diện (EN + VI)
+
+## 56. Chuyển dữ liệu từ nền tảng khác (`imports`, D-219)
+
+Đặc tả: [`docs/steps/56-imports.md`](steps/56-imports.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 47. Người bán đang ở Shopify, WooCommerce, Haravan, Sapo, KiotViet muốn chuyển sang mà
+không nhập lại tay và không mất thứ hạng tìm kiếm của đường dẫn cũ.
+
+- [ ] Module `imports`: tải file xuất (CSV, Excel) của nền tảng cũ; **hồ sơ ánh xạ cột là dữ liệu có
+      phiên bản** cho từng nền tảng (định dạng xuất của họ đổi thì sửa dữ liệu, không sửa code), người
+      dùng chỉnh ánh xạ được; nhận diện bảng mã và dấu phân cách
+- [ ] Chạy thử trước: xem trước số dòng, lỗi theo từng dòng và cột, không ghi gì; chạy thật bằng job
+      theo lô, dừng / chạy tiếp được, gọi `api` của `catalog`, `inventory`, `customers`, `orders` (đơn
+      cũ nhập làm lịch sử, không trừ kho, không gửi thông báo) — không ghi thẳng vào bảng module khác
+- [ ] Chạy lại không trùng: bảng ánh xạ ID nguồn → ID mới theo nền tảng và loại; ảnh tải từ link của
+      nền tảng cũ qua bộ chặn SSRF của kernel (`autoxide_kernel::net`), giới hạn cỡ, vào `media`
+- [ ] Giữ đường dẫn cũ: tạo chuyển hướng 301 từ đường dẫn sản phẩm / danh mục / bài cũ sang đường dẫn mới
+      (chuyển hướng của `content`), báo các đường dẫn không ánh xạ được
+- [ ] Dữ liệu cá nhân khi nhập khách hàng (Luật BVDLCN 91/2025): người nhập xác nhận căn cứ xử lý; đồng ý
+      nhận quảng cáo **không** tự mang sang nếu không có bằng chứng (bước 37); mật khẩu cũ không nhập —
+      khách đặt lại qua link; file tải lên xoá sau khi xong
+- [ ] Báo cáo sau khi nhập (đã tạo, bỏ qua, lỗi, cần làm tay); hướng dẫn chuyển từ từng nền tảng (EN + VI)
+
+## 57. Phân tích truy cập và hành vi (`analytics`) (chủ dự án giao ngày 14/11/2026, D-220)
+
+Đặc tả: [`docs/steps/57-analytics.md`](steps/57-analytics.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
 Bắt đầu SAU bước 37. Số liệu truy cập ngay trong Autoxide, không gửi dữ liệu người đọc cho bên thứ ba.
 
@@ -1348,9 +1397,9 @@ Bắt đầu SAU bước 37. Số liệu truy cập ngay trong Autoxide, không 
 - [ ] Theo dõi theo người chỉ khi đồng ý (sổ đồng ý bước 37), rút đồng ý thì xoá phần gắn người; hạn lưu là
       cấu hình; tool MCP chỉ đọc; phạm vi theo website của nút; test trên cả hai database
 
-## 56. Tự động hoá quy trình (`automations`) (chủ dự án giao ngày 14/11/2026, D-219)
+## 58. Tự động hoá quy trình (`automations`) (chủ dự án giao ngày 14/11/2026, D-220)
 
-Đặc tả: [`docs/steps/56-automations.md`](steps/56-automations.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+Đặc tả: [`docs/steps/58-automations.md`](steps/58-automations.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
 Bắt đầu SAU bước 51 (lệnh chờ duyệt, job API). Luật "khi … thì …" như Shopify Flow; mỗi hành động là một tool
 MCP đã có, chạy với quyền của người tạo luật.
@@ -1374,7 +1423,9 @@ tảng xin vào dữ liệu, nhóm nút ngoài cây cho báo cáo, quản trị 
 cuối ngày.
 
 Để sau (D-194): bán sỉ B2B (báo giá, công nợ, hạn mức tín dụng) · đặt lịch dịch vụ · chat chăm sóc
-khách · sản phẩm thuê bao định kỳ · bán xuyên biên giới nhiều tiền tệ · quảng cáo trong sàn.
+khách · sản phẩm thuê bao định kỳ · bán xuyên biên giới nhiều tiền tệ · quảng cáo trong sàn · đo hành vi
+người xem (lượt xem, phễu mua hàng, bấm banner — cần đồng ý cookie theo Luật BVDLCN; hiện để công cụ
+ngoài như Google Analytics làm).
 
 Chờ chủ dự án quyết (không làm khi chưa có quyết định): đăng nhập thay người dùng để hỗ trợ · định
 dạng ảnh AVIF. Đã cân nhắc và không làm: API dữ liệu tự

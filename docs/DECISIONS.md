@@ -5180,25 +5180,50 @@ Quyết định: theo luật "đặc tả của module cung cấp hợp đồng 
 Lý do: ba đặc tả viết song song nên lệch (B-b3, B-b10, B-3.2d, B-c12); để lệch thì bước 46 sẽ ghi hai bút
 toán cho cùng một đồng tiền.
 
-## D-219 · Thêm `analytics` (bước 55), `automations` (bước 56), nhập dữ liệu chung, tìm kiếm thay được, đẩy di động — 2026-11-14 — chủ dự án quyết
+## D-219 · Giao diện cửa hàng qua API (bước 55) và chuyển dữ liệu từ nền tảng khác (bước 56) — 2026-11-13 — agent quyết
+
+Quyết định: thêm bước 55 — vị trí hiển thị và banner trong `content` (lịch hiển thị, theo cửa hàng /
+nhánh, link tới đối tượng của module đăng ký sau qua điểm cắm `ContentLinks`, tự ẩn khi chương trình
+khuyến mại kết thúc), bộ sưu tập sản phẩm trong `catalog` (chọn tay hay theo quy tắc, sắp bán chạy từ
+event tuỳ chọn của `orders`), thông tin cửa hàng công khai là cài đặt kế thừa của nút trong
+`organizations`. Thêm bước 56 — module `imports`: nhập file xuất của Shopify, WooCommerce, Haravan, Sapo,
+KiotViet bằng hồ sơ ánh xạ cột là dữ liệu có phiên bản, chạy thử trước, chạy lại không trùng, chuyển
+hướng 301 từ đường dẫn cũ, không mang đồng ý quảng cáo và mật khẩu cũ. Đo hành vi người xem để sau (cần
+đồng ý cookie; hiện dùng công cụ ngoài).
+
+Lý do: chủ dự án hỏi hệ thống đã có biến thể, bảng giá, khuyến mại, voucher, banner và các module hỗ
+trợ như hệ thống lớn chưa (13/11/2026). Rà lộ trình thấy banner, bộ sưu tập, thông tin cửa hàng và chuyển
+dữ liệu từ nền tảng khác chưa có ở đâu, trong khi các nền tảng thương mại điện tử đều có và mọi khách
+chuyển nhà đều cần. Banner đặt trong `content` vì website không bán hàng cũng dùng; bộ sưu tập trong
+`catalog` vì là truy vấn trên sản phẩm.
+
+Đã cân nhắc: module `storefront` riêng — chỉ gom vài bảng của ba module, thêm hợp đồng mà không bớt phụ
+thuộc; nhập qua API của nền tảng cũ — cần tài khoản đối tác, để làm như bộ nối (D-191); trình dựng trang
+kéo thả — trái D-026 (core chỉ có API).
+
+## D-220 · Thêm `analytics` (bước 57), `automations` (bước 58), tìm kiếm thay được, đẩy di động — 2026-11-14 — chủ dự án quyết
 
 Quyết định: chủ dự án đồng ý các chỗ hở agent rà ra khi soát lộ trình:
 
-1. **Module `analytics`, bước 55 mới** (sau 37): số liệu truy cập tự lưu, mặc định không cookie (khoá phiên
+1. **Module `analytics`, bước 57 mới** (sau 37): số liệu truy cập tự lưu, mặc định không cookie (khoá phiên
    HMAC xoay và xoá mỗi ngày, không lưu IP hay user agent đầy đủ), chỉ giữ số gộp lâu dài; theo dõi theo người
    chỉ khi đồng ý qua sổ đồng ý của bước 37. Cấm dấu vân tay trình duyệt.
-2. **Module `automations`, bước 56 mới** (sau 51): luật "khi … thì …" — kích hoạt bằng event / lịch, điều kiện
+2. **Module `automations`, bước 58 mới** (sau 51): luật "khi … thì …" — kích hoạt bằng event / lịch, điều kiện
    là cây toán tử cố định, hành động là tool MCP chạy **với quyền hiện tại của người tạo luật**; hành động rủi
    ro chờ duyệt (P12), chống vòng lặp, khoá chống chạy trùng, `Idempotency-Key` mỗi bước.
-3. **Nhập dữ liệu chung** (P17 bước 51): mặc định chạy thử, báo lỗi theo dòng và cột, chạy lại không tạo trùng,
-   ghi qua cùng service như REST. Bộ chuyển đổi từ Shopify / WooCommerce / Haravan / Sapo là công cụ riêng.
+3. **Nhập dữ liệu:** không làm khung nhập ở kernel — dùng module `imports` của bước 56 (D-219) làm cách nhập
+   duy nhất, mở rộng thêm nguồn `autoxide` (cùng cột với xuất chung P16 bước 51) và đích `content`, `media`,
+   `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý).
 4. **Bộ máy tìm kiếm thay được** (P7 bước 40): trait `SearchBackend`, mặc định trong database (chạy như nhau trên
    hai database), backend ngoài là module riêng làm khi đo thấy cần.
 5. **Kênh đẩy di động** (`MobilePush`) cho `notifications` ở bước 37; bộ nối Firebase / Apple cần khoá thật —
    khi đó dừng lại hỏi.
 
+Thay một phần D-219: câu "đo hành vi người xem để sau (cần đồng ý cookie; hiện dùng công cụ ngoài)" — chủ dự
+án đã duyệt làm `analytics` không cookie, không công cụ ngoài. D-219 do agent quyết nên thay được.
+
 `CLAUDE.md` thêm `analytics`, `automations` vào danh sách module được dựng. Thứ tự đăng ký: `analytics` cùng nhóm
-với `newsletter`, `comments`, `support`; `automations` đăng ký cuối cùng (nghe event và gọi tool của mọi module).
+với `newsletter`, `comments`, `support`; `automations` đăng ký cuối cùng (sau `imports`, `reporting`) (nghe event và gọi tool của mọi module).
 Đặt lịch dịch vụ và ký hợp đồng điện tử vẫn chờ chủ dự án quyết hướng sản phẩm.
 
 Lý do: chủ cửa hàng nào cũng cần số liệu truy cập và tự động hoá; chuyển từ nền tảng khác cần nhập dữ liệu;

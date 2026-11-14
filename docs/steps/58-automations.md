@@ -1,6 +1,6 @@
-# Bước 56 — Tự động hoá quy trình (`automations`)
+# Bước 58 — Tự động hoá quy trình (`automations`)
 
-> Lộ trình: `docs/ROADMAP.md` bước 56 · Quyết định: D-219 · Đặc tả liên quan: `docs/steps/51-ui-contracts.md`
+> Lộ trình: `docs/ROADMAP.md` bước 58 · Quyết định: D-220 · Đặc tả liên quan: `docs/steps/51-ui-contracts.md`
 > (P12 lệnh chờ duyệt, P15 job API), `docs/steps/40-core-capabilities.md` (MCP), `docs/steps/54-authorization.md`
 
 ## Mục tiêu

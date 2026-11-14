@@ -868,7 +868,7 @@ chung** để mẫu do khách tự soạn có biến, điều kiện, vòng lặ
   DECISIONS trước khi chọn.
 - **Thấp (A-b10).** Báo cáo đã lưu và lịch gửi qua email (dùng xuất chung của bước 51, D-213).
 
-## Bổ sung theo D-219
+## Bổ sung theo D-220
 
 ### Kênh đẩy cho ứng dụng di động
 

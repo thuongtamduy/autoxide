@@ -505,7 +505,7 @@ Mọi test chạm database qua `TestDatabase::run` (SQLite và Postgres), qua RE
 - Có thêm `/llms-full.txt` (gộp hướng dẫn các module) hay không — khuyến nghị chưa, tới khi có module
   khai tài liệu riêng cho agent.
 
-## Bổ sung theo D-219
+## Bổ sung theo D-220
 
 ### P7 — Bộ máy tìm kiếm thay được (sau bước 33)
 

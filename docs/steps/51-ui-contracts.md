@@ -365,23 +365,17 @@ bộ lọc khác.
   /api/v1/kernel/settings/{name}/test` gọi thử qua trait của module (không trong transaction ghi).
 - P10: hộp việc không có "Đã xử lý" (D-212).
 
-## Bổ sung theo D-219
+## Bổ sung theo D-220
 
-### P17 — Nhập dữ liệu dùng chung
+### P17 — Nhập dữ liệu: dùng module `imports` (bước 56), không làm ở kernel
 
-Ngược với xuất chung (P16): `POST /api/v1/kernel/imports {resource, file_id, mapping?, dry_run=true}` — tệp
-CSV hay JSON Lines tải qua `files` / tải thẳng (P4 bước 40), chạy bằng job (P15), **mặc định chạy thử**: kiểm
-từng dòng, trả báo cáo `{rows, valid, errors: [{row, field, code, message}]}` (tải về được), không ghi gì;
-chạy thật với `dry_run=false` và `Idempotency-Key`, mỗi lô một transaction, dòng lỗi bỏ qua và ghi vào báo cáo,
-chạy lại không tạo trùng (khoá tự nhiên do module khai: SKU, email, số đơn ngoài). Chống CSV injection khi đọc
-và khi xuất lại báo cáo.
+Một cách nhập cho cả dự án: module `imports` của bước 56 (chạy thử trước, ánh xạ cột là dữ liệu có phiên
+bản, chạy lại không trùng, lỗi theo dòng và cột, ghi qua `api` của module đích). D-220 mở rộng nó:
 
-- Module khai `Module::imports` → `resource`, cột (kiểu, bắt buộc, khoá tự nhiên), permission, hàm ghi theo lô
-  gọi **cùng service** như REST (luật 8) — mặc định rỗng (D-038). Đầu tiên: `content` (bài, trang), `media`
-  (từ URL, có giới hạn và kiểm loại thật như tải lên), `newsletter` (người đăng ký — **chỉ** kèm bằng chứng đồng
-  ý), `catalog`, `customers`, `orders` (đơn lịch sử, không trừ kho, không ghi tiền mới).
-- **Bộ chuyển đổi từ nền tảng khác** (Shopify, WooCommerce, Haravan, Sapo): đổi tệp xuất của họ sang định dạng
-  nhập ở trên, là module hay công cụ riêng làm sau, không vào kernel.
-- Test (cả hai database): `chay_thu_khong_ghi_gi`, `loi_tung_dong_bao_dung_dong_va_cot`,
-  `chay_lai_khong_tao_trung`, `dong_loi_khong_lam_hong_lo`, `nhap_khong_vuot_quyen_nguoi_goi`,
-  `newsletter_khong_nhap_khi_thieu_bang_chung_dong_y`.
+- Thêm nguồn **`autoxide`**: định dạng CSV của chính Autoxide, **cùng cột với xuất chung (P16)** — xuất ở
+  khách này nhập được ở khách khác hay sau khi sửa trên bảng tính.
+- Thêm đích ngoài thương mại: `content` (bài, trang, kèm chuyển hướng 301 như bước 56 đã có), `media` (từ
+  URL qua `autoxide_kernel::net`, kiểm loại thật như tải lên), `newsletter` (người đăng ký **chỉ** kèm bằng chứng
+  đồng ý đầy đủ; không có thì không nhập — như bước 56 không mang đồng ý quảng cáo cũ).
+- Đích ngoài thương mại không phải chờ bước 47: phần nhập `content` / `media` / `newsletter` của `imports` làm
+  được khi bước 51 P16 (xuất chung) đã có; phần thương mại vẫn theo điều kiện bắt đầu của bước 56.

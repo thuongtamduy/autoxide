@@ -290,16 +290,32 @@ async fn chay_lai_khi_deadlock() {
         insert_note(db.write(), 1).await.unwrap();
         insert_note(db.write(), 2).await.unwrap();
         let attempts = Arc::new(AtomicUsize::new(0));
+        // Điểm hẹn của hai transaction (chỉ Postgres): cả hai khoá xong dòng đầu rồi mới khoá dòng
+        // thứ hai, nên chắc chắn deadlock dù máy nhanh hay chậm. Trước đây chỉ ngủ 300 ms — máy
+        // bận thì một bên xong trước khi bên kia kịp khoá, không có deadlock, test hỏng ngẫu nhiên.
+        let barrier = Arc::new(tokio::sync::Barrier::new(2));
         let mut tasks = tokio::task::JoinSet::new();
         for (first, second) in [(1, 2), (2, 1)] {
-            let (db, attempts) = (db.clone(), attempts.clone());
+            let (db, attempts, barrier) = (db.clone(), attempts.clone(), barrier.clone());
             tasks.spawn(async move {
-                let (db, attempts) = (&db, &attempts);
+                let (db, attempts, barrier) = (&db, &attempts, &barrier);
                 db.write_with_retry(move || async move {
                     attempts.fetch_add(1, Ordering::SeqCst);
                     let transaction = db.begin_write().await?;
                     touch_note(&transaction, first).await?;
-                    tokio::time::sleep(Duration::from_millis(300)).await;
+                    match db.backend() {
+                        // Lần chạy lại sau deadlock không còn ai tới điểm hẹn: hết hạn chờ thì đi
+                        // tiếp (bên kia đã bị huỷ, dòng đã nhả).
+                        DatabaseBackend::Postgres => {
+                            let _ =
+                                tokio::time::timeout(Duration::from_secs(2), barrier.wait()).await;
+                        }
+                        // SQLite: `begin_write` giữ quyền ghi cả database, bên kia chờ ở
+                        // `begin_write` — điểm hẹn sẽ chờ nhau mãi, nên chỉ ngủ như cũ.
+                        DatabaseBackend::Sqlite => {
+                            tokio::time::sleep(Duration::from_millis(300)).await;
+                        }
+                    }
                     touch_note(&transaction, second).await?;
                     transaction.commit().await?;
                     Ok(())
