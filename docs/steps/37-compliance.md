@@ -3,6 +3,9 @@
 > Lộ trình: `docs/ROADMAP.md` bước 37 · Thiết kế: `docs/research/business-foundation.md` trụ 5, mục 4
 > (Bộ Công Thương), mục 7 (D-190), mục 9 (D-194) · Quyết định: D-185, D-186, D-187, D-190, D-193, D-194
 > (và D-046, D-054, D-109, D-112, D-123 của phần đã có)
+> Nguồn đối chiếu thiết kế 2: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới
+> `docs/research/ui-trace/`.
+> Đã gộp các quyết định: D-202, D-206, D-217, D-220; đối chiếu thiết kế 2 (D-208…D-218) (D-228).
 
 File này có hai phần: **Phần A — module `compliance`**, **Phần B — module `notifications`**, cộng
 **Phần C — sửa module và kernel có sẵn**. Ba phần dùng chung một danh sách commit, test, tiêu chí xong.
@@ -17,7 +20,9 @@ từ mẫu; điều khoản, chính sách, quy chế, hợp đồng có phiên b
 báo vi phạm SHTT / hàng giả và khiếu nại người tiêu dùng có hạn xử lý và lưu vết; tài khoản đăng
 nội dung xác thực bằng SMS khi khách bật; sổ mục đích / đồng ý, thời hạn lưu, quy trình sự cố 72 giờ;
 nội dung có AI gợi ý mang `ai_assisted`; một module thông báo nhiều kênh tách tin giao dịch và tin
-quảng cáo, dùng chung sổ đồng ý với `newsletter`. Mọi điểm luật hay đổi là **dữ liệu có ngày hiệu
+quảng cáo, dùng chung sổ đồng ý với `newsletter`, có kênh đẩy cho ứng dụng di động (D-220); mẫu mail và
+thông báo do khách tự soạn qua một bộ dựng mẫu an toàn dùng chung trong kernel (D-206); yêu cầu của chủ thể
+dữ liệu qua kênh khác có sổ và hạn (D-217). Mọi điểm luật hay đổi là **dữ liệu có ngày hiệu
 lực**, không viết cứng trong code (D-186).
 
 Phục vụ cả năm mô hình: khách độc lập (website bán hàng → thông báo), chuỗi (mỗi tên miền một hồ sơ),
@@ -41,25 +46,31 @@ SaaS (mỗi khách tự lo hồ sơ của họ), sàn (đăng ký, KYC người 
 
 - Kernel: `crates/kernel/src/identity.rs` (trait `IdentityVerifier`), `crates/kernel/src/sms.rs`
   (trait `SmsSender`, kiểu `PhoneNumber`), `StartContext::optional`, `Module::retention`, cột cư trú dữ
-  liệu trên bảng mặt điều khiển của bước 33.
-- Testkit: `FakeIdentityVerifier`, `FakeSmsSender` (`crates/testkit/src/identity.rs`, `sms.rs`).
+  liệu trên bảng mặt điều khiển của bước 33; bộ dựng mẫu `autoxide_kernel::template` (D-206, mục 2).
+- Testkit: `FakeIdentityVerifier`, `FakeSmsSender` (`crates/testkit/src/identity.rs`, `sms.rs`); bản giả
+  `MobilePushSender` cho test (D-220).
 - Crate `modules/compliance` (`autoxide-compliance`), crate `modules/notifications`
   (`autoxide-notifications`); bảng `compliance_…`, `notifications_…`.
 - Tài liệu cho người ngoài: `docs/COMPLIANCE.md` + `docs/COMPLIANCE.vi.md` (gồm sổ tay sự cố 72 giờ),
   `docs/NOTIFICATIONS.md` + `docs/NOTIFICATIONS.vi.md`.
 
 **Sửa:** `content` (mẫu trang bắt buộc, `pub mod api` cho ảnh chụp trang đã đăng, `ai_assisted`, ẩn
-theo vụ việc), `media` (`alt_ai_assisted`), `comments` (cổng xác thực khi đăng, ẩn theo vụ việc),
-`newsletter` (sổ đồng ý chung), mọi module giữ dữ liệu cá nhân (khai `Module::retention`),
-`crates/app/src/modules.rs` (thứ tự đăng ký), `docs/MODULE_GUIDE.md` + `.vi.md`, `CHANGELOG.md`,
-`STACK.md` (nếu thêm thư viện web push), `docs/openapi.json`, `.env.example`.
+theo vụ việc), `media` (`alt_ai_assisted`), `comments` (xác thực khi đăng qua `PostingVerifier` của kernel
+mà `compliance` đăng ký — D-202; ẩn theo vụ việc), `newsletter` (sổ đồng ý chung, chiến dịch dùng bộ dựng
+mẫu — D-206), mọi module giữ dữ liệu cá nhân (khai `Module::retention`), `crates/app/src/modules.rs` (thứ
+tự đăng ký), `docs/MODULE_GUIDE.md` + `.vi.md`, `docs/COMMENTS.md` + `.vi.md` (D-202), `CHANGELOG.md`,
+`STACK.md` (thư viện web push nếu thêm; thư viện mẫu và `mrml` — D-206), `docs/openapi.json`,
+`.env.example`.
 
 **Ngoài phạm vi:** bộ nối VNeID / eKYC / SMS brandname / Zalo thật; nộp hồ sơ lên cổng Bộ Công Thương
 (không có API công khai — con người nộp); chiến dịch SMS / ZNS hàng loạt (chỉ có gửi từng tin; email
 hàng loạt vẫn là `newsletter`); nhận từ khoá "TC" trả lời SMS (cần bộ nối có tin đến); kiểm danh sách
 "không quảng cáo" quốc gia (ghi ở "Agent tự quyết"); SSE / realtime cho hộp thư trong ứng dụng (bước
 40); thuế khấu trừ, chứng từ (36); đánh giá sau mua (45 dùng `ModerationPolicy` của bước này); thông
-tin người bán trên trang sản phẩm (46 khai "fact" cho danh sách kiểm).
+tin người bán trên trang sản phẩm (46 khai "fact" cho danh sách kiểm); module `email` riêng — gửi mail vẫn
+là `mail` (`dyn Mailer`), nơi khách sửa mẫu vẫn là `notifications_templates`, chiến dịch vẫn là `newsletter`
+(D-206); bộ cài đặt `MobilePushSender` cho Firebase Cloud Messaging / Apple Push Notification service (module
+riêng, cần khoá của nhà cung cấp — khi đó dừng lại hỏi chủ dự án, D-220).
 
 ## Thiết kế
 
@@ -73,12 +84,15 @@ compliance      — require: dyn Mailer, dyn OrgDirectory, dyn AdministrativeUni
                   optional: dyn IdentityVerifier, dyn SmsSender
                   provide:  dyn KycGate, dyn PostingGate, dyn AcceptanceGate, dyn ConsentLedger,
                             dyn AccountVerification, dyn ModerationPolicy, dyn ComplianceRules, dyn ComplianceFacts
+                  đăng ký:  PostingVerifier của kernel (context.posting_verifier, D-202)
 notifications   — require: dyn Mailer, dyn Users (auth), dyn ConsentLedger, dyn AccountVerification, dyn ComplianceRules
-                  optional: dyn SmsSender, dyn ZnsSender;  provide: dyn Notifier
+                  optional: dyn SmsSender, dyn ZnsSender, dyn MobilePushSender (D-220);  provide: dyn Notifier
 newsletter      — DỜI xuống sau notifications (cần dyn ConsentLedger)
-comments        — DỜI xuống sau notifications (cần dyn PostingGate)
 catalog, inventory, … (như bảng tên dùng chung)
 ```
+
+`comments` không `require::<dyn PostingGate>` nên không phải dời thứ tự đăng ký: nó hỏi `PostingVerifier`
+của kernel, và chỗ giữ `PostingVerification` thấy bộ hỏi cả khi `compliance` khởi động sau (D-202, xem C2).
 
 Vì sao: `notifications` cần sổ đồng ý của `compliance` → `compliance` đứng trước. `compliance` vì vậy
 **không** dùng `dyn Notifier`: mail của nó (kết quả KYC, vụ việc, nhắc hạn sự cố) gửi thẳng bằng
@@ -152,6 +166,32 @@ Mã lỗi kernel mới (bản dịch ở `crates/kernel/locales/vi.json`): `iden
 ("Chưa cấu hình nhà cung cấp xác thực danh tính."), `identity_callback_invalid` ("Chữ ký callback của
 nhà cung cấp không hợp lệ."), `sms_disabled` ("Máy chủ chưa cấu hình gửi SMS."),
 `tenant_residency_violation` ("Khách yêu cầu lưu dữ liệu tại {country}; nơi lưu này không đáp ứng.").
+
+### 2. Kernel — bộ dựng mẫu `autoxide_kernel::template` (D-206)
+
+Không có module `email` riêng (Phạm vi). Bước này thêm **một bộ dựng mẫu dùng chung** để mẫu do khách tự
+soạn có biến, điều kiện, vòng lặp, và mail HTML hiển thị đúng ở mọi trình đọc. `notifications` (Phần B) và
+`newsletter` (C3) dùng nó.
+
+- **Ngôn ngữ mẫu an toàn cho người dùng tự viết** (mẫu là dữ liệu không tin cậy):
+  - biến `{{ customer.name }}`, điều kiện `{% if %}`, vòng lặp `{% for line in order.lines %}`, bộ lọc
+    định dạng của kernel (`money`, `date`, `number` theo ngôn ngữ và múi giờ của nút);
+  - **không** đọc tệp, gọi mạng, gọi hàm tuỳ ý, nạp mẫu khác ngoài danh sách khối dựng sẵn;
+  - giới hạn: độ dài mẫu (`AUTOXIDE_TEMPLATE_MAX_BYTES`, mặc định 64 KiB), số bước chạy, độ sâu vòng lặp,
+    độ dài kết quả — vượt thì lỗi `template.limit_exceeded`, không treo worker;
+  - mặc định **thoát HTML** mọi giá trị chèn vào bản HTML; muốn chèn HTML phải là khối dựng sẵn của hệ
+    thống (vd bảng dòng hàng), không có bộ lọc `raw` cho dữ liệu người dùng.
+- **Thư viện:** cần một thư viện mẫu (vài chục dòng tự viết không đủ cho điều kiện, vòng lặp, giới hạn
+  chạy); chọn giữa `liquid` và `minijinja` — "Agent tự quyết" #9. Chỉ một ngôn ngữ mẫu trong cả dự án.
+- **Bố cục HTML:** khung mail chung (logo, màu chủ đạo, chân thư có địa chỉ người gửi theo hồ sơ pháp lý
+  của nút) viết bằng MJML, dựng bằng `mrml` (MJML viết bằng Rust) để chạy đúng trên Outlook, Gmail, điện
+  thoại. Khách chỉnh logo / màu / chân thư bằng dữ liệu, không sửa MJML. **Luôn kèm bản chữ thuần** sinh
+  từ cùng mẫu.
+- **Hợp đồng biến:** loại thông báo khai **schema biến** (JSON Schema, cùng chỗ với `NotificationKind`) và
+  một bộ dữ liệu mẫu để xem trước. Lưu mẫu thì kiểm: cú pháp đúng, chỉ dùng biến có trong schema, biến bắt
+  buộc của loại đó có mặt (vd link đặt lại mật khẩu) — sai thì gom lỗi một lần (D-083) với vị trí dòng,
+  cột: `template.syntax_error`, `template.unknown_variable`, `template.required_variable_missing`.
+- Kernel chỉ dựng chữ, không biết khái niệm đơn hàng hay sản phẩm: dữ liệu do module khai báo loại đưa vào.
 
 ---
 
@@ -242,7 +282,7 @@ Khoá quy tắc (gói `vn` đóng trong crate ở `modules/compliance/rules/vn/*
 | Bảng | Cột chính | Khoá / index |
 |---|---|---|
 | `compliance_policies` | `tenant_id`, `key` (`jurisdiction`, `posting.comments`, `posting.reviews`, `posting.livestream`, `posting.max_accounts_per_phone`, `cases.auto_restrict`, `complaints.contact`, `privacy.contact`, `incident.alert_emails`), `value` JSON, `updated_by`, `updated_at` | PK (`tenant_id`,`key`) |
-| `compliance_kyc_profiles` | `id`, `tenant_id`, `subject_kind` (`user`/`org`), `subject_id`, `party_type`, `status` (`draft`/`pending`/`verified`/`rejected`/`expired`/`revoked`), `method`, `provider`, `provider_reference`, `verified_name`, `document_kind`, `document_hash` (SHA-256 của số đã chuẩn hoá), `document_last4`, `assurance`, `verified_at`, `expires_at`, `reason_code`, `reviewed_by`, `created_at`, `updated_at` | unique (`tenant_id`,`subject_kind`,`subject_id`); index (`tenant_id`,`status`,`id`), (`tenant_id`,`document_hash`) |
+| `compliance_kyc_profiles` | `id`, `tenant_id`, `subject_kind` (`user`/`org`), `subject_id`, `party_type`, `status` (`draft`/`pending`/`needs_info`/`verified`/`rejected`/`expired`/`revoked`; `needs_info` — A-c9), `method`, `provider`, `provider_reference`, `verified_name`, `document_kind`, `document_hash` (SHA-256 của số đã chuẩn hoá), `document_last4`, `assurance`, `verified_at`, `expires_at`, `reason_code`, `reviewed_by`, `created_at`, `updated_at` | unique (`tenant_id`,`subject_kind`,`subject_id`); index (`tenant_id`,`status`,`id`), (`tenant_id`,`document_hash`) |
 | `compliance_kyc_attempts` | `id`, `tenant_id`, `profile_id`, `method`, `provider`, `provider_reference`, `status`, `result_code`, `result` JSON (chỉ trường trong allowlist), `created_at`, `completed_at` | index (`tenant_id`,`profile_id`,`id`); unique (`tenant_id`,`provider`,`provider_reference`) khi có — dùng `''` khi chưa có và loại `''` khỏi kiểm ở service |
 | `compliance_kyc_callbacks` | `id`, `tenant_id`, `provider`, `received_at`, `body` (nguyên văn, đã kiểm chữ ký), `processed_at`, `attempt_id` | index (`tenant_id`,`received_at`); xoá theo `privacy.retention_limits` |
 | `compliance_kyc_documents` | `id`, `tenant_id`, `profile_id`, `storage_key` (`compliance/kyc/<tenant>/<id>`), `media_type`, `size`, `delete_after`, `deleted_at`, `created_at` | chỉ cho `method = manual`; job xoá file sau quyết định + `AUTOXIDE_COMPLIANCE_KYC_DOCUMENT_RETENTION_DAYS` |
@@ -262,6 +302,7 @@ Khoá quy tắc (gói `vn` đóng trong crate ở `modules/compliance/rules/vn/*
 | `compliance_disclosures` | `id`, `tenant_id`, `authority`, `request_reference`, `legal_basis`, `requested_at`, `subject` (`org:<id>`/`user:<id>`), `fields` JSON (TÊN trường đã cung cấp, không giá trị), `disclosed_by`, `disclosed_at` | index (`tenant_id`,`disclosed_at`) |
 | `compliance_incidents` | `id`, `tenant_id` (sự cố toàn nền tảng ghi một dòng cho từng khách bị ảnh hưởng, vì mỗi khách là bên kiểm soát dữ liệu của mình), `title`, `description`, `severity`, `status` (`open`/`contained`/`reported`/`closed`), `detected_at`, `report_due_at` (= `detected_at` + giờ của `privacy.incident`), `authority_notified_at`, `authority_reference`, `subjects_notified_at`, `data_categories` JSON, `affected_count`, `created_by`, `updated_at` | index (`tenant_id`,`status`,`report_due_at`) |
 | `compliance_incident_entries` | `id`, `tenant_id`, `incident_id`, `body`, `author_user_id`, `created_at` | chỉ thêm |
+| `compliance_subject_requests` (D-217) | `id`, `tenant_id`, `kind` (`access`/`erasure`/`rectification`/`objection`/`restriction`), `channel` (`email`/`post`/`phone`/`authority`/`other`), `subject` (email / số / user_id), `received_at`, `due_at`, `status` (`received`/`in_progress`/`fulfilled`/`rejected`), `reason`, `job_id`, `handled_by` | chỉ cho yêu cầu qua kênh khác — xem A3 "Dữ liệu cá nhân" |
 
 Cùng `compliance_events`, `compliance_jobs`, `compliance_throttle`.
 
@@ -279,7 +320,9 @@ nhà cung cấp → chỉ `method = manual`: người dùng tải ảnh giấy t
 `content`), ảnh xoá sau `delete_after`. Lưu tối thiểu: không lưu ảnh khuôn mặt / dữ liệu sinh trắc học
 (dữ liệu nhạy cảm, Luật 91/2025) — chỉ kết quả, mã tham chiếu, tên đã xác thực, băm + 4 số cuối giấy tờ.
 Cùng `document_hash` đã `verified` ở hồ sơ khác → giữ `pending` chờ duyệt tay (`reason_code =
-duplicate_document`). Job hằng ngày `compliance.kyc_expiry` → `expired` + event + mail.
+duplicate_document`). Job hằng ngày `compliance.kyc_expiry` → `expired` + event + mail. **Cần bổ sung**
+(A-c9): `POST …/kyc/profiles/{id}/request-info {fields, message}` đưa hồ sơ về `needs_info`; người nộp nhận
+thông báo, nộp bổ sung thì hồ sơ về lại `pending`.
 
 **Cổng chặn.** `KycGate::require_verified` đọc `kyc.required_activities` hiệu lực lúc gọi (trước
 01/7/2026 không chặn — ngày nằm trong dữ liệu). Bước 37 tự dùng cổng ở: `PostingGate` với
@@ -315,6 +358,12 @@ logo cập nhật tay (`POST …/status`) — `logo_snippet` chỉ nhận `<a hr
 src="https://…"></a>` (parse, dựng lại từ `link_url` + `image_url`; HTML khác → `compliance.logo_snippet_invalid`;
 miền cho phép là dữ liệu trong `moit.checklist.*`).
 
+**"Chặn bán" khi website chưa thông báo (A-3.5).** **Cần đối chiếu** NĐ 52/2013/NĐ-CP sửa bởi NĐ
+85/2021/NĐ-CP và Luật Thương mại điện tử 2025: bán trước khi thông báo website với Bộ Công Thương bị **cấm**
+hay chỉ **bị phạt**. Nếu cấm: thêm cổng chặn đặt hàng (`compliance.website_not_notified`, 403) gọi từ
+checkout của bước 45. Nếu không: nhãn trong danh sách kiểm đổi thành "bắt buộc theo luật", không chặn. Agent
+bước 37 ghi kết quả đối chiếu vào DECISIONS trước khi chọn ("Agent tự quyết" #10).
+
 **Văn bản pháp lý có phiên bản.** Văn bản được soạn là trang của `content` (một cách soạn trang);
 `POST …/documents/{id}/versions {source_entry_id, locale, effective_from, requires_reacceptance}` gọi
 `dyn PublishedEntries::published_snapshot` (content, xem C1) → chép **ảnh chụp bất biến** (title, body,
@@ -323,7 +372,8 @@ plain_text, `revision_id`, SHA-256) vào `compliance_document_versions`. `versio
 `POST /me/acceptances {version_id, channel, method}` (idempotent theo unique) ghi `sha256` của chính
 bản đã hiện cho người dùng. Bản mới có `requires_reacceptance` → `GET /me/pending-acceptances` liệt
 kê; `AcceptanceGate` từ chối tới khi chấp nhận lại. Bản không đòi chấp nhận lại vẫn có hiệu lực từ
-`effective_from` (người dùng thấy bản mới qua endpoint công khai).
+`effective_from` (người dùng thấy bản mới qua endpoint công khai). `GET …/documents/{id}/acceptance-stats`
+trả số người đã chấp nhận theo phiên bản (A-c9).
 
 **Vụ việc (SHTT / hàng giả / khiếu nại người tiêu dùng).** Tiếp nhận (công khai có chống spam
 `autoxide_kernel::antispam` như `forms`, hoặc người đăng nhập, hoặc nhân sự nhập từ cơ quan) →
@@ -349,8 +399,16 @@ hạn 1 năm). Rút đồng ý → event `compliance.consent_withdrawn {consent_
 lưu: `GET/PUT …/residency` đọc / đặt `data_residency` qua API kernel (chỉ nhân sự nền tảng đặt). Sự cố:
 tạo sự cố → `report_due_at`; job `compliance.incident_deadlines` (15 phút) gửi mail tới
 `incident.alert_emails` ở các mốc `remind_at_hours` và phát `compliance.incident_deadline_near`; sổ tay
-72 giờ ở `docs/COMPLIANCE*.md`. `GET …/processing-register` xuất sổ hoạt động xử lý (mục đích, căn cứ,
-loại dữ liệu, thời hạn, nơi lưu) làm đầu vào cho hồ sơ đánh giá tác động — mẫu hồ sơ cần đối chiếu.
+72 giờ ở `docs/COMPLIANCE*.md`. Sự cố có bản nháp thông báo gửi cơ quan và gửi người bị ảnh hưởng (AI chỉ
+là bản nháp, D-109; A-c9), mốc 72 giờ như trên. `GET …/processing-register` xuất sổ hoạt động xử lý (mục
+đích, căn cứ, loại dữ liệu, thời hạn, nơi lưu) làm đầu vào cho hồ sơ đánh giá tác động — mẫu hồ sơ cần đối
+chiếu.
+
+**Sổ yêu cầu của chủ thể dữ liệu (D-217, A-b3, A-c8).** Yêu cầu đến qua kênh khác (email, thư, điện thoại, cơ
+quan) ghi vào `compliance_subject_requests`; `POST …/subject-requests/{id}/fulfil` chạy job xuất / xoá dùng
+cơ chế sẵn có; việc vào hộp việc kèm hạn. Hạn trả lời là dữ liệu có ngày hiệu lực (Luật 91/2025/QH15, NĐ
+356/2025 — **cần đối chiếu văn bản gốc**). Không áp cho yêu cầu người dùng tự làm trong tài khoản: xuất và
+xoá dữ liệu người dùng tự bấm chạy ngay, không qua duyệt (D-217).
 
 **Bảo vệ người tiêu dùng.** Văn bản `general_conditions` (điều kiện giao dịch chung) công khai qua
 `/public/documents/general_conditions`, chấp nhận lúc thanh toán (bước 45 gọi `AcceptanceGate`); khiếu
@@ -371,6 +429,7 @@ Mọi response theo `Data` / `Page` / `Problem`; danh sách dùng `fetch_page`; 
 | `GET /kyc/profiles`, `GET /kyc/profiles/{id}` | `compliance.kyc.read` | lọc `status`, `subject` |
 | `POST /kyc/profiles`, `POST /kyc/profiles/{id}/sessions`, `POST /kyc/profiles/{id}/documents` | `compliance.kyc.submit` (hay quản trị nút có `Scope` trên nút đó) | hồ sơ của nút người bán |
 | `POST /kyc/profiles/{id}/approve` · `/reject` · `/revoke` | `compliance.kyc.review`, phiên người | `reason_code` bắt buộc khi reject / revoke |
+| `POST /kyc/profiles/{id}/request-info` | chưa nêu ("Agent tự quyết" #11) | `{fields, message}` → `needs_info` (A-c9) |
 | `POST /kyc/callbacks/{provider}` | công khai, chữ ký | 204; lỗi `identity_callback_invalid` |
 | `GET/POST /legal-profiles`, `GET/PATCH /legal-profiles/{id}` | `compliance.legal.read` / `.manage` | `Address` kiểm qua `AdministrativeUnits` |
 | `GET /legal-profiles/{id}/template-variables` | `compliance.legal.read` | biến cho mẫu trang của `content` |
@@ -380,11 +439,13 @@ Mọi response theo `Data` / `Page` / `Problem`; danh sách dùng `fetch_page`; 
 | `POST /websites/{id}/status` | `compliance.legal.manage` | `{status, reference, link_url, image_url, snippet}` |
 | `GET/POST /documents`, `GET /documents/{id}`, `GET/POST /documents/{id}/versions` | `compliance.documents.read` / `.manage` | `compliance.source_not_published` |
 | `GET /documents/{id}/acceptances` | `compliance.documents.read` | bằng chứng, lọc theo subject |
+| `GET /documents/{id}/acceptance-stats` | chưa nêu ("Agent tự quyết" #11) | số người đã chấp nhận theo phiên bản (A-c9) |
 | `GET /me/pending-acceptances`, `POST /me/acceptances` | đăng nhập | |
 | `GET/POST /purposes`, `PATCH /purposes/{key}` | `compliance.privacy.read` / `.manage` | |
 | `GET /me/consents`, `PUT /me/consents` | đăng nhập | `{purpose, scope, channel, granted, text, text_version}` |
 | `GET /consents`, `DELETE /consents` | `compliance.privacy.manage` | tra / xoá theo `subject` (email, số, user) cho yêu cầu của chủ thể |
 | `GET /retention`, `GET /processing-register`, `GET/PUT /residency` | `compliance.privacy.read` / `.manage` (PUT: nhân sự nền tảng) | |
+| `GET/POST /subject-requests`, `POST /subject-requests/{id}/fulfil` | chưa nêu ("Agent tự quyết" #11) | sổ yêu cầu của chủ thể qua kênh khác; `fulfil` chạy job xuất / xoá (D-217) |
 | `GET/POST /incidents`, `GET/PATCH /incidents/{id}`, `POST /incidents/{id}/entries` | `compliance.incidents.manage` | |
 | `GET/POST /cases`, `GET /cases/{id}`, `POST /cases/{id}/entries` | `compliance.cases.read` / `.handle` | |
 | `POST /cases/{id}/restrict` · `/restore` · `/decision` | `compliance.cases.handle` (decision: phiên người) | `compliance.case_state_invalid` |
@@ -467,6 +528,7 @@ chủ sở hữu cho chân trang), `GET /public/documents/{kind}?locale=` (bản
 | `compliance.incident_not_found` | 404 | Không có sự cố này. |
 | `compliance.rules_invalid` | 422 | Bản quy tắc không hợp lệ: {detail}. |
 | `compliance.link_invalid` | 400 | Link đã hết hạn hoặc không hợp lệ. |
+| `compliance.website_not_notified` | 403 | Website chưa thông báo với Bộ Công Thương nên chưa được bán. — **chỉ thêm khi** đối chiếu kết luận "cấm" (A3, "Chặn bán") |
 
 ---
 
@@ -476,7 +538,7 @@ chủ sở hữu cho chân trang), `GET /public/documents/{kind}?locale=` (bản
 
 ```rust
 pub enum Category { Security, Transactional, Marketing }   // Security: không tắt được
-pub enum Channel { Email, Sms, Zns, WebPush, InApp }
+pub enum Channel { Email, Sms, Zns, WebPush, InApp, MobilePush /* D-220 */ }
 pub struct NotificationKind { pub key: &'static str /* "orders.order_shipped" */, pub category: Category,
     pub channels: &'static [Channel], pub template: NotificationTemplate,
     pub purpose: Option<&'static str> /* Marketing: khoá mục đích trong sổ đồng ý, mặc định "marketing" */ }
@@ -500,6 +562,12 @@ pub struct Outcome { pub message_ids: Vec<Uuid>, pub skipped: Vec<(Channel, Skip
 }
 ```
 
+- **Schema biến** (D-206): mỗi loại thông báo khai cùng chỗ với `NotificationKind` một JSON Schema cho biến
+  và một bộ dữ liệu mẫu để xem trước (mục 2).
+- **Kênh `MobilePush`** (D-220): trait `MobilePushSender`; bộ cài đặt cho Firebase Cloud Messaging và Apple
+  Push Notification service là module riêng, cần khoá của nhà cung cấp — khi đó dừng lại hỏi chủ dự án; bản
+  giả cho test có sẵn.
+
 ### B2. Bảng dữ liệu (cấp khách hàng; migration `m0001_create_notifications` có `down`)
 
 | Bảng | Cột chính | Khoá / index |
@@ -507,9 +575,10 @@ pub struct Outcome { pub message_ids: Vec<Uuid>, pub skipped: Vec<(Channel, Skip
 | `notifications_messages` | `id`, `tenant_id`, `kind`, `category`, `channel`, `user_id` NULL, `address` (email / số / endpoint id; xoá sau hạn lưu), `locale`, `params` JSON, `status` (`queued`/`deferred`/`sent`/`failed`/`skipped`/`canceled`), `skip_reason` (`no_consent`/`consent_withdrawn`/`preference_off`/`no_address`/`channel_disabled`/`quiet_hours_expired`/`invitation_used`/`''`), `not_before`, `attempts`, `provider_reference`, `error_code`, `dedupe_key`, `created_at`, `sent_at` | unique (`tenant_id`,`dedupe_key`,`channel`); index (`tenant_id`,`user_id`,`id`), (`tenant_id`,`status`,`not_before`) |
 | `notifications_inbox` | `id`, `tenant_id`, `user_id`, `kind`, `title`, `body`, `link`, `read_at`, `created_at` | index (`tenant_id`,`user_id`,`id`), (`tenant_id`,`user_id`,`read_at`) |
 | `notifications_preferences` | `tenant_id`, `user_id`, `target` (`kind:<key>` hay `category:<tên>`), `channel`, `enabled`, `updated_at` | PK (`tenant_id`,`user_id`,`target`,`channel`) |
-| `notifications_templates` | `tenant_id`, `kind`, `channel`, `locale`, `title`, `body`, `short`, `zns_template_id`, `updated_by`, `updated_at` | PK (`tenant_id`,`kind`,`channel`,`locale`) — ghi đè mẫu mặc định |
+| `notifications_templates` | `tenant_id`, `kind`, `channel`, `locale`, `title`, `body`, `short`, `zns_template_id`, `format` (`plain` mặc định — giữ mẫu cũ / `template`), `subject`, `body_html` NULL, `body_text`, `version`, `published_at`, `updated_by`, `updated_at` (D-206) | PK (`tenant_id`,`kind`,`channel`,`locale`) — ghi đè mẫu mặc định. Bản nháp và bản đang dùng tách nhau; mỗi lần xuất bản tăng `version`, giữ 20 bản gần nhất để quay lại (D-206) |
 | `notifications_push_subscriptions` | `id`, `tenant_id`, `user_id`, `endpoint`, `endpoint_key` (SHA-256), `p256dh`, `auth_secret` (mã hoá AEAD của bước 33), `user_agent`, `failures`, `created_at`, `last_used_at` | unique (`tenant_id`,`endpoint_key`); index (`tenant_id`,`user_id`) |
 | `notifications_invitations` | `tenant_id`, `channel`, `subject_key` (SHA-256 số / email), `sent_at` | PK (`tenant_id`,`channel`,`subject_key`) — "chỉ một tin mời đăng ký đầu tiên" |
+| `notifications_device_tokens` (D-220) | `id`, `tenant_id`, `user_id`, `platform` (`ios`/`android`), `token` (mã hoá AEAD của bước 33), `app_id`, `locale`, `created_at`, `last_used_at`, `failures` | unique (`tenant_id`, băm `token`) |
 
 Cùng `notifications_events`, `notifications_jobs`, `notifications_throttle`.
 
@@ -538,31 +607,69 @@ Web push: VAPID (RFC 8292) + mã hoá nội dung (RFC 8291); khoá VAPID dẫn x
 `SecretKey::derive("notifications.vapid")` (không thêm secret mới); `GET /public/web-push-key` trả khoá
 công khai. Endpoint trả 404 / 410 → xoá subscription.
 
+Đẩy di động (`MobilePush`, D-220): token thiết bị trong `notifications_device_tokens`; nhà cung cấp báo token
+hết hiệu lực → xoá. Cùng luật như web push: tuỳ chọn nhận theo loại, tin quảng cáo cần đồng ý, khung giờ gửi.
+
+**Dựng mẫu khi gửi (D-206).**
+
+- Dựng mẫu ở worker `deliver`, **ngoài transaction**; lỗi dựng (mẫu hỏng sau khi lưu do dữ liệu bất
+  thường) → dùng mẫu mặc định trong code, ghi `error_code = template_fallback`, cảnh báo cho quản trị —
+  không bỏ tin giao dịch hay bảo mật.
+- Kênh SMS / ZNS / push dùng phần `short` của cùng bộ dựng (không HTML); ZNS vẫn đi theo mẫu đã duyệt của
+  Zalo, bộ dựng chỉ điền `zns_params`.
+- Mẫu tin **quảng cáo** không thể bỏ chân thư huỷ nhận và nhãn quảng cáo: bộ dựng tự chèn, mẫu không gỡ
+  được. Không chèn điểm ảnh theo dõi hay link theo dõi vào mẫu mặc định; khách bật đo mở thư thì phải có
+  căn cứ xử lý trong sổ của `compliance` (Luật 91/2025 — cần đối chiếu).
+
+**Báo cáo đã lưu (ưu tiên thấp, A-b10).** Báo cáo đã lưu và lịch gửi qua email, dùng xuất chung của bước 51
+(D-213).
+
 ### B4. API, MCP, event, job, cấu hình, permission, lỗi
 
-REST `/api/v1/notifications`: `GET /kinds` (đăng nhập: loại, nhóm, kênh — cho trang tuỳ chọn);
-`GET /me/inbox` (Page), `GET /me/inbox/unread-count`, `POST /me/inbox/{id}/read`, `POST /me/inbox/read-all`;
-`GET /me/preferences`, `PUT /me/preferences` (`notifications.preference_locked` khi tắt `Security`);
-`POST /me/push-subscriptions`, `DELETE /me/push-subscriptions/{id}`; `GET /templates`, `PUT/DELETE
-/templates/{kind}/{channel}/{locale}`, `POST …/preview` (`notifications.templates.manage`);
-`POST /messages` (`notifications.send`; kind `Marketing` cần thêm `notifications.send_marketing`), `GET
-/messages`, `GET /messages/{id}` (`notifications.messages.read`, có dữ liệu cá nhân); công khai `POST
-/public/unsubscribe {token}`, `GET /public/web-push-key`.
+**REST `/api/v1/notifications`:**
 
-MCP: `list_kinds` (read), `send_notification`, `list_messages` (read), `list_my_inbox` (read),
-`mark_inbox_read`. Event: `notifications.template_updated`, `…template_deleted`, `…preferences_updated`,
-`…push_subscription_added`, `…push_subscription_removed` — **không** phát event cho từng tin (audit phình;
-nhật ký gửi đã là `notifications_messages`). Job `notifications.deliver`; lịch hằng ngày
-`notifications.purge` (xoá `address` / `params` của tin quá `RETENTION_DAYS`, xoá inbox quá hạn).
-Setting: `AUTOXIDE_NOTIFICATIONS_RETENTION_DAYS` (90), `…_INBOX_RETENTION_DAYS` (180),
+- `GET /kinds` (đăng nhập: loại, nhóm, kênh — cho trang tuỳ chọn); `GET /kinds/{kind}/schema` (schema biến
+  và dữ liệu mẫu, D-206).
+- `GET /me/inbox` (Page), `GET /me/inbox/unread-count`, `POST /me/inbox/{id}/read`, `POST /me/inbox/read-all`;
+  `GET /me/preferences`, `PUT /me/preferences` (`notifications.preference_locked` khi tắt `Security`).
+- `POST /me/push-subscriptions`, `DELETE /me/push-subscriptions/{id}`; `POST /me/device-tokens`, `DELETE
+  /me/device-tokens/{id}` (D-220).
+- Mẫu (`notifications.templates.manage`): `GET /templates`, `PUT/DELETE /templates/{kind}/{channel}/{locale}`;
+  với cùng đường dẫn mẫu (D-206): `PUT …/draft`, `POST …/publish`, `POST …/rollback {version}`, `POST
+  …/preview` (dựng bằng dữ liệu mẫu của loại hay dữ liệu người gọi gửi — chỉ khoá có trong schema), `POST
+  …/test-send {to}` (gửi thử tới **địa chỉ đã xác minh của chính người gọi**, không tới địa chỉ tuỳ ý — chống
+  dùng làm công cụ gửi thư rác; có throttle).
+- `GET /branding`, `PUT /branding` (logo, màu, chân thư theo nút; `notifications.branding.manage`, D-206).
+- `POST /messages` (`notifications.send`; kind `Marketing` cần thêm `notifications.send_marketing`), `GET
+  /messages`, `GET /messages/{id}` (`notifications.messages.read`, có dữ liệu cá nhân).
+- Công khai: `POST /public/unsubscribe {token}`, `GET /public/web-push-key`.
+
+**MCP:** `list_kinds` (read), `send_notification`, `list_messages` (read), `list_my_inbox` (read),
+`mark_inbox_read`, `preview_template` (`read_only`), `update_template_draft` (D-206). Xuất bản mẫu qua REST
+hay tool `publish_template` có `approval_required` cho key `agent` (P12 bước 51). AI gợi ý mẫu (D-109) chỉ là
+bản nháp.
+
+**Event:** `notifications.template_updated`, `…template_deleted`, `…template_published`,
+`…template_rolled_back`, `…branding_updated` (D-206), `…preferences_updated`, `…push_subscription_added`,
+`…push_subscription_removed` — **không** phát event cho từng tin (audit phình; nhật ký gửi đã là
+`notifications_messages`).
+
+**Job:** `notifications.deliver`; lịch hằng ngày `notifications.purge` (xoá `address` / `params` của tin quá
+`RETENTION_DAYS`, xoá inbox quá hạn).
+
+**Setting:** `AUTOXIDE_NOTIFICATIONS_RETENTION_DAYS` (90), `…_INBOX_RETENTION_DAYS` (180),
 `…_UNSUBSCRIBE_URL`, `…_WEB_PUSH_CONTACT` (`mailto:` cho VAPID), `…_PER_RECIPIENT_PER_HOUR` (20).
-Permission: `notifications.send`, `notifications.send_marketing`, `notifications.messages.read`,
-`notifications.templates.manage`. Mã lỗi: `notifications.kind_unknown` (422, "Không có loại thông báo
-`{kind}`."), `notifications.template_invalid` (422, "Mẫu thông báo thiếu tham số {params}."),
+
+**Permission:** `notifications.send`, `notifications.send_marketing`, `notifications.messages.read`,
+`notifications.templates.manage`, `notifications.branding.manage` (D-206).
+
+**Mã lỗi:** `notifications.kind_unknown` (422, "Không có loại thông báo `{kind}`."),
+`notifications.template_invalid` (422, "Mẫu thông báo thiếu tham số {params}."),
 `notifications.message_not_found` (404, "Không có tin này."), `notifications.preference_locked` (422,
 "Không tắt được thông báo bảo mật."), `notifications.push_subscription_invalid` (422, "Đăng ký nhận thông
 báo đẩy không hợp lệ."), `notifications.link_invalid` (400, "Link đã hết hạn hoặc không hợp lệ."),
-`notifications.zns_disabled` (503, "Máy chủ chưa cấu hình Zalo ZNS.").
+`notifications.zns_disabled` (503, "Máy chủ chưa cấu hình Zalo ZNS."). Lỗi lưu mẫu `template.*` của kernel ở
+mục 2 (D-206).
 
 ---
 
@@ -583,10 +690,17 @@ báo đẩy không hợp lệ."), `notifications.link_invalid` (400, "Link đã 
   `compliance.target_restricted` / `…target_restored` cho `content.entry:<id>`: cột mới
   `content_published.restricted_at`; trang công khai trả **451** `content.restricted` ("Nội dung tạm ẩn do
   có phản ánh vi phạm."), sitemap / feed / tìm kiếm bỏ qua; idempotent.
-- **C2 `comments`:** dời đăng ký sau `notifications`; `posting.rs` thêm bước đầu "xác thực tài khoản" gọi
-  `PostingGate::check(…, Comments)` NGOÀI transaction, trước kiểm nội dung; khách vãng lai bị từ chối
-  khi mức ≠ `none`. Nghe `target_restricted` / `restored` cho `comments.comment:<id>` → ẩn / hiện lại
-  (giữ trạng thái cũ để khôi phục đúng).
+- **C2 `comments` (D-202):** kernel đã có `autoxide_kernel::access::PostingVerifier` (`is_verified(user_id)`)
+  và chỗ giữ `PostingVerification`; `comments` hỏi nó cho các loại đích trong
+  `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` (khách vãng lai luôn bị từ chối ở đó, lỗi
+  `comments.verification_required`). Chưa ai đăng ký thì mọi tài khoản đăng nhập tính là đã xác thực.
+  Bước này: `compliance` đăng ký `context.posting_verifier(…)` trong `start`, cài bằng
+  `AccountVerification::level` ≥ mức `posting.comments` của khách (khi bước 33 đã có, thêm tham số khách
+  vào trait của kernel bằng một hàm mới có cài đặt mặc định — D-038). `comments` **không**
+  `require::<dyn PostingGate>` và không phải dời thứ tự đăng ký; `posting.comments` khác `none` thì
+  `compliance` coi mọi loại đích của `comments` là "chỉ tài khoản đã xác thực" — ghi trong
+  `docs/COMMENTS.md` (+ `.vi.md`) cách hai cấu hình kết hợp. Nghe `target_restricted` / `restored` cho
+  `comments.comment:<id>` → ẩn / hiện lại (giữ trạng thái cũ để khôi phục đúng).
 - **C3 `newsletter`:** dời đăng ký sau `compliance`; mọi đường xác nhận (link, danh sách không double
   opt-in, nhập có `consent_source`, trang tuỳ chọn) gọi `ConsentLedger::grant` **trước** transaction của
   mình (`subject = Email`, `purpose = "marketing"`, `scope = "newsletter.list:<id>"`, `channel = "email"`,
@@ -595,7 +709,11 @@ báo đẩy không hợp lệ."), `notifications.link_invalid` (400, "Link đã 
   `granted_many` (thiếu → delivery `skipped`, lý do `consent_withdrawn`). Nghe
   `compliance.consent_withdrawn` → `ConsentLedger::get` lấy email → huỷ các đăng ký khớp (không gọi lại
   ledger nếu đã `unsubscribed`). Thêm task `newsletter.backfill_consents` ghi sổ cho đăng ký `confirmed` có
-  sẵn (idempotent theo `source_ref`).
+  sẵn (idempotent theo `source_ref`). Chiến dịch dùng bộ dựng mẫu (D-206): thêm `format` (`static` mặc định
+  — hành vi cũ / `template`); biến được phép: thông tin người nhận đã có (`subscriber.name`,
+  `subscriber.email` che bớt), danh sách, link huỷ — không gì khác. Dựng từng người nhận trong job gửi theo
+  lô, dùng chung một mẫu đã biên dịch. Endpoint chiến dịch hiện có giữ nguyên hành vi (D-059); thêm trường
+  mới, không đổi trường cũ.
 - **C4 AI (Luật 134/2025):** `content_entries`, `content_published` thêm `ai_assisted BOOL DEFAULT false`;
   snapshot revision thêm trường (serde default `false`); `PATCH /entries/{id}` nhận `ai_assisted` — đặt
   `true` khi người dùng áp gợi ý từ `seo-suggestions` hay sửa từ bản AI; đặt lại `false` cần
@@ -604,8 +722,8 @@ báo đẩy không hợp lệ."), `notifications.link_invalid` (400, "Link đã 
 - **C5 `Module::retention`:** khai cho `auth` (phiên, token), `audit`, `webhooks` (lần gửi), `forms`,
   `newsletter`, `comments` (bình luận, dấu vết IP), `media` (thùng rác), `compliance`, `notifications` —
   `keep` đọc từ setting đang có (không thêm setting mới).
-- **C6 `crates/app/src/modules.rs`:** thêm `compliance`, `notifications`; dời `newsletter`, `comments`
-  xuống sau; cập nhật bài `worker_chay_lich_dinh_ky_cua_module` (số lịch).
+- **C6 `crates/app/src/modules.rs`:** thêm `compliance`, `notifications`; dời `newsletter` xuống sau
+  (`comments` không phải dời — D-202); cập nhật bài `worker_chay_lich_dinh_ky_cua_module` (số lịch).
 
 ## Thứ tự làm
 
@@ -613,26 +731,30 @@ báo đẩy không hợp lệ."), `notifications.link_invalid` (400, "Link đã 
 |---|---|---|
 | 1 | Kernel `identity.rs`, `sms.rs` (`PhoneNumber` có test chuẩn hoá số VN), `StartContext::optional`, `Module::retention` + `RetentionCatalog`, migration cư trú dữ liệu, lỗi kernel; testkit `FakeIdentityVerifier`, `FakeSmsSender`; `MODULE_GUIDE` (EN + VI) | KYC, SMS, dữ liệu cá nhân |
 | 2 | Crate `compliance` khung: `lib.rs`, `api.rs` đủ trait A1, permission, event, `locales/vi.json`, ba file migration đặt sẵn tên, `compliance_rules` + gói `vn` + `ComplianceRules` + task / job nạp | nền chung |
-| 3 | KYC: hồ sơ, attempt, callback, tài liệu thủ công, `KycGate`, job hết hạn | KYC |
-| 4 | Xác thực số điện thoại + `AccountVerification` + `PostingGate` + `comments` dùng cổng (dời thứ tự) | NĐ 147, SMS |
+| 3 | KYC: hồ sơ, attempt, callback, tài liệu thủ công, `KycGate`, job hết hạn, `needs_info` + `request-info` (A-c9) | KYC |
+| 4 | Xác thực số điện thoại + `AccountVerification` + `PostingGate` + đăng ký `PostingVerifier` của kernel cho `comments`, `docs/COMMENTS*.md` (D-202) | NĐ 147, SMS |
 | 5 | `content`: `pub mod api` `PublishedEntries`, mẫu trang EN + VI, endpoint mẫu | Trang bắt buộc |
-| 6 | Hồ sơ pháp lý, website, trang gắn website, danh sách kiểm, `ComplianceFacts`, doctor, dossier, logo, endpoint công khai | Hồ sơ Bộ Công Thương |
-| 7 | Văn bản có phiên bản, chấp nhận, `AcceptanceGate`, `/public/documents` | Văn bản pháp lý |
-| 8 | Mục đích, sổ đồng ý, `ConsentLedger`, rút qua link, thời hạn lưu (`GET /retention` + khai của module, C5), cư trú dữ liệu, sự cố 72 giờ, sổ xử lý; `docs/COMPLIANCE*.md` | Dữ liệu cá nhân |
+| 6 | Hồ sơ pháp lý, website, trang gắn website, danh sách kiểm, `ComplianceFacts`, doctor, dossier, logo, endpoint công khai; đối chiếu "chặn bán" rồi làm cổng hay nhãn (A-3.5) | Hồ sơ Bộ Công Thương |
+| 7 | Văn bản có phiên bản, chấp nhận, `AcceptanceGate`, `/public/documents`, `acceptance-stats` (A-c9) | Văn bản pháp lý |
+| 8 | Mục đích, sổ đồng ý, `ConsentLedger`, rút qua link, thời hạn lưu (`GET /retention` + khai của module, C5), cư trú dữ liệu, sự cố 72 giờ (kèm bản nháp thông báo, A-c9), sổ xử lý, sổ yêu cầu của chủ thể (D-217); `docs/COMPLIANCE*.md` | Dữ liệu cá nhân |
 | 9 | Vụ việc + phản hồi + quyết định + công khai + disclosures; `content` / `comments` nghe ẩn / hiện | Báo vi phạm |
 | 10 | `ModerationPolicy`, `moderation.hide_reasons`, `general_conditions`, case `consumer_complaint` | Người tiêu dùng |
 | 11 | `ai_assisted` cho `content`, `alt_ai_assisted` cho `media` | Nhãn AI |
 | 12 | Crate `notifications`: khai loại, `Notifier`, email + in-app + SMS + ZNS (trait) + web push, ưu tiên, mẫu theo khách, khung giờ, tin mời, `docs/NOTIFICATIONS*.md` | `notifications` |
 | 13 | `newsletter` dùng sổ đồng ý (dời thứ tự, backfill) | `newsletter` dùng chung sổ |
-| 14 | `openapi.json`, `.env.example`, `CHANGELOG`, ROADMAP đánh dấu, DECISIONS (mục dưới) | — |
+| 14 | Kernel `template` (mục 2); `notifications` mẫu động: schema biến, nháp / xuất bản / quay lại, xem trước, gửi thử, thương hiệu theo nút; `newsletter` chiến dịch `format = template` (D-206) | Mẫu mail và thông báo động |
+| 15 | Kênh `MobilePush`: trait `MobilePushSender` + bản giả, `notifications_device_tokens`, endpoint token thiết bị (D-220) | Đẩy di động |
+| 16 | Báo cáo đã lưu, lịch gửi qua email (ưu tiên thấp, A-b10; cần xuất chung của bước 51, D-213) | `notifications` |
+| 17 | `openapi.json`, `.env.example`, `CHANGELOG`, ROADMAP đánh dấu, DECISIONS (mục dưới) | — |
 
 **Chia nhóm song song (theo skill `split-work`):** commit 1–2 do agent chính làm trước và merge (mọi
 nhóm cần trait và khung crate; file dùng chung `lib.rs`, `permissions.rs`, `events.rs`, `locales/vi.json`,
 `modules.rs` do agent chính giữ — nhóm gửi phần thêm, agent chính gộp). Sau đó bốn nhóm, mỗi nhóm một
 worktree: **N1** KYC + số điện thoại + cổng (3, 4); **N2** content mẫu + hồ sơ Bộ Công Thương + văn bản
 (5, 6, 7 — 7 cần `PublishedEntries` của 5 trong cùng nhóm); **N3** quyền riêng tư + vụ việc + người tiêu
-dùng + nhãn AI (8, 9, 10, 11); **N4** `notifications` + `newsletter` (12, 13 — dùng `ConsentLedger` của
-khung; test ban đầu với bản cài trong bộ nhớ, đổi sang thật khi N3 merge). Mỗi nhóm một file migration
+dùng + nhãn AI (8, 9, 10, 11); **N4** `notifications` + `newsletter` (12, 13, 14, 15 — dùng `ConsentLedger`
+của khung; test ban đầu với bản cài trong bộ nhớ, đổi sang thật khi N3 merge; kernel `template` của 14 là file
+dùng chung, agent chính gộp). Commit 16 làm sau cùng, khi bước 51 đã có xuất chung. Mỗi nhóm một file migration
 đã đặt tên sẵn ở commit 2 (`m0001` N1, `m0002` N2, `m0003` N3) để không đụng nhau.
 
 ## Test bắt buộc
@@ -650,7 +772,8 @@ Postgres; fake qua `TestAppBuilder::provide::<dyn IdentityVerifier>` / `<dyn Sms
   `tai_lieu_kyc_thu_cong_bi_xoa_sau_han`.
 - Số điện thoại: `otp_dung_mot_lan` (**đồng thời**: hai lần xác nhận cùng mã song song → đúng một thành
   công), `otp_sai_qua_so_lan_bi_khoa`, `otp_khong_nam_trong_job_va_log`, `mot_so_khong_xac_thuc_hai_tai_khoan`,
-  `binh_luan_bi_chan_khi_khach_doi_xac_thuc_so`, `khach_vang_lai_bi_chan_khi_doi_xac_thuc`.
+  `binh_luan_bi_chan_khi_khach_doi_xac_thuc_so`, `khach_vang_lai_bi_chan_khi_doi_xac_thuc`,
+  `comments_dung_trang_thai_xac_thuc_that` (đăng ký bộ hỏi thật, người chưa xác thực số bị từ chối — D-202).
 - Bộ Công Thương: `danh_sach_kiem_bao_thieu_trang_va_ma_so_thue`, `danh_sach_kiem_doi_theo_phien_ban_quy_tac`,
   `fact_chua_dang_ky_la_unknown`, `snippet_logo_la_bi_tu_choi` (script, `onerror`, miền khác),
   `badge_cong_khai_theo_ten_mien`, `doctor_canh_bao_website_thieu_muc`, `dossier_dien_tu_ho_so_that`.
@@ -667,7 +790,14 @@ Postgres; fake qua `TestAppBuilder::provide::<dyn IdentityVerifier>` / `<dyn Sms
   `ngoai_khung_gio_doi_toi_7h` (thời gian giả), `tin_moi_dang_ky_chi_mot_lan`,
   `thong_bao_bao_mat_khong_tat_duoc`, `dedupe_key_chong_gui_trung` (**đồng thời**: hai `notify` song song
   cùng khoá → một tin), `push_410_xoa_subscription`, `mau_cua_khach_ghi_de_mau_mac_dinh`,
-  `payload_job_chi_co_id`.
+  `payload_job_chi_co_id`; đẩy di động (D-220): `token_het_hieu_luc_bi_xoa`,
+  `tin_quang_cao_khong_gui_khi_chua_dong_y` (kênh di động).
+- Mẫu động (D-206): `mau_nguoi_dung_khong_doc_duoc_bien_ngoai_schema`,
+  `mau_vong_lap_vo_han_bi_cat_theo_gioi_han`, `gia_tri_chen_vao_html_luon_duoc_thoat`,
+  `mau_quang_cao_luon_co_chan_thu_huy_nhan`, `luu_mau_thieu_bien_bat_buoc_bi_tu_choi_mot_lan`,
+  `gui_thu_chi_toi_dia_chi_cua_nguoi_goi`, `mau_hong_luc_gui_dung_mau_mac_dinh`,
+  `xuat_ban_va_quay_lai_phien_ban`, `ban_tin_ca_nhan_hoa_moi_nguoi_nhan`,
+  `html_dung_tren_mau_mjml_va_co_ban_chu_thuan`.
 - Newsletter: `xac_nhan_ghi_so_dong_y`, `rut_o_compliance_huy_dang_ky_newsletter`,
   `chien_dich_bo_qua_nguoi_da_rut`, `backfill_chay_lai_khong_trung`.
 - **Rò rỉ giữa khách** (bài chung của testkit bước 33) cho mọi bảng của `compliance` và
@@ -683,7 +813,10 @@ Postgres; fake qua `TestAppBuilder::provide::<dyn IdentityVerifier>` / `<dyn Sms
       `NotificationTemplate` có bản dịch.
 - [ ] `docs/openapi.json`, `.env.example` sinh lại; `docs/COMPLIANCE.md` + `.vi.md`,
       `docs/NOTIFICATIONS.md` + `.vi.md`, `docs/MODULE_GUIDE.md` + `.vi.md` (mục `Module::retention`,
-      `StartContext::optional`, cách dùng `KycGate` / `PostingGate` / `Notifier`) cùng nội dung hai ngôn ngữ.
+      `StartContext::optional`, cách dùng `KycGate` / `PostingGate` / `Notifier`), `docs/COMMENTS.md` +
+      `.vi.md` (cách `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` và `posting.comments` kết hợp, D-202) cùng nội
+      dung hai ngôn ngữ.
+- [ ] `STACK.md` ghi thư viện mẫu đã chọn và `mrml` (D-206).
 - [ ] Mẫu trang EN + VI, mỗi mẫu ghi rõ cần người có chuyên môn pháp lý duyệt.
 - [ ] `CHANGELOG.md` có mục; ROADMAP đánh dấu `[x]`; DECISIONS có các mục ở "Agent tự quyết"; phát hành
       theo `docs/RELEASING.md` khi cả bước xong.
@@ -712,8 +845,9 @@ Postgres; fake qua `TestAppBuilder::provide::<dyn IdentityVerifier>` / `<dyn Sms
 - **Snippet logo** là HTML người dùng dán: không bao giờ trả lại nguyên văn — dựng lại từ URL đã kiểm.
 - **Event ra ngoài**: `webhooks` chuyển mọi event ra hệ thống ngoài — payload không mang email, số điện
   thoại, số giấy tờ, tên người báo.
-- **Thứ tự đăng ký**: `newsletter`, `comments` phải đứng sau `compliance` / `notifications`; nếu quên,
-  `require` lỗi lúc khởi động (tốt) — nhưng bài số lịch của `crates/app` phải sửa.
+- **Thứ tự đăng ký**: `newsletter` phải đứng sau `compliance` / `notifications`; nếu quên, `require` lỗi
+  lúc khởi động (tốt) — nhưng bài số lịch của `crates/app` phải sửa. `comments` không phải dời: nó hỏi
+  `PostingVerifier` qua chỗ giữ của kernel, không `require` trait của `compliance` (D-202).
 - **Bản quy tắc**: chọn bản có `effective_from ≤ t < effective_to` với `version` lớn nhất; hai bản cùng
   ngày hiệu lực → bản `version` lớn thắng. Nạp lại gói đóng sẵn không được ghi đè bản nhập tay.
 - **451 và cache**: trang bị ẩn phải mất khỏi cache (`ETag` đổi) và khỏi sitemap / feed.
@@ -728,9 +862,9 @@ bản gốc / người có chuyên môn pháp lý trước khi chạy thật** (
 | Tính năng | Căn cứ | Hiệu lực | Chưa chắc |
 |---|---|---|---|
 | KYC người bán, người livestream, người tiếp thị liên kết | Luật TMĐT 122/2025/QH15, Điều 17 (người bán); điều về livestream / tiếp thị liên kết | 01/7/2026 | Điều cụ thể cho livestream / tiếp thị; nghị định hướng dẫn (nguồn nêu NĐ 248/2026) |
-| Thông báo (logo xanh) / đăng ký (logo đỏ) website; thông tin bắt buộc trên website | NĐ 52/2013 sửa bởi NĐ 85/2021 (mục minh bạch thông tin, thông báo / đăng ký); từ 01/7/2026 theo Luật TMĐT 2025 + nghị định hướng dẫn | — | Danh mục hồ sơ, mẫu tờ khai mới; miền của logo |
+| Thông báo (logo xanh) / đăng ký (logo đỏ) website; thông tin bắt buộc trên website | NĐ 52/2013 sửa bởi NĐ 85/2021 (mục minh bạch thông tin, thông báo / đăng ký); từ 01/7/2026 theo Luật TMĐT 2025 + nghị định hướng dẫn | — | Danh mục hồ sơ, mẫu tờ khai mới; miền của logo; bán trước khi thông báo website bị **cấm** hay chỉ **bị phạt** (quyết cổng chặn hay nhãn, A-3.5) |
 | Xác thực tài khoản đăng nội dung bằng số di động tại Việt Nam / định danh điện tử | NĐ 147/2024/NĐ-CP | 25/12/2024 | Phạm vi áp cho bình luận / đánh giá ngoài mạng xã hội; số nước ngoài |
-| Đồng ý, căn cứ xử lý, quyền chủ thể, báo vi phạm 72 giờ, dữ liệu nhạy cảm (sinh trắc học) | Luật BVDLCN 91/2025/QH15; NĐ 356/2025/NĐ-CP | 01/01/2026 | Cơ quan nhận báo cáo và mẫu; mẫu hồ sơ đánh giá tác động |
+| Đồng ý, căn cứ xử lý, quyền chủ thể, báo vi phạm 72 giờ, dữ liệu nhạy cảm (sinh trắc học) | Luật BVDLCN 91/2025/QH15; NĐ 356/2025/NĐ-CP | 01/01/2026 | Cơ quan nhận báo cáo và mẫu; mẫu hồ sơ đánh giá tác động; hạn trả lời yêu cầu của chủ thể (D-217); căn cứ xử lý khi khách bật đo mở thư (D-206) |
 | Lưu dữ liệu tại Việt Nam | Luật An ninh mạng 116/2025/QH15; NĐ 53/2022/NĐ-CP | 01/7/2026 (luật) | Đối tượng bắt buộc lưu tại Việt Nam |
 | Văn bản có phiên bản, bằng chứng chấp nhận | Luật Giao dịch điện tử 20/2023/QH15 | 01/7/2024 | Yêu cầu lưu trữ thông điệp dữ liệu |
 | Điều kiện giao dịch chung, khiếu nại, không chặn / ẩn đánh giá trái quy định | Luật BVQLNTD 19/2023/QH15; NĐ 55/2024/NĐ-CP | 01/7/2024 | Thời hạn phản hồi khiếu nại (mặc định dữ liệu: 7 ngày làm việc); danh sách lý do được ẩn |
@@ -746,8 +880,8 @@ Ghi `docs/DECISIONS.md` (skill `record-decision`) cho mỗi mục đã chốt; m
 1. **Trang bắt buộc ở `content`, ảnh chụp ở `compliance`** — khuyến nghị như trên (một cách soạn trang;
    bằng chứng chấp nhận tự đủ). Ghi quyết định vì nó thêm `pub mod api` cho `content` và đặt thứ tự
    `content → compliance`.
-2. **Dời `newsletter`, `comments` sau `compliance` / `notifications`** và `compliance` không dùng `Notifier`
-   — ghi quyết định (đổi thứ tự đăng ký có sẵn).
+2. **Dời `newsletter` sau `compliance` / `notifications`** và `compliance` không dùng `Notifier` — ghi quyết
+   định (đổi thứ tự đăng ký có sẵn). `comments` không phải dời (D-202).
 3. **`ZnsSender` ở `notifications::api` hay kernel** — khuyến nghị `notifications::api` (chỉ thông báo dùng).
 4. **Web push**: tự viết RFC 8291 / 8292 bằng `p256` (đã có, bật `ecdh`), `hkdf`, `aes-gcm` hay dùng crate
    có sẵn — tra bằng `check-library-api`, đo số dòng; thêm thư viện thì ghi `STACK.md`.
@@ -758,124 +892,12 @@ Ghi `docs/DECISIONS.md` (skill `record-decision`) cho mỗi mục đã chốt; m
    để trait `DoNotContactList` cho bước sau, ghi ở "Sau core".
 8. **Gói quy tắc `vn` ban đầu**: nội dung danh sách kiểm, hạn, lý do ẩn — viết từ nguồn ở `business-foundation.md`,
    mọi mục `needs_legal_review: true`.
-
-## Bổ sung theo D-202 (điểm nối xác thực tài khoản đã có trong kernel)
-
-- Kernel đã có `autoxide_kernel::access::PostingVerifier` (`is_verified(user_id)`) và chỗ giữ
-  `PostingVerification`; `comments` hỏi nó cho các loại đích trong `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES`
-  (khách luôn bị từ chối ở đó, lỗi `comments.verification_required`). Chưa ai đăng ký thì mọi tài khoản
-  đăng nhập tính là đã xác thực.
-- Bước này: `compliance` đăng ký `context.posting_verifier(…)` trong `start`, cài bằng
-  `AccountVerification::level` ≥ mức `posting.comments` của khách (khi bước 33 đã có, thêm tham số khách
-  vào trait của kernel bằng một hàm mới có cài đặt mặc định — D-038). Thay phần C2 ở trên: `comments`
-  **không** `require::<dyn PostingGate>` và **không** dời thứ tự đăng ký; `posting.comments` khác `none`
-  thì `compliance` coi mọi loại đích của `comments` là "chỉ tài khoản đã xác thực" — ghi trong
-  `docs/COMMENTS.md` cách hai cấu hình kết hợp.
-- Test: `comments_dung_trang_thai_xac_thuc_that` (đăng ký bộ hỏi thật, người chưa xác thực số bị từ chối).
-
-## Bổ sung theo D-206 (mẫu mail và thông báo động, khách tự soạn)
-
-Không có module `email` riêng: gửi mail vẫn là `mail` (`dyn Mailer`), nơi khách sửa mẫu vẫn là
-`notifications_templates` (B2), chiến dịch vẫn là `newsletter`. Bước này thêm **một bộ dựng mẫu dùng
-chung** để mẫu do khách tự soạn có biến, điều kiện, vòng lặp, và mail HTML hiển thị đúng ở mọi trình đọc.
-
-### Bộ dựng mẫu trong kernel (`autoxide_kernel::template`)
-
-- **Ngôn ngữ mẫu an toàn cho người dùng tự viết** (mẫu là dữ liệu không tin cậy):
-  - biến `{{ customer.name }}`, điều kiện `{% if %}`, vòng lặp `{% for line in order.lines %}`, bộ lọc
-    định dạng của kernel (`money`, `date`, `number` theo ngôn ngữ và múi giờ của nút);
-  - **không** đọc tệp, gọi mạng, gọi hàm tuỳ ý, nạp mẫu khác ngoài danh sách khối dựng sẵn;
-  - giới hạn: độ dài mẫu (`AUTOXIDE_TEMPLATE_MAX_BYTES`, mặc định 64 KiB), số bước chạy, độ sâu vòng lặp,
-    độ dài kết quả — vượt thì lỗi `template.limit_exceeded`, không treo worker;
-  - mặc định **thoát HTML** mọi giá trị chèn vào bản HTML; muốn chèn HTML phải là khối dựng sẵn của hệ
-    thống (vd bảng dòng hàng), không có bộ lọc `raw` cho dữ liệu người dùng.
-- **Thư viện:** cần một thư viện mẫu (vài chục dòng tự viết không đủ cho điều kiện, vòng lặp, giới hạn
-  chạy). Ứng viên: `liquid` (cú pháp Liquid — Shopify dùng cho mẫu thông báo; chủ cửa hàng quen) và
-  `minijinja` (có vùng cách ly và giới hạn chạy). Agent làm bước này đo (thời gian dựng 1 000 mẫu, kích
-  thước binary), tra API bằng skill `check-library-api`, chọn một, ghi `STACK.md` và DECISIONS. Chỉ một
-  ngôn ngữ mẫu trong cả dự án.
-- **Bố cục HTML:** khung mail chung (logo, màu chủ đạo, chân thư có địa chỉ người gửi theo hồ sơ pháp lý
-  của nút) viết bằng MJML, dựng bằng `mrml` (MJML viết bằng Rust) để chạy đúng trên Outlook, Gmail, điện
-  thoại. Khách chỉnh logo / màu / chân thư bằng dữ liệu, không sửa MJML. **Luôn kèm bản chữ thuần** sinh
-  từ cùng mẫu.
-- **Hợp đồng biến:** loại thông báo khai **schema biến** (JSON Schema, cùng chỗ với `NotificationKind`)
-  và một bộ dữ liệu mẫu để xem trước. Lưu mẫu thì kiểm: cú pháp đúng, chỉ dùng biến có trong schema, biến
-  bắt buộc của loại đó có mặt (vd link đặt lại mật khẩu) — sai thì gom lỗi một lần (D-083) với vị trí dòng,
-  cột: `template.syntax_error`, `template.unknown_variable`, `template.required_variable_missing`.
-- Kernel chỉ dựng chữ, không biết khái niệm đơn hàng hay sản phẩm: dữ liệu do module khai báo loại đưa vào.
-
-### `notifications` (B1–B4) dùng bộ dựng mẫu
-
-- `notifications_templates` thêm `format` (`plain` mặc định — giữ mẫu cũ / `template`), `subject`,
-  `body_html` NULL, `body_text`, `version`, `published_at`; bản nháp và bản đang dùng tách nhau, mỗi lần
-  xuất bản tăng `version`, giữ 20 bản gần nhất để quay lại (`POST …/rollback {version}`).
-- `POST /templates/{kind}/{channel}/{locale}/preview` dựng bằng dữ liệu mẫu của loại hay dữ liệu người gọi
-  gửi (chỉ khoá có trong schema); `POST …/test-send {to}` gửi thử tới **địa chỉ đã xác minh của chính người
-  gọi** (không gửi tới địa chỉ tuỳ ý — chống dùng làm công cụ gửi thư rác), có throttle.
-- Kênh SMS / ZNS / push dùng phần `short` của cùng bộ dựng (không HTML); ZNS vẫn đi theo mẫu đã duyệt của
-  Zalo, bộ dựng chỉ điền `zns_params`.
-- Dựng mẫu ở worker `deliver`, **ngoài transaction**; lỗi dựng (mẫu hỏng sau khi lưu do dữ liệu bất
-  thường) → dùng mẫu mặc định trong code, ghi `error_code = template_fallback`, cảnh báo cho quản trị —
-  không bỏ tin giao dịch hay bảo mật.
-- Mẫu tin **quảng cáo** không thể bỏ chân thư huỷ nhận và nhãn quảng cáo: bộ dựng tự chèn, mẫu không gỡ
-  được. Không chèn điểm ảnh theo dõi hay link theo dõi vào mẫu mặc định; khách bật đo mở thư thì phải có
-  căn cứ xử lý trong sổ của `compliance` (Luật 91/2025 — cần đối chiếu).
-
-### `newsletter` dùng bộ dựng mẫu
-
-- Chiến dịch thêm `format` (`static` mặc định — hành vi cũ / `template`); biến được phép: thông tin người
-  nhận đã có (`subscriber.name`, `subscriber.email` che bớt), danh sách, link huỷ — không gì khác. Dựng
-  từng người nhận trong job gửi theo lô, dùng chung một mẫu đã biên dịch.
-- Endpoint chiến dịch hiện có giữ nguyên hành vi (D-059); thêm trường mới, không đổi trường cũ.
-
-### API, MCP, quyền, test
-
-- REST thêm ở `notifications`: `GET /kinds/{kind}/schema` (schema biến + dữ liệu mẫu), `PUT …/draft`,
-  `POST …/publish`, `POST …/rollback`, `POST …/preview`, `POST …/test-send`, `GET /branding` / `PUT
-  /branding` (logo, màu, chân thư theo nút). Permission: `notifications.templates.manage` (đã có),
-  `notifications.branding.manage` (mới).
-- MCP: `preview_template` (`read_only`), `update_template_draft`; xuất bản qua REST hay tool
-  `publish_template` có `approval_required` cho key `agent` (P12 bước 51). AI gợi ý mẫu (D-109) chỉ là
-  bản nháp.
-- Event: `notifications.template_published`, `…template_rolled_back`, `…branding_updated`.
-- Test (cả hai database): `mau_nguoi_dung_khong_doc_duoc_bien_ngoai_schema`,
-  `mau_vong_lap_vo_han_bi_cat_theo_gioi_han`, `gia_tri_chen_vao_html_luon_duoc_thoat`,
-  `mau_quang_cao_luon_co_chan_thu_huy_nhan`, `luu_mau_thieu_bien_bat_buoc_bi_tu_choi_mot_lan`,
-  `gui_thu_chi_toi_dia_chi_cua_nguoi_goi`, `mau_hong_luc_gui_dung_mau_mac_dinh`,
-  `xuat_ban_va_quay_lai_phien_ban`, `ban_tin_ca_nhan_hoa_moi_nguoi_nhan`,
-  `html_dung_tren_mau_mjml_va_co_ban_chu_thuan`.
-
-## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
-
-> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
-
-- **Sổ yêu cầu của chủ thể dữ liệu (D-217, A-b3, A-c8).** Bảng `compliance_subject_requests` (`id`,
-  `tenant_id`, `kind` (`access`/`erasure`/`rectification`/`objection`/`restriction`), `channel`
-  (`email`/`post`/`phone`/`authority`/`other`), `subject` (email / số / user_id), `received_at`, `due_at`,
-  `status` (`received`/`in_progress`/`fulfilled`/`rejected`), `reason`, `job_id`, `handled_by`). API: `GET/POST
-  /api/v1/compliance/subject-requests`, `POST …/{id}/fulfil` (chạy job xuất / xoá dùng cơ chế sẵn có), việc
-  vào hộp việc kèm hạn. Hạn trả lời là dữ liệu có ngày hiệu lực (Luật 91/2025/QH15, NĐ 356/2025 — **cần
-  đối chiếu văn bản gốc**). Không áp cho yêu cầu người dùng tự làm trong tài khoản.
-- **KYC cần bổ sung (A-c9).** Trạng thái `needs_info` và `POST /api/v1/compliance/kyc/profiles/{id}/request-info
-  {fields, message}`; người nộp nhận thông báo, nộp bổ sung đưa hồ sơ về `pending`.
-- **Văn bản và sự cố (A-c9).** `GET /api/v1/compliance/documents/{id}/acceptance-stats` (số người đã chấp
-  nhận theo phiên bản); sự cố có bản nháp thông báo gửi cơ quan và gửi người bị ảnh hưởng (AI chỉ là bản nháp,
-  D-109), mốc 72 giờ như mục đã có.
-- **"Chặn bán" (A-3.5).** **Cần đối chiếu** NĐ 52/2013/NĐ-CP sửa bởi NĐ 85/2021/NĐ-CP và Luật Thương mại điện
-  tử 2025: bán trước khi thông báo website với Bộ Công Thương bị **cấm** hay chỉ **bị phạt**. Nếu cấm: thêm
-  cổng chặn đặt hàng (`compliance.website_not_notified`, 403) gọi từ checkout của bước 45. Nếu không: nhãn
-  trong danh sách kiểm đổi thành "bắt buộc theo luật", không chặn. Agent bước 37 ghi kết quả đối chiếu vào
-  DECISIONS trước khi chọn.
-- **Thấp (A-b10).** Báo cáo đã lưu và lịch gửi qua email (dùng xuất chung của bước 51, D-213).
-
-## Bổ sung theo D-220
-
-### Kênh đẩy cho ứng dụng di động
-
-`Channel` thêm `MobilePush`: trait `MobilePushSender` (bộ cài đặt cho Firebase Cloud Messaging và Apple Push
-Notification service là module riêng, cần khoá của nhà cung cấp — khi đó dừng lại hỏi chủ dự án; bản giả cho
-test có sẵn). Bảng `notifications_device_tokens` (`id`, `tenant_id`, `user_id`, `platform` `ios/android`,
-`token` mã hoá AEAD của bước 33, `app_id`, `locale`, `created_at`, `last_used_at`, `failures`; unique
-(`tenant_id`, băm `token`)). `POST /me/device-tokens`, `DELETE /me/device-tokens/{id}`; nhà cung cấp báo token
-hết hiệu lực → xoá. Cùng luật như web push: tuỳ chọn nhận theo loại, tin quảng cáo cần đồng ý, khung giờ gửi.
-Test: `token_het_hieu_luc_bi_xoa`, `tin_quang_cao_khong_gui_khi_chua_dong_y` (kênh di động).
+9. **Thư viện ngôn ngữ mẫu** (D-206): `liquid` (cú pháp Liquid — Shopify dùng cho mẫu thông báo; chủ cửa
+   hàng quen) hay `minijinja` (có vùng cách ly và giới hạn chạy). Đo (thời gian dựng 1 000 mẫu, kích thước
+   binary), tra API bằng skill `check-library-api`, chọn một, ghi `STACK.md` và DECISIONS.
+10. **"Chặn bán" khi website chưa thông báo** (A-3.5): đối chiếu văn bản (A3) rồi chọn cổng chặn
+    `compliance.website_not_notified` hay nhãn "bắt buộc theo luật"; ghi kết quả đối chiếu vào DECISIONS
+    trước khi chọn.
+11. **Permission cho endpoint đặc tả chưa nêu**: `POST /kyc/profiles/{id}/request-info`,
+    `GET /documents/{id}/acceptance-stats`, `GET/POST /subject-requests`, `POST /subject-requests/{id}/fulfil`
+    — chọn trong permission của module và ghi DECISIONS.

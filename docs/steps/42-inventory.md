@@ -3,6 +3,9 @@
 > Lộ trình: `docs/ROADMAP.md` bước 42 và phần "Giai đoạn module thương mại" · Thiết kế:
 > `docs/research/business-foundation.md` mục 8, 9 · Quyết định: D-180, D-181 (`rows`), D-182
 > (`write_with_retry`), D-184 (`reference`), D-185, D-191, D-194
+> Nguồn đối chiếu thiết kế đợt 2: `docs/prompts/ui-phase2-api.md` (màn tương ứng ở
+> `docs/research/ui-traceability.md`, đợt 2).
+> Đã gộp các quyết định: D-200, D-201, D-204, D-223…D-227 (D-228).
 
 ## Mục tiêu
 
@@ -10,15 +13,20 @@ Xong bước này, mỗi khách quản lý tồn theo biến thể × kho (kho l
 `store`), mọi biến động nằm trong một sổ chỉ thêm, và **không bao giờ bán quá tồn** dù nhiều request
 cùng lúc trên SQLite hay Postgres. `orders` (45) giữ chỗ → xác nhận → xuất / trả lại theo `order_id`
 qua `autoxide_inventory::api`; chuỗi bán lẻ chuyển kho, kiểm kê, nhập hàng từ nhà cung cấp, theo dõi lô
-/ hạn dùng / serial và giá vốn bình quân cho báo cáo lãi gộp.
+/ hạn dùng / serial và giá vốn bình quân cho báo cáo lãi gộp. Hàng đặt trước giữ suất không vượt giới hạn
+và được chia theo thứ tự đặt khi hàng về (D-204); website thấy tình trạng hàng theo cửa hàng mà không lộ số
+tồn lớn (D-200); người mua đăng ký được báo khi có hàng lại (D-201).
 
 ## Bắt đầu khi
 
 - Bước 41 xong: `dyn Catalog` (biến thể, cờ `track_inventory` / `allow_backorder` / `lot_tracked` /
-  `serial_tracked`, `bundle_components`), `autoxide_kernel::csv`, `Subscription::optional`.
+  `serial_tracked`, chế độ bán `sale_mode` và trường đặt trước của D-204, `bundle_components`),
+  `autoxide_kernel::csv`, `Subscription::optional`.
 - Từ nền: `TenantContext`, `OrgId`, `Scope`, `dyn OrgDirectory` (loại nút, trạng thái, `Address` của
-  nút), `dyn Ledger` (bước 36), đánh số chứng từ `numbering` (bước 36), `dyn Notifier` (bước 37) không
-  bắt buộc — cảnh báo tồn thấp đi qua event.
+  nút, cửa hàng có `pickup`), `dyn Ledger` (bước 36, cả `Ledger::balances`), đánh số chứng từ `numbering`
+  (bước 36), `dyn Notifier` (bước 37) không bắt buộc — cảnh báo tồn thấp đi qua event; báo khi có hàng
+  lại gửi qua `notifications`, đồng ý riêng theo mục đích (bước 37); danh sách lý do theo khách
+  `Module::reason_lists` / `ReasonCodes` (bước 51, D-223); cài đặt kế thừa theo nút (bước 34).
 - Làm song song được với 43, 44.
 
 ## Phạm vi
@@ -51,6 +59,16 @@ Mỗi dòng `inventory_levels` (biến thể × kho) giữ hai số, đều đ�
 Giữ chỗ là MỘT câu `UPDATE … SET available = available − q WHERE id = ? AND available >= q` — không
 đọc trước. Hai cột cùng đổi trong một transaction (hai câu `adjust`); dòng đã bị câu đầu khoá trên
 Postgres, SQLite chỉ một bên ghi.
+
+**Hàng đặt trước** (biến thể `sale_mode = preorder` của bước 41, D-204): giữ chỗ được dù `available` âm,
+dòng giữ đánh dấu `preordered = true` (bên cạnh `backordered`). Tổng suất đặt trước đang giữ hay đã xác
+nhận không được vượt `preorder_limit`: `inventory_preorder_counters` tăng bằng `UPDATE … SET reserved =
+reserved + q WHERE reserved + q <= limit` (không đọc rồi ghi) — 0 dòng thì `inventory.preorder_sold_out`.
+Trả chỗ khi huỷ / hết hạn thì trừ lại `reserved`. Hàng về (nhập kho, chuyển kho tới): job
+`inventory.allocate_preorders` chia tồn mới cho các dòng đặt trước **theo thứ tự đặt** (id UUIDv7) và phát
+`inventory.preorder_allocated` từng dòng để `orders` chuyển đơn sang chuẩn bị hàng; nhận lại event nhập
+kho không chia hai lần (khoá theo id biến động kho). Đặt trước không làm mức công khai thành "còn hàng":
+mức công khai là `preorder`.
 
 ### Kiểu và trait
 
@@ -90,6 +108,7 @@ pub struct ReservedLine {
     pub quantity: i64,
     pub fulfilled_quantity: i64,
     pub backordered: bool,                 // giữ khi `available` âm (sản phẩm cho bán khi hết)
+    pub preordered: bool,                  // dòng đặt trước (D-204)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -149,6 +168,10 @@ pub trait Inventory: Send + Sync {
     async fn fulfil(&self, tenant: &TenantContext, request: &FulfilRequest) -> Result<Reservation, Error>;
     /// Nhập lại hàng trả về. Gọi lại cùng `reference` + cùng nội dung: không cộng lần hai.
     async fn restock(&self, tenant: &TenantContext, request: &RestockRequest) -> Result<(), Error>;
+    /// Lọc tập biến thể còn hàng ở một cửa hàng — cho bộ lọc "chỉ hàng có sẵn ở cửa hàng X" của
+    /// `catalog` (D-200). Tên và chữ ký phác thảo.
+    async fn in_stock_at(&self, tenant: &TenantContext, store_org_id: OrgId, variant_ids: &[Uuid])
+        -> Result<Vec<Uuid>, Error>;
 }
 ```
 
@@ -164,6 +187,29 @@ huỷ các phần đã trừ trong transaction đó (rollback toàn bộ rồi t
 dùng savepoint — xem "Chỗ dễ sai"). Hai cờ `prefer_nearby`, `allow_split` lưu theo nút bán trong
 `inventory_settings`.
 
+### Tình trạng hàng công khai (D-200)
+
+`GET /public/availability?variant_ids&store_id` trả cho mỗi biến thể × cửa hàng một mức: `in_stock`,
+`low` (kèm `quantity` khi tồn khả dụng dưới `AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD`), `out`, `preorder`
+(D-204); bỏ `store_id` thì trả mọi cửa hàng có `pickup` (bước 34). Không bao giờ trả số tồn trên ngưỡng.
+Cache ngắn (vài giây) và ETag theo phiên bản sổ biến động.
+
+### Báo khi có hàng lại (D-201)
+
+`POST /public/restock-alerts {variant_id, store_id?, contact}` — xác nhận hai bước như `newsletter`, đồng
+ý riêng cho mục đích "thông báo có hàng" (bước 37). Nghe `inventory.level_changed` từ 0 lên trên 0 ở đúng
+cửa hàng (hay bất kỳ kho bán online khi bỏ `store_id`), gửi một lần qua `notifications`, rồi đánh dấu đã
+gửi: một đợt có hàng chỉ gửi một lần dù event đến lại.
+
+### Lý do điều chỉnh và hạn dùng của lô (D-223…D-227)
+
+- **Lý do điều chỉnh tồn** là danh sách `inventory.adjustment` (D-223), khai qua `Module::reason_lists`,
+  kiểm bằng `ReasonCodes::ensure`; mã mặc định: `damaged`, `lost`, `found`, `data_entry_fix`,
+  `sample_use`, `expired`, `count_variance`. Kiểm kê dùng cùng danh sách.
+- **Ngưỡng "sắp hết hạn"** là cài đặt kế thừa theo nút `inventory.expiring_days` (mặc định 30). Lô trả
+  `expiry_state` (`ok` / `expiring` / `expired`) tính lúc đọc từ `expires_on` và ngưỡng; lọc
+  `GET /lots?expiry_state=` bằng khoảng ngày trên index (`tenant_id`, `level_id`, `expires_on`).
+
 ### Bảng dữ liệu
 
 Mọi bảng có `tenant_id`; unique / index bắt đầu bằng `tenant_id`; số lượng `big_integer`; tiền
@@ -173,21 +219,23 @@ Mọi bảng có `tenant_id`; unique / index bắt đầu bằng `tenant_id`; s�
 | Bảng | Cột chính | Khoá / index |
 |---|---|---|
 | `inventory_levels` | `id`, `tenant_id`, `org_id` (kho), `variant_id`, `on_hand`, `available`, `incoming`, `reorder_point?`, `allow_negative` (chép từ `allow_backorder`), `average_cost_minor`, `average_cost_currency`, `updated_at` | unique (`tenant_id`,`org_id`,`variant_id`); (`tenant_id`,`variant_id`) |
-| `inventory_movements` | **chỉ thêm**: `id`, `tenant_id`, `org_id`, `variant_id`, `level_id`, `kind` (`receipt`/`sale`/`return`/`adjustment`/`count`/`transfer_out`/`transfer_in`/`expiry`/`supplier_return`), `quantity` (có dấu), `unit_cost_minor`, `unit_cost_currency`, `lot_id?`, `reason_code?`, `note`, `source_type`, `source_id`, `actor_id?`, `created_at` | (`tenant_id`,`level_id`,`id`); (`tenant_id`,`source_type`,`source_id`); (`tenant_id`,`created_at`,`id`) |
+| `inventory_movements` | **chỉ thêm**: `id`, `tenant_id`, `org_id`, `variant_id`, `level_id`, `kind` (`receipt`/`sale`/`return`/`adjustment`/`count`/`transfer_out`/`transfer_in`/`expiry`/`supplier_return`), `quantity` (có dấu), `unit_cost_minor`, `unit_cost_currency`, `lot_id?`, `reason_code?` (mã của danh sách `inventory.adjustment`, lưu mã không lưu nhãn — D-223), `note`, `source_type`, `source_id`, `actor_id?`, `created_at` | (`tenant_id`,`level_id`,`id`); (`tenant_id`,`source_type`,`source_id`); (`tenant_id`,`created_at`,`id`) |
 | `inventory_reservations` | `id`, `tenant_id`, `order_id`, `selling_org_id`, `status`, `expires_at?`, `fingerprint`, `created_at`, `updated_at` | unique (`tenant_id`,`order_id`); (`tenant_id`,`status`,`expires_at`) |
-| `inventory_reservation_lines` | `id`, `tenant_id`, `reservation_id`, `line_key`, `variant_id`, `bundle_variant_id?`, `level_id`, `org_id`, `quantity`, `fulfilled_quantity`, `released_quantity`, `backordered` | (`tenant_id`,`reservation_id`) |
+| `inventory_reservation_lines` | `id`, `tenant_id`, `reservation_id`, `line_key`, `variant_id`, `bundle_variant_id?`, `level_id`, `org_id`, `quantity`, `fulfilled_quantity`, `released_quantity`, `backordered`, `preordered` (D-204) | (`tenant_id`,`reservation_id`) |
+| `inventory_preorder_counters` | suất đặt trước (D-204): `tenant_id`, `variant_id`, `reserved`, `limit` (chép từ `preorder_limit` của catalog), `updated_at` | pk (`tenant_id`,`variant_id`) |
 | `inventory_fulfilments` | `id`, `tenant_id`, `reservation_id`, `fulfilment_key`, `fingerprint`, `created_at` | unique (`tenant_id`,`reservation_id`,`fulfilment_key`) |
+| `inventory_restock_alerts` | đăng ký báo khi có hàng lại, cấp khách hàng (D-201): biến thể, cửa hàng (NULL = kho bán online), liên hệ, trạng thái xác nhận, đã gửi | bắt đầu bằng `tenant_id` |
 | `inventory_restocks` | `id`, `tenant_id`, `reference`, `reference_fingerprint`, `order_id?`, `org_id`, `created_at` | unique (`tenant_id`,`reference`) |
 | `inventory_sources` | `selling_org_id`, `warehouse_org_id`, `priority`, `active` | unique (`tenant_id`,`selling_org_id`,`warehouse_org_id`) |
 | `inventory_settings` | `org_id`, `prefer_nearby`, `allow_split` | unique (`tenant_id`,`org_id`) |
-| `inventory_lots` | `id`, `tenant_id`, `level_id`, `lot_code`, `expires_on?` (`date`), `on_hand`, `received_at` | unique (`tenant_id`,`level_id`,`lot_code`); (`tenant_id`,`level_id`,`expires_on`) |
+| `inventory_lots` | `id`, `tenant_id`, `level_id`, `lot_code`, `expires_on?` (`date`), `on_hand`, `received_at`; `expiry_state` không lưu, tính lúc đọc | unique (`tenant_id`,`level_id`,`lot_code`); (`tenant_id`,`level_id`,`expires_on`) |
 | `inventory_serials` | `id`, `tenant_id`, `variant_id`, `serial`, `org_id?`, `status` (`in_stock`/`sold`/`returned`/`written_off`), `order_id?`, `updated_at` | unique (`tenant_id`,`variant_id`,`serial`) |
 | `inventory_transfers` + `inventory_transfer_lines` | `number`, `from_org_id`, `to_org_id`, `status` (`draft`/`in_transit`/`partially_received`/`received`/`closed`/`cancelled`), `shipped_at?`, `reference?` / `variant_id`, `quantity`, `received_quantity`, `unit_cost_minor`, `unit_cost_currency`, `lot_code?` | unique (`tenant_id`,`number`); (`tenant_id`,`to_org_id`,`status`) |
 | `inventory_counts` + `inventory_count_lines` | `number`, `org_id`, `status` (`open`/`applied`/`cancelled`), `applied_at?` / `variant_id`, `counted`, `expected_at_count` (`on_hand` lúc đếm dòng đó), `counted_at`, `reason_code?` | (`tenant_id`,`org_id`,`status`) |
 | `inventory_suppliers` | `id`, `tenant_id`, `org_id`, `code`, `name`, `name_key`, `tax_code?`, `contact_name?`, `phone?`, `email?`, `address` (cột của `Address`), `payment_terms_days`, `currency`, `active` | unique (`tenant_id`,`code`) |
 | `inventory_purchase_orders` + `…_lines` | `number`, `org_id` (kho nhận), `supplier_id`, `status` (`draft`/`ordered`/`partially_received`/`received`/`closed`/`cancelled`), `expected_on?`, `total_minor`, `currency` / `variant_id`, `quantity`, `received_quantity`, `unit_cost_minor`, `unit_cost_currency` | unique (`tenant_id`,`number`); (`tenant_id`,`supplier_id`,`status`) |
-| `inventory_receipts` + `…_lines` | phiếu nhập: `number`, `org_id`, `supplier_id?`, `purchase_order_id?`, `reference`, `reference_fingerprint`, `posted_at`, `total_minor`, `currency` / `variant_id`, `quantity`, `unit_cost_minor`, `unit_cost_currency`, `lot_code?`, `expires_on?`, `serials` (JSON) | unique (`tenant_id`,`number`); unique (`tenant_id`,`reference`) |
-| `inventory_supplier_returns` + `…_lines` | `number`, `org_id`, `supplier_id`, `receipt_id?`, `reference`, `posted_at` / như phiếu nhập | unique (`tenant_id`,`number`); unique (`tenant_id`,`reference`) |
+| `inventory_receipts` + `…_lines` | phiếu nhập: `number`, `org_id`, `supplier_id?`, `purchase_order_id?`, `reference`, `reference_fingerprint`, `posted_at`, `total_minor`, `currency`, `ledger_status` (`pending`/`posted`/`failed`/`not_applicable`), `ledger_entry_id?`, `ledger_posted_at?`, `ledger_error_code?` (D-223…D-227) / `variant_id`, `quantity`, `unit_cost_minor`, `unit_cost_currency`, `lot_code?`, `expires_on?`, `serials` (JSON) | unique (`tenant_id`,`number`); unique (`tenant_id`,`reference`) |
+| `inventory_supplier_returns` + `…_lines` | `number`, `org_id`, `supplier_id`, `receipt_id?`, `reference`, `posted_at`, cột `ledger_*` như phiếu nhập (D-223…D-227) / như phiếu nhập | unique (`tenant_id`,`number`); unique (`tenant_id`,`reference`) |
 
 Số chứng từ (`PO-…`, `PN-…`, `CK-…`, `KK-…`, `TH-…`) cấp bằng `numbering` của bước 36 theo phạm vi
 (khách / kho / năm), trong cùng transaction với chứng từ.
@@ -197,21 +245,32 @@ Số chứng từ (`PO-…`, `PN-…`, `CK-…`, `KK-…`, `TH-…`) cấp bằn
 Dưới `/api/v1/inventory`; envelope, pagination, ETag, `Created` như mọi module; mọi bản ghi theo kho
 kiểm quyền theo độ sâu ở nút kho.
 
+Quản trị:
+
 | Method + path | Permission | Ghi chú |
 |---|---|---|
 | `GET /levels?org_id&variant_id&below_reorder` · `GET /levels/{id}` | `inventory.read` | trả `on_hand`, `available`, `reserved`, `incoming`, giá vốn |
 | `PATCH /levels/{id}` | `inventory.settings.manage` | `reorder_point` |
 | `GET /movements?org_id&variant_id&kind&from&to` | `inventory.read` | sổ, mới trước |
-| `POST /adjustments` | `inventory.adjust` | `{org_id, reference, lines:[{variant_id, quantity, reason_code, note}]}`, `reason_code` bắt buộc |
+| `POST /adjustments` | `inventory.adjust` | `{org_id, reference, lines:[{variant_id, quantity, reason_code, note}]}`, `reason_code` bắt buộc, thuộc danh sách `inventory.adjustment` (D-223) |
+| `GET /lots?expiry_state=` | `inventory.read` | `expiry_state` `ok` / `expiring` / `expired` (D-223…D-227) |
 | `GET /reservations?order_id&status` · `POST /reservations/{id}/release` | `inventory.reservations.read` · `inventory.adjust` | gỡ kẹt bằng tay, có audit |
 | `GET/POST /transfers` · `GET /transfers/{id}` · `POST /transfers/{id}/ship` · `POST /transfers/{id}/receive` · `POST /transfers/{id}/close` · `POST /transfers/{id}/cancel` | `inventory.transfer` (nút nguồn khi gửi, nút đích khi nhận) | nhận một phần được |
 | `GET/POST /counts` · `PUT /counts/{id}/lines` · `POST /counts/{id}/apply` · `POST /counts/{id}/cancel` · `POST /counts/{id}/import` (CSV) | `inventory.count`; áp dụng cần `inventory.adjust` | lệch có `reason_code` |
-| `GET/POST /suppliers` · `PATCH /suppliers/{id}` | `inventory.purchasing.read` · `inventory.purchasing.manage` | |
+| `GET/POST /suppliers` · `PATCH /suppliers/{id}` | `inventory.purchasing.read` · `inventory.purchasing.manage` | `GET` trả `payable` (công nợ) của từng nhà cung cấp qua `Ledger::balances` — một lần gọi cho cả trang; `ledger` chưa cài thì trường vắng mặt (D-223…D-227) |
 | `GET/POST /purchase-orders` · `GET/PATCH /purchase-orders/{id}` · `POST /purchase-orders/{id}/order` · `…/close` · `…/cancel` | purchasing | |
-| `POST /receipts` · `GET /receipts[/{id}]` | `inventory.receive` | `reference` bắt buộc (`submit_once`); theo PO hay nhập thẳng |
+| `POST /receipts` · `GET /receipts[/{id}]` | `inventory.receive` | `reference` bắt buộc (`submit_once`); theo PO hay nhập thẳng; trả `ledger_status` |
+| `POST /receipts/{id}/retry-ledger` | `inventory.purchasing.manage` | ghi sổ lại phiếu `ledger_status = failed` (D-223…D-227) |
 | `POST /supplier-returns` · `GET /supplier-returns[/{id}]` | `inventory.purchasing.manage` | |
 | `GET/PUT /sources/{selling_org_id}` · `GET/PUT /settings/{org_id}` | `inventory.settings.manage` | |
 | `GET /reports/valuation?org_id&at` | `inventory.read` | tồn × giá vốn bình quân |
+
+Công khai (không cần đăng nhập):
+
+| Method + path | Ghi chú |
+|---|---|
+| `GET /public/availability?variant_ids&store_id` | mức `in_stock` / `low` / `out` / `preorder` — xem "Tình trạng hàng công khai" (D-200) |
+| `POST /public/restock-alerts` | `{variant_id, store_id?, contact}`, xác nhận hai bước (D-201) |
 
 ### Tool MCP
 
@@ -227,7 +286,11 @@ báo cáo) · `inventory.movement_recorded` · `inventory.low_stock` (khi `avail
 `inventory.reservation_confirmed` · `inventory.reservation_released` (lý do) ·
 `inventory.reservation_expired` · `inventory.transfer_shipped` · `inventory.transfer_received` ·
 `inventory.count_applied` · `inventory.goods_received` · `inventory.supplier_returned` ·
-`inventory.lot_expired`.
+`inventory.lot_expired` · `inventory.preorder_allocated` (từng dòng đặt trước được chia hàng — D-204) ·
+`inventory.cost_changed` (`org_id`, `variant_id`, giá vốn bình quân mới — `catalog` giữ bảng giá vốn cho sàn giá,
+D-222).
+
+Nhận event của chính module: `inventory.level_changed` từ 0 lên trên 0 → gửi báo có hàng lại (D-201).
 
 Nhận bằng `Subscription::optional` (chưa có `orders` thì không lỗi khởi động), mỗi handler gọi đúng
 hàm service mà `api` gọi, chịu được nhận lại:
@@ -246,7 +309,10 @@ lời gọi trực tiếp lỗi sau khi `orders` đã commit.
 - `inventory.post_receipt_to_ledger` / `inventory.post_supplier_return_to_ledger`: xếp trong cùng
   transaction với phiếu; gọi `Ledger` (bước 36, chữ ký theo đặc tả bước đó) với mã tham chiếu
   `inventory.receipt:<id>` — Nợ hàng tồn kho / Có phải trả nhà cung cấp (đảo lại khi trả hàng). Ledger
-  chống trùng theo mã tham chiếu nên chạy lại an toàn.
+  chống trùng theo mã tham chiếu nên chạy lại an toàn. Job cập nhật `ledger_status`, `ledger_entry_id`,
+  `ledger_posted_at`, `ledger_error_code` của phiếu; `ledger` chưa cài → `not_applicable` (D-223…D-227).
+- `inventory.allocate_preorders`: chia hàng về cho dòng đặt trước theo thứ tự đặt; khoá theo id biến
+  động kho để nhận lại event nhập kho không chia hai lần (D-204).
 - Lịch: `inventory.expire_reservations` mỗi phút (mỗi chỗ giữ quá hạn một transaction, đổi trạng thái
   có điều kiện `held → expired` rồi cộng lại `available`); `inventory.expire_lots` mỗi ngày (lô quá
   hạn: biến động `expiry`, trừ `on_hand` và `available`, event `inventory.lot_expired`).
@@ -255,8 +321,10 @@ lời gọi trực tiếp lỗi sau khi `orders` đã commit.
 
 ### Cấu hình (`AUTOXIDE_INVENTORY_`)
 
-`MAX_HOLD_HOURS` (72), `EXPIRE_BATCH` (200), `MAX_LINES_PER_RESERVATION` (200). Quy tắc theo khách
-(nguồn, chia kho, tồn tối thiểu) nằm trong bảng, không ở biến môi trường. Sinh lại `.env.example`.
+`MAX_HOLD_HOURS` (72), `EXPIRE_BATCH` (200), `MAX_LINES_PER_RESERVATION` (200),
+`PUBLIC_LOW_THRESHOLD` (5, D-200). Quy tắc theo khách (nguồn, chia kho, tồn tối thiểu) nằm trong bảng,
+không ở biến môi trường. Cài đặt kế thừa theo nút: `inventory.expiring_days` (30, D-223…D-227). Danh sách
+lý do: `inventory.adjustment` (D-223). Sinh lại `.env.example`.
 
 ### Tính năng và hạn mức
 
@@ -289,8 +357,11 @@ lời gọi trực tiếp lỗi sau khi `orders` đã commit.
 | `inventory.over_receipt` | 409 | Nhận nhiều hơn số đặt / số đang chuyển. |
 | `inventory.reason_required` | 422 | Điều chỉnh tồn cần lý do. |
 | `inventory.supplier_code_taken` | 409 | Mã nhà cung cấp `{code}` đã có. |
+| `inventory.preorder_sold_out` | 409 | Đã hết suất đặt trước cho sản phẩm này (D-204). |
 
 ## Thứ tự làm
+
+Số mục theo danh sách việc của bước 42 trong ROADMAP.
 
 1. Khung crate, đăng ký, permission, tính năng / hạn mức.
 2. `levels`, `movements`, điều chỉnh có lý do, `verify_levels`; giá vốn bình quân khi nhập → **mục 1**
@@ -299,10 +370,16 @@ lời gọi trực tiếp lỗi sau khi `orders` đã commit.
    "100 người mua cái cuối" → **mục 2**.
 4. `api.rs`, event phát ra, handler nhận event của `orders` (test bằng module giả khai các event đó) →
    **mục 5**.
-5. Chuyển kho, kiểm kê, cảnh báo tồn thấp, cho bán khi hết → **mục 3**.
-6. Lô / hạn dùng (chọn lô hết hạn trước khi xuất), serial → **mục 4**.
-7. Nhà cung cấp, đơn đặt hàng, phiếu nhập một phần, trả hàng nhà cung cấp, job ghi sổ cái → **mục 6**.
-8. Tài liệu `docs/INVENTORY.md` + `.vi.md`, OpenAPI, `.env.example`, CHANGELOG, ROADMAP.
+5. Chuyển kho, kiểm kê, lý do điều chỉnh là danh sách `inventory.adjustment`, cảnh báo tồn thấp, cho bán
+   khi hết → **mục 3**.
+6. Lô / hạn dùng (chọn lô hết hạn trước khi xuất, `inventory.expiring_days`, `expiry_state`), serial →
+   **mục 4**.
+7. Nhà cung cấp (+ `payable`), đơn đặt hàng, phiếu nhập một phần, trả hàng nhà cung cấp, job ghi sổ cái
+   (+ `ledger_status`, `retry-ledger`) → **mục 6**.
+8. Hàng đặt trước: `preordered`, `inventory_preorder_counters`, `inventory.allocate_preorders` → **mục 7**.
+9. Tình trạng hàng công khai, hàm lọc biến thể còn hàng cho `catalog` → **mục 8**.
+10. Báo khi có hàng lại → **mục 9**.
+11. Tài liệu `docs/INVENTORY.md` + `.vi.md`, OpenAPI, `.env.example`, CHANGELOG, ROADMAP.
 
 ## Test bắt buộc
 
@@ -330,6 +407,10 @@ Cả SQLite và Postgres, qua `TestDatabase::run` / `TestApp`; `dyn Catalog`, `d
 - `nhap_hang_mot_phan_theo_po`, `phieu_nhap_ghi_so_cai_mot_lan` (job chạy hai lần → ledger giả nhận một
   mã tham chiếu), `tra_hang_nha_cung_cap_dao_but_toan`.
 - `canh_bao_ton_thap_chi_khi_vuot_nguong`.
+- Hàng đặt trước (D-204): `dat_truoc_khong_vuot_gioi_han_khi_dong_thoi` (100 người, giới hạn 10),
+  `hang_ve_chia_theo_thu_tu_dat`, `huy_dat_truoc_tra_lai_suat`.
+- Tình trạng hàng công khai (D-200): số tồn lớn không lộ; mức đổi ngay sau khi giữ chỗ.
+- Báo khi có hàng lại (D-201): một đợt có hàng chỉ gửi một lần dù event đến lại.
 - **Rò rỉ**: bài chung giữa khách; `ro_ri_giua_hai_kho_anh_em` (nhân viên kho A độ sâu `Unit` không
   đọc / điều chỉnh tồn kho B, không thấy chỗ giữ của B).
 
@@ -339,7 +420,7 @@ Cả SQLite và Postgres, qua `TestDatabase::run` / `TestApp`; `dyn Catalog`, `d
 - [ ] Không có đường ghi `on_hand` / `available` nào ngoài `rows::adjust`; không có `UPDATE` /
       `DELETE` trên `inventory_movements` (thêm kiểm vào test hay `xtask` nếu rẻ).
 - [ ] `docs/INVENTORY.md` + `docs/INVENTORY.vi.md` (mô hình tồn, giữ chỗ, chọn kho, kiểm kê, nhập
-      hàng); OpenAPI, `.env.example` sinh lại; CHANGELOG.
+      hàng, hàng đặt trước, tình trạng công khai); OpenAPI, `.env.example` sinh lại; CHANGELOG.
 - [ ] DECISIONS: mô hình `on_hand` / `available`; chọn kho; cách tính giá vốn và làm tròn; cách kiểm
       kê khi đang bán; nhận event của `orders` qua `Subscription::optional`.
 - [ ] `./gate.sh` đầy đủ xanh; đánh dấu ROADMAP; commit; phát hành theo `docs/RELEASING.md`.
@@ -366,6 +447,13 @@ Cả SQLite và Postgres, qua `TestDatabase::run` / `TestApp`; `dyn Catalog`, `d
   điều kiện trạng thái.
 - **Lô**: giữ chỗ ở mức dòng tồn, chọn lô lúc xuất; lô hết hạn phải bị trừ khỏi `available` bằng job,
   nếu không sẽ bán hàng hết hạn.
+- **Suất đặt trước**: tăng `reserved` bằng một câu `UPDATE` có điều kiện, không đọc rồi ghi; trả chỗ thì
+  trừ lại. Chia hàng về theo thứ tự đặt, khoá theo id biến động kho để event nhập kho đến lại không chia
+  hai lần (D-204).
+- **Tình trạng công khai**: không bao giờ trả số tồn trên `PUBLIC_LOW_THRESHOLD`; đặt trước hiện
+  `preorder`, không phải "còn hàng" (D-200, D-204).
+- **Báo có hàng lại**: chỉ gửi khi `inventory.level_changed` cho thấy tồn đi từ 0 lên trên 0, một lần mỗi
+  đợt, chịu được event đến lại (D-201).
 - **SQLite**: một bên ghi — test đồng thời 100 request dựa vào `AUTOXIDE_DATABASE_WAIT_SECONDS`; đặt đủ
   lớn trong test, đừng hạ số request.
 
@@ -387,50 +475,3 @@ Cả SQLite và Postgres, qua `TestDatabase::run` / `TestApp`; `dyn Catalog`, `d
   khuyến nghị gộp theo dòng tồn trong mỗi transaction.
 - Mặc định `allow_split` — khuyến nghị tắt (một đơn một kho, dễ giao).
 - Ghi mọi lựa chọn vào `docs/DECISIONS.md` (skill `record-decision`).
-
-## Bổ sung theo D-200 (thiết kế giao diện 2)
-
-**Tình trạng hàng công khai.** `GET /public/availability?variant_ids&store_id` (công khai) trả cho mỗi biến
-thể × cửa hàng một mức: `in_stock`, `low` (kèm `quantity` khi tồn khả dụng dưới
-`AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD`, mặc định 5), `out`; bỏ `store_id` thì trả mọi cửa hàng có
-`pickup` (bước 34). Không bao giờ trả số tồn trên ngưỡng. `api` thêm hàm lọc tập biến thể còn hàng ở một
-cửa hàng để `catalog` làm bộ lọc "chỉ hàng có sẵn ở cửa hàng X". Cache ngắn (vài giây) và ETag theo phiên
-bản sổ biến động. Test: số tồn lớn không lộ; mức đổi ngay sau khi giữ chỗ.
-
-## Bổ sung theo D-201
-
-**Báo khi có hàng lại.** `POST /public/restock-alerts {variant_id, store_id?, contact}` — xác nhận hai
-bước như `newsletter`, đồng ý riêng cho mục đích "thông báo có hàng" (bước 37). Nghe
-`inventory.level_changed` từ 0 lên trên 0 ở đúng cửa hàng (hay bất kỳ kho bán online khi bỏ
-`store_id`), gửi một lần qua `notifications`, rồi đánh dấu đã gửi. Bảng `inventory_restock_alerts` cấp
-khách hàng. Test: một đợt có hàng chỉ gửi một lần dù event đến lại.
-
-## Bổ sung theo D-204 (hàng đặt trước)
-
-- Biến thể `preorder` (bước 41): giữ chỗ được dù `available` âm, dòng giữ đánh dấu `preordered = true`
-  (bên cạnh `backordered`). Tổng suất đặt trước đang giữ hay đã xác nhận không được vượt `preorder_limit`:
-  bảng `inventory_preorder_counters` (`tenant_id`, `variant_id`, `reserved`, `limit` chép từ catalog,
-  `updated_at`; pk (`tenant_id`, `variant_id`)), tăng bằng `UPDATE … SET reserved = reserved + q WHERE
-  reserved + q <= limit` (không đọc rồi ghi) — 0 dòng thì `inventory.preorder_sold_out` (409). Trả chỗ khi
-  huỷ / hết hạn thì trừ lại.
-- Hàng về (nhập kho, chuyển kho tới): job `inventory.allocate_preorders` chia tồn mới cho các dòng đặt
-  trước **theo thứ tự đặt** (id UUIDv7), phát `inventory.preorder_allocated` từng dòng để `orders` chuyển
-  đơn sang chuẩn bị hàng. Nhận lại event nhập kho không chia hai lần (khoá theo id biến động kho).
-- Đặt trước không làm `available` công khai thành "còn hàng": mức công khai là `preorder`.
-- Test (cả hai database): `dat_truoc_khong_vuot_gioi_han_khi_dong_thoi` (100 người, giới hạn 10),
-  `hang_ve_chia_theo_thu_tu_dat`, `huy_dat_truoc_tra_lai_suat`.
-
-## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
-
-> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
-
-- **Lý do điều chỉnh tồn** là danh sách `inventory.adjustment` (D-223), mặc định: `damaged`, `lost`, `found`,
-  `data_entry_fix`, `sample_use`, `expired`, `count_variance`. Kiểm kê dùng cùng danh sách.
-- **Ngưỡng "sắp hết hạn"** là cài đặt kế thừa theo nút `inventory.expiring_days` (mặc định 30). Lô trả
-  `expiry_state` (`ok` / `expiring` / `expired`) tính lúc đọc từ `expires_on` và ngưỡng; lọc `GET /lots?expiry_state=`
-  bằng khoảng ngày trên index (`tenant_id`, `level_id`, `expires_on`).
-- **Trạng thái ghi sổ của phiếu nhập / trả nhà cung cấp:** cột `ledger_status` (`pending` / `posted` / `failed`),
-  `ledger_entry_id?`, `ledger_posted_at?`, `ledger_error_code?` do job `inventory.post_receipt_to_ledger` cập nhật;
-  `ledger` chưa cài → `not_applicable`. `POST /receipts/{id}/retry-ledger` (`inventory.purchasing.manage`).
-- **Công nợ nhà cung cấp.** `GET /suppliers` trả `payable` của từng nhà cung cấp qua `Ledger::balances` (bước 36, một
-  lần gọi cho cả trang); `ledger` chưa cài thì trường vắng mặt.
