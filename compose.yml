@@ -23,13 +23,17 @@ x-autoxide: &autoxide
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # Bản mới nhất được hỗ trợ, để bản cài mới được vá lâu nhất (PostgreSQL 18: tới 11/2030).
+    # Bản tối thiểu (16) vẫn được gate và CI test.
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: autoxide
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: autoxide
     volumes:
-      - postgres:/var/lib/postgresql/data
+      # Từ bản 18, image đặt dữ liệu ở /var/lib/postgresql/<bản>/docker: gắn volume vào thư
+      # mục cha để lần nâng bản chính sau (pg_upgrade) thấy được cả dữ liệu cũ lẫn mới.
+      - postgres:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U autoxide -d autoxide"]
       interval: 5s
