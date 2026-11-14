@@ -364,3 +364,24 @@ bộ lọc khác.
 - `GET /api/v1/kernel/settings` thêm `last_used_at`, `last_error` cho mỗi cài đặt có nối ra ngoài; `POST
   /api/v1/kernel/settings/{name}/test` gọi thử qua trait của module (không trong transaction ghi).
 - P10: hộp việc không có "Đã xử lý" (D-212).
+
+## Bổ sung theo D-219
+
+### P17 — Nhập dữ liệu dùng chung
+
+Ngược với xuất chung (P16): `POST /api/v1/kernel/imports {resource, file_id, mapping?, dry_run=true}` — tệp
+CSV hay JSON Lines tải qua `files` / tải thẳng (P4 bước 40), chạy bằng job (P15), **mặc định chạy thử**: kiểm
+từng dòng, trả báo cáo `{rows, valid, errors: [{row, field, code, message}]}` (tải về được), không ghi gì;
+chạy thật với `dry_run=false` và `Idempotency-Key`, mỗi lô một transaction, dòng lỗi bỏ qua và ghi vào báo cáo,
+chạy lại không tạo trùng (khoá tự nhiên do module khai: SKU, email, số đơn ngoài). Chống CSV injection khi đọc
+và khi xuất lại báo cáo.
+
+- Module khai `Module::imports` → `resource`, cột (kiểu, bắt buộc, khoá tự nhiên), permission, hàm ghi theo lô
+  gọi **cùng service** như REST (luật 8) — mặc định rỗng (D-038). Đầu tiên: `content` (bài, trang), `media`
+  (từ URL, có giới hạn và kiểm loại thật như tải lên), `newsletter` (người đăng ký — **chỉ** kèm bằng chứng đồng
+  ý), `catalog`, `customers`, `orders` (đơn lịch sử, không trừ kho, không ghi tiền mới).
+- **Bộ chuyển đổi từ nền tảng khác** (Shopify, WooCommerce, Haravan, Sapo): đổi tệp xuất của họ sang định dạng
+  nhập ở trên, là module hay công cụ riêng làm sau, không vào kernel.
+- Test (cả hai database): `chay_thu_khong_ghi_gi`, `loi_tung_dong_bao_dung_dong_va_cot`,
+  `chay_lai_khong_tao_trung`, `dong_loi_khong_lam_hong_lo`, `nhap_khong_vuot_quyen_nguoi_goi`,
+  `newsletter_khong_nhap_khi_thieu_bang_chung_dong_y`.

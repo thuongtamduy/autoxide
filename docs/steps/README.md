@@ -1,6 +1,6 @@
-# Đặc tả từng bước (30–54)
+# Đặc tả từng bước (30–56)
 
-Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 54, có một file đặc tả ở đây (bước 50 chỉ là việc của chủ dự án). Đặc tả nói **cách làm**:
+Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 56, có một file đặc tả ở đây (bước 50 chỉ là việc của chủ dự án). Đặc tả nói **cách làm**:
 
 - bảng dữ liệu, API, permission, event, mã lỗi;
 - thứ tự commit, test bắt buộc, tiêu chí xong;
@@ -42,6 +42,8 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 54,
 | 52 | [52-admin-experience.md](52-admin-experience.md) | Bàn kỹ thuật, hoàn tác, AI trong quản trị, thông báo, sức khoẻ người bán và tuân thủ (D-201) |
 | 53 | [53-support.md](53-support.md) | `support`: phiếu hỗ trợ khách hàng, SLA theo giờ làm, phân công theo nút, chuyển sang khiếu nại (D-204) |
 | 54 | [54-authorization.md](54-authorization.md) | Phân quyền chuẩn hàng đầu: hợp đồng quyền trong OpenAPI, deny, rào, chia sẻ bản ghi, step-up, nâng quyền đúng lúc, hai người, quyền theo trường, mô phỏng, rà soát, AuthZEN (D-205) |
+| 55 | [55-analytics.md](55-analytics.md) | `analytics`: số liệu truy cập không cookie, phễu, theo dõi theo người khi đồng ý (D-219) |
+| 56 | [56-automations.md](56-automations.md) | `automations`: luật "khi … thì …" chạy tool MCP với quyền người tạo, chờ duyệt, chống vòng lặp (D-219) |
 | 41–49 | [41](41-catalog.md) · [42](42-inventory.md) · [43](43-promotions.md) · [44](44-shipping.md) · [45](45-orders.md) · [46](46-marketplace.md) · [47](47-customers.md) · [48](48-channels.md) · [49](49-affiliate.md) | Module thương mại |
 
 ## Luật chung đã chốt (D-198)
@@ -83,9 +85,9 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 54,
 ```
 kernel → address → organizations → auth (và các module sẵn có theo thứ tự hiện tại,
          trừ newsletter, comments)
-       → tax → ledger → invoices → compliance → notifications → newsletter, comments, support → plans
+       → tax → ledger → invoices → compliance → notifications → newsletter, comments, support, analytics → plans
        → catalog → inventory, promotions, shipping → orders → marketplace → affiliate, customers, channels
-       → reporting
+       → reporting → automations   (cuối cùng: nghe event và gọi tool của mọi module)
 ```
 
 - `compliance` đứng trước `notifications`, nên `compliance` gửi mail bằng `dyn Mailer` và OTP bằng

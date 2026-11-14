@@ -438,6 +438,8 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 | 52 Trải nghiệm quản trị nâng cao (D-201) | 51 | 41–49 |
 | 53 Hỗ trợ khách hàng (D-204) | 37 (thông báo, vụ việc khiếu nại) | 41–49 |
 | 54 Phân quyền chuẩn hàng đầu (D-205) | 34; P6, P7 cần P12 của 51; P1 làm ở bước 31 | 41–49, 53 |
+| 55 Phân tích truy cập (D-219) | 37 (đồng ý), 34 | 41–49 |
+| 56 Tự động hoá quy trình (D-219) | 51 (P12 duyệt, P15 job) | 41–49, 55 |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
@@ -801,6 +803,8 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
 - [ ] Đối chiếu thiết kế 2 (D-217): sổ yêu cầu của chủ thể dữ liệu qua kênh khác, có hạn là dữ liệu (Luật
       91/2025 — cần đối chiếu); KYC `needs_info`; số người chấp nhận theo phiên bản văn bản; bản nháp thông
       báo sự cố; đối chiếu "bán trước khi thông báo website" bị cấm hay bị phạt rồi mới chọn chặn hay nhãn
+- [ ] Kênh đẩy cho ứng dụng di động (D-219): trait `MobilePushSender` (Firebase / Apple là module riêng,
+      cần khoá — dừng lại hỏi), token thiết bị mã hoá, cùng luật đồng ý và khung giờ như web push
 
 ## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
 
@@ -915,6 +919,9 @@ cả SQLite và Postgres.
       chung qua database như `throttle` (D-116) hay một cách khác chạy trên cả hai database; đo
       chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
       quyết định
+- [ ] Bộ máy tìm kiếm thay được (D-219): trait `SearchBackend`, mặc định chạy trong database (bảng
+      `kernel_search_docs`, đúng dấu xếp trước), backend ngoài (Meilisearch, Typesense…) cắm vào không sửa
+      module; module khai loại tài liệu tìm được; lọc theo khách và nút trong backend; lệnh dựng lại chỉ mục
 
 ## Giai đoạn module thương mại (chủ dự án giao ngày 13/11/2026, D-191)
 
@@ -1253,6 +1260,9 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       chối, event `kernel.approval_decided`, tool MCP); bộ lọc nội dung (`review`, `scheduled`,
       `ai_generated`, `missing_locale`, `missing_alt`); bỏ hoãn việc; thử cài đặt nối ngoài; hộp việc không
       có "Đã xử lý"
+- [ ] Nhập dữ liệu dùng chung (D-219): `POST /kernel/imports` mặc định chạy thử, báo lỗi theo dòng và cột,
+      chạy lại không tạo trùng, ghi qua cùng service như REST; module khai cột nhập được; bộ chuyển đổi từ
+      Shopify / WooCommerce / Haravan / Sapo là công cụ riêng làm sau
 
 ## 52. Trải nghiệm quản trị nâng cao (D-201)
 
@@ -1324,6 +1334,33 @@ Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe v
       quyền không dùng 90 ngày, rà soát quyền định kỳ vào hộp việc
 - [ ] Endpoint theo chuẩn OpenID AuthZEN Authorization API 1.0; agent hành động thay người dùng có vết
       `on_behalf_of`; số đo quyết định quyền; hướng dẫn `docs/ACCESS.md` (EN + VI)
+
+## 55. Phân tích truy cập và hành vi (`analytics`) (chủ dự án giao ngày 14/11/2026, D-219)
+
+Đặc tả: [`docs/steps/55-analytics.md`](steps/55-analytics.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 37. Số liệu truy cập ngay trong Autoxide, không gửi dữ liệu người đọc cho bên thứ ba.
+
+- [ ] Thu sự kiện từ website (endpoint công khai, gom lô, chống bot) và từ event của module; loại sự kiện do
+      module khai; phiên ẩn danh không cookie với khoá xoay mỗi ngày, không lưu IP hay user agent đầy đủ
+- [ ] Gộp theo giờ / ngày, báo cáo chỉ đọc bảng gộp: tổng quan, trang, nguồn, chiến dịch UTM, đối tượng xem
+      nhiều, phễu do module khai; số liệu cho trang tổng quan (bước 51) và "thịnh hành" cho `catalog`
+- [ ] Theo dõi theo người chỉ khi đồng ý (sổ đồng ý bước 37), rút đồng ý thì xoá phần gắn người; hạn lưu là
+      cấu hình; tool MCP chỉ đọc; phạm vi theo website của nút; test trên cả hai database
+
+## 56. Tự động hoá quy trình (`automations`) (chủ dự án giao ngày 14/11/2026, D-219)
+
+Đặc tả: [`docs/steps/56-automations.md`](steps/56-automations.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 51 (lệnh chờ duyệt, job API). Luật "khi … thì …" như Shopify Flow; mỗi hành động là một tool
+MCP đã có, chạy với quyền của người tạo luật.
+
+- [ ] Luật: kích hoạt bằng event, lịch hay gọi tay; điều kiện là cây toán tử cố định (không biểu thức tự do);
+      hành động là tool MCP có tham số điền từ event; lưu luật kiểm event, tool, quyền, tham số một lần
+- [ ] Chạy bằng job ngoài transaction, nhận lại event không chạy hai lần, mỗi bước có `Idempotency-Key`; hành
+      động rủi ro chờ duyệt; chống vòng lặp và giới hạn số lần chạy; nhật ký từng lần chạy, chạy lại
+- [ ] Chạy thử khô, danh mục kích hoạt và hành động người gọi dùng được, mẫu luật do module khai; agent tạo
+      luật thì chờ duyệt; người tạo mất quyền thì luật tự tắt; test trên cả hai database
 
 ## Sau core (chưa mở)
 

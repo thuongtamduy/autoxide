@@ -867,3 +867,15 @@ chung** để mẫu do khách tự soạn có biến, điều kiện, vòng lặ
   trong danh sách kiểm đổi thành "bắt buộc theo luật", không chặn. Agent bước 37 ghi kết quả đối chiếu vào
   DECISIONS trước khi chọn.
 - **Thấp (A-b10).** Báo cáo đã lưu và lịch gửi qua email (dùng xuất chung của bước 51, D-213).
+
+## Bổ sung theo D-219
+
+### Kênh đẩy cho ứng dụng di động
+
+`Channel` thêm `MobilePush`: trait `MobilePushSender` (bộ cài đặt cho Firebase Cloud Messaging và Apple Push
+Notification service là module riêng, cần khoá của nhà cung cấp — khi đó dừng lại hỏi chủ dự án; bản giả cho
+test có sẵn). Bảng `notifications_device_tokens` (`id`, `tenant_id`, `user_id`, `platform` `ios/android`,
+`token` mã hoá AEAD của bước 33, `app_id`, `locale`, `created_at`, `last_used_at`, `failures`; unique
+(`tenant_id`, băm `token`)). `POST /me/device-tokens`, `DELETE /me/device-tokens/{id}`; nhà cung cấp báo token
+hết hiệu lực → xoá. Cùng luật như web push: tuỳ chọn nhận theo loại, tin quảng cáo cần đồng ý, khung giờ gửi.
+Test: `token_het_hieu_luc_bi_xoa`, `tin_quang_cao_khong_gui_khi_chua_dong_y` (kênh di động).
