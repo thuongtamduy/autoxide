@@ -3,7 +3,8 @@
 > Lộ trình: `docs/ROADMAP.md` bước 31 · Quyết định: D-059 (endpoint deprecated), D-177 (SDK
 > TypeScript trong repo, không npm — D-177 ghi "agent làm bước 32 quyết" theo số cũ; theo bảng
 > D-178 đó là bước này), D-004 (OpenAPI là nguồn sinh SDK), D-097 (giao diện ở repo riêng), D-109
-> (bản nháp AI chờ duyệt), D-164 / D-169 (`TestApp`), D-173 (gate hai mức), D-192 (bước 33 chờ bước này)
+> (bản nháp AI chờ duyệt), D-164 / D-169 (`TestApp`), D-173 (gate hai mức), D-192 (bước 33 chờ bước này),
+> D-068 (MCP), D-167 (hợp đồng module), D-233 (A6 hợp đồng tool MCP, A7 `cargo semver-checks`)
 
 ## Mục tiêu
 
@@ -12,7 +13,9 @@ gate chặn mọi thay đổi phá vỡ `/api/v1` so với bản phát hành g�
 `docs/openapi.json`; hướng dẫn theo tình huống có ví dụ chạy thật trong gate; mỗi response trong test
 HTTP được kiểm khớp schema của chính endpoint đó; database của bản trước nâng lên bản hiện tại được, và
 migration của mọi module đi được up → down → up. Đây là lưới an toàn cho bước 33 (sửa mọi bảng của mọi
-module) — nên bước 33 chỉ bắt đầu khi bước này xong.
+module) — nên bước 33 chỉ bắt đầu khi bước này xong. Tool MCP có hợp đồng như endpoint (`docs/mcp-tools.json`,
+`api-diff` chặn tool đổi phá vỡ — A6); hợp đồng Rust của module được `cargo semver-checks` báo cáo mỗi lần
+phát hành (A7) (D-233).
 
 ## Bắt đầu khi
 
@@ -28,6 +31,9 @@ File dùng chung với bước khác:
   `modules/content/src/entries/{body,slug}.rs` — bước 32 dời file của `comments`, `forms` (và thêm
   Markdown cho bình luận): test đặt **ngay cạnh hàm** (`#[cfg(test)] mod`), để dời file thì test đi theo.
 - Bước 30 đổi `docs/openapi.json` (WebP `sources`, 503 `shutting_down`): không phá vỡ theo luật dưới đây.
+- Bước 40 (P2) thêm tool, bước 51 (P12) thêm `requires_approval_for_agent` cho tool: mỗi bước sinh lại
+  `docs/mcp-tools.json` (A6). Thêm tool là không phá vỡ; gắn cờ duyệt cho tool **đang có** là phá vỡ theo A6
+  — bước 51 làm tool mới hay ghi ngoại lệ có quyết định (D-233).
 
 ## Phạm vi
 
@@ -36,11 +42,14 @@ Sửa / tạo: `xtask/src/` (lệnh `api-diff`, `sdk`, có thể `upgrade-test`)
 `crates/kernel/src/http/openapi.rs` (media type của lỗi — xem B4), `crates/testkit/src/` (kiểm response
 theo hợp đồng, ảnh chụp schema), `crates/app/src/e2e/` và `crates/app/tests/` (ví dụ tài liệu, migration,
 nâng cấp), `sdk/typescript/` (mới), `docs/guides/` (mới, EN + VI), `README*.md`, `gate.sh`,
-`.github/workflows/ci.yml`, `docs/RELEASING.md`, `STACK.md`, `CHANGELOG.md`, `docs/DECISIONS.md`.
+`.github/workflows/ci.yml`, `docs/RELEASING.md`, `STACK.md`, `CHANGELOG.md`, `docs/DECISIONS.md`. Thêm cho
+A6 / A7 (D-233): `crates/kernel/src/{mcp.rs, http/mcp.rs, module/registry.rs, module_catalog.rs}` (deprecation
+cho tool), `crates/app/src/commands/mcp_manifest.rs` + `crates/app/src/main.rs` (lệnh `mcp-manifest`),
+`docs/mcp-tools.json` (mới), `xtask/src/semver.rs` (mới).
 
 Ngoài phạm vi: đăng npm (D-177), SDK ngôn ngữ khác, `/api/v2`, sửa hành vi endpoint (chỉ sửa **tài
-liệu** khi tài liệu sai — và đó là thay đổi phải qua `api-diff`), `cargo semver-checks` cho hợp đồng Rust
-(D-167 để sau).
+liệu** khi tài liệu sai — và đó là thay đổi phải qua `api-diff`), `cargo semver-checks` **chặn** trong gate
+khi còn `0.x` — bước này chỉ báo cáo lúc phát hành, xem A7 (D-167, D-233).
 
 ## Thiết kế
 
@@ -207,6 +216,141 @@ Bảng tool **không viết tay rồi để lệch**: test (A5) so bảng trong 
   của CI chạy `tsc --noEmit` trên chúng cùng SDK. Kiểu sai so với SDK thì CI đỏ.
 - Bảng tool của `mcp.md`: test như A4, cùng file.
 
+### A6. Hợp đồng tool MCP — chặn thay đổi phá vỡ như `/api/v1` (D-233)
+
+Agent viết cho bản cũ gọi tool theo tên và tham số đã biết — tool là hợp đồng như endpoint, không được
+âm thầm đổi.
+
+**Manifest.** Lệnh `autoxide mcp-manifest` (file mới `crates/app/src/commands/mcp_manifest.rs`, khai trong
+`main.rs` cạnh `Openapi`): dựng runtime như `autoxide openapi` (`runtime::start(…, Migrations::Ignore)` —
+tool khai sau `start`), lấy `Modules::tools()` của mọi module đang đăng ký (`modules::all()`) và
+deprecation của tool, in JSON ra stdout: `cargo run -p autoxide -- mcp-manifest > docs/mcp-tools.json`.
+Hình dạng (phác thảo):
+
+```json
+{
+  "manifest_version": 1,
+  "tools": [
+    {
+      "name": "content.create_draft",
+      "description": "…",
+      "permissions": ["content.write", "content.write_own"],
+      "annotations": { "read_only": false, "destructive": false, "returns_secret": false,
+                       "requires_approval_for_agent": false },
+      "input_schema": { "type": "object", "properties": { … }, "required": [ … ] },
+      "output_schema": null,
+      "deprecation": null
+    }
+  ]
+}
+```
+
+- Nguồn: `Tool::name()` (tên đầy đủ), `description()` (bản gốc, chưa nối câu permission như `tools/list`),
+  `permission()` + `alternative()` (như `ModuleTool` của danh mục module), `is_read_only()`,
+  `is_destructive()`, `is_secret()`, `input_schema()`. `requires_approval_for_agent` có thật từ bước 51
+  (P12); trước đó luôn `false`. `output_schema`: `Tool` hiện chưa khai schema kết quả (`Tool::new` chỉ đòi
+  `O: Serialize`) — trường là `null`, luật so kết quả bên dưới áp khi cả hai bản có schema; thêm cách khai
+  schema kết quả không thuộc A6. `deprecation`: `{since, sunset, successor}` hay `null`.
+- Tất định: `tools` sắp theo `name`; khoá object tự sắp (workspace `serde_json` không bật `preserve_order` —
+  kiểm lại khi làm); JSON đẹp, kết thúc bằng một dòng trống, như `docs/openapi.json`.
+- Test `file_mcp_tools_trong_repo_khop_voi_code` (cạnh lệnh, như `file_openapi_trong_repo_khop_voi_code`,
+  `TestDatabase::run`): lệch thì đỏ, thông báo ghi sẵn lệnh sinh lại ở trên.
+
+**`api-diff` so cả manifest.** `cargo xtask api-diff` (A1), sau phần OpenAPI, đọc
+`git show <tag>:docs/mcp-tools.json` và so với file trên đĩa. Tag chưa có file → in "no MCP tool manifest in
+<tag>; nothing to compare" rồi qua (như tag thiếu `docs/openapi.json`). Ghép tool theo `name`. Phần schema
+dùng lại bộ so của A1 (chuẩn hoá nullable, `allOf`; `input_schema` không có `$ref` — kernel đã cấm), không
+viết bộ so thứ hai: `input_schema` so theo chiều *request*, `output_schema` theo chiều *response*. Mã
+ổn định, tiền tố `tool.`:
+
+| Mã | Phá vỡ khi |
+| --- | --- |
+| `tool.removed` | tool có ở bản cũ, không có ở bản mới (đổi tên = bỏ tool cũ) — **trừ** khi tool cũ có `deprecation` và `sunset` ≤ hôm nay (UTC) |
+| `tool.parameter_added_required` | thêm tham số bắt buộc (khoá mới trong `required`, ở mọi mức lồng) |
+| `tool.parameter_became_required` | tham số tuỳ chọn thành bắt buộc |
+| `tool.parameter_removed` | bỏ tham số — đầu vào của tool thường dùng `deny_unknown_fields`, agent gửi tham số cũ bị từ chối |
+| `tool.parameter_type_changed` | tập kiểu nhỏ đi hay khác (bỏ `null`, `integer` → `string`…), đổi `format` |
+| `tool.constraint_tightened` | thu hẹp giá trị cho phép: bỏ giá trị enum, `maxLength` / `maximum` / `maxItems` giảm, `minLength` / `minimum` tăng, `pattern` đổi |
+| `tool.no_longer_read_only` | `read_only` `true` → `false` (client đang gọi không hỏi lại) |
+| `tool.approval_added` | `requires_approval_for_agent` `false` → `true` (agent đang chạy một mạch bỗng nhận `approval_required`) |
+| `tool.result_property_removed` | bỏ trường của `output_schema` |
+| `tool.result_changed` | trường kết quả bắt buộc thành tuỳ chọn / nullable, tập kiểu lớn ra hay khác, hay bỏ hẳn `output_schema` |
+
+Không phá vỡ (dòng `note:`): thêm tool, thêm tham số tuỳ chọn, thêm trường kết quả, nới ràng buộc, thêm giá
+trị enum của tham số, `read_only` `false` → `true`, bỏ `requires_approval_for_agent`, đổi `description`.
+In `warning:`, không đỏ: tool thành `destructive`, đổi permission (agent có key cũ có thể không còn thấy
+tool — xem lại trước khi phát hành), thêm giá trị enum trong kết quả. Ngoại lệ có chủ đích: cùng file
+`xtask/api-breaking-allow.json` của A1, `at` là `<tên tool> <vị trí>` (vd `content.create_draft $.title`).
+
+Thông báo, vd:
+
+```text
+[api-breaking] tool.removed: content.create_draft (in v0.13.0) is gone.
+  Keep it working; declare it in Module::deprecations (Deprecation::tool) with a sunset date and add the
+  replacement as a new tool, e.g. content.create_draft_v2 (D-233). It may be removed after the sunset date.
+[api-breaking] tool.parameter_added_required: content.create_draft $.folder_id
+  Agents built for the old version do not send it. Make it optional, or add a new tool.
+```
+
+**Tool deprecated (mở rộng D-059 cho tool).** Thay đổi phá vỡ thì làm tool mới (vd `create_draft_v2`), tool
+cũ chạy y như cũ tới ngày sunset và khai qua `Module::deprecations` — không thêm hàm mới vào `Module`:
+
+- Hàm tạo mới (phác thảo) `Deprecation::tool("create_draft", "2026-12-01").sunset("2027-06-01")
+  .successor("create_draft_v2")` — tên ngắn, kernel thêm tiền tố `<module>.` như `tools()`. Cách lưu bên
+  trong (trường mới, hay gom `method` / `path` vào một enum đích) agent quyết; ưu tiên cách **thêm**, không
+  đổi trường công khai đang có của `Deprecation` (hợp đồng module, D-167) — buộc phải đổi thì ghi vào
+  "Breaking (Rust)" (A7).
+- Kiểm như endpoint (ngày đúng dạng, `sunset` sau `since`) ở chỗ kiểm deprecation hiện có; tool và
+  `successor` phải có trong `tools()` của chính module — kiểm trong `Modules::tools()` (gọi sau `start`),
+  sai là lỗi khởi động.
+- Lớp HTTP (`deprecation::apply`, middleware header) chỉ nhận deprecation của endpoint; danh mục module
+  đưa deprecation của tool vào `ModuleTool` (trường tuỳ chọn mới `deprecation`), **không** vào
+  `ModuleDeprecation` (làm `method` / `path` thành tuỳ chọn là `response.property_optional` của A1).
+- `tools/list`: mô tả tool thêm cùng câu với endpoint ("Deprecated since …; removed on …; use
+  `content.create_draft_v2` instead.").
+- Kết quả của tool cũ (`http/mcp.rs`, `call_tool`) mang cảnh báo mà không đổi envelope `{"data": …}`: thêm
+  `_meta` `{"autoxide/deprecation": {"since", "sunset", "successor"}}` cho máy và một mục `content` văn bản
+  ("Warning: tool … is deprecated …") cho mô hình đọc — tra `CallToolResult` của `rmcp` đang ghim bằng skill
+  `check-library-api` (có `meta` không, thêm `content` cạnh `structured` thế nào). Đếm số lần gọi bằng
+  `mcp_deprecated_tool_calls_total{tool}` (tên tool là tập cố định do code khai), như D-059.
+
+**Test:** trong `api_diff.rs` (JSON nhỏ viết tay) một test cho mỗi mã `tool.*` ở bảng trên, cộng
+`tool_them_tham_so_tuy_chon_thi_qua`, `tool_them_moi_thi_qua`, `tool_deprecated_qua_sunset_duoc_bo`,
+`tool_deprecated_chua_toi_sunset_thi_do`, `tag_cu_chua_co_manifest_thi_bo_qua`,
+`so_docs_mcp_tools_voi_chinh_no_khong_co_gi`. Kernel / app (cả hai database, qua `TestApp`):
+`tool_deprecated_co_canh_bao_trong_ket_qua`, `tool_deprecated_co_cau_deprecated_trong_tools_list`,
+`khai_deprecation_cho_tool_khong_co_bi_tu_choi_luc_khoi_dong`; `file_mcp_tools_trong_repo_khop_voi_code`.
+
+### A7. `cargo semver-checks` cho hợp đồng Rust — trong quy trình phát hành, chưa vào gate (D-233)
+
+Giữ lý do của D-167: khi còn `0.x`, mọi bản minor được phép phá vỡ, nên **chặn** trong gate không có ích.
+Nhưng người viết module (D-164) vẫn cần biết bản mới phá gì — nên **báo cáo** mỗi lần phát hành.
+
+- Lệnh `cargo xtask semver [--base <tag>]` (file mới `xtask/src/semver.rs`): chọn tag như A1 (`git describe`
+  từ `HEAD`, lỗi rõ khi shallow, không có tag thì in "no release tag found; nothing to compare" và thoát 0);
+  gọi `cargo semver-checks` so với tag đó cho các crate là **hợp đồng module**: `autoxide-kernel`,
+  `autoxide-testkit`. Crate của module chỉ lộ `pub mod api` + `pub fn module` (D-031, `cargo xtask check`
+  kiểm), nên chạy công cụ trên crate module là kiểm đúng phần `api` — thêm chúng nếu thời gian chạy chấp
+  nhận được (đo rồi ghi quyết định); không được thì chỉ module có `api` được module khác dùng.
+- Cách gọi, cờ chọn bản gốc (rev / thư mục build), toolchain cần, cách đọc kết quả: tra đúng phiên bản bằng
+  skill `check-library-api`, không viết theo trí nhớ. Công cụ là binary cài riêng (`cargo install
+  cargo-semver-checks --locked`, phiên bản ghim ghi ở `STACK.md`); chưa cài thì lệnh báo lỗi kèm lệnh cài.
+- Kết quả: thoát 0 khi còn `0.x` dù có phá vỡ (in `warning:` từng mục); `--markdown` in dòng tiếng Anh để
+  chép vào mục `### Breaking (Rust)` của phiên bản trong `CHANGELOG.md` (và vào ghi chú phát hành, vốn lấy từ
+  CHANGELOG). Không có phá vỡ thì không thêm mục.
+- **Chế độ chặn:** tự bật khi `version` của workspace ≥ `1.0.0` (đọc `Cargo.toml` gốc), hay bằng cờ
+  `--deny`; có phá vỡ thì thoát 1. Từ lúc lên `1.0`, hay khi chủ dự án quyết công bố framework (D-164), lệnh
+  vào bước bắt buộc của phát hành / workflow `Release` (và cân nhắc gate) — ghi quyết định mới lúc đó.
+- Công cụ cần mạng (cài công cụ, tải crate) và build bản của tag cũ, lâu: chạy bằng lệnh riêng, **không** trong
+  `./gate.sh`.
+- `docs/RELEASING.md`: khi làm, thêm một bước (sau bước sửa CHANGELOG, trước commit `release:`) chạy
+  `cargo xtask semver` và chép kết quả vào "Breaking (Rust)"; nói rõ còn `0.x` thì chỉ báo cáo. Đặc tả này
+  chỉ ghi yêu cầu, không sửa RELEASING trước khi làm.
+- Test (`#[cfg(test)]` trong `semver.rs`, hàm thuần, không chạy công cụ thật): `semver_khi_0x_chi_bao_cao`,
+  `semver_tu_1_0_thi_chan`, `semver_co_deny_thi_chan`, `semver_thieu_cong_cu_bao_lenh_cai`,
+  `semver_markdown_dung_dang_changelog`. Thử tay một lần: xoá một hàm `pub` của kernel trên nhánh tạm → lệnh
+  liệt kê nó; ghi kết quả vào quyết định.
+
 ### B1. Test nâng cấp từ bản phát hành trước
 
 Khuyến nghị cấu trúc:
@@ -317,22 +461,30 @@ hai media type này là một cho lỗi (A1) — làm A1 trước B4.
 | --- | --- | --- |
 | 1 | kernel: `x-sunset` / `x-deprecated-since` / `x-successor` trong OpenAPI (+ test) | A.1 |
 | 2 | `xtask api-diff` + test từng luật; `gate.sh`; `ci.yml` `fetch-depth: 0`; quyết định | A.1 |
-| 3 | testkit: kiểm response theo hợp đồng + `unchecked()`; kernel: media type của lỗi; sinh lại `docs/openapi.json`; sửa lệch khác test tìm ra (mỗi loại lệch một commit) | B.4 |
-| 4 | `xtask sdk` + `sdk/typescript/` + `--check` trong gate + job `sdk` trong CI; quyết định (D-177) | A.2 |
-| 5 | `docs/guides/` (EN + VI) các tình huống; README trỏ tới | A.3 |
-| 6 | `docs/guides/mcp.md` (EN + VI) + test bảng tool | A.4 |
-| 7 | test ví dụ tài liệu (`e2e/guides.rs`), trích ví dụ TS cho CI | A.5 |
-| 8 | testkit `schema_snapshot`; test migration up → down → up (trống và có dữ liệu); sửa `down` hỏng nếu có (migration mới, không sửa migration đã commit) | B.2 |
-| 9 | `proptest`: từng nhóm đích một commit; sửa lỗi tìm ra (kèm ca hồi quy) | B.3 |
-| 10 | test nâng cấp + `xtask upgrade-test` + job `upgrade` + bước trong RELEASING | B.1 |
-| 11 | CHANGELOG, ROADMAP, phát hành (D-171) | — |
+| 3 | kernel: `Deprecation::tool`, kiểm khai báo, câu deprecated trong `tools/list`, cảnh báo trong kết quả tool; lệnh `mcp-manifest` + `docs/mcp-tools.json` + test khớp code | A6 (D-233) |
+| 4 | `api-diff` so `docs/mcp-tools.json` (luật `tool.*`) + test từng luật | A6 (D-233) |
+| 5 | `xtask semver` + test; bước trong RELEASING; `STACK.md` (phiên bản công cụ); quyết định | A7 (D-233) |
+| 6 | testkit: kiểm response theo hợp đồng + `unchecked()`; kernel: media type của lỗi; sinh lại `docs/openapi.json`; sửa lệch khác test tìm ra (mỗi loại lệch một commit) | B.4 |
+| 7 | `xtask sdk` + `sdk/typescript/` + `--check` trong gate + job `sdk` trong CI; quyết định (D-177) | A.2 |
+| 8 | `docs/guides/` (EN + VI) các tình huống; README trỏ tới | A.3 |
+| 9 | `docs/guides/mcp.md` (EN + VI) + test bảng tool | A.4 |
+| 10 | test ví dụ tài liệu (`e2e/guides.rs`), trích ví dụ TS cho CI | A.5 |
+| 11 | testkit `schema_snapshot`; test migration up → down → up (trống và có dữ liệu); sửa `down` hỏng nếu có (migration mới, không sửa migration đã commit) | B.2 |
+| 12 | `proptest`: từng nhóm đích một commit; sửa lỗi tìm ra (kèm ca hồi quy) | B.3 |
+| 13 | test nâng cấp + `xtask upgrade-test` + job `upgrade` + bước trong RELEASING | B.1 |
+| 14 | CHANGELOG, ROADMAP, phát hành (D-171) — kèm chạy `cargo xtask semver` lần đầu (A7) | — |
 
 ## Test bắt buộc
 
 - `xtask`: test của `api_diff` (danh sách ở A1); test của bộ sinh SDK (schema mẫu → TypeScript mong đợi:
   nullable, enum, `oneOf`, `allOf`, mảng, map `additionalProperties`, tên có ký tự lạ); `sdk --check` đỏ
   khi file lệch.
-- `crates/kernel`: `deprecation_ghi_x_sunset_vao_tai_lieu`; response lỗi khai `application/problem+json`.
+- `xtask`: test luật `tool.*` của `api_diff` và test của `semver` (danh sách ở A6, A7) (D-233).
+- `crates/kernel`: `deprecation_ghi_x_sunset_vao_tai_lieu`; response lỗi khai `application/problem+json`;
+  `tool_deprecated_co_canh_bao_trong_ket_qua`, `tool_deprecated_co_cau_deprecated_trong_tools_list`,
+  `khai_deprecation_cho_tool_khong_co_bi_tu_choi_luc_khoi_dong` — cả hai database (D-233).
+- `crates/app/src/commands/mcp_manifest.rs`: `file_mcp_tools_trong_repo_khop_voi_code`, cả hai database
+  (D-233).
 - `crates/testkit`: `response_lech_hop_dong_thi_send_bao_loi`, `unchecked_bo_qua_kiem`,
   `schema_snapshot` trên cả hai database (bảng, cột, index, unique).
 - `crates/app/src/e2e/guides.rs`: mọi ví dụ `curl` của `docs/guides/*.md` chạy được; khối code EN = VI;
@@ -355,6 +507,12 @@ hai media type này là một cho lỗi (A1) — làm A1 trước B4.
 - [ ] Migration mọi module up → down → up, trống và có dữ liệu, hai database
 - [ ] Property test cho sáu nhóm đích; `proptest` trong `STACK.md`
 - [ ] Mọi response trong test HTTP khớp `docs/openapi.json`; tài liệu lỗi khai đúng media type
+- [ ] `docs/mcp-tools.json` sinh từ code, test giữ khớp; `api-diff` chặn tool đổi phá vỡ (bỏ tool, thêm tham
+      số bắt buộc, `read_only` thành ghi…), test cho từng luật; tool khai deprecated qua
+      `Module::deprecations`, kết quả mang cảnh báo (D-233)
+- [ ] `cargo xtask semver` báo thay đổi phá vỡ của kernel, testkit (và `api` của module nếu đo chấp nhận
+      được) so với tag trước; bước trong `docs/RELEASING.md`, mục "Breaking (Rust)" của CHANGELOG; chỉ báo
+      cáo khi `0.x`, chặn từ `1.0`; không trong `./gate.sh` (D-233)
 - [ ] `./gate.sh` đầy đủ xanh; CHANGELOG (SDK, hướng dẫn, media type lỗi trong tài liệu, `x-sunset`);
       quyết định mới; ROADMAP `[x]`; phát hành theo `docs/RELEASING.md`
 
@@ -382,6 +540,16 @@ hai media type này là một cho lỗi (A1) — làm A1 trước B4.
 - **Ví dụ tài liệu** chứa secret giả: dùng `$TOKEN`, `axk_…` rút gọn, không chép token thật từ test ra
   tài liệu (gitleaks).
 - `proptest` sinh chuỗi Unicode lạ: bộ kiểm đếm byte hay ký tự phải đúng như D-174 ghi.
+- **Manifest tool không tất định** (thứ tự module, thứ tự khoá) làm test khớp code đỏ ngẫu nhiên — sắp theo
+  tên, không dựa vào thứ tự đăng ký (D-233).
+- **Deprecation của tool lọt vào lớp HTTP** (`deprecation::apply`, middleware header) hay vào
+  `ModuleDeprecation`: lớp HTTP đi tìm route không có; `method` / `path` thành tuỳ chọn là phá vỡ response
+  theo A1 (D-233).
+- **Gắn cờ cho tool đang có** (`requires_approval_for_agent` của bước 51, bỏ `read_only`) là phá vỡ dù code
+  "chỉ thêm một dòng" — làm tool mới, hay ngoại lệ có quyết định (D-233).
+- **`cargo semver-checks` hiểu luật `0.x`** của SemVer: bản `0.x` tăng minor được coi như tăng major, nên có
+  thể không báo gì. Phải ép công cụ so như bản không được phá vỡ (tra cờ đúng phiên bản, vd loại phát hành)
+  để lấy được danh sách; xác nhận bằng lần thử tay ở A7 (D-233).
 
 ## Căn cứ pháp lý
 
@@ -399,4 +567,7 @@ Ghi mỗi lựa chọn thành mục mới trong `docs/DECISIONS.md` (số kế t
 - Thư viện kiểm JSON Schema (đo rồi chọn).
 - Test nâng cấp: integration test có điều kiện theo biến môi trường + lệnh `xtask`, ngoài `gate.sh`.
 - Tên và cách chia file trong `docs/guides/`; dạng hẹp của ví dụ `curl`.
-- Có kiểm hợp đồng cho MCP (tool `input_schema` / kết quả) không — ngoài ROADMAP; khuyến nghị để sau.
+- Hợp đồng tool MCP làm theo A6 (D-233); agent quyết chi tiết: cách lưu deprecation của tool trong
+  `Deprecation`, cách đưa cảnh báo vào kết quả theo API `rmcp` đang ghim.
+- `cargo semver-checks` (A7, D-233): crate nào ngoài kernel / testkit được kiểm (đo thời gian), phiên bản
+  công cụ ghim.

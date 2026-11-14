@@ -5583,3 +5583,37 @@ phối cha → con, yêu cầu duyệt, sổ điều hướng, `PayoutGateway`, 
 Đã cân nhắc: mở bước 68+ cho từng mục — thêm bước mà không thêm giá trị, phần lõi chờ lâu hơn; "đăng nhập thay người
 dùng" có quyền ghi như một số nền tảng — rủi ro lạm quyền và dữ liệu cá nhân, "xem như chỉ đọc" đủ cho việc gỡ lỗi;
 module `contracts` riêng cho ký điện tử — `compliance` đã sở hữu văn bản pháp lý có phiên bản.
+
+## D-233 · Viết đặc tả cho 6 việc "để sau" còn rải trong đặc tả; dọn câu "để sau" đã cũ — 2026-11-14 — chủ dự án trao quyền, agent quyết
+
+Chủ dự án yêu cầu viết đặc tả luôn cho các việc còn ghi "để sau" trong đặc tả (ngoài 11 mục của D-232), quyền quyết
+giao cho agent. Như D-232: không mở bước mới, gắn vào bước cùng chủ đề, cuối danh sách của bước.
+
+| # | Việc | Bước | Quyết định chính |
+|---|---|---|---|
+| 1 | Hợp đồng tool MCP | 31 (A6) | `docs/mcp-tools.json` sinh từ code; `api-diff` chặn thay đổi phá vỡ của tool như của endpoint; tool cũ khai deprecated (mở rộng D-059 cho tool) |
+| 2 | `cargo semver-checks` | 31 (A7) | Chạy trong quy trình phát hành cho kernel, testkit; **chỉ báo cáo** khi còn `0.x`, chặn từ `1.0` hay khi công bố framework — giữ lý do của D-167, không đưa vào gate |
+| 3 | Báo khi sản phẩm yêu thích có hàng lại / giảm giá | 47 | Người mua tự bật, đồng ý theo mục đích riêng; chỉ báo giảm thật ≥ 5% so với giá mốc; tối đa 1 lần / 7 ngày mỗi sản phẩm; gom lô theo khung giờ |
+| 4 | Banner trong gian hàng người bán | 55 | Người bán tự quản trong nút của mình; sàn duyệt theo chính sách dữ liệu; link chỉ tới hàng của chính người bán; không phải quảng cáo trong sàn (64) |
+| 5 | Người bán nước ngoài trên sàn | 63 | Tắt mặc định; điều kiện (giấy tờ, đại diện, thuế) là gói luật có ngày hiệu lực, chưa có gói thì không bật được; công bố quốc gia người bán; chi trả ngoại tệ; hàng nhập khẩu cho người mua ngoài phạm vi |
+| 6 | EDI cho B2B | 59 | Chuẩn mở UBL 2.1 (OASIS); vào qua API key `service`, ra qua `webhooks`; EDIFACT / X12 là bộ chuyển đổi riêng khi có khách cần |
+
+Dọn câu "để sau" đã cũ (việc đã có bước riêng): sản phẩm bán theo kỳ (62), bán sỉ B2B (59), chat thời gian thực
+(61), ứng dụng OAuth (65), thử A/B (67), quảng cáo trong sàn (64) — trong đặc tả 35, 45, 46, 47, 53, 54, 57 và
+ROADMAP.
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật 91/2025/QH15 và luật tin quảng cáo của
+bước 37 (báo yêu thích); Luật 19/2023/QH15 (không báo giảm giá ảo; công bố người bán nước ngoài); Luật Thương mại
+điện tử 122/2025, NĐ 85/2021, NĐ 117/2025, Thông tư 80/2021/TT-BTC (người bán nước ngoài, thuế).
+
+Lý do: chủ dự án muốn phủ hết việc đã biết; gắn vào bước có sẵn dùng lại hạ tầng (api-diff, sổ đồng ý, banner,
+webhooks, KYC, đa tiền tệ) và không làm giai đoạn A dài thêm.
+
+Đã cân nhắc: đưa `cargo semver-checks` vào gate ngay — vẫn như D-167, không có ích khi còn `0.x`; EDIFACT / X12 trong
+core — nặng, ít khách Việt Nam dùng, để thành bộ chuyển đổi riêng; cho người bán nước ngoài gửi hàng nhập khẩu thẳng
+tới người mua — kéo theo hải quan, thuế nhập khẩu, cần đối chiếu riêng.
+
+Ghi thêm cho D-233 (lúc gộp kết quả): EDI của bước 59 nhận và trả **thân XML (UBL)** ở `/api/v1/wholesale/edi/*` —
+ngoại lệ có chủ đích của luật "ba hình dạng response" (`Data` / `Page` / `Problem`), cùng loại với tải tệp (hoá đơn
+điện tử XML của 36, nguồn cấp sản phẩm của 48): chuẩn của chứng từ là XML, không bọc trong envelope JSON; lỗi giao
+thức (xác thực, quá cỡ, sai kiểu nội dung) vẫn trả `Problem`.

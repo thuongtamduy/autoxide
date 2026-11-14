@@ -432,6 +432,8 @@ Payload `{"before": …, "after": …}`, không có token tải.
 `catalog.preorder_date_changed` (trước / sau — để `orders` báo người mua khi ngày dời; D-204) ·
 `catalog.price_changed` (lúc thêm dòng giá: bảng giá, biến thể, giá cũ / mới, `valid_from`) ·
 `catalog.price_effective` (lúc giá hẹn giờ bắt đầu hay hết hiệu lực — cho `channels`) ·
+`catalog.display_price_changed` (giá hiển thị công khai của biến thể đổi — gồm giá sau giảm tự động ghi vào
+`catalog_storefront_entries`; `org_id`, biến thể, giá cũ / mới; cho báo giảm giá yêu thích của bước 47, D-233) ·
 `catalog.category_changed` · `catalog.import_completed` · `catalog.export_completed` ·
 `catalog.downloads_issued` · `catalog.downloads_revoked`.
 

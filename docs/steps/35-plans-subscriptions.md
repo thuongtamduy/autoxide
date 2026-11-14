@@ -71,7 +71,7 @@ phụ thuộc). Sửa module: `organizations`, `auth`, `files` (khai và gọi h
 
 NGOÀI phạm vi: hạn mức theo nút (vd số nhân sự mỗi cửa hàng); trừ tiền tự động định kỳ bằng thẻ đã
 lưu; hoàn tiền tỉ lệ khi hạ gói / huỷ; mã giảm giá cho thuê bao; thuê bao định kỳ cho **người mua**
-của khách ("sản phẩm thuê bao" — để sau, D-194); báo cáo doanh thu SaaS (bước 38).
+của khách ("sản phẩm thuê bao" — bước 62 `recurring`, D-221); báo cáo doanh thu SaaS (bước 38).
 
 ## Thiết kế
 

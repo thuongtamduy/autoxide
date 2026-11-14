@@ -95,6 +95,10 @@ Nhóm A — hợp đồng và người gọi API:
       permission cần, giới hạn (rate limit theo API key, bản nháp chờ duyệt — D-109)
 - [ ] Ví dụ trong tài liệu được test: các ví dụ của hai mục trên chạy thật trên app dựng bằng
       `TestApp` trong gate (hay một lệnh `xtask` gate gọi), để tài liệu không lệch code
+- [ ] Hợp đồng tool MCP (D-233): `docs/mcp-tools.json` sinh từ code, `api-diff` chặn thay đổi phá vỡ của tool
+      (bỏ tool, thêm tham số bắt buộc, `read_only` thành ghi…), tool cũ khai deprecated như endpoint
+- [ ] `cargo semver-checks` cho kernel và testkit trong quy trình phát hành (D-233): báo cáo khi còn `0.x`, chặn
+      từ `1.0` hay khi công bố framework (giữ lý do D-167)
 
 Nhóm B — chống hồi quy:
 
@@ -600,8 +604,8 @@ Module trung lập với nghiệp vụ, không phải core: `support`, `analytic
 
 Đặc tả: [`docs/steps/53-support.md`](steps/53-support.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
-Bắt đầu SAU bước 37; song song được với 41–49. Phiếu hỗ trợ, không phải chat thời gian thực (vẫn để sau,
-D-194). Khiếu nại có hạn luật định vẫn ở `compliance` (bước 37), tranh chấp ở `marketplace` (bước 46):
+Bắt đầu SAU bước 37; song song được với 41–49. Phiếu hỗ trợ; chat thời gian thực là bước 61
+(D-221). Khiếu nại có hạn luật định vẫn ở `compliance` (bước 37), tranh chấp ở `marketplace` (bước 46):
 `support` chuyển phiếu sang đó, không làm lại.
 
 - [ ] Phiếu và tin nhắn: tạo từ website (có tài khoản; vãng lai qua OTP email / số điện thoại; từ token
@@ -954,6 +958,8 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
       giới thiệu bạn bè có thưởng
 - [ ] Tặng voucher (D-222): sinh nhật, đổi điểm lấy voucher, sau khi mua, giới thiệu bạn — qua
       `grant_voucher`, gọi lại không cấp thêm
+- [ ] Báo khi sản phẩm yêu thích có hàng lại hay giảm giá (D-233): người mua tự bật, đồng ý riêng, chỉ giảm thật
+      ≥ ngưỡng so với giá mốc, tối đa 1 lần / 7 ngày mỗi sản phẩm, gom lô theo khung giờ
 
 ## 48. Bán đa kênh (`channels`)
 
@@ -1016,6 +1022,8 @@ họ dữ liệu để vẽ trang chủ, trang danh mục, chân trang mà khôn
       không"; thiếu module thì link loại đó bị từ chối khi lưu
 - [ ] Tool MCP cho banner và bộ sưu tập (soạn, lên lịch, sắp xếp) như REST; AI chỉ gợi ý chữ, đánh dấu
       `ai_assisted` (bước 37); hướng dẫn cho người làm giao diện (EN + VI)
+- [ ] Banner trong gian hàng người bán trên sàn (D-233): người bán tự quản trong nút của mình, sàn duyệt theo
+      chính sách, link chỉ tới hàng của chính người bán, không phải quảng cáo trong sàn
 
 ## 56. Chuyển dữ liệu từ nền tảng khác (`imports`, D-219)
 
@@ -1054,6 +1062,8 @@ Bắt đầu SAU bước 45 và 47. Bán cho doanh nghiệp trên cùng hệ th�
       người bán trên sàn, giá niêm phong tới hạn, trao thầu thành báo giá / hợp đồng; không dùng cho mua sắm công
 - [ ] Ký hợp đồng điện tử trong `compliance` (D-232): `SignatureProvider` + bộ giả, ký `simple` (OTP + đồng ý) hay
       `digital` (chữ ký số qua nhà cung cấp được cấp phép), mã băm chống sửa tệp; dùng cho 59, 46, 49
+- [ ] Trao đổi chứng từ B2B tự động (EDI, D-233): UBL 2.1 cho đơn, xác nhận đơn, báo giao; vào qua API key
+      `service`, ra qua `webhooks`; chống trùng theo ID chứng từ, chặn XXE; EDIFACT / X12 là bộ chuyển đổi riêng
 
 ## 60. Đặt lịch dịch vụ (`bookings`) (chủ dự án giao ngày 14/11/2026, D-221)
 
@@ -1105,6 +1115,9 @@ Bắt đầu SAU bước 36, 41, 44, 45. Mở rộng module có sẵn, không mo
 - [ ] Sổ cái ghi số gốc và số quy đổi, chênh lệch tỉ giá; thuế GTGT 0% cho xuất khẩu khi đủ hồ sơ; người mua
       trong nước chỉ VND (Pháp lệnh Ngoại hối — cần đối chiếu); mã HS và xuất xứ cho giao hàng quốc tế; test trên
       cả hai database
+- [ ] Người bán nước ngoài trên sàn (D-233): tắt mặc định, điều kiện (giấy tờ, đại diện, thuế) là gói luật có
+      ngày hiệu lực, KYC hồ sơ nước ngoài, công bố quốc gia và nơi gửi hàng, chi trả ngoại tệ; hàng nhập khẩu
+      cho người mua ngoài phạm vi
 
 ## 64. Quảng cáo trong sàn (`ads`) (chủ dự án giao ngày 14/11/2026, D-221)
 
@@ -1149,6 +1162,9 @@ phẩm bán theo kỳ (62), đa tiền tệ (63), quảng cáo trong sàn (64), 
 Đã đưa vào các bước (D-232): khách thử nghiệm và nhóm nút cho báo cáo (38), AVIF (39), trả trước một phần (45),
 quản trị trên điện thoại (52), duyệt từng lần truy cập hỗ trợ và "xem như" chỉ đọc (54), hợp đồng khung, mời thầu và
 ký điện tử (59), gọi điện trong chat (61), bán ứng dụng trả phí (65).
+
+Đã viết đặc tả (D-233): hợp đồng tool MCP và `cargo semver-checks` (31), báo yêu thích (47), banner gian hàng
+người bán (55), EDI (59), người bán nước ngoài (63).
 
 Để sau: (trống — ý tưởng mới ghi một dòng ở đây, chưa viết đặc tả, cho tới khi xong giai đoạn A).
 
