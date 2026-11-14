@@ -442,6 +442,14 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 | 56 Chuyển dữ liệu từ nền tảng khác (D-219) | 47 | 48, 49 |
 | 57 Phân tích truy cập (D-220) | 37 (đồng ý), 34 | 41–49 |
 | 58 Tự động hoá quy trình (D-220) | 51 (P12 duyệt, P15 job) | 41–49, 57 |
+| 59 Bán sỉ B2B (D-221) | 45, 47 | 46, 48, 49 |
+| 60 Đặt lịch dịch vụ (D-221) | 34, 36 (37 cho nhắc lịch) | 41–49 |
+| 61 Chat chăm sóc khách (D-221) | 40 (SSE), 53 | 41–49 |
+| 62 Sản phẩm bán theo kỳ (D-221) | 45, 36 | 46–49 |
+| 63 Đa tiền tệ (D-221) | 36, 41, 44, 45 | 46–49 |
+| 64 Quảng cáo trong sàn (D-221) | 46, 57 | 47–49 |
+| 65 Chợ ứng dụng OAuth (D-221) | 54, 33 | 41–49 |
+| 66 SCIM (D-221) | 34, 40 (OIDC) | 35–49 |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
@@ -1411,21 +1419,113 @@ MCP đã có, chạy với quyền của người tạo luật.
 - [ ] Chạy thử khô, danh mục kích hoạt và hành động người gọi dùng được, mẫu luật do module khai; agent tạo
       luật thì chờ duyệt; người tạo mất quyền thì luật tự tắt; test trên cả hai database
 
+## 59. Bán sỉ B2B (`wholesale`) (chủ dự án giao ngày 14/11/2026, D-221)
+
+Đặc tả: [`docs/steps/59-wholesale.md`](steps/59-wholesale.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 45 và 47. Bán cho doanh nghiệp trên cùng hệ thống bán lẻ.
+
+- [ ] Công ty mua có nhiều người mua và người duyệt; bảng giá sỉ, bậc giá theo số lượng, số lượng tối thiểu —
+      không lộ giá sỉ ra công khai
+- [ ] Báo giá có hạn, chấp nhận thành đơn với giá đã chốt; đặt nhanh theo SKU / CSV
+- [ ] Trả chậm theo điều khoản, hạn mức tín dụng không vượt khi đặt đồng thời, công nợ trong sổ cái, tuổi nợ,
+      nhắc nợ, chặn đơn trả chậm khi quá hạn; hoá đơn ghi mã số thuế công ty; test trên cả hai database
+
+## 60. Đặt lịch dịch vụ (`bookings`) (chủ dự án giao ngày 14/11/2026, D-221)
+
+Đặc tả: [`docs/steps/60-bookings.md`](steps/60-bookings.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 34 và 36; không cần phần bán hàng. Spa, salon, phòng khám, lớp học, sân thể thao.
+
+- [ ] Dịch vụ (thời lượng, đệm, sức chứa, cọc), nhân viên và phòng / thiết bị, lịch làm việc lặp và ngày nghỉ
+      theo múi giờ của nút; tính giờ trống công khai
+- [ ] Đặt chỗ không bao giờ chồng giờ khi nhiều người đặt cùng lúc (ô giờ có khoá duy nhất, chạy trên cả hai
+      database); giữ tạm khi trả cọc qua đối tác; huỷ, đổi giờ, vắng mặt theo chính sách
+- [ ] Nhắc lịch qua `notifications`, khách vãng lai đặt bằng OTP, `/me/bookings`, tool MCP; test trên cả hai
+      database
+
+## 61. Chat chăm sóc khách (`conversations`) (chủ dự án giao ngày 14/11/2026, D-221)
+
+Đặc tả: [`docs/steps/61-conversations.md`](steps/61-conversations.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 40 (SSE) và 53 (`support`).
+
+- [ ] Cuộc trò chuyện giữa người mua và cửa hàng / người bán, gắn với sản phẩm hay đơn; tin nhắn chỉ thêm, gửi
+      lại không trùng, thu hồi trong thời hạn ngắn; hộp thư chung, phân công, đã đọc
+- [ ] Tin mới thời gian thực qua SSE, người không online nhận thông báo gom lô; chuyển thành phiếu hỗ trợ
+- [ ] Chống lạm dụng (chặn, báo vi phạm, xác thực tài khoản khi khách bật), hạn lưu là cấu hình, gợi ý trả lời
+      bằng AI chỉ là bản nháp; test trên cả hai database
+
+## 62. Sản phẩm bán theo kỳ (`recurring`) (chủ dự án giao ngày 14/11/2026, D-221)
+
+Đặc tả: [`docs/steps/62-recurring.md`](steps/62-recurring.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 45 và 36. Người mua trả cho cửa hàng theo kỳ — khác `plans` (khách trả cho nền tảng, bước 35).
+
+- [ ] Gói bán theo kỳ trên sản phẩm (chu kỳ, giá, dùng thử, số kỳ tối thiểu); mỗi kỳ tự tạo đơn và thu tiền qua
+      đối tác, không tạo trùng khi job chạy lại; thanh toán lỗi thì thử lại rồi tạm dừng
+- [ ] Người mua tự tạm dừng, bỏ qua kỳ, đổi sản phẩm, đổi phương thức, huỷ dễ như đăng ký; báo trước khi trừ tiền
+      và khi đổi giá; không lưu số thẻ; số liệu MRR và tỉ lệ rời bỏ; test trên cả hai database
+
+## 63. Đa tiền tệ và bán xuyên biên giới (chủ dự án giao ngày 14/11/2026, D-221)
+
+Đặc tả: [`docs/steps/63-multi-currency.md`](steps/63-multi-currency.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 36, 41, 44, 45. Mở rộng module có sẵn, không module mới.
+
+- [ ] Tỉ giá có ngày hiệu lực dạng phân số nguyên (nhập tay hay trait nguồn tỉ giá), thị trường (quốc gia, tiền
+      tệ, ngôn ngữ) theo website; giá theo thị trường, đơn chốt tỉ giá lúc đặt
+- [ ] Sổ cái ghi số gốc và số quy đổi, chênh lệch tỉ giá; thuế GTGT 0% cho xuất khẩu khi đủ hồ sơ; người mua
+      trong nước chỉ VND (Pháp lệnh Ngoại hối — cần đối chiếu); mã HS và xuất xứ cho giao hàng quốc tế; test trên
+      cả hai database
+
+## 64. Quảng cáo trong sàn (`ads`) (chủ dự án giao ngày 14/11/2026, D-221)
+
+Đặc tả: [`docs/steps/64-ads.md`](steps/64-ads.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 46 và 57 (`analytics`).
+
+- [ ] Chiến dịch của người bán (vị trí, từ khoá / danh mục, CPC / CPM, giá thầu, ngân sách, lịch); chèn vị trí
+      quảng cáo vào danh sách công khai qua điểm cắm của `catalog`, luôn có nhãn "Quảng cáo"
+- [ ] Đếm hiển thị và bấm qua `analytics` (chống bấm giả), trừ ngân sách không vượt khi đồng thời; phí là doanh
+      thu dịch vụ của sàn thu qua quyết toán hay hoá đơn, không giữ ví trả trước; báo cáo hiệu quả cho người bán;
+      test trên cả hai database
+
+## 65. Chợ ứng dụng qua OAuth 2.0 (`apps`) (chủ dự án giao ngày 14/11/2026, D-221)
+
+Đặc tả: [`docs/steps/65-apps.md`](steps/65-apps.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 54 và 33. Ứng dụng bên ngoài cắm vào như Shopify App Store.
+
+- [ ] Máy chủ ủy quyền OAuth 2.0 trong `auth`: mã ủy quyền + PKCE bắt buộc, refresh token xoay vòng, phạm vi là
+      tên permission, thu hồi và kiểm tra token, siêu dữ liệu máy chủ (RFC 7009, 7636, 7662, 8414)
+- [ ] Đăng ký ứng dụng, nền tảng duyệt ứng dụng công khai, khách cài / đồng ý / gỡ (token mất hiệu lực ngay),
+      webhook theo ứng dụng, audit `actor_kind = app`; test trên cả hai database
+
+## 66. Đồng bộ nhân viên qua SCIM 2.0 (chủ dự án giao ngày 14/11/2026, D-221)
+
+Đặc tả: [`docs/steps/66-scim.md`](steps/66-scim.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 34 và 40 (đăng nhập OIDC).
+
+- [ ] Endpoint SCIM 2.0 trong `auth` (Users, Groups, bộ lọc, PATCH theo RFC 7644) với token SCIM riêng mỗi khách
+- [ ] Nhân viên `active=false` thì khoá và thu hồi phiên, API key ngay; nhóm ánh xạ sang role ở nút; test trên
+      cả hai database
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.
 
-Để sau (D-205): ứng dụng bên thứ ba qua OAuth 2.0 với phạm vi là tên permission (chợ ứng dụng) · đồng bộ
-người dùng và nhóm từ hệ thống doanh nghiệp qua SCIM 2.0.
+Đã đưa lên lộ trình (D-221): bán sỉ B2B (bước 59), đặt lịch dịch vụ (60), chat chăm sóc khách (61), sản
+phẩm bán theo kỳ (62), đa tiền tệ (63), quảng cáo trong sàn (64), chợ ứng dụng OAuth (65), SCIM (66).
 
 Để sau (D-201, theo nghiên cứu): khách thử nghiệm (sandbox) cách ly, khách duyệt từng lần nhân sự nền
 tảng xin vào dữ liệu, nhóm nút ngoài cây cho báo cáo, quản trị trên điện thoại có thanh đáy và tóm tắt
 cuối ngày.
 
-Để sau (D-194): bán sỉ B2B (báo giá, công nợ, hạn mức tín dụng) · đặt lịch dịch vụ · chat chăm sóc
-khách · sản phẩm thuê bao định kỳ · bán xuyên biên giới nhiều tiền tệ · quảng cáo trong sàn · đo hành vi
-người xem (lượt xem, phễu mua hàng, bấm banner — cần đồng ý cookie theo Luật BVDLCN; hiện để công cụ
-ngoài như Google Analytics làm).
+Để sau: bán qua ứng dụng trả phí trên chợ ứng dụng (chia doanh thu) · tiền cọc một phần cho hàng đặt trước
+· đấu thầu và hợp đồng khung B2B · gọi điện / tổng đài trong chat. (Đo hành vi người xem đã thành bước 57
+`analytics` không cookie, D-220.)
 
 Chờ chủ dự án quyết (không làm khi chưa có quyết định): đăng nhập thay người dùng để hỗ trợ · định
 dạng ảnh AVIF. Đã cân nhắc và không làm: API dữ liệu tự

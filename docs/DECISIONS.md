@@ -5234,3 +5234,42 @@ cho bên thứ ba, không đường thứ hai làm điều REST / MCP không là
 tự động hoá bằng ngôn ngữ kịch bản (Lua, JavaScript) — không kiểm được lúc lưu, khó giải thích, rủi ro bảo mật;
 chỉ dùng webhook cho tự động hoá — cần máy chủ ngoài, khó cho người không biết lập trình; tìm kiếm Postgres
 full-text — không có trên SQLite, trái luật số một.
+
+## D-221 · Đưa tám mảng "để sau" lên lộ trình: bước 59–66 — 2026-11-14 — chủ dự án quyết
+
+Quyết định: chủ dự án đưa cả tám mảng đang ở mục "Sau core" lên lộ trình, mỗi mảng một bước có đặc tả:
+
+| Bước | Mảng | Module | Bắt đầu sau |
+|---|---|---|---|
+| 59 | Bán sỉ B2B: công ty mua, giá sỉ, báo giá, công nợ, hạn mức | `wholesale` | 45, 47 |
+| 60 | Đặt lịch dịch vụ: giờ trống, chống chồng giờ, cọc qua đối tác | `bookings` | 34, 36 |
+| 61 | Chat chăm sóc khách qua SSE, chuyển thành phiếu hỗ trợ | `conversations` | 40, 53 |
+| 62 | Sản phẩm bán theo kỳ (người mua trả cửa hàng; khác `plans`) | `recurring` | 45, 36 |
+| 63 | Đa tiền tệ, bán xuyên biên giới (mở rộng `ledger`, `tax`, `catalog`, `orders`, `shipping`) | — | 36, 41, 44, 45 |
+| 64 | Quảng cáo trong sàn, luôn gắn nhãn, phí là doanh thu dịch vụ của sàn | `ads` | 46, 57 |
+| 65 | Chợ ứng dụng qua OAuth 2.0 (PKCE bắt buộc, phạm vi là permission) | `apps` (+ `auth`) | 54, 33 |
+| 66 | Đồng bộ nhân viên qua SCIM 2.0 | trong `auth` | 34, 40 |
+
+Thay: mục "Để sau (D-194)" về B2B, đặt lịch, chat, bán theo kỳ, đa tiền tệ, quảng cáo trong sàn, và mục "Để sau
+(D-205)" về OAuth, SCIM. Câu "đo hành vi người xem… để Google Analytics làm" còn sót trong mục "Sau core" bỏ, vì
+đã là bước 57 (D-220). `CLAUDE.md` thêm `wholesale`, `bookings`, `conversations`, `recurring`, `ads`, `apps` vào
+danh sách module được dựng.
+
+Những ràng buộc giữ từ luật cũ, ghi trong từng đặc tả:
+- tiền đi qua đối tác có giấy phép (D-187): cọc đặt lịch, trừ tiền định kỳ, thanh toán ngoại tệ; quảng cáo
+  không có "ví" giữ tiền trả trước của người bán;
+- chống ghi đồng thời bằng câu lệnh có điều kiện hay khoá duy nhất chạy trên cả hai database (hạn mức tín dụng,
+  ô giờ đặt lịch, ngân sách quảng cáo);
+- người mua trong nước chỉ VND — **cần đối chiếu** Pháp lệnh Ngoại hối 2005 (sửa 2013) và Thông tư
+  32/2013/TT-NHNN trước khi bật đa tiền tệ; trích tiền định kỳ — **cần đối chiếu** NĐ 52/2024 và quy định của NHNN
+  về ủy quyền trích nợ; nhãn quảng cáo — **cần đối chiếu** Luật Quảng cáo và văn bản sửa đổi hiện hành.
+
+Còn để sau: bán ứng dụng trả phí trên chợ (chia doanh thu), tiền cọc một phần cho hàng đặt trước, đấu thầu và
+hợp đồng khung B2B, gọi điện / tổng đài trong chat. Ký hợp đồng điện tử vẫn chờ chủ dự án quyết hướng.
+
+Lý do: Autoxide phục vụ mọi mô hình kinh doanh (D-185); tám mảng này là thứ các nền tảng lớn đều có, và người
+dùng hỏi tới khi chọn nền tảng.
+
+Đã cân nhắc: gộp bán theo kỳ vào `plans` — khác người trả tiền và khác cách ghi sổ, chỉ dùng chung bộ tính lịch
+kỳ; module `fx` riêng cho đa tiền tệ — tiền tệ đã có trong `money`, tỉ giá thuộc `ledger`; WebSocket cho chat —
+SSE của bước 40 đủ cho tin đến, gửi tin vẫn là REST, một cách làm.

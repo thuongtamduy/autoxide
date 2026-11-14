@@ -1,6 +1,6 @@
-# Đặc tả từng bước (30–58)
+# Đặc tả từng bước (30–66)
 
-Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 58, có một file đặc tả ở đây (bước 50 chỉ là việc của chủ dự án). Đặc tả nói **cách làm**:
+Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 66, có một file đặc tả ở đây (bước 50 chỉ là việc của chủ dự án). Đặc tả nói **cách làm**:
 
 - bảng dữ liệu, API, permission, event, mã lỗi;
 - thứ tự commit, test bắt buộc, tiêu chí xong;
@@ -46,6 +46,7 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 58,
 | 56 | [56-imports.md](56-imports.md) | `imports`: chuyển dữ liệu từ Shopify, WooCommerce, Haravan, Sapo, KiotViet, giữ đường dẫn cũ (D-219) |
 | 57 | [57-analytics.md](57-analytics.md) | `analytics`: số liệu truy cập không cookie, phễu, theo dõi theo người khi đồng ý (D-220) |
 | 58 | [58-automations.md](58-automations.md) | `automations`: luật "khi … thì …" chạy tool MCP với quyền người tạo, chờ duyệt, chống vòng lặp (D-220) |
+| 59–66 | [59](59-wholesale.md) · [60](60-bookings.md) · [61](61-conversations.md) · [62](62-recurring.md) · [63](63-multi-currency.md) · [64](64-ads.md) · [65](65-apps.md) · [66](66-scim.md) | Bán sỉ B2B, đặt lịch, chat, bán theo kỳ, đa tiền tệ, quảng cáo trong sàn, chợ ứng dụng OAuth, SCIM (D-221) |
 | 41–49 | [41](41-catalog.md) · [42](42-inventory.md) · [43](43-promotions.md) · [44](44-shipping.md) · [45](45-orders.md) · [46](46-marketplace.md) · [47](47-customers.md) · [48](48-channels.md) · [49](49-affiliate.md) | Module thương mại |
 
 ## Luật chung đã chốt (D-198)
@@ -87,8 +88,10 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 58,
 ```
 kernel → address → organizations → auth (và các module sẵn có theo thứ tự hiện tại,
          trừ newsletter, comments)
-       → tax → ledger → invoices → compliance → notifications → newsletter, comments, support, analytics → plans
-       → catalog → inventory, promotions, shipping → orders → marketplace → affiliate, customers, channels
+       → tax → ledger → invoices → compliance → notifications → newsletter, comments, support, analytics,
+         bookings, conversations, apps → plans
+       → catalog → inventory, promotions, shipping → orders → marketplace → affiliate, customers, channels,
+         wholesale, recurring, ads
        → imports → reporting → automations   (cuối cùng: nghe event và gọi tool của mọi module)
 ```
 
