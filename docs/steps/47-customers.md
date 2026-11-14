@@ -11,7 +11,9 @@
 ## Mục tiêu
 
 Cửa hàng, chuỗi và sàn biết khách của mình và giữ chân họ: hồ sơ bán hàng của từng người mua (lịch sử
-mua dựng từ event của `orders`, tổng chi, nhóm và phân khúc theo quy tắc, nhãn, ghi chú của nhân viên);
+mua dựng từ event của `orders`, tổng chi, nhóm và phân khúc theo quy tắc, nhãn, ghi chú của nhân viên — nhãn,
+ghi chú và trường tự định nghĩa dùng chỗ chung của bước 51 (P20, P13, P19): `customers.customer` khai `taggable`
+và đích trường tự định nghĩa, không có bảng nhãn / ghi chú riêng — D-237);
 nhóm khách dùng được cho bảng giá (bước 41) và khuyến mại (bước 43); điểm thưởng và hạng thành viên với
 sổ điểm chỉ thêm, điểm có hạn, quy tắc là dữ liệu, điểm chưa dùng là **nghĩa vụ trong sổ cái**; thẻ quà
 tặng và số dư cửa hàng **tắt mặc định**, chỉ dùng mua hàng của chính khách (tenant) phát hành, không rút
@@ -82,7 +84,7 @@ giấy phép, D-187).
 ### Nhóm và phân khúc
 
 Nhóm `manual` (nhân viên thêm) hay `rule` (quy tắc là dữ liệu JSON có kiểm: `total_spent_min`,
-`orders_count_min`, `last_order_within_days`, `tier_in`, `tags_any`, `org_in`). Job đánh giá lại khi
+`orders_count_min`, `last_order_within_days`, `tier_in`, `tags_any` (nhãn chung P20 của bước 51), `org_in`). Job đánh giá lại khi
 hồ sơ đổi (enqueue, `unique_key` = hồ sơ + khe 1 phút — khoá job của kernel sống tới khi job xong bị
 dọn, khoá cố định sẽ chặn lần sau) và toàn bộ hằng đêm. `BuyerGroups::groups_of` (cắm vào
 `orders`) trả ID nhóm; `orders` chuyển cho `catalog` (bảng giá theo nhóm) và `promotions` (giảm theo
@@ -194,7 +196,9 @@ không báo giảm giá ảo, không làm phiền.
   đến trễ hay đến lại):
   - Có hàng lại: `inventory.level_changed` (`Subscription::optional`) với `before.available ≤ 0` và
     `after.available > 0` ở kho bán online (như D-201 khi không nêu cửa hàng) → dòng theo biến thể đó, và dòng
-    theo sản phẩm của biến thể (`Catalog::variants` đổi biến thể ra sản phẩm).
+    theo sản phẩm của biến thể (`Catalog::variants` đổi biến thể ra sản phẩm). Bỏ những biến thể mà người đó đã
+    tự đăng ký báo có hàng lại ở `inventory` (`Inventory::restock_alerts_of`, bước 42) — tin đó do `inventory`
+    gửi, một lần có hàng chỉ một tin (D-237).
   - Giảm giá: `catalog.price_changed`, `catalog.price_effective` (giá niêm yết) và event của `catalog` khi giá
     sau giảm tự động trên `catalog_storefront_entries` đổi. Giá hiển thị đọc qua `catalog::api`. Bước 41 chưa
     có event giá sau giảm hay hàm đọc giá hiển thị cho nhiều ID thì bước này thêm vào `catalog` (tên do
@@ -256,8 +260,7 @@ migration có `down`; `outbox_migration`, `jobs_migration`).
 
 | Bảng | Cột chính | Khoá / index |
 |---|---|---|
-| `customers_profiles` | `id`, `tenant_id`, `org_id`, `user_id` NULL, `phone_key` NULL, `phone` NULL, `email_lower` NULL, `full_name` NULL, `full_name_search` (chữ thường không dấu — `autoxide_kernel::search`), `birthday` NULL, `gender` NULL, `tags` text, `tier_code` NULL, `total_spent_*`, `orders_count` BIGINT, `first_order_at` NULL, `last_order_at` NULL, `created_at`, `updated_at` | unique (`tenant_id`, `user_id`); unique (`tenant_id`, `phone_key`); index (`tenant_id`, `org_id`, `id`), (`tenant_id`, `full_name_search`), (`tenant_id`, `email_lower`) |
-| `customers_notes` | `id`, `tenant_id`, `profile_id`, `author_id`, `body`, `created_at` | index (`tenant_id`, `profile_id`, `id`) |
+| `customers_profiles` | `id`, `tenant_id`, `org_id`, `user_id` NULL, `phone_key` NULL, `phone` NULL, `email_lower` NULL, `full_name` NULL, `full_name_search` (chữ thường không dấu — `autoxide_kernel::search`), `birthday` NULL, `gender` NULL, `tier_code` NULL, `total_spent_*`, `orders_count` BIGINT, `first_order_at` NULL, `last_order_at` NULL, `created_at`, `updated_at` | unique (`tenant_id`, `user_id`); unique (`tenant_id`, `phone_key`); index (`tenant_id`, `org_id`, `id`), (`tenant_id`, `full_name_search`), (`tenant_id`, `email_lower`) |
 | `customers_order_facts` | `tenant_id`, `order_id`, `profile_id`, `org_id`, `channel`, `status`, `net_*` (tiền thực trả cho hàng hoá, từ `goods_paid_*`, D-226), `refunded_*`, `placed_at`, `completed_at` NULL, `updated_at` | pk (`tenant_id`, `order_id`); index (`tenant_id`, `profile_id`, `placed_at`) |
 | `customers_groups` | `id`, `tenant_id`, `org_id` NULL (nhóm của một nhánh), `name`, `kind` (`manual/rule`), `rule` text NULL, `created_at`, `updated_at` | unique (`tenant_id`, `name`) |
 | `customers_group_members` | `tenant_id`, `group_id`, `profile_id`, `source` (`manual/rule`), `added_at` | pk (`tenant_id`, `group_id`, `profile_id`); index (`tenant_id`, `profile_id`) |
@@ -290,8 +293,7 @@ migration có `down`; `outbox_migration`, `jobs_migration`).
 | `GET /` · `GET /{id}` | `customers.read` | tìm theo tên (không dấu), SĐT (chuẩn hoá rồi băm), email; lọc nhóm, hạng, nhãn; theo phạm vi; liên hệ đã che (`phone_masked`, `email_masked`, D-226) |
 | `GET /{id}/contact` | `customers.contact.reveal` | SĐT, email đầy đủ; ghi audit mỗi lần (D-226) |
 | `POST /` | `customers.manage` | đăng ký tại quầy theo SĐT; trùng `phone_key` → 409 kèm `id` hồ sơ có sẵn |
-| `PUT /{id}` | `customers.manage` | nhãn, tên, ngày sinh; `If-Match` |
-| `POST /{id}/notes` · `GET /{id}/notes` | `customers.manage` / `customers.read` | ghi chú nội bộ |
+| `PUT /{id}` | `customers.manage` | tên, ngày sinh, trường tự định nghĩa; `If-Match` |
 | `GET /{id}/orders` | `customers.read` | từ `customers_order_facts` |
 | `GET/POST /groups` · `PUT/DELETE /groups/{id}` · `POST/DELETE /groups/{id}/members/{profile_id}` | `customers.segments.manage` | quy tắc kiểm hợp lệ, xem trước số hồ sơ khớp (`GET /groups/{id}/preview`) |
 | `GET/POST /loyalty/rules` · `GET/POST /loyalty/tiers` | `customers.loyalty.manage` | dữ liệu có ngày hiệu lực; không sửa dòng đã hiệu lực |
@@ -395,7 +397,8 @@ giảm ≥ 5%), `AUTOXIDE_CUSTOMERS_WISHLIST_ALERTS_PER_DAY` (1 tin / người /
 Số **mục** theo danh sách bước 47 trong ROADMAP.
 
 1. Khung crate, permission, cấu hình, `api.rs`, đăng ký. → chuẩn bị
-2. Hồ sơ, nhận diện theo tài khoản / SĐT, `order_facts` từ event (net theo D-226), ghi chú, nhãn, tìm kiếm,
+2. Hồ sơ, nhận diện theo tài khoản / SĐT, `order_facts` từ event (net theo D-226), khai `taggable` và đích trường tự định nghĩa
+   cho `customers.customer` (ghi chú, nhãn, trường qua P13 / P20 / P19 của bước 51 — D-237), tìm kiếm,
    che liên hệ và `GET /{id}/contact`. → **mục 1**
 3. Nhóm + quy tắc + `BuyerGroups` (`groups_of`, `tier_of`) cắm vào `orders`. → **mục 2**
 4. Điểm: quy tắc, lô, sổ, số dư, tender `points`, hết hạn, hạng, bút toán. → **mục 3**
@@ -471,8 +474,8 @@ Cả SQLite và Postgres, `TestApp` với `orders` và module nền thật; `Not
   (`orders:<order_id>:earn`).
 - **Tin quảng cáo**: kiểm đồng ý lúc lên lịch **và** lúc gửi (có thể đã rút giữa chừng); không gửi
   cho vãng lai không có đồng ý ghi trong sổ.
-- **Dữ liệu cá nhân**: SĐT, ngày sinh, ghi chú nhân viên là dữ liệu cá nhân — có trong export, xoá khi
-  `USER_DELETED`; phần sổ cái (nghĩa vụ) giữ theo luật kế toán, không mang tên / SĐT.
+- **Dữ liệu cá nhân**: SĐT, ngày sinh, ghi chú nhân viên (bảng `kernel_record_notes` của bước 51), trường tự định
+  nghĩa đánh dấu `personal_data` là dữ liệu cá nhân — có trong export, xoá khi `USER_DELETED`; phần sổ cái (nghĩa vụ) giữ theo luật kế toán, không mang tên / SĐT.
 - **Giờ hết hạn điểm** theo múi giờ của khách (cuối ngày giờ Việt Nam), lưu UTC. Voucher sinh nhật cũng xét
   theo múi giờ của khách.
 - **Đổi điểm lấy voucher**: trừ điểm và cấp voucher dùng chung `source_ref`; `grant_voucher` lỗi thì hoàn điểm

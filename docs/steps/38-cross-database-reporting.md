@@ -34,10 +34,10 @@ Mọi thứ chạy và có test trên cả SQLite (mỗi database một file) v�
 - Bước 33: `DatabaseRegistry` (mở database của khách bất kỳ, mở lười, có giới hạn), `kernel_placements`
   (`shared` / `dedicated`), worker và bộ phát event chạy trên từng database, `Delivered` mang tenant của
   event, lỗi `tenant_maintenance`, `autoxide copy` mở rộng để dời cả một khách.
-- Bước 36 đã merge: `ledger`, `invoices` (fact tiền đầu tiên; tỉ giá qua `dyn Invoices::exchange_rate`).
+- Bước 36 đã merge: `ledger`, `invoices` (fact tiền đầu tiên; tỉ giá qua `dyn Ledger::exchange_rate` — D-237).
 - Mục sandbox (D-232) cần thêm bước 35 (hạn mức gói, quyền dùng) và bước 37 (`SmsSender`, `IdentityVerifier`):
   bộ giả của kernel thay đúng các trait đó.
-- Làm song song được với 39, 40, 41–45. Module 41–45 tự khai fact của mình theo cơ chế ở đây (bước 45 có mục
+- Làm song song được với 40, 41–45. Bước 39 làm **sau** bước này (rà index phủ cả bảng của 38 — D-237). Module 41–45 tự khai fact của mình theo cơ chế ở đây (bước 45 có mục
   "event cho kho báo cáo gộp").
 
 ## Phạm vi
@@ -308,7 +308,7 @@ của con nằm ở database của gốc).
    - lọc `tenant_ids` / `org_ids` của client là **giao** với tập được phép, không bao giờ mở rộng; khách ngoài
      cây hay ngoài phạm vi → `reporting.tenant_not_found` (404, không lộ khách có tồn tại hay không).
 5. **Nhiều tiền tệ**: tổng luôn trả theo từng tiền gốc; nếu client xin `currency=VND` thì quy đổi **từng nhóm
-   (tiền, ngày)** bằng tỉ giá của **khách người xem** ngày đó (`dyn Invoices::exchange_rate`, gọi trước, ngoài
+   (tiền, ngày)** bằng tỉ giá của **khách người xem** ngày đó (`dyn Ledger::exchange_rate`, gọi trước, ngoài
    transaction), làm tròn `HalfUp` theo nhóm rồi cộng; thiếu tỉ giá thì liệt kê trong `missing_rates` và
    **không** cộng nhóm đó vào tổng quy đổi (không đoán, không bỏ im lặng).
 6. **Fact đầu tiên** (bước này): `invoices.document_issued` → `invoices.issued_total` (tiền = tổng chứng từ,

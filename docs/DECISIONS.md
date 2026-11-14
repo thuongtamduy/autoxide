@@ -5716,3 +5716,40 @@ bộ vị trí dùng được; giữ tốc độ vì một lời gọi cho cả 
 khách; xoay vòng ngẫu nhiên hay theo trọng số — phá cache, F5 nhảy, cần thì làm bằng thử A/B của bước 67; banner
 chữ có màu tự do — phá thương hiệu, lệch theme; ghép vị trí banner vào khối `announcement_bar` — hai việc khác
 nhau (cố định so với có lịch), gộp làm mỗi khối nửa vời.
+
+## D-237 · Rà lộ trình lần hai trước bước 31: tỉ giá về `ledger`, một chỗ cho thông tin cửa hàng, nhãn và ghi chú của `customers`, báo có hàng lại không trùng, sửa bảng phụ thuộc — 2026-11-14 — agent quyết
+
+Chủ dự án yêu cầu rà toàn bộ lộ trình một lượt trước khi code bước 31. Kiểm máy: mọi đường dẫn đặc tả tồn tại, mọi
+mã D-… có trong nhật ký, đủ 37 bước 31–67 trong bảng thứ tự. Đọc từng bước và đối chiếu đặc tả thì thấy năm chỗ
+mâu thuẫn hay làm một việc hai nơi; sửa thẳng vào thân đặc tả (một đặc tả, một phiên bản — D-228):
+
+1. **Tỉ giá thuộc `ledger`** (thay chỗ để ngỏ ở D-233 / đặc tả 63). Đặc tả 36 đặt bảng tỉ giá ở `invoices` nhưng
+   `ledger` (đăng ký **trước** `invoices`) lại gọi `dyn Invoices::exchange_rate` khi ghi bút toán ngoại tệ —
+   không làm được theo luật thứ tự đăng ký. Đặc tả 63 thì đặt bảng khác (`ledger_fx_rates`, dạng phân số). Chốt:
+   bảng `ledger_fx_rates` (số thập phân chuẩn hoá dạng chữ như mọi số thập phân của 36), `Ledger::exchange_rate`,
+   endpoint `/api/v1/ledger/exchange-rates`, lịch `ledger.fetch_exchange_rates`; `invoices`, báo cáo gộp (38),
+   chi trả ngoại tệ và đa tiền tệ (63) đọc qua đó.
+2. **Thông tin cửa hàng một chỗ.** Hồ sơ công khai của nút (34) và `storefront.*` (55) cùng giữ tên, logo, địa chỉ,
+   giờ mở cửa. Chốt: **địa điểm** (tên hiển thị, `Address`, giờ mở cửa, ngày đặc biệt, nhận tại quầy, ảnh bìa) chỉ
+   ở hồ sơ nút của 34; **thương hiệu** (tên thương hiệu, logo, biểu tượng, liên hệ, mạng xã hội) chỉ ở cài đặt kế
+   thừa `storefront.*` của 55; `/public/storefront` ghép hai phần. Bỏ `logo_media_id` khỏi hồ sơ nút.
+3. **`customers` dùng chỗ chung của bước 51.** Đặc tả 47 còn cột `tags` và bảng `customers_notes` riêng, trái với
+   P13 (ghi chú chung) và P20 (nhãn chung, D-235). Chốt: `customers.customer` khai `taggable`, đích trường tự định
+   nghĩa; ghi chú qua `kernel_record_notes`.
+4. **Báo có hàng lại không gửi trùng.** Đăng ký báo có hàng lại của `inventory` (42) và báo yêu thích của
+   `customers` (47) cùng nghe một event. Chốt: `inventory_restock_alerts` ghi `user_id` khi người đăng ký đã đăng
+   nhập; `Inventory::restock_alerts_of` cho `customers` bỏ những biến thể người đó đã tự đăng ký — một lần có hàng,
+   một tin.
+5. **Bảng phụ thuộc.** 38 ghi "song song với 39" trong khi 39 bắt đầu sau 38 (39 rà index phủ cả bảng của 33–38) —
+   bỏ 39 khỏi cột song song của 38. Thêm phụ thuộc còn thiếu: 55 (khối vùng banner cần 67), 59 (ký điện tử: 37; mời
+   thầu: 46), 61 (37), 63 (người bán nước ngoài: 37, 46), 67 (34; P19 của 51). Mục 45 và 47 của lộ trình ghi thêm
+   phần của D-234 / D-235; mục 63 bỏ "phân số nguyên"; `SiteExtensions` vào danh sách điểm cắm.
+
+Không đổi thứ tự làm (D-228) và không đổi phạm vi bước nào.
+
+Lý do: sửa trên giấy rẻ hơn sửa sau khi code; ba chỗ đầu nếu để tới lúc code sẽ thành hai bảng cùng một dữ liệu
+hay một lời gọi trái luật thứ tự đăng ký.
+
+Đã cân nhắc: giữ tỉ giá ở `invoices` và cho `ledger` nhận tỉ giá do bên gọi truyền vào — mọi bên gọi `post` phải tự
+tra tỉ giá, dễ lệch; gộp hẳn báo có hàng lại vào `inventory` (bỏ phần của `customers`) — báo yêu thích có luật riêng
+(giảm giá, 7 ngày, gom lô) đã chốt ở D-233, chỉ cần chống trùng.

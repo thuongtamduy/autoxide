@@ -34,7 +34,7 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 | 33 Khách hàng, vị trí dữ liệu | 31 và nhóm A của 32 xong (31 giữ API và bản nâng cấp không vỡ khi mọi bảng đổi) | hai mục độc lập của 40 |
 | 34 Tổ chức, quyền, danh tính | 33 | — |
 | 35 Gói, thuê bao · 36 Tiền, thuế · 37 Tuân thủ | 34 | nhau; hai mục cuối của 35 chờ 36 và 37 |
-| 38 Xuyên database, báo cáo gộp | 34 và 36 | 39, 40, 41–45 |
+| 38 Xuyên database, báo cáo gộp | 34 và 36 | 40, 41–45 (39 làm sau: rà index cả bảng của 38) |
 | 39 Vận hành, hiệu năng | 38 | 40, 41–46 |
 | 40 Năng lực còn thiếu | header bảo mật và MCP: ngay; còn lại: 34 | 35–39 |
 | 41 Sản phẩm | 35 và 36 | 37–40 |
@@ -46,16 +46,16 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 | 52 Trải nghiệm quản trị nâng cao (D-201) | 51 | 41–49 |
 | 53 Hỗ trợ khách hàng (D-204) | 37 (thông báo, vụ việc khiếu nại) | 41–49 |
 | 54 Phân quyền chuẩn hàng đầu (D-205) | 34; P6, P7 cần P12 của 51; P1 làm ở bước 31 | 41–49, 53 |
-| 55 Giao diện cửa hàng (D-219) | 41 (banner và thông tin cửa hàng làm được từ sau 34) | 42–49 |
+| 55 Giao diện cửa hàng (D-219, D-236) | 41 (banner và thông tin cửa hàng làm được từ sau 34); khối vùng banner: 67 | 42–49 |
 | 56 Chuyển dữ liệu từ nền tảng khác (D-219) | 47 | 48, 49 |
 | 57 Phân tích truy cập (D-220) | 37 (đồng ý), 34 | 41–49 |
 | 58 Tự động hoá quy trình (D-220) | 51 (P12 duyệt, P15 job) | 41–49, 57 |
-| 59 Bán sỉ B2B (D-221) | 45, 47 | 46, 48, 49 |
+| 59 Bán sỉ B2B (D-221) | 45, 47; ký điện tử: 37; mời thầu: 46 | 48, 49 |
 | 60 Đặt lịch dịch vụ (D-221) | 34, 36 (37 cho nhắc lịch) | 41–49 |
-| 61 Chat chăm sóc khách (D-221) | 40 (SSE), 53 | 41–49 |
-| 67 Trang dựng từ khối, AI tạo trang (D-229, D-231, D-234, D-235) | 51, 37 (nhãn AI, đồng ý, chân trang pháp lý); thử A/B: 57 | 41–49 (module thương mại khai khối ở bước của nó) |
+| 61 Chat chăm sóc khách (D-221) | 40 (SSE), 53, 37 (thông báo) | 41–49 |
+| 67 Trang dựng từ khối, AI tạo trang (D-229, D-231, D-234, D-235) | 51 (gồm P19 cho loại nội dung), 37 (nhãn AI, đồng ý, chân trang pháp lý), 34 (website, múi giờ); thử A/B: 57 | 41–49 (module thương mại khai khối ở bước của nó) |
 | 62 Sản phẩm bán theo kỳ (D-221) | 45, 36 | 46–49 |
-| 63 Đa tiền tệ (D-221) | 36, 41, 44, 45 | 46–49 |
+| 63 Đa tiền tệ (D-221) | 36, 41, 44, 45; người bán nước ngoài: 37, 46 | 47–49 |
 | 64 Quảng cáo trong sàn (D-221) | 46, 57 | 47–49 |
 | 65 Chợ ứng dụng OAuth (D-221) | 54, 33; bán ứng dụng trả phí: 35, 36 | 41–49 |
 | 66 SCIM (D-221) | 34, 40 (OIDC) | 35–49 |
@@ -548,8 +548,8 @@ Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 3
 Đặc tả: [`docs/steps/39-operations-performance.md`](steps/39-operations-performance.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
 Khi đã có người dùng thật: biết sớm khi hệ thống kẹt, không mất dữ liệu, xử lý sự cố không phải
-đoán, và chịu được dữ liệu cỡ thật. Bắt đầu SAU bước 38 (nền đa khách): backup, số đo, cảnh báo
-theo từng khách hàng và từng database. Làm nhóm A trước: số đo tồn đọng dùng để quan sát lúc chạy tải ở nhóm B. Mọi số đo ghi kèm máy,
+đoán, và chịu được dữ liệu cỡ thật. Bắt đầu SAU bước 38: backup, số đo, cảnh báo
+theo từng khách hàng và từng database (nền đa khách của bước 33); sau 38 để rà index phủ cả bảng của 33–38. Làm nhóm A trước: số đo tồn đọng dùng để quan sát lúc chạy tải ở nhóm B. Mọi số đo ghi kèm máy,
 ngày, cỡ dữ liệu; mọi thay đổi chạy và có test trên cả hai database; không đổi tính đúng lấy tốc độ.
 
 Nhóm A — vận hành:
@@ -926,8 +926,10 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       hạn; không chia sẻ danh sách giữa các khách
 - [ ] Trả góp qua đối tác (trait của bước 36); bảo hành theo số serial hay theo đơn: phiếu bảo hành, tiếp
       nhận, trạng thái xử lý, hạn bảo hành
-- [ ] Khối `orders.add_to_cart`, `buy_now`, `reviews` cho trang dựng từ khối (D-229); câu trả lời tự động về
-      trạng thái đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
+- [ ] Khối `orders.add_to_cart`, `buy_now`, `reviews` cho trang dựng từ khối (D-229) và `orders.cart_link` cho đầu
+      trang (D-234); câu trả lời tự động về trạng thái đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
+- [ ] Ô người mua nhập lúc đặt hàng (D-235): `orders.order` là đích trường tự định nghĩa (P19 của bước 51) có mức
+      `buyer_input`; checkout kiểm cùng bộ gom lỗi; mail xác nhận đọc được các trường này
 - [ ] Trả trước một phần cho hàng đặt trước (D-232): tỉ lệ hay số tiền, phần còn lại thu khi sẵn sàng giao,
       người bán huỷ hoàn đủ, người mua huỷ theo điều kiện công bố; không mặc định là "đặt cọc" (BLDS Điều 328)
 
@@ -962,8 +964,8 @@ Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nú
 
 Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (bước 34); module này giữ hồ sơ bán hàng.
 
-- [ ] Hồ sơ khách: lịch sử mua (từ event của `orders`), tổng chi, nhãn, ghi chú của nhân viên; che số điện
-      thoại / email, xem đủ cần permission và ghi audit (D-226)
+- [ ] Hồ sơ khách: lịch sử mua (từ event của `orders`), tổng chi; nhãn, ghi chú, trường tự định nghĩa dùng chỗ
+      chung của bước 51 (D-237); che số điện thoại / email, xem đủ cần permission và ghi audit (D-226)
 - [ ] Nhóm và phân khúc theo quy tắc, dùng cho bảng giá (bước 41) và khuyến mại (bước 43); phân khúc và
       hạng thành viên làm điều kiện khuyến mại (D-222)
 - [ ] Điểm thưởng và hạng thành viên: sổ điểm chỉ thêm, điểm có hạn dùng, quy tắc tích / đổi là dữ liệu;
@@ -1032,9 +1034,10 @@ họ dữ liệu để vẽ trang chủ, trang danh mục, chân trang mà khôn
 - [ ] Bộ sưu tập sản phẩm (`catalog`): chọn tay (có thứ tự) hay theo quy tắc (danh mục, thuộc tính,
       khoảng giá, hàng mới, đang khuyến mại), sắp theo mới nhất / giá / bán chạy (số bán nhận từ event
       tuỳ chọn của `orders`); trang công khai có slug, SEO, ảnh; dùng được trong menu và banner
-- [ ] Thông tin cửa hàng công khai (`organizations`): tên, logo, biểu tượng trang, liên hệ, địa chỉ
-      (`Address`), giờ mở cửa theo ngày và ngày nghỉ, mạng xã hội — kế thừa theo cây (chuỗi đặt, cửa
-      hàng ghi đè); chân trang lấy thêm thông tin chủ sở hữu và logo Bộ Công Thương từ bước 37
+- [ ] Thông tin cửa hàng công khai (`organizations`): thương hiệu (tên, logo, biểu tượng trang, liên hệ, mạng xã
+      hội) là cài đặt kế thừa theo cây (chuỗi đặt, cửa hàng ghi đè); địa chỉ, giờ mở cửa, ngày nghỉ lấy từ hồ sơ
+      địa điểm của bước 34, không lưu hai chỗ (D-237); chân trang lấy thêm thông tin chủ sở hữu và logo Bộ Công
+      Thương từ bước 37
 - [ ] Liên kết tới đối tượng của module đăng ký sau (sản phẩm, bộ sưu tập, chương trình) qua điểm cắm
       `ContentLinks` trong `content::api`: module đó gắn bộ dựng đường dẫn và bộ kiểm "còn hiển thị
       không"; thiếu module thì link loại đó bị từ chối khi lưu
@@ -1133,8 +1136,8 @@ Bắt đầu SAU bước 45 và 36. Người mua trả cho cửa hàng theo kỳ
 
 Bắt đầu SAU bước 36, 41, 44, 45. Mở rộng module có sẵn, không module mới.
 
-- [ ] Tỉ giá có ngày hiệu lực dạng phân số nguyên (nhập tay hay trait nguồn tỉ giá), thị trường (quốc gia, tiền
-      tệ, ngôn ngữ) theo website; giá theo thị trường, đơn chốt tỉ giá lúc đặt
+- [ ] Dùng tỉ giá có ngày hiệu lực của sổ cái (bước 36, D-237), thêm nguồn tỉ giá nếu cần; thị trường (quốc gia,
+      tiền tệ, ngôn ngữ) theo website; giá theo thị trường, đơn chốt tỉ giá lúc đặt
 - [ ] Sổ cái ghi số gốc và số quy đổi, chênh lệch tỉ giá; thuế GTGT 0% cho xuất khẩu khi đủ hồ sơ; người mua
       trong nước chỉ VND (Pháp lệnh Ngoại hối — cần đối chiếu); mã HS và xuất xứ cho giao hàng quốc tế; test trên
       cả hai database
@@ -1187,7 +1190,9 @@ quản trị trên điện thoại (52), duyệt từng lần truy cập hỗ tr
 ký điện tử (59), gọi điện trong chat (61), bán ứng dụng trả phí (65).
 
 Đã viết đặc tả (D-233): hợp đồng tool MCP và `cargo semver-checks` (31), báo yêu thích (47), banner gian hàng
-người bán (55), EDI (59), người bán nước ngoài (63).
+người bán (55), EDI (59), người bán nước ngoài (63). Sau đó: chủ đề theo lịch, đầu / chân trang (67, D-234); trường
+tự định nghĩa, nhãn, đổi câu chữ (51), loại nội dung (67), mã theo dõi và đồng ý cookie (37) (D-235); kiểu vị trí
+banner (55, D-236); rà lộ trình lần hai (D-237).
 
 Để sau: (trống — ý tưởng mới ghi một dòng ở đây, chưa viết đặc tả, cho tới khi xong giai đoạn A).
 

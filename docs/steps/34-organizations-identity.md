@@ -255,7 +255,8 @@ migration có `down`.
 - `organizations_setting`: `tenant_id`, `org_id`, `key`, `value` (`text`, JSON đã kiểm),
   `updated_by`, `updated_at`. PK `(tenant_id, org_id, key)`.
 - Hồ sơ công khai của nút (D-200, đợt 2): các trường ở mục "Hồ sơ công khai của nút" dưới; ảnh chỉ giữ ID
-  của `media` (`cover_media_id`, `logo_media_id`).
+  của `media` (`cover_media_id`). Logo là của thương hiệu, đặt ở cài đặt kế thừa `storefront.logo_media_id`
+  (bước 55) — không có cột logo ở hồ sơ nút (D-237).
 - Migration nâng cấp: với mỗi khách đang có trên database này → nút gốc (kernel + `organizations_unit`
   loại `tenant`, tên = tên khách). Khách tạo sau: nghe `kernel.tenant_created`. `OrgDirectory::root`
   tự tạo gốc còn thiếu (dưới `OrgTree::lock`) để chịu được event đến chậm.
@@ -371,14 +372,16 @@ cho `auth_support_grant` còn hạn — chỉ chạy hai câu sau khi người g
 
 Module `organizations` thêm cho mỗi nút: `public` (mặc định tắt), tên hiển thị (`display_name`), `Address`,
 giờ mở cửa theo thứ trong tuần và ngày nghỉ đặc biệt, `pickup` (nhận hàng tại quầy), tên miền gắn với nút.
+Đây là **dữ liệu của từng địa điểm** và là chỗ duy nhất giữ địa chỉ, giờ mở cửa của nút; thông tin thương hiệu
+(tên thương hiệu, logo, liên hệ, mạng xã hội) là cài đặt kế thừa `storefront.*` của bước 55 (D-237).
 
 - **Đọc:** `GET /api/v1/organizations/public/stores` (công khai; khách suy từ tên miền như mọi endpoint
   công khai) trả các nút `public` của khách, sắp theo thứ tự khách đặt, `ETag` / `Cache-Control` như
   `/api/v1/address`. Không trả thành viên, cài đặt nội bộ hay nút không công khai.
 - **Ghi** (đợt 2): `PATCH /api/v1/organizations/units/{id}/public-profile` (`organizations.profile.manage`, theo độ
   sâu) nhận `public`, `display_name`, `Address`, `opening_hours[]` (thứ, giờ mở, giờ đóng — một ngày nhiều
-  khoảng được), `special_days[]` (ngày, đóng cửa hay giờ riêng, ghi chú), `pickup`, `cover_media_id?`,
-  `logo_media_id?` (ID của `media`, chỉ giữ ID). Kiểm: giờ đóng sau giờ mở, ngày đặc biệt không trùng — sai
+  khoảng được), `special_days[]` (ngày, đóng cửa hay giờ riêng, ghi chú), `pickup`, `cover_media_id?`
+  (ID của `media`, chỉ giữ ID; logo đặt ở `storefront.*` của bước 55 — D-237). Kiểm: giờ đóng sau giờ mở, ngày đặc biệt không trùng — sai
   thì `organizations.invalid_opening_hours` (422). Ghi xong xoá `ETag` của `/public/stores`; event
   `organizations.public_profile_updated`.
 

@@ -172,6 +172,10 @@ pub trait Inventory: Send + Sync {
     /// `catalog` (D-200). Tên và chữ ký phác thảo.
     async fn in_stock_at(&self, tenant: &TenantContext, store_org_id: OrgId, variant_ids: &[Uuid])
         -> Result<Vec<Uuid>, Error>;
+    /// Biến thể mà tài khoản này đang có đăng ký báo có hàng lại đã xác nhận (kho bán online) — để `customers`
+    /// (báo yêu thích, bước 47) không gửi trùng tin cho cùng một lần có hàng (D-237).
+    async fn restock_alerts_of(&self, tenant: &TenantContext, user_id: Uuid, variant_ids: &[Uuid])
+        -> Result<Vec<Uuid>, Error>;
 }
 ```
 
@@ -224,7 +228,7 @@ Mọi bảng có `tenant_id`; unique / index bắt đầu bằng `tenant_id`; s�
 | `inventory_reservation_lines` | `id`, `tenant_id`, `reservation_id`, `line_key`, `variant_id`, `bundle_variant_id?`, `level_id`, `org_id`, `quantity`, `fulfilled_quantity`, `released_quantity`, `backordered`, `preordered` (D-204) | (`tenant_id`,`reservation_id`) |
 | `inventory_preorder_counters` | suất đặt trước (D-204): `tenant_id`, `variant_id`, `reserved`, `limit` (chép từ `preorder_limit` của catalog), `updated_at` | pk (`tenant_id`,`variant_id`) |
 | `inventory_fulfilments` | `id`, `tenant_id`, `reservation_id`, `fulfilment_key`, `fingerprint`, `created_at` | unique (`tenant_id`,`reservation_id`,`fulfilment_key`) |
-| `inventory_restock_alerts` | đăng ký báo khi có hàng lại, cấp khách hàng (D-201): biến thể, cửa hàng (NULL = kho bán online), liên hệ, trạng thái xác nhận, đã gửi | bắt đầu bằng `tenant_id` |
+| `inventory_restock_alerts` | đăng ký báo khi có hàng lại, cấp khách hàng (D-201): biến thể, cửa hàng (NULL = kho bán online), liên hệ, `user_id?` (khi người đăng ký đã đăng nhập — D-237), trạng thái xác nhận, đã gửi | bắt đầu bằng `tenant_id`; (`tenant_id`,`user_id`,`variant_id`) |
 | `inventory_restocks` | `id`, `tenant_id`, `reference`, `reference_fingerprint`, `order_id?`, `org_id`, `created_at` | unique (`tenant_id`,`reference`) |
 | `inventory_sources` | `selling_org_id`, `warehouse_org_id`, `priority`, `active` | unique (`tenant_id`,`selling_org_id`,`warehouse_org_id`) |
 | `inventory_settings` | `org_id`, `prefer_nearby`, `allow_split` | unique (`tenant_id`,`org_id`) |
