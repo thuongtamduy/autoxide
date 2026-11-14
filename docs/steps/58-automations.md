@@ -88,3 +88,8 @@ event_id)`), cùng `automations_events`, `automations_jobs`.
 ## Agent làm bước này tự quyết
 
 Cú pháp lịch; giới hạn độ dài luật; mẫu luật mặc định cho từng mô hình kinh doanh. Ghi vào `docs/DECISIONS.md`.
+
+## Bổ sung theo D-222
+
+Hành động "tặng voucher" gọi tool MCP `promotions.grant_voucher` (`source = automation`, `source_ref =
+automation:<run_id>:<step>`) — chạy lại không cấp thêm; vẫn kiểm quyền của `run_as`.

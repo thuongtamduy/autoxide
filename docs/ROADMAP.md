@@ -992,6 +992,10 @@ bước 35.
 - [ ] Đối chiếu thiết kế 2: sản phẩm của người bán trên website của chuỗi (`seller`, `sold_by`, facet,
       `ProductCard.seller`), `warranty_months`, điểm cắm `set_listing_gate`; giá sau giảm tự động và lọc
       `on_sale`; "thường mua cùng"
+- [ ] Bảng giá theo các nền tảng lớn (D-222): một thứ tự chọn bảng giá (nút gần nhất → công ty B2B → nhóm
+      khách → kênh → thị trường → ưu tiên); bảng giá suy ra theo công thức ghi thành dòng giá thật; quy tắc làm
+      tròn giá đẹp; sàn giá (giá tối thiểu, biên lợi nhuận trên giá vốn); đổi giá hàng loạt có xem trước, duyệt,
+      hẹn giờ, giá tạm thời
 
 ## 42. Kho (`inventory`)
 
@@ -1041,7 +1045,21 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
       sản phẩm / biến thể, giá sau mã, điều kiện, số lượt còn lại — để trang sản phẩm hiện "còn X với mã
       …"; giá niêm yết vẫn là giá không mã (mã phải nhập thì không hiện như giá đã giảm)
 - [ ] Đối chiếu thiết kế 2: event giá sau giảm tự động cho danh sách công khai; flash sale công khai với
-      suất còn là số thật; điều kiện `first_order_only"
+      suất còn là số thật; điều kiện `first_order_only`
+- [ ] Chương trình, coupon, voucher (D-222): chương trình là luật; coupon là mã ai có cũng dùng được; voucher
+      là quyền dùng một lần trong ví của một tài khoản (lưu, nhập mã nhận, được tặng qua `grant_voucher`); ví
+      voucher của người mua; mã gắn với một người luôn là voucher
+- [ ] Cộng dồn theo ba lớp sản phẩm / đơn / vận chuyển: độc quyền trong lớp hay toàn giỏ, `combines_with`,
+      dừng sau chương trình, chế độ ưu tiên hay lợi nhất cho người mua (tất định); 1 voucher mỗi lớp cho mỗi bên
+      trả tiền
+- [ ] Ai trả tiền giảm giá (sàn / người bán / nhãn hàng / đối tác thanh toán, chia theo tỉ lệ) chia về từng
+      dòng; người bán đăng ký tham gia chương trình của sàn; ngân sách tiền, lượt theo ngày, khung giờ
+- [ ] Loại mới: bậc thang, combo đồng giá, mua kèm deal sốc, chọn quà, mua 2 tính 1 / món rẻ nhất; điều kiện
+      theo phương thức thanh toán, hãng giao, tỉnh, phân khúc, hạng, app / web / quầy, thương hiệu, người bán,
+      khách mới, loại trừ hàng đang giảm
+- [ ] Chống lạm dụng theo nhiều khoá người mua (tài khoản, số điện thoại, địa chỉ — chỉ bản băm), giới hạn
+      theo kỳ; quy tắc trả hàng (hoàn theo tỉ lệ, quà, voucher về ví khi huỷ); chạy thử, kiểm xung đột, lịch,
+      số liệu chương trình; tính giỏ trong bộ nhớ, đo p99 < 5 ms cho 50 dòng × 500 chương trình
 
 ## 44. Vận chuyển (`shipping`)
 
@@ -1116,7 +1134,10 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [ ] Đối chiếu thiết kế 2 (D-209, D-215, D-216, D-218): `invoice_timing = on_delivered` mặc định,
       `buyer_cancel_until = preparing`, `allowed_return_reasons`, `acceptance_hours`; `payment_actions[]` khi
       giỏ nhiều chế độ dòng tiền; nhận tại cửa hàng (mã 6 số, giao cho người nhận hộ); chứng từ của người
-      mua; giỏ bỏ dở, gửi lại link thanh toán; xuất đơn qua xuất chung; hạn thanh toán đọc từ `ledger"
+      mua; giỏ bỏ dở, gửi lại link thanh toán; xuất đơn qua xuất chung; hạn thanh toán đọc từ `ledger`
+- [ ] Coupon và voucher trong giỏ (D-222): mã và voucher tách nhau, điền dữ liệu điều kiện cho `promotions`,
+      chụp khoản giảm kèm ai trả tiền vào đơn; trả hàng hoàn theo tỉ lệ, xử lý quà; hoá đơn ghi khoản giảm và
+      hàng khuyến mại (cần đối chiếu NĐ 123/2020 sửa bởi NĐ 70/2025)
 
 ## 46. Sàn (`marketplace`)
 
@@ -1140,6 +1161,8 @@ Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nú
 - [ ] Đối chiếu thiết kế 2 (D-214, D-216, D-218): bút toán theo tên tài khoản của 36, tạm giữ qua
       `ledger_holds`; COD không về tài khoản sàn; danh sách người bán công khai, đánh giá theo người bán, theo
       dõi gian hàng (đồng ý riêng cho tin hàng mới); huy hiệu chỉ từ dữ liệu thật
+- [ ] Quyết toán theo ai trả tiền giảm giá (D-222): voucher sàn thì người bán nhận đủ, voucher shop trừ doanh
+      thu người bán; gốc tính phí sàn là dữ liệu có ngày hiệu lực; người bán đồng ý trước khi cùng chịu chi phí
 
 ## 47. Khách hàng và giữ chân khách (`customers`)
 
@@ -1157,6 +1180,8 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
 - [ ] Danh sách yêu thích, sản phẩm vừa xem; nhắc giỏ hàng bỏ dở qua `notifications` — chỉ khi người
       mua đã đồng ý nhận tin quảng cáo (bước 37); giới thiệu bạn bè có thưởng
 - [ ] Đối chiếu thiết kế 2: gộp danh sách yêu thích của trình duyệt vào tài khoản khi đăng nhập
+- [ ] Tặng voucher (D-222): sinh nhật, đổi điểm lấy voucher, sau khi mua, giới thiệu bạn — qua `grant_voucher`,
+      gọi lại không cấp thêm; phân khúc và hạng thành viên làm điều kiện khuyến mại
 
 ## 48. Bán đa kênh (`channels`)
 

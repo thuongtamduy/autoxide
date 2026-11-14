@@ -124,7 +124,7 @@ thẻ là nhận trước (không xuất hoá đơn bán hàng), xuất hoá đ�
   **Marketing** (notifications áp khung giờ, từ chối là dừng ngay). Mỗi tin có link huỷ nhận.
 - Giới thiệu bạn: mỗi hồ sơ một mã; người được giới thiệu nhập mã trong `REFERRAL_APPLY_DAYS` ngày sau
   khi tạo tài khoản và trước đơn đầu tiên; đủ điều kiện khi đơn đầu `completed` với giá trị tối thiểu;
-  thưởng (điểm, hay mã giảm qua `Promotions::issue_code` — giả định bước 43 có, hay số dư nếu đã bật)
+  thưởng (điểm, hay voucher qua `Promotions::grant_voucher` — D-222, hay số dư nếu đã bật)
   theo `customers_referral_rules` có ngày hiệu lực. Chống gian lận: cùng `phone_key` / email / thiết
   bị với người giới thiệu → `rejected`.
 
@@ -147,7 +147,8 @@ pub struct CustomerSummary { pub id: CustomerId, pub user_id: Option<Uuid>, pub 
 
 Giả định: `orders::api::{OrderExtensions, Tender, BuyerGroups}` (bước 45);
 `notifications::api::Notifier::{send, has_marketing_consent(tenant, recipient, channel)}` (bước 37);
-`promotions::api::Promotions::issue_code(tenant, IssueCode { campaign_id, reference, buyer })` (bước 43);
+`promotions::api::Promotions::grant_voucher(tenant, GrantVoucher { promotion_id, user_id, source, source_ref })`
+(bước 43, D-222 — trước ghi `issue_code`);
 `ledger::api::Ledger::post` (bước 36); event tạo tài khoản người mua của bước 34 (để tạo hồ sơ sớm — không
 bắt buộc).
 
@@ -367,3 +368,15 @@ Cả SQLite và Postgres, `TestApp` với `orders` và module nền thật; `Not
 
 - **Gộp danh sách đã lưu khi đăng nhập (B-c13, thấp).** `POST /me/wishlist/merge {items}` gộp danh sách
   yêu thích lưu ở trình duyệt vào tài khoản, bỏ trùng.
+
+## Bổ sung theo D-222 (voucher cho người mua)
+
+- **Cấp voucher qua `Promotions::grant_voucher`** (không tự tạo mã): sinh nhật (job hằng ngày theo múi giờ của
+  khách, `source_ref = birthday:<năm>`), đổi điểm lấy voucher (trừ điểm và cấp voucher cùng `source_ref =
+  points:<id bút toán điểm>`; cấp lỗi thì hoàn điểm bằng bút toán đảo), sau khi mua (nghe
+  `orders.order_completed`, `purchase:<order_id>`), giới thiệu bạn (`referral:<id>`). Gọi lại không cấp thêm.
+- **Hạng thành viên** đưa vào giỏ: `BuyerGroups` thêm `tier_of(tenant, user_id) -> Option<String>` (cài mặc định
+  trả `None`); `orders` điền `Cart.membership_tier`. Nhóm / phân khúc vẫn là `group_ids` như cũ.
+- Điểm thưởng là cách thanh toán (Tender `points`), không phải khuyến mại; voucher đổi từ điểm là khuyến mại.
+- **Test:** `voucher_sinh_nhat_moi_nam_mot_lan`, `doi_diem_lay_voucher_khong_nhan_doi`,
+  `cap_voucher_loi_hoan_diem`.

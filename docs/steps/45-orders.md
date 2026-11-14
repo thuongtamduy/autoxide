@@ -705,3 +705,22 @@ endpoint trả 404 `orders.support_unavailable` và đơn không hiện nút (đ
   `POST /api/v1/orders/{id}/payment-link` (gửi lại link thanh toán còn hạn của `ledger`); xuất đơn đi qua
   xuất chung của bước 51 (D-213), không có endpoint xuất riêng.
 - **Hạn thanh toán (D-218).** Bỏ giá trị 1440 phút riêng của bước này; đọc `expires_at` từ `ledger`.
+
+## Bổ sung theo D-222 (coupon, voucher, chia tiền giảm)
+
+- **Dữ liệu giỏ cho `promotions`.** Giỏ giữ `codes` (coupon) và `voucher_ids` (voucher trong ví, chỉ người đăng
+  nhập) tách nhau; `PUT /carts/{id}/vouchers`. Điền `Cart.buyer_keys` (`user:<id>`, băm số điện thoại, băm địa
+  chỉ giao chuẩn hoá bằng HMAC với secret của khách — không lưu bản thô ở `promotions`), `payment_method`,
+  `carrier`, `ship_to_province_code`, `client`, `membership_tier` (từ `BuyerGroups` do `customers` cắm vào
+  `OrderExtensions`; chưa cài thì rỗng), `gift_selections`. Đổi phương thức thanh toán hay hãng giao thì báo giá lại
+  (khoản giảm theo phương thức thanh toán có thể đổi).
+- **Chụp vào đơn.** Mỗi dòng đơn lưu khoản giảm theo chương trình kèm `funding` (ai trả, bao nhiêu) và nguồn
+  (`automatic` / `code` / `voucher` + id); đơn con trên sàn nhận phần chia của voucher sàn.
+- **Trả hàng.** Theo mục 8 của đặc tả 43: hoàn theo tỉ lệ bằng `Money::allocate`, tổng hoàn không vượt tiền đã
+  trả; `promotions.clawback_on_return` (mặc định `none`); quà theo `gift_return_policy`; `returns/preview` hiện
+  rõ phần giảm bị trừ. Huỷ trọn đơn gọi `Promotions::release` (voucher về ví nếu còn hạn).
+- **Hoá đơn.** Khoản giảm ghi trên hoá đơn là chiết khấu / giảm giá của dòng; hàng tặng là dòng riêng ghi rõ
+  "hàng khuyến mại"; phần do sàn hay đối tác thanh toán trả ghi theo dữ liệu quy tắc hoá đơn — **cần đối chiếu**
+  NĐ 123/2020 (sửa bởi NĐ 70/2025) và cần người có chuyên môn xác nhận trước khi chạy thật (D-222).
+- **Test:** `voucher_cua_nguoi_khac_bi_tu_choi`, `doi_phuong_thuc_thanh_toan_tinh_lai_giam`,
+  `tra_mot_phan_hoan_theo_ti_le_tong_khop`, `tra_mon_dieu_kien_tru_gia_tri_qua`, `huy_don_tra_voucher_vao_vi`.

@@ -375,3 +375,210 @@ giữ chỗ thật (không làm tròn, không số giả).
   đổi (cho `catalog_storefront_entries`); `GET /public/promotions/flash-sales` trả giờ bắt đầu / kết thúc và
   **suất còn** (số thật, không làm giả độ khan hiếm — Luật 19/2023); điều kiện `first_order_only` (đơn đầu
   của người mua trong khách, hỏi `orders` qua `api`).
+
+## Bổ sung theo D-222 (khuyến mại theo các nền tảng lớn; coupon và voucher)
+
+Phần này **thay** những chỗ nói khác ở trên khi hai bên vênh nhau (vd cờ `exclusive`). Chưa có migration nào
+của `promotions` được commit, nên đổi thẳng thiết kế bảng.
+
+### 1. Chương trình, coupon, voucher
+
+- **Chương trình** (`promotions_promotions`) là luật. `trigger` ∈ `automatic` / `code` / `voucher`.
+- **Coupon** = dòng `promotions_codes` với `purpose = redeem` của chương trình `code`: ai có mã cũng dùng được,
+  kể cả khách vãng lai. Mã chung hay lô mã riêng (đã có). Không có coupon "chỉ một người": việc đó là voucher.
+- **Voucher** = dòng `promotions_vouchers` của chương trình `voucher`: một quyền **dùng một lần** trong ví của
+  **một tài khoản**, không cần gõ mã. Chỉ người đăng nhập. Không chuyển cho người khác, không đổi ra tiền.
+- Mã nhận voucher = `promotions_codes.purpose = claim`: nhập mã → cấp một voucher vào ví (không giảm thẳng).
+
+| Bảng | Cột chính | Khoá / index |
+|---|---|---|
+| `promotions_vouchers` | `id`, `tenant_id`, `promotion_id`, `holder_user_id`, `status` (`available`/`held`/`used`/`expired`/`revoked`), `source` (`claim`/`claim_code`/`grant`/`loyalty`/`purchase_reward`/`birthday`/`referral`/`compensation`/`automation`), `source_ref`, `valid_from`, `expires_at`, `issued_at`, `used_order_id?`, `updated_at` | unique (`tenant_id`,`promotion_id`,`holder_user_id`,`source`,`source_ref`); (`tenant_id`,`holder_user_id`,`status`,`expires_at`); (`tenant_id`,`status`,`expires_at`) |
+
+`promotions_promotions` thêm cho chương trình `voucher`: `voucher_quota?` + `issued_count` (tổng số phát),
+`per_user_claim_limit?`, `voucher_valid_days?` (hạn tính từ lúc nhận) hay dùng `ends_at`, `claimable` (hiện nút
+"Lưu" công khai), `claim_requires_verified_phone`.
+
+Trait `Promotions` thêm (gọi lại cùng `source` + `source_ref` → trả voucher cũ, không cấp thêm):
+
+```rust
+async fn grant_voucher(&self, tenant: &TenantContext, request: &GrantVoucher)
+    -> Result<Submitted<Voucher>, Error>;
+async fn vouchers_of(&self, tenant: &TenantContext, user_id: Uuid, status: Option<VoucherStatus>)
+    -> Result<Vec<Voucher>, Error>;
+```
+
+Người gọi: `customers` (sinh nhật, đổi điểm, sau khi mua, giới thiệu bạn — bước 47), `support` (bù lỗi — 53),
+`automations` (58). Cấp tay: `POST /promotions/{id}/vouchers` (permission `promotions.vouchers.grant`, lý do bắt
+buộc, có audit).
+
+REST cho người mua (dưới `/api/v1/promotions`):
+
+| Method + path | Permission | Ghi chú |
+|---|---|---|
+| `GET /me/vouchers?status&store_id` | `promotions.use` | ví voucher, sắp theo hạn gần nhất; `Page` |
+| `POST /public/promotions/{id}/claim` | `promotions.use` | bấm "Lưu"; 201; hết suất → `promotions.voucher_quota_exhausted` |
+| `POST /me/vouchers/claim-code` `{code}` | `promotions.use` | nhập mã nhận voucher; giới hạn số lần thử |
+
+`Cart` thêm `voucher_ids: Vec<Uuid>`. Voucher phải thuộc `buyer_id`, còn `available` và còn hạn; sai thì vào
+`rejected_codes` (giữ tên; mỗi mục mang `code?` hoặc `voucher_id?`) với lý do, không lỗi cả giỏ. Giữ:
+`available → held` bằng `UPDATE … WHERE status = 'available'`, xác nhận → `used`, trả → `available` nếu còn hạn,
+không thì `expired`. Job `promotions.expire_vouchers` mỗi giờ. `GET /public/promotions/eligible` trả thêm voucher
+trong ví dùng được cho giỏ và `best_selection` (tổ hợp mã + voucher lợi nhất theo luật cộng dồn ở mục 2).
+
+Dữ liệu cá nhân: ví nằm trong `PersonalData` export; xoá tài khoản → voucher chưa dùng chuyển `revoked`, voucher
+đã dùng giữ cho chứng từ, bỏ liên kết người.
+
+### 2. Lớp và cộng dồn
+
+- `class` ∈ `product` / `order` / `shipping`, suy từ `scope` (`items` → `product`). Thứ tự tính giữ nguyên: lớp
+  `product` → `order` → `shipping` → trần pháp luật.
+- `exclusivity` ∈ `none` / `class` / `global` (**thay cờ `exclusive`**): `class` = không cộng với chương trình
+  khác cùng lớp; `global` = không cộng với bất cứ gì.
+- `combines_with` (tập lớp được cộng cùng, vd chương trình lớp `order` cộng được với `shipping` nhưng không với
+  `product`). Hai chương trình cộng được khi **cả hai** cho phép (như Shopify).
+- `stop_after` (bool): áp chương trình này thì không xét chương trình ưu tiên thấp hơn cùng lớp.
+- Chế độ của khách (cài đặt kế thừa `promotions.stacking_mode`): `priority` (mặc định — dễ đoán: theo
+  `priority` giảm dần rồi `id`) hay `best_for_buyer`: mỗi lớp so **tập cộng dồn được** với **từng chương trình
+  độc quyền đứng riêng**, lấy khoản giảm lớn nhất; bằng nhau → `priority` → `id`. Số phương án ≤ số chương trình
+  độc quyền ứng viên, nên tuyến tính, vẫn tất định. Không tìm tổ hợp tối ưu toàn cục.
+- Giới hạn: `MAX_CODES_PER_CART` (đã có) và `MAX_VOUCHERS_PER_CLASS` (1) — tính **theo từng bên trả tiền**: trên
+  sàn một giỏ dùng được 1 voucher của mỗi người bán + 1 voucher sàn cho mỗi lớp (kiểu Shopee).
+
+### 3. Ai trả tiền
+
+`promotions_funding` (`promotion_id`, `payer_kind` (`platform`/`seller`/`brand`/`payment_partner`),
+`payer_org_id?`, `share_bp`; tổng `share_bp` = 10.000, sai → `promotions.invalid_funding`). Mặc định: một dòng
+`seller` = nút sở hữu chương trình, 100%. `LineDiscount` thêm `funding: Vec<FundingShare>` (chia bằng
+`Money::allocate`, tổng khớp từng đồng). Chương trình của người bán chỉ áp dòng của người bán đó; chương trình
+của sàn chia về các đơn con theo tiền dòng. `orders` chụp `funding` vào đơn; `marketplace` quyết toán theo đó
+(đặc tả 46); `payment_partner` thành khoản phải thu từ đối tác trong `ledger`.
+
+**Tham gia chương trình của sàn** (flash sale, ngày hội): `promotions_participations` (`promotion_id`,
+`seller_org_id`, `status` `pending`/`approved`/`rejected`, `items` JSON: biến thể, giá / mức giảm đề nghị, số
+suất, `reviewed_by?`). Người bán đăng ký (`promotions.participate`), sàn duyệt; duyệt xong mới thành
+`flash_items`. Phần người bán tự giảm thì `funding` của người bán.
+
+### 4. Ngân sách, lượt theo ngày, khung giờ
+
+- `budget_minor?` + `budget_used_minor`: giữ = cộng khoản giảm của chương trình trong đơn bằng `rows::adjust`
+  có trần. Không đủ ngân sách thì **không áp** chương trình (lý do `promotions.reason.budget_exhausted`), không
+  áp một phần. Hết ngân sách → event `promotions.budget_exhausted`, chương trình vẫn `active` cho tới khi trả
+  lượt làm còn chỗ.
+- `daily_usage_limit?`: `promotions_daily_usage` (`promotion_id`, `day` theo múi giờ cửa hàng, `used`; unique)
+  — chèn `ON CONFLICT DO NOTHING` rồi `adjust`.
+- Khung giờ ("giờ vàng"): `promotions_schedules` (`promotion_id`, `weekdays` (bitmask), `start_minute`,
+  `end_minute`) theo múi giờ cửa hàng; không có dòng = cả ngày.
+
+### 5. Loại mới
+
+| `kind` | Nghĩa | Cột / bảng |
+|---|---|---|
+| `tiered` | Mua nhiều giảm nhiều: 2 món −10%, 3 món −15%; đơn 500k −50k, 1 triệu −120k | `promotions_tiers` (`promotion_id`, `threshold_kind` `quantity`/`amount`, `threshold`, `value_bp?`, `value_minor?`); lấy bậc cao nhất đạt |
+| `bundle_price` | Combo đồng giá: chọn N món trong tập mục tiêu giá X ("3 món 199k") | `bundle_quantity`, `bundle_price_minor`; lặp theo `max_applications`; xếp món đắt nhất vào combo trước cho tất định |
+| `add_on` | Mua kèm deal sốc: có món điều kiện thì mua món thưởng giá ưu đãi | `role = condition / reward`; `max_add_on_quantity`; giá / mức giảm theo `promotions_flash_items` |
+| `gift_choice` | Chọn quà: đạt điều kiện thì chọn `gift_quantity` món trong danh sách | `promotions_gift_options` (`variant_id`, `stock_limit?`, `quantity_used`); `Cart.gift_selections`; chưa chọn → gợi ý, không chặn đặt hàng |
+| `buy_x_get_y` (mở rộng) | Mua 2 tính 1, món rẻ nhất miễn phí, mua 2 giảm 50% món thứ hai | `reward_selection` (`cheapest`/`same_item`/`specified`), `reward_value_bp` (10.000 = tặng), `max_applications` |
+
+Hàng tặng và quà giữ tồn qua `orders` → `inventory` như dòng thường giá 0 (đã chốt: dòng riêng).
+
+### 6. Điều kiện mở rộng
+
+`promotions_conditions` (`promotion_id`, `kind`, `operator` `in`/`not_in`/`gte`/`lte`, `values` JSON trong
+`text`). Nạp vào bộ nhớ thì biên dịch thành struct, không đọc JSON khi tính. `kind`: `payment_method`,
+`carrier`, `ship_to_province`, `membership_tier`, `client` (`web`/`app`/`pos`), `brand`
+(thuộc tính), `seller_org`, `attribute`, `new_customer` (chưa có đơn hoàn tất), `returning_customer`,
+`min_items`, `exclude_discounted` (bỏ dòng đã có khoản giảm lớp `product` hay đang có giá gạch `compare_at`),
+`exclude_targets`. Nhóm / phân khúc khách vẫn qua `promotions_customer_groups` (ID nhóm của bước 47, đã có).
+`Cart` thêm `payment_method`, `carrier`, `ship_to_province_code`, `client`, `membership_tier`,
+`gift_selections`, `has_compare_at` theo dòng — `orders` điền; mọi trường đi vào `fingerprint`. Đổi phương thức thanh
+toán / hãng giao là tính lại.
+
+### 7. Chống lạm dụng
+
+- `per_customer_limit` thêm `per_customer_period` (`lifetime` / `day` / `week` / `month`).
+- `Cart.buyer_keys: Vec<String>` thay `buyer_key`: `user:<id>`, băm số điện thoại, băm địa chỉ giao chuẩn hoá
+  (`orders` tính; ở đây không lưu bản thô). Giữ lượt cộng **mọi** khoá theo thứ tự cố định; một khoá hết lượt là
+  từ chối — một người không lấy thêm lượt bằng tài khoản mới cùng số điện thoại.
+- Flash sale: `per_customer_quantity_limit` mỗi biến thể.
+- Thử mã: rate limiting của kernel theo người mua / IP cho nhập coupon và mã nhận voucher; lô mã riêng dài ≥ 8 ký
+  tự.
+
+### 8. Trả hàng và huỷ
+
+Quy tắc cho `orders` (đặc tả 45) dùng ảnh chụp `Evaluation`:
+- Trả một phần: tiền hoàn của dòng = tiền đã trả của dòng × số trả / số mua, chia bằng `Money::allocate` (đơn vị
+  cuối nhận phần dư) — tổng hoàn qua nhiều lần trả không vượt tiền đã trả.
+- Trả làm đơn rớt dưới ngưỡng (đơn 500k giảm 50k, trả còn 300k): mặc định **không thu lại** khoản giảm (cài đặt
+  kế thừa `promotions.clawback_on_return` = `none` / `proportional`).
+- Quà / hàng tặng khi trả món điều kiện: `gift_return_policy` của chương trình (`return_gift` /
+  `deduct_gift_value` / `keep`), mặc định `return_gift`.
+- Huỷ trọn đơn: coupon trả lượt theo `return_usage_on_cancel`; voucher về ví nếu còn hạn. Trả hàng một phần không
+  trả voucher.
+
+### 9. Chạy thử, xung đột, lịch, số liệu
+
+- `POST /promotions/{id}/simulate` `{carts: [Cart]}` (≤ 20 giỏ, `promotions.read`): mỗi giỏ kết quả có và không có
+  chương trình; chạy được cả khi `draft`. Không ghi gì.
+- `GET /promotions/{id}/conflicts`: chương trình trùng mục tiêu và thời gian có `exclusivity` khác `none` →
+  cảnh báo; `activate` trả `warnings`, không chặn.
+- `GET /promotions/calendar?from&to&org_id`: chương trình theo khoảng ngày (cho lịch của người bán).
+- `promotions_stats_daily` (`promotion_id`, `day`, `redemptions`, `discount_minor`, `order_value_minor`,
+  `platform_funded_minor`, `seller_funded_minor`; unique) cập nhật trong cùng transaction với `confirm` /
+  `release`. `GET /promotions/{id}/stats?from&to`. Số liệu chỉ là số đếm; "doanh thu tăng thêm" để bước 57.
+
+### 10. Nhẹ và nhanh
+
+- `CompiledPromotions` trong bộ nhớ theo (khách, cửa hàng): chương trình `active` / `scheduled` trong 24 giờ
+  tới, điều kiện đã biên dịch, chỉ mục `variant_id` / `product_id` / `category_id` / thuộc tính → chương trình.
+  Khoá theo `promotions_revisions` (`tenant_id`, `revision`) tăng trong cùng transaction với mọi lần đổi chương
+  trình; máy chủ khác nhận event để nạp lại, kèm hạn 60 giây làm lưới an toàn.
+- `evaluate` = tra chỉ mục cho dòng trong giỏ → ứng viên → tính; không query database ngoài lần nạp. Mục tiêu:
+  giỏ 50 dòng, 500 chương trình đang chạy, p99 < 5 ms phần tính; bench `promotions/benches/evaluate.rs`, số ghi
+  `docs/BENCHMARKS.md`.
+- `reserve` một transaction: mọi bộ đếm (chương trình, mã, voucher, ngân sách, ngày, mỗi khoá người mua, flash,
+  quà) theo thứ tự (`counter`, `counter_id`) cố định.
+- Giá sau giảm tự động lớp `product` không có điều kiện giỏ thì ghi sẵn sang `catalog` (event đã có).
+
+### 11. Trần pháp luật và sàn giá
+
+- Cộng **mọi** khoản giảm trên một đơn vị (mọi lớp sản phẩm, mọi bên trả tiền) rồi so trần (D-222, cần đối
+  chiếu).
+- Sàn giá của `catalog` (`Catalog::price_floors`): `activate` cảnh báo hay chặn theo `action`; khi tính, quy tắc
+  `block` cắt khoản giảm như trần pháp luật, lý do `promotions.reason.capped_by_floor`.
+- `promotions_notice_rules` có thêm `promotion_kind = purchase_voucher` (voucher cấp sau khi mua — "bán hàng kèm
+  phiếu mua hàng", Điều 92 Luật Thương mại; cần đối chiếu).
+
+### Permission, event, lỗi mới
+
+- Permission: `promotions.use` (người mua: ví, lưu, nhập mã nhận — gán sẵn cho vai trò người mua của bước 34),
+  `promotions.vouchers.grant`, `promotions.funding.manage` (đặt phần sàn / nhãn hàng trả),
+  `promotions.participate` (người bán đăng ký chương trình của sàn).
+- Event: `promotions.voucher_issued`, `promotions.voucher_used`, `promotions.budget_exhausted`,
+  `promotions.participation_reviewed`. Không phát event cho mỗi voucher hết hạn (job đổi theo lô).
+- Lỗi: `promotions.voucher_not_found` (404), `promotions.voucher_not_owned` (403), `promotions.voucher_expired`
+  (422), `promotions.voucher_used` (409), `promotions.voucher_quota_exhausted` (409),
+  `promotions.claim_limit_reached` (409), `promotions.claim_requires_verified_phone` (403),
+  `promotions.budget_exhausted` (409), `promotions.daily_limit_reached` (409), `promotions.outside_schedule`
+  (422), `promotions.not_combinable` (422), `promotions.too_many_vouchers` (422), `promotions.invalid_funding`
+  (422), `promotions.gift_out_of_stock` (409). Thêm bản dịch và key lý do tương ứng.
+- Tool MCP thêm: `promotions.grant_voucher` (cùng service với REST, `promotions.vouchers.grant`; bước 58 gọi),
+  `promotions.simulate` (`read_only`), `promotions.list_vouchers_of_user` (`read_only`, cho nhân viên hỗ trợ).
+- Tính năng (bước 35): `promotions.vouchers`, `promotions.tiered`, `promotions.bundles`,
+  `promotions.budget`. Cấu hình: `MAX_VOUCHERS_PER_CLASS` (1), `MAX_SIMULATE_CARTS` (20),
+  `COMPILED_TTL_SECONDS` (60).
+
+### Test bắt buộc thêm (cả SQLite và Postgres)
+
+- Đồng thời: `voucher_quota_10_nguoi_100` (claim), `mot_voucher_hai_don_dong_thoi` (đúng 1),
+  `ngan_sach_khong_vuot_khi_100_don`, `luot_theo_ngay_dong_thoi`, `cung_so_dien_thoai_hai_tai_khoan` (khoá chung
+  chặn), `qua_het_suat`.
+- Cộng dồn: ma trận `exclusivity` × `combines_with` × lớp; `stop_after`; `best_for_buyer_tat_dinh` (100 lần, thứ tự
+  dòng xáo trộn → cùng kết quả); `voucher_shop_va_voucher_san_cung_gio`.
+- Loại: `bac_thang_lay_bac_cao_nhat`, `combo_dong_gia_lap_lai`, `mua_kem_deal_soc`, `chon_qua`,
+  `mua_2_tinh_1_mon_re_nhat`.
+- Điều kiện: `theo_phuong_thuc_thanh_toan`, `khung_gio_theo_mui_gio_cua_hang`, `khach_moi`,
+  `loai_hang_dang_giam`.
+- Tiền: `chia_nguoi_tra_tong_khop`, `tran_cong_ca_voucher_san_va_shop`, `san_gia_cat_khoan_giam`.
+- Voucher: `chi_chu_vi_dung_duoc`, `cap_lai_cung_source_ref_khong_nhan_doi`, `huy_don_tra_voucher_con_han`,
+  `xoa_tai_khoan_thu_hoi_voucher`, `voucher_trong_xuat_du_lieu_ca_nhan`.
+- Hiệu năng: bench ở mục 10 (không là test đỏ / xanh của gate; số đo ghi tài liệu).
