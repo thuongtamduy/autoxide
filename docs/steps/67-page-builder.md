@@ -1,7 +1,8 @@
 # Bước 67 — Trang dựng từ khối, AI tạo trang, bộ giao diện website (`content`)
 
 > Lộ trình: `docs/ROADMAP.md` bước 67 · Luật chung: `docs/steps/README.md` · Quyết định: D-229 (thiết kế bước
-> này), D-231 (thử A/B, AI tạo ảnh, khối mã tự viết), D-026 (core chỉ có API), D-102 (thân bài từ chối mặc định), D-109 (AI chỉ thành nháp), D-123 (sổ đối
+> này), D-231 (thử A/B, AI tạo ảnh, khối mã tự viết), D-234 (chủ đề theo lịch, đầu trang /
+> chân trang của website), D-026 (core chỉ có API), D-102 (thân bài từ chối mặc định), D-109 (AI chỉ thành nháp), D-123 (sổ đối
 > tượng), D-208 (nội dung theo website và nút)
 
 ## Mục tiêu
@@ -18,7 +19,8 @@ Trang đăng xong có link công khai ngay: tên miền của website + đườn
 được chức năng thật — form, đăng ký nhận tin, giỏ hàng, lưu voucher — vì đó là **khối do module cung cấp**, không
 phải code AI tự viết.
 
-Kèm theo trong bước: bộ giao diện chung của website (màu, chữ, khoảng cách), thư viện trang mẫu, khu dùng chung
+Kèm theo trong bước: bộ giao diện chung của website (màu, chữ, khoảng cách), chủ đề theo mùa / ngày lễ / khung giờ
+và đầu trang, chân trang dùng cho cả website (D-234), thư viện trang mẫu, khu dùng chung
 nhiều trang, kiểm tra sức khoẻ website, bộ nháp chiến dịch tạo từ một chương trình khuyến mại, thử A/B hai phiên
 bản trang, AI tạo ảnh cho banner và ảnh minh hoạ, khối mã tự viết chạy cách ly (D-231).
 
@@ -37,7 +39,7 @@ bản trang, AI tạo ảnh cho banner và ảnh minh hoạ, khối mã tự vi�
   liệu cho khối, kiểm props theo JSON Schema.
 - **`content`:**
   - trang có bố cục khối (thân `layout`, cạnh thân `rich` sẵn có);
-  - bộ giao diện của website, khu dùng chung, trang mẫu;
+  - bộ giao diện của website, chủ đề theo lịch, đầu trang / chân trang của website, khu dùng chung, trang mẫu;
   - đọc công khai trả bố cục kèm dữ liệu khối;
   - AI tạo và sửa trang;
   - kiểm tra sức khoẻ website, bộ nháp chiến dịch;
@@ -50,6 +52,7 @@ bản trang, AI tạo ảnh cho banner và ảnh minh hoạ, khối mã tự vi�
 
 **Ngoài phạm vi:**
 - giao diện kéo thả và bộ vẽ khối (repo giao diện);
+- mã chạy hiệu ứng trang trí của chủ đề (repo giao diện; core chỉ trả tên hiệu ứng trong danh sách cho phép);
 - thử A/B **giá hay khuyến mại** (chỉ thử bố cục và nội dung — D-231);
 - AI tạo **ảnh sản phẩm** hay ảnh người thật (D-231).
 
@@ -93,8 +96,9 @@ Khối nền tối thiểu (khai ở `content`, trừ khi ghi khác):
 | Chữ | `heading`, `rich_text` (dùng lại bộ kiểm ProseMirror của D-102), `button` (link nội bộ / ngoài, kiểu), `faq` (cặp hỏi–đáp, sinh JSON-LD FAQPage) |
 | Media | `image` (ID `media`), `gallery`, `video` (ID `media` hay nhúng từ host cho phép như D-102), `hero` (ảnh nền + tiêu đề + nút) |
 | Thu khách | `announcement_bar`, `countdown` (tới một mốc giờ UTC), `popup` (thu email: luôn kèm ô đồng ý của bước 37, tần suất hiện, không chặn đóng) |
-| Nhúng | `content.embed` (bản ghi qua sổ đối tượng, P6), `content.posts` (danh sách bài theo chuyên mục) |
-| Module khác | `forms.embed`, `newsletter.signup`, `comments.thread`; bước 41+: `catalog.product_grid`, `catalog.product_card`, `catalog.collection`, `orders.add_to_cart`, `orders.buy_now`, `promotions.flash_sale`, `promotions.voucher_claim`, `orders.reviews` |
+| Nhúng | `content.embed` (bản ghi qua sổ đối tượng, P6), `content.posts` (danh sách bài theo chuyên mục), `content.menu` (menu sẵn có của `content` theo `key`), `content.logo` (logo hiệu lực của chủ đề, link về trang chủ), `content.search_box` |
+| Cửa hàng | `organizations.store_info` (khai ở `organizations` tại **bước 55** khi có thông tin cửa hàng: tên, liên hệ, địa chỉ, giờ mở cửa — chọn trường hiện) |
+| Module khác | `forms.embed`, `newsletter.signup`, `comments.thread`; bước 41+: `catalog.product_grid`, `catalog.product_card`, `catalog.collection`, `orders.add_to_cart`, `orders.buy_now`, `orders.cart_link`, `promotions.flash_sale`, `promotions.voucher_claim`, `orders.reviews` |
 | Pháp lý | `legal.footer` (khai ở `compliance`): thông tin chủ sở hữu, logo Bộ Công Thương — **tự gắn** cuối mọi trang của website bán hàng, không xoá được |
 
 ### 2. Bố cục trang
@@ -119,10 +123,76 @@ Khối nền tối thiểu (khai ở `content`, trừ khi ghi khác):
 
 - `content_themes` theo website (nút, kế thừa — chuỗi đặt, cửa hàng ghi đè): màu (primary, secondary, nền, chữ,
   thành công / lỗi), font (chọn trong danh sách cho phép, không tải font lạ), cỡ chữ, bo góc, khoảng cách,
-  logo (ID `media`). Kiểm độ tương phản chữ / nền đạt WCAG AA, không đạt thì cảnh báo (không chặn).
+  logo (ID `media`), ảnh nền trang (ID `media`, tuỳ chọn). Kiểm độ tương phản chữ / nền đạt WCAG AA, không đạt thì
+  cảnh báo (không chặn).
+- Logo của thương hiệu đặt một chỗ: khi bước 55 đã có, logo theme để trống thì dùng `storefront.logo_media_id` của
+  `organizations` (đọc qua trait nó công bố) — mail, hoá đơn, trang dùng chung một logo; theme và bản chủ đề chỉ ghi
+  đè khi cần (vd logo Tết). Trước bước 55, logo đặt ở theme.
 - Khối chỉ tham chiếu token (`color: "primary"`), không mã màu tự do — trang do AI tạo vẫn đúng thương hiệu; đổi
   token là mọi trang đổi theo.
-- `GET /public/theme` (ETag) cho giao diện.
+
+### 3a. Chủ đề theo lịch: mùa, ngày lễ, khung giờ (D-234)
+
+- **Bản chủ đề** (`content_theme_variants`) của một website: tên, phần **ghi đè** của theme gốc (chỉ những token
+  muốn đổi — màu, font trong danh sách, logo, ảnh nền), hiệu ứng trang trí tuỳ chọn, đầu trang / chân trang riêng
+  tuỳ chọn (mục 3b), lịch chạy, độ ưu tiên, trạng thái `draft` / `active` / `paused`. Ghi đè đi qua **cùng bộ kiểm**
+  của theme gốc (font trong danh sách, ảnh là ID `media`, kiểm tương phản trên token hiệu lực sau khi ghép).
+- **Lịch** (JSON có schema, kiểm khi lưu, gom lỗi một lần — D-083):
+  - `once`: `starts_at`, `ends_at` (UTC) — dịp lễ, chiến dịch;
+  - `daily`: giờ bắt đầu / kết thúc theo giờ địa phương (`HH:MM`, qua nửa đêm được), khoảng ngày áp dụng tuỳ chọn —
+    vd "giờ vàng 20:00–22:00";
+  - `weekly`: như `daily` kèm các thứ trong tuần — vd "cuối tuần".
+  Giờ địa phương theo `organizations.timezone` của nút website, tính bằng công cụ múi giờ IANA của bước 34 (không
+  cộng độ lệch cố định). Lễ theo âm lịch (Tết, Trung thu) đổi ngày mỗi năm nên dùng `once` với ngày cụ thể.
+- **Chọn bản đang hiệu lực** ở thời điểm `t`: các bản `active` có lịch phủ `t`; nhiều bản trùng thì ưu tiên cao hơn
+  thắng, bằng nhau thì bản bắt đầu muộn hơn, rồi theo `id` — luôn ra **một** kết quả, mọi máy chủ giống nhau. Không
+  bản nào phủ thì dùng theme gốc. Chỉ **một** bản áp tại một lúc (không chồng nhiều bản) để kết quả dễ đoán.
+- **Thư viện chủ đề mẫu** đi kèm bản phát hành (`modules/content/data/theme-presets/*.json`, nhúng vào binary, không
+  cần bảng): Tết Nguyên đán, Valentine, 8/3, 30/4–1/5, Trung thu, 20/10, Black Friday, Giáng sinh, giờ vàng… — mỗi
+  mẫu là phần ghi đè + hiệu ứng gợi ý + ngày gợi ý theo năm cho lễ âm lịch (dữ liệu, kiểm lại mỗi lần cập nhật gói
+  mẫu). Khách chọn mẫu → tạo bản chủ đề **nháp** của mình rồi chỉnh.
+- **Chép sang năm sau:** `POST /theme-variants/{id}/copy {schedule}` tạo bản nháp giống hệt với lịch mới.
+- **Hiệu ứng trang trí** chỉ chọn trong danh sách cho phép do core khai (`snow`, `petals`, `lanterns`, `fireworks`,
+  `confetti`, `hearts`), kèm `intensity` (`low` / `medium`). Core chỉ lưu và trả **tên** hiệu ứng; giao diện vẽ.
+  Hợp đồng ghi trong `docs/PAGES.md` cho người làm giao diện: tải hiệu ứng sau khi trang đã hiện, ngân sách
+  dung lượng mỗi hiệu ứng, tự tắt khi người xem bật giảm chuyển động (`prefers-reduced-motion`), **không** chạy ở
+  trang giỏ hàng, thanh toán, tài khoản, đăng nhập.
+- **Giới hạn của hệ thống** (giữ nhanh và an toàn): chủ đề không chứa CSS, HTML hay script — chỉ token, ID `media`
+  và tên hiệu ứng; chân trang pháp lý vẫn tự gắn với mọi bản chủ đề; số bản chủ đề của một website theo hạn mức gói
+  `content.theme_variants` (bước 35) và trần của máy chủ `AUTOXIDE_CONTENT_THEME_VARIANTS_MAX`.
+- **Xem trước:** `GET /site/{org_id}/preview?at=<thời điểm>&variant_id?` (người có `content.themes.manage`) trả đúng
+  hình dạng của `GET /public/site` như thể đang ở thời điểm `at`, gồm cả bản nháp được chỉ định.
+
+### 3b. Đầu trang và chân trang của website (D-234)
+
+- **Khu cố định của website** (`content_site_regions`): `header` và `footer`, mỗi khu là một bố cục khối (cùng bộ
+  kiểm, giới hạn và khối như trang — mục 2), theo ngôn ngữ (thiếu bản dịch thì dùng ngôn ngữ mặc định của website),
+  kế thừa theo nút (chuỗi đặt, cửa hàng ghi đè).
+- Có nháp và đăng: sửa vào `draft_layout`, `POST /site-regions/{id}/publish` mới thành bản công khai (đầu trang
+  hiện trên mọi trang nên không đăng thẳng); lịch sử phiên bản như khu dùng chung.
+- Khối hay dùng trong đầu trang / chân trang: `content.logo`, `content.menu`, `content.search_box`,
+  `announcement_bar`, `organizations.store_info`, `newsletter.signup`; bước 41+ thêm `orders.cart_link`.
+- Bản chủ đề (mục 3a) có thể kèm đầu trang / chân trang riêng (vd đầu trang Tết có thanh thông báo nghỉ lễ); không
+  kèm thì dùng khu của theme gốc.
+- Chân trang pháp lý (`legal.footer`) luôn gắn **dưới** khu `footer`, không nằm trong bố cục nên không xoá được.
+
+### 3c. Đọc công khai phần khung website (D-234)
+
+- `GET /api/v1/content/public/site?locale` — **một** lời gọi cho phần khung của mọi trang: token hiệu lực (theme
+  gốc ghép bản chủ đề đang chạy), hiệu ứng, `header`, `footer` (bố cục kèm `blocks_data` như mục 5), `legal_footer`,
+  `variant` (`id`, tên — giao diện biết đang ở chủ đề nào), `next_change_at` (mốc đổi chủ đề gần nhất).
+- **Không thêm việc cho đường nóng:**
+  - kết quả tính một lần, giữ trong bộ nhớ theo (`tenant_id`, website, ngôn ngữ) tới mốc đổi chủ đề kế tiếp hoặc
+    tối đa `SITE_CACHE_SECONDS` (30), cái nào tới trước; sửa theme / bản chủ đề / khu cố định trong cùng tiến trình
+    xoá cache ngay, tiến trình khác thấy chậm tối đa 30 giây;
+  - tìm "mốc kế tiếp" chỉ xét 7 ngày tới (đủ cho mọi lịch `daily` / `weekly`), không quét xa hơn;
+  - `ETag` theo (phiên bản theme gốc, bản chủ đề đang chạy và phiên bản của nó, phiên bản khu cố định, phiên bản dữ
+    liệu khối); `Cache-Control: max-age` = số giây tới `next_change_at`, trần 300 — CDN và trình duyệt tự hết hạn
+    **đúng lúc** chủ đề đổi, không cần ai xoá cache;
+  - token trả về là tên → giá trị phẳng để giao diện gán thẳng thành biến CSS: đổi chủ đề chỉ đổi biến, không dựng
+    lại trang.
+- `GET /public/resolve` của từng trang **không** lặp lại phần khung; giao diện gọi `public/site` một lần rồi dùng cho
+  mọi trang.
 
 ### 4. Khu dùng chung và trang mẫu
 
@@ -137,7 +207,7 @@ Khối nền tối thiểu (khai ở `content`, trừ khi ghi khác):
 - `GET /api/v1/content/public/resolve?path&locale` (đã có) trả thêm `layout` và `blocks_data`: kernel gom khối có
   `has_data` theo loại, gọi `BlockData::resolve` **một lần mỗi loại** (song song, có hạn thời gian), ghép kết quả.
   Một khối lỗi / hết giờ → `null` cho khối đó, trang vẫn trả.
-- Cache: `ETag` theo (phiên bản trang, phiên bản theme, "phiên bản dữ liệu" mà mỗi `BlockData` báo — vd
+- Cache: `ETag` theo (phiên bản trang, phiên bản theme hiệu lực, "phiên bản dữ liệu" mà mỗi `BlockData` báo — vd
   `catalog` báo số phiên bản giá); `Cache-Control` ngắn cho trang có khối dữ liệu.
 - Trang không còn công khai → 404; khối của module đã tắt → bỏ khỏi kết quả công khai, quản trị thấy cảnh báo.
 
@@ -237,6 +307,8 @@ Ba mức, chọn theo cài đặt; **mức mặc định là tắt** cho tới k
 |---|---|---|
 | `content_entries` (thêm cột) | `body_kind` (`rich`/`layout`, mặc định `rich`) | — |
 | `content_themes` | `id`, `tenant_id`, `org_id`, `tokens` (JSON trong `text`), `version`, `updated_by`, `updated_at` | unique (`tenant_id`,`org_id`) |
+| `content_theme_variants` | `id`, `tenant_id`, `org_id`, `name`, `overrides` (JSON), `effect?`, `effect_intensity?`, `schedule` (JSON), `starts_at?` / `ends_at?` (UTC — lịch `once`, hay khoảng ngày của lịch lặp; để lọc nhanh), `priority`, `status` (`draft`/`active`/`paused`), `preset_key?`, `version`, `created_by`, `updated_by`, `updated_at` | (`tenant_id`,`org_id`,`status`) |
+| `content_site_regions` | `id`, `tenant_id`, `org_id`, `region` (`header`/`footer`), `locale`, `variant_slot` (`base` hay ID bản chủ đề dạng chữ — không dùng NULL vì unique coi NULL là khác nhau trên cả hai database), `layout` (JSON, bản công khai), `draft_layout?`, `version`, `published_at?`, `updated_by`, `updated_at` | unique (`tenant_id`,`org_id`,`region`,`locale`,`variant_slot`) |
 | `content_shared_sections` | `id`, `tenant_id`, `org_id`, `name`, `layout` (JSON), `version`, `updated_at` | (`tenant_id`,`org_id`) |
 | `content_shared_section_uses` | `section_id`, `entry_id` (cập nhật khi lưu trang) | unique (`tenant_id`,`section_id`,`entry_id`); (`tenant_id`,`entry_id`) |
 | `content_page_templates` | `id`, `tenant_id?` (NULL = mẫu dùng chung), `org_id?`, `industry`, `name_key`/`name`, `layout`, `preview_media_id?`, `pack_version?` | (`tenant_id`,`industry`) |
@@ -258,7 +330,12 @@ vào danh sách ở `docs/steps/README.md`.
 | `POST/DELETE /entries/{id}/edit-lock` | `content.pages.write` | giữ / nhả khoá sửa |
 | `POST /entries/{id}/ai/compose` · `POST /entries/{id}/ai/edit` · `GET /entries/{id}/ai/thread` | `content.pages.ai` | 202 + job; kết quả là revision nháp |
 | `POST /entries/{id}/layout/copy-to/{locale}` | `content.pages.write` | sao khung sang bản dịch, tuỳ chọn dịch bằng AI |
-| `GET/PUT /themes/{org_id}` · `GET /public/theme` | `content.themes.manage` · công khai | token kế thừa; ETag |
+| `GET/PUT /themes/{org_id}` | `content.themes.manage` | theme gốc, token kế thừa |
+| `GET/POST /theme-variants?org_id` · `GET/PUT/DELETE /theme-variants/{id}` · `POST /theme-variants/{id}/{activate,pause,copy}` | `content.themes.manage` | chủ đề theo lịch (mục 3a); `If-Match` |
+| `GET /theme-presets` | `content.themes.manage` | thư viện chủ đề mẫu |
+| `GET/PUT /site-regions?org_id&region&locale` · `POST /site-regions/{id}/publish` | `content.themes.manage` | đầu trang / chân trang (mục 3b) |
+| `GET /site/{org_id}/preview?at&variant_id` | `content.themes.manage` | xem trước khung website ở một thời điểm |
+| `GET /public/site?locale` | công khai | khung website (mục 3c); ETag, `max-age` tới mốc đổi chủ đề |
 | `GET/POST /shared-sections` · `GET/PUT/DELETE /shared-sections/{id}` | `content.pages.write` | xoá đang dùng → 409 |
 | `GET /page-templates?industry` · `POST /page-templates` (lưu trang thành mẫu) · `POST /entries/from-template` | `content.pages.write` | |
 | `POST /campaign-drafts` · `GET /campaign-drafts/{job_id}` | `content.pages.ai` | job, kết quả là danh sách bản nháp ở từng module |
@@ -270,6 +347,7 @@ vào danh sách ở `docs/steps/README.md`.
 ### Tool MCP
 
 `content.list_blocks` (`read_only`), `content.get_page_layout` (`read_only`), `content.update_page_layout`,
+`content.list_theme_variants` (`read_only`), `content.save_theme_variant` (lưu là nháp; bật cần người),
 `content.compose_page` (nháp), `content.edit_page` (nháp), `content.create_campaign_drafts` (nháp),
 `content.site_health` (`read_only`), `content.experiment_results` (`read_only`), `media.generate_ai_image`. Không có
 tool sửa khối mã tự viết cho agent ngoài đường chờ duyệt. Cùng service với REST; agent bên ngoài dựng trang được với đúng quyền như
@@ -277,7 +355,8 @@ người.
 
 ### Event
 
-`content.layout_updated` (entry, revision, `ai_assisted`), `content.theme_updated`, `content.shared_section_updated`
+`content.layout_updated` (entry, revision, `ai_assisted`), `content.theme_updated` (theme gốc, bản chủ đề, khu cố
+định — kèm loại), `content.shared_section_updated`
 (kèm số trang bị ảnh hưởng), `content.ai_draft_ready`, `content.site_health_checked`, `content.experiment_started`,
 `content.experiment_concluded`, `content.custom_code_changed` (mức, mã băm — không mang mã), `media.ai_image_generated`.
 Không mang nội dung trang.
@@ -285,14 +364,15 @@ Không mang nội dung trang.
 ### Cấu hình (`AUTOXIDE_CONTENT_`)
 
 `LAYOUT_MAX_BLOCKS` (500), `LAYOUT_MAX_BYTES` (262144), `EDIT_LOCK_SECONDS` (120), `AI_MAX_RETRIES` (2),
-`BLOCK_DATA_TIMEOUT_MS` (800), `SITE_HEALTH_NOT_FOUND_MIN_HITS` (5), `CUSTOM_CODE_MAX_BYTES` (65536),
+`BLOCK_DATA_TIMEOUT_MS` (800), `SITE_HEALTH_NOT_FOUND_MIN_HITS` (5), `THEME_VARIANTS_MAX` (50), `SITE_CACHE_SECONDS` (30), `CUSTOM_CODE_MAX_BYTES` (65536),
 `UNSANDBOXED_CODE` (`false` — chỉ người cài máy chủ bật mức D), `EXPERIMENT_MIN_SAMPLE` (100 lượt xem mỗi phiên bản
 trước khi báo độ tin cậy). Sinh lại `.env.example`.
 
 ### Tính năng và hạn mức (bước 35)
 
-Tính năng: `content.page_builder`, `content.ai_pages`, `content.shared_sections`, `content.experiments`,
-`content.custom_code`, `media.ai_images`. Hạn mức: `content.ai_page_generations` (mỗi tháng), `content.layout_pages`,
+Tính năng: `content.page_builder`, `content.ai_pages`, `content.shared_sections`, `content.theme_schedule`,
+`content.experiments`, `content.custom_code`, `media.ai_images`. Hạn mức: `content.ai_page_generations` (mỗi tháng),
+`content.theme_variants` (số bản chủ đề mỗi website), `content.layout_pages`,
 `media.ai_images` (mỗi tháng).
 
 ### Permission
@@ -314,6 +394,10 @@ Tính năng: `content.page_builder`, `content.ai_pages`, `content.shared_section
 | `content.ai_unavailable` | 503 | Chưa bật AI cho máy chủ này. |
 | `content.ai_result_invalid` | 422 | AI chưa tạo được bố cục hợp lệ sau {tries} lần; hãy mô tả cụ thể hơn. |
 | `content.legal_footer_required` | 422 | Trang của website bán hàng phải giữ chân trang pháp lý. |
+| `content.theme_schedule_invalid` | 422 | Lịch chủ đề chưa hợp lệ: {count} lỗi (xem `errors`). |
+| `content.theme_effect_unknown` | 422 | Hiệu ứng `{effect}` không có trong danh sách cho phép. |
+| `content.theme_font_not_allowed` | 422 | Font `{font}` không có trong danh sách cho phép. |
+| `content.theme_variant_active` | 409 | Bản chủ đề đang bật; tạm dừng trước khi xoá. |
 | `content.experiment_running` | 409 | Trang đang chạy thử A/B; dừng thí nghiệm trước khi sửa. |
 | `content.experiment_price_text` | 422 | Phiên bản `{variant}` ghi số tiền khác giá đang có; giá phải lấy từ khối dữ liệu. |
 | `content.custom_code_disabled` | 403 | Website chưa bật khối mã tự viết. |
@@ -329,7 +413,8 @@ Tính năng: `content.page_builder`, `content.ai_pages`, `content.shared_section
 2. `content`: `body_kind`, bộ kiểm bố cục, khối nền, `PUT/PATCH layout`, khoá sửa; test.
 3. Đọc công khai có `blocks_data`, ETag, khối lỗi không hỏng trang; `forms`, `newsletter`, `comments`, `media`
    khai khối; `compliance` khai `legal.footer`.
-4. Theme, khu dùng chung, trang mẫu (gói mẫu dùng chung + task nạp).
+4. Theme, khu dùng chung, trang mẫu (gói mẫu dùng chung + task nạp); chủ đề theo lịch, thư viện chủ đề mẫu, đầu
+   trang / chân trang, `GET /public/site` có cache tới mốc đổi.
 5. AI: compose / edit bằng job, kiểm và thử lại, lịch sử trò chuyện; bộ nháp chiến dịch.
 6. Kiểm tra sức khoẻ website, nguồn hộp việc.
 7. Khối mã tự viết: cài đặt theo website, ba mức, khung cách ly, sổ script, audit + step-up.
@@ -346,6 +431,14 @@ Tính năng: `content.page_builder`, `content.ai_pages`, `content.shared_section
 - Đồng thời: `hai_nguoi_cung_giu_khoa_chi_mot_duoc`, `hai_patch_cung_phien_ban_chi_mot_thang`.
 - Công khai: `blocks_data_mot_lan_goi_moi_loai` (đếm lời gọi `BlockData` giả), `khoi_loi_tra_null_trang_van_tra`,
   `ban_ghi_het_cong_khai_khong_lo`, `etag_doi_khi_theme_doi`, `chan_trang_phap_ly_tu_gan_khong_xoa_duoc`.
+- Chủ đề (thời điểm truyền vào service bằng tham số `now`, như bước 35): `chu_de_tet_bat_dung_gio_tat_dung_gio`, `gio_vang_qua_nua_dem`,
+  `lich_tuan_theo_mui_gio_cua_website`, `hai_ban_trung_gio_uu_tien_cao_thang`, `khong_ban_nao_thi_dung_theme_goc`,
+  `max_age_bang_so_giay_toi_moc_doi`, `etag_doi_khi_ban_chu_de_doi`, `public_site_da_cache_khong_cham_database`
+  (đếm query), `ghi_de_kiem_tuong_phan_tren_token_da_ghep`, `hieu_ung_la_bi_tu_choi`, `font_la_bi_tu_choi`,
+  `vuot_han_muc_ban_chu_de`, `ban_nhap_khong_bao_gio_hien_cong_khai`, `xem_truoc_dung_thoi_diem`,
+  `chep_sang_nam_sau_la_ban_nhap`.
+- Khung website: `dau_trang_nhap_chua_dang_khong_hien`, `thieu_ban_dich_dung_ngon_ngu_mac_dinh`,
+  `cua_hang_ghi_de_dau_trang_cua_chuoi`, `ban_chu_de_kem_dau_trang_rieng`, `chan_trang_phap_ly_luon_duoi_footer`.
 - AI (`FakeTextModel`): `ai_tao_trang_chi_la_ban_nhap`, `ai_dung_khoi_la_thi_thu_lai_roi_bao_loi`,
   `ai_sua_tra_json_patch`, `khong_gui_du_lieu_nguoi_mua_cho_mo_hinh`, `het_han_muc_ai_theo_goi`.
 - Thử A/B: `cung_nguoi_luon_cung_phien_ban` (gọi 100 lần cùng `visitor_key`), `ti_le_chia_dung_xap_xi`
@@ -363,8 +456,8 @@ Tính năng: `content.page_builder`, `content.ai_pages`, `content.shared_section
 
 - [ ] Mọi mục của bước 67 trong ROADMAP được phủ; khối của `content`, `forms`, `newsletter`, `comments`, `media`,
       `compliance` có mặt và có bản dịch.
-- [ ] Đo: `GET /public/resolve` của trang 50 khối với 5 loại khối dữ liệu (bộ giả) — p99 ghi vào
-      `docs/BENCHMARKS.md`, trên cả hai database.
+- [ ] Đo: `GET /public/resolve` của trang 50 khối với 5 loại khối dữ liệu (bộ giả), và `GET /public/site` khi cache
+      nóng / nguội (website có 50 bản chủ đề) — p99 ghi vào `docs/BENCHMARKS.md`, trên cả hai database.
 - [ ] `docs/PAGES.md` + `.vi.md`, MODULE_GUIDE (EN + VI), OpenAPI, `.env.example`, CHANGELOG.
 - [ ] DECISIONS: thư viện JSON Schema; giới hạn khối; cách tính ETag có dữ liệu.
 - [ ] `./gate.sh` đầy đủ xanh; ROADMAP; commit; phát hành theo `docs/RELEASING.md`.
@@ -383,6 +476,13 @@ Tính năng: `content.page_builder`, `content.ai_pages`, `content.shared_section
 - **Schema khối đổi:** khối thêm props thì mặc định cho props mới; bỏ hay đổi nghĩa props là khối mới
   (`…_v2`), khối cũ vẫn đọc được (như luật API, D-059).
 - **Theme kế thừa:** đọc token hiệu lực theo cây (cài đặt kế thừa của bước 34), ETag theo phiên bản hiệu lực.
+- **Chủ đề theo lịch tính bằng giờ máy chủ hay độ lệch cố định:** sai khi máy chủ khác múi giờ hay khi vùng có giờ
+  mùa hè. Luôn tính từ UTC qua múi giờ IANA của website; hàm chọn bản nhận `now` làm tham số để test được.
+- **Cache vượt mốc đổi chủ đề:** `max-age` cố định làm chủ đề Tết còn hiện sau Tết. Luôn cắt `max-age` và cache trong
+  bộ nhớ tại `next_change_at`.
+- **Quét lịch mỗi request:** chọn bản hiệu lực trên dữ liệu đã nạp trong bộ nhớ, không query mỗi lần đọc công khai.
+- **Hiệu ứng làm chậm trang:** core không trả mã hiệu ứng; hợp đồng với giao diện ghi rõ tải sau, có ngân sách,
+  tôn trọng giảm chuyển động, không chạy ở trang thanh toán.
 - **Popup thu email:** luôn có ô đồng ý và liên kết chính sách; không gửi gì khi chưa đồng ý (bước 37).
 - **Thử A/B ngẫu nhiên theo lần tải:** người xem F5 thấy trang nhảy qua lại, số liệu sai. Luôn chia bằng băm cố định.
 - **Cache khi có thí nghiệm:** CDN cache một phiên bản cho mọi người nếu thiếu `Vary` — chỉ thêm `Vary` cho trang
@@ -407,7 +507,7 @@ Tính năng: `content.page_builder`, `content.ai_pages`, `content.shared_section
 ## Agent làm bước này tự quyết
 
 - Thư viện kiểm JSON Schema (ưu tiên crate đã ổn định, chạy không cần mạng); ghi `STACK.md` và DECISIONS.
-- Bộ khối nền cuối cùng và tên props; bộ trang mẫu ban đầu.
+- Bộ khối nền cuối cùng và tên props; bộ trang mẫu và bộ chủ đề mẫu ban đầu; danh sách font và hiệu ứng cho phép.
 - Cách tính "phiên bản dữ liệu" của khối dữ liệu cho ETag.
 - Tên sự kiện mục tiêu mặc định cho thử A/B; ngưỡng mẫu và mức tin cậy hiển thị.
 - Nhà cung cấp ảnh thứ hai (ngoài OpenAI Images) nếu có API ổn định — tra tài liệu gốc, không đoán.

@@ -5617,3 +5617,37 @@ Ghi thêm cho D-233 (lúc gộp kết quả): EDI của bước 59 nhận và tr
 ngoại lệ có chủ đích của luật "ba hình dạng response" (`Data` / `Page` / `Problem`), cùng loại với tải tệp (hoá đơn
 điện tử XML của 36, nguồn cấp sản phẩm của 48): chuẩn của chứng từ là XML, không bọc trong envelope JSON; lỗi giao
 thức (xác thực, quá cỡ, sai kiểu nội dung) vẫn trả `Problem`.
+
+## D-234 · Chủ đề theo mùa / ngày lễ / khung giờ và đầu trang, chân trang của website — 2026-11-14 — chủ dự án đồng ý đề xuất, agent quyết chi tiết
+
+Chủ dự án hỏi CMS đã đổi được màu chủ đạo, logo, thanh, đầu trang, chân trang và chủ đề theo mùa, ngày lễ, giờ đặc
+biệt chưa — "trong giới hạn cho phép của hệ thống", và không được làm mất sự nhanh, mượt. Đặc tả 67 (D-229) đã có
+theme gốc, khu dùng chung, thanh thông báo; 55 có thông tin cửa hàng. Còn thiếu hai thứ, thêm vào **bước 67** (không
+mở bước mới):
+
+1. **Bản chủ đề có lịch** (`content_theme_variants`): ghi đè một phần theme gốc (token, font trong danh sách, logo,
+   ảnh nền), hiệu ứng trang trí tuỳ chọn, đầu / chân trang riêng tuỳ chọn; lịch `once` (UTC) / `daily` / `weekly`
+   (giờ địa phương theo `organizations.timezone` của website, công cụ múi giờ IANA của bước 34). Trùng giờ: ưu
+   tiên cao hơn → bắt đầu muộn hơn → `id`; chỉ một bản áp tại một lúc. Thư viện chủ đề mẫu nhúng trong binary (lễ
+   âm lịch kèm ngày gợi ý theo năm là dữ liệu); chép sang năm sau; xem trước ở một thời điểm.
+2. **Đầu trang và chân trang của website** (`content_site_regions`): bố cục khối, nháp / đăng, theo ngôn ngữ, kế thừa
+   theo nút; chân trang pháp lý luôn gắn dưới, không nằm trong bố cục. Khối mới: `content.logo`, `content.menu`,
+   `content.search_box`; `orders.cart_link` (bước 45); `organizations.store_info` (bước 55).
+3. **`GET /api/v1/content/public/site`** — một lời gọi cho khung website, thay `GET /public/theme` (chưa code): cache
+   trong bộ nhớ tới mốc đổi chủ đề kế tiếp (trần 30 giây cho tiến trình khác), `Cache-Control: max-age` cắt đúng tại
+   `next_change_at` (trần 300), ETag theo phiên bản hiệu lực; token phẳng để giao diện gán thành biến CSS. Đo p99
+   khi cache nóng / nguội trên cả hai database.
+
+Giới hạn của hệ thống: chủ đề chỉ chứa token, ID `media`, tên hiệu ứng — không CSS, HTML, script; hiệu ứng chỉ trong
+danh sách core khai, giao diện vẽ, tải sau, tôn trọng `prefers-reduced-motion`, không chạy ở giỏ hàng / thanh toán /
+tài khoản / đăng nhập; số bản chủ đề theo hạn mức gói `content.theme_variants` và trần máy chủ
+`AUTOXIDE_CONTENT_THEME_VARIANTS_MAX`; logo thương hiệu đặt một chỗ (`storefront.logo_media_id` khi bước 55 có),
+theme chỉ ghi đè.
+
+Lý do: khách đổi giao diện theo dịp mà không cần người làm giao diện; mọi thứ là dữ liệu đã kiểm nên trang vẫn đúng
+thương hiệu và an toàn; giá trị chọn sẵn ở máy chủ và cache tới đúng mốc đổi nên đường đọc công khai không thêm query.
+
+Đã cân nhắc: chồng nhiều bản chủ đề cùng lúc — kết quả khó đoán, khó cache; cho khách viết CSS tự do — phá thương hiệu,
+mở đường chèn mã, đã có khối mã tự viết cách ly (D-231) cho nhu cầu đặc biệt; để giao diện tự tính lịch — mỗi giao
+diện tính một kiểu, lệch múi giờ, cache CDN không biết lúc nào hết hạn; bảng riêng cho chủ đề mẫu — dữ liệu đi theo
+bản phát hành, nhúng binary đủ; lịch theo âm lịch tự tính — thêm thư viện cho vài ngày mỗi năm, ngày cụ thể đủ.
