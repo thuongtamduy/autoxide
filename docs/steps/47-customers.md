@@ -360,3 +360,10 @@ Cả SQLite và Postgres, `TestApp` với `orders` và module nền thật; `Not
 - Thưởng giới thiệu mặc định: khuyến nghị điểm (không cần thẻ quà tặng đã bật).
 - Nếu bước 45 chưa thêm `contact_key` vào kernel: thêm ở bước này (một hàm, có test hai khách cho hai
   khoá khác nhau) và ghi quyết định.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Gộp danh sách đã lưu khi đăng nhập (B-c13, thấp).** `POST /me/wishlist/merge {items}` gộp danh sách
+  yêu thích lưu ở trình duyệt vào tài khoản, bỏ trùng.

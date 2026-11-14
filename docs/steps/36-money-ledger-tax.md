@@ -730,3 +730,26 @@ Ghi mỗi quyết định vào `docs/DECISIONS.md` (skill `record-decision`).
   cấp cho ký hiệu đó; khuyến nghị theo `EInvoiceCapabilities::assigns_numbers` từng ký hiệu.
 - **Ánh xạ tài khoản "vn"** và hồ sơ xuất cho phần mềm kế toán cụ thể: chỉ đưa vào khi đối chiếu được nguồn
   công bố; không thì để hồ sơ chung và cho khách tự ánh xạ.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Thống nhất với 45, 46 (D-218, B-b3, B-3.2d).** Bộ tên tài khoản ở đây là bộ duy nhất; tiền thu hộ ghi
+  lúc thu vào `clearing.*`; phí sàn và khấu trừ thay ghi lúc `orders.order_completed`; `ledger_holds` là cơ
+  chế tạm giữ duy nhất — `api` thêm `Ledger::hold_status(source_module, source_id)` cho `marketplace`.
+- **Một hạn thanh toán (D-218, B-b10).** `AUTOXIDE_LEDGER_PAYMENT_EXPIRY_MINUTES` (30) là nguồn duy nhất,
+  kể cả VietQR; `api` trả `expires_at` cho `orders`.
+- **COD (D-216, B-b1).** `ledger_flow_settings.cod_remittance` (`partner_collection` / `seller_direct`):
+  tiền COD về tài khoản thu hộ của đối tác hay thẳng người bán, **không bao giờ** về tài khoản của nhà vận
+  hành sàn; `seller_direct` thì phí và khấu trừ thay thu bằng hoá đơn phí định kỳ hay công nợ
+  (`receivable.seller[S]`).
+- **Mã số thuế 12 số (B-c11).** Hồ sơ thuế nhận cả mã số thuế 10 / 13 số và số định danh cá nhân 12 số dùng
+  làm mã số thuế (TT 86/2024/TT-BTC — **cần đối chiếu văn bản gốc**). Tuỳ chọn trait
+  `TaxpayerDirectory::lookup(tax_id)` (bản giả cho test; bản nối thật cần tài khoản đối tác — khi đó dừng
+  lại hỏi chủ dự án).
+- **Bút toán theo chứng từ nguồn (B-c12).** `GET /api/v1/ledger/entries?source_module&source_id`
+  (`ledger.entries.read`, phạm vi theo nút).
+- **Phí sàn và khấu trừ thay (B-3.2e, f).** Hoá đơn phí sàn tách thuế GTGT riêng; khấu trừ thay chỉ áp cho
+  hộ và cá nhân kinh doanh, doanh nghiệp tự kê khai (theo `tax_profile.kind`). Căn cứ NĐ 117/2025/NĐ-CP —
+  **cần đối chiếu văn bản gốc**.

@@ -325,3 +325,42 @@ Test đã có (cả hai database): `flag_ghi_lai_cung_key_la_ghi_de`, `khong_doc
 ### P4 — Định nghĩa số liệu (chưa làm)
 
 Xem `SummaryMetric::definition` và trường `definition` ở mục P4 phía trên; làm cùng P4.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+### P15 — Job API chung (D-213, A-b2, A-c1)
+
+`GET /api/v1/kernel/jobs?status=&kind=&org_id=` (job người gọi được xem: của mình, hay theo permission
+`kernel.jobs.read` trong phạm vi nút), `GET /api/v1/kernel/jobs/{id}` (`status`, `progress` {done, total},
+`result`, `file` {url ký có hạn, size, expires_at}), `POST /api/v1/kernel/jobs/{id}/retry`
+(`kernel.jobs.manage`, có audit). File kết quả giữ `AUTOXIDE_JOBS_FILE_RETENTION_DAYS` (mặc định 7). P8
+dùng endpoint này cho tiến độ thao tác hàng loạt.
+
+### P16 — Xuất danh sách theo bộ lọc (D-213, A-b8, B-c6)
+
+`POST /api/v1/kernel/exports {resource, params, columns, format: csv}`: `params` kiểm theo schema bộ lọc của
+P7, chạy bằng job (P15), ghi CSV qua `autoxide_kernel::csv` (chống CSV injection), xong thì báo qua
+`notifications`. Module khai danh sách xuất được qua `Module::exports` (`resource`, cột, permission, hàm đọc
+theo lô) — mặc định rỗng (D-038). Thay cho xuất riêng của `forms`, `catalog` (41:237), `orders`.
+
+### P12 bổ sung — Yêu cầu duyệt đầy đủ (D-213, A-c2)
+
+`GET /api/v1/kernel/approvals?status=`, `GET /api/v1/kernel/approvals/{id}`, `POST …/approve`, `POST
+…/reject {reason}`; event `kernel.approval_decided` (agent biết kết quả mà không hỏi lại liên tục); tool MCP
+`list_approvals`, `get_approval` (`read_only`), `decide_approval`. `ModuleTool` thêm
+`requires_approval_for_agent` (A-c12).
+
+### P7 bổ sung — Bộ lọc nội dung (A-c5)
+
+Bài viết: `review=pending`, `scheduled=true`, `ai_generated=true`, `missing_locale=<locale>`; media:
+`missing_alt=true` (kể cả thiếu bản dịch `alt` của một ngôn ngữ, D-202). Khai trong schema bộ lọc như mọi
+bộ lọc khác.
+
+### Nhỏ (A-c10, A-c11)
+
+- `DELETE /api/v1/me/work/{key}/snooze` (bỏ hoãn).
+- `GET /api/v1/kernel/settings` thêm `last_used_at`, `last_error` cho mỗi cài đặt có nối ra ngoài; `POST
+  /api/v1/kernel/settings/{name}/test` gọi thử qua trait của module (không trong transaction ghi).
+- P10: hộp việc không có "Đã xử lý" (D-212).

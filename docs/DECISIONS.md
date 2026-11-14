@@ -5064,3 +5064,118 @@ mỗi module tự làm. Câu định nghĩa số liệu nằm cạnh code tính 
 Đã cân nhắc: đặt endpoint dưới `/api/v1/kernel/me/flags` — đúng quy tắc tiền tố module nhưng đường dẫn
 "của tôi" rải rác theo module; đặc tả 51 đã dùng `/api/v1/me/…` nên gom về một tiền tố; lưu cờ trong
 `auth` — kernel không được phụ thuộc module `auth`, và các endpoint `/me` khác của bước 51 là của kernel.
+
+## D-208 · Nội dung và media theo website, theo nút tổ chức (H1) — 2026-11-14 — agent quyết
+
+Quyết định: `content` và `media` có `org_id` (nút sở hữu); `forms` có `org_id` tuỳ chọn. Quyền theo độ sâu
+(bước 34) áp cho chúng. Đọc công khai lọc theo website: tên miền → nút qua `kernel_tenant_domains.org_id`
+(bước 33); menu và ngôn ngữ bật theo website. Bộ lọc quản trị `owner_org`, `site`. Thay câu "`org_id` chỉ
+thêm vào `notes`; `content`, `media`, `forms`… giữ dữ liệu cấp khách" ở `docs/steps/34-organizations-identity.md`
+bằng mục "Bổ sung theo D-208"; `newsletter`, `comments` vẫn cấp khách.
+
+Lý do: mô hình chuỗi và sàn của D-185 cần cửa hàng và người bán có bài, trang, ảnh riêng (A-b1, A-c3 trong
+`docs/research/ui-trace/A-nen-tang.md`). Câu cũ do agent quyết ở đặc tả 34, không phải chủ dự án.
+
+Đã cân nhắc: một khách riêng cho mỗi website — mất báo cáo và quản trị chung của chuỗi; thẻ "website" tự do
+trên bài — không có quyền theo nhánh.
+
+## D-209 · "Chờ xác nhận" đơn là chính sách theo nút (H2) — 2026-11-14 — agent quyết
+
+Quyết định: `orders_policies.acceptance_hours` (mặc định 0 = tự xác nhận như đặc tả 45 hiện tại). Khác 0
+thì đơn đã thanh toán / COD chờ cửa hàng hay người bán bấm nhận; quá hạn tạo việc trong hộp việc (bước 51)
+rồi huỷ theo chính sách, hoàn tiền tự động, tính vào `cancelled_by_seller` của bước 46. Sàn đặt mức cho
+người bán (kế thừa theo cây).
+
+Lý do: sàn ở Việt Nam thường buộc người bán nhận đơn; chỉ số `cancelled_by_seller` cần mốc này (B-b6).
+
+## D-210 · Tách nhánh thành khách riêng, chuyển database: chỉ nhân sự nền tảng (H3) — 2026-11-14 — agent quyết
+
+Quyết định: khách chỉ "gửi yêu cầu" tách / chuyển. Mặt điều khiển có API job cho nhân sự nền tảng:
+`POST /api/v1/kernel/placements/migrations`, `POST /api/v1/kernel/tenants/{id}/moves`, `dry_run` mặc định
+`true`, tiến độ qua job API chung (D-213). CLI (`autoxide tenant split|merge|move`) vẫn là cách chính.
+
+Lý do: việc không hoàn tác được trên dữ liệu nhiều khách; đặc tả 38:286 đã để CLI là chính (A-c6).
+
+## D-211 · Khách tự thu hồi quyền vào hỗ trợ (H4) — 2026-11-14 — agent quyết
+
+Quyết định: giữ `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` mặc định 8, khoảng 1–72 như đặc tả 34. Thêm: quản
+trị của khách tự thu hồi một lần cấp đang còn hạn (`DELETE /api/v1/auth/support-access/{id}`, permission
+`auth.support_access.revoke` ở khách), event `auth.support_access_revoked` mang `revoked_by_tenant`. Lần cấp
+theo yêu cầu cơ quan có thẩm quyền (`legal_request`) không thu hồi được từ phía khách.
+
+Lý do: khách phải kiểm soát được ai đang vào dữ liệu của mình (Luật 91/2025 — cần đối chiếu văn bản gốc).
+
+## D-212 · Hộp việc không có nút "Đã xử lý" (H5) — 2026-11-14 — agent quyết
+
+Quyết định: việc tự hết khi bản ghi gốc xử lý xong; người dùng chỉ Hoãn và Giao (P10 bước 51). Không có
+trạng thái "đã xử lý" hay "bỏ qua" lưu riêng. Thiết kế đã sửa màn hình theo.
+
+Lý do: việc tính từ dữ liệu (51:99); đánh dấu tay làm hộp việc lệch dữ liệu thật.
+
+## D-213 · Job API chung, xuất danh sách chung, yêu cầu duyệt đầy đủ (bước 51) — 2026-11-14 — agent quyết
+
+Quyết định: kernel có `GET /api/v1/kernel/jobs?status=&kind=`, `GET …/{id}` (`progress`, `result`, `file`),
+`POST …/{id}/retry` (audit), permission `kernel.jobs.read` / `kernel.jobs.manage`; file kết quả giữ có hạn,
+tải bằng link ký. Xuất danh sách dùng chung (bộ lọc theo schema P7 → job → CSV qua `autoxide_kernel::csv`
+→ báo xong qua `notifications`); module khai cột xuất được, không tự làm xuất riêng. Yêu cầu duyệt (P12) có
+`GET /api/v1/kernel/approvals?status=`, `GET …/{id}`, `POST …/reject {reason}`, event
+`kernel.approval_decided`, tool MCP tương ứng.
+
+Lý do: P8 (51:239) đã dẫn tới job API mà chưa định nghĩa; forms, catalog (41:237), orders đều cần xuất (A-b2,
+A-b8, A-c1, A-c2, B-c6).
+
+## D-214 · Không chat với người bán trong core; huy hiệu chỉ từ dữ liệu có thật (H6) — 2026-11-14 — agent quyết
+
+Quyết định: "Chat với người bán" vẫn ở "Sau core" (D-194). Huy hiệu người bán tin cậy (bước 46, 52) không
+dùng "tỉ lệ trả lời tin nhắn" — chỉ chỉ số có dữ liệu trong core (giao đúng hạn, huỷ do người bán, đánh giá,
+tranh chấp thua, thời gian trả lời phiếu hỗ trợ của bước 53 khi có).
+
+Lý do: không có tin nhắn thì chỉ số đó là bịa (B-b11).
+
+## D-215 · Thời điểm lập hoá đơn mặc định khi giao xong (H7) — 2026-11-14 — agent quyết
+
+Quyết định: `orders_policies.invoice_timing` thêm `on_delivered` và lấy làm mặc định; `on_complete` chỉ dùng
+khi khách có căn cứ; giữ `on_confirm`, `on_request`. Căn cứ: NĐ 123/2020/NĐ-CP Điều 9 (thời điểm lập hoá đơn
+khi bán hàng hoá là thời điểm chuyển giao quyền sở hữu hay quyền sử dụng), sửa bởi NĐ 70/2025/NĐ-CP — **cần
+đối chiếu văn bản gốc**.
+
+Lý do: giao xong là lúc chuyển giao hàng hoá với đa số đơn thương mại điện tử (B-b5).
+
+## D-216 · COD và nhiều chế độ dòng tiền trong một checkout (H8, H9) — 2026-11-14 — agent quyết
+
+Quyết định: (1) tiền COD **không bao giờ** về tài khoản của nhà vận hành sàn — về tài khoản thu hộ của đối
+tác có giấy phép, hoặc thẳng về người bán. Người bán tự thu COD thì phí sàn và khấu trừ thay thu bằng hoá đơn
+phí định kỳ hoặc công nợ. Cột `ledger_flow_settings.cod_remittance`; lỗi `marketplace.cod_flow_unsupported`;
+event `shipping.cod_settled` mang `seller_org_id`. Căn cứ: NĐ 52/2024/NĐ-CP (thanh toán không dùng tiền
+mặt), NĐ 117/2025/NĐ-CP (khấu trừ thuế của nền tảng) — **cần đối chiếu văn bản gốc**. (2) Một giỏ có nhiều
+nút: chỉ một mã QR khi mọi nút cùng đối tác thu hộ; khác chế độ thì checkout trả `payment_actions[]`, mỗi
+chế độ một mục, giao diện hiện từng bước.
+
+Lý do: D-187 — core không giữ tiền người mua (B-b1, B-b2).
+
+## D-217 · Yêu cầu dữ liệu cá nhân người dùng tự làm không cần duyệt (H10) — 2026-11-14 — agent quyết
+
+Quyết định: xuất và xoá dữ liệu mà người dùng tự bấm trong tài khoản chạy ngay, không qua duyệt. Sổ yêu cầu
+của chủ thể dữ liệu (`compliance_subject_requests`, có hạn trả lời là dữ liệu có ngày hiệu lực) chỉ dành cho
+yêu cầu qua kênh khác (email, thư, cơ quan). Căn cứ hạn trả lời: Luật 91/2025/QH15, NĐ 356/2025 — **cần đối
+chiếu văn bản gốc**.
+
+Lý do: người dùng đã xác thực tự làm thì không cần người trung gian (A-b3).
+
+## D-218 · Thống nhất tiền giữa bước 36, 45, 46: tên tài khoản, tạm giữ, hạn thanh toán — 2026-11-14 — agent quyết
+
+Quyết định: theo luật "đặc tả của module cung cấp hợp đồng thắng" (`docs/steps/README.md`):
+
+1. Bộ tên tài khoản của đặc tả 36 (`clearing.gateway`, `clearing.carrier_cod`, `payable.seller_held[S]`,
+   `payable.seller_available[S]`, `revenue.*`, `tax.*`…) là bộ duy nhất; bảng bút toán của đặc tả 46
+   (`buyer_prepayments`, `seller_payable:<seller>`…) viết lại theo tên đó khi làm bước 46.
+2. Tiền thu hộ ghi lúc thu vào `clearing.*` của đối tác; phí sàn và khấu trừ thay ghi lúc
+   `orders.order_completed` (như đặc tả 46).
+3. Một cơ chế tạm giữ: `ledger_holds` của 36. `marketplace_settlements.hold_until` bỏ; trạng thái giữ / được
+   rút đọc từ `ledger_holds` qua `api` của `ledger`.
+4. Một hạn thanh toán: `AUTOXIDE_LEDGER_PAYMENT_EXPIRY_MINUTES` (36, mặc định 30) là nguồn duy nhất cho mọi
+   thanh toán `pending`, kể cả VietQR; đặc tả 45 bỏ giá trị 1440 riêng và đọc hạn từ `ledger`. Chuyển khoản
+   chậm hơn hạn vẫn được khớp vào hàng chờ sai lệch của 36, không mất tiền.
+
+Lý do: ba đặc tả viết song song nên lệch (B-b3, B-b10, B-3.2d, B-c12); để lệch thì bước 46 sẽ ghi hai bút
+toán cho cùng một đồng tiền.

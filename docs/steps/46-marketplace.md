@@ -364,3 +364,18 @@ Cả SQLite và Postgres; `TestApp` với `orders` và các module nền thật,
   dạng mẫu khi có văn bản gốc; ghi quyết định.
 - Có cho người bán tự chọn lịch chi trả không: khuyến nghị không — lịch của sàn, giống nhau cho mọi
   người bán.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Bút toán và tạm giữ (D-218).** Bảng bút toán của đặc tả này viết lại theo tên tài khoản của 36 khi làm;
+  `marketplace_settlements.hold_until` bỏ, trạng thái giữ đọc từ `ledger_holds` (`Ledger::hold_status`).
+- **COD (D-216, B-b1, B-c1).** Người bán chọn `cod_remittance`; sàn không nhận tiền COD vào tài khoản của
+  mình — chế độ không hỗ trợ trả 422 `marketplace.cod_flow_unsupported`; với `seller_direct`, phí sàn và khấu
+  trừ thay thu bằng hoá đơn phí định kỳ hay công nợ của người bán.
+- **Người bán công khai, đánh giá theo người bán, theo dõi gian hàng (B-b8, B-c4).** `GET /public/sellers`
+  (lọc, phân trang), `GET /public/sellers/{slug}/reviews` (gom từ đánh giá của `orders`), `POST/DELETE
+  /me/followed-sellers/{slug}`; bảng `marketplace_followers` (`tenant_id`, `seller_org_id`, `user_id`,
+  `created_at`); báo hàng mới của gian hàng qua `notifications` loại `Marketing` — cần đồng ý riêng.
+- **Huy hiệu tin cậy (D-214, B-b11).** Chỉ chỉ số có dữ liệu thật; không "tỉ lệ trả lời tin nhắn".

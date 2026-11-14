@@ -685,3 +685,23 @@ trợ" trên trang đơn (có tài khoản và vãng lai) gọi `SupportIntake::
 `links = ["orders.order:<id>"]`, `reference = "orders.order:<id>:<Idempotency-Key>"`. `support` chưa cài thì
 endpoint trả 404 `orders.support_unavailable` và đơn không hiện nút (đọc qua `Subscription::optional` /
 điểm nối tuỳ chọn). Không còn event `orders.support_requested`.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Chính sách đơn (D-209, D-215, B-b5, B-b6, B-c8).** `orders_policies`: `invoice_timing` thêm
+  `on_delivered` làm **mặc định**; `buyer_cancel_until` thêm `preparing`; thêm `allowed_return_reasons`
+  (danh sách mã); thêm `acceptance_hours` (0 = tự xác nhận). Đơn chờ nhận quá hạn → việc trong hộp việc, rồi
+  huỷ, hoàn tiền tự động, event `orders.order_cancelled` với `cause = seller_not_accepted`.
+- **Nhiều chế độ dòng tiền trong một checkout (D-216, B-b2, B-c2).** Checkout trả `payment_actions[]` (mỗi
+  chế độ dòng tiền một mục: `kind`, `amount`, `qr`/`redirect_url`/`cod`); một mã QR duy nhất khi mọi nút cùng
+  đối tác thu hộ.
+- **Nhận tại cửa hàng (B-c7).** `POST /api/v1/orders/{id}/pickup/ready` (gửi mã nhận 6 số cho người mua),
+  `POST …/pickup/handover {code | proxy_name, proxy_phone}`, lọc `GET /api/v1/orders?pickup_org_id&pickup_status`.
+- **Chứng từ của người mua (B-c5).** `GET /me/orders/{id}/documents` (hoá đơn, phiếu bảo hành, biên bản trả
+  hàng) và bản dùng token xem đơn vãng lai.
+- **Giỏ bỏ dở, link thanh toán, xuất đơn (B-b9, B-c6).** `GET /api/v1/orders/carts?status=abandoned`,
+  `POST /api/v1/orders/{id}/payment-link` (gửi lại link thanh toán còn hạn của `ledger`); xuất đơn đi qua
+  xuất chung của bước 51 (D-213), không có endpoint xuất riêng.
+- **Hạn thanh toán (D-218).** Bỏ giá trị 1440 phút riêng của bước này; đọc `expires_at` từ `ledger`.

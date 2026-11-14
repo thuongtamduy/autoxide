@@ -518,3 +518,20 @@ Ghi DECISIONS cho lựa chọn có ảnh hưởng lâu dài (skill `record-decis
 7. Database `dedicated` khi cấp phát: tạo mới (SQLite: file trong thư mục cấu hình; Postgres: `CREATE
    DATABASE` bằng URL quản trị) hay lấy từ danh sách dựng sẵn — theo cách bước 33 làm; Postgres cần quyền
    `CREATEDB`, ghi trong `docs/DEPLOY.md`.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Xuất toàn bộ dữ liệu một khách (A-b9).** `POST /api/v1/kernel/tenants/{id}/exports` chạy job gom
+  bản xuất của mọi module (dùng cơ chế backup / `PersonalData` mở rộng theo khách) thành gói tải về qua link
+  ký có hạn; nhà vận hành và quản trị của chính khách đều gọi được; tự đề nghị khi khách huỷ thuê bao, giữ
+  gói trong `AUTOXIDE_PLANS_EXPORT_RETENTION_DAYS` (mặc định 30).
+- **Tạm khoá khác chỉ đọc (A-3.11).** Thuê bao quá hạn → khách `read_only` (bước 33). Thêm `POST
+  /api/v1/plans/tenants/{id}/subscription/suspend` cho nhân sự nền tảng khi cần khoá hẳn (đặt
+  `kernel_tenants.status = suspended`), có lý do và audit.
+- **Hạn mức nút (A-3.12).** Hạn mức `organizations.units` đếm **mọi nút trừ gốc**; hạn mức theo loại khai
+  riêng (`organizations.units.<loại>`, vd `organizations.units.store`) khi gói cần giới hạn số cửa hàng.
+- **Danh sách khách (A-c7).** Cung cấp `subscription_status`, `near_limit` cho bộ lọc của bước 33.
+- **Thấp (A-b10, B-b14).** Thông báo của nền tảng tới quản trị mọi khách (qua `notifications`, loại
+  `Security` / `Transactional`); liên hệ hỗ trợ của nền tảng hiện trong tài khoản khách.

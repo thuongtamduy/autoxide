@@ -431,3 +431,12 @@ hàng. Cache ngắn theo (sản phẩm, tỉnh). Test: kết quả bằng `quote
 theo phương thức, ngày lễ là dữ liệu có ngày hiệu lực (`shipping_calendars`). Nhận tại cửa hàng trả
 `ready_at` = giờ đặt + `prep_hours` lùi tới giờ mở cửa kế tiếp (hồ sơ công khai của nút, bước 34) và
 `hold_days`. Khoảng dài hơn 7 ngày thì ghi rõ lý do (hàng đặt trước, vùng xa).
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **GTGT trên phí giao (B-b5, B-c9).** `shipping_methods.tax_category`; báo giá trả dòng thuế cho phí giao,
+  `orders` ghi dòng thuế đó lên hoá đơn. Căn cứ Luật Thuế GTGT 48/2024/QH15 — **cần đối chiếu văn bản gốc**.
+- **COD (D-216).** Event `shipping.cod_settled` mang `seller_org_id` và tài khoản nhận (đối tác thu hộ hay
+  người bán), để `ledger` ghi đúng chỗ.

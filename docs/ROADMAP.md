@@ -625,6 +625,9 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
       chưa migrate xong thì chỉ các khách trên nó nhận lỗi `tenant_maintenance` (503), các khách khác
       chạy bình thường; `migrate --all` chạy lại được từ chỗ dừng; worker chia lượt công bằng giữa
       các khách trong database chung (một khách không chiếm hết job queue)
+- [ ] Đối chiếu thiết kế 2 (D-210, D-218 mục 33): cấu hình nghiệp vụ của module theo khách (`Module::tenant_settings`
+      cho `comments`, `forms`, `content`, `media`); `GET /kernel/tenants` có lọc và `expand`; API job di chuyển
+      database chỉ cho nhân sự nền tảng, dry-run mặc định; tách "tạm khoá" (chặn mọi route) khỏi "chỉ đọc"
 
 ## 34. Tổ chức, quyền theo độ sâu, danh tính (D-185)
 
@@ -670,6 +673,10 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 - [ ] Tạo tài khoản từ số điện thoại đã xác thực qua tra đơn vãng lai (D-202; làm cùng bước 45 khi
       `orders` có token xem đơn): `POST /api/v1/auth/phone-signups`, đăng nhập bằng passkey hay OTP, không
       bắt buộc mật khẩu
+- [ ] Đối chiếu thiết kế 2 (D-208, D-211): `org_id` cho `content`, `media` (`forms` tuỳ chọn), quyền theo độ
+      sâu, công khai theo website; xác nhận lại danh tính `POST /auth/me/reauth` thay `current_password`;
+      ngôn ngữ và múi giờ ưa thích; khách tự thu hồi quyền vào hỗ trợ; `memberships?inherited=true`;
+      bắt buộc MFA theo role, `last_login_at"
 
 ## 35. Gói, quyền dùng tính năng, hạn mức, thuê bao (D-185)
 
@@ -691,6 +698,9 @@ chờ KYC của bước 37 — làm hai mục đó sau cùng. Giá, kỳ thanh t
       bằng tài khoản của nhà vận hành nền tảng
 - [ ] Cấp phát: khách tự đăng ký (kèm KYC khi gói yêu cầu, bước 37) → tạo khách → chọn vị trí dữ
       liệu theo gói → migrate → dữ liệu mẫu → mời quản trị; lệnh CLI và API tương ứng
+- [ ] Đối chiếu thiết kế 2: xuất toàn bộ dữ liệu một khách bằng job khi huỷ thuê bao; `suspend` thuê bao
+      cho nhân sự nền tảng; hạn mức nút đếm mọi nút trừ gốc, hạn mức theo loại nút khai riêng; thông báo
+      của nền tảng tới quản trị mọi khách
 
 ## 36. Tiền, sổ cái, thuế, chứng từ (D-187, D-188)
 
@@ -733,6 +743,10 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
       i18n, xuất HTML và PDF — chọn thư viện sau khi kiểm, ghi `STACK.md`
 - [ ] Xuất dữ liệu kế toán: sổ nhật ký chung và chứng từ theo kỳ ra CSV / Excel theo định dạng nhập
       của phần mềm kế toán phổ biến, để kế toán của khách không nhập lại tay
+- [ ] Đối chiếu thiết kế 2 (D-216, D-218): một bộ tên tài khoản, một cơ chế tạm giữ (`ledger_holds`), một
+      hạn thanh toán cho cả VietQR; `cod_remittance` (COD không về tài khoản nhà vận hành sàn); mã số thuế 12
+      số (TT 86/2024 — cần đối chiếu); `GET /ledger/entries?source_module&source_id`; phí sàn tách GTGT,
+      khấu trừ thay chỉ cho hộ / cá nhân (NĐ 117/2025 — cần đối chiếu)
 
 ## 37. Tuân thủ pháp luật Việt Nam (D-186)
 
@@ -784,6 +798,9 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       điều kiện, vòng lặp, giới hạn chạy, luôn thoát HTML, kiểm biến theo schema lúc lưu); mail HTML theo
       khung MJML có thương hiệu của khách, luôn kèm bản chữ thuần; nháp / xuất bản / quay lại phiên bản,
       xem trước, gửi thử tới địa chỉ của chính người gọi; `newsletter` cá nhân hoá từng người nhận
+- [ ] Đối chiếu thiết kế 2 (D-217): sổ yêu cầu của chủ thể dữ liệu qua kênh khác, có hạn là dữ liệu (Luật
+      91/2025 — cần đối chiếu); KYC `needs_info`; số người chấp nhận theo phiên bản văn bản; bản nháp thông
+      báo sự cố; đối chiếu "bán trước khi thông báo website" bị cấm hay bị phạt rồi mới chọn chặn hay nhãn
 
 ## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
 
@@ -798,6 +815,7 @@ Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 3
       liệu cha → con (vd danh mục, bảng giá) gọi service của con, chạy lại được, không trùng
 - [ ] Tách một nhánh tổ chức thành khách riêng (database riêng) và gộp ngược lại, giữ ID và lịch sử;
       test trên cả hai database
+- [ ] Đối chiếu thiết kế 2 (D-210): tách / gộp khách qua API chỉ cho nhân sự nền tảng, khách chỉ gửi yêu cầu
 
 ## 39. Vận hành và hiệu năng (chủ dự án giao ngày 13/11/2026; số cũ 33, D-189)
 
@@ -954,6 +972,9 @@ bước 35.
 - [ ] Hỏi đáp và ảnh song ngữ (D-202): đăng ký `catalog.product` vào sổ đối tượng, bộ tính nhãn
       `seller` (permission quản lý sản phẩm ở nút sở hữu) và event vòng đời (lưu trữ / xoá → đóng và ẩn
       hỏi đáp); `catalog_product_media` ghi đè `alt` theo ngôn ngữ như `media_alt_translations`
+- [ ] Đối chiếu thiết kế 2: sản phẩm của người bán trên website của chuỗi (`seller`, `sold_by`, facet,
+      `ProductCard.seller`), `warranty_months`, điểm cắm `set_listing_gate`; giá sau giảm tự động và lọc
+      `on_sale`; "thường mua cùng"
 
 ## 42. Kho (`inventory`)
 
@@ -1002,6 +1023,8 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 - [ ] Giá khi áp mã cho từng sản phẩm (D-200): endpoint công khai trả các mã công khai áp được cho một
       sản phẩm / biến thể, giá sau mã, điều kiện, số lượt còn lại — để trang sản phẩm hiện "còn X với mã
       …"; giá niêm yết vẫn là giá không mã (mã phải nhập thì không hiện như giá đã giảm)
+- [ ] Đối chiếu thiết kế 2: event giá sau giảm tự động cho danh sách công khai; flash sale công khai với
+      suất còn là số thật; điều kiện `first_order_only"
 
 ## 44. Vận chuyển (`shipping`)
 
@@ -1023,6 +1046,8 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
       cửa hàng trả giờ sẵn sàng (thời gian chuẩn bị + giờ mở cửa của bước 34) và số ngày giữ hàng
 - [ ] Ước tính phí giao công khai (D-200): theo tỉnh và một sản phẩm / số lượng, chưa cần giỏ, cho trang
       sản phẩm; cùng bảng phí với báo giá của `orders`, ghi rõ "ước tính", ngưỡng miễn phí
+- [ ] Đối chiếu thiết kế 2 (D-216): thuế GTGT trên phí giao (Luật 48/2024 — cần đối chiếu);
+      `shipping.cod_settled` mang `seller_org_id` và nơi nhận tiền
 
 ## 45. Giỏ hàng, đặt hàng, đơn hàng (`orders`)
 
@@ -1071,6 +1096,10 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [ ] Nút "Đánh giá này hữu ích" (D-203): mỗi người một phiếu, rút lại được, đếm cùng transaction,
       `sort=helpful` phân trang bằng con trỏ; không tự bỏ phiếu cho mình, người bán không bỏ phiếu cho sản
       phẩm của mình; không có nút "không hữu ích"
+- [ ] Đối chiếu thiết kế 2 (D-209, D-215, D-216, D-218): `invoice_timing = on_delivered` mặc định,
+      `buyer_cancel_until = preparing`, `allowed_return_reasons`, `acceptance_hours`; `payment_actions[]` khi
+      giỏ nhiều chế độ dòng tiền; nhận tại cửa hàng (mã 6 số, giao cho người nhận hộ); chứng từ của người
+      mua; giỏ bỏ dở, gửi lại link thanh toán; xuất đơn qua xuất chung; hạn thanh toán đọc từ `ledger"
 
 ## 46. Sàn (`marketplace`)
 
@@ -1091,6 +1120,9 @@ Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nú
 - [ ] Cung cấp thông tin người bán và doanh thu cho cơ quan thuế theo kỳ (NĐ 117/2025 — cần đối
       chiếu mẫu và hạn); kho của sàn (sàn nhận hàng của người bán, đóng gói, giao — tồn theo người bán
       trong kho của sàn)
+- [ ] Đối chiếu thiết kế 2 (D-214, D-216, D-218): bút toán theo tên tài khoản của 36, tạm giữ qua
+      `ledger_holds`; COD không về tài khoản sàn; danh sách người bán công khai, đánh giá theo người bán, theo
+      dõi gian hàng (đồng ý riêng cho tin hàng mới); huy hiệu chỉ từ dữ liệu thật
 
 ## 47. Khách hàng và giữ chân khách (`customers`)
 
@@ -1107,6 +1139,7 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
       thẻ trả trước (D-194); số dư là nghĩa vụ trong sổ cái
 - [ ] Danh sách yêu thích, sản phẩm vừa xem; nhắc giỏ hàng bỏ dở qua `notifications` — chỉ khi người
       mua đã đồng ý nhận tin quảng cáo (bước 37); giới thiệu bạn bè có thưởng
+- [ ] Đối chiếu thiết kế 2: gộp danh sách yêu thích của trình duyệt vào tài khoản khi đăng nhập
 
 ## 48. Bán đa kênh (`channels`)
 
@@ -1215,6 +1248,11 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
 - [ ] Định nghĩa số liệu tóm tắt (D-207): `SummaryMetric::definition` (i18n key, mặc định `None`),
       `GET /api/v1/kernel/summary` trả `definition` đã dịch; gate kiểm mọi số liệu đều khai và có bản dịch
       — làm cùng mục số liệu tóm tắt (P4)
+- [ ] Đối chiếu thiết kế 2 (D-212, D-213): job API chung (danh sách, chi tiết có tiến độ và file, chạy lại
+      có audit); xuất danh sách theo bộ lọc dùng chung (CSV qua job); yêu cầu duyệt đầy đủ (danh sách, từ
+      chối, event `kernel.approval_decided`, tool MCP); bộ lọc nội dung (`review`, `scheduled`,
+      `ai_generated`, `missing_locale`, `missing_alt`); bỏ hoãn việc; thử cài đặt nối ngoài; hộp việc không
+      có "Đã xử lý"
 
 ## 52. Trải nghiệm quản trị nâng cao (D-201)
 
@@ -1235,6 +1273,8 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
       số; lọc theo `actor_kind` và theo key; dòng của lệnh nhận `202 approval_required` giữ `approval_id`
 - [ ] Sức khoẻ người bán và sức khoẻ tuân thủ: chỉ số so với ngưỡng (ngưỡng là dữ liệu có ngày hiệu lực),
       vi phạm, hạn phải xử lý; huy hiệu người bán tin cậy tính từ số liệu thật, công bố tiêu chí
+- [ ] Đối chiếu thiết kế 2: tên endpoint bàn kỹ thuật, event theo bản ghi đọc từ audit, `kernel.devtools.manage`,
+      `request_id` / `trace_id` trong nhật ký; trợ lý AI trong quản trị chạy tool MCP với quyền người gọi
 
 ## 53. Hỗ trợ khách hàng (`support`) (chủ dự án giao ngày 13/11/2026, D-204)
 

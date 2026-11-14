@@ -656,3 +656,23 @@ mặc định trên placement riêng — phủ chế độ `multi` cho mọi tes
 - Bộ canh SQL trong test (callback của SeaORM) — khuyến nghị làm nếu API của bản ghim cho phép.
 - Giới hạn mặc định của pool / số database mở; TTL cache — đo rồi chỉnh, ghi số.
 - Tên hàm chuyển tiếp trong phần A4 — miễn là `#[doc(hidden)]`, bị `#[deprecated]` ở B14 và xoá đầu bước 34.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Cấu hình hành vi module theo khách (A-b7).** Áp `Module::tenant_settings` cho cấu hình nghiệp vụ của
+  module đang có: từ cấm, từ nghi ngờ, số link tối đa, chế độ duyệt của `comments`; hạn lưu bài nộp của
+  `forms`; ngôn ngữ bật và ngôn ngữ mặc định của `content`; ngôn ngữ dịch `alt` của `media`. Biến môi trường
+  hiện có thành **giá trị mặc định** cho mọi khách; khách ghi đè qua `PUT /api/v1/kernel/tenants/{id}/settings/{key}`.
+- **Danh sách khách cho mặt điều khiển (A-c7).** `GET /api/v1/kernel/tenants` thêm lọc `placement_kind`,
+  `schema_state`, `subscription_status`, `near_limit=true` và `expand=placement,subscription,usage` — một
+  câu gọi cho cả trang, không gọi riêng từng dòng.
+- **API job đội database (D-210, A-c6).** `POST /api/v1/kernel/placements/migrations {placement_id,
+  dry_run=true}`, `POST /api/v1/kernel/tenants/{id}/moves {target_placement_id, dry_run=true}` — chỉ nhân sự
+  nền tảng (`kernel.platform.manage`), chạy bằng job, tiến độ qua job API chung (D-213). CLI vẫn là cách chính.
+- **Tạm khoá khác chỉ đọc (A-3.11).** `kernel_tenants.status = suspended` (kernel chặn **mọi** route của
+  khách, kể cả đọc, trả 403 `tenant_suspended`) tách khỏi `read_only` (thuê bao quá hạn, bước 35: đọc được,
+  mọi lệnh ghi trả 402 `plans.subscription_past_due`). Hai cờ độc lập, một middleware kiểm cả hai.
+- Test thêm: `cau_hinh_module_theo_khach_ghi_de_bien_moi_truong`, `khach_tam_khoa_khong_doc_duoc`,
+  `khach_chi_doc_doc_duoc_khong_ghi_duoc`, `di_chuyen_khach_dry_run_khong_doi_gi`.
