@@ -204,3 +204,28 @@ Phần máy chủ cần thêm: đề bài cho teammate ở `docs/prompts/ui-help
 - Các khối lớn trong một trang dùng cùng bề rộng; khối hẹp hơn (biểu mẫu) là ngoại lệ có chủ đích.
 - Bộ kiểm tra tự động đo thêm: lấn lề, thẻ lẻ, dải cuộn ngang mà kéo dọc được; quét ở 360, 390, 430, 768,
   820, 1024, 1280, 1440px.
+
+## 8. Mặt tiền: điều hướng, trang sản phẩm, đặt hàng (14/11/2026)
+
+- **Thanh danh mục:**
+  - nút "Danh mục" đầu thanh;
+  - danh mục sản phẩm có biểu tượng;
+  - lối vào đặc biệt (Khuyến mại, sàn, Góc bếp) dồn phải, có màu riêng.
+  
+  Máy có chuột, từ 1024px: rê chuột hoặc dùng bàn phím mở bảng xổ (nhóm con, bán chạy, gợi ý), làm bằng CSS
+  thuần. Màn hẹp hơn: dải chip cuộn ngang. Trong sản phẩm thật, menu lấy từ backend (cách làm chờ chủ dự án
+  chọn).
+- **Hàng tab trên điện thoại:** thành lưới hiện đủ mọi mục (tên ngắn + dòng phụ), không giấu mục sau thanh
+  cuộn ngang.
+- **Đánh giá:**
+  - lọc theo sao, có ảnh, cỡ, chủ đề;
+  - sắp xếp;
+  - nút hữu ích và báo vi phạm;
+  - tên người mua rút gọn.
+- **Hỏi đáp:** ô tìm cạnh nút "Đặt câu hỏi" mở tại chỗ; câu trả lời ghi vai trò ("Cửa hàng", "Đã mua").
+- **Đặt hàng trên điện thoại:** tóm tắt đơn thu gọn thành một dải ở đầu trang; thanh tổng tiền và nút tiếp
+  tục cố định ở đáy màn hình.
+- **Trang chiến dịch có phong cách riêng:**
+  - dùng chung đầu trang và chân trang của site;
+  - chỉ phần thân đổi phong cách, gom CSS dưới một lớp gốc riêng;
+  - thông tin pháp lý ở chân trang giữ nguyên.
