@@ -111,6 +111,35 @@ Endpoint menu của `content` đã phát hành, nên không sửa hành vi cũ (
   - nhập menu cũ hai lần không nhân đôi;
   - thiếu ngôn ngữ thì dùng ngôn ngữ mặc định.
 
+## Bổ sung từ màn quản trị "Website › Menu" (đã vẽ, 14/11/2026)
+
+Màn quản trị đã vẽ theo đúng đề bài này. Khi vẽ thì lộ ra các điểm sau, cần chốt trong đặc tả:
+
+1. **Tìm đối tượng cho bộ chọn.** `ResourceResolver` cần thêm hàm tìm tuỳ chọn (theo loại, chữ, ngôn ngữ, giới hạn),
+   hoặc một endpoint tìm trong sổ đối tượng.
+2. **Danh sách loại đã đăng ký,** kèm cờ "có cây", để giao diện khoá "Tự lấy nhóm con" trước khi lưu.
+3. **Người quản trị xem tên của đối tượng chưa công khai.** D-150 đang để resolver trả tiêu đề rỗng khi không công
+   khai. Màn cần hiện "Workshop… · sẽ không hiện". Vì vậy API đọc menu cho người có `menus.read` trả kèm tiêu đề và
+   trạng thái của từng đích, hoặc ghi một ngoại lệ có lý do.
+4. **`content.term` có cài `children()` không** (danh mục nội dung có cấp cha con). Màn đang coi là có.
+5. **Bảng xổ "Danh mục" cần hai tầng** (mỗi danh mục một cột, kèm nhóm con của nó). Cần tham số `depth`, hoặc ghi rõ
+   giao diện gọi lồng.
+6. **Giá trị của các tập cố định:**
+   - bộ biểu tượng; màn dùng `grid pan pot knife glass bowl towel tag store book gift pin`;
+   - `highlight`: `none`, `sale`, `brand`;
+   - quy ước "mục cấp 1 có highlight thì dồn sang phải".
+7. **Mã lỗi:**
+   - ô Gợi ý (`feature_kind`, `feature_id`) dùng chung ba mã của `ref_kind` hay có mã riêng;
+   - thêm mã cho đường dẫn sai, vd `menus.invalid_url`.
+8. **Tên loại của cửa hàng công khai (bước 34).** Màn tạm dùng `organizations.store`.
+9. **Lệnh nhập menu cũ khi đã có menu mới cùng `key` và ngôn ngữ:** giữ nguyên, không ghi đè. Cần ghi lần nhập gần
+   nhất (thời điểm, người chạy, số mục) và một lần chạy thử (dry-run) để xem trước.
+10. **Thời hạn cache của API công khai.** Màn ghi "tối đa 60 giây".
+11. **Lưu bị 412:** cần đọc được phiên bản mới, hoặc có lịch sử phiên bản menu, để hiện khác biệt hai phía.
+12. **Ô Gợi ý có cho đặt tiêu đề riêng không.** Ví dụ mặt tiền ghi "Bộ sưu tập gốm Bát Tràng", còn tên đối tượng là
+    "Gốm Sứ Bát Tràng Xưa".
+13. **Tiêu đề đối tượng theo ngôn ngữ:** `resolve` cần nhận ngôn ngữ, để menu bản EN không phải tự đặt mọi nhãn.
+
 ## Báo cáo khi xong
 
 Báo cáo bằng tiếng Việt, lời thường, cho chủ dự án mới học Rust, gồm:
