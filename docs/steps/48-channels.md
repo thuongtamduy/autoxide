@@ -3,6 +3,9 @@
 > Lộ trình: `docs/ROADMAP.md` bước 48 · Thiết kế: `docs/research/business-foundation.md` mục 8 (bộ nối
 > đối tác là module riêng), mục 9 · Quyết định: D-187, D-191, D-194 · Đặc tả liên quan:
 > `docs/steps/45-orders.md` (`OrderIntake`), `docs/steps/42-…` (`inventory`)
+> Đã gộp các quyết định: D-204, D-222, D-223…D-227 (D-228).
+> Nguồn đối chiếu thiết kế đợt 2: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong
+> `docs/research/ui-traceability.md`.
 
 ## Mục tiêu
 
@@ -11,7 +14,9 @@ mà vẫn **một kho, một danh sách sản phẩm, đơn từ mọi nơi về
 `SalesChannel` để mỗi sàn / mạng xã hội là một module bộ nối riêng (làm khi có tài khoản thử, D-191);
 liên kết biến thể với mã trên từng kênh và giá riêng theo kênh; đồng bộ tồn có phần để dành cho từng
 kênh; đơn từ kênh vào `orders` với kênh nguồn, trừ kho chung, **không trùng khi kênh gửi lại**; báo cáo
-theo kênh; đối soát tiền kênh trả với sổ cái. Bộ nối giả (`fake`) chạy trong test.
+theo kênh; đối soát tiền kênh trả với sổ cái. Bộ nối giả (`fake`) chạy trong test. Ngoài các sàn, website
+công bố **nguồn cấp sản phẩm** (product feed) cho quảng cáo mua sắm của Google (Merchant Center) và danh mục
+sản phẩm của Meta (Facebook / Instagram) (D-204).
 
 ## Bắt đầu khi
 
@@ -25,8 +30,9 @@ theo kênh; đối soát tiền kênh trả với sổ cái. Bộ nối giả (`
 Crate mới `modules/channels` (`autoxide-channels`), đăng ký sau `orders`. Bố cục: `accounts/`,
 `listings/` (liên kết, giá theo kênh), `stock/` (phân bổ, đẩy tồn), `inbound/` (đơn vào, webhook,
 kéo đơn), `fulfillment.rs` (đẩy trạng thái giao lên kênh), `settlements/`, `registry.rs` (sổ bộ nối),
-cùng các file chuẩn (`lib.rs`, `api.rs`, `config.rs`, `permissions.rs`, `events.rs`, `entity/`,
-`migration/`, `http/`, `tools.rs`, `tests/` — bộ nối giả ở `tests/fake_channel.rs`).
+`feeds/` (nguồn cấp sản phẩm, D-204), cùng các file chuẩn (`lib.rs`, `api.rs`, `config.rs`,
+`permissions.rs`, `events.rs`, `entity/`, `migration/`, `http/`, `tools.rs`, `tests/` — bộ nối giả ở
+`tests/fake_channel.rs`).
 
 Sửa ngoài crate: `Cargo.toml`, `crates/app/Cargo.toml`, `crates/app/src/modules.rs`,
 `docs/openapi.json`, `.env.example`, `CHANGELOG.md`, `docs/ROADMAP.md`. Nếu `inventory::api` (bước 42)
@@ -85,10 +91,12 @@ Credentials giải mã từ kho secret theo khách ngay trước khi gọi, khô
 
 `channels_listings` ánh xạ (tài khoản, biến thể) ↔ (`external_item_id`, `external_sku`). Đăng sản phẩm
 từ `catalog` (`Catalog::snapshot` + nội dung, ảnh) lên kênh bằng `upsert_listing` qua job. Giá theo
-kênh: không đặt → giá bảng giá của cửa hàng gắn với tài khoản; đặt `price_rule` = giá cố định (`Money`,
-có `effective_from`) hay tăng / giảm `markup_bp` trên giá catalog (làm tròn lên bậc `rounding_minor`, vd
-1.000 đồng). Nghe `catalog.price_changed` / `catalog.product_status_changed` (giả định tên của bước
-41) → enqueue đẩy giá / gỡ bán. Thuộc tính bắt buộc riêng của kênh (ngành hàng của kênh) lưu ở
+kênh (D-222, một cách làm): không đặt → giá bảng giá của cửa hàng gắn với tài khoản; giá cố định cho một
+tin đăng → `price_rule` = `Money`, có `effective_from` (giữ ở đây); giá theo % trên giá cửa hàng = **bảng
+giá suy ra** của `catalog` có cột `channel` (đặc tả 41) — `price_rule` chỉ tham chiếu `price_list_id` của
+bảng giá đó, làm tròn theo `catalog_rounding_rules`; `channels` không tự tính phần trăm hay làm tròn. Nghe
+`catalog.price_changed` / `catalog.product_status_changed` (giả định tên của bước 41) → enqueue đẩy giá /
+gỡ bán. Thuộc tính bắt buộc riêng của kênh (ngành hàng của kênh) lưu ở
 `channel_attributes` (JSON, bộ nối kiểm).
 
 ### Phân bổ tồn
@@ -105,7 +113,8 @@ Mỗi (tài khoản, biến thể) — hay mặc định của tài khoản — 
   `set_allocation(tenant, reference, variant, warehouses, quantity) -> Result<u64 /* số giữ được */, Error>`
   và `consume_allocation(tenant, reference, order_reference, quantity) -> Result<u64, Error>` (chuyển
   phần giữ sang giữ chỗ của đơn trong một transaction của `inventory`). Đơn từ kênh đó tiêu phần cứng
-  trước, phần thiếu lấy từ tồn chung.
+  trước, phần thiếu lấy từ tồn chung. Số đẩy lên kênh = phần giữ riêng còn lại + phần chia theo tỉ lệ từ
+  tồn chung (`share_bp`, mặc định 0 với `reserved`) − `buffer_qty`, không âm (D-223…D-227, đợt 2).
 
 **Không bán quá** trong Autoxide được bảo đảm bởi `inventory`: mọi đơn (web, POS, kênh) đều giữ chỗ
 nguyên tử. Rủi ro còn lại là độ trễ của kênh — hai kênh cùng bán cái cuối trong khoảng chưa đồng bộ:
@@ -138,6 +147,11 @@ dòng mới. Job `channels.import_order`:
 4. Trạng thái kênh đổi sau đó (huỷ, đang giao, đã giao, hoàn tất, trả hàng) → `external_transition`
    theo bảng ánh xạ `ExternalStatus → OrderStatus`; chuyển không hợp lệ (vd kênh báo huỷ sau khi đã giao)
    → ghi `channels_inbound_orders.conflict`, event `channels.order_conflict`, người xử lý.
+5. Đơn `oversold` có hàng lại và nhập được → `imported`. Kênh huỷ đơn trước khi nhập → `cancelled_by_channel`;
+   kênh huỷ sau khi nhập → `cancelled_by_channel` và đơn của `orders` cũng huỷ.
+6. Người xử lý đóng xung đột hay đơn bán quá bằng `POST /inbound-orders/{id}/resolve` → `resolved`, kèm
+   `resolution_code` (danh sách lý do `channels.inbound_resolution` khai qua `Module::reason_lists`, kiểm bằng
+   `ReasonCodes::ensure` — D-223) và ghi chú.
 
 Đơn kênh mà người bán tự giao (`fulfilled_by_channel = false`): nghe `shipping.shipment_created` /
 `orders.order_status_changed` của đơn có kênh nguồn → `update_fulfillment` (mã vận đơn, hãng) qua job.
@@ -163,6 +177,27 @@ nhận). Khớp từng dòng với đơn (`external_order_id` → `order_id`) v�
 `channel_receivable` của tài khoản sau đối soát = tiền kênh còn nợ — báo cáo
 `GET /settlements/summary` so với sổ cái.
 
+### Nguồn cấp sản phẩm cho Google, Meta (D-204)
+
+Quảng cáo mua sắm của Google (Merchant Center) và danh mục sản phẩm của Meta (Facebook / Instagram) đọc
+**nguồn cấp sản phẩm** (product feed) — một tệp do website công bố, họ tải định kỳ. Khác bộ nối sàn: không
+nhận đơn, không cần tài khoản API, chỉ công bố dữ liệu công khai.
+
+- **Dựng tệp bằng job** `channels.build_feed` (lịch theo cấu hình của nguồn, mặc định mỗi 6 giờ, và khi
+  có event giá / tồn / trạng thái sản phẩm thì gom lại dựng một lần sau 15 phút): đọc qua `api` của
+  `catalog` (tên, mô tả, ảnh, GTIN, thương hiệu, biến thể, đường dẫn — dữ liệu JSON-LD của D-201),
+  `inventory` (mức công khai `in_stock` / `out` / `preorder` — không lộ số tồn), `promotions` (giá khuyến
+  mại không cần mã và hạn của nó). Ghi theo lô, không giữ cả danh mục trong bộ nhớ. Chỉ sản phẩm
+  `active`, công khai ở cửa hàng đó. Tệp đã dựng lưu qua `media` riêng tư hay `files` (`media_id`); lỗi từng
+  sản phẩm (vd thiếu GTIN, thiếu ảnh) ghi vào `channels_feed_issues` — xoá và ghi lại mỗi lần dựng.
+- **Phục vụ.** `GET /api/v1/channels/public/feeds/{id}.{xml|csv}?token=` (công khai, token dài, đổi được —
+  chỉ lưu `token_hash`; `ETag`, `Last-Modified`, `Cache-Control`). Không có dữ liệu cá nhân hay giá vốn trong
+  tệp.
+- **Đúng chuẩn.** Trường bắt buộc theo đặc tả của Google Merchant Center và Meta Commerce tại thời điểm làm
+  (tra tài liệu chính thức, ghi phiên bản trong DECISIONS); giá kèm mã tiền tệ, tiền là số nguyên đơn vị
+  nhỏ nhất đổi sang chuỗi đúng định dạng; giá gạch là giá ngay trước khuyến mại (Luật Giá, D-201 — cần
+  đối chiếu).
+
 ### Bảng dữ liệu
 
 Quy ước như bước 45 (`tenant_id` đầu mọi khoá; UUIDv7; UTC; `Money` hai cột; JSON trong `text`;
@@ -171,12 +206,14 @@ migration có `down`; `outbox_migration`, `jobs_migration`).
 | Bảng | Cột chính | Khoá / index |
 |---|---|---|
 | `channels_accounts` | `id`, `tenant_id`, `org_id` (cửa hàng sở hữu), `kind`, `name`, `external_shop_id` NULL, `credentials_ref` (kho secret), `warehouse_org_ids` text, `price_list_org_id` NULL, `settings` text (`auto_cancel_oversold`, `order_pull_minutes`…), `status` (`active/paused/reauth_required/unavailable/disconnected`), `order_cursor` NULL, `last_synced_at` NULL, `created_at`, `updated_at` | unique (`tenant_id`, `kind`, `external_shop_id`); index (`tenant_id`, `org_id`) |
-| `channels_listings` | `id`, `tenant_id`, `account_id`, `variant_id`, `external_item_id` NULL, `external_sku`, `channel_attributes` text, `price_rule` text NULL, `status` (`draft/pending/live/rejected/delisted/error`), `last_error` NULL, `last_pushed_price_*` NULL, `last_pushed_stock` NULL, `last_pushed_at` NULL, `updated_at` | unique (`tenant_id`, `account_id`, `variant_id`); unique (`tenant_id`, `account_id`, `external_sku`); index (`tenant_id`, `account_id`, `external_item_id`) |
+| `channels_listings` | `id`, `tenant_id`, `account_id`, `variant_id`, `external_item_id` NULL, `external_sku`, `channel_attributes` text, `price_rule` text NULL (giá cố định `Money` + `effective_from`, hay tham chiếu `price_list_id`, D-222), `status` (`draft/pending/live/rejected/delisted/error`), `last_error` NULL, `last_pushed_price_*` NULL, `last_pushed_stock` NULL, `last_pushed_at` NULL, `updated_at` | unique (`tenant_id`, `account_id`, `variant_id`); unique (`tenant_id`, `account_id`, `external_sku`); index (`tenant_id`, `account_id`, `external_item_id`) |
 | `channels_allocations` | `id`, `tenant_id`, `account_id`, `variant_id` NULL (NULL = mặc định), `mode` (`share/reserved`), `share_bp` INT, `reserved_qty` BIGINT, `buffer_qty` BIGINT, `updated_at` | unique (`tenant_id`, `account_id`, `variant_key`) |
 | `channels_webhook_receipts` | `id`, `tenant_id`, `account_id`, `received_at`, `signature_ok` BOOL, `body` text, `notice_ids` text, `processed_at` NULL, `error` NULL | index (`tenant_id`, `account_id`, `received_at`) — xoá sau `RAW_RETENTION_DAYS` |
-| `channels_inbound_orders` | `id`, `tenant_id`, `account_id`, `external_order_id`, `external_status`, `payload_hash`, `raw` text NULL, `status` (`received/needs_mapping/imported/oversold/conflict/failed`), `order_id` NULL, `conflict` text NULL, `attempts` INT, `received_at`, `updated_at` | unique (`tenant_id`, `account_id`, `external_order_id`); index (`tenant_id`, `status`, `updated_at`), (`tenant_id`, `order_id`) |
+| `channels_inbound_orders` | `id`, `tenant_id`, `account_id`, `external_order_id`, `external_status`, `payload_hash`, `raw` text NULL, `status` (`received/needs_mapping/imported/oversold/conflict/failed/resolved/cancelled_by_channel`), `order_id` NULL, `conflict` text NULL, `resolution_code` NULL, `resolution_note` NULL, `attempts` INT, `received_at`, `updated_at` | unique (`tenant_id`, `account_id`, `external_order_id`); index (`tenant_id`, `status`, `updated_at`), (`tenant_id`, `order_id`) |
 | `channels_settlements` | `id`, `tenant_id`, `account_id`, `external_payout_id`, `period_from`, `period_to`, `payout_*`, `status` (`imported/matched/mismatch/posted`), `created_at`, `updated_at` | unique (`tenant_id`, `account_id`, `external_payout_id`) |
 | `channels_settlement_lines` | `id`, `tenant_id`, `settlement_id`, `external_order_id`, `order_id` NULL, `revenue_*`, `fees` text, `fees_total_*`, `subsidy_*`, `net_*`, `status` (`matched/mismatch/resolved`), `note` NULL | unique (`tenant_id`, `settlement_id`, `external_order_id`); index (`tenant_id`, `status`) |
+| `channels_feeds` | `id`, `tenant_id`, `org_id` (cửa hàng), `format` (`google_merchant_xml` / `meta_csv`), `locale`, `currency`, `filter` text (JSON: danh mục, nhãn, loại trừ sản phẩm), `token_hash`, `media_id` NULL (tệp đã dựng), `item_count`, `error_count`, `built_at` NULL, `created_at`, `updated_at` | index (`tenant_id`, `org_id`) |
+| `channels_feed_issues` | `tenant_id`, `feed_id`, `variant_id`, `code`, `field` | xoá và ghi lại mỗi lần dựng |
 
 ### API REST (`/api/v1/channels`)
 
@@ -191,16 +228,19 @@ migration có `down`; `outbox_migration`, `jobs_migration`).
 | `POST /accounts/{id}/sync` | `channels.manage` | đẩy tồn / giá toàn bộ ngay (job) |
 | `GET /accounts/{id}/stock-preview?variant_id=` | `channels.read` | số sẽ đẩy cho từng kênh, kèm cách tính |
 | `POST /webhooks/{account_id}` | công khai (chữ ký của kênh) | luôn trả 200 sau khi lưu; chữ ký sai → 401 `channels.webhook_signature_invalid` |
-| `GET /inbound-orders` · `GET /inbound-orders/{id}` | `channels.orders.manage` | lọc `needs_mapping`, `oversold`, `conflict`, `failed` |
-| `POST /inbound-orders/{id}/mapping` · `POST /inbound-orders/{id}/retry` · `POST /inbound-orders/{id}/resolve` | `channels.orders.manage` | ánh xạ dòng, chạy lại, đóng xung đột |
+| `GET /inbound-orders` · `GET /inbound-orders/{id}` | `channels.orders.manage` | lọc `needs_mapping`, `oversold`, `conflict`, `failed`, `resolved`, `cancelled_by_channel` |
+| `POST /inbound-orders/{id}/mapping` · `POST /inbound-orders/{id}/retry` · `POST /inbound-orders/{id}/resolve` | `channels.orders.manage` | ánh xạ dòng, chạy lại, đóng xung đột / đơn bán quá (`resolve` nhận `resolution_code` + ghi chú, D-223) |
 | `GET /settlements` · `GET /settlements/{id}` · `POST /settlement-lines/{id}/resolve` · `GET /settlements/summary` | `channels.finance.read` / `channels.finance.manage` | đối soát |
+| `GET/POST/PATCH/DELETE /feeds` · `POST /feeds/{id}/rotate-token` · `POST /feeds/{id}/build` · `GET /feeds/{id}/issues` | `channels.feeds.manage` | nguồn cấp sản phẩm (D-204) |
+| `GET /public/feeds/{id}.{xml|csv}?token=` | công khai (token) | tệp nguồn cấp; token sai → 404 `channels.feed_not_found` (D-204) |
 | `GET /reports/channels?from&to` | `channels.read` + `orders.reports.read` | doanh thu theo kênh (gọi báo cáo của `orders` qua `api` hay dùng `group_by=channel`), phí, thực nhận |
 
 ### Tool MCP
 
 `list_channel_accounts` (`read_only`), `channel_stock_preview` (`read_only`), `set_channel_allocation`,
 `link_listing`, `list_inbound_orders` (`read_only`), `map_inbound_order`, `retry_inbound_order`,
-`channel_settlement_summary` (`read_only`). Cùng service và permission như REST.
+`channel_settlement_summary` (`read_only`), `list_feed_issues` (`read_only`), `build_feed` (D-204). Cùng
+service và permission như REST.
 
 ### Event
 
@@ -220,7 +260,8 @@ Nghe: `inventory.stock_changed`, `catalog.price_changed`, `catalog.product_statu
 `channels.push_stock` / `channels.push_price` (enqueue, khoá theo khe thời gian), `channels.full_sync` (mỗi
 `FULL_SYNC_HOURS`), `channels.publish_listing` (enqueue), `channels.push_fulfillment` (enqueue),
 `channels.fetch_settlements` (mỗi ngày), `channels.renew_allocations` (mỗi giờ, chế độ `reserved`),
-`channels.purge_raw` (mỗi ngày).
+`channels.purge_raw` (mỗi ngày), `channels.build_feed` (theo lịch của nguồn, mặc định mỗi 6 giờ, và gom
+event giá / tồn / trạng thái sản phẩm dựng một lần sau 15 phút — D-204).
 
 ### Cấu hình
 
@@ -232,7 +273,7 @@ Nghe: `inventory.stock_changed`, `catalog.price_changed`, `catalog.product_statu
 ### Permission
 
 `channels.read`, `channels.manage`, `channels.orders.manage`, `channels.finance.read`,
-`channels.finance.manage`.
+`channels.finance.manage`, `channels.feeds.manage` (D-204).
 
 ### Mã lỗi
 
@@ -253,18 +294,25 @@ Nghe: `inventory.stock_changed`, `catalog.price_changed`, `catalog.product_statu
 | `channels.mapping_incomplete` | 422 | Còn dòng chưa gắn sản phẩm: {lines}. |
 | `channels.rate_limited` | 503 | Kênh {kind} đang giới hạn tần suất gọi; thử lại sau {seconds} giây. |
 | `channels.settlement_line_not_found` | 404 | Không tìm thấy dòng đối soát. |
+| `channels.feed_not_found` | 404 | Không tìm thấy nguồn cấp sản phẩm. (cả khi token sai — không lộ có nguồn hay không; D-204) |
+| `channels.feed_format_unknown` | 422 | Định dạng nguồn cấp {format} không được hỗ trợ. (D-204) |
+| `channels.feed_building` | 409 | Nguồn cấp đang được dựng; thử lại sau. (D-204) |
 
 ## Thứ tự làm
+
+Số **mục** theo danh sách bước 48 trong ROADMAP.
 
 1. Khung crate, `api.rs` (`SalesChannel`, `ChannelConnectors`, kiểu dữ liệu), sổ bộ nối, bộ nối giả,
    tài khoản kênh + credentials trong kho secret. → **mục 1**
 2. Liên kết sản phẩm / biến thể, giá theo kênh, đăng sản phẩm. → **mục 2**
 3. Phân bổ tồn (`share`, `reserved` + API `inventory` nếu thiếu), đẩy tồn có debounce, đối chiếu toàn
-   bộ. → **mục 2**
+   bộ. → **mục 3**
 4. Đơn vào: webhook + kéo đơn, `channels_inbound_orders`, ánh xạ, `OrderIntake::import`,
-   `external_transition`, quá bán, đẩy trạng thái giao. → **mục 3**
-5. Đối soát tiền kênh trả + bút toán + báo cáo theo kênh. → **mục 3**
-6. Tool MCP, `docs/openapi.json`, `.env.example`, hướng dẫn viết bộ nối kênh (EN + VI, vì người ngoài
+   `external_transition`, quá bán, `resolved` / `cancelled_by_channel`, đẩy trạng thái giao. → **mục 4**
+5. Đối soát tiền kênh trả + bút toán + báo cáo theo kênh. → **mục 5**
+6. Nguồn cấp sản phẩm cho Google, Meta: bảng, job dựng, link công khai có token, quản trị, lỗi từng sản
+   phẩm. → **mục 6**
+7. Tool MCP, `docs/openapi.json`, `.env.example`, hướng dẫn viết bộ nối kênh (EN + VI, vì người ngoài
    viết module bộ nối — thêm một mục vào `docs/MODULE_GUIDE.md` / `.vi.md`), CHANGELOG, ROADMAP.
 
 ## Test bắt buộc
@@ -286,15 +334,19 @@ lệnh nhận được, tiêm lỗi `RateLimited` / `Unauthorized`, phát webhoo
 - `settlement_matches_and_posts_ledger_once`; `settlement_mismatch_queued`.
 - `rate_limited_connector_reschedules_job`; `unauthorized_marks_account_reauth_required`.
 - `raw_payload_purged_after_retention`.
+- Nguồn cấp sản phẩm (D-204): `feed_chi_co_san_pham_cong_khai_cua_cua_hang`,
+  `feed_khong_lo_so_ton_va_gia_von`, `feed_token_sai_tra_404`, `feed_bao_loi_tung_san_pham_thieu_gtin`,
+  `feed_gia_khuyen_mai_kem_han`, `feed_dung_dinh_dang_xml_google` (so với tệp mẫu).
 - Rò rỉ: `tenant_isolation`; `store_staff_sees_only_own_store_accounts`.
 
 ## Tiêu chí xong
 
-- [ ] Ba mục của bước 48 có commit và test; gate đầy đủ xanh trên cả hai database.
+- [ ] Mọi mục của bước 48 có commit và test; gate đầy đủ xanh trên cả hai database.
 - [ ] Bộ nối giả chạy mọi đường của trait; hướng dẫn viết bộ nối (EN + VI) đủ để người ngoài làm module
       bộ nối mà không đọc mã nguồn `channels`.
 - [ ] Quyết định trong `docs/DECISIONS.md`: sổ bộ nối (đăng ký sau), hai chế độ phân bổ và giới hạn
-      "không bán quá" khi kênh trễ, bút toán đối soát kênh; API `inventory` mới nếu có thêm.
+      "không bán quá" khi kênh trễ, bút toán đối soát kênh; API `inventory` mới nếu có thêm; phiên bản đặc
+      tả Google Merchant Center / Meta Commerce dùng cho nguồn cấp (D-204).
 - [ ] `docs/openapi.json`, `.env.example`, CHANGELOG, ROADMAP; phát hành theo `docs/RELEASING.md`.
 
 ## Chỗ dễ sai
@@ -313,6 +365,8 @@ lệnh nhận được, tiêm lỗi `RateLimited` / `Unauthorized`, phát webhoo
   tin số thuế kênh trả về.
 - **Múi giờ của kênh**: thời gian kênh trả có thể theo giờ địa phương không kèm múi — bộ nối phải đổi ra
   UTC; test với bộ nối giả trả giờ `+07:00`.
+- **Nguồn cấp lộ dữ liệu**: chỉ sản phẩm `active`, công khai ở cửa hàng đó; tồn chỉ ở mức công khai, không số;
+  không giá vốn, không dữ liệu cá nhân; token sai trả 404 như không có nguồn (D-204).
 - **Dữ liệu người mua của kênh** bị che một phần (SĐT `*****123`): không dùng làm `buyer_key` chống bom
   hàng; đơn kênh không đưa vào thống kê COD của bước 45.
 
@@ -324,6 +378,7 @@ lệnh nhận được, tiêm lỗi `RateLimited` / `Unauthorized`, phát webhoo
 - Luật BVDLCN 91/2025 + NĐ 356/2025: dữ liệu người mua nhận từ kênh dùng để giao hàng và chăm sóc đơn;
   không dùng cho tiếp thị nếu không có đồng ý; thời hạn lưu dữ liệu thô là dữ liệu cấu hình.
 - Luật Kế toán 88/2015: bảng kê đối soát và bút toán lưu ít nhất 10 năm.
+- Luật Giá: giá gạch trong nguồn cấp sản phẩm là giá ngay trước khuyến mại (D-201, D-204) — **cần đối chiếu**.
 
 ## Agent làm bước này tự quyết
 
@@ -333,53 +388,3 @@ lệnh nhận được, tiêm lỗi `RateLimited` / `Unauthorized`, phát webhoo
   người bán tự quyết nhập thêm hàng hay huỷ).
 - Kéo đơn hay chỉ webhook khi kênh có cả hai: khuyến nghị cả hai (webhook nhanh, kéo đơn để không sót).
 - Giá trị mặc định của debounce, chu kỳ đối chiếu — đo với bộ nối giả có độ trễ rồi chốt; ghi quyết định.
-
-## Bổ sung theo D-204 (nguồn cấp sản phẩm cho Google, Meta)
-
-Quảng cáo mua sắm của Google (Merchant Center) và danh mục sản phẩm của Meta (Facebook / Instagram) đọc
-**nguồn cấp sản phẩm** (product feed) — một tệp do website công bố, họ tải định kỳ. Khác bộ nối sàn: không
-nhận đơn, không cần tài khoản API, chỉ công bố dữ liệu công khai.
-
-- **Bảng.** `channels_feeds`: `id`, `tenant_id`, `org_id` (cửa hàng), `format` (`google_merchant_xml` /
-  `meta_csv`), `locale`, `currency`, `filter` JSON (danh mục, nhãn, loại trừ sản phẩm), `token_hash`,
-  `media_id` NULL (tệp đã dựng, lưu qua `media` riêng tư hay `files`), `item_count`, `error_count`,
-  `built_at` NULL, `created_at`, `updated_at`; index (`tenant_id`, `org_id`). `channels_feed_issues`:
-  `tenant_id`, `feed_id`, `variant_id`, `code`, `field` (lỗi từng sản phẩm, vd thiếu GTIN, thiếu ảnh) — xoá
-  và ghi lại mỗi lần dựng.
-- **Dựng tệp bằng job** `channels.build_feed` (lịch theo cấu hình của nguồn, mặc định mỗi 6 giờ, và khi
-  có event giá / tồn / trạng thái sản phẩm thì gom lại dựng một lần sau 15 phút): đọc qua `api` của
-  `catalog` (tên, mô tả, ảnh, GTIN, thương hiệu, biến thể, đường dẫn — dữ liệu JSON-LD của D-201),
-  `inventory` (mức công khai `in_stock` / `out` / `preorder` — không lộ số tồn), `promotions` (giá khuyến
-  mại không cần mã và hạn của nó). Ghi theo lô, không giữ cả danh mục trong bộ nhớ. Chỉ sản phẩm
-  `active`, công khai ở cửa hàng đó.
-- **Phục vụ.** `GET /api/v1/channels/public/feeds/{id}.{xml|csv}?token=` (công khai, token dài, đổi được;
-  `ETag`, `Last-Modified`, `Cache-Control`). Không có dữ liệu cá nhân hay giá vốn trong tệp.
-- **Quản trị.** `GET/POST/PATCH/DELETE /feeds`, `POST /feeds/{id}/rotate-token`, `POST /feeds/{id}/build`,
-  `GET /feeds/{id}/issues` (`channels.feeds.manage`). Tool MCP `list_feed_issues` (`read_only`),
-  `build_feed`.
-- **Đúng chuẩn.** Trường bắt buộc theo đặc tả của Google Merchant Center và Meta Commerce tại thời điểm làm
-  (tra tài liệu chính thức, ghi phiên bản trong DECISIONS); giá kèm mã tiền tệ, tiền là số nguyên đơn vị
-  nhỏ nhất đổi sang chuỗi đúng định dạng; giá gạch là giá ngay trước khuyến mại (Luật Giá, D-201 — cần
-  đối chiếu).
-- **Mã lỗi:** `channels.feed_not_found` (404 — cả khi token sai, không lộ có nguồn hay không),
-  `channels.feed_format_unknown` (422), `channels.feed_building` (409 — đang dựng, thử lại sau).
-- **Test** (cả hai database): `feed_chi_co_san_pham_cong_khai_cua_cua_hang`,
-  `feed_khong_lo_so_ton_va_gia_von`, `feed_token_sai_tra_404`, `feed_bao_loi_tung_san_pham_thieu_gtin`,
-  `feed_gia_khuyen_mai_kem_han`, `feed_dung_dinh_dang_xml_google` (so với tệp mẫu).
-
-## Bổ sung theo D-222
-
-- Giá theo kênh tính theo % trên giá cửa hàng = **bảng giá suy ra** của `catalog` có cột `channel` (đặc tả 41);
-  `price_rule.markup_bp` và `rounding_minor` của bước này thay bằng tham chiếu `price_list_id` và
-  `catalog_rounding_rules` — một cách làm. Giá cố định cho một tin đăng (`price_rule` = `Money`) giữ ở đây.
-
-## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
-
-> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
-
-- **Trạng thái đơn kênh:** thêm `resolved` (người đóng xung đột hay đơn bán quá bằng `resolve`, kèm
-  `resolution_code` — danh sách `channels.inbound_resolution`, D-223 — và ghi chú) và `cancelled_by_channel`
-  (kênh huỷ trước khi nhập, hay sau khi nhập thì đơn của `orders` cũng huỷ). Đơn `oversold` có hàng lại và nhập được
-  → `imported`.
-- **Chế độ `reserved`:** số đẩy lên kênh = phần giữ riêng còn lại + phần chia theo tỉ lệ từ tồn chung (`share_bp`,
-  mặc định 0 với `reserved`) − `buffer_qty`, không âm.

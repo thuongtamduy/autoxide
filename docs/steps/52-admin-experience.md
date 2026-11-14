@@ -2,6 +2,9 @@
 
 > Lộ trình: `docs/ROADMAP.md` bước 52 · Thiết kế: `docs/research/ui-design.md` mục 5 · Quyết định:
 > D-109 (AI chỉ thành bản nháp), D-200, D-201
+> Đã gộp các quyết định: D-202, D-224 và đối chiếu thiết kế 2 (A-c10, A-c12) (D-228).
+> Mã `A-…` trỏ tới `docs/research/ui-trace/` (nguồn: `docs/prompts/ui-trace-roadmap.md`); `ActorKind` đủ bảy
+> giá trị có nguồn `docs/prompts/ui-phase2-api.md`, màn tương ứng ở `docs/research/ui-traceability.md`.
 
 ## Mục tiêu
 
@@ -17,12 +20,28 @@ SAU bước 51. Mục AI cần module `ai` (bước 18) và P7 của bước 51 
 ### 1. Bàn kỹ thuật
 
 - Nhật ký request theo khách (bảng `kernel_request_log`, cấp khách hàng, có hạn lưu là cấu hình, mặc định
-  14 ngày, xoá bằng job): thời điểm, API key hay người dùng, phương thức, **đường dẫn mẫu** (không có ID
-  thật), status, `code` lỗi, thời gian xử lý, `Idempotency-Key`. Không lưu thân request, header xác thực,
-  query có dữ liệu cá nhân. Ghi bất đồng bộ, không làm chậm request; đo trước / sau.
+  14 ngày, xoá bằng job): thời điểm, API key hay người dùng (`api_key_id`), `actor_kind`, phương thức,
+  **đường dẫn mẫu** (không có ID thật), status, `code` lỗi, thời gian xử lý, `Idempotency-Key`, `approval_id`,
+  `request_id`, `trace_id` (nối với OTLP, A-c10). Không lưu thân request, header xác thực, query có dữ liệu cá
+  nhân. Ghi bất đồng bộ, không làm chậm request; đo trước / sau.
+- `actor_kind` dùng `ActorKind` của kernel (D-224, P12 bước 51) — đủ bảy giá trị `human`, `agent`, `service`,
+  `system`, `support`, `app`, `scim`, không phải tập con.
+- **Nhật ký lệnh của agent (D-202).** Lệnh gọi qua MCP ghi `mcp:<tên tool>` (vd `mcp:comments.answer`) vào cột
+  đường dẫn mẫu, phương thức `MCP`; **không ghi tham số** của tool (có thể chứa dữ liệu cá nhân). Ghi ở lớp
+  MCP của kernel (`mcp.rs`), một dòng cho mỗi lần gọi tool, kể cả khi tool trả lỗi. Lệnh nhận
+  `202 approval_required` (P12 bước 51): dòng nhật ký giữ `approval_id` để giao diện nối tới yêu cầu duyệt;
+  khi lệnh được duyệt và chạy, dòng mới ghi cùng `approval_id`.
+- `GET /api/v1/kernel/devtools/requests` lọc theo `actor_kind`, `api_key_id`, `path` (chính xác, vd
+  `mcp:orders.refund`), `status`, khoảng thời gian; phân trang bằng `fetch_page`, index (`tenant_id`,
+  `actor_kind`, `id`) và (`tenant_id`, `api_key_id`, `id`). Tool MCP `kernel.request_log`
+  (`kernel.devtools.read`, `read_only`) như REST (D-202).
 - Webhook: danh sách lần giao (module `webhooks` đã có bảng giao), lọc theo trạng thái, gửi lại một lần
-  giao. Event theo bản ghi: đọc từ outbox theo `kind` + `id`. Dead-letter queue: chạy lại có audit.
-- Permission `kernel.devtools.read`. Tool MCP tương ứng.
+  giao: `POST /api/v1/webhooks/deliveries/{id}/redeliver` (A-c10).
+- Event theo bản ghi: `GET /api/v1/kernel/devtools/events?object=<kind>:<id>` — **đọc từ audit**, vì outbox
+  bị dọn sau khi giao (A-c10).
+- Dead-letter queue: chạy lại có audit.
+- Permission: đọc `kernel.devtools.read`; ghi (gửi lại lần giao, chạy lại job) `kernel.devtools.manage`
+  (A-c10). Tool MCP tương ứng.
 
 ### 2. Hoàn tác an toàn
 
@@ -34,8 +53,10 @@ SAU bước 51. Mục AI cần module `ai` (bước 18) và P7 của bước 51 
 
 - `POST /api/v1/ai/filters/parse {resource, text}` → `params` đã kiểm theo schema bộ lọc (P7 bước 51) và
   phần không hiểu. Không bao giờ tự chạy lệnh ghi.
-- Trợ lý gọi tool MCP với đúng quyền của người dùng; lệnh ghi chỉ ra bản nháp hay `dry_run` chờ người duyệt
-  (D-109); lệnh rủi ro đi qua yêu cầu duyệt của P12 bước 51.
+- Trợ lý: `POST /api/v1/ai/assistant/messages {page, text}` (A-c12) chạy tool MCP với **đúng quyền của người
+  gọi**, chỉ tool `read_only` khi khách chưa bật ghi; lệnh ghi chỉ ra bản nháp hay `dry_run` chờ người duyệt
+  (D-109); lệnh rủi ro đi qua yêu cầu duyệt của P12 bước 51. Trả lời kèm danh sách tool đã gọi để người dùng
+  kiểm.
 
 ### 4. Thông báo và ghim
 
@@ -54,44 +75,15 @@ SAU bước 51. Mục AI cần module `ai` (bước 18) và P7 của bước 51 
 
 ## Test bắt buộc
 
-`request_log_khong_luu_than_va_token`, `request_log_het_han_bi_xoa`, `dry_run_khong_ghi_khong_phat_event`,
-`restore_tra_lai_trang_thai_truoc`, `ai_filter_parse_chi_tra_tham_so_hop_le` (dùng `FakeTextModel`),
-`seller_badge_tinh_tu_so_lieu_that` — trên cả hai database.
+Trên cả hai database:
+
+- `request_log_khong_luu_than_va_token`, `request_log_het_han_bi_xoa`, `dry_run_khong_ghi_khong_phat_event`,
+  `restore_tra_lai_trang_thai_truoc`, `ai_filter_parse_chi_tra_tham_so_hop_le` (dùng `FakeTextModel`),
+  `seller_badge_tinh_tu_so_lieu_that`.
+- Nhật ký lệnh của agent (D-202): `lenh_mcp_ghi_dung_ten_tool`, `tham_so_tool_khong_lot_vao_nhat_ky`,
+  `loc_nhat_ky_theo_actor_kind_va_key`, `lenh_cho_duyet_giu_approval_id`.
 
 ## Agent làm bước này tự quyết
 
 Hạn lưu mặc định của nhật ký request; ghi nhật ký bằng outbox hay hàng đợi trong bộ nhớ có giới hạn (đo
 trước); danh sách chỉ số sức khoẻ người bán đầu tiên. Ghi vào `docs/DECISIONS.md`.
-
-## Bổ sung theo D-202 (nhật ký lệnh của agent)
-
-- Lệnh gọi qua MCP ghi `mcp:<tên tool>` (vd `mcp:comments.answer`) vào cột đường dẫn mẫu của
-  `kernel_request_log`, phương thức `MCP`; **không ghi tham số** của tool (có thể chứa dữ liệu cá nhân).
-  Ghi ở lớp MCP của kernel (`mcp.rs`), một dòng cho mỗi lần gọi tool, kể cả khi tool trả lỗi.
-- Cột mới `actor_kind` (`human` / `agent` / `system`, P12 bước 51) và `api_key_id`; `GET
-  /api/v1/kernel/devtools/requests` lọc theo `actor_kind`, `api_key_id`, `path` (chính xác, vd
-  `mcp:orders.refund`), `status`, khoảng thời gian; phân trang bằng `fetch_page`, index (`tenant_id`,
-  `actor_kind`, `id`) và (`tenant_id`, `api_key_id`, `id`).
-- Lệnh nhận `202 approval_required` (P12 bước 51): dòng nhật ký giữ `approval_id` để giao diện nối tới
-  yêu cầu duyệt; khi lệnh được duyệt và chạy, dòng mới ghi cùng `approval_id`.
-- Tool MCP `kernel.request_log` (`kernel.devtools.read`, `read_only`) như REST.
-- **Test:** `lenh_mcp_ghi_dung_ten_tool`, `tham_so_tool_khong_lot_vao_nhat_ky`,
-  `loc_nhat_ky_theo_actor_kind_va_key`, `lenh_cho_duyet_giu_approval_id` — cả hai database.
-
-## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
-
-> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
-
-- **Tên endpoint bàn kỹ thuật (A-c10).** `GET /api/v1/kernel/devtools/requests` (đã ghi ở mục D-202),
-  `POST /api/v1/webhooks/deliveries/{id}/redeliver`, `GET /api/v1/kernel/devtools/events?object=<kind>:<id>`
-  — **đọc từ audit**, vì outbox bị dọn sau khi giao. Permission đọc `kernel.devtools.read`, ghi (gửi lại,
-  chạy lại job) `kernel.devtools.manage`. Nhật ký request lưu thêm `request_id`, `trace_id` để nối với OTLP.
-- **Trợ lý AI trong quản trị (A-c12).** `POST /api/v1/ai/assistant/messages {page, text}`: chạy tool MCP với
-  **quyền của người gọi**, chỉ tool `read_only` khi khách chưa bật ghi; lệnh ghi thành bản nháp hay yêu cầu
-  duyệt (D-109, P12). Trả lời kèm danh sách tool đã gọi để người dùng kiểm.
-
-## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
-
-> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
-
-- `kernel_request_log.actor_kind` dùng `ActorKind` của D-224 (đủ bảy giá trị), không phải tập con.

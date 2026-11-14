@@ -4,6 +4,10 @@
 > (dòng "nhân sự nền tảng") · Quyết định: D-185, D-190, D-192, D-193; nền cũ D-046 (role), D-063 /
 > D-162 (đặt lại mật khẩu chạy trong job), D-117 (token dùng một lần), D-181 (`rows`), D-184
 > (`reference`), D-038 (hàm mới của `Module` luôn có mặc định).
+> Nguồn đối chiếu thiết kế: `docs/prompts/ui-trace-roadmap.md` (mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`)
+> và `docs/prompts/ui-phase2-api.md` (đợt 2; màn tương ứng ghi trong `docs/research/ui-traceability.md`).
+> Đã gộp các quyết định: D-200, D-202, D-208, D-211; đối chiếu thiết kế 2 (D-208…D-218) và đợt 2
+> (D-223…D-227) (D-228).
 
 ## Mục tiêu
 
@@ -15,6 +19,10 @@ Có danh mục **đơn vị hành chính Việt Nam sau sáp nhập** (module `a
 theo cây khách hàng, đăng nhập bằng link, mời người dùng, và nhân sự nền tảng chỉ vào dữ liệu khách
 khi có quyền cấp có thời hạn. Phục vụ mô hình 2 (nhiều cửa hàng), 4 (chuỗi cha-con), sàn (người
 bán là nút loại `seller`); mô hình 1 và 3 không phải làm gì thêm (cây một nút, mặc định).
+
+Mỗi nút có **hồ sơ công khai** (giờ mở cửa, nhận hàng tại quầy…) cho website (D-200); nội dung và media
+thuộc nút và hiện theo website (D-208). Tài khoản có ngôn ngữ, múi giờ ưa thích, tự đổi tên hiển thị, và
+xác nhận lại danh tính trước lệnh nhạy cảm; khách tự thu hồi quyền vào hỗ trợ (D-211).
 
 ## Bắt đầu khi
 
@@ -45,9 +53,16 @@ Crate mới: `modules/address` (`autoxide-address`), `modules/organizations` (`a
 Sửa: `crates/kernel` (`access.rs`, `tenancy`, `event` — trường `Actor`, `module.rs` — hàm
 `org_settings`), `crates/testkit` (`TestApp::builder(…).member(…)`, bài rò rỉ giữa hai nhánh),
 `modules/auth` (membership có nút, role có độ sâu, realm, API key gắn nút, uỷ quyền, link đăng nhập,
-lời mời, quyền vào hỗ trợ), `modules/notes` (ví dụ `org_id`), `crates/app/src/modules.rs`, lệnh CLI
-`autoxide user invite`, `docs/MODULE_GUIDE.md` + `.vi.md`, `docs/DEPLOY.md` + `.vi.md` (cấu hình
+lời mời, quyền vào hỗ trợ, xác nhận lại danh tính, ưa thích của người dùng), `modules/notes` (ví dụ
+`org_id`), `modules/content`, `modules/media`, `modules/forms` (`org_id`, D-208), `crates/app/src/modules.rs`,
+lệnh CLI `autoxide user invite`, `docs/MODULE_GUIDE.md` + `.vi.md`, `docs/DEPLOY.md` + `.vi.md` (cấu hình
 mới), `CHANGELOG.md`, `.env.example`, `docs/openapi.json`.
+
+**Dữ liệu theo nút:** `org_id` thêm vào `notes` (ví dụ), `content` và `media` (nút sở hữu), `forms` (NULL
+được) (D-208); `newsletter`, `comments` giữ dữ liệu cấp khách (quyền của chúng chỉ có độ sâu `tenant`).
+
+**Làm cùng bước 45** (ghi ở đây vì danh tính và đăng nhập thuộc `auth`): tạo tài khoản từ số điện thoại đã
+xác thực, `POST /api/v1/auth/phone-signups` — mục "Tạo tài khoản từ số đã xác thực" dưới (D-202).
 
 **Thứ tự đăng ký (khác bảng tên chung — xem "Agent tự quyết" #1):** `mail`, `ai`, `files`,
 **`address`**, **`organizations`**, `auth`, … — `organizations` cần `dyn AdministrativeUnits` để kiểm
@@ -57,9 +72,8 @@ mới), `CHANGELOG.md`, `.env.example`, `docs/openapi.json`.
 NGOÀI phạm vi: kho báo cáo gộp, cha thao tác dữ liệu con bằng job phân phối, tách / gộp nhánh (bước
 38); KYC, cờ "đã xác thực số điện thoại" (37); gói, hạn mức (35 — bước này chỉ để chỗ gọi
 `reserve`); hồ sơ khách hàng CRM, điểm thưởng (47); sổ địa chỉ người mua (44); hạn mức theo nút
-(vd số nhân sự mỗi cửa hàng). `org_id` thêm vào `notes`, và vào `content`, `media` (`forms` tuỳ chọn)
-theo mục "Bổ sung theo đối chiếu thiết kế 2" ở cuối file (D-208, thay câu cũ "chỉ `notes`"); `newsletter`,
-`comments` giữ dữ liệu cấp khách (quyền của chúng chỉ có độ sâu `tenant`).
+(vd số nhân sự mỗi cửa hàng); gỡ danh tính OIDC (`DELETE /api/v1/auth/me/identities/{id}`, chặn cách
+đăng nhập cuối bằng `auth.identity_last_method`) đã có ở bước 40 — bước này không thêm gì (đợt 2).
 
 ## Thiết kế
 
@@ -240,6 +254,8 @@ migration có `down`.
   `name`, `description`, `created_at`, `updated_at`. PK `(tenant_id, code)`.
 - `organizations_setting`: `tenant_id`, `org_id`, `key`, `value` (`text`, JSON đã kiểm),
   `updated_by`, `updated_at`. PK `(tenant_id, org_id, key)`.
+- Hồ sơ công khai của nút (D-200, đợt 2): các trường ở mục "Hồ sơ công khai của nút" dưới; ảnh chỉ giữ ID
+  của `media` (`cover_media_id`, `logo_media_id`).
 - Migration nâng cấp: với mỗi khách đang có trên database này → nút gốc (kernel + `organizations_unit`
   loại `tenant`, tên = tên khách). Khách tạo sau: nghe `kernel.tenant_created`. `OrgDirectory::root`
   tự tạo gốc còn thiếu (dưới `OrgTree::lock`) để chịu được event đến chậm.
@@ -248,8 +264,8 @@ migration có `down`.
 
 | Bảng | Lớp | Đổi ở bước này |
 |---|---|---|
-| `auth_user`, phiên, MFA, passkey, `auth_tokens` | cấp khách hàng | thêm `realm` (`staff` / `customer`, mặc định `staff`); unique `(tenant_id, realm, email)`. Nhân sự là dòng của khách vận hành (database mặt điều khiển); người mua là dòng của khách mình (database của khách) |
-| `auth_role`, `auth_role_permission` | mặt điều khiển | role thuộc một khách (`tenant_id`); `auth_role_permission` thêm `scope` (mặc định `tenant`); mỗi khách một role `admin` dựng sẵn (`all_permissions`) |
+| `auth_user`, phiên, MFA, passkey, `auth_tokens` | cấp khách hàng | thêm `realm` (`staff` / `customer`, mặc định `staff`); unique `(tenant_id, realm, email)`. Nhân sự là dòng của khách vận hành (database mặt điều khiển); người mua là dòng của khách mình (database của khách). `auth_user` thêm `locale`, `time_zone` (IANA) (A-b4) và `last_login_at` (A-b10) |
+| `auth_role`, `auth_role_permission` | mặt điều khiển | role thuộc một khách (`tenant_id`); `auth_role_permission` thêm `scope` (mặc định `tenant`); mỗi khách một role `admin` dựng sẵn (`all_permissions`); `auth_role` thêm `requires_mfa` (bắt buộc MFA theo role, A-b10) |
 | `auth_user_role` (= membership) | mặt điều khiển | thêm `org_id`; `tenant_id` = khách mà membership có hiệu lực; unique `(tenant_id, user_id, org_id, role_id)`; index `(tenant_id, org_id)` |
 | `auth_api_key` | mặt điều khiển | thêm `org_id` (nút của hàng rào; gốc = không rào) |
 | `auth_invitation` (mới) | mặt điều khiển | `tenant_id`, `id`, `email`, `name`, `org_id`, `invited_by`, `status` (`pending` / `accepted` / `revoked`), `expires_at`, `accepted_user_id`, `token_id` (token đang hiệu lực), `created_at`, `updated_at`; index `(tenant_id, status, created_at)`, `(tenant_id, email)` |
@@ -266,6 +282,10 @@ database mặt điều khiển) — giữ. Nếu bước 33 đã xếp `auth_rol
 `auth.move_roles` — ghi DECISIONS.
 
 **`notes`:** thêm `org_id` (`uuid`, NOT NULL; dòng cũ = `tenant_id`), index `(tenant_id, org_id)`.
+
+**`content`, `media`, `forms`** (D-208, A-b1, A-c3): `content` và `media` thêm `org_id` (nút sở hữu; mặc định
+nút gốc khi nâng cấp); `forms` thêm `org_id` NULL được. Cách đọc theo website ở mục "Nội dung và media theo
+website và nút" dưới.
 
 ### API REST
 
@@ -286,7 +306,8 @@ public, max-age=86400`):
 
 **`/api/v1/organizations`** (permission: `organizations.units.read` scoped, `organizations.units.write`
 scoped, `organizations.units.manage` scoped, `organizations.types.manage`,
-`organizations.settings.write` scoped; với `units.*`, độ sâu `own` được coi như `unit`):
+`organizations.settings.write` scoped, `organizations.profile.manage` scoped; với `units.*`, độ sâu `own`
+được coi như `unit`):
 
 | Method, path | Permission | Ghi chú |
 |---|---|---|
@@ -301,6 +322,8 @@ scoped, `organizations.units.manage` scoped, `organizations.types.manage`,
 | `GET /settings` | đăng nhập | danh mục khoá (`OrgSettingCatalog`): khoá, mô tả, mặc định |
 | `GET /units/{id}/settings` | units.read | giá trị hiệu lực: `{key, value, source_unit_id, inherited}` |
 | `PUT /units/{id}/settings/{key}` `{value}` · `DELETE …/{key}` | settings.write | `DELETE` = quay về kế thừa |
+| `PATCH /units/{id}/public-profile` | profile.manage (theo độ sâu) | ghi hồ sơ công khai của nút — mục "Hồ sơ công khai của nút" (đợt 2) |
+| `GET /public/stores` | công khai | nút `public` của khách suy từ tên miền; `ETag` / `Cache-Control` như `/api/v1/address` (D-200) |
 
 Khoá cài đặt do `organizations` khai: `organizations.timezone` (IANA, mặc định `UTC`),
 `organizations.currency` (`Currency::parse`), `organizations.language` (`Language` của kernel,
@@ -316,9 +339,11 @@ trên bảng của chính mình.
 | `GET /permissions` | roles.read | thêm `scoped: bool` |
 | `POST/PUT /roles…` | roles.manage | thêm `grants: [{permission, scope}]` cạnh `permissions` (= độ sâu `tenant`); scope < tenant cho permission không scoped → 422 `auth.scope_not_supported` |
 | `GET /users/{id}/memberships` · `PUT …` `{memberships: [{org_id, role_ids}]}` | users.read · roles.manage | `PUT /users/{id}/roles` cũ = membership ở gốc; người gán phải có mọi permission của role trong phạm vi nút (`require_covers` mở rộng) |
-| `GET /memberships?org_id=&role_id=` | users.read (scoped) | ai làm ở nút nào |
+| `GET /memberships?org_id=&role_id=&inherited=` | users.read (scoped) | ai làm ở nút nào; `inherited=true` trả membership hiệu lực kể cả kế thừa từ nút trên (A-c11) |
 | `GET /me/memberships` · `GET /me/tenants` | đăng nhập | khách / nút người gọi vào được, kèm đường vào (`direct` / `delegation` / `support`) |
 | `POST /me/tenant` `{tenant_id}` | đăng nhập | cặp token mới cho khách đã chọn (nếu bước 33 chưa có) |
+| `PATCH /me` `{locale?, time_zone?, name?}` | đăng nhập | ngôn ngữ, múi giờ ưa thích (A-b4); tên hiển thị (đợt 2) — mục "Tài khoản" dưới |
+| `POST /me/reauth` `{method: passkey\|totp\|email_link}` | đăng nhập | token xác nhận lại ngắn hạn, dùng một lần (A-b6, A-c4) — mục "Tài khoản" dưới |
 | `POST /api-keys` | (như cũ) | thêm `org_id` (mặc định gốc; phải trong phạm vi người tạo) |
 | `POST /register`, `/login`, `/login/link`, `/password-reset` | công khai | thêm `realm` (mặc định `staff`); `customer` cần ngữ cảnh khách (tên miền / header) và `auth.customer_registration = true` |
 | `GET /customers?q=` · `GET/PATCH /customers/{id}` | `auth.customers.read` / `auth.customers.manage` | tài khoản người mua của khách hiện tại (khoá / mở, không xem mật khẩu) |
@@ -329,7 +354,9 @@ trên bảng của chính mình.
 | `POST /invitations/accept` `{token, name?, password?}` | công khai / đăng nhập | email chưa có tài khoản nhân sự: tạo (email coi là đã xác minh), đặt mật khẩu nếu gửi, trả tokens (đăng ký passkey tiếp bằng `/me/passkeys/registration`); đã có tài khoản: phải đăng nhập đúng tài khoản đó (`auth.invitation_sign_in_required` / `auth.invitation_email_mismatch`), chỉ thêm membership |
 | `GET /delegations?direction=incoming\|outgoing` · `POST /delegations` `{child_tenant_id, role_id, org_id?, expires_at?, reason}` · `DELETE /delegations/{id}` | `auth.delegations.read` / `auth.delegations.manage` (ở khách cha) | khách con phải là con cháu trong `kernel_tenants`; con xem được (incoming), chỉ cha hay nền tảng thu hồi |
 | `GET /support-access` | `auth.support_access.read` (ở khách) | quản trị của khách xem mọi lần cấp và lần vào |
-| `POST /support-grants` `{tenant_id, staff_user_id, role_id, basis, reason, legal_reference?, hours}` · `DELETE /support-grants/{id}` · `GET /support-grants?tenant_id=` | `auth.support.grant` (ở khách vận hành) | khách tắt `auth.support_access` → chỉ `legal_request` được |
+| `DELETE /support-access/{id}` | `auth.support_access.revoke` (ở khách) | khách tự thu hồi một lần cấp còn hạn; lần cấp `legal_request` không thu hồi được từ phía khách (D-211) |
+| `POST /support-grants` `{tenant_id, staff_user_id, role_id, basis, reason, legal_reference?, hours}` · `DELETE /support-grants/{id}` · `GET /support-grants?tenant_id=` | `auth.support.grant` (ở khách vận hành) | khách tắt `auth.support_access` → chỉ `legal_request` được; trần giờ `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` (D-211 giữ như cũ) |
+| `POST /phone-signups` `{lookup_token, display_name?}` | công khai, rate limit theo IP | làm ở bước 45 — mục "Tạo tài khoản từ số đã xác thực" dưới (D-202) |
 
 **Tính `Principal`** (đường nóng, mặt điều khiển): một câu `auth_user_role ⋈ auth_role ⟕
 auth_role_permission` lọc `user_id`, `tenant_id` (như D-076), cộng một câu cho uỷ quyền (role R
@@ -337,6 +364,54 @@ người đó giữ **ở gốc** khách cha, có `auth_delegation` còn hiệu 
 cho `auth_support_grant` còn hạn — chỉ chạy hai câu sau khi người gọi không có membership trực tiếp
 (hay gộp `UNION ALL`, đo rồi chọn). Không tra cây lúc xác thực: grant mang nút gốc, phần nhánh do
 `scope_condition` đẩy xuống SQL. Người mua: chỉ kiểm tài khoản, không có permission.
+
+### Hồ sơ công khai của nút (D-200)
+
+Module `organizations` thêm cho mỗi nút: `public` (mặc định tắt), tên hiển thị (`display_name`), `Address`,
+giờ mở cửa theo thứ trong tuần và ngày nghỉ đặc biệt, `pickup` (nhận hàng tại quầy), tên miền gắn với nút.
+
+- **Đọc:** `GET /api/v1/organizations/public/stores` (công khai; khách suy từ tên miền như mọi endpoint
+  công khai) trả các nút `public` của khách, sắp theo thứ tự khách đặt, `ETag` / `Cache-Control` như
+  `/api/v1/address`. Không trả thành viên, cài đặt nội bộ hay nút không công khai.
+- **Ghi** (đợt 2): `PATCH /api/v1/organizations/units/{id}/public-profile` (`organizations.profile.manage`, theo độ
+  sâu) nhận `public`, `display_name`, `Address`, `opening_hours[]` (thứ, giờ mở, giờ đóng — một ngày nhiều
+  khoảng được), `special_days[]` (ngày, đóng cửa hay giờ riêng, ghi chú), `pickup`, `cover_media_id?`,
+  `logo_media_id?` (ID của `media`, chỉ giữ ID). Kiểm: giờ đóng sau giờ mở, ngày đặc biệt không trùng — sai
+  thì `organizations.invalid_opening_hours` (422). Ghi xong xoá `ETag` của `/public/stores`; event
+  `organizations.public_profile_updated`.
+
+### Nội dung và media theo website và nút (D-208)
+
+- `content`, `media` có `org_id` (nút sở hữu), `forms` có `org_id` NULL được (bảng ở trên); quyền `content.*`,
+  `media.*`, `forms.*` thành `scoped()` — độ sâu áp như mọi dữ liệu theo nút.
+- Đọc công khai lọc theo website: tên miền → nút qua `kernel_tenant_domains.org_id` (bước 33); bài của nút
+  và bài của nhánh trên được chia sẻ xuống thì hiện. Menu và ngôn ngữ bật theo website.
+- Bộ lọc quản trị `owner_org`, `site`.
+- Media riêng của người bán trên sàn dùng chính cơ chế này.
+- `newsletter`, `comments` vẫn cấp khách.
+
+### Tài khoản: xác nhận lại danh tính, ưa thích, MFA theo role
+
+- **Xác nhận lại danh tính** (A-b6, A-c4): `POST /api/v1/auth/me/reauth {method: passkey|totp|email_link}` trả
+  token ngắn hạn (`AUTOXIDE_AUTH_REAUTH_MINUTES`, mặc định 10) dùng một lần cho lệnh nhạy cảm (tạo API key,
+  đổi email, tắt MFA, đổi role admin) thay cho `current_password` — tài khoản chỉ có passkey cũng làm được.
+  Bước 54 (P5, step-up) dùng chính token này.
+- **Ngôn ngữ và múi giờ ưa thích** (A-b4): `auth_user.locale`, `auth_user.time_zone` (IANA), đổi bằng
+  `PATCH /api/v1/auth/me`; mail và `notifications` gửi chậm (job) dùng hai giá trị này thay cho ngôn ngữ của
+  request gốc. Thay mục đã hoãn ở D-062.
+- **Tự đổi tên hiển thị** (đợt 2): `PATCH /api/v1/auth/me` nhận thêm `name` (1–100 ký tự, bỏ khoảng trắng đầu
+  cuối); cập nhật `search_text`; event `auth.user_updated`.
+- **Ưu tiên thấp** (A-b10): chính sách bắt buộc MFA theo role (`auth_role.requires_mfa`);
+  `auth_user.last_login_at`.
+
+### Tạo tài khoản từ số đã xác thực (D-202 — làm ở bước 45)
+
+`auth` thêm `POST /api/v1/auth/phone-signups {lookup_token, display_name?}` (công khai, rate limit theo IP):
+lấy số điện thoại đã qua OTP từ token xem đơn của `orders` (trait `OrderLookups` do `orders` công bố ở bước
+45 — `auth` đăng ký trước nên lấy qua chỗ giữ của kernel hay `Subscription::optional`, agent bước 45 chọn),
+tạo tài khoản trong khách với số đó đã xác thực, đăng nhập bằng passkey (bước 12) hay OTP; không bắt buộc mật
+khẩu. Số đã thuộc một tài khoản → 409 `auth.phone_taken` (gợi ý đăng nhập). Làm ở bước 45 khi `orders` có
+token xem đơn; `orders` chỉ gọi `claim` sau đó.
 
 ### Tool MCP · Event · Job · Cấu hình · Permission · Mã lỗi
 
@@ -349,12 +424,14 @@ uỷ quyền, quyền vào hỗ trợ (việc nhạy cảm chỉ qua REST có ng
 
 **Event** (ghi cùng transaction qua outbox, bên nhận chịu nhận lại): `organizations.unit_created`,
 `unit_updated`, `unit_moved` (cha cũ, cha mới), `unit_status_changed`, `unit_type_changed`,
-`setting_changed`; `address.dataset_imported`; `auth.memberships_changed`, `auth.invitation_created`,
+`setting_changed`, `public_profile_updated` (đợt 2); `address.dataset_imported`; `auth.user_updated` (đổi
+tên hiển thị, đợt 2), `auth.memberships_changed`, `auth.invitation_created`,
 `invitation_accepted`, `invitation_revoked`, `auth.login_link_used`, `auth.customer_registered`,
 `auth.delegation_granted`, `delegation_revoked`, `delegated_access_started` (ghi ở **cả** khách con
 và khách cha — hai outbox, có thể hai database: ghi ở con trong transaction cấp token, ở cha qua job
 `auth.mirror_event` để chạy lại được), `auth.support_access_granted`, `support_access_started`,
-`support_access_revoked` (ghi với `tenant_id` của khách được vào để audit của khách thấy). Mọi event
+`support_access_revoked` (ghi với `tenant_id` của khách được vào để audit của khách thấy; mang
+`revoked_by_tenant` khi khách tự thu hồi — D-211). Mọi event
 trong lúc vào bằng uỷ quyền / hỗ trợ mang `Actor.access`.
 
 **Job:** `auth.send_login_link` (như `auth.send_password_reset`, D-162), `auth.send_invitation`,
@@ -364,13 +441,15 @@ trợ đã hết hạn > thời hạn lưu audit (chỉ dòng grant, event audit
 **Cấu hình (`Setting`, sinh lại `.env.example`):** `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` (8; 2–32),
 `AUTOXIDE_AUTH_LOGIN_LINK` (`false`), `AUTOXIDE_AUTH_LOGIN_LINK_URL` (trang có `{token}`; không đặt
 thì mail chứa token), `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES` (15; 5–60), `AUTOXIDE_AUTH_INVITATION_URL`,
-`AUTOXIDE_AUTH_INVITATION_DAYS` (7; 1–30), `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` (8; 1–72).
+`AUTOXIDE_AUTH_INVITATION_DAYS` (7; 1–30), `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` (8; 1–72 — D-211 giữ),
+`AUTOXIDE_AUTH_REAUTH_MINUTES` (10; hạn token xác nhận lại, A-b6).
 
 **Permission mới:** `organizations.units.read` / `.write` / `.manage` (scoped),
-`organizations.types.manage`, `organizations.settings.write` (scoped); `auth.invitations.manage`
-(scoped), `auth.customers.read`, `auth.customers.manage`, `auth.delegations.read`,
-`auth.delegations.manage`, `auth.support_access.read`, `auth.support.grant`; `notes.read` /
-`notes.write` thành scoped.
+`organizations.types.manage`, `organizations.settings.write` (scoped), `organizations.profile.manage`
+(scoped, đợt 2); `auth.invitations.manage` (scoped), `auth.customers.read`, `auth.customers.manage`,
+`auth.delegations.read`, `auth.delegations.manage`, `auth.support_access.read`,
+`auth.support_access.revoke` (D-211), `auth.support.grant`; `notes.read` / `notes.write` thành scoped;
+`content.*`, `media.*`, `forms.*` thành scoped (D-208).
 
 **Mã lỗi** (thêm bản dịch vào `locales/vi.json` của crate tương ứng; kernel ở locales của kernel):
 
@@ -388,6 +467,7 @@ thì mail chứa token), `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES` (15; 5–60), `AUTOX
 | `organizations.invalid_transition` | 409 | Không chuyển được nút từ `{from}` sang `{to}`. |
 | `organizations.setting_unknown` | 404 | Không có cài đặt `{key}`; xem `GET /api/v1/organizations/settings`. |
 | `organizations.setting_invalid` | 422 | Giá trị của `{key}` không hợp lệ: {reason} |
+| `organizations.invalid_opening_hours` | 422 | Giờ mở cửa không hợp lệ: giờ đóng phải sau giờ mở, ngày đặc biệt không được trùng. |
 | `address.unit_not_found` | 404 | Không có đơn vị hành chính mã `{code}`. |
 | `address.commune_not_in_province` | 422 | Xã / phường `{commune}` không thuộc tỉnh / thành `{province}`. |
 | `address.country_unsupported` | 422 | Chưa có danh mục đơn vị hành chính cho quốc gia `{country}`. |
@@ -406,6 +486,7 @@ thì mail chứa token), `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES` (15; 5–60), `AUTOX
 | `auth.support_access_disabled` | 403 | Khách hàng đã tắt quyền vào để hỗ trợ; chỉ yêu cầu của cơ quan có thẩm quyền được cấp. |
 | `auth.support_grant_not_found` | 404 | Không có quyền vào hỗ trợ `{id}`. |
 | `auth.support_duration_exceeded` | 422 | Quyền vào hỗ trợ dài tối đa {max} giờ. |
+| `auth.phone_taken` | 409 | Số điện thoại này đã thuộc một tài khoản; hãy đăng nhập. |
 | `notes.org_required` | 422 | Bạn làm ở nhiều nút: hãy chọn `org_id` cho ghi chú. |
 
 ## Thứ tự làm
@@ -420,23 +501,31 @@ mục xong:
    kernel. Testkit: `.member(token, user, org, &[("notes.read", Scope::Unit)])`. Ghi DECISIONS
    (độ sâu; gốc = tenant id; cấu trúc cây là của kernel). → ROADMAP mục 1, 2.
 2. **Module `address`** (không phụ thuộc gì): bảng, task `address.import`, dữ liệu VN gốc, REST, MCP,
-   trait `AdministrativeUnits`, kiểu `Address`, doctor. → mục 5.
+   trait `AdministrativeUnits`, kiểu `Address`, doctor. → mục 5, 6.
 3. **Module `organizations`**: loại nút, nút, vòng đời, dời nút, cài đặt kế thừa, REST, MCP, event,
-   gốc cho khách cũ và khách mới; đăng ký trước `auth`. → mục 1, 3.
+   gốc cho khách cũ và khách mới; đăng ký trước `auth`. → mục 1, 4.
 4. **`auth`: membership có nút, role có độ sâu, API key gắn nút**, migration nâng cấp, `Principal`
-   mới, endpoint membership. → mục 2, 4 (phần nâng cấp, API key).
+   mới, endpoint membership (kể cả `?inherited=true`, A-c11). → mục 2, 8 (phần nâng cấp, API key).
 5. **`notes` làm ví dụ** + bài rò rỉ giữa hai nhánh anh em trong testkit, chạy cho `notes` và
-   `organizations`; hướng dẫn viết module (EN + VI): `org_id`, độ sâu, khuôn kế thừa. → mục 2, 3.
+   `organizations`; hướng dẫn viết module (EN + VI): `org_id`, độ sâu, khuôn kế thừa. → mục 2, 4.
 6. **Danh tính hai lớp**: `realm`, người mua theo khách, `/me/tenants`, đổi khách đang chọn,
-   endpoint `customers`, role `admin` cho mỗi khách mới (nghe `kernel.tenant_created`). → mục 4.
-7. **Uỷ quyền theo cây khách hàng.** → mục 6.
-8. **Đăng nhập bằng link.** → mục 7.
+   endpoint `customers`, role `admin` cho mỗi khách mới (nghe `kernel.tenant_created`). → mục 8.
+7. **Uỷ quyền theo cây khách hàng.** → mục 10.
+8. **Đăng nhập bằng link.** → mục 11.
 9. **Mời người dùng** + `autoxide user invite --email … --role … [--org …] [--tenant …]` (qua
-   `api::Invitations`). → mục 8.
-10. **Quyền vào hỗ trợ của nhân sự nền tảng.** → mục 9.
-11. Đo đường nóng (`scripts/loadtest.sh`, `GET /auth/me` bằng access token và API key; trước bước 4 và
-    sau bước 10), ghi số đo vào DECISIONS; `docs/openapi.json`; `CHANGELOG.md`; tài liệu deploy; gate
+   `api::Invitations`). → mục 12.
+10. **Quyền vào hỗ trợ của nhân sự nền tảng**, kể cả khách tự thu hồi (D-211). → mục 13.
+11. **Hồ sơ công khai của nút**: trường hồ sơ, `GET /public/stores` (D-200), `PATCH …/public-profile`
+    (đợt 2). → mục 7.
+12. **`content`, `media`, `forms` theo nút và website** (D-208): `org_id`, quyền scoped, đọc công khai theo
+    website, bộ lọc `owner_org` / `site`. → mục 3.
+13. **Tài khoản**: `POST /me/reauth`, `locale` / `time_zone` / `name` qua `PATCH /me`, `requires_mfa` theo
+    role, `last_login_at`. → mục 9.
+14. Đo đường nóng (`scripts/loadtest.sh`, `GET /auth/me` bằng access token và API key; trước bước 4 và
+    sau bước 13), ghi số đo vào DECISIONS; `docs/openapi.json`; `CHANGELOG.md`; tài liệu deploy; gate
     đầy đủ; phát hành (`docs/RELEASING.md`).
+
+Không làm ở bước này: `POST /auth/phone-signups` (ROADMAP mục 14) làm ở bước 45 (D-202).
 
 ## Test bắt buộc
 
@@ -470,6 +559,10 @@ database nào.
   `link_gan_thiet_bi_sai_secret_bi_tu_choi`, `loi_moi_het_han_thu_hoi_gui_lai`,
   `nguoi_moi_khong_cap_duoc_quyen_minh_khong_co`, `api_key_ngoai_nhanh_bi_tu_choi`,
   `admin_moi_khach_khong_vao_khach_khac`.
+- Hồ sơ công khai của nút (D-200): nút không công khai không lộ qua `/public/stores`; hai khách cùng
+  database không thấy cửa hàng của nhau.
+- Nội dung theo website (D-208): `bai_cua_cua_hang_a_khong_hien_tren_website_cua_cua_hang_b`,
+  `nguoi_ban_chi_thay_media_cua_minh`.
 
 ## Tiêu chí xong
 
@@ -534,7 +627,9 @@ database nào.
 - Nhân sự nền tảng vào dữ liệu khách: Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 (hiệu lực 01/01/2026)
   và NĐ 356/2025/NĐ-CP — xử lý dữ liệu cá nhân phải có căn cứ, có mục đích, để lại vết; cung cấp dữ
   liệu cho cơ quan có thẩm quyền theo yêu cầu bằng văn bản (lưu số văn bản) — **cần đối chiếu điều
-  khoản cụ thể** về trường hợp xử lý không cần đồng ý và nghĩa vụ ghi nhật ký.
+  khoản cụ thể** về trường hợp xử lý không cần đồng ý và nghĩa vụ ghi nhật ký. Khách phải kiểm soát
+  được ai đang vào dữ liệu của mình nên tự thu hồi được lần cấp còn hạn, trừ yêu cầu của cơ quan có
+  thẩm quyền (D-211 — **cần đối chiếu văn bản gốc**).
 - Email mời, link đăng nhập là thư giao dịch, không phải quảng cáo (NĐ 91/2020 không áp cho thư giao
   dịch — cần đối chiếu khi bước 37 dựng `notifications`).
 
@@ -557,59 +652,3 @@ Ghi DECISIONS cho mỗi lựa chọn có ảnh hưởng lâu dài (skill `record
    dấu `email_verified_at` như tài khoản thường; bước 37 thêm cờ xác thực số điện thoại.
 7. Thêm `Permission::scoped_without_own()` hay coi `own` = `unit` cho permission trên chính nút —
    khuyến nghị cách sau (đơn giản, ghi trong mô tả permission).
-
-## Bổ sung theo D-200 (thiết kế giao diện 2)
-
-**Hồ sơ công khai của nút.** Module `organizations` thêm cho mỗi nút: `public` (mặc định tắt), tên hiển thị,
-`Address`, giờ mở cửa theo thứ trong tuần (và ngày nghỉ đặc biệt), `pickup` (nhận hàng tại quầy), tên miền
-gắn với nút. `GET /api/v1/organizations/public/stores` (công khai; khách suy từ tên miền như mọi endpoint
-công khai) trả các nút `public` của khách, sắp theo thứ tự khách đặt, `ETag` / `Cache-Control` như
-`/api/v1/address`. Không trả thành viên, cài đặt nội bộ hay nút không công khai. Test: nút không công khai
-không lộ; hai khách cùng database không thấy cửa hàng của nhau.
-
-## Bổ sung theo D-202 (tạo tài khoản từ số đã xác thực)
-
-`auth` thêm `POST /api/v1/auth/phone-signups {lookup_token, display_name?}` (công khai, rate limit theo IP):
-lấy số điện thoại đã qua OTP từ token xem đơn của `orders` (trait `OrderLookups` do `orders` công bố ở
-bước 45 — đăng ký `auth` trước thì lấy qua chỗ giữ của kernel hay `Subscription::optional`, agent bước 45
-chọn), tạo tài khoản trong khách với số đó đã xác thực, đăng nhập bằng passkey (bước 12) hay OTP; không bắt
-buộc mật khẩu. Số đã thuộc một tài khoản → 409 `auth.phone_taken` (gợi ý đăng nhập). Phần này làm ở bước
-45 khi `orders` có token xem đơn; ghi ở đây vì danh tính và đăng nhập thuộc `auth`.
-
-## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
-
-> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
-
-- **Nội dung theo website và nút (D-208, A-b1, A-c3).** Thay câu "`org_id` chỉ thêm vào `notes`…" ở mục
-  Phạm vi: `content` và `media` thêm `org_id` (nút sở hữu, mặc định nút gốc khi nâng cấp), `forms` thêm
-  `org_id` NULL được; quyền `content.*`, `media.*`, `forms.*` thành `scoped()`; đọc công khai lọc theo
-  website (tên miền → nút qua `kernel_tenant_domains.org_id`, bài của nút và nhánh trên được chia sẻ xuống
-  thì hiện); menu và ngôn ngữ bật theo website; bộ lọc quản trị `owner_org`, `site`. `newsletter`,
-  `comments` vẫn cấp khách. Media riêng của người bán trên sàn dùng chính mục này. Test:
-  `bai_cua_cua_hang_a_khong_hien_tren_website_cua_cua_hang_b`, `nguoi_ban_chi_thay_media_cua_minh`.
-- **Xác nhận lại danh tính (A-b6, A-c4).** `POST /api/v1/auth/me/reauth {method: passkey|totp|email_link}`
-  trả token ngắn hạn (`AUTOXIDE_AUTH_REAUTH_MINUTES`, mặc định 10) dùng một lần cho lệnh nhạy cảm (tạo API
-  key, đổi email, tắt MFA, đổi role admin) thay cho `current_password` — tài khoản chỉ có passkey cũng làm
-  được. Bước 54 (P5, step-up) dùng chính token này.
-- **Ngôn ngữ và múi giờ ưa thích (A-b4).** `auth_user.locale`, `auth_user.time_zone` (IANA), `PATCH
-  /api/v1/auth/me`; mail và `notifications` gửi chậm (job) dùng hai giá trị này thay cho ngôn ngữ của
-  request gốc. Thay mục đã hoãn ở D-062.
-- **Khách tự thu hồi quyền vào hỗ trợ (D-211, A-b5).** `DELETE /api/v1/auth/support-access/{id}`
-  (`auth.support_access.revoke` ở khách); trần giờ giữ như cũ; lần cấp `legal_request` không thu hồi được.
-- **Nhỏ (A-c11).** `GET /api/v1/auth/memberships?org_id&inherited=true` (membership hiệu lực kể cả kế thừa từ
-  nút trên). **Thấp (A-b10):** chính sách bắt buộc MFA theo role (`auth_roles.requires_mfa`),
-  `auth_user.last_login_at`.
-
-## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
-
-> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
-
-- **Ghi hồ sơ công khai của nút.** `PATCH /api/v1/organizations/{id}/public-profile` (`organizations.profile.manage`,
-  theo độ sâu): `public`, `display_name`, `Address`, `opening_hours[]` (thứ, giờ mở, giờ đóng — nhiều khoảng một
-  ngày được), `special_days[]` (ngày, đóng cửa hay giờ riêng, ghi chú), `pickup`, `cover_media_id?`, `logo_media_id?`
-  (ID của `media`, chỉ giữ ID). Kiểm: giờ đóng sau giờ mở, ngày đặc biệt không trùng; xoá ETag của
-  `/public/stores`. Event `organizations.public_profile_updated`. Lỗi `organizations.invalid_opening_hours` (422).
-- **Tự đổi tên hiển thị.** `PATCH /api/v1/auth/me` (đã có cho `locale`, `time_zone`) nhận thêm `name` (1–100 ký tự,
-  bỏ khoảng trắng đầu cuối); cập nhật `search_text`; event `auth.user_updated`.
-- **Gỡ danh tính OIDC** đã có ở bước 40 (`DELETE /api/v1/auth/me/identities/{id}`, chặn cách đăng nhập cuối
-  `auth.identity_last_method`) — không thêm gì.

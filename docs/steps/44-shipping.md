@@ -3,6 +3,10 @@
 > Lộ trình: `docs/ROADMAP.md` bước 44 và phần "Giai đoạn module thương mại" · Thiết kế:
 > `docs/research/business-foundation.md` mục 8 · Quyết định: D-180, D-184, D-186, D-187 (không giữ
 > tiền), D-190 (secret theo khách), D-191, D-193 (`address`)
+> Nguồn đối chiếu thiết kế: `docs/prompts/ui-trace-roadmap.md` (mã `A-…` / `B-…` trỏ tới
+> `docs/research/ui-trace/`) và `docs/prompts/ui-phase2-api.md` (màn tương ứng ở
+> `docs/research/ui-traceability.md`, đợt 2).
+> Đã gộp các quyết định: D-200, D-201, D-208…D-218 (gồm D-216), D-223…D-227 (D-228).
 
 ## Mục tiêu
 
@@ -10,6 +14,8 @@ Xong bước này, khách có sổ địa chỉ người mua theo đơn vị hà
 (vùng theo tỉnh, bậc cân nặng / kích thước, miễn phí từ một giá trị đơn, nhận tại cửa hàng), cắm được
 hãng vận chuyển qua trait `ShippingCarrier` (bộ nối thật là module riêng), quản lý vận đơn (nhiều kiện,
 giao một phần, giao thất bại, hoàn hàng) và đối soát tiền thu hộ (COD) với bảng kê của hãng qua sổ cái.
+Báo giá trả ngày giao dự kiến là ngày cụ thể theo lịch giao và giờ chốt của khách (D-201, D-223…D-227) và
+dòng thuế GTGT của phí giao (D-208…D-218); trang sản phẩm có ước tính phí giao công khai (D-200).
 `shipping` **không phụ thuộc `orders`**: nhận yêu cầu giao qua event, báo trạng thái qua event; `orders`
 gọi `autoxide_shipping::api` để báo giá.
 
@@ -19,7 +25,8 @@ gọi `autoxide_shipping::api` để báo giá.
   gọi đưa vào (lấy từ `VariantSnapshot` của `catalog`) — `shipping` không gọi `catalog`.
 - Từ nền: `Address` và `dyn AdministrativeUnits` (`autoxide_address::api`, bước 34), `dyn OrgDirectory`,
   `TenantContext`, `Scope`, kho secret theo khách (bước 33), `dyn Ledger` (bước 36), người mua là tài khoản
-  theo khách (bước 34).
+  theo khách (bước 34), giờ mở cửa trong hồ sơ công khai của nút (bước 34), nhóm thuế của engine thuế
+  (bước 36), danh sách lý do theo khách `Module::reason_lists` / `ReasonCodes` (bước 51, D-223).
 - Song song được với 42, 43.
 
 ## Phạm vi
@@ -200,6 +207,31 @@ pub mod fake { pub struct FakeCarrier { /* … */ } }
 - `Pickup`: các điểm nhận (nút cửa hàng có cờ), phí 0 hay phí đặt.
 - Địa chỉ đích phải hợp lệ theo `AdministrativeUnits` (xã thuộc tỉnh, còn hiệu lực); nước ngoài thì chỉ
   phương thức khai `countries` khác `VN`.
+- **GTGT trên phí giao** (B-b5, B-c9; D-208…D-218): phương thức có `tax_category`; báo giá trả dòng thuế
+  cho phí giao, `orders` ghi dòng thuế đó lên hoá đơn.
+
+### Ngày giao dự kiến và lịch giao
+
+- `Quote` và ước tính công khai trả `eta: {earliest_date, latest_date, order_by}` — ngày tuyệt đối theo
+  múi giờ của khách, `order_by` = giờ chốt hôm nay nếu còn (D-201). Khoảng dài hơn 7 ngày thì ghi rõ lý
+  do (hàng đặt trước, vùng xa).
+- Ngày làm việc, giờ chốt theo phương thức, ngày lễ là dữ liệu có ngày hiệu lực (D-201): lịch
+  `shipping_calendars` (múi giờ, ngày làm việc trong tuần) và ngày riêng `shipping_calendar_days` (`closed`
+  hay `special_hours` kèm giờ chốt) (D-223…D-227). Ngày nghỉ lễ do khách nhập khi có thông báo chính thức;
+  task `shipping.load_holidays pack=vn year=` nạp gói ngày nghỉ dùng chung nếu đã có (dữ liệu, không viết
+  cứng).
+- **Giờ chốt "giao trong ngày"** (D-223…D-227): phương thức có `calendar_id?`, `cutoff_minute?` (phút từ 0
+  giờ theo múi giờ lịch, vd 660 = 11:00), `same_day`; ngày giao dự kiến tính theo lịch và giờ chốt.
+- **Nhận tại cửa hàng** (D-201): trả `ready_at` = giờ đặt + `prep_hours` lùi tới giờ mở cửa kế tiếp (hồ sơ
+  công khai của nút, bước 34) và `hold_days` — thời hạn giữ hàng chờ nhận, khai trên phương thức nhận tại
+  cửa hàng; bước 45 dùng (D-223…D-227).
+
+### Ước tính phí giao công khai (D-200)
+
+`GET /public/shipping/estimate?product_id&variant_id&quantity&province_code` (công khai) chạy cùng
+`quote` với một giỏ ảo một dòng, giao tới mã tỉnh (chưa cần xã), trả các phương thức, phí, thời gian dự
+kiến (`eta`), ngưỡng miễn phí. Response ghi rõ `estimate: true`; phí thật luôn tính lại khi đặt hàng. Cache
+ngắn theo (sản phẩm, tỉnh).
 
 ### Bảng dữ liệu
 
@@ -212,17 +244,19 @@ chưa có). Migration có `down`; thêm `outbox_migration`, `jobs_migration`.
 |---|---|---|
 | `shipping_addresses` | sổ địa chỉ người mua: `id`, `tenant_id`, `buyer_id`, `label`, `recipient_name`, `phone`, cột `Address`, `is_default`, `created_at`, `updated_at` | (`tenant_id`,`buyer_id`,`id`) |
 | `shipping_zones` · `shipping_zone_regions` | `id`, `org_id`, `name` / `zone_id`, `country`, `province_code?` (NULL = cả nước) | (`tenant_id`,`org_id`); unique (`tenant_id`,`zone_id`,`country`,`province_code`) |
-| `shipping_methods` | `id`, `tenant_id`, `org_id`, `code`, `kind`, `names` (JSON), `active`, `position`, `carrier_account_id?`, `service_code?`, `free_over_minor?`, `free_over_currency?`, `handling_fee_minor`, `currency`, `volumetric_divisor`, `default_item_weight_grams?`, `countries` (JSON), `estimated_min_days?`, `estimated_max_days?`, `updated_at` | unique (`tenant_id`,`org_id`,`code`) |
+| `shipping_methods` | `id`, `tenant_id`, `org_id`, `code`, `kind`, `names` (JSON), `active`, `position`, `carrier_account_id?`, `service_code?`, `free_over_minor?`, `free_over_currency?`, `handling_fee_minor`, `currency`, `tax_category` (D-208…D-218), `volumetric_divisor`, `default_item_weight_grams?`, `countries` (JSON), `estimated_min_days?`, `estimated_max_days?`, `calendar_id?`, `cutoff_minute?`, `same_day`, `hold_days?` (nhận tại cửa hàng) (D-223…D-227), `updated_at` | unique (`tenant_id`,`org_id`,`code`) |
 | `shipping_rates` | `method_id`, `zone_id`, `min_weight_grams`, `max_weight_grams?`, `max_side_mm?`, `amount_minor`, `currency`, `step_grams?`, `step_amount_minor?` | (`tenant_id`,`method_id`,`zone_id`,`min_weight_grams`) |
+| `shipping_calendars` | lịch giao (D-223…D-227): `id`, `tenant_id`, `org_id`, `name`, `time_zone` (mặc định `Asia/Ho_Chi_Minh`), `working_weekdays` (bitmask), `updated_at` | bắt đầu bằng `tenant_id` |
+| `shipping_calendar_days` | `calendar_id`, `date`, `kind` (`closed`/`special_hours`), `cutoff_minute?`, `note` | unique (`tenant_id`,`calendar_id`,`date`) |
 | `shipping_pickup_points` | `method_id`, `org_id` (cửa hàng), `instructions`, `prep_hours` | unique (`tenant_id`,`method_id`,`org_id`) |
-| `shipping_carrier_accounts` | `id`, `tenant_id`, `org_id`, `carrier_code`, `name`, `secret_ref` (khoá trong kho secret theo khách), `webhook_token_hash`, `settings` (JSON), `sandbox`, `active` | (`tenant_id`,`carrier_code`) |
+| `shipping_carrier_accounts` | `id`, `tenant_id`, `org_id`, `carrier_code`, `name`, `secret_ref` (khoá trong kho secret theo khách), `webhook_token_hash`, `settings` (JSON), `sandbox`, `active`, `check_status` (`never`/`ok`/`failed`), `checked_at?`, `check_error_code?` (D-223…D-227) | (`tenant_id`,`carrier_code`) |
 | `shipping_shipments` | `id`, `tenant_id`, `org_id`, `origin_org_id`, `order_id`, `order_number`, `request_key`, `request_fingerprint`, `direction`, `method_id`, `carrier_account_id?`, `carrier_code?`, `service_code?`, `tracking_number?`, `status`, `status_at`, `recipient_name`, `recipient_phone`, cột `Address`, `declared_value_minor`, `cod_minor?`, `currency`, `quoted_fee_minor?`, `actual_fee_minor?`, `cod_status` (`none`/`pending`/`collected`/`settled`/`mismatch`), `attempts`, `created_at`, `updated_at` | unique (`tenant_id`,`order_id`,`request_key`); unique (`tenant_id`,`carrier_code`,`tracking_number`); (`tenant_id`,`status`,`status_at`); (`tenant_id`,`org_id`,`created_at`,`id`) |
 | `shipping_parcels` | `shipment_id`, `position`, `weight_grams`, `length_mm?`, `width_mm?`, `height_mm?`, `tracking_number?` | (`tenant_id`,`shipment_id`) |
 | `shipping_shipment_items` | `shipment_id`, `parcel_id?`, `order_line_key`, `variant_id`, `sku`, `name`, `quantity` | (`tenant_id`,`shipment_id`) |
 | `shipping_tracking_events` | **chỉ thêm**: `shipment_id`, `source` (`carrier`/`staff`/`system`), `event_key`, `status`, `carrier_status`, `occurred_at`, `note`, `created_at` | unique (`tenant_id`,`shipment_id`,`event_key`); (`tenant_id`,`shipment_id`,`occurred_at`) |
 | `shipping_webhook_inbox` | nguyên văn webhook: `id`, `tenant_id`, `carrier_account_id`, `received_at`, `headers` (đã bỏ header bí mật), `body`, `status` (`received`/`processed`/`rejected`/`failed`), `error?` | (`tenant_id`,`status`,`received_at`) |
 | `shipping_cod_statements` · `shipping_cod_statement_lines` | `id`, `carrier_account_id`, `statement_reference`, `period_from`, `period_to`, `total_cod_minor`, `total_fee_minor`, `net_paid_minor`, `currency`, `status` (`imported`/`reconciled`/`has_mismatch`), `imported_by`, `imported_at` / `tracking_number`, `cod_minor`, `fee_minor`, `shipment_id?`, `match` (`matched`/`amount_mismatch`/`unknown_tracking`/`not_delivered`) | unique (`tenant_id`,`carrier_account_id`,`statement_reference`) |
-| `shipping_cod_discrepancies` | `statement_line_id?`, `shipment_id?`, `kind`, `expected_minor`, `reported_minor`, `status` (`open`/`resolved`), `resolution_note`, `resolved_by?` | (`tenant_id`,`status`) |
+| `shipping_cod_discrepancies` | `statement_line_id?`, `shipment_id?`, `kind`, `expected_minor`, `reported_minor`, `status` (`open`/`resolved`), `resolution_code?` (danh sách `shipping.cod_resolution` — D-223), `resolution_note`, `resolved_by?` | (`tenant_id`,`status`) |
 
 ### API REST
 
@@ -234,7 +268,8 @@ Dưới `/api/v1/shipping`. Dữ liệu theo cửa hàng kiểm quyền theo đ�
 | `GET /buyers/{buyer_id}/addresses` | `shipping.addresses.read` | cho nhân viên chăm sóc khách |
 | `GET/POST /zones` · `PATCH/DELETE /zones/{id}` · `PUT /zones/{id}/regions` | `shipping.settings.manage` | |
 | `GET/POST /methods` · `GET/PATCH/DELETE /methods/{id}` · `PUT /methods/{id}/rates` · `PUT /methods/{id}/pickup-points` | `shipping.settings.manage` | |
-| `GET/POST /carrier-accounts` · `PATCH /carrier-accounts/{id}` · `POST /carrier-accounts/{id}/test` | `shipping.carriers.manage` | thông tin đăng nhập ghi vào kho secret, không bao giờ trả lại |
+| `GET/POST /calendars` · `PATCH /calendars/{id}` · `PUT/DELETE /calendars/{id}/days/{date}` | `shipping.settings.manage` | lịch giao, ngày nghỉ, giờ chốt (D-223…D-227) |
+| `GET/POST /carrier-accounts` · `PATCH /carrier-accounts/{id}` · `POST /carrier-accounts/{id}/test` | `shipping.carriers.manage` | thông tin đăng nhập ghi vào kho secret, không bao giờ trả lại; `check_status` cập nhật bởi `test` và khi gọi hãng thật nhận `Unauthorized` (D-223…D-227) |
 | `POST /quote` | `shipping.read` | thân `QuoteRequest`; cùng hàm với `api` (cho agent / nhân viên) |
 | `GET /shipments?order_id&status&org_id&tracking` · `GET /shipments/{id}` | `shipping.shipments.read` | kèm kiện, món, lịch sử trạng thái |
 | `POST /shipments` | `shipping.shipments.manage` | tạo tay (`ShipmentRequest`), dùng cho bán tại quầy giao sau |
@@ -242,7 +277,9 @@ Dưới `/api/v1/shipping`. Dữ liệu theo cửa hàng kiểm quyền theo đ�
 | `POST /shipments/{id}/status` | `shipping.shipments.manage` | cập nhật tay (giao bằng người của cửa hàng, nhận tại cửa hàng) |
 | `GET /shipments/{id}/label` | `shipping.shipments.read` | file nhãn từ hãng, lưu đệm trong `Storage` (`shipping/labels/<id>`) |
 | `POST /webhooks/{carrier_code}/{account_token}` | công khai | chỉ trả 2xx khi đã ghi nguyên văn; chữ ký sai → 401, không lưu thân |
-| `POST /cod/statements` (CSV hay lấy qua API của hãng) · `GET /cod/statements[/{id}]` · `GET /cod/discrepancies` · `POST /cod/discrepancies/{id}/resolve` | `shipping.cod.manage` | `statement_reference` chống trùng |
+| `POST /cod/statements` (CSV hay lấy qua API của hãng) · `GET /cod/statements[/{id}]` · `GET /cod/discrepancies` · `POST /cod/discrepancies/{id}/resolve` | `shipping.cod.manage` | `statement_reference` chống trùng; `resolve` nhận `resolution_code` (danh sách `shipping.cod_resolution`) + `note` bắt buộc, ghi audit (D-223…D-227) |
+| `POST /cod/discrepancies/{id}/refresh-tracking` | `shipping.cod.manage` | lấy lại hành trình từ hãng (ngoài transaction ghi), cập nhật vận đơn (D-223…D-227) |
+| `GET /public/shipping/estimate?product_id&variant_id&quantity&province_code` | công khai | ước tính phí giao, `estimate: true` (D-200) |
 
 Webhook: khách lấy từ `account_token` (token ngẫu nhiên, lưu băm) và cách phân giải khách giống webhook
 cổng thanh toán của bước 36 — chốt theo đặc tả bước 33 / 36.
@@ -269,6 +306,9 @@ Phát (payload có `order_id`, `request_key`, `shipment_id`, `status`, `tracking
 `shipping.shipment_cancelled` · `shipping.booking_failed` · `shipping.cod_collected` ·
 `shipping.cod_settled` · `shipping.cod_mismatch` · `shipping.carrier_account_changed`.
 
+`shipping.cod_settled` mang thêm `seller_org_id` và tài khoản nhận (đối tác thu hộ hay người bán), để
+`ledger` ghi đúng chỗ (D-216).
+
 ### Job và lịch
 
 - `shipping.book`: đổi `pending → booking` có điều kiện, gọi `create_shipment` (ngoài transaction,
@@ -279,18 +319,22 @@ Phát (payload có `order_id`, `request_key`, `shipment_id`, `status`, `tracking
 - `shipping.post_cod`: khi giao xong có COD — ghi sổ cái Nợ "phải thu hãng `<account>`" / Có "phải thu
   người mua COD" (mã tham chiếu `shipping.cod:<shipment_id>`); khi đối soát khớp — Nợ "tiền đang chuyển
   về" (số thực trả) + Nợ "chi phí vận chuyển" (phí hãng trừ) / Có "phải thu hãng" (mã
-  `shipping.cod_settle:<line_id>`). Tài khoản và chữ ký `Ledger` theo đặc tả bước 36 và 45.
+  `shipping.cod_settle:<line_id>`). Tài khoản và chữ ký `Ledger` theo đặc tả bước 36 và 45. Dòng lệch
+  COD giải quyết với `resolution_code = written_off` sinh bút toán theo bước 36 (D-223…D-227).
 - `shipping.import_cod_statement`: đọc CSV (`autoxide_kernel::csv`) / API của hãng, khớp theo
   `tracking_number`, sinh chênh lệch.
 - Lịch: `shipping.reconcile_bookings` mỗi 5 phút (vận đơn kẹt ở `booking` quá 10 phút → hỏi
   `find_by_reference`); `shipping.poll_tracking` mỗi 30 phút cho hãng không có webhook; `shipping.cod_aging`
   mỗi ngày (giao xong quá `COD_SETTLEMENT_DAYS` mà chưa có trong bảng kê → chênh lệch `overdue`).
+- Task: `shipping.load_holidays pack=vn year=` — nạp gói ngày nghỉ dùng chung nếu đã có (D-223…D-227).
 
 ### Cấu hình (`AUTOXIDE_SHIPPING_`)
 
 `FAKE_CARRIER` (false), `CARRIER_TIMEOUT_SECONDS` (10), `MAX_ADDRESSES_PER_BUYER` (20),
 `WEBHOOK_MAX_BYTES` (256 KiB), `COD_SETTLEMENT_DAYS` (14). Cấu hình của hãng thuộc từng khách nằm
-trong `shipping_carrier_accounts` + kho secret, không trong biến môi trường (D-190).
+trong `shipping_carrier_accounts` + kho secret, không trong biến môi trường (D-190). Lịch giao, ngày nghỉ,
+giờ chốt nằm trong bảng, không trong biến môi trường. Danh sách lý do: `shipping.cod_resolution` (D-223),
+mã mặc định `carrier_corrected`, `delivered_confirmed`, `returned_confirmed`, `written_off`.
 
 ### Tính năng và hạn mức
 
@@ -326,17 +370,22 @@ trong `shipping_carrier_accounts` + kho secret, không trong biến môi trườ
 
 ## Thứ tự làm
 
+Số mục theo danh sách việc của bước 44 trong ROADMAP.
+
 1. Khung crate, permission, tính năng / hạn mức, `CarrierRegistry`, `fake::FakeCarrier`.
 2. Sổ địa chỉ người mua (`Address`, kiểm bằng `AdministrativeUnits`, địa chỉ nước ngoài dạng chung,
    `PersonalData` + xoá khi người mua bị xoá) → **mục 1**.
-3. Vùng, phương thức, bậc phí, miễn phí, nhận tại cửa hàng, `ShippingRates::quote`, `POST /quote` →
-   **mục 2**.
-4. Tài khoản hãng (secret theo khách), `ShippingCarrier`, đặt / huỷ / nhãn / theo dõi, webhook (ghi
-   nguyên văn → job, chống trùng, ánh xạ trạng thái) → **mục 3**.
+3. Vùng, phương thức, bậc phí, miễn phí, nhận tại cửa hàng, `ShippingRates::quote`, `POST /quote`,
+   `tax_category` và dòng thuế của phí giao → **mục 2**.
+4. Tài khoản hãng (secret theo khách, `check_status`), `ShippingCarrier`, đặt / huỷ / nhãn / theo dõi,
+   webhook (ghi nguyên văn → job, chống trùng, ánh xạ trạng thái) → **mục 3**.
 5. Vận đơn: nhận event của `orders` (test bằng module giả), nhiều kiện, tách, giao thất bại, hoàn hàng,
    event phát ra → **mục 4**.
-6. COD: ghi sổ cái, nhập bảng kê, khớp, chênh lệch, quá hạn → **mục 5**.
-7. `docs/SHIPPING.md` + `.vi.md` (cách viết bộ nối hãng có ví dụ từ `FakeCarrier`), OpenAPI,
+6. COD: ghi sổ cái, nhập bảng kê, khớp, chênh lệch, quá hạn, `cod_settled` mang `seller_org_id`, khớp dòng
+   lệch có `resolution_code` + `refresh-tracking` → **mục 5**.
+7. Lịch giao, ngày nghỉ, giờ chốt, `eta`, `ready_at` / `hold_days` của nhận tại cửa hàng → **mục 6**.
+8. Ước tính phí giao công khai → **mục 7**.
+9. `docs/SHIPPING.md` + `.vi.md` (cách viết bộ nối hãng có ví dụ từ `FakeCarrier`), OpenAPI,
    `.env.example`, CHANGELOG, ROADMAP.
 
 ## Test bắt buộc
@@ -361,6 +410,7 @@ hãng bằng `FakeCarrier`.
 - **Rò rỉ**: bài chung giữa khách (vận đơn, địa chỉ, tài khoản hãng); `ro_ri_giua_hai_cua_hang_anh_em`
   (nhân viên cửa hàng A không thấy vận đơn / phương thức riêng của B); người mua X không đọc được địa
   chỉ của người mua Y.
+- Ước tính công khai (D-200): kết quả bằng `quote` của giỏ một dòng cùng tỉnh.
 - `api_shipping_qua_testapp` (`ShippingRates`, `CarrierRegistry`), `fake_carrier_bi_canh_bao_trong_doctor`.
 
 ## Tiêu chí xong
@@ -369,7 +419,8 @@ hãng bằng `FakeCarrier`.
 - [ ] `shipping` không có phụ thuộc Cargo vào `autoxide-orders` hay `autoxide-catalog`; chỉ biết tên
       event dạng chuỗi.
 - [ ] Không gọi mạng trong transaction ghi; không lưu / log thông tin đăng nhập hãng.
-- [ ] `docs/SHIPPING.md` + `docs/SHIPPING.vi.md`; OpenAPI, `.env.example`; CHANGELOG.
+- [ ] `docs/SHIPPING.md` + `docs/SHIPPING.vi.md` (gồm lịch giao, giờ chốt, ước tính công khai); OpenAPI,
+      `.env.example`; CHANGELOG.
 - [ ] DECISIONS: `CarrierRegistry` cho nhiều hãng; bảng trạng thái chung và chuyển hợp lệ; cân quy
       đổi; COD ghi sổ cái (core không giữ tiền, căn cứ); webhook ghi nguyên văn rồi xử lý bằng job.
 - [ ] `./gate.sh` đầy đủ xanh; ROADMAP; commit; phát hành theo `docs/RELEASING.md`.
@@ -393,6 +444,10 @@ hãng bằng `FakeCarrier`.
 - **Hai database**: bậc cân `max_weight_grams` NULL = vô hạn — viết điều kiện `IS NULL OR >`, không
   dùng `COALESCE` với số lớn; tìm vùng theo `province_code` NULL dùng `IS NULL`, không `= NULL`.
 - **Số điện thoại** người nhận là dữ liệu cá nhân: không đưa vào log, event chỉ mang ID.
+- **Ngày giao dự kiến**: ngày tuyệt đối tính theo múi giờ của khách / của lịch; ngày nghỉ, giờ chốt là
+  dữ liệu, không viết cứng (D-201, D-223…D-227).
+- **Lấy lại hành trình** cho dòng lệch COD gọi hãng ngoài transaction ghi (D-223…D-227).
+- **Ước tính công khai** chỉ là ước tính (`estimate: true`); phí thật luôn tính lại khi đặt hàng (D-200).
 
 ## Căn cứ pháp lý
 
@@ -407,6 +462,10 @@ hãng bằng `FakeCarrier`.
 - Sổ địa chỉ là dữ liệu cá nhân: Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 và NĐ 356/2025 (từ 01/01/2026)
   — mục đích giao hàng, xuất và xoá theo yêu cầu, không dùng cho quảng cáo.
 - Chứng từ đối soát COD là chứng từ kế toán: lưu theo Luật Kế toán 88/2015 (bước 36).
+- COD không về tài khoản của nhà vận hành sàn — về đối tác thu hộ có giấy phép hoặc thẳng người bán
+  (D-216); vì vậy `shipping.cod_settled` mang `seller_org_id` và tài khoản nhận.
+- GTGT trên phí giao: Luật Thuế GTGT 48/2024/QH15 — **cần đối chiếu văn bản gốc** (D-208…D-218).
+- Ngày nghỉ lễ: theo thông báo chính thức — dữ liệu khách nhập hay gói dùng chung, không viết cứng.
 
 ## Agent làm bước này tự quyết
 
@@ -416,47 +475,3 @@ hãng bằng `FakeCarrier`.
 - Đọc bảng kê CSV theo một định dạng chung (cột `tracking_number`, `cod_amount`, `fee`) và để bộ nối
   từng hãng đổi định dạng riêng — khuyến nghị vậy.
 - Ghi vào `docs/DECISIONS.md` (skill `record-decision`).
-
-## Bổ sung theo D-200 (thiết kế giao diện 2)
-
-**Ước tính phí giao công khai.** `GET /public/shipping/estimate?product_id&variant_id&quantity&province_code`
-(công khai) chạy cùng `quote` với một giỏ ảo một dòng, giao tới mã tỉnh (chưa cần xã), trả các phương thức,
-phí, thời gian dự kiến, ngưỡng miễn phí. Response ghi rõ `estimate: true`; phí thật luôn tính lại khi đặt
-hàng. Cache ngắn theo (sản phẩm, tỉnh). Test: kết quả bằng `quote` của giỏ một dòng cùng tỉnh.
-
-## Bổ sung theo D-201
-
-**Ngày giao dự kiến.** `Quote` và ước tính công khai trả `eta: {earliest_date, latest_date, order_by}`
-(ngày tuyệt đối theo múi giờ của khách, `order_by` = giờ chốt hôm nay nếu còn). Ngày làm việc, giờ chốt
-theo phương thức, ngày lễ là dữ liệu có ngày hiệu lực (`shipping_calendars`). Nhận tại cửa hàng trả
-`ready_at` = giờ đặt + `prep_hours` lùi tới giờ mở cửa kế tiếp (hồ sơ công khai của nút, bước 34) và
-`hold_days`. Khoảng dài hơn 7 ngày thì ghi rõ lý do (hàng đặt trước, vùng xa).
-
-## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
-
-> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
-
-- **GTGT trên phí giao (B-b5, B-c9).** `shipping_methods.tax_category`; báo giá trả dòng thuế cho phí giao,
-  `orders` ghi dòng thuế đó lên hoá đơn. Căn cứ Luật Thuế GTGT 48/2024/QH15 — **cần đối chiếu văn bản gốc**.
-- **COD (D-216).** Event `shipping.cod_settled` mang `seller_org_id` và tài khoản nhận (đối tác thu hộ hay
-  người bán), để `ledger` ghi đúng chỗ.
-
-## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
-
-> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
-
-- **Lịch giao.** `shipping_calendars` (`id`, `tenant_id`, `org_id`, `name`, `time_zone` (mặc định
-  `Asia/Ho_Chi_Minh`), `working_weekdays` (bitmask), `updated_at`) và `shipping_calendar_days` (`calendar_id`,
-  `date`, `kind` `closed`/`special_hours`, `cutoff_minute?`, `note`; unique (`tenant_id`, `calendar_id`, `date`)).
-  `GET/POST /calendars`, `PATCH /calendars/{id}`, `PUT/DELETE /calendars/{id}/days/{date}`
-  (`shipping.rates.manage`). Ngày nghỉ lễ do khách nhập khi có thông báo chính thức; task
-  `shipping.load_holidays pack=vn year=` nạp gói ngày nghỉ dùng chung nếu đã có (dữ liệu, không viết cứng).
-- **Giờ chốt "giao trong ngày".** Phương thức có `calendar_id?`, `cutoff_minute?` (phút từ 0 giờ theo múi giờ lịch,
-  vd 660 = 11:00), `same_day`; ngày giao dự kiến tính theo lịch và giờ chốt.
-- **Trạng thái tài khoản hãng.** `shipping_carrier_accounts` thêm `check_status` (`never`/`ok`/`failed`),
-  `checked_at?`, `check_error_code?`; cập nhật bởi `POST …/test` và khi gọi thật nhận `Unauthorized`.
-- **Khớp dòng lệch COD.** `POST /cod/discrepancies/{id}/refresh-tracking` (lấy lại hành trình từ hãng, ngoài
-  transaction ghi, cập nhật vận đơn) và `resolve` nhận `resolution_code` (danh sách `shipping.cod_resolution`,
-  D-223: `carrier_corrected`, `delivered_confirmed`, `returned_confirmed`, `written_off`) + `note` bắt buộc; ghi audit;
-  `written_off` sinh bút toán theo bước 36.
-- **Thời hạn giữ hàng chờ nhận:** phương thức nhận tại cửa hàng có `hold_days`; bước 45 dùng (dưới).

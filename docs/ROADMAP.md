@@ -207,50 +207,42 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
 
 Thiết kế: trụ 2. Bắt đầu SAU bước 33.
 
-- [ ] Cây tổ chức trong khách hàng: loại nút tự đặt, độ sâu có giới hạn, bảng tổ tiên – con cháu,
-      dời nút (khoá dòng), vòng đời nút (chờ duyệt, hoạt động, tạm khoá, lưu trữ — khoá một nút thì
-      cả nhánh ngừng ghi)
-- [ ] Thành viên và quyền có độ sâu `own` / `unit` / `subtree` / `tenant`; `Principal` mang quyền
-      theo nút; công cụ lọc theo nhánh cho service; dữ liệu nghiệp vụ mang `org_id`; module mẫu
-      `notes` dùng làm ví dụ; testkit có bài rò rỉ giữa hai nhánh anh em
-- [ ] Cài đặt kế thừa theo cây (múi giờ, tiền tệ, ngôn ngữ, hồ sơ thuế, chính sách) và khuôn mẫu
-      để module áp cùng cách cho dữ liệu của mình (vd giá: chuỗi đặt, cửa hàng ghi đè)
-- [ ] Danh tính hai lớp: nhân sự là tài khoản toàn nền tảng (mặt điều khiển), một người làm cho
-      nhiều khách / nút; người mua là tài khoản theo từng khách; API key gắn với khách và nút.
-      Nâng cấp: tài khoản, role và API key có sẵn thành nhân sự của khách mặc định, giữ quyền cũ
-- [ ] Địa chỉ và đơn vị hành chính Việt Nam (module nền `address`, D-193): chỉ danh mục sau sáp nhập
-      — hai cấp tỉnh / thành → xã / phường / đặc khu, 34 tỉnh và 3.321 xã theo QĐ 19/2025/QĐ-TTg,
-      hiệu lực 01/7/2025; không có cấp huyện, không đối chiếu địa chỉ cũ. Dữ liệu dùng chung mọi
-      khách (mặt điều khiển), lấy từ nguồn chính thức, ghi nguồn và ngày; mỗi đơn vị có mã, tên, loại,
-      mã cấp trên, ngày hiệu lực từ / tới; cập nhật bằng task khi nhà nước đổi (không sửa code).
-      Kiểu `Address` trong `api` (quốc gia, mã tỉnh, mã xã, dòng địa chỉ, kèm tên tại thời điểm ghi);
-      kiểm mã xã thuộc đúng tỉnh; endpoint công khai danh sách tỉnh, xã theo tỉnh, tìm theo tên (không
-      dấu cũng tìm được), có ETag / cache. Nút tổ chức (cửa hàng, kho, người bán), hồ sơ KYC và hồ sơ
-      pháp lý (bước 37), sổ địa chỉ người mua (bước 44) đều dùng kiểu này
-- [ ] Uỷ quyền theo cây khách hàng: role ở khách cha có hiệu lực ở các khách con khi được cấp; vào
-      ngữ cảnh khách con bằng cùng API; audit ghi ở cả hai phía
-- [ ] Đăng nhập bằng link qua email (không cần mật khẩu): token dùng một lần, hết hạn ngắn, gắn
-      thiết bị yêu cầu khi được; MFA vẫn áp dụng; trả lời như nhau về thời gian dù email có hay
-      không (như D-154, D-162); tắt mặc định, bật bằng cấu hình
-- [ ] Mời người dùng qua email: quản trị viên mời kèm role định sẵn, người được mời đặt mật khẩu
-      (hay passkey) qua link dùng một lần; lời mời hết hạn, thu hồi được, có event cho audit; lệnh
-      CLI tương ứng
-- [ ] Hồ sơ công khai của nút (D-200): tên hiển thị, địa chỉ (`Address`), giờ mở cửa theo ngày, có
-      nhận hàng tại quầy hay không, tên miền gắn với nút; endpoint công khai danh sách cửa hàng của khách
-      theo tên miền (chỉ nút bật "hiện công khai"), có ETag / cache — website dùng cho "cửa hàng gần bạn"
-      và chọn nơi nhận hàng
-- [ ] Nhân sự nền tảng vào dữ liệu của khách (D-190): chỉ khi có quyền vào cấp có thời hạn, ghi lý
-      do; mọi lần vào ghi audit mà quản trị của khách xem được (Luật BVDLCN 2025); khách tắt được
-      quyền vào hỗ trợ, trừ yêu cầu của cơ quan có thẩm quyền (có audit)
-- [ ] Tạo tài khoản từ số điện thoại đã xác thực qua tra đơn vãng lai (D-202; làm cùng bước 45 khi
-      `orders` có token xem đơn): `POST /api/v1/auth/phone-signups`, đăng nhập bằng passkey hay OTP, không
-      bắt buộc mật khẩu
-- [ ] Đối chiếu thiết kế 2 (D-208, D-211): `org_id` cho `content`, `media` (`forms` tuỳ chọn), quyền theo độ
-      sâu, công khai theo website; xác nhận lại danh tính `POST /auth/me/reauth` thay `current_password`;
-      ngôn ngữ và múi giờ ưa thích; khách tự thu hồi quyền vào hỗ trợ; `memberships?inherited=true`;
-      bắt buộc MFA theo role, `last_login_at"
-- [ ] Đối chiếu đợt 2: ghi hồ sơ công khai của nút (giờ mở cửa, ngày đặc biệt, ảnh); tự đổi tên hiển thị qua
-      `PATCH /auth/me`
+- [ ] Cây tổ chức trong khách hàng: loại nút tự đặt, độ sâu có giới hạn, bảng tổ tiên – con cháu, dời nút (khoá
+      dòng), vòng đời nút (chờ duyệt, hoạt động, tạm khoá, lưu trữ — khoá một nút thì cả nhánh ngừng ghi)
+- [ ] Thành viên và quyền có độ sâu `own` / `unit` / `subtree` / `tenant`: `Principal` mang quyền theo nút, công
+      cụ lọc theo nhánh cho service, dữ liệu nghiệp vụ mang `org_id` (`notes` làm ví dụ), membership kể cả kế
+      thừa (`memberships?inherited=true`); testkit có bài rò rỉ giữa hai nhánh anh em
+- [ ] Nội dung theo website và nút (D-208): `org_id` cho `content`, `media` (`forms` tuỳ chọn), quyền của chúng
+      theo độ sâu; đọc công khai lọc theo website (tên miền → nút), menu và ngôn ngữ bật theo website; bộ lọc
+      quản trị `owner_org`, `site`
+- [ ] Cài đặt kế thừa theo cây (múi giờ, tiền tệ, ngôn ngữ, hồ sơ thuế, chính sách) và khuôn mẫu để module áp
+      cùng cách cho dữ liệu của mình (vd giá: chuỗi đặt, cửa hàng ghi đè)
+- [ ] Đơn vị hành chính VN (module nền `address`, D-193) sau sáp nhập: tỉnh → xã / phường / đặc khu, 34 tỉnh,
+      3.321 xã (QĐ 19/2025/QĐ-TTg, từ 01/7/2025), không cấp huyện, không đối chiếu địa chỉ cũ; dữ liệu chung
+      (mặt điều khiển), nguồn chính thức, ghi nguồn, ngày; đơn vị có mã, tên, loại, mã cấp trên, hiệu lực từ–tới
+- [ ] Dùng `address`: cập nhật bằng task khi nhà nước đổi (không sửa code); kiểu `Address` trong `api` (quốc
+      gia, mã tỉnh, mã xã, dòng, kèm tên lúc ghi), kiểm xã thuộc đúng tỉnh, dùng cho nút, KYC, hồ sơ pháp lý
+      (37), sổ địa chỉ người mua (44); endpoint công khai tỉnh, xã theo tỉnh, tìm không dấu, ETag / cache
+- [ ] Hồ sơ công khai của nút (D-200): tên hiển thị, `Address`, giờ mở cửa theo ngày và ngày đặc biệt, nhận hàng
+      tại quầy, ảnh, tên miền gắn với nút; ghi qua `PATCH …/public-profile`; endpoint công khai cửa hàng theo
+      tên miền (chỉ nút "hiện công khai"), ETag / cache — cho "cửa hàng gần bạn", chọn nơi nhận hàng
+- [ ] Danh tính hai lớp: nhân sự là tài khoản toàn nền tảng (mặt điều khiển), một người làm cho nhiều khách /
+      nút; người mua là tài khoản theo từng khách; API key gắn với khách và nút. Nâng cấp: tài khoản, role và
+      API key có sẵn thành nhân sự của khách mặc định, giữ quyền cũ
+- [ ] Tài khoản: xác nhận lại danh tính `POST /auth/me/reauth` thay `current_password`; ngôn ngữ, múi giờ ưa
+      thích và tự đổi tên hiển thị qua `PATCH /auth/me`; bắt buộc MFA theo role; `last_login_at`
+- [ ] Uỷ quyền theo cây khách hàng: role ở khách cha có hiệu lực ở các khách con khi được cấp; vào ngữ cảnh
+      khách con bằng cùng API; audit ghi ở cả hai phía
+- [ ] Đăng nhập bằng link qua email (không cần mật khẩu): token dùng một lần, hết hạn ngắn, gắn thiết bị yêu cầu
+      khi được; MFA vẫn áp dụng; trả lời như nhau về thời gian dù email có hay không (như D-154, D-162); tắt mặc
+      định, bật bằng cấu hình
+- [ ] Mời người dùng qua email: quản trị viên mời kèm role định sẵn, người được mời đặt mật khẩu (hay passkey)
+      qua link dùng một lần; lời mời hết hạn, thu hồi được, có event cho audit; lệnh CLI tương ứng
+- [ ] Nhân sự nền tảng vào dữ liệu của khách (D-190): chỉ khi có quyền vào cấp có thời hạn, ghi lý do; mọi lần
+      vào ghi audit mà quản trị của khách xem được (Luật BVDLCN 2025); khách tắt được quyền vào hỗ trợ và tự thu
+      hồi lần cấp còn hạn (D-211), trừ yêu cầu của cơ quan có thẩm quyền (có audit)
+- [ ] Tạo tài khoản từ số điện thoại đã xác thực qua tra đơn vãng lai (D-202; làm cùng bước 45 khi `orders` có
+      token xem đơn): `POST /api/v1/auth/phone-signups`, đăng nhập bằng passkey hay OTP, không bắt buộc mật khẩu
 
 ## 35. Gói, quyền dùng tính năng, hạn mức, thuê bao (D-185)
 
@@ -331,54 +323,47 @@ thanh toán của bước này). Core không bao giờ tự giữ tiền.
 Thiết kế: trụ 5 và mục 4 (đăng ký Bộ Công Thương). Bắt đầu SAU bước 34. Mỗi mục ghi căn cứ pháp lý
 trong quyết định của nó; quy định hay đổi để dạng dữ liệu có ngày hiệu lực.
 
-- [ ] Định danh (KYC): hồ sơ cá nhân / tổ chức, trait `IdentityVerifier` (VNeID qua nhà cung cấp,
-      eKYC), trạng thái và hạn, lưu tối thiểu (kết quả và mã tham chiếu, hạn chế lưu ảnh giấy tờ,
-      sinh trắc học); cổng chặn: nút loại người bán, người livestream, tiếp thị liên kết chưa xác
-      thực thì không được bán / phát (Luật TMĐT 122/2025, Điều 17, từ 01/7/2026)
-- [ ] Hồ sơ pháp lý website và logo Bộ Công Thương: hồ sơ chủ sở hữu theo khách và theo người bán;
-      loại website (bán hàng → thông báo, logo xanh; nền tảng trung gian / sàn → đăng ký, logo đỏ)
-      theo từng tên miền; danh sách kiểm tuân thủ là dữ liệu có phiên bản; API và `autoxide doctor`
-      báo thứ còn thiếu; xuất bộ hồ sơ (dữ liệu tờ khai, nháp đề án, quy chế); lưu trạng thái và
-      đoạn mã logo, endpoint công khai trả về cho giao diện
-- [ ] Trang bắt buộc có mẫu (module `content`): thông tin chủ sở hữu, chính sách bảo vệ dữ liệu cá
-      nhân, đổi trả, vận chuyển, thanh toán, kiểm hàng, giải quyết khiếu nại, điều khoản; với sàn
-      thêm quy chế hoạt động, mẫu hợp đồng với người bán, thông tin người bán trên trang sản phẩm
-      (EN + VI, nội dung mẫu ghi rõ cần người có chuyên môn pháp lý duyệt)
-- [ ] Báo vi phạm sở hữu trí tuệ / hàng giả: tiếp nhận → ẩn → phản hồi của người bị báo → quyết
-      định, có hạn xử lý, lưu vết; kênh khiếu nại của sàn; cung cấp thông tin người bán khi cơ quan
-      có thẩm quyền yêu cầu (có audit)
-- [ ] Xác thực tài khoản đăng nội dung (NĐ 147/2024): cờ "đã xác thực số điện thoại / định danh";
-      khách bật yêu cầu cho bình luận, đánh giá, livestream; đăng ký `PostingVerifier` của kernel (D-202)
-      để `comments` (`AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES`) dùng trạng thái thật
-- [ ] Dữ liệu cá nhân (Luật 91/2025, NĐ 356/2025): sổ căn cứ xử lý / đồng ý theo mục đích; thời hạn
-      lưu theo loại dữ liệu; vị trí lưu theo khách (lưu tại Việt Nam chọn được); quy trình sự cố có
-      mốc 72 giờ kể từ khi phát hiện trong sổ tay vận hành
-- [ ] Văn bản pháp lý có phiên bản và bằng chứng chấp nhận (D-190): điều khoản, chính sách dữ liệu
-      cá nhân, quy chế sàn, hợp đồng với người bán, điều kiện giao dịch chung — mỗi bản có số phiên
-      bản và ngày hiệu lực; ghi ai chấp nhận bản nào, lúc nào, qua kênh nào (Luật Giao dịch điện tử
-      20/2023); bản mới thì yêu cầu chấp nhận lại khi cần
-- [ ] Bảo vệ người tiêu dùng (D-190; Luật 19/2023/QH15 + NĐ 55/2024, từ 01/7/2024): nền tảng
-      không chặn, không ẩn đánh giá trái quy định; minh bạch điều kiện giao dịch chung; kênh tiếp nhận
-      và hạn xử lý khiếu nại của người tiêu dùng — cần đối chiếu văn bản gốc từng điều
-- [ ] Gắn nhãn nội dung do AI tạo (D-190; Luật Trí tuệ nhân tạo 134/2025/QH15, từ 01/3/2026, và
-      nghị định hướng dẫn — cần đối chiếu): nội dung tạo hay sửa từ gợi ý AI mang dấu nguồn gốc
-      `ai_assisted`, API trả về để giao diện gắn nhãn khi công khai
-- [ ] Gửi SMS (D-190): trait `SmsSender` (nhà cung cấp SMS có brandname), mã một lần qua SMS để xác
-      thực số điện thoại theo NĐ 147/2024; một bộ cài đặt giả cho test
-- [ ] Module nền `notifications` (D-194; thay mục "module thông báo chờ quyết"): kênh email, SMS,
-      Zalo ZNS (trait), web push, trong ứng dụng; mẫu theo i18n và theo khách; tuỳ chọn nhận của người
-      dùng; **tách tin giao dịch và tin quảng cáo** — tin quảng cáo chỉ gửi khi đã đồng ý trước, từ
-      chối là dừng ngay, khung giờ gửi là dữ liệu (NĐ 91/2020: tin nhắn 7h–22h, chỉ một tin đăng ký
-      đầu tiên — cần đối chiếu bản thay thế đang dự thảo); `newsletter` dùng chung sổ đồng ý
-- [ ] Mẫu mail và thông báo động khách tự soạn (D-206): bộ dựng mẫu an toàn dùng chung trong kernel (biến,
-      điều kiện, vòng lặp, giới hạn chạy, luôn thoát HTML, kiểm biến theo schema lúc lưu); mail HTML theo
-      khung MJML có thương hiệu của khách, luôn kèm bản chữ thuần; nháp / xuất bản / quay lại phiên bản,
-      xem trước, gửi thử tới địa chỉ của chính người gọi; `newsletter` cá nhân hoá từng người nhận
-- [ ] Đối chiếu thiết kế 2 (D-217): sổ yêu cầu của chủ thể dữ liệu qua kênh khác, có hạn là dữ liệu (Luật
-      91/2025 — cần đối chiếu); KYC `needs_info`; số người chấp nhận theo phiên bản văn bản; bản nháp thông
-      báo sự cố; đối chiếu "bán trước khi thông báo website" bị cấm hay bị phạt rồi mới chọn chặn hay nhãn
-- [ ] Kênh đẩy cho ứng dụng di động (D-220): trait `MobilePushSender` (Firebase / Apple là module riêng,
-      cần khoá — dừng lại hỏi), token thiết bị mã hoá, cùng luật đồng ý và khung giờ như web push
+- [ ] Định danh (KYC): hồ sơ cá nhân / tổ chức, `IdentityVerifier` (VNeID qua nhà cung cấp, eKYC), trạng thái,
+      hạn, `needs_info`, lưu tối thiểu (kết quả, mã tham chiếu; hạn chế ảnh giấy tờ, sinh trắc học); người bán,
+      livestream, tiếp thị liên kết chưa xác thực bị chặn bán / phát (Luật TMĐT 122/2025 Điều 17, từ 01/7/2026)
+- [ ] Hồ sơ pháp lý website và logo Bộ Công Thương: hồ sơ chủ sở hữu theo khách và theo người bán; loại website
+      theo tên miền (bán hàng → thông báo, logo xanh; sàn / trung gian → đăng ký, logo đỏ); danh sách kiểm là dữ
+      liệu có phiên bản, API và `autoxide doctor` báo thứ còn thiếu
+- [ ] Bộ hồ sơ Bộ Công Thương: xuất bộ hồ sơ (dữ liệu tờ khai, nháp đề án, quy chế); lưu trạng thái và đoạn mã
+      logo, endpoint công khai trả về cho giao diện; đối chiếu "bán trước khi thông báo website" bị cấm hay bị
+      phạt rồi mới chọn chặn hay nhãn (A-3.5)
+- [ ] Trang bắt buộc có mẫu (`content`): thông tin chủ sở hữu, chính sách dữ liệu cá nhân, đổi trả, vận chuyển,
+      thanh toán, kiểm hàng, giải quyết khiếu nại, điều khoản; sàn thêm quy chế, mẫu hợp đồng với người bán,
+      thông tin người bán trên trang sản phẩm (EN + VI, ghi rõ cần người có chuyên môn pháp lý duyệt)
+- [ ] Báo vi phạm sở hữu trí tuệ / hàng giả: tiếp nhận → ẩn → phản hồi của người bị báo → quyết định, có hạn xử
+      lý, lưu vết; kênh khiếu nại của sàn; cung cấp thông tin người bán khi cơ quan có thẩm quyền yêu cầu (có
+      audit)
+- [ ] Xác thực tài khoản đăng nội dung (NĐ 147/2024): cờ "đã xác thực số điện thoại / định danh", khách bật cho
+      bình luận, đánh giá, livestream; mã một lần qua `SmsSender` (SMS brandname, D-190) + bản giả; đăng ký
+      `PostingVerifier` (D-202) cho `comments` (`AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES`) dùng trạng thái thật
+- [ ] Dữ liệu cá nhân (Luật 91/2025, NĐ 356/2025): sổ căn cứ xử lý / đồng ý theo mục đích; thời hạn lưu theo
+      loại dữ liệu; nơi lưu theo khách (chọn lưu tại VN); sự cố có mốc 72 giờ từ khi phát hiện trong sổ tay vận
+      hành, kèm bản nháp thông báo; sổ yêu cầu của chủ thể qua kênh khác, hạn là dữ liệu (D-217, cần đối chiếu)
+- [ ] Văn bản pháp lý có phiên bản (D-190; Luật Giao dịch điện tử 20/2023): điều khoản, chính sách dữ liệu cá
+      nhân, quy chế sàn, hợp đồng người bán, điều kiện giao dịch chung — số phiên bản, ngày hiệu lực; ai chấp
+      nhận bản nào, lúc nào, kênh nào; chấp nhận lại khi cần; số người chấp nhận theo phiên bản
+- [ ] Bảo vệ người tiêu dùng (D-190; Luật 19/2023/QH15 + NĐ 55/2024, từ 01/7/2024): nền tảng không chặn, không
+      ẩn đánh giá trái quy định; minh bạch điều kiện giao dịch chung; kênh tiếp nhận và hạn xử lý khiếu nại của
+      người tiêu dùng — cần đối chiếu văn bản gốc từng điều
+- [ ] Gắn nhãn nội dung do AI tạo (D-190; Luật Trí tuệ nhân tạo 134/2025/QH15, từ 01/3/2026, và nghị định hướng
+      dẫn — cần đối chiếu): nội dung tạo hay sửa từ gợi ý AI mang `ai_assisted`, API trả về để giao diện gắn
+      nhãn khi công khai
+- [ ] Module nền `notifications` (D-194): kênh email, SMS, Zalo ZNS (trait), web push, trong ứng dụng; mẫu theo
+      i18n và theo khách; tuỳ chọn nhận của người dùng; `newsletter` dùng chung sổ đồng ý; (thấp) báo cáo đã
+      lưu, lịch gửi qua email (A-b10)
+- [ ] Tách tin giao dịch và tin quảng cáo (NĐ 91/2020 — cần đối chiếu bản thay thế đang dự thảo): tin quảng cáo
+      chỉ gửi khi đã đồng ý trước, từ chối là dừng ngay; khung giờ gửi là dữ liệu (tin nhắn 7h–22h); chỉ một tin
+      mời đăng ký đầu tiên
+- [ ] Mẫu mail, thông báo khách tự soạn (D-206): bộ dựng mẫu an toàn ở kernel (biến, điều kiện, vòng lặp, giới
+      hạn chạy, luôn thoát HTML, kiểm biến theo schema khi lưu); mail HTML khung MJML có thương hiệu khách + bản
+      chữ thuần; nháp / xuất bản / quay lại, xem trước, gửi thử tới chính người gọi; `newsletter` cá nhân hoá
+- [ ] Kênh đẩy cho ứng dụng di động (D-220): trait `MobilePushSender` (Firebase / Apple là module riêng, cần
+      khoá — dừng lại hỏi), token thiết bị mã hoá, cùng luật đồng ý và khung giờ như web push
 
 ## 40. Năng lực còn thiếu của core (agent đề xuất; số cũ 34, D-189)
 
@@ -433,60 +418,43 @@ cùng một giao diện phục vụ mọi mô hình kinh doanh. Module khai ph�
 kernel gom và lọc theo khách, gói, permission ở nút đang chọn. Kernel không có danh sách phân hệ viết cứng.
 Bước 41–49 khai phần của module mình ngay trong bước đó nếu phần tương ứng của bước 51 đã xong.
 
-- [ ] Nhúng bản ghi của module khác vào nội dung: node `embed` (`kind`, `id`) trong thân bài của
-      `content`, kiểm qua sổ đối tượng (D-123) khi lưu, đọc công khai trả kèm tiêu đề, tóm tắt, đường dẫn,
-      ảnh của đối tượng còn công khai; `Resource` thêm `image`. `content` không biết khái niệm sản phẩm
-- [ ] Sổ điều hướng: `Module::navigation` (nhóm phân hệ, mục, permission, tính năng, nguồn số đếm,
-      thứ tự); nhóm trùng phải khai giống nhau; endpoint trả menu đã lọc — ẩn khi module chưa bật hay
-      thiếu permission, **khoá (vẫn hiện) khi thiếu tính năng của gói**; nhãn theo i18n; ETag; tool MCP
-- [ ] Hộp việc: trait `WorkSource` (đếm, liệt kê việc chờ theo phạm vi nút), việc tính từ dữ liệu của
-      module, không có bảng việc riêng; endpoint gom sắp theo mức gấp và hạn, endpoint số đếm cho menu;
-      hạn thời gian mỗi nguồn, nguồn chậm không làm hỏng cả hộp; cache số đếm có khách trong khoá; khác
-      hộp thư của `notifications`
-- [ ] Tìm xuyên phân hệ: trait `FinderSource`; endpoint gom kết quả theo loại đối tượng, không dấu vẫn
-      tìm được (`kernel::search`), chỉ chạy nguồn người gọi có quyền, mỗi nguồn áp phạm vi nút
-- [ ] Số liệu tóm tắt cho trang tổng quan của phân hệ: trait `SummaryMetric` (tiền, số đếm, tỉ lệ) theo
-      phạm vi nút; số nặng đọc từ bảng dẫn xuất, không quét bảng giao dịch mỗi lần mở trang
-- [ ] Hoạt động gần đây (module `audit`): câu đọc được theo i18n key mà module khai trên `EventInfo`,
-      chỉ hiện bản ghi người gọi có quyền đọc ở nút của bản ghi
-- [ ] Khai menu, nguồn việc, nguồn tìm, số liệu cho mọi module đang có; MODULE_GUIDE (EN + VI) mục
-      "khai phần của module cho giao diện"; test rò rỉ giữa hai nhánh anh em cho số đếm và kết quả tìm
-- [ ] View đã lưu (D-201): `/me/views` lưu tham số lọc, sắp xếp, cột, nhóm, mật độ của một danh sách;
-      phạm vi cá nhân / nút / khách; tham số kiểm theo **schema bộ lọc mà mỗi endpoint danh sách công bố**
-      trong OpenAPI (máy và agent dựng được chip lọc mà không viết cứng)
-- [ ] Thao tác hàng loạt chung (D-201): nhận `ids[]` hoặc `filter` kèm `expected_count` (lệch thì từ
-      chối), `Idempotency-Key` bắt buộc, chạy bằng job có tiến độ (SSE của bước 40), trả kết quả từng
-      bản ghi; module khai hành động hàng loạt của mình
-- [ ] Tìm nâng cao (D-201): toán tử `is:`, `status:`, so sánh số, phủ định; tham số phạm vi
-      `node | subtree | accessible`; endpoint `resolve` đổi một mã (số đơn, mã vận đơn, ID) thành bản
-      ghi người gọi được xem
-- [ ] Hộp việc theo người (D-201): mỗi việc có khoá ổn định, "vì sao bạn thấy" (permission, nút), hoãn
-      tới một thời điểm, giao cho người khác — bảng cấp khách hàng có `tenant_id`; việc thiết lập theo mô
-      hình (`SetupStep`, trạng thái tính từ dữ liệu, bước pháp lý chặn bán được đánh dấu)
-- [ ] Giải thích quyền (D-201): `POST /me/can` kiểm nhiều cặp (permission, nút) một lần, trả lý do
-      `missing_permission` / `module_not_enabled` / `feature_not_in_plan` / `quota_exceeded` và gói mở
-      được — giao diện hiện "vì sao bị khoá, ai cấp được, nâng gói mở gì"
-- [ ] Agent là người dùng thật (D-201): loại API key `agent`; `actor_kind` (người / agent / hệ thống) trong
-      audit; lệnh rủi ro (hoàn tiền, chi trả, khoá sổ, xoá dữ liệu) do agent gọi trả `202
-      approval_required` kèm yêu cầu duyệt có hạn, người có quyền duyệt thì lệnh chạy — như nhau cho REST
-      và MCP; việc chờ duyệt vào hộp việc
-- [ ] Dòng hoạt động và ghi chú nội bộ trên mọi bản ghi (D-201): gộp audit, ghi chú (nhắc tên bằng @,
-      người được nhắc nhận thông báo), khoá bằng loại đối tượng của sổ đối tượng (D-123); một chỗ dùng
-      chung thay cho mỗi module tự làm ghi chú
-- [x] Cờ theo người dùng cho trợ giúp trong giao diện (D-207): `GET` / `PUT` / `DELETE /api/v1/me/flags`
-      (bảng `kernel_user_flags`), chỉ cờ của chính mình, hạn mức `AUTOXIDE_USER_FLAGS_MAX`, có trong bản
-      xuất dữ liệu và xoá khi xoá tài khoản; `tenant_id` thêm ở bước 33 cùng mọi bảng
-- [ ] Định nghĩa số liệu tóm tắt (D-207): `SummaryMetric::definition` (i18n key, mặc định `None`),
-      `GET /api/v1/kernel/summary` trả `definition` đã dịch; gate kiểm mọi số liệu đều khai và có bản dịch
-      — làm cùng mục số liệu tóm tắt (P4)
-- [ ] Đối chiếu thiết kế 2 (D-212, D-213): job API chung (danh sách, chi tiết có tiến độ và file, chạy lại
-      có audit); xuất danh sách theo bộ lọc dùng chung (CSV qua job); yêu cầu duyệt đầy đủ (danh sách, từ
-      chối, event `kernel.approval_decided`, tool MCP); bộ lọc nội dung (`review`, `scheduled`,
-      `ai_generated`, `missing_locale`, `missing_alt`); bỏ hoãn việc; thử cài đặt nối ngoài; hộp việc không
-      có "Đã xử lý"
-- [ ] Nhập dữ liệu (D-220): không làm ở kernel — module `imports` (bước 56) thêm nguồn `autoxide` cùng cột với
+- [ ] Nhúng bản ghi của module khác vào nội dung (P6): node `embed` (`kind`, `id`) của `content`, kiểm qua
+      sổ đối tượng (D-123) khi lưu, đọc công khai trả tiêu đề, tóm tắt, đường dẫn, ảnh của đối tượng còn
+      công khai; `Resource` thêm `image`. `content` không biết khái niệm sản phẩm
+- [ ] Sổ điều hướng (P1): `Module::navigation` (nhóm, mục, permission, tính năng, nguồn số đếm, thứ tự); nhóm
+      trùng phải khai giống nhau; menu ẩn khi module chưa bật hay thiếu permission, **khoá (vẫn hiện) khi
+      thiếu tính năng của gói**; nhãn theo i18n; ETag; tool MCP
+- [ ] Hộp việc (P2, P10): `WorkSource` tính từ dữ liệu, không bảng việc, không "Đã xử lý" (D-212); sắp theo
+      gấp, hạn; số đếm cho menu (cache có khách trong khoá); nguồn chậm không hỏng hộp; khác hộp thư của
+      `notifications`; khoá ổn định, "vì sao bạn thấy", hoãn / bỏ hoãn, giao; `SetupStep` đánh dấu bước chặn bán
+- [ ] Tìm (P3, P9): `FinderSource` gom theo loại, không dấu vẫn tìm, chỉ nguồn người gọi có quyền, áp phạm vi
+      nút; toán tử `is:`, `status:`, so sánh, phủ định; phạm vi `node | subtree | accessible`; `resolve` đổi
+      mã (số đơn, mã vận đơn, ID) thành bản ghi người gọi được xem
+- [ ] Số liệu tóm tắt (P4): `SummaryMetric` (tiền, số đếm, tỉ lệ) theo phạm vi nút, số nặng từ bảng dẫn xuất;
+      `definition` (i18n key, mặc định `None`) trả đã dịch, gate kiểm mọi số liệu khai và có bản dịch (D-207)
+- [ ] Hoạt động (P5, P13): câu đọc được theo i18n key trên `EventInfo`, chỉ bản ghi người gọi đọc được ở nút
+      của nó; dòng hoạt động và ghi chú nội bộ trên mọi bản ghi theo loại của sổ đối tượng (D-123), nhắc @
+      có thông báo; một chỗ dùng chung thay cho mỗi module tự làm ghi chú
+- [ ] Schema bộ lọc mỗi danh sách công bố trong OpenAPI (máy, agent dựng chip lọc) và view đã lưu `/me/views`
+      (P7): tham số, sắp xếp, cột, nhóm, mật độ; phạm vi cá nhân / nút / khách; bộ lọc nội dung `review`,
+      `scheduled`, `ai_generated`, `missing_locale`, `missing_alt`
+- [ ] Job và hàng loạt (P8, P15, P16; D-213): job API chung (danh sách, tiến độ, file, chạy lại có audit);
+      module khai hành động hàng loạt, nhận `ids[]` hoặc `filter` + `expected_count`, `Idempotency-Key`, kết
+      quả từng bản ghi, tiến độ qua SSE; xuất danh sách theo bộ lọc thành CSV qua job
+- [ ] Giải thích quyền (P11): `POST /me/can` nhiều cặp (permission, nút), lý do `missing_permission` /
+      `module_not_enabled` / `feature_not_in_plan` / `quota_exceeded` — giao diện hiện vì sao bị khoá, ai cấp
+      được, nâng gói mở gì
+- [ ] Agent là người dùng thật (P12): API key `agent`; `ActorKind` chung cho audit, nhật ký, event (D-224);
+      lệnh rủi ro (hoàn tiền, chi trả, khoá sổ, xoá dữ liệu) agent gọi trả `202 approval_required`, yêu cầu
+      duyệt có hạn, đủ duyệt / từ chối / event / tool MCP, như nhau REST và MCP; việc chờ vào hộp việc
+- [x] Cờ theo người dùng cho trợ giúp trong giao diện (P14, D-207): `/api/v1/me/flags` (`kernel_user_flags`),
+      chỉ cờ của mình, hạn mức `AUTOXIDE_USER_FLAGS_MAX`, có trong bản xuất dữ liệu, xoá khi xoá tài khoản;
+      `tenant_id` thêm ở bước 33 cùng mọi bảng
+- [ ] Danh sách lý do theo khách (P18, D-223); cài đặt nối ra ngoài có `last_used_at`, `last_error` và thử
+- [ ] Nhập dữ liệu (P17, D-220): không làm ở kernel — `imports` (bước 56) thêm nguồn `autoxide` cùng cột với
       xuất chung và đích `content`, `media`, `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý)
-- [ ] Danh sách lý do theo khách (P18, D-223) và `ActorKind` thống nhất cho audit, nhật ký, event (D-224)
+- [ ] Khai menu, nguồn việc, nguồn tìm, số liệu cho mọi module đang có; MODULE_GUIDE (EN + VI) mục "khai phần
+      của module cho giao diện"; test rò rỉ giữa hai nhánh anh em cho số đếm và kết quả tìm
 
 ## 54. Phân quyền chuẩn hàng đầu (chủ dự án giao ngày 13/11/2026, D-205)
 
@@ -521,21 +489,18 @@ Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe v
 Bắt đầu SAU bước 51. Những điều nên có theo nghiên cứu các trang quản trị hàng đầu (Stripe, Shopify,
 Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
 
-- [ ] Bàn kỹ thuật cho nhà phát triển và agent: nhật ký request theo khách (API key, đường dẫn mẫu,
-      status, `code`, có hạn lưu, không lưu thân request), danh sách lần giao webhook kèm gửi lại, event
-      theo bản ghi, chạy lại job trong dead-letter queue
+- [ ] Bàn kỹ thuật: nhật ký request theo khách (API key, đường dẫn mẫu, status, `code`, `request_id` /
+      `trace_id`, có hạn lưu, không lưu thân request); lần giao webhook kèm gửi lại; event theo bản ghi đọc
+      từ audit; chạy lại job trong dead-letter queue; `kernel.devtools.read` / `kernel.devtools.manage`
+- [ ] Nhật ký lệnh của agent (D-202): lệnh MCP ghi `mcp:<tên tool>`, không ghi tham số; lọc theo
+      `actor_kind` (đủ `ActorKind`, D-224) và theo key; dòng của lệnh `202 approval_required` giữ `approval_id`
 - [ ] Hoàn tác an toàn: lưu trữ / ẩn có `restore`; lệnh ghi lớn có `dry_run` trả trước những gì sẽ đổi
-- [ ] AI trong quản trị (D-109): đổi câu lời thường thành bộ lọc đã kiểm theo schema (`ai/filters/parse`),
-      trợ lý dùng tool MCP với đúng quyền người dùng, mọi lệnh ghi là bản nháp chờ duyệt
-- [ ] Thông báo: lý do nhận, trạng thái xong / lưu, bộ lọc, cấu hình kênh theo loại event; ghim màn hình
-      hay dùng (`/me/pins`)
-- [ ] Nhật ký lệnh của agent (D-202): lệnh MCP ghi `mcp:<tên tool>` vào đường dẫn mẫu, không ghi tham
-      số; lọc theo `actor_kind` và theo key; dòng của lệnh nhận `202 approval_required` giữ `approval_id`
-- [ ] Sức khoẻ người bán và sức khoẻ tuân thủ: chỉ số so với ngưỡng (ngưỡng là dữ liệu có ngày hiệu lực),
-      vi phạm, hạn phải xử lý; huy hiệu người bán tin cậy tính từ số liệu thật, công bố tiêu chí
-- [ ] Đối chiếu thiết kế 2: tên endpoint bàn kỹ thuật, event theo bản ghi đọc từ audit, `kernel.devtools.manage`,
-      `request_id` / `trace_id` trong nhật ký; trợ lý AI trong quản trị chạy tool MCP với quyền người gọi
-- [ ] Nhật ký lệnh dùng đủ `ActorKind` của D-224
+- [ ] AI trong quản trị (D-109): lời thường thành bộ lọc đã kiểm theo schema (`ai/filters/parse`); trợ lý chạy
+      tool MCP với quyền người gọi, mọi lệnh ghi là bản nháp hay yêu cầu duyệt, trả kèm tool đã gọi
+- [ ] Thông báo: lý do nhận, trạng thái xong / lưu, bộ lọc, cấu hình kênh theo loại event; ghim màn hình hay
+      dùng (`/me/pins`)
+- [ ] Sức khoẻ người bán và sức khoẻ tuân thủ: chỉ số so với ngưỡng (ngưỡng là dữ liệu có ngày hiệu lực), vi
+      phạm, hạn phải xử lý; huy hiệu người bán tin cậy tính từ số liệu thật, công bố tiêu chí
 
 ## Giai đoạn C — Vận hành
 
@@ -716,45 +681,41 @@ Module nghiệp vụ, không phải core: khái niệm sản phẩm, đơn hàng
 Bắt đầu SAU bước 35 và 36. Khai hạn mức (số sản phẩm) và tính năng (nhiều biến thể, bảng giá) theo
 bước 35.
 
-- [ ] Chuẩn bị chung cho bước 42–49 (đặc tả 41, commit đầu tiên): `Subscription::optional` (nhận
-      event của module có thể chưa cài), dời bộ CSV của `forms` thành `autoxide_kernel::csv` và slug
-      của `content` thành `autoxide_kernel::slug` — để ba bước song song 42–44 không cùng sửa kernel
-- [ ] Sản phẩm và biến thể: tuỳ chọn (màu, cỡ…), SKU và mã vạch duy nhất trong khách, trạng thái
-      (nháp, đang bán, ngừng bán, lưu trữ), ảnh qua `Media`, nội dung nhiều ngôn ngữ, cân nặng và
-      kích thước (cho vận chuyển), nhóm thuế của engine thuế; slug và đường dẫn công khai
-- [ ] Danh mục sản phẩm dạng cây và thuộc tính theo danh mục; **thuộc tính bắt buộc theo danh mục là
-      dữ liệu** (vd xuất xứ, hạn dùng, thông tin nhãn hàng hoá theo NĐ 43/2017 và NĐ 111/2021 — cần
-      đối chiếu); danh mục hàng cấm và hàng kinh doanh có điều kiện là dữ liệu, kèm giấy tờ phải có
-- [ ] Bảng giá: giá theo cửa hàng / nhóm khách (B2B), kế thừa theo cây (chuỗi đặt, cửa hàng ghi
-      đè — bước 34), giá có ngày hiệu lực, **lịch sử giá** (khuyến mại cần "giá ngay trước khi khuyến
-      mại"); giá niêm yết bằng Đồng Việt Nam, gồm thuế khi bán cho người tiêu dùng (Luật Giá 16/2023 —
-      cần đối chiếu)
-- [ ] Đọc công khai cho website: danh sách, lọc theo danh mục / thuộc tính / khoảng giá, tìm kiếm
-      (hợp đồng tìm kiếm sẵn có của kernel), ETag và cache như `content`; sitemap
-- [ ] Tìm và lọc như các site hàng đầu (D-201): gợi ý tìm công khai gom sản phẩm, danh mục, bài viết,
-      cửa hàng qua một trait; khớp đúng dấu xếp trước khớp không dấu; từ đồng nghĩa theo khách; sắp xếp
-      bán chạy và đánh giá; số đếm theo từng giá trị lọc (có giới hạn, có index, cả hai database); thẻ
-      sản phẩm có tóm tắt biến thể, điểm đánh giá, đơn giá theo đơn vị cơ sở; dữ liệu cho JSON-LD
-      (GTIN, thương hiệu, URL từng biến thể, giá gạch là giá ngay trước khuyến mại)
-- [ ] Nhập / xuất CSV bằng job (kiểm từng dòng, báo lỗi theo dòng, chống CSV injection); gợi ý mô tả
-      và SEO bằng AI chỉ thành bản nháp, đánh dấu `ai_assisted` (bước 37)
-- [ ] API hợp đồng cho module khác (`catalog::api`): đọc sản phẩm / biến thể / giá tại một thời
-      điểm để chụp vào chứng từ; event khi giá hay trạng thái đổi; tool MCP như REST
-- [ ] Loại sản phẩm: hàng vật lý, hàng số (giao file bằng link ký có hạn qua `files`, giới hạn lượt
-      tải), dịch vụ (không giao hàng); combo / bộ sản phẩm trừ kho từng thành phần; sản phẩm tương tự
-      theo ý nghĩa (embedding sẵn có của module `ai`)
-- [ ] Hỏi đáp và ảnh song ngữ (D-202): đăng ký `catalog.product` vào sổ đối tượng, bộ tính nhãn
-      `seller` (permission quản lý sản phẩm ở nút sở hữu) và event vòng đời (lưu trữ / xoá → đóng và ẩn
-      hỏi đáp); `catalog_product_media` ghi đè `alt` theo ngôn ngữ như `media_alt_translations`
-- [ ] Đối chiếu thiết kế 2: sản phẩm của người bán trên website của chuỗi (`seller`, `sold_by`, facet,
-      `ProductCard.seller`), `warranty_months`, điểm cắm `set_listing_gate`; giá sau giảm tự động và lọc
-      `on_sale`; "thường mua cùng"
-- [ ] Bảng giá theo các nền tảng lớn (D-222): một thứ tự chọn bảng giá (nút gần nhất → công ty B2B → nhóm
-      khách → kênh → thị trường → ưu tiên); bảng giá suy ra theo công thức ghi thành dòng giá thật; quy tắc làm
-      tròn giá đẹp; sàn giá (giá tối thiểu, biên lợi nhuận trên giá vốn); đổi giá hàng loạt có xem trước, duyệt,
-      hẹn giờ, giá tạm thời
-- [ ] Đối chiếu đợt 2: trạng thái của lần nhập / xuất CSV; `readiness` (thiếu thuộc tính, giấy tờ) để lọc và
-      đếm sản phẩm chưa mở bán được
+- [ ] Chuẩn bị chung cho bước 42–49 (commit đầu tiên): `Subscription::optional` (nhận event của module có thể
+      chưa cài), bộ CSV của `forms` thành `autoxide_kernel::csv`, slug của `content` thành
+      `autoxide_kernel::slug` — để ba bước song song 42–44 không cùng sửa kernel
+- [ ] Sản phẩm và biến thể: tuỳ chọn (màu, cỡ…), SKU và mã vạch duy nhất trong khách, trạng thái (nháp, đang
+      bán, ngừng bán, lưu trữ), ảnh qua `Media`, nội dung nhiều ngôn ngữ, cân nặng và kích thước (cho vận
+      chuyển), nhóm thuế của engine thuế, `warranty_months`; slug và đường dẫn công khai
+- [ ] Danh mục dạng cây, thuộc tính theo danh mục; **thuộc tính bắt buộc là dữ liệu** (xuất xứ, hạn dùng, nhãn
+      hàng hoá theo NĐ 43/2017, NĐ 111/2021 — cần đối chiếu); hàng cấm / có điều kiện là dữ liệu kèm giấy tờ
+      phải có; `readiness` để lọc và đếm sản phẩm chưa mở bán được (D-223…D-227)
+- [ ] Bảng giá: theo cửa hàng / nhóm khách (B2B), kế thừa theo cây (chuỗi đặt, cửa hàng ghi đè — bước 34), ngày
+      hiệu lực, **lịch sử giá** (khuyến mại cần "giá ngay trước khuyến mại"); giá niêm yết bằng Đồng Việt Nam,
+      gồm thuế khi bán cho người tiêu dùng (Luật Giá 16/2023 — cần đối chiếu)
+- [ ] Bảng giá theo các nền tảng lớn (D-222): một thứ tự chọn bảng (nút gần nhất → công ty B2B → nhóm khách →
+      kênh → thị trường → ưu tiên); bảng giá suy ra ghi thành dòng giá thật; làm tròn giá đẹp; sàn giá (giá tối
+      thiểu, biên lợi nhuận trên giá vốn); đổi giá hàng loạt có xem trước, duyệt, hẹn giờ, giá tạm thời
+- [ ] Đọc công khai cho website: danh sách, lọc theo danh mục / thuộc tính / khoảng giá, tìm (hợp đồng tìm kiếm
+      của kernel), ETag và cache như `content`, sitemap; giá sau giảm tự động và lọc `on_sale`; sản phẩm của
+      người bán trên website của chuỗi (`seller`, `sold_by`, facet, `ProductCard.seller`)
+- [ ] Tìm và lọc như các site hàng đầu (D-201): gợi ý tìm gom sản phẩm, danh mục, bài viết, cửa hàng qua một
+      trait; khớp đúng dấu xếp trước không dấu; từ đồng nghĩa theo khách; sắp bán chạy và đánh giá; số đếm theo
+      từng giá trị lọc (có giới hạn, có index, cả hai database)
+- [ ] Thẻ sản phẩm và JSON-LD (D-201): tóm tắt biến thể, điểm đánh giá, đơn giá theo đơn vị cơ sở; GTIN,
+      thương hiệu, URL từng biến thể, giá gạch là giá ngay trước khuyến mại
+- [ ] Nhập / xuất CSV bằng job (kiểm từng dòng, lỗi theo dòng, chống CSV injection, trạng thái của lần nhập /
+      xuất); gợi ý mô tả và SEO bằng AI chỉ thành bản nháp, đánh dấu `ai_assisted` (bước 37)
+- [ ] API hợp đồng (`catalog::api`): đọc sản phẩm / biến thể / giá tại một thời điểm để chụp vào chứng từ, sàn
+      giá cho `promotions`; điểm cắm `set_listing_gate` cho `marketplace`; event khi giá hay trạng thái đổi;
+      tool MCP như REST
+- [ ] Loại sản phẩm: hàng vật lý, hàng số (link ký có hạn qua `files`, giới hạn lượt tải), dịch vụ (không
+      giao hàng), combo / bộ sản phẩm trừ kho từng thành phần; hàng đặt trước (`sale_mode`, ngày dự kiến có
+      hàng, giới hạn suất — D-204)
+- [ ] Gợi ý sản phẩm: sản phẩm tương tự theo ý nghĩa (embedding sẵn có của module `ai`); "thường mua cùng"
+- [ ] Hỏi đáp và ảnh song ngữ (D-202): `catalog.product` trong sổ đối tượng, nhãn `seller` (permission quản lý
+      sản phẩm ở nút sở hữu), event vòng đời (lưu trữ / xoá → đóng và ẩn hỏi đáp); `catalog_product_media`
+      ghi đè `alt` theo ngôn ngữ như `media_alt_translations`
 
 ## 42. Kho (`inventory`)
 
@@ -762,28 +723,25 @@ bước 35.
 
 Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều request cùng lúc, trên cả hai database.
 
-- [ ] Kho là nút tổ chức loại `warehouse` hay cửa hàng (bước 34); tồn theo biến thể × kho; **sổ biến
-      động kho chỉ thêm** (nhập, xuất, điều chỉnh, chuyển), tồn hiện tại suy từ sổ và giữ bằng khoá
-      dòng của kernel
-- [ ] Giữ chỗ tồn: giữ có hạn theo `order_id` → xác nhận khi đặt hàng → trả lại khi huỷ hay hết hạn
-      (job); chọn kho theo quy tắc (gần người mua, đủ hàng); test đồng thời "100 người mua 1 cái cuối"
-- [ ] Chuyển kho (đang đi đường), kiểm kê (chênh lệch thành bút toán điều chỉnh có lý do), cảnh báo
-      tồn thấp (event), cho phép bán khi hết hàng hay không theo sản phẩm
-- [ ] Giá vốn bình quân gia quyền theo kho cho báo cáo lãi gộp; lô và hạn dùng (bán trước hết hạn
-      trước), số serial — bật theo sản phẩm
+- [ ] Kho là nút tổ chức loại `warehouse` hay cửa hàng (bước 34); tồn theo biến thể × kho; **sổ biến động kho
+      chỉ thêm** (nhập, xuất, điều chỉnh, chuyển); tồn hiện tại suy từ sổ và giữ bằng khoá dòng của kernel
+- [ ] Giữ chỗ tồn: giữ có hạn theo `order_id` → xác nhận khi đặt hàng → trả lại khi huỷ hay hết hạn (job); chọn
+      kho theo quy tắc (gần người mua, đủ hàng); test đồng thời "100 người mua 1 cái cuối"
+- [ ] Chuyển kho (đang đi đường), kiểm kê (chênh lệch thành bút toán điều chỉnh có lý do; lý do là danh sách
+      theo khách, D-223), cảnh báo tồn thấp (event), cho phép bán khi hết hàng hay không theo sản phẩm
+- [ ] Giá vốn bình quân gia quyền theo kho cho báo cáo lãi gộp; lô và hạn dùng (bán trước hết hạn trước, ngưỡng
+      sắp hết hạn theo nút), số serial — bật theo sản phẩm
 - [ ] Nhận event của `orders` (xác nhận, huỷ, trả hàng nhập lại kho) — chịu được nhận lại event
-- [ ] Nhập hàng (D-194): nhà cung cấp, đơn đặt hàng nhà cung cấp, nhận hàng một phần, công nợ phải
-      trả nhà cung cấp vào sổ cái, trả hàng cho nhà cung cấp — chuỗi bán lẻ cần cho việc hằng ngày
-- [ ] Báo khi có hàng lại theo cửa hàng (D-201): người mua đăng ký (xác nhận hai bước, đồng ý riêng cho
-      mục đích này), nghe event tồn kho rồi gửi qua `notifications`; mỗi người một lần mỗi đợt có hàng
-- [ ] Tình trạng hàng công khai theo cửa hàng (D-200): endpoint công khai trả mức `in_stock` / `low`
-      (kèm số khi dưới ngưỡng, ngưỡng là cấu hình) / `out` cho biến thể × cửa hàng, không lộ số tồn lớn;
-      `catalog` lọc "chỉ hàng có sẵn ở cửa hàng X" qua `api` của `inventory`; có ETag, cache ngắn
-- [ ] Hàng đặt trước (D-204): biến thể có chế độ bán `preorder` với ngày dự kiến có hàng và giới hạn số
-      suất (bước 41 khai); giữ suất không vượt giới hạn khi nhiều người đặt cùng lúc; hàng về thì chia cho
-      đơn đặt trước theo thứ tự đặt
-- [ ] Đối chiếu đợt 2: lý do điều chỉnh tồn là danh sách theo khách; ngưỡng sắp hết hạn của lô; trạng thái ghi
-      sổ của phiếu nhập; công nợ nhà cung cấp qua `ledger`
+- [ ] Nhập hàng (D-194): nhà cung cấp, đơn đặt hàng nhà cung cấp, nhận hàng một phần, trả hàng cho nhà cung
+      cấp; công nợ phải trả vào sổ cái, trạng thái ghi sổ của phiếu nhập (ghi lại được), công nợ từng nhà
+      cung cấp qua `ledger`
+- [ ] Hàng đặt trước (D-204): biến thể `preorder` (ngày dự kiến có hàng, giới hạn suất — bước 41 khai); giữ suất
+      không vượt giới hạn khi nhiều người đặt cùng lúc; hàng về thì chia cho đơn đặt trước theo thứ tự đặt
+- [ ] Tình trạng hàng công khai theo cửa hàng (D-200): mức `in_stock` / `low` (kèm số khi dưới ngưỡng cấu hình)
+      / `out` / `preorder`, không lộ số tồn lớn; `catalog` lọc "chỉ hàng có sẵn ở cửa hàng X" qua `api`; ETag,
+      cache ngắn
+- [ ] Báo khi có hàng lại theo cửa hàng (D-201): người mua đăng ký (xác nhận hai bước, đồng ý riêng cho mục đích
+      này), nghe event tồn kho rồi gửi qua `notifications`; mỗi người một lần mỗi đợt có hàng
 
 ## 43. Khuyến mại (`promotions`)
 
@@ -793,36 +751,38 @@ Bắt đầu SAU bước 41. Luật khuyến mại đổi thường xuyên: hạ
 cứng (Thông tư 39/2025/TT-BCT trần 50% giá ngay trước khuyến mại, có ngoại lệ chương trình tập trung
 quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản hiện hành).
 
-- [ ] Mã giảm giá và giảm tự động: theo sản phẩm, danh mục, giá trị đơn, nhóm khách; mua X tặng Y;
-      miễn phí vận chuyển; khung thời gian; quy tắc cộng dồn; giới hạn lượt dùng tổng và mỗi người
-- [ ] Giữ chỗ lượt dùng và số lượng flash sale như tồn kho (giữ → xác nhận → trả lại), test đồng thời
-- [ ] API cho `orders`: tính giảm giá cho một giỏ, trả từng dòng giảm kèm lý do (người mua thấy rõ
-      điều kiện — Luật 19/2023)
-- [ ] Kiểm tuân thủ: chặn chương trình vượt hạn mức đang hiệu lực; xuất dữ liệu thông báo khuyến mại
-      gửi Sở Công Thương nơi tổ chức; lưu vết chương trình đã chạy
-- [ ] Mã dùng được cho một giỏ (D-201): trả mã dùng được và mã chưa đủ điều kiện kèm lý do ("thêm X
-      để dùng"); giao diện thay ô nhập mã mở sẵn bằng bộ chọn; số lượt còn lại chỉ hiện khi là số thật
-- [ ] Giá khi áp mã cho từng sản phẩm (D-200): endpoint công khai trả các mã công khai áp được cho một
-      sản phẩm / biến thể, giá sau mã, điều kiện, số lượt còn lại — để trang sản phẩm hiện "còn X với mã
-      …"; giá niêm yết vẫn là giá không mã (mã phải nhập thì không hiện như giá đã giảm)
-- [ ] Đối chiếu thiết kế 2: event giá sau giảm tự động cho danh sách công khai; flash sale công khai với
-      suất còn là số thật; điều kiện `first_order_only`
-- [ ] Chương trình, coupon, voucher (D-222): chương trình là luật; coupon là mã ai có cũng dùng được; voucher
-      là quyền dùng một lần trong ví của một tài khoản (lưu, nhập mã nhận, được tặng qua `grant_voucher`); ví
-      voucher của người mua; mã gắn với một người luôn là voucher
+- [ ] Chương trình là luật, đến người mua bằng ba cách (D-222): giảm tự động; coupon — mã ai có cũng dùng
+      được (mã chung hay lô mã riêng); voucher — quyền dùng một lần trong ví của một tài khoản; mã gắn với
+      một người luôn là voucher; khung thời gian với ngày kết thúc bắt buộc (D-225)
+- [ ] Loại khuyến mại: giảm theo sản phẩm, danh mục, giá trị đơn, nhóm khách; mua X tặng Y (mua 2 tính 1,
+      món rẻ nhất); miễn phí vận chuyển; flash sale; bậc thang, combo đồng giá, mua kèm deal sốc, chọn quà
+      (D-222)
+- [ ] Điều kiện: phương thức thanh toán, hãng giao, tỉnh, phân khúc, hạng, app / web / quầy, thương hiệu,
+      người bán, khách mới, loại trừ hàng đang giảm (D-222); đơn đầu tiên (`first_order_only`); khung giờ
+- [ ] API cho `orders`: tính giảm giá cho một giỏ, trả từng dòng giảm kèm lý do (người mua thấy rõ điều
+      kiện — Luật 19/2023); tính trong bộ nhớ, đo p99 < 5 ms cho 50 dòng × 500 chương trình (D-222)
 - [ ] Cộng dồn theo ba lớp sản phẩm / đơn / vận chuyển: độc quyền trong lớp hay toàn giỏ, `combines_with`,
-      dừng sau chương trình, chế độ ưu tiên hay lợi nhất cho người mua (tất định); 1 voucher mỗi lớp cho mỗi bên
-      trả tiền
+      dừng sau chương trình, chế độ ưu tiên hay lợi nhất cho người mua (tất định); 1 voucher mỗi lớp cho
+      mỗi bên trả tiền (D-222)
 - [ ] Ai trả tiền giảm giá (sàn / người bán / nhãn hàng / đối tác thanh toán, chia theo tỉ lệ) chia về từng
-      dòng; người bán đăng ký tham gia chương trình của sàn; ngân sách tiền, lượt theo ngày, khung giờ
-- [ ] Loại mới: bậc thang, combo đồng giá, mua kèm deal sốc, chọn quà, mua 2 tính 1 / món rẻ nhất; điều kiện
-      theo phương thức thanh toán, hãng giao, tỉnh, phân khúc, hạng, app / web / quầy, thương hiệu, người bán,
-      khách mới, loại trừ hàng đang giảm
-- [ ] Chống lạm dụng theo nhiều khoá người mua (tài khoản, số điện thoại, địa chỉ — chỉ bản băm), giới hạn
-      theo kỳ; quy tắc trả hàng (hoàn theo tỉ lệ, quà, voucher về ví khi huỷ); chạy thử, kiểm xung đột, lịch,
-      số liệu chương trình; tính giỏ trong bộ nhớ, đo p99 < 5 ms cho 50 dòng × 500 chương trình
-- [ ] Đối chiếu đợt 2 (D-225): thời hạn bắt buộc và giới hạn số ngày giảm giá là dữ liệu; thông báo theo từng
-      nơi nhận; kiểm trước khi bật; nhắc khi flash sale bắt đầu (đồng ý riêng cho một lần nhắc)
+      dòng; người bán đăng ký tham gia chương trình của sàn; ngân sách tiền, lượt theo ngày (D-222)
+- [ ] Giữ chỗ lượt dùng (tổng, mỗi người, theo ngày, ngân sách), suất flash sale và quà như tồn kho (giữ →
+      xác nhận → trả lại), test đồng thời; chống lạm dụng theo nhiều khoá người mua (tài khoản, số điện
+      thoại, địa chỉ — chỉ bản băm), giới hạn theo kỳ (D-222)
+- [ ] Ví voucher của người mua (D-222): lưu, nhập mã nhận, được tặng qua `grant_voucher` (gọi lại không
+      cấp thêm), cấp tay có lý do; có trong xuất dữ liệu cá nhân, xoá tài khoản thì thu hồi voucher chưa dùng
+- [ ] Quy tắc trả hàng và huỷ cho `orders` (D-222): hoàn theo tỉ lệ, quà khi trả món điều kiện, voucher về
+      ví khi huỷ đơn
+- [ ] Kiểm tuân thủ: chặn chương trình vượt hạn mức đang hiệu lực (cộng mọi khoản giảm trên một đơn vị,
+      D-222) và sàn giá; giới hạn số ngày giảm giá là dữ liệu; kiểm trước khi bật, không ghi (D-225)
+- [ ] Thông báo khuyến mại theo từng nơi nhận (D-225): xuất dữ liệu thông báo gửi Sở Công Thương nơi tổ
+      chức, ghi nhận đã nộp từng nơi; lưu vết chương trình đã chạy
+- [ ] Mã cho người mua thấy: mã / voucher dùng được cho giỏ và mã chưa đủ điều kiện kèm lý do ("thêm X để
+      dùng"), bộ chọn thay ô nhập mã (D-201); trang sản phẩm hiện "còn X với mã …", giá niêm yết vẫn là giá
+      không mã (D-200); số lượt còn lại chỉ hiện khi là số thật
+- [ ] Công khai và nhắc: event giá sau giảm tự động cho danh sách công khai; flash sale công khai với suất
+      còn là số thật; nhắc khi flash sale bắt đầu (đồng ý riêng cho một lần nhắc, D-225)
+- [ ] Chạy thử chương trình trên giỏ mẫu, kiểm xung đột, lịch, số liệu chương trình (D-222)
 
 ## 44. Vận chuyển (`shipping`)
 
@@ -830,24 +790,22 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 
 Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua event, báo trạng thái qua event.
 
-- [ ] Sổ địa chỉ của người mua dùng `Address` của module nền `address` (bước 34, D-193); địa chỉ
-      nước ngoài dạng chung
-- [ ] Phí vận chuyển của khách tự đặt: vùng theo tỉnh, bậc cân nặng / kích thước, miễn phí từ một
-      giá trị đơn, nhận tại cửa hàng (chuỗi); API báo giá cho `orders`
-- [ ] Trait `ShippingCarrier` (báo giá, tạo vận đơn, huỷ, in nhãn, theo dõi) và bộ giả cho test;
-      webhook trạng thái của hãng: kiểm chữ ký, không trùng, ánh xạ về trạng thái chung
+- [ ] Sổ địa chỉ của người mua dùng `Address` của module nền `address` (bước 34, D-193); địa chỉ nước ngoài
+      dạng chung
+- [ ] Phí vận chuyển khách tự đặt: vùng theo tỉnh, bậc cân nặng / kích thước, miễn phí từ một giá trị đơn,
+      nhận tại cửa hàng (chuỗi); API báo giá cho `orders`; thuế GTGT trên phí giao (Luật 48/2024 — cần đối
+      chiếu)
+- [ ] Trait `ShippingCarrier` (báo giá, tạo vận đơn, huỷ, in nhãn, theo dõi) và bộ giả cho test; trạng thái
+      kiểm tài khoản hãng; webhook trạng thái của hãng: kiểm chữ ký, không trùng, ánh xạ về trạng thái chung
 - [ ] Vận đơn: một đơn nhiều kiện, giao một phần, giao thất bại, hoàn hàng; event cho `orders`
-- [ ] Thu hộ khi giao (COD): tiền do hãng vận chuyển thu và chuyển trả theo hợp đồng với hãng; sổ cái
-      ghi phải thu từ hãng, đối soát với bảng kê COD của hãng; lệch thì báo
-- [ ] Ngày giao dự kiến là ngày cụ thể (D-201): khoảng ngày tuyệt đối kèm giờ chốt đơn trong ngày, tính
-      theo múi giờ của khách; ngày làm việc, giờ chốt, ngày lễ là dữ liệu có ngày hiệu lực; nhận tại
-      cửa hàng trả giờ sẵn sàng (thời gian chuẩn bị + giờ mở cửa của bước 34) và số ngày giữ hàng
-- [ ] Ước tính phí giao công khai (D-200): theo tỉnh và một sản phẩm / số lượng, chưa cần giỏ, cho trang
-      sản phẩm; cùng bảng phí với báo giá của `orders`, ghi rõ "ước tính", ngưỡng miễn phí
-- [ ] Đối chiếu thiết kế 2 (D-216): thuế GTGT trên phí giao (Luật 48/2024 — cần đối chiếu);
-      `shipping.cod_settled` mang `seller_org_id` và nơi nhận tiền
-- [ ] Đối chiếu đợt 2: lịch giao và ngày nghỉ, giờ chốt giao trong ngày, trạng thái kiểm tài khoản hãng, khớp
-      dòng lệch COD có lý do và audit, thời hạn giữ hàng chờ nhận
+- [ ] Thu hộ khi giao (COD): tiền do hãng thu và chuyển trả theo hợp đồng với hãng; sổ cái ghi phải thu từ hãng,
+      đối soát với bảng kê COD; lệch thì báo, khớp dòng lệch có lý do và audit; `shipping.cod_settled` mang
+      `seller_org_id` và nơi nhận tiền (D-216)
+- [ ] Ngày giao dự kiến là ngày cụ thể (D-201): khoảng ngày tuyệt đối kèm giờ chốt trong ngày, theo múi giờ của
+      khách; lịch giao, ngày làm việc, ngày nghỉ, giờ chốt giao trong ngày là dữ liệu có ngày hiệu lực; nhận
+      tại cửa hàng trả giờ sẵn sàng (chuẩn bị + giờ mở cửa của bước 34) và thời hạn giữ hàng chờ nhận
+- [ ] Ước tính phí giao công khai (D-200): theo tỉnh và một sản phẩm / số lượng, chưa cần giỏ, cho trang sản
+      phẩm; cùng bảng phí với báo giá của `orders`, ghi rõ "ước tính", ngưỡng miễn phí
 
 ## 45. Giỏ hàng, đặt hàng, đơn hàng (`orders`)
 
@@ -856,55 +814,45 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
 Bắt đầu SAU bước 42, 43, 44. Gọi `catalog`, `inventory`, `promotions`, `shipping` qua `api` của chúng;
 tiền qua `PaymentGateway` và sổ cái của bước 36.
 
-- [ ] Giỏ hàng cho người mua và khách vãng lai (gộp khi đăng nhập); giá, giảm giá, thuế, phí vận
-      chuyển luôn tính lại ở máy chủ, không tin số từ client
-- [ ] Đặt hàng: báo giá cuối → giữ tồn và lượt khuyến mại → tạo đơn với số đơn tuần tự (đánh số chứng
-      từ của bước 36) → thanh toán theo chế độ dòng tiền của khách (tự thu / thu hộ qua đối tác /
-      chia tại cổng / COD); `Idempotency-Key` bắt buộc; hết hạn thanh toán thì trả chỗ
-- [ ] Vòng đời đơn: chờ thanh toán → đã xác nhận → đang chuẩn bị → đang giao → đã giao → hoàn tất;
-      huỷ theo quy tắc; mọi chuyển trạng thái qua service, ghi event và bút toán sổ cái tương ứng
-- [ ] Đổi trả và hoàn tiền: yêu cầu trả trong thời hạn chính sách, duyệt, nhận hàng về (nhập kho),
-      hoàn tiền qua cổng, bút toán đảo, hoá đơn điều chỉnh / thay thế (NĐ 123/2020 sửa bởi NĐ 70/2025
-      — cần đối chiếu)
-- [ ] Hoá đơn điện tử cho đơn (qua `EInvoiceProvider`), kể cả hoá đơn từ máy tính tiền cho bán tại
-      quầy; mail xác nhận đơn và cập nhật trạng thái qua job, nội dung theo i18n
-- [ ] Bán tại quầy (POS) qua API cho chuỗi cửa hàng: đơn tạo tại cửa hàng, tiền mặt / thẻ / QR, trừ
-      kho của cửa hàng đó
-- [ ] Đánh giá sau mua: chỉ người đã mua, có kiểm duyệt nhưng không chặn hay ẩn đánh giá trái quy định
-      (Luật 19/2023); dùng lại `comments` nếu hợp, không thì module `reviews` — ghi quyết định
-- [ ] Báo cáo bán hàng theo cửa hàng / kênh / sản phẩm / thời gian, theo quyền độ sâu; event cho kho
-      báo cáo gộp (bước 38)
-- [ ] Chống "bom hàng" COD (D-194): tỉ lệ nhận hàng thành công của người mua trong khách (chỉ dữ
-      liệu của chính khách, có căn cứ xử lý theo Luật BVDLCN), quy tắc buộc trả trước khi rủi ro cao,
-      danh sách chặn có lý do và thời hạn; không chia sẻ danh sách giữa các khách
-- [ ] Mua không cần tài khoản cho trọn (D-201): báo giá giỏ có `free_shipping_remaining`; trạng thái
-      thanh toán công khai bằng token (hỏi định kỳ hay SSE) cho màn QR; tra đơn vãng lai bằng số đơn +
-      OTP số điện thoại; gắn các đơn vãng lai vào tài khoản mới sau khi xác thực số điện thoại; người
-      nhận hộ khi nhận tại cửa hàng; cách trả hàng (lấy tận nơi / bưu cục / cửa hàng) và thời gian hoàn
-      tiền theo phương thức thanh toán; đánh giá lọc theo có ảnh / số sao / sắp xếp, bộ sưu tập ảnh của
-      người mua, tóm tắt AI chỉ là bản nháp nhân viên duyệt và gắn nhãn (D-109)
-- [ ] Trả góp qua đối tác (trait của bước 36); bảo hành theo số serial hay theo đơn: phiếu bảo hành,
-      tiếp nhận, trạng thái xử lý, hạn bảo hành
-- [ ] Bổ sung theo D-202: nhãn `verified_buyer` cho hỏi đáp sản phẩm (bộ tính nhãn của kernel); trả
-      hàng kèm ảnh (lý do bắt buộc ảnh là chính sách theo nút) và `POST /me/orders/{id}/returns/preview`
-      (tiền hoàn, cách gửi trả và phí, thời gian hoàn, hạn — không ghi); thao tác bằng token xem đơn vãng
-      lai (huỷ, đổi địa chỉ có OTP lần hai, mở hỗ trợ) qua cùng service, giới hạn tra / gửi lại OTP / hạn
-      token là cấu hình, che số điện thoại và địa chỉ tới cấp phường
-- [ ] Hàng đặt trước trong đơn (D-204): tách lần giao hàng sẵn và hàng đặt trước, người mua đồng ý điều
-      kiện và thấy ngày giao dự kiến trước khi đặt, dời ngày thì báo và cho huỷ miễn phí, ngừng bán đặt
-      trước thì huỷ và hoàn tiền tự động; nút "mở hỗ trợ" của đơn tạo phiếu ở `support` (bước 53)
-- [ ] Nút "Đánh giá này hữu ích" (D-203): mỗi người một phiếu, rút lại được, đếm cùng transaction,
-      `sort=helpful` phân trang bằng con trỏ; không tự bỏ phiếu cho mình, người bán không bỏ phiếu cho sản
-      phẩm của mình; không có nút "không hữu ích"
-- [ ] Đối chiếu thiết kế 2 (D-209, D-215, D-216, D-218): `invoice_timing = on_delivered` mặc định,
-      `buyer_cancel_until = preparing`, `allowed_return_reasons`, `acceptance_hours`; `payment_actions[]` khi
-      giỏ nhiều chế độ dòng tiền; nhận tại cửa hàng (mã 6 số, giao cho người nhận hộ); chứng từ của người
-      mua; giỏ bỏ dở, gửi lại link thanh toán; xuất đơn qua xuất chung; hạn thanh toán đọc từ `ledger`
-- [ ] Coupon và voucher trong giỏ (D-222): mã và voucher tách nhau, điền dữ liệu điều kiện cho `promotions`,
-      chụp khoản giảm kèm ai trả tiền vào đơn; trả hàng hoàn theo tỉ lệ, xử lý quà; hoá đơn ghi khoản giảm và
-      hàng khuyến mại (cần đối chiếu NĐ 123/2020 sửa bởi NĐ 70/2025)
-- [ ] Đối chiếu đợt 2 (D-227): giữ hàng chờ nhận có hạn; đóng ca có chênh lệch ghi sổ cái; danh sách lý do theo
-      khách; đếm đánh giá mới theo mốc đã xem; bản nháp tóm tắt đánh giá bằng AI chờ duyệt
+- [ ] Giỏ hàng cho người mua và vãng lai (gộp khi đăng nhập); giá, giảm, thuế, phí giao luôn tính lại ở máy
+      chủ, không tin số từ client; `free_shipping_remaining` (D-201); coupon và voucher tách nhau, điền dữ liệu
+      điều kiện cho `promotions`, chụp khoản giảm kèm ai trả tiền vào đơn (D-222); danh sách giỏ bỏ dở
+- [ ] Đặt hàng: báo giá cuối → giữ tồn, lượt khuyến mại → số đơn tuần tự (bước 36) → thanh toán theo chế độ
+      dòng tiền (tự thu / thu hộ / chia tại cổng / COD; `payment_actions[]`, D-216); `Idempotency-Key` bắt
+      buộc; hạn thanh toán đọc từ `ledger` (D-218), hết hạn thì trả chỗ; trạng thái thanh toán công khai
+- [ ] Vòng đời đơn: chờ thanh toán → xác nhận → chuẩn bị → đang giao → đã giao → hoàn tất; huỷ theo quy tắc
+      (`buyer_cancel_until` tới `preparing`), chờ cửa hàng nhận đơn `acceptance_hours` (D-209); mọi chuyển
+      qua service, ghi event và bút toán sổ cái; gửi lại link thanh toán còn hạn
+- [ ] Nhận tại cửa hàng và hàng đặt trước: mã nhận 6 số, người nhận hộ, giữ hàng chờ nhận có hạn rồi huỷ /
+      hoàn theo chính sách; đặt trước (D-204): tách lần giao, đồng ý điều kiện và thấy ngày giao trước khi
+      đặt, dời ngày thì báo và cho huỷ miễn phí, ngừng bán đặt trước thì huỷ và hoàn tiền tự động
+- [ ] Đổi trả và hoàn tiền: trả trong hạn chính sách, lý do theo `allowed_return_reasons` (D-209, D-223), duyệt,
+      nhận về (nhập kho), hoàn qua cổng, bút toán đảo, hoá đơn điều chỉnh / thay thế (NĐ 123/2020 sửa bởi
+      NĐ 70/2025 — cần đối chiếu); hoàn theo tỉ lệ khoản giảm, xử lý quà, voucher về ví (D-222)
+- [ ] Trả hàng phía người mua (D-201, D-202): cách gửi trả (lấy tận nơi / bưu cục / cửa hàng), thời gian hoàn
+      theo phương thức thanh toán; ảnh kèm (lý do bắt buộc ảnh là chính sách theo nút); `returns/preview`
+      trả tiền hoàn, cách gửi và phí, thời gian hoàn, hạn — không ghi
+- [ ] Hoá đơn điện tử qua `EInvoiceProvider`, kể cả từ máy tính tiền; `invoice_timing = on_delivered` mặc
+      định (D-215); khoản giảm, hàng khuyến mại trên hoá đơn (D-222, cần đối chiếu NĐ 123/2020 sửa bởi NĐ
+      70/2025); mail xác nhận, cập nhật trạng thái qua job theo i18n; chứng từ của người mua
+- [ ] Mua không cần tài khoản (D-201, D-202): tra đơn bằng số đơn + OTP; token xem đơn để huỷ, đổi địa chỉ
+      (OTP lần hai), mở hỗ trợ ở `support` (D-204), qua cùng service; giới hạn tra / gửi lại OTP / hạn token
+      là cấu hình; che số điện thoại, địa chỉ tới cấp phường; gắn đơn vãng lai vào tài khoản đã xác thực số
+- [ ] Bán tại quầy (POS) qua API cho chuỗi: đơn tạo tại cửa hàng, tiền mặt / thẻ / QR, trừ kho của cửa hàng
+      đó; đóng ca có chênh lệch: lý do, ghi sổ cái, cần duyệt khi vượt ngưỡng (D-227)
+- [ ] Đánh giá sau mua: chỉ người đã mua, kiểm duyệt không chặn / ẩn trái quy định (Luật 19/2023), lý do ẩn
+      theo danh sách (D-223); dùng `comments`, module `reviews` hay đặt ở `orders` — ghi quyết định; lọc có
+      ảnh / số sao / sắp xếp, ảnh người mua; đếm đánh giá mới theo mốc đã xem; nhãn `verified_buyer` (D-202)
+- [ ] Nút "Đánh giá này hữu ích" (D-203): mỗi người một phiếu, rút được, đếm cùng transaction, `sort=helpful`
+      bằng con trỏ, không tự / người bán bỏ phiếu, không có "không hữu ích"; tóm tắt đánh giá bằng AI chỉ là
+      bản nháp nhân viên duyệt, gắn nhãn (D-109, D-201)
+- [ ] Báo cáo bán hàng theo cửa hàng / kênh / sản phẩm / thời gian, theo quyền độ sâu; event cho kho báo cáo
+      gộp (bước 38); xuất đơn qua xuất chung của bước 51 (D-213)
+- [ ] Chống "bom hàng" COD (D-194): tỉ lệ nhận hàng thành công của người mua chỉ trong dữ liệu của khách (có
+      căn cứ xử lý theo Luật BVDLCN), quy tắc buộc trả trước khi rủi ro cao, danh sách chặn có lý do và thời
+      hạn; không chia sẻ danh sách giữa các khách
+- [ ] Trả góp qua đối tác (trait của bước 36); bảo hành theo số serial hay theo đơn: phiếu bảo hành, tiếp
+      nhận, trạng thái xử lý, hạn bảo hành
 
 ## 46. Sàn (`marketplace`)
 
@@ -937,20 +885,20 @@ Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nú
 
 Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (bước 34); module này giữ hồ sơ bán hàng.
 
-- [ ] Hồ sơ khách: lịch sử mua (từ event của `orders`), tổng chi, nhóm và phân khúc theo quy tắc,
-      nhãn, ghi chú của nhân viên; nhóm khách dùng cho bảng giá (bước 41) và khuyến mại (bước 43)
-- [ ] Điểm thưởng và hạng thành viên: sổ điểm chỉ thêm, điểm có hạn dùng, quy tắc tích / đổi là dữ
-      liệu; điểm chưa dùng là nghĩa vụ ghi trong sổ cái
-- [ ] Thẻ quà tặng và số dư cửa hàng: chỉ dùng mua hàng của chính khách đó, không rút ra tiền,
-      không chuyển ra ngoài — **tắt mặc định**, chỉ bật sau khi đối chiếu NĐ 52/2024 về ví điện tử /
-      thẻ trả trước (D-194); số dư là nghĩa vụ trong sổ cái
-- [ ] Danh sách yêu thích, sản phẩm vừa xem; nhắc giỏ hàng bỏ dở qua `notifications` — chỉ khi người
-      mua đã đồng ý nhận tin quảng cáo (bước 37); giới thiệu bạn bè có thưởng
-- [ ] Đối chiếu thiết kế 2: gộp danh sách yêu thích của trình duyệt vào tài khoản khi đăng nhập
-- [ ] Tặng voucher (D-222): sinh nhật, đổi điểm lấy voucher, sau khi mua, giới thiệu bạn — qua `grant_voucher`,
-      gọi lại không cấp thêm; phân khúc và hạng thành viên làm điều kiện khuyến mại
-- [ ] Đối chiếu đợt 2 (D-226): che số điện thoại / email, xem đủ cần permission và ghi audit; cơ sở tính điểm
-      thống nhất
+- [ ] Hồ sơ khách: lịch sử mua (từ event của `orders`), tổng chi, nhãn, ghi chú của nhân viên; che số điện
+      thoại / email, xem đủ cần permission và ghi audit (D-226)
+- [ ] Nhóm và phân khúc theo quy tắc, dùng cho bảng giá (bước 41) và khuyến mại (bước 43); phân khúc và
+      hạng thành viên làm điều kiện khuyến mại (D-222)
+- [ ] Điểm thưởng và hạng thành viên: sổ điểm chỉ thêm, điểm có hạn dùng, quy tắc tích / đổi là dữ liệu;
+      điểm chưa dùng là nghĩa vụ ghi trong sổ cái; cơ sở tính điểm thống nhất (D-226)
+- [ ] Thẻ quà tặng và số dư cửa hàng: chỉ dùng mua hàng của chính khách đó, không rút ra tiền, không chuyển
+      ra ngoài — **tắt mặc định**, chỉ bật sau khi đối chiếu NĐ 52/2024 về ví điện tử / thẻ trả trước
+      (D-194); số dư là nghĩa vụ trong sổ cái
+- [ ] Danh sách yêu thích (gộp danh sách của trình duyệt vào tài khoản khi đăng nhập), sản phẩm vừa xem;
+      nhắc giỏ hàng bỏ dở qua `notifications` — chỉ khi người mua đã đồng ý nhận tin quảng cáo (bước 37);
+      giới thiệu bạn bè có thưởng
+- [ ] Tặng voucher (D-222): sinh nhật, đổi điểm lấy voucher, sau khi mua, giới thiệu bạn — qua
+      `grant_voucher`, gọi lại không cấp thêm
 
 ## 48. Bán đa kênh (`channels`)
 
@@ -961,15 +909,16 @@ Facebook / Zalo; một kho, một danh sách sản phẩm, đơn từ mọi nơi
 
 - [ ] Trait `SalesChannel` (đăng sản phẩm, cập nhật giá và tồn, lấy đơn, cập nhật trạng thái giao)
       và bộ giả cho test; bộ nối từng sàn là module riêng, làm khi có tài khoản thử (D-191)
-- [ ] Liên kết sản phẩm / biến thể với mã trên từng kênh; giá riêng theo kênh; đồng bộ tồn có phần
-      để dành cho từng kênh, không bán quá khi nhiều kênh cùng bán
-- [ ] Đơn từ kênh khác vào `orders` với kênh nguồn, trừ kho chung, không trùng khi kênh gửi lại;
-      báo cáo theo kênh; đối soát tiền sàn trả với sổ cái
+- [ ] Liên kết sản phẩm / biến thể với mã trên từng kênh; giá riêng theo kênh (giá cố định cho một tin
+      đăng, hay bảng giá suy ra theo kênh của `catalog` — D-222)
+- [ ] Đồng bộ tồn có phần để dành cho từng kênh, không bán quá khi nhiều kênh cùng bán; số đẩy lên kênh ở
+      chế độ `reserved` (phần giữ riêng còn lại + phần chia từ tồn chung)
+- [ ] Đơn từ kênh khác vào `orders` với kênh nguồn, trừ kho chung, không trùng khi kênh gửi lại; trạng
+      thái đơn kênh sau khi xử lý (`resolved` kèm lý do — D-223, `cancelled_by_channel`)
+- [ ] Báo cáo theo kênh; đối soát tiền sàn trả với sổ cái
 - [ ] Nguồn cấp sản phẩm cho Google Merchant Center và danh mục của Meta (D-204): tệp XML / CSV dựng bằng
       job theo cửa hàng, ngôn ngữ, tiền tệ; link công khai có token; báo lỗi từng sản phẩm (thiếu GTIN,
       ảnh); không lộ số tồn hay giá vốn
-- [ ] Đối chiếu đợt 2: trạng thái đơn kênh sau khi xử lý (`resolved`, `cancelled_by_channel`); số đẩy lên kênh
-      ở chế độ `reserved`
 
 ## 49. Tiếp thị liên kết và bán qua livestream (`affiliate`)
 
