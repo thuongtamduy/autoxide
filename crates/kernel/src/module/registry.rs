@@ -652,7 +652,8 @@ mod tests {
         // Chỉ biến của hai module nội bộ `kernel` và `antispam`.
         let names: Vec<&str> = reader.values().iter().map(|value| value.setting.name).collect();
         let internal = |name: &&str| {
-            ["AUTOXIDE_SECRET_KEY", "AUTOXIDE_HTTP_PUBLIC_URL"].contains(name)
+            ["AUTOXIDE_SECRET_KEY", "AUTOXIDE_HTTP_PUBLIC_URL", "AUTOXIDE_USER_FLAGS_MAX"]
+                .contains(name)
                 || name.starts_with("AUTOXIDE_ANTISPAM_")
         };
         assert!(names.iter().all(internal), "{names:?}");

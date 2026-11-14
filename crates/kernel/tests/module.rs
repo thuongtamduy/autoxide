@@ -221,8 +221,8 @@ async fn module_nhan_database_va_khai_route() {
         let routes = modules.routes();
         let names: Vec<&str> = routes.iter().map(|(name, _)| *name).collect();
         // Hai module nội bộ luôn đứng đầu; `kernel` có sổ module, `antispam` có endpoint lấy
-        // token form.
-        assert_eq!(names, ["kernel", "antispam", "users", "notes", "pinger"]);
+        // token form. Cuối cùng là `me`: endpoint "của tôi" của kernel dưới `/api/v1/me` (D-207).
+        assert_eq!(names, ["kernel", "antispam", "users", "notes", "pinger", "me"]);
         let paths: Vec<Vec<String>> = routes
             .into_iter()
             .map(|(_, router)| router.into_openapi().paths.paths.keys().cloned().collect())
@@ -234,7 +234,8 @@ async fn module_nhan_database_va_khai_route() {
                 vec!["/token".to_owned()],
                 vec![],
                 vec!["/".to_owned()],
-                vec![]
+                vec![],
+                vec!["/flags".to_owned(), "/flags/{key}".to_owned()]
             ]
         );
     })
