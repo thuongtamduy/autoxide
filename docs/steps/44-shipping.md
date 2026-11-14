@@ -6,7 +6,7 @@
 > Nguồn đối chiếu thiết kế: `docs/prompts/ui-trace-roadmap.md` (mã `A-…` / `B-…` trỏ tới
 > `docs/research/ui-trace/`) và `docs/prompts/ui-phase2-api.md` (màn tương ứng ở
 > `docs/research/ui-traceability.md`, đợt 2).
-> Đã gộp các quyết định: D-200, D-201, D-208…D-218 (gồm D-216), D-223…D-227 (D-228).
+> Đã gộp các quyết định: D-200, D-201, D-208…D-218 (gồm D-216), D-223…D-227 ; thêm thẳng vào thân: D-230 (D-228).
 
 ## Mục tiêu
 
@@ -185,6 +185,10 @@ pub trait CarrierRegistry: Send + Sync {
 /// Bộ giả cho test và để thử trên máy dev: trạng thái điều khiển bằng tay, ký webhook bằng HMAC.
 pub mod fake { pub struct FakeCarrier { /* … */ } }
 ```
+
+Trả lời tự động (D-230): khi có `support` (bước 53), `shipping` gắn `FactSource` ý định
+`shipping.tracking` (mã vận đơn hay số đơn) vào `SupportFacts`, trả mẫu câu i18n về trạng thái mới nhất; chỉ
+trả khi vận đơn thuộc đơn của người hỏi, không thì `None`.
 
 `shipping` công bố `dyn ShippingRates` và `dyn CarrierRegistry`. `fake::FakeCarrier` nằm trong `api`
 (không tham chiếu `crate::…`) để testkit và bước 45 dùng; tự đăng ký khi

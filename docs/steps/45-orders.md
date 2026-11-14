@@ -3,7 +3,7 @@
 > Lộ trình: `docs/ROADMAP.md` bước 45 · Thiết kế: `docs/research/business-foundation.md` mục 3 (trụ 4),
 > mục 8, mục 9 · Quyết định: D-180, D-181, D-182, D-184, D-185, D-186, D-187, D-188, D-190, D-191, D-194
 > Đã gộp các quyết định: D-201, D-202, D-203, D-204, D-209, D-213, D-215, D-216, D-218, D-222, D-223,
-> D-227 (D-228).
+> D-227 ; thêm thẳng vào thân: D-229, D-230 (D-228).
 > Mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/` (nguồn: `docs/prompts/ui-trace-roadmap.md`); phần của
 > đợt 2 có nguồn `docs/prompts/ui-phase2-api.md`, màn tương ứng ở `docs/research/ui-traceability.md`.
 
@@ -215,6 +215,13 @@ pub struct Attribution { pub click_id: Option<Uuid>, pub code: Option<String>, p
 
 `api` còn công bố trait `OrderLookups` với `verified_phone(token)` (D-202): `auth` (bước 34) gọi để lấy số
 điện thoại đã qua OTP của một token xem đơn (mục "Mua không cần tài khoản").
+
+Trả lời tự động (D-230): `orders` gắn một `FactSource` vào `SupportFacts` của `support` (bước 53) khi có
+`support`: ý định `orders.order_status` (tham số số đơn) trả mẫu câu i18n "Đơn {number} đang {status}, dự kiến
+giao {eta}" — chỉ khi đơn thuộc tài khoản hay số điện thoại đã xác thực của người hỏi, không thì `None`.
+
+Khối cho trang (D-229, bước 67): `orders` khai `orders.add_to_cart`, `orders.buy_now`, `orders.reviews` qua
+`Module::blocks()` và gắn `BlockData` (giá, còn hàng, điểm đánh giá — chỉ dữ liệu công khai).
 
 `OrderExtensions` vì `start` chạy theo thứ tự đăng ký: `orders` không `require` được trait của module
 đăng ký sau nó, nên module sau tự cắm vào (mỗi điểm cắm một lần; cắm hai lần → lỗi khởi động).

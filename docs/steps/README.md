@@ -1,6 +1,6 @@
-# Đặc tả từng bước (30–66)
+# Đặc tả từng bước (30–67)
 
-Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 66, có một file đặc tả ở đây (bước 50 chỉ là việc của chủ dự án). Đặc tả nói **cách làm**:
+Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 67, có một file đặc tả ở đây (bước 50 chỉ là việc của chủ dự án). Đặc tả nói **cách làm**:
 
 - bảng dữ liệu, API, permission, event, mã lỗi;
 - thứ tự commit, test bắt buộc, tiêu chí xong;
@@ -50,6 +50,7 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 66,
 | 56 | [56-imports.md](56-imports.md) | `imports`: chuyển dữ liệu từ Shopify, WooCommerce, Haravan, Sapo, KiotViet, giữ đường dẫn cũ (D-219) |
 | 57 | [57-analytics.md](57-analytics.md) | `analytics`: số liệu truy cập không cookie, phễu, theo dõi theo người khi đồng ý (D-220) |
 | 58 | [58-automations.md](58-automations.md) | `automations`: luật "khi … thì …" chạy tool MCP với quyền người tạo, chờ duyệt, chống vòng lặp (D-220) |
+| 67 | [67-page-builder.md](67-page-builder.md) | Trang dựng từ khối, AI tạo trang, bộ giao diện website, kiểm tra sức khoẻ website (`content` + sổ khối của kernel, D-229) |
 | 59–66 | [59](59-wholesale.md) · [60](60-bookings.md) · [61](61-conversations.md) · [62](62-recurring.md) · [63](63-multi-currency.md) · [64](64-ads.md) · [65](65-apps.md) · [66](66-scim.md) | Bán sỉ B2B, đặt lịch, chat, bán theo kỳ, đa tiền tệ, quảng cáo trong sàn, chợ ứng dụng OAuth, SCIM (D-221) |
 | 41–49 | [41](41-catalog.md) · [42](42-inventory.md) · [43](43-promotions.md) · [44](44-shipping.md) · [45](45-orders.md) · [46](46-marketplace.md) · [47](47-customers.md) · [48](48-channels.md) · [49](49-affiliate.md) | Module thương mại |
 
@@ -78,6 +79,7 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 66,
   - `kernel_tenants`, `kernel_placements`, `kernel_backups`, `kernel_relocations`
   - danh mục đơn vị hành chính của `address`
   - dữ liệu luật dùng chung: `catalog_restriction_rules`, `promotions_legal_limits`, `promotions_notice_rules`
+  - trang mẫu dùng chung: dòng `tenant_id` NULL của `content_page_templates` (bước 67)
   - `invoices_archives` (bản lưu kế toán còn sau khi xoá khách)
 - `kernel_sequences` (đánh số chứng từ) là bảng **cấp khách hàng**, có ở mọi database dữ liệu: số phải cấp
   trong cùng transaction với chứng từ.
@@ -150,6 +152,7 @@ sau dùng lại, không làm lại.
 | `Resource::image`, node `embed` của `content` | 51 (sau 33) | 41 (`catalog.product`) |
 | `navigation` (`Module::navigation`), `work::WorkSource`, `finder::FinderSource`, `summary::SummaryMetric`, `EventInfo::activity` | 51 (sau 34–35) | 41–49 |
 | `x-autoxide-filters`, `kernel_saved_views`, `BulkAction`, `resolve`, `kernel_work_states`, `SetupStep`, `/me/can`, `ApiKeyKind`, `ActorKind`, `kernel_approval_requests`, `kernel_record_notes` | 51 (D-201) | 41–49, 52 |
+| `blocks` (`BlockType`, `Module::blocks`, `BlockData`, `GET /kernel/blocks`) | 67 (D-229) | 41, 43, 45 (khai khối) |
 
 ## Việc chỉ chủ dự án làm được
 

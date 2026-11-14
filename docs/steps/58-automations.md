@@ -1,6 +1,6 @@
 # Bước 58 — Tự động hoá quy trình (`automations`)
 
-> Lộ trình: `docs/ROADMAP.md` bước 58 · Quyết định: D-220 · Đặc tả liên quan: `docs/steps/51-ui-contracts.md`
+> Lộ trình: `docs/ROADMAP.md` bước 58 · Quyết định: D-220, D-222, D-229 (cảnh báo bất thường) · Đặc tả liên quan: `docs/steps/51-ui-contracts.md`
 > (P12 lệnh chờ duyệt, P15 job API), `docs/steps/40-core-capabilities.md` (MCP), `docs/steps/54-authorization.md`
 
 ## Mục tiêu
@@ -24,7 +24,16 @@ JSON, `enabled`, `run_as` (người tạo luật — hành động chạy **vớ
 quyền thì luật tự tắt, báo cho quản trị), `version`, `created_by`, `updated_at`.
 
 - **Kích hoạt (`trigger`)**: một loại event đã khai trong sổ event (vd `orders.order_placed`), hoặc lịch
-  (`cron` đơn giản: mỗi giờ / ngày / tuần, theo múi giờ của nút), hoặc gọi tay / từ tool MCP.
+  (`cron` đơn giản: mỗi giờ / ngày / tuần, theo múi giờ của nút), hoặc gọi tay / từ tool MCP, hoặc **số liệu bất
+  thường** (dưới).
+- **Cảnh báo bất thường (D-229)**: kích hoạt `metric` đọc một số liệu tóm tắt module đã khai (`SummaryMetric`, bước
+  51 P4 — vd doanh thu theo ngày, số đơn, tỉ lệ đơn COD giao thất bại, số ngày còn đủ hàng của biến thể theo tốc
+  độ bán 14 ngày của `inventory`) theo lịch, so với **ngưỡng cố định** hay **mức nền** (trung bình cùng thứ trong
+  4 tuần trước) bằng toán tử `drop_pct` / `rise_pct` / `below` / `above`. Thống kê đơn giản, tất định, giải thích
+  được ("doanh thu hôm nay 12 triệu, thấp hơn 45% so với trung bình 4 thứ Hai trước: 21,8 triệu"); không mô hình
+  học máy. Mỗi luật một lần báo mỗi kỳ (khoá theo khe thời gian). Mẫu luật dựng sẵn: doanh thu tụt, sắp hết hàng
+  theo tốc độ bán, tỉ lệ bom hàng tăng, phiếu hỗ trợ quá hạn tăng — hành động mặc định là thông báo cho người tạo
+  luật và đưa vào hộp việc.
 - **Điều kiện**: cây `all` / `any` / `not` trên trường của payload event (đường dẫn JSON), toán tử cố định
   (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `contains`, `exists`); kiểu kiểm theo JSON Schema payload mà
   module khai cho event (thêm `EventInfo::payload_schema`, mặc định không có → chỉ so chuỗi). Không biểu
@@ -32,6 +41,8 @@ quyền thì luật tự tắt, báo cho quản trị), `version`, `created_by`,
 - **Hành động**: danh sách tuần tự, mỗi bước là một tool MCP (`tool`, `arguments` có thể lấy giá trị từ
   payload bằng `{{ event.order.id }}` qua bộ dựng mẫu của kernel — D-206), cộng vài hành động có sẵn của module
   này: `wait` (tối đa 30 ngày, bằng job hẹn giờ), `stop_if`.
+- Hành động "tặng voucher" (D-222) gọi tool `promotions.grant_voucher` (`source = automation`, `source_ref =
+  automation:<run_id>:<step>`) — chạy lại không cấp thêm; vẫn kiểm quyền của `run_as`.
 - Lưu luật thì kiểm: event / tool có thật, người tạo có permission của **mọi** tool trong luật, tham số khớp
   JSON Schema đầu vào của tool (có thể kiểm sau khi điền mẫu bằng dữ liệu mẫu). Lỗi gom một lần (D-083).
 
@@ -76,7 +87,8 @@ event_id)`), cùng `automations_events`, `automations_jobs`.
 `luu_luat_kiem_quyen_moi_tool`, `nguoi_tao_mat_quyen_thi_luat_tu_tat`, `nhan_lai_event_khong_chay_hai_lan`,
 `hanh_dong_rui_ro_cho_duyet`, `luat_khong_tu_kich_hoat_lai_minh`, `chay_lai_sau_loi_khong_lam_hai_lan`,
 `chay_thu_kho_khong_goi_tool`, `wait_hen_gio_roi_chay_tiep`, `vuot_so_lan_chay_tam_dung_luat`,
-`luat_cua_nut_khac_khong_thay`, `agent_tao_luat_thi_cho_duyet`.
+`luat_cua_nut_khac_khong_thay`, `agent_tao_luat_thi_cho_duyet`, `so_lieu_tut_so_voi_muc_nen_thi_bao`,
+`mot_ky_chi_bao_mot_lan`, `so_lieu_thieu_du_lieu_nen_khong_bao_sai`.
 
 ## Chỗ dễ sai
 
@@ -88,8 +100,3 @@ event_id)`), cùng `automations_events`, `automations_jobs`.
 ## Agent làm bước này tự quyết
 
 Cú pháp lịch; giới hạn độ dài luật; mẫu luật mặc định cho từng mô hình kinh doanh. Ghi vào `docs/DECISIONS.md`.
-
-## Bổ sung theo D-222
-
-Hành động "tặng voucher" gọi tool MCP `promotions.grant_voucher` (`source = automation`, `source_ref =
-automation:<run_id>:<step>`) — chạy lại không cấp thêm; vẫn kiểm quyền của `run_as`.

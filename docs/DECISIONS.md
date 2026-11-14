@@ -5452,3 +5452,63 @@ vẫn đọc lại.
 
 Đã cân nhắc: đánh số lại các bước — số bước được nhắc khoảng 110 lần trong nhật ký quyết định, nhật ký chỉ thêm
 không sửa, đổi số thì quyết định cũ trỏ sai; gộp các bước nhỏ 59–66 — mỗi bước là một module, gộp thì ranh giới mờ.
+
+## D-229 · Trang dựng từ khối và AI tạo trang (bước 67); tính năng AI hỗ trợ người dùng trong CMS — 2026-11-14 — chủ dự án quyết
+
+Quyết định: chủ dự án đồng ý thêm bước 67 và các tính năng AI / tự động hoá đi kèm, sau khi đối chiếu cách làm
+của Builder.io (khối đăng ký sẵn, trang là JSON, AI chỉ dùng khối đã đăng ký), Shopify Horizon (trang ghép từ
+theme blocks), Wix Harmony (AI dựng rồi người sửa kéo thả) và Webflow App Gen / Base44 (AI sinh code rồi deploy).
+
+- **Một nền cho hai cách dùng.** Trang của `content` có thân `layout` (cây khối JSON). Tạo bằng trò chuyện với AI
+  và kéo thả cùng sửa bản dữ liệu đó. Giao diện kéo thả ở repo giao diện (D-026, D-097); core có sổ khối, kiểm
+  bố cục, nháp / lịch sử / xem trước / hẹn giờ, khoá sửa, đọc công khai kèm dữ liệu khối.
+- **AI chỉ ghép khối, không sinh code.** Kết quả AI là bố cục hay JSON Patch qua cùng bộ kiểm từ chối mặc định
+  (như D-102), thành bản nháp `ai_assisted` (D-109). Không có khối "mã tuỳ chỉnh" ở bước này.
+- **Module tự khai khối** qua `Module::blocks()` (mặc định rỗng — D-038) và trả dữ liệu qua `BlockData` theo lô
+  (không N+1). Chức năng thật (form, đăng ký nhận tin, giỏ hàng, lưu voucher) là khối của module sở hữu.
+- **Không deploy:** đăng là công khai ngay ở tên miền của website + đường dẫn trang; chân trang pháp lý tự gắn.
+- **Đi kèm:** bộ giao diện chung của website (token, kế thừa), khu dùng chung, trang mẫu, kiểm tra sức khoẻ website
+  (SEO, alt, link gãy, 404 → gợi ý chuyển hướng), bộ nháp chiến dịch từ một chương trình khuyến mại.
+- **Thêm vào bước có sẵn:** tạo sản phẩm nháp từ ảnh (41); cảnh báo bất thường bằng thống kê đơn giản, tất định
+  (58). Hỏi số liệu bằng câu thường đã có ở trợ lý của bước 52 (tool chỉ đọc với quyền người hỏi), không thêm.
+
+Thay: câu "trình dựng trang kéo thả — trái D-026" trong phần "Đã cân nhắc" của D-219 — chỉ phần kéo thả là giao
+diện (ở repo riêng); dữ liệu trang là API nên không trái D-026.
+
+Để sau: thử A/B trang (sau bước 57); AI tạo ảnh (cần loại nhà cung cấp AI cho ảnh); khối mã tuỳ chỉnh (cần quyết
+định riêng: tắt mặc định, HTML / CSS đã lọc, iframe `sandbox`, CSP chặt).
+
+Lý do: người không biết code làm được trang đích ngay, an toàn (AI không đưa được mã vào trang, không làm lộ dữ
+liệu người mua), nhẹ (trang là dữ liệu, không build, không deploy), và agent bên ngoài cũng dựng trang qua MCP.
+
+Đã cân nhắc: AI sinh code như Webflow App Gen / Base44 — mạnh nhưng phải deploy, khó kiểm, rủi ro bảo mật, nặng
+cho mục tiêu "hỗ trợ nhẹ"; module `pages` riêng — lặp nháp / lịch sử / đường dẫn / xem trước mà `content` đã có.
+
+## D-230 · AI tự trả lời câu hỏi đơn giản đã có câu trả lời chính xác; câu phức tạp chỉ soạn nháp — 2026-11-14 — chủ dự án quyết
+
+Quyết định: chủ dự án chọn — **câu hỏi phức tạp hay mơ hồ: AI chỉ soạn nháp cho nhân viên; câu hỏi đơn giản, đã
+biết chính xác, không mơ hồ: tự động trả lời.** Đây là ngoại lệ có giới hạn của câu "kết quả AI không bao giờ tự
+đăng" trong D-109, cho kênh hỗ trợ (`support`, bước 53) và chat (`conversations`, bước 61):
+
+- **Chữ gửi tự động không do mô hình viết.** Chỉ hai nguồn: câu trả lời mẫu được người có quyền **duyệt cho tự
+  động** (kèm ngày phải rà lại), gửi nguyên văn; hoặc mẫu câu i18n của `FactSource` dựng từ dữ liệu chính xác
+  (trạng thái đơn, hành trình vận đơn, giờ mở cửa) — chỉ khi người hỏi chứng minh được là chủ dữ liệu. Mô hình chỉ
+  **phân loại** câu hỏi và chọn nguồn.
+- **Quyết định trong Rust, không tin mô hình:** gửi khi độ tin cậy ≥ ngưỡng của nút (mặc định 90%), không có cờ rủi
+  ro, chưa quá số lần tự động liên tiếp (mặc định 2). Không bao giờ tự động cho khiếu nại, hoàn tiền / trả hàng /
+  huỷ đơn, thanh toán lỗi, dữ liệu cá nhân, pháp lý, lời lẽ bức xúc, người mua đòi gặp người; từ khoá chặn theo nút
+  là dữ liệu.
+- **Tắt mặc định**, khách bật theo nút; tin tự động gắn nhãn "Trả lời tự động" và có nút "Gặp nhân viên"; người
+  mua báo "không đúng" đủ ngưỡng thì câu trả lời tự thôi dùng; mọi lần tự động ghi nhật ký.
+- Một bộ quyết duy nhất: `AutoResponder` của `support`; `conversations` gọi nó, không làm bộ riêng.
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật Trí tuệ nhân tạo 134/2025/QH15 và văn
+bản hướng dẫn (cho người dùng biết đang tương tác với hệ thống tự động); Luật 19/2023/QH15 (thông tin cho người
+tiêu dùng chính xác); Luật 91/2025/QH15 (không trả dữ liệu cho người chưa chứng minh là chủ).
+
+Lý do: phần lớn câu hỏi lặp lại ("đơn tôi đâu", "mấy giờ mở cửa", "đổi trả mấy ngày") có câu trả lời chắc chắn;
+trả ngay giúp người mua và nhân viên. Giới hạn nguồn câu trả lời là cách giữ "chính xác, không mơ hồ" mà không
+phải tin mô hình tự viết đúng.
+
+Đã cân nhắc: để mô hình tự viết câu trả lời rồi gửi khi "tự tin" — mô hình có thể bịa (chính sách, ngày giao) mà
+vẫn tự tin; chỉ soạn nháp cho mọi câu — an toàn nhưng bỏ lợi ích chính chủ dự án muốn.

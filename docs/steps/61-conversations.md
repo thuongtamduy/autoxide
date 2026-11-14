@@ -1,6 +1,6 @@
 # Bước 61 — Chat chăm sóc khách (`conversations`)
 
-> Lộ trình: `docs/ROADMAP.md` bước 61 · Quyết định: D-221 · Đặc tả liên quan: 40 P5 (SSE), 53 (`support`),
+> Lộ trình: `docs/ROADMAP.md` bước 61 · Quyết định: D-221, D-230 (trả lời tự động) · Đặc tả liên quan: 40 P5 (SSE), 53 (`support`),
 > 37 (thông báo, xác thực tài khoản), 46 (sàn)
 
 ## Mục tiêu
@@ -31,8 +31,12 @@ Bước 40 P5 (SSE), 53 (`support`), 37 (thông báo). Sàn (46) thì thêm chat
   đọc tin để quảng cáo.
 - **Chống lạm dụng:** throttle theo người, chặn người dùng, báo vi phạm; xác thực tài khoản theo NĐ 147/2024 dùng
   `PostingVerification` của kernel (D-202) khi khách bật.
-- **Trợ lý AI** (D-109): gợi ý câu trả lời cho nhân viên là bản nháp; không tự trả lời khách khi chưa bật rõ
-  ràng và gắn nhãn "trả lời tự động".
+- **Trợ lý AI** (D-109, D-230): câu hỏi phức tạp hay mơ hồ → gợi ý câu trả lời cho nhân viên là bản nháp. Câu
+  hỏi đơn giản đã có câu trả lời chính xác → trả lời tự động bằng `AutoResponder` của `support` (bước 53): cùng
+  luật, cùng câu trả lời đã duyệt và `FactSource`, cùng cài đặt bật / tắt theo nút (tắt mặc định), không có bộ
+  quyết riêng ở đây. Tin tự động `author_kind = system`, `auto_reply = true`, nhãn "Trả lời tự động" và nút
+  "Gặp nhân viên" (dừng tự động trong cuộc trò chuyện, phân công người); chạy bằng job sau khi tin của khách đã
+  lưu, không chặn việc gửi tin.
 
 ### API, MCP, quyền, lỗi
 
@@ -51,7 +55,7 @@ Bước 40 P5 (SSE), 53 (`support`), 37 (thông báo). Sàn (46) thì thêm chat
 
 `gui_lai_cung_client_id_khong_trung`, `stream_chi_phat_cho_nguoi_co_quyen`, `nhan_vien_nhanh_khac_khong_doc_duoc`,
 `thu_hoi_qua_hai_phut_bi_tu_choi`, `tin_chua_doc_gui_thong_bao_mot_lan`, `chuyen_thanh_phieu_ho_tro`,
-`het_han_luu_thi_xoa`.
+`het_han_luu_thi_xoa`, `tu_dong_tra_loi_qua_autoresponder_cua_support`, `gap_nhan_vien_dung_tu_dong_trong_cuoc`.
 
 ## Căn cứ pháp lý
 

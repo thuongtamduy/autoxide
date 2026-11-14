@@ -3,7 +3,7 @@
 > Lộ trình: `docs/ROADMAP.md` bước 43 và phần "Giai đoạn module thương mại" · Thiết kế:
 > `docs/research/business-foundation.md` mục 8 · Quyết định: D-180, D-181, D-184, D-186, D-188
 > (`rust_decimal`), D-191
-> Đã gộp các quyết định: D-200, D-201, D-208…D-218, D-222, D-225 (D-228).
+> Đã gộp các quyết định: D-200, D-201, D-208…D-218, D-222, D-225 ; thêm thẳng vào thân: D-229 (D-228).
 > Nguồn đối chiếu thiết kế: `docs/prompts/ui-trace-roadmap.md` (mã `A-…` / `B-…` trỏ tới
 > `docs/research/ui-trace/`) và `docs/prompts/ui-phase2-api.md` (đợt 2, màn ghi trong
 > `docs/research/ui-traceability.md`).
@@ -244,6 +244,12 @@ chốt).
   `exclude_targets`. `orders` điền các trường tương ứng của `Cart`.
 - Khung giờ ("giờ vàng"): `promotions_schedules` (`promotion_id`, `weekdays` (bitmask), `start_minute`,
   `end_minute`) theo múi giờ cửa hàng; không có dòng = cả ngày (D-222).
+
+### Khối cho trang (D-229, bước 67)
+
+`promotions` khai `promotions.flash_sale` (đếm ngược, suất còn là số thật) và `promotions.voucher_claim` (nút
+"Lưu" voucher `claimable`) qua `Module::blocks()`, gắn `BlockData` trả dữ liệu công khai của chương trình;
+chương trình đã kết thúc → `None`. Bộ nháp chiến dịch của bước 67 tạo trang, banner, bản tin từ một chương trình.
 
 ### Cách tính (thứ tự cố định để cùng giỏ luôn ra cùng kết quả)
 

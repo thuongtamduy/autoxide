@@ -1,6 +1,6 @@
 # Bước 53 — Hỗ trợ khách hàng (`support`)
 
-> Lộ trình: `docs/ROADMAP.md` bước 53 · Quyết định: D-204 · Đặc tả liên quan: `docs/steps/37-compliance.md`
+> Lộ trình: `docs/ROADMAP.md` bước 53 · Quyết định: D-204, D-222, D-230 (trả lời tự động) · Đặc tả liên quan: `docs/steps/37-compliance.md`
 > (vụ việc `consumer_complaint`, `notifications`), `docs/steps/45-orders.md` (nút "mở hỗ trợ" của đơn,
 > mục D-202), `docs/steps/46-marketplace.md` (tranh chấp), `docs/steps/51-ui-contracts.md` (hộp việc)
 
@@ -41,10 +41,12 @@ từ token xem đơn của bước 45), từ nhân viên (ghi hộ cuộc gọi)
 phân loại, mức ưu tiên, phân công người / nhóm; trạng thái và hạn trả lời (SLA) theo chính sách của nút;
 câu trả lời mẫu; ghi chú nội bộ; tệp đính kèm qua `media`; gắn phiếu với bản ghi khác (đơn, sản phẩm…);
 chuyển thành khiếu nại; đánh giá mức hài lòng sau khi đóng; tìm và lọc; tool MCP; gợi ý trả lời bằng AI
-(chỉ bản nháp, D-109).
+(bản nháp, D-109); **trả lời tự động câu hỏi đơn giản đã có câu trả lời chính xác** (D-230) — câu hỏi phức tạp
+hay mơ hồ thì AI soạn nháp cho nhân viên. Bộ trả lời tự động này cũng phục vụ chat của bước 61.
 
-Không làm: chat thời gian thực, gọi điện, tổng đài; trợ lý AI tự trả lời người mua (luôn có người duyệt);
-cơ sở tri thức / trang câu hỏi thường gặp (dùng `content`).
+Không làm: chat thời gian thực (bước 61), gọi điện, tổng đài; AI tự viết câu trả lời mới gửi thẳng người mua
+(chỉ gửi câu trả lời đã duyệt hay câu trả lời dựng từ dữ liệu chính xác — D-230); cơ sở tri thức / trang câu
+hỏi thường gặp công khai (dùng `content`).
 
 ## Thiết kế
 
@@ -98,6 +100,11 @@ hàm của service (máy trạng thái, như `orders`).
 (D-123) lúc gắn — chỉ gắn bản ghi người gọi được xem. Trang đơn của nhân viên hiện "phiếu liên quan"
 qua `GET /tickets?link=orders.order:<id>`. Module khác không đọc bảng của `support`.
 
+Tặng voucher bù lỗi (D-222): `support` đăng ký trước `promotions` nên không gọi nó. Giao diện gọi
+`POST /api/v1/promotions/{id}/vouchers` (`source = compensation`, `source_ref = ticket:<id>`, permission
+`promotions.vouchers.grant`) rồi gắn voucher vào phiếu như một liên kết (`promotions.voucher:<id>`); không có
+`promotions` thì không có hành động này.
+
 ### Email vào (tuỳ chọn, tắt mặc định)
 
 Trả lời thư thông báo của phiếu thì vào lại phiếu: địa chỉ `Reply-To` mang token phiếu
@@ -113,11 +120,43 @@ mới (chống spam). Cắt phần trích dẫn thư cũ bằng quy tắc đơn 
 không tạo hai vụ việc (`compliance` nhận `source_ref = "support.ticket:<id>"` duy nhất). Người mua chọn loại
 "khiếu nại" trên form công khai thì đi thẳng sang `compliance` (không tạo phiếu).
 
-### AI (D-109)
+### AI: bản nháp và trả lời tự động (D-109, D-230)
 
-`POST /tickets/{id}/reply-suggestions` gọi `TextModel` với lịch sử phiếu (bỏ email, số điện thoại) và câu
-trả lời mẫu liên quan; kết quả là **bản nháp** nhân viên sửa rồi gửi, tin nhắn mang `ai_assisted = true`
-(bước 37 gắn nhãn). Không gọi trong transaction ghi. Tắt khi module `ai` chưa cấu hình.
+**Bản nháp cho nhân viên.** `POST /tickets/{id}/reply-suggestions` gọi `TextModel` với lịch sử phiếu (bỏ email,
+số điện thoại) và câu trả lời mẫu liên quan; kết quả là **bản nháp** nhân viên sửa rồi gửi, tin nhắn mang
+`ai_assisted = true` (bước 37 gắn nhãn). Khi trả lời tự động bật mà câu hỏi không đủ điều kiện (dưới), job tạo
+sẵn bản nháp này cho phiếu (`support_reply_drafts`) để nhân viên mở là thấy. Không gọi AI trong transaction ghi.
+Tắt khi module `ai` chưa cấu hình.
+
+**Trả lời tự động (D-230) — tắt mặc định, khách bật theo nút** (`support_policies.auto_reply`). Chỉ hai nguồn
+câu trả lời, **không có chữ do mô hình tự viết** được gửi cho người mua:
+
+1. **Câu trả lời đã duyệt:** câu trả lời mẫu (`support_macros`) được đánh dấu `auto_reply` bởi người có
+   `support.auto_reply.manage`, kèm vài cách hỏi mẫu (`questions`) và ngày phải rà lại (`review_due_on`, quá hạn
+   thì tự thôi dùng). Gửi nguyên văn câu trả lời (điền biến như macro thường).
+2. **Câu trả lời từ dữ liệu chính xác:** module khác gắn `FactSource` vào điểm cắm `SupportFacts` của
+   `support::api` lúc `start` (module đăng ký sau vẫn gắn được): `orders` — trạng thái đơn, `shipping` — hành
+   trình vận đơn. Giờ mở cửa, địa chỉ cửa hàng thì `support` tự dựng `FactSource` từ `api` của `organizations`
+   (đăng ký trước nên `require` được). Mỗi `FactSource` khai ý định (`intent`), schema
+   tham số và **mẫu câu i18n**; trả `None` khi không chắc (không tìm thấy, nhiều kết quả, người hỏi không chứng
+   minh được là chủ dữ liệu — vd đơn không thuộc tài khoản hay số điện thoại đã xác thực OTP của người hỏi).
+
+Luồng: tin của người mua tới (phiếu hay chat 61) → job `support.auto_reply` → `TextModel` chỉ **phân loại**,
+trả JSON theo schema `{kind: answer|fact|other, macro_id?, intent?, params?, confidence_bp, risk_flags[]}` →
+Rust quyết:
+- gửi tự động khi **mọi** điều kiện đúng: `kind` là `answer` hay `fact`; `confidence_bp` ≥
+  `auto_reply_min_confidence_bp` của nút (mặc định 9.000); `macro_id` có `auto_reply` còn hạn rà / `FactSource`
+  trả câu; không có `risk_flags`; chưa vượt `auto_reply_max_per_thread` (mặc định 2) lần liên tiếp;
+- **không bao giờ** tự động cho: khiếu nại, đòi hoàn tiền / trả hàng / huỷ đơn, thanh toán lỗi, yêu cầu về dữ
+  liệu cá nhân, câu hỏi pháp lý, lời lẽ bức xúc, người mua đòi gặp người — mô hình gắn `risk_flags`, và danh
+  sách từ khoá chặn theo nút (dữ liệu) chặn thêm ở phía Rust;
+- còn lại → bản nháp cho nhân viên, phiếu / chat vào hộp việc như thường.
+
+Tin tự động mang `author_kind = system`, `auto_reply = true`, nhãn "Trả lời tự động" (i18n), kèm nút "Gặp nhân
+viên" (một bấm là dừng tự động trong luồng đó và chuyển người). Mỗi lần ghi `support_auto_replies` (nguồn,
+`confidence_bp`, người mua bấm "hữu ích / không đúng"); câu trả lời bị báo "không đúng" từ `AUTO_REPLY_FLAG_LIMIT`
+(3) lần trong 7 ngày thì tự thôi dùng và báo người duyệt. `POST /auto-reply/preview {text, org_id}` cho người cấu
+hình thử: trả quyết định sẽ ra (gửi gì / nháp / chuyển người) mà không gửi.
 
 ### Kiểu và trait (phác thảo — tra API thật bằng skill `check-library-api`)
 
@@ -131,6 +170,24 @@ pub struct NewTicket { pub org_id: Uuid, pub requester: Requester, pub category:
     pub subject: String, pub body: String, pub links: Vec<String>, pub reference: String }
 pub enum Requester { User(Uuid), VerifiedPhone(PhoneNumber), VerifiedEmail(String) }
 pub struct TicketRef { pub id: Uuid, pub number: String, pub access_token: Option<String> }
+
+/// Trả lời tự động (D-230) — `conversations` (bước 61) gọi cho tin chat.
+#[async_trait] pub trait AutoResponder: Send + Sync {
+    async fn decide(&self, tenant: &TenantContext, question: InboundQuestion) -> Result<ReplyDecision, Error>;
+}
+pub struct InboundQuestion { pub org_id: Uuid, pub thread: String /* `support.ticket:<id>` | `conversations.thread:<id>` */,
+    pub requester: Requester, pub text: String, pub locale: String, pub auto_replies_in_row: u32 }
+pub enum ReplyDecision { Send { text: String, source: AutoSource }, Draft { text: String }, Handoff }
+pub enum AutoSource { Macro(Uuid), Fact { intent: String } }
+
+/// Điểm cắm cho module đăng ký sau: câu trả lời dựng từ dữ liệu chính xác.
+#[async_trait] pub trait FactSource: Send + Sync {
+    fn intents(&self) -> Vec<FactIntent>; // tên `<module>.<ý định>`, mô tả (i18n key), schema tham số
+    /// `None` khi không chắc chắn hay người hỏi không chứng minh được là chủ dữ liệu.
+    async fn answer(&self, tenant: &TenantContext, requester: &Requester, intent: &str, params: &serde_json::Value,
+        locale: &str) -> Result<Option<String>, Error>;
+}
+// `SupportFacts::attach(Arc<dyn FactSource>)` — như `OrderExtensions`.
 ```
 
 `compliance::api` thêm (nếu chưa có) `ComplaintIntake::open(tenant, ComplaintFromTicket) -> CaseRef`.
@@ -143,8 +200,10 @@ pub struct TicketRef { pub id: Uuid, pub number: String, pub access_token: Optio
 | `support_messages` | `id`, `tenant_id`, `ticket_id`, `kind` (`public/internal/system`), `author_kind` (`customer/agent/system`), `author_user_id` NULL, `body`, `media_ids` text, `hidden_at` NULL, `hidden_by` NULL, `hidden_reason` NULL, `ai_assisted` BOOL, `created_at` | index (`tenant_id`, `ticket_id`, `id`) — chỉ thêm |
 | `support_links` | `tenant_id`, `ticket_id`, `target` (`<kind>:<id>`), `created_at` | pk (`tenant_id`, `ticket_id`, `target`); index (`tenant_id`, `target`) |
 | `support_teams` · `support_team_members` | nhóm theo nút; thành viên, cờ `accepting` | unique (`tenant_id`, `org_id`, `name`) |
-| `support_policies` | `tenant_id`, `org_id`, `categories` JSON, `first_response_minutes` JSON (theo ưu tiên), `resolve_minutes` JSON, `auto_close_days`, `holidays` JSON, `guest_tickets` BOOL, `inbound_email` BOOL, `updated_at` | pk (`tenant_id`, `org_id`); kế thừa theo cây |
-| `support_macros` | `id`, `tenant_id`, `org_id`, `name`, `bodies` JSON (theo ngôn ngữ), `created_by`, `updated_at` | index (`tenant_id`, `org_id`) |
+| `support_policies` | `tenant_id`, `org_id`, `categories` JSON, `first_response_minutes` JSON (theo ưu tiên), `resolve_minutes` JSON, `auto_close_days`, `holidays` JSON, `guest_tickets` BOOL, `inbound_email` BOOL, `auto_reply` BOOL (mặc định tắt), `auto_reply_min_confidence_bp` (9000), `auto_reply_max_per_thread` (2), `auto_reply_blocked_terms` JSON, `updated_at` | pk (`tenant_id`, `org_id`); kế thừa theo cây |
+| `support_macros` | `id`, `tenant_id`, `org_id`, `name`, `bodies` JSON (theo ngôn ngữ), `auto_reply` BOOL, `questions` JSON (cách hỏi mẫu theo ngôn ngữ), `approved_by` NULL, `approved_at` NULL, `review_due_on` NULL, `created_by`, `updated_at` | index (`tenant_id`, `org_id`), (`tenant_id`, `org_id`, `auto_reply`) |
+| `support_auto_replies` | `id`, `tenant_id`, `org_id`, `thread` (`support.ticket:<id>` / `conversations.thread:<id>`), `message_ref`, `source_kind` (`macro`/`fact`), `macro_id` NULL, `intent` NULL, `confidence_bp`, `feedback` NULL (`helpful`/`wrong`), `created_at` | index (`tenant_id`, `org_id`, `created_at`), (`tenant_id`, `macro_id`, `feedback`) |
+| `support_reply_drafts` | `id`, `tenant_id`, `ticket_id`, `body`, `ai_assisted`, `created_at`, `used_at` NULL | index (`tenant_id`, `ticket_id`) |
 | `support_routing_rules` | `id`, `tenant_id`, `org_id`, `match` JSON (loại, kênh), `team_id`, `position` | index (`tenant_id`, `org_id`, `position`) |
 
 Cộng bảng `support_events` (outbox), `support_jobs`, `support_throttle`, `support_tokens` của kernel.
@@ -162,14 +221,16 @@ Cộng bảng `support_events` (outbox), `support_jobs`, `support_throttle`, `su
 | `PATCH /tickets/{id}` | `support.tickets.reply` | trạng thái, ưu tiên, loại, phân công; `If-Match` |
 | `POST /tickets/{id}/links` · `DELETE …/links/{target}` | `…reply` | kiểm qua sổ đối tượng |
 | `POST /tickets/{id}/escalate` | `support.tickets.manage` | thành khiếu nại / lên sàn |
-| `POST /tickets/{id}/reply-suggestions` | `…reply` | AI, bản nháp |
+| `POST /tickets/{id}/reply-suggestions` · `GET /tickets/{id}/reply-drafts` | `…reply` | AI, bản nháp |
+| `PUT /macros/{id}/auto-reply` `{enabled, questions, review_due_on}` · `POST /auto-reply/preview` · `GET /auto-replies` | `support.auto_reply.manage` | duyệt câu trả lời cho tự động; thử quyết định không gửi; nhật ký và phản hồi |
+| `POST /public/tickets/{id}/auto-replies/{reply_id}/feedback` · `POST /me/tickets/{id}/auto-replies/{reply_id}/feedback` · `POST …/handoff` | token phiếu / `support.request` | "hữu ích / không đúng"; "gặp nhân viên" |
 | `GET/PUT /policies/{org_id}` · `/teams` · `/macros` · `/routing-rules` | `support.settings.manage` | |
 | `GET /reports/summary` | `support.tickets.read` | số phiếu, thời gian phản hồi / giải quyết trung vị, tỉ lệ quá hạn, hài lòng — theo nút, khoảng thời gian |
 
 ### Tool MCP
 
 `list_tickets`, `get_ticket` (`read_only`), `reply_ticket`, `add_internal_note`, `update_ticket`,
-`link_ticket`, `suggest_reply` (`read_only`, bản nháp). Cùng service, cùng permission (luật 8). Agent trả
+`link_ticket`, `suggest_reply` (`read_only`, bản nháp), `preview_auto_reply` (`read_only`). Cùng service, cùng permission (luật 8). Agent trả
 lời người mua là lệnh ghi bình thường; khách muốn duyệt trước thì bật cho `reply_ticket` cơ chế
 `approval_required` của P12 bước 51.
 
@@ -177,12 +238,14 @@ lời người mua là lệnh ghi bình thường; khách muốn duyệt trướ
 
 `support.ticket_created`, `support.ticket_status_changed`, `support.ticket_assigned`,
 `support.message_added` (không mang nội dung — chỉ id, loại, tác giả), `support.ticket_breached`,
-`support.ticket_escalated`, `support.satisfaction_recorded`. Không mang email, số điện thoại, token.
+`support.ticket_escalated`, `support.satisfaction_recorded`, `support.auto_replied` (nguồn, không nội dung),
+`support.auto_reply_disabled` (câu trả lời bị thôi dùng vì báo sai hay quá hạn rà). Không mang email, số điện thoại, token.
 
 Nghe: `privacy::USER_DELETED` (ẩn danh hoá người mua, giữ phiếu cho thống kê), `orders.order_*` không cần.
 
 ### Job và lịch
 
+`support.auto_reply` (mỗi tin của người mua khi nút bật — chạy ngoài transaction, `unique_key` theo tin),
 `support.sla_check` (mỗi phút: đánh dấu quá hạn, phát event, đưa vào hộp việc), `support.auto_close`
 (hằng ngày), `support.retention` (xoá phiếu đóng quá `AUTOXIDE_SUPPORT_RETENTION_DAYS`, mặc định 730 ngày
 — dữ liệu có ngày hiệu lực khi luật đổi).
@@ -190,20 +253,24 @@ Nghe: `privacy::USER_DELETED` (ẩn danh hoá người mua, giữ phiếu cho th
 ### Cấu hình
 
 `AUTOXIDE_SUPPORT_RETENTION_DAYS` (730), `AUTOXIDE_SUPPORT_GUEST_PER_HOUR` (5 / IP băm),
-`AUTOXIDE_SUPPORT_MAX_BODY_CHARS` (10000), `AUTOXIDE_SUPPORT_TOKEN_DAYS_AFTER_CLOSE` (30). Chính sách kinh
+`AUTOXIDE_SUPPORT_MAX_BODY_CHARS` (10000), `AUTOXIDE_SUPPORT_TOKEN_DAYS_AFTER_CLOSE` (30),
+`AUTOXIDE_SUPPORT_AUTO_REPLY_FLAG_LIMIT` (3). Chính sách kinh
 doanh (loại, SLA, giờ làm, tự đóng) là dữ liệu theo nút, không phải biến môi trường.
 
 ### Permission
 
 `support.request` (người mua), `support.tickets.read`, `support.tickets.reply`, `support.tickets.manage`,
-`support.settings.manage`. Tính năng gói (bước 35): `support`, `support.sla`, `support.ai`.
+`support.settings.manage`, `support.auto_reply.manage`. Tính năng gói (bước 35): `support`, `support.sla`,
+`support.ai`, `support.auto_reply`.
 
 ### Mã lỗi (kèm bản dịch `vi`)
 
 `support.ticket_not_found` (404), `support.verification_required` (403 — vãng lai chưa xác thực OTP),
 `support.ticket_closed` (409 — tạo phiếu mới), `support.invalid_transition` (409),
 `support.assignee_out_of_scope` (422), `support.link_not_found` (422), `support.attachment_not_owned` (422),
-`support.category_unknown` (422), `support.already_escalated` (409), `support.guest_tickets_disabled` (403).
+`support.category_unknown` (422), `support.already_escalated` (409), `support.guest_tickets_disabled` (403),
+`support.auto_reply_unavailable` (503 — chưa cấu hình AI), `support.macro_not_approved` (422 — bật tự động cho
+câu trả lời chưa có người duyệt).
 
 ## Thứ tự làm
 
@@ -212,6 +279,8 @@ doanh (loại, SLA, giờ làm, tự đóng) là dữ liệu theo nút, không p
 3. SLA theo giờ làm, phân công, nhóm, quy tắc; job; hộp việc (bước 51).
 4. Đính kèm, liên kết bản ghi, câu trả lời mẫu, chuyển thành khiếu nại, hài lòng.
 5. Tool MCP, AI gợi ý, báo cáo; email vào (trait + bộ giả); tài liệu `docs/SUPPORT.md` (EN + VI).
+6. Trả lời tự động (D-230): duyệt câu trả lời, điểm cắm `SupportFacts`, job phân loại, luật quyết trong Rust,
+   nhãn và "gặp nhân viên", phản hồi, xem thử; `AutoResponder` cho bước 61.
 
 ## Test bắt buộc (cả hai database)
 
@@ -222,6 +291,13 @@ doanh (loại, SLA, giờ làm, tự đóng) là dữ liệu theo nút, không p
 `chuyen_khieu_nai_goi_lai_khong_tao_hai_vu_viec`, `tin_nhan_khong_sua_duoc_chi_an_co_ly_do`,
 `phan_cong_dong_thoi_mot_ben_thang` (`If-Match`), `xoa_tai_khoan_an_danh_hoa_giu_thong_ke`,
 `tool_mcp_cung_permission_nhu_rest`, `goi_y_ai_chi_la_ban_nhap` (`FakeTextModel`).
+
+Trả lời tự động (`FakeTextModel` trả phân loại định sẵn): `tu_dong_tat_mac_dinh`,
+`chi_gui_nguyen_van_cau_tra_loi_da_duyet` (chữ gửi đi đúng bằng macro, không phải chữ mô hình),
+`do_tin_cay_thap_thanh_ban_nhap`, `khieu_nai_hoan_tien_khong_bao_gio_tu_dong`, `tu_khoa_chan_cua_nut_chan_tu_dong`,
+`fact_don_cua_nguoi_khac_tra_none`, `qua_so_lan_lien_tiep_chuyen_nguoi`, `bam_gap_nhan_vien_dung_tu_dong`,
+`bao_sai_du_nguong_thoi_dung_cau_tra_loi`, `het_han_ra_lai_thoi_dung`, `xem_thu_khong_gui`,
+`gui_lai_job_khong_tra_loi_hai_lan` (cả hai database).
 
 ## Tiêu chí xong
 
@@ -236,6 +312,9 @@ nơi.
 - Lộ số điện thoại / email của người mua cho nhân viên nhánh khác, hay trong event.
 - Thư thông báo của phiếu là tin giao dịch: không đi qua sổ đồng ý quảng cáo, nhưng không được kèm quảng cáo.
 - Email vào tạo phiếu mới từ thư lạ → thành kênh spam.
+- Trả lời tự động: để chữ của mô hình lọt ra người mua (kể cả "tóm tắt" câu trả lời mẫu) — chỉ gửi văn bản đã
+  duyệt hay mẫu câu i18n của `FactSource`; tin lời mô hình về độ tin cậy mà bỏ luật chặn phía Rust; trả lời từ dữ
+  liệu cho người chưa chứng minh là chủ dữ liệu (lộ đơn của người khác).
 
 ## Căn cứ pháp lý
 
@@ -243,6 +322,7 @@ nơi.
 |---|---|---|
 | Tiếp nhận, giải quyết khiếu nại của người tiêu dùng; thời hạn phản hồi | Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15; NĐ 55/2024/NĐ-CP | Phần có hạn luật định đi qua `compliance` — cần đối chiếu văn bản gốc |
 | Dữ liệu cá nhân trong phiếu (tối thiểu hoá, thời hạn lưu, xoá theo yêu cầu) | Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15; NĐ 356/2025 | Thời hạn lưu mặc định 730 ngày cần người có chuyên môn xác nhận |
+| Cho người dùng biết đang nhận câu trả lời tự động / tương tác với hệ thống AI | Luật Trí tuệ nhân tạo 134/2025/QH15 và văn bản hướng dẫn | Nhãn "Trả lời tự động" + nút gặp nhân viên — cần đối chiếu văn bản gốc |
 | Thông tin liên hệ, kênh hỗ trợ công bố trên website TMĐT | NĐ 52/2013 sửa bởi NĐ 85/2021 (thay bởi Luật TMĐT 122/2025 và văn bản hướng dẫn) | Cần đối chiếu văn bản đang hiệu lực |
 
 ## Agent làm bước này tự quyết
@@ -250,9 +330,3 @@ nơi.
 Thuật toán cắt trích dẫn thư; danh sách loại mặc định; có tách `support_teams` hay dùng nhóm của
 `organizations`; mặc định SLA (khuyến nghị phản hồi đầu 8 giờ làm việc, giải quyết 3 ngày làm việc). Ghi
 vào `docs/DECISIONS.md`.
-
-## Bổ sung theo D-222
-
-Nhân viên tặng voucher bù lỗi từ phiếu hỗ trợ: gọi `Promotions::grant_voucher` (`source = compensation`,
-`source_ref = ticket:<id>`), permission `promotions.vouchers.grant`; phiếu ghi voucher đã tặng. `promotions` chưa
-cài thì ẩn hành động này.
