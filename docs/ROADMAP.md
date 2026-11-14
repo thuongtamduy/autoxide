@@ -1,426 +1,34 @@
 # Lộ trình
 
-Dựng theo thứ tự. Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và
-Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết thư viện: [`STACK.md`](../STACK.md).
-
-Trạng thái: **bước 0–30 xong** (phần cần repo công khai ở bước 50); bước 50 chờ chủ dự án công khai repo (D-199); 31 trở đi chưa bắt đầu — thứ tự và phụ thuộc ở
-bảng ngay trước bước 30 (D-192); bước 51 thêm theo thiết kế giao diện 2 (D-200), bước 52 theo nghiên cứu các sản phẩm hàng đầu (D-201); bản phát hành mới nhất `v0.12.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199):
-`./gate.sh` cục bộ là gate duy nhất.
-
-## 0. Khung dự án
-
-- [x] Workspace Cargo, cấu hình lint chung (cấm `unsafe`, cấm `unwrap` ngoài test)
-- [x] Khai `license = "MIT OR Apache-2.0"` cho mọi crate
-- [x] `README.md` (tiếng Anh) + `README.vi.md`: dự án là gì, cách chạy, license
-- [x] Ghim phiên bản thư viện nền; xác nhận chúng tương thích với nhau
-- [x] `gate.sh`: fmt, clippy, test SQLite, test Postgres (Docker)
-- [x] Kiểm ranh giới module tự động trong gate
-
-## 1. Nền
-
-- [x] Cấu hình từ env, kiểm lúc khởi động
-- [x] Kết nối database: tách đọc / ghi, WAL trên SQLite
-- [x] Migration theo module (up, down, status)
-- [x] Kiểm trong gate: tên bảng mang tiền tố module, không foreign key xuyên module
-- [x] Hợp đồng module + đăng ký ở một chỗ (khi có module đầu tiên: thêm `"modules/*"`
-      vào `members` của `Cargo.toml` gốc)
-- [x] Kiểu lỗi chung, envelope trả về, pagination theo UUIDv7
-- [x] HTTP: `/api/v1`, request id, timeout, giới hạn body, CORS, graceful shutdown
-- [x] OpenAPI sinh từ code + kiểm không lệch trong gate
-- [x] Health check (`/health/live`, `/health/ready`)
-- [x] Log, metrics (`/metrics`), tracing
-- [x] CLI: `serve`, `migrate` (`serve` từ chối chạy khi còn migration chưa áp dụng)
-
-## 2. Đăng nhập, role và permission
-
-- [x] Người dùng, hash mật khẩu Argon2id
-- [x] Đăng nhập: access token sống ngắn + refresh token rotation, phát hiện reuse
-- [x] Role và permission; module tự khai báo permission của mình
-- [x] Rate limiting; login throttling
-- [x] CLI tạo người dùng đầu tiên
-- [x] Tạo người dùng: quản trị viên tạo; tự đăng ký bật tắt bằng cấu hình (mặc định tắt)
-- [x] API key cho máy và AI agent: tạo, thu hồi, giới hạn theo permission
-
-## 3. MFA
-
-- [x] TOTP: bật, xác nhận, tắt
-- [x] Recovery code dùng một lần
-- [x] Đăng nhập hai bước khi đã bật MFA
-
-## 4. Event và audit log
-
-- [x] Event ghi cùng transaction rồi mới phát
-- [x] Audit log chỉ thêm: ai, làm gì, bản ghi nào, lúc nào, trước / sau
-- [x] API xem audit log (có permission riêng)
-
-## 5. Job queue
-
-- [x] Job lưu trong database; claim job an toàn khi nhiều worker (test đồng thời)
-- [x] Retry có backoff, dead-letter queue
-- [x] Lịch chạy định kỳ (job đầu tiên: dọn dòng hết hạn của `auth_login_throttle`,
-      `auth_refresh_token`, `auth_mfa_challenge`, và event đã giao xong trong các bảng
-      `<module>_events`)
-- [x] Process role: `api`, `worker`, hoặc cả hai
-
-## 6. i18n và idempotency
-
-- [x] Thông báo lỗi và hệ thống theo i18n key (vi, en), chọn theo header; mặc định tiếng Anh
-      (`code` của lỗi là i18n key, câu tiếng Anh mặc định đã nằm ở chỗ tạo lỗi — D-039;
-      việc còn lại: bản dịch vi tra theo `code`, chọn ngôn ngữ theo header, và gate kiểm mọi
-      `code` đều có bản dịch)
-- [x] Idempotency key cho lệnh ghi (test gửi trùng đồng thời)
-- [x] Đánh dấu endpoint deprecated
-
-## 7. Email
-
-Đặt sau job queue vì mail gửi qua job để có retry.
-
-- [x] Gửi mail qua SMTP sau một trait; khi chưa cấu hình SMTP thì ghi mail ra file (cho dev và test)
-- [x] Mẫu mail theo i18n key (vi, en)
-- [x] Đặt lại mật khẩu: token dùng một lần, có hạn, không lộ việc email có tồn tại hay không
-- [x] Người dùng tự đổi mật khẩu của mình (cần nhập mật khẩu cũ); quản trị viên đặt mật khẩu
-      cho tài khoản tạo không kèm mật khẩu (service `set_password` đã có)
-- [x] Xác minh email khi tạo tài khoản và khi đổi email
-
-## 8. Lưu file
-
-- [x] Trait chung; cài đặt ổ đĩa cục bộ và S3
-- [x] Tải lên, tải xuống, xoá; metadata trong database
-- [x] Giới hạn kích thước và loại file
-
-## 9. MCP endpoint
-
-Cho AI agent gọi chức năng của hệ thống như công cụ (Model Context Protocol).
-
-- [x] Endpoint MCP qua HTTP, xác thực bằng API key hoặc access token
-- [x] Module tự khai báo tool của mình qua hợp đồng module (như route và permission)
-- [x] Mỗi tool gắn permission; chỉ liệt kê và cho gọi tool mà người gọi có permission
-- [x] Tool gọi vào service layer (cùng logic với REST); lệnh ghi đi qua audit log
-- [x] Tool của core: ít nhất đọc thông tin người gọi và danh mục permission
-- [x] Test bằng một MCP client thật trên cả hai database
-
-## 10. Module mẫu
-
-- [x] Một module nghiệp vụ nhỏ dùng đủ: migration, permission, service, REST, OpenAPI,
-      event, audit, MCP tool — làm khuôn cho module về sau
-- [x] Hướng dẫn viết module (tiếng Anh + tiếng Việt)
-
-## 11. Công cụ và deploy
-
-- [x] Lệnh CLI chép dữ liệu giữa SQLite và Postgres
-- [x] Bộ đo hiệu năng (đọc, list, ghi, ghi đồng thời) trên cả hai database, có số gốc để so về sau
-- [x] Dockerfile multi-stage + `compose.yml` (ứng dụng + Postgres)
-- [x] Backup và restore
-- [x] CI: gate đầy đủ (đã gồm `cargo-deny`) trên Postgres tối thiểu và mới nhất; quét
-      secret bằng gitleaks
-- [x] Thử gỡ ngoại lệ RUSTSEC-2026-0459 trong `deny.toml` (D-032) — chưa gỡ được, xem D-075
-- [x] Hướng dẫn cài đặt và deploy (tiếng Anh + tiếng Việt), đủ để người lạ tự làm theo
-
-## 12. Passkey (mở sau core, chủ dự án chọn ngày 11/11/2026)
-
-Đăng nhập bằng passkey (WebAuthn: vân tay, Face ID, khoá bảo mật) bên cạnh mật khẩu + TOTP.
-
-- [x] Người dùng đã đăng nhập thêm, xem, xoá passkey của mình
-- [x] Đăng nhập bằng passkey không cần email (discoverable credential), cấp token như đăng nhập thường
-- [x] Trạng thái nghi thức lưu trong database (nhiều máy chủ chạy song song được), dùng một lần, có hạn
-- [x] Cấu hình RP ID và origin; không cấu hình thì tính năng tắt, báo lỗi rõ
-- [x] Test bằng authenticator phần mềm trên cả hai database, kể cả dùng đồng thời một nghi thức
-
-## 13. Củng cố core (chủ dự án giao ngày 11/11/2026, agent quyết cách làm)
-
-Kiểm lại phần đã có:
-
-- [x] ~~CI chạy xanh trên GitHub~~ — chủ dự án tắt CI trên GitHub; `./gate.sh` cục bộ là gate duy nhất (D-107)
-- [x] Rà soát bảo mật toàn repo bằng một lượt đọc độc lập; sửa mọi lỗi tìm thấy (D-079)
-- [x] Rà soát bảo mật lần hai cho phần thêm sau đó (media, content, webhook, AI, luồng giữa các module); sửa mọi lỗi tìm thấy (D-149)
-- [x] Rà soát bảo mật forms, newsletter, comments và nền chung cho dữ liệu người lạ; sửa mọi lỗi tìm thấy (D-150)
-- [x] Thử tải dài hạn: không rò bộ nhớ, không rò kết nối database (docs/BENCHMARKS.md)
-
-Hệ thống tài khoản:
-
-- [x] Quản lý phiên đăng nhập: người dùng xem và đăng xuất từng thiết bị; quản trị viên thu hồi mọi phiên của một người (D-080)
-- [x] Xoá tài khoản (event cho mọi module dọn dữ liệu của người đó) và xuất dữ liệu cá nhân (D-080)
-- [x] Tìm người dùng theo email hoặc tên (D-080)
-
-Phát hành và nâng cấp:
-
-- [x] Số phiên bản, `CHANGELOG`, bản phát hành trên GitHub (làm tay theo `docs/RELEASING.md`, D-107; `v0.2.0`)
-- [x] ~~CI build và đăng image Docker lên GitHub Container Registry~~ — thay bằng build image cục bộ khi phát hành (D-107)
-- [x] Dependabot đề xuất nâng cấp; kiểm lỗ hổng thư viện bằng `cargo deny check` trong gate (lịch hằng ngày trên GitHub đã tắt, D-107)
-
-Tích hợp:
-
-- [x] Webhook: gửi event ra hệ thống bên ngoài, có chữ ký, thử lại, theo dõi được (D-081)
-
-## 14. Hoàn thiện hợp đồng API (chủ dự án giao ngày 12/11/2026)
-
-Sau lượt kiểm hợp đồng API của chủ dự án. Đã sửa ngay (D-082): `docs/openapi.json` không
-hợp lệ (`$ref` tới `Order` không tồn tại), mô tả tool MCP lọt tiếng Việt; gate kiểm cả hai.
-
-- [x] Kết quả tool MCP dạng danh sách không lồng `data` hai lần — cùng hình dạng với REST (D-083)
-- [x] Tool MCP cho phần còn thiếu: file, audit log, role, API key (cùng service, cùng permission với REST) (D-083)
-- [x] Khai header `Idempotency-Key` và `Accept-Language` trên từng endpoint trong OpenAPI, để SDK sinh tự động có sẵn tham số (D-083)
-- [x] Kiểm dữ liệu báo mọi lỗi trong một lần (email sai và tên rỗng cùng báo), đúng như tài liệu hứa (D-083)
-- [x] Tạo mới (201) trả header `Location`; OpenAPI có mục `servers` (D-083)
-- [x] Chống ghi đè khi hai người cùng sửa: `ETag` / `If-Match` cho các endpoint sửa (D-084)
-
-## 15. Nền chung cho media và nội dung (core)
-
-Thứ `media` và `content` cùng cần, viết trung lập với nghiệp vụ để module nào cũng dùng được
-(D-085, D-099). Bước này và bước 16 làm trên `main` dưới tên "bước 15: thư viện media"; tách
-lại thành 15 và 16 khi gộp nhánh đề bài của `content` (D-103).
-
-- [x] Danh sách lọc theo trường và sắp xếp theo trường khác thời gian tạo (tên, kích thước…)
-      bằng keyset pagination, không `OFFSET`; tìm theo chữ dùng chung (D-085)
-- [x] Tìm được tiếng Việt không dấu ("da lat" ra "Đà Lạt"), như nhau trên SQLite và Postgres (D-104)
-- [x] Endpoint đọc công khai (`Option<Principal>`); rate limiting vẫn áp (D-085)
-- [x] Cache: `ETag` + `If-None-Match` → `304`, `Cache-Control` do endpoint đặt (D-085)
-- [x] Chống ghi đè: `ETag` + `If-Match` → `412` (bước 14, D-084); `If-Match` bắt buộc → `428` (D-085)
-- [x] `Storage` đọc theo khoảng byte và liệt kê theo tiền tố, có cài đặt mặc định (D-085)
-
-## 16. Module `media` — thư viện media (chủ dự án giao ngày 12/11/2026)
-
-Module `media`: ảnh, video, âm thanh, tài liệu trong thư mục lồng nhau, cho website và module
-`content` dùng lại (D-086, D-100). `files` giữ nguyên.
-
-- [x] Tải lên: kiểm kích thước, loại được phép, loại thật theo chữ ký đầu file; kích thước ảnh; SHA-256; báo item trùng (D-086, D-089)
-- [x] Danh sách lọc theo thư mục, loại, `visibility`, thùng rác, tên; sắp theo thời gian, tên, kích thước
-- [x] Sửa thông tin và thay nội dung giữ ID, bắt buộc `If-Match`
-- [x] Tải nội dung: công khai hay cần quyền; `inline` chỉ cho ảnh raster; `Range`, `HEAD`, 304; cache theo phiên bản (D-086, D-087)
-- [x] Thư mục lồng nhau: tạo, đổi tên, chuyển, xoá khi trống (D-088)
-- [x] Thùng rác: vào, khôi phục, xoá hẳn (permission riêng); job xoá quá hạn và dọn nội dung mồ côi
-- [x] Event cho mọi thay đổi (vào audit log); tool MCP; trait `Media` cho module khác (D-090)
-- [x] Backup / restore mang theo `media`; hướng dẫn dùng (tiếng Anh + tiếng Việt)
-
-Bổ sung (chủ dự án giao thêm ngày 12/11/2026):
-
-- [x] Ảnh thu nhỏ làm bằng job nền, lấy bằng `?w=` (D-093)
-- [x] Nhãn song song với thư mục; quản lý nhãn (D-094)
-- [x] Tải lên qua MCP (base64, tối đa 1 MiB) (D-095)
-
-Bổ sung (D-202):
-
-- [x] `alt` theo ngôn ngữ: bảng `media_alt_translations`, item trả `alts`, `PUT` / `DELETE
-      /{id}/alts/{locale}`, tool `set_alt`, ngôn ngữ theo `AUTOXIDE_MEDIA_ALT_LOCALES`, `Media::find_many_in`
-      lùi về `alt` mặc định; `content` tra ảnh công khai theo ngôn ngữ của bài; test trên cả hai database
-
-
-## 17. Module `content` — nội dung (chủ dự án chọn ngày 12/11/2026, D-096, D-098, D-101)
-
-Chỉ nội dung và những gì liên quan đến nội dung; không thương mại điện tử. Làm sau `media`
-(D-099, D-100). Giao diện (trang quản trị, website) là repo riêng (D-097) — bước này chỉ làm API.
-Thiết kế: D-102; đề bài đầy đủ: [`docs/prompts/step-17-content.md`](prompts/step-17-content.md);
-khảo sát: [`docs/research/content.md`](research/content.md).
-
-- [x] Bài viết và trang chung một mô hình: tiêu đề, slug, tóm tắt, thân bài JSON (máy chủ kiểm
-      theo danh sách node được phép, chặn link độc), ảnh đại diện và ảnh trong bài (ID của
-      `media`, kiểm qua `api` của `media`); số chữ, thời gian đọc, văn bản thuần để tìm kiếm
-- [x] Nháp tách khỏi bản công khai; đăng, gỡ, lưu trữ; hẹn giờ đăng và gỡ qua job queue (ghim
-      một revision)
-- [x] Lịch sử phiên bản: xem và khôi phục
-- [x] Trang có cấp cha con, đường dẫn lồng nhau, chuyển trang sang nhánh khác (D-101)
-- [x] Đường dẫn do backend tính; endpoint `resolve`; tự tạo chuyển hướng khi đường dẫn công khai
-      đổi (cả cây con), chuyển hướng làm tay, 410 cho nội dung đã gỡ
-- [x] Danh mục (cha con) và thẻ; tác giả là hồ sơ của `content`, một bài nhiều tác giả
-- [x] Menu điều hướng nhiều tầng, theo ngôn ngữ, trỏ tới ID nội dung hoặc URL
-- [x] Đa ngôn ngữ (vi, en): mỗi bản dịch một bản ghi, slug riêng, liên kết với nhau
-- [x] SEO: meta title, meta description, ảnh chia sẻ, canonical, `noindex`; dữ liệu cho sitemap
-      (kèm bản dịch cho hreflang) và feed
-- [x] Xem trước bản nháp bằng token ký, có hạn
-- [x] Permission: đọc nháp, viết, đăng, quản lý; người đọc công khai chỉ thấy bản đã đăng
-      (endpoint công khai, tìm kiếm và cache của bước 15); `If-Match` bắt buộc (D-102)
-- [x] Event và audit cho mọi thay đổi, đủ dữ liệu để website làm mới cache qua webhook; tool MCP
-      gọi cùng service; dọn và xuất dữ liệu cá nhân
-- [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database (kể cả test đồng
-      thời); hướng dẫn dùng (tiếng Anh + tiếng Việt)
-
-## 18. Tính năng AI (chủ dự án giao ngày 12/11/2026, D-109)
-
-Tầng kết nối AI trung lập (nhiều nhà cung cấp, mặc định tắt), quyền cho AI agent, gợi ý SEO và
-alt text, dịch bài, tìm theo ý nghĩa. Đề bài: [`docs/prompts/ai.md`](prompts/ai.md); khảo sát:
-[`docs/research/ai.md`](research/ai.md).
-
-- [x] Quyền cho agent: `content.delete` tách riêng, `content.write_own`, `content.publish_own`, xin
-      duyệt, `ai_generated` / `ai_reviewed`, rate limiting theo API key
-- [x] Tầng kết nối: trait `TextModel` / `Embedder` ở kernel, module `ai` (adapter `anthropic` và
-      `openai`, client embedding, hạn mức token mỗi ngày, metrics, `/ai/status`, `autoxide ai check`)
-- [x] Kiểm SEO không dùng AI; gợi ý SEO bằng AI (chỉ gợi ý, không ghi)
-- [x] Gợi ý alt text cho ảnh của `media` (ảnh riêng tư chỉ gửi khi bật)
-- [x] Dịch bài bằng AI vào nháp: tách mẩu có thẻ giữ chỗ, không ghi đè bản người đã sửa, báo bản dịch đã cũ
-- [x] Tìm theo ý nghĩa kết hợp tìm theo chữ (RRF), chạy như nhau trên hai database; endpoint công
-      khai tắt mặc định; số đo 10.000 và 100.000 đoạn
-- [x] Test trên cả hai database (kể cả đồng thời, máy chủ AI giả); hướng dẫn `docs/AI.md` + `docs/AI.vi.md`
-
-## 19. Nền chung cho dữ liệu người đọc gửi lên (core, chủ dự án giao ngày 12/11/2026, D-112)
-
-Đề bài: [`docs/prompts/forms-newsletter-comments.md`](prompts/forms-newsletter-comments.md),
-giai đoạn 0; khảo sát: [`docs/research/forms-newsletter-comments.md`](research/forms-newsletter-comments.md).
-Mỗi mục một commit, gate xanh trên cả hai database.
-
-- [x] Khoá ký của kernel (`AUTOXIDE_SECRET_KEY`, dẫn khoá theo mục đích; không cấu hình thì sinh
-      một lần và lưu trong database)
-- [x] `ClientInfo` dùng chung (IP đã giải, user agent, `Origin`, `Referer`);
-      `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`
-- [x] Băm IP (gộp tiền tố rồi HMAC; dạng `bucket` theo ngày và `fingerprint`)
-- [x] `Throttle` lưu trong database, dùng chung; `auth` chuyển sang dùng
-- [x] Token dùng một lần trong kernel; `auth` chuyển sang dùng, hành vi không đổi
-- [x] Chống spam hai pha: nhận / cách ly / từ chối; trường bẫy, token form ký, giới hạn theo IP
-      và email băm, phát hiện trùng; nonce của token form làm idempotency cho người lạ
-- [x] ALTCHA v2 tự viết (mặc định tắt)
-- [x] `Mail` / `Mailer`: `reply_to`, header theo danh sách cho phép, lỗi vĩnh viễn / tạm thời,
-      khoá chống trùng; event thất bại vĩnh viễn
-- [x] `Actor` cho người lạ trên outbox
-- [x] `ResourceDirectory` trung lập; `content` đăng ký resolver
-- [x] `AUTOXIDE_HTTP_PUBLIC_URL`
-- [x] Hợp đồng chung cho ba module: `docs/prompts/reader-input-contract.md`
-
-## 20. Module `forms` — biểu mẫu (chủ dự án giao ngày 12/11/2026, D-112)
-
-- [x] Định nghĩa form có phiên bản, trường theo danh sách đóng, nhãn theo ngôn ngữ
-- [x] Nhận bài gửi công khai qua chống spam; máy chủ kiểm mọi trường, báo mọi lỗi một lần
-- [x] Hộp thư quản trị, email báo quản trị viên, xuất CSV (chặn CSV injection)
-- [x] Xoá và xuất theo email; tự xoá theo thời hạn; event không mang câu trả lời; tool MCP
-- [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
-
-## 21. Module `newsletter` — bản tin email (chủ dự án giao ngày 12/11/2026, D-112)
-
-- [x] Danh sách, người đăng ký, xác nhận hai bước (`POST`, không `GET`)
-- [x] Huỷ đăng ký một chạm (RFC 8058) và trang chọn danh sách bằng token
-- [x] Chiến dịch: nháp, hẹn giờ, gửi theo lô có giới hạn tốc độ, tạm dừng, tiếp tục, huỷ; không
-      gửi trùng khi chạy lại
-- [x] Danh sách chặn, endpoint bounce chung; thư quảng cáo theo cấu hình
-- [x] Tự tạo bản tin khi `content` đăng bài (tuỳ chọn); tool MCP
-- [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
-
-## 22. Module `comments` — bình luận (chủ dự án giao ngày 12/11/2026, D-112)
-
-- [x] Bình luận theo đích bất kỳ, hai cấp; người dùng đăng nhập hoặc khách
-- [x] Kiểm duyệt theo pipeline cố định; báo cáo vi phạm; cấm theo người dùng / email / IP băm
-- [x] Sửa trong thời hạn (token sửa cho khách), xoá mềm giữ luồng, đếm, mở / đóng đích
-- [x] Báo email khi có trả lời (chọn nhận, email đã xác minh); giữ dữ liệu theo thời hạn
-- [x] Dữ liệu cá nhân; tool MCP
-- [x] Đăng ký trong `crates/app/src/modules.rs`; test trên cả hai database; hướng dẫn (EN + VI)
-
-Bổ sung (D-202, cho hỏi đáp sản phẩm của thiết kế giao diện 2):
-
-- [x] Hỏi đáp trên `comments`: event vòng đời do module sở hữu đích khai (`Module::resource_events`, thay
-      danh sách viết cứng), nhãn tác giả `seller` / `verified_buyer` qua bộ tính nhãn của kernel (tính lúc
-      ghi, lưu cùng bình luận), loại đích chỉ cho tài khoản đã xác thực (điểm nối `PostingVerifier`, NĐ
-      147/2024), tìm `q` đúng dấu xếp trước (`fetch_page_tiers`), số câu hỏi tách khỏi số bình luận, tool
-      MCP `unanswered` / `answer`; test trên cả hai database
-
-## 23. Đóng các giới hạn còn để lại của D-150 (chủ dự án giao ngày 12/11/2026)
-
-- [x] `comments`: tên viết trọn chữ Kirin / Hy Lạp trông như tên Latin không qua được danh sách
-      tên dành riêng và luật không trùng tên (so theo dạng "khung" của chữ)
-- [x] Địa chỉ client: tin proxy theo dải địa chỉ (`AUTOXIDE_HTTP_TRUSTED_PROXIES`), header chỉ
-      được đọc khi kết nối đến từ proxy tin cậy
-- [x] Dấu IP riêng cho từng module (không nối được người gửi giữa các module); cảnh báo lúc khởi
-      động khi khoá ký nằm trong database
-- [x] `newsletter`: đăng ký công khai trả lời trong cùng một khoảng thời gian dù địa chỉ ở trạng
-      thái nào (việc ghi và gửi mail chạy trong job)
-
-## 24. Sổ module cho màn hình quản lý module (chủ dự án giao ngày 12/11/2026, D-155)
-
-Giao diện quản trị ở repo riêng (D-096, D-097); bước này chỉ làm API trong core.
-
-- [x] `GET /api/v1/kernel/modules` và `GET /api/v1/kernel/modules/{name}` (kèm trạng thái
-      migration); permission `kernel.modules.read`; tool MCP; test trên cả hai database
-
-## 25. Rà soát bảo mật và hiệu năng toàn core (chủ dự án giao ngày 12/11/2026)
-
-- [x] Rà soát độc lập (bốn vùng: HTTP / MCP / quyền; `auth`; lưu trữ, job, event, webhook, mail;
-      hiệu năng đường nóng và index)
-- [x] Kiểm lại từng phát hiện với code; sửa kèm test chạy trên cả hai database; ghi quyết định
-
-## 26. Đóng các việc để lại của bước 25 (agent quyết, theo D-156…D-158)
-
-- [x] Lệnh CLI gỡ xác thực hai bước của một tài khoản (admin duy nhất mất thiết bị)
-- [x] `files`: job dọn nội dung mồ côi trong nơi lưu (như `media`)
-- [x] `autoxide jobs retry` một job `webhooks.send` đã hỏng thì gửi lại thật
-- [x] Đặt lại mật khẩu: trả lời trong cùng khoảng thời gian dù email có hay không (việc chạy trong job)
-- [x] Đo tải (`scripts/loadtest.sh`) rồi tối ưu xác thực mỗi request nếu đo được lợi — đo: không lợi, không làm (D-163)
-
-## 27. Cửa cho người viết module, core sẵn sàng thành framework (chủ dự án giao ngày 13/11/2026, D-164)
-
-Mượn cái hay của framework khác ([`docs/research/frameworks.md`](research/frameworks.md)).
-
-- [x] `TestApp` trong `autoxide-testkit`: dựng module như binary trên `TestDatabase`, gọi REST và
-      MCP với quyền tuỳ chọn; `notes` dùng nó; hướng dẫn (EN + VI)
-- [x] Các module còn lại chuyển sang `TestApp` (một cách làm cho mỗi việc)
-- [x] `cargo xtask new-module <tên>`: sinh module mới từ khuôn `notes`, qua được gate
-- [x] `Module::checks` + `autoxide doctor`: kiểm cấu hình, database, migration và kiểm của module
-- [x] `Module::tasks` + `autoxide task`: lệnh quản trị do module khai — D-169
-- [x] Hợp đồng ổn định: danh sách public dependency, `#[non_exhaustive]` cho kiểu sẽ lớn thêm,
-      chính sách deprecate API Rust; hướng dẫn viết module ở repo riêng (EN + VI) — D-167
-- [x] Hàm tạo / builder cho các kiểu module đang dựng bằng literal, rồi `#[non_exhaustive]`
-      (danh sách ở D-167) — D-170
-
-## 28. Dọn cấu trúc (chủ dự án giao ngày 13/11/2026)
-
-Từ lượt rà soát kiến trúc cùng ngày: bỏ code lặp, giữ luật handler, module lớn dễ tìm.
-
-- [x] Kiểm email một chỗ: `autoxide_kernel::email` cho `forms`, `comments`, `newsletter`; `auth`
-      dùng chung phần chuẩn hoá
-- [x] `content`: handler không đọc database (`describe`, `preview_entry` vào service); `cargo xtask
-      check` chặn handler gọi database
-- [x] `content`: gom file theo nhóm, tách `tests.rs` thành thư mục
-- [x] Quy ước bố cục module (theo lớp hay theo tính năng) trong hướng dẫn viết module (EN + VI)
-- [x] `kernel`: tách bộ đăng ký `Modules` khỏi `module.rs`
-- [x] `crates/app`: test đầu-cuối `media_e2e` ra khỏi chỗ code của binary
-
-## 29. Nền cho nghiệp vụ tiền (chủ dự án giao ngày 13/11/2026)
-
-Từ lượt rà soát cùng ngày: core đã có transaction nguyên tử, event cùng transaction, idempotency
-key (24 giờ), ETag / `If-Match`, job không chạy trùng, audit log chỉ thêm — nhưng chưa đủ cho
-nghiệp vụ có tiền (số dư, giao dịch, phân bổ). Mọi mục thuộc core, trung lập với ngành, chạy và
-có test trên cả SQLite và Postgres; test đồng thời cho mọi thứ ghi đồng thời.
-
-- [x] Kiểm tràn số nguyên ở bản release: `[profile.release] overflow-checks = true` trong
-      `Cargo.toml` gốc (hiện không khai, nên bản build thật cộng tràn `i64` sẽ âm thầm quay
-      vòng). Đo lại bằng `scripts/loadtest.sh` trước và sau, ghi số đo vào quyết định
-- [x] `autoxide_kernel::money`: kiểu `Money` = số nguyên `i64` đơn vị nhỏ nhất + mã tiền tệ
-      ISO 4217 (kèm số chữ số thập phân của mã). Cộng, trừ, nhân với số nguyên có kiểm tràn và
-      trả `Error`; cấm phép tính giữa hai loại tiền; chia / phân bổ theo tỉ lệ không mất đơn vị
-      nào (100 chia 3 → 34, 33, 33); JSON và OpenAPI với `amount` là chuỗi số nguyên (client
-      JavaScript làm tròn sai số lớn hơn 2⁵³) và `currency`; cách lưu chuẩn là hai cột
-      `<tên>_minor` (`BIGINT`) và `<tên>_currency`
-- [x] Cập nhật có điều kiện và khoá dòng thành công cụ chung của kernel, thay mẹo "chạm dòng"
-      đang viết tay ở `auth` (`user/service.rs`, `role/service.rs`, `session/service.rs`),
-      `forms` (`public.rs`), `comments` và `content` (`content_tree_locks`): hàm khoá một dòng tới
-      hết transaction, và cách chuẩn để trừ số dư (`UPDATE … SET balance = balance - x WHERE id = ?
-      AND balance >= x`, kiểm số dòng bị đổi). Test: nhiều request trừ cùng lúc trên cả hai
-      database, số dư không bao giờ âm, tổng không lệch
-- [x] Thử lại transaction khi xung đột tạm thời: một hàm của `Database` chạy lại transaction ghi
-      có giới hạn số lần khi gặp deadlock hay xung đột (Postgres `40001`, `40P01`; SQLite bận),
-      lỗi khác trả ngay. Tài liệu nói rõ phần việc bên trong phải chịu được chạy lại. Test cả
-      hai nhánh
-- [x] Audit log chống sửa: mỗi dòng của `audit_entry` mang mã băm của nội dung và của dòng trước
-      (chuỗi băm); `autoxide doctor` kiểm chuỗi còn nguyên và báo dòng đầu tiên bị sửa. Giải
-      quyết cùng việc xoá dữ liệu cá nhân (`modules/audit/src/recorder.rs` xử lý `USER_DELETED`):
-      băm phần không chứa dữ liệu cá nhân, hoặc cách khác giữ được chuỗi. Có migration cho dữ
-      liệu cũ
-- [x] Chống trùng lệnh ở tầng nghiệp vụ: quy ước mã tham chiếu do client đặt (`reference`), duy
-      nhất theo người gọi, lưu vĩnh viễn cùng bản ghi; gửi lại cùng mã thì trả kết quả cũ, cùng
-      mã mà nội dung khác thì 409/422 — không dựa riêng vào idempotency key HTTP (hết hạn sau 24
-      giờ). Helper trong kernel nếu đủ chung
-- [x] Hướng dẫn "Nghiệp vụ có tiền" trong hướng dẫn viết module (EN + VI): dùng `Money`, thứ tự
-      khoá dòng chống deadlock, cập nhật có điều kiện, thử lại khi xung đột, mã tham chiếu, event
-      cùng transaction, không sửa hay xoá giao dịch mà ghi giao dịch đảo; module `notes` hay một
-      test mẫu minh hoạ
-
-Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi trong `docs/DECISIONS.md`:
-
-- Thư viện số thập phân (vd `rust_decimal`) để tính lãi, tỉ giá, thuế với quy tắc làm tròn rõ
-  ràng; chỉ dùng để tính, vẫn lưu bằng số nguyên. Thêm thư viện thì ghi `STACK.md`.
-- Module sổ cái kép (`ledger`: mỗi giao dịch có bút toán nợ và có cân nhau, chỉ thêm, số dư suy ra
-  từ bút toán): module nghiệp vụ mới, `CLAUDE.md` chỉ cho dựng module chủ dự án đã giao.
-
-## Thứ tự và phụ thuộc từ bước 30 (D-192)
+Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết
+thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
+
+Trạng thái: **bước 0–30 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); bước 50 chờ
+chủ dự án công khai repo (D-199); bản phát hành mới nhất `v0.12.0`. CI trên GitHub chỉ chạy khi repo công khai
+(D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
+
+**Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
+xếp theo **thứ tự làm**; bước kế tiếp là bước đầu tiên (từ trên xuống) còn mục `[ ]` mà các bước nó phụ
+thuộc đã xong.
+
+## Thứ tự làm (D-228)
+
+| Giai đoạn | Bước, theo thứ tự | Vì sao ở đây |
+|---|---|---|
+| A. Hợp đồng và nền lõi | 31, 32 → 33 → 34 → 35, 36, 37 (song song) → 40 | giữ API không vỡ trước khi sửa mọi bảng; đa khách, tổ chức, tiền, tuân thủ là nền của mọi thứ sau |
+| B. Lớp cho giao diện và phân quyền | 51 → 54 → 52 | module thương mại khai luôn phần của mình (51 nên xong trước 41); 54 cần P12 của 51 |
+| C. Vận hành | 38 → 39 | báo cáo xuyên database, backup, hiệu năng trước khi có dữ liệu thương mại thật |
+| D. Module nền dùng chung | 53, 57, 58, 66, 65 | hỗ trợ khách (45 và 61 dùng), phân tích (64 dùng), tự động hoá, SCIM, chợ ứng dụng |
+| E. Thương mại | 41 → 42, 43, 44 → 45 → 46, 47, 48, 49, 55 → 56, 59, 60, 61, 62, 63, 64 | module nghiệp vụ cắm vào core đã xong |
+| Chờ chủ dự án | 50 | chỉ làm khi chủ dự án nói repo đã công khai |
+
+Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song. Trong một giai đoạn,
+bảng phụ thuộc ngay dưới cho biết bước nào chạy song song được.
+
+## Phụ thuộc giữa các bước (D-192)
 
 | Bước | Bắt đầu khi | Song song được với |
 |---|---|---|
-| 30 Ra mắt công khai | ngay (đang làm) | 31, 32 |
 | 31 Hợp đồng API, chống hồi quy | ngay | 30, 32 |
 | 32 Dọn bố cục | ngay; `media` của nhóm A làm sau khi WebP (30) merge | 30, 31 |
 | 33 Khách hàng, vị trí dữ liệu | 31 và nhóm A của 32 xong (31 giữ API và bản nâng cấp không vỡ khi mọi bảng đổi) | hai mục độc lập của 40 |
@@ -453,57 +61,7 @@ Chờ chủ dự án quyết — KHÔNG làm khi chưa có quyết định ghi t
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
-## 30. Ra mắt công khai (chủ dự án giao ngày 13/11/2026, D-175, D-176)
-
-Đặc tả: [`docs/steps/30-public-launch.md`](steps/30-public-launch.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-Đưa Autoxide tới tay người lạ: repo công khai, CI và phát hành tự động, image Docker có chứng
-thực, file của một dự án mã nguồn mở, ảnh nhẹ, deploy không gián đoạn, cài được chỉ bằng README.
-Không đụng code của bước 29 (trừ `media` và `kernel/src/http/health.rs`), nên làm ngay được.
-Tài liệu cho người ngoài viết tiếng Anh kèm bản tiếng Việt cùng nội dung.
-
-Nhóm A — CI và phát hành (D-175, D-197, D-199; phần cần repo công khai ở bước 50):
-
-- [x] Agent xác nhận gitleaks quét toàn lịch sử mọi nhánh xanh và không file nào chứa tên máy chủ,
-      IP, đường dẫn riêng hay thông tin cá nhân (13/11/2026); email cá nhân trong metadata commit:
-      chủ dự án chọn giữ nguyên (D-197)
-- [x] Ba workflow có lại trigger tự chạy (`ci.yml` push lên `main` và pull request, `audit.yml`
-      theo lịch, `release.yml` theo tag `vX.Y.Z`), bỏ ghi chú "TẮT tự chạy (D-107)"; mọi job chỉ
-      chạy khi repo công khai, riêng tư thì bỏ qua không tốn phí (D-197)
-- [x] `release.yml` đăng image `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` cho `linux/amd64` và
-      `linux/arm64` (máy build gốc, không giả lập) bằng `GITHUB_TOKEN`, kèm chứng thực nguồn gốc
-      build và SBOM đã ký; `docs/DEPLOY.md` (EN + VI) có lệnh kiểm chứng thực; `docs/RELEASING.md`
-      có hai đường: workflow khi công khai, phát hành từ máy khi còn riêng tư (D-199)
-
-Nhóm B — file của dự án mã nguồn mở:
-
-- [x] `SECURITY.md` (EN + VI): phiên bản còn được vá, cách báo lỗ hổng riêng tư (bật "Private
-      vulnerability reporting" của GitHub — chủ dự án bấm), thời gian phản hồi dự kiến, những gì
-      không tính là lỗ hổng; README trỏ tới nó
-- [x] `CONTRIBUTING.md` (EN + VI) cho người đóng góp là người: dựng môi trường, hai mức gate
-      (D-173), luật quan trọng nhất tóm từ `CLAUDE.md` (hai database, ranh giới module, lỗi có
-      `code`, test), cách viết commit và PR, license của phần đóng góp (MIT OR Apache-2.0, như
-      repo); trỏ `CLAUDE.md` cho người dùng AI agent
-- [x] Quy tắc ứng xử (`CODE_OF_CONDUCT.md`, theo Contributor Covenant bản mới nhất) với địa chỉ
-      liên hệ do chủ dự án đặt; mẫu issue (báo lỗi: phiên bản, database, cách tái hiện; đề xuất) và
-      mẫu PR (đã chạy `./gate.sh`, đã sửa EN + VI, đã thêm CHANGELOG) trong `.github/`
-- [x] `cargo xtask check` hay test giữ các file trên không mất và hai bản EN / VI không lệch
-      tiêu đề mục (cách làm như kiểm bản dịch i18n), để agent phiên sau không quên sửa một bên
-
-Nhóm C — sản phẩm (D-176):
-
-- [x] `media`: bản nhỏ WebP bên cạnh JPEG / PNG. Chọn bộ mã hoá sau khi kiểm thư viện đúng phiên
-      bản ghim (kiểu nén mất dữ liệu cho ảnh chụp, có alpha cho ảnh trong suốt); website nhận được
-      WebP qua API công khai (`PublicMedia`, `body_media`, `srcset`) mà client cũ không hỏng; ảnh đã
-      có làm lại bằng `autoxide task media.refresh_variants`; đo dung lượng và thời gian mã hoá
-      trên ảnh thử của D-168, ghi vào quyết định; hướng dẫn `docs/MEDIA.md` (EN + VI)
-- [x] Deploy không gián đoạn: nhận tín hiệu dừng thì `/health/ready` trả 503 trong một khoảng
-      cấu hình được (biến mới qua `Setting`, sinh lại `.env.example`) trước khi ngừng nhận kết nối,
-      `/health/live` vẫn 200; rồi mới tới `AUTOXIDE_HTTP_SHUTDOWN_SECONDS`. Test; `docs/DEPLOY.md`
-      (EN + VI)
-- [x] Thử cài như người lạ: máy hay container sạch, làm đúng README tiếng Anh theo đường build từ
-      mã nguồn (cả SQLite và Postgres), ghi mọi chỗ vấp rồi sửa README / `docs/DEPLOY.md` (EN + VI
-      cùng commit). Thử bằng image đã đăng: bước 50
+## Giai đoạn A — Hợp đồng và nền lõi
 
 ## 31. Hợp đồng API và chống hồi quy (chủ dự án giao ngày 13/11/2026, D-177)
 
@@ -822,6 +380,165 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
 - [ ] Kênh đẩy cho ứng dụng di động (D-220): trait `MobilePushSender` (Firebase / Apple là module riêng,
       cần khoá — dừng lại hỏi), token thiết bị mã hoá, cùng luật đồng ý và khung giờ như web push
 
+## 40. Năng lực còn thiếu của core (agent đề xuất; số cũ 34, D-189)
+
+Đặc tả: [`docs/steps/40-core-capabilities.md`](steps/40-core-capabilities.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+So với những gì một lõi backend hiện đại thường có sẵn, core còn thiếu sáu năng lực chung, không
+gắn với ngành nào. Header bảo mật và MCP đầy đủ hơn không phụ thuộc nền đa khách: làm được ngay.
+Bốn mục còn lại (OIDC, tải thẳng lên S3, SSE, rate limit) bắt đầu SAU bước 34 vì phải theo khách hàng
+và tổ chức. Endpoint mới có OpenAPI và tool MCP
+tương ứng; thêm thư viện thì kiểm đúng phiên bản và ghi `STACK.md`; mọi mục chạy và có test trên
+cả SQLite và Postgres.
+
+- [ ] Đăng nhập qua nhà cung cấp danh tính theo OpenID Connect (Google, Microsoft, GitHub qua
+      OAuth 2.0, và một nhà cung cấp OIDC bất kỳ khai bằng cấu hình): PKCE, kiểm `state` / `nonce`,
+      kiểm chữ ký `id_token` qua JWKS; liên kết với tài khoản sẵn có theo email đã xác minh, không
+      tự gộp khi email chưa xác minh; MFA của Autoxide vẫn áp dụng; tắt mặc định, bật bằng cấu hình
+- [ ] Tải file lớn thẳng lên nơi lưu: khi nơi lưu là S3, cấp link tải lên ký sẵn có hạn và giới hạn
+      cỡ / loại, rồi một lệnh xác nhận kiểm file (cỡ, loại thật, hash) trước khi ghi bản ghi; nơi
+      lưu là ổ đĩa thì đi qua máy chủ như cũ. Một trait trong `Storage`, `files` và `media` dùng
+      chung; file tải lên mà không xác nhận được dọn bằng job
+- [ ] Header bảo mật chung cho mọi response của API (`X-Content-Type-Options: nosniff`,
+      `Referrer-Policy`, `X-Frame-Options` hay `frame-ancestors`, HSTS khi cấu hình chạy sau
+      HTTPS, CSP chặt cho trang tài liệu API): một lớp trong `kernel/src/http/`, cấu hình được,
+      có test; hai endpoint trả file đang tự đặt header thì dùng chung lớp này
+- [ ] Đẩy event theo thời gian thực bằng Server-Sent Events — stream event do module phát, KHÔNG
+      tự đẩy mọi thay đổi của bảng ("realtime theo bảng" mà `docs/research/frameworks.md` đã không
+      mượn); ghi quyết định nêu khác biệt đó. Một endpoint stream các event mà người
+      gọi có permission được xem (lọc theo tên event và theo quyền đọc bản ghi), nối lại bằng
+      `Last-Event-ID` không mất event trong khoảng giữ, giới hạn số kết nối; chạy đúng khi nhiều
+      máy chủ (đọc từ bảng event, không chỉ từ bộ nhớ một tiến trình)
+- [ ] MCP đầy đủ hơn: resources (vd tài liệu của module, schema một loại bản ghi), prompts mẫu cho
+      việc hay làm (viết nháp bài, kiểm duyệt bình luận) do module khai qua `Module`, kèm cài đặt
+      mặc định rỗng (D-038); một trang mô tả cho agent tự khám phá API (vd `/llms.txt` trỏ tới
+      OpenAPI, MCP và hướng dẫn), sinh từ code để không lệch
+- [ ] Rate limit đúng khi chạy nhiều máy chủ: giới hạn theo API key (và tuỳ chọn theo địa chỉ) đếm
+      chung qua database như `throttle` (D-116) hay một cách khác chạy trên cả hai database; đo
+      chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
+      quyết định
+- [ ] Bộ máy tìm kiếm thay được (D-220): trait `SearchBackend`, mặc định chạy trong database (bảng
+      `kernel_search_docs`, đúng dấu xếp trước), backend ngoài (Meilisearch, Typesense…) cắm vào không sửa
+      module; module khai loại tài liệu tìm được; lọc theo khách và nút trong backend; lệnh dựng lại chỉ mục
+
+## Giai đoạn B — Lớp cho giao diện và phân quyền
+
+## 51. Hợp đồng cho khung quản trị và mặt tiền (thiết kế giao diện 2, D-200)
+
+Đặc tả: [`docs/steps/51-ui-contracts.md`](steps/51-ui-contracts.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+Thiết kế: [`docs/research/ui-design.md`](research/ui-design.md).
+
+Giao diện (repo riêng, D-097) dựng menu, hộp việc, tìm kiếm, trang tổng quan từ dữ liệu của core để
+cùng một giao diện phục vụ mọi mô hình kinh doanh. Module khai phần của mình (mặc định rỗng, D-038);
+kernel gom và lọc theo khách, gói, permission ở nút đang chọn. Kernel không có danh sách phân hệ viết cứng.
+Bước 41–49 khai phần của module mình ngay trong bước đó nếu phần tương ứng của bước 51 đã xong.
+
+- [ ] Nhúng bản ghi của module khác vào nội dung: node `embed` (`kind`, `id`) trong thân bài của
+      `content`, kiểm qua sổ đối tượng (D-123) khi lưu, đọc công khai trả kèm tiêu đề, tóm tắt, đường dẫn,
+      ảnh của đối tượng còn công khai; `Resource` thêm `image`. `content` không biết khái niệm sản phẩm
+- [ ] Sổ điều hướng: `Module::navigation` (nhóm phân hệ, mục, permission, tính năng, nguồn số đếm,
+      thứ tự); nhóm trùng phải khai giống nhau; endpoint trả menu đã lọc — ẩn khi module chưa bật hay
+      thiếu permission, **khoá (vẫn hiện) khi thiếu tính năng của gói**; nhãn theo i18n; ETag; tool MCP
+- [ ] Hộp việc: trait `WorkSource` (đếm, liệt kê việc chờ theo phạm vi nút), việc tính từ dữ liệu của
+      module, không có bảng việc riêng; endpoint gom sắp theo mức gấp và hạn, endpoint số đếm cho menu;
+      hạn thời gian mỗi nguồn, nguồn chậm không làm hỏng cả hộp; cache số đếm có khách trong khoá; khác
+      hộp thư của `notifications`
+- [ ] Tìm xuyên phân hệ: trait `FinderSource`; endpoint gom kết quả theo loại đối tượng, không dấu vẫn
+      tìm được (`kernel::search`), chỉ chạy nguồn người gọi có quyền, mỗi nguồn áp phạm vi nút
+- [ ] Số liệu tóm tắt cho trang tổng quan của phân hệ: trait `SummaryMetric` (tiền, số đếm, tỉ lệ) theo
+      phạm vi nút; số nặng đọc từ bảng dẫn xuất, không quét bảng giao dịch mỗi lần mở trang
+- [ ] Hoạt động gần đây (module `audit`): câu đọc được theo i18n key mà module khai trên `EventInfo`,
+      chỉ hiện bản ghi người gọi có quyền đọc ở nút của bản ghi
+- [ ] Khai menu, nguồn việc, nguồn tìm, số liệu cho mọi module đang có; MODULE_GUIDE (EN + VI) mục
+      "khai phần của module cho giao diện"; test rò rỉ giữa hai nhánh anh em cho số đếm và kết quả tìm
+- [ ] View đã lưu (D-201): `/me/views` lưu tham số lọc, sắp xếp, cột, nhóm, mật độ của một danh sách;
+      phạm vi cá nhân / nút / khách; tham số kiểm theo **schema bộ lọc mà mỗi endpoint danh sách công bố**
+      trong OpenAPI (máy và agent dựng được chip lọc mà không viết cứng)
+- [ ] Thao tác hàng loạt chung (D-201): nhận `ids[]` hoặc `filter` kèm `expected_count` (lệch thì từ
+      chối), `Idempotency-Key` bắt buộc, chạy bằng job có tiến độ (SSE của bước 40), trả kết quả từng
+      bản ghi; module khai hành động hàng loạt của mình
+- [ ] Tìm nâng cao (D-201): toán tử `is:`, `status:`, so sánh số, phủ định; tham số phạm vi
+      `node | subtree | accessible`; endpoint `resolve` đổi một mã (số đơn, mã vận đơn, ID) thành bản
+      ghi người gọi được xem
+- [ ] Hộp việc theo người (D-201): mỗi việc có khoá ổn định, "vì sao bạn thấy" (permission, nút), hoãn
+      tới một thời điểm, giao cho người khác — bảng cấp khách hàng có `tenant_id`; việc thiết lập theo mô
+      hình (`SetupStep`, trạng thái tính từ dữ liệu, bước pháp lý chặn bán được đánh dấu)
+- [ ] Giải thích quyền (D-201): `POST /me/can` kiểm nhiều cặp (permission, nút) một lần, trả lý do
+      `missing_permission` / `module_not_enabled` / `feature_not_in_plan` / `quota_exceeded` và gói mở
+      được — giao diện hiện "vì sao bị khoá, ai cấp được, nâng gói mở gì"
+- [ ] Agent là người dùng thật (D-201): loại API key `agent`; `actor_kind` (người / agent / hệ thống) trong
+      audit; lệnh rủi ro (hoàn tiền, chi trả, khoá sổ, xoá dữ liệu) do agent gọi trả `202
+      approval_required` kèm yêu cầu duyệt có hạn, người có quyền duyệt thì lệnh chạy — như nhau cho REST
+      và MCP; việc chờ duyệt vào hộp việc
+- [ ] Dòng hoạt động và ghi chú nội bộ trên mọi bản ghi (D-201): gộp audit, ghi chú (nhắc tên bằng @,
+      người được nhắc nhận thông báo), khoá bằng loại đối tượng của sổ đối tượng (D-123); một chỗ dùng
+      chung thay cho mỗi module tự làm ghi chú
+- [x] Cờ theo người dùng cho trợ giúp trong giao diện (D-207): `GET` / `PUT` / `DELETE /api/v1/me/flags`
+      (bảng `kernel_user_flags`), chỉ cờ của chính mình, hạn mức `AUTOXIDE_USER_FLAGS_MAX`, có trong bản
+      xuất dữ liệu và xoá khi xoá tài khoản; `tenant_id` thêm ở bước 33 cùng mọi bảng
+- [ ] Định nghĩa số liệu tóm tắt (D-207): `SummaryMetric::definition` (i18n key, mặc định `None`),
+      `GET /api/v1/kernel/summary` trả `definition` đã dịch; gate kiểm mọi số liệu đều khai và có bản dịch
+      — làm cùng mục số liệu tóm tắt (P4)
+- [ ] Đối chiếu thiết kế 2 (D-212, D-213): job API chung (danh sách, chi tiết có tiến độ và file, chạy lại
+      có audit); xuất danh sách theo bộ lọc dùng chung (CSV qua job); yêu cầu duyệt đầy đủ (danh sách, từ
+      chối, event `kernel.approval_decided`, tool MCP); bộ lọc nội dung (`review`, `scheduled`,
+      `ai_generated`, `missing_locale`, `missing_alt`); bỏ hoãn việc; thử cài đặt nối ngoài; hộp việc không
+      có "Đã xử lý"
+- [ ] Nhập dữ liệu (D-220): không làm ở kernel — module `imports` (bước 56) thêm nguồn `autoxide` cùng cột với
+      xuất chung và đích `content`, `media`, `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý)
+- [ ] Danh sách lý do theo khách (P18, D-223) và `ActorKind` thống nhất cho audit, nhật ký, event (D-224)
+
+## 54. Phân quyền chuẩn hàng đầu (chủ dự án giao ngày 13/11/2026, D-205)
+
+Đặc tả: [`docs/steps/54-authorization.md`](steps/54-authorization.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 34. Mô hình: RBAC theo cây tổ chức có độ sâu (bước 34) + chia sẻ bản ghi một bước + deny
+và rào + điều kiện theo ngữ cảnh — luật là dữ liệu có kiểu, không ngôn ngữ chính sách tự do. Đối chiếu với
+Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe và chuẩn OpenID AuthZEN.
+
+- [ ] Một hàm quyết định duy nhất, thu hồi tức thì (quyền không nằm trong token; cache theo phiên bản quyền
+      của khách); test so khớp "lọc danh sách = kiểm từng bản ghi" sinh ngẫu nhiên trên cả hai database
+- [ ] Deny thắng allow trên role; rào quyền tối đa cho khách con (kể cả admin của khách con); API key chi
+      tiết: hạn bắt buộc, chọn tài nguyên, dải IP, lần dùng cuối, xoay vòng, quản trị duyệt key
+- [ ] Xác thực lại cho việc nhạy cảm (passkey / MFA gần đây, RFC 9470); điều kiện theo IP và khung giờ
+      trên gán role
+- [ ] Chia sẻ bản ghi có hạn cho người, nhóm, nút, key (module khai quan hệ `viewer` / `editor`…), không
+      trao quyền mình không có
+- [ ] Quyền theo trường dữ liệu: trường cá nhân / nhạy cảm / tài chính phân loại trong OpenAPI, bị che khi
+      thiếu `<module>.read_personal`, đọc dữ liệu nhạy cảm có audit (Luật 91/2025) — áp cho `auth`,
+      `comments`, `forms`, `newsletter`
+- [ ] Nâng quyền đúng lúc (role đủ điều kiện, kích hoạt có lý do, hạn, duyệt); tài khoản khẩn cấp; lệnh hai
+      người và cặp quyền xung đột do module khai, ngưỡng là dữ liệu
+- [ ] Giải thích và mô phỏng (vì sao có / không có quyền, thử role nháp), "ai có quyền trên bản ghi này",
+      quyền không dùng 90 ngày, rà soát quyền định kỳ vào hộp việc
+- [ ] Endpoint theo chuẩn OpenID AuthZEN Authorization API 1.0; agent hành động thay người dùng có vết
+      `on_behalf_of`; số đo quyết định quyền; hướng dẫn `docs/ACCESS.md` (EN + VI)
+
+## 52. Trải nghiệm quản trị nâng cao (D-201)
+
+Đặc tả: [`docs/steps/52-admin-experience.md`](steps/52-admin-experience.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 51. Những điều nên có theo nghiên cứu các trang quản trị hàng đầu (Stripe, Shopify,
+Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
+
+- [ ] Bàn kỹ thuật cho nhà phát triển và agent: nhật ký request theo khách (API key, đường dẫn mẫu,
+      status, `code`, có hạn lưu, không lưu thân request), danh sách lần giao webhook kèm gửi lại, event
+      theo bản ghi, chạy lại job trong dead-letter queue
+- [ ] Hoàn tác an toàn: lưu trữ / ẩn có `restore`; lệnh ghi lớn có `dry_run` trả trước những gì sẽ đổi
+- [ ] AI trong quản trị (D-109): đổi câu lời thường thành bộ lọc đã kiểm theo schema (`ai/filters/parse`),
+      trợ lý dùng tool MCP với đúng quyền người dùng, mọi lệnh ghi là bản nháp chờ duyệt
+- [ ] Thông báo: lý do nhận, trạng thái xong / lưu, bộ lọc, cấu hình kênh theo loại event; ghim màn hình
+      hay dùng (`/me/pins`)
+- [ ] Nhật ký lệnh của agent (D-202): lệnh MCP ghi `mcp:<tên tool>` vào đường dẫn mẫu, không ghi tham
+      số; lọc theo `actor_kind` và theo key; dòng của lệnh nhận `202 approval_required` giữ `approval_id`
+- [ ] Sức khoẻ người bán và sức khoẻ tuân thủ: chỉ số so với ngưỡng (ngưỡng là dữ liệu có ngày hiệu lực),
+      vi phạm, hạn phải xử lý; huy hiệu người bán tin cậy tính từ số liệu thật, công bố tiêu chí
+- [ ] Đối chiếu thiết kế 2: tên endpoint bàn kỹ thuật, event theo bản ghi đọc từ audit, `kernel.devtools.manage`,
+      `request_id` / `trace_id` trong nhật ký; trợ lý AI trong quản trị chạy tool MCP với quyền người gọi
+- [ ] Nhật ký lệnh dùng đủ `ActorKind` của D-224
+
+## Giai đoạn C — Vận hành
+
 ## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
 
 Đặc tả: [`docs/steps/38-cross-database-reporting.md`](steps/38-cross-database-reporting.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
@@ -898,48 +615,82 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
 - [ ] Quan sát theo khách (D-190): log và trace mang trường `tenant_id`; **không** dùng `tenant_id`
       làm nhãn số đo (trái luật code về nhãn); lượng dùng theo khách lấy từ số đo dùng của bước 35
 
-## 40. Năng lực còn thiếu của core (agent đề xuất; số cũ 34, D-189)
+## Giai đoạn D — Module nền dùng chung
 
-Đặc tả: [`docs/steps/40-core-capabilities.md`](steps/40-core-capabilities.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+Module trung lập với nghiệp vụ, không phải core: `support`, `analytics`, `automations`, `apps`; SCIM nằm trong `auth`.
 
-So với những gì một lõi backend hiện đại thường có sẵn, core còn thiếu sáu năng lực chung, không
-gắn với ngành nào. Header bảo mật và MCP đầy đủ hơn không phụ thuộc nền đa khách: làm được ngay.
-Bốn mục còn lại (OIDC, tải thẳng lên S3, SSE, rate limit) bắt đầu SAU bước 34 vì phải theo khách hàng
-và tổ chức. Endpoint mới có OpenAPI và tool MCP
-tương ứng; thêm thư viện thì kiểm đúng phiên bản và ghi `STACK.md`; mọi mục chạy và có test trên
-cả SQLite và Postgres.
+## 53. Hỗ trợ khách hàng (`support`) (chủ dự án giao ngày 13/11/2026, D-204)
 
-- [ ] Đăng nhập qua nhà cung cấp danh tính theo OpenID Connect (Google, Microsoft, GitHub qua
-      OAuth 2.0, và một nhà cung cấp OIDC bất kỳ khai bằng cấu hình): PKCE, kiểm `state` / `nonce`,
-      kiểm chữ ký `id_token` qua JWKS; liên kết với tài khoản sẵn có theo email đã xác minh, không
-      tự gộp khi email chưa xác minh; MFA của Autoxide vẫn áp dụng; tắt mặc định, bật bằng cấu hình
-- [ ] Tải file lớn thẳng lên nơi lưu: khi nơi lưu là S3, cấp link tải lên ký sẵn có hạn và giới hạn
-      cỡ / loại, rồi một lệnh xác nhận kiểm file (cỡ, loại thật, hash) trước khi ghi bản ghi; nơi
-      lưu là ổ đĩa thì đi qua máy chủ như cũ. Một trait trong `Storage`, `files` và `media` dùng
-      chung; file tải lên mà không xác nhận được dọn bằng job
-- [ ] Header bảo mật chung cho mọi response của API (`X-Content-Type-Options: nosniff`,
-      `Referrer-Policy`, `X-Frame-Options` hay `frame-ancestors`, HSTS khi cấu hình chạy sau
-      HTTPS, CSP chặt cho trang tài liệu API): một lớp trong `kernel/src/http/`, cấu hình được,
-      có test; hai endpoint trả file đang tự đặt header thì dùng chung lớp này
-- [ ] Đẩy event theo thời gian thực bằng Server-Sent Events — stream event do module phát, KHÔNG
-      tự đẩy mọi thay đổi của bảng ("realtime theo bảng" mà `docs/research/frameworks.md` đã không
-      mượn); ghi quyết định nêu khác biệt đó. Một endpoint stream các event mà người
-      gọi có permission được xem (lọc theo tên event và theo quyền đọc bản ghi), nối lại bằng
-      `Last-Event-ID` không mất event trong khoảng giữ, giới hạn số kết nối; chạy đúng khi nhiều
-      máy chủ (đọc từ bảng event, không chỉ từ bộ nhớ một tiến trình)
-- [ ] MCP đầy đủ hơn: resources (vd tài liệu của module, schema một loại bản ghi), prompts mẫu cho
-      việc hay làm (viết nháp bài, kiểm duyệt bình luận) do module khai qua `Module`, kèm cài đặt
-      mặc định rỗng (D-038); một trang mô tả cho agent tự khám phá API (vd `/llms.txt` trỏ tới
-      OpenAPI, MCP và hướng dẫn), sinh từ code để không lệch
-- [ ] Rate limit đúng khi chạy nhiều máy chủ: giới hạn theo API key (và tuỳ chọn theo địa chỉ) đếm
-      chung qua database như `throttle` (D-116) hay một cách khác chạy trên cả hai database; đo
-      chi phí mỗi request trước và sau; giữ đếm trong bộ nhớ làm mặc định nếu đo thấy đắt, ghi
-      quyết định
-- [ ] Bộ máy tìm kiếm thay được (D-220): trait `SearchBackend`, mặc định chạy trong database (bảng
-      `kernel_search_docs`, đúng dấu xếp trước), backend ngoài (Meilisearch, Typesense…) cắm vào không sửa
-      module; module khai loại tài liệu tìm được; lọc theo khách và nút trong backend; lệnh dựng lại chỉ mục
+Đặc tả: [`docs/steps/53-support.md`](steps/53-support.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
-## Giai đoạn module thương mại (chủ dự án giao ngày 13/11/2026, D-191)
+Bắt đầu SAU bước 37; song song được với 41–49. Phiếu hỗ trợ, không phải chat thời gian thực (vẫn để sau,
+D-194). Khiếu nại có hạn luật định vẫn ở `compliance` (bước 37), tranh chấp ở `marketplace` (bước 46):
+`support` chuyển phiếu sang đó, không làm lại.
+
+- [ ] Phiếu và tin nhắn: tạo từ website (có tài khoản; vãng lai qua OTP email / số điện thoại; từ token
+      xem đơn của bước 45), nhân viên ghi hộ; trạng thái qua một máy trạng thái; tin nhắn chỉ thêm, ghi
+      chú nội bộ có nhắc tên, đính kèm qua `media`; người mua vãng lai xem bằng token phiếu, gộp phiếu vào
+      tài khoản sau khi đăng ký
+- [ ] Phạm vi theo nút tổ chức (bước 34): nhân viên thấy phiếu của nút mình và nhánh dưới; người bán trên
+      sàn chỉ thấy phiếu gian hàng mình; nhóm nhân viên, quy tắc tự phân công là dữ liệu, chia vòng
+- [ ] Hạn trả lời (SLA) theo ưu tiên, tính theo giờ làm việc và ngày nghỉ của nút, dừng khi chờ người
+      mua; job đánh dấu quá hạn; nguồn việc cho hộp việc (bước 51); báo cáo thời gian phản hồi, tỉ lệ quá
+      hạn, mức hài lòng
+- [ ] Gắn phiếu với đơn, sản phẩm qua sổ đối tượng (D-123); câu trả lời mẫu có biến; chuyển phiếu thành
+      khiếu nại người tiêu dùng của `compliance` (gọi lại không tạo hai vụ việc) hay lên sàn
+- [ ] Tool MCP (cùng permission như REST); gợi ý trả lời bằng AI chỉ là bản nháp (D-109); email trả lời
+      vào lại phiếu qua trait `InboundMail` (tắt mặc định); hướng dẫn `docs/SUPPORT.md` (EN + VI); test
+      trên cả hai database
+
+## 57. Phân tích truy cập và hành vi (`analytics`) (chủ dự án giao ngày 14/11/2026, D-220)
+
+Đặc tả: [`docs/steps/57-analytics.md`](steps/57-analytics.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 37. Số liệu truy cập ngay trong Autoxide, không gửi dữ liệu người đọc cho bên thứ ba.
+
+- [ ] Thu sự kiện từ website (endpoint công khai, gom lô, chống bot) và từ event của module; loại sự kiện do
+      module khai; phiên ẩn danh không cookie với khoá xoay mỗi ngày, không lưu IP hay user agent đầy đủ
+- [ ] Gộp theo giờ / ngày, báo cáo chỉ đọc bảng gộp: tổng quan, trang, nguồn, chiến dịch UTM, đối tượng xem
+      nhiều, phễu do module khai; số liệu cho trang tổng quan (bước 51) và "thịnh hành" cho `catalog`
+- [ ] Theo dõi theo người chỉ khi đồng ý (sổ đồng ý bước 37), rút đồng ý thì xoá phần gắn người; hạn lưu là
+      cấu hình; tool MCP chỉ đọc; phạm vi theo website của nút; test trên cả hai database
+
+## 58. Tự động hoá quy trình (`automations`) (chủ dự án giao ngày 14/11/2026, D-220)
+
+Đặc tả: [`docs/steps/58-automations.md`](steps/58-automations.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 51 (lệnh chờ duyệt, job API). Luật "khi … thì …" như Shopify Flow; mỗi hành động là một tool
+MCP đã có, chạy với quyền của người tạo luật.
+
+- [ ] Luật: kích hoạt bằng event, lịch hay gọi tay; điều kiện là cây toán tử cố định (không biểu thức tự do);
+      hành động là tool MCP có tham số điền từ event; lưu luật kiểm event, tool, quyền, tham số một lần
+- [ ] Chạy bằng job ngoài transaction, nhận lại event không chạy hai lần, mỗi bước có `Idempotency-Key`; hành
+      động rủi ro chờ duyệt; chống vòng lặp và giới hạn số lần chạy; nhật ký từng lần chạy, chạy lại
+- [ ] Chạy thử khô, danh mục kích hoạt và hành động người gọi dùng được, mẫu luật do module khai; agent tạo
+      luật thì chờ duyệt; người tạo mất quyền thì luật tự tắt; test trên cả hai database
+
+## 66. Đồng bộ nhân viên qua SCIM 2.0 (chủ dự án giao ngày 14/11/2026, D-221)
+
+Đặc tả: [`docs/steps/66-scim.md`](steps/66-scim.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 34 và 40 (đăng nhập OIDC).
+
+- [ ] Endpoint SCIM 2.0 trong `auth` (Users, Groups, bộ lọc, PATCH theo RFC 7644) với token SCIM riêng mỗi khách
+- [ ] Nhân viên `active=false` thì khoá và thu hồi phiên, API key ngay; nhóm ánh xạ sang role ở nút; test trên
+      cả hai database
+
+## 65. Chợ ứng dụng qua OAuth 2.0 (`apps`) (chủ dự án giao ngày 14/11/2026, D-221)
+
+Đặc tả: [`docs/steps/65-apps.md`](steps/65-apps.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Bắt đầu SAU bước 54 và 33. Ứng dụng bên ngoài cắm vào như Shopify App Store.
+
+- [ ] Máy chủ ủy quyền OAuth 2.0 trong `auth`: mã ủy quyền + PKCE bắt buộc, refresh token xoay vòng, phạm vi là
+      tên permission, thu hồi và kiểm tra token, siêu dữ liệu máy chủ (RFC 7009, 7636, 7662, 8414)
+- [ ] Đăng ký ứng dụng, nền tảng duyệt ứng dụng công khai, khách cài / đồng ý / gỡ (token mất hiệu lực ngay),
+      webhook theo ứng dụng, audit `actor_kind = app`; test trên cả hai database
+
+## Giai đoạn E — Module thương mại (chủ dự án giao ngày 13/11/2026, D-191)
 
 Module nghiệp vụ, không phải core: khái niệm sản phẩm, đơn hàng, kho không vào `kernel`. Thiết kế:
 `docs/research/business-foundation.md`, mục 8. Luật chung cho bước 41–49:
@@ -1236,162 +987,6 @@ liên kết (bước 37).
       lưu vết phiên theo yêu cầu của luật
 - [ ] Đối chiếu đợt 2: `paid_on` khi đánh dấu đã chi
 
-## 50. Công khai repo (chờ chủ dự án, D-175, D-197, D-199)
-
-Chủ dự án giữ repo riêng tư (D-199). **Agent không làm bước này khi chủ dự án chưa nói repo đã
-công khai**; khi đó các bước khác vẫn đi tiếp bình thường. Workflow đã viết sẵn (D-197), công
-khai là tự chạy.
-
-- [ ] Chủ dự án công khai repo (Settings → Change visibility); ngay trước đó agent quét lại
-      gitleaks toàn lịch sử và tìm tên máy chủ, IP, đường dẫn riêng, thông tin cá nhân. Agent không
-      tự đổi chế độ công khai
-- [ ] Chủ dự án bật trong Settings → Code security: secret scanning, push protection, Dependabot
-      alerts, private vulnerability reporting (`SECURITY.md` dựa vào nó); gitleaks trong `./gate.sh`
-      giữ nguyên
-- [ ] `CI` và `Security audit` chạy xanh trên GitHub
-- [ ] Bản phát hành kế tiếp qua workflow `Release`: image amd64 + arm64 đăng lên `ghcr.io`, chủ
-      repo đổi gói image sang Public một lần; `gh attestation verify` xác nhận chứng thực nguồn gốc
-      và SBOM; `docs/RELEASING.md` bỏ phần "Khi repo còn riêng tư"
-- [ ] Thử cài như người lạ bằng image đã đăng (cả SQLite và Postgres), sửa README /
-      `docs/DEPLOY.md` (EN + VI cùng commit) theo chỗ vấp
-
-## 51. Hợp đồng cho khung quản trị và mặt tiền (thiết kế giao diện 2, D-200)
-
-Đặc tả: [`docs/steps/51-ui-contracts.md`](steps/51-ui-contracts.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-Thiết kế: [`docs/research/ui-design.md`](research/ui-design.md).
-
-Giao diện (repo riêng, D-097) dựng menu, hộp việc, tìm kiếm, trang tổng quan từ dữ liệu của core để
-cùng một giao diện phục vụ mọi mô hình kinh doanh. Module khai phần của mình (mặc định rỗng, D-038);
-kernel gom và lọc theo khách, gói, permission ở nút đang chọn. Kernel không có danh sách phân hệ viết cứng.
-Bước 41–49 khai phần của module mình ngay trong bước đó nếu phần tương ứng của bước 51 đã xong.
-
-- [ ] Nhúng bản ghi của module khác vào nội dung: node `embed` (`kind`, `id`) trong thân bài của
-      `content`, kiểm qua sổ đối tượng (D-123) khi lưu, đọc công khai trả kèm tiêu đề, tóm tắt, đường dẫn,
-      ảnh của đối tượng còn công khai; `Resource` thêm `image`. `content` không biết khái niệm sản phẩm
-- [ ] Sổ điều hướng: `Module::navigation` (nhóm phân hệ, mục, permission, tính năng, nguồn số đếm,
-      thứ tự); nhóm trùng phải khai giống nhau; endpoint trả menu đã lọc — ẩn khi module chưa bật hay
-      thiếu permission, **khoá (vẫn hiện) khi thiếu tính năng của gói**; nhãn theo i18n; ETag; tool MCP
-- [ ] Hộp việc: trait `WorkSource` (đếm, liệt kê việc chờ theo phạm vi nút), việc tính từ dữ liệu của
-      module, không có bảng việc riêng; endpoint gom sắp theo mức gấp và hạn, endpoint số đếm cho menu;
-      hạn thời gian mỗi nguồn, nguồn chậm không làm hỏng cả hộp; cache số đếm có khách trong khoá; khác
-      hộp thư của `notifications`
-- [ ] Tìm xuyên phân hệ: trait `FinderSource`; endpoint gom kết quả theo loại đối tượng, không dấu vẫn
-      tìm được (`kernel::search`), chỉ chạy nguồn người gọi có quyền, mỗi nguồn áp phạm vi nút
-- [ ] Số liệu tóm tắt cho trang tổng quan của phân hệ: trait `SummaryMetric` (tiền, số đếm, tỉ lệ) theo
-      phạm vi nút; số nặng đọc từ bảng dẫn xuất, không quét bảng giao dịch mỗi lần mở trang
-- [ ] Hoạt động gần đây (module `audit`): câu đọc được theo i18n key mà module khai trên `EventInfo`,
-      chỉ hiện bản ghi người gọi có quyền đọc ở nút của bản ghi
-- [ ] Khai menu, nguồn việc, nguồn tìm, số liệu cho mọi module đang có; MODULE_GUIDE (EN + VI) mục
-      "khai phần của module cho giao diện"; test rò rỉ giữa hai nhánh anh em cho số đếm và kết quả tìm
-- [ ] View đã lưu (D-201): `/me/views` lưu tham số lọc, sắp xếp, cột, nhóm, mật độ của một danh sách;
-      phạm vi cá nhân / nút / khách; tham số kiểm theo **schema bộ lọc mà mỗi endpoint danh sách công bố**
-      trong OpenAPI (máy và agent dựng được chip lọc mà không viết cứng)
-- [ ] Thao tác hàng loạt chung (D-201): nhận `ids[]` hoặc `filter` kèm `expected_count` (lệch thì từ
-      chối), `Idempotency-Key` bắt buộc, chạy bằng job có tiến độ (SSE của bước 40), trả kết quả từng
-      bản ghi; module khai hành động hàng loạt của mình
-- [ ] Tìm nâng cao (D-201): toán tử `is:`, `status:`, so sánh số, phủ định; tham số phạm vi
-      `node | subtree | accessible`; endpoint `resolve` đổi một mã (số đơn, mã vận đơn, ID) thành bản
-      ghi người gọi được xem
-- [ ] Hộp việc theo người (D-201): mỗi việc có khoá ổn định, "vì sao bạn thấy" (permission, nút), hoãn
-      tới một thời điểm, giao cho người khác — bảng cấp khách hàng có `tenant_id`; việc thiết lập theo mô
-      hình (`SetupStep`, trạng thái tính từ dữ liệu, bước pháp lý chặn bán được đánh dấu)
-- [ ] Giải thích quyền (D-201): `POST /me/can` kiểm nhiều cặp (permission, nút) một lần, trả lý do
-      `missing_permission` / `module_not_enabled` / `feature_not_in_plan` / `quota_exceeded` và gói mở
-      được — giao diện hiện "vì sao bị khoá, ai cấp được, nâng gói mở gì"
-- [ ] Agent là người dùng thật (D-201): loại API key `agent`; `actor_kind` (người / agent / hệ thống) trong
-      audit; lệnh rủi ro (hoàn tiền, chi trả, khoá sổ, xoá dữ liệu) do agent gọi trả `202
-      approval_required` kèm yêu cầu duyệt có hạn, người có quyền duyệt thì lệnh chạy — như nhau cho REST
-      và MCP; việc chờ duyệt vào hộp việc
-- [ ] Dòng hoạt động và ghi chú nội bộ trên mọi bản ghi (D-201): gộp audit, ghi chú (nhắc tên bằng @,
-      người được nhắc nhận thông báo), khoá bằng loại đối tượng của sổ đối tượng (D-123); một chỗ dùng
-      chung thay cho mỗi module tự làm ghi chú
-- [x] Cờ theo người dùng cho trợ giúp trong giao diện (D-207): `GET` / `PUT` / `DELETE /api/v1/me/flags`
-      (bảng `kernel_user_flags`), chỉ cờ của chính mình, hạn mức `AUTOXIDE_USER_FLAGS_MAX`, có trong bản
-      xuất dữ liệu và xoá khi xoá tài khoản; `tenant_id` thêm ở bước 33 cùng mọi bảng
-- [ ] Định nghĩa số liệu tóm tắt (D-207): `SummaryMetric::definition` (i18n key, mặc định `None`),
-      `GET /api/v1/kernel/summary` trả `definition` đã dịch; gate kiểm mọi số liệu đều khai và có bản dịch
-      — làm cùng mục số liệu tóm tắt (P4)
-- [ ] Đối chiếu thiết kế 2 (D-212, D-213): job API chung (danh sách, chi tiết có tiến độ và file, chạy lại
-      có audit); xuất danh sách theo bộ lọc dùng chung (CSV qua job); yêu cầu duyệt đầy đủ (danh sách, từ
-      chối, event `kernel.approval_decided`, tool MCP); bộ lọc nội dung (`review`, `scheduled`,
-      `ai_generated`, `missing_locale`, `missing_alt`); bỏ hoãn việc; thử cài đặt nối ngoài; hộp việc không
-      có "Đã xử lý"
-- [ ] Nhập dữ liệu (D-220): không làm ở kernel — module `imports` (bước 56) thêm nguồn `autoxide` cùng cột với
-      xuất chung và đích `content`, `media`, `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý)
-- [ ] Danh sách lý do theo khách (P18, D-223) và `ActorKind` thống nhất cho audit, nhật ký, event (D-224)
-
-## 52. Trải nghiệm quản trị nâng cao (D-201)
-
-Đặc tả: [`docs/steps/52-admin-experience.md`](steps/52-admin-experience.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-Bắt đầu SAU bước 51. Những điều nên có theo nghiên cứu các trang quản trị hàng đầu (Stripe, Shopify,
-Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
-
-- [ ] Bàn kỹ thuật cho nhà phát triển và agent: nhật ký request theo khách (API key, đường dẫn mẫu,
-      status, `code`, có hạn lưu, không lưu thân request), danh sách lần giao webhook kèm gửi lại, event
-      theo bản ghi, chạy lại job trong dead-letter queue
-- [ ] Hoàn tác an toàn: lưu trữ / ẩn có `restore`; lệnh ghi lớn có `dry_run` trả trước những gì sẽ đổi
-- [ ] AI trong quản trị (D-109): đổi câu lời thường thành bộ lọc đã kiểm theo schema (`ai/filters/parse`),
-      trợ lý dùng tool MCP với đúng quyền người dùng, mọi lệnh ghi là bản nháp chờ duyệt
-- [ ] Thông báo: lý do nhận, trạng thái xong / lưu, bộ lọc, cấu hình kênh theo loại event; ghim màn hình
-      hay dùng (`/me/pins`)
-- [ ] Nhật ký lệnh của agent (D-202): lệnh MCP ghi `mcp:<tên tool>` vào đường dẫn mẫu, không ghi tham
-      số; lọc theo `actor_kind` và theo key; dòng của lệnh nhận `202 approval_required` giữ `approval_id`
-- [ ] Sức khoẻ người bán và sức khoẻ tuân thủ: chỉ số so với ngưỡng (ngưỡng là dữ liệu có ngày hiệu lực),
-      vi phạm, hạn phải xử lý; huy hiệu người bán tin cậy tính từ số liệu thật, công bố tiêu chí
-- [ ] Đối chiếu thiết kế 2: tên endpoint bàn kỹ thuật, event theo bản ghi đọc từ audit, `kernel.devtools.manage`,
-      `request_id` / `trace_id` trong nhật ký; trợ lý AI trong quản trị chạy tool MCP với quyền người gọi
-- [ ] Nhật ký lệnh dùng đủ `ActorKind` của D-224
-
-## 53. Hỗ trợ khách hàng (`support`) (chủ dự án giao ngày 13/11/2026, D-204)
-
-Đặc tả: [`docs/steps/53-support.md`](steps/53-support.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-Bắt đầu SAU bước 37; song song được với 41–49. Phiếu hỗ trợ, không phải chat thời gian thực (vẫn để sau,
-D-194). Khiếu nại có hạn luật định vẫn ở `compliance` (bước 37), tranh chấp ở `marketplace` (bước 46):
-`support` chuyển phiếu sang đó, không làm lại.
-
-- [ ] Phiếu và tin nhắn: tạo từ website (có tài khoản; vãng lai qua OTP email / số điện thoại; từ token
-      xem đơn của bước 45), nhân viên ghi hộ; trạng thái qua một máy trạng thái; tin nhắn chỉ thêm, ghi
-      chú nội bộ có nhắc tên, đính kèm qua `media`; người mua vãng lai xem bằng token phiếu, gộp phiếu vào
-      tài khoản sau khi đăng ký
-- [ ] Phạm vi theo nút tổ chức (bước 34): nhân viên thấy phiếu của nút mình và nhánh dưới; người bán trên
-      sàn chỉ thấy phiếu gian hàng mình; nhóm nhân viên, quy tắc tự phân công là dữ liệu, chia vòng
-- [ ] Hạn trả lời (SLA) theo ưu tiên, tính theo giờ làm việc và ngày nghỉ của nút, dừng khi chờ người
-      mua; job đánh dấu quá hạn; nguồn việc cho hộp việc (bước 51); báo cáo thời gian phản hồi, tỉ lệ quá
-      hạn, mức hài lòng
-- [ ] Gắn phiếu với đơn, sản phẩm qua sổ đối tượng (D-123); câu trả lời mẫu có biến; chuyển phiếu thành
-      khiếu nại người tiêu dùng của `compliance` (gọi lại không tạo hai vụ việc) hay lên sàn
-- [ ] Tool MCP (cùng permission như REST); gợi ý trả lời bằng AI chỉ là bản nháp (D-109); email trả lời
-      vào lại phiếu qua trait `InboundMail` (tắt mặc định); hướng dẫn `docs/SUPPORT.md` (EN + VI); test
-      trên cả hai database
-
-## 54. Phân quyền chuẩn hàng đầu (chủ dự án giao ngày 13/11/2026, D-205)
-
-Đặc tả: [`docs/steps/54-authorization.md`](steps/54-authorization.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-Bắt đầu SAU bước 34. Mô hình: RBAC theo cây tổ chức có độ sâu (bước 34) + chia sẻ bản ghi một bước + deny
-và rào + điều kiện theo ngữ cảnh — luật là dữ liệu có kiểu, không ngôn ngữ chính sách tự do. Đối chiếu với
-Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe và chuẩn OpenID AuthZEN.
-
-- [ ] Một hàm quyết định duy nhất, thu hồi tức thì (quyền không nằm trong token; cache theo phiên bản quyền
-      của khách); test so khớp "lọc danh sách = kiểm từng bản ghi" sinh ngẫu nhiên trên cả hai database
-- [ ] Deny thắng allow trên role; rào quyền tối đa cho khách con (kể cả admin của khách con); API key chi
-      tiết: hạn bắt buộc, chọn tài nguyên, dải IP, lần dùng cuối, xoay vòng, quản trị duyệt key
-- [ ] Xác thực lại cho việc nhạy cảm (passkey / MFA gần đây, RFC 9470); điều kiện theo IP và khung giờ
-      trên gán role
-- [ ] Chia sẻ bản ghi có hạn cho người, nhóm, nút, key (module khai quan hệ `viewer` / `editor`…), không
-      trao quyền mình không có
-- [ ] Quyền theo trường dữ liệu: trường cá nhân / nhạy cảm / tài chính phân loại trong OpenAPI, bị che khi
-      thiếu `<module>.read_personal`, đọc dữ liệu nhạy cảm có audit (Luật 91/2025) — áp cho `auth`,
-      `comments`, `forms`, `newsletter`
-- [ ] Nâng quyền đúng lúc (role đủ điều kiện, kích hoạt có lý do, hạn, duyệt); tài khoản khẩn cấp; lệnh hai
-      người và cặp quyền xung đột do module khai, ngưỡng là dữ liệu
-- [ ] Giải thích và mô phỏng (vì sao có / không có quyền, thử role nháp), "ai có quyền trên bản ghi này",
-      quyền không dùng 90 ngày, rà soát quyền định kỳ vào hộp việc
-- [ ] Endpoint theo chuẩn OpenID AuthZEN Authorization API 1.0; agent hành động thay người dùng có vết
-      `on_behalf_of`; số đo quyết định quyền; hướng dẫn `docs/ACCESS.md` (EN + VI)
-
 ## 55. Giao diện cửa hàng qua API: banner, bộ sưu tập, thông tin cửa hàng (D-219)
 
 Đặc tả: [`docs/steps/55-storefront.md`](steps/55-storefront.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
@@ -1439,33 +1034,6 @@ không nhập lại tay và không mất thứ hạng tìm kiếm của đườn
       nhận quảng cáo **không** tự mang sang nếu không có bằng chứng (bước 37); mật khẩu cũ không nhập —
       khách đặt lại qua link; file tải lên xoá sau khi xong
 - [ ] Báo cáo sau khi nhập (đã tạo, bỏ qua, lỗi, cần làm tay); hướng dẫn chuyển từ từng nền tảng (EN + VI)
-
-## 57. Phân tích truy cập và hành vi (`analytics`) (chủ dự án giao ngày 14/11/2026, D-220)
-
-Đặc tả: [`docs/steps/57-analytics.md`](steps/57-analytics.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-Bắt đầu SAU bước 37. Số liệu truy cập ngay trong Autoxide, không gửi dữ liệu người đọc cho bên thứ ba.
-
-- [ ] Thu sự kiện từ website (endpoint công khai, gom lô, chống bot) và từ event của module; loại sự kiện do
-      module khai; phiên ẩn danh không cookie với khoá xoay mỗi ngày, không lưu IP hay user agent đầy đủ
-- [ ] Gộp theo giờ / ngày, báo cáo chỉ đọc bảng gộp: tổng quan, trang, nguồn, chiến dịch UTM, đối tượng xem
-      nhiều, phễu do module khai; số liệu cho trang tổng quan (bước 51) và "thịnh hành" cho `catalog`
-- [ ] Theo dõi theo người chỉ khi đồng ý (sổ đồng ý bước 37), rút đồng ý thì xoá phần gắn người; hạn lưu là
-      cấu hình; tool MCP chỉ đọc; phạm vi theo website của nút; test trên cả hai database
-
-## 58. Tự động hoá quy trình (`automations`) (chủ dự án giao ngày 14/11/2026, D-220)
-
-Đặc tả: [`docs/steps/58-automations.md`](steps/58-automations.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-Bắt đầu SAU bước 51 (lệnh chờ duyệt, job API). Luật "khi … thì …" như Shopify Flow; mỗi hành động là một tool
-MCP đã có, chạy với quyền của người tạo luật.
-
-- [ ] Luật: kích hoạt bằng event, lịch hay gọi tay; điều kiện là cây toán tử cố định (không biểu thức tự do);
-      hành động là tool MCP có tham số điền từ event; lưu luật kiểm event, tool, quyền, tham số một lần
-- [ ] Chạy bằng job ngoài transaction, nhận lại event không chạy hai lần, mỗi bước có `Idempotency-Key`; hành
-      động rủi ro chờ duyệt; chống vòng lặp và giới hạn số lần chạy; nhật ký từng lần chạy, chạy lại
-- [ ] Chạy thử khô, danh mục kích hoạt và hành động người gọi dùng được, mẫu luật do module khai; agent tạo
-      luật thì chờ duyệt; người tạo mất quyền thì luật tự tắt; test trên cả hai database
 
 ## 59. Bán sỉ B2B (`wholesale`) (chủ dự án giao ngày 14/11/2026, D-221)
 
@@ -1539,26 +1107,26 @@ Bắt đầu SAU bước 46 và 57 (`analytics`).
       thu dịch vụ của sàn thu qua quyết toán hay hoá đơn, không giữ ví trả trước; báo cáo hiệu quả cho người bán;
       test trên cả hai database
 
-## 65. Chợ ứng dụng qua OAuth 2.0 (`apps`) (chủ dự án giao ngày 14/11/2026, D-221)
+## Chờ chủ dự án
 
-Đặc tả: [`docs/steps/65-apps.md`](steps/65-apps.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+## 50. Công khai repo (chờ chủ dự án, D-175, D-197, D-199)
 
-Bắt đầu SAU bước 54 và 33. Ứng dụng bên ngoài cắm vào như Shopify App Store.
+Chủ dự án giữ repo riêng tư (D-199). **Agent không làm bước này khi chủ dự án chưa nói repo đã
+công khai**; khi đó các bước khác vẫn đi tiếp bình thường. Workflow đã viết sẵn (D-197), công
+khai là tự chạy.
 
-- [ ] Máy chủ ủy quyền OAuth 2.0 trong `auth`: mã ủy quyền + PKCE bắt buộc, refresh token xoay vòng, phạm vi là
-      tên permission, thu hồi và kiểm tra token, siêu dữ liệu máy chủ (RFC 7009, 7636, 7662, 8414)
-- [ ] Đăng ký ứng dụng, nền tảng duyệt ứng dụng công khai, khách cài / đồng ý / gỡ (token mất hiệu lực ngay),
-      webhook theo ứng dụng, audit `actor_kind = app`; test trên cả hai database
-
-## 66. Đồng bộ nhân viên qua SCIM 2.0 (chủ dự án giao ngày 14/11/2026, D-221)
-
-Đặc tả: [`docs/steps/66-scim.md`](steps/66-scim.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-Bắt đầu SAU bước 34 và 40 (đăng nhập OIDC).
-
-- [ ] Endpoint SCIM 2.0 trong `auth` (Users, Groups, bộ lọc, PATCH theo RFC 7644) với token SCIM riêng mỗi khách
-- [ ] Nhân viên `active=false` thì khoá và thu hồi phiên, API key ngay; nhóm ánh xạ sang role ở nút; test trên
-      cả hai database
+- [ ] Chủ dự án công khai repo (Settings → Change visibility); ngay trước đó agent quét lại
+      gitleaks toàn lịch sử và tìm tên máy chủ, IP, đường dẫn riêng, thông tin cá nhân. Agent không
+      tự đổi chế độ công khai
+- [ ] Chủ dự án bật trong Settings → Code security: secret scanning, push protection, Dependabot
+      alerts, private vulnerability reporting (`SECURITY.md` dựa vào nó); gitleaks trong `./gate.sh`
+      giữ nguyên
+- [ ] `CI` và `Security audit` chạy xanh trên GitHub
+- [ ] Bản phát hành kế tiếp qua workflow `Release`: image amd64 + arm64 đăng lên `ghcr.io`, chủ
+      repo đổi gói image sang Public một lần; `gh attestation verify` xác nhận chứng thực nguồn gốc
+      và SBOM; `docs/RELEASING.md` bỏ phần "Khi repo còn riêng tư"
+- [ ] Thử cài như người lạ bằng image đã đăng (cả SQLite và Postgres), sửa README /
+      `docs/DEPLOY.md` (EN + VI cùng commit) theo chỗ vấp
 
 ## Sau core (chưa mở)
 

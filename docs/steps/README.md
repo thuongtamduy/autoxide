@@ -24,6 +24,10 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 66,
 3. Phần "Agent làm bước này tự quyết" của mỗi đặc tả: người làm chọn, rồi ghi vào `docs/DECISIONS.md`.
    Không dừng lại hỏi trừ khi `CLAUDE.md` bảo phải hỏi (secret thật, việc không hoàn tác được ở bên ngoài).
 4. Thấy đặc tả sai hay thiếu thì sửa đặc tả trong cùng PR, ghi một dòng lý do trong commit.
+5. **Một đặc tả, một phiên bản đúng (D-228).** Quyết định mới làm đổi đặc tả thì sửa thẳng vào thân (đúng
+   bảng, đúng mục API, test…), xoá câu cũ bị thay, ghi số quyết định trong ngoặc — không nối thêm mục
+   "Bổ sung theo …" ở cuối. Đặc tả nào còn mục "Bổ sung" cũ thì commit đầu tiên của bước đó gộp chúng vào
+   thân trước khi viết code.
 
 | Bước | Đặc tả | Module / phần chính |
 |---|---|---|

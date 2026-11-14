@@ -5426,3 +5426,29 @@ bút toán từ sổ cái. Vượt ngưỡng `cash_variance_approval_minor` (cà
 
 Căn cứ: chế độ kế toán doanh nghiệp (TT 200/2014, TT 133/2016 — tài khoản 1381 / 3381) — **cần đối chiếu**.
 Lý do: tiền két lệch là sự thật kế toán, phải vào sổ; quyết nguyên nhân là việc của người, không để phần mềm đoán.
+
+## D-228 · Lộ trình xếp theo thứ tự làm; bước đã xong tách file; đặc tả một phiên bản — 2026-11-14 — chủ dự án quyết
+
+Quyết định: chủ dự án đồng ý bốn việc dọn sau khi rà bước 31–66:
+1. **Số bước là mã cố định, không phải thứ tự.** `docs/ROADMAP.md` xếp các bước theo thứ tự làm, chia giai
+   đoạn: A hợp đồng và nền lõi (31, 32, 33, 34, 35–37, 40) → B lớp cho giao diện và phân quyền (51, 54, 52) →
+   C vận hành (38, 39) → D module nền dùng chung (53, 57, 58, 66, 65) → E thương mại (41–49, 55, 56, 59–64);
+   bước 50 ở mục "Chờ chủ dự án". Bảng phụ thuộc của D-192 giữ nguyên (bỏ dòng 30). Bước kế tiếp là bước đầu
+   tiên từ trên xuống còn mục `[ ]` mà phụ thuộc đã xong — skill `next-step` sửa theo.
+2. **Bước 0–30 đã xong** chuyển nguyên văn sang `docs/roadmap/done.md`; lộ trình chỉ còn việc đang mở.
+3. **Một đặc tả, một phiên bản đúng.** Các mục "Bổ sung theo …" nối ở cuối đặc tả được gộp vào thân (bảng, API,
+   test… đúng chỗ), câu bị thay thì xoá, ghi số quyết định trong ngoặc. Làm ngay cho đặc tả có từ ba mục bổ sung
+   (34, 37, 41–45, 47, 48, 51, 52); đặc tả còn lại gộp ở commit đầu tiên của bước đó. Từ nay không nối mục
+   "Bổ sung" mới — luật ghi ở `docs/steps/README.md`.
+4. **Danh sách việc của mỗi bước gom theo chủ đề**, không theo nguồn ("Đối chiếu thiết kế 2", "D-202"…); nguồn
+   vẫn nằm trong quyết định và đặc tả.
+
+Thay: câu "thứ tự và phụ thuộc ở bảng ngay trước bước 30" (D-192) — bảng nay ở đầu lộ trình; cách chọn bước
+kế tiếp "số nhỏ nhất còn mục chưa xong" của skill `next-step`.
+
+Lý do: số bước đã không còn khớp thứ tự làm (51 phải trước 41; 53, 57, 58, 65, 66 thuộc phần dùng chung), đặc tả
+bị vá chồng tới bảy lớp với chỗ lớp sau đảo lớp trước, và gần 30% lộ trình là việc đã xong mà mỗi phiên agent
+vẫn đọc lại.
+
+Đã cân nhắc: đánh số lại các bước — số bước được nhắc khoảng 110 lần trong nhật ký quyết định, nhật ký chỉ thêm
+không sửa, đổi số thì quyết định cũ trỏ sai; gộp các bước nhỏ 59–66 — mỗi bước là một module, gộp thì ranh giới mờ.
