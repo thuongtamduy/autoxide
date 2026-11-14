@@ -2,7 +2,7 @@
 
 > Lộ trình: `docs/ROADMAP.md` bước 67 · Luật chung: `docs/steps/README.md` · Quyết định: D-229 (thiết kế bước
 > này), D-231 (thử A/B, AI tạo ảnh, khối mã tự viết), D-234 (chủ đề theo lịch, đầu trang /
-> chân trang của website), D-026 (core chỉ có API), D-102 (thân bài từ chối mặc định), D-109 (AI chỉ thành nháp), D-123 (sổ đối
+> chân trang của website), D-235 (loại nội dung tự định nghĩa), D-026 (core chỉ có API), D-102 (thân bài từ chối mặc định), D-109 (AI chỉ thành nháp), D-123 (sổ đối
 > tượng), D-208 (nội dung theo website và nút)
 
 ## Mục tiêu
@@ -20,13 +20,14 @@ Trang đăng xong có link công khai ngay: tên miền của website + đườn
 phải code AI tự viết.
 
 Kèm theo trong bước: bộ giao diện chung của website (màu, chữ, khoảng cách), chủ đề theo mùa / ngày lễ / khung giờ
-và đầu trang, chân trang dùng cho cả website (D-234), thư viện trang mẫu, khu dùng chung
+và đầu trang, chân trang dùng cho cả website (D-234), loại nội dung tự định nghĩa (D-235), thư viện trang mẫu, khu dùng chung
 nhiều trang, kiểm tra sức khoẻ website, bộ nháp chiến dịch tạo từ một chương trình khuyến mại, thử A/B hai phiên
 bản trang, AI tạo ảnh cho banner và ảnh minh hoạ, khối mã tự viết chạy cách ly (D-231).
 
 ## Bắt đầu khi
 
-- **Bước 51 xong:** sổ đối tượng có `image` (P6), hộp việc (P2) cho kiểm tra sức khoẻ, lệnh cần duyệt (P12).
+- **Bước 51 xong:** sổ đối tượng có `image` (P6), hộp việc (P2) cho kiểm tra sức khoẻ, lệnh cần duyệt (P12),
+  trường tự định nghĩa (P19) cho loại nội dung tự định nghĩa.
 - **Bước 34:** website là nút có tên miền (D-208), cài đặt kế thừa cho bộ giao diện.
 - **Bước 37:** dấu `ai_assisted`, sổ đồng ý (popup thu email), chân trang pháp lý (thông tin chủ sở hữu, logo Bộ
   Công Thương).
@@ -40,6 +41,7 @@ bản trang, AI tạo ảnh cho banner và ảnh minh hoạ, khối mã tự vi�
 - **`content`:**
   - trang có bố cục khối (thân `layout`, cạnh thân `rich` sẵn có);
   - bộ giao diện của website, chủ đề theo lịch, đầu trang / chân trang của website, khu dùng chung, trang mẫu;
+  - loại nội dung tự định nghĩa (dựng trên trường tự định nghĩa P19 của bước 51);
   - đọc công khai trả bố cục kèm dữ liệu khối;
   - AI tạo và sửa trang;
   - kiểm tra sức khoẻ website, bộ nháp chiến dịch;
@@ -193,6 +195,9 @@ Khối nền tối thiểu (khai ở `content`, trừ khi ghi khác):
     lại trang.
 - `GET /public/resolve` của từng trang **không** lặp lại phần khung; giao diện gọi `public/site` một lần rồi dùng cho
   mọi trang.
+- **Phần của module khác** trong khung (vd cấu hình đồng ý cookie và mã theo dõi của `compliance` — bước 37, D-235)
+  đi qua điểm cắm `SiteExtensions` của `content::api`: `content` đăng ký trước `compliance` nên không `require` được
+  nó; module sau tự cắm vào, `public/site` trả thêm `extensions: {"<module>": …}` cùng ETag và `max-age`.
 
 ### 4. Khu dùng chung và trang mẫu
 
@@ -201,6 +206,33 @@ Khối nền tối thiểu (khai ở `content`, trừ khi ghi khác):
 - **Trang mẫu** (`content_page_templates`): bố cục mẫu theo ngành (bán lẻ, F&B, dịch vụ, sự kiện, tuyển dụng).
   Mẫu dùng chung đi kèm bản phát hành (`modules/content/data/templates/*.json`, nạp bằng task); khách lưu trang của
   mình thành mẫu riêng. Tạo trang từ mẫu = chép bố cục, bỏ khối của module chưa bật.
+
+### 4a. Loại nội dung tự định nghĩa (D-235)
+
+Khách tạo loại nội dung của riêng mình ngoài bài viết và trang — vd "Đội ngũ", "Dự án đã làm", "Chi nhánh", "Cảm
+nhận khách hàng", "Câu hỏi thường gặp" — mà không sửa code.
+
+- **Loại** (`content_types`): `key` (`snake_case`, không đổi khi đã có mục), nhãn số ít / số nhiều theo ngôn ngữ,
+  biểu tượng (tên trong danh sách cho phép), `routable` + `path_prefix` (vd `/du-an` → mỗi mục có trang
+  `/du-an/<slug>`), `body` (`none` / `rich` / `layout`), `has_seo`, `listable` (có API danh sách công khai), phạm vi
+  website (nút, như nội dung theo website — D-208).
+- **Trường** của loại là trường tự định nghĩa (bước 51 P19) với đích `content.type.<key>` — cùng bộ kiểu, bộ kiểm,
+  bộ lọc, hạn mức; không có bộ trường thứ hai.
+- **Mục** của loại là `content_entries` với `kind = custom` và `type_id` — dùng nguyên nháp, lịch sử, duyệt, hẹn giờ,
+  bản dịch, SEO, chuyển hướng, nhãn AI của `content`. Trường `reference` nối mục với mục (vd dự án → thành viên đội
+  ngũ) hay với bản ghi của module khác qua sổ đối tượng.
+- **Trang chi tiết dựng sẵn:** loại `routable` có một bố cục mẫu (`content_types.detail_layout`) dùng khối
+  `content.entry_field {field}` (hiện một trường của mục đang xem) — mọi mục của loại hiện theo cùng bố cục, không
+  phải dựng từng trang.
+- **Khối danh sách:** `content.type_list {type, filters, sort, limit, card_fields}` hiện các mục của một loại trong
+  trang dựng từ khối (vd lưới "Dự án đã làm" lọc theo trường `linh_vuc`); dữ liệu qua `BlockData` theo lô như mục 5.
+- **Đọc công khai:** `GET /public/types/{key}/entries?locale&cf.<key>=…&cursor&limit` (`Page`, chỉ loại `listable`,
+  chỉ trường `public`), `GET /public/resolve` nhận đường dẫn có `path_prefix`.
+- **Giới hạn:** tính năng `content.custom_types`, hạn mức `content.custom_types` (số loại mỗi khách); xoá loại còn mục
+  → 409; tắt loại thì mục ngừng công khai, không mất dữ liệu.
+- **AI:** mô hình được thấy danh sách loại và trường khi tạo trang (mục 6) để dùng khối `content.type_list`; AI gợi ý
+  bộ trường khi khách mô tả loại mới ("tôi muốn trang giới thiệu đội ngũ") — kết quả là **bản nháp** định nghĩa, người
+  bấm tạo.
 
 ### 5. Đọc công khai
 
@@ -310,6 +342,8 @@ Ba mức, chọn theo cài đặt; **mức mặc định là tắt** cho tới k
 | `content_theme_variants` | `id`, `tenant_id`, `org_id`, `name`, `overrides` (JSON), `effect?`, `effect_intensity?`, `schedule` (JSON), `starts_at?` / `ends_at?` (UTC — lịch `once`, hay khoảng ngày của lịch lặp; để lọc nhanh), `priority`, `status` (`draft`/`active`/`paused`), `preset_key?`, `version`, `created_by`, `updated_by`, `updated_at` | (`tenant_id`,`org_id`,`status`) |
 | `content_site_regions` | `id`, `tenant_id`, `org_id`, `region` (`header`/`footer`), `locale`, `variant_slot` (`base` hay ID bản chủ đề dạng chữ — không dùng NULL vì unique coi NULL là khác nhau trên cả hai database), `layout` (JSON, bản công khai), `draft_layout?`, `version`, `published_at?`, `updated_by`, `updated_at` | unique (`tenant_id`,`org_id`,`region`,`locale`,`variant_slot`) |
 | `content_shared_sections` | `id`, `tenant_id`, `org_id`, `name`, `layout` (JSON), `version`, `updated_at` | (`tenant_id`,`org_id`) |
+| `content_types` | `id`, `tenant_id`, `org_id`, `key`, `labels` (JSON), `icon`, `routable`, `path_prefix?`, `body`, `has_seo`, `listable`, `detail_layout?` (JSON), `active`, `version`, `updated_at` | unique (`tenant_id`,`key`); unique (`tenant_id`,`org_id`,`path_prefix`) khi `routable` |
+| `content_entries` (thêm cột) | `type_id?` (khi `kind = custom`); cột `custom_fields` và bảng `content_custom_index` đã có từ bước 51 (P19, đích `content.entry`) | (`tenant_id`,`type_id`,`status`,`id`) |
 | `content_shared_section_uses` | `section_id`, `entry_id` (cập nhật khi lưu trang) | unique (`tenant_id`,`section_id`,`entry_id`); (`tenant_id`,`entry_id`) |
 | `content_page_templates` | `id`, `tenant_id?` (NULL = mẫu dùng chung), `org_id?`, `industry`, `name_key`/`name`, `layout`, `preview_media_id?`, `pack_version?` | (`tenant_id`,`industry`) |
 | `content_edit_locks` | `entry_id`, `tenant_id`, `user_id`, `expires_at` | pk (`tenant_id`,`entry_id`) — chiếm bằng `INSERT … ON CONFLICT` có điều kiện hết hạn |
@@ -338,6 +372,8 @@ vào danh sách ở `docs/steps/README.md`.
 | `GET /public/site?locale` | công khai | khung website (mục 3c); ETag, `max-age` tới mốc đổi chủ đề |
 | `GET/POST /shared-sections` · `GET/PUT/DELETE /shared-sections/{id}` | `content.pages.write` | xoá đang dùng → 409 |
 | `GET /page-templates?industry` · `POST /page-templates` (lưu trang thành mẫu) · `POST /entries/from-template` | `content.pages.write` | |
+| `GET/POST /types` · `GET/PATCH/DELETE /types/{id}` · `POST /types/ai/suggest` | `content.types.manage` | loại nội dung tự định nghĩa (mục 4a); gợi ý AI trả bản nháp |
+| `GET /public/types/{key}/entries` | công khai | mục của loại `listable`; `cf.<key>` lọc trường `public` + `filterable` |
 | `POST /campaign-drafts` · `GET /campaign-drafts/{job_id}` | `content.pages.ai` | job, kết quả là danh sách bản nháp ở từng module |
 | `GET /site-health?org_id` · `POST /site-health/{org_id}/run` | `content.read` · `content.pages.write` | kết quả gần nhất; chạy ngay (giới hạn 1 lần / giờ) |
 | `GET/POST /entries/{id}/experiments` · `POST /experiments/{id}/start` · `…/stop` · `…/conclude` · `GET /experiments/{id}/results` | `content.experiments.manage` · `content.read` | thử A/B (mục 9) |
@@ -347,7 +383,7 @@ vào danh sách ở `docs/steps/README.md`.
 ### Tool MCP
 
 `content.list_blocks` (`read_only`), `content.get_page_layout` (`read_only`), `content.update_page_layout`,
-`content.list_theme_variants` (`read_only`), `content.save_theme_variant` (lưu là nháp; bật cần người),
+`content.list_theme_variants` (`read_only`), `content.list_types` (`read_only`), `content.save_type`, `content.save_theme_variant` (lưu là nháp; bật cần người),
 `content.compose_page` (nháp), `content.edit_page` (nháp), `content.create_campaign_drafts` (nháp),
 `content.site_health` (`read_only`), `content.experiment_results` (`read_only`), `media.generate_ai_image`. Không có
 tool sửa khối mã tự viết cho agent ngoài đường chờ duyệt. Cùng service với REST; agent bên ngoài dựng trang được với đúng quyền như
@@ -371,13 +407,13 @@ trước khi báo độ tin cậy). Sinh lại `.env.example`.
 ### Tính năng và hạn mức (bước 35)
 
 Tính năng: `content.page_builder`, `content.ai_pages`, `content.shared_sections`, `content.theme_schedule`,
-`content.experiments`, `content.custom_code`, `media.ai_images`. Hạn mức: `content.ai_page_generations` (mỗi tháng),
-`content.theme_variants` (số bản chủ đề mỗi website), `content.layout_pages`,
+`content.experiments`, `content.custom_code`, `content.custom_types`, `media.ai_images`. Hạn mức: `content.ai_page_generations` (mỗi tháng),
+`content.theme_variants` (số bản chủ đề mỗi website), `content.custom_types` (số loại nội dung), `content.layout_pages`,
 `media.ai_images` (mỗi tháng).
 
 ### Permission
 
-`content.pages.write`, `content.pages.ai`, `content.themes.manage`, `content.experiments.manage`,
+`content.pages.write`, `content.pages.ai`, `content.themes.manage`, `content.types.manage`, `content.experiments.manage`,
 `content.custom_code.manage` (thêm vào bộ của `content`; quyền theo độ sâu ở nút website — D-208); `media.ai_generate`
 (module `media`).
 
@@ -398,6 +434,9 @@ Tính năng: `content.page_builder`, `content.ai_pages`, `content.shared_section
 | `content.theme_effect_unknown` | 422 | Hiệu ứng `{effect}` không có trong danh sách cho phép. |
 | `content.theme_font_not_allowed` | 422 | Font `{font}` không có trong danh sách cho phép. |
 | `content.theme_variant_active` | 409 | Bản chủ đề đang bật; tạm dừng trước khi xoá. |
+| `content.type_in_use` | 409 | Loại nội dung còn {count} mục; xoá hoặc chuyển mục trước. |
+| `content.type_key_locked` | 409 | Không đổi được mã của loại nội dung đã có mục. |
+| `content.path_prefix_taken` | 409 | Đường dẫn `{prefix}` đã được loại nội dung hay trang khác dùng. |
 | `content.experiment_running` | 409 | Trang đang chạy thử A/B; dừng thí nghiệm trước khi sửa. |
 | `content.experiment_price_text` | 422 | Phiên bản `{variant}` ghi số tiền khác giá đang có; giá phải lấy từ khối dữ liệu. |
 | `content.custom_code_disabled` | 403 | Website chưa bật khối mã tự viết. |
@@ -414,7 +453,9 @@ Tính năng: `content.page_builder`, `content.ai_pages`, `content.shared_section
 3. Đọc công khai có `blocks_data`, ETag, khối lỗi không hỏng trang; `forms`, `newsletter`, `comments`, `media`
    khai khối; `compliance` khai `legal.footer`.
 4. Theme, khu dùng chung, trang mẫu (gói mẫu dùng chung + task nạp); chủ đề theo lịch, thư viện chủ đề mẫu, đầu
-   trang / chân trang, `GET /public/site` có cache tới mốc đổi.
+   trang / chân trang, `GET /public/site` có cache tới mốc đổi, điểm cắm `SiteExtensions`.
+   Loại nội dung tự định nghĩa: bảng, trường qua P19, `kind = custom`, trang chi tiết dựng sẵn, khối
+   `content.type_list` / `content.entry_field`, đọc công khai, gợi ý AI.
 5. AI: compose / edit bằng job, kiểm và thử lại, lịch sử trò chuyện; bộ nháp chiến dịch.
 6. Kiểm tra sức khoẻ website, nguồn hộp việc.
 7. Khối mã tự viết: cài đặt theo website, ba mức, khung cách ly, sổ script, audit + step-up.
@@ -437,7 +478,11 @@ Tính năng: `content.page_builder`, `content.ai_pages`, `content.shared_section
   (đếm query), `ghi_de_kiem_tuong_phan_tren_token_da_ghep`, `hieu_ung_la_bi_tu_choi`, `font_la_bi_tu_choi`,
   `vuot_han_muc_ban_chu_de`, `ban_nhap_khong_bao_gio_hien_cong_khai`, `xem_truoc_dung_thoi_diem`,
   `chep_sang_nam_sau_la_ban_nhap`.
-- Khung website: `dau_trang_nhap_chua_dang_khong_hien`, `thieu_ban_dich_dung_ngon_ngu_mac_dinh`,
+- Loại nội dung (D-235): `tao_loai_va_muc_co_truong_rieng`, `muc_cua_loai_dung_lai_nhap_lich_su_dich`,
+  `duong_dan_theo_path_prefix`, `trung_path_prefix_409`, `xoa_loai_con_muc_409`, `tat_loai_thi_muc_het_cong_khai`,
+  `truong_internal_khong_lo_cong_khai`, `loc_danh_sach_cong_khai_theo_truong`, `khoi_type_list_mot_lan_goi`,
+  `ai_goi_y_loai_chi_la_ban_nhap`, `vuot_han_muc_loai_theo_goi`.
+- Khung website: `dau_trang_nhap_chua_dang_khong_hien`, `phan_cua_compliance_qua_site_extensions`, `thieu_ban_dich_dung_ngon_ngu_mac_dinh`,
   `cua_hang_ghi_de_dau_trang_cua_chuoi`, `ban_chu_de_kem_dau_trang_rieng`, `chan_trang_phap_ly_luon_duoi_footer`.
 - AI (`FakeTextModel`): `ai_tao_trang_chi_la_ban_nhap`, `ai_dung_khoi_la_thi_thu_lai_roi_bao_loi`,
   `ai_sua_tra_json_patch`, `khong_gui_du_lieu_nguoi_mua_cho_mo_hinh`, `het_han_muc_ai_theo_goi`.

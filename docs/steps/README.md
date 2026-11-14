@@ -153,6 +153,7 @@ sau dùng lại, không làm lại.
 | `Resource::image`, node `embed` của `content` | 51 (sau 33) | 41 (`catalog.product`) |
 | `navigation` (`Module::navigation`), `work::WorkSource`, `finder::FinderSource`, `summary::SummaryMetric`, `EventInfo::activity` | 51 (sau 34–35) | 41–49 |
 | `x-autoxide-filters`, `kernel_saved_views`, `BulkAction`, `resolve`, `kernel_work_states`, `SetupStep`, `/me/can`, `ApiKeyKind`, `ActorKind`, `kernel_approval_requests`, `kernel_record_notes` | 51 (D-201) | 41–49, 52 |
+| `custom_fields` (`Module::custom_field_targets`, `CustomFields::validate`, `index_migration`, `CustomIndex`), `tags` (`taggable`, `kernel_tags`), `Module::overridable_texts` + `kernel_text_overrides` (D-235) | 51 (P19–P21) | 37 (câu banner), 41–49, 53, 59–62, 67 (loại nội dung) |
 | `blocks` (`BlockType`, `Module::blocks`, `BlockData`, `GET /kernel/blocks`) | 67 (D-229) | 41, 43, 45 (khai khối) |
 | `voice::VoiceProvider` + bộ giả (D-232) | 61 | — |
 | `signature::SignatureProvider` + bộ giả (D-232) | 59 (luồng ký trong `compliance`) | 46, 49 |

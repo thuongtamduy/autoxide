@@ -5,7 +5,7 @@
 > (và D-046, D-054, D-109, D-112, D-123 của phần đã có)
 > Nguồn đối chiếu thiết kế 2: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới
 > `docs/research/ui-trace/`.
-> Đã gộp các quyết định: D-202, D-206, D-217, D-220; đối chiếu thiết kế 2 (D-208…D-218) (D-228).
+> Đã gộp các quyết định: D-202, D-206, D-217, D-220, D-235 (mã theo dõi, đồng ý cookie); đối chiếu thiết kế 2 (D-208…D-218) (D-228).
 
 File này có hai phần: **Phần A — module `compliance`**, **Phần B — module `notifications`**, cộng
 **Phần C — sửa module và kernel có sẵn**. Ba phần dùng chung một danh sách commit, test, tiêu chí xong.
@@ -296,6 +296,9 @@ Khoá quy tắc (gói `vn` đóng trong crate ở `modules/compliance/rules/vn/*
 | `compliance_document_versions` | `id`, `tenant_id`, `document_id`, `version` INT, `locale`, `source` (`content.entry:<id>`), `source_revision_id`, `title`, `body` JSON (ảnh chụp thân bài), `plain_text`, `sha256`, `effective_from`, `requires_reacceptance` BOOL, `published_by`, `published_at` | unique (`tenant_id`,`document_id`,`version`,`locale`); không bao giờ UPDATE / DELETE (trừ xoá khách theo luật lưu trữ) |
 | `compliance_acceptances` | `id`, `tenant_id`, `document_id`, `version`, `version_id`, `subject_kind`, `subject_id`, `accepted_by` (user), `channel` (`web`/`mobile_app`/`api`/`mcp`/`in_store`), `method` (`checkbox`/`click_wrap`/`signature`), `ip_fingerprint`, `user_agent` (≤ 300 ký tự), `sha256` (của bản đã chấp nhận), `accepted_at` | unique (`tenant_id`,`version_id`,`subject_kind`,`subject_id`); index (`tenant_id`,`subject_kind`,`subject_id`,`document_id`) |
 | `compliance_purposes` | `id`, `tenant_id`, `key`, `category` (`service`/`marketing`/`analytics`/`legal`/`kyc`), `legal_basis` (`consent`/`contract`/`legal_obligation`/`vital_interest`/`public_interest`), `data_categories` JSON, `channels` JSON, `description` JSON (`{"en":…, "vi":…}`), `retention` TEXT, `active`, `updated_at` | unique (`tenant_id`,`key`). Chỉ giữ phần khách thêm / ghi đè; danh sách hiệu lực = `privacy.default_purposes` ∪ bảng này |
+| `compliance_tracking_tags` (D-235) | `id`, `tenant_id`, `org_id` (website), `provider`, `tracking_id`, `status` (`active`/`paused`), `created_by`, `created_at`, `updated_at` | unique (`tenant_id`,`org_id`,`provider`,`tracking_id`) |
+| `compliance_cookie_settings` (D-235) | `tenant_id`, `org_id`, `enabled`, `categories` (JSON), `policy_version`, `position`, `updated_by`, `updated_at` | pk (`tenant_id`,`org_id`) |
+| `compliance_cookie_consents` (D-235) | `id`, `tenant_id`, `org_id`, `consent_id`, `categories` (JSON), `policy_version`, `ip_hash`, `user_id?`, `created_at` | (`tenant_id`,`consent_id`); (`tenant_id`,`created_at`) — xoá theo `privacy.consent_proof_days` |
 | `compliance_consents` | `id`, `tenant_id`, `subject_kind` (`user`/`email`/`phone`), `subject_key` (user id, hoặc SHA-256 của email / số đã chuẩn hoá), `subject_value` NULL (email / số; NULL sau khi xoá theo yêu cầu), `user_id` NULL, `purpose`, `scope`, `channel`, `state` (`granted`/`withdrawn`), `granted_at`, `withdrawn_at`, `updated_at` | unique (`tenant_id`,`subject_kind`,`subject_key`,`purpose`,`scope`,`channel`) |
 | `compliance_consent_records` | `id`, `tenant_id`, `consent_id`, `action` (`grant`/`withdraw`), `evidence` JSON, `source`, `source_ref`, `actor` JSON, `recorded_at` | unique (`tenant_id`,`source_ref`,`action`); chỉ thêm |
 | `compliance_cases` | `id`, `tenant_id`, `kind` (`ip_infringement`/`counterfeit`/`prohibited_goods`/`consumer_complaint`/`other`), `target` (`<module>.<loại>:<id>` hay `''`), `respondent_org_key`, `reporter_kind` (`guest`/`user`/`rights_holder`/`authority`), `reporter_user_id`, `reporter_name`, `reporter_email`, `reporter_phone`, `claim` TEXT, `rights` JSON (văn bằng, link), `status` (`received`/`under_review`/`awaiting_response`/`decided`/`closed`/`withdrawn`), `restricted` BOOL, `decision` (`upheld`/`rejected`/`partially_upheld`/`''`), `ack_due_at`, `respond_by`, `decide_by`, `decided_at`, `decided_by`, `tracking_hash` (băm token tra cứu của người báo), `created_at`, `updated_at` | index (`tenant_id`,`status`,`decide_by`), (`tenant_id`,`target`), (`tenant_id`,`respondent_org_key`,`id`) |
@@ -496,7 +499,7 @@ chủ sở hữu cho chân trang), `GET /public/documents/{kind}?locale=` (bản
 
 **Permission:** `compliance.kyc.read`, `compliance.kyc.submit`, `compliance.kyc.review`,
 `compliance.legal.read`, `compliance.legal.manage`, `compliance.documents.read`,
-`compliance.documents.manage`, `compliance.privacy.read`, `compliance.privacy.manage`,
+`compliance.documents.manage`, `compliance.privacy.read`, `compliance.privacy.manage`, `compliance.tracking.manage` (A6),
 `compliance.incidents.manage`, `compliance.cases.read`, `compliance.cases.handle`,
 `compliance.disclosures.manage`, `compliance.policies.manage`, `compliance.rules.read`,
 `compliance.rules.manage`.
@@ -530,6 +533,40 @@ chủ sở hữu cho chân trang), `GET /public/documents/{kind}?locale=` (bản
 | `compliance.rules_invalid` | 422 | Bản quy tắc không hợp lệ: {detail}. |
 | `compliance.link_invalid` | 400 | Link đã hết hạn hoặc không hợp lệ. |
 | `compliance.website_not_notified` | 403 | Website chưa thông báo với Bộ Công Thương nên chưa được bán. — **chỉ thêm khi** đối chiếu kết luận "cấm" (A3, "Chặn bán") |
+
+### A6. Mã theo dõi quảng cáo và đồng ý cookie (D-235)
+
+Khách bán hàng cần gắn mã đo của nền tảng quảng cáo (Google Analytics 4, Google Tag Manager, Google Ads, Meta Pixel,
+TikTok Pixel, Zalo) mà không dán mã tự viết, và chỉ chạy khi người xem đã đồng ý.
+
+- **Danh sách nhà cung cấp cho sẵn** (dữ liệu trong code, thêm nhà cung cấp = thêm một mục + test): mỗi mục có `key`,
+  nhóm đồng ý (`analytics` / `marketing`), dạng mã ID (kiểm khi lưu, vd `G-XXXXXXX` cho GA4), danh sách host cho CSP,
+  nước nhận dữ liệu. Khách chỉ điền **mã ID**, không dán script.
+- **Mã của website** (`compliance_tracking_tags`): nhà cung cấp, mã ID, trạng thái, theo website (nút).
+- **Banner đồng ý** theo website (`compliance_cookie_settings`): nhóm `necessary` (luôn bật, không mã theo dõi nào
+  thuộc nhóm này), `preferences`, `analytics`, `marketing`; câu chữ lấy từ i18n, khai là câu đổi được để khách sửa qua
+  P21 khi bước 51 xong (trừ câu `legal`); phiên bản chính sách (đổi nhóm hay thêm nhà cung cấp → phiên bản mới, người xem được hỏi lại).
+- **Mặc định không tải gì trước khi đồng ý.** Nút "Từ chối tất cả" ngang hàng và dễ bấm như "Đồng ý tất cả"; không
+  ô chọn sẵn. Mã chỉ tải sau khi người xem đồng ý **đúng nhóm** của nó.
+- **Ghi bằng chứng đồng ý** của người xem ẩn danh (`compliance_cookie_consents`): `consent_id` ngẫu nhiên do giao
+  diện tạo và giữ trong cookie cần thiết, nhóm đã chọn, phiên bản chính sách, `ip_hash` (kernel `ip_hash`), thời
+  điểm; giữ theo `privacy.consent_proof_days`. Người đã đăng nhập thì ghi thêm vào sổ đồng ý chung (A1) với mục đích
+  `analytics` / `marketing`. `POST /public/cookie-consents` có chống spam như form công khai.
+- **Minh bạch:** nhà cung cấp đang bật tự vào danh sách "bên nhận dữ liệu" của sổ mục đích công khai
+  (`/public/purposes`), kèm nước nhận (chuyển dữ liệu ra nước ngoài).
+- **Đọc công khai:** `GET /api/v1/compliance/public/consent-config?org_id` trả banner, nhóm, phiên bản, mã theo nhóm,
+  `csp_hosts`; khi bước 67 có, phần này đi kèm `GET /public/site` qua điểm cắm `SiteExtensions` — giao diện chỉ gọi
+  một lần. ETag; cache tới khi khách sửa.
+- **Không làm chậm trang** (hợp đồng với giao diện, ghi ở `docs/COMPLIANCE.md`): tải mã sau khi trang đã hiện
+  (`async` / sau sự kiện load), không chặn hiển thị; không chạy ở trang đăng nhập và tài khoản; trang thanh toán chỉ
+  gửi sự kiện chuyển đổi chuẩn (`view_item`, `add_to_cart`, `begin_checkout`, `purchase` — bảng tên sự kiện ghi
+  trong tài liệu), không thêm mã khác.
+- **Ngoài phạm vi:** gửi chuyển đổi từ máy chủ tới nền tảng quảng cáo (API chuyển đổi phía máy chủ) — cần đối chiếu
+  riêng về chuyển dữ liệu cá nhân.
+- API: `GET/POST /tracking-tags?org_id`, `PATCH/DELETE /tracking-tags/{id}`, `GET/PUT /cookie-settings/{org_id}`
+  (`compliance.tracking.manage`); `GET /cookie-consents/stats?org_id` (tỉ lệ đồng ý theo nhóm, số gộp). Tool MCP
+  `compliance.list_tracking_tags` (`read_only`). Event `compliance.tracking_changed`.
+- Mã lỗi: `compliance.tracking_provider_unknown` (422), `compliance.tracking_id_invalid` (422, kèm dạng mong đợi).
 
 ---
 
@@ -738,6 +775,7 @@ mục 2 (D-206).
 | 6 | Hồ sơ pháp lý, website, trang gắn website, danh sách kiểm, `ComplianceFacts`, doctor, dossier, logo, endpoint công khai; đối chiếu "chặn bán" rồi làm cổng hay nhãn (A-3.5) | Hồ sơ Bộ Công Thương |
 | 7 | Văn bản có phiên bản, chấp nhận, `AcceptanceGate`, `/public/documents`, `acceptance-stats` (A-c9) | Văn bản pháp lý |
 | 8 | Mục đích, sổ đồng ý, `ConsentLedger`, rút qua link, thời hạn lưu (`GET /retention` + khai của module, C5), cư trú dữ liệu, sự cố 72 giờ (kèm bản nháp thông báo, A-c9), sổ xử lý, sổ yêu cầu của chủ thể (D-217); `docs/COMPLIANCE*.md` | Dữ liệu cá nhân |
+| 8b | Mã theo dõi quảng cáo, banner đồng ý cookie, bằng chứng đồng ý ẩn danh, `consent-config` công khai, `docs/COMPLIANCE*.md` mục cho người làm giao diện (D-235) | Mã theo dõi và đồng ý cookie |
 | 9 | Vụ việc + phản hồi + quyết định + công khai + disclosures; `content` / `comments` nghe ẩn / hiện | Báo vi phạm |
 | 10 | `ModerationPolicy`, `moderation.hide_reasons`, `general_conditions`, case `consumer_complaint` | Người tiêu dùng |
 | 11 | `ai_assisted` cho `content`, `alt_ai_assisted` cho `media` | Nhãn AI |
@@ -752,8 +790,8 @@ mục 2 (D-206).
 nhóm cần trait và khung crate; file dùng chung `lib.rs`, `permissions.rs`, `events.rs`, `locales/vi.json`,
 `modules.rs` do agent chính giữ — nhóm gửi phần thêm, agent chính gộp). Sau đó bốn nhóm, mỗi nhóm một
 worktree: **N1** KYC + số điện thoại + cổng (3, 4); **N2** content mẫu + hồ sơ Bộ Công Thương + văn bản
-(5, 6, 7 — 7 cần `PublishedEntries` của 5 trong cùng nhóm); **N3** quyền riêng tư + vụ việc + người tiêu
-dùng + nhãn AI (8, 9, 10, 11); **N4** `notifications` + `newsletter` (12, 13, 14, 15 — dùng `ConsentLedger`
+(5, 6, 7 — 7 cần `PublishedEntries` của 5 trong cùng nhóm); **N3** quyền riêng tư + mã theo dõi + vụ việc + người tiêu
+dùng + nhãn AI (8, 8b, 9, 10, 11); **N4** `notifications` + `newsletter` (12, 13, 14, 15 — dùng `ConsentLedger`
 của khung; test ban đầu với bản cài trong bộ nhớ, đổi sang thật khi N3 merge; kernel `template` của 14 là file
 dùng chung, agent chính gộp). Commit 16 làm sau cùng, khi bước 51 đã có xuất chung. Mỗi nhóm một file migration
 đã đặt tên sẵn ở commit 2 (`m0001` N1, `m0002` N2, `m0003` N3) để không đụng nhau.
@@ -782,6 +820,10 @@ Postgres; fake qua `TestAppBuilder::provide::<dyn IdentityVerifier>` / `<dyn Sms
   `ban_moi_doi_chap_nhan_lai_thi_cong_chan`, `nguon_chua_dang_bi_tu_choi`.
 - Đồng ý: `grant_idempotent_theo_source_ref`, `rut_o_marketing_chan_moi_kenh`, `rut_qua_link_ky`,
   `xoa_nguoi_dung_giu_ban_ghi_rut_khong_giu_email`, **đồng thời** `grant_va_withdraw_song_song_khong_mat_dong`.
+- Mã theo dõi và cookie (D-235): `chua_dong_y_khong_tra_ma_nao_o_nhom_chua_chon`, `ma_id_sai_dang_bi_tu_choi`,
+  `nha_cung_cap_la_bi_tu_choi`, `doi_nhom_tang_phien_ban_chinh_sach`, `bang_chung_dong_y_khong_luu_ip_tho`,
+  `nguoi_dang_nhap_ghi_vao_so_dong_y_chung`, `nha_cung_cap_bat_hien_trong_ben_nhan_du_lieu`,
+  `cau_legal_cua_banner_khong_doi_duoc`, `csp_hosts_chi_gom_nha_cung_cap_dang_bat`.
 - Vụ việc: `bao_cong_khai_co_chong_spam`, `an_dich_roi_khoi_phuc_khi_bac` (content trả 451 rồi 200;
   comment ẩn rồi hiện), `nhan_lai_event_an_khong_hong`, `phan_hoi_sau_han_bi_tu_choi`,
   `han_xu_ly_tinh_ngay_lam_viec`, `disclosure_ghi_audit_khong_ghi_gia_tri`.
@@ -873,6 +915,7 @@ bản gốc / người có chuyên môn pháp lý trước khi chạy thật** (
 | Nhãn nội dung do AI tạo / sửa | Luật Trí tuệ nhân tạo 134/2025/QH15 và nghị định hướng dẫn | 01/3/2026 | Hình thức nhãn; phạm vi "sửa" |
 | Tin quảng cáo: đồng ý trước, từ chối dừng ngay, 7h–22h, một tin mời đăng ký, nhãn "QC" | NĐ 91/2020/NĐ-CP (Điều 13 và lân cận) | 08/10/2020 | Bản thay thế đang dự thảo; giới hạn số tin / ngày; danh sách không quảng cáo |
 | Zalo ZNS | Chính sách của nhà cung cấp (không phải luật) | — | Loại mẫu được phép cho quảng cáo |
+| Mã theo dõi quảng cáo, cookie, chuyển dữ liệu người xem cho nền tảng nước ngoài (D-235) | Luật BVDLCN 91/2025/QH15; NĐ 356/2025/NĐ-CP; Luật BVQLNTD 19/2023/QH15 | 01/01/2026 | Cookie đo lường có cần đồng ý hay dùng căn cứ khác; hồ sơ đánh giá tác động chuyển dữ liệu ra nước ngoài khi bật pixel; thời hạn giữ bằng chứng đồng ý |
 
 ## Agent làm bước này tự quyết
 

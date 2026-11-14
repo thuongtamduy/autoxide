@@ -53,7 +53,7 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 | 59 Bán sỉ B2B (D-221) | 45, 47 | 46, 48, 49 |
 | 60 Đặt lịch dịch vụ (D-221) | 34, 36 (37 cho nhắc lịch) | 41–49 |
 | 61 Chat chăm sóc khách (D-221) | 40 (SSE), 53 | 41–49 |
-| 67 Trang dựng từ khối, AI tạo trang (D-229, D-231, D-234) | 51, 37 (nhãn AI, đồng ý, chân trang pháp lý); thử A/B: 57 | 41–49 (module thương mại khai khối ở bước của nó) |
+| 67 Trang dựng từ khối, AI tạo trang (D-229, D-231, D-234, D-235) | 51, 37 (nhãn AI, đồng ý, chân trang pháp lý); thử A/B: 57 | 41–49 (module thương mại khai khối ở bước của nó) |
 | 62 Sản phẩm bán theo kỳ (D-221) | 45, 36 | 46–49 |
 | 63 Đa tiền tệ (D-221) | 36, 41, 44, 45 | 46–49 |
 | 64 Quảng cáo trong sàn (D-221) | 46, 57 | 47–49 |
@@ -367,6 +367,9 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
 - [ ] Mẫu mail, thông báo khách tự soạn (D-206): bộ dựng mẫu an toàn ở kernel (biến, điều kiện, vòng lặp, giới
       hạn chạy, luôn thoát HTML, kiểm biến theo schema khi lưu); mail HTML khung MJML có thương hiệu khách + bản
       chữ thuần; nháp / xuất bản / quay lại, xem trước, gửi thử tới chính người gọi; `newsletter` cá nhân hoá
+- [ ] Mã theo dõi quảng cáo và đồng ý cookie (D-235): nhà cung cấp cho sẵn (GA4, GTM, Google Ads, Meta, TikTok,
+      Zalo), khách chỉ điền mã ID; banner đồng ý theo nhóm, từ chối dễ như đồng ý, không tải gì trước khi đồng ý;
+      bằng chứng đồng ý ẩn danh; nhà cung cấp tự vào danh sách bên nhận dữ liệu; tải sau, không chặn hiển thị
 - [ ] Kênh đẩy cho ứng dụng di động (D-220): trait `MobilePushSender` (Firebase / Apple là module riêng, cần
       khoá — dừng lại hỏi), token thiết bị mã hoá, cùng luật đồng ý và khung giờ như web push
 
@@ -456,6 +459,13 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       chỉ cờ của mình, hạn mức `AUTOXIDE_USER_FLAGS_MAX`, có trong bản xuất dữ liệu, xoá khi xoá tài khoản;
       `tenant_id` thêm ở bước 33 cùng mọi bảng
 - [ ] Danh sách lý do theo khách (P18, D-223); cài đặt nối ra ngoài có `last_used_at`, `last_error` và thử
+- [ ] Trường tự định nghĩa trên bản ghi (P19, D-235): module khai đích, khách thêm trường (kiểu, nhãn, bắt buộc,
+      mức hiện `internal` / `public` / `buyer_input`), giá trị nằm trên bản ghi, lọc qua bảng index của module ghi
+      cùng transaction, dùng chung cho xuất / nhập / tự động hoá; hạn mức theo gói; test trên cả hai database
+- [ ] Nhãn gắn bản ghi (P20, D-235): nhãn nội bộ dùng chung mọi loại bản ghi, lọc `tags_any` / `tags_all`, gắn
+      hàng loạt, gộp nhãn, event cho tự động hoá
+- [ ] Đổi câu chữ hiển thị theo khách (P21, D-235): chỉ câu module cho đổi và không gian `ui.*`, giữ chỗ điền, không
+      đổi mã lỗi và câu pháp lý, đọc qua cache không query
 - [ ] Nhập dữ liệu (P17, D-220): không làm ở kernel — `imports` (bước 56) thêm nguồn `autoxide` cùng cột với
       xuất chung và đích `content`, `media`, `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý)
 - [ ] Khai menu, nguồn việc, nguồn tìm, số liệu cho mọi module đang có; MODULE_GUIDE (EN + VI) mục "khai phần
@@ -678,6 +688,8 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 - [ ] Đầu trang và chân trang của cả website (D-234): bố cục khối có nháp / đăng, theo ngôn ngữ, kế thừa theo nút,
       bản chủ đề kèm được bản riêng; `GET /public/site` một lời gọi cho khung website, cache tới đúng mốc đổi chủ
       đề, không query khi cache nóng; đo p99 trên cả hai database
+- [ ] Loại nội dung tự định nghĩa (D-235): khách tạo loại (đội ngũ, dự án, chi nhánh…) với trường riêng của bước
+      51, mục dùng lại nháp / lịch sử / bản dịch / SEO, trang chi tiết dựng sẵn, khối danh sách, API công khai có lọc
 - [ ] AI tạo trang và sửa tiếp bằng trò chuyện (job, kết quả qua bộ kiểm, thử lại có giới hạn, bản nháp
       `ai_assisted`, lịch sử trò chuyện để hoàn tác); bộ nháp chiến dịch từ một chương trình khuyến mại
 - [ ] Kiểm tra sức khoẻ website vào hộp việc: thiếu SEO / alt, link gãy, khối tham chiếu bản ghi đã ẩn, đường dẫn

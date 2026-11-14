@@ -3,7 +3,7 @@
 > Lộ trình: `docs/ROADMAP.md` bước 51 · Thiết kế: `docs/research/ui-design.md` · Quyết định: D-038
 > (hàm mới của `Module` có mặc định), D-097 (giao diện là repo riêng), D-123 (sổ đối tượng), D-155 (sổ
 > module), D-185, D-200
-> Đã gộp các quyết định: D-201, D-207, D-212, D-213, D-220, D-223, D-224 (D-228).
+> Đã gộp các quyết định: D-201, D-207, D-212, D-213, D-220, D-223, D-224 (D-228); P19–P21: D-235.
 > Mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/` (nguồn: `docs/prompts/ui-trace-roadmap.md`); P18 và
 > `ActorKind` có nguồn `docs/prompts/ui-phase2-api.md`, màn tương ứng ở `docs/research/ui-traceability.md`.
 
@@ -18,7 +18,8 @@ của module khác vào bài viết mà `content` không biết khái niệm c�
 Theo nghiên cứu các trang quản trị hàng đầu (D-201), core còn có: schema bộ lọc và view đã lưu, thao tác
 hàng loạt, tìm có toán tử và mở thẳng theo mã, hộp việc theo người, giải thích quyền, agent là người dùng
 thật với lệnh chờ duyệt, dòng hoạt động và ghi chú trên mọi bản ghi; cùng job API chung, xuất danh sách
-chung (D-213), cờ theo người dùng (D-207) và danh sách lý do theo khách (D-223). Mọi phần: hàm mới của
+chung (D-213), cờ theo người dùng (D-207), danh sách lý do theo khách (D-223); và để khách tự chỉnh mà không
+cần sửa code (D-235): trường tự định nghĩa trên bản ghi, nhãn gắn bản ghi, đổi câu chữ hiển thị. Mọi phần: hàm mới của
 `Module` có mặc định rỗng, chạy và có test trên cả hai database, áp như nhau cho REST và MCP.
 
 ## Bắt đầu khi
@@ -34,6 +35,7 @@ chung (D-213), cờ theo người dùng (D-207) và danh sách lý do theo khác
 | P15 Job API · P16 Xuất chung (D-213) | trong bước 51 | P16 dùng schema bộ lọc của P7 và job của P15 |
 | P17 Nhập dữ liệu (D-220) | thuộc bước 56 | phần `content` / `media` / `newsletter` làm được khi P16 đã có |
 | P18 Danh sách lý do (D-223) | trong bước 51 | — |
+| P19 Trường tự định nghĩa · P20 Nhãn · P21 Đổi câu chữ (D-235) | trong bước 51, sau P7, P8 | P19, P20 dùng schema bộ lọc (P7) và thao tác hàng loạt (P8); hạn mức của bước 35 |
 
 Bước 41–49 khai menu, nguồn việc, nguồn tìm, số liệu của module mình **ngay trong bước đó** nếu bước 51
 đã xong phần tương ứng; chưa xong thì bước 51 khai thay cho mọi module đang có. Bước 51 đánh dấu xong khi
@@ -49,8 +51,9 @@ File mới: `kernel/src/navigation.rs`, `kernel/src/work.rs`, `kernel/src/finder
 `kernel/src/summary.rs`, `kernel/src/http/workspace.rs`.
 
 Bảng mới của kernel (cấp khách hàng, có `tenant_id`): `kernel_saved_views` (P7), `kernel_work_states` (P10),
-`kernel_approval_requests` (P12), `kernel_record_notes` (P13), `kernel_reason_codes` (P18); `kernel_user_flags`
-(P14, đã có).
+`kernel_approval_requests` (P12), `kernel_record_notes` (P13), `kernel_reason_codes` (P18), `kernel_custom_fields`
+(P19), `kernel_tags` và `kernel_record_tags` (P20), `kernel_text_overrides` (P21); `kernel_user_flags` (P14, đã có).
+File mới thêm: `kernel/src/custom_fields.rs`, `kernel/src/tags.rs`.
 
 NGOÀI phạm vi: giao diện (repo riêng); tuỳ biến menu theo từng người dùng (ghim, ẩn); trợ lý AI trong
 quản trị (bước 52); full-text search riêng (vẫn là "chứa" của `kernel::search`); nhập dữ liệu ở kernel
@@ -328,6 +331,90 @@ bản, chạy lại không trùng, lỗi theo dòng và cột, ghi qua `api` c�
 - `ReasonCodes::ensure(tenant, list, code)` cho service (đọc qua cache theo khách, xoá khi ghi). Dòng dữ liệu
   lưu mã, không lưu nhãn — đổi nhãn không sửa lịch sử; mã đã dùng không xoá được, chỉ tắt.
 
+### P19 — Trường tự định nghĩa trên bản ghi (D-235)
+
+Khách thêm ô dữ liệu của riêng mình cho một loại bản ghi (vd "ngày sinh con" cho khách hàng, "mã công trình" cho
+đơn, "người phụ trách" cho bài viết) mà không sửa code.
+
+- **Module chọn tham gia:** `Module::custom_field_targets() -> Vec<CustomFieldTarget>` (mặc định rỗng — D-038).
+  `CustomFieldTarget { target, read_permission, write_permission, visibilities }` — `target` là tên loại bản ghi
+  của sổ đối tượng (`customers.customer`, `orders.order`, `content.entry`…), `visibilities` là mức hiện mà loại đó
+  hỗ trợ.
+- **Định nghĩa** (`kernel_custom_fields`, cấp khách hàng): `key` (`snake_case`, không đổi sau khi tạo), `data_type`
+  (`text`, `long_text`, `integer`, `decimal` + `scale`, `boolean`, `date`, `datetime`, `option`, `options`, `url`,
+  `email`, `phone`, `media` (ID `media`), `reference` (loại + ID trong sổ đối tượng)), `labels` / `help` theo ngôn
+  ngữ, `required`, `options`, ràng buộc (độ dài, khoảng giá trị — **không** nhận biểu thức chính quy do khách viết),
+  `default`, `visibility` (`internal` — chỉ nhân sự; `public` — có trong đọc công khai; `buyer_input` — người dùng
+  cuối nhập được, chỉ loại bản ghi khai hỗ trợ, vd checkout của bước 45), `filterable`, `personal_data`, `position`,
+  `active`, `version`.
+- **Giá trị nằm trên bản ghi** của module sở hữu: cột `custom_fields` (JSON trong `text`) ở bảng của module — đọc
+  bản ghi không phải nối bảng. Service của module gọi `CustomFields::validate(tenant, target, incoming, current)`:
+  kiểm theo định nghĩa đang có, gom mọi lỗi báo một lần (D-083, đường dẫn `custom_fields.<key>`), trả giá trị đã
+  chuẩn hoá. Định nghĩa đọc từ cache theo khách (xoá khi ghi).
+- **Lọc:** chỉ trường `filterable` được lọc. Module thêm migration `custom_fields::index_migration("<module>")`
+  (như `outbox_migration`) tạo bảng `<module>_custom_index` (`tenant_id`, `record_id`, `field_id`, `value_text`,
+  `value_int`; index (`tenant_id`, `field_id`, `value_text`) và (`tenant_id`, `field_id`, `value_int`)); service ghi
+  index **cùng transaction** với bản ghi bằng `CustomIndex::write`. Danh sách nhận `cf.<key>=<toán tử>:<giá trị>`
+  (`eq`, `in`, `gte`, `lte`, `prefix`), kernel dựng điều kiện `id IN (subquery)` — câu SQL thường, chạy trên cả hai
+  database, không dùng toán tử JSON riêng của database nào. Ngày, số thập phân, boolean quy về `value_int`; chữ
+  quy về chữ thường bỏ dấu cho `prefix`.
+- **API:** `GET/POST /api/v1/kernel/custom-fields?target=`, `GET/PATCH/DELETE …/{id}` (`kernel.custom_fields.manage`).
+  Bản ghi nhận và trả `custom_fields: {key: value}`; trong OpenAPI là object có `additionalProperties`, giao diện và
+  agent đọc định nghĩa từ endpoint trên để dựng form và chip lọc (P7). Tool MCP `kernel.list_custom_fields`
+  (`read_only`).
+- **Đổi định nghĩa:** đổi nhãn, thêm lựa chọn, nới ràng buộc thì được; đổi `data_type` hay `key` khi đã có giá trị
+  thì không (`kernel.custom_field_type_locked`, 409) — tạo trường mới. Xoá = `active=false` ngay, job dọn giá trị
+  và index theo lô.
+- **Dữ liệu cá nhân:** trường `personal_data` đi vào xuất / xoá dữ liệu cá nhân của module sở hữu (bước 37) bằng
+  hàm trợ giúp của kernel; không ghi giá trị vào log hay event (event chỉ mang tên trường đổi).
+- **Dùng lại khắp nơi:** xuất (P16) và nhập (bước 56) có cột `cf.<key>`; tự động hoá (58) đặt điều kiện và gán giá trị;
+  sao chép sang khách thật (38) chép định nghĩa.
+- **Giới hạn:** hạn mức gói `kernel.custom_fields` (số trường mỗi loại) và `kernel.custom_fields_filterable`; trần
+  máy chủ `AUTOXIDE_CUSTOM_FIELDS_MAX` (100 mỗi loại); giá trị mỗi bản ghi tối đa `AUTOXIDE_CUSTOM_FIELDS_MAX_BYTES`
+  (16384).
+- **Khác thuộc tính sản phẩm (bước 41):** thuộc tính mô tả hàng cho người mua (biến thể, bộ lọc cửa hàng, nguồn cấp
+  sàn); trường tự định nghĩa trên `catalog.product` chỉ có mức `internal` (dữ liệu nội bộ của khách).
+- Bước 51 khai đích cho `content.entry`; module của bước 41–49, 53, 59–62 khai đích của mình ở bước đó.
+
+### P20 — Nhãn gắn bản ghi (D-235)
+
+- `kernel_tags` (`tenant_id`, `id`, `name`, `normalized` (chữ thường, bỏ dấu), `color` (tên màu trong bảng cố định
+  của kernel), `description?`, `created_by`, `created_at`; unique (`tenant_id`, `normalized`)) và `kernel_record_tags`
+  (`tenant_id`, `kind`, `record_id`, `tag_id`, `created_by`, `created_at`; unique (`tenant_id`, `kind`, `record_id`,
+  `tag_id`); index (`tenant_id`, `tag_id`, `kind`, `record_id`)). Bảng thuộc kernel vì lọc danh sách cần subquery
+  trong câu SQL của module (cùng lý do với `kernel_org_closure`).
+- Loại bản ghi của sổ đối tượng khai `taggable` (thêm trường, `#[non_exhaustive]`). Gắn / gỡ cần quyền **ghi** bản
+  ghi (sổ đối tượng thêm bộ tra quyền ghi); tạo nhãn mới khi gắn được phép trừ khi khách bật cài đặt
+  `kernel.tags.restricted` (khi đó cần `kernel.tags.manage`).
+- API: `GET/POST /api/v1/kernel/tags`, `PATCH/DELETE /api/v1/kernel/tags/{id}`, `POST …/{id}/merge {into}`
+  (`kernel.tags.manage`); `PUT /api/v1/kernel/records/{kind}/{id}/tags {tag_ids}`; thao tác hàng loạt `kernel.tag_add` /
+  `kernel.tag_remove` cho mọi loại `taggable` (P8). Danh sách nhận `tags_any=` / `tags_all=` (kernel dựng điều kiện);
+  bản ghi trả `tags` — nạp theo lô một lần mỗi trang, không N+1.
+- Event `kernel.record_tags_changed {kind, id, added, removed}` cho tự động hoá (58). Nhãn là dữ liệu nội bộ,
+  không có trong đọc công khai.
+- Giới hạn: hạn mức gói `kernel.tags` (số nhãn mỗi khách), tối đa 50 nhãn mỗi bản ghi.
+- **Không phải thứ đã có:** thẻ (tag) của `content` là phân loại **công khai** của bài viết (có trang, có slug) — giữ
+  nguyên. Nhãn của `media` (D-094) đã là hợp đồng API — giữ nguyên, không chuyển. Từ bước 51, loại bản ghi mới cần
+  nhãn nội bộ dùng P20, không tự làm bảng nhãn riêng.
+
+### P21 — Đổi câu chữ hiển thị theo khách (D-235)
+
+- Module đánh dấu i18n key **đổi được**: `Module::overridable_texts() -> Vec<OverridableText { key, legal }>`
+  (mặc định rỗng) — thường là thuật ngữ và câu hướng tới người dùng cuối (vd `orders.term.order`, trạng thái đơn
+  hiển thị cho người mua). Mã lỗi (`code`) và câu của lỗi **không** đổi được: đó là hợp đồng với máy và phải nói
+  đúng cách sửa. Key `legal` (câu đồng ý, chân trang pháp lý) không đổi được.
+- Không gian `ui.*` cho repo giao diện: khách ghi đè câu của giao diện; core chỉ kiểm dạng key, độ dài và giữ —
+  tối đa `AUTOXIDE_TEXT_OVERRIDES_UI_MAX` (1000) key.
+- `kernel_text_overrides` (`tenant_id`, `locale`, `key`, `text`, `updated_by`, `updated_at`; unique (`tenant_id`,
+  `locale`, `key`)). Kiểm khi lưu: chữ thuần (không HTML), tối đa 500 ký tự, tập chỗ điền `{tên}` **trùng khớp** bản
+  mặc định (thiếu hay thừa → 422 liệt kê). Cho phép cả ngôn ngữ core chưa có bản dịch nếu khách đã bật ngôn ngữ đó
+  (bước 34) — thiếu câu thì về tiếng Anh như luật i18n.
+- Đọc: bộ dịch của kernel tra bản của khách trước, rồi bản của module, rồi tiếng Anh. Bản của khách nằm trong
+  cache bộ nhớ theo khách (một map, xoá khi ghi) — đường nóng không query.
+- API: `GET /api/v1/kernel/texts?locale&prefix&overridden` (key đổi được, câu mặc định, câu của khách),
+  `PUT/DELETE /api/v1/kernel/texts/{locale}/{key}` (`kernel.texts.manage`; xoá = về mặc định);
+  `GET /api/v1/kernel/public/texts?locale&prefix=ui.` (công khai, ETag) cho giao diện.
+
 ### Cài đặt có nối ra ngoài (A-c10, A-c11)
 
 `GET /api/v1/kernel/settings` thêm `last_used_at`, `last_error` cho mỗi cài đặt có nối ra ngoài; `POST
@@ -336,15 +423,19 @@ bản, chạy lại không trùng, lỗi theo dòng và cột, ghi qua `api` c�
 ### Permission · Mã lỗi · Cấu hình
 
 P1–P4 không có permission mới (lọc theo permission sẵn có của từng nguồn). Permission mới:
-`kernel.views.share` (P7), `kernel.jobs.read`, `kernel.jobs.manage` (P15), `kernel.reasons.manage` (P18).
+`kernel.views.share` (P7), `kernel.jobs.read`, `kernel.jobs.manage` (P15), `kernel.reasons.manage` (P18),
+`kernel.custom_fields.manage` (P19), `kernel.tags.manage` (P20), `kernel.texts.manage` (P21).
 
 Mã lỗi mới: `kernel.navigation_conflict` (lúc khởi động, không ra API), `kernel.find_query_too_short` (422),
 `content.embed_unknown_kind` (422), `content.embed_not_found` (422), `kernel.bulk_count_changed` (409, P8),
 `approval_required` (202, P12), `kernel.flag_limit_reached` (409, P14), `kernel.reason_legal` (409, P18),
-`kernel.reason_invalid` (422, P18). Thêm bản dịch tiếng Việt.
+`kernel.reason_invalid` (422, P18), `kernel.custom_field_invalid` (422, P19 — gom lỗi), `kernel.custom_field_unknown`
+(422), `kernel.custom_field_type_locked` (409), `kernel.custom_field_not_filterable` (422), `kernel.tag_limit_reached`
+(409, P20), `kernel.text_not_overridable` (422, P21), `kernel.text_placeholders_mismatch` (422). Thêm bản dịch tiếng Việt.
 
 Cấu hình: hạn thời gian mỗi nguồn (P2–P4, mặc định 300 ms), `AUTOXIDE_USER_FLAGS_MAX` (500),
-`AUTOXIDE_JOBS_FILE_RETENTION_DAYS` (7).
+`AUTOXIDE_JOBS_FILE_RETENTION_DAYS` (7), `AUTOXIDE_CUSTOM_FIELDS_MAX` (100), `AUTOXIDE_CUSTOM_FIELDS_MAX_BYTES` (16384),
+`AUTOXIDE_TEXT_OVERRIDES_UI_MAX` (1000).
 
 ## Thứ tự làm
 
@@ -362,7 +453,9 @@ Cấu hình: hạn thời gian mỗi nguồn (P2–P4, mặc định 300 ms), `A
 10. P10 hộp việc theo người, `SetupStep`; P11 `/me/can`.
 11. P12 `ActorKind`, loại API key, yêu cầu duyệt đầy đủ; P13 dòng hoạt động và ghi chú.
 12. P18 danh sách lý do; cài đặt có nối ra ngoài.
-13. MODULE_GUIDE (EN + VI) mục "khai phần của module cho giao diện"; sinh lại `docs/openapi.json`;
+13. P19 trường tự định nghĩa (đích `content.entry`), P20 nhãn, P21 đổi câu chữ.
+14. MODULE_GUIDE (EN + VI) mục "khai phần của module cho giao diện" (gồm khai đích trường tự định nghĩa, `taggable`,
+    câu đổi được); sinh lại `docs/openapi.json`;
     CHANGELOG; đánh dấu ROADMAP.
 
 P14 đã làm (D-207). P17 làm ở bước 56 (module `imports`).
@@ -386,6 +479,14 @@ Mọi test chạm database qua `TestDatabase::run` (SQLite và Postgres), qua RE
   `approval_het_han_khong_chay_lenh`, `activity_khong_lo_ban_ghi_ngoai_quyen`.
 - P18 (D-223): `ma_mac_dinh_tu_dong_co`, `khach_them_ma_rieng`, `ma_legal_khong_tat_duoc`,
   `ma_da_tat_bi_tu_choi_khi_ghi`, `hai_khach_khong_thay_ma_cua_nhau`.
+- P19–P21 (D-235): `truong_tu_dinh_nghia_gom_loi_mot_lan`, `loc_theo_truong_dung_tren_ca_hai_database`,
+  `index_ghi_cung_transaction_voi_ban_ghi` (lỗi giữa chừng → không còn dòng index), `doi_kieu_truong_da_co_gia_tri_409`,
+  `truong_internal_khong_lo_o_doc_cong_khai`, `truong_du_lieu_ca_nhan_vao_xuat_va_xoa`, `vuot_han_muc_truong_theo_goi`,
+  `nhan_trung_ten_khac_dau_la_mot` (`VIP` / `vip`), `gan_nhan_can_quyen_ghi_ban_ghi`, `loc_tags_all_va_tags_any`,
+  `danh_sach_nap_nhan_mot_lan_moi_trang` (đếm query), `gop_nhan_chuyen_het_ban_ghi`,
+  `cau_cua_khach_thay_cau_mac_dinh`, `cho_dien_lech_bi_tu_choi`, `ma_loi_khong_doi_duoc`, `cau_legal_khong_doi_duoc`,
+  `doc_cau_khong_cham_database_khi_cache_nong`, **đồng thời** `hai_nguoi_cung_tao_nhan_cung_ten_chi_mot_dong`; bài rò rỉ
+  giữa khách cho cả bốn bảng.
 - P14 (đã có, D-207): `flag_ghi_lai_cung_key_la_ghi_de`, `khong_doc_duoc_flag_cua_nguoi_khac`,
   `key_sai_dinh_dang_bi_tu_choi`, `vuot_han_muc_flag_bao_loi_ro`, `xoa_tai_khoan_xoa_flag`,
   `put_dong_thoi_cung_key_chi_mot_dong`, `loc_theo_tien_to_khong_coi_gach_duoi_la_ky_tu_dai_dien`,
@@ -404,6 +505,11 @@ phù hợp; `docs/openapi.json` mô tả đủ từng endpoint; `./gate.sh` xanh
 - **Nhóm điều hướng viết cứng trong kernel**: kernel trung lập với nghiệp vụ; nhóm "Bán hàng" do module
   thương mại khai.
 - **Ẩn mục bị khoá**: thiết kế yêu cầu hiện kèm nhãn khoá để người dùng biết nâng gói mở được gì.
+- **Lọc trường tự định nghĩa bằng toán tử JSON của database:** chỉ một bên có, và không có index — luôn qua bảng
+  `<module>_custom_index`.
+- **Index lệch với bản ghi:** ghi index ngoài transaction thì lỗi giữa chừng để lại dữ liệu sai; luôn cùng transaction.
+- **Biểu thức chính quy do khách viết:** có thể làm treo máy chủ (ReDoS) — không nhận, chỉ có ràng buộc đơn giản.
+- **Câu của khách đổi nghĩa thông báo pháp lý hay lỗi:** chỉ key module cho phép; key `legal` và mã lỗi không đổi được.
 
 ## Agent làm bước này tự quyết
 
