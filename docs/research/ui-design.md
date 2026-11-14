@@ -183,6 +183,9 @@ Phần máy chủ cần thêm: đề bài cho teammate ở `docs/prompts/ui-help
   ngang trên điện thoại) chứ không bóp chữ.
 - Đầu trang website: ô tìm chiếm phần giữa; khổ 721–1100 giữ một hàng. Trang thanh toán khép kín ở mọi
   khổ: không ô tìm, không danh mục, không dòng khuyến mãi.
-- Bài viết có cột bên: cột chữ giữ bề rộng dễ đọc (720px), cột bên thẳng mép phải với ảnh bìa.
+- Trang bài viết dùng một khung biên tập chung 1144px (cột chữ 720 + khoảng cách 64 + cột bên 360) cho
+  tiêu đề, ảnh bìa, nội dung và "đọc tiếp": mọi khối thẳng một mép trái và một mép phải, không dư khoảng
+  trống. Thân bài hẹp hơn thanh menu là cố ý.
+- Các khối lớn trong một trang dùng cùng bề rộng; khối hẹp hơn (biểu mẫu) là ngoại lệ có chủ đích.
 - Bộ kiểm tra tự động đo thêm: lấn lề, thẻ lẻ, dải cuộn ngang mà kéo dọc được; quét ở 360, 390, 430, 768,
   820, 1024, 1280, 1440px.
