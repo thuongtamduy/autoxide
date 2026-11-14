@@ -113,6 +113,24 @@ Ký hiệu: **thiếu** là không có ở đâu; **hở** là đặc tả dùng
 | Tóm tắt trang "Tôi" | 47, 34 | thiếu | Một endpoint trả số liệu tài khoản (đơn chưa xong, lượt tải còn, điểm, bảo hành còn hạn, tranh chấp đang mở), để khỏi gọi 9 API khi mở trang. |
 | Xác nhận đơn qua SMS | 45, `notifications` | hở | Email không còn bắt buộc khi đặt hàng giao tận nơi (theo khuyến nghị giảm số ô phải nhập). Đặc tả việc gửi xác nhận đơn qua SMS khi khách không có email. Phần tra đơn bằng mã đơn và số điện thoại đã có. |
 | Hoá đơn công ty cần email | 36 | hở | Ghi rõ: xuất hoá đơn cho công ty thì bắt buộc email nhận hoá đơn. |
+| Người mua xác nhận đã nhận hàng | 45 | thiếu | `POST /me/orders/{id}/confirm-receipt`, gọi lại được (idempotency key). Mở hạn đổi trả và nút đánh giá; không thay việc hãng vận chuyển báo đã giao. |
+| Đổi trả kèm ảnh, video mở hộp | 45 | thiếu | Yêu cầu đổi trả nhận `media_ids` (ảnh, video qua module `media`). Đơn trả thêm `return_deadline_at`, `returnable` và `return_blocked_reason` (mã ổn định, có bản dịch), để giao diện tắt nút kèm lý do thay vì ẩn nút. |
+| Thưởng điểm khi đánh giá | 47 | thiếu | Mức thưởng là dữ liệu có ngày hiệu lực, giao diện ghi sẵn trên nút ("+20 điểm"). Thưởng không phụ thuộc số sao hay nội dung khen chê, vì thưởng theo đánh giá tốt là đánh giá có điều kiện. Cần đối chiếu văn bản gốc về đánh giá có thưởng. |
+| Ngày giao dự kiến dạng khoảng | 44 | hở | `ShippingOption` trả `eta_from` và `eta_to` (ngày theo giờ Việt Nam). Giao diện tự viết "Thứ Bảy 14/11 – Chủ nhật 15/11", điện thoại viết gọn hơn. Không trả câu đã viết sẵn. |
+| Hỏi đáp: sắp xếp và hữu ích | 45 (D-202 phần A) | hở | Danh sách câu hỏi nhận `order=helpful\|newest`. Lượt "hữu ích" một người một lần, cùng cách với đánh giá. |
+| Hàng thay thế ("Có thể bạn thích") | 41 | thiếu | Quan hệ `alternatives` giữa sản phẩm, kèm một dòng "khác ở điểm nào" theo ngôn ngữ. Tách khỏi "Dùng kèm". |
+| "Hôm nay nấu gì?" | `content`, 41 | thiếu | Công thức là bài viết; dụng cụ cần dùng gắn qua khối nhúng trỏ tới `catalog.product` trong sổ đối tượng (D-123). Không chép ID sản phẩm vào thân bài. Trả cả bộ dụng cụ cùng giá và tồn hiện tại. |
+| Thêm nhiều dòng vào giỏ một lần | 45 | thiếu | `POST /cart/lines:batch` gọi lại được (idempotency key). Dòng hết hàng báo riêng từng dòng, không làm hỏng cả lô. |
+| Sắp theo mức giảm | 41, 43 | thiếu | Danh sách sản phẩm công khai nhận `order=discount_desc`, tính theo giá thật ngay trước khuyến mại. |
+
+### Từ rà soát trang quản trị (R4, 14/11/2026)
+
+| Mục | Bước | Loại | Nội dung |
+|---|---|---|---|
+| Menu con của phân hệ do core trả về | 51 (`Module::navigation`) | hở | Sổ điều hướng trả cho mỗi phân hệ danh sách màn (nhãn, đường dẫn, thứ tự cố định), lọc theo permission và gói. Giao diện chỉ vẽ; mọi màn trong cùng phân hệ dùng một danh sách. |
+| Số đếm trên menu và thanh bên | 51, 52 (hộp việc) | thiếu | Mỗi mục menu có thể kèm một số "việc đang chờ" và cờ gấp, lấy cùng nguồn với hộp việc. Hiện các màn tự ghi số nên lệch nhau (đơn 37 / 12 / 412; COD 1 / 2). |
+| Lỗi theo từng ô | chung (D-083) | đã có | Giao diện đã đánh dấu ô sai, ghi lỗi dưới từng ô và đưa con trỏ về ô sai đầu tiên. Cần `Problem` trả danh sách lỗi theo tên trường (`errors[].field`). Kiểm mọi endpoint ghi đều theo đúng cách này. |
+| Hoàn tác | chung | hở | Thao tác đảo được (hoãn việc, đổi trạng thái, ẩn bình luận) cần endpoint đảo lại, hoặc trả kèm "lệnh đảo" để giao diện gọi khi người dùng bấm Hoàn tác trong 6 giây. |
 
 ## Căn cứ cần đối chiếu (agent đã ghi trên màn)
 

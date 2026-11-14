@@ -92,19 +92,23 @@ trạng thái bên trong cũng đạt: các bước mua, đánh giá, trạng th
 - **Quick View trên máy tính:** thường hại hơn lợi (Baymard).
 - **Banner tự chạy:** không dùng. Trang chủ đã là các khối tĩnh xếp dọc.
 
-## Để đợt sau (đã có bằng chứng, chưa làm)
+## Đợt sau (đăng ngày 14/11/2026)
 
-- **"Có thể bạn thích"** (hàng thay thế) ở cuối trang sản phẩm, tách khỏi "Dùng kèm". Cần dữ liệu hàng thay thế.
-- **Hỏi đáp:**
-  - thêm sắp xếp;
-  - nút "Hữu ích" cùng kiểu với phần đánh giá;
-  - thống nhất cách viết ngày giao giữa các trang.
-- **Khối "Hôm nay nấu gì?":** chọn món, gom dụng cụ cần dùng vào giỏ (Việt Nam); công thức có khối "dụng cụ dùng
-  trong món" (quốc tế).
-- **Sắp xếp "% giảm nhiều nhất"; giá theo đơn vị** cho hàng bán theo bộ.
-- **Đánh giá có thưởng điểm** (ghi mức thưởng trên nút); nút "Đã nhận được hàng"; đổi trả kèm video mở hộp.
+| Thay đổi | Trang |
+|---|---|
+| "Có thể bạn thích" (hàng thay thế), tách khỏi "Dùng kèm"; mỗi món ghi khác ở điểm nào | sản phẩm |
+| Hỏi đáp có sắp xếp, nút "Hữu ích" cùng kiểu đánh giá | sản phẩm |
+| Ngày giao viết thống nhất mọi trang ("Thứ Bảy 14/11 – Chủ nhật 15/11"), điện thoại viết gọn | mọi trang |
+| Khối "Hôm nay nấu gì?": chọn món, bỏ dụng cụ đã có, thêm cả bộ vào giỏ | trang chủ |
+| Sắp xếp "% giảm nhiều nhất" | danh mục |
+| Nút "Đã nhận được hàng"; đổi trả có lý do chọn sẵn, ảnh hoặc video mở hộp, ghi rõ còn mấy ngày (hết hạn thì nút tắt kèm lý do); "Viết đánh giá · +20 điểm" | tài khoản |
+
+## Còn để sau
+
+- **Giá theo đơn vị** cho hàng bán theo bộ.
 - **Liên hệ nhanh** (gọi, Zalo); nhận thông báo đơn qua Zalo.
-- **Đo Core Web Vitals thật** và gửi về backend; ảnh có kích thước cố định, ảnh chính không lazy-load.
+- **Đo Core Web Vitals thật** và gửi về backend; ảnh có kích thước cố định, ảnh chính không lazy-load. Việc này thuộc
+  repo giao diện khi dựng thật, bản thiết kế không đo được.
 
 ## Việc của backend
 
