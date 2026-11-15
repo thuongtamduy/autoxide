@@ -137,3 +137,26 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Bình luận › Cài đặt | Cài đặt bình luận theo khách (bật / tắt, chế độ duyệt) | 33 | Dữ liệu mẫu (`src/sample/engage.ts`) |
 | [ ] | Bình luận › Cài đặt | Chính sách `posting.comments` (xác thực tài khoản, NĐ 147/2024) | 37 | Dữ liệu mẫu (`src/sample/engage.ts`) |
 | [ ] | Ba tab "Dữ liệu theo email" | Một yêu cầu của chủ thể dữ liệu gom mọi module, gắn với hồ sơ ở Tuân thủ | 37 | Ba tab riêng, mỗi module tra / xoá một lần |
+
+## Nội dung › Thư viện media, Trang và cấu trúc, Menu
+
+| | Màn | Cần | Bước | Giao diện đang làm gì |
+|---|---|---|---|---|
+| [ ] | Thư viện media | Lọc "thiếu alt" (`alt_missing=true`) và số ảnh thiếu alt | mới | Lọc trên trang đang xem (48 tệp) |
+| [ ] | Thư viện media | Tóm tắt cả thư viện: tổng tệp, dung lượng, số ảnh thiếu alt | mới | Tính trên trang đang xem |
+| [ ] | Thư viện media | Số tệp trong mỗi thư mục (`item_count` trong `FolderResponse`) | mới | Không hiện số |
+| [ ] | Thư viện media | Alt theo từng ngôn ngữ và cờ "ảnh trang trí" (`GET/PUT /media/{id}/alts`) | mới | Alt ngôn ngữ mặc định là `alt` thật; ngôn ngữ khác và cờ trang trí là dữ liệu mẫu (`src/sample/media.ts`) |
+| [ ] | Thư viện media | "Đang dùng ở": bài, trang, sản phẩm nào dùng tệp (`GET /media/{id}/usages`) | mới | Ghi "máy chủ chưa liệt kê được" |
+| [ ] | Thư viện media | Tên người tải lên (hiện chỉ có id) | mới | Không hiện |
+| [ ] | Thư viện media | Giới hạn tải lên cho giao diện: dung lượng tối đa, loại cho phép | mới (cùng loại "cấu hình cho giao diện") | Để core báo lỗi theo `code` sau khi gửi |
+| [ ] | Mọi biểu mẫu | `detail` trong `errors[]` của Problem dịch theo `Accept-Language` (vd lỗi `to_url` của chuyển hướng ra tiếng Anh) | mới | Hiện nguyên câu của core |
+| [ ] | Trang và cấu trúc | Số bài theo danh mục, thẻ, tác giả (`entry_count`) | mới | Ghi "chưa hiện số" |
+| [ ] | Trang và cấu trúc | Đường dẫn đầy đủ của trang (`path`) trong `EntryResponse` | mới | Tự ghép slug theo cây, chưa có tiền tố ngôn ngữ |
+| [ ] | Trang và cấu trúc | ETag (hoặc `version`) của từng dòng trong danh sách | mới | Đọc lại bản ghi trước khi sửa, so `updated_at` |
+| [ ] | Trang và cấu trúc | Lấy cả cây trang khi hơn 200 trang | mới | Lấy 200 trang đầu, có ghi chú |
+| [ ] | Lịch sử phiên bản | Tên người sửa của phiên bản (hiện chỉ có id) | mới | Hiện lý do giữ phiên bản và thời điểm |
+| [ ] | Menu | Module `menus`: `GET/POST /menus`, `GET/PUT/DELETE /menus/{id}`, `GET /menus/public/{key}` | mới (đề bài `menus-module.md`) | Dữ liệu mẫu (`src/sample/menus.ts`) |
+| [ ] | Menu | Sổ đối tượng: danh sách loại kèm cờ "có cây"; tìm đối tượng | 51 (P6) + đề bài menus, điểm 1–2 | Dữ liệu mẫu |
+| [ ] | Menu | Đọc menu kèm tiêu đề và trạng thái của từng đích, cho người có `menus.read` | mới (đề bài menus, điểm 3) | Dữ liệu mẫu |
+| [ ] | Menu | Lệnh nhập menu cũ có chạy thử; ghi lần nhập gần nhất | mới (đề bài menus, điểm 9) | Dữ liệu mẫu; nguồn là menu cũ thật |
+| [ ] | Menu | Header `Deprecation` / `Sunset` trên `/content/menus…` (core chưa gửi) | mới (đề bài menus, mục 3) | Ghi ngày sunset theo bản thiết kế |
