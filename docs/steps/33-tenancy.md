@@ -25,7 +25,7 @@ thay đổi phá vỡ của bước 31 xanh), bản cài cũ nâng cấp đượ
 - Có sẵn: `Database` (read/write/begin_write/write_with_retry/begin_snapshot), `rows`, `reference`,
   `SecretKey` (D-113), `Throttle` (D-116), `OneTimeTokens` (D-117), antispam nonce (D-119), `Outbox`,
   `JobQueue`/`Worker`/`Claim`, `Dispatcher`, `transfer::copy_modules` (D-070), `Migrator` (mỗi migration
-  chạy trong transaction trên cả hai database — `crates/kernel/src/migration.rs`, `Transactional`).
+  chạy trong transaction trên cả hai database — `crates/kernel/src/data/migration.rs`, `Transactional`).
 
 ## Phạm vi
 

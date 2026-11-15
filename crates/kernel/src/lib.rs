@@ -2,46 +2,34 @@
 //! HTTP, hợp đồng module). Kernel không biết module nào — phụ thuộc chỉ đi một
 //! chiều từ module vào kernel (`cargo xtask check` kiểm điều này).
 //!
-//! Nội dung được dựng dần ở bước 1 của `docs/ROADMAP.md`.
+//! Bố cục (D-247): file xếp theo nhóm riêng tư — `contracts/` (trait module cung cấp cho nhau),
+//! `data/` (database), `security/`, `ops/` (vận hành), `values/` (kiểu giá trị). Trên cùng là
+//! phần mọi module chạm tới: `error`, `response`, `i18n`, `module`, `config`, `http`, `event`,
+//! `job`, `mcp`. Đường dẫn công khai KHÔNG có tên nhóm: `pub use` dưới đây giữ
+//! `autoxide_kernel::ai::TextModel` cho module ở repo riêng (D-167), và `crate::ai::…` bên trong
+//! kernel — nhóm là riêng tư nên không có đường thứ hai (`autoxide_kernel::contracts::ai`). Module
+//! mới vào nhóm hợp với nó (mỗi file nhóm ghi module nào của bước 33+ thuộc về đó) rồi thêm vào
+//! `pub use`; test `tests/public_paths.rs` giữ mọi đường dẫn công khai.
 
-pub mod access;
-pub mod ai;
-pub mod antispam;
-mod builtin;
+mod contracts;
+mod data;
+mod ops;
+mod security;
+mod values;
+
+pub use contracts::{ai, mail, privacy, resource, storage};
+pub use data::{database, migration, pagination, reference, rows, search, transfer, version};
+pub(crate) use ops::{builtin, module_catalog, user_flags};
+pub use ops::{doctor, logging, metrics, task, telemetry};
+pub use security::{access, antispam, idempotency, ip_hash, secret, throttle, tls, tokens};
+pub use values::{email, money, public_url};
+
 pub mod config;
-pub mod database;
-pub mod doctor;
-pub mod email;
 pub mod error;
 pub mod event;
 pub mod http;
 pub mod i18n;
-pub mod idempotency;
-pub mod ip_hash;
 pub mod job;
-pub mod logging;
-pub mod mail;
 pub mod mcp;
-pub mod metrics;
-pub mod migration;
 pub mod module;
-mod module_catalog;
-pub mod money;
-pub mod pagination;
-pub mod privacy;
-pub mod public_url;
-pub mod reference;
-pub mod resource;
 pub mod response;
-pub mod rows;
-pub mod search;
-pub mod secret;
-pub mod storage;
-pub mod task;
-pub mod telemetry;
-pub mod throttle;
-pub mod tls;
-pub mod tokens;
-pub mod transfer;
-mod user_flags;
-pub mod version;

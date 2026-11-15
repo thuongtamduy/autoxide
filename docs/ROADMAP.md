@@ -74,10 +74,10 @@ các module nhóm A dời file. Mỗi mục có test trên cả hai database và
 
 Nhóm A — bố cục:
 
-- [ ] Áp quy ước "File layout" của hướng dẫn viết module cho `newsletter`, `comments`, `media`,
+- [x] Áp quy ước "File layout" của hướng dẫn viết module cho `newsletter`, `comments`, `media`,
       `forms`: phần service chia theo tính năng, test dài thành thư mục `tests/`; không đổi hành vi,
       đếm số test trước và sau phải bằng nhau
-- [ ] `kernel`: gom các file nằm phẳng trong `src/` thành nhóm (vd hợp đồng cho module: `ai`,
+- [x] `kernel`: gom các file nằm phẳng trong `src/` thành nhóm (vd hợp đồng cho module: `ai`,
       `mail`, `storage`, `search`, `privacy`…), giữ nguyên đường dẫn công khai bằng `pub use` để
       module ở repo riêng không phải sửa (D-167)
 
@@ -128,7 +128,7 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
       database (dẫn xuất từ `AUTOXIDE_SECRET_KEY`), có số phiên bản khoá để xoay khoá; một công cụ
       dùng chung trong `kernel`, thuật toán chuẩn (AEAD) qua thư viện đã kiểm; migration mã hoá dữ
       liệu cũ; bản backup không còn chứa các secret này ở dạng đọc được. Khi `AUTOXIDE_SECRET_KEY`
-      chưa đặt thì khoá gốc nằm trong database (`kernel/src/secret.rs`), mã hoá không bảo vệ được
+      chưa đặt thì khoá gốc nằm trong database (`kernel/src/security/secret.rs`), mã hoá không bảo vệ được
       bản backup: `autoxide doctor` và log lúc khởi động nói rõ điều đó. Ghi quyết định
 - [ ] Cấu hình và secret theo khách (D-190): thông tin kết nối đối tác của từng khách (cổng thanh
       toán, SMTP, hoá đơn điện tử, khoá AI) lưu mã hoá bằng cơ chế trên; module đọc qua một trait

@@ -9,6 +9,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Changed
+
+- Internal, no change in behaviour: the code of `newsletter`, `comments`, `media` and `forms` is grouped by
+  feature like `content` and `auth`, and the kernel's files sit in private groups (`contracts`, `data`,
+  `security`, `ops`, `values`). Every public path (`autoxide_kernel::ai::TextModel`, …) is unchanged, and a
+  test keeps it so.
+
 ## [0.14.0] - 2026-11-15
 
 ### Added

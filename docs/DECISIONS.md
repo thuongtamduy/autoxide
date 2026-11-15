@@ -6125,3 +6125,65 @@ workspace thì không được, vì hai bản trùng tên crate.
   hành.
 - Chạy trong gate: mỗi lần gate lại tốn thêm một lần build bản release và cần Docker. Trong khi đó gate phải chạy
   được trên máy chỉ có Postgres (`GATE_POSTGRES_URL`).
+
+## D-247 · Bố cục theo tính năng của bốn module và nhóm file của kernel (bước 32 A1, A2) — 2026-11-15 — agent quyết
+
+Bối cảnh: `newsletter`, `comments`, `media`, `forms` (6–10 nghìn dòng mỗi module) và kernel (37 file nằm phẳng)
+chưa theo quy ước "File layout" của `docs/MODULE_GUIDE.md`. Bước 33 sẽ sửa mọi bảng của mọi module và thêm
+khoảng tám module vào kernel; người sửa cần tìm đúng chỗ ngay.
+
+Quyết định:
+
+- **Module: theo cách của `content`.**
+  - File tính năng chính giữ logic và khai các file con trong thư mục cùng tên: `campaigns.rs` + `campaigns/`,
+    `posting.rs` + `posting/`, `moderation.rs` + `moderation/`, `forms.rs` + `forms/`.
+  - Nhóm không có file chính thì là file nhóm chỉ khai module con: `audience.rs`, `submissions.rs`,
+    `library.rs`, `images.rs`.
+  - Tính năng chỉ có một file giữ ở trên cùng, không bọc thêm nhóm: `public.rs` của `newsletter` (cùng tên
+    với `http/public.rs`), `threads.rs` của `comments`. Bảng của đặc tả đặt chúng vào `signup/`, `reading/`;
+    nhóm một file không giúp tìm nhanh hơn mà còn đổi tên.
+  - Bố cục cụ thể:
+
+    | Module | Nhóm |
+    | --- | --- |
+    | `newsletter` | `audience/` (`lists`, `subscribers`, `bounces`); `campaigns/` (`sending`, `new_posts`, `compose`) |
+    | `comments` | `posting/` (`authoring`, `targets`); `moderation/` (`reports`) |
+    | `forms` | `forms/` (`fields`); `submissions/` (`public`, `inbox`, `csv`, `notify`) |
+    | `media` | `library/` (`upload`, `sniff`, `folders`, `tags`); `images/` (`variants`, `refresh`, `alt`, `alts`) |
+
+  - `tests.rs` của `forms` và `media` thành `tests/`: đồ dùng chung ở `mod.rs`, mỗi tính năng một file;
+    file con viết `use super::*;` như `mod tests` thường làm.
+  - Chỉ dời, không đổi tên hàm, kiểu, mã lỗi, job, event, permission hay tool. Số test và tên lá của từng
+    crate trước và sau như nhau: `newsletter` 28, `comments` 40, `forms` 29, `media` 49, kernel 324 (doc test
+    đổi tên vì tên của chúng mang đường dẫn file).
+- **Kernel: năm nhóm riêng tư, đường dẫn công khai không đổi.**
+  - Năm nhóm:
+
+    | Nhóm | Module | Bước 33+ thêm vào |
+    | --- | --- | --- |
+    | `contracts/` | `ai`, `mail`, `privacy`, `resource`, `storage` | `payment`, `einvoice`, `identity`, `sms`, `entitlement` |
+    | `data/` | `database`, `migration`, `pagination`, `reference`, `rows`, `search`, `transfer`, `version` | `tenancy`, `numbering` |
+    | `security/` | `access`, `antispam`, `idempotency`, `ip_hash`, `secret`, `throttle`, `tls`, `tokens` | — |
+    | `ops/` | `doctor`, `logging`, `metrics`, `task`, `telemetry`; riêng tư: `builtin`, `module_catalog`, `user_flags` | — |
+    | `values/` | `email`, `money`, `public_url` | `decimal` |
+
+  - Giữ trên cùng: `error`, `response`, `i18n`, `module`, `config`, `http`, `event`, `job`, `mcp`. Đây là
+    phần mọi module chạm tới. `mcp` không có trong bảng của đặc tả; nó là hợp đồng như `http`.
+  - `user_flags` (D-207) vào `ops/` cạnh `builtin`, vì module nội bộ `kernel` phục vụ nó.
+  - `lib.rs` khai `mod <nhóm>;` riêng tư và `pub use <nhóm>::{…};`. `autoxide_kernel::ai::TextModel` và
+    `crate::ai::…` vẫn chạy. Không có đường thứ hai qua tên nhóm.
+  - `crates/kernel/tests/public_paths.rs` `use` mọi module công khai cùng một kiểu tiêu biểu: mất đường dẫn
+    nào là lỗi biên dịch.
+  - Đã sửa theo đường dẫn mới: allowlist của `.gitleaks.toml` cho `security/antispam/fixtures/altcha_v2.json`.
+    Không phải sửa: `ENV_ACCESS_FILE` (`config/` giữ trên cùng), `include_str!` của `i18n` (giữ trên cùng) và của
+    `antispam` (dời cả thư mục). `cargo doc` với `-D warnings` sạch.
+- Tài liệu đang dùng (MODULE_GUIDE, đặc tả bước sau, ROADMAP) sửa theo đường dẫn mới. Nhật ký và đặc tả của
+  bước đã xong giữ nguyên: chúng ghi lại lúc đó.
+
+Lý do: bước 33 sửa từng module và thêm module vào kernel theo đúng một chỗ dễ đoán. Module ở repo riêng (D-167)
+không phải sửa dòng nào.
+
+Đã cân nhắc:
+- Re-export trong file nhóm (`pub(crate) use lists::List`) để khỏi sửa đường dẫn bên trong module: thành hai
+  cách gọi một thứ.
+- Đặt tên nhóm vào đường dẫn công khai của kernel (`autoxide_kernel::contracts::ai`): phá vỡ hợp đồng module.
