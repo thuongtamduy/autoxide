@@ -606,4 +606,87 @@ mod tests {
         assert_eq!(error[0].code, "too_large");
         assert_eq!(fields(json!({"type": "paragraph"}))[0].0, "body");
     }
+
+    // Property test (đặc tả 31 B3): JSON bất kỳ (giới hạn độ sâu) và cây node gần đúng không làm
+    // bộ kiểm panic; thân đã nhận thì kiểm lại vẫn nhận; `stored_image_ids` chỉ trả UUID có trong
+    // thân.
+    fn any_json() -> impl proptest::strategy::Strategy<Value = Value> {
+        use proptest::prelude::*;
+        let leaf = prop_oneof![
+            Just(Value::Null),
+            any::<bool>().prop_map(Value::Bool),
+            any::<i32>().prop_map(Value::from),
+            "\\PC{0,12}".prop_map(Value::String),
+        ];
+        leaf.prop_recursive(5, 64, 6, |inner| {
+            prop_oneof![
+                proptest::collection::vec(inner.clone(), 0..6).prop_map(Value::Array),
+                proptest::collection::btree_map(
+                    "type|content|text|attrs|marks|level|mediaId|[a-z]{1,6}",
+                    inner,
+                    0..6
+                )
+                .prop_map(|map| Value::Object(map.into_iter().collect())),
+            ]
+        })
+    }
+
+    /// Cây node gần với thân bài thật: tên node, thuộc tính và cấp lồng đúng phần lớn thời gian.
+    fn near_document() -> impl proptest::strategy::Strategy<Value = Value> {
+        use proptest::prelude::*;
+        let text = "\\PC{0,20}".prop_map(|text| json!({"type": "text", "text": text}));
+        let inline = prop_oneof![text, Just(json!({"type": "hardBreak"}))];
+        let paragraph = proptest::collection::vec(inline, 0..4)
+            .prop_map(|content| json!({"type": "paragraph", "content": content}));
+        let image = (any::<u128>(), "\\PC{0,10}").prop_map(|(id, alt)| {
+            json!({"type": "image", "attrs": {"mediaId": Uuid::from_u128(id).to_string(), "alt": alt}})
+        });
+        let heading = (1u8..7, "\\PC{1,10}").prop_map(|(level, text)| {
+            json!({"type": "heading", "attrs": {"level": level}, "content": [{"type": "text", "text": text}]})
+        });
+        let block = prop_oneof![paragraph, image, heading, Just(json!({"type": "horizontalRule"}))];
+        proptest::collection::vec(block, 0..8)
+            .prop_map(|content| json!({"type": "doc", "content": content}))
+    }
+
+    fn all_strings(value: &Value, found: &mut Vec<String>) {
+        match value {
+            Value::String(text) => found.push(text.clone()),
+            Value::Array(items) => items.iter().for_each(|item| all_strings(item, found)),
+            Value::Object(map) => map.values().for_each(|item| all_strings(item, found)),
+            _ => {}
+        }
+    }
+
+    fn check_invariants(body: &Value) -> Result<(), proptest::test_runner::TestCaseError> {
+        if check(body, 1 << 20, &[]).is_ok() {
+            let stored = body.to_string();
+            let again: Value = serde_json::from_str(&stored).unwrap();
+            proptest::prop_assert!(
+                check(&again, 1 << 20, &[]).is_ok(),
+                "accepted once, refused after a round trip"
+            );
+            let mut strings = Vec::new();
+            all_strings(body, &mut strings);
+            for id in stored_image_ids(&stored) {
+                proptest::prop_assert!(
+                    strings.contains(&id.to_string()),
+                    "{id} is not in the body"
+                );
+            }
+        }
+        Ok(())
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn json_bat_ky_khong_panic(body in any_json()) {
+            check_invariants(&body)?;
+        }
+
+        #[test]
+        fn cay_gan_dung_giu_bat_bien(body in near_document()) {
+            check_invariants(&body)?;
+        }
+    }
 }

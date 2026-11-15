@@ -109,7 +109,7 @@ Nhóm B — chống hồi quy:
 - [x] Migration thật của mọi module chạy vòng up → down → up trên database trống và trên database
       có dữ liệu, trên cả hai database (hiện chỉ có test cơ chế bằng bảng mẫu,
       `crates/kernel/tests/migration.rs`)
-- [ ] Property test cho các bộ kiểm đầu vào: thân bài ProseMirror (`content`), slug, email
+- [x] Property test cho các bộ kiểm đầu vào: thân bài ProseMirror (`content`), slug, email
       (`autoxide_kernel::email`), con trỏ pagination, CSV chống injection, chữ và link của bình
       luận (chống XSS) — sinh đầu vào ngẫu nhiên, không panic, giữ bất biến; thêm thư viện thì ghi
       `STACK.md`
