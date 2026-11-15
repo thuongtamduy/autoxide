@@ -227,3 +227,30 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/catalog.ts
 | [ ] | Nhà cung cấp | `GET/POST /suppliers`, `PATCH`; công nợ phải trả đọc từ sổ cái | 42 (công nợ: 36) |
 | [ ] | Nhập hàng | `GET/POST /purchase-orders`, `POST /{id}/order\|close\|cancel`, `POST/GET /receipts` (`reference`), `POST/GET /supplier-returns`; kèm tình trạng job ghi sổ cái | 42 (tình trạng ghi sổ: mới) |
 | [ ] | Nhập hàng | Phải trả và giá trị nhập trong tháng | mới (đọc sổ cái, 36) |
+
+## Mặt điều khiển nền tảng (`/platform`)
+
+Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/platform.ts`, `platform-plans.ts`, `platform-data.ts`, trừ chỗ ghi khác.
+
+| | Màn | Cần | Bước |
+|---|---|---|---|
+| [ ] | Mọi màn | Biết người đăng nhập thuộc khách nền tảng (`GET /kernel/tenant`) để hiện mặt điều khiển; permission của nhân sự vận hành | 33, 34 |
+| [ ] | Mọi màn | Sổ điều hướng của core có khái niệm không gian (khách / nền tảng) | 51 |
+| [ ] | Khách hàng | `GET /kernel/tenants` (lọc `status`, `parent_id`), `GET /kernel/placements` | 33 |
+| [ ] | Khách hàng | Trường của khách `business_model`, `primary_domain`; của placement `pending_migrations`, `location` | mới |
+| [ ] | Khách hàng | Số đếm tóm tắt và hạn mức gần chạm nhất của mọi khách trong một lần gọi | mới |
+| [ ] | Chi tiết khách | `PATCH /kernel/tenants/{id}` `{status}` kèm `reason` để ghi audit | 33 (`reason`: mới) |
+| [ ] | Chi tiết khách | Dời khách chung ↔ riêng qua API: `POST /kernel/tenants/{id}/move` `{to, dry_run}` | mới (33 mới có CLI) |
+| [ ] | Chi tiết khách | Xuất toàn bộ dữ liệu khách: `POST/GET /kernel/tenants/{id}/exports` và link tải | mới (33 mới có CLI) |
+| [ ] | Chi tiết khách | Quyền dùng của một khách bất kỳ: `GET /plans/tenants/{id}/entitlements` | mới |
+| [ ] | Chi tiết khách, Thuê bao | Lịch sử thuê bao; đặt / bỏ chỉ đọc; kỳ thanh toán theo khách cho nhà vận hành | mới |
+| [ ] | Thuê bao | `GET /plans/subscriptions`, `PUT` / `cancel` thuê bao của khách, `POST /billing-periods/{id}/mark-paid` | 35 |
+| [ ] | Gói và giá | `GET/POST/PUT` gói, `retire`, `prices`, `deactivate`; `subscriber_count` | 35 (`subscriber_count`: mới) |
+| [ ] | Ghi đè | Danh sách ghi đè của mọi khách (`GET /plans/overrides`) | mới |
+| [ ] | Cấp phát | `POST/GET /plans/provisionings`, `…/retry` | 35 |
+| [ ] | Cấp phát | Danh sách lượt cấp phát `?status=`; lịch sử từng bước; `slug`, `business_model`, tên placement trong body | mới |
+| [ ] | Đội database | Migrate bằng job, chạy thử trước: `POST /kernel/placements/migrations` `{placement_id?, dry_run}` | mới (33 mới có CLI) |
+| [ ] | Sức khoẻ | `GET /kernel/ops/backlog`, `/ops/backups` | 39 |
+| [ ] | Sức khoẻ | Cảnh báo đang bật kèm câu "làm gì": `GET /kernel/ops/alerts` | mới |
+| [ ] | Vào dữ liệu khách | `GET/POST/DELETE /auth/support-grants` | 34 |
+| [ ] | Vào dữ liệu khách | Nhà vận hành đọc cài đặt `auth.support_access` của khách; danh sách nhân sự nền tảng | mới |
