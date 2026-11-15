@@ -610,6 +610,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry_sdk",
  "proptest",
+ "ring",
  "rmcp",
  "rustls",
  "sea-orm",
@@ -629,6 +630,7 @@ dependencies = [
  "utoipa-scalar",
  "uuid",
  "validator",
+ "zeroize",
 ]
 
 [[package]]

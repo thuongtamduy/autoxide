@@ -10,6 +10,13 @@
 //! - Migration đã commit thì không sửa — thêm migration mới (`CLAUDE.md`).
 //!
 //! Module viết migration bằng `use autoxide_kernel::migration::prelude::*;`.
+//!
+//! **Upgrade dữ liệu** ([`DataUpgrade`], `Module::upgrades`, D-257): việc nâng cấp dữ liệu cần cấu hình
+//! của chương trình (vd mã hoá secret cũ bằng khoá `AUTOXIDE_SECRET_KEY`). Tên `u0001_…`, ghi vào
+//! cùng bảng `<m>_migrations`, chạy bởi `migrate up` ngay sau migration schema nó khai trong
+//! [`DataUpgrade::after`]; còn upgrade chờ thì `serve` từ chối chạy như còn migration chờ. Upgrade
+//! chạy NGOÀI transaction của migration (nó tự mở transaction của mình) và phải chạy lại được từ
+//! đầu: hỏng giữa chừng thì lần sau làm tiếp phần chưa xong.
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -20,7 +27,51 @@ use sea_orm::sea_query::{Alias, DynIden, IntoIden};
 use sea_orm_migration::{MigrationName, MigrationTrait, MigratorTraitSelf, SchemaManager};
 
 use crate::database::Database;
+use crate::error::Error;
 use crate::module::{is_identifier, module_name_problems};
+use crate::secret::{KeyConfig, SecretKey};
+
+/// Một upgrade dữ liệu của module. Xem đầu file.
+//
+// `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
+#[async_trait::async_trait]
+pub trait DataUpgrade: Send + Sync {
+    /// Tên, duy nhất trong module, dạng `u0001_<việc>`.
+    fn name(&self) -> &'static str;
+
+    /// Migration schema của cùng module mà upgrade chạy ngay sau.
+    fn after(&self) -> &'static str;
+
+    /// Nâng dữ liệu. Chạy lại được (bỏ qua dòng đã nâng).
+    async fn up(&self, context: &UpgradeContext) -> Result<(), Error>;
+
+    /// Đưa dữ liệu về như trước (để bản cũ của chương trình đọc được). Chạy lại được.
+    async fn down(&self, context: &UpgradeContext) -> Result<(), Error>;
+}
+
+/// Thứ một upgrade dữ liệu cần: database và khoá của chương trình.
+#[derive(Clone, Debug)]
+pub struct UpgradeContext {
+    database: Database,
+    secret: SecretKey,
+}
+
+impl UpgradeContext {
+    /// Ngữ cảnh trên `database` với khoá `secret` — cho test của module; chương trình dựng nó
+    /// trong `Migrator`.
+    pub fn new(database: Database, secret: SecretKey) -> Self {
+        UpgradeContext { database, secret }
+    }
+
+    pub fn database(&self) -> &Database {
+        &self.database
+    }
+
+    /// Khoá của chương trình (`SecretKey::sealer` để mã hoá secret).
+    pub fn secret(&self) -> &SecretKey {
+        &self.secret
+    }
+}
 
 /// Những thứ cần để viết một migration.
 pub mod prelude {
@@ -48,13 +99,38 @@ pub struct ModuleMigrations {
     // mỗi lần hỏi trạng thái hay chạy, mà `Box<dyn MigrationTrait>` không sao chép
     // được. Với `Arc`, "sao chép" chỉ là thêm một tham chiếu tới cùng migration.
     migrations: Vec<Arc<dyn MigrationTrait>>,
+    upgrades: Vec<Arc<dyn DataUpgrade>>,
 }
 
 impl ModuleMigrations {
     /// `module` là tên module (chữ thường, số, `_`; bắt đầu bằng chữ). Mọi bảng của
     /// module phải mang tiền tố `<module>_`.
     pub fn new(module: &'static str, migrations: Vec<Box<dyn MigrationTrait>>) -> Self {
-        ModuleMigrations { module, migrations: migrations.into_iter().map(Arc::from).collect() }
+        ModuleMigrations {
+            module,
+            migrations: migrations.into_iter().map(Arc::from).collect(),
+            upgrades: Vec::new(),
+        }
+    }
+
+    /// Thêm các upgrade dữ liệu của module.
+    pub fn with_upgrades(mut self, upgrades: Vec<Box<dyn DataUpgrade>>) -> Self {
+        self.upgrades = upgrades.into_iter().map(Arc::from).collect();
+        self
+    }
+
+    /// Migration schema và upgrade theo thứ tự chạy: mỗi upgrade ngay sau migration nó khai.
+    fn entries(&self) -> Vec<Entry> {
+        let mut entries = Vec::new();
+        for migration in &self.migrations {
+            entries.push(Entry::Schema(Arc::clone(migration)));
+            for upgrade in
+                self.upgrades.iter().filter(|upgrade| upgrade.after() == migration.name())
+            {
+                entries.push(Entry::Upgrade(Arc::clone(upgrade)));
+            }
+        }
+        entries
     }
 
     pub fn module(&self) -> &'static str {
@@ -67,7 +143,11 @@ impl ModuleMigrations {
     }
 
     fn names(&self) -> Vec<String> {
-        self.migrations.iter().map(|migration| migration.name().to_owned()).collect()
+        self.migrations
+            .iter()
+            .map(|migration| migration.name().to_owned())
+            .chain(self.upgrades.iter().map(|upgrade| upgrade.name().to_owned()))
+            .collect()
     }
 }
 
@@ -93,6 +173,8 @@ pub struct MigrationState {
 #[derive(Debug)]
 pub struct Migrator {
     modules: Vec<ModuleMigrations>,
+    /// Khoá cho upgrade dữ liệu. Mặc định: khoá gốc kernel giữ trong database.
+    keys: KeyConfig,
 }
 
 impl Migrator {
@@ -119,11 +201,37 @@ impl Migrator {
                 }
             }
         }
+        for set in &modules {
+            for upgrade in &set.upgrades {
+                if !upgrade.name().starts_with('u') {
+                    problems.push(format!(
+                        "module `{}`: data upgrade `{}` must be named `u0001_<what>`",
+                        set.module,
+                        upgrade.name()
+                    ));
+                }
+                if !set.migrations.iter().any(|migration| migration.name() == upgrade.after()) {
+                    problems.push(format!(
+                        "module `{}`: data upgrade `{}` runs after `{}`, which is not one of its \
+                         migrations",
+                        set.module,
+                        upgrade.name(),
+                        upgrade.after()
+                    ));
+                }
+            }
+        }
         if problems.is_empty() {
-            Ok(Migrator { modules })
+            Ok(Migrator { modules, keys: KeyConfig::default() })
         } else {
             Err(MigrationError(problems.join("; ")))
         }
+    }
+
+    /// Khoá của chương trình cho upgrade dữ liệu (`Modules::migrator` đặt).
+    pub(crate) fn with_keys(mut self, keys: KeyConfig) -> Self {
+        self.keys = keys;
+        self
     }
 
     /// Trạng thái mọi migration, theo thứ tự module đăng ký rồi thứ tự khai báo.
@@ -131,7 +239,7 @@ impl Migrator {
     pub async fn status(&self, database: &Database) -> Result<Vec<MigrationState>, MigrationError> {
         let mut states = Vec::new();
         for set in &self.modules {
-            let migrations = ModuleMigrator(set)
+            let migrations = ModuleMigrator { set, context: None }
                 .get_migration_with_status_read_only(database.read())
                 .await
                 .map_err(|error| failure(set.module, "cannot read migration status", &error))?;
@@ -157,8 +265,9 @@ impl Migrator {
     /// áp dụng. Gặp lỗi thì dừng; các migration trước đó vẫn được giữ.
     pub async fn up(&self, database: &Database) -> Result<Vec<MigrationState>, MigrationError> {
         let mut applied = Vec::new();
+        let context = self.context(database);
         for set in &self.modules {
-            let migrator = ModuleMigrator(set);
+            let migrator = ModuleMigrator { set, context: Some(context.clone()) };
             let pending = migrator
                 .get_pending_migrations_read_only(database.read())
                 .await
@@ -194,7 +303,7 @@ impl Migrator {
                 if known.is_empty() { "(none)".to_owned() } else { known.join(", ") }
             ))
         })?;
-        let migrator = ModuleMigrator(set);
+        let migrator = ModuleMigrator { set, context: Some(self.context(database)) };
         let applied = migrator
             .get_migration_with_status_read_only(database.read())
             .await
@@ -225,24 +334,89 @@ fn failure(module: &str, action: &str, error: &DbErr) -> MigrationError {
     MigrationError(format!("module `{module}`: {action}: {error}"))
 }
 
-/// Nối một [`ModuleMigrations`] vào bộ máy của sea-orm-migration.
-struct ModuleMigrator<'a>(&'a ModuleMigrations);
+impl Migrator {
+    fn context(&self, database: &Database) -> UpgradeContext {
+        UpgradeContext::new(database.clone(), self.keys.key_for(database))
+    }
+}
+
+/// Một mục trong danh sách chạy của module.
+enum Entry {
+    Schema(Arc<dyn MigrationTrait>),
+    Upgrade(Arc<dyn DataUpgrade>),
+}
+
+/// Nối một [`ModuleMigrations`] vào bộ máy của sea-orm-migration. `context`: `None` khi chỉ đọc
+/// trạng thái (upgrade không chạy).
+struct ModuleMigrator<'a> {
+    set: &'a ModuleMigrations,
+    context: Option<UpgradeContext>,
+}
 
 impl MigratorTraitSelf for ModuleMigrator<'_> {
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        self.0
-            .migrations
-            .iter()
-            // `Arc::clone`: thêm một tham chiếu, không sao chép migration.
+        self.set
+            .entries()
+            .into_iter()
             // `as Box<dyn …>`: đổi kiểu cụ thể thành "bất kỳ kiểu nào cài trait này".
-            .map(|migration| {
-                Box::new(Transactional(Arc::clone(migration))) as Box<dyn MigrationTrait>
+            .map(|entry| match entry {
+                Entry::Schema(migration) => {
+                    Box::new(Transactional(migration)) as Box<dyn MigrationTrait>
+                }
+                Entry::Upgrade(upgrade) => Box::new(Upgrading {
+                    module: self.set.module,
+                    upgrade,
+                    context: self.context.clone(),
+                }) as Box<dyn MigrationTrait>,
             })
             .collect()
     }
 
     fn migration_table_name(&self) -> DynIden {
-        Alias::new(self.0.history_table()).into_iden()
+        Alias::new(self.set.history_table()).into_iden()
+    }
+}
+
+/// Một upgrade dữ liệu trong bộ máy migration: chạy ngoài transaction (upgrade tự mở transaction).
+struct Upgrading {
+    module: &'static str,
+    upgrade: Arc<dyn DataUpgrade>,
+    context: Option<UpgradeContext>,
+}
+
+impl Upgrading {
+    fn context(&self) -> Result<&UpgradeContext, DbErr> {
+        self.context.as_ref().ok_or_else(|| {
+            DbErr::Custom(format!(
+                "data upgrade `{}` of module `{}` needs the configuration; run it with \
+                 `autoxide migrate up`",
+                self.upgrade.name(),
+                self.module
+            ))
+        })
+    }
+}
+
+impl MigrationName for Upgrading {
+    fn name(&self) -> &str {
+        self.upgrade.name()
+    }
+}
+
+#[sea_orm_migration::async_trait::async_trait]
+impl MigrationTrait for Upgrading {
+    async fn up(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        let context = self.context()?;
+        self.upgrade.up(context).await.map_err(|error| DbErr::Custom(error.to_string()))
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        let context = self.context()?;
+        self.upgrade.down(context).await.map_err(|error| DbErr::Custom(error.to_string()))
+    }
+
+    fn use_transaction(&self) -> Option<bool> {
+        Some(false)
     }
 }
 

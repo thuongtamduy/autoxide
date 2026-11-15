@@ -108,6 +108,12 @@ enum Command {
     /// or an argument is wrong, 1 when the task fails. Run `autoxide migrate up` first.
     Task(commands::task::Arguments),
 
+    /// Encrypt stored secrets again with the current key (after rotating AUTOXIDE_SECRET_KEY).
+    ///
+    /// `autoxide secrets reseal` runs the `reseal_secrets` task of every module that keeps
+    /// encrypted secrets. Run `autoxide migrate up` first.
+    Secrets(commands::secrets::Arguments),
+
     /// Manage user accounts, e.g. create the first administrator.
     ///
     /// Runs with the rights of whoever operates the server: no sign-in needed.
@@ -128,6 +134,7 @@ fn main() -> ExitCode {
         Command::Openapi => commands::openapi::run(),
         Command::McpManifest => commands::mcp_manifest::run(),
         Command::Restore(arguments) => commands::backup::restore(&arguments),
+        Command::Secrets(arguments) => commands::secrets::run(&arguments),
         Command::Serve => commands::serve::run(),
         Command::Task(arguments) => commands::task::run(&arguments),
         Command::User(arguments) => commands::user::run(&arguments),

@@ -79,6 +79,12 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Upgrade dữ liệu của module (D-257): việc nâng dữ liệu cần cấu hình của chương trình (vd
+    /// mã hoá secret cũ). Mặc định rỗng. Xem `autoxide_kernel::migration::DataUpgrade`.
+    fn upgrades(&self) -> Vec<Box<dyn crate::migration::DataUpgrade>> {
+        Vec::new()
+    }
+
     /// Bảng mặt điều khiển của module (bước 33, D-253): bảng không có `tenant_id` vì chung cả nền
     /// tảng, chỉ có dữ liệu ở database điều khiển. Mọi bảng khác của module (trừ `<m>_migrations`)
     /// là bảng cấp khách hàng và phải có `tenant_id` — testkit và `cargo xtask check` kiểm.

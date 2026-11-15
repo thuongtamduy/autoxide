@@ -6510,3 +6510,31 @@ Thay thế: không. Bổ sung D-253, D-254.
    `kernel_tenant_settings`.
 
 Bổ sung D-253.
+
+## D-257 · Mã hoá secret khi lưu, upgrade dữ liệu, xoay khoá (bước 33 A6, dời từ bước 37) — 2026-11-15 — agent quyết
+
+1. **Thuật toán và thư viện: AES-256-GCM qua `ring` 0.17** (đã có trong cây phụ thuộc qua rustls / object_store —
+   không thêm crate để biên dịch; `zeroize` cũng vậy). Nonce 96 bit ngẫu nhiên mỗi lần mã hoá; số lần mã hoá mỗi khoá
+   nhỏ (secret cấu hình, không phải dữ liệu lớn) nên giới hạn 2^32 của nonce ngẫu nhiên không chạm tới. Không tự chế
+   thuật toán.
+2. **Định dạng** `sealed:v1:<key_id>:<base64url(nonce || ciphertext || tag)>`; AAD = mục đích + khách + định danh
+   dòng: chép giá trị sang dòng khác, khách khác hay mục đích khác thì không mở được. `key_id` = 8 ký tự hex đầu của
+   SHA-256 khoá (đây là "số phiên bản khoá" của ROADMAP).
+3. **Khoá** = `SecretKey::derive("autoxide/kernel/seal/v1")`. Khoá cũ: `AUTOXIDE_SECRET_KEY_PREVIOUS` (danh sách) và —
+   khi `AUTOXIDE_SECRET_KEY` đã đặt — khoá gốc kernel từng sinh trong `kernel_secrets`, để lần đầu đặt biến môi trường
+   không làm mất secret nào. Xoay khoá: `autoxide secrets reseal` chạy mọi task `<module>.reseal_secrets`.
+4. **Upgrade dữ liệu (`Module::upgrades`)**: ghi vào cùng bảng `<m>_migrations` như đặc tả. sea-orm-migration báo lỗi
+   khi bảng lịch sử có dòng không nằm trong danh sách, nên upgrade là một mục của danh sách chạy, đặt **ngay sau
+   migration schema nó khai** (`DataUpgrade::after`) — thứ tự trong bảng lịch sử khớp thứ tự chạy, `down` gỡ đúng
+   thứ tự. Upgrade chạy **ngoài** transaction của migration (nó cần đọc / ghi khoá gốc qua kết nối khác — trong
+   transaction ghi của SQLite sẽ tự chờ chính mình) và phải chạy lại được từ đầu; `down` đưa dữ liệu về như cũ để
+   bản trước của chương trình đọc được. Khoá dùng trong upgrade là khoá của chương trình (`Modules::migrator` mang
+   cấu hình khoá module `kernel` đọc); dựng `Migrator` tay thì dùng khoá gốc trong database.
+5. **Cảnh báo**: `autoxide doctor` (bước `secret_key`) và log khởi động nói rõ khi `AUTOXIDE_SECRET_KEY` chưa đặt thì
+   bản backup chứa cả khoá lẫn secret đã mã hoá.
+
+Căn cứ pháp lý: Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 và Nghị định 356/2025/NĐ-CP yêu cầu biện pháp kỹ thuật
+bảo vệ dữ liệu (mã hoá là biện pháp được nêu); Luật An ninh mạng 116/2025/QH15. Điều khoản cụ thể cần đối chiếu
+văn bản gốc hay người có chuyên môn pháp lý (D-186).
+
+Bổ sung D-253. Thay phần "mã hoá dữ liệu nhạy cảm" của bước 37 (D-190 đã dời sang bước 33).

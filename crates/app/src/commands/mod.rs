@@ -9,6 +9,7 @@ pub mod jobs;
 pub mod mcp_manifest;
 pub mod migrate;
 pub mod openapi;
+pub mod secrets;
 pub mod serve;
 pub mod task;
 pub mod user;
