@@ -42,6 +42,15 @@ endpoints are marked deprecated with a sunset date first.
   platform. testkit: `schema_tenancy_violations` checks a migrated database (every other table has
   `tenant_id` NOT NULL without a default; unique keys and indexes start with it, except keys made only of UUIDs
   and sweep indexes named `…_sweep_idx`); `cargo xtask check` refuses an entity without `tenant_id`.
+- Secrets the server must read back are stored encrypted (AES-256-GCM) with a key derived from
+  `AUTOXIDE_SECRET_KEY`: `autoxide_kernel::secret::Sealer` (`SecretKey::sealer`). Rotating the key: new value in
+  `AUTOXIDE_SECRET_KEY`, old one in the new setting `AUTOXIDE_SECRET_KEY_PREVIOUS`, then the new command
+  `autoxide secrets reseal`. `autoxide doctor` and the startup log say plainly that a backup holds the key when
+  `AUTOXIDE_SECRET_KEY` is unset.
+- For module authors: data upgrades (`Module::upgrades`, `autoxide_kernel::migration::DataUpgrade`) — a change
+  of stored data that needs the configuration, such as encrypting old secrets. Named `u0001_…`, recorded with the
+  migrations of the module, run by `autoxide migrate up` right after the migration they name; `serve` refuses to
+  start while one is pending.
 - For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
   errors.
 

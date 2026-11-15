@@ -62,6 +62,8 @@ pub struct Modules {
     catalog: crate::module_catalog::ModuleCatalog,
     /// Cờ theo người dùng của module `kernel`, phục vụ dưới `/api/v1/me` (D-207).
     user_flags: crate::user_flags::Handle,
+    /// Cấu hình khoá gốc (module `kernel` điền lúc `configure`), cho upgrade dữ liệu.
+    keys: crate::secret::KeyConfig,
     /// Sổ database (bước 33); có sau [`start`](Self::start).
     tenancy: Option<crate::tenancy::DatabaseRegistry>,
 }
@@ -84,8 +86,13 @@ impl Modules {
         }
         let catalog = crate::module_catalog::ModuleCatalog::default();
         let user_flags = crate::user_flags::Handle::default();
+        let keys = crate::secret::KeyConfig::default();
         let mut all: Vec<Box<dyn Module>> = vec![
-            Box::new(crate::builtin::KernelModule::new(catalog.clone(), user_flags.clone())),
+            Box::new(crate::builtin::KernelModule::new(
+                catalog.clone(),
+                user_flags.clone(),
+                keys.clone(),
+            )),
             Box::new(crate::antispam::module::AntispamModule::default()),
         ];
         all.extend(modules);
@@ -128,6 +135,7 @@ impl Modules {
                 apis: Apis::default(),
                 catalog,
                 user_flags,
+                keys,
                 tenancy: None,
             })
         } else {
@@ -489,12 +497,15 @@ impl Modules {
 
     /// Migrator chạy migration của mọi module.
     pub fn migrator(&self) -> Result<Migrator, MigrationError> {
-        Migrator::new(
-            self.modules
-                .iter()
-                .map(|module| ModuleMigrations::new(module.name(), module.migrations()))
-                .collect(),
-        )
+        let modules = self
+            .modules
+            .iter()
+            .map(|module| {
+                ModuleMigrations::new(module.name(), module.migrations())
+                    .with_upgrades(module.upgrades())
+            })
+            .collect();
+        Ok(Migrator::new(modules)?.with_keys(self.keys.clone()))
     }
 }
 
@@ -719,8 +730,13 @@ mod tests {
         // Chỉ biến của hai module nội bộ `kernel` và `antispam`.
         let names: Vec<&str> = reader.values().iter().map(|value| value.setting.name).collect();
         let internal = |name: &&str| {
-            ["AUTOXIDE_SECRET_KEY", "AUTOXIDE_HTTP_PUBLIC_URL", "AUTOXIDE_USER_FLAGS_MAX"]
-                .contains(name)
+            [
+                "AUTOXIDE_SECRET_KEY",
+                "AUTOXIDE_SECRET_KEY_PREVIOUS",
+                "AUTOXIDE_HTTP_PUBLIC_URL",
+                "AUTOXIDE_USER_FLAGS_MAX",
+            ]
+            .contains(name)
                 || name.starts_with("AUTOXIDE_ANTISPAM_")
         };
         assert!(names.iter().all(internal), "{names:?}");

@@ -67,9 +67,10 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         && modules.api::<SecretKey>().is_some_and(|key| !key.is_configured())
     {
         tracing::warn!(
-            "AUTOXIDE_SECRET_KEY is not set: the signing key is kept in the database, so anyone \
-             with a copy of the database can work visitors' IP blocks back out of the stored \
-             hashes. Set it (outside the database, the same on every server) in production."
+            "AUTOXIDE_SECRET_KEY is not set: the root key is kept in the database, so anyone with \
+             a copy of the database (a backup) can open the secrets stored encrypted and work \
+             visitors' IP blocks back out of the stored hashes. Set it (outside the database, \
+             the same on every server) in production."
         );
     }
     let background = modules.dispatcher().and_then(|dispatcher| {

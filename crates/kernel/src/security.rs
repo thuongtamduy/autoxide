@@ -5,6 +5,7 @@ pub mod access;
 pub mod antispam;
 pub mod idempotency;
 pub mod ip_hash;
+mod seal;
 pub mod secret;
 pub mod throttle;
 pub mod tls;

@@ -23,8 +23,9 @@ use crate::user_flags::{self, UserFlags};
 pub(crate) const NAME: &str = "kernel";
 
 pub(crate) struct KernelModule {
-    /// Giá trị `AUTOXIDE_SECRET_KEY`; có sau `configure`.
-    secret: Option<Vec<u8>>,
+    /// Giá trị `AUTOXIDE_SECRET_KEY` và `AUTOXIDE_SECRET_KEY_PREVIOUS`; điền lúc `configure`, dùng
+    /// chung với `Migrator`.
+    keys: crate::secret::KeyConfig,
     /// Giá trị `AUTOXIDE_HTTP_PUBLIC_URL`; có sau `configure`.
     public_url: PublicUrl,
     /// Sổ module, do `Modules::start` điền sau khi mọi module khởi động.
@@ -38,9 +39,13 @@ pub(crate) struct KernelModule {
 }
 
 impl KernelModule {
-    pub(crate) fn new(catalog: ModuleCatalog, flags: user_flags::Handle) -> Self {
+    pub(crate) fn new(
+        catalog: ModuleCatalog,
+        flags: user_flags::Handle,
+        keys: crate::secret::KeyConfig,
+    ) -> Self {
         KernelModule {
-            secret: None,
+            keys,
             public_url: PublicUrl::default(),
             catalog,
             database: None,
@@ -76,9 +81,10 @@ impl Module for KernelModule {
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         let secret = crate::secret::read_setting(reader);
+        let previous = crate::secret::read_previous(reader);
         let public_url = crate::public_url::read_setting(reader);
         let max_flags = user_flags::read_setting(reader);
-        self.secret = secret?;
+        self.keys.set(secret?, previous?);
         self.public_url = public_url?;
         self.max_flags = max_flags?;
         Ok(())
@@ -108,7 +114,7 @@ impl Module for KernelModule {
         let flags = Arc::new(UserFlags::new(context.database().clone(), self.max_flags));
         context.personal_data(flags.clone())?;
         self.flags.fill(flags);
-        let key = SecretKey::new(context.database().clone(), self.secret.clone());
+        let key = self.keys.key_for(context.database());
         context.provide::<SecretKey>(Arc::new(key))?;
         context.provide::<PublicUrl>(Arc::new(self.public_url.clone()))
     }
