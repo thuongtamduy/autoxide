@@ -115,10 +115,10 @@ Nhóm B — chống hồi quy:
       `STACK.md`
 - [x] Response thật khớp hợp đồng (D-241): test HTTP qua `TestApp` kiểm mỗi response (thân và mã) khớp
       schema của endpoint đó trong `docs/openapi.json`, để tài liệu không hứa điều code không làm
-- [ ] Hợp đồng quyền đọc được bằng máy (D-205, đặc tả 54 mục P1): mỗi operation OpenAPI có
+- [x] Hợp đồng quyền đọc được bằng máy (D-245; D-205, đặc tả 54 mục P1): mỗi operation OpenAPI có
       `x-permissions` hay `x-public`, sinh từ một khai báo cạnh handler; `Permission` có mức rủi ro
       (`read` / `write` / `destructive` / `sensitive_data` / `money`)
-- [ ] Test độ phủ phân quyền trong gate (D-205): mọi operation không công khai trả 401 khi không token và
+- [x] Test độ phủ phân quyền trong gate (D-205, D-245): mọi operation không công khai trả 401 khi không token và
       403 khi token không có quyền; operation thiếu khai báo quyền làm gate đỏ; tool MCP `read_only` chỉ
       đòi quyền mức `read`
 

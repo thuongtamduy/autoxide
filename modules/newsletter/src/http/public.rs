@@ -88,6 +88,7 @@ fn locale(raw: Option<&str>) -> Result<Locale, Error> {
 #[utoipa::path(
     get,
     path = "/public/lists",
+    extensions(("x-public" = json!(true))),
     operation_id = "list_public_newsletter_lists",
     security((), ("bearer" = [])),
     params(LocaleQuery),
@@ -167,6 +168,7 @@ pub(crate) struct SubscribeResponse {
 #[utoipa::path(
     post,
     path = "/public/subscribe",
+    extensions(("x-public" = json!(true))),
     operation_id = "subscribe_newsletter",
     security((), ("bearer" = [])),
     request_body = SubscribeBody,
@@ -230,6 +232,7 @@ pub(crate) struct ConfirmResponse {
 #[utoipa::path(
     post,
     path = "/public/confirm",
+    extensions(("x-public" = json!(true))),
     operation_id = "confirm_newsletter_subscription",
     security((), ("bearer" = [])),
     request_body = ConfirmBody,
@@ -274,6 +277,7 @@ pub(crate) struct UnsubscribeResponse {
 #[utoipa::path(
     post,
     path = "/public/unsubscribe",
+    extensions(("x-public" = json!(true))),
     operation_id = "unsubscribe_newsletter",
     security((), ("bearer" = [])),
     params(TokenQuery),
@@ -343,6 +347,7 @@ impl From<Preferences> for PreferencesResponse {
 #[utoipa::path(
     get,
     path = "/public/preferences",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_newsletter_preferences",
     security((), ("bearer" = [])),
     params(TokenQuery),
@@ -397,6 +402,7 @@ pub(crate) struct PreferencesBody {
 #[utoipa::path(
     put,
     path = "/public/preferences",
+    extensions(("x-public" = json!(true))),
     operation_id = "update_newsletter_preferences",
     security((), ("bearer" = [])),
     params(TokenQuery),

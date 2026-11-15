@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use autoxide_kernel::access::{Permission, Principal};
+use autoxide_kernel::access::{Permission, Principal, Risk};
 use autoxide_kernel::ai::{Embedder, TextModel};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::mcp::{NoInput, Tool};
@@ -20,7 +20,8 @@ use crate::usage::UsageBook;
 pub(crate) const AI_VIEW: Permission = Permission::new(
     "ai.view",
     "See whether AI features are on, which provider and model they use, and today's token use.",
-);
+)
+.with_risk(Risk::Read);
 
 /// Mọi thứ trạng thái cần.
 pub(crate) struct Status {
@@ -85,6 +86,7 @@ pub(crate) fn routes(status: Arc<Status>) -> OpenApiRouter {
 #[utoipa::path(
     get,
     path = "/status",
+    extensions(("x-permissions" = json!(["ai.view"]))),
     operation_id = "get_ai_status",
     security(("bearer" = [])),
     responses(

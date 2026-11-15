@@ -131,6 +131,7 @@ fn roles(roles: Vec<Role>) -> Data<Vec<RoleResponse>> {
 #[utoipa::path(
     get,
     path = "/permissions",
+    extensions(("x-permissions" = json!(["auth.roles.read"]))),
     operation_id = "list_permissions",
     security(("bearer" = [])),
     responses(
@@ -153,6 +154,7 @@ async fn list_permissions(
 #[utoipa::path(
     get,
     path = "/roles",
+    extensions(("x-permissions" = json!(["auth.roles.read"]))),
     operation_id = "list_roles",
     security(("bearer" = [])),
     params(PageQuery),
@@ -179,6 +181,7 @@ async fn list_roles(
 #[utoipa::path(
     post,
     path = "/roles",
+    extensions(("x-permissions" = json!(["auth.roles.manage"]))),
     operation_id = "create_role",
     security(("bearer" = [])),
     request_body = RoleRequest,
@@ -206,6 +209,7 @@ async fn create_role(
 #[utoipa::path(
     get,
     path = "/roles/{id}",
+    extensions(("x-permissions" = json!(["auth.roles.read"]))),
     operation_id = "get_role",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the role.")),
@@ -233,6 +237,7 @@ async fn get_role(
 #[utoipa::path(
     put,
     path = "/roles/{id}",
+    extensions(("x-permissions" = json!(["auth.roles.manage"]))),
     operation_id = "replace_role",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the role."), ("If-Match" = Option<String>, Header, description = "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.")),
@@ -266,6 +271,7 @@ async fn replace_role(
 #[utoipa::path(
     delete,
     path = "/roles/{id}",
+    extensions(("x-permissions" = json!(["auth.roles.manage"]))),
     operation_id = "delete_role",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the role.")),
@@ -293,6 +299,7 @@ async fn delete_role(
 #[utoipa::path(
     get,
     path = "/users/{id}/roles",
+    extensions(("x-permissions" = json!(["auth.users.read"]))),
     operation_id = "get_user_roles",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user.")),
@@ -319,6 +326,7 @@ async fn get_user_roles(
 #[utoipa::path(
     put,
     path = "/users/{id}/roles",
+    extensions(("x-permissions" = json!(["auth.roles.manage"]))),
     operation_id = "replace_user_roles",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user.")),

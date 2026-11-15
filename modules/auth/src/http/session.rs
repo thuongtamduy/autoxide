@@ -164,6 +164,7 @@ impl MeResponse {
 #[utoipa::path(
     post,
     path = "/login",
+    extensions(("x-public" = json!(true))),
     operation_id = "login",
     request_body = LoginRequest,
     responses(
@@ -206,6 +207,7 @@ const METHODS: [&str; 2] = ["totp", "recovery_code"];
 #[utoipa::path(
     post,
     path = "/login/mfa",
+    extensions(("x-public" = json!(true))),
     operation_id = "login_mfa",
     request_body = LoginMfaRequest,
     responses(
@@ -233,6 +235,7 @@ async fn login_mfa(
 #[utoipa::path(
     post,
     path = "/refresh",
+    extensions(("x-public" = json!(true))),
     operation_id = "refresh",
     request_body = RefreshRequest,
     responses(
@@ -257,6 +260,7 @@ async fn refresh(
 #[utoipa::path(
     post,
     path = "/logout",
+    extensions(("x-public" = json!(true))),
     operation_id = "logout",
     request_body = RefreshRequest,
     responses(
@@ -276,6 +280,7 @@ async fn logout(
 #[utoipa::path(
     get,
     path = "/me",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "me",
     security(("bearer" = [])),
     responses(
@@ -302,6 +307,7 @@ async fn me(
 #[utoipa::path(
     post,
     path = "/me/password",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "change_password",
     security(("bearer" = [])),
     request_body = ChangePasswordRequest,

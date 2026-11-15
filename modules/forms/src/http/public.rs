@@ -136,6 +136,7 @@ pub(crate) struct LocaleQuery {
 #[utoipa::path(
     get,
     path = "/public/{key}",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_public_form",
     security((), ("bearer" = [])),
     params(("key" = String, Path, description = "Key of the form."), LocaleQuery),
@@ -208,6 +209,7 @@ pub(crate) struct SubmitResponse {
 #[utoipa::path(
     post,
     path = "/public/{key}/submissions",
+    extensions(("x-public" = json!(true))),
     operation_id = "submit_form",
     security((), ("bearer" = [])),
     params(("key" = String, Path, description = "Key of the form.")),

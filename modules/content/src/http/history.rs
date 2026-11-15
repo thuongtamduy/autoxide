@@ -100,6 +100,7 @@ pub(crate) struct ScheduleRequest {
 #[utoipa::path(
     get,
     path = "/entries/{id}/revisions",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "list_content_revisions",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry."), PageQuery),
@@ -126,6 +127,7 @@ pub(crate) async fn list_revisions(
 #[utoipa::path(
     get,
     path = "/entries/{id}/revisions/{revision_id}",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "get_content_revision",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry."), ("revision_id" = Uuid, Path, description = "Id of the revision.")),
@@ -152,6 +154,7 @@ pub(crate) async fn get_revision(
 #[utoipa::path(
     post,
     path = "/entries/{id}/revisions/{revision_id}/restore",
+    extensions(("x-permissions" = json!(["content.write", "content.write_own"]))),
     operation_id = "restore_content_revision",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry."), ("revision_id" = Uuid, Path, description = "Id of the revision."), ("If-Match" = String, Header, description = "Required: the `ETag` of the entry (or `*`).")),
@@ -182,6 +185,7 @@ pub(crate) async fn restore_revision(
 #[utoipa::path(
     get,
     path = "/entries/{id}/schedules",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "list_content_schedules",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry.")),
@@ -209,6 +213,7 @@ pub(crate) async fn list_schedules(
 #[utoipa::path(
     post,
     path = "/entries/{id}/schedules",
+    extensions(("x-permissions" = json!(["content.publish"]))),
     operation_id = "create_content_schedule",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = "Required: the `ETag` of the entry (or `*`).")),
@@ -242,6 +247,7 @@ pub(crate) async fn create_schedule(
 #[utoipa::path(
     delete,
     path = "/schedules/{id}",
+    extensions(("x-permissions" = json!(["content.publish"]))),
     operation_id = "cancel_content_schedule",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the schedule.")),

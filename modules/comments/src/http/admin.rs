@@ -74,6 +74,7 @@ impl QueueQuery {
 #[utoipa::path(
     get,
     path = "/",
+    extensions(("x-permissions" = json!(["comments.read"]))),
     operation_id = "list_comments",
     security(("bearer" = [])),
     params(QueueQuery, PageQuery),
@@ -102,6 +103,7 @@ pub(crate) async fn list_comments(
 #[utoipa::path(
     get,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["comments.read"]))),
     operation_id = "get_comment",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -137,6 +139,7 @@ pub(crate) struct UpdateCommentRequest {
 #[utoipa::path(
     patch,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["comments.moderate"]))),
     operation_id = "update_comment",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -179,6 +182,7 @@ pub(crate) struct PurgedResponse {
 #[utoipa::path(
     delete,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["comments.moderate"]))),
     operation_id = "delete_comment",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -204,6 +208,7 @@ pub(crate) async fn delete_comment(
 #[utoipa::path(
     get,
     path = "/{id}/reports",
+    extensions(("x-permissions" = json!(["comments.read"]))),
     operation_id = "list_comment_reports",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment."), PageQuery),
@@ -242,6 +247,7 @@ pub(crate) struct BansQuery {
 #[utoipa::path(
     get,
     path = "/bans",
+    extensions(("x-permissions" = json!(["comments.manage"]))),
     operation_id = "list_comment_bans",
     security(("bearer" = [])),
     params(BansQuery, PageQuery),
@@ -297,6 +303,7 @@ pub(crate) struct BanRequest {
 #[utoipa::path(
     post,
     path = "/bans",
+    extensions(("x-permissions" = json!(["comments.manage"]))),
     operation_id = "create_comment_ban",
     security(("bearer" = [])),
     request_body = BanRequest,
@@ -332,6 +339,7 @@ pub(crate) async fn create_ban(
 #[utoipa::path(
     delete,
     path = "/bans/{id}",
+    extensions(("x-permissions" = json!(["comments.manage"]))),
     operation_id = "delete_comment_ban",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the ban.")),
@@ -357,6 +365,7 @@ pub(crate) async fn delete_ban(
 #[utoipa::path(
     get,
     path = "/targets/{target_type}/{target_id}",
+    extensions(("x-permissions" = json!(["comments.read"]))),
     operation_id = "get_comment_target",
     security(("bearer" = [])),
     params(
@@ -416,6 +425,7 @@ pub(crate) struct TargetRequest {
 #[utoipa::path(
     put,
     path = "/targets/{target_type}/{target_id}",
+    extensions(("x-permissions" = json!(["comments.manage"]))),
     operation_id = "set_comment_target",
     security(("bearer" = [])),
     params(
@@ -501,6 +511,7 @@ pub(crate) struct ErasedResponse {
 #[utoipa::path(
     get,
     path = "/data",
+    extensions(("x-permissions" = json!(["comments.export"]))),
     operation_id = "export_comments_email_data",
     security(("bearer" = [])),
     params(EmailQuery),
@@ -516,6 +527,8 @@ pub(crate) async fn get_email_data(
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<EmailDataResponse>, Error> {
+    // Kiểm quyền trước khi đọc `email`: người không có quyền nhận 403, không phải 422 (D-245).
+    principal.require(&crate::permissions::COMMENTS_EXPORT)?;
     let found = service.email_data(&principal, query.email()?).await?;
     Ok(Data {
         data: EmailDataResponse {
@@ -539,6 +552,7 @@ pub(crate) async fn get_email_data(
 #[utoipa::path(
     delete,
     path = "/data",
+    extensions(("x-permissions" = json!(["comments.export"]))),
     operation_id = "erase_comments_email_data",
     security(("bearer" = [])),
     params(EmailQuery),
@@ -554,6 +568,8 @@ pub(crate) async fn delete_email_data(
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<ErasedResponse>, Error> {
+    // Kiểm quyền trước khi đọc `email`: người không có quyền nhận 403, không phải 422 (D-245).
+    principal.require(&crate::permissions::COMMENTS_EXPORT)?;
     let cleared = service.erase_email(&principal, query.email()?).await?;
     Ok(Data { data: ErasedResponse { cleared } })
 }

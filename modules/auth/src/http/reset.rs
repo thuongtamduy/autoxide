@@ -47,6 +47,7 @@ pub(crate) struct ResetConfirmation {
 #[utoipa::path(
     post,
     path = "/password-reset",
+    extensions(("x-public" = json!(true))),
     operation_id = "request_password_reset",
     request_body = ResetRequest,
     responses(
@@ -70,6 +71,7 @@ async fn request_reset(
 #[utoipa::path(
     post,
     path = "/password-reset/confirm",
+    extensions(("x-public" = json!(true))),
     operation_id = "confirm_password_reset",
     request_body = ResetConfirmation,
     responses(

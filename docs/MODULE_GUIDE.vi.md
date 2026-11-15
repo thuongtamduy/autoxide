@@ -122,6 +122,17 @@ Route nằm trong `src/http.rs`, đăng ký bằng `OpenApiRouter::routes(routes
 - Viết tài liệu cho mọi handler: một dòng `///` (thành summary), permission cần có, và
   `description` cho mọi response kèm `code` lỗi. Doc comment trên handler và kiểu schema
   viết tiếng Anh, cho người gọi API.
+- Khai ai được gọi mỗi endpoint trong `#[utoipa::path]`, ngay sau `path`:
+  `extensions(("x-permissions" = json!(["notes.write"])))` (có một trong các permission là đủ;
+  `[]` nghĩa là mọi người đã đăng nhập) hoặc `extensions(("x-public" = json!(true)))`. Mô tả
+  hay response 403 phải nêu đúng các permission đó. Gate kiểm mọi endpoint: không token → 401,
+  người không có permission → 403 `permission_denied`. Kiểm permission trước tiên trong
+  handler, trước khi đọc đầu vào, để người không có quyền không bao giờ nhận 422. Tool MCP
+  hoặc `.requires(…)` một permission, hoặc khai `.for_any_signed_in()`; tool chỉ đọc phải gọi
+  được bằng một permission mức `read`.
+- Mức rủi ro của permission (`read`, `write`, `destructive`, `sensitive_data`, `money`) suy từ
+  tên (`….read` là `read`, còn lại `write`); khác thì đặt bằng
+  `Permission::new(…).with_risk(Risk::Destructive)`.
 - Thay đổi phá vỡ: thêm endpoint mới và khai endpoint cũ trong `Module::deprecations`.
   Gate (`cargo xtask api-diff`) so `docs/openapi.json` với bản phát hành gần nhất và từ chối
   thay đổi phá vỡ, nêu từng chỗ và cách làm đúng.

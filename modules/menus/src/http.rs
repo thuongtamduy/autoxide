@@ -264,6 +264,7 @@ impl From<Menu> for SiteMenuSummary {
 #[utoipa::path(
     get,
     path = "/",
+    extensions(("x-permissions" = json!(["menus.read"]))),
     operation_id = "list_menus",
     security(("bearer" = [])),
     params(PageQuery),
@@ -291,6 +292,7 @@ async fn list_menus(
 #[utoipa::path(
     post,
     path = "/",
+    extensions(("x-permissions" = json!(["menus.manage"]))),
     operation_id = "create_menu",
     security(("bearer" = [])),
     request_body = CreateSiteMenuRequest,
@@ -318,6 +320,7 @@ async fn create_menu(
 #[utoipa::path(
     get,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["menus.read"]))),
     operation_id = "get_menu",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the menu.")),
@@ -345,6 +348,7 @@ async fn get_menu(
 #[utoipa::path(
     put,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["menus.manage"]))),
     operation_id = "replace_menu_items",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the menu."), ("If-Match" = String, Header, description = "Required: the `ETag` you read, or `*`.")),
@@ -377,6 +381,7 @@ async fn replace_menu(
 #[utoipa::path(
     delete,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["menus.manage"]))),
     operation_id = "delete_menu",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the menu.")),
@@ -416,6 +421,7 @@ pub(crate) struct PublicQuery {
 #[utoipa::path(
     get,
     path = "/public/{key}",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_public_menu",
     security((), ("bearer" = [])),
     params(("key" = String, Path, description = "Key of the menu, e.g. `main`."), PublicQuery),

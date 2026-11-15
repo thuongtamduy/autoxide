@@ -1679,7 +1679,10 @@
       },
       "name": "files.delete_file",
       "output_schema": null,
-      "permissions": []
+      "permissions": [
+        "files.upload",
+        "files.manage"
+      ]
     },
     {
       "annotations": {
@@ -1707,7 +1710,10 @@
       },
       "name": "files.get_file",
       "output_schema": null,
-      "permissions": []
+      "permissions": [
+        "files.upload",
+        "files.manage"
+      ]
     },
     {
       "annotations": {
@@ -1781,7 +1787,10 @@
       },
       "name": "files.read_file",
       "output_schema": null,
-      "permissions": []
+      "permissions": [
+        "files.upload",
+        "files.manage"
+      ]
     },
     {
       "annotations": {

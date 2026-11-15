@@ -3105,6 +3105,8 @@ export type ModuleMigration = {
 export type ModulePermission = {
   description: string;
   name: string;
+  /** How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`. */
+  risk: string;
 };
 
 /** A recurring job. */

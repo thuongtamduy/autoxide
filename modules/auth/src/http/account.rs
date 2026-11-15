@@ -54,6 +54,7 @@ pub(crate) struct PersonalDataResponse {
 #[utoipa::path(
     get,
     path = "/me/export",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "export_personal_data",
     security(("bearer" = [])),
     responses(
@@ -87,6 +88,7 @@ async fn export_personal_data(
 #[utoipa::path(
     delete,
     path = "/me",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "delete_own_account",
     security(("bearer" = [])),
     request_body = DeleteAccountRequest,

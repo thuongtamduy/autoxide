@@ -128,6 +128,8 @@ pub struct Tool {
     input_schema: Value,
     handler: Arc<dyn ToolHandler>,
     deprecation: Option<ToolDeprecation>,
+    /// Khai tường minh: mọi người đã đăng nhập gọi được (service tự giới hạn vào dữ liệu của họ).
+    any_signed_in: bool,
 }
 
 impl std::fmt::Debug for Tool {
@@ -158,6 +160,7 @@ impl Tool {
                 .unwrap_or(Value::Null),
             handler: Arc::new(Typed { handler, input: PhantomData }),
             deprecation: None,
+            any_signed_in: false,
         }
     }
 
@@ -173,6 +176,19 @@ impl Tool {
     pub fn or_requires(mut self, permission: Permission) -> Self {
         self.alternative = Some(permission);
         self
+    }
+
+    /// Mọi người đã đăng nhập gọi được, không cần permission — vd việc trên tài khoản của chính họ
+    /// (service tự giới hạn). Như `x-permissions: []` của endpoint: test độ phủ phân quyền đòi mỗi
+    /// tool hoặc có permission, hoặc khai điều này (D-245).
+    pub fn for_any_signed_in(mut self) -> Self {
+        self.any_signed_in = true;
+        self
+    }
+
+    /// Xem [`for_any_signed_in`](Self::for_any_signed_in).
+    pub fn is_for_any_signed_in(&self) -> bool {
+        self.any_signed_in
     }
 
     /// Tool chỉ đọc, không đổi gì (gợi ý cho client MCP: gọi không cần hỏi lại).

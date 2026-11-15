@@ -227,7 +227,7 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
                 "name": "notes",
                 "internal": false,
                 "position": 2,
-                "permissions": [{ "name": "notes.write", "description": "Write notes." }],
+                "permissions": [{ "name": "notes.write", "description": "Write notes.", "risk": "write" }],
                 "events": [{ "name": "notes.note_created", "description": "A note was created." }],
                 "subscriptions": [],
                 "jobs": ["notes.cleanup"],

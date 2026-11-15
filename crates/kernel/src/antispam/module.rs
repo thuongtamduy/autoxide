@@ -88,6 +88,7 @@ pub(crate) struct FormTokenResponse {
 #[utoipa::path(
     get,
     path = "/token",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_antispam_token",
     security((), ("bearer" = [])),
     params(TokenQuery),

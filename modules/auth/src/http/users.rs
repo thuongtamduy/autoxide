@@ -128,6 +128,7 @@ pub(crate) struct UserSearchQuery {
 #[utoipa::path(
     get,
     path = "/users",
+    extensions(("x-permissions" = json!(["auth.users.read"]))),
     operation_id = "list_users",
     security(("bearer" = [])),
     params(UserSearchQuery, PageQuery),
@@ -158,6 +159,7 @@ async fn list_users(
 #[utoipa::path(
     post,
     path = "/users",
+    extensions(("x-permissions" = json!(["auth.users.manage"]))),
     operation_id = "create_user",
     security(("bearer" = [])),
     request_body = CreateUserRequest,
@@ -189,6 +191,7 @@ async fn create_user(
 #[utoipa::path(
     get,
     path = "/users/{id}",
+    extensions(("x-permissions" = json!(["auth.users.read"]))),
     operation_id = "get_user",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user.")),
@@ -217,6 +220,7 @@ async fn get_user(
 #[utoipa::path(
     patch,
     path = "/users/{id}",
+    extensions(("x-permissions" = json!(["auth.users.manage"]))),
     operation_id = "update_user",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user."), ("If-Match" = Option<String>, Header, description = "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.")),
@@ -254,6 +258,7 @@ async fn update_user(
 #[utoipa::path(
     delete,
     path = "/users/{id}",
+    extensions(("x-permissions" = json!(["auth.users.manage"]))),
     operation_id = "delete_user",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user.")),
@@ -284,6 +289,7 @@ async fn delete_user(
 #[utoipa::path(
     post,
     path = "/register",
+    extensions(("x-public" = json!(true))),
     operation_id = "register",
     request_body = RegisterRequest,
     responses(
@@ -320,6 +326,7 @@ async fn register(
 #[utoipa::path(
     put,
     path = "/users/{id}/password",
+    extensions(("x-permissions" = json!(["auth.users.manage"]))),
     operation_id = "set_user_password",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user.")),

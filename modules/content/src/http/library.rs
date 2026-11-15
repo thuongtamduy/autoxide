@@ -132,6 +132,7 @@ pub(crate) struct TermsQuery {
 #[utoipa::path(
     get,
     path = "/terms",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "list_content_terms",
     security(("bearer" = [])),
     params(TermsQuery, PageQuery),
@@ -162,6 +163,7 @@ pub(crate) async fn list_terms(
 #[utoipa::path(
     post,
     path = "/terms",
+    extensions(("x-permissions" = json!(["content.manage"]))),
     operation_id = "create_content_term",
     security(("bearer" = [])),
     request_body = CreateTermRequest,
@@ -188,6 +190,7 @@ pub(crate) async fn create_term(
 #[utoipa::path(
     get,
     path = "/terms/{id}",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "get_content_term",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the term.")),
@@ -214,6 +217,7 @@ pub(crate) async fn get_term(
 #[utoipa::path(
     patch,
     path = "/terms/{id}",
+    extensions(("x-permissions" = json!(["content.manage"]))),
     operation_id = "update_content_term",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the term."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -248,6 +252,7 @@ pub(crate) async fn update_term(
 #[utoipa::path(
     delete,
     path = "/terms/{id}",
+    extensions(("x-permissions" = json!(["content.manage"]))),
     operation_id = "delete_content_term",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the term.")),
@@ -343,6 +348,7 @@ impl From<AuthorFields> for AuthorInput {
 #[utoipa::path(
     get,
     path = "/authors",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "list_content_authors",
     security(("bearer" = [])),
     params(PageQuery),
@@ -368,6 +374,7 @@ pub(crate) async fn list_authors(
 #[utoipa::path(
     post,
     path = "/authors",
+    extensions(("x-permissions" = json!(["content.manage"]))),
     operation_id = "create_content_author",
     security(("bearer" = [])),
     request_body = AuthorFields,
@@ -394,6 +401,7 @@ pub(crate) async fn create_author(
 #[utoipa::path(
     get,
     path = "/authors/{id}",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "get_content_author",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the author.")),
@@ -419,6 +427,7 @@ pub(crate) async fn get_author(
 #[utoipa::path(
     patch,
     path = "/authors/{id}",
+    extensions(("x-permissions" = json!(["content.manage"]))),
     operation_id = "update_content_author",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the author."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -452,6 +461,7 @@ pub(crate) async fn update_author(
 #[utoipa::path(
     delete,
     path = "/authors/{id}",
+    extensions(("x-permissions" = json!(["content.manage"]))),
     operation_id = "delete_content_author",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the author.")),

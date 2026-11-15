@@ -75,6 +75,7 @@ pub(crate) struct UpdateFolderRequest {
 #[utoipa::path(
     get,
     path = "/folders",
+    extensions(("x-permissions" = json!(["media.read"]))),
     operation_id = "list_media_folders",
     security(("bearer" = [])),
     params(FoldersQuery, PageQuery),
@@ -104,6 +105,7 @@ pub(crate) async fn list_folders(
 #[utoipa::path(
     post,
     path = "/folders",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "create_media_folder",
     security(("bearer" = [])),
     request_body = CreateFolderRequest,
@@ -130,6 +132,7 @@ pub(crate) async fn create_folder(
 #[utoipa::path(
     get,
     path = "/folders/{id}",
+    extensions(("x-permissions" = json!(["media.read"]))),
     operation_id = "get_media_folder",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the folder.")),
@@ -155,6 +158,7 @@ pub(crate) async fn get_folder(
 #[utoipa::path(
     patch,
     path = "/folders/{id}",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "update_media_folder",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the folder."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the folder since; otherwise `412`.")),
@@ -190,6 +194,7 @@ pub(crate) async fn update_folder(
 #[utoipa::path(
     delete,
     path = "/folders/{id}",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "delete_media_folder",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the folder.")),

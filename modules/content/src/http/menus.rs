@@ -127,6 +127,7 @@ pub(crate) struct MenuSummary {
 #[utoipa::path(
     get,
     path = "/menus",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "list_content_menus",
     security(("bearer" = [])),
     responses(
@@ -158,6 +159,7 @@ pub(crate) async fn list_menus(
 #[utoipa::path(
     get,
     path = "/menus/{key}",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "get_content_menu",
     security(("bearer" = [])),
     params(("key" = String, Path, description = "Key of the menu, e.g. `main`."), MenuQuery),
@@ -185,6 +187,7 @@ pub(crate) async fn get_menu(
 #[utoipa::path(
     put,
     path = "/menus/{key}",
+    extensions(("x-permissions" = json!(["content.manage"]))),
     operation_id = "put_content_menu",
     security(("bearer" = [])),
     params(("key" = String, Path, description = "Key of the menu: 1 to 64 lower-case letters, digits, `-` or `_`."), MenuQuery, ("If-Match" = String, Header, description = "Required: the `ETag` you read, or `*`.")),

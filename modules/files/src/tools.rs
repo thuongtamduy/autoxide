@@ -18,7 +18,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::http::FileResponse;
-use crate::permissions::FILES_UPLOAD;
+use crate::permissions::{FILES_MANAGE, FILES_UPLOAD};
 use crate::service::FileService;
 
 /// Lớn nhất mà `read_file` trả (base64 to hơn khoảng một phần ba).
@@ -81,6 +81,8 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
                 }
             },
         )
+        .requires(FILES_UPLOAD)
+        .or_requires(FILES_MANAGE)
         .read_only(),
         Tool::new(
             "read_file",
@@ -103,6 +105,8 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
                 }
             },
         )
+        .requires(FILES_UPLOAD)
+        .or_requires(FILES_MANAGE)
         .read_only(),
         Tool::new(
             "upload_file",
@@ -137,6 +141,8 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
                 }
             },
         )
+        .requires(FILES_UPLOAD)
+        .or_requires(FILES_MANAGE)
         .destructive(),
     ]
 }

@@ -211,6 +211,48 @@ fn problem_media_type(response: &mut utoipa::openapi::Response) {
     }
 }
 
+/// Hợp đồng quyền đọc được bằng máy (D-205, đặc tả 54 P1, D-245): mỗi operation khai đúng một trong
+/// - `x-public: true` — gọi được không cần đăng nhập;
+/// - `x-permissions: [..]` — cần đăng nhập và một trong các permission (danh sách rỗng: chỉ cần đăng
+///   nhập).
+///
+/// Mỗi permission khai phải được nói tới trong mô tả hay response 403 của operation, để chữ cho người
+/// đọc không lệch khai báo.
+fn access_problems(endpoint: &str, operation: &utoipa::openapi::path::Operation) -> Vec<String> {
+    let extensions = operation.extensions.as_ref();
+    let public = extensions.and_then(|extensions| extensions.get("x-public"));
+    let permissions = extensions.and_then(|extensions| extensions.get("x-permissions"));
+    match (public, permissions) {
+        (Some(serde_json::Value::Bool(true)), None) => Vec::new(),
+        (None, Some(serde_json::Value::Array(names))) => {
+            let mut text = format!(
+                "{} {}",
+                operation.summary.as_deref().unwrap_or_default(),
+                operation.description.as_deref().unwrap_or_default()
+            );
+            if let Some(RefOr::T(forbidden)) = operation.responses.responses.get("403") {
+                text.push_str(&forbidden.description);
+            }
+            names
+                .iter()
+                .filter_map(|name| match name.as_str() {
+                    Some(name) if text.contains(&format!("`{name}`")) => None,
+                    Some(name) => Some(format!(
+                        "{endpoint}: `x-permissions` lists `{name}`, but neither the description nor \
+                         the 403 response mentions it"
+                    )),
+                    None => Some(format!("{endpoint}: `x-permissions` must list permission names")),
+                })
+                .collect()
+        }
+        _ => vec![format!(
+            "{endpoint}: declare who may call it — add `extensions((\"x-permissions\" = \
+             json!([\"<module>.<permission>\"])))` (`[]`: any signed-in caller) or \
+             `extensions((\"x-public\" = json!(true)))` to `#[utoipa::path]` (D-245)"
+        )],
+    }
+}
+
 /// Kiểm tài liệu có đủ để gọi đúng API mà không cần đọc mã nguồn. Trả về danh sách
 /// vấn đề; rỗng nghĩa là đạt. Gate chạy hàm này trên tài liệu của cả chương trình.
 pub fn lint(openapi: &OpenApi) -> Vec<String> {
@@ -248,6 +290,7 @@ pub fn lint(openapi: &OpenApi) -> Vec<String> {
                     problems.push(format!("{endpoint}: response {status} has no description"));
                 }
             }
+            problems.extend(access_problems(&endpoint, operation));
         }
     }
     match serde_json::to_value(openapi) {

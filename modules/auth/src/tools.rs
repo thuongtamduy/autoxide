@@ -212,6 +212,7 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
                 }
             },
         )
+        .for_any_signed_in()
         .read_only(),
         Tool::new(
             "create_api_key",
@@ -226,6 +227,7 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
                 }
             },
         )
+        .for_any_signed_in()
         .returns_secret(),
         Tool::new(
             "revoke_api_key",
@@ -238,6 +240,7 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
                 }
             },
         )
+        .for_any_signed_in()
         .destructive(),
     ]
 }
@@ -264,6 +267,7 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
                 }
             },
         )
+        .for_any_signed_in()
         .read_only(),
         Tool::new(
             "list_permissions",

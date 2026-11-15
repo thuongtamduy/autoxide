@@ -179,6 +179,7 @@ pub(crate) struct UpdateSubscriberRequest {
 #[utoipa::path(
     get,
     path = "/subscribers",
+    extensions(("x-permissions" = json!(["newsletter.read"]))),
     operation_id = "list_newsletter_subscribers",
     security(("bearer" = [])),
     params(SubscribersQuery, PageQuery),
@@ -220,6 +221,7 @@ pub(crate) async fn list_subscribers(
 #[utoipa::path(
     post,
     path = "/subscribers/import",
+    extensions(("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "import_newsletter_subscribers",
     security(("bearer" = [])),
     request_body = ImportRequest,
@@ -260,6 +262,7 @@ pub(crate) async fn import_subscribers(
 #[utoipa::path(
     get,
     path = "/subscribers/{id}",
+    extensions(("x-permissions" = json!(["newsletter.read"]))),
     operation_id = "get_newsletter_subscriber",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the subscriber.")),
@@ -286,6 +289,7 @@ pub(crate) async fn get_subscriber(
 #[utoipa::path(
     patch,
     path = "/subscribers/{id}",
+    extensions(("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "update_newsletter_subscriber",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the subscriber."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -327,6 +331,7 @@ pub(crate) async fn update_subscriber(
 #[utoipa::path(
     delete,
     path = "/subscribers/{id}",
+    extensions(("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "delete_newsletter_subscriber",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the subscriber.")),
@@ -408,6 +413,7 @@ pub(crate) struct ErasedResponse {
 #[utoipa::path(
     get,
     path = "/data",
+    extensions(("x-permissions" = json!(["newsletter.export"]))),
     operation_id = "export_newsletter_email_data",
     security(("bearer" = [])),
     params(EmailQuery),
@@ -423,6 +429,8 @@ pub(crate) async fn get_email_data(
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<EmailDataResponse>, Error> {
+    // Kiểm quyền trước khi đọc `email`: người không có quyền nhận 403, không phải 422 (D-245).
+    principal.require(&crate::permissions::NEWSLETTER_EXPORT)?;
     let email = required(query.email.as_deref(), "email")?;
     let found = service.email_data(&principal, email).await?;
     Ok(Data {
@@ -445,6 +453,7 @@ pub(crate) async fn get_email_data(
 #[utoipa::path(
     delete,
     path = "/data",
+    extensions(("x-permissions" = json!(["newsletter.export"]))),
     operation_id = "erase_newsletter_email_data",
     security(("bearer" = [])),
     params(EmailQuery),
@@ -460,6 +469,8 @@ pub(crate) async fn delete_email_data(
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<ErasedResponse>, Error> {
+    // Kiểm quyền trước khi đọc `email`: người không có quyền nhận 403, không phải 422 (D-245).
+    principal.require(&crate::permissions::NEWSLETTER_EXPORT)?;
     let email = required(query.email.as_deref(), "email")?;
     let deleted = service.erase_email(&principal, email).await?;
     Ok(Data { data: ErasedResponse { deleted } })

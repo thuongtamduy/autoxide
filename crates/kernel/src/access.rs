@@ -38,13 +38,72 @@ use crate::module::is_identifier;
 pub struct Permission {
     name: &'static str,
     description: &'static str,
+    risk: Risk,
+}
+
+/// Mức rủi ro của một permission, đọc được bằng máy (D-205, đặc tả 54 P1): giao diện và AI agent
+/// biết trước việc nào chỉ đọc, việc nào cần cẩn thận; tool MCP chỉ đọc chỉ được đòi permission
+/// mức [`Risk::Read`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum Risk {
+    /// Chỉ xem.
+    Read,
+    /// Tạo, sửa.
+    Write,
+    /// Xoá hay ghi đè không lấy lại được.
+    Destructive,
+    /// Xem hay xuất dữ liệu cá nhân của người khác.
+    SensitiveData,
+    /// Chạm tới tiền.
+    Money,
+}
+
+impl Risk {
+    /// Tên ổn định trong API: `read`, `write`, `destructive`, `sensitive_data`, `money`.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Risk::Read => "read",
+            Risk::Write => "write",
+            Risk::Destructive => "destructive",
+            Risk::SensitiveData => "sensitive_data",
+            Risk::Money => "money",
+        }
+    }
+}
+
+/// `text` kết thúc bằng `suffix` (dùng được trong `const fn`).
+const fn ends_with(text: &str, suffix: &str) -> bool {
+    let (text, suffix) = (text.as_bytes(), suffix.as_bytes());
+    if suffix.len() > text.len() {
+        return false;
+    }
+    let offset = text.len() - suffix.len();
+    let mut index = 0;
+    while index < suffix.len() {
+        if text[offset + index] != suffix[index] {
+            return false;
+        }
+        index += 1;
+    }
+    true
 }
 
 impl Permission {
     /// `name`: `<module>.<việc>`, các đoạn là chữ thường, số và `_`.
     /// `description`: câu tiếng Anh cho người cấp quyền đọc (hiện trong API).
+    ///
+    /// Mức rủi ro suy từ tên: `….read` là [`Risk::Read`], còn lại [`Risk::Write`]; khác thì đặt bằng
+    /// [`with_risk`](Self::with_risk).
     pub const fn new(name: &'static str, description: &'static str) -> Self {
-        Permission { name, description }
+        let risk = if ends_with(name, ".read") { Risk::Read } else { Risk::Write };
+        Permission { name, description, risk }
+    }
+
+    /// Đặt mức rủi ro, vd `Permission::new("notes.purge", "…").with_risk(Risk::Destructive)`.
+    pub const fn with_risk(mut self, risk: Risk) -> Self {
+        self.risk = risk;
+        self
     }
 
     pub fn name(&self) -> &'static str {
@@ -53,6 +112,10 @@ impl Permission {
 
     pub fn description(&self) -> &'static str {
         self.description
+    }
+
+    pub const fn risk(&self) -> Risk {
+        self.risk
     }
 }
 

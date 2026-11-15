@@ -51,6 +51,7 @@ pub(crate) struct EntryAuthors {
 #[utoipa::path(
     post,
     path = "/entries/{id}/translations",
+    extensions(("x-permissions" = json!(["content.write", "content.write_own"]))),
     operation_id = "create_content_translation",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry to translate.")),
@@ -84,6 +85,7 @@ pub(crate) async fn create_translation(
 #[utoipa::path(
     put,
     path = "/entries/{id}/terms",
+    extensions(("x-permissions" = json!(["content.write", "content.write_own", "content.publish", "content.publish_own"]))),
     operation_id = "set_content_entry_terms",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry.")),
@@ -115,6 +117,7 @@ pub(crate) async fn set_terms(
 #[utoipa::path(
     put,
     path = "/entries/{id}/authors",
+    extensions(("x-permissions" = json!(["content.write", "content.write_own", "content.publish", "content.publish_own"]))),
     operation_id = "set_content_entry_authors",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry.")),

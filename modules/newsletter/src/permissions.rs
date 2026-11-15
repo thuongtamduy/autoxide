@@ -5,12 +5,13 @@
 //! `new_posts = send`) cũng cần `newsletter.send`. Đăng ký thay người lạ mà không qua lớp chống
 //! spam cần `newsletter.subscribe` — chỉ đăng nhập thôi là chưa đủ.
 
-use autoxide_kernel::access::Permission;
+use autoxide_kernel::access::{Permission, Risk};
 
 pub(crate) const NEWSLETTER_READ: Permission = Permission::new(
     "newsletter.read",
     "Read lists, subscribers (personal data), campaigns with their progress, and suppressions.",
-);
+)
+.with_risk(Risk::SensitiveData);
 pub(crate) const NEWSLETTER_MANAGE: Permission = Permission::new(
     "newsletter.manage",
     "Create and change lists, import and change subscribers, write draft campaigns (changing a \
@@ -24,7 +25,8 @@ pub(crate) const NEWSLETTER_SEND: Permission = Permission::new(
 pub(crate) const NEWSLETTER_EXPORT: Permission = Permission::new(
     "newsletter.export",
     "Export or erase everything the newsletter holds about an email address.",
-);
+)
+.with_risk(Risk::SensitiveData);
 
 pub(crate) const NEWSLETTER_SUBSCRIBE: Permission = Permission::new(
     "newsletter.subscribe",

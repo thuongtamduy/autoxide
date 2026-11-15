@@ -122,6 +122,17 @@ and are mounted under `/api/v1/<name>`; a module declares only the tail (`/`, `/
 - Document every handler: a `///` line (the summary), the required permission, and a
   `description` for every response with the error `code`s. Doc comments on handlers and
   schema types are English, written for API callers.
+- Declare who may call each endpoint in `#[utoipa::path]`, right after `path`:
+  `extensions(("x-permissions" = json!(["notes.write"])))` (one of the listed permissions is
+  enough; `[]` means any signed-in caller) or `extensions(("x-public" = json!(true)))`. The
+  description or the 403 response must name the same permissions. The gate checks every
+  endpoint: no token → 401, a caller without the permission → 403 `permission_denied`. Check
+  the permission first in the handler, before reading the input, so a caller without it
+  never gets a 422. An MCP tool either `.requires(…)` a permission or says
+  `.for_any_signed_in()`; a read-only tool must be callable with a `read`-level permission.
+- A permission's risk (`read`, `write`, `destructive`, `sensitive_data`, `money`) follows from
+  its name (`….read` is `read`, others `write`); set another with
+  `Permission::new(…).with_risk(Risk::Destructive)`.
 - Breaking change: add a new endpoint and declare the old one in `Module::deprecations`.
   The gate (`cargo xtask api-diff`) compares `docs/openapi.json` with the last release and
   refuses breaking changes, naming each one and the way to do it right.
