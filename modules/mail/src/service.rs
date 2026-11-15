@@ -144,7 +144,10 @@ impl Sender {
     }
 
     /// Đường gửi và người gửi của `tenant`: của riêng khách khi đã đặt, không thì của máy chủ.
-    async fn route(&self, tenant: &TenantContext) -> Result<(Arc<Transport>, Mailbox), Error> {
+    async fn delivery_for(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<(Arc<Transport>, Mailbox), Error> {
         let from = match self.settings.get(tenant, &TENANT_FROM).await? {
             Some(value) => value.as_str().parse::<Mailbox>().map_err(|error| {
                 Error::internal(format!("tenant setting `mail.from` is not a mailbox: {error}"))
@@ -181,7 +184,7 @@ impl JobHandler for Sender {
             .tenant
             .as_ref()
             .ok_or_else(|| Error::internal("a mail job must belong to a tenant"))?;
-        let (transport, from) = self.route(tenant).await?;
+        let (transport, from) = self.delivery_for(tenant).await?;
         let mut builder = Message::builder().from(from).to(to).subject(mail.subject);
         if let Some(reply_to) = &mail.reply_to {
             let reply_to = reply_to.parse().map_err(|error| {
