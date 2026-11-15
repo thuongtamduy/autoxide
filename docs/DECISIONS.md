@@ -6991,3 +6991,15 @@ Chủ dự án hỏi merge vào `main` mà không phát hành có được khôn
 - Job dọn hằng ngày chạy mỗi database: tìm khách qua `comments_targets` (mọi bình luận đều có dòng đích, bảng nhỏ, khoá
   chính bắt đầu bằng `tenant_id`), xoá bình luận quá hạn theo từng khách (event đúng khách); dấu vết IP, khoá người báo
   cáo theo IP, nonce, token, bộ đếm quét cả database. Subscriber event dùng `event.tenant`.
+
+## D-283 · `menus` theo khách: cache menu công khai và `ETag` theo khách; lệnh nhập menu cũ nhận khách (bước 33 B, D-238) — 2026-11-15 — agent quyết
+
+- `menus_menus`, `menus_items` mang `tenant_id`, migration `m0006_tenancy`: `(tenant_id, key, locale)` duy nhất (bước 34
+  chèn `org_id` sau `tenant_id`), `(tenant_id, menu_id, position)`.
+- Cache menu công khai khoá theo `(khách, key, locale)`, mỗi khách một bộ đếm thế hệ: khách ghi thì chỉ bản cache của
+  khách đó bị bỏ; kết quả giải trước lần ghi không được cất. Bản hết hạn được dọn khi cất bản mới (cache không lớn dần
+  theo số khách). `ETag` băm cả ID khách: hai khách có menu giống hệt nhau vẫn khác `ETag`, gửi `ETag` của khách này ở
+  khách kia không ra 304.
+- Lệnh `menus.import_content_menus` nhận `tenant=<slug>` (bỏ trống: khách mặc định, nơi có mọi menu cũ làm trước bước
+  33), không tự duyệt mọi khách vì `menus` không biết khách nào có menu cũ trong `content`. Chạy lại bỏ qua menu đã có.
+  Đọc đúng menu cũ của từng khách khi `content` chuyển xong (B13).

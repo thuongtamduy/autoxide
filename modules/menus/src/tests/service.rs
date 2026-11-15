@@ -1,5 +1,6 @@
 //! Test service: giải đối tượng, bỏ đối tượng không công khai, nhóm con có giới hạn, nhãn có
-//! hạn, `If-Match` đồng thời, nhập menu cũ hai lần, ngôn ngữ mặc định, cache.
+//! hạn, `If-Match` đồng thời, nhập menu cũ hai lần, ngôn ngữ mặc định, cache; hai khách cùng
+//! database không thấy menu hay cache của nhau (bước 33).
 
 use autoxide_content::api::{LegacyMenu, LegacyMenuItem, LegacyTarget};
 use autoxide_kernel::error::ErrorKind;
@@ -38,7 +39,7 @@ fn labels(items: &[PublicSiteMenuItem]) -> Vec<&str> {
 async fn giai_doi_tuong_va_bo_doi_tuong_khong_cong_khai() {
     TestDatabase::run(async |test| {
         let harness = harness(test).await;
-        let service = &harness.service;
+        let (service, t) = (&harness.service, &harness.tenant);
         let items = vec![
             object("shop.item", "p1"),
             ItemInput { label: Some("Named".into()), ..object("shop.item", "p2") },
@@ -61,8 +62,8 @@ async fn giai_doi_tuong_va_bo_doi_tuong_khong_cong_khai() {
                 ..link("Sale", "/sale")
             },
         ];
-        service.create(&admin(), menu("main", "vi", items)).await.unwrap();
-        let ready = service.public_menu("main", Some("vi"), Utc::now()).await.unwrap();
+        service.create(t, &admin(), menu("main", "vi", items)).await.unwrap();
+        let ready = service.public_menu(t, "main", Some("vi"), Utc::now()).await.unwrap();
         let shown = &ready.menu.items;
         assert_eq!(labels(shown), ["p1@vi", "Named", "Column", "Sale"]);
         assert_eq!(shown[0].href.as_deref(), Some("/items/p1"));
@@ -90,9 +91,10 @@ async fn giai_doi_tuong_va_bo_doi_tuong_khong_cong_khai() {
 async fn loi_dich_gom_mot_lan() {
     TestDatabase::run(async |test| {
         let harness = harness(test).await;
-        let service = &harness.service;
+        let (service, t) = (&harness.service, &harness.tenant);
         let error = service
             .create(
+                t,
                 &admin(),
                 menu("main", "en", vec![object("shop.item", "x1"), object("shop.item", "x2")]),
             )
@@ -103,33 +105,34 @@ async fn loi_dich_gom_mot_lan() {
         assert_eq!(fields, ["items[0].ref.id", "items[1].ref.id"]);
 
         let error = service
-            .create(&admin(), menu("main", "en", vec![object("forms.form", "1")]))
+            .create(t, &admin(), menu("main", "en", vec![object("forms.form", "1")]))
             .await
             .unwrap_err();
         assert_eq!(error.code(), "menus.ref_unknown_kind");
 
         let unsupported = ItemInput { auto_children: true, ..object("shop.item", "p1") };
         let error =
-            service.create(&admin(), menu("main", "en", vec![unsupported])).await.unwrap_err();
+            service.create(t, &admin(), menu("main", "en", vec![unsupported])).await.unwrap_err();
         assert_eq!(error.code(), "menus.children_unsupported");
         assert_eq!(error.fields()[0].field, "items[0].auto_children");
 
         let mixed = vec![object("shop.item", "x1"), link("", "/x")];
-        let error = service.create(&admin(), menu("main", "en", mixed)).await.unwrap_err();
+        let error = service.create(t, &admin(), menu("main", "en", mixed)).await.unwrap_err();
         assert_eq!(error.code(), "validation_failed");
         assert_eq!(error.fields().len(), 2);
 
         let feature = ItemInput { feature: to("shop.item", "x9"), ..link("A", "/a") };
-        let error = service.create(&admin(), menu("main", "en", vec![feature])).await.unwrap_err();
+        let error =
+            service.create(t, &admin(), menu("main", "en", vec![feature])).await.unwrap_err();
         assert_eq!(error.fields()[0].field, "items[0].feature.id");
 
         let reader =
             autoxide_kernel::access::Principal::new(Uuid::now_v7(), ["menus.read".to_owned()]);
-        let error = service.create(&reader, menu("main", "en", vec![])).await.unwrap_err();
+        let error = service.create(t, &reader, menu("main", "en", vec![])).await.unwrap_err();
         assert_eq!(error.code(), "permission_denied");
 
-        service.create(&admin(), menu("main", "en", vec![])).await.unwrap();
-        let error = service.create(&admin(), menu("main", "en", vec![])).await.unwrap_err();
+        service.create(t, &admin(), menu("main", "en", vec![])).await.unwrap();
+        let error = service.create(t, &admin(), menu("main", "en", vec![])).await.unwrap_err();
         assert_eq!(error.code(), "menus.menu_exists");
     })
     .await
@@ -142,7 +145,7 @@ async fn loi_dich_gom_mot_lan() {
 async fn nhom_con_tu_lay_co_gioi_han() {
     TestDatabase::run(async |test| {
         let harness = harness(test).await;
-        let service = &harness.service;
+        let (service, t) = (&harness.service, &harness.tenant);
         let items = vec![ItemInput {
             label: Some("Shop".into()),
             auto_children: true,
@@ -150,8 +153,8 @@ async fn nhom_con_tu_lay_co_gioi_han() {
             children: vec![link("All", "/all")],
             ..object("shop.category", "c")
         }];
-        service.create(&admin(), menu("main", "en", items)).await.unwrap();
-        let ready = service.public_menu("main", None, Utc::now()).await.unwrap();
+        service.create(t, &admin(), menu("main", "en", items)).await.unwrap();
+        let ready = service.public_menu(t, "main", None, Utc::now()).await.unwrap();
         let shop = &ready.menu.items[0];
         assert_eq!(labels(&shop.children), ["All", "Category c1", "Category c2"]);
         assert_eq!(shop.children[1].href.as_deref(), Some("/c/c1"));
@@ -166,7 +169,7 @@ async fn nhom_con_tu_lay_co_gioi_han() {
 async fn nhan_het_han_tu_an() {
     TestDatabase::run(async |test| {
         let harness = harness(test).await;
-        let service = &harness.service;
+        let (service, t) = (&harness.service, &harness.tenant);
         let now = crate::items::micros(Utc::now());
         let badge = |from: Option<i64>, until: Option<i64>| {
             Some(BadgeInput {
@@ -182,18 +185,18 @@ async fn nhan_het_han_tu_an() {
             ItemInput { badge: badge(Some(2), None), ..link("Later", "/c") },
             ItemInput { badge: badge(Some(-1), Some(1)), ..link("Now", "/d") },
         ];
-        service.create(&admin(), menu("main", "en", items)).await.unwrap();
-        let ready = service.public_menu("main", None, now).await.unwrap();
+        service.create(t, &admin(), menu("main", "en", items)).await.unwrap();
+        let ready = service.public_menu(t, "main", None, now).await.unwrap();
         let shown: Vec<bool> = ready.menu.items.iter().map(|item| item.badge.is_some()).collect();
         assert_eq!(shown, [true, false, false, true]);
         assert_eq!(ready.expires_at, now + Duration::seconds(60), "the next change is 1 hour away");
 
         // Một giờ sau: "Now" tắt, nên bản đã giải chỉ dùng được tới đúng lúc đó.
-        service.cache.clear();
+        service.cache.clear(t.id());
         let later = now + Duration::minutes(59) + Duration::seconds(30);
-        let ready = service.public_menu("main", None, later).await.unwrap();
+        let ready = service.public_menu(t, "main", None, later).await.unwrap();
         assert_eq!(ready.expires_at, now + Duration::hours(1));
-        let after = service.public_menu("main", None, now + Duration::hours(1)).await.unwrap();
+        let after = service.public_menu(t, "main", None, now + Duration::hours(1)).await.unwrap();
         let shown: Vec<bool> = after.menu.items.iter().map(|item| item.badge.is_some()).collect();
         assert_eq!(shown, [true, false, false, false], "expired badges hide by themselves");
         assert_ne!(after.etag, ready.etag);
@@ -207,12 +210,12 @@ async fn nhan_het_han_tu_an() {
 async fn if_match_dong_thoi() {
     TestDatabase::run(async |test| {
         let harness = harness(test).await;
-        let service = &harness.service;
-        let (saved, _) = service.create(&admin(), menu("main", "en", vec![])).await.unwrap();
+        let (service, t) = (&harness.service, &harness.tenant);
+        let (saved, _) = service.create(t, &admin(), menu("main", "en", vec![])).await.unwrap();
         let (ada, bob) = (admin(), admin());
         let (first, second) = tokio::join!(
-            service.replace(&ada, saved.id, vec![link("Ada", "/ada")], Some(saved.updated_at)),
-            service.replace(&bob, saved.id, vec![link("Bob", "/bob")], Some(saved.updated_at)),
+            service.replace(t, &ada, saved.id, vec![link("Ada", "/ada")], Some(saved.updated_at)),
+            service.replace(t, &bob, saved.id, vec![link("Bob", "/bob")], Some(saved.updated_at)),
         );
         let results = [first, second];
         let ok = results.iter().filter(|result| result.is_ok()).count();
@@ -223,16 +226,16 @@ async fn if_match_dong_thoi() {
             })
             .count();
         assert_eq!((ok, stale), (1, 1));
-        let (_, nodes) = service.get(&admin(), saved.id).await.unwrap();
+        let (_, nodes) = service.get(t, &admin(), saved.id).await.unwrap();
         assert_eq!(nodes.len(), 1, "only the winner's items are saved");
 
         // `*` (không kiểm phiên bản) vẫn ghi; menu không còn thì 404.
-        service.replace(&ada, saved.id, vec![], None).await.unwrap();
-        service.delete(&ada, saved.id).await.unwrap();
-        let gone = service.replace(&ada, saved.id, vec![], None).await.unwrap_err();
+        service.replace(t, &ada, saved.id, vec![], None).await.unwrap();
+        service.delete(t, &ada, saved.id).await.unwrap();
+        let gone = service.replace(t, &ada, saved.id, vec![], None).await.unwrap_err();
         assert_eq!(gone.code(), "menus.menu_not_found");
         assert_eq!(
-            service.delete(&ada, saved.id).await.unwrap_err().code(),
+            service.delete(t, &ada, saved.id).await.unwrap_err().code(),
             "menus.menu_not_found"
         );
     })
@@ -246,28 +249,31 @@ async fn if_match_dong_thoi() {
 async fn ngon_ngu_mac_dinh_va_cache() {
     TestDatabase::run(async |test| {
         let harness = harness(test).await;
-        let service = &harness.service;
+        let (service, t) = (&harness.service, &harness.tenant);
         let (saved, _) =
-            service.create(&admin(), menu("main", "en", vec![link("Home", "/")])).await.unwrap();
+            service.create(t, &admin(), menu("main", "en", vec![link("Home", "/")])).await.unwrap();
         let now = Utc::now();
-        let ready = service.public_menu("main", Some("VI"), now).await.unwrap();
+        let ready = service.public_menu(t, "main", Some("VI"), now).await.unwrap();
         assert_eq!(ready.menu.locale, "en", "falls back to the default language");
-        let error = service.public_menu("main", Some("fr"), now).await.unwrap_err();
+        let error = service.public_menu(t, "main", Some("fr"), now).await.unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Validation);
-        let error = service.public_menu("nope", None, now).await.unwrap_err();
+        let error = service.public_menu(t, "nope", None, now).await.unwrap_err();
         assert_eq!(error.code(), "menus.public_menu_not_found");
 
-        let again = service.public_menu("main", None, now).await.unwrap();
+        let again = service.public_menu(t, "main", None, now).await.unwrap();
         service
-            .replace(&admin(), saved.id, vec![link("Start", "/")], Some(saved.updated_at))
+            .replace(t, &admin(), saved.id, vec![link("Start", "/")], Some(saved.updated_at))
             .await
             .unwrap();
-        let changed = service.public_menu("main", None, now).await.unwrap();
+        let changed = service.public_menu(t, "main", None, now).await.unwrap();
         assert_eq!(labels(&changed.menu.items), ["Start"]);
         assert_ne!(changed.etag, again.etag);
 
-        service.create(&admin(), menu("main", "vi", vec![link("Trang chủ", "/")])).await.unwrap();
-        let vietnamese = service.public_menu("main", Some("vi"), now).await.unwrap();
+        service
+            .create(t, &admin(), menu("main", "vi", vec![link("Trang chủ", "/")]))
+            .await
+            .unwrap();
+        let vietnamese = service.public_menu(t, "main", Some("vi"), now).await.unwrap();
         assert_eq!(vietnamese.menu.locale, "vi");
     })
     .await
@@ -280,7 +286,7 @@ async fn ngon_ngu_mac_dinh_va_cache() {
 async fn nhap_menu_cu_hai_lan_khong_nhan_doi() {
     TestDatabase::run(async |test| {
         let harness = harness(test).await;
-        let service = &harness.service;
+        let (service, t) = (&harness.service, &harness.tenant);
         let entry = Uuid::now_v7();
         let term = Uuid::now_v7();
         let old = |key: &str, locale: &str| LegacyMenu {
@@ -306,11 +312,11 @@ async fn nhap_menu_cu_hai_lan_khong_nhan_doi() {
         *harness.legacy.0.lock().unwrap() =
             vec![old("main", "en"), old("footer", "vi"), old("main", "fr")];
 
-        let report = service.import_content_menus().await.unwrap();
+        let report = service.import_content_menus(t).await.unwrap();
         assert_eq!(report.imported.len(), 2);
         assert_eq!(report.failed.len(), 1, "`fr` is not a menus language");
-        let first = service.find_by_key("main", "en").await.unwrap().unwrap();
-        let (_, nodes) = service.get(&admin(), first.id).await.unwrap();
+        let first = service.find_by_key(t, "main", "en").await.unwrap().unwrap();
+        let (_, nodes) = service.get(t, &admin(), first.id).await.unwrap();
         let about = &nodes[0].item;
         assert_eq!(
             (about.label.as_str(), about.ref_kind.as_deref(), about.ref_id.clone()),
@@ -320,16 +326,134 @@ async fn nhap_menu_cu_hai_lan_khong_nhan_doi() {
         assert_eq!(nodes[1].item.ref_kind.as_deref(), Some("content.term"));
 
         // Sửa menu đã nhập rồi nhập lại: không thêm, không đè.
-        service.replace(&admin(), first.id, vec![link("Mine", "/")], None).await.unwrap();
-        let report = service.import_content_menus().await.unwrap();
+        service.replace(t, &admin(), first.id, vec![link("Mine", "/")], None).await.unwrap();
+        let report = service.import_content_menus(t).await.unwrap();
         assert_eq!((report.imported.len(), report.skipped.len()), (0, 2));
         let page = autoxide_kernel::pagination::PageRequest::try_from(
             autoxide_kernel::pagination::PageQuery::default(),
         )
         .unwrap();
-        assert_eq!(service.list(&admin(), &page).await.unwrap().data.len(), 2);
-        let (_, nodes) = service.get(&admin(), first.id).await.unwrap();
+        assert_eq!(service.list(t, &admin(), &page).await.unwrap().data.len(), 2);
+        let (_, nodes) = service.get(t, &admin(), first.id).await.unwrap();
         assert_eq!(nodes[0].item.label, "Mine");
+    })
+    .await
+    .unwrap();
+}
+
+/// Hai khách trên cùng database (bước 33), cùng menu `main` ở `en`: menu công khai của mỗi khách
+/// chỉ có mục của khách đó — kể cả khi menu của khách kia đã nằm trong cache, và sau khi một khách
+/// sửa menu (chỉ bản cache của khách đó đổi). Đọc, sửa, xoá theo ID không vượt khách; nhập menu cũ
+/// theo từng khách.
+#[tokio::test]
+async fn hai_khach_cung_khoa_khong_lo_menu_va_cache() {
+    TestDatabase::run(async |test| {
+        use autoxide_kernel::tenancy::{MAIN_PLACEMENT, TenantContext, TenantId, TenantStatus};
+
+        let harness = harness(test).await;
+        let (service, a) = (&harness.service, &harness.tenant);
+        let b = &TenantContext::new(
+            TenantId::from_uuid(Uuid::now_v7()),
+            "other",
+            "Other",
+            TenantStatus::Active,
+            MAIN_PLACEMENT,
+            harness.database.clone(),
+        );
+        let (mine, _) = service
+            .create(a, &admin(), menu("main", "en", vec![link("Home A", "/")]))
+            .await
+            .unwrap();
+        let (theirs, _) = service
+            .create(b, &admin(), menu("main", "en", vec![link("Home B", "/")]))
+            .await
+            .unwrap();
+        let now = Utc::now();
+
+        // Khách A đọc trước (vào cache), rồi khách B: mỗi khách menu của mình.
+        let cached_a = service.public_menu(a, "main", None, now).await.unwrap();
+        assert_eq!(labels(&cached_a.menu.items), ["Home A"]);
+        let cached_b = service.public_menu(b, "main", None, now).await.unwrap();
+        assert_eq!(labels(&cached_b.menu.items), ["Home B"]);
+        assert_ne!(cached_a.etag, cached_b.etag);
+        let again_b = service.public_menu(b, "main", None, now).await.unwrap();
+        assert!(std::sync::Arc::ptr_eq(&cached_b, &again_b), "served from the cache of B");
+
+        // Khách B sửa menu: bản của B đổi, bản đã cache của A giữ nguyên (không bị xoá).
+        let items = vec![link("New B", "/new")];
+        service.replace(b, &admin(), theirs.id, items, Some(theirs.updated_at)).await.unwrap();
+        let changed_b = service.public_menu(b, "main", None, now).await.unwrap();
+        assert_eq!(labels(&changed_b.menu.items), ["New B"]);
+        let still_a = service.public_menu(a, "main", None, now).await.unwrap();
+        assert!(std::sync::Arc::ptr_eq(&cached_a, &still_a), "A's cached copy is kept");
+        assert_eq!(labels(&still_a.menu.items), ["Home A"]);
+
+        // Hai khách có menu giống hệt nhau vẫn nhận hai `ETag` khác nhau.
+        for tenant in [a, b] {
+            service
+                .create(tenant, &admin(), menu("footer", "en", vec![link("Hi", "/hi")]))
+                .await
+                .unwrap();
+        }
+        let footer_a = service.public_menu(a, "footer", None, now).await.unwrap();
+        let footer_b = service.public_menu(b, "footer", None, now).await.unwrap();
+        assert_eq!(footer_a.menu, footer_b.menu);
+        assert_ne!(footer_a.etag, footer_b.etag);
+
+        // Theo ID: khách B không đọc, sửa hay xoá được menu của khách A.
+        let page = autoxide_kernel::pagination::PageRequest::try_from(
+            autoxide_kernel::pagination::PageQuery::default(),
+        )
+        .unwrap();
+        let listed = service.list(b, &admin(), &page).await.unwrap();
+        assert!(listed.data.iter().all(|(menu, _)| menu.tenant_id == b.id().as_uuid()));
+        assert_eq!(listed.data.len(), 2);
+        let missing = "menus.menu_not_found";
+        assert_eq!(service.get(b, &admin(), mine.id).await.unwrap_err().code(), missing);
+        let replaced = service.replace(b, &admin(), mine.id, vec![], None).await;
+        assert_eq!(replaced.unwrap_err().code(), missing);
+        assert_eq!(service.delete(b, &admin(), mine.id).await.unwrap_err().code(), missing);
+        let (_, nodes) = service.get(a, &admin(), mine.id).await.unwrap();
+        assert_eq!(nodes[0].item.label, "Home A");
+
+        // Nhập menu cũ: mỗi khách một bản, chạy lại ở một khách không nhân đôi.
+        *harness.legacy.0.lock().unwrap() = vec![LegacyMenu {
+            key: "old".into(),
+            locale: "en".into(),
+            items: vec![LegacyMenuItem {
+                label: "Docs".into(),
+                target: LegacyTarget::Url("/docs".into()),
+                children: vec![],
+            }],
+        }];
+        for tenant in [a, b] {
+            assert_eq!(service.import_content_menus(tenant).await.unwrap().imported.len(), 1);
+        }
+        let report = service.import_content_menus(a).await.unwrap();
+        assert_eq!((report.imported.len(), report.skipped.len()), (0, 1));
+        let old_b = service.find_by_key(b, "old", "en").await.unwrap().unwrap();
+        assert_eq!(old_b.tenant_id, b.id().as_uuid());
+    })
+    .await
+    .unwrap();
+}
+
+/// Lệnh `menus.import_content_menus`: không nêu khách thì nhập vào khách mặc định; khách không có
+/// thì báo lỗi, không nhập gì.
+#[tokio::test]
+async fn lenh_nhap_theo_khach() {
+    TestDatabase::run(async |test| {
+        let harness = harness(test).await;
+        *harness.legacy.0.lock().unwrap() =
+            vec![LegacyMenu { key: "old".into(), locale: "en".into(), items: vec![] }];
+        let registry = autoxide_kernel::tenancy::DatabaseRegistry::single(harness.database.clone());
+        let task = crate::legacy::task(harness.service.clone(), registry);
+        let unknown = task.parse(&["tenant=nope".to_owned()]).unwrap();
+        assert_eq!(task.run(&unknown).await.unwrap_err().code(), "tenant_not_found");
+        let report = task.run(&task.parse(&[]).unwrap()).await.unwrap();
+        assert!(report.starts_with("Tenant `default`: imported 1 menu(s)"), "{report}");
+        let found = harness.service.find_by_key(&harness.tenant, "old", "en").await.unwrap();
+        assert!(found.is_some());
     })
     .await
     .unwrap();

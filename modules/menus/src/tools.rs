@@ -101,10 +101,10 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
             "list_menus",
             "List the website menus (every key and language), newest first; follow \
              `pagination.next_cursor` for more.",
-            move |_tenant: TenantContext, principal: Principal, input: PageInput| {
+            move |tenant: TenantContext, principal: Principal, input: PageInput| {
                 let service = list.clone();
                 async move {
-                    let page = service.list(&principal, &input.page()?).await?;
+                    let page = service.list(&tenant, &principal, &input.page()?).await?;
                     Ok::<Page<SiteMenuSummary>, Error>(page.map(|(menu, items)| SiteMenuSummary::new(menu, items)))
                 }
             },
@@ -114,10 +114,10 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
         Tool::new(
             "get_menu",
             "Get a website menu with its items as saved, and its `version` for `replace_menu_items`.",
-            move |_tenant: TenantContext, principal: Principal, input: MenuId| {
+            move |tenant: TenantContext, principal: Principal, input: MenuId| {
                 let service = get.clone();
                 async move {
-                    let (menu, nodes) = service.get(&principal, input.id).await?;
+                    let (menu, nodes) = service.get(&tenant, &principal, input.id).await?;
                     let version = etag(menu.updated_at);
                     Ok::<_, Error>(Versioned { version, menu: menu_response(menu, nodes) })
                 }
@@ -131,11 +131,11 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
                 "Create a website menu: a key (e.g. `main`, `footer`), a language and an item tree.",
                 item_shape!()
             ),
-            move |_tenant: TenantContext, principal: Principal, input: CreateMenuInput| {
+            move |tenant: TenantContext, principal: Principal, input: CreateMenuInput| {
                 let service = create.clone();
                 async move {
                     let new = NewMenu { key: input.key, locale: input.locale, items: parse_items(input.items)? };
-                    let (menu, nodes) = service.create(&principal, new).await?;
+                    let (menu, nodes) = service.create(&tenant, &principal, new).await?;
                     let version = etag(menu.updated_at);
                     Ok::<_, Error>(Versioned { version, menu: menu_response(menu, nodes) })
                 }
@@ -150,12 +150,12 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
                  read it again.",
                 item_shape!()
             ),
-            move |_tenant: TenantContext, principal: Principal, input: ReplaceItemsInput| {
+            move |tenant: TenantContext, principal: Principal, input: ReplaceItemsInput| {
                 let service = replace.clone();
                 async move {
                     let expected = IfMatch::from_value(&input.version).expected()?;
                     let items = parse_items(input.items)?;
-                    let (menu, nodes) = service.replace(&principal, input.id, items, expected).await?;
+                    let (menu, nodes) = service.replace(&tenant, &principal, input.id, items, expected).await?;
                     let version = etag(menu.updated_at);
                     Ok::<_, Error>(Versioned { version, menu: menu_response(menu, nodes) })
                 }
@@ -165,10 +165,10 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
         Tool::new(
             "delete_menu",
             "Delete a website menu and all its items. It cannot be restored.",
-            move |_tenant: TenantContext, principal: Principal, input: MenuId| {
+            move |tenant: TenantContext, principal: Principal, input: MenuId| {
                 let service = delete.clone();
                 async move {
-                    service.delete(&principal, input.id).await?;
+                    service.delete(&tenant, &principal, input.id).await?;
                     Ok::<_, Error>(serde_json::json!({ "deleted": input.id }))
                 }
             },

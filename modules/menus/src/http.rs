@@ -9,6 +9,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header};
@@ -289,10 +290,11 @@ impl SiteMenuSummary {
 )]
 async fn list_menus(
     State(service): State<Arc<MenuService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<SiteMenuSummary>, Error> {
-    let page = service.list(&principal, &PageRequest::try_from(query)?).await?;
+    let page = service.list(&tenant, &principal, &PageRequest::try_from(query)?).await?;
     Ok(page.map(|(menu, items)| SiteMenuSummary::new(menu, items)))
 }
 
@@ -318,10 +320,11 @@ async fn list_menus(
 )]
 async fn create_menu(
     State(service): State<Arc<MenuService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CreateSiteMenuRequest>,
 ) -> Result<Created<SiteMenu>, Error> {
-    let (menu, nodes) = service.create(&principal, input.into()).await?;
+    let (menu, nodes) = service.create(&tenant, &principal, input.into()).await?;
     let version = menu.updated_at;
     Ok(Created::new(format!("/menus/{}", menu.id), menu_response(menu, nodes)).tagged(version))
 }
@@ -346,10 +349,11 @@ async fn create_menu(
 )]
 async fn get_menu(
     State(service): State<Arc<MenuService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<SiteMenu>, Error> {
-    let (menu, nodes) = service.get(&principal, id).await?;
+    let (menu, nodes) = service.get(&tenant, &principal, id).await?;
     Ok(Tagged { version: menu.updated_at, data: menu_response(menu, nodes) })
 }
 
@@ -378,13 +382,15 @@ async fn get_menu(
 )]
 async fn replace_menu(
     State(service): State<Arc<MenuService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
     ValidJson(input): ValidJson<ReplaceSiteMenuItemsRequest>,
 ) -> Result<Tagged<SiteMenu>, Error> {
     let expected = if_match.required()?;
-    let (menu, nodes) = service.replace(&principal, id, input.into_items(), expected).await?;
+    let (menu, nodes) =
+        service.replace(&tenant, &principal, id, input.into_items(), expected).await?;
     Ok(Tagged { version: menu.updated_at, data: menu_response(menu, nodes) })
 }
 
@@ -407,10 +413,11 @@ async fn replace_menu(
 )]
 async fn delete_menu(
     State(service): State<Arc<MenuService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    service.delete(&principal, id).await?;
+    service.delete(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -447,11 +454,12 @@ pub(crate) struct PublicQuery {
 )]
 async fn get_public_menu(
     State(service): State<Arc<MenuService>>,
+    tenant: TenantContext,
     Path(key): Path<String>,
     Query(query): Query<PublicQuery>,
 ) -> Result<Response, Error> {
     let now = Utc::now();
-    let ready = service.public_menu(&key, query.locale.as_deref(), now).await?;
+    let ready = service.public_menu(&tenant, &key, query.locale.as_deref(), now).await?;
     let seconds = (ready.expires_at - now).num_seconds();
     let cache =
         if seconds > 0 { format!("public, max-age={seconds}") } else { "no-cache".to_owned() };

@@ -124,3 +124,7 @@ autoxide task menus.import_content_menus
 Menu đã có ở đây (cùng khoá và ngôn ngữ) được để nguyên, nên chạy lại vẫn an toàn. Mục trỏ bài viết thành `ref`
 `content.entry`; mục trỏ danh mục hay thẻ thành `content.term`. Sau đó cho website đọc
 `GET /api/v1/menus/public/{key}`.
+
+Lệnh chép menu của khách mặc định. Máy chủ có nhiều khách thì chạy một lần cho mỗi khách có menu cũ, nêu khách bằng
+tên rút gọn: `autoxide task menus.import_content_menus tenant=shop-a`. Menu của khách nào là của khách đó: menu công
+khai `main` của khách này không bao giờ trả cho khách khác.

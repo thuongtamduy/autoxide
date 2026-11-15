@@ -126,3 +126,7 @@ autoxide task menus.import_content_menus
 Menus that already exist here (same key and language) are left alone, so running it again is safe. Items pointing
 to posts become `ref` `content.entry`; items pointing to categories or tags become `content.term`. Then switch the
 website to `GET /api/v1/menus/public/{key}`.
+
+It copies the menus of the default tenant. On a server with several tenants, run it once per tenant that has old
+menus, naming the tenant by its short name: `autoxide task menus.import_content_menus tenant=shop-a`. Each tenant's
+menus stay its own: the public menu `main` of one tenant is never served to another.

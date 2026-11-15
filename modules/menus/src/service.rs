@@ -9,12 +9,11 @@ use std::sync::Arc;
 
 use autoxide_content::api::LegacyMenus;
 use autoxide_kernel::access::Principal;
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::resource::ResourceDirectory;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_media::api::Media;
 use chrono::{DateTime, Utc};
 use sea_orm::{
@@ -53,7 +52,6 @@ pub(crate) struct Dependencies {
 }
 
 pub(crate) struct MenuService {
-    pub(crate) database: Database,
     outbox: Outbox,
     pub(crate) resources: ResourceDirectory,
     pub(crate) media: Arc<dyn Media>,
@@ -63,14 +61,8 @@ pub(crate) struct MenuService {
 }
 
 impl MenuService {
-    pub(crate) fn new(
-        database: Database,
-        outbox: Outbox,
-        dependencies: Dependencies,
-        config: MenusConfig,
-    ) -> Self {
+    pub(crate) fn new(outbox: Outbox, dependencies: Dependencies, config: MenusConfig) -> Self {
         MenuService {
-            database,
             outbox,
             resources: dependencies.resources,
             media: dependencies.media,
@@ -84,18 +76,20 @@ impl MenuService {
     /// đếm cho cả trang, không đếm từng menu).
     pub(crate) async fn list(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         page: &PageRequest,
     ) -> Result<Page<(Menu, u64)>, Error> {
         principal.require(&MENUS_READ)?;
-        let read = self.database.read();
-        let page =
-            fetch_page(menu::Entity::find(), menu::Column::Id, |row| row.id, page, read).await?;
+        let read = tenant.database().read();
+        let select = menu::Entity::find().scoped(tenant);
+        let page = fetch_page(select, menu::Column::Id, |row| row.id, page, read).await?;
         let ids: Vec<Uuid> = page.data.iter().map(|menu| menu.id).collect();
         let counts: HashMap<Uuid, i64> = if ids.is_empty() {
             HashMap::new()
         } else {
             item::Entity::find()
+                .scoped(tenant)
                 .select_only()
                 .column(item::Column::MenuId)
                 .column_as(item::Column::Id.count(), "items")
@@ -116,12 +110,13 @@ impl MenuService {
     /// Menu `id` kèm cây mục như đã lưu.
     pub(crate) async fn get(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<(Menu, Vec<Node>), Error> {
         principal.require(&MENUS_READ)?;
-        let found = self.find(id).await?;
-        let items = self.items_of(self.database.read(), id).await?;
+        let found = self.find(tenant, id).await?;
+        let items = self.items_of(tenant.database().read(), tenant, id).await?;
         Ok((found, tree(items)))
     }
 
@@ -129,11 +124,12 @@ impl MenuService {
     /// `menus.menu_exists`.
     pub(crate) async fn create(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         input: NewMenu,
     ) -> Result<(Menu, Vec<Node>), Error> {
         principal.require(&MENUS_MANAGE)?;
-        self.create_checked(Actor::from(principal), input, true).await
+        self.create_checked(tenant, Actor::from(principal), input, true).await
     }
 
     /// Như [`create`](Self::create), không kiểm permission. `check_targets`: hỏi sổ đối tượng
@@ -141,6 +137,7 @@ impl MenuService {
     /// ẩn mục đó, không làm hỏng cả lần nhập).
     pub(crate) async fn create_checked(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         input: NewMenu,
         check_targets: bool,
@@ -164,14 +161,15 @@ impl MenuService {
                 "must be left out when creating a menu",
             ));
         }
-        self.check_targets(&flat, &locale, check_targets, &mut problems).await?;
+        self.check_targets(tenant, &flat, &locale, check_targets, &mut problems).await?;
         if !problems.is_empty() {
             return Err(invalid(problems));
         }
         let now = micros(Utc::now());
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let saved = menu::Model {
             id: Uuid::now_v7(),
+            tenant_id: tenant.id().as_uuid(),
             key: key.clone(),
             locale: locale.clone(),
             created_at: now,
@@ -188,20 +186,14 @@ impl MenuService {
                 error.into()
             }
         })?;
-        let rows = insert_items(&transaction, saved.id, flat).await?;
+        let rows = insert_items(&transaction, tenant, saved.id, flat).await?;
         let event =
             events::MenuCreated(Change { before: None, after: Some(snapshot(&saved, rows.len())) });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::menu_subject(saved.id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::menu_subject(saved.id), &event)
             .await?;
         transaction.commit().await?;
-        self.cache.clear();
+        self.cache.clear(tenant.id());
         tracing::info!(menu_id = %saved.id, items = rows.len(), "menu created");
         Ok((saved, tree(rows)))
     }
@@ -210,23 +202,25 @@ impl MenuService {
     /// `None` khi họ gửi `*`. Menu đã bị sửa từ lúc đó thì 412.
     pub(crate) async fn replace(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         items: Vec<ItemInput>,
         expected: Option<DateTime<Utc>>,
     ) -> Result<(Menu, Vec<Node>), Error> {
         principal.require(&MENUS_MANAGE)?;
-        let found = self.find(id).await?;
+        let found = self.find(tenant, id).await?;
         let mut problems = Vec::new();
         let flat = flatten(&items, &mut problems);
         // Chỉ giữ được id của mục đang thuộc chính menu này.
         if flat.iter().any(|entry| entry.kept) {
             let current: std::collections::HashSet<Uuid> = item::Entity::find()
+                .scoped(tenant)
                 .select_only()
                 .column(item::Column::Id)
                 .filter(item::Column::MenuId.eq(id))
                 .into_tuple::<Uuid>()
-                .all(self.database.read())
+                .all(tenant.database().read())
                 .await?
                 .into_iter()
                 .collect();
@@ -239,109 +233,127 @@ impl MenuService {
                 ));
             }
         }
-        self.check_targets(&flat, &found.locale, true, &mut problems).await?;
+        self.check_targets(tenant, &flat, &found.locale, true, &mut problems).await?;
         if !problems.is_empty() {
             return Err(invalid(problems));
         }
         let now = micros(Utc::now());
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         // Kiểm phiên bản trong chính câu UPDATE: hai người sửa cùng lúc thì một người nhận 412.
         let editor = Actor::from(principal).user_id;
         let updated = menu::Entity::update_many()
             .col_expr(menu::Column::UpdatedAt, sea_orm::sea_query::Expr::value(now))
             .col_expr(menu::Column::UpdatedBy, sea_orm::sea_query::Expr::value(editor))
+            .scoped(tenant)
             .filter(menu::Column::Id.eq(id))
             .filter(menu::Column::UpdatedAt.eq(expected.unwrap_or(found.updated_at)))
             .exec(&transaction)
             .await?;
         if updated.rows_affected == 0 {
             // Không còn menu (vừa bị xoá) hoặc đã bị sửa.
-            return Err(match menu::Entity::find_by_id(id).one(&transaction).await? {
-                Some(_) => autoxide_kernel::version::changed(),
-                None => menu_not_found(id),
-            });
+            return Err(
+                match menu::Entity::find_by_id(id).scoped(tenant).one(&transaction).await? {
+                    Some(_) => autoxide_kernel::version::changed(),
+                    None => menu_not_found(id),
+                },
+            );
         }
-        let before =
-            item::Entity::find().filter(item::Column::MenuId.eq(id)).count(&transaction).await?;
-        item::Entity::delete_many().filter(item::Column::MenuId.eq(id)).exec(&transaction).await?;
-        let rows = insert_items(&transaction, id, flat).await?;
+        let before = item::Entity::find()
+            .scoped(tenant)
+            .filter(item::Column::MenuId.eq(id))
+            .count(&transaction)
+            .await?;
+        item::Entity::delete_many()
+            .scoped(tenant)
+            .filter(item::Column::MenuId.eq(id))
+            .exec(&transaction)
+            .await?;
+        let rows = insert_items(&transaction, tenant, id, flat).await?;
         let saved = Menu { updated_at: now, updated_by: editor, ..found };
         let event = events::MenuReplaced(Change {
             before: Some(snapshot(&saved, usize::try_from(before).unwrap_or(usize::MAX))),
             after: Some(snapshot(&saved, rows.len())),
         });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                Actor::from(principal),
-                events::menu_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, Actor::from(principal), events::menu_subject(id), &event)
             .await?;
         transaction.commit().await?;
-        self.cache.clear();
+        self.cache.clear(tenant.id());
         tracing::info!(menu_id = %id, items = rows.len(), "menu replaced");
         Ok((saved, tree(rows)))
     }
 
     /// Xoá menu `id` cùng mọi mục của nó.
-    pub(crate) async fn delete(&self, principal: &Principal, id: Uuid) -> Result<(), Error> {
+    pub(crate) async fn delete(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<(), Error> {
         principal.require(&MENUS_MANAGE)?;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let found = menu::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| menu_not_found(id))?;
         let count = item::Entity::delete_many()
+            .scoped(tenant)
             .filter(item::Column::MenuId.eq(id))
             .exec(&transaction)
             .await?
             .rows_affected;
-        menu::Entity::delete_by_id(id).exec(&transaction).await?;
+        menu::Entity::delete_many()
+            .scoped(tenant)
+            .filter(menu::Column::Id.eq(id))
+            .exec(&transaction)
+            .await?;
         let event = events::MenuDeleted(Change {
             before: Some(snapshot(&found, usize::try_from(count).unwrap_or(usize::MAX))),
             after: None,
         });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                Actor::from(principal),
-                events::menu_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, Actor::from(principal), events::menu_subject(id), &event)
             .await?;
         transaction.commit().await?;
-        self.cache.clear();
+        self.cache.clear(tenant.id());
         tracing::info!(menu_id = %id, "menu deleted");
         Ok(())
     }
 
     /// Menu theo khoá và ngôn ngữ (đọc công khai, nhập menu cũ).
-    pub(crate) async fn find_by_key(&self, key: &str, locale: &str) -> Result<Option<Menu>, Error> {
+    pub(crate) async fn find_by_key(
+        &self,
+        tenant: &TenantContext,
+        key: &str,
+        locale: &str,
+    ) -> Result<Option<Menu>, Error> {
         Ok(menu::Entity::find()
+            .scoped(tenant)
             .filter(menu::Column::Key.eq(key))
             .filter(menu::Column::Locale.eq(locale))
-            .one(self.database.read())
+            .one(tenant.database().read())
             .await?)
     }
 
     pub(crate) async fn items_of<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         menu_id: Uuid,
     ) -> Result<Vec<item::Model>, Error> {
         Ok(item::Entity::find()
+            .scoped(tenant)
             .filter(item::Column::MenuId.eq(menu_id))
             .order_by_asc(item::Column::Position)
             .all(connection)
             .await?)
     }
 
-    async fn find(&self, id: Uuid) -> Result<Menu, Error> {
+    async fn find(&self, tenant: &TenantContext, id: Uuid) -> Result<Menu, Error> {
         menu::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| menu_not_found(id))
     }
@@ -367,6 +379,7 @@ impl MenuService {
     /// nhóm con tự lấy chỉ trên loại có cây. Gom lỗi vào `problems`.
     async fn check_targets(
         &self,
+        tenant: &TenantContext,
         flat: &[Flat],
         locale: &str,
         check_exists: bool,
@@ -417,15 +430,7 @@ impl MenuService {
         }
         let mut found: HashSet<(String, String)> = HashSet::new();
         for (kind, ids) in by_kind {
-            let resolved = self
-                .resources
-                .resolve_many(
-                    &TenantContext::legacy_default(&self.database),
-                    kind,
-                    &ids,
-                    Some(locale),
-                )
-                .await?;
+            let resolved = self.resources.resolve_many(tenant, kind, &ids, Some(locale)).await?;
             found.extend(resolved.into_keys().map(|id| (kind.to_owned(), id)));
         }
         for (path, kind, id) in &wanted {
@@ -446,14 +451,16 @@ impl MenuService {
     }
 }
 
-/// Ghi các dòng mục của menu `menu_id` (trong transaction của người gọi).
+/// Ghi các dòng mục của menu `menu_id` của khách `tenant` (trong transaction của người gọi).
 async fn insert_items<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     menu_id: Uuid,
     flat: Vec<Flat>,
 ) -> Result<Vec<item::Model>, Error> {
+    let tenant_id = tenant.id().as_uuid();
     let rows: Vec<item::Model> =
-        flat.into_iter().map(|entry| item::Model { menu_id, ..entry.row }).collect();
+        flat.into_iter().map(|entry| item::Model { tenant_id, menu_id, ..entry.row }).collect();
     if !rows.is_empty() {
         item::Entity::insert_many(rows.iter().cloned().map(IntoActiveModel::into_active_model))
             .exec(connection)

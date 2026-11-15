@@ -250,3 +250,63 @@ async fn giu_id_muc_etag_khi_tao_va_so_muc_trong_danh_sach() {
     .await
     .unwrap();
 }
+
+/// Hai khách (một dùng chung database, một database riêng) cùng menu `main`: menu công khai trả
+/// menu của đúng khách theo header `autoxide-tenant`, kể cả khi menu của khách kia đã nằm trong
+/// cache; người của khách B không đọc được menu của khách A qua bất kỳ `GET` hay tool MCP chỉ đọc
+/// nào (bước 33).
+#[tokio::test]
+async fn hai_khach_cung_menu_khong_ro_ri() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia);
+        let all = ["menus.read", "menus.manage"];
+        let app = TestApp::builder(test)
+            .tenant("a")
+            .tenant_dedicated("b")
+            .user_in("a", "admin-a", 1, &all)
+            .user_in("b", "admin-b", 2, &all)
+            .provide::<dyn Media>(media)
+            .module(Shop)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let marker = "marker-menus-a";
+        let mut ids = Vec::new();
+        for (who, label) in [("admin-a", marker), ("admin-b", "Menu B")] {
+            let body = json!({"key": "main", "items": [
+                {"label": label, "url": "/home", "children": [{"label": format!("{label} child"), "url": "/child"}]}
+            ]});
+            let created = send(&app, "POST", "", Some(who), &[], Some(body)).await;
+            assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+            ids.push(created.json()["data"]["id"].as_str().unwrap().to_owned());
+        }
+        let item = {
+            let read = send(&app, "GET", &format!("/{}", ids[0]), Some("admin-a"), &[], None).await;
+            read.json()["data"]["items"][0]["id"].as_str().unwrap().to_owned()
+        };
+        // Đọc hai lượt: lượt sau trả từ cache, vẫn đúng khách.
+        let mut tags = Vec::new();
+        for _ in 0..2 {
+            for (slug, label) in [("a", marker), ("b", "Menu B")] {
+                let public = send(&app, "GET", "/public/main", None, &[("autoxide-tenant", slug)], None).await;
+                assert_eq!(public.status(), StatusCode::OK, "{}", public.json());
+                assert_eq!(public.json()["data"]["items"][0]["label"], label);
+                tags.push(public.header(header::ETAG).to_owned());
+            }
+        }
+        assert_ne!(tags[0], tags[1]);
+        // `ETag` của khách A gửi ở khách B không ra 304.
+        let headers = [("autoxide-tenant", "b"), ("if-none-match", tags[0].as_str())];
+        let other = send(&app, "GET", "/public/main", None, &headers, None).await;
+        assert_eq!(other.status(), StatusCode::OK);
+        let missing = send(&app, "GET", &format!("/{}", ids[0]), Some("admin-b"), &[], None).await;
+        assert_eq!(missing.status(), StatusCode::NOT_FOUND, "{}", missing.json());
+
+        let seeded = [("id", ids[0].clone()), ("id", item)];
+        let violations = autoxide_testkit::leak_check(&app, "admin-b", marker, &seeded).await.unwrap();
+        assert_eq!(violations, Vec::<String>::new());
+    })
+    .await
+    .unwrap();
+}

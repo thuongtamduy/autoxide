@@ -48,8 +48,6 @@ pub const PENDING_TENANCY: &[&str] = &[
     // forms
     // media
     // menus
-    "menus_items",
-    "menus_menus",
     // newsletter
 ];
 
