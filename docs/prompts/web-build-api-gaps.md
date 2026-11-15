@@ -158,11 +158,15 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Trang và cấu trúc | ETag (hoặc `version`) của từng dòng trong danh sách | mới | Đọc lại bản ghi trước khi sửa, so `updated_at` |
 | [ ] | Trang và cấu trúc | Lấy cả cây trang khi hơn 200 trang | mới | Lấy 200 trang đầu, có ghi chú |
 | [ ] | Lịch sử phiên bản | Tên người sửa của phiên bản (hiện chỉ có id) | mới | Hiện lý do giữ phiên bản và thời điểm |
-| [ ] | Menu | Module `menus`: `GET/POST /menus`, `GET/PUT/DELETE /menus/{id}`, `GET /menus/public/{key}` | mới (đề bài `menus-module.md`) | Dữ liệu mẫu (`src/sample/menus.ts`) |
-| [ ] | Menu | Sổ đối tượng: danh sách loại kèm cờ "có cây"; tìm đối tượng | 51 (P6) + đề bài menus, điểm 1–2 | Dữ liệu mẫu |
-| [ ] | Menu | Đọc menu kèm tiêu đề và trạng thái của từng đích, cho người có `menus.read` | mới (đề bài menus, điểm 3) | Dữ liệu mẫu |
-| [ ] | Menu | Lệnh nhập menu cũ có chạy thử; ghi lần nhập gần nhất | mới (đề bài menus, điểm 9) | Dữ liệu mẫu; nguồn là menu cũ thật |
-| [ ] | Menu | Header `Deprecation` / `Sunset` trên `/content/menus…` (core chưa gửi) | mới (đề bài menus, mục 3) | Ghi ngày sunset theo bản thiết kế |
+| [x] | Menu | Module `menus`: `GET/POST /menus`, `GET/PUT/DELETE /menus/{id}`, `GET /menus/public/{key}` | v0.14.0 | API thật (W-022 của web) |
+| [ ] | Menu | Sổ đối tượng: danh sách loại kèm cờ "có cây"; tìm đối tượng | 51 (P6) + đề bài menus, điểm 1–2 | Hai loại của `content` ghi cứng; bài và danh mục đọc qua API content (200 đầu); loại thương mại là dữ liệu mẫu, core từ chối khi lưu (`menus.ref_unknown_kind`) |
+| [ ] | Menu | Đọc menu kèm tiêu đề và trạng thái của từng đích, cho người có `menus.read` | mới (đề bài menus, điểm 3) | Tự tra từ bài và danh mục đã đọc; đích ngoài danh sách chỉ hiện id |
+| [ ] | Menu | Lệnh nhập menu cũ có chạy thử; ghi lần nhập gần nhất | mới (đề bài menus, điểm 9) | Tự tính bản xem trước từ dữ liệu thật, hiện câu lệnh `autoxide task menus.import_content_menus`; chưa có nút chạy |
+| [ ] | Menu | Danh sách menu kèm số mục (`item_count`), người và lúc sửa cuối | mới | Bảng không có cột "Mục" |
+| [ ] | Menu | `POST /menus` trả `ETag` như `GET` và `PUT` | mới | Đọc lại menu sau khi tạo |
+| [ ] | Menu | Giữ id của mục giữa các lần lưu (nhận `id` trong `SiteMenuItemInput`); hiện `PUT` cấp id mới cho mọi mục | mới | Giữ mục đang chọn theo vị trí trong cây |
+| [ ] | Menu | Ngôn ngữ được phép của menu (`AUTOXIDE_MENUS_LOCALES`) qua API | mới | Dùng danh sách ngôn ngữ của content; core vẫn kiểm |
+| [x] | Menu | Header `Deprecation` / `Sunset` trên `/content/menus…` | v0.14.0 | Lấy ngày từ header `Sunset` thật |
 
 ## Tổ chức › Cây tổ chức (`/org`) và Tuân thủ (`/compliance`)
 
