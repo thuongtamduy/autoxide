@@ -6921,3 +6921,13 @@ Chủ dự án hỏi merge vào `main` mà không phát hành có được khôn
   qua sổ database theo khách đọc từ khoá) — không bao giờ coi một file là mồ côi chỉ vì job đang chạy trên database
   khác. Khoá của khách không còn trong sổ thì để nguyên (không đoán). Chạy trên N database thì quét N lần: chấp nhận
   (xoá idempotent, mỗi ngày một lần); tối ưu khi đo thấy chậm.
+
+## D-278 · `webhooks` theo khách: chỉ gửi tới endpoint cùng khách, secret ký lưu mã hoá (bước 33 B7) — 2026-11-15 — agent quyết
+
+- `webhooks_endpoint`, `webhooks_delivery` mang `tenant_id`. Bộ phát (`Fanout`) chỉ đọc endpoint **cùng khách với
+  event** trên database của khách đó: event của khách này không bao giờ tạo lần gửi tới địa chỉ của khách khác. Job
+  gửi là job theo khách; job dọn lần gửi cũ quét cả database (`webhooks_delivery_created_sweep_idx`).
+- Secret ký lưu bằng `Sealer` (D-257), mục đích `webhooks.endpoint_secret`, dữ liệu đi kèm là khách + ID endpoint;
+  chỉ mở lúc ký. Endpoint có sẵn được mã hoá bằng upgrade dữ liệu `u0001_seal_secrets` (chạy lại được, có `down`).
+  Giá trị mã hoá dài hơn cột `varchar(100)` cũ: migration `m0007_widen_secret` đổi cột thành `text` trên Postgres
+  (SQLite không giới hạn độ dài, không làm gì) — rẽ nhánh theo database chỉ trong migration này.

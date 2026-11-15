@@ -64,6 +64,10 @@ impl Module for WebhooksModule {
         migration::all()
     }
 
+    fn upgrades(&self) -> Vec<Box<dyn autoxide_kernel::migration::DataUpgrade>> {
+        migration::upgrades()
+    }
+
     fn permissions(&self) -> Vec<Permission> {
         permissions::all()
     }
@@ -86,10 +90,10 @@ impl Module for WebhooksModule {
             .config
             .clone()
             .ok_or_else(|| Error::internal("module `webhooks` started before it was configured"))?;
-        let database = context.database().clone();
+        let secrets = context.require::<autoxide_kernel::secret::SecretKey>()?;
         let service = Arc::new(
             WebhookService::new(
-                database.clone(),
+                secrets.as_ref().clone(),
                 context.outbox()?,
                 context.events().clone(),
                 config.allow_http,
@@ -98,15 +102,15 @@ impl Module for WebhooksModule {
             .with_translations(context.translations().clone()),
         );
         let sender = Arc::new(Sender {
-            database: database.clone(),
+            secrets: secrets.as_ref().clone(),
             client: Sender::client(config.timeout, config.allow_private_networks)?,
             allow_private_networks: config.allow_private_networks,
         });
         self.running = Some(Running {
             service,
-            fanout: delivery::fanout(database.clone()),
+            fanout: delivery::fanout(),
             sender,
-            cleanup: Arc::new(Cleanup { database }),
+            cleanup: Arc::new(Cleanup),
         });
         Ok(())
     }

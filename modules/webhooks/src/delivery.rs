@@ -11,11 +11,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use serde::{Deserialize, Serialize};
@@ -48,9 +47,9 @@ impl Job for Send {
     const KIND: &'static str = SEND_KIND;
 }
 
-/// Nhận mọi event, tạo lần gửi cho các endpoint muốn nó.
+/// Nhận mọi event, tạo lần gửi cho các endpoint muốn nó — **chỉ endpoint cùng khách với event**
+/// (bước 33): event của khách này không bao giờ tới địa chỉ của khách khác.
 pub(crate) struct Fanout {
-    pub database: Database,
     pub jobs: JobQueue,
 }
 
@@ -59,9 +58,11 @@ impl EventHandler for Fanout {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         // Một câu đọc mỗi event: bảng endpoint nhỏ. Đọc trên kết nối ghi để endpoint
         // vừa tạo nhận ngay event kế tiếp.
+        let tenant = &event.tenant;
         let rows = endpoint::Entity::find()
             .filter(endpoint::Column::DisabledAt.is_null())
-            .all(self.database.write())
+            .scoped(tenant)
+            .all(tenant.database().write())
             .await?;
         let mut targets = Vec::new();
         for row in rows {
@@ -83,10 +84,12 @@ impl EventHandler for Fanout {
 
 impl Fanout {
     async fn create(&self, target: &Endpoint, event: &Delivered, body: &str) -> Result<(), Error> {
-        let transaction = self.database.begin_write().await?;
+        let tenant = &event.tenant;
+        let transaction = tenant.database().begin_write().await?;
         let id = Uuid::now_v7();
         let inserted = delivery::ActiveModel {
             id: Set(id),
+            tenant_id: Set(tenant.id().as_uuid()),
             endpoint_id: Set(target.id),
             event_id: Set(event.id),
             event_name: Set(event.name.clone()),
@@ -111,14 +114,7 @@ impl Fanout {
             Err(error) => return Err(error.into()),
         }
         let options = EnqueueOptions::default().max_attempts(MAX_ATTEMPTS);
-        self.jobs
-            .enqueue(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                &Send { delivery_id: id },
-                options,
-            )
-            .await?;
+        self.jobs.enqueue(&transaction, tenant, &Send { delivery_id: id }, options).await?;
         transaction.commit().await?;
         Ok(())
     }
@@ -147,9 +143,9 @@ pub(crate) const STATUS_PENDING: &str = "pending";
 pub(crate) const STATUS_SUCCEEDED: &str = "succeeded";
 pub(crate) const STATUS_FAILED: &str = "failed";
 
-/// Chạy job gửi.
+/// Chạy job gửi (job theo khách: database và secret của khách mang job).
 pub(crate) struct Sender {
-    pub database: Database,
+    pub secrets: autoxide_kernel::secret::SecretKey,
     pub client: reqwest::Client,
     /// `AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS`.
     pub allow_private_networks: bool,
@@ -182,8 +178,14 @@ impl JobHandler for Sender {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         let input: Send = serde_json::from_value(job.payload.clone())
             .map_err(|error| Error::internal(format!("webhook job payload: {error}")))?;
-        let Some(mut row) =
-            delivery::Entity::find_by_id(input.delivery_id).one(self.database.write()).await?
+        let tenant = job
+            .tenant
+            .as_ref()
+            .ok_or_else(|| Error::internal("a webhook job must belong to a tenant"))?;
+        let Some(mut row) = delivery::Entity::find_by_id(input.delivery_id)
+            .scoped(tenant)
+            .one(tenant.database().write())
+            .await?
         else {
             // Endpoint đã bị xoá (cùng lịch sử gửi): không còn gì để gửi.
             return Ok(());
@@ -191,16 +193,19 @@ impl JobHandler for Sender {
         // Lần gửi đã hỏng hẳn mà job chạy lại từ lần đầu: người vận hành vừa đưa job từ
         // dead-letter queue về (`autoxide jobs retry`) — mở lại lần gửi rồi gửi thật (D-161).
         // Lần đầu bình thường thì lần gửi luôn đang `pending`.
-        if row.status == STATUS_FAILED && job.attempt == 1 && self.reopen(&row).await? {
+        if row.status == STATUS_FAILED && job.attempt == 1 && self.reopen(tenant, &row).await? {
             row.status = STATUS_PENDING.to_owned();
         }
         if row.status != STATUS_PENDING {
             return Ok(());
         }
-        let target =
-            endpoint::Entity::find_by_id(row.endpoint_id).one(self.database.write()).await?;
+        let target = endpoint::Entity::find_by_id(row.endpoint_id)
+            .scoped(tenant)
+            .one(tenant.database().write())
+            .await?;
         let Some(target) = target.filter(|target| target.disabled_at.is_none()) else {
-            self.finish(&row, STATUS_FAILED, None, Some("the endpoint was disabled")).await?;
+            self.finish(tenant, &row, STATUS_FAILED, None, Some("the endpoint was disabled"))
+                .await?;
             return Ok(());
         };
 
@@ -210,13 +215,22 @@ impl JobHandler for Sender {
             reqwest::Url::parse(&target.url).is_ok_and(|url| crate::network::is_public_host(&url));
         if !self.allow_private_networks && !public {
             let problem = format!("the address {}", crate::network::PRIVATE_ADDRESS);
-            self.finish(&row, STATUS_FAILED, None, Some(&problem)).await?;
+            self.finish(tenant, &row, STATUS_FAILED, None, Some(&problem)).await?;
             return Ok(());
         }
 
         let timestamp = now().timestamp();
         let message_id = row.id.to_string();
-        let signature = signature::sign(&target.secret, &message_id, timestamp, &row.body)?;
+        let sealer = self.secrets.sealer().await?;
+        let secret = sealer.open(
+            tenant.id(),
+            crate::service::SECRET_PURPOSE,
+            &target.id.to_string(),
+            &target.secret,
+        )?;
+        let secret = String::from_utf8(secret.to_vec())
+            .map_err(|_| Error::internal("a stored webhook secret is not text"))?;
+        let signature = signature::sign(&secret, &message_id, timestamp, &row.body)?;
         let sent = self
             .client
             .post(&target.url)
@@ -231,7 +245,7 @@ impl JobHandler for Sender {
         match sent {
             Ok(response) if response.status().is_success() => {
                 let status = i32::from(response.status().as_u16());
-                self.finish(&row, STATUS_SUCCEEDED, Some(status), None).await?;
+                self.finish(tenant, &row, STATUS_SUCCEEDED, Some(status), None).await?;
                 metrics::counter!("webhooks_delivered_total").increment(1);
                 Ok(())
             }
@@ -239,8 +253,14 @@ impl JobHandler for Sender {
                 let status = response.status();
                 let problem = format!("the endpoint answered {status}");
                 let outcome = if last { STATUS_FAILED } else { STATUS_PENDING };
-                self.finish(&row, outcome, Some(i32::from(status.as_u16())), Some(&problem))
-                    .await?;
+                self.finish(
+                    tenant,
+                    &row,
+                    outcome,
+                    Some(i32::from(status.as_u16())),
+                    Some(&problem),
+                )
+                .await?;
                 Err(failed(&problem, last))
             }
             Err(error) => {
@@ -251,7 +271,7 @@ impl JobHandler for Sender {
                 tracing::warn!(delivery_id = %row.id, detail, "webhook request failed");
                 let problem = describe(&error);
                 let outcome = if last { STATUS_FAILED } else { STATUS_PENDING };
-                self.finish(&row, outcome, None, Some(&problem)).await?;
+                self.finish(tenant, &row, outcome, None, Some(&problem)).await?;
                 Err(failed(&problem, last))
             }
         }
@@ -260,12 +280,13 @@ impl JobHandler for Sender {
 
 impl Sender {
     /// Lần gửi hỏng hẳn `row` thành `pending` lại; `false` nếu nó không còn `failed`.
-    async fn reopen(&self, row: &delivery::Model) -> Result<bool, Error> {
+    async fn reopen(&self, tenant: &TenantContext, row: &delivery::Model) -> Result<bool, Error> {
         let reopened = delivery::Entity::update_many()
             .col_expr(delivery::Column::Status, Expr::value(STATUS_PENDING))
             .filter(delivery::Column::Id.eq(row.id))
             .filter(delivery::Column::Status.eq(STATUS_FAILED))
-            .exec(self.database.write())
+            .scoped(tenant)
+            .exec(tenant.database().write())
             .await?;
         if reopened.rows_affected == 1 {
             tracing::info!(delivery_id = %row.id, "failed webhook delivery reopened by a job retry");
@@ -276,6 +297,7 @@ impl Sender {
     /// Ghi kết quả của một lần thử.
     async fn finish(
         &self,
+        tenant: &TenantContext,
         row: &delivery::Model,
         status: &str,
         response_status: Option<i32>,
@@ -296,7 +318,11 @@ impl Sender {
         if status == STATUS_SUCCEEDED {
             update = update.col_expr(delivery::Column::DeliveredAt, Expr::value(Some(now)));
         }
-        update.filter(delivery::Column::Id.eq(row.id)).exec(self.database.write()).await?;
+        update
+            .filter(delivery::Column::Id.eq(row.id))
+            .scoped(tenant)
+            .exec(tenant.database().write())
+            .await?;
         if status == STATUS_FAILED {
             tracing::warn!(delivery_id = %row.id, endpoint_id = %row.endpoint_id, "webhook delivery failed for good");
             metrics::counter!("webhooks_failed_total").increment(1);
@@ -328,19 +354,17 @@ fn describe(error: &reqwest::Error) -> String {
     }
 }
 
-/// Xoá lần gửi cũ.
-pub(crate) struct Cleanup {
-    pub database: Database,
-}
+/// Xoá lần gửi cũ của mọi khách trên database job đang quét (index `_sweep_idx`).
+pub(crate) struct Cleanup;
 
 #[async_trait::async_trait]
 impl JobHandler for Cleanup {
-    async fn run(&self, _: &JobContext) -> Result<(), Error> {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
         let before = now() - chrono::Duration::days(KEEP_DELIVERIES_DAYS);
         let deleted = delivery::Entity::delete_many()
             .filter(delivery::Column::CreatedAt.lt(before))
             .filter(delivery::Column::Status.ne(STATUS_PENDING))
-            .exec(self.database.write())
+            .exec(job.database.write())
             .await?;
         tracing::info!(deleted = deleted.rows_affected, "old webhook deliveries removed");
         Ok(())
@@ -348,6 +372,6 @@ impl JobHandler for Cleanup {
 }
 
 /// Dùng trong `Arc<dyn …>`.
-pub(crate) fn fanout(database: Database) -> Arc<Fanout> {
-    Arc::new(Fanout { database, jobs: JobQueue::new("webhooks") })
+pub(crate) fn fanout() -> Arc<Fanout> {
+    Arc::new(Fanout { jobs: JobQueue::new("webhooks") })
 }

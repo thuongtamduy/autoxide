@@ -75,9 +75,6 @@ pub const PENDING_TENANCY: &[&str] = &[
     "newsletter_subscribers",
     "newsletter_subscriptions",
     "newsletter_suppressions",
-    // webhooks
-    "webhooks_delivery",
-    "webhooks_endpoint",
 ];
 
 /// Các vi phạm (đã sắp xếp); rỗng nghĩa là hợp lệ. `control_plane`: bảng mặt điều khiển đã khai;

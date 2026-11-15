@@ -9,6 +9,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -265,15 +266,16 @@ async fn list_event_types(
 )]
 async fn list_endpoints(
     State(service): State<Arc<WebhookService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(filter): Query<EndpointFilter>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<EndpointResponse>, Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
     let active = filter.status.map(|status| matches!(status, EndpointStatus::Active));
-    let page = service.list(active, &PageRequest::try_from(query)?).await?;
+    let page = service.list(&tenant, active, &PageRequest::try_from(query)?).await?;
     let ids: Vec<Uuid> = page.data.iter().map(|endpoint| endpoint.id).collect();
-    let mut last = service.last_deliveries(&ids).await?;
+    let mut last = service.last_deliveries(&tenant, &ids).await?;
     Ok(page.map(|endpoint| {
         let delivery = last.remove(&endpoint.id).map(LastDelivery::from);
         EndpointResponse { last_delivery: Some(delivery), ..EndpointResponse::from(endpoint) }
@@ -304,13 +306,14 @@ async fn list_endpoints(
 )]
 async fn create_endpoint(
     State(service): State<Arc<WebhookService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CreateEndpointRequest>,
 ) -> Result<(NoStore, Created<CreatedEndpointResponse>), Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
     let input =
         NewEndpoint { url: input.url, description: input.description, events: input.events };
-    let created = service.create(Actor::from(&principal), input).await?;
+    let created = service.create(&tenant, Actor::from(&principal), input).await?;
     let path = format!("/webhooks/{}", created.endpoint.id);
     let data =
         CreatedEndpointResponse { secret: created.secret, endpoint: created.endpoint.into() };
@@ -336,12 +339,14 @@ async fn create_endpoint(
 )]
 async fn get_endpoint(
     State(service): State<Arc<WebhookService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<EndpointResponse>, Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
-    let endpoint = service.get(id).await?;
-    let delivery = service.last_deliveries(&[id]).await?.remove(&id).map(LastDelivery::from);
+    let endpoint = service.get(&tenant, id).await?;
+    let delivery =
+        service.last_deliveries(&tenant, &[id]).await?.remove(&id).map(LastDelivery::from);
     let version = endpoint.updated_at;
     let data =
         EndpointResponse { last_delivery: Some(delivery), ..EndpointResponse::from(endpoint) };
@@ -370,6 +375,7 @@ async fn get_endpoint(
 )]
 async fn update_endpoint(
     State(service): State<Arc<WebhookService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
@@ -383,7 +389,7 @@ async fn update_endpoint(
         disabled: input.disabled,
     };
     let expected = if_match.expected()?;
-    let endpoint = service.update(Actor::from(&principal), id, changes, expected).await?;
+    let endpoint = service.update(&tenant, Actor::from(&principal), id, changes, expected).await?;
     Ok(Tagged { version: endpoint.updated_at, data: endpoint.into() })
 }
 
@@ -406,11 +412,12 @@ async fn update_endpoint(
 )]
 async fn delete_endpoint(
     State(service): State<Arc<WebhookService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
-    service.delete(Actor::from(&principal), id).await?;
+    service.delete(&tenant, Actor::from(&principal), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -434,11 +441,12 @@ async fn delete_endpoint(
 )]
 async fn rotate_secret(
     State(service): State<Arc<WebhookService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<(NoStore, Data<SecretResponse>), Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
-    let secret = service.rotate_secret(Actor::from(&principal), id).await?;
+    let secret = service.rotate_secret(&tenant, Actor::from(&principal), id).await?;
     Ok((NO_STORE, Data { data: SecretResponse { secret } }))
 }
 
@@ -462,11 +470,12 @@ async fn rotate_secret(
 )]
 async fn list_deliveries(
     State(service): State<Arc<WebhookService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<DeliveryResponse>, Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
-    let page = service.deliveries(id, &PageRequest::try_from(query)?).await?;
+    let page = service.deliveries(&tenant, id, &PageRequest::try_from(query)?).await?;
     Ok(page.map(DeliveryResponse::from))
 }

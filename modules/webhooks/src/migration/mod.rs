@@ -2,8 +2,11 @@
 //! thêm file mới và một dòng vào cuối [`all`].
 
 mod m0001_create_webhooks;
+mod m0007_widen_secret;
+pub(crate) mod u0001_seal_secrets;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::tenancy::migration::TenantTable;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -22,5 +25,28 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                 autoxide_kernel::job::tenant_table("webhooks"),
             ],
         ),
+        // Endpoint và lần gửi thuộc một khách (bước 33, D-278); index dọn lần gửi cũ quét cả
+        // database. Ngay sau đó upgrade `u0001_seal_secrets` mã hoá secret ký đã có.
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0006_tenancy",
+            vec![
+                TenantTable::new("webhooks_endpoint"),
+                TenantTable::new("webhooks_delivery")
+                    .unique(
+                        "webhooks_delivery_endpoint_event_unique",
+                        ["tenant_id", "endpoint_id", "event_id"],
+                    )
+                    .index("webhooks_delivery_endpoint_idx", ["tenant_id", "endpoint_id", "id"])
+                    .drop_index("webhooks_delivery_created_idx")
+                    .sweep_index("webhooks_delivery_created_sweep_idx", ["created_at"]),
+            ],
+        ),
+        // Secret đã mã hoá dài hơn cột cũ (Postgres).
+        Box::new(m0007_widen_secret::Migration),
     ]
+}
+
+/// Upgrade dữ liệu của module, theo thứ tự.
+pub(crate) fn upgrades() -> Vec<Box<dyn autoxide_kernel::migration::DataUpgrade>> {
+    vec![Box::new(u0001_seal_secrets::SealSecrets)]
 }
