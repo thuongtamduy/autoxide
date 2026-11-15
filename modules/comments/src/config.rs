@@ -78,6 +78,13 @@ pub(crate) const MAX_LINKS: Setting = Setting::new(
 )
 .with_default("2");
 
+pub(crate) const MARKDOWN: Setting = Setting::new(
+    "AUTOXIDE_COMMENTS_MARKDOWN",
+    "Whether comments may be written in Markdown (`true` or `false`): bold, italics, links, \
+     quotes and code, rendered to safe HTML. Plain text works either way.",
+)
+.with_default("true");
+
 pub(crate) const EDIT_MINUTES: Setting = Setting::new(
     "AUTOXIDE_COMMENTS_EDIT_MINUTES",
     "Minutes during which authors may change their comment (0 to 1440; 0: never). Deleting \
@@ -224,6 +231,8 @@ pub(crate) struct CommentsConfig {
     pub mode_overrides: BTreeMap<(String, bool), Mode>,
     pub max_length: usize,
     pub max_links: usize,
+    /// Nhận bài viết bằng Markdown (D-252).
+    pub markdown: bool,
     pub edit_minutes: u32,
     pub report_threshold: u32,
     /// 0: không tự đóng.
@@ -257,6 +266,7 @@ impl Default for CommentsConfig {
             mode_overrides: BTreeMap::new(),
             max_length: 4000,
             max_links: 2,
+            markdown: true,
             edit_minutes: 15,
             report_threshold: 3,
             auto_close_days: 0,
@@ -297,6 +307,7 @@ impl CommentsConfig {
             reader.optional_with(&MODERATION_BY_TYPE, overrides).map(Option::unwrap_or_default);
         let max_length = reader.get_with(&MAX_LENGTH, |raw| parse_in_range(raw, 10usize, 20_000));
         let max_links = reader.get_with(&MAX_LINKS, |raw| parse_in_range(raw, 0usize, 100));
+        let markdown = reader.get_with(&MARKDOWN, flag);
         let edit = reader.get_with(&EDIT_MINUTES, |raw| parse_in_range(raw, 0u32, 1440));
         let threshold = reader.get_with(&REPORT_THRESHOLD, |raw| parse_in_range(raw, 1u32, 1000));
         let close = reader.get_with(&AUTO_CLOSE_DAYS, |raw| parse_in_range(raw, 0u32, 36_500));
@@ -337,6 +348,7 @@ impl CommentsConfig {
             mode_overrides,
             max_length: max_length?,
             max_links: max_links?,
+            markdown: markdown?,
             edit_minutes: edit?,
             report_threshold: threshold?,
             auto_close_days: close?,

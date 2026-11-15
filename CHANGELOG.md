@@ -25,6 +25,11 @@ endpoints are marked deprecated with a sunset date first.
   users (`GET`, `DELETE /api/v1/auth/users/{id}/passkeys`, `DELETE …/passkeys/{passkey_id}`); the event
   `auth.passkey_removed` then records `by_administrator`. `autoxide user remove-passkeys --email …` does the same
   from the server for an only administrator who lost their devices.
+- `comments`: comments may be written in a small part of Markdown (`format: markdown`: bold, italics, links,
+  quotes, code), rendered to safe HTML from a fixed list of tags (raw HTML shows as text, images as their text,
+  only `http(s)` links). Plain text stays the default and old comments show as before; Markdown links count
+  towards the link limit. New setting `AUTOXIDE_COMMENTS_MARKDOWN` (on), `markdown` in the public settings,
+  `format` in every comment.
 - For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
   errors.
 

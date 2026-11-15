@@ -58,7 +58,7 @@ cho từng mã.
 ## Website
 
 1. `GET /api/v1/comments/public/settings` — giới hạn và công tắc (có nhận khách không, số phút
-   được sửa, độ dài tối đa, mail báo trả lời có bật không).
+   được sửa, độ dài tối đa, mail báo trả lời có bật không, Markdown có bật không).
 2. `GET /api/v1/comments/public/threads?target_type=content.entry&target_id=…&order=desc&limit=20&replies_limit=3`
    — bình luận gốc đang hiện kèm vài trả lời đầu và `reply_count`; đi tiếp bằng
    `pagination.next_cursor`. Thêm trả lời: `GET /api/v1/comments/public/comments/{id}/replies`.
@@ -66,7 +66,7 @@ cho từng mã.
    (tối đa 100). Khung bình luận có mở không: `GET /api/v1/comments/public/targets/{type}/{id}`.
 3. Hiển thị `body_html` (mọi thứ đã escape, xuống dòng thành `<br>`, địa chỉ `http(s)` thành link
    có `rel="nofollow ugc noopener"`); không bao giờ chèn `body` như HTML. Ghi rõ khách là khách
-   (`author.kind`).
+   (`author.kind`). Xem "Chữ thường và Markdown" bên dưới.
 4. Mỗi lần hiện khung (không bao giờ trong HTML đã cache): `GET /api/v1/antispam/token?scope=comments:content.entry`.
    Hiện một ô bẫy ẩn mà người thật để trống.
 5. `POST /api/v1/comments/public/comments`:
@@ -105,6 +105,23 @@ cho từng mã.
 - Báo cáo: `POST /api/v1/comments/public/comments/{id}/reports {"reason": "spam" | "abuse" |
   "illegal" | "other", "note": "…"}`. Mỗi tài khoản báo một bình luận một lần; khách được đếm theo
   khối mạng (`/24` với IPv4, `/48` với IPv6).
+
+## Chữ thường và Markdown
+
+Bình luận gửi kèm `format`: `text` (mặc định) hay `markdown`. `markdown` chỉ dùng được khi
+`GET /api/v1/comments/public/settings` trả `markdown: true` (`AUTOXIDE_COMMENTS_MARKDOWN`, mặc định
+bật; tắt thì `markdown` bị từ chối ở trường `format`). Sửa mà không gửi `format` thì giữ định dạng
+của bình luận. Bình luận cũ là `text` và hiện như trước.
+
+- `text`: chữ thường. Dấu `*` vẫn là `*`; xuống dòng được giữ; địa chỉ `http(s)` thành link.
+- `markdown`: một phần nhỏ của Markdown — `**đậm**`, `*nghiêng*`, `[link](https://…)` và
+  `<https://…>`, `> trích dẫn`, `` `code` `` và khối code. Tiêu đề và mục danh sách hiện như đoạn
+  văn; ảnh hiện thành chữ của nó (không bao giờ tải ảnh); HTML thô hiện thành chữ. Chỉ link
+  `http(s)` dùng được, đều có `rel="nofollow ugc noopener"`.
+
+Máy chủ dựng `body_html` từ một danh sách thẻ cố định (`p`, `br`, `strong`, `em`, `a`,
+`blockquote`, `code`, `pre`), nên website chèn nguyên `body_html` ở cả hai định dạng. Link Markdown
+được tính vào `AUTOXIDE_COMMENTS_MAX_LINKS` như địa chỉ trần. Từ cấm được so trên chữ người viết.
 
 ## Kiểm duyệt
 
@@ -210,6 +227,7 @@ có tool xoá hẳn (dùng REST).
 | `AUTOXIDE_COMMENTS_MODERATION_BY_TYPE`     | —                                           |
 | `AUTOXIDE_COMMENTS_MAX_LENGTH`             | `4000`                                      |
 | `AUTOXIDE_COMMENTS_MAX_LINKS`              | `2`                                         |
+| `AUTOXIDE_COMMENTS_MARKDOWN`               | `true`                                      |
 | `AUTOXIDE_COMMENTS_EDIT_MINUTES`           | `15`                                        |
 | `AUTOXIDE_COMMENTS_REPORT_THRESHOLD`       | `3`                                         |
 | `AUTOXIDE_COMMENTS_AUTO_CLOSE_DAYS`        | `0` (không bao giờ)                         |

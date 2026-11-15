@@ -21,6 +21,7 @@ use super::views::{EditedComment, PostedComment, PublicComment, TargetResponse, 
 use crate::moderation::reports::ReportReason;
 use crate::posting::NewComment;
 use crate::service::CommentsService;
+use crate::text::Format;
 use crate::threads::{REPLIES_MAX, oldest_first};
 
 /// What a website needs to know to show the comment box.
@@ -43,6 +44,8 @@ pub(crate) struct CommentSettings {
     pub max_links: usize,
     /// Minutes during which authors may change their comment (0: never).
     pub edit_minutes: u32,
+    /// Comments may be written in Markdown (`format: markdown`): show formatting buttons.
+    pub markdown: bool,
     /// The server can mail people about replies (show the "notify me" box).
     pub reply_mails: bool,
     /// Ask `GET /api/v1/antispam/token?scope=comments:<target_type>` for a form token each
@@ -76,6 +79,7 @@ pub(crate) async fn get_settings(
             max_length: config.max_length,
             max_links: config.max_links,
             edit_minutes: config.edit_minutes,
+            markdown: config.markdown,
             reply_mails: config.reply_mails(),
             token_scope: "comments:{target_type}".to_owned(),
         },
@@ -241,8 +245,11 @@ pub(crate) struct CreateCommentRequest {
     /// Reply to this comment (a top-level comment or a reply in its thread); omit for a new
     /// thread.
     parent_id: Option<Uuid>,
-    /// Plain text; line breaks are kept, `http(s)` addresses become links.
+    /// The text, as `format` says; line breaks are kept, `http(s)` addresses become links.
     body: String,
+    /// `text` (the default: plain text) or `markdown` (bold, italics, links, quotes, code;
+    /// only when `GET /public/settings` says `markdown: true`).
+    format: Option<Format>,
     /// Guests: the name to show (required). Signed-in users show the name of their profile.
     author_name: Option<String>,
     /// Address for reply mails (never shown). Required with `notify_replies`.
@@ -300,6 +307,7 @@ pub(crate) async fn create_comment(
         target_id: input.target_id,
         parent_id: input.parent_id,
         body: input.body,
+        format: input.format.unwrap_or_default(),
         author_name: input.author_name,
         email: input.email,
         notify_replies: input.notify_replies,
@@ -322,6 +330,8 @@ pub(crate) async fn create_comment(
 pub(crate) struct EditCommentRequest {
     /// The new text.
     body: String,
+    /// `text` or `markdown`; omitted: as the comment was written.
+    format: Option<Format>,
     /// Guests: the `edit_token` received when posting. Signed-in authors omit it.
     edit_token: Option<String>,
 }
@@ -356,8 +366,9 @@ pub(crate) async fn edit_comment(
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<EditCommentRequest>,
 ) -> Result<Data<EditedComment>, Error> {
-    let found =
-        service.edit(principal.as_ref(), id, input.edit_token.as_deref(), &input.body).await?;
+    let found = service
+        .edit(principal.as_ref(), id, input.edit_token.as_deref(), &input.body, input.format)
+        .await?;
     Ok(Data { data: found.into() })
 }
 

@@ -6330,3 +6330,51 @@ Quyết định:
 - Hai lệnh khôi phục của CLI dùng chung một đường (`enum Recovery`, `recover`).
 - `docs/DEPLOY.md` (EN + VI): cách dùng cạnh `reset-mfa`.
 - **Không có tool MCP:** việc khôi phục tài khoản không giao cho agent.
+
+## D-252 · `comments`: Markdown giới hạn bằng `pulldown-cmark` và bộ dựng theo danh sách cho phép (bước 32 B4) — 2026-11-15 — agent quyết
+
+Bối cảnh: D-112 ghi "bình luận chữ thường; Markdown + sanitizer để sau". Người viết muốn in đậm, trích dẫn, đặt
+link có chữ.
+
+Quyết định:
+
+- **Cột mới `format`** trên `comments_comments` (migration `m0010_add_format`: `string_len(16)` NOT NULL DEFAULT
+  `'text'`; `down` bỏ cột — test migration up → down → up của mọi module chạy nó trên cả hai database). Dòng có
+  sẵn là `text` nên hiển thị như cũ.
+- **Request:**
+  - `POST /public/comments` nhận `format` (`text` mặc định: client cũ gửi chữ có `*` không bị đổi nghĩa).
+  - `PATCH …/{id}` nhận `format`; không gửi thì giữ định dạng đang có.
+  - Setting `AUTOXIDE_COMMENTS_MARKDOWN` (mặc định `true`); tắt mà gửi `markdown` thì 422 ở trường `format`, gom
+    cùng các lỗi khác.
+  - `GET /public/settings` thêm `markdown`.
+  - Response có `format`; `body_html` dựng theo nó.
+  - Tool MCP `comments.answer` giữ chữ thường. Input tool không lồng được `$ref`, và tool làm ít hơn REST là được
+    (luật kiến trúc 8 chỉ cấm làm nhiều hơn).
+- **`pulldown-cmark` 0.13 chỉ để phân tích** (`default-features = false`, `Options::empty()`: không bảng, chú
+  thích, gạch ngang…). HTML do `text::markdown` tự dựng trên luồng event, theo danh sách cho phép:
+  - Thẻ ra được: `<p>`, `<br>`, `<strong>`, `<em>`, `<a href rel>`, `<blockquote>`, `<code>`, `<pre><code>`.
+    Mọi chữ qua `escape`.
+  - `Event::Html` / `InlineHtml` thành chữ đã escape.
+  - Link chỉ `http(s)`, kèm `rel="nofollow ugc noopener"`; link khác thành chữ của nó; không bao giờ lồng `<a>`.
+  - Ảnh thành chữ `alt`, không `<img>`: chặn ảnh theo dõi.
+  - Tiêu đề, mục danh sách thành đoạn văn; đường kẻ bỏ; xuống dòng mềm thành `<br>` (như bình luận chữ thường).
+  - Địa chỉ trần trong chữ vẫn thành link như bài chữ thường.
+- **Không thêm `ammonia`:** bộ dựng chỉ ra thẻ cố định, nên không có HTML lạ nào cần lọc. Thêm `ammonia` (kéo
+  `html5ever`) là thêm nhiều mã để giải một vấn đề không có. `pulldown-cmark` nhỏ, thuần Rust, chỉ kéo
+  `bitflags`, `memchr`, `unicase`; không đo kích thước binary riêng, vì đặc tả chỉ đòi đo khi chọn đường
+  `ammonia`.
+- **`text::links(body, format)`** đếm link Markdown (`[a](url)`, `<url>`, link kiểu tham chiếu) cộng địa chỉ trần:
+  giới hạn link của chống spam không bị lách. Từ cấm vẫn so trên chữ gốc.
+- **Test:**
+  - Bài `text` ra `body_html` y như trước: `plain_html` giữ nguyên thuật toán; mọi test cũ giữ nguyên, kể cả
+    `xss_bi_chan`.
+  - Markdown: đúng thẻ; XSS gồm `<script>`, `javascript:`, `data:`, HTML thô, link lồng, ảnh, thực thể HTML,
+    `onclick`.
+  - Property test của bước 31 chạy cả `markdown`, với danh sách thẻ cho phép mở rộng.
+  - Service: lưu `format`, đếm link, sửa giữ định dạng, tắt Setting.
+
+Đã cân nhắc:
+- Markdown → HTML (`pulldown-cmark` feature `html`) rồi lọc bằng `ammonia`: hai bước, phụ thuộc nặng, và an toàn
+  nằm ở cấu hình bộ lọc thay vì ở mã.
+- Tự viết bộ đọc Markdown: Markdown có nhiều ca biên (link kiểu tham chiếu, lồng nhau, escape); thư viện chuẩn
+  CommonMark đáng tin hơn vài trăm dòng tự viết.

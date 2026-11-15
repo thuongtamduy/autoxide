@@ -11,7 +11,7 @@ use crate::entity::{ban, report};
 use crate::posting::Posted;
 use crate::posting::targets::Target;
 use crate::service::{Comment, Status, badges_of};
-use crate::text;
+use crate::text::{self, Format};
 use crate::threads::ThreadRoot;
 
 /// Who wrote a comment.
@@ -52,10 +52,14 @@ pub(crate) struct PublicComment {
     /// label for each code.
     #[schema(example = json!(["verified_buyer"]))]
     pub badges: Vec<String>,
-    /// The text as written (plain text, line breaks kept). Never insert it as HTML.
+    /// The text as written (plain text or Markdown, see `format`). Never insert it as HTML.
     pub body: String,
+    /// How `body` is written: `text` or `markdown`.
+    pub format: Format,
     /// The text as safe HTML: everything escaped, line breaks as `<br>`, `http(s)` addresses as
-    /// links with `rel="nofollow ugc noopener"`.
+    /// links with `rel="nofollow ugc noopener"`. For `markdown`, only `<p>`, `<strong>`, `<em>`,
+    /// `<a>`, `<blockquote>`, `<code>` and `<pre>` besides: raw HTML shows as text, images as
+    /// their text. Insert this, never `body`.
     pub body_html: String,
     /// Deleted by its author: no text or name, kept so its replies stay in place.
     pub deleted: bool,
@@ -73,7 +77,8 @@ impl From<Comment> for PublicComment {
         let badges = badges_of(&row);
         PublicComment {
             id: row.id,
-            body_html: text::to_html(&row.body),
+            body_html: text::to_html(&row.body, Format::from_column(&row.format)),
+            format: Format::from_column(&row.format),
             body: row.body,
             target_type: row.target_type,
             target_id: row.target_id,
@@ -201,6 +206,8 @@ pub(crate) struct CommentDetail {
     pub author_email: Option<String>,
     pub email_verified: bool,
     pub body: String,
+    /// How `body` is written: `text` or `markdown`.
+    pub format: Format,
     pub body_html: String,
     /// Keyed hash of the author's network block (never the address itself); use it to ban;
     /// cleared after `AUTOXIDE_COMMENTS_IP_RETENTION_DAYS`.
@@ -239,7 +246,8 @@ impl From<Comment> for CommentDetail {
             badges,
             author_email: row.author_email,
             email_verified: row.email_verified,
-            body_html: text::to_html(&row.body),
+            body_html: text::to_html(&row.body, Format::from_column(&row.format)),
+            format: Format::from_column(&row.format),
             body: row.body,
             ip_fingerprint: row.ip_fingerprint,
             locale: row.locale,

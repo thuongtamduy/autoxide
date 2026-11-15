@@ -353,6 +353,8 @@ export type CommentDetail = {
   created_at: string;
   edited_at?: string | null;
   email_verified: boolean;
+  /** How `body` is written: `text` or `markdown`. */
+  format: Format;
   /**
    * Why it is held: `moderation`, `first_comment`, `reported`, `suspect_word`,
    * `too_many_links`, or the anti-spam reasons (`too_fast`, `duplicate`, `classifier`…),
@@ -429,6 +431,8 @@ export type CommentSettings = {
   enabled: boolean;
   /** Guests (no account) may comment. */
   guests_allowed: boolean;
+  /** Comments may be written in Markdown (`format: markdown`): show formatting buttons. */
+  markdown: boolean;
   /** Longest comment, in characters. */
   max_length: number;
   /** More links than this hold a comment for approval. */
@@ -575,7 +579,7 @@ export type CreateCampaignRequest = {
 export type CreateCommentRequest = {
   /** Guests: the name to show (required). Signed-in users show the name of their profile. */
   author_name?: string | null;
-  /** Plain text; line breaks are kept, `http(s)` addresses become links. */
+  /** The text, as `format` says; line breaks are kept, `http(s)` addresses become links. */
   body: string;
   /** The value of the `altcha` widget, when the server uses a challenge. */
   challenge?: string | null;
@@ -586,6 +590,7 @@ export type CreateCommentRequest = {
    * signed in.
    */
   form_token?: string | null;
+  format?: Format | null;
   /** Language of the author: `en` or `vi` (for the mails). */
   locale?: string | null;
   /** Mail me when someone replies (a confirmation mail is sent to `email` first). */
@@ -935,6 +940,8 @@ export type Data_CommentDetail = {
     created_at: string;
     edited_at?: string | null;
     email_verified: boolean;
+    /** How `body` is written: `text` or `markdown`. */
+    format: Format;
     /**
      * Why it is held: `moderation`, `first_comment`, `reported`, `suspect_word`,
      * `too_many_links`, or the anti-spam reasons (`too_fast`, `duplicate`, `classifier`…),
@@ -993,6 +1000,8 @@ export type Data_CommentSettings = {
     enabled: boolean;
     /** Guests (no account) may comment. */
     guests_allowed: boolean;
+    /** Comments may be written in Markdown (`format: markdown`): show formatting buttons. */
+    markdown: boolean;
     /** Longest comment, in characters. */
     max_length: number;
     /** More links than this hold a comment for approval. */
@@ -1740,11 +1749,13 @@ export type Data_PublicComment = {
      * label for each code.
      */
     badges: string[];
-    /** The text as written (plain text, line breaks kept). Never insert it as HTML. */
+    /** The text as written (plain text or Markdown, see `format`). Never insert it as HTML. */
     body: string;
     /**
      * The text as safe HTML: everything escaped, line breaks as `<br>`, `http(s)` addresses as
-     * links with `rel="nofollow ugc noopener"`.
+     * links with `rel="nofollow ugc noopener"`. For `markdown`, only `<p>`, `<strong>`, `<em>`,
+     * `<a>`, `<blockquote>`, `<code>` and `<pre>` besides: raw HTML shows as text, images as
+     * their text. Insert this, never `body`.
      */
     body_html: string;
     created_at: string;
@@ -1752,6 +1763,8 @@ export type Data_PublicComment = {
     deleted: boolean;
     /** When the author last changed it. */
     edited_at?: string | null;
+    /** How `body` is written: `text` or `markdown`. */
+    format: Format;
     id: string;
     /** The top-level comment, for a reply; `null` for a top-level comment. */
     parent_id?: string | null;
@@ -2505,6 +2518,7 @@ export type EditCommentRequest = {
   body: string;
   /** Guests: the `edit_token` received when posting. Signed-in authors omit it. */
   edit_token?: string | null;
+  format?: Format | null;
 };
 
 /** A comment just changed, for its author. */
@@ -2838,6 +2852,12 @@ export type FormTokenResponse = {
   /** Send it with the form (the receiving endpoint says in which field). Valid once. */
   token: string;
 };
+
+/**
+ * How the body of a comment is written: `text` (plain text; addresses become links) or
+ * `markdown` (a small part of Markdown: bold, italics, links, quotes, code).
+ */
+export type Format = "text" | "markdown";
 
 /** Health of the service. */
 export type Health = {
@@ -3420,6 +3440,8 @@ export type Page_CommentDetail = {
     created_at: string;
     edited_at?: string | null;
     email_verified: boolean;
+    /** How `body` is written: `text` or `markdown`. */
+    format: Format;
     /**
      * Why it is held: `moderation`, `first_comment`, `reported`, `suspect_word`,
      * `too_many_links`, or the anti-spam reasons (`too_fast`, `duplicate`, `classifier`…),
@@ -3775,11 +3797,13 @@ export type Page_PublicComment = {
      * label for each code.
      */
     badges: string[];
-    /** The text as written (plain text, line breaks kept). Never insert it as HTML. */
+    /** The text as written (plain text or Markdown, see `format`). Never insert it as HTML. */
     body: string;
     /**
      * The text as safe HTML: everything escaped, line breaks as `<br>`, `http(s)` addresses as
-     * links with `rel="nofollow ugc noopener"`.
+     * links with `rel="nofollow ugc noopener"`. For `markdown`, only `<p>`, `<strong>`, `<em>`,
+     * `<a>`, `<blockquote>`, `<code>` and `<pre>` besides: raw HTML shows as text, images as
+     * their text. Insert this, never `body`.
      */
     body_html: string;
     created_at: string;
@@ -3787,6 +3811,8 @@ export type Page_PublicComment = {
     deleted: boolean;
     /** When the author last changed it. */
     edited_at?: string | null;
+    /** How `body` is written: `text` or `markdown`. */
+    format: Format;
     id: string;
     /** The top-level comment, for a reply; `null` for a top-level comment. */
     parent_id?: string | null;
@@ -4393,11 +4419,13 @@ export type PublicComment = {
    * label for each code.
    */
   badges: string[];
-  /** The text as written (plain text, line breaks kept). Never insert it as HTML. */
+  /** The text as written (plain text or Markdown, see `format`). Never insert it as HTML. */
   body: string;
   /**
    * The text as safe HTML: everything escaped, line breaks as `<br>`, `http(s)` addresses as
-   * links with `rel="nofollow ugc noopener"`.
+   * links with `rel="nofollow ugc noopener"`. For `markdown`, only `<p>`, `<strong>`, `<em>`,
+   * `<a>`, `<blockquote>`, `<code>` and `<pre>` besides: raw HTML shows as text, images as
+   * their text. Insert this, never `body`.
    */
   body_html: string;
   created_at: string;
@@ -4405,6 +4433,8 @@ export type PublicComment = {
   deleted: boolean;
   /** When the author last changed it. */
   edited_at?: string | null;
+  /** How `body` is written: `text` or `markdown`. */
+  format: Format;
   id: string;
   /** The top-level comment, for a reply; `null` for a top-level comment. */
   parent_id?: string | null;

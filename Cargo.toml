@@ -193,6 +193,10 @@ opentelemetry-otlp = { version = "0.33", default-features = false, features = [
 ] }
 tracing-opentelemetry = { version = "0.34", default-features = false }
 
+# Markdown giới hạn của bình luận (D-252): chỉ bộ phân tích (pull parser); HTML do `comments` tự
+# dựng theo danh sách thẻ cho phép, nên tắt feature `html` và `getopts` (công cụ dòng lệnh).
+pulldown-cmark = { version = "0.13", default-features = false }
+
 # --- Chỉ dùng trong test ---
 # `ServiceExt::oneshot`: gửi một request thẳng vào router, không cần mở port.
 tower = { version = "0.5", features = ["util"] }
