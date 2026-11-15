@@ -6208,3 +6208,55 @@ Quyết định (thay D-171):
 
 Lý do: ít lần chủ dự án phải tạo bản phát hành bằng tay; mỗi bản có đủ thay đổi để người dùng đáng nâng cấp.
 `main` vẫn luôn xanh và mới sau mỗi bước.
+
+## D-249 · `forms`: xuất CSV lớn bằng job, link tải ký, file theo dữ liệu cá nhân (bước 32 B3) — 2026-11-15 — agent quyết
+
+Bối cảnh: `GET /api/v1/forms/{id}/submissions/export` dựng cả file trong bộ nhớ và giữ request tới khi xong. Form
+có hàng chục nghìn bài thì chậm và tốn bộ nhớ. Thêm giới hạn từ chối cho endpoint cũ là thay đổi phá vỡ (D-059).
+
+Quyết định:
+
+- Giữ endpoint đồng bộ như cũ. Thêm ba endpoint:
+  - `POST /{id}/submissions/exports`: thân không bắt buộc, `status` như bản đồng bộ; trả 201 + `Location`.
+  - `GET /exports/{export_id}`: trạng thái `pending` / `running` / `ready` / `failed`, `row_count`, `size`,
+    `expires_at`, và `download_url` khi `ready`.
+  - `GET /exports/{export_id}/file?expires=&signature=`: `x-public`, không cần đăng nhập.
+  - Bảng `forms_exports` (migration `m0007_create_exports`), job `forms.export_submissions` xếp trong cùng
+    transaction với dòng.
+- **Một bản đang chạy mỗi form; trùng thì 409** `forms.export_in_progress`, id bản đang chạy nằm trong thông báo.
+  Không trả lại bản đang chạy, để mỗi yêu cầu có một câu trả lời rõ. Transaction khoá dòng form (`rows::lock_one`)
+  trước khi xét, nên yêu cầu đồng thời ra đúng một 201 trên cả hai database (có test).
+- **Cùng nội dung từng byte với bản đồng bộ.** `csv::write` tách thành `csv::BOM` và `csv::line`. Cột
+  (`export_columns`) và đọc trang 200 bài (`export_page`) là hàm dùng chung. Job ghi theo luồng
+  (`futures_util::stream::try_unfold`) vào `dyn Storage`, khoá `forms/exports/<id>.csv`: không giữ cả file trong
+  bộ nhớ.
+- **Lỗi thì `failed`, không thử lại.** Job trả `Ok`, người dùng yêu cầu bản mới. Lỗi giữa chừng mà thử lại thì
+  file dở bị ghi đè và dễ lặp vô ích. Job chạy lại khi bản xuất đã `ready` / `failed` thì không làm gì.
+- **Link ký:**
+  - Khoá ký: HMAC-SHA256 bằng `SecretKey::derive("forms.export_download")`, trên `export_id` (16 byte) và
+    `expires` (giây Unix, 8 byte big-endian); chữ ký là hex.
+  - So chữ ký bằng `verify_slice` (thời gian không đổi). Sai chữ ký, sửa hạn hay đã hết hạn: cùng một mã 403
+    `forms.export_link_invalid`. File hay dòng đã xoá: 404.
+  - Link sống `AUTOXIDE_FORMS_EXPORT_LINK_MINUTES` (mặc định 60, 1–10080) và không quá hạn giữ file. Mỗi lần đọc
+    bản xuất ra link mới.
+  - Link là URL tuyệt đối khi có `AUTOXIDE_HTTP_PUBLIC_URL`, không thì đường dẫn trên API.
+- **File chứa dữ liệu cá nhân:**
+  - Giữ `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` (mặc định 24, 1–720) sau khi xong; bản `failed` cũng có hạn.
+  - Job `forms.cleanup` xoá file trước, dòng sau; xoá file lỗi thì để dòng cho lần sau.
+  - `DELETE /api/v1/forms/data?email=` và xoá form xoá mọi bản xuất của form liên quan, sau transaction (nơi lưu
+    có thể ở xa).
+  - Tài khoản bị xoá thì `requested_by` thành `NULL`.
+  - Event mới `forms.submissions_exported` (subject là form, `after`: `export_id`, `row_count`, không email):
+    audit biết ai lấy dữ liệu ra.
+- `forms` cần `dyn Storage` (đăng ký sau `files` — đã đúng) và `PublicUrl`.
+- `MemoryStorage` dời từ `media` sang testkit (API mới, công khai) kèm `fail_writes` để thử đường lỗi của nơi lưu;
+  `media` dùng lại.
+- Không có tool MCP: dữ liệu cá nhân hàng loạt, như việc xuất / xoá theo email.
+
+Căn cứ: Nghị định 13/2023/NĐ-CP (hiệu lực 01/7/2023) và Luật Bảo vệ dữ liệu cá nhân 2025 (hiệu lực 01/01/2026) —
+quyền xoá dữ liệu, nên file xuất phải bị xoá theo. Thời hạn giữ file xuất là cấu hình; cần đối chiếu văn bản gốc
+hay người có chuyên môn pháp lý cho trường hợp cụ thể (D-186).
+
+Đã cân nhắc:
+- Trả bản đang chạy thay vì 409: client không biết đó là bản cũ hay bản mình vừa yêu cầu.
+- Link tải cần đăng nhập: không mở được trong trình duyệt khi client dùng token. Chữ ký gắn với id và hạn là đủ.

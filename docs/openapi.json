@@ -1645,6 +1645,23 @@
         ],
         "description": "A new post or page, created as a draft."
       },
+      "CreateExportRequest": {
+        "description": "What to export. The body may be omitted.",
+        "properties": {
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SubmissionStatus",
+                "description": "`new`, `read`, `archived` or `spam`; omitted: every status but `spam` (like\n`GET /{id}/submissions/export`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
       "CreateFolderRequest": {
         "additionalProperties": false,
         "description": "A new folder.",
@@ -3452,6 +3469,99 @@
             },
             "required": [
               "deleted"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ExportResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A CSV export made in the background.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "download_expires_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "download_url": {
+                "description": "Link to the file, only while `ready`: it needs no sign-in, so it can be opened in a\nbrowser, and it works until `download_expires_at`. An absolute URL when\n`AUTOXIDE_HTTP_PUBLIC_URL` is set, otherwise a path on this API. Get the export again\nfor a fresh link.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expires_at": {
+                "description": "When the file is deleted (`AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` after it was finished).",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "finished_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "form_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "row_count": {
+                "description": "Rows in the file (without the header line), once `ready`.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "size": {
+                "description": "Size of the file in bytes, once `ready`.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "state": {
+                "$ref": "#/components/schemas/ExportState",
+                "description": "`pending` and `running` until the file is written; then `ready` or `failed`."
+              },
+              "status": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/SubmissionStatus",
+                    "description": "The `status` the export was asked for; `null`: every status but `spam`."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "form_id",
+              "state",
+              "created_at"
             ],
             "type": "object"
           }
@@ -7551,6 +7661,100 @@
           "description"
         ],
         "type": "object"
+      },
+      "ExportResponse": {
+        "description": "A CSV export made in the background.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "download_expires_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "download_url": {
+            "description": "Link to the file, only while `ready`: it needs no sign-in, so it can be opened in a\nbrowser, and it works until `download_expires_at`. An absolute URL when\n`AUTOXIDE_HTTP_PUBLIC_URL` is set, otherwise a path on this API. Get the export again\nfor a fresh link.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expires_at": {
+            "description": "When the file is deleted (`AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` after it was finished).",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "form_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "row_count": {
+            "description": "Rows in the file (without the header line), once `ready`.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "size": {
+            "description": "Size of the file in bytes, once `ready`.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/ExportState",
+            "description": "`pending` and `running` until the file is written; then `ready` or `failed`."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SubmissionStatus",
+                "description": "The `status` the export was asked for; `null`: every status but `spam`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "form_id",
+          "state",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "ExportState": {
+        "description": "Where an export is: `pending` (asked for, waiting for the job), `running` (the file is being\nwritten), `ready` (get `download_url`) or `failed` (ask for a new one).",
+        "enum": [
+          "pending",
+          "running",
+          "ready",
+          "failed"
+        ],
+        "type": "string"
       },
       "Field": {
         "additionalProperties": false,
@@ -32409,6 +32613,214 @@
         ]
       }
     },
+    "/api/v1/forms/exports/{export_id}": {
+      "get": {
+        "description": "Requires `forms.export`. While `pending` or `running`, ask again in a few seconds. Once\n`ready`, `download_url` is a fresh link to the file each time you ask.",
+        "operationId": "forms_get_form_submissions_export",
+        "parameters": [
+          {
+            "description": "Id of the export.",
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ExportResponse"
+                }
+              }
+            },
+            "description": "The export."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `forms.export`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No export has this id, or it was deleted; code `forms.export_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a CSV export made in the background.",
+        "tags": [
+          "forms"
+        ],
+        "x-permissions": [
+          "forms.export"
+        ]
+      }
+    },
+    "/api/v1/forms/exports/{export_id}/file": {
+      "get": {
+        "description": "No sign-in: the link from `download_url` carries its own signature and expiry, so it can be\nopened in a browser. Do not share it: anyone with the link can download the file until it\nexpires.",
+        "operationId": "forms_download_form_submissions_export",
+        "parameters": [
+          {
+            "description": "Id of the export.",
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "When the link stops working, in seconds since 1970 (UTC).",
+            "in": "query",
+            "name": "expires",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Signature of the link.",
+            "in": "query",
+            "name": "signature",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The CSV file.",
+            "headers": {
+              "Content-Disposition": {
+                "description": "`attachment` with the file name `<key>-submissions.csv`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`expires` or `signature` is missing or not well formed."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The link is wrong or has expired; code `forms.export_link_invalid`. Get a new one from `GET /api/v1/forms/exports/{export_id}`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The export or its file was deleted; code `forms.export_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Download the file of a CSV export.",
+        "tags": [
+          "forms"
+        ],
+        "x-public": true
+      }
+    },
     "/api/v1/forms/public/{key}": {
       "get": {
         "description": "No sign-in needed. The fields with their labels, help and choices in one language, the\ntoken scope and the success message. Admin settings (notification addresses, limits,\nretention, allowed origins) are never included.",
@@ -33745,6 +34157,152 @@
           }
         ],
         "summary": "Export the submissions of a form as CSV.",
+        "tags": [
+          "forms"
+        ],
+        "x-permissions": [
+          "forms.export"
+        ]
+      }
+    },
+    "/api/v1/forms/{id}/submissions/exports": {
+      "post": {
+        "description": "Requires `forms.export`. For forms with many submissions: the file is written by a\nbackground job, then `GET /api/v1/forms/exports/{export_id}` (the `Location` of the answer)\ngives a download link. Same content as `GET /{id}/submissions/export`, byte for byte. One\nexport per form at a time. The file holds personal data and is deleted after\n`AUTOXIDE_FORMS_EXPORT_KEEP_HOURS`, or as soon as submissions of the form are deleted by\nemail or the form is deleted.",
+        "operationId": "forms_create_form_submissions_export",
+        "parameters": [
+          {
+            "description": "Id of the form.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExportRequest"
+              }
+            }
+          },
+          "description": "Optional; may be omitted.",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ExportResponse"
+                }
+              }
+            },
+            "description": "Asked for; the job writes the file shortly.",
+            "headers": {
+              "Location": {
+                "description": "Address of the export.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `forms.export`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No form has this id; code `forms.not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The form already has an export that is not finished; code `forms.export_in_progress` (its id is in the message)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`status` is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Export the submissions of a form as CSV, in the background.",
         "tags": [
           "forms"
         ],

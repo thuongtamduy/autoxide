@@ -7,9 +7,11 @@
 //!   lại cùng token tuần tự và đồng thời), form đóng và `Origin`, event không mang câu trả lời,
 //!   mail báo.
 //! - `data.rs`: CSV, xuất / xoá theo email, dọn theo thời hạn, tài khoản bị xoá.
+//! - `exports.rs`: xuất CSV lớn bằng job, link tải ký, xoá file xuất.
 
 mod data;
 mod definitions;
+mod exports;
 mod submissions;
 
 use std::net::IpAddr;

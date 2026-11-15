@@ -157,64 +157,21 @@ impl Module for MediaModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
-    use std::collections::BTreeMap;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
 
     use autoxide_kernel::access::Principal;
     use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
     use autoxide_kernel::database::Database;
-    use autoxide_kernel::error::Error;
     use autoxide_kernel::event::Outbox;
     use autoxide_kernel::migration::{Migrator, ModuleMigrations};
-    use autoxide_kernel::storage::{ByteStream, Storage, StoredFile};
-    use autoxide_testkit::TestDatabase;
+    use autoxide_kernel::storage::ByteStream;
+    use autoxide_testkit::{MemoryStorage, TestDatabase};
     use bytes::Bytes;
-    use futures_util::{StreamExt as _, TryStreamExt as _};
+    use futures_util::StreamExt as _;
     use uuid::Uuid;
 
     use crate::config::{Limits, MediaConfig};
     use crate::service::MediaService;
-
-    /// Nơi lưu trong bộ nhớ: đủ cho test của module (nơi lưu thật — ổ đĩa, S3 — được thử
-    /// ở test đầu-cuối của `crates/app`). Không cài lại `get_range` / `keys_with_prefix`:
-    /// thử luôn cài đặt mặc định của kernel.
-    #[derive(Default)]
-    pub struct MemoryStorage(pub Mutex<BTreeMap<String, Bytes>>);
-
-    #[async_trait::async_trait]
-    impl Storage for MemoryStorage {
-        async fn put(&self, key: &str, content: ByteStream) -> Result<u64, Error> {
-            let chunks: Vec<Bytes> = content.try_collect().await?;
-            let bytes = Bytes::from(chunks.concat());
-            let size = bytes.len() as u64;
-            self.0.lock().unwrap().insert(key.to_owned(), bytes);
-            Ok(size)
-        }
-
-        async fn get(&self, key: &str) -> Result<Option<StoredFile>, Error> {
-            let bytes = self.0.lock().unwrap().get(key).cloned();
-            Ok(bytes.map(|bytes| {
-                // Chia thành khúc 3 byte để thử việc cắt khoảng qua nhiều khúc.
-                let content = futures_util::stream::iter(
-                    bytes
-                        .chunks(3)
-                        .map(|chunk| Ok(Bytes::copy_from_slice(chunk)))
-                        .collect::<Vec<_>>(),
-                )
-                .boxed();
-                StoredFile::new(bytes.len() as u64, content)
-            }))
-        }
-
-        async fn delete(&self, key: &str) -> Result<(), Error> {
-            self.0.lock().unwrap().remove(key);
-            Ok(())
-        }
-
-        async fn keys(&self) -> Result<Vec<String>, Error> {
-            Ok(self.0.lock().unwrap().keys().cloned().collect())
-        }
-    }
 
     pub fn limits() -> Limits {
         let source = ConfigSource::default();

@@ -359,6 +359,9 @@ impl FormsService {
             .await?;
         transaction.commit().await?;
         tracing::info!(form_id = %id, submissions = submissions.rows_affected, "form deleted");
+        // File xuất của form chứa bài vừa xoá (sau transaction: nơi lưu có thể ở xa).
+        let exports = self.exports_of(vec![id]).await?;
+        self.purge_exports(exports).await?;
         Ok(())
     }
 

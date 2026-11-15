@@ -63,6 +63,20 @@ pub(crate) const NOTIFY_LANGUAGE: Setting = Setting::new(
 )
 .with_default("en");
 
+pub(crate) const EXPORT_LINK_MINUTES: Setting = Setting::new(
+    "AUTOXIDE_FORMS_EXPORT_LINK_MINUTES",
+    "Minutes a download link of a CSV export made in the background works (1 to 10080). The \
+     link needs no sign-in, so keep it short.",
+)
+.with_default("60");
+
+pub(crate) const EXPORT_KEEP_HOURS: Setting = Setting::new(
+    "AUTOXIDE_FORMS_EXPORT_KEEP_HOURS",
+    "Hours the file of a CSV export made in the background is kept before the daily job deletes \
+     it (1 to 720). The file holds personal data.",
+)
+.with_default("24");
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FormsConfig {
     pub max_submission_bytes: usize,
@@ -75,6 +89,10 @@ pub(crate) struct FormsConfig {
     pub spam_retention_days: u32,
     pub ip_retention_days: u32,
     pub notify_language: Language,
+    /// Link tải bản xuất sống bao lâu.
+    pub export_link_minutes: u32,
+    /// File xuất giữ bao lâu.
+    pub export_keep_hours: u32,
 }
 
 impl Default for FormsConfig {
@@ -89,6 +107,8 @@ impl Default for FormsConfig {
             spam_retention_days: 30,
             ip_retention_days: 90,
             notify_language: Language::En,
+            export_link_minutes: 60,
+            export_keep_hours: 24,
         }
     }
 }
@@ -111,6 +131,8 @@ impl FormsConfig {
             "vi" => Ok(Language::Vi),
             _ => Err("must be `en` or `vi`".to_owned()),
         });
+        let link = reader.get_with(&EXPORT_LINK_MINUTES, |raw| parse_in_range(raw, 1u32, 10_080));
+        let keep = reader.get_with(&EXPORT_KEEP_HOURS, |raw| parse_in_range(raw, 1u32, 720));
         Ok(FormsConfig {
             max_submission_bytes: max_submission_bytes?,
             max_fields: max_fields?,
@@ -121,6 +143,8 @@ impl FormsConfig {
             spam_retention_days: spam?,
             ip_retention_days: ip?,
             notify_language: language?,
+            export_link_minutes: link?,
+            export_keep_hours: keep?,
         })
     }
 }

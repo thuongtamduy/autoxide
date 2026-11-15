@@ -108,6 +108,25 @@ curl -X POST http://localhost:8080/api/v1/forms \
   start with `=`, `+`, `-`, `@`, tab or carriage return get a leading `'` so they are never run
   as formulas.
 
+### Large exports
+
+For a form with many submissions, export in the background instead of holding a request open:
+
+1. `POST /api/v1/forms/{id}/submissions/exports` (body optional: `{"status": "new"}` like the
+   `status` of the export above) answers `201` at once, with the export's address in `Location`.
+   A form has one export running at a time; asking again meanwhile answers `409`
+   `forms.export_in_progress`.
+2. `GET /api/v1/forms/exports/{export_id}` gives `state`: `pending`, `running`, then `ready` (or
+   `failed`: ask for a new one). Once `ready`, `download_url` is a link to the file — the same
+   content as the export above, byte for byte.
+3. The link needs no sign-in, so it can be opened in a browser; it works for
+   `AUTOXIDE_FORMS_EXPORT_LINK_MINUTES` (default 60). Do not share it. Ask for the export again
+   for a fresh link. It is an absolute URL when `AUTOXIDE_HTTP_PUBLIC_URL` is set.
+
+Both need `forms.export`. The file is written to the shared file storage (module `files`, local
+disk or S3) under `forms/exports/` and deleted after `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` (default
+24) by the daily cleanup job.
+
 ## Personal data
 
 - `GET /api/v1/forms/data?email=…` lists, and `DELETE /api/v1/forms/data?email=…` deletes for
@@ -124,6 +143,11 @@ curl -X POST http://localhost:8080/api/v1/forms \
 - When an account is deleted, forms it created stay; `created_by` becomes `null`.
 - Deleting a form deletes its submissions. A submission whose form no longer exists is
   deleted by the daily cleanup job.
+- Large exports hold personal data. Deleting the submissions of an address, or deleting a form,
+  also deletes every export file of the forms concerned. Export files left are deleted after
+  `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS`. Backups of the file storage copy `forms/exports/` too
+  while the files exist. The event `forms.submissions_exported` records who exported which
+  form (for the audit log), without the file.
 
 ## Legal
 
@@ -161,6 +185,8 @@ use REST) and no tool to send a form.
 | `AUTOXIDE_FORMS_SPAM_RETENTION_DAYS`            | `30`    |
 | `AUTOXIDE_FORMS_IP_RETENTION_DAYS`              | `90`    |
 | `AUTOXIDE_FORMS_NOTIFY_LANGUAGE`                | `en`    |
+| `AUTOXIDE_FORMS_EXPORT_LINK_MINUTES`            | `60`    |
+| `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS`              | `24`    |
 
 A form may set its own `ip_limit_per_hour`, `email_limit_per_hour` and `retention_days`. The
 anti-spam layer itself (`AUTOXIDE_ANTISPAM_*`) is shared by every module. All are described in

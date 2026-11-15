@@ -3,6 +3,7 @@
 //! qua `routes!` để có tài liệu OpenAPI (luật kiến trúc 6).
 
 mod admin;
+mod exports;
 mod inbox;
 mod public;
 #[cfg(test)]
@@ -28,6 +29,9 @@ pub(crate) fn routes(service: Arc<FormsService>) -> OpenApiRouter {
         .routes(routes!(admin::get_form, admin::update_form, admin::delete_form))
         .routes(routes!(inbox::list_submissions))
         .routes(routes!(inbox::export_submissions))
+        .routes(routes!(exports::create_export))
+        .routes(routes!(exports::get_export))
+        .routes(routes!(exports::download_export))
         .routes(routes!(inbox::get_submission, inbox::update_submission, inbox::delete_submission))
         .routes(routes!(inbox::get_email_data, inbox::delete_email_data))
         .routes(routes!(public::get_public_form))

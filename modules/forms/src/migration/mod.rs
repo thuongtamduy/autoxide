@@ -2,6 +2,7 @@
 //! và một dòng vào cuối [`all`].
 
 mod m0001_create_forms;
+mod m0007_create_exports;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -18,5 +19,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::throttle::throttle_migration("m0005_create_throttle", "forms"),
         // Bảng `forms_antispam_nonces`: nonce của token form — gửi lại là trả kết quả cũ (D-119).
         autoxide_kernel::antispam::antispam_migration("m0006_create_antispam_nonces", "forms"),
+        // Bảng `forms_exports`: bản xuất CSV lớn chạy bằng job (đặc tả 32 B3).
+        Box::new(m0007_create_exports::Migration),
     ]
 }

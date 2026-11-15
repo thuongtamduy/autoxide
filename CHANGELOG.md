@@ -9,6 +9,16 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- `forms`: large CSV exports in the background. `POST /api/v1/forms/{id}/submissions/exports` answers at once;
+  `GET /api/v1/forms/exports/{export_id}` gives the state and, once ready, a signed download link that needs no
+  sign-in and expires (`AUTOXIDE_FORMS_EXPORT_LINK_MINUTES`). The file has the same content as the existing
+  export. It is kept `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS`, and deleted with the submissions of an address or with
+  the form. New event `forms.submissions_exported`.
+- For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
+  errors.
+
 ### Changed
 
 - Internal, no change in behaviour: the code of `newsletter`, `comments`, `media` and `forms` is grouped by

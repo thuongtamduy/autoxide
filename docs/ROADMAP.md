@@ -89,7 +89,7 @@ Nhóm B — việc nhật ký quyết định đã ghi "để sau":
 - [ ] `auth`: quản trị viên xem và gỡ passkey của người khác (permission riêng, ghi event cho
       audit), và lệnh CLI gỡ passkey của một tài khoản cho khi admin duy nhất mất thiết bị —
       `autoxide user reset-mfa` (D-159) hiện chỉ tắt TOTP, không gỡ passkey
-- [ ] `forms`: xuất CSV lớn bằng job ghi file vào `Storage`, trả link tải có hạn; xuất đồng bộ hiện
+- [x] `forms`: xuất CSV lớn bằng job ghi file vào `Storage`, trả link tải có hạn; xuất đồng bộ hiện
       tại giữ cho số bài nhỏ (cách xuất đang có: `modules/forms/src/submissions/csv.rs`)
 - [ ] `comments`: Markdown giới hạn (đậm, nghiêng, link, trích dẫn, code) với bộ lọc HTML chống
       XSS — thêm thư viện thì đo và ghi `STACK.md`; giữ test XSS sẵn có; chữ thường cũ hiển thị như cũ

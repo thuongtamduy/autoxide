@@ -13,7 +13,7 @@ use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 
 use crate::library::sniff::samples;
-use crate::testing::MemoryStorage;
+use autoxide_testkit::MemoryStorage;
 
 struct App {
     http: TestApp,

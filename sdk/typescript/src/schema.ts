@@ -625,6 +625,11 @@ export type CreateEntryRequest = EntryFieldsInput & {
   parent_id?: string | null;
 };
 
+/** What to export. The body may be omitted. */
+export type CreateExportRequest = {
+  status?: SubmissionStatus | null;
+};
+
 /** A new folder. */
 export type CreateFolderRequest = {
   /** Name, 1 to 255 characters, without `/` or `\`; unique (ignoring case) in the parent. */
@@ -1256,6 +1261,34 @@ export type Data_ErasedResponse = {
   data: {
     /** Submissions deleted. */
     deleted: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ExportResponse = {
+  /** A CSV export made in the background. */
+  data: {
+    created_at: string;
+    download_expires_at?: string | null;
+    /**
+     * Link to the file, only while `ready`: it needs no sign-in, so it can be opened in a
+     * browser, and it works until `download_expires_at`. An absolute URL when
+     * `AUTOXIDE_HTTP_PUBLIC_URL` is set, otherwise a path on this API. Get the export again
+     * for a fresh link.
+     */
+    download_url?: string | null;
+    /** When the file is deleted (`AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` after it was finished). */
+    expires_at?: string | null;
+    finished_at?: string | null;
+    form_id: string;
+    id: string;
+    /** Rows in the file (without the header line), once `ready`. */
+    row_count?: number | null;
+    /** Size of the file in bytes, once `ready`. */
+    size?: number | null;
+    /** `pending` and `running` until the file is written; then `ready` or `failed`. */
+    state: ExportState;
+    status?: SubmissionStatus | null;
   };
 };
 
@@ -2640,6 +2673,37 @@ export type EventTypeResponse = {
   description: string;
   name: string;
 };
+
+/** A CSV export made in the background. */
+export type ExportResponse = {
+  created_at: string;
+  download_expires_at?: string | null;
+  /**
+   * Link to the file, only while `ready`: it needs no sign-in, so it can be opened in a
+   * browser, and it works until `download_expires_at`. An absolute URL when
+   * `AUTOXIDE_HTTP_PUBLIC_URL` is set, otherwise a path on this API. Get the export again
+   * for a fresh link.
+   */
+  download_url?: string | null;
+  /** When the file is deleted (`AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` after it was finished). */
+  expires_at?: string | null;
+  finished_at?: string | null;
+  form_id: string;
+  id: string;
+  /** Rows in the file (without the header line), once `ready`. */
+  row_count?: number | null;
+  /** Size of the file in bytes, once `ready`. */
+  size?: number | null;
+  /** `pending` and `running` until the file is written; then `ready` or `failed`. */
+  state: ExportState;
+  status?: SubmissionStatus | null;
+};
+
+/**
+ * Where an export is: `pending` (asked for, waiting for the job), `running` (the file is being
+ * written), `ready` (get `download_url`) or `failed` (ask for a new one).
+ */
+export type ExportState = "pending" | "running" | "ready" | "failed";
 
 /** A field of a form. */
 export type Field = {
@@ -7425,6 +7489,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/forms/exports/{export_id}": {
+    /** Get a CSV export made in the background. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { export_id: string }; };
+      responses: {
+        200: Data_ExportResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/forms/exports/{export_id}/file": {
+    /** Download the file of a CSV export. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { export_id: string }; query: { expires: number; signature: string }; };
+      responses: {
+        200: string;
+        400: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/forms/public/{key}": {
     /** Get a form to show (public). */
     get: {
@@ -7560,6 +7650,22 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/forms/{id}/submissions/exports": {
+    /** Export the submissions of a form as CSV, in the background. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CreateExportRequest;
+      responses: {
+        201: Data_ExportResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };
