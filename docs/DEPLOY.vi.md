@@ -291,6 +291,11 @@ sudo -u autoxide autoxide backup "backups/$(date +%F)"
 Để khôi phục trên một máy mới, chuẩn bị thư mục (bước 1–2), rồi chạy
 `autoxide restore <thư mục backup>` ở đó trước khi khởi động service.
 
+Với `AUTOXIDE_TENANCY_MODE=multi`, bản backup có database chính (sổ khách và mọi khách trên đó) và
+mọi file, nhưng không có database của các placement khác; lệnh in cảnh báo nêu tên chúng. Backup các
+database đó bằng công cụ của chính database. Cất `AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản
+backup: thiếu nó thì secret đã mã hoá trong bản backup không đọc được.
+
 ## Chuyển từ SQLite sang PostgreSQL
 
 Tạo một database PostgreSQL trống, dừng máy chủ, rồi chép. Database đích được áp dụng

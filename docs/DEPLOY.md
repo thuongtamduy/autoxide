@@ -293,6 +293,12 @@ sudo -u autoxide autoxide backup "backups/$(date +%F)"
 To restore on a new machine, prepare the directory (steps 1–2), then run
 `autoxide restore <backup directory>` there before starting the service.
 
+With `AUTOXIDE_TENANCY_MODE=multi`, the backup holds the main database (the tenant register and
+every tenant on it) and all files, but not the databases of other placements; the command prints
+a warning naming them. Back those databases up with the database's own tools. Keep
+`AUTOXIDE_SECRET_KEY` in a safe place apart from the backups: without it, the encrypted secrets in
+a backup cannot be read.
+
 ## Moving from SQLite to PostgreSQL
 
 Create an empty PostgreSQL database, stop the server, and copy. The target gets every

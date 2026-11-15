@@ -103,11 +103,43 @@ pub(crate) async fn run_backup(settings: Settings, directory: PathBuf) -> Result
         tokio::fs::write(directory.join(MANIFEST), text)
             .await
             .map_err(|error| format!("cannot write {MANIFEST}: {error}"))?;
-        Ok(summary("Backed up", &tables, files, &directory))
+        let mut text = summary("Backed up", &tables, files, &directory);
+        text.push_str(&skipped_placements(runtime.modules.tenancy().as_ref()).await?);
+        Ok(text)
     }
     .await;
     let _ = runtime.database.close().await;
     result
+}
+
+/// Chế độ `multi`: backup chỉ chép database chính (sổ khách và khách trên placement chung) và mọi
+/// file; database riêng của placement khác KHÔNG được chép (bước 39 làm đủ). Trả lời cảnh báo để in
+/// (rỗng khi không có placement nào khác), và ghi log.
+async fn skipped_placements(
+    registry: Option<&autoxide_kernel::tenancy::DatabaseRegistry>,
+) -> Result<String, String> {
+    let Some(registry) = registry else { return Ok(String::new()) };
+    if registry.mode() != autoxide_kernel::tenancy::TenancyMode::Multi {
+        return Ok(String::new());
+    }
+    let others: Vec<String> = registry
+        .databases()
+        .await
+        .map_err(describe)?
+        .into_iter()
+        .filter(|(id, _, _)| *id != autoxide_kernel::tenancy::MAIN_PLACEMENT)
+        .map(|(_, name, _)| name)
+        .collect();
+    if others.is_empty() {
+        return Ok(String::new());
+    }
+    tracing::warn!(placements = others.join(","), "backup does not copy dedicated placements");
+    Ok(format!(
+        "WARNING: only the main database was copied. The databases of these placements were NOT: \
+         {}. Back each of them up with your database's own tools until `autoxide backup` covers \
+         them.\n",
+        others.join(", ")
+    ))
 }
 
 /// Đưa bản backup trong `directory` vào database (mới, trống) và nơi lưu file đang cấu
@@ -432,6 +464,44 @@ mod tests {
         let mode = std::fs::metadata(path.join("inner")).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o700);
         std::fs::remove_dir_all(&path).unwrap();
+    }
+
+    /// Chế độ `multi` có placement riêng: backup nói rõ database của placement đó không được chép.
+    #[tokio::test]
+    async fn multi_canh_bao_placement_khong_chep() {
+        use autoxide_kernel::tenancy::{
+            DatabaseRegistry, NewPlacement, PlacementKind, TenancyConfig, TenancyMode,
+        };
+        TestDatabase::run(async |test| {
+            let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
+            let settings = crate::settings::read(&source).unwrap();
+            let database = Database::connect(&settings.config.database).await.unwrap();
+            let single = DatabaseRegistry::new(
+                database.clone(),
+                settings.config.database.clone(),
+                settings.config.tenancy.clone(),
+            );
+            assert_eq!(skipped_placements(Some(&single)).await.unwrap(), "");
+            let registry = DatabaseRegistry::new(
+                database.clone(),
+                settings.config.database.clone(),
+                TenancyConfig::with_mode(TenancyMode::Multi),
+            );
+            let placements = settings.modules.placements(&registry).unwrap();
+            let up_all = crate::commands::migrate::Action::Up { all: true };
+            crate::commands::migrate::execute_all(&up_all, &placements).await.unwrap();
+            assert_eq!(skipped_placements(Some(&registry)).await.unwrap(), "");
+            let url = test.extra_database().await.unwrap();
+            let new = NewPlacement::new("eu-1", PlacementKind::Dedicated, url.parse().unwrap());
+            placements.add(new).await.unwrap();
+            crate::commands::migrate::execute_all(&up_all, &placements).await.unwrap();
+            let warning = skipped_placements(Some(&registry)).await.unwrap();
+            assert!(warning.starts_with("WARNING: only the main database was copied"), "{warning}");
+            assert!(warning.contains(": eu-1."), "{warning}");
+            database.close().await.unwrap();
+        })
+        .await
+        .unwrap();
     }
 
     #[tokio::test]

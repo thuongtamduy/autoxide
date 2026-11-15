@@ -118,7 +118,10 @@ async fn execute_main(
 }
 
 /// `status --all` / `up --all`: database điều khiển (`main`) rồi từng placement.
-async fn execute_all(action: &Action, placements: &Placements) -> Result<String, String> {
+pub(crate) async fn execute_all(
+    action: &Action,
+    placements: &Placements,
+) -> Result<String, String> {
     let sections = match action {
         Action::Up { .. } => placements.up_all().await,
         _ => placements.status_all().await,

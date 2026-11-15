@@ -7097,3 +7097,10 @@ và `Principal` không đổi.
   rò rỉ; test của scaffold chặn khuôn mất điều đó.
 - Còn lại cho phần C (dòng lộ trình "Mọi thứ ngoài bảng" chưa đánh dấu): bucket lưu trữ riêng cho khách `dedicated`
   (`kernel_placements.storage_sealed` đã có cột, chưa dùng), con trỏ pagination mang khách.
+
+## D-290 · `autoxide backup` ở chế độ `multi` cảnh báo placement không được chép (bước 33 C3) — 2026-11-15 — agent quyết
+
+Backup chép database chính (sổ khách, khách trên placement chung) và mọi file (khoá có tiền tố khách đi kèm); database
+của placement khác chưa được chép (bước 39 làm đủ). Thay vì im lặng, lệnh in `WARNING: …` nêu tên từng placement bị bỏ
+và ghi log; hướng dẫn deploy (EN + VI) nói backup chúng bằng công cụ của database và cất `AUTOXIDE_SECRET_KEY` tách khỏi
+bản backup. Chế độ `single` không đổi gì.
