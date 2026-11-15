@@ -6874,3 +6874,15 @@ Chủ dự án hỏi merge vào `main` mà không phát hành có được khôn
 - Không phát hành, không tạo tag: bản phát hành vẫn theo D-248 (cuối giai đoạn A hay khi chủ dự án bảo).
 - Điều kiện để `main` luôn dùng được: phần dở của bước 33 không đổi hành vi mặc định (chế độ `single`; `multi` vẫn bị
   từ chối tới khi mọi module theo khách), và mọi thay đổi chỉ thêm (D-059).
+
+## D-274 · `mail` theo khách: hàng đợi trên database của khách, SMTP và người gửi riêng của khách (bước 33 B3) — 2026-11-15 — agent quyết
+
+- `mail` không có bảng riêng: mail xếp hàng (job `mail.send`) trên **database của khách gửi**, event
+  `mail.delivery_failed` ghi cùng khách — `newsletter`, `auth` của khách đó nhận đúng event.
+- Hai cấu hình theo khách (D-190, `Module::tenant_settings`): `mail.smtp_url` (secret, lưu mã hoá, không bao giờ trả
+  ra) và `mail.from`. Khách chưa đặt thì dùng `AUTOXIDE_MAIL_SMTP_URL` / `AUTOXIDE_MAIL_FROM` của máy chủ. Kết nối
+  SMTP của khách dựng một lần theo URL rồi dùng lại (pool của `lettre`), không giữ secret trong log hay lỗi.
+- Job gửi mail phải có khách (job theo khách, không phải job quét cả database); thiếu thì lỗi nội bộ, không gửi bằng
+  cấu hình của khách khác.
+- `client-config` của `mail` (D-271) vẫn chỉ nói về cấu hình chung của máy chủ; khách xem cấu hình của mình qua
+  `GET /api/v1/kernel/settings`.

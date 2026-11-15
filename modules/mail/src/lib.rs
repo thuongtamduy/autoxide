@@ -81,6 +81,10 @@ impl Module for MailModule {
         self.config.as_ref().map_or(Ok(None), client_config::section)
     }
 
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![service::TENANT_SMTP_URL, service::TENANT_FROM]
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(MailConfig::read(reader)?);
         Ok(())
@@ -104,10 +108,10 @@ impl Module for MailModule {
         }
         let transport = Arc::new(Transport::new(config.smtp_url.as_deref(), config.file_dir)?);
         self.probe = Some(Arc::new(doctor::SmtpProbe { transport: transport.clone() }));
-        let database = context.database().clone();
+        let settings = context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?;
         self.sender =
-            Some(Arc::new(Sender::new(transport, config.from, database, context.outbox()?)));
-        let service = MailService::new(context.database().clone(), context.jobs());
+            Some(Arc::new(Sender::new(transport, config.from, context.outbox()?, settings)));
+        let service = MailService::new(context.jobs());
         context.provide::<dyn Mailer>(Arc::new(service))
     }
 

@@ -640,6 +640,7 @@ dependencies = [
  "async-trait",
  "autoxide-kernel",
  "autoxide-testkit",
+ "axum",
  "chrono",
  "lettre",
  "metrics",
