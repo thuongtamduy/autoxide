@@ -4,3 +4,4 @@
 
 pub(crate) mod guides;
 pub(crate) mod media;
+pub(crate) mod migrations;
