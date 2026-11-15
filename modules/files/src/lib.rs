@@ -52,6 +52,8 @@ struct FilesModule {
     service: Option<Arc<FileService>>,
     /// Bước kiểm của `autoxide doctor`; có sau `start`.
     probe: Option<Arc<doctor::StorageProbe>>,
+    /// Sổ database, cho job dọn mồ côi (đối chiếu khoá với database của đúng khách); có sau `start`.
+    databases: Option<autoxide_kernel::tenancy::DatabaseRegistry>,
 }
 
 impl Module for FilesModule {
@@ -105,8 +107,8 @@ impl Module for FilesModule {
         let storage: Arc<dyn Storage> = Arc::new(ObjectStorage::open(&config.backend)?);
         self.probe = Some(Arc::new(doctor::StorageProbe { storage: storage.clone(), location }));
         let outbox = context.outbox()?;
-        let database = context.database().clone();
-        let service = Arc::new(FileService::new(database, storage.clone(), outbox, config.limits));
+        self.databases = Some(context.tenancy());
+        let service = Arc::new(FileService::new(storage.clone(), outbox, config.limits));
         self.service = Some(service.clone());
         context.personal_data(service)?;
         context.provide::<dyn Storage>(storage)
@@ -138,12 +140,13 @@ impl Module for FilesModule {
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {
-        self.service.clone().map_or_else(Vec::new, |service| {
-            vec![JobRegistration::new(
+        match (self.service.clone(), self.databases.clone()) {
+            (Some(service), Some(databases)) => vec![JobRegistration::new(
                 cleanup::CLEAN_ORPHANS,
-                Arc::new(cleanup::CleanOrphans(service)),
-            )]
-        })
+                Arc::new(cleanup::CleanOrphans { service, databases }),
+            )],
+            _ => Vec::new(),
+        }
     }
 
     fn schedules(&self) -> Vec<Schedule> {
@@ -186,7 +189,7 @@ pub(crate) mod testing {
         let dir = std::env::temp_dir().join(format!("autoxide-files-{}", uuid::Uuid::now_v7()));
         let storage = Arc::new(ObjectStorage::open(&Backend::Local { dir }).unwrap());
         let outbox = Outbox::standalone("files");
-        (Arc::new(FileService::new(database.clone(), storage, outbox, limits)), database)
+        (Arc::new(FileService::new(storage, outbox, limits)), database)
     }
 
     pub fn no_limits() -> Limits {

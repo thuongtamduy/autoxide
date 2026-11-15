@@ -61,10 +61,10 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
         Tool::new(
             "list_files",
             "List the files you uploaded, newest first; follow `pagination.next_cursor` for more.",
-            move |_tenant: TenantContext, principal: Principal, input: PageInput| {
+            move |tenant: TenantContext, principal: Principal, input: PageInput| {
                 let service = list.clone();
                 async move {
-                    let page = service.list(&principal, &input.page()?).await?;
+                    let page = service.list(&tenant, &principal, &input.page()?).await?;
                     Ok::<Page<FileResponse>, Error>(page.map(FileResponse::from))
                 }
             },
@@ -75,10 +75,12 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
             "get_file",
             "Get the details of a file (name, type, size, SHA-256). Your own files need \
              `files.upload`; anyone's need `files.manage`.",
-            move |_tenant: TenantContext, principal: Principal, input: FileId| {
+            move |tenant: TenantContext, principal: Principal, input: FileId| {
                 let service = get.clone();
                 async move {
-                    Ok::<_, Error>(FileResponse::from(service.get(&principal, input.id).await?))
+                    Ok::<_, Error>(FileResponse::from(
+                        service.get(&tenant, &principal, input.id).await?,
+                    ))
                 }
             },
         )
@@ -89,15 +91,15 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
             "read_file",
             "Get a file with its content as base64, for files up to 1 MiB; download larger ones \
              with `GET /api/v1/files/{id}/content`. Same access as `get_file`.",
-            move |_tenant: TenantContext, principal: Principal, input: FileId| {
+            move |tenant: TenantContext, principal: Principal, input: FileId| {
                 let service = read.clone();
                 async move {
-                    let file = service.get(&principal, input.id).await?;
+                    let file = service.get(&tenant, &principal, input.id).await?;
                     if u64::try_from(file.size).unwrap_or(u64::MAX) > MAX_TOOL_BYTES {
                         return Err(too_large_for_tool(input.id));
                     }
                     let download = service
-                        .download(&principal, input.id, |_| false)
+                        .download(&tenant, &principal, input.id, |_| false)
                         .await?
                         .ok_or_else(|| Error::internal("a download without a known version"))?;
                     let chunks: Vec<Bytes> = download.content.try_collect().await?;
@@ -113,7 +115,7 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
             "upload_file",
             "Upload a small file, its content base64-encoded (the size and type limits of the \
              server apply). Upload large files with `POST /api/v1/files`.",
-            move |_tenant: TenantContext, principal: Principal, input: UploadInput| {
+            move |tenant: TenantContext, principal: Principal, input: UploadInput| {
                 let service = upload.clone();
                 async move {
                     let content = STANDARD.decode(input.content_base64.trim()).map_err(|_| {
@@ -124,7 +126,13 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
                     })?;
                     let stream = futures_util::stream::iter([Ok(Bytes::from(content))]).boxed();
                     let file = service
-                        .upload(&principal, &input.name, input.content_type.as_deref(), stream)
+                        .upload(
+                            &tenant,
+                            &principal,
+                            &input.name,
+                            input.content_type.as_deref(),
+                            stream,
+                        )
                         .await?;
                     Ok::<_, Error>(FileResponse::from(file))
                 }
@@ -134,10 +142,10 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
         Tool::new(
             "delete_file",
             "Delete a file and its content; it cannot be restored. Same access as `get_file`.",
-            move |_tenant: TenantContext, principal: Principal, input: FileId| {
+            move |tenant: TenantContext, principal: Principal, input: FileId| {
                 let service = delete.clone();
                 async move {
-                    service.delete(&principal, input.id).await?;
+                    service.delete(&tenant, &principal, input.id).await?;
                     Ok::<_, Error>(serde_json::json!({ "deleted": input.id }))
                 }
             },
@@ -171,10 +179,10 @@ mod tests {
     #[tokio::test]
     async fn tai_len_doc_va_xoa_file_qua_tool() {
         TestDatabase::run(async |test| {
-            let (files, _) = service(test, no_limits()).await;
+            let (files, database) = service(test, no_limits()).await;
             let tools = all(&files);
             let tool = |name: &str| tools.iter().find(|tool| tool.name() == name).unwrap();
-            let tenant = TenantContext::legacy_default(&files.database);
+            let tenant = TenantContext::default_on(database);
             let ada = Principal::new(Uuid::now_v7(), ["files.upload".to_owned()]);
             let bob = Principal::new(Uuid::now_v7(), ["files.upload".to_owned()]);
 
@@ -208,14 +216,14 @@ mod tests {
         TestDatabase::run(async |test| {
             let limits =
                 crate::config::Limits { max_bytes: 4 * MAX_TOOL_BYTES, allowed_types: None };
-            let (files, _) = service(test, limits).await;
+            let (files, database) = service(test, limits).await;
+            let tenant = TenantContext::default_on(database);
             let ada = Principal::new(Uuid::now_v7(), ["files.upload".to_owned()]);
             let big = Bytes::from(vec![b'x'; usize::try_from(MAX_TOOL_BYTES).unwrap() + 1]);
             let stream = futures_util::stream::iter([Ok(big)]).boxed();
-            let file = files.upload(&ada, "big.bin", None, stream).await.unwrap();
+            let file = files.upload(&tenant, &ada, "big.bin", None, stream).await.unwrap();
             let tools = all(&files);
             let read = tools.iter().find(|tool| tool.name() == "read_file").unwrap();
-            let tenant = TenantContext::legacy_default(&files.database);
             let error = read.call(tenant, ada, json!({"id": file.id})).await.unwrap_err();
             assert_eq!(error.code(), "files.too_large_for_tool");
             assert!(error.to_string().contains(&format!("/api/v1/files/{}/content", file.id)));

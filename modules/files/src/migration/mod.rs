@@ -4,6 +4,7 @@
 mod m0001_create_file;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::tenancy::migration::TenantTable;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -20,6 +21,14 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             vec![
                 autoxide_kernel::event::tenant_table("files"),
                 autoxide_kernel::job::tenant_table("files"),
+            ],
+        ),
+        // File thuộc một khách (bước 33).
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0006_tenancy",
+            vec![
+                TenantTable::new("files_file")
+                    .index("files_file_owner_idx", ["tenant_id", "owner_id", "id"]),
             ],
         ),
     ]

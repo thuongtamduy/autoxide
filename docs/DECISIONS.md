@@ -6910,3 +6910,14 @@ Chủ dự án hỏi merge vào `main` mà không phát hành có được khôn
   lại sẽ che việc xoá đầu chuỗi.
 - `doctor audit.chain` duyệt mọi database (placement) và mọi đầu chuỗi trên đó, báo chỗ hỏng kèm khách và placement.
 - Định dạng băm `audit-v1` không đổi (không băm `tenant_id`): chuỗi đã ghi trước bước 33 vẫn kiểm được.
+
+## D-277 · `files` theo khách: dòng theo khách, nội dung dưới tiền tố của khách, dọn mồ côi tra đúng database (bước 33 B6) — 2026-11-15 — agent quyết
+
+- `files_file` mang `tenant_id`; service không giữ database, mọi hàm nhận `&TenantContext`.
+- Nội dung đọc / ghi qua `TenantStorage` (D-259): khách mặc định giữ `files/<id>` (file cũ không phải dời), khách
+  khác `tenants/<khách>/files/<id>`. Module khác nhận `dyn Storage` (nơi lưu chung) từ `files` như trước; khi chuyển
+  sang theo khách, mỗi module tự bọc `TenantStorage::new(storage, tenant)`.
+- Job dọn mồ côi chạy theo lịch trên từng database nhưng đối chiếu mỗi khoá với **database của chính khách đó** (tra
+  qua sổ database theo khách đọc từ khoá) — không bao giờ coi một file là mồ côi chỉ vì job đang chạy trên database
+  khác. Khoá của khách không còn trong sổ thì để nguyên (không đoán). Chạy trên N database thì quét N lần: chấp nhận
+  (xoá idempotent, mỗi ngày một lần); tối ưu khi đo thấy chậm.
