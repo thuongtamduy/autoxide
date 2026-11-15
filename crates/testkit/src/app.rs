@@ -199,6 +199,13 @@ impl<'a> TestAppBuilder<'a> {
         self
     }
 
+    /// Như [`module`](Self::module), cho module đã đóng hộp — vd cả danh sách module của binary
+    /// (`modules::all()`) trong test đầu-cuối.
+    pub fn boxed_module(mut self, module: Box<dyn Module>) -> Self {
+        self.modules.push(module);
+        self
+    }
+
     /// Công bố một trait thay cho module thật, vd `provide::<dyn Storage>(Arc::new(fake))`.
     /// Mọi thứ `provide` được công bố bởi module `testkit`, đứng trước mọi module khác.
     pub fn provide<T>(mut self, api: Arc<T>) -> Self

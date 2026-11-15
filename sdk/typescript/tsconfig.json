@@ -3,12 +3,24 @@
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "paths": {
+      "@autoxide/sdk": [
+        "./src/index.ts"
+      ]
+    }
   },
-  "include": ["src", "examples"]
+  "include": [
+    "src",
+    "examples"
+  ]
 }
