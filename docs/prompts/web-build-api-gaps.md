@@ -374,3 +374,33 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/market.ts`
 | [ ] | Tiền của người bán | `GET /settlements?seller=me`, `GET /payouts?seller=me`, `GET /statements` (CSV) | 46 (CSV qua route của giao diện) |
 | [ ] | "Xem như người bán" | Đọc gian hàng như người bán thấy, chỉ đọc, cho `marketplace.sellers.read` / `marketplace.finance.read` | 46 (cookie `ax_seller_view` trên dữ liệu mẫu) |
 | [ ] | Mọi màn Sàn | Mã lỗi chưa có trong đặc tả: `marketplace.listing_not_found`, `fee_rule_not_found`, `fee_rule_in_effect`, `payout_not_found`, `document_not_found`, `penalty_not_found`, `penalty_already_appealed`, `not_ready` | mới |
+
+## Khách hàng (`/customers`), Kênh bán (`/sales/channels`), Tiếp thị liên kết (`/marketing/affiliate`)
+
+Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/customers.ts`, `channels.ts`, `channel-accounts.ts`, `affiliate.ts`.
+
+| | Màn | Cần | Bước |
+|---|---|---|---|
+| [ ] | Khách hàng | `GET/POST /customers`, `GET/PUT /{id}`, `/{id}/notes`, `/{id}/orders`, `/{id}/points`, `POST /{id}/points/adjustments` | 47 |
+| [ ] | Khách hàng | Trường hồ sơ trả sẵn bản che (SĐT / email / ngày sinh); xem đầy đủ cần permission riêng và ghi audit | mới |
+| [ ] | Khách hàng | Số liệu tóm tắt: số hồ sơ, có tài khoản, chỉ SĐT, tỉ lệ mua lại 90 ngày | mới (51) |
+| [ ] | Tài khoản người mua | `GET /auth/customers?status=`, `POST /{id}/lock`, `/{id}/unlock`, cài đặt `customer_registration` | 34 |
+| [ ] | Nhóm khách | `GET/POST /groups`, `PUT/DELETE /groups/{id}`, `GET /groups/{id}/preview` (kèm số đã đồng ý nhận tin), thành viên; `used_in`; mã `customers.group_in_use`, `customers.rule_empty` | 47 (mã lỗi và `used_in`: mới) |
+| [ ] | Điểm và hạng | `GET/POST /loyalty/rules`, `GET /loyalty/tiers`, `GET /loyalty/summary` | 47 (summary: mới) |
+| [ ] | Điểm và hạng | Thưởng điểm khi đánh giá có ngày hiệu lực, không phụ thuộc số sao, đếm đã thưởng | 47 |
+| [ ] | Giỏ bỏ dở | `GET/POST /reminder-rules` | 47 |
+| [ ] | Giới thiệu bạn | `GET /customers/referrals` cho nhân viên, `GET/POST /referral-rules` | 47 (danh sách: mới) |
+| [ ] | Rủi ro COD | `GET/POST /orders/risk/rules`, `POST /risk/lookup`, `GET/POST /risk/blocks`, `POST /risk/blocks/{id}/lift` | 45 |
+| [ ] | Kênh bán | `GET /channels/connectors`, `/accounts`, `POST /accounts`, `/accounts/{id}/pause\|resume\|disconnect\|sync` | 48 |
+| [ ] | Liên kết sản phẩm | Listings gộp mọi tài khoản kèm giá web / giá kênh; `PUT …/listings/{variant_id}`, `/publish`, `…/delist` | 48 (gộp, delist: mới) |
+| [ ] | Phân bổ tồn | `GET/PUT /allocations`, `GET /stock-preview` gộp mọi tài khoản | 48 (gộp: mới) |
+| [ ] | Đơn cần xử lý | `GET /inbound-orders`, `/{id}/mapping\|retry\|resolve`; số liệu; `resolution` | 48 (số liệu, `resolution`: mới) |
+| [ ] | Đơn hàng | Đơn có `channel` = `shopee` / `tiktok_shop`, `channel_account_id` kèm tên, `external_ref`, `funds_flow = channel_collect` | 45, 48 |
+| [ ] | Đối soát kênh | `GET /settlements`, `/{id}`, `POST /settlement-lines/{id}/resolve`, `GET /settlements/summary`, `POST /settlements/{id}/post` | 48 (post, hai tổng: mới) |
+| [ ] | Báo cáo kênh | `GET /reports/channels?from&to` | 48 |
+| [ ] | Tiếp thị liên kết | `GET /partners`, `/{id}`, `POST /{id}/transitions`; tóm tắt KYC theo mục đích, hạn, "còn thiếu gì" | 49 (tóm tắt KYC: mới) |
+| [ ] | Quy tắc hoa hồng | `GET/POST /commission-rules`, `/{id}/close`, `/preview`, `GET/PUT /programs/{org_id}` | 49 |
+| [ ] | Hoa hồng | `GET /commissions`, số liệu tóm tắt, điều chỉnh âm | 49 (số liệu, điều chỉnh: mới) |
+| [ ] | Chi trả | `GET /payouts` (ảnh chụp khấu trừ), `POST /{id}/mark-paid`, `/{id}/retry`; thuế TNCN khấu trừ thay có ngày hiệu lực | 49, 36 |
+| [ ] | Livestream | `GET/POST /live-sessions`, `/{id}/start\|end\|products\|log\|report` | 49 |
+| [ ] | Góc người tiếp thị | `GET /partners/me/stats`, `/me/links`, `/me/tax-statement` | 49 |
