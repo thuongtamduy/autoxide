@@ -85,6 +85,12 @@ enum Command {
     /// Connects to the database (modules build their services) but does not need migrations.
     McpManifest,
 
+    /// Manage the placements: the databases that keep tenants' data (multi-tenant mode).
+    ///
+    /// `add` stores the connection URL encrypted; `check` compares each placement's migrations
+    /// with the program. Run `autoxide migrate up --all` to bring placements up to date.
+    Placement(commands::placement::Arguments),
+
     /// Restore a backup made by `autoxide backup` into a new, empty database.
     ///
     /// Restores into the database of `DATABASE_URL` (which gets every migration first)
@@ -139,6 +145,7 @@ fn main() -> ExitCode {
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
         Command::Openapi => commands::openapi::run(),
         Command::McpManifest => commands::mcp_manifest::run(),
+        Command::Placement(arguments) => commands::placement::run(&arguments),
         Command::Restore(arguments) => commands::backup::restore(&arguments),
         Command::Secrets(arguments) => commands::secrets::run(&arguments),
         Command::Serve => commands::serve::run(),

@@ -6606,3 +6606,33 @@ Bổ sung D-253.
    (sẽ mã hoá bằng `Sealer` ở A9b) không bao giờ ra API.
 
 Bổ sung D-253.
+
+## D-261 · Placement: URL mã hoá, `schema_state`, `migrate --all` (bước 33 A9b) — 2026-11-15 — agent quyết
+
+1. **URL kết nối của placement lưu mã hoá** bằng `Sealer` (D-257): mục đích `kernel.placement_url` /
+   `kernel.placement_read_url`, khách `NO_TENANT`, dòng = ID placement. Sổ database mở bằng khoá gốc của chương
+   trình (module `kernel` đưa vào lúc khởi động; CLI qua `Modules::placements`). Giá trị chưa mã hoá vẫn đọc được
+   (chép tay vào bảng) — `autoxide secrets reseal` về sau mã hoá lại như mọi secret. Placement chỉ tạo bằng CLI
+   (`autoxide placement add`), thử kết nối trước khi lưu; `--url -` đọc URL từ stdin để mật khẩu không nằm trong
+   lịch sử shell hay danh sách tiến trình. API không bao giờ trả URL.
+2. **Placement chạy đúng bộ migration của database điều khiển** (D-253 mục 2: mọi database cùng schema). Upgrade
+   dữ liệu trên placement dùng khoá gốc của **database điều khiển** (`Migrator::keyed_on`): module mã hoá secret của
+   mọi khách bằng khoá đó; dùng khoá tự sinh của chính placement thì secret không mở được.
+3. **`schema_state`**: `ready` / `behind` / `migrating`. Khách trên placement khác `ready` nhận `tenant_maintenance`
+   (503) — `TenantContext` mang cờ `schema_ready` (đọc cùng câu tra khách, nối `kernel_placements`, cache theo TTL
+   như khách); worker và dispatcher bỏ qua placement chưa `ready`. Placement `main` luôn `ready` (`serve` đòi database
+   điều khiển đủ migration). Tạo khách trên placement chưa `ready` → `tenant_placement_behind` (409), vì gieo dữ liệu
+   vào bảng chưa có sẽ hỏng giữa chừng.
+4. **Kiểm `schema_state`**: `autoxide placement check`, `migrate up` (chế độ `multi` in placement còn chờ), và `serve`
+   kiểm mỗi phút bằng một tác vụ nền — **không** dùng job lịch `kernel.check_placements` như đặc tả: lịch chạy mỗi
+   database một lần, mà việc này chỉ cần chạy trên database điều khiển, và kernel chưa có bảng job. Lệnh kiểm không
+   đè `migrating`; mọi lệnh đổi trạng thái chỉ ghi khi trạng thái vẫn là giá trị vừa đọc (hai máy chủ cùng kiểm
+   không ghi đè nhau). **Không** kiểm lúc mở pool lần đầu (đặc tả) — tránh một truy vấn migration trên đường request;
+   kiểm định kỳ đã đủ (chậm nhất một phút + TTL cache).
+5. **`migrate up --all`**: `main` trước, rồi từng placement theo tên; mỗi placement `migrating` → migrate + upgrade →
+   `ready`; hỏng thì đặt `behind`, dừng, báo tên placement. Chạy lại tiếp từ chỗ dừng (bảng `<m>_migrations` của từng
+   database nhớ phần đã xong). Một lần migrate chết giữa chừng để lại `migrating`: chạy lại `migrate up --all`.
+6. **Lỗi ở CLI in đủ nguyên nhân** (`describe_error`): lỗi nội bộ giấu nguyên nhân với API nhưng người vận hành máy
+   chủ cần thấy (URL trong thông báo kết nối đã che mật khẩu).
+
+Bổ sung D-253, D-257.

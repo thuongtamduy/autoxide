@@ -521,6 +521,17 @@ impl Modules {
     }
 
     /// Migrator chạy migration của mọi module.
+    /// Quản lý placement trên `registry` (lệnh `autoxide placement`, `migrate --all`, kiểm định kỳ
+    /// của `serve`): đưa khoá gốc của chương trình vào sổ (mở URL placement đã mã hoá) và dùng
+    /// migration của mọi module.
+    pub fn placements(
+        &self,
+        registry: &crate::tenancy::DatabaseRegistry,
+    ) -> Result<crate::tenancy::Placements, MigrationError> {
+        registry.use_secret_key(self.keys.key_for(registry.control()));
+        Ok(crate::tenancy::Placements::new(registry.clone(), self.migrator()?))
+    }
+
     pub fn migrator(&self) -> Result<Migrator, MigrationError> {
         let modules = self
             .modules

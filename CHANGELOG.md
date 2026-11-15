@@ -21,6 +21,13 @@ endpoints are marked deprecated with a sunset date first.
   `kernel.current_tenant`, `kernel.list_tenants`, `kernel.get_tenant`; CLI `autoxide tenant create|list|show|suspend|
   resume|provision`. New permissions `kernel.tenants.read`, `kernel.tenants.manage`, `kernel.placements.read`, new
   events `kernel.tenant_created`, `kernel.tenant_updated`. Creating a tenant is refused in the `single` mode.
+- Placements — the databases that keep tenants' data: `autoxide placement add <name> --url …` (the URL is checked
+  by connecting, then stored encrypted; `--url -` reads it from standard input), `autoxide placement list`,
+  `autoxide placement check`. `autoxide migrate up --all` / `status --all` run the main database, then every
+  placement by name, and can be run again after a failure. While a placement has migrations to apply, only the
+  tenants on it answer `503` (`tenant_maintenance`) and its jobs wait; `serve` checks the placements every minute in
+  the multi-tenant mode. New error codes `tenant_placement_taken`, `tenant_placement_behind` (creating a tenant on
+  a placement that is not up to date).
 - For module authors: `Module::seed_tenant` gives the data a new tenant starts with (roles, counters…); it must be
   safe to run again, because `autoxide tenant provision` repeats a creation that stopped half-way.
 
