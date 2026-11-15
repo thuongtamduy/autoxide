@@ -52,6 +52,16 @@ pub enum Action {
         #[arg(long)]
         email: String,
     },
+    /// Remove every passkey of an account.
+    ///
+    /// For an administrator who lost the devices holding their passkeys when no other
+    /// administrator can do it through the API (`DELETE /api/v1/auth/users/{id}/passkeys`).
+    /// The account signs in with its password and can add new passkeys.
+    RemovePasskeys {
+        /// Email of the account.
+        #[arg(long)]
+        email: String,
+    },
 }
 
 pub fn run(arguments: &Arguments) -> ExitCode {
@@ -59,7 +69,10 @@ pub fn run(arguments: &Arguments) -> ExitCode {
         Action::Create { email, name, admin, password_stdin } => {
             (email, name, admin, password_stdin)
         }
-        Action::ResetMfa { email } => return reset_mfa_command(&email),
+        Action::ResetMfa { email } => return recovery_command(Recovery::ResetMfa(email)),
+        Action::RemovePasskeys { email } => {
+            return recovery_command(Recovery::RemovePasskeys(email));
+        }
     };
     let settings = match settings::load() {
         Ok(settings) => settings,
@@ -112,13 +125,20 @@ async fn create(settings: Settings, account: NewAccount) -> Result<String, Strin
 }
 
 /// `autoxide user reset-mfa`.
-fn reset_mfa_command(email: &str) -> ExitCode {
+/// Việc khôi phục tài khoản của người vận hành, qua `AccountRecovery` của module `auth`.
+enum Recovery {
+    ResetMfa(String),
+    RemovePasskeys(String),
+}
+
+/// Lệnh `reset-mfa` / `remove-passkeys`: đọc cấu hình, làm `action`, in kết quả.
+fn recovery_command(action: Recovery) -> ExitCode {
     let settings = match settings::load() {
         Ok(settings) => settings,
         Err(errors) => return report_invalid_configuration(&errors),
     };
     let config = settings.config.clone();
-    match run_with_observability(&config, reset_mfa(settings, email.to_owned())) {
+    match run_with_observability(&config, recover(settings, action)) {
         Ok(report) => {
             print!("{report}");
             ExitCode::SUCCESS
@@ -127,20 +147,35 @@ fn reset_mfa_command(email: &str) -> ExitCode {
     }
 }
 
-/// Khởi động chương trình, tắt xác thực hai bước của tài khoản `email`.
-async fn reset_mfa(settings: Settings, email: String) -> Result<String, String> {
+/// Khởi động chương trình, làm `action`, đóng database. Trả câu báo cho người vận hành.
+async fn recover(settings: Settings, action: Recovery) -> Result<String, String> {
     let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
     let outcome = match runtime.modules.api::<dyn AccountRecovery>() {
-        Some(recovery) => recovery.reset_mfa(&email).await.map_err(|error| describe(&error)),
+        Some(recovery) => match action {
+            Recovery::ResetMfa(email) => recovery.reset_mfa(&email).await.map(|user| {
+                format!(
+                    "Two-step sign-in of {} (id {}) is off. Sign in with the password, then turn \
+                     it on again.\n",
+                    user.email, user.id
+                )
+            }),
+            Recovery::RemovePasskeys(email) => {
+                recovery.remove_passkeys(&email).await.map(|(user, removed)| {
+                    format!(
+                        "Removed {removed} passkey(s) of {} (id {}). Sign in with the password, \
+                         then add new passkeys.\n",
+                        user.email, user.id
+                    )
+                })
+            }
+        }
+        .map_err(|error| describe(&error)),
         None => Err("no registered module manages user accounts (`auth`)".to_owned()),
     };
     let closed = runtime.database.close().await.map_err(|error| format!("database: {error}"));
-    let user = outcome?;
+    let report = outcome?;
     closed?;
-    Ok(format!(
-        "Two-step sign-in of {} (id {}) is off. Sign in with the password, then turn it on again.\n",
-        user.email, user.id
-    ))
+    Ok(report)
 }
 
 /// Mật khẩu là dòng đầu của `input`, bỏ ký tự xuống dòng cuối (không bỏ khoảng trắng:

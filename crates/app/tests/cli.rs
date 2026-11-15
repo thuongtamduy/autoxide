@@ -396,6 +396,21 @@ async fn user_create_tao_admin_va_bao_loi_ro() {
         let missing = reset("ghost@example.com");
         assert_eq!(missing.status.code(), Some(1));
         assert!(stderr(&missing).contains("(auth.account_not_found)"), "{}", stderr(&missing));
+
+        // Gỡ mọi passkey (đặc tả 32 B2): như trên.
+        let remove = |email: &str| {
+            autoxide(directory.path(), &["user", "remove-passkeys", "--email", email], &environment)
+        };
+        let done = remove("ada@example.com");
+        assert_eq!(done.status.code(), Some(0), "{}", stderr(&done));
+        assert!(
+            stdout(&done).contains("Removed 0 passkey(s) of ada@example.com"),
+            "{}",
+            stdout(&done)
+        );
+        let missing = remove("ghost@example.com");
+        assert_eq!(missing.status.code(), Some(1));
+        assert!(stderr(&missing).contains("(auth.account_not_found)"), "{}", stderr(&missing));
     })
     .await
     .unwrap();

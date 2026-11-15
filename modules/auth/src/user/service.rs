@@ -450,7 +450,7 @@ impl UserService {
         let subject = id.to_string();
         OneTimeTokens::new("auth").revoke(&transaction, "email_verification", &subject).await?;
         if mode == PasswordWrite::Recovery {
-            crate::passkey::remove_all_in(&transaction, &self.outbox, actor, id).await?;
+            crate::passkey::remove_all_in(&transaction, &self.outbox, actor, id, false).await?;
             crate::api_key::revoke_all_in(&transaction, &self.outbox, actor, id).await?;
             OneTimeTokens::new("auth").revoke(&transaction, "password_reset", &subject).await?;
         }
@@ -483,7 +483,7 @@ impl UserService {
         SessionService::revoke_user(transaction, id).await?;
         SessionService::drop_mfa_challenges(transaction, id).await?;
         crate::passkey::drop_ceremonies_in(transaction, id).await?;
-        crate::passkey::remove_all_in(transaction, &self.outbox, actor, id).await?;
+        crate::passkey::remove_all_in(transaction, &self.outbox, actor, id, false).await?;
         crate::api_key::revoke_all_in(transaction, &self.outbox, actor, id).await?;
         crate::mfa::service::remove_in(transaction, &self.outbox, actor, id, false).await?;
         let subject = id.to_string();

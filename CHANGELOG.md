@@ -21,11 +21,17 @@ endpoints are marked deprecated with a sunset date first.
   everywhere, removes its password, passkeys, API keys and two-step sign-in, gives the old address back when it is
   free, and sends a password-reset mail there. New setting `AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL`, new event
   `auth.email_change_reported`.
+- `auth`: administrators with the new permission `auth.passkeys.manage` see and remove the passkeys of other
+  users (`GET`, `DELETE /api/v1/auth/users/{id}/passkeys`, `DELETE …/passkeys/{passkey_id}`); the event
+  `auth.passkey_removed` then records `by_administrator`. `autoxide user remove-passkeys --email …` does the same
+  from the server for an only administrator who lost their devices.
 - For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
   errors.
 
 ### Changed
 
+- For module authors: the trait `autoxide_auth::api::AccountRecovery` has a new method `remove_passkeys`; only
+  `auth` implements it.
 - Internal, no change in behaviour: the code of `newsletter`, `comments`, `media` and `forms` is grouped by
   feature like `content` and `auth`, and the kernel's files sit in private groups (`contracts`, `data`,
   `security`, `ops`, `values`). Every public path (`autoxide_kernel::ai::TextModel`, …) is unchanged, and a

@@ -177,6 +177,7 @@ impl Module for AuthModule {
         context.provide::<dyn api::AccountRecovery>(Arc::new(recovery::OperatorRecovery {
             users: users.clone(),
             mfa: mfa.clone(),
+            passkeys: passkeys.clone(),
         }))?;
         context.personal_data(Arc::new(privacy::AuthPersonalData {
             users: users.clone(),

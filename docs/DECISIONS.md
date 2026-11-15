@@ -6300,3 +6300,33 @@ Lý do: chủ tài khoản biết ngay khi email bị đổi, và lấy lại đ
 Đã cân nhắc:
 - Gửi mail báo trực tiếp trong request: chậm request, và gửi cả khi transaction rollback.
 - Giữ mật khẩu cũ, chỉ thu hồi phiên: kẻ chiếm đã biết mật khẩu nên đăng nhập lại ngay được.
+
+## D-251 · `auth`: quản trị viên xem và gỡ passkey của người khác; `autoxide user remove-passkeys` (bước 32 B2) — 2026-11-15 — agent quyết
+
+Bối cảnh: người dùng mất thiết bị giữ passkey thì chỉ tự gỡ được khi còn đăng nhập. `autoxide user reset-mfa`
+(D-159) chỉ tắt TOTP, không gỡ passkey, nên admin duy nhất mất thiết bị không có đường nào.
+
+Quyết định:
+
+- **Permission mới `auth.passkeys.manage`** (`Risk::Destructive`): "See and remove the passkeys of other users".
+  Tách khỏi `auth.users.manage`, vì gỡ passkey là việc khôi phục tài khoản, nên giao riêng cho người lo việc đó.
+- **Ba endpoint dưới `/api/v1/auth/users/{id}/passkeys`:**
+  - `GET`: danh sách, cùng dạng `GET /me/passkeys`, không có khoá.
+  - `DELETE …/{passkey_id}`: gỡ một passkey.
+  - `DELETE`: gỡ hết; vẫn 204 khi người đó không có passkey nào. Có cả hai kiểu gỡ: mất một thiết bị hay mất
+    hết đều là việc thường gặp.
+  - Mỗi endpoint kiểm permission, người đích có tồn tại, rồi `require_covers` (không tác động lên người quyền
+    cao hơn, D-079).
+- **Không đổi mật khẩu, không đăng xuất phiên khác**, giống `DELETE /users/{id}/mfa`: đây là giúp người mất thiết
+  bị, không phải khoá kẻ chiếm. Việc khoá kẻ chiếm có `POST /auth/email-change/report` (D-250) và đặt lại mật
+  khẩu.
+- **Event:** dùng lại `auth.passkey_removed`, actor là quản trị viên. Thêm `after.by_administrator: true` (như
+  `auth.mfa_disabled`, D-159); người dùng tự gỡ thì `after` vắng như cũ. `passkey::remove_all_in` nhận thêm cờ
+  `by_admin`.
+- **CLI `autoxide user remove-passkeys --email …`** cạnh `reset-mfa`, in số passkey đã gỡ. Trait công khai
+  `autoxide_auth::api::AccountRecovery` thêm `remove_passkeys(email) -> (User, u64)`, chạy với
+  `Actor::system()`; không có tài khoản thì `auth.account_not_found`. Đây là thay đổi phá vỡ cho ai tự cài trait
+  này (chỉ `auth` cài): ghi CHANGELOG, chấp nhận ở `0.x` (D-167).
+- Hai lệnh khôi phục của CLI dùng chung một đường (`enum Recovery`, `recover`).
+- `docs/DEPLOY.md` (EN + VI): cách dùng cạnh `reset-mfa`.
+- **Không có tool MCP:** việc khôi phục tài khoản không giao cho agent.
