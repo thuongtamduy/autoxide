@@ -9,6 +9,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::Page;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, etag};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -97,7 +98,7 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
             "list_menus",
             "List the website menus (every key and language), newest first; follow \
              `pagination.next_cursor` for more.",
-            move |principal: Principal, input: PageInput| {
+            move |_tenant: TenantContext, principal: Principal, input: PageInput| {
                 let service = list.clone();
                 async move {
                     let page = service.list(&principal, &input.page()?).await?;
@@ -110,7 +111,7 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
         Tool::new(
             "get_menu",
             "Get a website menu with its items as saved, and its `version` for `replace_menu_items`.",
-            move |principal: Principal, input: MenuId| {
+            move |_tenant: TenantContext, principal: Principal, input: MenuId| {
                 let service = get.clone();
                 async move {
                     let (menu, nodes) = service.get(&principal, input.id).await?;
@@ -127,7 +128,7 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
                 "Create a website menu: a key (e.g. `main`, `footer`), a language and an item tree.",
                 item_shape!()
             ),
-            move |principal: Principal, input: CreateMenuInput| {
+            move |_tenant: TenantContext, principal: Principal, input: CreateMenuInput| {
                 let service = create.clone();
                 async move {
                     let new = NewMenu { key: input.key, locale: input.locale, items: parse_items(input.items)? };
@@ -146,7 +147,7 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
                  read it again.",
                 item_shape!()
             ),
-            move |principal: Principal, input: ReplaceItemsInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ReplaceItemsInput| {
                 let service = replace.clone();
                 async move {
                     let expected = IfMatch::from_value(&input.version).expected()?;
@@ -161,7 +162,7 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
         Tool::new(
             "delete_menu",
             "Delete a website menu and all its items. It cannot be restored.",
-            move |principal: Principal, input: MenuId| {
+            move |_tenant: TenantContext, principal: Principal, input: MenuId| {
                 let service = delete.clone();
                 async move {
                     service.delete(&principal, input.id).await?;

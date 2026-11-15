@@ -7,6 +7,7 @@ use std::process::ExitCode;
 
 use autoxide_auth::api::{AccountRecovery, Accounts, NewAccount};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantContext;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
@@ -110,7 +111,10 @@ async fn create(settings: Settings, account: NewAccount) -> Result<String, Strin
     let admin = account.admin;
     let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
     let outcome = match runtime.modules.api::<dyn Accounts>() {
-        Some(accounts) => accounts.create(account).await.map_err(|error| describe(&error)),
+        Some(accounts) => accounts
+            .create(&TenantContext::legacy_default(&runtime.database), account)
+            .await
+            .map_err(|error| describe(&error)),
         None => Err("no registered module manages user accounts (`auth`)".to_owned()),
     };
     // Đóng kết nối cả khi tạo hỏng; lỗi tạo quan trọng hơn lỗi lúc đóng.
@@ -152,7 +156,7 @@ async fn recover(settings: Settings, action: Recovery) -> Result<String, String>
     let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
     let outcome = match runtime.modules.api::<dyn AccountRecovery>() {
         Some(recovery) => match action {
-            Recovery::ResetMfa(email) => recovery.reset_mfa(&email).await.map(|user| {
+            Recovery::ResetMfa(email) => recovery.reset_mfa(&TenantContext::legacy_default(&runtime.database), &email).await.map(|user| {
                 format!(
                     "Two-step sign-in of {} (id {}) is off. Sign in with the password, then turn \
                      it on again.\n",
@@ -160,7 +164,7 @@ async fn recover(settings: Settings, action: Recovery) -> Result<String, String>
                 )
             }),
             Recovery::RemovePasskeys(email) => {
-                recovery.remove_passkeys(&email).await.map(|(user, removed)| {
+                recovery.remove_passkeys(&TenantContext::legacy_default(&runtime.database), &email).await.map(|(user, removed)| {
                     format!(
                         "Removed {removed} passkey(s) of {} (id {}). Sign in with the password, \
                          then add new passkeys.\n",

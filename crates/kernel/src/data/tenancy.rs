@@ -370,6 +370,12 @@ pub mod errors {
     }
 }
 
+/// Khách mặc định trên một database không nối tới đâu — cho test đơn vị của kernel không truy vấn.
+#[cfg(test)]
+pub(crate) fn test_tenant() -> TenantContext {
+    TenantContext::default_on(Database::detached())
+}
+
 /// Kiểm `tenant` có phục vụ được không: tạm khoá → `tenant_suspended`; bảo trì / đang dời / đang
 /// cấp phát → `tenant_maintenance`.
 pub fn ensure_serving(tenant: &TenantContext) -> Result<(), Error> {

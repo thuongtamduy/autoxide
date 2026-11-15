@@ -8,6 +8,7 @@ use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::pagination::{Order, PageRequest};
 use autoxide_kernel::privacy::{PersonalData, USER_DELETED};
 use autoxide_kernel::resource::{Resource, ResourceResolver};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::TestDatabase;
 use serde_json::json;
 use uuid::Uuid;
@@ -261,7 +262,7 @@ struct Entries;
 
 #[async_trait::async_trait]
 impl ResourceResolver for Entries {
-    async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
+    async fn resolve(&self, _tenant: &TenantContext, id: &str) -> Result<Option<Resource>, Error> {
         Ok(Some(
             Resource::new("A new post")
                 .public(!id.starts_with("00000000"))
@@ -358,7 +359,14 @@ async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
             ..ListInput::default()
         };
         let weekly = h.service.create_list(&owner, input).await.unwrap();
-        let exported = h.service.export(owner.user_id()).await.unwrap();
+        let exported = h
+            .service
+            .export(
+                &autoxide_kernel::tenancy::TenantContext::legacy_default(&h.database),
+                owner.user_id(),
+            )
+            .await
+            .unwrap();
         assert_eq!(exported["lists"][0]["key"], "weekly");
         let deleted = Delivered::new(
             autoxide_kernel::tenancy::TenantContext::legacy_default(&h.database),
@@ -369,7 +377,16 @@ async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
         h.service.handle(&deleted).await.unwrap();
         h.service.handle(&deleted).await.unwrap();
         assert_eq!(h.service.get_list(&owner, weekly.row.id).await.unwrap().row.created_by, None);
-        assert_eq!(h.service.export(owner.user_id()).await.unwrap()["lists"], json!([]));
+        assert_eq!(
+            h.service
+                .export(
+                    &autoxide_kernel::tenancy::TenantContext::legacy_default(&h.database),
+                    owner.user_id()
+                )
+                .await
+                .unwrap()["lists"],
+            json!([])
+        );
     })
     .await
     .unwrap();

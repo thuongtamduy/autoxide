@@ -189,6 +189,7 @@ impl Module for ContentModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
+    use autoxide_kernel::tenancy::TenantContext;
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
 
@@ -221,7 +222,11 @@ pub(crate) mod testing {
 
     #[async_trait::async_trait]
     impl Media for FakeMedia {
-        async fn find_many(&self, ids: &[Uuid]) -> Result<Vec<MediaRef>, Error> {
+        async fn find_many(
+            &self,
+            _tenant: &TenantContext,
+            ids: &[Uuid],
+        ) -> Result<Vec<MediaRef>, Error> {
             let known = self.0.lock().unwrap();
             Ok(ids
                 .iter()
@@ -241,8 +246,13 @@ pub(crate) mod testing {
         }
 
         /// `alt` theo ngôn ngữ: `[<ngôn ngữ>]`, để test thấy ảnh được tra theo ngôn ngữ nào.
-        async fn find_many_in(&self, ids: &[Uuid], locale: &str) -> Result<Vec<MediaRef>, Error> {
-            let mut found = self.find_many(ids).await?;
+        async fn find_many_in(
+            &self,
+            tenant: &TenantContext,
+            ids: &[Uuid],
+            locale: &str,
+        ) -> Result<Vec<MediaRef>, Error> {
+            let mut found = self.find_many(tenant, ids).await?;
             for item in &mut found {
                 item.alt = format!("[{locale}]");
             }

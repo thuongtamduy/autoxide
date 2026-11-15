@@ -1,6 +1,7 @@
 //! Test lẻ của mục: tạo, slug, sửa nháp, trang có cha, sổ đối tượng.
 
 use super::*;
+use autoxide_kernel::tenancy::TenantContext;
 
 /// Tạo bài: slug tiếng Việt từ tiêu đề, trùng thì thêm hậu tố; thân bài tính số chữ, thời
 /// gian đọc; revision `initial`; event.
@@ -203,20 +204,43 @@ async fn so_doi_tuong_content_entry() {
         let mut new = post("Hello");
         new.fields.excerpt = Some("Short".into());
         let entry = content.create(&ada, new).await.unwrap();
-        let draft = resolver.resolve(&entry.id.to_string()).await.unwrap().unwrap();
+        let draft = resolver
+            .resolve(&TenantContext::legacy_default(&content.database), &entry.id.to_string())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(
             (draft.public, draft.title.as_str(), draft.summary.as_str(), draft.url.as_deref()),
             (false, "", "", None)
         );
         assert_eq!(draft.owner_user_ids, [ada.user_id()]);
         content.publish(&ada, entry.id, None, None, false).await.unwrap();
-        let live = resolver.resolve(&entry.id.to_string()).await.unwrap().unwrap();
+        let live = resolver
+            .resolve(&TenantContext::legacy_default(&content.database), &entry.id.to_string())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(
             (live.public, live.summary.as_str(), live.url.as_deref(), live.locale.as_deref()),
             (true, "Short", Some("/blog/hello"), Some("en"))
         );
-        assert!(resolver.resolve(&Uuid::now_v7().to_string()).await.unwrap().is_none());
-        assert!(resolver.resolve("not-a-uuid").await.unwrap().is_none());
+        assert!(
+            resolver
+                .resolve(
+                    &TenantContext::legacy_default(&content.database),
+                    &Uuid::now_v7().to_string()
+                )
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            resolver
+                .resolve(&TenantContext::legacy_default(&content.database), "not-a-uuid")
+                .await
+                .unwrap()
+                .is_none()
+        );
     })
     .await
     .unwrap();

@@ -158,6 +158,7 @@ impl Module for FormsModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
+    use autoxide_kernel::tenancy::TenantContext;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
@@ -196,7 +197,7 @@ pub(crate) mod testing {
 
     #[async_trait::async_trait]
     impl Mailer for FakeMailer {
-        async fn send(&self, mail: Mail) -> Result<(), Error> {
+        async fn send(&self, _tenant: &TenantContext, mail: Mail) -> Result<(), Error> {
             if mail.reply_to.is_some() && self.refuse_reply_to.load(Ordering::SeqCst) {
                 return Err(Error::validation(vec![FieldError::new(
                     "reply_to",

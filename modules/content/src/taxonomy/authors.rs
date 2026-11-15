@@ -393,7 +393,11 @@ impl ContentService {
         if let Some(avatar) = input.avatar_media_id {
             row.avatar_media_id = avatar;
             if let Some(id) = avatar
-                && self.media.find(id).await?.is_none()
+                && self
+                    .media
+                    .find(&TenantContext::legacy_default(&self.database), id)
+                    .await?
+                    .is_none()
             {
                 problems.push(FieldError::new(
                     "avatar_media_id",

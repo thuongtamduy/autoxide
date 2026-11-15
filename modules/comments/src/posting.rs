@@ -158,7 +158,14 @@ impl CommentsService {
         // dùng hỏi qua điểm nối của kernel (module giữ trạng thái xác thực, bước 37).
         if self.config.verified_only.contains(&kind) {
             let verified = match principal {
-                Some(principal) => self.verification.is_verified(principal.user_id()).await?,
+                Some(principal) => {
+                    self.verification
+                        .is_verified(
+                            &TenantContext::legacy_default(&self.database),
+                            principal.user_id(),
+                        )
+                        .await?
+                }
                 None => false,
             };
             if !verified {
@@ -233,7 +240,16 @@ impl CommentsService {
         // Nhãn của tác giả trên đích (vd `seller`, `verified_buyer`), tính một lần lúc ghi qua
         // sổ đối tượng — có thể gọi module khác nên ở NGOÀI transaction (D-202).
         let badges = match principal {
-            Some(principal) => self.resources.badges(&kind, &target_id, principal).await?.join(","),
+            Some(principal) => self
+                .resources
+                .badges(
+                    &TenantContext::legacy_default(&self.database),
+                    &kind,
+                    &target_id,
+                    principal,
+                )
+                .await?
+                .join(","),
             None => String::new(),
         };
         let now = now();

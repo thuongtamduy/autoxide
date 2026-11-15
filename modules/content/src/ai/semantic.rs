@@ -220,7 +220,15 @@ impl ContentService {
             .map(|(text, _)| text.clone())
             .collect();
         // Gọi embedding NGOÀI transaction (luật: không gọi mạng trong transaction ghi).
-        let mut fresh = self.embedder.embed("content.index", &missing, EmbedKind::Document).await?;
+        let mut fresh = self
+            .embedder
+            .embed(
+                &TenantContext::legacy_default(&self.database),
+                "content.index",
+                &missing,
+                EmbedKind::Document,
+            )
+            .await?;
         for vector in &mut fresh {
             vector::normalize(vector);
         }
@@ -466,8 +474,15 @@ impl ContentService {
         {
             return Ok(found);
         }
-        let mut vectors =
-            self.embedder.embed("content.search", &[q.to_owned()], EmbedKind::Query).await?;
+        let mut vectors = self
+            .embedder
+            .embed(
+                &TenantContext::legacy_default(&self.database),
+                "content.search",
+                &[q.to_owned()],
+                EmbedKind::Query,
+            )
+            .await?;
         let mut vector = vectors.pop().unwrap_or_default();
         vector::normalize(&mut vector);
         let vector = Arc::new(vector);

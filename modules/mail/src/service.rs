@@ -64,7 +64,7 @@ impl MailService {
 
 #[async_trait::async_trait]
 impl Mailer for MailService {
-    async fn send(&self, mail: Mail) -> Result<(), Error> {
+    async fn send(&self, tenant: &TenantContext, mail: Mail) -> Result<(), Error> {
         let mut problems = Vec::new();
         if mail.to.parse::<Mailbox>().is_err() {
             problems.push(FieldError::new(
@@ -98,15 +98,7 @@ impl Mailer for MailService {
             headers: mail.headers,
             dedupe_key: mail.dedupe_key,
         };
-        let id = self
-            .queue
-            .enqueue(
-                self.database.write(),
-                &TenantContext::legacy_default(&self.database),
-                &job,
-                options,
-            )
-            .await?;
+        let id = self.queue.enqueue(self.database.write(), tenant, &job, options).await?;
         // Không ghi địa chỉ hay nội dung vào log: chỉ ID của job.
         tracing::info!(job_id = ?id, "mail queued");
         Ok(())

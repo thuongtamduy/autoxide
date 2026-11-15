@@ -23,6 +23,7 @@ use crate::posting::targets::OwnerEvents;
 use crate::service::Status;
 use crate::testing::{admin, config, service};
 use autoxide_kernel::database::Database;
+use autoxide_kernel::tenancy::TenantContext;
 
 fn delivered(
     database: &Database,
@@ -383,7 +384,11 @@ async fn du_lieu_ca_nhan() {
             )
             .await
             .unwrap();
-        let exported = h.service.export(bob.user_id()).await.unwrap();
+        let exported = h
+            .service
+            .export(&TenantContext::legacy_default(&h.service.database), bob.user_id())
+            .await
+            .unwrap();
         assert_eq!(exported["profile"]["display_name"], "Bob");
         assert_eq!(exported["comments"][0]["body"], "Của Bob");
         let event = delivered(
@@ -403,7 +408,11 @@ async fn du_lieu_ca_nhan() {
                 .unwrap()
                 .is_none()
         );
-        let exported = h.service.export(bob.user_id()).await.unwrap();
+        let exported = h
+            .service
+            .export(&TenantContext::legacy_default(&h.service.database), bob.user_id())
+            .await
+            .unwrap();
         assert_eq!(
             (
                 exported["comments"].clone(),

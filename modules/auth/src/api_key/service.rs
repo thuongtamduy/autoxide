@@ -442,7 +442,13 @@ mod tests {
             password: Some(PASSWORD.to_owned()),
             admin: false,
         };
-        let ada = Accounts::create(services.users.as_ref(), ada).await.unwrap();
+        let ada = Accounts::create(
+            services.users.as_ref(),
+            &TenantContext::legacy_default(&services.database),
+            ada,
+        )
+        .await
+        .unwrap();
         let role = services
             .roles
             .create(

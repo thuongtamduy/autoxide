@@ -319,6 +319,7 @@ fn fingerprint<T: Serialize>(value: &T) -> Result<String, Error> {
 }
 
 use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::Path;
 
 use super::page_request;
@@ -564,7 +565,7 @@ pub(crate) async fn get_author(
     let avatar = match author.avatar_media_id {
         Some(id) => service
             .media
-            .find(id)
+            .find(&TenantContext::legacy_default(&service.database), id)
             .await?
             .filter(|item| item.visibility == autoxide_media::api::MediaVisibility::Public),
         None => None,

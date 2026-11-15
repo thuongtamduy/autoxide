@@ -13,6 +13,7 @@
 
 use autoxide_auth::api::{Accounts, NewAccount};
 use autoxide_kernel::access::Risk;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::Method;
 use serde_json::{Map, Value, json};
@@ -201,7 +202,11 @@ async fn nobody(app: &TestApp) -> String {
         password: Some(password.to_owned()),
         admin: false,
     };
-    app.api::<dyn Accounts>().unwrap().create(account).await.unwrap();
+    app.api::<dyn Accounts>()
+        .unwrap()
+        .create(&TenantContext::legacy_default(app.database()), account)
+        .await
+        .unwrap();
     let login = app
         .post("/api/v1/auth/login")
         .json(json!({"email": "nobody@example.com", "password": password}))

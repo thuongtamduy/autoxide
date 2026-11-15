@@ -10,6 +10,7 @@ use autoxide_kernel::ai::{Effort, EmbedKind, Embedder, Part, Prompt, TextModel};
 use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::migration::{Migrator, ModuleMigrations};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::TestDatabase;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
@@ -161,14 +162,16 @@ async fn anthropic_dang_request_va_ket_qua() {
     TestDatabase::run(async |test| {
         let (url, fake) =
             server(vec![ok(anthropic_answer(r#"{"title": "Đà Lạt"}"#, "end_turn"))]).await;
-        let book = Arc::new(UsageBook::new(database(test).await, 0));
+        let database = database(test).await;
+        let tenant = TenantContext::legacy_default(&database);
+        let book = Arc::new(UsageBook::new(database, 0));
         let model = text(
             Box::new(Anthropic::new(&text_config(Provider::Anthropic, &url)).unwrap()),
             book.clone(),
         );
         let image = Part::Image { media_type: "image/png".into(), bytes: vec![1, 2, 3] };
         let done = model
-            .generate(prompt(vec![Part::Text("Một bài về Đà Lạt".into()), image]))
+            .generate(&tenant, prompt(vec![Part::Text("Một bài về Đà Lạt".into()), image]))
             .await
             .unwrap();
         assert_eq!(done.output, json!({"title": "Đà Lạt"}));
@@ -204,7 +207,9 @@ async fn anthropic_dang_request_va_ket_qua() {
 #[tokio::test]
 async fn anthropic_cac_nhanh_loi() {
     TestDatabase::run(async |test| {
-        let book = Arc::new(UsageBook::new(database(test).await, 0));
+        let database = database(test).await;
+        let tenant = TenantContext::legacy_default(&database);
+        let book = Arc::new(UsageBook::new(database, 0));
         let answers = vec![
             ok(anthropic_answer("", "refusal")),
             ok(anthropic_answer(r#"{"title": "x"#, "max_tokens")),
@@ -223,7 +228,7 @@ async fn anthropic_cac_nhanh_loi() {
         config.anthropic_fallback = false;
         config.timeout = Duration::from_secs(1);
         let model = text(Box::new(Anthropic::new(&config).unwrap()), book);
-        let run = || model.generate(prompt(vec![Part::Text("x".into())]));
+        let run = || model.generate(&tenant, prompt(vec![Part::Text("x".into())]));
         assert_eq!(run().await.unwrap_err().code(), "ai.refused");
         assert_eq!(run().await.unwrap_err().code(), "ai.output_truncated");
         assert_eq!(run().await.unwrap().output, json!({"title": "second try"}));
@@ -247,7 +252,9 @@ async fn anthropic_cac_nhanh_loi() {
 #[tokio::test]
 async fn openai_dang_request_va_cac_nhanh() {
     TestDatabase::run(async |test| {
-        let book = Arc::new(UsageBook::new(database(test).await, 0));
+        let database = database(test).await;
+        let tenant = TenantContext::legacy_default(&database);
+        let book = Arc::new(UsageBook::new(database, 0));
         let refusal = json!({"model": "m", "choices": [{"finish_reason": "stop", "message": {"content": null, "refusal": "I can't."}}]});
         let answers = vec![
             ok(openai_answer(r#"{"title": "A"}"#, "stop")),
@@ -260,7 +267,7 @@ async fn openai_dang_request_va_cac_nhanh() {
         let config = text_config(Provider::OpenAi, &url);
         let strict = text(Box::new(OpenAi::new(&config).unwrap()), book.clone());
         let image = Part::Image { media_type: "image/jpeg".into(), bytes: vec![255] };
-        let done = strict.generate(prompt(vec![Part::Text("x".into()), image])).await.unwrap();
+        let done = strict.generate(&tenant, prompt(vec![Part::Text("x".into()), image])).await.unwrap();
         assert_eq!(done.output, json!({"title": "A"}));
         assert_eq!(book.used_today().await.unwrap(), 10);
         let seen = fake.seen.lock().unwrap()[0].clone();
@@ -281,7 +288,7 @@ async fn openai_dang_request_va_cac_nhanh() {
         loose.openai_max_tokens_param = "max_tokens".into();
         loose.api_key = None;
         let loose = text(Box::new(OpenAi::new(&loose).unwrap()), book);
-        let run = || loose.generate(prompt(vec![Part::Text("x".into())]));
+        let run = || loose.generate(&tenant, prompt(vec![Part::Text("x".into())]));
         assert_eq!(run().await.unwrap().output, json!({"title": "B"}));
         let seen = fake.seen.lock().unwrap()[1].clone();
         assert!(seen.headers.get("authorization").is_none());
@@ -300,7 +307,9 @@ async fn openai_dang_request_va_cac_nhanh() {
 #[tokio::test]
 async fn embedding_chia_lo_va_kiem_so_chieu() {
     TestDatabase::run(async |test| {
-        let book = Arc::new(UsageBook::new(database(test).await, 0));
+        let database = database(test).await;
+        let tenant = TenantContext::legacy_default(&database);
+        let book = Arc::new(UsageBook::new(database, 0));
         let answers = vec![
             ok(json!({"data": [{"index": 1, "embedding": [0.0, 1.0]}, {"index": 0, "embedding": [1.0, 0.0]}], "usage": {"prompt_tokens": 4}})),
             ok(json!({"data": [{"index": 0, "embedding": [0.5, 0.5]}], "usage": {"total_tokens": 2}})),
@@ -320,14 +329,14 @@ async fn embedding_chia_lo_va_kiem_so_chieu() {
         assert!(embeddings.enabled());
         assert_eq!((embeddings.model_id(), embeddings.dimensions()), ("bge-m3", 2));
         let texts: Vec<String> = ["a", "b", "c"].map(str::to_owned).to_vec();
-        let vectors = embeddings.embed("test.embed", &texts, EmbedKind::Document).await.unwrap();
+        let vectors = embeddings.embed(&tenant, "test.embed", &texts, EmbedKind::Document).await.unwrap();
         assert_eq!(vectors, [vec![1.0, 0.0], vec![0.0, 1.0], vec![0.5, 0.5]]);
         assert_eq!(book.used_today().await.unwrap(), 6);
         let seen = fake.seen.lock().unwrap().clone();
         assert_eq!(seen[0].path, "/embeddings");
         assert_eq!(seen[0].body, json!({"model": "bge-m3", "input": ["a", "b"], "dimensions": 2}));
         assert_eq!(seen[1].body["input"], json!(["c"]));
-        let wrong = embeddings.embed("test.embed", &["d".to_owned()], EmbedKind::Query).await;
+        let wrong = embeddings.embed(&tenant, "test.embed", &["d".to_owned()], EmbedKind::Query).await;
         assert_eq!(wrong.unwrap_err().code(), "ai.output_invalid");
     })
     .await
@@ -340,13 +349,18 @@ async fn embedding_chia_lo_va_kiem_so_chieu() {
 async fn tat_khong_doc_anh_va_het_han_muc() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
+        let tenant = TenantContext::legacy_default(&database);
         let book = Arc::new(UsageBook::new(database.clone(), 0));
         let off = Text { provider: None, capabilities: Default::default(), book: book.clone() };
         assert!(!off.capabilities().enabled);
-        assert_eq!(off.generate(prompt(Vec::new())).await.unwrap_err().code(), "ai.disabled");
+        assert_eq!(
+            off.generate(&tenant, prompt(Vec::new())).await.unwrap_err().code(),
+            "ai.disabled"
+        );
         let no_embeddings = Embeddings { client: None, book: book.clone() };
         assert!(!no_embeddings.enabled());
-        let error = no_embeddings.embed("test.embed", &["a".to_owned()], EmbedKind::Query).await;
+        let error =
+            no_embeddings.embed(&tenant, "test.embed", &["a".to_owned()], EmbedKind::Query).await;
         assert_eq!(error.unwrap_err().code(), "ai.embedding_disabled");
 
         let (url, _) = server(vec![ok(anthropic_answer(r#"{"title": "x"}"#, "end_turn"))]).await;
@@ -355,7 +369,7 @@ async fn tat_khong_doc_anh_va_het_han_muc() {
         blind.capabilities.images = false;
         let image = Part::Image { media_type: "image/png".into(), bytes: vec![1] };
         assert_eq!(
-            blind.generate(prompt(vec![image])).await.unwrap_err().code(),
+            blind.generate(&tenant, prompt(vec![image])).await.unwrap_err().code(),
             "ai.unsupported_input"
         );
 
@@ -364,8 +378,9 @@ async fn tat_khong_doc_anh_va_het_han_muc() {
             Box::new(Anthropic::new(&text_config(Provider::Anthropic, &url)).unwrap()),
             limited.clone(),
         );
-        model.generate(prompt(vec![Part::Text("x".into())])).await.unwrap();
-        let error = model.generate(prompt(vec![Part::Text("x".into())])).await.unwrap_err();
+        model.generate(&tenant, prompt(vec![Part::Text("x".into())])).await.unwrap();
+        let error =
+            model.generate(&tenant, prompt(vec![Part::Text("x".into())])).await.unwrap_err();
         assert_eq!(error.code(), "ai.quota_exceeded");
         assert!(error.retry_after().is_some_and(|seconds| seconds <= 86_400));
     })

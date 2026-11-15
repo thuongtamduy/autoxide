@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::tenancy::TenantContext;
 
 use crate::api::{AccountRecovery, User};
 use crate::mfa::MfaService;
@@ -30,7 +31,7 @@ impl OperatorRecovery {
 
 #[async_trait::async_trait]
 impl AccountRecovery for OperatorRecovery {
-    async fn reset_mfa(&self, email: &str) -> Result<User, Error> {
+    async fn reset_mfa(&self, _tenant: &TenantContext, email: &str) -> Result<User, Error> {
         let user = self.account(email).await?;
         // Người vận hành máy chủ, tức "hệ thống"; event ghi `by_administrator`.
         self.mfa.reset(Actor::system(), user.id).await?;
@@ -38,7 +39,11 @@ impl AccountRecovery for OperatorRecovery {
         Ok(user)
     }
 
-    async fn remove_passkeys(&self, email: &str) -> Result<(User, u64), Error> {
+    async fn remove_passkeys(
+        &self,
+        _tenant: &TenantContext,
+        email: &str,
+    ) -> Result<(User, u64), Error> {
         let user = self.account(email).await?;
         let removed = self.passkeys.remove_all_for(Actor::system(), user.id).await?;
         Ok((user, removed))
@@ -62,7 +67,13 @@ mod tests {
                 password: None,
                 admin: true,
             };
-            let ada = Accounts::create(services.users.as_ref(), account).await.unwrap();
+            let ada = Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account,
+            )
+            .await
+            .unwrap();
             let setup = services.mfa.start_totp(ada.id, "ada@example.com").await.unwrap();
             let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
             let code = crate::mfa::service::tests::code_at(&setup.secret, now);
@@ -74,9 +85,22 @@ mod tests {
                 mfa: services.mfa.clone(),
                 passkeys: services.passkeys.clone(),
             };
-            assert_eq!(recovery.reset_mfa(" ADA@example.com ").await.unwrap().id, ada.id);
+            assert_eq!(
+                recovery
+                    .reset_mfa(
+                        &TenantContext::legacy_default(&services.database),
+                        " ADA@example.com "
+                    )
+                    .await
+                    .unwrap()
+                    .id,
+                ada.id
+            );
             assert!(!services.mfa.status(ada.id).await.unwrap().totp_enabled);
-            let missing = recovery.reset_mfa("ghost@example.com").await.unwrap_err();
+            let missing = recovery
+                .reset_mfa(&TenantContext::legacy_default(&services.database), "ghost@example.com")
+                .await
+                .unwrap_err();
             assert_eq!(missing.code(), "auth.account_not_found");
 
             // Gỡ passkey (đặc tả 32 B2).
@@ -94,10 +118,32 @@ mod tests {
                 .finish_registration(ada.id, ceremony.id, "Phone", &credential)
                 .await
                 .unwrap();
-            let (user, removed) = recovery.remove_passkeys("ada@example.com").await.unwrap();
+            let (user, removed) = recovery
+                .remove_passkeys(
+                    &TenantContext::legacy_default(&services.database),
+                    "ada@example.com",
+                )
+                .await
+                .unwrap();
             assert_eq!((user.id, removed), (ada.id, 1));
-            assert_eq!(recovery.remove_passkeys("ada@example.com").await.unwrap().1, 0);
-            let missing = recovery.remove_passkeys("ghost@example.com").await.unwrap_err();
+            assert_eq!(
+                recovery
+                    .remove_passkeys(
+                        &TenantContext::legacy_default(&services.database),
+                        "ada@example.com"
+                    )
+                    .await
+                    .unwrap()
+                    .1,
+                0
+            );
+            let missing = recovery
+                .remove_passkeys(
+                    &TenantContext::legacy_default(&services.database),
+                    "ghost@example.com",
+                )
+                .await
+                .unwrap_err();
             assert_eq!(missing.code(), "auth.account_not_found");
         })
         .await

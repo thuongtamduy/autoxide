@@ -430,7 +430,13 @@ impl ContentService {
         let ids: Vec<String> = batch.iter().map(|segment| segment.id.clone()).collect();
         let size: usize = batch.iter().map(|segment| segment.text.len()).sum();
         for attempt in 1..=2 {
-            let answer = self.ai.generate(batch_prompt(batch, from, to, size)).await?;
+            let answer = self
+                .ai
+                .generate(
+                    &TenantContext::legacy_default(&self.database),
+                    batch_prompt(batch, from, to, size),
+                )
+                .await?;
             let mut found = BTreeMap::new();
             for item in
                 answer.output.get("segments").and_then(Value::as_array).into_iter().flatten()

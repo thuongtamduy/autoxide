@@ -599,7 +599,9 @@ impl ContentService {
             wanted.iter().map(|(_, id)| *id).collect::<BTreeSet<_>>().into_iter().collect();
         let mut found = std::collections::HashMap::new();
         for chunk in ids.chunks(autoxide_media::api::MAX_IDS) {
-            for item in self.media.find_many(chunk).await? {
+            for item in
+                self.media.find_many(&TenantContext::legacy_default(&self.database), chunk).await?
+            {
                 found.insert(item.id, item);
             }
         }

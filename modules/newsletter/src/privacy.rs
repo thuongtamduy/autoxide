@@ -11,6 +11,7 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -21,7 +22,7 @@ use crate::service::NewsletterService;
 
 #[async_trait::async_trait]
 impl PersonalData for NewsletterService {
-    async fn export(&self, user_id: Uuid) -> Result<Value, Error> {
+    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let read = self.database.read();
         let lists =
             list::Entity::find().filter(list::Column::CreatedBy.eq(user_id)).all(read).await?;

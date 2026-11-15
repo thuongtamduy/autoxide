@@ -33,6 +33,7 @@ use crate::config::CorsOrigins;
 use crate::error::{Error, ErrorKind};
 use crate::i18n::{Language, Translations};
 use crate::mcp::Tool;
+use crate::tenancy::TenantContext;
 
 /// Đường dẫn của endpoint MCP.
 pub const MCP_PATH: &str = "/mcp";
@@ -93,10 +94,18 @@ async fn authenticate(
     let (mut parts, body) = request.into_parts();
     let authenticated =
         Box::pin(crate::tenancy::request::authenticate(&authenticator, &mut parts)).await;
+    // Khách của request (đặt vào extensions của request): tool nhận nó cùng người gọi.
+    let authenticated = match authenticated {
+        Ok(principal) => Box::pin(crate::tenancy::request::tenant(&mut parts))
+            .await
+            .map(|tenant| (principal, tenant)),
+        Err(error) => Err(error),
+    };
     let mut request = Request::from_parts(parts, body);
     match authenticated {
-        Ok(principal) => {
+        Ok((principal, tenant)) => {
             request.extensions_mut().insert(principal);
+            request.extensions_mut().insert(tenant);
             let secret = SecretResult::default();
             request.extensions_mut().insert(secret.clone());
             let mut response = next.run(request).await;
@@ -126,17 +135,23 @@ async fn authenticate(
 #[derive(Clone, Default)]
 struct SecretResult(Arc<AtomicBool>);
 
-/// Người gọi và ngôn ngữ của request đang xử lý.
-fn caller(context: &RequestContext<RoleServer>) -> Result<(Principal, Language), ErrorData> {
+/// Khách, người gọi và ngôn ngữ của request đang xử lý.
+fn caller(
+    context: &RequestContext<RoleServer>,
+) -> Result<(TenantContext, Principal, Language), ErrorData> {
     let parts = context.extensions.get::<axum::http::request::Parts>();
     let principal = parts.and_then(|parts| parts.extensions.get::<Principal>()).cloned();
-    let principal = principal.ok_or_else(|| {
-        ErrorData::internal_error("the MCP request reached the server without a caller", None)
-    })?;
+    let tenant = parts.and_then(|parts| parts.extensions.get::<TenantContext>()).cloned();
+    let (Some(principal), Some(tenant)) = (principal, tenant) else {
+        return Err(ErrorData::internal_error(
+            "the MCP request reached the server without a caller",
+            None,
+        ));
+    };
     let accept = parts
         .and_then(|parts| parts.headers.get(header::ACCEPT_LANGUAGE))
         .and_then(|value| value.to_str().ok());
-    Ok((principal, Language::negotiate(accept)))
+    Ok((tenant, principal, Language::negotiate(accept)))
 }
 
 fn describe(tool: &Tool) -> rmcp::model::Tool {
@@ -233,7 +248,7 @@ impl ServerHandler for McpServer {
         _request: Option<PaginatedRequestParams>,
         context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        let (principal, _) = caller(&context)?;
+        let (_, principal, _) = caller(&context)?;
         let tools = self.tools.iter().filter(|tool| tool.allows(&principal)).map(describe);
         Ok(ListToolsResult::with_all_items(tools.collect()))
     }
@@ -243,7 +258,7 @@ impl ServerHandler for McpServer {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
-        let (principal, language) = caller(&context)?;
+        let (tenant, principal, language) = caller(&context)?;
         let tool = self
             .tools
             .iter()
@@ -268,7 +283,7 @@ impl ServerHandler for McpServer {
         }
         let arguments = request.arguments.map_or(Value::Null, Value::Object);
         metrics::counter!("mcp_tool_calls_total").increment(1);
-        let mut result = match tool.call(principal, arguments).await {
+        let mut result = match tool.call(tenant, principal, arguments).await {
             Ok(value) => CallToolResult::structured(envelope(value)),
             Err(error) => self.failure(tool.name(), &error, language),
         };

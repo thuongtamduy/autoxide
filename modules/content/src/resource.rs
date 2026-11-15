@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::resource::{Resource, ResourceRef, ResourceResolver};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -34,13 +35,14 @@ pub(crate) struct EntryResolver(pub Arc<ContentService>);
 
 #[async_trait::async_trait]
 impl ResourceResolver for EntryResolver {
-    async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
-        Ok(self.resolve_many(&[id.to_owned()], None).await?.remove(id))
+    async fn resolve(&self, tenant: &TenantContext, id: &str) -> Result<Option<Resource>, Error> {
+        Ok(self.resolve_many(tenant, &[id.to_owned()], None).await?.remove(id))
     }
 
     // Bài nào cũng có một ngôn ngữ riêng (bản dịch là bài khác), nên `locale` không dùng.
     async fn resolve_many(
         &self,
+        _tenant: &TenantContext,
         ids: &[String],
         _locale: Option<&str>,
     ) -> Result<HashMap<String, Resource>, Error> {
@@ -87,14 +89,15 @@ pub(crate) struct TermResolver(pub Arc<ContentService>);
 
 #[async_trait::async_trait]
 impl ResourceResolver for TermResolver {
-    async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
-        Ok(self.resolve_many(&[id.to_owned()], None).await?.remove(id))
+    async fn resolve(&self, tenant: &TenantContext, id: &str) -> Result<Option<Resource>, Error> {
+        Ok(self.resolve_many(tenant, &[id.to_owned()], None).await?.remove(id))
     }
 
     /// Tên, slug theo `locale`; thiếu thì ngôn ngữ mặc định của `content`, rồi bản dịch bất kỳ.
     /// Danh mục và thẻ luôn công khai (không có bản nháp).
     async fn resolve_many(
         &self,
+        _tenant: &TenantContext,
         ids: &[String],
         locale: Option<&str>,
     ) -> Result<HashMap<String, Resource>, Error> {
@@ -139,6 +142,7 @@ impl ResourceResolver for TermResolver {
     /// Danh mục con trực tiếp, theo thứ tự tạo. Thẻ không có con.
     async fn children(
         &self,
+        _tenant: &TenantContext,
         id: &str,
         _locale: Option<&str>,
         limit: usize,

@@ -247,7 +247,7 @@ impl EmailVerifications {
                 VERIFY_CODE.mail(email, &self.translations, language, &params)
             }
         };
-        self.mailer.send(mail).await
+        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await
     }
 }
 

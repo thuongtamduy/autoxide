@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::ai::{Effort, EmbedKind, Embedder, Part, Prompt, TextModel};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::json;
 
 use super::{report_failure, report_invalid_configuration, run_with_observability};
@@ -54,7 +55,9 @@ async fn check(settings: Settings) -> Result<(String, bool), String> {
     let text = runtime.modules.api::<dyn TextModel>();
     let embedder = runtime.modules.api::<dyn Embedder>();
     let outcome = match (text, embedder) {
-        (Some(text), Some(embedder)) => Ok(report(text, embedder).await),
+        (Some(text), Some(embedder)) => {
+            Ok(report(&TenantContext::legacy_default(&runtime.database), text, embedder).await)
+        }
         _ => Err("the `ai` module is not registered".to_owned()),
     };
     let closed = runtime.database.close().await.map_err(|error| format!("database: {error}"));
@@ -63,7 +66,11 @@ async fn check(settings: Settings) -> Result<(String, bool), String> {
     Ok(outcome)
 }
 
-async fn report(text: Arc<dyn TextModel>, embedder: Arc<dyn Embedder>) -> (String, bool) {
+async fn report(
+    tenant: &TenantContext,
+    text: Arc<dyn TextModel>,
+    embedder: Arc<dyn Embedder>,
+) -> (String, bool) {
     let mut lines = String::new();
     let mut healthy = true;
     let capabilities = text.capabilities();
@@ -79,7 +86,7 @@ async fn report(text: Arc<dyn TextModel>, embedder: Arc<dyn Embedder>) -> (Strin
             .input(vec![Part::Text("Health check.".to_owned())])
             .effort(Effort::Low)
             .max_output_tokens(1024);
-        match text.generate(prompt).await {
+        match text.generate(tenant, prompt).await {
             Ok(done) => lines.push_str(&format!(
                 "Text generation: works ({} {}, answered by {}, {} tokens).\n",
                 capabilities.provider,
@@ -97,7 +104,7 @@ async fn report(text: Arc<dyn TextModel>, embedder: Arc<dyn Embedder>) -> (Strin
     }
     if embedder.enabled() {
         let texts = vec!["Health check.".to_owned()];
-        match embedder.embed("ai.check", &texts, EmbedKind::Query).await {
+        match embedder.embed(tenant, "ai.check", &texts, EmbedKind::Query).await {
             Ok(_) => lines.push_str(&format!(
                 "Embeddings: work ({}, {} dimensions).\n",
                 embedder.model_id(),

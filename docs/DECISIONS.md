@@ -6467,3 +6467,23 @@ Bài học khi đổi hàng loạt chỗ gọi bằng gợi ý của `rustc`: v�
 tham số với bản trước khi đổi (bỏ tham số khách) trước khi commit.
 
 Thay thế: không. Bổ sung D-253.
+
+## D-255 · Trait của kernel và `api` của module nhận khách (bước 33 A4b) — 2026-11-15 — agent quyết
+
+Phần còn lại của bảng "Chữ ký đổi" (đặc tả 33): `PersonalData`, `ResourceResolver`, `Mailer`, `TextModel`,
+`Embedder`, `IdempotencyStore`, `ToolHandler` và trait `api` của `auth`, `media`, `notes` nhận khách. Bổ sung so
+với bảng của đặc tả (cùng lý do: mọi hàm chạm dữ liệu của khách nhận khách — D-253 mục 1):
+
+1. **`BadgeResolver::badges`, `PostingVerifier::is_verified`, `content::api::LegacyMenus`** cũng nhận khách: chúng
+   đọc dữ liệu cấp khách hàng (người mua, trạng thái xác thực, menu cũ).
+2. **Tool MCP nhận `TenantContext` theo giá trị, đứng đầu** (`|tenant, principal, input|`): lớp xác thực của
+   `/mcp` giải khách của request (như extractor REST) và đặt vào request; tool nào cũng có, không cần tra lại.
+3. **Lớp idempotency lấy khách từ người gọi** (`DatabaseRegistry::tenant(principal.tenant_id())`, kể cả nhân sự
+   nền tảng đang vào khách khác). Lớp này nằm ngoài lớp đặt sổ database vào request nên nhận sổ qua cấu hình
+   của nó; app không có sổ database (chỉ ở test dựng router tay) thì bỏ qua idempotency.
+4. **Trait nội bộ của module `ai`** (nhà cung cấp, embedding) cũng nhận khách và chuyển tiếp — chỗ cho khoá AI theo
+   khách ở phần B4.
+5. Kernel có `Database::detached()` và `tenancy::test_tenant()` chỉ trong `cfg(test)`, cho test đơn vị cần một
+   ngữ cảnh khách mà không truy vấn gì. Test MCP của kernel chuyển sang `TestDatabase` (cần sổ database).
+
+Thay thế: không. Bổ sung D-253, D-254.

@@ -373,6 +373,7 @@ async fn login(
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -445,7 +446,7 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            crate::api::Accounts::create(services.users.as_ref(), root).await.unwrap();
+            crate::api::Accounts::create(services.users.as_ref(), &TenantContext::legacy_default(&services.database), root).await.unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let body = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": PASSWORD});
             let (status, _, key) = call(&app, "POST", "/api-keys", Some(&admin), Some(body)).await;
@@ -478,12 +479,20 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin,
             };
-            let root = Accounts::create(services.users.as_ref(), account("root@example.com", true))
-                .await
-                .unwrap();
-            let bob = Accounts::create(services.users.as_ref(), account("bob@example.com", false))
-                .await
-                .unwrap();
+            let root = Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("root@example.com", true),
+            )
+            .await
+            .unwrap();
+            let bob = Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("bob@example.com", false),
+            )
+            .await
+            .unwrap();
             for (user, seed) in [(bob.id, 1), (bob.id, 2), (root.id, 3)] {
                 let mut device = SoftAuthenticator::new(seed);
                 let ceremony = services.passkeys.start_registration(user, PASSWORD).await.unwrap();

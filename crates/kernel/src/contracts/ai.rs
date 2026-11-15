@@ -12,6 +12,7 @@
 use serde_json::Value;
 
 use crate::error::Error;
+use crate::tenancy::TenantContext;
 
 /// Mức độ kỹ khi mô hình suy nghĩ: đổi lấy chi phí và thời gian. Mỗi nhà cung cấp tự đổi sang
 /// tham số của mình (hay bỏ qua nếu không có).
@@ -186,7 +187,9 @@ pub trait TextModel: Send + Sync {
     /// Sinh một kết quả khớp `prompt.output_schema`. Lỗi có `code` ổn định (`ai.disabled`,
     /// `ai.quota_exceeded`, `ai.provider_unavailable`, `ai.refused`, `ai.output_truncated`,
     /// `ai.output_invalid`, `ai.unsupported_input`, `ai.misconfigured`).
-    async fn generate(&self, prompt: Prompt) -> Result<Generation, Error>;
+    ///
+    /// `tenant`: khách mà việc này làm cho — khoá, hạn mức và số đếm theo khách.
+    async fn generate(&self, tenant: &TenantContext, prompt: Prompt) -> Result<Generation, Error>;
 }
 
 /// Đoạn chữ được tính embedding để làm gì (một số mô hình cần biết; mô hình khác bỏ qua).
@@ -213,6 +216,7 @@ pub trait Embedder: Send + Sync {
     /// Một vector cho mỗi phần tử của `texts`, cùng thứ tự. `purpose`: như [`Prompt::purpose`].
     async fn embed(
         &self,
+        tenant: &TenantContext,
         purpose: &'static str,
         texts: &[String],
         kind: EmbedKind,

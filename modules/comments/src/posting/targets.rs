@@ -137,7 +137,11 @@ impl CommentsService {
         if !self.resources.knows(kind) {
             return Ok(None);
         }
-        match self.resources.resolve(kind, id).await? {
+        match self
+            .resources
+            .resolve(&TenantContext::legacy_default(&self.database), kind, id)
+            .await?
+        {
             Some(resource) if resource.public => Ok(Some(resource)),
             _ => Err(target_not_found()),
         }
