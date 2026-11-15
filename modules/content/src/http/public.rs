@@ -379,11 +379,14 @@ pub(crate) async fn list_posts(
     // Câu tìm dài vô hạn thành một câu `LIKE` đắt trên mọi bài, cho bất kỳ ai gọi.
     let max = crate::ai::semantic::QUERY_MAX;
     if query.q.as_deref().is_some_and(|q| q.trim().chars().count() > max) {
-        problems.push(autoxide_kernel::error::FieldError::new(
-            "q",
-            "length",
-            format!("must be at most {max} characters"),
-        ));
+        problems.push(
+            autoxide_kernel::error::FieldError::new(
+                "q",
+                "length",
+                "must be at most {max} characters",
+            )
+            .with_param("max", max),
+        );
     }
     let page = page_request(paging, problems)?;
     let filter =

@@ -451,11 +451,14 @@ impl NewsletterService {
         if let Action::Schedule(at) = action
             && (at <= now || at > now + chrono::Duration::days(SCHEDULE_MAX_DAYS))
         {
-            return Err(Error::validation(vec![FieldError::new(
-                "at",
-                "range",
-                format!("must be in the future, at most {SCHEDULE_MAX_DAYS} days ahead"),
-            )]));
+            return Err(Error::validation(vec![
+                FieldError::new(
+                    "at",
+                    "range",
+                    "must be in the future, at most {schedule_max_days} days ahead",
+                )
+                .with_param("schedule_max_days", SCHEDULE_MAX_DAYS),
+            ]));
         }
         if matches!(action, Action::Send | Action::Schedule(_) | Action::Resume) {
             // Thiếu cấu hình thì báo NGAY, không để job hỏng lặng lẽ.
@@ -710,11 +713,10 @@ impl NewsletterService {
         if let Some(html) = input.body_html {
             let html = html.map(|html| html.trim().to_owned()).filter(|html| !html.is_empty());
             if html.as_ref().is_some_and(|html| html.len() > HTML_MAX) {
-                problems.push(FieldError::new(
-                    "body_html",
-                    "length",
-                    format!("must be at most {HTML_MAX} bytes"),
-                ));
+                problems.push(
+                    FieldError::new("body_html", "length", "must be at most {html_max} bytes")
+                        .with_param("html_max", HTML_MAX),
+                );
             }
             row.body_html = html;
         }

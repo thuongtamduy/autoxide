@@ -122,11 +122,14 @@ impl Localized {
         let mut clean = |locale: &str, value: &Option<String>| {
             let value = value.as_deref().map(str::trim).filter(|value| !value.is_empty())?;
             if value.chars().count() > max {
-                problems.push(FieldError::new(
-                    format!("{field}.{locale}"),
-                    "length",
-                    format!("must be at most {max} characters long"),
-                ));
+                problems.push(
+                    FieldError::new(
+                        format!("{field}.{locale}"),
+                        "length",
+                        "must be at most {max} characters long",
+                    )
+                    .with_param("max", max),
+                );
             }
             Some(value.to_owned())
         };
@@ -208,11 +211,10 @@ pub(crate) fn check_definition(
     problems: &mut Vec<FieldError>,
 ) -> Vec<Field> {
     if fields.is_empty() || fields.len() > max_fields {
-        problems.push(FieldError::new(
-            "fields",
-            "length",
-            format!("must have 1 to {max_fields} fields"),
-        ));
+        problems.push(
+            FieldError::new("fields", "length", "must have 1 to {max_fields} fields")
+                .with_param("max_fields", max_fields),
+        );
     }
     let mut keys = HashSet::new();
     let mut consents = 0;
@@ -283,22 +285,24 @@ fn check_options(field: &Field, at: &str, problems: &mut Vec<FieldError>) -> Vec
         return Vec::new();
     }
     if field.options.is_empty() || field.options.len() > OPTIONS_MAX {
-        problems.push(FieldError::new(
-            at,
-            "length",
-            format!("must have 1 to {OPTIONS_MAX} options"),
-        ));
+        problems.push(
+            FieldError::new(at, "length", "must have 1 to {options_max} options")
+                .with_param("options_max", OPTIONS_MAX),
+        );
     }
     let mut values = HashSet::new();
     let mut clean = Vec::with_capacity(field.options.len());
     for (index, option) in field.options.iter().enumerate() {
         let value = option.value.trim().to_owned();
         if value.is_empty() || value.chars().count() > OPTION_VALUE_MAX {
-            problems.push(FieldError::new(
-                format!("{at}[{index}].value"),
-                "length",
-                format!("must be 1 to {OPTION_VALUE_MAX} characters"),
-            ));
+            problems.push(
+                FieldError::new(
+                    format!("{at}[{index}].value"),
+                    "length",
+                    "must be 1 to {option_value_max} characters",
+                )
+                .with_param("option_value_max", OPTION_VALUE_MAX),
+            );
         } else if !values.insert(value.clone()) {
             problems.push(FieldError::new(
                 format!("{at}[{index}].value"),
@@ -326,7 +330,9 @@ fn check_lengths(field: &Field, at: &dyn Fn(&str) -> String, problems: &mut Vec<
         return;
     };
     if field.max_length.is_some_and(|max| max == 0 || max > cap) {
-        problems.push(FieldError::new(at("max_length"), "range", format!("must be 1 to {cap}")));
+        problems.push(
+            FieldError::new(at("max_length"), "range", "must be 1 to {cap}").with_param("cap", cap),
+        );
     }
     if let Some(min) = field.min_length
         && min > field.max_length.unwrap_or(cap)
@@ -394,26 +400,25 @@ pub(crate) fn check_answers(
         ));
     }
     if unknown.len() > UNKNOWN_REPORTED {
-        problems.push(FieldError::new(
-            "data",
-            "unknown",
-            format!(
-                "has {} more keys that are not fields of this form",
-                unknown.len() - UNKNOWN_REPORTED
-            ),
-        ));
+        problems.push(
+            FieldError::new(
+                "data",
+                "unknown",
+                "has {count} more keys that are not fields of this form",
+            )
+            .with_param("count", unknown.len() - UNKNOWN_REPORTED),
+        );
     }
     for field in fields {
         let path = format!("data.{}", field.key);
         let raw = input.get(&field.key).filter(|value| !is_blank(value));
         let Some(raw) = raw else {
             if field.required {
-                let (code, message) = if field.kind == FieldType::Consent {
-                    ("consent_required", "the box must be ticked")
+                problems.push(if field.kind == FieldType::Consent {
+                    FieldError::new(path, "consent_required", "the box must be ticked")
                 } else {
-                    ("required", "needs an answer")
-                };
-                problems.push(FieldError::new(path, code, message));
+                    FieldError::new(path, "required", "needs an answer")
+                });
             }
             continue;
         };
@@ -447,8 +452,8 @@ fn check_value(
     path: &str,
     problems: &mut Vec<FieldError>,
 ) -> Option<Value> {
-    let mut fail = |code: &str, message: String| {
-        problems.push(FieldError::new(path, code, message));
+    let mut fail = |error: FieldError| {
+        problems.push(error);
         None
     };
     match field.kind {
@@ -464,7 +469,7 @@ fn check_value(
                 _ => None,
             };
             let Some((value, number)) = number else {
-                return fail("type", "must be a number".to_owned());
+                return fail(FieldError::new(path, "type", "must be a number"));
             };
             if field.min.is_some_and(|min| value < min) || field.max.is_some_and(|max| value > max)
             {
@@ -474,17 +479,19 @@ fn check_value(
                     (None, Some(max)) => format!("at most {max}"),
                     (None, None) => String::new(),
                 };
-                return fail("range", format!("must be {range}"));
+                return fail(
+                    FieldError::new(path, "range", "must be {range}").with_param("range", range),
+                );
             }
             Some(Value::Number(number))
         }
         FieldType::Consent => match raw {
             Value::Bool(true) => Some(Value::Bool(true)),
-            _ => fail("type", "must be `true` (ticked) or `false`".to_owned()),
+            _ => fail(FieldError::new(path, "type", "must be `true` (ticked) or `false`")),
         },
         FieldType::Checkbox => {
             let Value::Array(items) = raw else {
-                return fail("type", "must be an array of option values".to_owned());
+                return fail(FieldError::new(path, "type", "must be an array of option values"));
             };
             let mut chosen: Vec<Value> = Vec::with_capacity(items.len());
             for item in items {
@@ -494,8 +501,8 @@ fn check_value(
                     .filter(|value| field.options.iter().any(|option| option.value == *value));
                 let Some(value) = valid else {
                     return fail(
-                        "option",
-                        format!("every value must be one of: {}", option_list(field)),
+                        FieldError::new(path, "option", "every value must be one of: {allowed}")
+                            .with_param("allowed", option_list(field)),
                     );
                 };
                 if !chosen.iter().any(|seen| seen.as_str() == Some(value)) {
@@ -506,7 +513,7 @@ fn check_value(
         }
         kind => {
             let Value::String(text) = raw else {
-                return fail("type", "must be a string".to_owned());
+                return fail(FieldError::new(path, "type", "must be a string"));
             };
             let text = if kind == FieldType::Textarea {
                 text.trim().replace("\r\n", "\n")
@@ -517,7 +524,11 @@ fn check_value(
                 c.is_control() && !(kind == FieldType::Textarea && matches!(c, '\n' | '\t'))
             });
             if control {
-                return fail("invalid", "must not contain control characters".to_owned());
+                return fail(FieldError::new(
+                    path,
+                    "invalid",
+                    "must not contain control characters",
+                ));
             }
             let length = text.chars().count();
             match kind {
@@ -529,28 +540,37 @@ fn check_value(
                             &text,
                         ))
                     {
-                        return fail(
+                        return fail(FieldError::new(
+                            path,
                             "email",
-                            "must be an email address like `name@example.com`".to_owned(),
-                        );
+                            "must be an email address like `name@example.com`",
+                        ));
                     }
                 }
                 FieldType::Phone => {
                     if length > PHONE_MAX || !is_phone(&text) {
-                        return fail(
+                        return fail(FieldError::new(
+                            path,
                             "phone",
-                            "must be a phone number: 6 to 15 digits, optionally with `+`, spaces, `-`, `(`, `)` or `.`".to_owned(),
-                        );
+                            "must be a phone number: 6 to 15 digits, optionally with `+`, spaces, `-`, `(`, `)` or `.`",
+                        ));
                     }
                 }
                 FieldType::Date => {
                     if NaiveDate::parse_from_str(&text, "%Y-%m-%d").is_err() || text.len() != 10 {
-                        return fail("date", "must be a date written `YYYY-MM-DD`".to_owned());
+                        return fail(FieldError::new(
+                            path,
+                            "date",
+                            "must be a date written `YYYY-MM-DD`",
+                        ));
                     }
                 }
                 FieldType::Select | FieldType::Radio => {
                     if !field.options.iter().any(|option| option.value == text) {
-                        return fail("option", format!("must be one of: {}", option_list(field)));
+                        return fail(
+                            FieldError::new(path, "option", "must be one of: {allowed}")
+                                .with_param("allowed", option_list(field)),
+                        );
                     }
                 }
                 _ => {
@@ -558,7 +578,15 @@ fn check_value(
                     let max = field.max_length.map_or(default_max as usize, |max| max as usize);
                     let min = field.min_length.unwrap_or(0) as usize;
                     if length > max || length < min {
-                        return fail("length", format!("must be {min} to {max} characters long"));
+                        return fail(
+                            FieldError::new(
+                                path,
+                                "length",
+                                "must be {min} to {max} characters long",
+                            )
+                            .with_param("min", min)
+                            .with_param("max", max),
+                        );
                     }
                 }
             }

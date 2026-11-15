@@ -57,11 +57,14 @@ impl MediaService {
             ));
         }
         if context.chars().count() > CONTEXT_MAX {
-            problems.push(FieldError::new(
-                "context",
-                "length",
-                format!("must be at most {CONTEXT_MAX} characters long"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "context",
+                    "length",
+                    "must be at most {context_max} characters long",
+                )
+                .with_param("context_max", CONTEXT_MAX),
+            );
         }
         if !problems.is_empty() {
             return Err(Error::validation(problems));

@@ -277,14 +277,15 @@ fn check_name(name: &str) -> Result<String, Error> {
     if valid {
         return Ok(name.to_owned());
     }
-    Err(Error::validation(vec![FieldError::new(
-        "name",
-        "invalid",
-        format!(
-            "must be 1 to {NAME_MAX_LENGTH} characters, without `/`, `\\`, control or invisible \
-             formatting characters"
-        ),
-    )]))
+    Err(Error::validation(vec![
+        FieldError::new(
+            "name",
+            "invalid",
+            "must be 1 to {name_max_length} characters, without `/`, `\\`, control or invisible \
+             formatting characters",
+        )
+        .with_param("name_max_length", NAME_MAX_LENGTH),
+    ]))
 }
 
 /// Ký tự định dạng vô hình đổi cách tên hiện ra: đảo chiều chữ (`invoice\u{202E}fdp.exe` hiện

@@ -110,7 +110,10 @@ impl ContentService {
         let mut flat = Vec::new();
         flatten(&items, None, 1, "items", &mut flat, &mut problems);
         if flat.len() > MAX_ITEMS {
-            problems.push(FieldError::new("items", "length", format!("at most {MAX_ITEMS} items")));
+            problems.push(
+                FieldError::new("items", "length", "at most {max_items} items")
+                    .with_param("max_items", MAX_ITEMS),
+            );
         }
         self.check_targets(&flat, &locale, &mut problems).await?;
         if !problems.is_empty() {
@@ -353,11 +356,10 @@ fn flatten(
     for (index, input) in items.iter().enumerate() {
         let here = format!("{path}[{index}]");
         if depth > MAX_DEPTH {
-            problems.push(FieldError::new(
-                here,
-                "too_deep",
-                format!("menus nest at most {MAX_DEPTH} levels"),
-            ));
+            problems.push(
+                FieldError::new(here, "too_deep", "menus nest at most {max_depth} levels")
+                    .with_param("max_depth", MAX_DEPTH),
+            );
             continue;
         }
         let label = input.label.trim();

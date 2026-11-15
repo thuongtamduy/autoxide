@@ -354,7 +354,10 @@ where
             return Err(crate::http::nul_refused());
         }
         let input: I = serde_json::from_value(arguments).map_err(|error| {
-            Error::validation(vec![FieldError::new("arguments", "invalid", error.to_string())])
+            Error::validation(vec![
+                FieldError::new("arguments", "invalid", "is not valid: {reason}")
+                    .with_param("reason", error),
+            ])
         })?;
         input.validate()?;
         let output = (self.handler)(tenant, principal, input).await?;

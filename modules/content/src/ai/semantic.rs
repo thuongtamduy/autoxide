@@ -345,15 +345,17 @@ impl ContentService {
         let q = query.q.trim();
         let mut problems = Vec::new();
         if q.is_empty() || q.chars().count() > QUERY_MAX {
-            problems.push(FieldError::new(
-                "q",
-                "length",
-                format!("must be 1 to {QUERY_MAX} characters"),
-            ));
+            problems.push(
+                FieldError::new("q", "length", "must be 1 to {query_max} characters")
+                    .with_param("query_max", QUERY_MAX),
+            );
         }
         let limit = query.limit.unwrap_or(LIMIT_DEFAULT);
         if !(1..=LIMIT_MAX).contains(&limit) {
-            problems.push(FieldError::new("limit", "range", format!("must be 1 to {LIMIT_MAX}")));
+            problems.push(
+                FieldError::new("limit", "range", "must be 1 to {limit_max}")
+                    .with_param("limit_max", LIMIT_MAX),
+            );
         }
         let locale = self.check_locale(query.locale.as_deref(), "locale", &mut problems);
         if !problems.is_empty() {

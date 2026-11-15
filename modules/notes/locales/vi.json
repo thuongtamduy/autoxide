@@ -1,4 +1,6 @@
 {
+  "field:must be 1 to {title_max_length} characters, not only spaces": "phải dài 1 đến {title_max_length} ký tự, không chỉ có khoảng trắng",
+  "field:must be at most {body_max_length} characters long": "phải dài tối đa {body_max_length} ký tự",
   "notes.note_not_found": "Bạn không có ghi chú `{id}`.",
   "notes.title_taken": "Bạn đã có một ghi chú tên `{title}`. Hãy chọn tên khác."
 }

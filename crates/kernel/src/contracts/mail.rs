@@ -85,11 +85,14 @@ impl Mail {
         let mut problems = Vec::new();
         for (index, (name, value)) in self.headers.iter().enumerate() {
             if !ALLOWED_HEADERS.iter().any(|allowed| allowed.eq_ignore_ascii_case(name)) {
-                problems.push(FieldError::new(
-                    format!("headers[{index}].name"),
-                    "not_allowed",
-                    format!("must be one of {}", ALLOWED_HEADERS.join(", ")),
-                ));
+                problems.push(
+                    FieldError::new(
+                        format!("headers[{index}].name"),
+                        "not_allowed",
+                        "must be one of {allowed}",
+                    )
+                    .with_param("allowed", ALLOWED_HEADERS.join(", ")),
+                );
             }
             if value.chars().any(|c| c == '\r' || c == '\n' || c == '\0') || value.len() > 998 {
                 problems.push(FieldError::new(

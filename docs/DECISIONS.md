@@ -6636,3 +6636,45 @@ Bổ sung D-253.
    chủ cần thấy (URL trong thông báo kết nối đã che mật khẩu).
 
 Bổ sung D-253, D-257.
+
+## D-262 · Câu lỗi từng ô dịch theo `Accept-Language`: câu mẫu tiếng Anh làm khoá (đề bài giao diện A1) — 2026-11-15 — agent quyết
+
+Bối cảnh: `detail` chung của Problem đã dịch (D-057), nhưng `errors[].detail` luôn là tiếng Anh — câu được ghép
+sẵn bằng `format!` ở 250 chỗ, không có khoá dịch. Giao diện quản trị hiện nguyên câu đó dưới ô
+(`docs/prompts/web-api-requests.md` mục A1).
+
+Quyết định:
+
+1. `FieldError::new(ô, mã, câu)` nhận **câu mẫu** tiếng Anh; chỗ thay đổi viết `{tên}` và điền bằng
+   `.with_param(tên, giá trị)` (điền một lượt như D-150). `message` vẫn là câu tiếng Anh đã điền — code cũ đọc nó
+   không đổi. Mã (`code`) của từng ô không đổi.
+2. **Khoá dịch là chính câu mẫu**, tiền tố `field:` (cách của gettext: câu gốc làm khoá). Lý do không đặt khoá
+   theo mã: cùng mã `length` có hàng chục câu khác nhau; đặt khoá riêng cho từng chỗ thì 250 khoá đặt tay. Câu mẫu
+   đổi thì bản dịch cũ không còn khớp và gate báo thiếu — bản dịch không bao giờ lặng lẽ cũ đi.
+3. Bản dịch nằm ở `locales/vi.json` của crate phát ra câu; khoá `field:` là của chung (không cần tiền tố module),
+   hai crate cùng câu thì phải cùng bản dịch (khác nhau là lỗi khởi động).
+4. REST (lớp ngôn ngữ) và MCP dịch từng ô; câu chưa dịch thì tiếng Anh. Câu của validator (`#[validate]`) cũng
+   thành câu mẫu, dịch ở `crates/kernel/locales/vi.json`.
+5. `cargo xtask check` (luật `i18n-field`): câu của `FieldError::new` phải là chuỗi viết sẵn (chặn `format!` và biến
+   — không dịch được) và có bản dịch; bản dịch không dùng nữa bị báo thừa. Lỗi của thư viện (JSON hỏng, WebAuthn)
+   đi qua câu mẫu `is not valid: {reason}` — phần `{reason}` là chữ của thư viện, giữ tiếng Anh.
+
+Thay đổi: 231 câu mẫu, bản dịch ở 12 crate. Thêm `FieldError::with_param`, `template`, `params`,
+`Translations::field_message`, `i18n::FIELD_PREFIX` (chỉ thêm; `FieldError::new` nhận thêm `Cow`).
+
+## D-263 · Nhịp chạy gate khi làm việc: gom theo nhóm, gate đầy đủ chỉ trước khi merge — 2026-11-15 — chủ dự án yêu cầu, agent chọn cách
+
+Bối cảnh: chủ dự án (15/11/2026): "Có cách nào coding nhanh hơn không? chứ mỗi lần xong 1 phần mà gate full thì hơi
+tốn thời gian và tài nguyên quá". Sửa `kernel` thì gate nhanh dựng lại và chạy test của mọi crate phụ thuộc (≈ 54 bộ
+test); đặc tả bước 33 còn tự đặt thêm một lượt gate đầy đủ ở cuối mỗi nhóm.
+
+Quyết định (giữ D-173, bỏ phần thêm của đặc tả 33):
+
+1. Trong lúc làm một nhóm việc: `cargo check` và test của đúng crate đang sửa (`cargo test -p <crate> <bộ lọc>`);
+   phần chạm database chạy thêm bài đó trên Postgres.
+2. `./gate.sh --quick` **một lần cho mỗi nhóm việc**, trước commit của nhóm — không sau từng mục nhỏ.
+3. `./gate.sh` (đầy đủ, cả hai database) **chỉ trước khi merge vào `main`** (D-173); bỏ lượt "gate đầy đủ ở cuối mỗi
+   phần" của `docs/steps/33-tenancy.md`.
+4. Thay đổi ở `kernel` gom một lượt, để cả workspace chỉ dựng lại một lần.
+
+Luật "gate đầy đủ xanh mới merge" không đổi.

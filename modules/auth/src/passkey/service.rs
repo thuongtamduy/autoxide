@@ -270,7 +270,10 @@ impl PasskeyService {
         let engine = self.engine()?;
         // Đọc câu trả lời trước khi dùng nghi thức: JSON hỏng thì nghi thức còn dùng được.
         let assertion = engine.read_assertion(credential).map_err(|Rejected(reason)| {
-            Error::validation(vec![FieldError::new("credential", "invalid", reason)])
+            Error::validation(vec![
+                FieldError::new("credential", "invalid", "is not valid: {reason}")
+                    .with_param("reason", reason),
+            ])
         })?;
         let state = self.take_ceremony(ceremony_id, None).await?;
         let stored = passkey::Entity::find()
@@ -359,11 +362,10 @@ fn check_name(name: &str) -> Result<String, Error> {
     if (1..=NAME_MAX_LENGTH).contains(&length) && !name.chars().any(char::is_control) {
         return Ok(name.to_owned());
     }
-    Err(Error::validation(vec![FieldError::new(
-        "name",
-        "length",
-        format!("must be 1 to {NAME_MAX_LENGTH} characters"),
-    )]))
+    Err(Error::validation(vec![
+        FieldError::new("name", "length", "must be 1 to {name_max_length} characters")
+            .with_param("name_max_length", NAME_MAX_LENGTH),
+    ]))
 }
 
 fn invalid_ceremony() -> Error {

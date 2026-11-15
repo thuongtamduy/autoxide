@@ -297,11 +297,10 @@ impl ContentService {
             }
         }
         if ids.len() > MAX_PER_ENTRY {
-            return Err(invalid(vec![FieldError::new(
-                "author_ids",
-                "length",
-                format!("at most {MAX_PER_ENTRY} authors"),
-            )]));
+            return Err(invalid(vec![
+                FieldError::new("author_ids", "length", "at most {max_per_entry} authors")
+                    .with_param("max_per_entry", MAX_PER_ENTRY),
+            ]));
         }
         let transaction = self.database.begin_write().await?;
         // Khoá dòng mục trước khi xoá rồi chèn lại liên kết (xem `set_entry_terms`).
@@ -399,11 +398,14 @@ impl ContentService {
                     .await?
                     .is_none()
             {
-                problems.push(FieldError::new(
-                    "avatar_media_id",
-                    "media_not_found",
-                    format!("media item {id} does not exist"),
-                ));
+                problems.push(
+                    FieldError::new(
+                        "avatar_media_id",
+                        "media_not_found",
+                        "media item {id} does not exist",
+                    )
+                    .with_param("id", id),
+                );
             }
         }
         match input.slug.as_deref().map(str::trim) {

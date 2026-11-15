@@ -1,4 +1,5 @@
 {
+  "field:must be 1 to {name_max_length} characters, without `/`, `\\`, control or invisible formatting characters": "phải dài 1 đến {name_max_length} ký tự, không có `/`, `\\`, ký tự điều khiển hay ký tự định dạng vô hình",
   "files.file_not_found": "Không có file `{id}`.",
   "files.invalid_base64": "`content_base64` không phải base64 hợp lệ.",
   "files.invalid_content_type": "Header `Content-Type` phải là một loại nội dung như `application/pdf`.",

@@ -301,11 +301,10 @@ impl MenuService {
         match canonical_locale(raw.trim()).filter(|locale| self.config.locales.contains(locale)) {
             Some(locale) => locale,
             None => {
-                problems.push(FieldError::new(
-                    "locale",
-                    "locale_not_supported",
-                    format!("must be one of: {}", self.config.locales.join(", ")),
-                ));
+                problems.push(
+                    FieldError::new("locale", "locale_not_supported", "must be one of: {allowed}")
+                        .with_param("allowed", self.config.locales.join(", ")),
+                );
                 self.config.default_locale.clone()
             }
         }
@@ -330,11 +329,14 @@ impl MenuService {
                     && self.resources.knows(kind)
                     && !self.resources.has_children(kind)
                 {
-                    problems.push(FieldError::new(
-                        format!("{}.auto_children", entry.path),
-                        "children_unsupported",
-                        format!("`{kind}` has no sub-items to take"),
-                    ));
+                    problems.push(
+                        FieldError::new(
+                            format!("{}.auto_children", entry.path),
+                            "children_unsupported",
+                            "`{kind}` has no sub-items to take",
+                        )
+                        .with_param("kind", kind),
+                    );
                 }
             }
             if let (Some(kind), Some(id)) = (&row.feature_kind, &row.feature_id) {
@@ -346,14 +348,15 @@ impl MenuService {
             if self.resources.knows(kind) {
                 by_kind.entry(kind).or_default().push((*id).to_owned());
             } else {
-                problems.push(FieldError::new(
-                    format!("{path}.kind"),
-                    "ref_unknown_kind",
-                    format!(
-                        "no module provides `{kind}`; known: {}",
-                        self.resources.types().join(", ")
-                    ),
-                ));
+                problems.push(
+                    FieldError::new(
+                        format!("{path}.kind"),
+                        "ref_unknown_kind",
+                        "no module provides `{kind}`; known: {known}",
+                    )
+                    .with_param("kind", kind)
+                    .with_param("known", self.resources.types().join(", ")),
+                );
             }
         }
         if !check_exists {
@@ -376,11 +379,14 @@ impl MenuService {
             if self.resources.knows(kind)
                 && !found.contains(&((*kind).to_owned(), (*id).to_owned()))
             {
-                problems.push(FieldError::new(
-                    format!("{path}.id"),
-                    "ref_not_found",
-                    format!("no `{kind}` has this id"),
-                ));
+                problems.push(
+                    FieldError::new(
+                        format!("{path}.id"),
+                        "ref_not_found",
+                        "no `{kind}` has this id",
+                    )
+                    .with_param("kind", kind),
+                );
             }
         }
         Ok(())

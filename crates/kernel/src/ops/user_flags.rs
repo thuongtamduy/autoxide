@@ -135,13 +135,14 @@ fn is_key(key: &str) -> bool {
 
 fn check_key(field: &str, key: &str, problems: &mut Vec<FieldError>) {
     if !is_key(key) {
-        problems.push(FieldError::new(
-            field,
-            "invalid",
-            format!(
-                "must be 1 to {KEY_MAX} characters of lower-case letters, digits, `.`, `_` and `-`"
-            ),
-        ));
+        problems.push(
+            FieldError::new(
+                field,
+                "invalid",
+                "must be 1 to {key_max} characters of lower-case letters, digits, `.`, `_` and `-`",
+            )
+            .with_param("key_max", KEY_MAX),
+        );
     }
 }
 
@@ -194,11 +195,10 @@ impl UserFlags {
         let mut problems = Vec::new();
         check_key("key", key, &mut problems);
         if value.chars().count() > VALUE_MAX {
-            problems.push(FieldError::new(
-                "value",
-                "length",
-                format!("must be at most {VALUE_MAX} characters long"),
-            ));
+            problems.push(
+                FieldError::new("value", "length", "must be at most {value_max} characters long")
+                    .with_param("value_max", VALUE_MAX),
+            );
         }
         if !problems.is_empty() {
             return Err(Error::validation(problems));

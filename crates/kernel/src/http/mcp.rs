@@ -197,7 +197,8 @@ impl McpServer {
                 .fields()
                 .iter()
                 .map(|field| {
-                    json!({"field": field.field, "code": field.code, "detail": field.message})
+                    let detail = self.translations.field_message(field, language);
+                    json!({"field": field.field, "code": field.code, "detail": detail})
                 })
                 .collect();
             body["errors"] = Value::Array(fields);

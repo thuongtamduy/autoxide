@@ -175,11 +175,14 @@ impl CommentsService {
         ids: &[String],
     ) -> Result<Vec<(String, i32, i32)>, Error> {
         if ids.is_empty() || ids.len() > COUNTS_MAX {
-            return Err(Error::validation(vec![FieldError::new(
-                "target_ids",
-                "length",
-                format!("must list 1 to {COUNTS_MAX} ids, separated by commas"),
-            )]));
+            return Err(Error::validation(vec![
+                FieldError::new(
+                    "target_ids",
+                    "length",
+                    "must list 1 to {counts_max} ids, separated by commas",
+                )
+                .with_param("counts_max", COUNTS_MAX),
+            ]));
         }
         for id in ids {
             self.check_target(kind, id)?;

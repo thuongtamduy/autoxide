@@ -302,11 +302,10 @@ impl NewsletterService {
         principal.require(&NEWSLETTER_MANAGE)?;
         let mut problems = Vec::new();
         if input.people.is_empty() || input.people.len() > IMPORT_MAX {
-            problems.push(FieldError::new(
-                "subscribers",
-                "length",
-                format!("must have 1 to {IMPORT_MAX} people"),
-            ));
+            problems.push(
+                FieldError::new("subscribers", "length", "must have 1 to {import_max} people")
+                    .with_param("import_max", IMPORT_MAX),
+            );
         }
         let mut people = Vec::with_capacity(input.people.len());
         let mut seen = HashSet::new();
@@ -810,11 +809,10 @@ fn check_attributes(
     problems: &mut Vec<FieldError>,
 ) -> Result<(), Error> {
     if to_json(attributes)?.len() > ATTRIBUTES_MAX {
-        problems.push(FieldError::new(
-            field,
-            "length",
-            format!("must be at most {ATTRIBUTES_MAX} bytes of JSON"),
-        ));
+        problems.push(
+            FieldError::new(field, "length", "must be at most {attributes_max} bytes of JSON")
+                .with_param("attributes_max", ATTRIBUTES_MAX),
+        );
     }
     Ok(())
 }

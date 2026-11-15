@@ -636,19 +636,17 @@ pub(crate) fn check_email_field(field: &str, email: &str) -> Option<FieldError> 
         FieldError::new(
             field,
             "email",
-            format!("must be a valid email address of at most {EMAIL_MAX_LENGTH} characters"),
+            "must be a valid email address of at most {email_max_length} characters",
         )
+        .with_param("email_max_length", EMAIL_MAX_LENGTH)
     })
 }
 
 fn check_name(name: &str) -> Option<FieldError> {
     let length = name.chars().count();
     (!(1..=NAME_MAX_LENGTH).contains(&length)).then(|| {
-        FieldError::new(
-            "name",
-            "length",
-            format!("must be between 1 and {NAME_MAX_LENGTH} characters long"),
-        )
+        FieldError::new("name", "length", "must be between 1 and {name_max_length} characters long")
+            .with_param("name_max_length", NAME_MAX_LENGTH)
     })
 }
 

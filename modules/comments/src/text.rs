@@ -45,11 +45,10 @@ pub(crate) fn clean_body(raw: &str, max: usize, problems: &mut Vec<FieldError>) 
     if length == 0 {
         problems.push(FieldError::new("body", "required", "must not be empty"));
     } else if length > max {
-        problems.push(FieldError::new(
-            "body",
-            "length",
-            format!("must be at most {max} characters long"),
-        ));
+        problems.push(
+            FieldError::new("body", "length", "must be at most {max} characters long")
+                .with_param("max", max),
+        );
     }
     body
 }

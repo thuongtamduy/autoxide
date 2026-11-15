@@ -95,11 +95,14 @@ impl Localized {
         let mut clean = |locale: &str, value: &Option<String>| {
             let value = value.as_deref().map(str::trim).filter(|value| !value.is_empty())?;
             if value.chars().count() > max {
-                problems.push(FieldError::new(
-                    format!("{field}.{locale}"),
-                    "length",
-                    format!("must be at most {max} characters long"),
-                ));
+                problems.push(
+                    FieldError::new(
+                        format!("{field}.{locale}"),
+                        "length",
+                        "must be at most {max} characters long",
+                    )
+                    .with_param("max", max),
+                );
             }
             Some(value.to_owned())
         };
@@ -126,11 +129,10 @@ pub(crate) fn line(
 ) -> Option<String> {
     let value = raw.map(str::trim).filter(|value| !value.is_empty())?;
     if value.chars().count() > max || value.chars().any(char::is_control) {
-        problems.push(FieldError::new(
-            field,
-            "length",
-            format!("must be at most {max} characters, on one line"),
-        ));
+        problems.push(
+            FieldError::new(field, "length", "must be at most {max} characters, on one line")
+                .with_param("max", max),
+        );
     }
     Some(value.to_owned())
 }
@@ -146,11 +148,14 @@ pub(crate) fn text(
     if value.chars().count() > max
         || value.chars().any(|c| c.is_control() && c != '\n' && c != '\r' && c != '\t')
     {
-        problems.push(FieldError::new(
-            field,
-            "length",
-            format!("must be at most {max} characters, without control characters"),
-        ));
+        problems.push(
+            FieldError::new(
+                field,
+                "length",
+                "must be at most {max} characters, without control characters",
+            )
+            .with_param("max", max),
+        );
     }
     Some(value.to_owned())
 }

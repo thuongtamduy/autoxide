@@ -631,21 +631,18 @@ pub(crate) fn check_name(name: &str, problems: &mut Vec<FieldError>) -> String {
         problems.push(FieldError::new(
             "name",
             "invalid",
-            format!(
-                "must be 1 to {NAME_MAX_LENGTH} characters, without `/`, `\\` or control characters"
-            ),
-        ));
+            "must be 1 to {name_max_length} characters, without `/`, `\\` or control characters",
+        ).with_param("name_max_length", NAME_MAX_LENGTH));
     }
     name.to_owned()
 }
 
 fn check_length(field: &str, value: Option<&str>, max: usize, problems: &mut Vec<FieldError>) {
     if value.is_some_and(|value| value.trim().chars().count() > max) {
-        problems.push(FieldError::new(
-            field,
-            "length",
-            format!("must be at most {max} characters long"),
-        ));
+        problems.push(
+            FieldError::new(field, "length", "must be at most {max} characters long")
+                .with_param("max", max),
+        );
     }
 }
 

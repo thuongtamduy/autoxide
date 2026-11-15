@@ -115,11 +115,10 @@ impl FormsService {
         let answers = fields::check_answers(&form.fields, &input.data, &mut problems);
         let data = to_json(&answers.data)?;
         if data.len() > self.config.max_submission_bytes {
-            problems.push(FieldError::new(
-                "data",
-                "length",
-                format!("must be at most {} bytes of JSON", self.config.max_submission_bytes),
-            ));
+            problems.push(
+                FieldError::new("data", "length", "must be at most {max} bytes of JSON")
+                    .with_param("max", self.config.max_submission_bytes),
+            );
         }
         if !problems.is_empty() {
             return Err(Error::validation(problems));

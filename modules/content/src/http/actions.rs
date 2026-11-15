@@ -87,11 +87,14 @@ pub(crate) async fn publish_entry(
         PublishRequest::default()
     } else {
         serde_json::from_slice(&body).map_err(|error| {
-            Error::validation(vec![autoxide_kernel::error::FieldError::new(
-                "body",
-                "invalid",
-                error.to_string(),
-            )])
+            Error::validation(vec![
+                autoxide_kernel::error::FieldError::new(
+                    "body",
+                    "invalid",
+                    "is not valid: {reason}",
+                )
+                .with_param("reason", error),
+            ])
         })?
     };
     let entry =

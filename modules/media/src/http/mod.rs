@@ -253,11 +253,10 @@ fn sort<T: for<'de> Deserialize<'de> + Default>(
         None | Some("") => T::default(),
         Some(raw) => serde_json::from_value(serde_json::Value::String(raw.to_owned()))
             .unwrap_or_else(|_| {
-                problems.push(FieldError::new(
-                    "sort",
-                    "invalid",
-                    format!("must be one of {allowed}"),
-                ));
+                problems.push(
+                    FieldError::new("sort", "invalid", "must be one of {allowed}")
+                        .with_param("allowed", allowed),
+                );
                 T::default()
             }),
     }

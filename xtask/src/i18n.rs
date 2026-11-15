@@ -2,6 +2,11 @@
 //! đều có bản dịch tiếng Việt trong `locales/vi.json` của crate đó; bản dịch không
 //! thừa; `code` của module mang tiền tố `<module>.` (D-039, D-057).
 //!
+//! Luật `i18n-field` (D-262): câu của lỗi từng ô (`FieldError::new(ô, mã, "câu mẫu")`) là chuỗi
+//! viết sẵn — chỗ thay đổi là `{tên}` điền bằng `.with_param` — và có bản dịch
+//! `"field:<câu mẫu>"` trong `locales/vi.json` của crate; câu ghép sẵn (`format!`, biến) thì không
+//! dịch được nên bị chặn.
+//!
 //! Tìm `code` bằng cách đọc mã nguồn: chuỗi có dạng `code` đứng ngay sau một chỗ tạo
 //! lỗi — `Error::not_found(` (và các hàm cùng họ), `ErrorKind::X,` (trong
 //! `Error::new(ErrorKind::X, "code"` hay bộ `(ErrorKind::X, "code")`), `NNN =>` (mã của
@@ -39,6 +44,23 @@ pub fn check_translations(workspace: &Workspace) -> Result<Vec<Violation>, Strin
             for (line, code) in error_codes(&text) {
                 codes.entry(code).or_insert_with(|| format!("{}/{file}:{line}", package.dir));
             }
+            for (line, site) in field_messages(&text) {
+                let location = format!("{}/{file}:{line}", package.dir);
+                match site {
+                    FieldMessage::Template(template) => {
+                        codes.entry(format!("{FIELD_PREFIX}{template}")).or_insert(location);
+                    }
+                    FieldMessage::Built(expression) => violations.push(Violation {
+                        rule: "i18n-field",
+                        location,
+                        message: format!(
+                            "the message of a FieldError must be a string literal (a template \
+                             with `{{name}}` filled by `.with_param`) so it can be translated, \
+                             not `{expression}`"
+                        ),
+                    }),
+                }
+            }
         }
         violations.extend(check_package(package, &codes, &read_translations(workspace, package)?));
     }
@@ -71,6 +93,20 @@ pub fn check_package(
     let file = format!("{}/locales/vi.json", package.dir);
     let module = package.dir.strip_prefix("modules/");
     for (code, location) in codes {
+        if let Some(template) = code.strip_prefix(FIELD_PREFIX) {
+            let translated = translations.as_ref().is_some_and(|map| map.contains_key(code));
+            if !translated {
+                violations.push(Violation {
+                    rule: "i18n-field",
+                    location: location.clone(),
+                    message: format!(
+                        "field error message `{template}` has no Vietnamese translation; add \
+                         `\"{code}\": \"…\"` to {file}"
+                    ),
+                });
+            }
+            continue;
+        }
         if let Some(module) = module
             && !code.starts_with(&format!("{module}."))
         {
@@ -104,6 +140,110 @@ pub fn check_package(
         }
     }
     violations
+}
+
+/// Tiền tố khoá bản dịch của câu lỗi từng ô (như `autoxide_kernel::i18n::FIELD_PREFIX`).
+const FIELD_PREFIX: &str = "field:";
+
+/// Câu của một `FieldError::new(…)`: chuỗi mẫu (đã bỏ escape), hay biểu thức dựng lúc chạy.
+#[derive(Debug, PartialEq, Eq)]
+pub enum FieldMessage {
+    Template(String),
+    Built(String),
+}
+
+/// Câu của mọi `FieldError::new(ô, mã, câu)` trong `text` kèm số dòng, bỏ chú thích và test.
+pub fn field_messages(text: &str) -> Vec<(usize, FieldMessage)> {
+    let source = without_tests_and_comments(text);
+    let mut found = Vec::new();
+    let needle = "FieldError::new(";
+    let mut index = 0;
+    while let Some(offset) = source[index..].find(needle) {
+        let start = index + offset + needle.len();
+        index = start;
+        let arguments = split_arguments(&source[start..]);
+        let Some(message) = arguments.get(2) else { continue };
+        let line = source[..start].matches('\n').count() + 1;
+        let message = message.trim();
+        let site = match string_literal(message) {
+            Some(template) => FieldMessage::Template(template),
+            None => FieldMessage::Built(message.split_whitespace().collect::<Vec<_>>().join(" ")),
+        };
+        found.push((line, site));
+    }
+    found
+}
+
+/// Các tham số của một lời gọi, từ ngay sau `(` tới `)` đóng nó (theo ngoặc và chuỗi).
+fn split_arguments(text: &str) -> Vec<String> {
+    let mut arguments = Vec::new();
+    let mut current = String::new();
+    let mut depth = 0usize;
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => {
+                current.push(c);
+                // Chép nguyên chuỗi, kể cả `\"` bên trong.
+                while let Some(inner) = chars.next() {
+                    current.push(inner);
+                    if inner == '\\' {
+                        if let Some(next) = chars.next() {
+                            current.push(next);
+                        }
+                    } else if inner == '"' {
+                        break;
+                    }
+                }
+            }
+            '(' | '[' | '{' => {
+                depth += 1;
+                current.push(c);
+            }
+            ')' | ']' | '}' if depth == 0 => {
+                arguments.push(std::mem::take(&mut current));
+                return arguments;
+            }
+            ')' | ']' | '}' => {
+                depth -= 1;
+                current.push(c);
+            }
+            ',' if depth == 0 => arguments.push(std::mem::take(&mut current)),
+            _ => current.push(c),
+        }
+    }
+    arguments
+}
+
+/// Giá trị của một chuỗi Rust thường `"…"` (bỏ escape, nối dòng bằng `\`); `None` nếu `text`
+/// không chỉ là một chuỗi như vậy.
+fn string_literal(text: &str) -> Option<String> {
+    let inner = text.strip_prefix('"')?.strip_suffix('"')?;
+    let mut value = String::new();
+    let mut chars = inner.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '"' {
+            return None;
+        }
+        if c != '\\' {
+            value.push(c);
+            continue;
+        }
+        match chars.next()? {
+            'n' => value.push('\n'),
+            't' => value.push('\t'),
+            '\\' => value.push('\\'),
+            '"' => value.push('"'),
+            '\'' => value.push('\''),
+            '\n' => {
+                while chars.peek().is_some_and(|c| c.is_whitespace()) {
+                    chars.next();
+                }
+            }
+            _ => return None,
+        }
+    }
+    Some(value)
 }
 
 /// Các `code` lỗi trong `text` kèm số dòng, bỏ chú thích và phần chỉ dùng cho test.
@@ -229,6 +369,32 @@ mod tests {
 
     fn codes(text: &str) -> Vec<String> {
         error_codes(text).into_iter().map(|(_, code)| code).collect()
+    }
+
+    #[test]
+    fn cau_loi_tung_o_phai_la_chuoi_mau() {
+        let text = r#"
+fn a() {
+    FieldError::new("title", "length", "must be at most {max} characters long")
+        .with_param("max", 200);
+    FieldError::new(format!("items[{i}]"), code(), "has a \"quote\" and \
+                     a continued line");
+    FieldError::new("x", "invalid", format!("must be {max}"));
+    FieldError::new("y", "invalid", reason);
+}
+#[cfg(test)]
+mod tests { fn t() { FieldError::new("z", "c", format!("ignored")); } }
+"#;
+        let found: Vec<FieldMessage> = field_messages(text).into_iter().map(|(_, m)| m).collect();
+        assert_eq!(
+            found,
+            [
+                FieldMessage::Template("must be at most {max} characters long".to_owned()),
+                FieldMessage::Template("has a \"quote\" and a continued line".to_owned()),
+                FieldMessage::Built("format!(\"must be {max}\")".to_owned()),
+                FieldMessage::Built("reason".to_owned()),
+            ]
+        );
     }
 
     #[test]

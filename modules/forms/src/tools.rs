@@ -72,7 +72,12 @@ fn decode<T: DeserializeOwned>(
     problems: &mut Vec<FieldError>,
 ) -> Option<T> {
     serde_json::from_value(value)
-        .map_err(|error| problems.push(FieldError::new(path, "invalid", error.to_string())))
+        .map_err(|error| {
+            problems.push(
+                FieldError::new(path, "invalid", "is not valid: {reason}")
+                    .with_param("reason", error),
+            )
+        })
         .ok()
 }
 

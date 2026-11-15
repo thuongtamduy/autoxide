@@ -160,22 +160,24 @@ pub(crate) async fn list_thread(
         Some(raw) => match raw.parse::<u32>() {
             Ok(value) if value <= REPLIES_MAX => value,
             _ => {
-                problems.push(FieldError::new(
-                    "replies_limit",
-                    "range",
-                    format!("must be a whole number between 0 and {REPLIES_MAX}"),
-                ));
+                problems.push(
+                    FieldError::new(
+                        "replies_limit",
+                        "range",
+                        "must be a whole number between 0 and {replies_max}",
+                    )
+                    .with_param("replies_max", REPLIES_MAX),
+                );
                 0
             }
         },
     };
     let search = query.q.as_deref().map(str::trim).filter(|text| !text.is_empty());
     if search.is_some_and(|text| text.chars().count() > SEARCH_MAX) {
-        problems.push(FieldError::new(
-            "q",
-            "length",
-            format!("must be at most {SEARCH_MAX} characters long"),
-        ));
+        problems.push(
+            FieldError::new("q", "length", "must be at most {search_max} characters long")
+                .with_param("search_max", SEARCH_MAX),
+        );
     }
     let page = page_request(paging, problems)?;
     Ok(service.thread(&kind, &id, &page, replies, search).await?.map(ThreadComment::from))
@@ -516,11 +518,11 @@ pub(crate) async fn count_comments(
             problems
                 .into_iter()
                 .map(|problem| {
+                    let mut problem = problem;
                     if problem.field == "target_id" {
-                        FieldError::new("target_ids", problem.code, problem.message)
-                    } else {
-                        problem
+                        "target_ids".clone_into(&mut problem.field);
                     }
+                    problem
                 })
                 .collect(),
         ));

@@ -267,7 +267,10 @@ pub(crate) async fn list_bans(
     let mut problems = Vec::new();
     let kind = query.kind.as_deref().map(str::trim).filter(|kind| !kind.is_empty());
     if kind.is_some_and(|kind| !matches!(kind, "user" | "email" | "ip")) {
-        problems.push(FieldError::new("kind", "invalid", format!("must be one of {BAN_KINDS}")));
+        problems.push(
+            FieldError::new("kind", "invalid", "must be one of {ban_kinds}")
+                .with_param("ban_kinds", BAN_KINDS),
+        );
     }
     let active = match query.active.as_deref().map(str::trim) {
         None | Some("" | "false") => false,

@@ -285,14 +285,15 @@ impl SettingsService {
         let setting = self.catalog.find(name)?;
         let value = value.trim();
         if value.is_empty() || value.chars().count() > VALUE_MAX {
-            return Err(Error::validation(vec![FieldError::new(
-                "value",
-                "length",
-                format!(
-                    "must be 1 to {VALUE_MAX} characters long; remove the setting with `DELETE` \
-                     instead of setting it empty"
-                ),
-            )]));
+            return Err(Error::validation(vec![
+                FieldError::new(
+                    "value",
+                    "length",
+                    "must be 1 to {value_max} characters long; remove the setting with `DELETE` \
+                     instead of setting it empty",
+                )
+                .with_param("value_max", VALUE_MAX),
+            ]));
         }
         let stored = if setting.secret {
             // Mã hoá TRƯỚC transaction: dẫn khoá có thể đọc database (khoá gốc giữ trong đó).

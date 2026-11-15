@@ -111,7 +111,10 @@ pub(crate) async fn create_export(
         CreateExportRequest::default()
     } else {
         serde_json::from_slice(&body).map_err(|error| {
-            Error::validation(vec![FieldError::new("body", "invalid", error.to_string())])
+            Error::validation(vec![
+                FieldError::new("body", "invalid", "is not valid: {reason}")
+                    .with_param("reason", error),
+            ])
         })?
     };
     let mut problems = Vec::new();

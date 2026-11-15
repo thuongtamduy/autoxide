@@ -316,11 +316,10 @@ impl CommentsService {
                 valid.then(|| raw.to_owned())
             }
             _ => {
-                problems.push(FieldError::new(
-                    "kind",
-                    "invalid",
-                    format!("must be one of {BAN_KINDS}"),
-                ));
+                problems.push(
+                    FieldError::new("kind", "invalid", "must be one of {ban_kinds}")
+                        .with_param("ban_kinds", BAN_KINDS),
+                );
                 None
             }
         };

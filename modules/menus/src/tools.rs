@@ -84,7 +84,10 @@ pub(crate) struct ReplaceItemsInput {
 fn parse_items(items: Vec<Value>) -> Result<Vec<ItemInput>, Error> {
     let parsed: Vec<SiteMenuItemInput> =
         serde_json::from_value(Value::Array(items)).map_err(|error| {
-            Error::validation(vec![FieldError::new("items", "invalid", error.to_string())])
+            Error::validation(vec![
+                FieldError::new("items", "invalid", "is not valid: {reason}")
+                    .with_param("reason", error),
+            ])
         })?;
     Ok(parsed.into_iter().map(ItemInput::from).collect())
 }

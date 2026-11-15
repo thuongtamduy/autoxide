@@ -161,6 +161,11 @@ async fn kiem_dau_vao_nhu_nhau_o_rest_va_mcp() {
         let (status, problem) = rest(&app, "POST", "", "ada", Some(json!({"title": long}))).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(problem["errors"][0]["field"], "title");
+        // Câu của từng ô cũng theo `Accept-Language` (D-262).
+        assert_eq!(
+            problem["errors"][0]["detail"],
+            "phải dài 1 đến 200 ký tự, không chỉ có khoảng trắng"
+        );
         let invalid = ada.call_tool(tool("notes.create_note", json!({"title": long}))).await;
         let invalid = invalid.unwrap().structured_content.unwrap();
         assert_eq!(

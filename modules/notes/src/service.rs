@@ -247,18 +247,20 @@ fn check(title: Option<&str>, body: Option<&str>) -> Result<Option<String>, Erro
     let title = title.map(str::trim);
     let mut problems = Vec::new();
     if title.is_some_and(|title| !(1..=TITLE_MAX_LENGTH).contains(&title.chars().count())) {
-        problems.push(FieldError::new(
-            "title",
-            "length",
-            format!("must be 1 to {TITLE_MAX_LENGTH} characters, not only spaces"),
-        ));
+        problems.push(
+            FieldError::new(
+                "title",
+                "length",
+                "must be 1 to {title_max_length} characters, not only spaces",
+            )
+            .with_param("title_max_length", TITLE_MAX_LENGTH),
+        );
     }
     if body.is_some_and(|body| body.chars().count() > BODY_MAX_LENGTH) {
-        problems.push(FieldError::new(
-            "body",
-            "length",
-            format!("must be at most {BODY_MAX_LENGTH} characters long"),
-        ));
+        problems.push(
+            FieldError::new("body", "length", "must be at most {body_max_length} characters long")
+                .with_param("body_max_length", BODY_MAX_LENGTH),
+        );
     }
     if !problems.is_empty() {
         return Err(Error::validation(problems));

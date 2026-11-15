@@ -315,18 +315,24 @@ impl ApiKeyService {
         let name = name.trim().to_owned();
         let mut problems = Vec::new();
         if !(1..=NAME_MAX_LENGTH).contains(&name.chars().count()) {
-            problems.push(FieldError::new(
-                "name",
-                "length",
-                format!("must be between 1 and {NAME_MAX_LENGTH} characters long"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "name",
+                    "length",
+                    "must be between 1 and {name_max_length} characters long",
+                )
+                .with_param("name_max_length", NAME_MAX_LENGTH),
+            );
         }
         if !(1..=MAX_PERMISSIONS).contains(&permissions.len()) {
-            problems.push(FieldError::new(
-                "permissions",
-                "length",
-                format!("must list between 1 and {MAX_PERMISSIONS} permissions"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "permissions",
+                    "length",
+                    "must list between 1 and {max_permissions} permissions",
+                )
+                .with_param("max_permissions", MAX_PERMISSIONS),
+            );
         }
         for (index, permission) in permissions.iter().enumerate() {
             let field = format!("permissions[{index}]");

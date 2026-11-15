@@ -223,11 +223,14 @@ impl RoleService {
     ) -> Result<Vec<Role>, Error> {
         let role_ids: BTreeSet<Uuid> = role_ids.into_iter().collect();
         if role_ids.len() > MAX_ROLES_PER_USER {
-            return Err(Error::validation(vec![FieldError::new(
-                "role_ids",
-                "length",
-                format!("must list at most {MAX_ROLES_PER_USER} roles"),
-            )]));
+            return Err(Error::validation(vec![
+                FieldError::new(
+                    "role_ids",
+                    "length",
+                    "must list at most {max_roles_per_user} roles",
+                )
+                .with_param("max_roles_per_user", MAX_ROLES_PER_USER),
+            ]));
         }
         let transaction = self.database.begin_write().await?;
         // Cập nhật dòng người dùng trước: khoá dòng đó tới hết transaction, nên hai
@@ -359,28 +362,35 @@ impl RoleService {
         let description = input.description.trim().to_owned();
         let mut problems = Vec::new();
         if !is_role_name(&name) {
-            problems.push(FieldError::new(
-                "name",
-                "pattern",
-                format!(
-                    "must be 1 to {NAME_MAX_LENGTH} characters: lowercase letters, digits, `_` \
-                     and `-`, starting with a letter"
-                ),
-            ));
+            problems.push(
+                FieldError::new(
+                    "name",
+                    "pattern",
+                    "must be 1 to {name_max_length} characters: lowercase letters, digits, `_` \
+                     and `-`, starting with a letter",
+                )
+                .with_param("name_max_length", NAME_MAX_LENGTH),
+            );
         }
         if description.chars().count() > DESCRIPTION_MAX_LENGTH {
-            problems.push(FieldError::new(
-                "description",
-                "length",
-                format!("must be at most {DESCRIPTION_MAX_LENGTH} characters long"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "description",
+                    "length",
+                    "must be at most {description_max_length} characters long",
+                )
+                .with_param("description_max_length", DESCRIPTION_MAX_LENGTH),
+            );
         }
         if input.permissions.len() > MAX_PERMISSIONS {
-            problems.push(FieldError::new(
-                "permissions",
-                "length",
-                format!("must list at most {MAX_PERMISSIONS} permissions"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "permissions",
+                    "length",
+                    "must list at most {max_permissions} permissions",
+                )
+                .with_param("max_permissions", MAX_PERMISSIONS),
+            );
         }
         for (index, permission) in input.permissions.iter().enumerate() {
             if !self.catalog.contains(permission) {

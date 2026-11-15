@@ -86,15 +86,14 @@ pub(crate) fn check_tags(
         problems.push(FieldError::new(
             field,
             "invalid",
-            format!("each tag must be 1 to {TAG_MAX_LENGTH} characters, without `,` or control characters"),
-        ));
+            "each tag must be 1 to {tag_max_length} characters, without `,` or control characters",
+        ).with_param("tag_max_length", TAG_MAX_LENGTH));
     }
     if kept.len() > MAX_TAGS_PER_ITEM {
-        problems.push(FieldError::new(
-            field,
-            "length",
-            format!("at most {MAX_TAGS_PER_ITEM} tags per item"),
-        ));
+        problems.push(
+            FieldError::new(field, "length", "at most {max_tags_per_item} tags per item")
+                .with_param("max_tags_per_item", MAX_TAGS_PER_ITEM),
+        );
     }
     kept
 }

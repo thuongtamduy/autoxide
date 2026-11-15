@@ -87,6 +87,19 @@ impl ErrorKind {
 }
 
 /// Lỗi của một trường trong dữ liệu đầu vào.
+///
+/// Câu viết thành **mẫu** tiếng Anh, chỗ thay đổi là `{tên}` điền bằng
+/// [`with_param`](Self::with_param) — không ghép sẵn bằng `format!`: bản dịch tra theo đúng câu
+/// mẫu (khoá `field:<câu mẫu>` trong `locales/vi.json`, như gettext dùng câu gốc làm khoá), rồi
+/// điền giá trị (D-262). `cargo xtask check` chặn câu chưa dịch và câu ghép sẵn.
+///
+/// ```
+/// use autoxide_kernel::error::FieldError;
+///
+/// let error = FieldError::new("title", "length", "must be at most {max} characters long")
+///     .with_param("max", 200);
+/// assert_eq!(error.message, "must be at most 200 characters long");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct FieldError {
@@ -94,17 +107,50 @@ pub struct FieldError {
     pub field: String,
     /// Mã ổn định của loại lỗi: `required`, `length`, `range`, `email`…
     pub code: String,
-    /// Câu nói rõ giá trị phải như thế nào.
+    /// Câu tiếng Anh đã điền giá trị: nói rõ giá trị phải như thế nào.
     pub message: String,
+    /// Câu mẫu (khoá dịch) và giá trị điền vào nó.
+    template: Cow<'static, str>,
+    params: Vec<(Cow<'static, str>, String)>,
 }
 
 impl FieldError {
+    /// Lỗi của trường `field`, mã `code`, câu mẫu `message` (có thể chứa `{tên}`).
     pub fn new(
         field: impl Into<String>,
         code: impl Into<String>,
-        message: impl Into<String>,
+        message: impl Into<Cow<'static, str>>,
     ) -> Self {
-        FieldError { field: field.into(), code: code.into(), message: message.into() }
+        let template = message.into();
+        FieldError {
+            field: field.into(),
+            code: code.into(),
+            message: template.to_string(),
+            template,
+            params: Vec::new(),
+        }
+    }
+
+    /// Điền `{name}` của câu mẫu bằng `value`.
+    #[must_use]
+    pub fn with_param(mut self, name: impl Into<Cow<'static, str>>, value: impl ToString) -> Self {
+        self.params.push((name.into(), value.to_string()));
+        // Điền một lượt (D-150): giá trị người dùng gõ có `{x}` không bị thay tiếp. Còn chỗ chưa
+        // có giá trị (đang gán dở) thì giữ câu mẫu.
+        let params: Vec<(&str, &str)> = self.params().collect();
+        self.message = crate::i18n::fill_all(&self.template, &params)
+            .unwrap_or_else(|| self.template.to_string());
+        self
+    }
+
+    /// Câu mẫu tiếng Anh, chưa điền (khoá dịch).
+    pub fn template(&self) -> &str {
+        &self.template
+    }
+
+    /// Các giá trị điền vào câu mẫu, theo thứ tự đã gán.
+    pub fn params(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.params.iter().map(|(name, value)| (name.as_ref(), value.as_str()))
     }
 
     /// Lỗi `required` nếu `value` rỗng (hoặc chỉ có khoảng trắng). Dùng trong service khi
@@ -344,11 +390,7 @@ fn collect_fields(prefix: &str, errors: &ValidationErrors, fields: &mut Vec<Fiel
         match kind {
             ValidationErrorsKind::Field(problems) => {
                 for problem in problems {
-                    fields.push(FieldError {
-                        field: path.clone(),
-                        code: problem.code.to_string(),
-                        message: field_message(problem),
-                    });
+                    fields.push(field_message(path.clone(), problem));
                 }
             }
             ValidationErrorsKind::Struct(nested) => collect_fields(&path, nested, fields),
@@ -361,10 +403,13 @@ fn collect_fields(prefix: &str, errors: &ValidationErrors, fields: &mut Vec<Fiel
     }
 }
 
-/// Câu tiếng Anh cho một lỗi của validator, dựng từ mã và tham số của nó.
-fn field_message(problem: &validator::ValidationError) -> String {
+/// Lỗi của trường `path` từ một lỗi của validator: câu mẫu tiếng Anh dựng từ mã và tham số của
+/// nó (dịch được như mọi câu mẫu).
+fn field_message(path: String, problem: &validator::ValidationError) -> FieldError {
+    let code = problem.code.to_string();
     if let Some(message) = &problem.message {
-        return message.to_string();
+        // Câu riêng khai ở `#[validate(… message = "…")]`: chưa có bản dịch (không module nào dùng).
+        return FieldError::new(path, code, "{message}").with_param("message", message);
     }
     // Tham số là JSON; chuỗi thì bỏ dấu nháy bao quanh.
     let param = |name: &str| {
@@ -375,27 +420,59 @@ fn field_message(problem: &validator::ValidationError) -> String {
     };
     let (min, max, equal) = (param("min"), param("max"), param("equal"));
     match problem.code.as_ref() {
-        "required" => "is required".to_owned(),
-        "email" => "must be a valid email address".to_owned(),
-        "url" => "must be a valid URL".to_owned(),
+        "required" => FieldError::new(path.clone(), code.clone(), "is required"),
+        "email" => FieldError::new(path.clone(), code.clone(), "must be a valid email address"),
+        "url" => FieldError::new(path.clone(), code.clone(), "must be a valid URL"),
         "length" => match (min, max, equal) {
-            (_, _, Some(equal)) => format!("must be exactly {equal} characters long"),
-            (Some(min), Some(max), _) => format!("must be between {min} and {max} characters long"),
-            (Some(min), None, _) => format!("must be at least {min} characters long"),
-            (None, Some(max), _) => format!("must be at most {max} characters long"),
-            (None, None, None) => "has an invalid length".to_owned(),
+            (_, _, Some(equal)) => FieldError::new(
+                path.clone(),
+                code.clone(),
+                "must be exactly {equal} characters long",
+            )
+            .with_param("equal", equal),
+            (Some(min), Some(max), _) => FieldError::new(
+                path.clone(),
+                code.clone(),
+                "must be between {min} and {max} characters long",
+            )
+            .with_param("min", min)
+            .with_param("max", max),
+            (Some(min), None, _) => FieldError::new(
+                path.clone(),
+                code.clone(),
+                "must be at least {min} characters long",
+            )
+            .with_param("min", min),
+            (None, Some(max), _) => {
+                FieldError::new(path.clone(), code.clone(), "must be at most {max} characters long")
+                    .with_param("max", max)
+            }
+            (None, None, None) => {
+                FieldError::new(path.clone(), code.clone(), "has an invalid length")
+            }
         },
         "range" => match (min, max) {
-            (Some(min), Some(max)) => format!("must be between {min} and {max}"),
-            (Some(min), None) => format!("must be at least {min}"),
-            (None, Some(max)) => format!("must be at most {max}"),
-            (None, None) => "is out of range".to_owned(),
+            (Some(min), Some(max)) => {
+                FieldError::new(path.clone(), code.clone(), "must be between {min} and {max}")
+                    .with_param("min", min)
+                    .with_param("max", max)
+            }
+            (Some(min), None) => {
+                FieldError::new(path.clone(), code.clone(), "must be at least {min}")
+                    .with_param("min", min)
+            }
+            (None, Some(max)) => {
+                FieldError::new(path.clone(), code.clone(), "must be at most {max}")
+                    .with_param("max", max)
+            }
+            (None, None) => FieldError::new(path.clone(), code.clone(), "is out of range"),
         },
         "must_match" => match param("other") {
-            Some(other) => format!("must match `{other}`"),
-            None => "does not match".to_owned(),
+            Some(other) => FieldError::new(path.clone(), code.clone(), "must match `{other}`")
+                .with_param("other", other),
+            None => FieldError::new(path.clone(), code.clone(), "does not match"),
         },
-        _ => "is not valid".to_owned(),
+        _ => FieldError::new(path.clone(), code.clone(), "is not valid"),
     }
 }
 
@@ -532,9 +609,18 @@ mod tests {
     fn thong_bao_rieng_va_ma_la_cua_validator_deu_duoc_giu() {
         let mut custom = validator::ValidationError::new("taken");
         custom.message = Some("is already used by another account".into());
-        assert_eq!(field_message(&custom), "is already used by another account");
-        assert_eq!(field_message(&validator::ValidationError::new("exotic")), "is not valid");
-        assert_eq!(field_message(&validator::ValidationError::new("required")), "is required");
+        assert_eq!(
+            field_message(String::new(), &custom).message,
+            "is already used by another account"
+        );
+        assert_eq!(
+            field_message(String::new(), &validator::ValidationError::new("exotic")).message,
+            "is not valid"
+        );
+        assert_eq!(
+            field_message(String::new(), &validator::ValidationError::new("required")).message,
+            "is required"
+        );
     }
 
     #[test]

@@ -105,11 +105,14 @@ impl MediaService {
         let locale = self.alt_locale(locale)?;
         let alt = alt.map(str::trim);
         if alt.is_some_and(|alt| alt.chars().count() > ALT_MAX_LENGTH) {
-            return Err(Error::validation(vec![FieldError::new(
-                "alt",
-                "length",
-                format!("must be at most {ALT_MAX_LENGTH} characters long"),
-            )]));
+            return Err(Error::validation(vec![
+                FieldError::new(
+                    "alt",
+                    "length",
+                    "must be at most {alt_max_length} characters long",
+                )
+                .with_param("alt_max_length", ALT_MAX_LENGTH),
+            ]));
         }
 
         let transaction = self.database.begin_write().await?;

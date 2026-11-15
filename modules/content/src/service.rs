@@ -66,11 +66,10 @@ impl ContentService {
         {
             Some(locale) => locale,
             None => {
-                problems.push(FieldError::new(
-                    field,
-                    "locale_not_supported",
-                    format!("must be one of: {}", self.config.locales.join(", ")),
-                ));
+                problems.push(
+                    FieldError::new(field, "locale_not_supported", "must be one of: {allowed}")
+                        .with_param("allowed", self.config.locales.join(", ")),
+                );
                 self.config.default_locale.clone()
             }
         }
@@ -124,11 +123,10 @@ pub(crate) fn check_length(
     problems: &mut Vec<FieldError>,
 ) {
     if value.is_some_and(|value| value.trim().chars().count() > max) {
-        problems.push(FieldError::new(
-            field,
-            "length",
-            format!("must be at most {max} characters long"),
-        ));
+        problems.push(
+            FieldError::new(field, "length", "must be at most {max} characters long")
+                .with_param("max", max),
+        );
     }
 }
 

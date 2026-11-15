@@ -322,16 +322,19 @@ impl WebhookService {
         let url = url.and_then(|url| match self.check_url(url) {
             Ok(url) => Some(url),
             Err(problem) => {
-                problems.push(FieldError::new("url", "invalid", problem));
+                problems.push(problem);
                 None
             }
         });
         if description.is_some_and(|text| text.trim().chars().count() > DESCRIPTION_MAX_LENGTH) {
-            problems.push(FieldError::new(
-                "description",
-                "length",
-                format!("must be at most {DESCRIPTION_MAX_LENGTH} characters long"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "description",
+                    "length",
+                    "must be at most {description_max_length} characters long",
+                )
+                .with_param("description_max_length", DESCRIPTION_MAX_LENGTH),
+            );
         }
         let events = events.map(|events| self.check_events(events, &mut problems));
         if !problems.is_empty() {
@@ -342,27 +345,43 @@ impl WebhookService {
 
     /// Địa chỉ đã kiểm: URL tuyệt đối tới 2048 ký tự, `https` (hoặc `http` khi cấu hình
     /// cho phép), không chứa tên đăng nhập / mật khẩu. Sai thì câu nói rõ phải sửa gì.
-    fn check_url(&self, raw: &str) -> Result<String, String> {
+    fn check_url(&self, raw: &str) -> Result<String, FieldError> {
         let raw = raw.trim();
         if raw.chars().count() > URL_MAX_LENGTH {
-            return Err(format!("must be at most {URL_MAX_LENGTH} characters long"));
+            return Err(FieldError::new("url", "invalid", "must be at most {max} characters long")
+                .with_param("max", URL_MAX_LENGTH));
         }
-        let url = reqwest::Url::parse(raw).map_err(|_| "must be an absolute URL".to_owned())?;
+        let Ok(url) = reqwest::Url::parse(raw) else {
+            return Err(FieldError::new("url", "invalid", "must be an absolute URL"));
+        };
         if url.host_str().is_none_or(str::is_empty) {
-            return Err("must name a host".to_owned());
+            return Err(FieldError::new("url", "invalid", "must name a host"));
         }
         if !url.username().is_empty() || url.password().is_some() {
-            return Err("must not contain a user name or password".to_owned());
+            return Err(FieldError::new(
+                "url",
+                "invalid",
+                "must not contain a user name or password",
+            ));
         }
         if !self.allow_private_networks && !crate::network::is_public_host(&url) {
-            return Err(crate::network::PRIVATE_ADDRESS.to_owned());
+            return Err(FieldError::new(
+                "url",
+                "invalid",
+                // Cùng câu với `network::PRIVATE_ADDRESS` (lỗi lúc gửi).
+                "points to a private or local network address; webhooks are sent only to public \
+                 addresses unless the server sets `AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true`",
+            ));
         }
         match url.scheme() {
             "https" => Ok(url.to_string()),
             "http" if self.allow_http => Ok(url.to_string()),
-            _ => Err("must start with `https://` (`http://` only when the server sets \
-                      `AUTOXIDE_WEBHOOKS_ALLOW_HTTP=true`, for development)"
-                .to_owned()),
+            _ => Err(FieldError::new(
+                "url",
+                "invalid",
+                "must start with `https://` (`http://` only when the server sets \
+                 `AUTOXIDE_WEBHOOKS_ALLOW_HTTP=true`, for development)",
+            )),
         }
     }
 
@@ -370,11 +389,14 @@ impl WebhookService {
     /// `problems`.
     fn check_events(&self, events: Vec<String>, problems: &mut Vec<FieldError>) -> Vec<String> {
         if events.is_empty() || events.len() > MAX_EVENTS {
-            problems.push(FieldError::new(
-                "events",
-                "length",
-                format!("must list 1 to {MAX_EVENTS} event names, or `*` for every event"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "events",
+                    "length",
+                    "must list 1 to {max_events} event names, or `*` for every event",
+                )
+                .with_param("max_events", MAX_EVENTS),
+            );
         }
         for (index, event) in events.iter().enumerate() {
             let event = event.trim();

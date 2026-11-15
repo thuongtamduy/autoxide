@@ -168,11 +168,14 @@ impl Placements {
             .open(new.url.expose(), new.read_url.as_ref().map(DatabaseUrl::expose))
             .await
             .map_err(|error| {
-                Error::validation(vec![FieldError::new(
-                    "url",
-                    "unreachable",
-                    format!("cannot connect to the database: {error}"),
-                )])
+                Error::validation(vec![
+                    FieldError::new(
+                        "url",
+                        "unreachable",
+                        "cannot connect to the database: {error}",
+                    )
+                    .with_param("error", error),
+                ])
             })?;
         let _ = probe.close().await;
         let id = PlacementId::from_uuid(Uuid::now_v7());

@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- The text of each field problem (`errors[].detail` of a `422` Problem, and `errors` of an MCP tool error) follows
+  `Accept-Language` like `detail` already did. For module authors: `FieldError::new` takes an English template with
+  `{name}` placeholders filled by `.with_param(name, value)`; its translation is keyed by the template
+  (`"field:<template>"` in `locales/vi.json`), and `cargo xtask check` refuses a message built with `format!` or one
+  without a translation.
 - Foundations for serving many customers (tenants) from one installation: the control-plane tables
   `kernel_tenants`, `kernel_placements` and `kernel_tenant_domains` (the existing data belongs to the default tenant),
   and the settings `AUTOXIDE_TENANCY_*`. The default mode `single` changes nothing; `multi` is refused until every

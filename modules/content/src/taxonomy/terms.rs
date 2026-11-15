@@ -219,11 +219,10 @@ impl ContentService {
         let mut problems = Vec::new();
         let locale = self.check_locale(input.locale.as_deref(), "locale", &mut problems);
         if input.name.as_deref().is_none_or(|name| name.trim().is_empty()) {
-            problems.push(FieldError::new(
-                "name",
-                "required",
-                format!("must be 1 to {NAME_MAX} characters"),
-            ));
+            problems.push(
+                FieldError::new("name", "required", "must be 1 to {name_max} characters")
+                    .with_param("name_max", NAME_MAX),
+            );
         }
         let parent = input.parent_id.flatten();
         self.check_term_parent(self.database.read(), taxonomy, None, parent, &mut problems).await?;
@@ -433,11 +432,10 @@ impl ContentService {
             }
         }
         if ids.len() > MAX_PER_ENTRY {
-            return Err(invalid(vec![FieldError::new(
-                "term_ids",
-                "length",
-                format!("at most {MAX_PER_ENTRY} terms"),
-            )]));
+            return Err(invalid(vec![
+                FieldError::new("term_ids", "length", "at most {max_per_entry} terms")
+                    .with_param("max_per_entry", MAX_PER_ENTRY),
+            ]));
         }
         let transaction = self.database.begin_write().await?;
         // Khoá dòng mục trước khi xoá rồi chèn lại liên kết: hai lệnh gắn cùng lúc chạy lần lượt

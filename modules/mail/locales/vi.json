@@ -1,1 +1,3 @@
-{}
+{
+  "field:must be a mail address, like `ada@example.com`": "phải là địa chỉ email, ví dụ `ada@example.com`"
+}

@@ -176,11 +176,10 @@ impl NewsletterService {
             .collect();
         let mut lists: Vec<&List> = Vec::new();
         if input.lists.is_empty() || input.lists.len() > LISTS_MAX {
-            problems.push(FieldError::new(
-                "lists",
-                "length",
-                format!("must have 1 to {LISTS_MAX} list keys"),
-            ));
+            problems.push(
+                FieldError::new("lists", "length", "must have 1 to {lists_max} list keys")
+                    .with_param("lists_max", LISTS_MAX),
+            );
         }
         for (index, key) in input.lists.iter().enumerate() {
             match public.get(key.trim()) {
