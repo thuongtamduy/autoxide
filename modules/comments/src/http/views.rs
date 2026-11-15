@@ -9,9 +9,9 @@ use uuid::Uuid;
 
 use crate::entity::{ban, report};
 use crate::posting::Posted;
-use crate::service::{Comment, Status};
-use crate::targets::Target;
-use crate::text;
+use crate::posting::targets::Target;
+use crate::service::{Comment, Status, badges_of};
+use crate::text::{self, Format};
 use crate::threads::ThreadRoot;
 
 /// Who wrote a comment.
@@ -47,10 +47,19 @@ pub(crate) struct PublicComment {
     /// The comment this one answers (the top-level comment or another reply in the thread).
     pub reply_to_id: Option<Uuid>,
     pub author: Author,
-    /// The text as written (plain text, line breaks kept). Never insert it as HTML.
+    /// Stable codes of what the author was on the target when writing, e.g. `seller` (manages
+    /// the product) or `verified_buyer` (received it); empty for most comments. Show your own
+    /// label for each code.
+    #[schema(example = json!(["verified_buyer"]))]
+    pub badges: Vec<String>,
+    /// The text as written (plain text or Markdown, see `format`). Never insert it as HTML.
     pub body: String,
+    /// How `body` is written: `text` or `markdown`.
+    pub format: Format,
     /// The text as safe HTML: everything escaped, line breaks as `<br>`, `http(s)` addresses as
-    /// links with `rel="nofollow ugc noopener"`.
+    /// links with `rel="nofollow ugc noopener"`. For `markdown`, only `<p>`, `<strong>`, `<em>`,
+    /// `<a>`, `<blockquote>`, `<code>` and `<pre>` besides: raw HTML shows as text, images as
+    /// their text. Insert this, never `body`.
     pub body_html: String,
     /// Deleted by its author: no text or name, kept so its replies stay in place.
     pub deleted: bool,
@@ -65,9 +74,11 @@ impl From<Comment> for PublicComment {
     fn from(found: Comment) -> Self {
         let deleted = found.status() == Status::Deleted;
         let row = found.row;
+        let badges = badges_of(&row);
         PublicComment {
             id: row.id,
-            body_html: text::to_html(&row.body),
+            body_html: text::to_html(&row.body, Format::from_column(&row.format)),
+            format: Format::from_column(&row.format),
             body: row.body,
             target_type: row.target_type,
             target_id: row.target_id,
@@ -78,6 +89,7 @@ impl From<Comment> for PublicComment {
                 kind: if row.author_kind == "user" { AuthorKind::User } else { AuthorKind::Guest },
                 name: found.name,
             },
+            badges: if deleted { Vec::new() } else { badges },
             deleted,
             edited_at: row.edited_at,
             created_at: row.created_at,
@@ -188,10 +200,14 @@ pub(crate) struct CommentDetail {
     pub user_id: Option<Uuid>,
     /// Guest name or the user's display name.
     pub author_name: Option<String>,
+    /// Codes of what the author was on the target when writing (`seller`, `verified_buyer`…).
+    pub badges: Vec<String>,
     /// Address given for reply mails (lower case).
     pub author_email: Option<String>,
     pub email_verified: bool,
     pub body: String,
+    /// How `body` is written: `text` or `markdown`.
+    pub format: Format,
     pub body_html: String,
     /// Keyed hash of the author's network block (never the address itself); use it to ban;
     /// cleared after `AUTOXIDE_COMMENTS_IP_RETENTION_DAYS`.
@@ -210,6 +226,7 @@ impl From<Comment> for CommentDetail {
     fn from(found: Comment) -> Self {
         let status = found.status();
         let row = found.row;
+        let badges = badges_of(&row);
         CommentDetail {
             id: row.id,
             target_type: row.target_type,
@@ -226,9 +243,11 @@ impl From<Comment> for CommentDetail {
             },
             user_id: row.user_id,
             author_name: found.name,
+            badges,
             author_email: row.author_email,
             email_verified: row.email_verified,
-            body_html: text::to_html(&row.body),
+            body_html: text::to_html(&row.body, Format::from_column(&row.format)),
+            format: Format::from_column(&row.format),
             body: row.body,
             ip_fingerprint: row.ip_fingerprint,
             locale: row.locale,
@@ -269,6 +288,10 @@ pub(crate) struct TargetResponse {
     pub comment_count: i32,
     /// Comments waiting for approval (`null` in the public answer).
     pub pending_count: Option<i32>,
+    /// Shown top-level comments, e.g. questions on a product (0 when hidden).
+    pub thread_count: i32,
+    /// Top-level comments waiting for approval (`null` in the public answer).
+    pub pending_thread_count: Option<i32>,
 }
 
 impl TargetResponse {
@@ -281,6 +304,8 @@ impl TargetResponse {
             },
             comment_count: if target.hidden && !admin { 0 } else { target.published_count },
             pending_count: admin.then_some(target.pending_count),
+            thread_count: if target.hidden && !admin { 0 } else { target.published_threads },
+            pending_thread_count: admin.then_some(target.pending_threads),
             hidden: target.hidden,
             closes_at: target.closes_at,
             target_type: target.kind,

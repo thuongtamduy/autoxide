@@ -8,12 +8,12 @@ use super::{
     assert_once_each, campaign, count_events, emails, import, list, next_job, run_job, send,
     subscribe, unsubscribe_token,
 };
-use crate::bounces::{BounceKind, DeliveryFailures};
+use crate::audience::bounces::{BounceKind, DeliveryFailures};
+use crate::audience::subscribers::{SubscriberChange, SubscriberStatus};
+use crate::campaigns::sending::SendJob;
 use crate::campaigns::{Action, CampaignStatus};
 use crate::config::NewsletterConfig;
 use crate::public::PreferencesChange;
-use crate::sending::SendJob;
-use crate::subscribers::{SubscriberChange, SubscriberStatus};
 use crate::testing::{admin, config, service, user};
 
 use super::drain;
@@ -33,7 +33,7 @@ async fn gui_moi_nguoi_mot_lan_kem_header_huy_mot_cham() {
             .service
             .list_subscribers(
                 &admin(),
-                &crate::subscribers::SubscriberFilter {
+                &crate::audience::subscribers::SubscriberFilter {
                     email: Some(people[1].clone()),
                     ..Default::default()
                 },
@@ -123,7 +123,7 @@ async fn chay_lai_va_song_song_khong_gui_trung() {
         let started = send(&h.service, draft.row.id).await;
         assert_eq!(run_job(&h, true).await.as_deref(), Some("newsletter.prepare"));
         // Chạy lại job chụp: không thêm dòng.
-        let prepare = crate::sending::PrepareJob {
+        let prepare = crate::campaigns::sending::PrepareJob {
             campaign_id: draft.row.id,
             run: started.row.run,
             after: None,
@@ -421,7 +421,7 @@ async fn hen_gio_va_huy() {
             )
             .await
             .unwrap();
-        let old = crate::sending::PrepareJob {
+        let old = crate::campaigns::sending::PrepareJob {
             campaign_id: draft.row.id,
             run: scheduled.row.run,
             after: None,
@@ -432,7 +432,7 @@ async fn hen_gio_va_huy() {
             CampaignStatus::Scheduled
         );
         // Tới giờ (gọi thẳng job của lượt mới): bắt đầu gửi.
-        let due = crate::sending::PrepareJob {
+        let due = crate::campaigns::sending::PrepareJob {
             campaign_id: draft.row.id,
             run: rescheduled.row.run,
             after: None,
@@ -500,7 +500,7 @@ async fn sua_chien_dich_hen_gio_ve_nhap() {
         );
 
         // Job hẹn giờ của lượt cũ tới giờ: không bắt đầu gửi.
-        let old = crate::sending::PrepareJob {
+        let old = crate::campaigns::sending::PrepareJob {
             campaign_id: draft.row.id,
             run: scheduled.row.run,
             after: None,

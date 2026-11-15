@@ -20,10 +20,10 @@ use validator::Validate;
 use super::{MediaItemResponse, folder_filter, page_of, page_request, present, sort, tagged};
 use crate::config::normalize_type;
 use crate::entity::api_folder;
+use crate::library::upload::NewUpload;
 use crate::service::{
     ItemChanges, ItemFilter, ItemSort, MediaService, Visibility, content_url, too_large,
 };
-use crate::upload::NewUpload;
 
 /// Filters and order of the media list. Combine any of them.
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
@@ -62,7 +62,7 @@ impl ItemsQuery {
             let wildcard = raw.strip_suffix("/*").map(|kind| format!("{kind}/x"));
             match normalize_type(wildcard.as_deref().unwrap_or(raw)) {
                 Some(_) if wildcard.is_some() => Some(raw.to_ascii_lowercase()),
-                Some(normalized) => Some(crate::sniff::canonical(&normalized).to_owned()),
+                Some(normalized) => Some(crate::library::sniff::canonical(&normalized).to_owned()),
                 None => {
                     problems.push(FieldError::new(
                         "type",
@@ -213,6 +213,7 @@ pub(super) fn content_type(headers: &HeaderMap) -> Result<Option<&str>, Error> {
 #[utoipa::path(
     get,
     path = "/",
+    extensions(("x-permissions" = json!(["media.read"]))),
     operation_id = "list_media_items",
     security(("bearer" = [])),
     params(ItemsQuery, PageQuery),
@@ -246,6 +247,7 @@ pub(crate) async fn list_items(
 #[utoipa::path(
     post,
     path = "/",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "upload_media_item",
     security(("bearer" = [])),
     params(UploadQuery),
@@ -306,6 +308,7 @@ pub(crate) async fn upload_item(
 #[utoipa::path(
     get,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["media.read"]))),
     operation_id = "get_media_item",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item.")),
@@ -333,6 +336,7 @@ pub(crate) async fn get_item(
 #[utoipa::path(
     patch,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "update_media_item",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the item since; otherwise `412`.")),
@@ -360,6 +364,94 @@ pub(crate) async fn update_item(
     tagged(&service, item).await
 }
 
+/// A translation of an item's text alternative.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = MediaAltTranslation)]
+pub(crate) struct AltRequest {
+    /// Text alternative in this language, up to 1000 characters.
+    #[schema(example = "Bếp từ đôi màu đen trên mặt bếp gỗ")]
+    pub alt: String,
+}
+
+/// Set the text alternative of a media item in one language.
+///
+/// Requires `media.write`. The item's `alt` stays the default; readers in `locale` get this
+/// text instead (e.g. a bilingual storefront). `locale` must be one of the languages the server
+/// lists in `AUTOXIDE_MEDIA_ALT_LOCALES`. `If-Match` is required. To draft the text with AI,
+/// use `POST /api/v1/media/{id}/alt-suggestions` with the same `locale`, then send it here.
+#[utoipa::path(
+    put,
+    path = "/{id}/alts/{locale}",
+    extensions(("x-permissions" = json!(["media.write"]))),
+    operation_id = "set_media_alt_translation",
+    security(("bearer" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Id of the media item."),
+        ("locale" = String, Path, description = "BCP 47 language code, e.g. `vi`."),
+        ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the item since; otherwise `412`."),
+    ),
+    request_body = AltRequest,
+    responses(
+        (status = 200, description = "The item after the change, with `alts`.", body = autoxide_kernel::response::Data<MediaItemResponse>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `media.write`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No media item has this id; code `media.item_not_found`.", body = Problem),
+        (status = 409, description = "The item is in the trash; code `media.item_in_trash`.", body = Problem),
+        (status = 412, description = "`If-Match` does not match: the item changed since you read it. Get it again and retry; code `precondition_failed`.", body = Problem),
+        (status = 422, description = "The language is not offered (code `media.unsupported_locale`) or the text is too long; see `errors`.", body = Problem),
+        (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
+    )
+)]
+pub(crate) async fn set_alt(
+    State(service): State<Arc<MediaService>>,
+    principal: Principal,
+    Path((id, locale)): Path<(Uuid, String)>,
+    if_match: IfMatch,
+    autoxide_kernel::http::ValidJson(input): autoxide_kernel::http::ValidJson<AltRequest>,
+) -> Result<Tagged<MediaItemResponse>, Error> {
+    let expected = if_match.required()?;
+    let item = service.set_alt(&principal, id, &locale, Some(&input.alt), expected).await?;
+    tagged(&service, item).await
+}
+
+/// Remove the text alternative of a media item in one language.
+///
+/// Requires `media.write`. Readers in `locale` get the item's default `alt` again. Removing a
+/// translation that does not exist changes nothing. `If-Match` is required.
+#[utoipa::path(
+    delete,
+    path = "/{id}/alts/{locale}",
+    extensions(("x-permissions" = json!(["media.write"]))),
+    operation_id = "delete_media_alt_translation",
+    security(("bearer" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Id of the media item."),
+        ("locale" = String, Path, description = "BCP 47 language code, e.g. `vi`."),
+        ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the item since; otherwise `412`."),
+    ),
+    responses(
+        (status = 200, description = "The item after the change, with `alts`.", body = autoxide_kernel::response::Data<MediaItemResponse>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `media.write`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No media item has this id; code `media.item_not_found`.", body = Problem),
+        (status = 409, description = "The item is in the trash; code `media.item_in_trash`.", body = Problem),
+        (status = 412, description = "`If-Match` does not match: the item changed since you read it. Get it again and retry; code `precondition_failed`.", body = Problem),
+        (status = 422, description = "The language is not offered; code `media.unsupported_locale`.", body = Problem),
+        (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
+    )
+)]
+pub(crate) async fn delete_alt(
+    State(service): State<Arc<MediaService>>,
+    principal: Principal,
+    Path((id, locale)): Path<(Uuid, String)>,
+    if_match: IfMatch,
+) -> Result<Tagged<MediaItemResponse>, Error> {
+    let expected = if_match.required()?;
+    let item = service.set_alt(&principal, id, &locale, None, expected).await?;
+    tagged(&service, item).await
+}
+
 /// Move a media item to the trash.
 ///
 /// Requires `media.write`. Its public link stops working; restore it with
@@ -368,6 +460,7 @@ pub(crate) async fn update_item(
 #[utoipa::path(
     delete,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "trash_media_item",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item.")),
@@ -394,6 +487,7 @@ pub(crate) async fn trash_item(
 #[utoipa::path(
     post,
     path = "/{id}/restore",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "restore_media_item",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item.")),
@@ -421,6 +515,7 @@ pub(crate) async fn restore_item(
 #[utoipa::path(
     post,
     path = "/{id}/purge",
+    extensions(("x-permissions" = json!(["media.purge"]))),
     operation_id = "purge_media_item",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item.")),

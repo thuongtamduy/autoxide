@@ -5,6 +5,7 @@ mod m0001_create_media;
 mod m0004_create_tags_and_variants;
 mod m0005_fold_search_keys;
 mod m0007_variant_formats;
+mod m0008_alt_translations;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -20,5 +21,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         // Cột `actor_kind` của bảng `media_events` (người lạ khác hệ thống, D-122).
         autoxide_kernel::event::outbox_actor_migration("m0006_add_event_actor", "media"),
         Box::new(m0007_variant_formats::Migration),
+        // `alt` theo ngôn ngữ (D-202).
+        Box::new(m0008_alt_translations::Migration),
     ]
 }

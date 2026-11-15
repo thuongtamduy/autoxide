@@ -29,8 +29,8 @@ use uuid::Uuid;
 
 use super::MediaItemResponse;
 use super::items::{body_stream, content_type};
+use crate::library::sniff::is_raster_image;
 use crate::service::{Item, MediaService, Visibility};
-use crate::sniff::is_raster_image;
 
 /// Cache của URL có phiên bản: một năm, nội dung không bao giờ đổi.
 const LONG_CACHE: u32 = 365 * 24 * 3600;
@@ -78,6 +78,7 @@ impl VersionQuery {
 #[utoipa::path(
     get,
     path = "/{id}/content",
+    extensions(("x-public" = json!(true))),
     operation_id = "download_media_item",
     security((), ("bearer" = [])),
     params(
@@ -117,6 +118,7 @@ pub(crate) async fn get_content(
 #[utoipa::path(
     head,
     path = "/{id}/content",
+    extensions(("x-public" = json!(true))),
     operation_id = "head_media_item",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item."), VersionQuery),
@@ -145,6 +147,7 @@ pub(crate) async fn head_content(
 #[utoipa::path(
     put,
     path = "/{id}/content",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "replace_media_content",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item."), ("If-Match" = String, Header, description = "Required: the `ETag` of the item (from `GET /api/v1/media/{id}`), or `*`. The content is replaced only if nobody changed the item since; otherwise `412`.")),
@@ -206,7 +209,8 @@ async fn serve(
     // Bản xin chưa làm xong (sẽ có): bản đang gửi là tạm, không được cache lâu dưới địa chỉ này.
     let pending = query.w.is_some_and(|width| {
         (copy.is_none() || fallback)
-            && crate::variants::wanted_widths(&service.config.image_widths, &item).contains(&width)
+            && crate::images::variants::wanted_widths(&service.config.image_widths, &item)
+                .contains(&width)
     });
     let (etag, content_type, size) = match &copy {
         Some(copy) => (

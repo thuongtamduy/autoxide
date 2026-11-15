@@ -188,8 +188,9 @@ mod tests {
 
             assert_eq!(
                 error,
-                "2 migrations have not been applied to the database: kernel/m0001_create_secrets, \
-                 notes/m0001_create_note; run `autoxide migrate up` first"
+                "3 migrations have not been applied to the database: kernel/m0001_create_secrets, \
+                 kernel/m0002_create_user_flags, notes/m0001_create_note; run `autoxide migrate up` \
+                 first"
             );
         })
         .await

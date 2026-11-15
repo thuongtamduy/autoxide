@@ -1,0 +1,3234 @@
+{
+  "manifest_version": 1,
+  "tools": [
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Tell whether the server's AI features are on (text generation, image reading, embeddings), which provider and models they use, and today's token use against the daily limit.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "ai.status",
+      "output_schema": null,
+      "permissions": [
+        "ai.view"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get one audit log entry.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An entry to get.",
+        "properties": {
+          "id": {
+            "description": "Id of the entry.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "audit.get_entry",
+      "output_schema": null,
+      "permissions": [
+        "audit.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List audit log entries — who changed what, when, before and after — newest first; filter by user, record, action or module. Follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which entries to list; every filter is optional. Paging as for every list.",
+        "properties": {
+          "action": {
+            "description": "Only this action (event name), e.g. `auth.user_updated`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actor_user_id": {
+            "description": "Only changes made by this user.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of entries to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "module": {
+            "description": "Only changes from this module, e.g. `auth`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject": {
+            "description": "Only changes to this record, e.g. `auth.user:<id>`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "audit.list_entries",
+      "output_schema": null,
+      "permissions": [
+        "audit.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": true
+      },
+      "deprecation": null,
+      "description": "Create an API key that acts as you, limited to the listed permissions. Needs your current password and a password session: an API key cannot create keys. The result carries the key, shown only once.",
+      "input_schema": {
+        "description": "A key to create.",
+        "properties": {
+          "current_password": {
+            "description": "Your current password: a stolen access token alone must not create a key that\noutlives it.",
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "When the key stops working (RFC 3339, in the future). Omit for a key that does\nnot expire.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "What the key is for, 1 to 100 characters.",
+            "example": "nightly report agent",
+            "type": "string"
+          },
+          "permissions": {
+            "description": "Permissions the key may use: at least one, each one you have yourself (see\n`GET /api/v1/auth/me`). Give a key only what its job needs.",
+            "example": [
+              "auth.users.read"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "permissions",
+          "current_password"
+        ],
+        "type": "object"
+      },
+      "name": "auth.create_api_key",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a role that grants the listed permissions (see `list_permissions`).",
+      "input_schema": {
+        "description": "The full content of a role.",
+        "properties": {
+          "description": {
+            "description": "What the role is for. Optional.",
+            "type": "string"
+          },
+          "name": {
+            "description": "Unique. Lowercase letters, digits, `_` and `-`, starting with a letter.",
+            "example": "editor",
+            "type": "string"
+          },
+          "permissions": {
+            "description": "Permissions to grant; each must be listed by `GET /api/v1/auth/permissions`.\nDuplicates are ignored.",
+            "example": [
+              "auth.roles.read"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "auth.create_role",
+      "output_schema": null,
+      "permissions": [
+        "auth.roles.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Delete a role; users who had it lose its permissions. The built-in `admin` role cannot be deleted.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A role or user to act on.",
+        "properties": {
+          "id": {
+            "description": "The id.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "auth.delete_role",
+      "output_schema": null,
+      "permissions": [
+        "auth.roles.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get one role.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A role or user to act on.",
+        "properties": {
+          "id": {
+            "description": "The id.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "auth.get_role",
+      "output_schema": null,
+      "permissions": [
+        "auth.roles.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the roles of a user (`id` is the user's id).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A role or user to act on.",
+        "properties": {
+          "id": {
+            "description": "The id.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "auth.get_user_roles",
+      "output_schema": null,
+      "permissions": [
+        "auth.users.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List your API keys (never their secrets); follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "auth.list_api_keys",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List every permission that roles can grant, with what each allows.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "auth.list_permissions",
+      "output_schema": null,
+      "permissions": [
+        "auth.roles.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List roles with the permissions they grant; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "auth.list_roles",
+      "output_schema": null,
+      "permissions": [
+        "auth.roles.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List user accounts, newest first; `search` finds users by email or name. Follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which users to list; paging as for every list.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of users to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "search": {
+            "description": "Only users whose email or name contains this text, in any case.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "auth.list_users",
+      "output_schema": null,
+      "permissions": [
+        "auth.users.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Replace the name, description and permissions of a role. The built-in `admin` role cannot be changed.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The full new content of a role.",
+        "properties": {
+          "description": {
+            "description": "What the role is for.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Id of the role.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "description": "Unique. Lowercase letters, digits, `_` and `-`, starting with a letter.",
+            "type": "string"
+          },
+          "permissions": {
+            "description": "Every permission the role grants (replaces the old list); see `list_permissions`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "auth.replace_role",
+      "output_schema": null,
+      "permissions": [
+        "auth.roles.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Revoke one of your API keys; it stops working at once.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A role or user to act on.",
+        "properties": {
+          "id": {
+            "description": "The id.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "auth.revoke_api_key",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Replace every role of a user with `role_ids`. The last administrator cannot lose the `admin` role.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The complete list of roles a user should have.",
+        "properties": {
+          "role_ids": {
+            "description": "Ids of the roles. Replaces every role the user had; `[]` removes all.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "user_id": {
+            "description": "Id of the user.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "role_ids"
+        ],
+        "type": "object"
+      },
+      "name": "auth.set_user_roles",
+      "output_schema": null,
+      "permissions": [
+        "auth.roles.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Rename, disable or enable a user account. Disabling signs the user out everywhere; the last active administrator cannot be disabled.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Changes to a user account; omitted fields stay as they are.",
+        "properties": {
+          "disabled": {
+            "description": "`true` disables the account and signs it out everywhere; `false` enables it.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the user.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "description": "New display name, 1 to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "auth.update_user",
+      "output_schema": null,
+      "permissions": [
+        "auth.users.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get the calling user (id, email, name) and the permissions they hold. Start here to learn what you may do.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "auth.whoami",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Answer a shown question (a top-level comment) as yourself, like a signed-in user on the website: the answer carries your badges on the target (e.g. `seller`), follows the same moderation and may wait for approval. Needs a display name (`PUT /api/v1/comments/profile`) and, on some kinds, a verified account.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An answer to a question.",
+        "properties": {
+          "body": {
+            "description": "The answer, plain text.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Id of the question (a shown top-level comment).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "locale": {
+            "description": "`en` or `vi`: language of mails sent to you about this answer.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "type": "object"
+      },
+      "name": "comments.answer",
+      "output_schema": null,
+      "permissions": [
+        "comments.post"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a comment in any status with its moderation details and its `version`, needed to approve, reject or mark it as spam.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A comment to read.",
+        "properties": {
+          "id": {
+            "description": "Id of the comment.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "comments.get",
+      "output_schema": null,
+      "permissions": [
+        "comments.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Approve (`published`), reject (`rejected`), mark as spam (`spam`) or hold again (`pending`) a comment. Approving shows it and mails people following the comment it answers. Pass the `version` you read.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A moderation decision.",
+        "properties": {
+          "id": {
+            "description": "Id of the comment.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "description": "`published` (approve), `rejected`, `spam` or `pending` (hold again).",
+            "type": "string"
+          },
+          "version": {
+            "description": "The `version` you read (or `*`). Refused with `precondition_failed` if the comment\nchanged since: read it again and retry.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "version"
+        ],
+        "type": "object"
+      },
+      "name": "comments.moderate",
+      "output_schema": null,
+      "permissions": [
+        "comments.moderate"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List comments for moderation, newest first: by default those waiting for approval (`pending`), with their text, author, email, hold reason and report count. Follow `pagination.next_cursor` with the same filters for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Filters and paging of the moderation queue.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of comments to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Only comments whose text or author name contains this, ignoring case and accents.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`pending` (the default), `published`, `rejected`, `spam` or `deleted`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target_id": {
+            "description": "Only comments on this target.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target_type": {
+            "description": "Only comments on targets of this kind, e.g. `content.entry`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "comments.queue",
+      "output_schema": null,
+      "permissions": [
+        "comments.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Open or close the comments of a target (`open` / `closed`); closed targets take no new comments, existing ones stay shown.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new comment state for a target.",
+        "properties": {
+          "state": {
+            "description": "`open` or `closed`.",
+            "type": "string"
+          },
+          "target_id": {
+            "description": "Id of the target in its module.",
+            "type": "string"
+          },
+          "target_type": {
+            "description": "Kind of the target, e.g. `content.entry`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_type",
+          "target_id",
+          "state"
+        ],
+        "type": "object"
+      },
+      "name": "comments.set_target_state",
+      "output_schema": null,
+      "permissions": [
+        "comments.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List shown questions (top-level comments, e.g. on a product) that have no shown answer yet, newest first, with their text, author and badges. Answer one with `comments.answer`. Follow `pagination.next_cursor` with the same filters for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Filters and paging of the unanswered questions.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of questions to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first: who waited longest).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Only questions whose text or author name contains this, ignoring case and accents.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target_id": {
+            "description": "Only questions on this target.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target_type": {
+            "description": "Only questions on targets of this kind, e.g. `catalog.product`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "comments.unanswered",
+      "output_schema": null,
+      "permissions": [
+        "comments.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a post or page as a draft (not visible to readers until published). The slug is made from the title unless given.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new post or page, created as a draft.",
+        "properties": {
+          "ai_generated": {
+            "description": "The content was generated by AI. AI agents should send `true`; with only\n`content.write_own` the server always sets it.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "body": {
+            "description": "The body: a ProseMirror / Tiptap JSON document (see the `update` tool).",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "excerpt": {
+            "description": "Short summary, up to 1000 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`post` or `page`.",
+            "type": "string"
+          },
+          "locale": {
+            "description": "Language, e.g. `vi`; omitted: the default language.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent_id": {
+            "description": "Parent page (pages only).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "description": "Omitted: made from the title.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "description": "1 to 300 characters.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title"
+        ],
+        "type": "object"
+      },
+      "name": "content.create_draft",
+      "output_schema": null,
+      "permissions": [
+        "content.write",
+        "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a post or page: its draft (title, slug, summary, body, images, SEO fields, status) and its `version`, needed to change it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An entry to read.",
+        "properties": {
+          "id": {
+            "description": "Id of the entry.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "content.get",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get an AI translation request: `status` (queued, running, succeeded, failed), the translation's draft (`result_entry_id`) or why it failed (`error_code`).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An entry to read.",
+        "properties": {
+          "id": {
+            "description": "Id of the entry.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "content.get_translation_request",
+      "output_schema": null,
+      "permissions": [
+        "content.read",
+        "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List posts and pages, drafts included, newest first. Filter by kind, language, status, parent page, text, category/tag or author. Follow `pagination.next_cursor` with the same filters for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Filters and paging of the entry list; omitted fields do not filter.",
+        "properties": {
+          "author_id": {
+            "description": "Only entries by this author (its id).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`post` or `page`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of entries to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "locale": {
+            "description": "Only this language, e.g. `vi`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent_id": {
+            "description": "Only entries directly under this page: an entry id, or `root`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Only entries whose title, summary or body contains this text, ignoring case and accents.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`draft`, `published` or `archived`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "term_id": {
+            "description": "Only entries with this category or tag (its id).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "content.list",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the saved revisions of an entry, newest first (without their fields).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Revisions of an entry.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the entry.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of revisions to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "content.list_revisions",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Publish the current draft of a post or page: readers see it at its address. Pass the `version` you read. With `content.publish_own`, only entries you created.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An entry to publish or take down.",
+        "properties": {
+          "id": {
+            "description": "Id of the entry.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "version": {
+            "description": "The `version` you read (or `*`). Refused with `precondition_failed` if the entry\nchanged since.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version"
+        ],
+        "type": "object"
+      },
+      "name": "content.publish",
+      "output_schema": null,
+      "permissions": [
+        "content.publish",
+        "content.publish_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Ask a person to review and publish the draft of a post or page you wrote (emits `content.review_requested`). Use it when you may write but not publish. Pass the `version` you read.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An entry to publish or take down.",
+        "properties": {
+          "id": {
+            "description": "Id of the entry.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "version": {
+            "description": "The `version` you read (or `*`). Refused with `precondition_failed` if the entry\nchanged since.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version"
+        ],
+        "type": "object"
+      },
+      "name": "content.request_review",
+      "output_schema": null,
+      "permissions": [
+        "content.write",
+        "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Look up a public address in a language, as the website does: the published entry there, a redirect, or `gone`. Drafts are never returned.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An address to look up.",
+        "properties": {
+          "locale": {
+            "description": "Language of the address, e.g. `vi`.",
+            "type": "string"
+          },
+          "path": {
+            "description": "The address, without domain or language prefix, e.g. `/blog/my-post`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "locale",
+          "path"
+        ],
+        "type": "object"
+      },
+      "name": "content.resolve",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Copy a revision back into the draft of its entry (the published version does not change until published again). Pass the entry's `version`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A revision to copy back into the draft.",
+        "properties": {
+          "id": {
+            "description": "Id of the entry.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "revision_id": {
+            "description": "Id of the revision.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "version": {
+            "description": "The `version` of the entry you read (or `*`).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision_id",
+          "version"
+        ],
+        "type": "object"
+      },
+      "name": "content.restore_revision",
+      "output_schema": null,
+      "permissions": [
+        "content.write",
+        "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Search the posts and pages of one language (drafts included) by meaning and by words, best first, each with how it matched and the best passage. Good for finding related or duplicate content before writing.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "What to search for.",
+        "properties": {
+          "limit": {
+            "description": "Results to return, 1 to 50. Defaults to 10.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "locale": {
+            "description": "Language to search in, e.g. `vi`; omitted: the default language.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Words or a question, 1 to 200 characters.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "q"
+        ],
+        "type": "object"
+      },
+      "name": "content.search",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Check the SEO of the draft of a post or page without AI: missing or too long title and description for search engines, images without alt text, skipped heading levels, duplicate titles, missing translations. Changes nothing.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An entry to read.",
+        "properties": {
+          "id": {
+            "description": "Id of the entry.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "content.seo_check",
+      "output_schema": null,
+      "permissions": [
+        "content.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Ask the server's AI model to suggest a title and description for search engines, a summary and up to 5 existing categories or tags for a draft. Saves nothing: apply what you accept with `update`. Uses AI tokens.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An entry to read.",
+        "properties": {
+          "id": {
+            "description": "Id of the entry.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "content.suggest_seo",
+      "output_schema": null,
+      "permissions": [
+        "content.write",
+        "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Ask the server's AI to translate a post or page into another configured language. Returns a request at once; a background job writes the translation's draft (never published, marked ai_generated) without overwriting changes made meanwhile. Check it with `get_translation_request`. Uses AI tokens.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An entry to translate.",
+        "properties": {
+          "id": {
+            "description": "Id of the entry to translate.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "locale": {
+            "description": "The language to translate into, e.g. `vi`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "locale"
+        ],
+        "type": "object"
+      },
+      "name": "content.translate",
+      "output_schema": null,
+      "permissions": [
+        "content.write",
+        "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Take a published post or page down; it goes back to draft and its address answers 404. Pass the `version` you read.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An entry to publish or take down.",
+        "properties": {
+          "id": {
+            "description": "Id of the entry.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "version": {
+            "description": "The `version` you read (or `*`). Refused with `precondition_failed` if the entry\nchanged since.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version"
+        ],
+        "type": "object"
+      },
+      "name": "content.unpublish",
+      "output_schema": null,
+      "permissions": [
+        "content.publish",
+        "content.publish_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Change the draft of a post or page; omitted fields stay as they are. A published entry keeps showing its published version until published again. Pass the `version` you read.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Changes to the draft of an entry; omitted fields stay as they are.",
+        "properties": {
+          "ai_generated": {
+            "description": "The content was generated by AI. AI agents should send `true`; with only\n`content.write_own` the server always sets it.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "body": {
+            "description": "The body: a ProseMirror / Tiptap JSON document, e.g. `{\"type\": \"doc\", \"content\":\n[{\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"Hello\"}]}]}`. Allowed\nnodes: paragraph, heading (level 2–4), bulletList, orderedList, listItem, blockquote,\ncodeBlock, horizontalRule, hardBreak, table, tableRow, tableHeader, tableCell,\nimage (attrs `mediaId`, `alt`, `caption`), embed (attrs `url`), text; marks: bold,\nitalic, code, strike, underline, link (attrs `href`).",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "excerpt": {
+            "description": "Short summary, up to 1000 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "featured_media_alt": {
+            "description": "Text alternative of the main image.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "featured_media_id": {
+            "description": "Main image: a media item id.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the entry.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "meta_description": {
+            "description": "Description for search engines, up to 1000 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "meta_title": {
+            "description": "Title for search engines, up to 300 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "save_revision": {
+            "description": "Keep a revision of the draft after this change.",
+            "type": "boolean"
+          },
+          "slug": {
+            "description": "Lower-case letters and digits joined by `-`, at most 100 characters. `\"\"` makes one\nfrom the title.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "description": "1 to 300 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "description": "The `version` you read (or `*` to change it whatever its version). Refused with\n`precondition_failed` if the entry changed since: read it again and retry.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version"
+        ],
+        "type": "object"
+      },
+      "name": "content.update",
+      "output_schema": null,
+      "permissions": [
+        "content.write",
+        "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Delete a file and its content; it cannot be restored. Same access as `get_file`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A file to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the file.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "files.delete_file",
+      "output_schema": null,
+      "permissions": [
+        "files.upload",
+        "files.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get the details of a file (name, type, size, SHA-256). Your own files need `files.upload`; anyone's need `files.manage`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A file to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the file.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "files.get_file",
+      "output_schema": null,
+      "permissions": [
+        "files.upload",
+        "files.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the files you uploaded, newest first; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "files.list_files",
+      "output_schema": null,
+      "permissions": [
+        "files.upload"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a file with its content as base64, for files up to 1 MiB; download larger ones with `GET /api/v1/files/{id}/content`. Same access as `get_file`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A file to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the file.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "files.read_file",
+      "output_schema": null,
+      "permissions": [
+        "files.upload",
+        "files.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Upload a small file, its content base64-encoded (the size and type limits of the server apply). Upload large files with `POST /api/v1/files`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A small file to upload.",
+        "properties": {
+          "content_base64": {
+            "description": "The content, base64-encoded (standard alphabet, with padding).",
+            "type": "string"
+          },
+          "content_type": {
+            "description": "Media type, e.g. `text/plain`. Omit for `application/octet-stream`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "File name, 1 to 255 characters.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "content_base64"
+        ],
+        "type": "object"
+      },
+      "name": "files.upload_file",
+      "output_schema": null,
+      "permissions": [
+        "files.upload"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a form (open unless `status` is `closed`); websites show it from `GET /api/v1/forms/public/{key}`. Every problem is reported at once. Setting `notify_emails` also needs the permission `forms.read` (the mails carry the answers). `fields` is the whole list, in display order; each field is an object `{key, type, label, help?, placeholder?, required?, options?, min_length?, max_length?, min?, max?}`: `key` a lower-case letter then lower-case letters, digits or `_`; `type` one of `text`, `email`, `phone`, `textarea`, `number`, `select`, `radio`, `checkbox`, `date`, `hidden`, `consent` (at most one); `label`, `help`, `placeholder` are `{\"en\": …, \"vi\": …}`; `options` (only `select`, `radio`, `checkbox`) is a list of `{value, label?}`. `success_message` is `{\"en\": …, \"vi\": …}`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new form. Same rules as `POST /api/v1/forms`.",
+        "properties": {
+          "allowed_origins": {
+            "description": "Websites allowed to send the form from a browser, like `https://example.com`; empty\nor omitted: any.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "email_limit_per_hour": {
+            "description": "Public submissions per hour from one email address; omitted: the server default.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "fields": {
+            "description": "The fields, in display order (see the tool description for their shape).",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "ip_limit_per_hour": {
+            "description": "Public submissions per hour from one network block; omitted: the server default.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "key": {
+            "description": "Lower-case letters and digits in groups joined by `-`, at most 50 characters; unique.",
+            "type": "string"
+          },
+          "name": {
+            "description": "Name for admins, 1 to 200 characters.",
+            "type": "string"
+          },
+          "notify_emails": {
+            "description": "Addresses mailed for each new submission (the mails carry the answers), up to 20.\nSetting them also needs the permission `forms.read`.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "reply_to_field": {
+            "description": "Key of the `email` field used as `Reply-To`; omitted: the first `email` field.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retention_days": {
+            "description": "Days submissions are kept (`0`: until deleted); omitted: the server default.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`open` (the default) or `closed`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "success_message": {
+            "description": "Shown after sending: `{\"en\": …, \"vi\": …}`.",
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "fields"
+        ],
+        "type": "object"
+      },
+      "name": "forms.create",
+      "output_schema": null,
+      "permissions": [
+        "forms.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a form: its fields (keys, types, labels, options), status, settings, and its `etag`, needed to change it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A form to read.",
+        "properties": {
+          "id": {
+            "description": "Id of the form.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "forms.get",
+      "output_schema": null,
+      "permissions": [
+        "forms.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a submission: answers with labels, sender email, status, and its `version`, needed to change its status.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A submission to read.",
+        "properties": {
+          "id": {
+            "description": "Id of the submission.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "forms.get_submission",
+      "output_schema": null,
+      "permissions": [
+        "forms.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List forms, newest first, with their fields and settings. Follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Filters and paging of the form list.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of forms to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`open` or `closed`; omitted: both.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "forms.list",
+      "output_schema": null,
+      "permissions": [
+        "forms.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the submissions of a form, newest first, with their answers and the labels of the form version they were sent with. Spam is left out unless `status` is `spam`. Follow `pagination.next_cursor` with the same filters for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Filters and paging of a form's submissions.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "form_id": {
+            "description": "Id of the form.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of submissions to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Only submissions whose answers contain this text, ignoring case and accents.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`new`, `read`, `archived` or `spam`; omitted: every status but `spam`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "form_id"
+        ],
+        "type": "object"
+      },
+      "name": "forms.list_submissions",
+      "output_schema": null,
+      "permissions": [
+        "forms.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Mark a submission `read`, `archived`, `spam`, or `new` (not spam after all: the notification mail is then sent as for a new submission). Pass the `version` you read.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new status for a submission.",
+        "properties": {
+          "id": {
+            "description": "Id of the submission.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "description": "`new`, `read`, `archived` or `spam`.",
+            "type": "string"
+          },
+          "version": {
+            "description": "The `version` you read (or `*`). Refused with `precondition_failed` if the submission\nchanged since: read it again and retry.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "version"
+        ],
+        "type": "object"
+      },
+      "name": "forms.set_submission_status",
+      "output_schema": null,
+      "permissions": [
+        "forms.review"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Change a form: only the given fields change. Close it with `status: closed` (there is no delete tool: deleting a form also deletes its submissions). Pass the `etag` you read. Changing `notify_emails` also needs the permission `forms.read` (the mails carry the answers). `fields` is the whole list, in display order; each field is an object `{key, type, label, help?, placeholder?, required?, options?, min_length?, max_length?, min?, max?}`: `key` a lower-case letter then lower-case letters, digits or `_`; `type` one of `text`, `email`, `phone`, `textarea`, `number`, `select`, `radio`, `checkbox`, `date`, `hidden`, `consent` (at most one); `label`, `help`, `placeholder` are `{\"en\": …, \"vi\": …}`; `options` (only `select`, `radio`, `checkbox`) is a list of `{value, label?}`. `success_message` is `{\"en\": …, \"vi\": …}`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Changes to a form. Omitted fields stay as they are; `null` clears the nullable ones.",
+        "properties": {
+          "allowed_origins": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "email_limit_per_hour": {
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "etag": {
+            "description": "The `etag` you read (or `*`). Refused with `precondition_failed` if the form changed\nsince: read it again and retry. (Not the form's `version`, which counts field changes.)",
+            "type": "string"
+          },
+          "fields": {
+            "description": "The whole new list of fields; a change makes a new form version, and old\nsubmissions keep the labels of their own version.",
+            "items": {
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the form.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "ip_limit_per_hour": {
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notify_emails": {
+            "description": "The whole new list of addresses mailed for each new submission (the mails carry the\nanswers). Changing it also needs the permission `forms.read`.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "reply_to_field": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retention_days": {
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`open` or `closed` (closed forms refuse submissions with `forms.closed`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "success_message": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "etag"
+        ],
+        "type": "object"
+      },
+      "name": "forms.update",
+      "output_schema": null,
+      "permissions": [
+        "forms.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Describe one installed module, like an item of `kernel.list_modules`, plus whether each of its migrations is applied to the database.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which module to describe.",
+        "properties": {
+          "name": {
+            "description": "Module name, e.g. `notes`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.get_module",
+      "output_schema": null,
+      "permissions": [
+        "kernel.modules.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the modules installed in this server, in start order, with the permissions, events, jobs, schedules, MCP tools, deprecated endpoints and migrations each declares. Use it to learn what this server can do.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "kernel.list_modules",
+      "output_schema": null,
+      "permissions": [
+        "kernel.modules.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a media item: name, type, size, image width and height, texts, visibility, and the `url` of its content.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A media item to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the media item.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "media.get",
+      "output_schema": null,
+      "permissions": [
+        "media.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List media items (images, video, audio, documents), newest first. Filter by folder, type, visibility, trash or name; sort by `created_at`, `name` or `size`. Follow `pagination.next_cursor` with the same filters for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Filters, order and paging of the media list; omitted fields do not filter.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "folder_id": {
+            "description": "Only items in this folder (not its subfolders): a folder id, or `root`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Only items whose name contains this text, ignoring case and accents.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sort": {
+            "description": "`created_at` (default), `name` or `size`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tag": {
+            "description": "Only items with this tag, ignoring case.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trashed": {
+            "description": "`true`: only items in the trash. Default: only items not in the trash.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "type": {
+            "description": "Only this media type (`image/png`) or family (`image/*`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "visibility": {
+            "description": "`public` or `private`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "media.list",
+      "output_schema": null,
+      "permissions": [
+        "media.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List media tags by name, each with the number of items carrying it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which tags to list.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of tags to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Only tags whose name contains this text, ignoring case and accents.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "media.list_tags",
+      "output_schema": null,
+      "permissions": [
+        "media.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Set (or, with `alt: null`, remove) the text alternative of a media item in one language, e.g. `vi` on a bilingual site; the item's own `alt` stays the default for other languages. Pass the `updated_at` you read; the change is refused if someone changed the item since.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The text alternative of a media item in one language.",
+        "properties": {
+          "alt": {
+            "description": "Text alternative in this language, up to 1000 characters; `null` removes the\ntranslation (readers in this language get the default `alt` again).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the media item.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "locale": {
+            "description": "BCP 47 language code, one the server offers (e.g. `vi`).",
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "The `updated_at` of the item as you last read it. The change is refused if the\nitem changed since; read it again and retry.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "updated_at",
+          "locale"
+        ],
+        "type": "object"
+      },
+      "name": "media.set_alt",
+      "output_schema": null,
+      "permissions": [
+        "media.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Ask the server's AI model to suggest alt text for an image (JPEG, PNG, GIF, WebP) in a language, optionally with context such as the post title. Saves nothing: store what you accept with `update`. Uses AI tokens.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An image to describe.",
+        "properties": {
+          "context": {
+            "description": "Where the image is used (for example the post title), up to 500 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the media item.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "locale": {
+            "description": "Language of the alt text, a BCP 47 code like `vi` or `en`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "locale"
+        ],
+        "type": "object"
+      },
+      "name": "media.suggest_alt",
+      "output_schema": null,
+      "permissions": [
+        "media.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Move a media item to the trash. Its public link stops working; it can be restored until the server deletes it for good (30 days by default).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A media item to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the media item.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "media.trash",
+      "output_schema": null,
+      "permissions": [
+        "media.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Change the details of a media item: name, alt text, title, caption, folder or visibility. Pass the `updated_at` you read; the change is refused if someone changed the item since.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Changes to a media item; omitted fields stay as they are.",
+        "properties": {
+          "alt": {
+            "description": "Text alternative for screen readers, up to 1000 characters; `\"\"` clears it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "caption": {
+            "description": "Caption, up to 2000 characters; `\"\"` clears it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "folder_id": {
+            "description": "Move to this folder; `null` moves to the root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the media item.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "description": "New file name, 1 to 255 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "description": "Replace the tags of the item; `[]` removes them all.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "title": {
+            "description": "Title, up to 255 characters; `\"\"` clears it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "description": "The `updated_at` of the item as you last read it. The change is refused if the\nitem changed since; read it again and retry.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "visibility": {
+            "description": "`public` (anyone with the link may load the content) or `private`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "name": "media.update",
+      "output_schema": null,
+      "permissions": [
+        "media.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Add a small file (at most 1 MiB) to the media library, sent as base64. The server checks the content really is of its type and reads image sizes. Upload larger files with `POST /api/v1/media`. The answer lists items that already had the same content in `duplicates`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A small file to add to the media library.",
+        "properties": {
+          "content_base64": {
+            "description": "The content, base64-encoded (standard alphabet, with padding); at most 1 MiB once\ndecoded. Upload larger files with `POST /api/v1/media`.",
+            "type": "string"
+          },
+          "content_type": {
+            "description": "Media type, e.g. `image/png`. Omit to let the server detect it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "folder_id": {
+            "description": "Folder to put the item in. Omit for the root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "File name, 1 to 255 characters, without `/` or `\\`.",
+            "type": "string"
+          },
+          "tags": {
+            "description": "Tags for the item.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "content_base64"
+        ],
+        "type": "object"
+      },
+      "name": "media.upload",
+      "output_schema": null,
+      "permissions": [
+        "media.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a website menu: a key (e.g. `main`, `footer`), a language and an item tree. Each item is an object: `label` (up to 200 characters; may be empty with `ref` to show the object's title); at most one of `url` (`https://`, `http://`, `mailto:` or a path starting with one `/`) and `ref` (`{\"kind\": \"content.term\", \"id\": \"...\"}`, an object of any module), with neither the item is a heading; `auto_children` (true to also list the object's sub-items) with `auto_children_limit` (1 to 50, default 12); `icon`; `highlight` (`accent`, `brand`, `sale`, `muted`); `badge` (`{\"text\", \"tone\": sale|brand|new|neutral, \"from\"?, \"until\"?}`); `feature` (an object to feature, same shape as `ref`); `children` (same shape; 4 levels and 200 items at most).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new website menu.",
+        "properties": {
+          "items": {
+            "description": "The item tree (see the tool description for the shape of an item).",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "key": {
+            "description": "1 to 64 lower-case letters, digits, `-` or `_`, e.g. `main` or `footer`.",
+            "type": "string"
+          },
+          "locale": {
+            "description": "The menu's language, e.g. `vi`; omitted: the default language.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
+      },
+      "name": "menus.create_menu",
+      "output_schema": null,
+      "permissions": [
+        "menus.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Delete a website menu and all its items. It cannot be restored.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A menu to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the menu.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "menus.delete_menu",
+      "output_schema": null,
+      "permissions": [
+        "menus.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a website menu with its items as saved, and its `version` for `replace_menu_items`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A menu to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the menu.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "menus.get_menu",
+      "output_schema": null,
+      "permissions": [
+        "menus.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the website menus (every key and language), newest first; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "menus.list_menus",
+      "output_schema": null,
+      "permissions": [
+        "menus.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Replace the whole item tree of a website menu. Send the `version` from `get_menu`; if the menu changed since, nothing is saved (`precondition_failed`): read it again. Each item is an object: `label` (up to 200 characters; may be empty with `ref` to show the object's title); at most one of `url` (`https://`, `http://`, `mailto:` or a path starting with one `/`) and `ref` (`{\"kind\": \"content.term\", \"id\": \"...\"}`, an object of any module), with neither the item is a heading; `auto_children` (true to also list the object's sub-items) with `auto_children_limit` (1 to 50, default 12); `icon`; `highlight` (`accent`, `brand`, `sale`, `muted`); `badge` (`{\"text\", \"tone\": sale|brand|new|neutral, \"from\"?, \"until\"?}`); `feature` (an object to feature, same shape as `ref`); `children` (same shape; 4 levels and 200 items at most).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The new item tree of a menu.",
+        "properties": {
+          "id": {
+            "description": "Id of the menu.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "items": {
+            "description": "The whole new item tree (see the tool description for the shape of an item).",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "version": {
+            "description": "The `version` returned by `get_menu` (or `*` to replace whatever the version).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "items"
+        ],
+        "type": "object"
+      },
+      "name": "menus.replace_menu_items",
+      "output_schema": null,
+      "permissions": [
+        "menus.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Write a draft campaign for a list. Nothing is sent: a person (or an agent with `newsletter.send`) sends or schedules it after review. Returns the campaign with its `version`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new draft campaign.",
+        "properties": {
+          "advertising": {
+            "description": "An advertising mail (labelled, limited per day per address).",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "body_html": {
+            "description": "HTML body, sent as is (not sanitised: admin interfaces preview it in a sandboxed iframe).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body_text": {
+            "description": "Plain-text body. A footer with the unsubscribe link is added to every mail.",
+            "type": "string"
+          },
+          "list_id": {
+            "description": "The list to send to.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "locale": {
+            "description": "Language of the footer: `en` (default) or `vi`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preheader": {
+            "description": "Short text shown after the subject in some mail apps (HTML mails only).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject": {
+            "description": "1 to 200 characters, one line.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "list_id",
+          "subject",
+          "body_text"
+        ],
+        "type": "object"
+      },
+      "name": "newsletter.create_campaign",
+      "output_schema": null,
+      "permissions": [
+        "newsletter.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Find subscribers by part of their email address, list or subscription status, newest first, with their subscriptions. Follow `pagination.next_cursor` with the same filters for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Filters of a subscriber search.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "description": "Part of the email address, any case.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of subscribers to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "list_id": {
+            "description": "Only subscribers of this list.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`unconfirmed`, `confirmed` or `unsubscribed` (in `list_id`, or in any list).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "newsletter.find_subscribers",
+      "output_schema": null,
+      "permissions": [
+        "newsletter.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a campaign: content, status and progress (`progress.total`, `pending`, `sent`, `failed`, `skipped`), and the `version` needed to send or schedule it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A campaign to read.",
+        "properties": {
+          "id": {
+            "description": "Id of the campaign.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "newsletter.get_campaign",
+      "output_schema": null,
+      "permissions": [
+        "newsletter.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the newsletter lists, newest first, with how many people are unconfirmed, confirmed and unsubscribed. Follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Paging of the list of lists.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of lists to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "newsletter.list_lists",
+      "output_schema": null,
+      "permissions": [
+        "newsletter.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Schedule a draft or scheduled campaign to start sending at `at`. Pass the `version` you read.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A campaign to schedule.",
+        "properties": {
+          "at": {
+            "description": "When to start sending: a future time with a time zone, e.g. `2026-12-01T08:00:00Z`.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Id of the campaign.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "version": {
+            "description": "The `version` you read (or `*`).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "version"
+        ],
+        "type": "object"
+      },
+      "name": "newsletter.schedule_campaign",
+      "output_schema": null,
+      "permissions": [
+        "newsletter.send"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Send a draft or scheduled campaign now to every confirmed subscriber of its list. Mails go out in batches; follow the progress with `get_campaign`. Pass the `version` you read.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A campaign to send now.",
+        "properties": {
+          "id": {
+            "description": "Id of the campaign.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "version": {
+            "description": "The `version` you read (or `*`). Refused with `precondition_failed` if the campaign\nchanged since: read it again, check it, and retry.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version"
+        ],
+        "type": "object"
+      },
+      "name": "newsletter.send_campaign",
+      "output_schema": null,
+      "permissions": [
+        "newsletter.send"
+      ]
+    }
+  ]
+}

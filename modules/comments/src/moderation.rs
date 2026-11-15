@@ -3,6 +3,8 @@
 //! (module `audit` ghi lại: ai, lúc nào, làm gì — phục vụ yêu cầu gỡ trong 24 giờ của Nghị định
 //! 147/2024 nếu áp dụng). Event không mang chữ hay email.
 
+pub(crate) mod reports;
+
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
@@ -15,10 +17,10 @@ use sea_orm::{
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::authoring::{Deletion, soft_delete, update_if_unchanged};
 use crate::entity::{ban, comment, report, subscription};
 use crate::events::{self, Change};
 use crate::permissions::{COMMENTS_EXPORT, COMMENTS_MANAGE, COMMENTS_MODERATE, COMMENTS_READ};
+use crate::posting::authoring::{Deletion, soft_delete, update_if_unchanged};
 use crate::service::{
     Comment, CommentsService, Status, comment_not_found, now, shift_counts, summary,
 };
@@ -32,6 +34,8 @@ pub(crate) struct QueueFilter {
     pub target_id: Option<String>,
     /// Chữ hay tên chứa chuỗi này (không phân biệt hoa thường, dấu).
     pub search: Option<String>,
+    /// Chỉ bình luận gốc chưa có trả lời đang hiện (câu hỏi chưa trả lời, D-202).
+    pub unanswered: bool,
 }
 
 /// Một lệnh cấm mới.
@@ -90,6 +94,11 @@ impl CommentsService {
         }
         if let Some(id) = filter.target_id.as_deref().filter(|id| !id.is_empty()) {
             select = select.filter(comment::Column::TargetId.eq(id));
+        }
+        if filter.unanswered {
+            select = select
+                .filter(comment::Column::Depth.eq(0))
+                .filter(comment::Column::ReplyCount.eq(0));
         }
         if let Some(search) = filter.search.as_deref().filter(|search| !search.trim().is_empty()) {
             select = select

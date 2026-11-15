@@ -32,14 +32,33 @@ Khách không cần permission nào: mọi thứ dưới `/api/v1/comments/publi
 `AUTOXIDE_COMMENTS_TARGET_TYPES` (mặc định `content.entry`) liệt kê các loại nhận bình luận. Khi
 một module khác tra được loại đó (module `content` tra `content.entry`), bình luận chỉ được nhận
 khi đích có thật và đang công khai; loại khác được nhận theo cấu hình. Đích có dòng riêng từ bình
-luận đầu tiên, giữ trạng thái (`open` / `closed`, `hidden`, `closes_at`) và số đếm. Khi `content`
-lưu trữ một bài, bình luận của bài đóng lại; khi xoá bài, bình luận còn bị ẩn.
-`AUTOXIDE_COMMENTS_AUTO_CLOSE_DAYS` đóng đích sau một số ngày kể từ bình luận đầu tiên.
+luận đầu tiên, giữ trạng thái (`open` / `closed`, `hidden`, `closes_at`) và số đếm. Module sở hữu
+loại đích khai event nào của nó đóng hay gỡ đích: khi `content` lưu trữ một bài, bình luận của bài
+đóng lại; khi xoá bài, bình luận còn bị ẩn. `AUTOXIDE_COMMENTS_AUTO_CLOSE_DAYS` đóng đích sau một số
+ngày kể từ bình luận đầu tiên.
+
+## Hỏi đáp
+
+Cùng các luồng đó làm hỏi đáp sản phẩm: câu hỏi là bình luận gốc, câu trả lời là trả lời của nó. Module
+sở hữu đích có thể gắn **nhãn** cho tác giả, tính lúc viết và trả về dạng mã ổn định trong `badges` (vd
+`seller` cho người quản lý sản phẩm, `verified_buyer` cho người đã nhận hàng); giao diện tự hiện nhãn
+cho từng mã.
+
+- Tìm câu hỏi của một đích: `GET /api/v1/comments/public/threads?target_type=…&target_id=…&q=bảo hành`
+  — không phân biệt hoa thường và dấu; khớp đúng dấu xếp trước.
+- Số trên tab: `GET /api/v1/comments/public/counts` trả `thread_count` (câu hỏi đang hiện) bên cạnh
+  `count` (mọi bình luận đang hiện); đích cũng trả `thread_count`, người kiểm duyệt có thêm
+  `pending_thread_count`.
+- Câu hỏi chưa trả lời (chưa có trả lời đang hiện): `GET /api/v1/comments?status=published&unanswered=true`.
+- `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` liệt kê loại đích chỉ tài khoản đã xác thực được hỏi hay trả
+  lời: khách bị từ chối, người dùng đăng nhập được hỏi qua module giữ trạng thái xác thực tài khoản
+  (`comments.verification_required`, 403). Chưa cài module đó thì mọi tài khoản đăng nhập tính là đã
+  xác thực.
 
 ## Website
 
 1. `GET /api/v1/comments/public/settings` — giới hạn và công tắc (có nhận khách không, số phút
-   được sửa, độ dài tối đa, mail báo trả lời có bật không).
+   được sửa, độ dài tối đa, mail báo trả lời có bật không, Markdown có bật không).
 2. `GET /api/v1/comments/public/threads?target_type=content.entry&target_id=…&order=desc&limit=20&replies_limit=3`
    — bình luận gốc đang hiện kèm vài trả lời đầu và `reply_count`; đi tiếp bằng
    `pagination.next_cursor`. Thêm trả lời: `GET /api/v1/comments/public/comments/{id}/replies`.
@@ -47,7 +66,7 @@ lưu trữ một bài, bình luận của bài đóng lại; khi xoá bài, bìn
    (tối đa 100). Khung bình luận có mở không: `GET /api/v1/comments/public/targets/{type}/{id}`.
 3. Hiển thị `body_html` (mọi thứ đã escape, xuống dòng thành `<br>`, địa chỉ `http(s)` thành link
    có `rel="nofollow ugc noopener"`); không bao giờ chèn `body` như HTML. Ghi rõ khách là khách
-   (`author.kind`).
+   (`author.kind`). Xem "Chữ thường và Markdown" bên dưới.
 4. Mỗi lần hiện khung (không bao giờ trong HTML đã cache): `GET /api/v1/antispam/token?scope=comments:content.entry`.
    Hiện một ô bẫy ẩn mà người thật để trống.
 5. `POST /api/v1/comments/public/comments`:
@@ -86,6 +105,23 @@ lưu trữ một bài, bình luận của bài đóng lại; khi xoá bài, bìn
 - Báo cáo: `POST /api/v1/comments/public/comments/{id}/reports {"reason": "spam" | "abuse" |
   "illegal" | "other", "note": "…"}`. Mỗi tài khoản báo một bình luận một lần; khách được đếm theo
   khối mạng (`/24` với IPv4, `/48` với IPv6).
+
+## Chữ thường và Markdown
+
+Bình luận gửi kèm `format`: `text` (mặc định) hay `markdown`. `markdown` chỉ dùng được khi
+`GET /api/v1/comments/public/settings` trả `markdown: true` (`AUTOXIDE_COMMENTS_MARKDOWN`, mặc định
+bật; tắt thì `markdown` bị từ chối ở trường `format`). Sửa mà không gửi `format` thì giữ định dạng
+của bình luận. Bình luận cũ là `text` và hiện như trước.
+
+- `text`: chữ thường. Dấu `*` vẫn là `*`; xuống dòng được giữ; địa chỉ `http(s)` thành link.
+- `markdown`: một phần nhỏ của Markdown — `**đậm**`, `*nghiêng*`, `[link](https://…)` và
+  `<https://…>`, `> trích dẫn`, `` `code` `` và khối code. Tiêu đề và mục danh sách hiện như đoạn
+  văn; ảnh hiện thành chữ của nó (không bao giờ tải ảnh); HTML thô hiện thành chữ. Chỉ link
+  `http(s)` dùng được, đều có `rel="nofollow ugc noopener"`.
+
+Máy chủ dựng `body_html` từ một danh sách thẻ cố định (`p`, `br`, `strong`, `em`, `a`,
+`blockquote`, `code`, `pre`), nên website chèn nguyên `body_html` ở cả hai định dạng. Link Markdown
+được tính vào `AUTOXIDE_COMMENTS_MAX_LINKS` như địa chỉ trần. Từ cấm được so trên chữ người viết.
 
 ## Kiểm duyệt
 
@@ -155,8 +191,9 @@ trường hợp của bạn trước khi dựa vào.**
   trong 24 giờ khi cơ quan có thẩm quyền yêu cầu, và một số dịch vụ phải lưu nhật ký xử lý (có
   nguồn nói 2 năm). Module có `AUTOXIDE_COMMENTS_ENABLED`, `AUTOXIDE_COMMENTS_ALLOW_GUESTS`,
   `AUTOXIDE_COMMENTS_SIGNED_IN_ONLY_TYPES`, đóng hay ẩn đích, xoá hẳn (`DELETE
-  /api/v1/comments/{id}`, ghi vào audit log kèm ai làm, lúc nào) và lý do báo cáo `illegal`. Xác
-  thực tài khoản bằng số điện thoại không thuộc module này. Thời gian giữ audit log do module
+  /api/v1/comments/{id}`, ghi vào audit log kèm ai làm, lúc nào) và lý do báo cáo `illegal`.
+  `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` hỏi module giữ trạng thái xác thực số điện thoại hay định
+  danh (không phải module này) trước khi nhận bình luận. Thời gian giữ audit log do module
   `audit` quyết.
 - **Việt Nam, Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 và Nghị định 356/2025:** người dùng có quyền
   xin dữ liệu và xin xoá; module xuất và xoá theo email và theo tài khoản, chỉ giữ dữ liệu mạng ở
@@ -169,8 +206,12 @@ trường hợp của bạn trước khi dựa vào.**
 
 Tool `comments.queue` và `comments.get` (`comments.read`), `comments.moderate`
 (`comments.moderate`; gửi `version` đã đọc, như `If-Match`) và `comments.set_target_state`
-(`comments.manage`), cùng permission và cùng kiểm tra như REST. Không có tool viết bình luận (đó là
-việc của người đọc trên website) và không có tool xoá hẳn (dùng REST).
+(`comments.manage`), cùng permission và cùng kiểm tra như REST. Cho hỏi đáp: `comments.unanswered`
+(`comments.read`) liệt kê câu hỏi đang hiện chưa có trả lời đang hiện, và `comments.answer`
+(`comments.post`) trả lời một câu bằng tài khoản của người gọi — như người dùng đăng nhập trên website,
+cùng nhãn, cùng kiểm xác thực và kiểm duyệt (đặt tên hiển thị trước bằng `PUT
+/api/v1/comments/profile`). Không có tool mở luồng mới (đó là việc của người đọc trên website) và không
+có tool xoá hẳn (dùng REST).
 
 ## Cấu hình
 
@@ -180,11 +221,13 @@ việc của người đọc trên website) và không có tool xoá hẳn (dùn
 | `AUTOXIDE_COMMENTS_TARGET_TYPES`           | `content.entry`                             |
 | `AUTOXIDE_COMMENTS_ALLOW_GUESTS`           | `true`                                      |
 | `AUTOXIDE_COMMENTS_SIGNED_IN_ONLY_TYPES`   | —                                           |
+| `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES`    | —                                           |
 | `AUTOXIDE_COMMENTS_GUEST_MODERATION`       | `pre`                                       |
 | `AUTOXIDE_COMMENTS_USER_MODERATION`        | `first_time`                                |
 | `AUTOXIDE_COMMENTS_MODERATION_BY_TYPE`     | —                                           |
 | `AUTOXIDE_COMMENTS_MAX_LENGTH`             | `4000`                                      |
 | `AUTOXIDE_COMMENTS_MAX_LINKS`              | `2`                                         |
+| `AUTOXIDE_COMMENTS_MARKDOWN`               | `true`                                      |
 | `AUTOXIDE_COMMENTS_EDIT_MINUTES`           | `15`                                        |
 | `AUTOXIDE_COMMENTS_REPORT_THRESHOLD`       | `3`                                         |
 | `AUTOXIDE_COMMENTS_AUTO_CLOSE_DAYS`        | `0` (không bao giờ)                         |

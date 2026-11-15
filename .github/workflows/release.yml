@@ -198,10 +198,18 @@ jobs:
             found && /^## \[/ { exit }
             found { print }
           ' CHANGELOG.md > notes.md
+      # Gói SDK TypeScript đính kèm bản phát hành: client cài bằng URL của file, không cần npm registry (D-177).
+      - name: Pack the TypeScript SDK
+        working-directory: sdk/typescript
+        run: |
+          npm pack
+          mv autoxide-sdk-*.tgz ../../
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
+          sdk="$(ls autoxide-sdk-*.tgz)"
           gh release create "$TAG" --title "Autoxide $TAG" --notes-file notes.md --verify-tag \
-            "sbom.spdx.json#SBOM (SPDX JSON) of the Docker image"
+            "sbom.spdx.json#SBOM (SPDX JSON) of the Docker image" \
+            "$sdk#TypeScript SDK (npm install <URL of this file>)"

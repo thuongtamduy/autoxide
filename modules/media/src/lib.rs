@@ -8,23 +8,18 @@
 //! REST ở `/api/v1/media` (hướng dẫn: `docs/MEDIA.md`), tool MCP, trait [`api::Media`]
 //! cho module khác, hai job định kỳ (dọn thùng rác, dọn nội dung mồ côi).
 
-mod alt;
 pub mod api;
 mod config;
 mod entity;
 mod events;
-mod folders;
 mod http;
+mod images;
 mod jobs;
+mod library;
 mod migration;
 mod permissions;
-mod refresh;
 mod service;
-mod sniff;
-mod tags;
 mod tools;
-mod upload;
-mod variants;
 
 #[cfg(test)]
 mod tests;
@@ -46,9 +41,9 @@ use axum::http::Method;
 use utoipa_axum::router::OpenApiRouter;
 
 use crate::config::MediaConfig;
+use crate::images::variants::{Generator, MAKE_VARIANTS};
 use crate::jobs::{CLEAN_ORPHANS, CleanOrphans, PURGE_TRASH, PurgeTrash};
 use crate::service::MediaService;
-use crate::variants::{Generator, MAKE_VARIANTS};
 
 /// Module `media`, để binary đăng ký trong `crates/app/src/modules.rs` — SAU module `files`
 /// (cần `dyn Storage` của nó).
@@ -150,7 +145,7 @@ impl Module for MediaModule {
     }
 
     fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
-        self.service.clone().map_or_else(Vec::new, |service| vec![refresh::task(service)])
+        self.service.clone().map_or_else(Vec::new, |service| vec![images::refresh::task(service)])
     }
 
     fn tools(&self) -> Vec<Tool> {
@@ -162,64 +157,21 @@ impl Module for MediaModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
-    use std::collections::BTreeMap;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
 
     use autoxide_kernel::access::Principal;
     use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
     use autoxide_kernel::database::Database;
-    use autoxide_kernel::error::Error;
     use autoxide_kernel::event::Outbox;
     use autoxide_kernel::migration::{Migrator, ModuleMigrations};
-    use autoxide_kernel::storage::{ByteStream, Storage, StoredFile};
-    use autoxide_testkit::TestDatabase;
+    use autoxide_kernel::storage::ByteStream;
+    use autoxide_testkit::{MemoryStorage, TestDatabase};
     use bytes::Bytes;
-    use futures_util::{StreamExt as _, TryStreamExt as _};
+    use futures_util::StreamExt as _;
     use uuid::Uuid;
 
     use crate::config::{Limits, MediaConfig};
     use crate::service::MediaService;
-
-    /// Nơi lưu trong bộ nhớ: đủ cho test của module (nơi lưu thật — ổ đĩa, S3 — được thử
-    /// ở test đầu-cuối của `crates/app`). Không cài lại `get_range` / `keys_with_prefix`:
-    /// thử luôn cài đặt mặc định của kernel.
-    #[derive(Default)]
-    pub struct MemoryStorage(pub Mutex<BTreeMap<String, Bytes>>);
-
-    #[async_trait::async_trait]
-    impl Storage for MemoryStorage {
-        async fn put(&self, key: &str, content: ByteStream) -> Result<u64, Error> {
-            let chunks: Vec<Bytes> = content.try_collect().await?;
-            let bytes = Bytes::from(chunks.concat());
-            let size = bytes.len() as u64;
-            self.0.lock().unwrap().insert(key.to_owned(), bytes);
-            Ok(size)
-        }
-
-        async fn get(&self, key: &str) -> Result<Option<StoredFile>, Error> {
-            let bytes = self.0.lock().unwrap().get(key).cloned();
-            Ok(bytes.map(|bytes| {
-                // Chia thành khúc 3 byte để thử việc cắt khoảng qua nhiều khúc.
-                let content = futures_util::stream::iter(
-                    bytes
-                        .chunks(3)
-                        .map(|chunk| Ok(Bytes::copy_from_slice(chunk)))
-                        .collect::<Vec<_>>(),
-                )
-                .boxed();
-                StoredFile::new(bytes.len() as u64, content)
-            }))
-        }
-
-        async fn delete(&self, key: &str) -> Result<(), Error> {
-            self.0.lock().unwrap().remove(key);
-            Ok(())
-        }
-
-        async fn keys(&self) -> Result<Vec<String>, Error> {
-            Ok(self.0.lock().unwrap().keys().cloned().collect())
-        }
-    }
 
     pub fn limits() -> Limits {
         let source = ConfigSource::default();
@@ -260,6 +212,7 @@ pub(crate) mod testing {
             trash_days: 30,
             image_widths: vec![100, 200],
             ai_send_private: send_private,
+            alt_locales: vec!["en".to_owned(), "vi".to_owned()],
         };
         let service = MediaService::new(
             database.clone(),

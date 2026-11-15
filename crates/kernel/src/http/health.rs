@@ -93,6 +93,7 @@ pub fn health_routes(database: Database, draining: Draining) -> OpenApiRouter {
 #[utoipa::path(
     get,
     path = "/health/live",
+    extensions(("x-public" = json!(true))),
     tag = "health",
     operation_id = "health_live",
     responses((status = 200, description = "The process is running.", body = Data<Health>))
@@ -109,6 +110,7 @@ async fn live() -> Data<Health> {
 #[utoipa::path(
     get,
     path = "/health/ready",
+    extensions(("x-public" = json!(true))),
     tag = "health",
     operation_id = "health_ready",
     responses(

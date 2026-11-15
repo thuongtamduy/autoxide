@@ -9,6 +9,138 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- `forms`: large CSV exports in the background. `POST /api/v1/forms/{id}/submissions/exports` answers at once;
+  `GET /api/v1/forms/exports/{export_id}` gives the state and, once ready, a signed download link that needs no
+  sign-in and expires (`AUTOXIDE_FORMS_EXPORT_LINK_MINUTES`). The file has the same content as the existing
+  export. It is kept `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS`, and deleted with the submissions of an address or with
+  the form. New event `forms.submissions_exported`.
+- `auth`: when an account's email changes, the old address gets a mail saying so, with a token (valid 7 days)
+  to report a change the owner did not make. `POST /api/v1/auth/email-change/report` signs the account out
+  everywhere, removes its password, passkeys, API keys and two-step sign-in, gives the old address back when it is
+  free, and sends a password-reset mail there. New setting `AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL`, new event
+  `auth.email_change_reported`.
+- `auth`: administrators with the new permission `auth.passkeys.manage` see and remove the passkeys of other
+  users (`GET`, `DELETE /api/v1/auth/users/{id}/passkeys`, `DELETE …/passkeys/{passkey_id}`); the event
+  `auth.passkey_removed` then records `by_administrator`. `autoxide user remove-passkeys --email …` does the same
+  from the server for an only administrator who lost their devices.
+- `comments`: comments may be written in a small part of Markdown (`format: markdown`: bold, italics, links,
+  quotes, code), rendered to safe HTML from a fixed list of tags (raw HTML shows as text, images as their text,
+  only `http(s)` links). Plain text stays the default and old comments show as before; Markdown links count
+  towards the link limit. New setting `AUTOXIDE_COMMENTS_MARKDOWN` (on), `markdown` in the public settings,
+  `format` in every comment.
+- For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
+  errors.
+
+### Changed
+
+- For module authors: the trait `autoxide_auth::api::AccountRecovery` has a new method `remove_passkeys`; only
+  `auth` implements it.
+- Internal, no change in behaviour: the code of `newsletter`, `comments`, `media` and `forms` is grouped by
+  feature like `content` and `auth`, and the kernel's files sit in private groups (`contracts`, `data`,
+  `security`, `ops`, `values`). Every public path (`autoxide_kernel::ai::TextModel`, …) is unchanged, and a
+  test keeps it so.
+
+### Fixed
+
+- `./gate.sh` ran `cargo xtask api-diff` and `cargo xtask sdk --check` before it stopped on errors, so a
+  breaking API change or an outdated SDK did not turn the gate red. They now run as steps like the others.
+
+## [0.14.0] - 2026-11-15
+
+### Added
+
+- `cargo xtask api-diff`: the gate refuses breaking changes to `/api/v1` against the last release tag
+  (removed operations, new required parameters or fields, removed response fields, narrowed types, removed
+  enum values…), each with a stable rule code and the way to do it right. Deprecated operations now carry
+  `x-sunset` in the OpenAPI document.
+- MCP tools have a contract like endpoints: `autoxide mcp-manifest` prints `docs/mcp-tools.json`, and
+  `cargo xtask api-diff` refuses breaking changes to tools (removed tool, new required parameter, a
+  read-only tool that now writes…). Modules deprecate a tool with `Deprecation::tool(…)` in
+  `Module::deprecations`; `tools/list` says so and every result carries `_meta.autoxide/deprecation` and a
+  warning. The module catalog lists a tool's `deprecation`.
+- `cargo xtask semver`: lists breaking changes to the Rust contract (`autoxide-kernel`, `autoxide-testkit`)
+  against the last release, with `cargo-semver-checks`; run when releasing. It only reports while the
+  version is `0.x`, and refuses breaking changes from `1.0` or with `--deny`.
+- A typed TypeScript SDK in `sdk/typescript/` (no dependencies; not on npm): `createClient`, typed paths,
+  parameters, bodies and results generated from `docs/openapi.json` by `cargo xtask sdk`, `AutoxideError`,
+  `paginate()`. The gate checks it matches the contract; each release attaches `autoxide-sdk-X.Y.Z.tgz`.
+- Task-by-task guides in `docs/guides/` (English and Vietnamese): a website (public endpoints, `srcset`
+  and WebP, ETag / 304), signing in and refreshing, API keys, safe retries, pagination, errors, and
+  connecting an AI agent over MCP with every tool and its permission. Their `curl` examples run as tests
+  on every build; their TypeScript examples are type-checked against the SDK in CI.
+- SDK: `AutoxideError.requestId` (the `X-Request-Id` of the answer).
+- For module authors (testkit): `schema_snapshot` (tables, columns, indexes of a SQLite or Postgres
+  database, to compare schemas) and `TestAppBuilder::boxed_module`. Every module's real migrations are
+  tested up → down → up, on an empty database and with data, on both databases.
+- Property tests (`proptest`, tests only) for the input checks: email, pagination cursors, post bodies,
+  slugs, CSV export, comment text and links (no HTML but safe links ever comes out).
+- A machine-readable access contract: every operation in the OpenAPI document carries `x-permissions`
+  (one of them is enough; `[]` for any signed-in caller) or `x-public: true`, and the module catalog gives
+  each permission a `risk` (`read`, `write`, `destructive`, `sensitive_data`, `money`). The gate checks
+  every endpoint answers 401 without a token and 403 `permission_denied` without the permission.
+- For module authors: `Permission::with_risk`, `Risk`, `Tool::for_any_signed_in`; the OpenAPI lint asks
+  every handler for `x-permissions` or `x-public`.
+- An upgrade test from the last release: `cargo xtask upgrade-test` runs the previous release's Docker
+  image, writes sample data through its API (users, tokens, API keys, images, posts, forms, newsletter
+  lists, webhooks, menus), then runs this version on the same database and data directory and checks every
+  record, the old tokens and a few writes — on SQLite and PostgreSQL. It runs in CI and before every
+  release (Linux, needs Docker).
+
+### Fixed
+
+- The OpenAPI document declared `application/json` for error responses; it now declares
+  `application/problem+json`, the media type errors are sent with.
+- `GET` / `DELETE /api/v1/{comments,forms,newsletter}/data` answered a caller without the permission with
+  `422` when `email` was missing; the permission is checked first now (`403`).
+- MCP tools of `files` now require `files.upload` or `files.manage`, like their endpoints (a caller without
+  them no longer sees them in `tools/list`).
+- The OpenAPI document declared the `value` of a form answer as an object; it is any JSON value (a string,
+  a number, an array or `true`), as it always was.
+
+### Changed
+
+- For module authors: `TestRequest::send` (testkit) checks every response against the OpenAPI document of
+  the app — status, media type and body — and fails the test with the place that differs.
+  `TestRequest::unchecked()` skips the check for tests that send out-of-contract answers on purpose.
+
+## [0.13.0] - 2026-11-14
+
+### Added
+
+- Comments as product questions and answers: authors get badges such as `seller` or
+  `verified_buyer` (codes in `badges`, computed by the module owning the target); `q` on
+  `GET /api/v1/comments/public/threads` searches a target's top-level comments ignoring accents,
+  exact-accent matches first; counts carry `thread_count`; `unanswered=true` on the moderation list
+  and the MCP tools `comments.unanswered` and `comments.answer`; `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES`
+  takes comments on some kinds only from verified accounts (`comments.verification_required`).
+- Media: alt text per language — `PUT` / `DELETE /api/v1/media/{id}/alts/{locale}`, `alts` on every
+  item, the MCP tool `media.set_alt`, languages from `AUTOXIDE_MEDIA_ALT_LOCALES` (default `en,vi`).
+  The content module's public images use the alt text in the post's language when there is one.
+- Interface flags per account: `GET` / `PUT` / `DELETE /api/v1/me/flags` remember dismissed hints or the
+  last "what's new" seen, for the signed-in user only (at most `AUTOXIDE_USER_FLAGS_MAX`, default 500).
+  Flags are part of the personal data export and are deleted with the account.
+- For module authors: `Module::resource_events`, `StartContext::badge_source`,
+  `StartContext::posting_verifier` and `pagination::fetch_page_tiers` (see `docs/MODULE_GUIDE.md`).
+- Website menus (`menus` module, `docs/MENUS.md`): `GET`/`POST /api/v1/menus`, `GET`/`PUT`/`DELETE
+  /api/v1/menus/{id}` (`If-Match` required to replace items), and the public
+  `GET /api/v1/menus/public/{key}` with `ETag` and caching (`AUTOXIDE_MENUS_PUBLIC_CACHE_SECONDS`). Items
+  link to addresses or to objects of any module (`ref`), take sub-items by themselves (`auto_children`),
+  and carry icons, highlights, dated badges and a featured object. MCP tools `menus.*`; permissions
+  `menus.read`, `menus.manage`; `autoxide task menus.import_content_menus` copies the content module's
+  menus.
+- The resource directory looks up many objects at once in a language (`ResourceResolver::resolve_many`),
+  gives pictures (`Resource::image`) and sub-items (`has_children`, `children`). The content module
+  registers categories and tags as `content.term` (public path `/<post prefix>/category/<slug>` or
+  `/…/tag/<slug>`).
+
+### Deprecated
+
+- The content module's menu endpoints (`GET /api/v1/content/menus`, `GET`/`PUT
+  /api/v1/content/menus/{key}`, `GET /api/v1/content/public/menus/{key}`), sunset 2027-05-14: use the
+  `menus` module.
+
 ## [0.12.0] - 2026-11-13
 
 ### Added
@@ -530,7 +662,9 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/thuongtamduy/autoxide/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/thuongtamduy/autoxide/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/thuongtamduy/autoxide/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/thuongtamduy/autoxide/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/thuongtamduy/autoxide/compare/v0.9.0...v0.10.0

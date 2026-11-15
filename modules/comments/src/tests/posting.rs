@@ -176,10 +176,14 @@ async fn gui_lai_cung_token_ra_cung_binh_luan() {
         // Token sửa cũ thôi dùng được, token mới dùng được.
         let id = first.comment.row.id;
         assert_eq!(
-            h.service.edit(None, id, first.edit_token.as_deref(), "Sửa").await.unwrap_err().code(),
+            h.service
+                .edit(None, id, first.edit_token.as_deref(), "Sửa", None)
+                .await
+                .unwrap_err()
+                .code(),
             "comments.not_author"
         );
-        h.service.edit(None, id, again.edit_token.as_deref(), "Sửa").await.unwrap();
+        h.service.edit(None, id, again.edit_token.as_deref(), "Sửa", None).await.unwrap();
 
         let shared = token(&h.service, KIND).await;
         let mut tasks = Vec::new();
@@ -355,7 +359,7 @@ async fn pipeline_kiem_duyet() {
                 &admin(),
                 KIND,
                 POST,
-                crate::targets::TargetChange {
+                crate::posting::targets::TargetChange {
                     state: Some("closed".to_owned()),
                     ..Default::default()
                 },
@@ -427,18 +431,18 @@ async fn sua_trong_thoi_han_va_xoa_mem() {
         let token = posted.edit_token.clone().unwrap();
         let eve = member(&h.service, "Eve", &[]).await;
         assert_eq!(
-            h.service.edit(Some(&eve), id, None, "Của tôi").await.unwrap_err().code(),
+            h.service.edit(Some(&eve), id, None, "Của tôi", None).await.unwrap_err().code(),
             "comments.not_author"
         );
         assert_eq!(
-            h.service.edit(None, id, Some("wrong"), "x").await.unwrap_err().code(),
+            h.service.edit(None, id, Some("wrong"), "x", None).await.unwrap_err().code(),
             "comments.not_author"
         );
-        let edited = h.service.edit(None, id, Some(&token), "Bản hai").await.unwrap();
+        let edited = h.service.edit(None, id, Some(&token), "Bản hai", None).await.unwrap();
         assert_eq!((edited.row.body.as_str(), edited.status()), ("Bản hai", Status::Published));
         assert!(edited.row.edited_at.is_some());
         // Sửa thành chữ nghi ngờ: về chờ duyệt, số đếm theo.
-        let held = h.service.edit(None, id, Some(&token), "Giảm giá!").await.unwrap();
+        let held = h.service.edit(None, id, Some(&token), "Giảm giá!", None).await.unwrap();
         assert_eq!(
             (held.status(), held.row.hold_reason.as_deref()),
             (Status::Pending, Some("suspect_word"))
@@ -450,7 +454,7 @@ async fn sua_trong_thoi_han_va_xoa_mem() {
         row.created_at = Set(crate::service::now() - chrono::Duration::minutes(16));
         row.update(h.database.write()).await.unwrap();
         assert_eq!(
-            h.service.edit(None, id, Some(&token), "Muộn").await.unwrap_err().code(),
+            h.service.edit(None, id, Some(&token), "Muộn", None).await.unwrap_err().code(),
             "comments.edit_window_passed"
         );
 
@@ -467,7 +471,7 @@ async fn sua_trong_thoi_han_va_xoa_mem() {
             (gone.status.as_str(), gone.body.as_str(), gone.reply_count),
             ("deleted", "", 1)
         );
-        let thread = h.service.thread(KIND, POST, &page(Order::Desc), 3).await.unwrap();
+        let thread = h.service.thread(KIND, POST, &page(Order::Desc), 3, None).await.unwrap();
         let shown: Vec<_> = thread
             .data
             .iter()
@@ -476,7 +480,7 @@ async fn sua_trong_thoi_han_va_xoa_mem() {
         assert_eq!(shown, [(root.id, None, 1)]);
         assert_eq!(counts(&h.database, POST).await, (1, 1));
         assert_eq!(
-            h.service.edit(Some(&eve), root.id, None, "x").await.unwrap_err().code(),
+            h.service.edit(Some(&eve), root.id, None, "x", None).await.unwrap_err().code(),
             "comments.not_editable"
         );
         let deleted: Vec<String> = events(&h.database)
@@ -650,7 +654,7 @@ async fn cursor_cua_luong() {
         let mut seen = Vec::new();
         let mut request = PageRequest::first(2, Order::Desc);
         loop {
-            let found = h.service.thread(KIND, POST, &request, 2).await.unwrap();
+            let found = h.service.thread(KIND, POST, &request, 2, None).await.unwrap();
             seen.extend(found.data.iter().map(|root| root.root.row.id));
             for root in &found.data {
                 if root.root.row.id == roots[0] {
@@ -667,7 +671,7 @@ async fn cursor_cua_luong() {
         let mut newest_first = roots.clone();
         newest_first.reverse();
         assert_eq!(seen, newest_first);
-        let oldest = h.service.thread(KIND, POST, &page(Order::Asc), 0).await.unwrap();
+        let oldest = h.service.thread(KIND, POST, &page(Order::Asc), 0, None).await.unwrap();
         assert_eq!(oldest.data.iter().map(|root| root.root.row.id).collect::<Vec<_>>(), roots);
         assert!(oldest.data[0].replies.is_empty());
         let replies =
@@ -678,7 +682,7 @@ async fn cursor_cua_luong() {
         let held = service(test, config()).await;
         as_guest(&held.service, &visitor("203.0.113.3"), guest("Ada", "Chờ")).await.unwrap();
         assert_eq!(
-            held.service.thread(KIND, POST, &page(Order::Desc), 3).await.unwrap().data.len(),
+            held.service.thread(KIND, POST, &page(Order::Desc), 3, None).await.unwrap().data.len(),
             5
         );
     })
@@ -701,7 +705,8 @@ async fn sua_sau_khi_duyet_va_tin_tuong_chi_theo_binh_luan_dang_hien() {
         let token = posted.edit_token.clone().unwrap();
         h.service.set_status(&moderator, id, Status::Published, None).await.unwrap();
         assert_eq!(counts(&h.database, POST).await, (1, 0));
-        let edited = h.service.edit(None, id, Some(&token), "Bản bẩn mà không có từ cấm").await;
+        let edited =
+            h.service.edit(None, id, Some(&token), "Bản bẩn mà không có từ cấm", None).await;
         let edited = edited.unwrap();
         assert_eq!(
             (edited.status(), edited.row.hold_reason.as_deref()),
@@ -710,7 +715,7 @@ async fn sua_sau_khi_duyet_va_tin_tuong_chi_theo_binh_luan_dang_hien() {
         assert!(edited.row.published_at.is_some());
         assert_eq!(counts(&h.database, POST).await, (0, 1));
         // Bình luận đang chờ duyệt mà sửa thì vẫn chờ.
-        let again = h.service.edit(None, id, Some(&token), "Bản ba").await.unwrap();
+        let again = h.service.edit(None, id, Some(&token), "Bản ba", None).await.unwrap();
         assert_eq!(again.status(), Status::Pending);
         assert_eq!(counts(&h.database, POST).await, (0, 1));
 
@@ -720,7 +725,7 @@ async fn sua_sau_khi_duyet_va_tin_tuong_chi_theo_binh_luan_dang_hien() {
         assert_eq!(first.shown, Status::Pending);
         let first = first.comment.row.id;
         h.service.set_status(&moderator, first, Status::Published, None).await.unwrap();
-        let edited = h.service.edit(Some(&bob), first, None, "Lần đầu, sửa").await.unwrap();
+        let edited = h.service.edit(Some(&bob), first, None, "Lần đầu, sửa", None).await.unwrap();
         assert_eq!(edited.status(), Status::Published);
         assert_eq!(
             h.service.post(Some(&bob), &client, signed("Lần hai")).await.unwrap().shown,
@@ -790,6 +795,66 @@ async fn tra_loi_dong_thoi_voi_xoa_han_luong() {
             assert_eq!(left, 0, "round {round}");
             assert_eq!(counts(&h.database, POST).await, (0, 0), "round {round}");
         }
+    })
+    .await
+    .unwrap();
+}
+
+/// Markdown giới hạn (D-252): `format` lưu cùng bài; tắt `AUTOXIDE_COMMENTS_MARKDOWN` thì gửi
+/// `markdown` là lỗi ở trường `format`; link Markdown được đếm cho giới hạn link; sửa không gửi
+/// `format` thì giữ định dạng cũ; bài mặc định là chữ thường.
+#[tokio::test]
+async fn markdown_luu_dinh_dang_dem_link_va_tat_duoc() {
+    use crate::text::Format;
+
+    TestDatabase::run(async |test| {
+        let h = service(test, open_config()).await;
+        let ada = member(&h.service, "Ada", &[]).await;
+        let plain =
+            h.service.post(Some(&ada), &ClientInfo::default(), signed("**x**")).await.unwrap();
+        assert_eq!(plain.comment.row.format, "text");
+
+        let mut input = signed("**Đậm** và [link](https://a.example)");
+        input.format = Format::Markdown;
+        let posted = h.service.post(Some(&ada), &ClientInfo::default(), input).await.unwrap();
+        assert_eq!(
+            (posted.comment.row.format.as_str(), posted.shown),
+            ("markdown", Status::Published)
+        );
+
+        // Ba link Markdown (giới hạn 2): giữ lại chờ duyệt, như ba địa chỉ trần.
+        let mut input = signed("[a](https://a.example) [b](https://b.example) <https://c.example>");
+        input.format = Format::Markdown;
+        let held = h.service.post(Some(&ada), &ClientInfo::default(), input).await.unwrap();
+        assert_eq!(held.shown, Status::Pending);
+        assert_eq!(held.comment.row.hold_reason.as_deref(), Some("too_many_links"));
+
+        // Sửa không gửi `format`: giữ `markdown`; gửi `text` thì đổi.
+        let id = posted.comment.row.id;
+        let edited = h.service.edit(Some(&ada), id, None, "*mới*", None).await.unwrap();
+        assert_eq!(edited.row.format, "markdown");
+        let edited =
+            h.service.edit(Some(&ada), id, None, "*mới*", Some(Format::Text)).await.unwrap();
+        assert_eq!(edited.row.format, "text");
+
+        // Tắt Markdown.
+        let off = service(test, CommentsConfig { markdown: false, ..open_config() }).await;
+        let bob = member(&off.service, "Bob", &[]).await;
+        let mut input = signed("*x*");
+        input.format = Format::Markdown;
+        let error = off.service.post(Some(&bob), &ClientInfo::default(), input).await.unwrap_err();
+        assert_eq!(error.code(), "validation_failed");
+        assert_eq!(error.fields()[0].field, "format");
+        let own = off.service.post(Some(&bob), &ClientInfo::default(), signed("x")).await.unwrap();
+        let error = off
+            .service
+            .edit(Some(&bob), own.comment.row.id, None, "*x*", Some(Format::Markdown))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            (error.code(), error.fields()[0].field.as_str()),
+            ("validation_failed", "format")
+        );
     })
     .await
     .unwrap();

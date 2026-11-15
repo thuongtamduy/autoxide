@@ -74,6 +74,9 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
     tạm dừng và tiếp tục, bounce, mail cho bài mới ([`docs/NEWSLETTER.vi.md`](docs/NEWSLETTER.vi.md))
 20. Bình luận: bình luận hai cấp gắn vào đích bất kỳ, cho người dùng đăng nhập hoặc khách,
     kiểm duyệt theo pipeline cố định, báo cáo, cấm, mail báo trả lời ([`docs/COMMENTS.vi.md`](docs/COMMENTS.vi.md))
+21. Menu của website: thanh menu chính, bảng xổ lớn, chân trang; mục trỏ tới địa chỉ hay tới đối
+    tượng của module bất kỳ, tự lấy mục con, nhãn có hạn, endpoint công khai có cache
+    ([`docs/MENUS.vi.md`](docs/MENUS.vi.md))
 
 ## Yêu cầu
 
@@ -186,6 +189,9 @@ audit log. Ví dụ với Claude Code:
 claude mcp add --transport http autoxide http://127.0.0.1:8080/mcp --header "Authorization: Bearer <api key>"
 ```
 
+[`docs/guides/mcp.vi.md`](docs/guides/mcp.vi.md) hướng dẫn từng bước: key với ít permission
+nhất, client MCP khác, mọi tool kèm permission cần có, và các giới hạn.
+
 Backup mọi thứ — dữ liệu của mọi module và mọi file đã lưu — vào một thư mục, rồi về
 sau khôi phục vào một database mới, trống (với nơi lưu file bất kỳ). Database được đọc
 trong một snapshot nhất quán, nên máy chủ vẫn chạy được trong lúc backup:
@@ -278,8 +284,12 @@ Tài khoản mới nhận một mail đề nghị xác nhận địa chỉ; toke
 được xác nhận bằng `POST /api/v1/auth/email-verification/confirm`, sau đó
 `email_verified_at` cho biết lúc xác minh. Muốn đổi email, người dùng gọi
 `POST /api/v1/auth/me/email` kèm địa chỉ mới và mật khẩu: email chỉ đổi khi địa chỉ
-mới được xác nhận theo cùng cách. Đặt `AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` để mail
-dẫn tới trang của bạn.
+mới được xác nhận theo cùng cách. Khi đó địa chỉ cũ nhận một mail báo, kèm token (hạn 7
+ngày) để báo một lần đổi mà chủ tài khoản không làm: `POST /api/v1/auth/email-change/report`
+đăng xuất tài khoản ở mọi nơi, bỏ mật khẩu, passkey, API key và xác thực hai bước, trả lại địa
+chỉ cũ khi nó còn trống, rồi gửi mail đặt lại mật khẩu tới đó. Đặt
+`AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` và `AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL` để các mail
+này dẫn tới trang của bạn.
 
 Khi chạy thật (production), đặt `AUTOXIDE_AUTH_TOKEN_SECRET` (khoá ký access token)
 bằng một chuỗi ngẫu nhiên dài, giống nhau trên mọi máy chủ:
@@ -333,6 +343,11 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
 - [`CLAUDE.md`](CLAUDE.md) — luật cho người đóng góp, là người hay AI agent
 - [`CHANGELOG.md`](CHANGELOG.md) — thay đổi của từng bản phát hành (tiếng Anh); image
   Docker đã phát hành ở `ghcr.io/<owner>/autoxide`
+- [`docs/guides/`](docs/guides/README.vi.md) — hướng dẫn API theo tình huống, có ví dụ `curl` và
+  TypeScript chạy như test: website, đăng nhập, API key, gọi lại an toàn, pagination, lỗi,
+  nối AI agent qua MCP
+- [`sdk/typescript/`](sdk/typescript/README.vi.md) — client TypeScript có kiểu, sinh từ
+  `docs/openapi.json`; [`docs/mcp-tools.json`](docs/mcp-tools.json) — hợp đồng của mọi tool MCP
 - [`docs/DEPLOY.vi.md`](docs/DEPLOY.vi.md) — cài đặt và deploy: Docker Compose với
   PostgreSQL hoặc một binary với SQLite, reverse proxy, cập nhật, backup
 - [`docs/MEDIA.vi.md`](docs/MEDIA.vi.md) — dùng thư viện media: tải lên, thư mục, link
@@ -347,6 +362,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
   trang xác nhận và trang lựa chọn của website, chiến dịch, bounce, lưu ý pháp lý
 - [`docs/COMMENTS.vi.md`](docs/COMMENTS.vi.md) — dùng module bình luận: đích, luồng và ô bình
   luận của website, kiểm duyệt, báo cáo và cấm, mail báo trả lời, lưu ý pháp lý
+- [`docs/MENUS.vi.md`](docs/MENUS.vi.md) — dùng module menu: mục, đối tượng của module khác, nhãn,
+  endpoint công khai và cache, chuyển từ menu của module nội dung
 - [`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md) — cách viết một module, bắt đầu
   từ module mẫu [`modules/notes`](modules/notes) (mặc định không đăng ký)
 

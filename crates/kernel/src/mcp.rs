@@ -86,6 +86,33 @@ pub trait ToolHandler: Send + Sync {
     async fn call(&self, principal: Principal, arguments: Value) -> Result<Value, Error>;
 }
 
+/// Tool đã deprecated (khai bằng `Deprecation::tool` trong `Module::deprecations`, D-240): ngày,
+/// ngày gỡ và tool dùng thay, tên đầy đủ.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ToolDeprecation {
+    /// `YYYY-MM-DD` (UTC).
+    pub since: String,
+    /// Ngày tool bị gỡ, `YYYY-MM-DD` (UTC), nếu đã định.
+    pub sunset: Option<String>,
+    /// Tool dùng thay, tên đầy đủ `<module>.<tên>`.
+    pub successor: Option<String>,
+}
+
+impl ToolDeprecation {
+    /// Câu tiếng Anh nối vào mô tả của tool và cảnh báo trong kết quả.
+    pub fn sentence(&self, tool: &str) -> String {
+        let mut text = format!("Tool `{tool}` is deprecated since {}.", self.since);
+        if let Some(sunset) = &self.sunset {
+            text.push_str(&format!(" It will be removed on {sunset}."));
+        }
+        if let Some(successor) = &self.successor {
+            text.push_str(&format!(" Use `{successor}` instead."));
+        }
+        text
+    }
+}
+
 /// Một tool MCP do module khai.
 #[derive(Clone)]
 pub struct Tool {
@@ -100,6 +127,9 @@ pub struct Tool {
     secret: bool,
     input_schema: Value,
     handler: Arc<dyn ToolHandler>,
+    deprecation: Option<ToolDeprecation>,
+    /// Khai tường minh: mọi người đã đăng nhập gọi được (service tự giới hạn vào dữ liệu của họ).
+    any_signed_in: bool,
 }
 
 impl std::fmt::Debug for Tool {
@@ -129,6 +159,8 @@ impl Tool {
             input_schema: serde_json::to_value(<I as PartialSchema>::schema())
                 .unwrap_or(Value::Null),
             handler: Arc::new(Typed { handler, input: PhantomData }),
+            deprecation: None,
+            any_signed_in: false,
         }
     }
 
@@ -144,6 +176,19 @@ impl Tool {
     pub fn or_requires(mut self, permission: Permission) -> Self {
         self.alternative = Some(permission);
         self
+    }
+
+    /// Mọi người đã đăng nhập gọi được, không cần permission — vd việc trên tài khoản của chính họ
+    /// (service tự giới hạn). Như `x-permissions: []` của endpoint: test độ phủ phân quyền đòi mỗi
+    /// tool hoặc có permission, hoặc khai điều này (D-245).
+    pub fn for_any_signed_in(mut self) -> Self {
+        self.any_signed_in = true;
+        self
+    }
+
+    /// Xem [`for_any_signed_in`](Self::for_any_signed_in).
+    pub fn is_for_any_signed_in(&self) -> bool {
+        self.any_signed_in
     }
 
     /// Tool chỉ đọc, không đổi gì (gợi ý cho client MCP: gọi không cần hỏi lại).
@@ -199,6 +244,16 @@ impl Tool {
     /// JSON Schema của đầu vào.
     pub fn input_schema(&self) -> &Value {
         &self.input_schema
+    }
+
+    /// Tool đã deprecated thì có (gắn bởi `Modules::tools` từ `Module::deprecations`).
+    pub fn deprecation(&self) -> Option<&ToolDeprecation> {
+        self.deprecation.as_ref()
+    }
+
+    pub(crate) fn deprecated(mut self, deprecation: ToolDeprecation) -> Self {
+        self.deprecation = Some(deprecation);
+        self
     }
 
     /// Người gọi có được thấy và gọi tool không.

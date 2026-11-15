@@ -330,7 +330,8 @@ async fn dat_lai_mat_khau_dong_moi_cua_mo_bang_mat_khau_cu() {
         let added = services.passkeys.finish_registration(ada, ceremony.id, "Evil", &credential);
         assert_eq!(added.await.unwrap_err().code(), "auth.invalid_passkey_ceremony");
         assert!(list(&services, ada).await.is_empty());
-        let changed = services.verifications.confirm(&change_token).await.unwrap_err();
+        let changed =
+            services.verifications.confirm(&change_token, Language::En).await.unwrap_err();
         assert_eq!(changed.code(), "auth.invalid_verification_token");
         let finished = services.sessions.complete_mfa(&mfa_token, &recovery[0], None).await;
         assert_eq!(finished.unwrap_err().code(), "auth.invalid_mfa_token");
@@ -356,7 +357,7 @@ async fn dat_lai_mat_khau_dong_moi_cua_mo_bang_mat_khau_cu() {
             .await
             .unwrap();
         let confirm = crate::testing::last_token(&services);
-        services.verifications.confirm(&confirm).await.unwrap();
+        services.verifications.confirm(&confirm, Language::En).await.unwrap();
         let stale = services.resets.confirm(&old_reset, "another new passphrase".to_owned()).await;
         assert_eq!(stale.unwrap_err().code(), "auth.invalid_reset_token");
     })

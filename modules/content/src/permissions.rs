@@ -4,7 +4,7 @@
 //! tạo — cùng người dùng **và** cùng API key (hai agent dùng hai key của một người không đụng
 //! bài của nhau).
 
-use autoxide_kernel::access::{Permission, Principal};
+use autoxide_kernel::access::{Permission, Principal, Risk};
 use autoxide_kernel::error::Error;
 
 use crate::entries::Entry;
@@ -31,7 +31,8 @@ pub(crate) const CONTENT_PUBLISH_OWN: Permission = Permission::new(
      archive, delete, move or schedule. Meant for AI agents.",
 );
 pub(crate) const CONTENT_DELETE: Permission =
-    Permission::new("content.delete", "Delete posts and pages for good.");
+    Permission::new("content.delete", "Delete posts and pages for good.")
+        .with_risk(Risk::Destructive);
 pub(crate) const CONTENT_MANAGE: Permission =
     Permission::new("content.manage", "Manage categories, tags, authors, menus and redirects.");
 

@@ -1,9 +1,11 @@
 # Phát hành một phiên bản
 
-Quy trình cho agent và chủ dự án (D-078). **Agent tự phát hành khi xong trọn một bước của
-`docs/ROADMAP.md`** — mọi mục của bước là `[x]`, gate xanh — không hỏi (D-171). Ngoài lúc đó
-chỉ phát hành khi chủ dự án giao. Không phát hành giữa bước, không phát hành khi mục
-`[Unreleased]` của `CHANGELOG.md` trống.
+Quy trình cho agent và chủ dự án (D-078). **Phát hành gom nhiều bước thành một bản lớn**
+(D-248, thay D-171): xong một bước thì chỉ merge vào `main` (gate đầy đủ xanh, PR merge kiểu
+rebase), không phát hành. Agent tự phát hành, không hỏi, khi xong trọn một **giai đoạn** của
+`docs/ROADMAP.md` (A, B, C…: mọi bước của giai đoạn đã `[x]`). Ngoài lúc đó chỉ phát hành khi chủ
+dự án giao. Không phát hành giữa bước, không phát hành khi mục `[Unreleased]` của `CHANGELOG.md`
+trống.
 
 Cần quyền đẩy lên GitHub: `gh` đã đăng nhập, hoặc biến môi trường `GH_TOKEN` (token
 fine-grained chỉ cho repo này, quyền Contents và Pull requests: Read and write). Thiếu quyền
@@ -40,12 +42,20 @@ bước 7.**
 1. Đưa nhánh lên `main` mới nhất: `git fetch origin`, rồi `git rebase origin/main`. Phiên
    khác có thể đã merge trong lúc mình làm — xem "Khi hai phiên đụng nhau" bên dưới.
 2. Đổi `version` trong `Cargo.toml` gốc; chạy `cargo check` để cập nhật `Cargo.lock`. Đổi
-   theo: `"version"` trong `docs/openapi.json`, bản phát hành mới nhất ở dòng "Trạng thái"
-   của `docs/ROADMAP.md`.
+   theo: `"version"` trong `docs/openapi.json`, `"version"` trong `sdk/typescript/package.json` và
+   `sdk/typescript/package-lock.json` (`cargo xtask sdk --check` của gate kiểm), bản phát hành mới
+   nhất ở dòng "Trạng thái" của `docs/ROADMAP.md`.
 3. Trong `CHANGELOG.md`: đổi `## [Unreleased]` thành `## [X.Y.Z] - YYYY-MM-DD`, thêm một
    mục `## [Unreleased]` trống ở trên, cập nhật hai dòng liên kết ở cuối file. Workflow kiểm
    có mục `## [X.Y.Z]` và tag khớp `version`, sai thì không phát hành.
-4. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này.
+   Rồi chạy `cargo xtask semver --markdown` (cần `cargo-semver-checks`, phiên bản ghim ở `STACK.md`;
+   mất vài phút và vài GB đĩa — `rm -rf target/semver-checks` sau đó): nó in mục `### Breaking (Rust)`
+   gồm thay đổi phá vỡ của `autoxide-kernel` và `autoxide-testkit` so với tag trước; chép vào mục
+   `## [X.Y.Z]`. Không in gì thì không thêm mục. Còn `0.x` thì chỉ báo cáo, không chặn (D-167, D-242).
+4. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này. Rồi
+   chạy test nâng cấp: `cargo xtask upgrade-test` — bản phát hành trước (image Docker của nó; tải
+   không được thì build từ tag, lâu) ghi dữ liệu, bản này đọc lại trên cùng database, cả SQLite lẫn
+   Postgres (D-246). Cần Docker; đỏ thì không phát hành. Job `upgrade` của CI chạy cùng lệnh.
 5. Đẩy nhánh, mở PR vào `main`, merge kiểu rebase để commit `release: vX.Y.Z` nằm nguyên
    trên `main`:
 
@@ -92,6 +102,8 @@ Chủ dự án giữ repo riêng tư (D-199), nên đẩy tag không kích hoạ
 
    Không có `gh` hay quyền tạo bản phát hành thì dừng ở tag đã đẩy và báo chủ dự án tạo bản phát
    hành trên trang Releases (chọn tag, dán phần `## [X.Y.Z]` của `CHANGELOG.md`).
+   Đính kèm gói SDK TypeScript: `(cd sdk/typescript && npm pack)` tạo `autoxide-sdk-X.Y.Z.tgz`;
+   `gh release upload vX.Y.Z sdk/typescript/autoxide-sdk-X.Y.Z.tgz` (hoặc kéo file vào trang phát hành).
 2. Image Docker chỉ khi chủ dự án muốn và đưa token GitHub có quyền `write:packages` — thiếu thì
    bỏ qua và báo lại, không tự tạo hay lưu token. Chỉ build được `linux/amd64`, không kèm chứng
    thực:

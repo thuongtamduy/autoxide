@@ -26,12 +26,12 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::fields::{Field, Localized};
+use crate::forms::fields::{Field, Localized};
 use crate::forms::{Form, FormInput, FormStatus};
 use crate::http::{FormResponse, SubmissionResponse, choice, page_request, present};
-use crate::inbox::{InboxFilter, Submission, SubmissionStatus};
 use crate::permissions::{FORMS_MANAGE, FORMS_READ, FORMS_REVIEW};
 use crate::service::FormsService;
+use crate::submissions::inbox::{InboxFilter, Submission, SubmissionStatus};
 
 const STATUSES: &str = "`new`, `read`, `archived`, `spam`";
 

@@ -19,9 +19,9 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{choice, page_request};
-use crate::fields::{FieldType, Localized};
-use crate::inbox::{InboxFilter, Submission, SubmissionStatus};
+use crate::forms::fields::{FieldType, Localized};
 use crate::service::FormsService;
+use crate::submissions::inbox::{InboxFilter, Submission, SubmissionStatus};
 
 /// One answer, with the field as it was when the submission was sent.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -33,7 +33,6 @@ pub(crate) struct AnswerResponse {
     pub label: Localized,
     /// A string; a number for `number`; an array of values for `checkbox`; `true` for
     /// `consent`.
-    #[schema(value_type = Object)]
     pub value: Value,
 }
 
@@ -141,6 +140,7 @@ pub(crate) const STATUSES: &str = "`new`, `read`, `archived`, `spam`";
 #[utoipa::path(
     get,
     path = "/{id}/submissions",
+    extensions(("x-permissions" = json!(["forms.read"]))),
     operation_id = "list_form_submissions",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the form."), SubmissionsQuery, PageQuery),
@@ -191,6 +191,7 @@ pub(crate) struct ExportQuery {
 #[utoipa::path(
     get,
     path = "/{id}/submissions/export",
+    extensions(("x-permissions" = json!(["forms.export"]))),
     operation_id = "export_form_submissions",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the form."), ExportQuery),
@@ -233,6 +234,7 @@ pub(crate) async fn export_submissions(
 #[utoipa::path(
     get,
     path = "/submissions/{id}",
+    extensions(("x-permissions" = json!(["forms.read"]))),
     operation_id = "get_form_submission",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the submission.")),
@@ -267,6 +269,7 @@ pub(crate) struct UpdateSubmissionRequest {
 #[utoipa::path(
     patch,
     path = "/submissions/{id}",
+    extensions(("x-permissions" = json!(["forms.review"]))),
     operation_id = "update_form_submission",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the submission."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -299,6 +302,7 @@ pub(crate) async fn update_submission(
 #[utoipa::path(
     delete,
     path = "/submissions/{id}",
+    extensions(("x-permissions" = json!(["forms.review"]))),
     operation_id = "delete_form_submission",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the submission.")),
@@ -358,6 +362,7 @@ pub(crate) struct ErasedResponse {
 #[utoipa::path(
     get,
     path = "/data",
+    extensions(("x-permissions" = json!(["forms.export"]))),
     operation_id = "export_forms_email_data",
     security(("bearer" = [])),
     params(EmailQuery),
@@ -373,6 +378,8 @@ pub(crate) async fn get_email_data(
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<EmailDataResponse>, Error> {
+    // Kiểm quyền trước khi đọc `email`: người không có quyền nhận 403, không phải 422 (D-245).
+    principal.require(&crate::permissions::FORMS_EXPORT)?;
     let found = service.submissions_of_email(&principal, query.email()?).await?;
     let email = autoxide_kernel::email::normalize(query.email()?);
     let submissions = found.into_iter().map(SubmissionResponse::from).collect();
@@ -387,6 +394,7 @@ pub(crate) async fn get_email_data(
 #[utoipa::path(
     delete,
     path = "/data",
+    extensions(("x-permissions" = json!(["forms.export"]))),
     operation_id = "erase_forms_email_data",
     security(("bearer" = [])),
     params(EmailQuery),
@@ -402,6 +410,8 @@ pub(crate) async fn delete_email_data(
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<ErasedResponse>, Error> {
+    // Kiểm quyền trước khi đọc `email`: người không có quyền nhận 403, không phải 422 (D-245).
+    principal.require(&crate::permissions::FORMS_EXPORT)?;
     let deleted = service.erase_email(&principal, query.email()?).await?;
     Ok(Data { data: ErasedResponse { deleted } })
 }

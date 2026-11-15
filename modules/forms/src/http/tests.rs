@@ -6,7 +6,8 @@
 use std::sync::Arc;
 
 use autoxide_kernel::mail::Mailer;
-use autoxide_testkit::{TestApp, TestDatabase, TestResponse, tool};
+use autoxide_kernel::storage::Storage;
+use autoxide_testkit::{MemoryStorage, TestApp, TestDatabase, TestResponse, tool};
 use axum::http::{Method, StatusCode, header};
 use serde_json::{Value, json};
 
@@ -14,9 +15,11 @@ use crate::testing::FakeMailer;
 
 /// Token → permission: `admin` mọi quyền của module; `reader` chỉ đọc; `website` chỉ
 /// `forms.submit` (máy chủ của website gửi form bằng API key); `member` không quyền nào (tài
-/// khoản tự đăng ký). Bên gửi mail là bản giả, thay cho module `mail`.
+/// khoản tự đăng ký). Bên gửi mail là bản giả, thay cho module `mail`; nơi lưu trong bộ nhớ
+/// thay cho module `files`.
 async fn app(test: &TestDatabase) -> TestApp {
     let mailer: Arc<dyn Mailer> = Arc::new(FakeMailer::default());
+    let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::new());
     TestApp::builder(test)
         // Không chờ 3 giây giữa lấy token và gửi.
         .setting("AUTOXIDE_ANTISPAM_MIN_FILL_SECONDS", "0")
@@ -26,6 +29,7 @@ async fn app(test: &TestDatabase) -> TestApp {
         .user("website", 3, &["forms.submit"])
         .user("member", 4, &[])
         .provide::<dyn Mailer>(mailer)
+        .provide::<dyn Storage>(storage)
         .module(crate::module())
         .build()
         .await
@@ -355,6 +359,61 @@ async fn tool_mcp() {
         let (_, read) = call("forms.get", json!({"id": survey})).await;
         assert_eq!(read["data"]["etag"], closed["data"]["etag"]);
         admin.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// Xuất CSV lớn qua HTTP: 201 + `Location`, thân bỏ trống được, `status` sai → 422, trùng → 409,
+/// job ghi file, link tải không cần đăng nhập ra đúng file (header như bản đồng bộ), link sửa →
+/// 403, không có quyền → 403.
+#[tokio::test]
+async fn xuat_csv_lon_qua_http() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let created = send(&app, "POST", "/forms", Some("admin"), &[], Some(definition())).await;
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let token = form_token(&app).await;
+        let sent = json!({"data": {"name": "Ada", "email": "ada@example.com", "topic": "sales"}, "form_token": token});
+        let accepted = send(&app, "POST", "/forms/public/contact/submissions", None, &[("origin", "https://example.com")], Some(sent)).await;
+        assert_eq!(accepted.status(), StatusCode::CREATED, "{}", accepted.json());
+
+        let path = format!("/api/v1/forms/{id}/submissions/exports");
+        let invalid = app.post(&path).token("admin").json(json!({"status": "lost"})).send().await.unwrap();
+        assert_eq!((invalid.status(), invalid.json()["errors"][0]["field"].as_str()), (StatusCode::UNPROCESSABLE_ENTITY, Some("status")));
+        let denied = app.post(&path).token("reader").send().await.unwrap();
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+        // Thân bỏ trống: mọi trạng thái trừ `spam`.
+        let asked = app.post(&path).token("admin").send().await.unwrap();
+        assert_eq!(asked.status(), StatusCode::CREATED, "{}", asked.json());
+        let export = asked.json()["data"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(asked.header(header::LOCATION), format!("/api/v1/forms/exports/{export}"));
+        assert_eq!(asked.json()["data"]["state"], "pending");
+        let busy = app.post(&path).token("admin").json(json!({})).send().await.unwrap();
+        assert_eq!((busy.status(), busy.json()["code"].as_str()), (StatusCode::CONFLICT, Some("forms.export_in_progress")));
+
+        let worker = app.modules().worker(app.database(), 4).unwrap();
+        while worker.run_once().await.unwrap() > 0 {}
+        let ready = send(&app, "GET", &format!("/forms/exports/{export}"), Some("admin"), &[], None).await;
+        assert_eq!(ready.status(), StatusCode::OK, "{}", ready.json());
+        assert_eq!((ready.json()["data"]["state"].as_str(), ready.json()["data"]["row_count"].as_i64()), (Some("ready"), Some(1)));
+        let url = ready.json()["data"]["download_url"].as_str().unwrap().to_owned();
+
+        // Link tải: không cần đăng nhập, cùng nội dung và header như bản đồng bộ.
+        let file = app.get(&url).send().await.unwrap();
+        assert_eq!(file.status(), StatusCode::OK);
+        let direct = send(&app, "GET", &format!("/forms/{id}/submissions/export"), Some("admin"), &[], None).await;
+        assert_eq!(file.body(), direct.body());
+        for name in [header::CONTENT_TYPE, header::CACHE_CONTROL, header::CONTENT_DISPOSITION] {
+            assert_eq!(file.header(name.clone()), direct.header(name));
+        }
+        let tampered = url.replace("signature=", "signature=00");
+        let refused = app.get(&tampered).send().await.unwrap();
+        assert_eq!((refused.status(), refused.json()["code"].as_str()), (StatusCode::FORBIDDEN, Some("forms.export_link_invalid")));
+        let unsigned = app.get(&format!("/api/v1/forms/exports/{export}/file")).send().await.unwrap();
+        assert_eq!(unsigned.status(), StatusCode::BAD_REQUEST);
+        let missing = send(&app, "GET", &format!("/forms/exports/{id}"), Some("admin"), &[], None).await;
+        assert_eq!((missing.status(), missing.json()["code"].as_str()), (StatusCode::NOT_FOUND, Some("forms.export_not_found")));
     })
     .await
     .unwrap();

@@ -16,7 +16,7 @@ use tower::ServiceExt as _;
 use crate::runtime::{self, Migrations, Runtime};
 
 /// PNG nhỏ nhất mà đúng định dạng, `width` × `height`.
-fn png(width: u32, height: u32) -> Vec<u8> {
+pub(crate) fn png(width: u32, height: u32) -> Vec<u8> {
     let mut bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR".to_vec();
     bytes.extend(width.to_be_bytes());
     bytes.extend(height.to_be_bytes());

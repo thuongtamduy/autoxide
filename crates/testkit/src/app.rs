@@ -69,6 +69,8 @@ fn fail(step: &str, error: impl fmt::Display) -> TestAppError {
 pub struct TestApp {
     router: Router,
     openapi: OpenApi,
+    /// `openapi` dạng JSON, cho bộ kiểm response theo hợp đồng.
+    contract: Value,
     // Giữ module sống cùng app: chúng sở hữu service của mình.
     modules: Modules,
     database: Database,
@@ -129,7 +131,14 @@ impl TestApp {
 
     /// Bắt đầu một request. `uri` là đường dẫn đầy đủ, vd `/api/v1/notes/{id}`.
     pub fn request(&self, method: Method, uri: &str) -> TestRequest<'_> {
-        TestRequest { app: self, builder: Request::builder().method(method).uri(uri), body: None }
+        TestRequest {
+            app: self,
+            method: method.to_string(),
+            path: uri.split('?').next().unwrap_or(uri).to_owned(),
+            checked: true,
+            builder: Request::builder().method(method).uri(uri),
+            body: None,
+        }
     }
 
     pub fn get(&self, uri: &str) -> TestRequest<'_> {
@@ -187,6 +196,13 @@ impl<'a> TestAppBuilder<'a> {
     /// dùng.
     pub fn module(mut self, module: impl Module + 'static) -> Self {
         self.modules.push(Box::new(module));
+        self
+    }
+
+    /// Như [`module`](Self::module), cho module đã đóng hộp — vd cả danh sách module của binary
+    /// (`modules::all()`) trong test đầu-cuối.
+    pub fn boxed_module(mut self, module: Box<dyn Module>) -> Self {
+        self.modules.push(module);
         self
     }
 
@@ -257,7 +273,8 @@ impl<'a> TestAppBuilder<'a> {
         if !api.schema_conflicts.is_empty() {
             return Err(fail("openapi", api.schema_conflicts.join(", ")));
         }
-        Ok(TestApp { router: api.router, openapi: api.openapi, modules, database })
+        let contract = serde_json::to_value(&api.openapi).map_err(|e| fail("openapi", e))?;
+        Ok(TestApp { router: api.router, openapi: api.openapi, contract, modules, database })
     }
 }
 
@@ -297,6 +314,11 @@ impl Authenticator for FakeAuthenticator {
 /// Request đang dựng. Gửi bằng [`TestRequest::send`].
 pub struct TestRequest<'a> {
     app: &'a TestApp,
+    method: String,
+    /// Đường dẫn, bỏ phần query.
+    path: String,
+    /// Kiểm response theo hợp đồng OpenAPI (mặc định có).
+    checked: bool,
     builder: axum::http::request::Builder,
     body: Option<Body>,
 }
@@ -333,7 +355,16 @@ impl TestRequest<'_> {
         self
     }
 
-    /// Gửi qua router (không mở cổng mạng) và đọc hết câu trả lời.
+    /// Không kiểm response theo hợp đồng OpenAPI — chỉ cho test cố ý tạo câu trả lời ngoài hợp
+    /// đồng. Lệch hợp đồng thường là lỗi thật (tài liệu hay code): sửa nó thay vì gọi hàm này.
+    pub fn unchecked(mut self) -> Self {
+        self.checked = false;
+        self
+    }
+
+    /// Gửi qua router (không mở cổng mạng) và đọc hết câu trả lời. Response lệch hợp đồng
+    /// OpenAPI của endpoint (mã trạng thái không khai, media type sai, thân sai schema) là lỗi
+    /// (đặc tả 31 B4) — trừ khi gọi [`unchecked`](Self::unchecked).
     pub async fn send(self) -> Result<TestResponse, TestAppError> {
         let request = self
             .builder
@@ -346,6 +377,19 @@ impl TestRequest<'_> {
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .map_err(|e| fail("body", e))?;
+        if self.checked {
+            let content_type =
+                headers.get(header::CONTENT_TYPE).and_then(|value| value.to_str().ok());
+            crate::contract::check(
+                &self.app.contract,
+                &self.method,
+                &self.path,
+                status.as_u16(),
+                content_type,
+                &body,
+            )
+            .map_err(|e| fail("response does not match docs/openapi.json", e))?;
+        }
         Ok(TestResponse { status, headers, body: body.to_vec() })
     }
 }

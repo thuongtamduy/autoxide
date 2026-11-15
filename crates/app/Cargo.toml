@@ -21,6 +21,7 @@ autoxide-content.workspace = true
 autoxide-forms.workspace = true
 autoxide-newsletter.workspace = true
 autoxide-comments.workspace = true
+autoxide-menus.workspace = true
 base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true
@@ -37,12 +38,16 @@ uuid.workspace = true
 async-trait.workspace = true
 axum.workspace = true
 autoxide-testkit.workspace = true
+# Module mẫu, không đăng ký trong binary: test migration chạy cả migration của nó.
+autoxide-notes.workspace = true
 # MCP client thật cho test đầu-cuối của endpoint MCP.
 rmcp = { workspace = true, features = [
   "client",
   "transport-streamable-http-client-reqwest",
   "reqwest-tls-no-provider",
 ] }
+# Client HTTP thật cho test nâng cấp (gọi máy chủ chạy trong container).
+reqwest.workspace = true
 sea-orm.workspace = true
 tower.workspace = true
 

@@ -45,6 +45,7 @@ events! {
     (SubmissionDeleted, "forms.submission_deleted", "A submission was deleted by hand."),
     (SubmissionsErased, "forms.submissions_erased", "Every submission of one email address was deleted (a data subject request); the address is not in the payload."),
     (SubmissionsExpired, "forms.submissions_expired", "The daily job deleted submissions past their retention time."),
+    (SubmissionsExported, "forms.submissions_exported", "A CSV export made in the background is ready (who asked, which form, how many rows); the file holds personal data, the payload does not."),
 }
 
 /// Chủ thể (subject) của event về form `id`.

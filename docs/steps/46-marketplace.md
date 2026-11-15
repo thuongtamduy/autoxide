@@ -41,8 +41,11 @@ Sửa ngoài crate: `Cargo.toml`, `crates/app/Cargo.toml`, `crates/app/src/modul
 `docs/openapi.json`, `.env.example`, `CHANGELOG.md`, `docs/ROADMAP.md`.
 
 NGOÀI phạm vi: bộ nối `PayoutGateway` thật / cổng chia tiền thật (module riêng, cần secret thật); nộp
-hồ sơ lên cổng của cơ quan nhà nước (con người làm; hệ thống xuất dữ liệu); quảng cáo trong sàn, người
-bán nước ngoài (để sau, D-190, D-194); trang quy chế sàn và mẫu hợp đồng (nội dung mẫu ở bước 37).
+hồ sơ lên cổng của cơ quan nhà nước (con người làm; hệ thống xuất dữ liệu); quảng cáo trong sàn — làm ở
+bước 64 (module `ads`, D-221); người bán nước ngoài — làm ở bước 63 (D-233): tắt mặc định, điều kiện là gói
+luật có ngày hiệu lực; bước đó thêm `residency`, quốc gia vào `marketplace_sellers` bằng migration mới và mở
+rộng `SellerGate`, `SellerDisclosure`, chi trả ngoại tệ — bước này chỉ làm người bán trong nước; trang quy
+chế sàn và mẫu hợp đồng (nội dung mẫu ở bước 37).
 
 ## Thiết kế
 
@@ -59,7 +62,8 @@ trạng thái `active` **và** `compliance` báo KYC còn hạn **và** đã ch�
 Người bán đăng ký: tài khoản nhân sự (toàn nền tảng, bước 34) tạo hồ sơ → `marketplace` tạo nút
 `seller` dưới nút sàn qua `OrgDirectory` (người đăng ký thành thành viên với role chủ gian hàng), hồ sơ
 pháp lý theo người bán qua `compliance`, gian hàng (tên, slug, logo, mô tả, địa chỉ lấy hàng
-`Address`, cách giao: `self` / `platform`).
+`Address`, cách giao: `self` / `platform`). Role chủ gian hàng gồm quyền quản lý banner của `content` ở độ sâu `unit`
+tại nút `seller` — cho banner trong gian hàng của bước 55 (D-233).
 
 ### Điểm cắm vào module khác
 
@@ -121,6 +125,10 @@ pub struct SellerSummary { pub org_id: OrgId, pub status: SellerStatus, pub disp
 #[async_trait] pub trait Sellers: Send + Sync {
     async fn find(&self, tenant: TenantId, seller: OrgId) -> Result<Option<SellerSummary>, Error>;
     async fn ensure_can_sell(&self, tenant: TenantId, seller: OrgId) -> Result<(), Error>;
+    /// Người bán đang hoạt động, đã xác thực và đủ giấy tờ cho mọi danh mục trong `category_ids` — mời thầu của
+    /// bước 59 dùng (D-232). Trả danh sách người bán đủ điều kiện, phân trang.
+    async fn eligible_for_categories(&self, tenant: TenantId, category_ids: &[Uuid], page: PageRequest)
+        -> Result<Page<SellerSummary>, Error>;
 }
 /// Thông tin người bán bắt buộc hiện trên trang sản phẩm (dữ liệu công khai, không có dữ liệu cá nhân thừa).
 #[async_trait] pub trait SellerDisclosure: Send + Sync {
@@ -269,7 +277,8 @@ là dữ liệu theo khách (bảng `marketplace_settings`: `tenant_id` pk, `pay
 
 1. Khung crate, permission, cấu hình, `api.rs`, đăng ký. → chuẩn bị
 2. Người bán: hồ sơ, nút `seller`, vòng đời, `SellerGate`, giấy tờ, trang công khai, nghe event
-   `compliance`. → **mục 1**
+   `compliance`; loại `marketplace.seller` trong sổ đối tượng (`resolve_many`, ảnh đại diện) để menu của website
+   trỏ tới gian hàng (D-238). → **mục 1**
 3. Duyệt sản phẩm + `ListingGate` + báo vi phạm. → **mục 2**
 4. Phí có ngày hiệu lực + `SellerSplitter` cắm vào `orders` (tách đơn theo người bán, tự giao / sàn
    giao). → **mục 3**
@@ -364,3 +373,33 @@ Cả SQLite và Postgres; `TestApp` với `orders` và các module nền thật,
   dạng mẫu khi có văn bản gốc; ghi quyết định.
 - Có cho người bán tự chọn lịch chi trả không: khuyến nghị không — lịch của sàn, giống nhau cho mọi
   người bán.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Bút toán và tạm giữ (D-218).** Bảng bút toán của đặc tả này viết lại theo tên tài khoản của 36 khi làm;
+  `marketplace_settlements.hold_until` bỏ, trạng thái giữ đọc từ `ledger_holds` (`Ledger::hold_status`).
+- **COD (D-216, B-b1, B-c1).** Người bán chọn `cod_remittance`; sàn không nhận tiền COD vào tài khoản của
+  mình — chế độ không hỗ trợ trả 422 `marketplace.cod_flow_unsupported`; với `seller_direct`, phí sàn và khấu
+  trừ thay thu bằng hoá đơn phí định kỳ hay công nợ của người bán.
+- **Người bán công khai, đánh giá theo người bán, theo dõi gian hàng (B-b8, B-c4).** `GET /public/sellers`
+  (lọc, phân trang), `GET /public/sellers/{slug}/reviews` (gom từ đánh giá của `orders`), `POST/DELETE
+  /me/followed-sellers/{slug}`; bảng `marketplace_followers` (`tenant_id`, `seller_org_id`, `user_id`,
+  `created_at`); báo hàng mới của gian hàng qua `notifications` loại `Marketing` — cần đồng ý riêng.
+- **Huy hiệu tin cậy (D-214, B-b11).** Chỉ chỉ số có dữ liệu thật; không "tỉ lệ trả lời tin nhắn".
+
+## Bổ sung theo D-222 (ai trả tiền giảm giá)
+
+- **Quyết toán theo `funding`.** Phần giảm người bán trả trừ vào doanh thu của người bán. Phần sàn trả
+  (`platform`): người bán vẫn nhận như không có khoản giảm đó; sàn ghi chi phí khuyến mại (tài khoản
+  `expense.promotion.platform` trong `ledger`, đặt tên theo D-218). Phần nhãn hàng / đối tác thanh toán trả: khoản
+  phải thu của sàn từ bên đó.
+- **Gốc tính phí sàn** là dữ liệu có ngày hiệu lực theo sàn (`fee_base`: `after_seller_discount` mặc định — giá
+  sau khoản giảm người bán trả, trước khoản giảm sàn trả); bảng đối soát cho người bán hiện từng phần.
+- **Voucher sàn và voucher người bán.** Người bán tạo chương trình của mình trong phạm vi nút `seller`; sàn tạo
+  chương trình toàn sàn, có thể chia `funding` với người bán (người bán đồng ý qua `promotions_participations`,
+  không áp tự động). Người bán đăng ký flash sale / ngày hội của sàn bằng `promotions.participate`.
+- **Trần pháp luật** cộng khoản giảm của sàn và của người bán trên một đơn vị (đặc tả 43 mục 11 — cần đối chiếu).
+- **Test:** `quyet_toan_voucher_san_nguoi_ban_nhan_du`, `quyet_toan_voucher_shop_tru_doanh_thu`,
+  `phi_san_tinh_tren_gia_sau_giam_cua_nguoi_ban`, `chia_funding_sai_bi_tu_choi`.

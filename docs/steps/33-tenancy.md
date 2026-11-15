@@ -25,7 +25,7 @@ thay đổi phá vỡ của bước 31 xanh), bản cài cũ nâng cấp đượ
 - Có sẵn: `Database` (read/write/begin_write/write_with_retry/begin_snapshot), `rows`, `reference`,
   `SecretKey` (D-113), `Throttle` (D-116), `OneTimeTokens` (D-117), antispam nonce (D-119), `Outbox`,
   `JobQueue`/`Worker`/`Claim`, `Dispatcher`, `transfer::copy_modules` (D-070), `Migrator` (mỗi migration
-  chạy trong transaction trên cả hai database — `crates/kernel/src/migration.rs`, `Transactional`).
+  chạy trong transaction trên cả hai database — `crates/kernel/src/data/migration.rs`, `Transactional`).
 
 ## Phạm vi
 
@@ -250,6 +250,8 @@ database (hết hạn, hàng đợi, giữ lại theo thời hạn) **không** b
 | forms | `forms_forms`, `forms_form_versions`, `forms_submissions` | T | `key` → `(tenant_id, key)`; `(form_id, version)` → thêm `tenant_id`; `created`/`retention` → `_sweep_idx` |
 | idempotency | `idempotency_record` | T | `(scope, key)` → `(tenant_id, scope, key)`; `expires` → `_sweep_idx` |
 | mail | (chỉ `mail_events`, `mail_jobs`) | T | như bảng helper |
+| menus | `menus_menus` | T | `(key, locale)` → `(tenant_id, key, locale)` (bước 34 thêm `org_id` sau `tenant_id`, D-238) |
+| menus | `menus_items` | T | `(menu_id, position)` → thêm `tenant_id` đầu |
 | media | `media_folder` | T | `(parent_id, name_key)` → `(tenant_id, parent_id, name_key)` (giữ nguyên ngữ nghĩa NULL của thư mục gốc) |
 | media | `media_tag`, `media_variant` | T | `name_key` → `(tenant_id, name_key)`; `(item_id, version_id, width)` → thêm `tenant_id` |
 | media | `media_lock` | T | PK `name` → `(tenant_id, name)`; dòng `folder_tree` gieo mỗi khách |
@@ -558,7 +560,8 @@ từng bảng; nguồn sạch; khách khác không bị đụng) · `ten_mien_xa
 `allowed_chi_tra_200_cho_ten_mien_verified_cua_khach_active` · `setting_secret_khong_bao_gio_tra_ra` ·
 `rate_limit_va_idempotency_key_khong_dung_chung_giua_khach` · `token_ky_cua_khach_a_bi_tu_choi_o_khach_b` ·
 `con_tro_cua_khach_a_o_khach_b_chi_tra_du_lieu_b` · `tenant_context_dong_thoi` (nhiều request song song của
-nhiều khách trên hai placement không lẫn database).
+nhiều khách trên hai placement không lẫn database). · `flag_cua_khach_nay_khong_lo_sang_khach_khac` (bảng
+`kernel_user_flags` của D-207 thêm `tenant_id`; cùng `user_id` và `key` ở hai khách là hai dòng).
 
 **Mỗi module (B1–B13):** `khong_ro_ri_giua_khach` (gieo qua REST ở khách A, `leak_check` bằng khách B; một
 khách trên placement chung và một khách `dedicated`) · `trung_ten_o_hai_khach_duoc_phep` (cùng email / slug /
@@ -655,3 +658,44 @@ mặc định trên placement riêng — phủ chế độ `multi` cho mọi tes
 - Bộ canh SQL trong test (callback của SeaORM) — khuyến nghị làm nếu API của bản ghim cho phép.
 - Giới hạn mặc định của pool / số database mở; TTL cache — đo rồi chỉnh, ghi số.
 - Tên hàm chuyển tiếp trong phần A4 — miễn là `#[doc(hidden)]`, bị `#[deprecated]` ở B14 và xoá đầu bước 34.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Cấu hình hành vi module theo khách (A-b7).** Áp `Module::tenant_settings` cho cấu hình nghiệp vụ của
+  module đang có: từ cấm, từ nghi ngờ, số link tối đa, chế độ duyệt của `comments`; hạn lưu bài nộp của
+  `forms`; ngôn ngữ bật và ngôn ngữ mặc định của `content`; ngôn ngữ dịch `alt` của `media`. Biến môi trường
+  hiện có thành **giá trị mặc định** cho mọi khách; khách ghi đè qua `PUT /api/v1/kernel/tenants/{id}/settings/{key}`.
+- **Danh sách khách cho mặt điều khiển (A-c7).** `GET /api/v1/kernel/tenants` thêm lọc `placement_kind`,
+  `schema_state`, `subscription_status`, `near_limit=true` và `expand=placement,subscription,usage` — một
+  câu gọi cho cả trang, không gọi riêng từng dòng.
+- **API job đội database (D-210, A-c6).** `POST /api/v1/kernel/placements/migrations {placement_id,
+  dry_run=true}`, `POST /api/v1/kernel/tenants/{id}/moves {target_placement_id, dry_run=true}` — chỉ nhân sự
+  nền tảng (`kernel.platform.manage`), chạy bằng job, tiến độ qua job API chung (D-213). CLI vẫn là cách chính.
+- **Tạm khoá khác chỉ đọc (A-3.11).** `kernel_tenants.status = suspended` (kernel chặn **mọi** route của
+  khách, kể cả đọc, trả 403 `tenant_suspended`) tách khỏi `read_only` (thuê bao quá hạn, bước 35: đọc được,
+  mọi lệnh ghi trả 402 `plans.subscription_past_due`). Hai cờ độc lập, một middleware kiểm cả hai.
+- Test thêm: `cau_hinh_module_theo_khach_ghi_de_bien_moi_truong`, `khach_tam_khoa_khong_doc_duoc`,
+  `khach_chi_doc_doc_duoc_khong_ghi_duoc`, `di_chuyen_khach_dry_run_khong_doi_gi`.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- **Gắn tên miền với nút.** `PATCH /api/v1/kernel/domains/{id} {org_id | null}` (`kernel.domains.manage`); `org_id`
+  phải là nút của khách hiện tại (hỏi `OrgDirectory` của bước 34, chưa cài thì chỉ nhận `null`); event
+  `kernel.domain_updated`. Tên miền đã `revoked` → 409 `kernel.domain_revoked`.
+- **Tên setting của kết nối đối tác.** `TenantSetting` thêm `group: Option<&'static str>`; mọi cấu hình kết nối
+  đối tác khai `group = "connection"` và đặt tên `<module>.connection.<loại>.<trường>` (trường bí mật đánh dấu
+  secret, vào kho secret, không bao giờ trả lại). `GET /api/v1/kernel/settings?group=connection` là nguồn của màn
+  "Kết nối đối tác"; kiểm thử dùng `POST /kernel/settings/{name}/test` đã có (bước 51). Tên cụ thể:
+
+  | Kết nối | Bước | Tên setting |
+  |---|---|---|
+  | SMS (OTP, brandname) | 37 | `compliance.connection.sms.provider`, `….sms.credentials` (secret), `….sms.brandname` |
+  | Xác thực danh tính (eKYC) | 37 | `compliance.connection.identity.provider`, `….identity.credentials` (secret) |
+  | Cổng thanh toán | 36 | `ledger.connection.payment.<mã cổng>.credentials` (secret), `….payment.<mã cổng>.enabled` |
+  | Chi trả (payout) | 36 | `ledger.connection.payout.<mã>.credentials` (secret) |
+  | Hoá đơn điện tử | 36 | `tax.connection.einvoice.provider`, `….einvoice.credentials` (secret), `….einvoice.serial` |
+  | Hãng vận chuyển | 44 | không dùng setting: nhiều tài khoản mỗi hãng nên giữ bảng `shipping_carrier_accounts`; màn liệt kê thêm từ `GET /api/v1/shipping/carrier-accounts` |

@@ -30,6 +30,8 @@ pub struct Model {
     pub email_verified: bool,
     /// Chữ thường, đã lọc.
     pub body: String,
+    /// `text` hay `markdown` (D-252): cách dựng `body_html` từ `body`.
+    pub format: String,
     /// `pending`, `published`, `rejected`, `spam` hoặc `deleted`.
     pub status: String,
     /// Lý do giữ lại (`moderation`, `too_many_links`, `too_fast,duplicate`…).
@@ -47,6 +49,11 @@ pub struct Model {
     pub content_hash: String,
     /// `search::fold` của chữ và tên, để tìm.
     pub search_key: String,
+    /// `search::exact_key` của chữ và tên: tầng "khớp đúng dấu" khi tìm (D-202).
+    pub match_key: String,
+    /// Mã nhãn của tác giả lúc viết, nối bằng `,` (`seller,verified_buyer`); rỗng: không nhãn.
+    /// Tính một lần lúc ghi qua sổ đối tượng của kernel (D-202).
+    pub badges: String,
     /// Số trả lời đang hiện (chỉ bình luận gốc), cập nhật cùng transaction.
     pub reply_count: i32,
     /// Số báo cáo vi phạm.

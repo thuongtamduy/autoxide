@@ -82,6 +82,7 @@ pub(crate) struct EndedSessionsResponse {
 #[utoipa::path(
     get,
     path = "/me/sessions",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "list_sessions",
     security(("bearer" = [])),
     params(PageQuery),
@@ -111,6 +112,7 @@ async fn list_sessions(
 #[utoipa::path(
     delete,
     path = "/me/sessions/{id}",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "end_session",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the session.")),
@@ -138,6 +140,7 @@ async fn end_session(
 #[utoipa::path(
     delete,
     path = "/me/sessions",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "end_sessions",
     security(("bearer" = [])),
     params(EndSessionsQuery),
@@ -168,6 +171,7 @@ async fn end_sessions(
 #[utoipa::path(
     delete,
     path = "/users/{id}/sessions",
+    extensions(("x-permissions" = json!(["auth.users.manage"]))),
     operation_id = "end_user_sessions",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user.")),

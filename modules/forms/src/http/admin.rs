@@ -17,7 +17,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{choice, page_request, present};
-use crate::fields::{Field, Localized};
+use crate::forms::fields::{Field, Localized};
 use crate::forms::{Form, FormInput, FormStatus};
 use crate::service::FormsService;
 
@@ -193,6 +193,7 @@ pub(crate) struct FormsQuery {
 #[utoipa::path(
     get,
     path = "/",
+    extensions(("x-permissions" = json!(["forms.read"]))),
     operation_id = "list_forms",
     security(("bearer" = [])),
     params(FormsQuery, PageQuery),
@@ -224,6 +225,7 @@ pub(crate) async fn list_forms(
 #[utoipa::path(
     post,
     path = "/",
+    extensions(("x-permissions" = json!(["forms.manage", "forms.read"]))),
     operation_id = "create_form",
     security(("bearer" = [])),
     request_body = CreateFormRequest,
@@ -250,6 +252,7 @@ pub(crate) async fn create_form(
 #[utoipa::path(
     get,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["forms.read"]))),
     operation_id = "get_form",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the form.")),
@@ -278,6 +281,7 @@ pub(crate) async fn get_form(
 #[utoipa::path(
     patch,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["forms.manage", "forms.read"]))),
     operation_id = "update_form",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the form."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -313,6 +317,7 @@ pub(crate) async fn update_form(
 #[utoipa::path(
     delete,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["forms.manage"]))),
     operation_id = "delete_form",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the form."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),

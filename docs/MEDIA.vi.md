@@ -68,6 +68,11 @@ thì nhận `428` (mã `precondition_required`); ai đó vừa sửa trước th
   thư mục gốc), `visibility`, `tags` (thay cả bộ nhãn; `[]` gỡ hết).
 - `PUT /api/v1/media/{id}/content` — thay nội dung, GIỮ ID (mọi chỗ đang dùng item vẫn
   đúng). Kiểm như khi tải lên. `url`, `version_id` và `ETag` đổi; nội dung cũ bị xoá.
+- `PUT /api/v1/media/{id}/alts/{locale}` với `{"alt": "…"}` — alt bằng một ngôn ngữ (vd `vi` trên
+  website hai ngôn ngữ); `DELETE /api/v1/media/{id}/alts/{locale}` gỡ nó. `alt` của item vẫn là bản
+  mặc định cho mọi ngôn ngữ chưa có bản dịch; item trả mọi bản dịch trong `alts`. Ngôn ngữ được
+  phép: `AUTOXIDE_MEDIA_ALT_LOCALES` (mặc định `en,vi`); ngôn ngữ khác bị từ chối với
+  `media.unsupported_locale`. Xoá hẳn item thì xoá luôn bản dịch.
 
 ## Phục vụ nội dung
 
@@ -173,15 +178,16 @@ cũng tính (`409`, `media.folder_not_empty`).
 `media.write`) nhờ mô hình AI của máy chủ gợi ý alt text cho một ảnh JPEG, PNG, GIF hay WebP
 bằng ngôn ngữ đó. Gửi một bản nhỏ (tối đa 1280 px), làm lại không kèm metadata kể cả khi ảnh
 gốc đã nhỏ, không bao giờ gửi file gốc; ảnh riêng tư chỉ
-gửi khi `AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true`. Không lưu gì: người xem rồi lưu bằng `PATCH`.
-`decorative: true` nghĩa là ảnh không thêm thông tin — để alt trống. `media.alt` chỉ có một
-ngôn ngữ; alt theo từng ngôn ngữ nằm ở node ảnh trong thân bài. Bật AI: [`AI.vi.md`](AI.vi.md).
+gửi khi `AUTOXIDE_MEDIA_AI_SEND_PRIVATE=true`. Không lưu gì: người xem rồi lưu bằng `PATCH` (ngôn
+ngữ mặc định) hay `PUT /api/v1/media/{id}/alts/{locale}` (ngôn ngữ khác). `decorative: true` nghĩa là
+ảnh không thêm thông tin — để alt trống. Thân bài cũng có thể đặt alt riêng trên node ảnh của nó, và
+alt đó được ưu tiên hơn alt của item. Bật AI: [`AI.vi.md`](AI.vi.md).
 
 ## AI agent (MCP)
 
-Tool `media.list`, `media.get`, `media.update`, `media.trash`, `media.list_tags`,
-`media.upload` và `media.suggest_alt`, cùng permission với endpoint REST. `media.update` nhận `updated_at` đã đọc
-thay cho `If-Match`. `media.upload` nhận nội dung dạng base64, tối đa 1 MiB sau khi giải mã —
+Tool `media.list`, `media.get`, `media.update`, `media.set_alt`, `media.trash`,
+`media.list_tags`, `media.upload` và `media.suggest_alt`, cùng permission với endpoint REST.
+`media.update` và `media.set_alt` nhận `updated_at` đã đọc thay cho `If-Match`. `media.upload` nhận nội dung dạng base64, tối đa 1 MiB sau khi giải mã —
 nhưng cả lời gọi tool còn phải lọt `AUTOXIDE_HTTP_BODY_LIMIT_BYTES` (mặc định 1 MiB), mà
 base64 dài hơn một phần ba, nên với giới hạn mặc định chỉ file tới khoảng 750 KiB là vừa; file
 lớn hơn thì tải lên qua REST.
@@ -193,7 +199,9 @@ thành công khai — nên chỉ cấp cho người cũng được xem thư vi�
 
 Module khác đọc media qua trait `autoxide_media::api::Media` (đăng ký sau `media`):
 `find_many(&ids)` trả về, trong hai câu query cho bao nhiêu ID cũng được, ID, visibility,
-loại, kích thước ảnh, `alt`, `url` và ảnh thu nhỏ của mỗi item không ở thùng rác. Bảng của module mình chỉ giữ ID của item.
+loại, kích thước ảnh, `alt`, `url` và ảnh thu nhỏ của mỗi item không ở thùng rác.
+`find_many_in(&ids, locale)` làm như vậy, với `alt` bằng ngôn ngữ đó khi item có bản dịch (thêm một
+câu query), không thì bản mặc định. Bảng của module mình chỉ giữ ID của item.
 
 ## Khi một tài khoản bị xoá
 

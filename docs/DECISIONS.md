@@ -4860,3 +4860,1521 @@ người duyệt cho lệnh rủi ro, nên "lệnh chờ duyệt" đi vào core 
 Đã cân nhắc: đối chiếu đơn vị hành chính cũ sang mới (nghiên cứu đề xuất) — trái D-193 do chủ dự án quyết,
 không làm; chuyển menu con sang thanh bên như Vercel 2026 — giữ hàng tab của D-200, xem lại khi có số đo;
 dồn mọi mục vào bước 51 — bước quá lớn, tách phần "nên có" sang bước 52.
+
+## D-202 · API còn thiếu cho thiết kế giao diện 2: hỏi đáp, `alt` theo ngôn ngữ, trả hàng, đơn vãng lai, nhật ký lệnh MCP — 2026-11-13 — chủ dự án giao, agent quyết cách làm
+
+Quyết định: năm khoảng trống rà ra từ thiết kế 2 (đề bài `docs/prompts/ui-api-gaps.md`) làm như sau.
+Phần A và B có code ngay (module `comments`, `media` đã có); C, D, E chỉ vào đặc tả, làm khi lộ trình tới
+bước đó. Mọi thay đổi API là **thêm** (D-059): endpoint, tham số, trường mới; không đổi hành vi hay hình
+dạng của endpoint đang có.
+
+**A. Hỏi đáp sản phẩm dựng trên `comments`** (không module mới): câu hỏi là bình luận gốc, trả lời là
+trả lời trong luồng.
+
+1. Kernel thêm ba điểm nối trung lập (theo mẫu sổ đối tượng D-123, mặc định rỗng — D-038):
+   - `Module::resource_events` → `ResourceEvent { event, kind, change: Closed | Removed }`: module sở hữu
+     khai event nào nghĩa là "thôi nhận tương tác" / "đã gỡ". Kernel kiểm lúc khởi động (event do chính
+     module khai, loại thuộc module đó, không trùng) và đưa cho mọi module qua
+     `StartContext::resource_events`. `comments` bỏ hằng số viết cứng `targets::OWNER_EVENTS`; `content`
+     khai `entry_archived → Closed`, `entry_deleted → Removed` (giữ đúng hành vi cũ). Bước 41 khai lưu
+     trữ / xoá sản phẩm là `Removed` (đóng và ẩn hỏi đáp).
+   - Bộ tính nhãn tác giả `BadgeResolver` trong `ResourceDirectory`: `context.badge_source(kind, codes,
+     resolver)` — module nào cũng đăng ký được cho loại của module khác (`orders` tính `verified_buyer`
+     cho `catalog.product`), mỗi nhãn của một loại chỉ một module tính, nhãn ngoài danh sách khai bị bỏ.
+     `comments` gọi lúc ghi (ngoài transaction), lưu mã vào cột `badges`, đường đọc không gọi chéo module.
+     Response công khai trả `badges: ["seller"]` — mã ổn định, giao diện tự dịch.
+   - `access::PostingVerifier` + chỗ giữ `PostingVerification` (một module đăng ký qua
+     `StartContext::posting_verifier`, thấy cả khi module đó khởi động sau): "tài khoản đã xác thực để
+     đăng nội dung chưa". **Bước 37 chưa có**, nên chưa module nào đăng ký: khi đó mọi tài khoản đăng nhập
+     tính là đã xác thực — giữ hành vi trước D-202. Bước 37 (mục NĐ 147/2024) đăng ký bộ hỏi thật:
+     `compliance` cài `PostingVerifier` dựa trên `PostingGate` / `AccountVerification` của đặc tả 37 (tên
+     đó thuộc `compliance`, nên điểm nối của kernel mang tên khác). Phần C2 của đặc tả 37 đổi theo:
+     `comments` không `require::<dyn PostingGate>` và không phải dời thứ tự đăng ký.
+2. `comments`: cấu hình `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` (mặc định rỗng — không đổi gì): ở loại
+   đích này khách bị từ chối và người dùng phải qua bộ hỏi xác thực, lỗi `comments.verification_required`
+   (403). Căn cứ: NĐ 147/2024/NĐ-CP về xác thực tài khoản đăng nội dung — **cần đối chiếu văn bản gốc**
+   xem hỏi đáp trên website bán hàng có thuộc phạm vi không; vì vậy là cấu hình theo loại đích.
+3. Tìm `q` trên `GET /public/threads`: chỉ bình luận gốc, không phân biệt hoa thường và dấu; khớp đúng dấu
+   (cột mới `match_key` = `search::exact_key`, NFC + chữ thường) xếp trước khớp không dấu (`search_key`).
+   Hạng phụ thuộc chữ gõ nên không lưu thành cột được: kernel thêm `pagination::fetch_page_tiers` (con trỏ
+   mang tầng và ID; mỗi trang tối đa một câu truy vấn mỗi tầng) — một cách làm cho mọi "xếp hai tầng"
+   về sau (gợi ý tìm của bước 41).
+4. Số đếm: `comments_targets` thêm `published_thread_count` / `pending_thread_count` (đổi cùng
+   transaction, cùng câu `UPDATE n = n + k` với số cũ); `GET /public/counts` thêm `thread_count`, đích thêm
+   `thread_count` và `pending_thread_count` (quản trị).
+5. MCP: `comments.unanswered` (`comments.read`, như `GET /?status=published&unanswered=true` — tham số mới)
+   và `comments.answer` (`comments.post`, gọi chính `CommentsService::post` như `POST /public/comments`).
+   "Chưa trả lời" là chưa có trả lời đang hiện (`reply_count = 0`), không phân biệt ai trả lời.
+
+**B. `alt` theo ngôn ngữ** (`media`): bảng mới `media_alt_translations` (`media_id`, `locale`, `alt`,
+`updated_at`; khoá (`media_id`, `locale`)) bằng migration mới; chưa có `tenant_id` vì `media_item` chưa
+theo khách — bước 33 thêm cho cả hai. `media_item.alt` giữ nghĩa bản ngôn ngữ mặc định. Item trả thêm
+`alts`; `PUT` / `DELETE /{id}/alts/{locale}` (bắt buộc `If-Match`, event `media.item_updated` kèm `alts`);
+tool `media.set_alt`; ngôn ngữ kiểm theo `AUTOXIDE_MEDIA_ALT_LOCALES` (mặc định `en,vi`), sai thì
+`media.unsupported_locale`. Trait `Media` thêm `find_many_in(ids, locale)` có cài đặt mặc định; `content`
+tra ảnh của bản công khai theo ngôn ngữ của bài. Gợi ý bằng AI: endpoint sẵn có
+`POST /{id}/alt-suggestions` đã nhận `locale` và chỉ trả bản nháp (D-109) — không thêm endpoint. Xoá hẳn
+ảnh thì xoá bản dịch cùng transaction.
+
+**C, D** vào đặc tả bước 45 (mục "Bổ sung theo D-202"): ảnh kèm yêu cầu trả hàng (kiểm chủ sở hữu qua trait
+của `media`), lý do bắt buộc ảnh là chính sách theo nút, `POST /me/orders/{id}/returns/preview` không ghi;
+thao tác bằng token xem đơn (huỷ, đổi địa chỉ có OTP lần hai, mở hỗ trợ) qua cùng service, giới hạn là
+cấu hình, che số điện thoại và địa chỉ. Tạo tài khoản từ số đã xác thực thuộc **`auth` (bước 34)** — danh
+tính và đăng nhập là việc của `auth`; `orders` chỉ gọi `claim` sau đó.
+
+**E** vào đặc tả bước 52: lệnh MCP ghi `mcp:<tool>` vào đường dẫn mẫu, không ghi tham số; lọc theo
+`actor_kind` và key; giữ `approval_id` khi lệnh nhận `202 approval_required`.
+
+Lý do: dùng lại `comments` (đã có kiểm duyệt, chống spam, luồng, số đếm, tool) rẻ và đúng hơn một module
+hỏi đáp mới; nhãn và event vòng đời là dữ liệu do module sở hữu khai nên thêm loại đích không phải sửa
+`comments`. Nhãn tính lúc ghi vì trang sản phẩm đọc nhiều gấp bội ghi và đường đọc không được gọi chéo
+module. Bộ hỏi xác thực là chỗ giữ của kernel thay vì `provide` / `require` vì thứ tự đăng ký không được
+lặng lẽ làm mất kiểm tra pháp lý (module đăng ký sau vẫn có hiệu lực).
+
+Đã cân nhắc: module `questions` riêng — lặp lại toàn bộ kiểm duyệt của `comments`; cột JSON cho `alt` theo
+ngôn ngữ trên `media_item` — khó lọc, khó xoá một ngôn ngữ, đổi hình dạng bảng đang có; xếp hạng tìm
+bằng `CASE WHEN … LIKE` trong `ORDER BY` — con trỏ theo ID không giữ được thứ tự, phải dùng `OFFSET`
+(luật cấm); kiểm `verified_only` bằng tên role — trái luật kiến trúc 7.
+
+## D-203 · Nút "Đánh giá này hữu ích" cho đánh giá sản phẩm (bước 45) — 2026-11-13 — chủ dự án giao, agent quyết cách làm
+
+Quyết định: đặc tả bước 45 thêm phiếu "hữu ích" cho đánh giá. Bảng `orders_review_votes` (mỗi người một
+phiếu cho mỗi đánh giá); cột `orders_reviews.helpful_count` đổi cùng transaction với phiếu; `PUT` / `DELETE
+/public/reviews/{id}/helpful` (đăng nhập, gửi lại không đếm thêm); `sort=helpful` phân trang bằng con trỏ
+(`fetch_page_by`). Mặc định vẫn sắp theo mới nhất. Không có phiếu "không hữu ích". Người viết đánh giá không
+tự bỏ phiếu cho mình; người quản lý đánh giá hay sản phẩm ở nút bán không bỏ phiếu cho sản phẩm của mình.
+Không phát event cho từng phiếu.
+
+Lý do: đặc tả D-201 đã có `sort=helpful` nhưng chưa có dữ liệu để sắp. Số đếm lưu sẵn để trang sản phẩm
+không phải đếm lại mỗi lần mở. Chặn người bán bỏ phiếu và bỏ phiếu "không hữu ích" để thứ tự này không thành
+cách đẩy đánh giá xấu xuống (Luật 19/2023 cấm chặn hay ẩn đánh giá trái quy định — cần đối chiếu văn bản gốc
+xem sắp xếp có thuộc phạm vi không).
+
+Đã cân nhắc: cho khách vãng lai bỏ phiếu theo IP băm — dễ dồn phiếu, mất ý nghĩa; nút "không hữu ích" như
+một số sàn — dễ bị dùng để hạ đánh giá xấu; tính "hữu ích" bằng đếm `COUNT(*)` lúc đọc — chậm trên sản phẩm
+nhiều đánh giá, không dùng được cho con trỏ.
+
+## D-204 · Thêm module `support` (bước 53), hàng đặt trước, nguồn cấp sản phẩm cho Google / Meta — 2026-11-13 — chủ dự án quyết
+
+Quyết định: chủ dự án đồng ý cả ba chỗ còn hở của phần thương mại mà agent rà ra:
+
+1. **Module `support` — hỗ trợ khách hàng, bước 53 mới** (đặc tả `docs/steps/53-support.md`): phiếu hỗ
+   trợ và tin nhắn, người mua có tài khoản hay vãng lai (OTP), phạm vi theo nút tổ chức, hạn trả lời theo
+   giờ làm việc, phân công, câu trả lời mẫu, tool MCP, gợi ý AI chỉ là bản nháp. Bắt đầu sau bước 37, song
+   song với 41–49. `CLAUDE.md` thêm `support` vào danh sách module được dựng. Ranh giới: khiếu nại có hạn
+   luật định vẫn là vụ việc `consumer_complaint` của `compliance` (bước 37), tranh chấp vẫn ở `marketplace`
+   (bước 46), trả hàng vẫn ở `orders` — `support` chỉ chuyển sang, không làm lại. Nút "mở hỗ trợ" của đơn
+   (D-202) gọi `SupportIntake` thay cho event `orders.support_requested`. Thứ tự đăng ký: `support` cùng
+   nhóm với `newsletter`, `comments` (sau `notifications`, trước `plans`).
+2. **Hàng đặt trước** (mục mới ở bước 42 và 45, bổ sung đặc tả 41, 42, 45): biến thể có `sale_mode =
+   preorder` (thay cờ `allow_backorder` bằng `sale_mode` gồm `in_stock` / `backorder` / `preorder`), ngày dự
+   kiến có hàng, giới hạn suất giữ bằng `UPDATE` có điều kiện; hàng về chia theo thứ tự đặt; người mua thấy
+   ngày giao và đồng ý điều kiện trước khi đặt; dời ngày thì được huỷ miễn phí. Thanh toán: trả hết lúc đặt
+   hay khi hàng về; **chưa làm tiền cọc một phần** (cần nghĩa vụ cọc trong sổ cái).
+3. **Nguồn cấp sản phẩm cho Google Merchant Center và danh mục của Meta** (mục mới ở bước 48, bổ sung đặc
+   tả 48): tệp XML / CSV dựng bằng job theo cửa hàng, ngôn ngữ, tiền tệ, phục vụ bằng link có token, báo
+   lỗi từng sản phẩm; nằm trong `channels` vì cùng việc "đưa sản phẩm ra kênh bán", không cần module mới.
+
+Lý do: Luật 19/2023 buộc có kênh tiếp nhận và giải quyết khiếu nại, đặc tả 45 đã có nút "mở hỗ trợ",
+nhưng chưa module nào giữ yêu cầu hỗ trợ thường ngày (ai nhận, trạng thái, hạn); dồn vào `compliance` thì
+lẫn việc vận hành hằng ngày với hồ sơ pháp lý. Hàng đặt trước và nguồn cấp sản phẩm là việc hằng ngày của
+cửa hàng ở Việt Nam (ra mắt sản phẩm, chạy quảng cáo Google / Facebook) mà lộ trình chưa có.
+
+Đã cân nhắc: chat thời gian thực thay cho phiếu — vẫn để sau (D-194), phiếu đủ cho kênh luật định và làm
+nền cho chat về sau; dùng `comments` làm phiếu — phiếu là riêng tư, có phân công và hạn, khác bình luận
+công khai; module `feeds` riêng — trùng việc với `channels`; tiền cọc đặt trước ngay bây giờ — cần thiết
+kế nghĩa vụ trong sổ cái, để khi làm bước 45 hay sau.
+
+## D-205 · Phân quyền chuẩn hàng đầu: bước 54 mới, hợp đồng quyền và test độ phủ ở bước 31 — 2026-11-13 — chủ dự án giao, agent quyết cách làm
+
+Quyết định: chủ dự án yêu cầu phân quyền theo chuẩn các nền tảng lớn và vượt họ. Mô hình chốt: **RBAC theo
+cây tổ chức có độ sâu (bước 34) + chia sẻ bản ghi một bước + deny và rào + điều kiện theo ngữ cảnh**, luật
+là dữ liệu có kiểu do module khai — không ngôn ngữ chính sách tự do, không thư viện chính sách ngoài.
+
+1. Bước 31 thêm hai mục làm ngay: hợp đồng quyền đọc được bằng máy (`x-permissions` / `x-public` trên mỗi
+   operation OpenAPI, `Permission` có mức rủi ro) và test độ phủ trong gate (mọi operation không công khai
+   trả 401 / 403 đúng; thiếu khai báo là đỏ). Rà soát ngày 13/11/2026 cho thấy 224 endpoint, 69 tool MCP
+   đều kiểm quyền, nhưng chỉ `media` có test cho từng endpoint — endpoint mới quên kiểm quyền sẽ lọt.
+2. Bước 54 mới (đặc tả `docs/steps/54-authorization.md`), sau bước 34: một hàm quyết định duy nhất và thu
+   hồi tức thì (quyền không nằm trong token, cache theo `kernel_access_version`); test so khớp lọc danh sách
+   với kiểm từng bản ghi; deny thắng allow; rào quyền tối đa cho khách con; API key chi tiết (hạn bắt buộc,
+   tài nguyên, IP, duyệt); xác thực lại theo RFC 9470; chia sẻ bản ghi có hạn; quyền theo trường dữ liệu
+   (che dữ liệu cá nhân, audit đọc dữ liệu nhạy cảm); nâng quyền đúng lúc; lệnh hai người; mô phỏng, "ai có
+   quyền", quyền không dùng, rà soát định kỳ; endpoint theo OpenID AuthZEN Authorization API 1.0 (chuẩn cuối
+   01/2026); agent hành động thay người dùng có vết.
+3. Để sau: OAuth 2.0 cho ứng dụng bên thứ ba, SCIM 2.0.
+
+Lý do: mỗi phần lấy từ một nền tảng đã chứng minh ở quy mô lớn — Dynamics 365 (độ sâu), Google Zanzibar
+(quan hệ, "ai có quyền"), AWS IAM (deny, SCP, mô phỏng, quyền không dùng), GitHub (token chi tiết, xác thực
+lại), Microsoft Entra PIM (nâng quyền đúng lúc, rà soát), Salesforce (quyền theo trường). Phần vượt trội là
+thứ họ không có cùng lúc: thu hồi tức thì ở mọi đường, lọc danh sách được chứng minh khớp kiểm từng bản ghi,
+độ phủ được gate chứng minh, giải thích được mọi quyết định, và sinh ra cho AI agent — trên cả hai database.
+
+Đã cân nhắc: đồ thị quan hệ đầy đủ kiểu Zanzibar / OpenFGA — mạnh nhưng bài toán "liệt kê bản ghi được
+xem" chậm và cần dịch vụ riêng; ngôn ngữ chính sách Cedar (`cedar-policy`) hay OPA — người thường khó đọc,
+điều kiện tự do không dịch được thành một câu SQL chạy trên cả hai database, thêm thư viện lớn; nhét phạm
+vi vào JWT — mất thu hồi tức thì.
+
+## D-206 · Mẫu mail và thông báo động: bộ dựng mẫu dùng chung, không module `email` riêng — 2026-11-13 — chủ dự án đồng ý, agent quyết cách làm
+
+Quyết định: không viết module `email`. Thêm `autoxide_kernel::template` — bộ dựng mẫu an toàn cho mẫu do
+khách tự soạn (biến, điều kiện, vòng lặp; không đọc tệp / mạng; giới hạn kích thước và số bước chạy; luôn
+thoát HTML; kiểm biến theo JSON Schema mà loại thông báo khai) — và khung mail HTML viết bằng MJML (dựng
+bằng `mrml`), luôn kèm bản chữ thuần. `notifications` (bước 37) dùng nó cho mẫu theo khách (nháp, xuất bản,
+quay lại phiên bản, xem trước, gửi thử tới địa chỉ của chính người gọi, thương hiệu theo nút); `newsletter`
+dùng nó để cá nhân hoá chiến dịch. Thư viện ngôn ngữ mẫu chọn giữa `liquid` và `minijinja` bằng đo khi làm,
+ghi `STACK.md`; chỉ một ngôn ngữ mẫu trong dự án. Mục mới ở bước 37, đặc tả ở cuối `docs/steps/37-compliance.md`.
+
+Lý do: gửi mail (`mail`), mẫu theo khách (`notifications_templates`, bước 37) và chiến dịch (`newsletter`)
+đã có chỗ; module mới sẽ thành hai nơi giữ mẫu. Phần thiếu thật là ngôn ngữ mẫu an toàn và HTML chạy đúng
+mọi trình đọc mail — đặt ở kernel để mọi module dùng một cách. Làm cùng bước 37 vì sổ đồng ý (tin quảng
+cáo luôn có chân thư huỷ nhận) và mẫu theo khách (cần `tenant_id`, bước 33) nằm ở đó.
+
+Đã cân nhắc: module `email` riêng có trình soạn kéo thả — giao diện thuộc repo riêng (D-097), core chỉ cần
+mẫu và API xem trước; Handlebars / Tera — Tera không có vùng cách ly cho mẫu không tin cậy, Handlebars không
+có giới hạn chạy rõ ràng; tự viết ngôn ngữ mẫu — vòng lặp, điều kiện, giới hạn và báo lỗi theo dòng cột vượt
+xa "vài chục dòng"; gửi thử tới địa chỉ tuỳ ý — thành công cụ gửi thư rác.
+
+## D-207 · API cho trợ giúp trong giao diện: cờ theo người dùng, định nghĩa số liệu — 2026-11-14 — agent quyết
+
+Quyết định: làm theo đề bài `docs/prompts/ui-help-api.md`.
+
+1. **Cờ theo người dùng — đã làm.** Bảng `kernel_user_flags` của module nội bộ `kernel` (migration
+   `m0002_create_user_flags` có `down`): `id` (UUIDv7), `user_id`, `key` (1–100 ký tự `a-z0-9._-`),
+   `value` (≤ 200 ký tự), `updated_at`; duy nhất (`user_id`, `key`). API `GET /api/v1/me/flags?prefix=`,
+   `PUT /api/v1/me/flags/{key}` (ghi đè bằng `ON CONFLICT`, gọi lại an toàn), `DELETE …/{key}` (204 kể cả
+   khi không có). Chỉ cần đăng nhập, không permission, chỉ cờ của chính người gọi; không tool MCP (việc của
+   giao diện). Hạn mức `AUTOXIDE_USER_FLAGS_MAX` (mặc định 500) → 409 `kernel.flag_limit_reached`; hai
+   request tạo cờ mới cùng lúc có thể vượt mức vài cờ — chấp nhận, đây là hạn mức chống lạm dụng.
+   - `/api/v1/me` là tiền tố dành riêng cho endpoint "của tôi" do kernel phục vụ (sau này `/me/views`,
+     `/me/can`, `/me/work` của bước 51 và `/me/pins` của 52 cũng ở đây): `Modules::routes` thêm mục
+     `("me", …)`, tên module `me` bị cấm như `kernel` và `antispam`.
+   - Dữ liệu cá nhân: dùng cơ chế đã có của kernel (`PersonalData` trong bản xuất, nghe
+     `privacy::USER_DELETED`), không cần chờ bước 37.
+   - **Chưa có `tenant_id`**: chưa bảng nào có (bước 33 thêm cho mọi bảng cấp khách hàng cùng lúc). Test
+     `flag_cua_khach_nay_khong_lo_sang_khach_khac` chuyển sang danh sách test của bước 33.
+2. **Định nghĩa số liệu — chỉ vào đặc tả.** Trait `SummaryMetric` (P4 bước 51) chưa có code, nên
+   `fn definition(&self) -> Option<&'static str>` (mặc định `None`, D-038), trường `definition` của
+   `GET /api/v1/kernel/summary` và bài kiểm gate "mọi số liệu khai định nghĩa và có bản dịch" ghi vào đặc tả
+   51 mục P4; làm cùng P4.
+
+Lý do: lưu "đã xem gợi ý" ở trình duyệt thì đổi máy là hiện lại; lưu ở máy chủ cần một chỗ chung thay vì
+mỗi module tự làm. Câu định nghĩa số liệu nằm cạnh code tính số để giao diện không nói sai cách tính.
+
+Đã cân nhắc: đặt endpoint dưới `/api/v1/kernel/me/flags` — đúng quy tắc tiền tố module nhưng đường dẫn
+"của tôi" rải rác theo module; đặc tả 51 đã dùng `/api/v1/me/…` nên gom về một tiền tố; lưu cờ trong
+`auth` — kernel không được phụ thuộc module `auth`, và các endpoint `/me` khác của bước 51 là của kernel.
+
+## D-208 · Nội dung và media theo website, theo nút tổ chức (H1) — 2026-11-14 — agent quyết
+
+Quyết định: `content` và `media` có `org_id` (nút sở hữu); `forms` có `org_id` tuỳ chọn. Quyền theo độ sâu
+(bước 34) áp cho chúng. Đọc công khai lọc theo website: tên miền → nút qua `kernel_tenant_domains.org_id`
+(bước 33); menu và ngôn ngữ bật theo website. Bộ lọc quản trị `owner_org`, `site`. Thay câu "`org_id` chỉ
+thêm vào `notes`; `content`, `media`, `forms`… giữ dữ liệu cấp khách" ở `docs/steps/34-organizations-identity.md`
+bằng mục "Bổ sung theo D-208"; `newsletter`, `comments` vẫn cấp khách.
+
+Lý do: mô hình chuỗi và sàn của D-185 cần cửa hàng và người bán có bài, trang, ảnh riêng (A-b1, A-c3 trong
+`docs/research/ui-trace/A-nen-tang.md`). Câu cũ do agent quyết ở đặc tả 34, không phải chủ dự án.
+
+Đã cân nhắc: một khách riêng cho mỗi website — mất báo cáo và quản trị chung của chuỗi; thẻ "website" tự do
+trên bài — không có quyền theo nhánh.
+
+## D-209 · "Chờ xác nhận" đơn là chính sách theo nút (H2) — 2026-11-14 — agent quyết
+
+Quyết định: `orders_policies.acceptance_hours` (mặc định 0 = tự xác nhận như đặc tả 45 hiện tại). Khác 0
+thì đơn đã thanh toán / COD chờ cửa hàng hay người bán bấm nhận; quá hạn tạo việc trong hộp việc (bước 51)
+rồi huỷ theo chính sách, hoàn tiền tự động, tính vào `cancelled_by_seller` của bước 46. Sàn đặt mức cho
+người bán (kế thừa theo cây).
+
+Lý do: sàn ở Việt Nam thường buộc người bán nhận đơn; chỉ số `cancelled_by_seller` cần mốc này (B-b6).
+
+## D-210 · Tách nhánh thành khách riêng, chuyển database: chỉ nhân sự nền tảng (H3) — 2026-11-14 — agent quyết
+
+Quyết định: khách chỉ "gửi yêu cầu" tách / chuyển. Mặt điều khiển có API job cho nhân sự nền tảng:
+`POST /api/v1/kernel/placements/migrations`, `POST /api/v1/kernel/tenants/{id}/moves`, `dry_run` mặc định
+`true`, tiến độ qua job API chung (D-213). CLI (`autoxide tenant split|merge|move`) vẫn là cách chính.
+
+Lý do: việc không hoàn tác được trên dữ liệu nhiều khách; đặc tả 38:286 đã để CLI là chính (A-c6).
+
+## D-211 · Khách tự thu hồi quyền vào hỗ trợ (H4) — 2026-11-14 — agent quyết
+
+Quyết định: giữ `AUTOXIDE_AUTH_SUPPORT_ACCESS_MAX_HOURS` mặc định 8, khoảng 1–72 như đặc tả 34. Thêm: quản
+trị của khách tự thu hồi một lần cấp đang còn hạn (`DELETE /api/v1/auth/support-access/{id}`, permission
+`auth.support_access.revoke` ở khách), event `auth.support_access_revoked` mang `revoked_by_tenant`. Lần cấp
+theo yêu cầu cơ quan có thẩm quyền (`legal_request`) không thu hồi được từ phía khách.
+
+Lý do: khách phải kiểm soát được ai đang vào dữ liệu của mình (Luật 91/2025 — cần đối chiếu văn bản gốc).
+
+## D-212 · Hộp việc không có nút "Đã xử lý" (H5) — 2026-11-14 — agent quyết
+
+Quyết định: việc tự hết khi bản ghi gốc xử lý xong; người dùng chỉ Hoãn và Giao (P10 bước 51). Không có
+trạng thái "đã xử lý" hay "bỏ qua" lưu riêng. Thiết kế đã sửa màn hình theo.
+
+Lý do: việc tính từ dữ liệu (51:99); đánh dấu tay làm hộp việc lệch dữ liệu thật.
+
+## D-213 · Job API chung, xuất danh sách chung, yêu cầu duyệt đầy đủ (bước 51) — 2026-11-14 — agent quyết
+
+Quyết định: kernel có `GET /api/v1/kernel/jobs?status=&kind=`, `GET …/{id}` (`progress`, `result`, `file`),
+`POST …/{id}/retry` (audit), permission `kernel.jobs.read` / `kernel.jobs.manage`; file kết quả giữ có hạn,
+tải bằng link ký. Xuất danh sách dùng chung (bộ lọc theo schema P7 → job → CSV qua `autoxide_kernel::csv`
+→ báo xong qua `notifications`); module khai cột xuất được, không tự làm xuất riêng. Yêu cầu duyệt (P12) có
+`GET /api/v1/kernel/approvals?status=`, `GET …/{id}`, `POST …/reject {reason}`, event
+`kernel.approval_decided`, tool MCP tương ứng.
+
+Lý do: P8 (51:239) đã dẫn tới job API mà chưa định nghĩa; forms, catalog (41:237), orders đều cần xuất (A-b2,
+A-b8, A-c1, A-c2, B-c6).
+
+## D-214 · Không chat với người bán trong core; huy hiệu chỉ từ dữ liệu có thật (H6) — 2026-11-14 — agent quyết
+
+Quyết định: "Chat với người bán" vẫn ở "Sau core" (D-194). Huy hiệu người bán tin cậy (bước 46, 52) không
+dùng "tỉ lệ trả lời tin nhắn" — chỉ chỉ số có dữ liệu trong core (giao đúng hạn, huỷ do người bán, đánh giá,
+tranh chấp thua, thời gian trả lời phiếu hỗ trợ của bước 53 khi có).
+
+Lý do: không có tin nhắn thì chỉ số đó là bịa (B-b11).
+
+## D-215 · Thời điểm lập hoá đơn mặc định khi giao xong (H7) — 2026-11-14 — agent quyết
+
+Quyết định: `orders_policies.invoice_timing` thêm `on_delivered` và lấy làm mặc định; `on_complete` chỉ dùng
+khi khách có căn cứ; giữ `on_confirm`, `on_request`. Căn cứ: NĐ 123/2020/NĐ-CP Điều 9 (thời điểm lập hoá đơn
+khi bán hàng hoá là thời điểm chuyển giao quyền sở hữu hay quyền sử dụng), sửa bởi NĐ 70/2025/NĐ-CP — **cần
+đối chiếu văn bản gốc**.
+
+Lý do: giao xong là lúc chuyển giao hàng hoá với đa số đơn thương mại điện tử (B-b5).
+
+## D-216 · COD và nhiều chế độ dòng tiền trong một checkout (H8, H9) — 2026-11-14 — agent quyết
+
+Quyết định: (1) tiền COD **không bao giờ** về tài khoản của nhà vận hành sàn — về tài khoản thu hộ của đối
+tác có giấy phép, hoặc thẳng về người bán. Người bán tự thu COD thì phí sàn và khấu trừ thay thu bằng hoá đơn
+phí định kỳ hoặc công nợ. Cột `ledger_flow_settings.cod_remittance`; lỗi `marketplace.cod_flow_unsupported`;
+event `shipping.cod_settled` mang `seller_org_id`. Căn cứ: NĐ 52/2024/NĐ-CP (thanh toán không dùng tiền
+mặt), NĐ 117/2025/NĐ-CP (khấu trừ thuế của nền tảng) — **cần đối chiếu văn bản gốc**. (2) Một giỏ có nhiều
+nút: chỉ một mã QR khi mọi nút cùng đối tác thu hộ; khác chế độ thì checkout trả `payment_actions[]`, mỗi
+chế độ một mục, giao diện hiện từng bước.
+
+Lý do: D-187 — core không giữ tiền người mua (B-b1, B-b2).
+
+## D-217 · Yêu cầu dữ liệu cá nhân người dùng tự làm không cần duyệt (H10) — 2026-11-14 — agent quyết
+
+Quyết định: xuất và xoá dữ liệu mà người dùng tự bấm trong tài khoản chạy ngay, không qua duyệt. Sổ yêu cầu
+của chủ thể dữ liệu (`compliance_subject_requests`, có hạn trả lời là dữ liệu có ngày hiệu lực) chỉ dành cho
+yêu cầu qua kênh khác (email, thư, cơ quan). Căn cứ hạn trả lời: Luật 91/2025/QH15, NĐ 356/2025 — **cần đối
+chiếu văn bản gốc**.
+
+Lý do: người dùng đã xác thực tự làm thì không cần người trung gian (A-b3).
+
+## D-218 · Thống nhất tiền giữa bước 36, 45, 46: tên tài khoản, tạm giữ, hạn thanh toán — 2026-11-14 — agent quyết
+
+Quyết định: theo luật "đặc tả của module cung cấp hợp đồng thắng" (`docs/steps/README.md`):
+
+1. Bộ tên tài khoản của đặc tả 36 (`clearing.gateway`, `clearing.carrier_cod`, `payable.seller_held[S]`,
+   `payable.seller_available[S]`, `revenue.*`, `tax.*`…) là bộ duy nhất; bảng bút toán của đặc tả 46
+   (`buyer_prepayments`, `seller_payable:<seller>`…) viết lại theo tên đó khi làm bước 46.
+2. Tiền thu hộ ghi lúc thu vào `clearing.*` của đối tác; phí sàn và khấu trừ thay ghi lúc
+   `orders.order_completed` (như đặc tả 46).
+3. Một cơ chế tạm giữ: `ledger_holds` của 36. `marketplace_settlements.hold_until` bỏ; trạng thái giữ / được
+   rút đọc từ `ledger_holds` qua `api` của `ledger`.
+4. Một hạn thanh toán: `AUTOXIDE_LEDGER_PAYMENT_EXPIRY_MINUTES` (36, mặc định 30) là nguồn duy nhất cho mọi
+   thanh toán `pending`, kể cả VietQR; đặc tả 45 bỏ giá trị 1440 riêng và đọc hạn từ `ledger`. Chuyển khoản
+   chậm hơn hạn vẫn được khớp vào hàng chờ sai lệch của 36, không mất tiền.
+
+Lý do: ba đặc tả viết song song nên lệch (B-b3, B-b10, B-3.2d, B-c12); để lệch thì bước 46 sẽ ghi hai bút
+toán cho cùng một đồng tiền.
+
+## D-219 · Giao diện cửa hàng qua API (bước 55) và chuyển dữ liệu từ nền tảng khác (bước 56) — 2026-11-13 — agent quyết
+
+Quyết định: thêm bước 55 — vị trí hiển thị và banner trong `content` (lịch hiển thị, theo cửa hàng /
+nhánh, link tới đối tượng của module đăng ký sau qua điểm cắm `ContentLinks`, tự ẩn khi chương trình
+khuyến mại kết thúc), bộ sưu tập sản phẩm trong `catalog` (chọn tay hay theo quy tắc, sắp bán chạy từ
+event tuỳ chọn của `orders`), thông tin cửa hàng công khai là cài đặt kế thừa của nút trong
+`organizations`. Thêm bước 56 — module `imports`: nhập file xuất của Shopify, WooCommerce, Haravan, Sapo,
+KiotViet bằng hồ sơ ánh xạ cột là dữ liệu có phiên bản, chạy thử trước, chạy lại không trùng, chuyển
+hướng 301 từ đường dẫn cũ, không mang đồng ý quảng cáo và mật khẩu cũ. Đo hành vi người xem để sau (cần
+đồng ý cookie; hiện dùng công cụ ngoài).
+
+Lý do: chủ dự án hỏi hệ thống đã có biến thể, bảng giá, khuyến mại, voucher, banner và các module hỗ
+trợ như hệ thống lớn chưa (13/11/2026). Rà lộ trình thấy banner, bộ sưu tập, thông tin cửa hàng và chuyển
+dữ liệu từ nền tảng khác chưa có ở đâu, trong khi các nền tảng thương mại điện tử đều có và mọi khách
+chuyển nhà đều cần. Banner đặt trong `content` vì website không bán hàng cũng dùng; bộ sưu tập trong
+`catalog` vì là truy vấn trên sản phẩm.
+
+Đã cân nhắc: module `storefront` riêng — chỉ gom vài bảng của ba module, thêm hợp đồng mà không bớt phụ
+thuộc; nhập qua API của nền tảng cũ — cần tài khoản đối tác, để làm như bộ nối (D-191); trình dựng trang
+kéo thả — trái D-026 (core chỉ có API).
+
+## D-220 · Thêm `analytics` (bước 57), `automations` (bước 58), tìm kiếm thay được, đẩy di động — 2026-11-14 — chủ dự án quyết
+
+Quyết định: chủ dự án đồng ý các chỗ hở agent rà ra khi soát lộ trình:
+
+1. **Module `analytics`, bước 57 mới** (sau 37): số liệu truy cập tự lưu, mặc định không cookie (khoá phiên
+   HMAC xoay và xoá mỗi ngày, không lưu IP hay user agent đầy đủ), chỉ giữ số gộp lâu dài; theo dõi theo người
+   chỉ khi đồng ý qua sổ đồng ý của bước 37. Cấm dấu vân tay trình duyệt.
+2. **Module `automations`, bước 58 mới** (sau 51): luật "khi … thì …" — kích hoạt bằng event / lịch, điều kiện
+   là cây toán tử cố định, hành động là tool MCP chạy **với quyền hiện tại của người tạo luật**; hành động rủi
+   ro chờ duyệt (P12), chống vòng lặp, khoá chống chạy trùng, `Idempotency-Key` mỗi bước.
+3. **Nhập dữ liệu:** không làm khung nhập ở kernel — dùng module `imports` của bước 56 (D-219) làm cách nhập
+   duy nhất, mở rộng thêm nguồn `autoxide` (cùng cột với xuất chung P16 bước 51) và đích `content`, `media`,
+   `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý).
+4. **Bộ máy tìm kiếm thay được** (P7 bước 40): trait `SearchBackend`, mặc định trong database (chạy như nhau trên
+   hai database), backend ngoài là module riêng làm khi đo thấy cần.
+5. **Kênh đẩy di động** (`MobilePush`) cho `notifications` ở bước 37; bộ nối Firebase / Apple cần khoá thật —
+   khi đó dừng lại hỏi.
+
+Thay một phần D-219: câu "đo hành vi người xem để sau (cần đồng ý cookie; hiện dùng công cụ ngoài)" — chủ dự
+án đã duyệt làm `analytics` không cookie, không công cụ ngoài. D-219 do agent quyết nên thay được.
+
+`CLAUDE.md` thêm `analytics`, `automations` vào danh sách module được dựng. Thứ tự đăng ký: `analytics` cùng nhóm
+với `newsletter`, `comments`, `support`; `automations` đăng ký cuối cùng (sau `imports`, `reporting`) (nghe event và gọi tool của mọi module).
+Đặt lịch dịch vụ và ký hợp đồng điện tử vẫn chờ chủ dự án quyết hướng sản phẩm.
+
+Lý do: chủ cửa hàng nào cũng cần số liệu truy cập và tự động hoá; chuyển từ nền tảng khác cần nhập dữ liệu;
+sàn lớn cần tìm kiếm vượt giới hạn "chứa chuỗi" của kernel. Thiết kế giữ luật cũ: không gửi dữ liệu người đọc
+cho bên thứ ba, không đường thứ hai làm điều REST / MCP không làm được, mọi thứ chạy trên cả hai database.
+
+Đã cân nhắc: nhúng Google Analytics hay công cụ ngoài — gửi dữ liệu người đọc ra ngoài, cần đồng ý cookie; luật
+tự động hoá bằng ngôn ngữ kịch bản (Lua, JavaScript) — không kiểm được lúc lưu, khó giải thích, rủi ro bảo mật;
+chỉ dùng webhook cho tự động hoá — cần máy chủ ngoài, khó cho người không biết lập trình; tìm kiếm Postgres
+full-text — không có trên SQLite, trái luật số một.
+
+## D-221 · Đưa tám mảng "để sau" lên lộ trình: bước 59–66 — 2026-11-14 — chủ dự án quyết
+
+Quyết định: chủ dự án đưa cả tám mảng đang ở mục "Sau core" lên lộ trình, mỗi mảng một bước có đặc tả:
+
+| Bước | Mảng | Module | Bắt đầu sau |
+|---|---|---|---|
+| 59 | Bán sỉ B2B: công ty mua, giá sỉ, báo giá, công nợ, hạn mức | `wholesale` | 45, 47 |
+| 60 | Đặt lịch dịch vụ: giờ trống, chống chồng giờ, cọc qua đối tác | `bookings` | 34, 36 |
+| 61 | Chat chăm sóc khách qua SSE, chuyển thành phiếu hỗ trợ | `conversations` | 40, 53 |
+| 62 | Sản phẩm bán theo kỳ (người mua trả cửa hàng; khác `plans`) | `recurring` | 45, 36 |
+| 63 | Đa tiền tệ, bán xuyên biên giới (mở rộng `ledger`, `tax`, `catalog`, `orders`, `shipping`) | — | 36, 41, 44, 45 |
+| 64 | Quảng cáo trong sàn, luôn gắn nhãn, phí là doanh thu dịch vụ của sàn | `ads` | 46, 57 |
+| 65 | Chợ ứng dụng qua OAuth 2.0 (PKCE bắt buộc, phạm vi là permission) | `apps` (+ `auth`) | 54, 33 |
+| 66 | Đồng bộ nhân viên qua SCIM 2.0 | trong `auth` | 34, 40 |
+
+Thay: mục "Để sau (D-194)" về B2B, đặt lịch, chat, bán theo kỳ, đa tiền tệ, quảng cáo trong sàn, và mục "Để sau
+(D-205)" về OAuth, SCIM. Câu "đo hành vi người xem… để Google Analytics làm" còn sót trong mục "Sau core" bỏ, vì
+đã là bước 57 (D-220). `CLAUDE.md` thêm `wholesale`, `bookings`, `conversations`, `recurring`, `ads`, `apps` vào
+danh sách module được dựng.
+
+Những ràng buộc giữ từ luật cũ, ghi trong từng đặc tả:
+- tiền đi qua đối tác có giấy phép (D-187): cọc đặt lịch, trừ tiền định kỳ, thanh toán ngoại tệ; quảng cáo
+  không có "ví" giữ tiền trả trước của người bán;
+- chống ghi đồng thời bằng câu lệnh có điều kiện hay khoá duy nhất chạy trên cả hai database (hạn mức tín dụng,
+  ô giờ đặt lịch, ngân sách quảng cáo);
+- người mua trong nước chỉ VND — **cần đối chiếu** Pháp lệnh Ngoại hối 2005 (sửa 2013) và Thông tư
+  32/2013/TT-NHNN trước khi bật đa tiền tệ; trích tiền định kỳ — **cần đối chiếu** NĐ 52/2024 và quy định của NHNN
+  về ủy quyền trích nợ; nhãn quảng cáo — **cần đối chiếu** Luật Quảng cáo và văn bản sửa đổi hiện hành.
+
+Còn để sau: bán ứng dụng trả phí trên chợ (chia doanh thu), tiền cọc một phần cho hàng đặt trước, đấu thầu và
+hợp đồng khung B2B, gọi điện / tổng đài trong chat. Ký hợp đồng điện tử vẫn chờ chủ dự án quyết hướng.
+
+Lý do: Autoxide phục vụ mọi mô hình kinh doanh (D-185); tám mảng này là thứ các nền tảng lớn đều có, và người
+dùng hỏi tới khi chọn nền tảng.
+
+Đã cân nhắc: gộp bán theo kỳ vào `plans` — khác người trả tiền và khác cách ghi sổ, chỉ dùng chung bộ tính lịch
+kỳ; module `fx` riêng cho đa tiền tệ — tiền tệ đã có trong `money`, tỉ giá thuộc `ledger`; WebSocket cho chat —
+SSE của bước 40 đủ cho tin đến, gửi tin vẫn là REST, một cách làm.
+
+## D-222 · Bảng giá và khuyến mại theo các nền tảng lớn; chương trình, coupon, voucher, thẻ quà tặng — 2026-11-14 — chủ dự án quyết
+
+Quyết định: chủ dự án đồng ý toàn bộ đề xuất sau khi đối chiếu đặc tả 41 và 43 với commercetools (Product
+Discount / Cart Discount / Discount Code, chế độ cộng dồn, nhóm "lợi nhất"), Shopify (ba lớp giảm giá,
+`combinesWith`), Stripe (Coupon là luật, Promotion Code là mã trỏ tới luật), Salesforce B2C (lớp, độc quyền
+theo lớp / toàn giỏ, thứ hạng) và Shopee (voucher shop / voucher sàn, kho voucher, voucher vận chuyển).
+
+**1. Bốn khái niệm, mỗi tên một nghĩa trong toàn hệ thống** (tên kiểu, bảng, API, tài liệu đều theo):
+
+| Tên | Là gì | Ai dùng được |
+|---|---|---|
+| Chương trình khuyến mại (`promotion`) | **Luật**: điều kiện, lợi ích, thời gian, ngân sách, cộng dồn, ai trả tiền. Đến tay người mua bằng một trong ba cách: `automatic`, `code`, `voucher` | — |
+| Coupon — mã giảm giá (`code`) | Chuỗi mã người mua gõ hay chọn để mở một chương trình `code`. Mã chung (`SALE50`) hay lô mã riêng mỗi mã một lượt | **Ai có mã cũng dùng được**, kể cả khách vãng lai |
+| Voucher — phiếu ưu đãi đã cấp (`voucher`) | Một quyền dùng một lần **nằm trong ví của một tài khoản**, có hạn riêng; có được do bấm "Lưu", nhập mã nhận, được tặng (sinh nhật, đổi điểm, sau khi mua, bù lỗi, giới thiệu bạn) | **Chỉ đúng tài khoản được cấp**; không chuyển, không đổi ra tiền |
+| Thẻ quà tặng (`gift card`, bước 47) | Tiền trả trước, là **cách thanh toán**, không phải khuyến mại; tắt mặc định (NĐ 52/2024) | — |
+
+Luật phân định: mã gắn với một người thì là voucher, không làm coupon "chỉ một người dùng". Coupon và voucher
+đều là khoản **giảm giá** (không phải tiền): cùng chịu trần pháp luật, cùng ghi "ai trả tiền", cùng hiện trên
+hoá đơn là khoản giảm. Mã dùng để **nhận** voucher (`claim`) khác mã dùng để **giảm** (`redeem`), cùng bảng mã.
+
+**2. Bảng giá (đặc tả 41):** thứ tự chọn bảng giá chung (nút gần nhất → công ty B2B → nhóm khách → kênh →
+thị trường → `priority` → `id`), cột cho bước 48 / 59 / 63 có sẵn từ migration đầu; bảng giá suy ra theo
+công thức (một tầng, ghi thành dòng giá thật bằng job); quy tắc làm tròn giá đẹp dùng chung; chặn / cảnh báo
+giá dưới sàn (giá tối thiểu, biên lợi nhuận trên giá vốn lấy qua event của `inventory`); đổi giá hàng loạt có
+xem trước, duyệt, hẹn giờ, giá tạm thời.
+
+**3. Khuyến mại (đặc tả 43):** ba lớp `product` / `order` / `shipping`, `exclusivity` `none` / `class` /
+`global` thay cờ `exclusive`, `combines_with`, `stop_after`; chế độ cộng dồn `priority` (mặc định) hay
+`best_for_buyer` (so tập cộng dồn với từng chương trình độc quyền, có giới hạn, vẫn tất định); ai trả tiền
+(`platform` / `seller` / `brand` / `payment_partner`, chia theo basis point); ngân sách tiền; lượt theo ngày,
+khung giờ; loại mới `tiered`, `bundle_price`, `add_on`, `gift_choice` và mua X tặng Y mở rộng; điều kiện mở rộng
+qua một bảng điều kiện chung; chống lạm dụng theo nhiều khoá người mua; ví voucher và `grant_voucher` cho
+module khác; đăng ký tham gia chương trình của sàn; chạy thử, kiểm xung đột, lịch, số liệu chương trình; mục
+tiêu tốc độ đo được.
+
+**4. Module khác:** 45 (dữ liệu giỏ mới, chia tiền giảm khi trả hàng, quà khi trả, hoá đơn), 46 (quyết toán theo
+người trả tiền giảm, gốc tính phí sàn), 47 (cấp voucher sinh nhật / đổi điểm / sau khi mua / giới thiệu; phân
+khúc và hạng vào giỏ), 48 (giá theo kênh là bảng giá suy ra), 53 và 58 (cấp voucher bù lỗi / theo quy trình).
+
+Nhẹ và nhanh (ràng buộc thiết kế, kiểm bằng số đo):
+- trang danh sách không chạy luật khuyến mại: giá sau giảm tự động ghi sẵn vào `catalog_storefront_entries`
+  theo event; giá suy ra ghi sẵn thành dòng giá;
+- `evaluate` chạy trong bộ nhớ trên chỉ mục chương trình đang chạy theo (khách, cửa hàng), nạp lại theo số phiên
+  bản; chỉ xét chương trình có mục tiêu trùng giỏ. Mục tiêu: giỏ 50 dòng, 500 chương trình đang chạy, p99 < 5 ms
+  phần tính, ghi số đo vào `docs/BENCHMARKS.md`;
+- mọi bộ đếm (lượt, ngân sách, suất, ví voucher, lượt theo ngày) đổi bằng `UPDATE` có điều kiện trong một
+  transaction, khoá theo thứ tự cố định; chạy được và có test đồng thời trên cả SQLite và Postgres.
+
+Căn cứ pháp lý — **cần người có chuyên môn pháp lý xác nhận trước khi chạy thật** (D-186), mọi con số là dữ
+liệu có ngày hiệu lực:
+- Luật Thương mại 36/2005/QH11, Điều 92: các hình thức khuyến mại, trong đó "bán hàng, cung ứng dịch vụ có kèm
+  theo phiếu mua hàng, phiếu sử dụng dịch vụ" — voucher cấp sau khi mua thuộc hình thức này; quy tắc thông báo
+  theo hình thức là dữ liệu `promotions_notice_rules`.
+- Thông tư 39/2025/TT-BCT và NĐ 239/2026 (sửa NĐ 81/2018): trần giảm giá 50% giá ngay trước khuyến mại. Trên sàn,
+  khi voucher sàn và voucher của người bán cùng áp, mặc định **cộng mọi khoản giảm trên một đơn vị rồi so trần**
+  (cách an toàn) — chưa rõ trần tính riêng cho từng thương nhân hay gộp.
+- NĐ 123/2020 (sửa bởi NĐ 70/2025) về hoá đơn: cách ghi khoản giảm giá, hàng khuyến mại, phần giảm do sàn hay đối
+  tác thanh toán trả — bước 45 làm theo dữ liệu, cần đối chiếu.
+- Luật 19/2023/QH15: điều kiện của coupon / voucher hiện rõ trước khi dùng; số lượt / suất còn là số thật.
+- Luật Bảo vệ dữ liệu cá nhân: ví voucher là dữ liệu cá nhân — có trong xuất dữ liệu, xoá tài khoản thì thu hồi
+  voucher chưa dùng; khoá chống lạm dụng chỉ lưu bản băm.
+
+Lý do: người dùng thường lẫn "voucher" và "coupon"; mỗi nền tảng gọi một kiểu. Chốt theo **ai dùng được** (ai có
+mã hay chỉ người được cấp) thì dễ hiểu, khớp thói quen ở Việt Nam ("kho voucher", "nhập mã") và khớp mô hình
+Stripe / commercetools (luật tách khỏi cách đưa tới người mua).
+
+Đã cân nhắc:
+- Gọi mọi thứ là "voucher" như nhiều sàn Việt Nam — mất phân biệt mã ai cũng dùng được và quyền của một người,
+  khiến hạn mức, chống lạm dụng và dữ liệu cá nhân xử lý lẫn lộn.
+- Chọn bảng giá "rẻ nhất" (như một số nền tảng B2B) — khó đoán, người bán không kiểm soát; giữ "cụ thể nhất".
+- Tìm tổ hợp khuyến mại tối ưu toàn cục — bài toán tổ hợp, chậm và khó giải thích; `best_for_buyer` chỉ so có
+  giới hạn.
+- Bảng giá suy ra tính lúc đọc — nhanh viết nhưng chậm đường nóng và mất lịch sử giá thật (cần cho trần 50%);
+  ghi sẵn thành dòng giá.
+
+## D-223 · Danh sách lý do theo khách: một cách làm cho mọi module — 2026-11-14 — agent quyết
+
+Quyết định: mọi danh sách "lý do" khách cần chọn (điều chỉnh tồn, ẩn đánh giá, từ chối trả hàng, lý do trả hàng
+cho phép, chênh lệch tiền két, khớp dòng lệch COD…) đi qua một tiện ích của kernel, mục P18 của bước 51:
+- module khai danh sách và bộ mã mặc định qua `Module::reason_lists()` (cài đặt mặc định trả rỗng — D-038); tên
+  danh sách `<module>.<việc>`, mã `snake_case`, nhãn mặc định là i18n key `<module>.reason.<việc>.<mã>`;
+- khách thêm mã, đổi nhãn, tắt mã mặc định, sắp thứ tự (`kernel_reason_codes`: `tenant_id`, `list`, `code`,
+  `labels` JSON, `active`, `position`, `builtin`, `updated_at`; unique (`tenant_id`, `list`, `code`));
+- mã mặc định đánh dấu `legal` (vd lý do ẩn đánh giá theo gói `vn` của bước 37) không tắt được;
+- service kiểm bằng `ReasonCodes::ensure(tenant, list, code)`; dòng dữ liệu lưu mã, không lưu nhãn — đổi nhãn
+  không sửa lịch sử; mã đã dùng không xoá được, chỉ tắt.
+
+Lý do: đợt 2 của thiết kế lộ ra ít nhất sáu danh sách lý do ở bốn module; mỗi module tự làm bảng riêng thì sáu
+cách làm, sáu bộ endpoint. Một tiện ích chung giữ "mỗi việc một cách làm" và giao diện học một lần.
+
+Đã cân nhắc: viết cứng danh sách trong code — khách không thêm được lý do của mình; mỗi module một bảng — lặp và
+lệch nhau.
+
+## D-224 · `ActorKind` thống nhất cho audit, nhật ký lệnh và event — 2026-11-14 — agent quyết
+
+Quyết định: kernel có một enum `ActorKind` (`#[non_exhaustive]`): `human`, `agent` (API key loại agent), `service`
+(API key loại dịch vụ), `system` (job, lịch), `support` (nhân sự hỗ trợ của nền tảng vào khách theo D-211),
+`app` (ứng dụng OAuth, bước 65), `scim` (bước 66). `Principal` mang nó; audit, `kernel_request_log` (bước 52) và
+envelope event (bước 40) ghi cùng giá trị; danh sách audit lọc `actor_kind=` (nhiều giá trị). Thay các tập con
+đang ghi rải rác ở 36, 51, 52, 65, 66.
+
+Lý do: khách cần thấy việc nào do người, việc nào do AI agent hay nhân sự nền tảng làm; một tập giá trị cho mọi
+nơi thì lọc được xuyên suốt.
+
+## D-225 · Khuyến mại: thời hạn bắt buộc, thông báo theo nơi nhận, kiểm trước khi bật, "Lưu mã", nhắc flash sale — 2026-11-14 — agent quyết
+
+Quyết định:
+- **`ends_at` vẫn bắt buộc.** Luật Thương mại 2005 Điều 97 yêu cầu công bố thời gian bắt đầu, kết thúc khuyến mại;
+  NĐ 81/2018 (sửa bởi NĐ 128/2024) giới hạn tổng số ngày giảm giá cho một loại hàng trong năm. "Miễn phí giao
+  không thời hạn" là **chính sách phí giao** của bước 44 (miễn phí từ một giá trị đơn), không phải chương trình
+  khuyến mại. `promotions_legal_limits` thêm `max_days_per_program?`, `max_days_per_year?` (dữ liệu, có ngày hiệu
+  lực); `activate` kiểm.
+- **Thông báo theo nơi nhận:** bảng `promotions_notices` (một dòng mỗi cơ quan nhận: tỉnh theo `address`, trạng
+  thái, số tiếp nhận, ngày nộp) thay ba cột `notice_*`; `notice_status` của chương trình suy ra (mọi nơi đã nộp).
+- **Kiểm trước khi bật:** `POST /promotions/{id}/activation-check` (không ghi) trả danh sách điều kiện, mỗi điều
+  kiện `code`, `ok`, `params`; `activate` lỗi thì trả cùng danh sách trong `errors[]` của `Problem` — không lưu
+  "lỗi lần bật cuối".
+- **"Lưu mã" của website = lưu voucher (D-222):** chương trình muốn có nút "Lưu" là chương trình `voucher` có
+  `claimable`; coupon công khai đã hiện sẵn ở bộ chọn mã của giỏ (D-201). Không làm `/me/saved-promotions`.
+- **Nhắc khi flash sale bắt đầu:** người mua bấm "Nhắc tôi" (`promotions.use`) tạo một dòng
+  `promotions_reminders`; job gửi qua `notifications` trước giờ mở `REMINDER_LEAD_MINUTES` (10). Lần bấm là đồng
+  ý riêng cho đúng một lần nhắc đó (ghi bằng chứng đồng ý theo bước 37), không thành đồng ý nhận quảng cáo.
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật Thương mại 36/2005 Điều 97; NĐ 81/2018
+sửa bởi NĐ 128/2024 (thời hạn giảm giá, nơi nhận thông báo, miễn phí giao có phải thông báo không); NĐ 239/2026;
+Luật 91/2025 về đồng ý cho mục đích cụ thể.
+
+## D-226 · Che số điện thoại, email của khách; cơ sở tính điểm thưởng — 2026-11-14 — agent quyết
+
+Quyết định:
+- Danh sách và chi tiết khách (`customers`, cả REST, MCP và xuất danh sách) trả số điện thoại, email **đã che**
+  (`09•• ••• 412`, `n•••@gmail.com`). Xem đủ: `GET /customers/{id}/contact` với permission
+  `customers.contact.reveal`; mỗi lần xem ghi audit (người xem, hồ sơ, lý do tuỳ chọn). Xuất danh sách có cột liên
+  hệ đầy đủ cũng cần permission này. Người mua xem dữ liệu của chính mình không bị che.
+- Điểm thưởng tính trên **số tiền người mua thực trả cho hàng hoá**: sau mọi khoản giảm (kể cả coupon, voucher),
+  gồm thuế (giá bán lẻ gồm thuế), không gồm phí giao, không gồm phần trả bằng điểm hay thẻ quà tặng; trừ phần
+  hoàn khi trả hàng. Cố định, ghi trong tài liệu; không là tuỳ chọn của khách.
+
+Căn cứ: Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 (tối thiểu hoá, kiểm soát truy cập) — **cần đối chiếu văn bản
+gốc**. Lý do điểm: một định nghĩa duy nhất thì người mua, nhân viên và sổ cái cùng số.
+
+## D-227 · Chênh lệch tiền két khi đóng ca — 2026-11-14 — agent quyết
+
+Quyết định: đóng ca (bước 45) tính `variance = counted − expected`; khác 0 thì bắt buộc `variance_reason` (danh
+sách lý do `orders.cash_variance`, D-223) và ghi chú. Chênh lệch ghi sổ cái ngay khi đóng ca vào tài khoản **chờ
+xử lý** của cửa hàng: thiếu → `suspense.cash_shortage`, thừa → `suspense.cash_overage` (ánh xạ sang hệ thống tài
+khoản kế toán theo bước 36 — tài sản thiếu chờ xử lý / tài sản thừa chờ giải quyết); người quản lý xử lý sau bằng
+bút toán từ sổ cái. Vượt ngưỡng `cash_variance_approval_minor` (cài đặt kế thừa) thì đóng ca cần người duyệt
+(P12 bước 51).
+
+Căn cứ: chế độ kế toán doanh nghiệp (TT 200/2014, TT 133/2016 — tài khoản 1381 / 3381) — **cần đối chiếu**.
+Lý do: tiền két lệch là sự thật kế toán, phải vào sổ; quyết nguyên nhân là việc của người, không để phần mềm đoán.
+
+## D-228 · Lộ trình xếp theo thứ tự làm; bước đã xong tách file; đặc tả một phiên bản — 2026-11-14 — chủ dự án quyết
+
+Quyết định: chủ dự án đồng ý bốn việc dọn sau khi rà bước 31–66:
+1. **Số bước là mã cố định, không phải thứ tự.** `docs/ROADMAP.md` xếp các bước theo thứ tự làm, chia giai
+   đoạn: A hợp đồng và nền lõi (31, 32, 33, 34, 35–37, 40) → B lớp cho giao diện và phân quyền (51, 54, 52) →
+   C vận hành (38, 39) → D module nền dùng chung (53, 57, 58, 66, 65) → E thương mại (41–49, 55, 56, 59–64);
+   bước 50 ở mục "Chờ chủ dự án". Bảng phụ thuộc của D-192 giữ nguyên (bỏ dòng 30). Bước kế tiếp là bước đầu
+   tiên từ trên xuống còn mục `[ ]` mà phụ thuộc đã xong — skill `next-step` sửa theo.
+2. **Bước 0–30 đã xong** chuyển nguyên văn sang `docs/roadmap/done.md`; lộ trình chỉ còn việc đang mở.
+3. **Một đặc tả, một phiên bản đúng.** Các mục "Bổ sung theo …" nối ở cuối đặc tả được gộp vào thân (bảng, API,
+   test… đúng chỗ), câu bị thay thì xoá, ghi số quyết định trong ngoặc. Làm ngay cho đặc tả có từ ba mục bổ sung
+   (34, 37, 41–45, 47, 48, 51, 52); đặc tả còn lại gộp ở commit đầu tiên của bước đó. Từ nay không nối mục
+   "Bổ sung" mới — luật ghi ở `docs/steps/README.md`.
+4. **Danh sách việc của mỗi bước gom theo chủ đề**, không theo nguồn ("Đối chiếu thiết kế 2", "D-202"…); nguồn
+   vẫn nằm trong quyết định và đặc tả.
+
+Thay: câu "thứ tự và phụ thuộc ở bảng ngay trước bước 30" (D-192) — bảng nay ở đầu lộ trình; cách chọn bước
+kế tiếp "số nhỏ nhất còn mục chưa xong" của skill `next-step`.
+
+Lý do: số bước đã không còn khớp thứ tự làm (51 phải trước 41; 53, 57, 58, 65, 66 thuộc phần dùng chung), đặc tả
+bị vá chồng tới bảy lớp với chỗ lớp sau đảo lớp trước, và gần 30% lộ trình là việc đã xong mà mỗi phiên agent
+vẫn đọc lại.
+
+Đã cân nhắc: đánh số lại các bước — số bước được nhắc khoảng 110 lần trong nhật ký quyết định, nhật ký chỉ thêm
+không sửa, đổi số thì quyết định cũ trỏ sai; gộp các bước nhỏ 59–66 — mỗi bước là một module, gộp thì ranh giới mờ.
+
+## D-229 · Trang dựng từ khối và AI tạo trang (bước 67); tính năng AI hỗ trợ người dùng trong CMS — 2026-11-14 — chủ dự án quyết
+
+Quyết định: chủ dự án đồng ý thêm bước 67 và các tính năng AI / tự động hoá đi kèm, sau khi đối chiếu cách làm
+của Builder.io (khối đăng ký sẵn, trang là JSON, AI chỉ dùng khối đã đăng ký), Shopify Horizon (trang ghép từ
+theme blocks), Wix Harmony (AI dựng rồi người sửa kéo thả) và Webflow App Gen / Base44 (AI sinh code rồi deploy).
+
+- **Một nền cho hai cách dùng.** Trang của `content` có thân `layout` (cây khối JSON). Tạo bằng trò chuyện với AI
+  và kéo thả cùng sửa bản dữ liệu đó. Giao diện kéo thả ở repo giao diện (D-026, D-097); core có sổ khối, kiểm
+  bố cục, nháp / lịch sử / xem trước / hẹn giờ, khoá sửa, đọc công khai kèm dữ liệu khối.
+- **AI chỉ ghép khối, không sinh code.** Kết quả AI là bố cục hay JSON Patch qua cùng bộ kiểm từ chối mặc định
+  (như D-102), thành bản nháp `ai_assisted` (D-109). Không có khối "mã tuỳ chỉnh" ở bước này.
+- **Module tự khai khối** qua `Module::blocks()` (mặc định rỗng — D-038) và trả dữ liệu qua `BlockData` theo lô
+  (không N+1). Chức năng thật (form, đăng ký nhận tin, giỏ hàng, lưu voucher) là khối của module sở hữu.
+- **Không deploy:** đăng là công khai ngay ở tên miền của website + đường dẫn trang; chân trang pháp lý tự gắn.
+- **Đi kèm:** bộ giao diện chung của website (token, kế thừa), khu dùng chung, trang mẫu, kiểm tra sức khoẻ website
+  (SEO, alt, link gãy, 404 → gợi ý chuyển hướng), bộ nháp chiến dịch từ một chương trình khuyến mại.
+- **Thêm vào bước có sẵn:** tạo sản phẩm nháp từ ảnh (41); cảnh báo bất thường bằng thống kê đơn giản, tất định
+  (58). Hỏi số liệu bằng câu thường đã có ở trợ lý của bước 52 (tool chỉ đọc với quyền người hỏi), không thêm.
+
+Thay: câu "trình dựng trang kéo thả — trái D-026" trong phần "Đã cân nhắc" của D-219 — chỉ phần kéo thả là giao
+diện (ở repo riêng); dữ liệu trang là API nên không trái D-026.
+
+Để sau: thử A/B trang (sau bước 57); AI tạo ảnh (cần loại nhà cung cấp AI cho ảnh); khối mã tuỳ chỉnh (cần quyết
+định riêng: tắt mặc định, HTML / CSS đã lọc, iframe `sandbox`, CSP chặt).
+
+Lý do: người không biết code làm được trang đích ngay, an toàn (AI không đưa được mã vào trang, không làm lộ dữ
+liệu người mua), nhẹ (trang là dữ liệu, không build, không deploy), và agent bên ngoài cũng dựng trang qua MCP.
+
+Đã cân nhắc: AI sinh code như Webflow App Gen / Base44 — mạnh nhưng phải deploy, khó kiểm, rủi ro bảo mật, nặng
+cho mục tiêu "hỗ trợ nhẹ"; module `pages` riêng — lặp nháp / lịch sử / đường dẫn / xem trước mà `content` đã có.
+
+## D-230 · AI tự trả lời câu hỏi đơn giản đã có câu trả lời chính xác; câu phức tạp chỉ soạn nháp — 2026-11-14 — chủ dự án quyết
+
+Quyết định: chủ dự án chọn — **câu hỏi phức tạp hay mơ hồ: AI chỉ soạn nháp cho nhân viên; câu hỏi đơn giản, đã
+biết chính xác, không mơ hồ: tự động trả lời.** Đây là ngoại lệ có giới hạn của câu "kết quả AI không bao giờ tự
+đăng" trong D-109, cho kênh hỗ trợ (`support`, bước 53) và chat (`conversations`, bước 61):
+
+- **Chữ gửi tự động không do mô hình viết.** Chỉ hai nguồn: câu trả lời mẫu được người có quyền **duyệt cho tự
+  động** (kèm ngày phải rà lại), gửi nguyên văn; hoặc mẫu câu i18n của `FactSource` dựng từ dữ liệu chính xác
+  (trạng thái đơn, hành trình vận đơn, giờ mở cửa) — chỉ khi người hỏi chứng minh được là chủ dữ liệu. Mô hình chỉ
+  **phân loại** câu hỏi và chọn nguồn.
+- **Quyết định trong Rust, không tin mô hình:** gửi khi độ tin cậy ≥ ngưỡng của nút (mặc định 90%), không có cờ rủi
+  ro, chưa quá số lần tự động liên tiếp (mặc định 2). Không bao giờ tự động cho khiếu nại, hoàn tiền / trả hàng /
+  huỷ đơn, thanh toán lỗi, dữ liệu cá nhân, pháp lý, lời lẽ bức xúc, người mua đòi gặp người; từ khoá chặn theo nút
+  là dữ liệu.
+- **Tắt mặc định**, khách bật theo nút; tin tự động gắn nhãn "Trả lời tự động" và có nút "Gặp nhân viên"; người
+  mua báo "không đúng" đủ ngưỡng thì câu trả lời tự thôi dùng; mọi lần tự động ghi nhật ký.
+- Một bộ quyết duy nhất: `AutoResponder` của `support`; `conversations` gọi nó, không làm bộ riêng.
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật Trí tuệ nhân tạo 134/2025/QH15 và văn
+bản hướng dẫn (cho người dùng biết đang tương tác với hệ thống tự động); Luật 19/2023/QH15 (thông tin cho người
+tiêu dùng chính xác); Luật 91/2025/QH15 (không trả dữ liệu cho người chưa chứng minh là chủ).
+
+Lý do: phần lớn câu hỏi lặp lại ("đơn tôi đâu", "mấy giờ mở cửa", "đổi trả mấy ngày") có câu trả lời chắc chắn;
+trả ngay giúp người mua và nhân viên. Giới hạn nguồn câu trả lời là cách giữ "chính xác, không mơ hồ" mà không
+phải tin mô hình tự viết đúng.
+
+Đã cân nhắc: để mô hình tự viết câu trả lời rồi gửi khi "tự tin" — mô hình có thể bịa (chính sách, ngày giao) mà
+vẫn tự tin; chỉ soạn nháp cho mọi câu — an toàn nhưng bỏ lợi ích chính chủ dự án muốn.
+
+## D-231 · Thử A/B trang, AI tạo ảnh, khối mã tự viết (bước 67) — 2026-11-14 — chủ dự án quyết
+
+Quyết định của chủ dự án cho ba việc D-229 để sau:
+
+1. **Thử A/B hai phiên bản trang: làm** (sau bước 57). Chia **cố định theo người xem**, không ngẫu nhiên theo
+   lần tải: `hash(thí nghiệm, mã người xem) mod 10000` so với tỉ lệ — cùng người F5 vẫn thấy cùng phiên bản. Mã
+   người xem: đã đăng nhập → tài khoản (mọi thiết bị, mọi ngày); chưa đăng nhập → khoá phiên ẩn danh trong ngày
+   của bước 57 (không cookie: hôm sau hay đổi mạng có thể đổi phiên bản — tài liệu ghi rõ). Bot luôn thấy bản gốc,
+   cùng URL. Chỉ thử bố cục và nội dung, **không thử giá / khuyến mại**. Người chọn bản thắng; hệ thống chỉ báo số
+   liệu và độ tin cậy.
+2. **AI tạo ảnh: làm theo khuyến nghị.** Trait `ImageModel` ở kernel, adapter ở module `ai`, mặc định tắt. Chỉ cho
+   banner, ảnh nền, ảnh minh hoạ; ảnh mang `ai_generated` và nhãn; **không bao giờ làm ảnh sản phẩm** (`catalog`
+   chặn); không tạo ảnh người thật nhận ra được hay thương hiệu của người khác.
+3. **Khối mã tự viết: chọn C, D bật được nếu muốn.** Ba mức `off` (mặc định) / `sandboxed` (C: HTML + CSS +
+   JavaScript trong iframe `sandbox` không `allow-same-origin`, CSP theo danh sách host — chủ cửa hàng bật) /
+   `unrestricted` (D: chèn thẳng vào trang — cần **cả** người cài máy chủ bật `AUTOXIDE_CONTENT_UNSANDBOXED_CODE`
+   **và** chủ cửa hàng bật có xác nhận lại danh tính; không bao giờ trên trang thanh toán, giỏ, tài khoản, đăng
+   nhập; người bán trên sàn không có mức D). Mọi mức: audit mỗi lần sửa, sổ script để rà, AI không bao giờ tạo hay
+   sửa khối này, agent sửa thì chờ duyệt.
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật 91/2025/QH15 và NĐ 356/2025 (chia người
+xem không cookie); Luật Trí tuệ nhân tạo 134/2025/QH15 (nhãn ảnh AI); Luật 19/2023/QH15 (ảnh sản phẩm, giá trung
+thực); luật an ninh mạng hiện hành; PCI DSS 4.0 yêu cầu 6.4.3 / 11.6.1 (chuẩn ngành về script trên trang thanh toán).
+
+Thay: dòng "để sau" về ba việc này trong D-229.
+
+Lý do: A/B cố định theo người là cách các công cụ lớn làm (người xem thấy trang ổn định, số liệu đúng); ảnh AI có
+ích cho banner nhưng gây hiểu sai nếu làm ảnh sản phẩm; mã tự viết cần cho tích hợp mà khối nhúng chưa có, mức C
+giữ an toàn cho người mua, mức D cho người chấp nhận rủi ro nhưng phải bật hai lớp và tránh trang thanh toán.
+
+Đã cân nhắc: chia A/B ngẫu nhiên theo lần tải — trang nhảy khi F5, số liệu sai; đặt cookie A/B cho khách chưa đồng ý
+— trái hướng không cookie của bước 57; cho mức D mặc định — rủi ro lộ dữ liệu người mua, rơi vào mọi khách dùng
+Autoxide.
+
+## D-232 · Đưa 11 mục "để sau / chờ quyết" vào các bước có sẵn — 2026-11-14 — chủ dự án trao quyền, agent quyết
+
+Chủ dự án yêu cầu viết đặc tả cho 11 mục ở phần "Sau core" của lộ trình và **trao quyền quyết định cho agent**, kể
+cả ba mục trước đây "chờ chủ dự án quyết". Agent quyết: **không mở bước mới**; mỗi mục gắn vào bước cùng chủ đề,
+đặt cuối danh sách của bước đó (làm sau phần chính của bước), để giai đoạn A không bị đẩy lùi.
+
+| # | Mục | Bước | Quyết định chính |
+|---|---|---|---|
+| 1 | Khách thử nghiệm (sandbox) | 38 | Sao cấu hình, không sao dữ liệu cá nhân; mọi đối tác buộc dùng bộ giả; mail chỉ tới nhân viên đã xác minh; `noindex`; tự hết hạn; đẩy sang khách thật thành **bản nháp** |
+| 2 | Khách duyệt từng lần khi nhân sự nền tảng xin vào | 54 | `support_access_mode` `disabled` / `per_request` (**mặc định**) / `standing`; duyệt qua P12; tối đa 4 giờ; `legal_request` như D-211 |
+| 3 | Nhóm nút ngoài cây cho báo cáo | 38 | Nhóm tự do trong `organizations`; **nhóm không cấp quyền** — báo cáo là giao của nhóm với phạm vi người xem |
+| 4 | Quản trị trên điện thoại | 52 | Gợi ý `mobile` trên sổ điều hướng (tối đa 5 mục thanh đáy); tóm tắt cuối ngày tự bật, theo giờ của người dùng |
+| 5 | Bán ứng dụng trả phí, chia doanh thu | 65 | Miễn phí hay thuê bao tháng; nền tảng là bên bán, thu qua hoá đơn thuê bao (35), chi nhà phát triển qua `PayoutGateway` (36); nhà phát triển nước ngoài chờ đối chiếu thuế |
+| 6 | Trả trước một phần cho hàng đặt trước | 45 | Gọi là "trả trước một phần", **không** mặc định là "đặt cọc" theo BLDS 2015 Điều 328; người bán huỷ hoàn đủ; người mua huỷ theo điều kiện công bố trước |
+| 7 | Đấu thầu và hợp đồng khung B2B | 59 | Hợp đồng khung có cam kết trừ nguyên tử; mời thầu nhiều người bán chỉ trên sàn, giá niêm phong tới hạn; không dùng cho mua sắm công |
+| 8 | Gọi điện / tổng đài trong chat | 61 | Trait `VoiceProvider` + bộ giả; yêu cầu gọi lại vào hộp việc; ghi âm tắt mặc định, phải thông báo trước |
+| 9 | Đăng nhập thay người dùng | 54 | Thay bằng **"xem như" chỉ đọc**, không bao giờ làm thay; người mua phải cấp phép (mã 30 phút); không xem người quyền cao hơn; audit hai id |
+| 10 | Ảnh AVIF | 39 | **Đo trước**: chỉ thêm khi nhẹ hơn WebP ≥ 20% ở chất lượng tương đương; sinh bằng job, tắt mặc định; không đạt thì ghi "không làm" kèm số đo |
+| 11 | Ký hợp đồng điện tử | 59 (trong `compliance`) | Trait `SignatureProvider` + bộ giả; ký `simple` (OTP + đồng ý, lưu bằng chứng) hay `digital` (chữ ký số qua nhà cung cấp được cấp phép); core không dựng PDF; mã băm chống sửa tệp |
+
+Bộ nối đối tác thật (tổng đài, chữ ký số) vẫn theo luật cũ: cần tài khoản thử và secret thật thì dừng hỏi chủ dự án.
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật 91/2025/QH15, NĐ 356/2025 (sandbox, xem
+như, ghi âm, truy cập hỗ trợ); Bộ luật Dân sự 2015 Điều 328 (đặt cọc); NĐ 123/2020 sửa bởi NĐ 70/2025 (hoá đơn khoản
+thu trước); Luật Đấu thầu 22/2023/QH15 (phạm vi mua sắm công); Luật Giao dịch điện tử 20/2023/QH15 và nghị định về
+chữ ký điện tử, dịch vụ tin cậy (ký hợp đồng); quy định thuế nhà thầu (chi cho nhà phát triển nước ngoài).
+
+Thay: các dòng "Để sau (D-201…)", "Để sau: bán qua ứng dụng trả phí…" và "Chờ chủ dự án quyết: đăng nhập thay người
+dùng · AVIF" ở mục "Sau core" của lộ trình; câu "Ký hợp đồng điện tử vẫn chờ chủ dự án quyết hướng" của D-221.
+
+Lý do: cả 11 mục là tính năng các nền tảng lớn đều có; gắn vào bước cùng chủ đề thì dùng lại hạ tầng sẵn có (phân
+phối cha → con, yêu cầu duyệt, sổ điều hướng, `PayoutGateway`, luồng đặt trước, báo giá B2B), không thêm module.
+
+Đã cân nhắc: mở bước 68+ cho từng mục — thêm bước mà không thêm giá trị, phần lõi chờ lâu hơn; "đăng nhập thay người
+dùng" có quyền ghi như một số nền tảng — rủi ro lạm quyền và dữ liệu cá nhân, "xem như chỉ đọc" đủ cho việc gỡ lỗi;
+module `contracts` riêng cho ký điện tử — `compliance` đã sở hữu văn bản pháp lý có phiên bản.
+
+## D-233 · Viết đặc tả cho 6 việc "để sau" còn rải trong đặc tả; dọn câu "để sau" đã cũ — 2026-11-14 — chủ dự án trao quyền, agent quyết
+
+Chủ dự án yêu cầu viết đặc tả luôn cho các việc còn ghi "để sau" trong đặc tả (ngoài 11 mục của D-232), quyền quyết
+giao cho agent. Như D-232: không mở bước mới, gắn vào bước cùng chủ đề, cuối danh sách của bước.
+
+| # | Việc | Bước | Quyết định chính |
+|---|---|---|---|
+| 1 | Hợp đồng tool MCP | 31 (A6) | `docs/mcp-tools.json` sinh từ code; `api-diff` chặn thay đổi phá vỡ của tool như của endpoint; tool cũ khai deprecated (mở rộng D-059 cho tool) |
+| 2 | `cargo semver-checks` | 31 (A7) | Chạy trong quy trình phát hành cho kernel, testkit; **chỉ báo cáo** khi còn `0.x`, chặn từ `1.0` hay khi công bố framework — giữ lý do của D-167, không đưa vào gate |
+| 3 | Báo khi sản phẩm yêu thích có hàng lại / giảm giá | 47 | Người mua tự bật, đồng ý theo mục đích riêng; chỉ báo giảm thật ≥ 5% so với giá mốc; tối đa 1 lần / 7 ngày mỗi sản phẩm; gom lô theo khung giờ |
+| 4 | Banner trong gian hàng người bán | 55 | Người bán tự quản trong nút của mình; sàn duyệt theo chính sách dữ liệu; link chỉ tới hàng của chính người bán; không phải quảng cáo trong sàn (64) |
+| 5 | Người bán nước ngoài trên sàn | 63 | Tắt mặc định; điều kiện (giấy tờ, đại diện, thuế) là gói luật có ngày hiệu lực, chưa có gói thì không bật được; công bố quốc gia người bán; chi trả ngoại tệ; hàng nhập khẩu cho người mua ngoài phạm vi |
+| 6 | EDI cho B2B | 59 | Chuẩn mở UBL 2.1 (OASIS); vào qua API key `service`, ra qua `webhooks`; EDIFACT / X12 là bộ chuyển đổi riêng khi có khách cần |
+
+Dọn câu "để sau" đã cũ (việc đã có bước riêng): sản phẩm bán theo kỳ (62), bán sỉ B2B (59), chat thời gian thực
+(61), ứng dụng OAuth (65), thử A/B (67), quảng cáo trong sàn (64) — trong đặc tả 35, 45, 46, 47, 53, 54, 57 và
+ROADMAP.
+
+Căn cứ — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật 91/2025/QH15 và luật tin quảng cáo của
+bước 37 (báo yêu thích); Luật 19/2023/QH15 (không báo giảm giá ảo; công bố người bán nước ngoài); Luật Thương mại
+điện tử 122/2025, NĐ 85/2021, NĐ 117/2025, Thông tư 80/2021/TT-BTC (người bán nước ngoài, thuế).
+
+Lý do: chủ dự án muốn phủ hết việc đã biết; gắn vào bước có sẵn dùng lại hạ tầng (api-diff, sổ đồng ý, banner,
+webhooks, KYC, đa tiền tệ) và không làm giai đoạn A dài thêm.
+
+Đã cân nhắc: đưa `cargo semver-checks` vào gate ngay — vẫn như D-167, không có ích khi còn `0.x`; EDIFACT / X12 trong
+core — nặng, ít khách Việt Nam dùng, để thành bộ chuyển đổi riêng; cho người bán nước ngoài gửi hàng nhập khẩu thẳng
+tới người mua — kéo theo hải quan, thuế nhập khẩu, cần đối chiếu riêng.
+
+Ghi thêm cho D-233 (lúc gộp kết quả): EDI của bước 59 nhận và trả **thân XML (UBL)** ở `/api/v1/wholesale/edi/*` —
+ngoại lệ có chủ đích của luật "ba hình dạng response" (`Data` / `Page` / `Problem`), cùng loại với tải tệp (hoá đơn
+điện tử XML của 36, nguồn cấp sản phẩm của 48): chuẩn của chứng từ là XML, không bọc trong envelope JSON; lỗi giao
+thức (xác thực, quá cỡ, sai kiểu nội dung) vẫn trả `Problem`.
+
+## D-234 · Chủ đề theo mùa / ngày lễ / khung giờ và đầu trang, chân trang của website — 2026-11-14 — chủ dự án đồng ý đề xuất, agent quyết chi tiết
+
+Chủ dự án hỏi CMS đã đổi được màu chủ đạo, logo, thanh, đầu trang, chân trang và chủ đề theo mùa, ngày lễ, giờ đặc
+biệt chưa — "trong giới hạn cho phép của hệ thống", và không được làm mất sự nhanh, mượt. Đặc tả 67 (D-229) đã có
+theme gốc, khu dùng chung, thanh thông báo; 55 có thông tin cửa hàng. Còn thiếu hai thứ, thêm vào **bước 67** (không
+mở bước mới):
+
+1. **Bản chủ đề có lịch** (`content_theme_variants`): ghi đè một phần theme gốc (token, font trong danh sách, logo,
+   ảnh nền), hiệu ứng trang trí tuỳ chọn, đầu / chân trang riêng tuỳ chọn; lịch `once` (UTC) / `daily` / `weekly`
+   (giờ địa phương theo `organizations.timezone` của website, công cụ múi giờ IANA của bước 34). Trùng giờ: ưu
+   tiên cao hơn → bắt đầu muộn hơn → `id`; chỉ một bản áp tại một lúc. Thư viện chủ đề mẫu nhúng trong binary (lễ
+   âm lịch kèm ngày gợi ý theo năm là dữ liệu); chép sang năm sau; xem trước ở một thời điểm.
+2. **Đầu trang và chân trang của website** (`content_site_regions`): bố cục khối, nháp / đăng, theo ngôn ngữ, kế thừa
+   theo nút; chân trang pháp lý luôn gắn dưới, không nằm trong bố cục. Khối mới: `content.logo`, `content.menu`,
+   `content.search_box`; `orders.cart_link` (bước 45); `organizations.store_info` (bước 55).
+3. **`GET /api/v1/content/public/site`** — một lời gọi cho khung website, thay `GET /public/theme` (chưa code): cache
+   trong bộ nhớ tới mốc đổi chủ đề kế tiếp (trần 30 giây cho tiến trình khác), `Cache-Control: max-age` cắt đúng tại
+   `next_change_at` (trần 300), ETag theo phiên bản hiệu lực; token phẳng để giao diện gán thành biến CSS. Đo p99
+   khi cache nóng / nguội trên cả hai database.
+
+Giới hạn của hệ thống: chủ đề chỉ chứa token, ID `media`, tên hiệu ứng — không CSS, HTML, script; hiệu ứng chỉ trong
+danh sách core khai, giao diện vẽ, tải sau, tôn trọng `prefers-reduced-motion`, không chạy ở giỏ hàng / thanh toán /
+tài khoản / đăng nhập; số bản chủ đề theo hạn mức gói `content.theme_variants` và trần máy chủ
+`AUTOXIDE_CONTENT_THEME_VARIANTS_MAX`; logo thương hiệu đặt một chỗ (`storefront.logo_media_id` khi bước 55 có),
+theme chỉ ghi đè.
+
+Lý do: khách đổi giao diện theo dịp mà không cần người làm giao diện; mọi thứ là dữ liệu đã kiểm nên trang vẫn đúng
+thương hiệu và an toàn; giá trị chọn sẵn ở máy chủ và cache tới đúng mốc đổi nên đường đọc công khai không thêm query.
+
+Đã cân nhắc: chồng nhiều bản chủ đề cùng lúc — kết quả khó đoán, khó cache; cho khách viết CSS tự do — phá thương hiệu,
+mở đường chèn mã, đã có khối mã tự viết cách ly (D-231) cho nhu cầu đặc biệt; để giao diện tự tính lịch — mỗi giao
+diện tính một kiểu, lệch múi giờ, cache CDN không biết lúc nào hết hạn; bảng riêng cho chủ đề mẫu — dữ liệu đi theo
+bản phát hành, nhúng binary đủ; lịch theo âm lịch tự tính — thêm thư viện cho vài ngày mỗi năm, ngày cụ thể đủ.
+
+## D-235 · Khách tự chỉnh không cần code: trường tự định nghĩa, nhãn, đổi câu chữ, loại nội dung, mã theo dõi và đồng ý cookie — 2026-11-14 — chủ dự án đồng ý đề xuất, agent quyết chi tiết
+
+Chủ dự án hỏi còn gì hỗ trợ "động" cho khách và người dùng CMS. Rà đặc tả thấy đã có: gói và tính năng (35), cây tổ
+chức và cài đặt kế thừa (34), tên miền, ngôn ngữ (33, 34), role tự tạo, menu, form, webhook (đã code), giao diện và
+chủ đề theo lịch (67, D-234), mẫu mail (37), số chứng từ (36), thuộc tính sản phẩm (41), bộ lọc đã lưu và thao tác
+hàng loạt (51), tự động hoá (58). Còn thiếu năm thứ, thêm vào bước có sẵn (không mở bước mới):
+
+| # | Việc | Bước | Quyết định chính |
+|---|---|---|---|
+| 1 | Trường tự định nghĩa trên bản ghi | 51 (P19) | Kernel giữ định nghĩa và bộ kiểm; module chọn tham gia bằng `Module::custom_field_targets()`; giá trị là cột JSON trên bản ghi của module (không nối bảng khi đọc); chỉ trường `filterable` vào bảng `<module>_custom_index` ghi cùng transaction, lọc bằng subquery thường — không toán tử JSON riêng của database; mức hiện `internal` / `public` / `buyer_input`; không nhận regex của khách |
+| 2 | Loại nội dung tự định nghĩa | 67 | `content_types` + mục `kind = custom`; trường là P19 (không có bộ trường thứ hai); dùng lại nháp, lịch sử, bản dịch, SEO; trang chi tiết dựng sẵn, khối `content.type_list` |
+| 3 | Mã theo dõi quảng cáo + đồng ý cookie | 37 (A6) | Nhà cung cấp cho sẵn, khách chỉ điền mã ID (không dán script); không tải gì trước khi đồng ý đúng nhóm; từ chối dễ như đồng ý; bằng chứng đồng ý ẩn danh; nhà cung cấp tự vào danh sách bên nhận dữ liệu; đi kèm `/public/site` qua điểm cắm `SiteExtensions` |
+| 4 | Nhãn gắn bản ghi | 51 (P20) | Bảng của kernel (lọc cần subquery, như `kernel_org_closure`); loại bản ghi khai `taggable`; gắn cần quyền ghi bản ghi; nhãn nội bộ, không công khai. Thẻ công khai của `content` và nhãn của `media` (D-094) giữ nguyên |
+| 5 | Đổi câu chữ hiển thị theo khách | 51 (P21) | Chỉ key module khai đổi được và không gian `ui.*` cho giao diện; giữ đúng chỗ điền; mã lỗi và câu `legal` không đổi được; đọc qua cache bộ nhớ theo khách |
+
+Kèm: `orders.order` hỗ trợ `buyer_input` để khách thêm ô người mua nhập lúc đặt hàng (45). Thêm vào bảng "API mới
+của kernel" ở `docs/steps/README.md`.
+
+Căn cứ của mục 3 — **cần đối chiếu văn bản gốc / người có chuyên môn pháp lý**: Luật BVDLCN 91/2025/QH15, NĐ
+356/2025/NĐ-CP (đồng ý, chuyển dữ liệu ra nước ngoài), Luật BVQLNTD 19/2023/QH15. Chưa chắc: cookie đo lường có cần
+đồng ý hay dùng căn cứ khác; hồ sơ đánh giá tác động khi bật pixel của nền tảng nước ngoài. Thiết kế chọn mức chặt
+(hỏi trước) — không chặn công việc.
+
+Lý do: mọi nền tảng lớn đều cho khách tự làm năm việc này; đặt ở kernel phần dùng chung (định nghĩa trường, nhãn,
+câu chữ) thì mỗi module không tự làm một kiểu; giữ tốc độ bằng giá trị nằm trên bản ghi, index riêng chỉ cho trường
+lọc, cache theo khách cho câu chữ và định nghĩa.
+
+Đã cân nhắc: kiểu "entity–attribute–value" (mỗi giá trị một dòng) cho trường tự định nghĩa — đọc bản ghi phải nối và
+gom nhiều dòng, chậm; cột JSON có index của database — Postgres có, SQLite khác hẳn, vi phạm luật số một; cho khách
+dán script theo dõi — đã có khối mã tự viết cách ly (D-231) cho nhu cầu đặc biệt, còn mã theo dõi phổ biến cần gắn
+với đồng ý nên phải có cấu trúc; chuyển nhãn của `media` sang P20 — phá hợp đồng API đã phát hành, không đem lại gì.
+
+## D-236 · Kiểu vị trí banner, bộ vị trí chuẩn, chọn trang hiện, banner dạng chữ, khối vùng banner — 2026-11-14 — chủ dự án đồng ý đề xuất, agent quyết chi tiết
+
+Chủ dự án muốn banner có loại theo vị trí (trên, trái, phải, chính…). Đặc tả 55 đã có vị trí là dữ liệu khách tự
+đặt tên, nhưng vị trí chỉ có tên và số banner tối đa — giao diện phải tự đoán cách vẽ, người soạn không biết ảnh
+cỡ nào. Thêm vào **bước 55** (không mở bước mới):
+
+1. **Kiểu vị trí:** `display` (`single` / `carousel` / `grid` / `stack` / `strip` / `popup`) với cài đặt có schema
+   (trượt tự động ≥ 4 giây hay tắt; lưới 2–4 cột; popup có tần suất, độ trễ); `accepts` (`image` / `text` / `any`);
+   tỉ lệ và cỡ ảnh tối thiểu (máy tính, điện thoại) kiểm khi lưu bằng kích thước `media` đã lưu, sai lệch tỉ lệ
+   ≤ 2%; `devices`; `page_kinds` (loại trang vị trí dùng được).
+2. **Bộ vị trí chuẩn** gieo cho khách mới qua `Module::seed_tenant`: `top_strip`, `home_hero`, `home_middle`,
+   `category_top`, `sidebar_left`, `sidebar_right`, `inline`, `above_footer`, `popup` — khách sửa, tắt, xoá được;
+   không gieo lại.
+3. **Chọn trang hiện:** banner có `page_kinds` (tập con của vị trí) và `page_targets` (`{kind, id}` theo sổ đối
+   tượng, tối đa 50); `catalog` đăng ký thêm `catalog.category`, `catalog.collection`. Lọc trong bộ nhớ trên tối đa
+   50 banner đang hiệu lực của vị trí — câu truy vấn và index không đổi.
+4. **Banner dạng chữ:** `kind = text`, màu là tên token của theme (không mã màu tự do).
+5. **Đọc nhiều vị trí một lần:** `GET /api/v1/content/public/placements?keys=` (tối đa 10), `max-age` là mốc gần nhất.
+6. **Khối `content.placement`** cho trang dựng từ khối và đầu trang (D-234), khai ở `content` tại bước 55 khi sổ khối
+   của bước 67 đã có; một lần đọc cho mọi vùng banner của trang.
+
+Thứ tự banner cố định theo `position` khách sắp, không đảo ngẫu nhiên. Khối `announcement_bar` / `popup` của bước 67
+giữ nguyên vai trò: chữ cố định trong một trang (popup đó để thu email); vị trí banner là nội dung có lịch, quản lý
+một chỗ.
+
+Lý do: giao diện biết vẽ gì từ dữ liệu, người soạn biết ảnh cỡ nào, đổi banner không làm vỡ trang; khách mới có ngay
+bộ vị trí dùng được; giữ tốc độ vì một lời gọi cho cả trang và cache tới đúng mốc banner đổi.
+
+Đã cân nhắc: danh sách vị trí cố định trong code (`left`, `right`…) — mỗi giao diện bố cục một kiểu, cố định là bó
+khách; xoay vòng ngẫu nhiên hay theo trọng số — phá cache, F5 nhảy, cần thì làm bằng thử A/B của bước 67; banner
+chữ có màu tự do — phá thương hiệu, lệch theme; ghép vị trí banner vào khối `announcement_bar` — hai việc khác
+nhau (cố định so với có lịch), gộp làm mỗi khối nửa vời.
+
+## D-237 · Rà lộ trình lần hai trước bước 31: tỉ giá về `ledger`, một chỗ cho thông tin cửa hàng, nhãn và ghi chú của `customers`, báo có hàng lại không trùng, sửa bảng phụ thuộc — 2026-11-14 — agent quyết
+
+Chủ dự án yêu cầu rà toàn bộ lộ trình một lượt trước khi code bước 31. Kiểm máy: mọi đường dẫn đặc tả tồn tại, mọi
+mã D-… có trong nhật ký, đủ 37 bước 31–67 trong bảng thứ tự. Đọc từng bước và đối chiếu đặc tả thì thấy năm chỗ
+mâu thuẫn hay làm một việc hai nơi; sửa thẳng vào thân đặc tả (một đặc tả, một phiên bản — D-228):
+
+1. **Tỉ giá thuộc `ledger`** (thay chỗ để ngỏ ở D-233 / đặc tả 63). Đặc tả 36 đặt bảng tỉ giá ở `invoices` nhưng
+   `ledger` (đăng ký **trước** `invoices`) lại gọi `dyn Invoices::exchange_rate` khi ghi bút toán ngoại tệ —
+   không làm được theo luật thứ tự đăng ký. Đặc tả 63 thì đặt bảng khác (`ledger_fx_rates`, dạng phân số). Chốt:
+   bảng `ledger_fx_rates` (số thập phân chuẩn hoá dạng chữ như mọi số thập phân của 36), `Ledger::exchange_rate`,
+   endpoint `/api/v1/ledger/exchange-rates`, lịch `ledger.fetch_exchange_rates`; `invoices`, báo cáo gộp (38),
+   chi trả ngoại tệ và đa tiền tệ (63) đọc qua đó.
+2. **Thông tin cửa hàng một chỗ.** Hồ sơ công khai của nút (34) và `storefront.*` (55) cùng giữ tên, logo, địa chỉ,
+   giờ mở cửa. Chốt: **địa điểm** (tên hiển thị, `Address`, giờ mở cửa, ngày đặc biệt, nhận tại quầy, ảnh bìa) chỉ
+   ở hồ sơ nút của 34; **thương hiệu** (tên thương hiệu, logo, biểu tượng, liên hệ, mạng xã hội) chỉ ở cài đặt kế
+   thừa `storefront.*` của 55; `/public/storefront` ghép hai phần. Bỏ `logo_media_id` khỏi hồ sơ nút.
+3. **`customers` dùng chỗ chung của bước 51.** Đặc tả 47 còn cột `tags` và bảng `customers_notes` riêng, trái với
+   P13 (ghi chú chung) và P20 (nhãn chung, D-235). Chốt: `customers.customer` khai `taggable`, đích trường tự định
+   nghĩa; ghi chú qua `kernel_record_notes`.
+4. **Báo có hàng lại không gửi trùng.** Đăng ký báo có hàng lại của `inventory` (42) và báo yêu thích của
+   `customers` (47) cùng nghe một event. Chốt: `inventory_restock_alerts` ghi `user_id` khi người đăng ký đã đăng
+   nhập; `Inventory::restock_alerts_of` cho `customers` bỏ những biến thể người đó đã tự đăng ký — một lần có hàng,
+   một tin.
+5. **Bảng phụ thuộc.** 38 ghi "song song với 39" trong khi 39 bắt đầu sau 38 (39 rà index phủ cả bảng của 33–38) —
+   bỏ 39 khỏi cột song song của 38. Thêm phụ thuộc còn thiếu: 55 (khối vùng banner cần 67), 59 (ký điện tử: 37; mời
+   thầu: 46), 61 (37), 63 (người bán nước ngoài: 37, 46), 67 (34; P19 của 51). Mục 45 và 47 của lộ trình ghi thêm
+   phần của D-234 / D-235; mục 63 bỏ "phân số nguyên"; `SiteExtensions` vào danh sách điểm cắm.
+
+Không đổi thứ tự làm (D-228) và không đổi phạm vi bước nào.
+
+Lý do: sửa trên giấy rẻ hơn sửa sau khi code; ba chỗ đầu nếu để tới lúc code sẽ thành hai bảng cùng một dữ liệu
+hay một lời gọi trái luật thứ tự đăng ký.
+
+Đã cân nhắc: giữ tỉ giá ở `invoices` và cho `ledger` nhận tỉ giá do bên gọi truyền vào — mọi bên gọi `post` phải tự
+tra tỉ giá, dễ lệch; gộp hẳn báo có hàng lại vào `inventory` (bỏ phần của `customers`) — báo yêu thích có luật riêng
+(giảm giá, 7 ngày, gom lô) đã chốt ở D-233, chỉ cần chống trùng.
+
+## D-238 · Module `menus`: menu của website tách khỏi `content`, mục menu trỏ tới đối tượng của mọi module (bước 68) — 2026-11-14 — chủ dự án quyết
+
+Chủ dự án quyết (14/11/2026, đề bài `docs/prompts/menus-module.md`): menu **trên website** (thanh danh mục, bảng
+xổ lớn, menu chân trang, menu phụ) là một module riêng, `menus`. Menu trỏ tới bản ghi của mọi module (bài viết,
+danh mục nội dung, danh mục sản phẩm, khuyến mại, gian hàng, cửa hàng), nên đặt trong `content` là sai chỗ. Thiết
+kế "kết hợp" (chủ dự án đồng ý): người quản trị dựng menu, toàn quyền thứ tự và lối vào đặc biệt; mục menu trỏ
+tới một đối tượng của sổ đối tượng và có thể tự lấy nhóm con. **Không gộp** với sổ điều hướng của bước 51
+(`Module::navigation`), là menu của trang quản trị.
+
+Quyết định thay phần menu của `content` ở bước 17: thiết kế và endpoint menu của D-096, D-102, D-105. Giữ luật từ
+chối link `//host` của D-149 ở module mới.
+
+Quyết định:
+
+1. **Kernel, sổ đối tượng (D-123), theo D-038** (hàm mới đều có mặc định, module cũ không sửa):
+   - `Resource.image: Option<Uuid>` (ID media), làm luôn phần này của P6 bước 51;
+   - kiểu `ResourceRef { kind, id }`;
+   - `ResourceResolver::resolve_many(ids, locale)`: tra nhiều đối tượng một lần, theo ngôn ngữ. Mặc định gọi
+     `resolve` từng cái;
+   - `ResourceResolver::children(id, locale, limit)`: mặc định rỗng;
+   - `ResourceResolver::has_children()`: mặc định `false`; loại có cây trả `true`.
+
+   Thêm hai hàm ngoài đề bài, vì hai lý do. Menu 200 mục mà tra từng cái là hàng trăm câu query. Tên danh mục
+   lại theo ngôn ngữ, trong khi `resolve(id)` không nhận ngôn ngữ.
+2. **`content` đăng ký `content.term`** (danh mục, thẻ):
+   - tên lấy theo ngôn ngữ, thiếu thì dùng ngôn ngữ mặc định;
+   - `children` trả danh mục con;
+   - đường dẫn công khai `/<AUTOXIDE_CONTENT_POST_PATH_PREFIX>/category/<slug>` (thẻ: `/…/tag/<slug>`). Website
+     hiện trang danh sách bằng `GET /api/v1/content/public/terms/{taxonomy}/{slug}`. Trước đây danh mục chưa có
+     đường dẫn công khai nào; đây là đường dẫn chuẩn từ nay.
+
+   `content.entry` trả thêm `image` (ảnh đại diện của bản công khai) và tra nhiều bài bằng một câu query.
+3. **Module `menus`, bảng và API.**
+   - Bảng `menus_menus`, `menus_items`. Mục menu có đúng một trong ba kiểu đích:
+     - `url`: `https://`, `http://`, `mailto:` hay đường dẫn `/…`; từ chối `//host`;
+     - `ref_kind` + `ref_id`;
+     - không có đích: nhóm tiêu đề.
+   - Trình bày:
+     - `label`: bỏ trống thì lấy tiêu đề của đối tượng;
+     - `auto_children` (1 tới 50 mục con);
+     - `icon`, `highlight`: tập cố định;
+     - nhãn: `badge_text`, `badge_tone` (`sale`, `brand`, `new`, `neutral`), `badge_from`, `badge_until`;
+     - ô gợi ý `feature_kind` + `feature_id`.
+   - Giới hạn: 4 cấp, 200 mục.
+   - API quản trị `/api/v1/menus` (`menus.read`, `menus.manage`): danh sách, đọc, tạo (201), thay cả cây (`PUT`,
+     bắt buộc `If-Match`), xoá. Tool MCP gọi cùng service.
+   - Lỗi lưu gom một lần (D-083): `menus.ref_unknown_kind`, `menus.ref_not_found`, `menus.children_unsupported`.
+4. **API công khai `GET /api/v1/menus/public/{key}?locale`.**
+   - Trả cây đã giải. Bỏ mục trỏ tới đối tượng không còn công khai, kèm mục con; bỏ nhóm không còn mục con. Mở
+     `auto_children`. Nhãn đã lọc theo hạn. Thiếu ngôn ngữ thì dùng ngôn ngữ mặc định.
+   - Mỗi mục kèm `ref` (loại, ID) để giao diện gọi thêm khi cần. Khối "Bán chạy" của bảng xổ **không** thuộc
+     module này: giao diện gọi danh sách sản phẩm công khai của `catalog` (lọc theo danh mục, sắp `best_selling`).
+   - `ETag` là dấu vân tay của cả câu trả lời; kernel tự trả 304.
+   - **Làm mới cache bằng thời hạn ngắn, không nghe event.** Bản đã giải nằm trong bộ nhớ, tối đa
+     `AUTOXIDE_MENUS_PUBLIC_CACHE_SECONDS` (mặc định 60; 0 là tắt). Cùng số đó đi vào `Cache-Control: max-age`.
+     Hai mốc rút ngắn thời hạn: menu được sửa thì xoá cache ngay; nhãn sắp tới hạn bật hay tắt thì hết hạn đúng
+     lúc đó. Đối tượng đổi tên hay đổi đường dẫn thì hiện sau tối đa một thời hạn cache.
+   - Ngôn ngữ: `AUTOXIDE_MENUS_LOCALES`, `AUTOXIDE_MENUS_DEFAULT_LOCALE`, giống cách của `content`.
+5. **Làm trước bước 33 theo lệnh của chủ dự án.**
+   - Chưa có `tenant_id` / `org_id` và tham số `site`:
+     - bước 33 thêm `tenant_id` cho bảng `menus_*` cùng mọi module, và thêm khách vào `resolve`, `resolve_many`,
+       `children`;
+     - bước 34 thêm `org_id` (website hay nút sở hữu, H1) và `?site=`.
+   - Các module sau đăng ký loại đối tượng trong bước của mình:
+     - `catalog.category` (41, có `children`);
+     - `promotions.promotion` (43);
+     - `marketplace.seller` (46);
+     - cửa hàng công khai (34).
+6. **Chuyển từ menu của `content` (D-059).**
+   - Bốn endpoint menu của `content` khai deprecated từ 2026-11-14, sunset 2027-05-14 (sáu tháng), kèm endpoint
+     thay thế; hành vi không đổi.
+   - `content` công bố trait `autoxide_content::api::LegacyMenus` để đọc menu cũ. Lệnh
+     `autoxide task menus.import_content_menus` nhập menu mà `menus` chưa có cùng (`key`, `locale`); chạy lại không
+     nhân đôi, không đè menu đã sửa. Mục trỏ bài thành `content.entry`, mục trỏ danh mục / thẻ thành `content.term`.
+   - `menus` không đọc bảng của `content`. Không có `content` thì `menus` vẫn chạy, chỉ lệnh nhập báo không có
+     nguồn.
+   - Qua ngày sunset thì gỡ endpoint, và gỡ bảng `content_menus*` bằng migration mới.
+   - Khối `content.menu` của bước 67 (D-234) đổi thành `menus.menu`, do module này khai.
+
+Lý do:
+- Menu của sàn thương mại trỏ tới danh mục sản phẩm, khuyến mại, gian hàng; `content` không được biết những thứ đó.
+  Sổ đối tượng cho `menus` trỏ tới loại của mọi module mà không phụ thuộc chúng.
+- Cache theo thời hạn ngắn đủ đúng (đổi tên danh mục hiện sau một phút) và không buộc `menus` phải biết event
+  đổi tên của từng module.
+
+Đã cân nhắc:
+- Giữ menu trong `content` và thêm cột cho mỗi loại đích: mỗi module thương mại phải sửa `content`.
+- Menu sinh hoàn toàn tự động từ cây danh mục: mất thứ tự tay và lối vào đặc biệt (chủ dự án loại).
+- Nghe event đổi tên của mọi module để xoá cache: `menus` phải biết tên event của module khác, và dễ sót.
+- Một trait chung cho mọi module có menu cũ: chỉ `content` có, nên dùng trait riêng của `content` là đủ.
+
+Thay: phần menu của D-096, D-102, D-105 (bước 17).
+
+## D-239 · `cargo xtask api-diff`: luật phá vỡ của `/api/v1`, chỉ `x-sunset` trong tài liệu (bước 31 A1) — 2026-11-15 — agent quyết
+
+Quyết định:
+- `cargo xtask api-diff [--base <ref>]` (`xtask/src/api_diff.rs`) so `docs/openapi.json` với bản ở tag phát hành
+  gần nhất là tổ tiên của `HEAD` (`git describe --tags --abbrev=0 --match 'v*.*.*'`). Chạy trong `./gate.sh` ở cả
+  hai mức, ngay sau `cargo xtask check`; job gate của CI lấy cả lịch sử (`fetch-depth: 0`).
+- Bật mọi luật trong bảng của đặc tả 31 A1, kể cả các luật ngoài chữ của ROADMAP: `parameter.removed`,
+  `request.constraint_tightened`, `response.status_removed`, `response.media_type_removed`,
+  `schema.composite_changed`.
+- Thêm một luật ngoài bảng: `request.property_removed`. Áp khi bản mới bỏ một trường của thân request **và** thân
+  đó có `additionalProperties: false`. Thân request của Autoxide dùng `deny_unknown_fields`, nên client cũ gửi
+  trường đó sẽ bị từ chối.
+- Enum:
+  - bỏ giá trị là phá vỡ ở cả hai chiều;
+  - thêm giá trị trong request là `note`;
+  - thêm giá trị trong response là `warning` (client chặt có thể vỡ), không đỏ;
+  - request từ tự do thành danh sách cố định là `request.constraint_tightened`.
+- `oneOf` / `anyOf` khác số biến thể là `schema.composite_changed`. Cùng số biến thể thì so từng cặp theo thứ tự.
+- Tài liệu OpenAPI chỉ thêm **một** extension: `x-sunset`. Không thêm `x-deprecated-since`, `x-successor`: hai
+  thông tin đó đã có trong câu của `description`. `Extensions` của utoipa là `HashMap`, nhiều khoá thì thứ tự trong
+  `openapi.json` đổi giữa các lần sinh. Bản cũ chưa có `x-sunset` thì đọc câu "removed on YYYY-MM-DD".
+- Ngoại lệ có chủ đích nằm ở `xtask/api-breaking-allow.json`. Mỗi mục cần `decision` và chỉ có hiệu lực với đúng
+  `base`.
+
+Lý do:
+- Mỗi luật thêm đều là trường hợp client cũ hỏng mà không có lỗi rõ.
+- Thử với các tag cũ: so với v0.3.0, lệnh bắt đúng một thay đổi phá vỡ thật (thân của
+  `POST /api/v1/auth/me/mfa/totp` thành bắt buộc). Từ v0.8.0 tới nay không có thay đổi phá vỡ nào.
+
+Đã cân nhắc:
+- Dùng `oasdiff` (Go): thêm công cụ ngoài, và không biết hai cách viết nullable của utoipa.
+- Báo đỏ khi thêm giá trị enum trong response: chặn cả việc thêm trạng thái mới hợp lệ; cảnh báo là đủ để người
+  phát hành xem lại.
+
+## D-240 · Hợp đồng tool MCP: `docs/mcp-tools.json`, `Deprecation::tool`, cảnh báo trong kết quả (bước 31 A6) — 2026-11-15 — agent quyết
+
+Quyết định (chi tiết D-233 giao cho agent):
+- **Lưu deprecation của tool:** thêm trường `tool: Option<&'static str>` và hàm tạo `Deprecation::tool(name, since)`
+  vào `Deprecation` sẵn có, không đổi trường công khai cũ (hợp đồng module, D-167). Với tool, `method` / `path` không
+  dùng.
+  - `Modules::deprecations()` chỉ trả endpoint: lớp HTTP và mục `deprecations` của danh mục module không thấy tool.
+  - `Modules::tools()` gắn deprecation vào tool (`Tool::deprecation()`). Tool hay tool dùng thay không có trong
+    `tools()` của chính module thì là lỗi khởi động.
+  - Danh mục module (`ModuleTool`) có thêm trường `deprecation` (thêm trường response, không phá vỡ).
+- **Báo cho agent** (`rmcp` 3.9: `CallToolResult` có `meta` và `content` công khai):
+  - `tools/list` nối câu "Tool `x` is deprecated since …; It will be removed on …; Use `y` instead.";
+  - kết quả giữ envelope `{"data": …}`, thêm `_meta` `{"autoxide/deprecation": {since, sunset, successor}}` và một
+    đoạn văn bản "Warning: …";
+  - số đo `mcp_deprecated_tool_calls_total{tool}`. Tên tool là tập cố định do code khai, nên dùng làm nhãn được.
+- **Manifest:** `autoxide mcp-manifest` in `docs/mcp-tools.json`.
+  - Tool sắp theo tên; khoá tự sắp.
+  - `requires_approval_for_agent` luôn `false` tới bước 51.
+  - `output_schema` luôn `null`, vì `Tool` chưa khai schema kết quả.
+  - Test giữ file khớp code như `docs/openapi.json`.
+- **`cargo xtask api-diff`** so cả manifest với tag trước, mã `tool.*` theo bảng của đặc tả 31 A6. Phần so schema
+  dùng lại bộ so của A1, ánh xạ mã `request.*` / `response.*` sang `tool.*`. Tag chưa có manifest (v0.13.0 trở
+  về trước) thì bỏ qua.
+
+Lý do: không thêm hàm mới vào `Module` (D-038) và không có hai bộ so schema. Đặt cảnh báo ngoài `{"data": …}` để
+client đang đọc `data` không vỡ.
+
+Đã cân nhắc:
+- Gom `method` / `path` vào một enum đích: đổi trường công khai của `Deprecation`, phá vỡ hợp đồng Rust.
+- Thêm `Module::tool_deprecations`: thêm một hàm vào trait cho việc mà hàm sẵn có làm được.
+
+## D-241 · Response thật khớp hợp đồng: bộ kiểm tự viết trong testkit, media type của lỗi, ngoại lệ đầu tiên của `api-diff` (bước 31 B4) — 2026-11-15 — agent quyết
+
+Quyết định:
+- `TestRequest::send` (testkit) kiểm **mọi** response với tài liệu OpenAPI của chính app:
+  - mã trạng thái có khai (không có thì dùng `default`);
+  - `Content-Type` là một khoá trong `content`;
+  - thân JSON đúng schema;
+  - lệch thì `send()` trả lỗi, nêu chỗ lệch, vd `GET /api/v1/x 200: $.data.id: expected string (uuid)`.
+- `TestRequest::unchecked()` bỏ kiểm, chỉ cho test cố ý tạo câu trả lời ngoài hợp đồng. Hiện chỉ dùng ở module giả
+  trong test idempotency (trả 500 / 429 dạng chữ, panic).
+- **Bộ kiểm JSON Schema tự viết** (`crates/testkit/src/contract.rs`, khoảng 250 dòng) cho đúng tập con utoipa sinh ra.
+  Không dùng thư viện `jsonschema`.
+  - Kiểm: `type` / nullable, `properties`, `required`, `additionalProperties`, `items`, `enum`, `const`, `oneOf`,
+    `anyOf`, `allOf`, `$ref`, giới hạn số và độ dài, `format` `uuid` / `date-time` / `date`.
+  - Không kiểm `pattern` (cần thư viện regex).
+  - `oneOf` kiểm như "khớp ít nhất một", vì biến thể utoipa sinh ra có thể chồng nhau.
+  - Tài liệu khai `application/octet-stream` thì nhận mọi loại không phải JSON (tệp của media có loại thật như
+    `image/png`).
+- **Media type của lỗi:** `http::openapi::finish` đổi mọi response có thân `Problem` khai dưới `application/json`
+  thành `application/problem+json`, đúng thứ lỗi thật trả. Sửa 822 chỗ; `api-diff` coi hai media type này là một
+  cho lỗi (D-239).
+- **Lệch tìm ra khi bật kiểm:** chỉ một lỗi tài liệu thật. `answers[].value` của bài nộp `forms` khai là object,
+  nhưng thực tế là chuỗi, số, mảng hay `true`; đã sửa thành mọi kiểu JSON. Theo luật, đó là "kiểu response đổi",
+  nên ghi bốn ngoại lệ (cho bản gốc `v0.13.0`) vào `xtask/api-breaking-allow.json`, dẫn quyết định này. Còn lại là
+  tài liệu sai của các route giả trong test của testkit, đã sửa.
+
+Lý do:
+- Tập schema utoipa sinh ra nhỏ và biết trước, nên vài trăm dòng là đủ (CLAUDE.md: không thêm thư viện khi tự viết
+  được).
+- `jsonschema` kéo theo regex và nhiều crate khác vào cây phụ thuộc của mọi crate dùng testkit.
+
+Đã cân nhắc:
+- Kiểm hợp đồng bằng một lớp HTTP riêng chỉ bật trong test: phải đổi `crates/app` và mọi module.
+- Bật kiểm từng test một: dễ quên.
+
+## D-242 · `cargo xtask semver`: chỉ kernel và testkit, ép so như bản patch, báo cáo khi còn `0.x` (bước 31 A7) — 2026-11-15 — agent quyết
+
+Quyết định:
+- `cargo xtask semver [--base <tag>] [--deny] [--markdown]` (`xtask/src/semver.rs`) gọi `cargo semver-checks
+  check-release -p <crate> --baseline-rev <tag> --release-type patch` cho `autoxide-kernel` và `autoxide-testkit`.
+  - Tag mặc định chọn như `api-diff` (tổ tiên gần nhất của `HEAD`).
+  - Ghim `cargo-semver-checks` 0.51.0 (`STACK.md`).
+- **Ép `--release-type patch`:** với `0.x`, công cụ coi bản minor như major, nên không báo gì. So như patch thì mọi
+  thay đổi phá vỡ đều hiện. Thử tay: đổi tên `IfMatch::from_value` thì lệnh báo đúng `inherent_method_missing`.
+- **Chế độ:**
+  - còn `0.x`: chỉ báo cáo (thoát 0);
+  - từ `1.0.0`, hay với `--deny`: có phá vỡ thì thoát 1.
+- `--markdown` in mục `### Breaking (Rust)` để chép vào CHANGELOG. Đường dẫn trên máy build trong "previously in
+  file …" được cắt về đường dẫn trong repo, vì repo công khai.
+- Chạy ở bước 3 của `docs/RELEASING.md`, **không** trong `./gate.sh`.
+- **Không** kiểm crate của module.
+
+Lý do:
+- Đo trên máy làm việc, so với v0.13.0:
+  - kernel và testkit: 3 phút 11 giây, chiếm khoảng 7 GB ở `target/semver-checks` (dựng rustdoc JSON của bản cũ và
+    bản mới);
+  - thêm 9 module có `api` thì nhân lên nhiều lần, và đĩa đã đầy giữa chừng.
+- Phần `api` của module hiện chỉ do module trong cùng repo dùng: đổi phá vỡ thì `cargo check` của workspace đỏ
+  ngay.
+- Khi có module ở repo riêng (D-164), xem lại.
+
+Đã cân nhắc: chạy trong gate — lâu, cần mạng, và còn `0.x` thì chặn không có ích (D-167).
+
+## D-243 · SDK TypeScript: bộ sinh viết bằng Rust trong `xtask`, gate kiểm khớp không cần Node, `tsc` trong CI (bước 31 A2) — 2026-11-15 — agent quyết
+
+Quyết định (D-177 giao cho agent):
+- `cargo xtask sdk` (`xtask/src/sdk.rs`) sinh `sdk/typescript/src/schema.ts` từ `docs/openapi.json`:
+  - mỗi schema một `export type`, kèm mô tả làm chú thích;
+  - interface `paths` với tham số theo vị trí, thân request và response theo mã của từng operation;
+  - thứ tự sắp theo tên.
+- Gate (cả hai mức) chạy `cargo xtask sdk --check`: file lệch hay `version` của `package.json` khác workspace thì đỏ,
+  kèm lệnh sinh lại. Người chạy `./gate.sh` không cần Node.
+- `client.ts` viết tay, không phụ thuộc thư viện:
+  - `createClient`; `get` / `post` / `put` / `patch` / `delete` có kiểu suy từ `paths`;
+  - `{data}` trả `data`, trang giữ nguyên;
+  - lỗi ném `AutoxideError` (`code`, `detail`, `errors`, `retryAfter`);
+  - `paginate()` theo `next_cursor`;
+  - 304 trả `{ notModified: true }`.
+- Gói là mã nguồn `.ts`, `private`, không đăng npm (D-177).
+- CI:
+  - job `sdk` chạy `npm ci && npx tsc --noEmit` trên SDK, `examples/smoke.ts` và ví dụ TypeScript trích từ
+    `docs/guides` (A5);
+  - Node 22.23.4 và `typescript` 5.9.3 ghim trong `package-lock.json`;
+  - workflow `Release` đính kèm `autoxide-sdk-X.Y.Z.tgz` (`npm pack`);
+  - khi repo còn riêng tư thì đính tay theo `docs/RELEASING.md`.
+
+Lý do:
+- Tập schema utoipa sinh ra nhỏ và biết trước; bộ sinh khoảng 300 dòng.
+- Thử trên `docs/openapi.json` thật (366 schema, 225 operation): `tsc --strict` sạch ngay. Ví dụ dùng thử bắt đúng
+  kiểu sai (`limit` là số).
+
+Đã cân nhắc: `openapi-typescript` qua image Docker `node` ghim phiên bản — thêm Docker vào gate nhanh, và kiểu sinh
+ra theo cách riêng của nó, khó đọc hơn.
+
+## D-244 · Hướng dẫn theo tình huống: dạng `curl` hẹp chạy như test, bảng tool kiểm theo code (bước 31 A3–A5) — 2026-11-15 — agent quyết
+
+Quyết định:
+- `docs/guides/` gồm 7 tình huống, mỗi file có bản `.vi.md` cùng nội dung: `website`, `authentication`, `api-keys`,
+  `retries`, `pagination`, `errors`, `mcp`, cộng `README` làm mục lục. Tệp mẫu (ảnh PNG nhỏ) nằm ở `files/`.
+- **Ví dụ `curl` dạng hẹp**, chạy bằng `crates/app/src/e2e/guides.rs`:
+  - khối `bash` có dòng `<!-- example: <tên> -->` ngay trước là một bước, gồm đúng một lệnh
+    `curl -sS [-X] "$API/…" [-H …] [--json '…' | --data-binary @tệp]`;
+  - chú thích `# save: TÊN=.đường.dẫn` hay `=header:<tên>`, `# expect: <mã>`, `# expect-header: <tên>: <giá trị>`;
+  - biến tách theo luật shell (`'…'` không thay, `"…"` có thay), nên lệnh trong tài liệu chạy thật được trong
+    terminal;
+  - mỗi hướng dẫn một database trống, dựng bằng `TestApp` với mọi module của binary (`TestAppBuilder::boxed_module`,
+    hàm mới của testkit), đăng nhập thật;
+  - response được kiểm theo hợp đồng (D-241), trừ bước chờ `304`.
+- **Khối code của bản tiếng Việt giống hệt bản tiếng Anh** (test kiểm). Chú thích trong code viết tiếng Anh.
+- **Ví dụ TypeScript** trích bằng `cargo xtask sdk --extract-examples`, kiểm kiểu cùng SDK trong job `sdk` của CI.
+  - Lần đầu, `tsc` bắt ba lỗi của ví dụ: `me.user` không có, `Problem` không có `request_id` (mã request nằm ở header
+    `X-Request-Id` — SDK thêm `AutoxideError.requestId`), `process` cần kiểu của Node (ví dụ không đọc
+    `process.env` nữa).
+- **Bảng tool của `mcp.md`** nằm giữa `<!-- tools:start -->` / `<!-- tools:end -->`, mỗi dòng
+  `| \`tên\` | permission | read-only / writes / destructive |`. Test so với `Modules::tools()`, sai thì in đúng
+  các dòng phải có.
+
+Lý do: tài liệu viết tay lệch code rất nhanh; khi ví dụ chạy trong gate, lệch là đỏ ngay. Bộ chạy riêng cho dạng
+hẹp khoảng 300 dòng, không cần shell thật trong test (chạy được trên mọi máy, mọi database).
+
+Đã cân nhắc: chạy khối `bash` bằng shell thật với máy chủ thật — cần cổng mạng, `curl` trên máy và dọn tiến trình,
+chậm và dễ hỏng trên CI.
+
+## D-245 · Hợp đồng quyền đọc được bằng máy và test độ phủ phân quyền (bước 31, đặc tả 54 P1) — 2026-11-15 — agent quyết
+
+Quyết định (chi tiết D-205 / đặc tả 54 P1 giao cho bước 31):
+- **Khai trên handler bằng `extensions` của `#[utoipa::path]`** (utoipa 6 có sẵn, không cần macro riêng):
+  - `("x-permissions" = json!([...]))`: có một trong các permission là đủ; danh sách rỗng là mọi người đã đăng nhập;
+  - hoặc `("x-public" = json!(true))`.
+  - Khai cho cả 226 operation bằng script đọc thông tin từ tài liệu hiện có: `security` và câu "Missing permission"
+    của response 403. Kết quả: 45 công khai, 24 chỉ cần đăng nhập, 157 có permission. Test độ phủ bên dưới kiểm lại.
+- **Lint của kernel (`http::lint`):** operation thiếu cả hai là lỗi; mỗi permission khai phải được nêu trong
+  mô tả hay response 403.
+  - Đặc tả muốn câu "Requires …" *sinh từ* khai báo. Tôi giữ câu viết tay, vì nó giàu hơn (vd "`files.upload` cho
+    file của bạn, `files.manage` cho file của mọi người"), và cho lint kiểm khớp. Mục đích "chữ không lệch khai báo"
+    vẫn đạt.
+- **Tài liệu OpenAPI xuất qua `serde_json::Value`** để mọi khoá sắp theo tên. Extension của operation nằm trong
+  `HashMap` của utoipa; operation có cả `x-permissions` lẫn `x-sunset` thì thứ tự sẽ đổi giữa các lần sinh.
+  `docs/openapi.json` sắp lại toàn bộ một lần, không đổi nghĩa (`api-diff` xác nhận).
+- **`Permission` có `risk`:**
+  - mặc định suy từ tên (`….read` là `read`, còn lại `write`);
+  - `with_risk` đặt khác: `sensitive_data` cho xem / xuất dữ liệu cá nhân (`auth.users.read`, `comments.read`,
+    `comments.export`, `forms.read`, `forms.export`, `newsletter.read`, `newsletter.export`, `files.manage`),
+    `destructive` cho `media.purge`, `content.delete`, `read` cho `ai.view`;
+  - danh mục module trả `risk` cho từng permission.
+- **Test độ phủ** (`crates/app/src/e2e/access.rs`, mọi module của binary, cả hai database):
+  - Request mẫu sinh từ tài liệu: tham số bắt buộc, `If-Match: *`, thân tối thiểu theo schema. Nhờ vậy lỗi kiểm dữ
+    liệu không che bước kiểm quyền.
+  - Mọi operation không công khai: không token → 401. Tài khoản thật không role nào → 403 `permission_denied` (404
+    nếu operation khai `x-hides-existence`). Với `[]` thì không bị từ chối.
+  - Permission khai phải có module khai thật.
+- **Tool MCP:**
+  - mỗi tool `.requires(…)` hoặc khai `.for_any_signed_in()` (hàm mới, tương đương `x-permissions: []`);
+  - tool chỉ đọc phải gọi được bằng ít nhất một permission mức `read` / `sensitive_data` (đặc tả ghi "chỉ yêu cầu
+    permission mức read"; nới thành "ít nhất một", vì tool như `get_file` cho cả `files.upload` lẫn
+    `files.manage`);
+  - ngoại lệ ghi trong test: `files.list_files` (`files.upload` gồm cả xem file của mình; `files` không có
+    permission chỉ đọc).
+- **Lỗi thật test tìm ra, đã sửa:**
+  - sáu endpoint `…/data` của `comments`, `forms`, `newsletter` đọc `email` trước khi kiểm quyền (người không quyền
+    nhận 422); handler giờ gọi `principal.require` trước;
+  - tool `files.get_file` / `read_file` / `delete_file` và bốn tool của `auth` không khai permission; endpoint
+    `files` cho `files.manage` mà tài liệu chỉ ghi `files.upload`.
+
+Lý do: endpoint mới quên kiểm quyền (hay kiểm sau khi đọc đầu vào) làm gate đỏ; AI agent và giao diện biết trước
+quyền của từng endpoint từ tài liệu.
+
+Đã cân nhắc:
+- Macro riêng bọc `#[utoipa::path]`: thêm một thứ phải học, trong khi `extensions` đã đủ.
+- Sinh `x-permissions` tự động từ lời gọi `principal.require` trong code: không đọc được lúc biên dịch, và có
+  service kiểm quyền theo điều kiện.
+
+## D-246 · Test nâng cấp từ bản phát hành trước: Docker, ngoài gate (bước 31 B1) — 2026-11-15 — agent quyết
+
+Bối cảnh: migration và dữ liệu cũ chỉ được thử trên database do **chính bản hiện tại** dựng. Lỗi chỉ lộ khi nâng
+cấp thật (migration mới hỏng trên dữ liệu của bản cũ, đổi cách lưu token, đổi định dạng file) thì không test nào
+bắt.
+
+Quyết định:
+
+- **Test** `crates/app/tests/upgrade.rs`, chạy trên database `TestDatabase` chọn (SQLite hay Postgres):
+  - bản cũ chạy bằng image Docker của nó (`TEST_UPGRADE_IMAGE`): `migrate up`, `user create`, `serve`;
+  - ghi dữ liệu mẫu qua HTTP thật: role, API key, ảnh PNG (chờ job ảnh nhỏ), bài nháp, bài đã đăng có ảnh đại diện
+    và ảnh trong thân, form, danh sách newsletter, webhook, menu (từ 0.13.0, đọc `--version` của image);
+  - dừng bằng `docker stop` (SIGTERM), kiểm container thoát 0;
+  - bản hiện tại (binary vừa build) trên **cùng database và cùng thư mục `data/`**: `migrate up`, `doctor`,
+    `serve`;
+  - đọc lại mọi bản ghi: mọi trường bản cũ trả về, bản mới trả y hệt (bản mới được thêm trường);
+  - access token, refresh token, API key và mật khẩu cũ còn dùng được;
+  - vài lệnh ghi: sửa bài, tải ảnh mới, tạo role; rồi `task media.refresh_variants`.
+- **Chưa đặt `TEST_UPGRADE_IMAGE` thì test in "skipped" và qua**, như test S3 với `TEST_S3_ENDPOINT`. Vì thế test
+  có trong `cargo test --workspace` nhưng không làm gì khi chạy `./gate.sh`.
+- **Lệnh `cargo xtask upgrade-test [--from <tag>] [--image <image>] [--database sqlite|postgres|both]`:**
+  - tag cũ mặc định là tag phát hành gần nhất trước HEAD (HEAD chính là tag thì lấy tag trước nó);
+  - image: thử tải `ghcr.io/<chủ>/<repo>:X.Y.Z` (và `:vX.Y.Z`); không được thì dùng `autoxide:vX.Y.Z` đã build
+    trên máy, hay build từ tag (`git worktree add` → `docker build --network host`, truyền biến proxy chuẩn);
+  - chạy test trên SQLite, rồi trên Postgres (`GATE_POSTGRES_URL`, không có thì dựng container như `gate.sh`).
+- **Không vào `./gate.sh`.** Lệnh cần Docker, tải hay build bản release của tag cũ, mất nhiều phút. Nó chạy ở job
+  `upgrade` của CI (ma trận `sqlite` / `postgres`, đăng nhập ghcr.io bằng `GITHUB_TOKEN` để tải image) và ở bước 4
+  của `docs/RELEASING.md`, trước khi gắn tag: đỏ thì không phát hành.
+- **Giới hạn:** container chạy với `--network host`, nên lệnh chỉ chạy trên Linux. Nhờ vậy bản cũ gọi được Postgres
+  của test, và test gọi được bản cũ ở `127.0.0.1` mà không cần ánh xạ port. Container chạy bằng uid/gid của máy để
+  file trong thư mục gắn vào ghi được và xoá được.
+- `reqwest` (đã có trong workspace) thêm vào `[dev-dependencies]` của `autoxide` làm client HTTP của test.
+
+Lý do: chỉ image thật của bản cũ mới đúng là thứ người dùng đang chạy. Build lại bản cũ từ mã nguồn trong cùng
+workspace thì không được, vì hai bản trùng tên crate.
+
+Đã cân nhắc:
+- Giữ sẵn file database mẫu của từng bản trong repo: không thử được Postgres, và file phải sinh lại mỗi lần phát
+  hành.
+- Chạy trong gate: mỗi lần gate lại tốn thêm một lần build bản release và cần Docker. Trong khi đó gate phải chạy
+  được trên máy chỉ có Postgres (`GATE_POSTGRES_URL`).
+
+## D-247 · Bố cục theo tính năng của bốn module và nhóm file của kernel (bước 32 A1, A2) — 2026-11-15 — agent quyết
+
+Bối cảnh: `newsletter`, `comments`, `media`, `forms` (6–10 nghìn dòng mỗi module) và kernel (37 file nằm phẳng)
+chưa theo quy ước "File layout" của `docs/MODULE_GUIDE.md`. Bước 33 sẽ sửa mọi bảng của mọi module và thêm
+khoảng tám module vào kernel; người sửa cần tìm đúng chỗ ngay.
+
+Quyết định:
+
+- **Module: theo cách của `content`.**
+  - File tính năng chính giữ logic và khai các file con trong thư mục cùng tên: `campaigns.rs` + `campaigns/`,
+    `posting.rs` + `posting/`, `moderation.rs` + `moderation/`, `forms.rs` + `forms/`.
+  - Nhóm không có file chính thì là file nhóm chỉ khai module con: `audience.rs`, `submissions.rs`,
+    `library.rs`, `images.rs`.
+  - Tính năng chỉ có một file giữ ở trên cùng, không bọc thêm nhóm: `public.rs` của `newsletter` (cùng tên
+    với `http/public.rs`), `threads.rs` của `comments`. Bảng của đặc tả đặt chúng vào `signup/`, `reading/`;
+    nhóm một file không giúp tìm nhanh hơn mà còn đổi tên.
+  - Bố cục cụ thể:
+
+    | Module | Nhóm |
+    | --- | --- |
+    | `newsletter` | `audience/` (`lists`, `subscribers`, `bounces`); `campaigns/` (`sending`, `new_posts`, `compose`) |
+    | `comments` | `posting/` (`authoring`, `targets`); `moderation/` (`reports`) |
+    | `forms` | `forms/` (`fields`); `submissions/` (`public`, `inbox`, `csv`, `notify`) |
+    | `media` | `library/` (`upload`, `sniff`, `folders`, `tags`); `images/` (`variants`, `refresh`, `alt`, `alts`) |
+
+  - `tests.rs` của `forms` và `media` thành `tests/`: đồ dùng chung ở `mod.rs`, mỗi tính năng một file;
+    file con viết `use super::*;` như `mod tests` thường làm.
+  - Chỉ dời, không đổi tên hàm, kiểu, mã lỗi, job, event, permission hay tool. Số test và tên lá của từng
+    crate trước và sau như nhau: `newsletter` 28, `comments` 40, `forms` 29, `media` 49, kernel 324 (doc test
+    đổi tên vì tên của chúng mang đường dẫn file).
+- **Kernel: năm nhóm riêng tư, đường dẫn công khai không đổi.**
+  - Năm nhóm:
+
+    | Nhóm | Module | Bước 33+ thêm vào |
+    | --- | --- | --- |
+    | `contracts/` | `ai`, `mail`, `privacy`, `resource`, `storage` | `payment`, `einvoice`, `identity`, `sms`, `entitlement` |
+    | `data/` | `database`, `migration`, `pagination`, `reference`, `rows`, `search`, `transfer`, `version` | `tenancy`, `numbering` |
+    | `security/` | `access`, `antispam`, `idempotency`, `ip_hash`, `secret`, `throttle`, `tls`, `tokens` | — |
+    | `ops/` | `doctor`, `logging`, `metrics`, `task`, `telemetry`; riêng tư: `builtin`, `module_catalog`, `user_flags` | — |
+    | `values/` | `email`, `money`, `public_url` | `decimal` |
+
+  - Giữ trên cùng: `error`, `response`, `i18n`, `module`, `config`, `http`, `event`, `job`, `mcp`. Đây là
+    phần mọi module chạm tới. `mcp` không có trong bảng của đặc tả; nó là hợp đồng như `http`.
+  - `user_flags` (D-207) vào `ops/` cạnh `builtin`, vì module nội bộ `kernel` phục vụ nó.
+  - `lib.rs` khai `mod <nhóm>;` riêng tư và `pub use <nhóm>::{…};`. `autoxide_kernel::ai::TextModel` và
+    `crate::ai::…` vẫn chạy. Không có đường thứ hai qua tên nhóm.
+  - `crates/kernel/tests/public_paths.rs` `use` mọi module công khai cùng một kiểu tiêu biểu: mất đường dẫn
+    nào là lỗi biên dịch.
+  - Đã sửa theo đường dẫn mới: allowlist của `.gitleaks.toml` cho `security/antispam/fixtures/altcha_v2.json`.
+    Không phải sửa: `ENV_ACCESS_FILE` (`config/` giữ trên cùng), `include_str!` của `i18n` (giữ trên cùng) và của
+    `antispam` (dời cả thư mục). `cargo doc` với `-D warnings` sạch.
+- Tài liệu đang dùng (MODULE_GUIDE, đặc tả bước sau, ROADMAP) sửa theo đường dẫn mới. Nhật ký và đặc tả của
+  bước đã xong giữ nguyên: chúng ghi lại lúc đó.
+
+Lý do: bước 33 sửa từng module và thêm module vào kernel theo đúng một chỗ dễ đoán. Module ở repo riêng (D-167)
+không phải sửa dòng nào.
+
+Đã cân nhắc:
+- Re-export trong file nhóm (`pub(crate) use lists::List`) để khỏi sửa đường dẫn bên trong module: thành hai
+  cách gọi một thứ.
+- Đặt tên nhóm vào đường dẫn công khai của kernel (`autoxide_kernel::contracts::ai`): phá vỡ hợp đồng module.
+
+## D-248 · Phát hành gom thành bản lớn, không phát hành sau từng bước — 2026-11-15 — chủ dự án quyết
+
+Bối cảnh: theo D-171, agent tự phát hành sau mỗi bước của lộ trình. Mỗi bản phát hành cần chủ dự án tự tạo
+trang phát hành trên GitHub, vì phiên làm việc không đẩy được tag. Chủ dự án (15/11/2026): "Làm xong rồi
+release 1 bản lớn thôi, đừng release từng cái nhỏ nữa".
+
+Quyết định (thay D-171):
+
+- **Xong một bước** (mọi mục `[x]`, gate đầy đủ xanh): merge vào `main` (PR, merge kiểu rebase), ghi thay đổi
+  vào `## [Unreleased]` của `CHANGELOG.md`. Không đổi số phiên bản, không gắn tag.
+- **Phát hành** theo `docs/RELEASING.md`, agent tự làm không hỏi, khi xong trọn một giai đoạn của lộ trình (A, B,
+  C…: mọi bước của giai đoạn đã `[x]`), hay khi chủ dự án bảo. Bản đầu tiên theo luật này gồm bước 32 trở đi của
+  giai đoạn A.
+- Phần còn lại của D-171 giữ nguyên: không phát hành giữa bước, không phát hành khi `[Unreleased]` trống, theo
+  luật SemVer của `RELEASING.md` (D-078).
+- Đặc tả bước 32 ghi "merge nhóm A vào `main` ngay khi xong, để bước 33 bắt đầu". Bước 33 làm tiếp trên cùng
+  nhánh này, nên nhóm A theo bước 32 vào `main` lúc bước 32 xong.
+
+Lý do: ít lần chủ dự án phải tạo bản phát hành bằng tay; mỗi bản có đủ thay đổi để người dùng đáng nâng cấp.
+`main` vẫn luôn xanh và mới sau mỗi bước.
+
+## D-249 · `forms`: xuất CSV lớn bằng job, link tải ký, file theo dữ liệu cá nhân (bước 32 B3) — 2026-11-15 — agent quyết
+
+Bối cảnh: `GET /api/v1/forms/{id}/submissions/export` dựng cả file trong bộ nhớ và giữ request tới khi xong. Form
+có hàng chục nghìn bài thì chậm và tốn bộ nhớ. Thêm giới hạn từ chối cho endpoint cũ là thay đổi phá vỡ (D-059).
+
+Quyết định:
+
+- Giữ endpoint đồng bộ như cũ. Thêm ba endpoint:
+  - `POST /{id}/submissions/exports`: thân không bắt buộc, `status` như bản đồng bộ; trả 201 + `Location`.
+  - `GET /exports/{export_id}`: trạng thái `pending` / `running` / `ready` / `failed`, `row_count`, `size`,
+    `expires_at`, và `download_url` khi `ready`.
+  - `GET /exports/{export_id}/file?expires=&signature=`: `x-public`, không cần đăng nhập.
+  - Bảng `forms_exports` (migration `m0007_create_exports`), job `forms.export_submissions` xếp trong cùng
+    transaction với dòng.
+- **Một bản đang chạy mỗi form; trùng thì 409** `forms.export_in_progress`, id bản đang chạy nằm trong thông báo.
+  Không trả lại bản đang chạy, để mỗi yêu cầu có một câu trả lời rõ. Transaction khoá dòng form (`rows::lock_one`)
+  trước khi xét, nên yêu cầu đồng thời ra đúng một 201 trên cả hai database (có test).
+- **Cùng nội dung từng byte với bản đồng bộ.** `csv::write` tách thành `csv::BOM` và `csv::line`. Cột
+  (`export_columns`) và đọc trang 200 bài (`export_page`) là hàm dùng chung. Job ghi theo luồng
+  (`futures_util::stream::try_unfold`) vào `dyn Storage`, khoá `forms/exports/<id>.csv`: không giữ cả file trong
+  bộ nhớ.
+- **Lỗi thì `failed`, không thử lại.** Job trả `Ok`, người dùng yêu cầu bản mới. Lỗi giữa chừng mà thử lại thì
+  file dở bị ghi đè và dễ lặp vô ích. Job chạy lại khi bản xuất đã `ready` / `failed` thì không làm gì.
+- **Link ký:**
+  - Khoá ký: HMAC-SHA256 bằng `SecretKey::derive("forms.export_download")`, trên `export_id` (16 byte) và
+    `expires` (giây Unix, 8 byte big-endian); chữ ký là hex.
+  - So chữ ký bằng `verify_slice` (thời gian không đổi). Sai chữ ký, sửa hạn hay đã hết hạn: cùng một mã 403
+    `forms.export_link_invalid`. File hay dòng đã xoá: 404.
+  - Link sống `AUTOXIDE_FORMS_EXPORT_LINK_MINUTES` (mặc định 60, 1–10080) và không quá hạn giữ file. Mỗi lần đọc
+    bản xuất ra link mới.
+  - Link là URL tuyệt đối khi có `AUTOXIDE_HTTP_PUBLIC_URL`, không thì đường dẫn trên API.
+- **File chứa dữ liệu cá nhân:**
+  - Giữ `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` (mặc định 24, 1–720) sau khi xong; bản `failed` cũng có hạn.
+  - Job `forms.cleanup` xoá file trước, dòng sau; xoá file lỗi thì để dòng cho lần sau.
+  - `DELETE /api/v1/forms/data?email=` và xoá form xoá mọi bản xuất của form liên quan, sau transaction (nơi lưu
+    có thể ở xa).
+  - Tài khoản bị xoá thì `requested_by` thành `NULL`.
+  - Event mới `forms.submissions_exported` (subject là form, `after`: `export_id`, `row_count`, không email):
+    audit biết ai lấy dữ liệu ra.
+- `forms` cần `dyn Storage` (đăng ký sau `files` — đã đúng) và `PublicUrl`.
+- `MemoryStorage` dời từ `media` sang testkit (API mới, công khai) kèm `fail_writes` để thử đường lỗi của nơi lưu;
+  `media` dùng lại.
+- Không có tool MCP: dữ liệu cá nhân hàng loạt, như việc xuất / xoá theo email.
+
+Căn cứ: Nghị định 13/2023/NĐ-CP (hiệu lực 01/7/2023) và Luật Bảo vệ dữ liệu cá nhân 2025 (hiệu lực 01/01/2026) —
+quyền xoá dữ liệu, nên file xuất phải bị xoá theo. Thời hạn giữ file xuất là cấu hình; cần đối chiếu văn bản gốc
+hay người có chuyên môn pháp lý cho trường hợp cụ thể (D-186).
+
+Đã cân nhắc:
+- Trả bản đang chạy thay vì 409: client không biết đó là bản cũ hay bản mình vừa yêu cầu.
+- Link tải cần đăng nhập: không mở được trong trình duyệt khi client dùng token. Chữ ký gắn với id và hạn là đủ.
+
+## D-250 · `auth`: đổi email thì báo địa chỉ cũ, kèm cách báo "không phải tôi" (bước 32 B1) — 2026-11-15 — agent quyết
+
+Bối cảnh: D-065 ghi "báo địa chỉ cũ để sau". Kẻ biết mật khẩu đổi được email sang địa chỉ của nó: chủ thật mất cả
+đường đặt lại mật khẩu, mà không hay biết gì.
+
+Quyết định:
+
+- **Mail báo đi qua job, xếp trong transaction của `confirm`.**
+  - `EmailVerifications::confirm` (khi email thực sự đổi) xếp job `auth.send_email_changed` trong cùng
+    transaction. Xác nhận rollback (vd địa chỉ bị người khác lấy) thì không có mail. Request không chờ mail.
+  - Payload: `user_id`, hai địa chỉ, lúc đổi, ngôn ngữ (`Accept-Language` của người xác nhận). Job queue xoá
+    payload khi xong (D-079).
+- **Job:** tạo token một lần (`OneTimeTokens::new("auth")`, mục đích `email_change_report`, `subject` = id,
+  `data` = địa chỉ cũ, sống **7 ngày** — hằng số `REPORT_DAYS`, vì mail báo hay được đọc muộn). Mail tới **địa chỉ
+  cũ** ghi địa chỉ mới **che bớt** (`n***@example.org`: đủ để chủ nhận ra, không lộ trọn địa chỉ kẻ chiếm cho ai
+  đọc trộm hộp thư cũ). Mẫu `auth.mail.email_changed_link` dẫn tới Setting mới
+  `AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL` (có `{token}`); không đặt thì `auth.mail.email_changed_code` chứa token.
+- **`POST /api/v1/auth/email-change/report`** (`x-public`, thân `{ "token" }`, trả 204). Một transaction:
+  1. dùng token; khoá dòng người dùng (`rows::lock_one`), nên hai lần báo đồng thời chỉ một bên được (có test);
+  2. địa chỉ cũ còn trống thì trả email về đó (kiểm trước, vì lỗi unique làm hỏng cả transaction trên Postgres);
+  3. khoá tài khoản bằng `UserService::lock_out_in`: bỏ mật khẩu (`NULL`: không đăng nhập bằng mật khẩu được
+     nữa), thu hồi phiên và refresh token, API key, passkey, token xác minh / đặt lại / báo đang chờ, tắt TOTP
+     kèm recovery code (`mfa::service::remove_in`, tách từ hàm tắt MFA sẵn có);
+  4. event mới `auth.email_change_reported` (`before.email`, `after.email`, `after.restored`);
+  5. khi email đã về địa chỉ cũ: xếp job `auth.send_password_reset` (D-162) tới đó.
+- **Địa chỉ cũ đã bị người khác lấy:** tài khoản vẫn bị khoá nhưng không gửi mail đặt lại nào. Mail đó sẽ tới
+  người khác, hay tới kẻ chiếm. Chủ tài khoản nhờ quản trị viên (`autoxide user …`).
+- Token sai, hết hạn, đã dùng, hay tài khoản đã bị xoá: cùng một lỗi 400 `auth.invalid_email_change_report_token`,
+  không cho dò gì.
+- Không thêm giới hạn lượt riêng cho endpoint: token 256 bit ngẫu nhiên không đoán được, như
+  `/password-reset/confirm`.
+- `EmailVerifications::confirm` nhận thêm `Language` (cho mail báo).
+
+Lý do: chủ tài khoản biết ngay khi email bị đổi, và lấy lại được tài khoản chỉ bằng hộp thư cũ. Kẻ chiếm mất mọi
+đường vào đã tạo (phiên, API key, passkey, MFA).
+
+Đã cân nhắc:
+- Gửi mail báo trực tiếp trong request: chậm request, và gửi cả khi transaction rollback.
+- Giữ mật khẩu cũ, chỉ thu hồi phiên: kẻ chiếm đã biết mật khẩu nên đăng nhập lại ngay được.
+
+## D-251 · `auth`: quản trị viên xem và gỡ passkey của người khác; `autoxide user remove-passkeys` (bước 32 B2) — 2026-11-15 — agent quyết
+
+Bối cảnh: người dùng mất thiết bị giữ passkey thì chỉ tự gỡ được khi còn đăng nhập. `autoxide user reset-mfa`
+(D-159) chỉ tắt TOTP, không gỡ passkey, nên admin duy nhất mất thiết bị không có đường nào.
+
+Quyết định:
+
+- **Permission mới `auth.passkeys.manage`** (`Risk::Destructive`): "See and remove the passkeys of other users".
+  Tách khỏi `auth.users.manage`, vì gỡ passkey là việc khôi phục tài khoản, nên giao riêng cho người lo việc đó.
+- **Ba endpoint dưới `/api/v1/auth/users/{id}/passkeys`:**
+  - `GET`: danh sách, cùng dạng `GET /me/passkeys`, không có khoá.
+  - `DELETE …/{passkey_id}`: gỡ một passkey.
+  - `DELETE`: gỡ hết; vẫn 204 khi người đó không có passkey nào. Có cả hai kiểu gỡ: mất một thiết bị hay mất
+    hết đều là việc thường gặp.
+  - Mỗi endpoint kiểm permission, người đích có tồn tại, rồi `require_covers` (không tác động lên người quyền
+    cao hơn, D-079).
+- **Không đổi mật khẩu, không đăng xuất phiên khác**, giống `DELETE /users/{id}/mfa`: đây là giúp người mất thiết
+  bị, không phải khoá kẻ chiếm. Việc khoá kẻ chiếm có `POST /auth/email-change/report` (D-250) và đặt lại mật
+  khẩu.
+- **Event:** dùng lại `auth.passkey_removed`, actor là quản trị viên. Thêm `after.by_administrator: true` (như
+  `auth.mfa_disabled`, D-159); người dùng tự gỡ thì `after` vắng như cũ. `passkey::remove_all_in` nhận thêm cờ
+  `by_admin`.
+- **CLI `autoxide user remove-passkeys --email …`** cạnh `reset-mfa`, in số passkey đã gỡ. Trait công khai
+  `autoxide_auth::api::AccountRecovery` thêm `remove_passkeys(email) -> (User, u64)`, chạy với
+  `Actor::system()`; không có tài khoản thì `auth.account_not_found`. Đây là thay đổi phá vỡ cho ai tự cài trait
+  này (chỉ `auth` cài): ghi CHANGELOG, chấp nhận ở `0.x` (D-167).
+- Hai lệnh khôi phục của CLI dùng chung một đường (`enum Recovery`, `recover`).
+- `docs/DEPLOY.md` (EN + VI): cách dùng cạnh `reset-mfa`.
+- **Không có tool MCP:** việc khôi phục tài khoản không giao cho agent.
+
+## D-252 · `comments`: Markdown giới hạn bằng `pulldown-cmark` và bộ dựng theo danh sách cho phép (bước 32 B4) — 2026-11-15 — agent quyết
+
+Bối cảnh: D-112 ghi "bình luận chữ thường; Markdown + sanitizer để sau". Người viết muốn in đậm, trích dẫn, đặt
+link có chữ.
+
+Quyết định:
+
+- **Cột mới `format`** trên `comments_comments` (migration `m0010_add_format`: `string_len(16)` NOT NULL DEFAULT
+  `'text'`; `down` bỏ cột — test migration up → down → up của mọi module chạy nó trên cả hai database). Dòng có
+  sẵn là `text` nên hiển thị như cũ.
+- **Request:**
+  - `POST /public/comments` nhận `format` (`text` mặc định: client cũ gửi chữ có `*` không bị đổi nghĩa).
+  - `PATCH …/{id}` nhận `format`; không gửi thì giữ định dạng đang có.
+  - Setting `AUTOXIDE_COMMENTS_MARKDOWN` (mặc định `true`); tắt mà gửi `markdown` thì 422 ở trường `format`, gom
+    cùng các lỗi khác.
+  - `GET /public/settings` thêm `markdown`.
+  - Response có `format`; `body_html` dựng theo nó.
+  - Tool MCP `comments.answer` giữ chữ thường. Input tool không lồng được `$ref`, và tool làm ít hơn REST là được
+    (luật kiến trúc 8 chỉ cấm làm nhiều hơn).
+- **`pulldown-cmark` 0.13 chỉ để phân tích** (`default-features = false`, `Options::empty()`: không bảng, chú
+  thích, gạch ngang…). HTML do `text::markdown` tự dựng trên luồng event, theo danh sách cho phép:
+  - Thẻ ra được: `<p>`, `<br>`, `<strong>`, `<em>`, `<a href rel>`, `<blockquote>`, `<code>`, `<pre><code>`.
+    Mọi chữ qua `escape`.
+  - `Event::Html` / `InlineHtml` thành chữ đã escape.
+  - Link chỉ `http(s)`, kèm `rel="nofollow ugc noopener"`; link khác thành chữ của nó; không bao giờ lồng `<a>`.
+  - Ảnh thành chữ `alt`, không `<img>`: chặn ảnh theo dõi.
+  - Tiêu đề, mục danh sách thành đoạn văn; đường kẻ bỏ; xuống dòng mềm thành `<br>` (như bình luận chữ thường).
+  - Địa chỉ trần trong chữ vẫn thành link như bài chữ thường.
+- **Không thêm `ammonia`:** bộ dựng chỉ ra thẻ cố định, nên không có HTML lạ nào cần lọc. Thêm `ammonia` (kéo
+  `html5ever`) là thêm nhiều mã để giải một vấn đề không có. `pulldown-cmark` nhỏ, thuần Rust, chỉ kéo
+  `bitflags`, `memchr`, `unicase`; không đo kích thước binary riêng, vì đặc tả chỉ đòi đo khi chọn đường
+  `ammonia`.
+- **`text::links(body, format)`** đếm link Markdown (`[a](url)`, `<url>`, link kiểu tham chiếu) cộng địa chỉ trần:
+  giới hạn link của chống spam không bị lách. Từ cấm vẫn so trên chữ gốc.
+- **Test:**
+  - Bài `text` ra `body_html` y như trước: `plain_html` giữ nguyên thuật toán; mọi test cũ giữ nguyên, kể cả
+    `xss_bi_chan`.
+  - Markdown: đúng thẻ; XSS gồm `<script>`, `javascript:`, `data:`, HTML thô, link lồng, ảnh, thực thể HTML,
+    `onclick`.
+  - Property test của bước 31 chạy cả `markdown`, với danh sách thẻ cho phép mở rộng.
+  - Service: lưu `format`, đếm link, sửa giữ định dạng, tắt Setting.
+
+Đã cân nhắc:
+- Markdown → HTML (`pulldown-cmark` feature `html`) rồi lọc bằng `ammonia`: hai bước, phụ thuộc nặng, và an toàn
+  nằm ở cấu hình bộ lọc thay vì ở mã.
+- Tự viết bộ đọc Markdown: Markdown có nhiều ca biên (link kiểu tham chiếu, lồng nhau, escape); thư viện chuẩn
+  CommonMark đáng tin hơn vài trăm dòng tự viết.

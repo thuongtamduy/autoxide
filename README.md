@@ -78,6 +78,9 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
     with pause and resume, bounces, mail for new posts ([`docs/NEWSLETTER.md`](docs/NEWSLETTER.md))
 20. Comments: two-level comments on any target for signed-in users or guests, a fixed
     moderation pipeline, reports, bans, reply mails ([`docs/COMMENTS.md`](docs/COMMENTS.md))
+21. Website menus: main bar, mega menus and footer whose items link to addresses or to objects of
+    any module, with automatic sub-items, dated badges and a cached public endpoint
+    ([`docs/MENUS.md`](docs/MENUS.md))
 
 ## Requirements
 
@@ -191,6 +194,9 @@ matching REST endpoint, so writes land in the audit log. For example, with Claud
 claude mcp add --transport http autoxide http://127.0.0.1:8080/mcp --header "Authorization: Bearer <api key>"
 ```
 
+[`docs/guides/mcp.md`](docs/guides/mcp.md) walks through it: a key with the least
+permissions, other MCP clients, every tool with the permission it needs, and the limits.
+
 Back up everything — the data of every module and every stored file — into a
 directory, and restore it into a new, empty database (with any file storage) later. The
 database is read in one consistent snapshot, so the server may keep running:
@@ -283,8 +289,13 @@ New accounts receive a mail asking to confirm their address; the token in it (va
 24 hours) is confirmed with `POST /api/v1/auth/email-verification/confirm`, and
 `email_verified_at` then shows when. To change their email, users call
 `POST /api/v1/auth/me/email` with the new address and their password: the email
-changes only once the new address is confirmed the same way. Set
-`AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` to link these mails to your own page.
+changes only once the new address is confirmed the same way. The old address then gets a
+mail saying so, with a token (valid 7 days) to report a change the owner did not make:
+`POST /api/v1/auth/email-change/report` signs the account out everywhere, removes its
+password, passkeys, API keys and two-step sign-in, gives the old address back when it is
+still free, and sends a password-reset mail there. Set
+`AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` and `AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL` to link
+these mails to your own pages.
 
 For production, set `AUTOXIDE_AUTH_TOKEN_SECRET` (the key that signs access tokens)
 to a long random value, the same on every server:
@@ -338,6 +349,11 @@ never share foreign keys. These rules are checked automatically by the gate.
 - [`CLAUDE.md`](CLAUDE.md) — the rules for contributors, human or AI agent
 - [`CHANGELOG.md`](CHANGELOG.md) — what changed in each release; released Docker images
   are at `ghcr.io/<owner>/autoxide`
+- [`docs/guides/`](docs/guides/README.md) — task-by-task guides to the API, with `curl` and
+  TypeScript examples that run as tests: a website, signing in, API keys, retries,
+  pagination, errors, connecting an AI agent over MCP
+- [`sdk/typescript/`](sdk/typescript/README.md) — a typed TypeScript client generated from
+  `docs/openapi.json`; [`docs/mcp-tools.json`](docs/mcp-tools.json) — the contract of every MCP tool
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — installing and deploying: Docker Compose with
   PostgreSQL or one binary with SQLite, reverse proxy, updates, backups
 - [`docs/MEDIA.md`](docs/MEDIA.md) — using the media library: upload, folders, public
@@ -352,6 +368,8 @@ never share foreign keys. These rules are checked automatically by the gate.
   website's sign-up, confirmation and preferences pages, campaigns, bounces, legal notes
 - [`docs/COMMENTS.md`](docs/COMMENTS.md) — using the comments module: targets, the
   website's thread and comment box, moderation, reports and bans, reply mails, legal notes
+- [`docs/MENUS.md`](docs/MENUS.md) — using the menus module: items, objects of other modules,
+  badges, the public endpoint and its caching, moving from the content module's menus
 - [`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md) — how to write a module, starting
   from the sample module [`modules/notes`](modules/notes) (not registered by default)
 

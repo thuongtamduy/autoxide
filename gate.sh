@@ -12,11 +12,13 @@
 #   1. định dạng            cargo fmt --check
 #   2. lint                 cargo clippy, cảnh báo tính là lỗi
 #   3. ranh giới workspace  cargo xtask check
-#   4. thư viện             cargo deny check (license, lỗ hổng, nguồn)
-#   5. secret               gitleaks: toàn bộ lịch sử git và thay đổi chưa commit
-#   6. test trên SQLite
-#   7. test trên Postgres   (tự dựng một container Docker dùng xong bỏ)
-#   Bước 6 và 7 chạy thêm test lưu file trên S3: gate dựng một máy chủ S3 giả lập
+#   4. hợp đồng API         cargo xtask api-diff: không phá vỡ /api/v1 so với tag phát hành gần nhất;
+#                           cargo xtask sdk --check: SDK TypeScript khớp docs/openapi.json
+#   5. thư viện             cargo deny check (license, lỗ hổng, nguồn)
+#   6. secret               gitleaks: toàn bộ lịch sử git và thay đổi chưa commit
+#   7. test trên SQLite
+#   8. test trên Postgres   (tự dựng một container Docker dùng xong bỏ)
+#   Bước 7 và 8 chạy thêm test lưu file trên S3: gate dựng một máy chủ S3 giả lập
 #   (moto) trong Docker, dùng xong bỏ.
 #
 # Cần có: toolchain Rust (rustup tự cài đúng bản ghim), cargo-deny, Docker (gitleaks cài
@@ -87,7 +89,7 @@ require() {
 require cargo "Install Rust from https://rustup.rs"
 require cargo-deny "Install it with: cargo install cargo-deny --locked"
 
-# --- 1-4: kiểm tĩnh, nhanh, không cần database ---------------------------------
+# --- 1-5: kiểm tĩnh, nhanh, không cần database ---------------------------------
 
 step "format (cargo fmt)"
 cargo fmt --all --check
@@ -98,12 +100,20 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 step "workspace boundaries (cargo xtask check)"
 cargo xtask check
 
+# So với tag phát hành gần nhất (tổ tiên của HEAD); cần lịch sử và tag (D-059, đặc tả 31 A1).
+step "api contract (cargo xtask api-diff)"
+cargo xtask api-diff
+
+# Kiểu TypeScript của SDK sinh từ docs/openapi.json; không cần Node (D-243).
+step "TypeScript SDK matches the contract (cargo xtask sdk --check)"
+cargo xtask sdk --check
+
 step "dependencies (cargo deny)"
 # -D ...-not-detected / -not-encountered: ngoại lệ trong deny.toml không còn cần
 # thì thành lỗi, để ngoại lệ tự hết hạn.
 cargo deny check -D advisory-not-detected -D license-not-encountered
 
-# --- 5: secret --------------------------------------------------------------------
+# --- 6: secret --------------------------------------------------------------------
 
 gitleaks_run() {
   if command -v gitleaks >/dev/null 2>&1; then
@@ -129,12 +139,12 @@ gitleaks_run git . "${leaks[@]}" --pre-commit
 if [ "$QUICK" = 1 ]; then
   step "tests on SQLite, changed crates only (cargo xtask test-affected)"
   cargo xtask test-affected
-  printf '\n\033[32mgate --quick: green — fmt, clippy, boundaries, dependencies, secrets, tests of changed crates on SQLite\033[0m\n'
+  printf '\n\033[32mgate --quick: green — fmt, clippy, boundaries, api contract, dependencies, secrets, tests of changed crates on SQLite\033[0m\n'
   printf 'Not checked: PostgreSQL, S3, crates you did not touch. Run ./gate.sh before merging into main.\n'
   exit 0
 fi
 
-# --- S3 cho test lưu file (dùng ở bước 6 và 7) -------------------------------------
+# --- S3 cho test lưu file (dùng ở bước 7 và 8) -------------------------------------
 
 start_s3() {
   require docker "Install Docker, or point GATE_S3_ENDPOINT at an existing S3-compatible service."
@@ -164,13 +174,13 @@ if [ -z "$S3_ENDPOINT" ]; then
 fi
 export TEST_S3_ENDPOINT="$S3_ENDPOINT"
 
-# --- 6: SQLite ------------------------------------------------------------------
+# --- 7: SQLite ------------------------------------------------------------------
 
 step "tests on SQLite"
 # `env -u`: bỏ biến nếu người chạy lỡ đặt sẵn, để bước này chắc chắn là SQLite.
 env -u TEST_DATABASE_URL cargo test --workspace --locked
 
-# --- 7: Postgres ----------------------------------------------------------------
+# --- 8: Postgres ----------------------------------------------------------------
 
 start_postgres() {
   require docker "Install Docker, or point GATE_POSTGRES_URL at an existing Postgres."
@@ -216,4 +226,4 @@ else
 fi
 TEST_DATABASE_URL="$POSTGRES_URL" cargo test --workspace --locked
 
-printf '\n\033[32mgate: green — fmt, clippy, boundaries, dependencies, secrets, tests on SQLite and Postgres (files also on S3)\033[0m\n'
+printf '\n\033[32mgate: green — fmt, clippy, boundaries, api contract, dependencies, secrets, tests on SQLite and Postgres (files also on S3)\033[0m\n'

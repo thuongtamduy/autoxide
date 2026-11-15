@@ -15,9 +15,9 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::authoring::{Deletion, soft_delete};
 use crate::entity::{comment, profile, report};
 use crate::events::{self, Change};
+use crate::posting::authoring::{Deletion, soft_delete};
 use crate::service::{CommentsService, Status};
 use crate::text;
 
@@ -43,7 +43,8 @@ impl PersonalData for CommentsService {
                 "reply_to_id": row.reply_to_id,
                 "status": row.status,
                 "body": row.body,
-                "body_html": text::to_html(&row.body),
+                "body_html": text::to_html(&row.body, text::Format::from_column(&row.format)),
+                "format": row.format,
                 "email": row.author_email,
                 "locale": row.locale,
                 "edited_at": row.edited_at,

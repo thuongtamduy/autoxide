@@ -278,7 +278,9 @@ mod tests {
         if let Some(key) = key {
             request = request.header("idempotency-key", key);
         }
-        let answer = request.bytes(body.to_owned()).send().await.unwrap();
+        // Handler giả cố ý trả câu trả lời ngoài hợp đồng (500 / 429 dạng chữ, panic) để thử lớp
+        // idempotency, nên không kiểm theo `docs/openapi.json`.
+        let answer = request.bytes(body.to_owned()).unchecked().send().await.unwrap();
         let replayed = answer
             .headers()
             .get("idempotent-replayed")

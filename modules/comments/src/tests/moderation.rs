@@ -12,14 +12,15 @@ use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, PaginatorTrait, Se
 use serde_json::json;
 
 use super::{
-    KIND, POST, as_guest, counts, events, guest, member, open_config, page, signed, visitor,
+    KIND, POST, as_guest, content_events, counts, events, guest, member, open_config, page, signed,
+    visitor,
 };
 use crate::config::CommentsConfig;
 use crate::entity::{comment, profile, subscription};
 use crate::moderation::QueueFilter;
-use crate::reports::{ReportReason, all_oldest};
+use crate::moderation::reports::{ReportReason, all_oldest};
+use crate::posting::targets::OwnerEvents;
 use crate::service::Status;
-use crate::targets::OwnerEvents;
 use crate::testing::{admin, config, service};
 
 fn delivered(name: &str, subject: Option<String>, payload: serde_json::Value) -> Delivered {
@@ -341,7 +342,7 @@ async fn du_lieu_ca_nhan() {
         assert_eq!(counts(&h.database, POST).await, (1, 0));
         // Luồng vẫn còn chỗ của bình luận gốc (có trả lời).
         assert_eq!(
-            h.service.thread(KIND, POST, &page(Order::Desc), 3).await.unwrap().data.len(),
+            h.service.thread(KIND, POST, &page(Order::Desc), 3, None).await.unwrap().data.len(),
             1
         );
 
@@ -360,7 +361,7 @@ async fn du_lieu_ca_nhan() {
                 Some(&bob),
                 &ClientInfo::default(),
                 mine,
-                crate::reports::ReportReason::Other,
+                crate::moderation::reports::ReportReason::Other,
                 None,
             )
             .await
@@ -463,7 +464,13 @@ async fn event_cua_chu_dich_dong_va_an() {
             .comment
             .row
             .id;
-        let handler = OwnerEvents(Arc::clone(&h.service));
+        let handler = OwnerEvents {
+            service: Arc::clone(&h.service),
+            events: crate::posting::targets::owner_events(
+                &content_events(),
+                &h.service.config.target_types,
+            ),
+        };
         let subject = Some(format!("{KIND}:{POST}"));
         let archived = delivered("content.entry_archived", subject.clone(), json!({}));
         handler.handle(&archived).await.unwrap();
@@ -479,22 +486,29 @@ async fn event_cua_chu_dich_dong_va_an() {
             "comments.target_closed"
         );
         assert_eq!(
-            h.service.thread(KIND, POST, &page(Order::Desc), 3).await.unwrap().data.len(),
+            h.service.thread(KIND, POST, &page(Order::Desc), 3, None).await.unwrap().data.len(),
             1,
             "closed, still shown"
         );
 
         handler.handle(&delivered("content.entry_deleted", subject, json!({}))).await.unwrap();
-        assert!(h.service.thread(KIND, POST, &page(Order::Desc), 3).await.unwrap().data.is_empty());
+        assert!(
+            h.service
+                .thread(KIND, POST, &page(Order::Desc), 3, None)
+                .await
+                .unwrap()
+                .data
+                .is_empty()
+        );
         assert_eq!(
             h.service.counts(KIND, &[POST.to_owned()]).await.unwrap(),
-            [(POST.to_owned(), 0)]
+            [(POST.to_owned(), 0, 0)]
         );
         assert_eq!(h.service.public_comment(id).await.unwrap_err().code(), "comments.not_found");
 
         // Mở lại bằng tay; `If-Match` cũ bị từ chối.
         let target = h.service.target(KIND, POST).await.unwrap();
-        let change = || crate::targets::TargetChange {
+        let change = || crate::posting::targets::TargetChange {
             state: Some("open".to_owned()),
             hidden: Some(false),
             closes_at: None,
@@ -514,7 +528,7 @@ async fn event_cua_chu_dich_dong_va_an() {
         assert_eq!(h.service.public_comment(id).await.unwrap().row.id, id);
         // Tự đóng sau `closes_at`.
         let past = Some(Some(crate::service::now() - chrono::Duration::minutes(1)));
-        let auto = crate::targets::TargetChange { closes_at: past, ..Default::default() };
+        let auto = crate::posting::targets::TargetChange { closes_at: past, ..Default::default() };
         h.service.set_target(&admin(), KIND, POST, auto, None).await.unwrap();
         assert_eq!(
             as_guest(&h.service, &client, guest("Ada", "Quá hạn")).await.unwrap_err().code(),

@@ -18,7 +18,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{page_request, present};
-use crate::lists::{List, ListInput, NewPosts, SubscriptionCounts};
+use crate::audience::lists::{List, ListInput, NewPosts, SubscriptionCounts};
 use crate::service::NewsletterService;
 use crate::text::{Locale, Localized};
 
@@ -108,6 +108,7 @@ pub(crate) struct UpdateListRequest {
 #[utoipa::path(
     get,
     path = "/lists",
+    extensions(("x-permissions" = json!(["newsletter.read"]))),
     operation_id = "list_newsletter_lists",
     security(("bearer" = [])),
     params(PageQuery),
@@ -141,6 +142,7 @@ pub(crate) async fn list_lists(
 #[utoipa::path(
     post,
     path = "/lists",
+    extensions(("x-permissions" = json!(["newsletter.manage", "newsletter.send"]))),
     operation_id = "create_newsletter_list",
     security(("bearer" = [])),
     request_body = CreateListRequest,
@@ -179,6 +181,7 @@ pub(crate) async fn create_list(
 #[utoipa::path(
     get,
     path = "/lists/{id}",
+    extensions(("x-permissions" = json!(["newsletter.read"]))),
     operation_id = "get_newsletter_list",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the list.")),
@@ -206,6 +209,7 @@ pub(crate) async fn get_list(
 #[utoipa::path(
     patch,
     path = "/lists/{id}",
+    extensions(("x-permissions" = json!(["newsletter.manage", "newsletter.send"]))),
     operation_id = "update_newsletter_list",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the list."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -250,6 +254,7 @@ pub(crate) async fn update_list(
 #[utoipa::path(
     delete,
     path = "/lists/{id}",
+    extensions(("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "delete_newsletter_list",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the list."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),

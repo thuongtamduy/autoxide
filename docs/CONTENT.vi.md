@@ -147,7 +147,9 @@ Permission `content.manage`.
   tác giả cho mục cần quyền sửa mục đó, không cần `content.read`.
 - **Menu** (`/api/v1/content/menus/{key}?locale=`): một cây mục (tối đa 4 cấp, 200 mục), mỗi
   mục trỏ tới một bài / trang, một term, hoặc một địa chỉ. `PUT` thay cả cây (`If-Match: *` để
-  tạo mới).
+  tạo mới). **Đã deprecated** (sunset 14/05/2027): menu của website chuyển sang module `menus`, mục
+  trỏ được tới đối tượng của module bất kỳ; chép menu sang bằng
+  `autoxide task menus.import_content_menus` ([`MENUS.vi.md`](MENUS.vi.md)).
 
 ## Website: endpoint công khai
 
@@ -157,7 +159,7 @@ Không cần đăng nhập. Chỉ trả bản đã đăng — không bao giờ t
 | ----------------------------------------------------- | ------------------------------------------------------------ |
 | `GET /public/resolve?locale=&path=`                   | Thứ ở một địa chỉ: `entry`, `redirect` hoặc `gone`           |
 | `GET /public/posts?locale=&term_id=&author_id=&q=`    | Bài đã đăng, mới nhất trước, có pagination (`q`: tối đa 200 ký tự) |
-| `GET /public/menus/{key}?locale=`                     | Menu kèm `href` đã tính; mục trỏ tới bài chưa đăng bị ẩn     |
+| `GET /public/menus/{key}?locale=`                     | Menu kèm `href` đã tính; đã deprecated, dùng `GET /api/v1/menus/public/{key}` |
 | `GET /public/terms/{taxonomy}/{slug}?locale=`         | Trang của một danh mục hay thẻ                               |
 | `GET /public/authors/{slug}`                          | Trang của một tác giả                                        |
 | `GET /public/sitemap?locale=`                         | Mọi địa chỉ đang công khai, kèm bản dịch cho `hreflang`, có pagination |

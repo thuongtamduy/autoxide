@@ -18,8 +18,8 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{page_request, sort};
+use crate::library::tags::{TagSort, TagWithCount};
 use crate::service::MediaService;
-use crate::tags::{TagSort, TagWithCount};
 
 /// A tag. Items carry tags as names; tags are created when first given to an item.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -74,6 +74,7 @@ pub(crate) struct RenameTagRequest {
 #[utoipa::path(
     get,
     path = "/tags",
+    extensions(("x-permissions" = json!(["media.read"]))),
     operation_id = "list_media_tags",
     security(("bearer" = [])),
     params(TagsQuery, PageQuery),
@@ -105,6 +106,7 @@ pub(crate) async fn list_tags(
 #[utoipa::path(
     get,
     path = "/tags/{id}",
+    extensions(("x-permissions" = json!(["media.read"]))),
     operation_id = "get_media_tag",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the tag.")),
@@ -131,6 +133,7 @@ pub(crate) async fn get_tag(
 #[utoipa::path(
     patch,
     path = "/tags/{id}",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "rename_media_tag",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the tag."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the tag since; otherwise `412`.")),
@@ -164,6 +167,7 @@ pub(crate) async fn rename_tag(
 #[utoipa::path(
     delete,
     path = "/tags/{id}",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "delete_media_tag",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the tag.")),

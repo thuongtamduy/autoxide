@@ -150,6 +150,10 @@ fn describe(tool: &Tool) -> rmcp::model::Tool {
         }
         _ => {}
     }
+    if let Some(deprecation) = tool.deprecation() {
+        description.push(' ');
+        description.push_str(&deprecation.sentence(tool.name()));
+    }
     let schema = match tool.input_schema() {
         Value::Object(object) => object.clone(),
         _ => serde_json::Map::new(),
@@ -183,6 +187,27 @@ impl McpServer {
         }
         CallToolResult::structured_error(body)
     }
+}
+
+/// Tool deprecated: kết quả giữ nguyên envelope `{"data": …}`, thêm `_meta`
+/// `autoxide/deprecation` cho máy và một đoạn văn bản cảnh báo cho mô hình đọc (D-240, như
+/// header `Deprecation` / `Sunset` của endpoint — D-059). Tên tool là tập cố định do code khai, nên
+/// dùng làm nhãn số đo được.
+fn warn_deprecated(
+    result: &mut CallToolResult,
+    tool: &str,
+    deprecation: &crate::mcp::ToolDeprecation,
+) {
+    metrics::counter!("mcp_deprecated_tool_calls_total", "tool" => tool.to_owned()).increment(1);
+    let mut meta = result.meta.take().unwrap_or_default();
+    meta.0.insert(
+        "autoxide/deprecation".to_owned(),
+        json!({"since": deprecation.since, "sunset": deprecation.sunset, "successor": deprecation.successor}),
+    );
+    result.meta = Some(meta);
+    result
+        .content
+        .push(rmcp::model::ContentBlock::text(format!("Warning: {}", deprecation.sentence(tool))));
 }
 
 /// Kết quả tool theo đúng envelope của REST: một trang (`Page`: `data` + `pagination`)
@@ -241,10 +266,13 @@ impl ServerHandler for McpServer {
         }
         let arguments = request.arguments.map_or(Value::Null, Value::Object);
         metrics::counter!("mcp_tool_calls_total").increment(1);
-        let result = match tool.call(principal, arguments).await {
+        let mut result = match tool.call(principal, arguments).await {
             Ok(value) => CallToolResult::structured(envelope(value)),
             Err(error) => self.failure(tool.name(), &error, language),
         };
+        if let Some(deprecation) = tool.deprecation() {
+            warn_deprecated(&mut result, tool.name(), deprecation);
+        }
         Ok(result.into())
     }
 }

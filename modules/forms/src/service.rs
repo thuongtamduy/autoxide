@@ -1,7 +1,8 @@
-//! Service của `forms`: MỌI logic nằm ở đây và các file cùng cấp (`forms.rs`, `inbox.rs`,
-//! `public.rs`…). Handler REST và tool MCP chỉ lấy dữ liệu vào rồi gọi service — cùng kết quả,
-//! cùng permission (luật kiến trúc 8). Mỗi lệnh ghi đi cùng event trong CÙNG transaction (luật
-//! kiến trúc 3); gọi mạng (chống spam, gửi mail) nằm NGOÀI transaction.
+//! Service của `forms`: MỌI logic nằm ở đây và các file theo tính năng — `forms.rs` + `forms/`
+//! (định nghĩa form, trường), `submissions/` (gửi công khai, hộp thư, CSV, mail báo),
+//! `retention.rs`, `privacy.rs`. Handler REST và tool MCP chỉ lấy dữ liệu vào rồi gọi service —
+//! cùng kết quả, cùng permission (luật kiến trúc 8). Mỗi lệnh ghi đi cùng event trong CÙNG
+//! transaction (luật kiến trúc 3); gọi mạng (chống spam, gửi mail) nằm NGOÀI transaction.
 
 use std::sync::Arc;
 
@@ -10,8 +11,11 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Outbox;
 use autoxide_kernel::i18n::Translations;
+use autoxide_kernel::job::JobQueue;
 use autoxide_kernel::mail::Mailer;
+use autoxide_kernel::public_url::PublicUrl;
 use autoxide_kernel::secret::SecretKey;
+use autoxide_kernel::storage::Storage;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{DbErr, SqlErr};
 
@@ -24,6 +28,11 @@ pub(crate) struct FormsService {
     pub(crate) secret: SecretKey,
     pub(crate) mailer: Arc<dyn Mailer>,
     pub(crate) translations: Translations,
+    /// Nơi lưu file xuất CSV (module `files` công bố).
+    pub(crate) storage: Arc<dyn Storage>,
+    pub(crate) jobs: JobQueue,
+    /// Địa chỉ công khai của API, để link tải bản xuất là link tuyệt đối khi đã cấu hình.
+    pub(crate) public_url: Arc<PublicUrl>,
     pub(crate) config: FormsConfig,
 }
 
@@ -35,6 +44,9 @@ pub(crate) struct Parts {
     pub secret: SecretKey,
     pub mailer: Arc<dyn Mailer>,
     pub translations: Translations,
+    pub storage: Arc<dyn Storage>,
+    pub jobs: JobQueue,
+    pub public_url: Arc<PublicUrl>,
 }
 
 impl FormsService {
@@ -46,6 +58,9 @@ impl FormsService {
             secret: parts.secret,
             mailer: parts.mailer,
             translations: parts.translations,
+            storage: parts.storage,
+            jobs: parts.jobs,
+            public_url: parts.public_url,
             config,
         }
     }

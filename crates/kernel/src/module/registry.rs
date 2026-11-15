@@ -54,8 +54,14 @@ pub struct Modules {
     personal_data: PersonalDataExport,
     /// Loại đối tượng các module đăng ký lúc khởi động.
     resources: crate::resource::ResourceDirectory,
+    /// Event vòng đời các module khai (`Module::resource_events`), đã kiểm.
+    resource_events: Vec<crate::resource::ResourceEvent>,
+    /// Bộ hỏi tài khoản đã xác thực (một module đăng ký lúc khởi động, D-202).
+    verification: crate::access::PostingVerification,
     /// Sổ module đã cài (module `kernel` phục vụ); điền ở cuối [`start`](Self::start).
     catalog: crate::module_catalog::ModuleCatalog,
+    /// Cờ theo người dùng của module `kernel`, phục vụ dưới `/api/v1/me` (D-207).
+    user_flags: crate::user_flags::Handle,
 }
 
 impl Modules {
@@ -67,14 +73,17 @@ impl Modules {
     /// được thứ chúng công bố.
     pub fn new(modules: Vec<Box<dyn Module>>) -> Result<Self, ModuleError> {
         let mut problems = Vec::new();
-        for reserved in [crate::builtin::NAME, crate::antispam::module::NAME] {
+        // `me`: tiền tố `/api/v1/me` của các endpoint "của tôi" do kernel phục vụ.
+        for reserved in [crate::builtin::NAME, crate::antispam::module::NAME, crate::user_flags::ME]
+        {
             if modules.iter().any(|module| module.name() == reserved) {
                 problems.push(format!("module name `{reserved}` is reserved for the kernel"));
             }
         }
         let catalog = crate::module_catalog::ModuleCatalog::default();
+        let user_flags = crate::user_flags::Handle::default();
         let mut all: Vec<Box<dyn Module>> = vec![
-            Box::new(crate::builtin::KernelModule::new(catalog.clone())),
+            Box::new(crate::builtin::KernelModule::new(catalog.clone(), user_flags.clone())),
             Box::new(crate::antispam::module::AntispamModule::default()),
         ];
         all.extend(modules);
@@ -91,6 +100,7 @@ impl Modules {
             problems.extend(errors);
             EventCatalog::default()
         });
+        let resource_events = checked_resource_events(&modules, &events, &mut problems);
         for module in &modules {
             for deprecation in module.deprecations() {
                 problems.extend(deprecation.problems(module.name()));
@@ -111,8 +121,11 @@ impl Modules {
                 wake: Arc::new(tokio::sync::Notify::new()),
                 personal_data: PersonalDataExport::default(),
                 resources: crate::resource::ResourceDirectory::default(),
+                resource_events,
+                verification: crate::access::PostingVerification::default(),
                 apis: Apis::default(),
                 catalog,
+                user_flags,
             })
         } else {
             Err(ModuleError(problems.join("; ")))
@@ -157,6 +170,8 @@ impl Modules {
                 apis: &mut apis,
                 personal_data: &self.personal_data,
                 resources: &self.resources,
+                resource_events: &self.resource_events,
+                verification: &self.verification,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
@@ -192,13 +207,18 @@ impl Modules {
         &self.permissions
     }
 
-    /// Endpoint deprecated của mọi module: `(tên module, khai báo)`.
+    /// Endpoint deprecated của mọi module: `(tên module, khai báo)`. Không gồm tool deprecated
+    /// (chúng đi theo tool, xem [`tools`](Self::tools)).
     pub fn deprecations(&self) -> Vec<(&'static str, crate::http::Deprecation)> {
         self.modules
             .iter()
             .flat_map(|module| {
                 let name = module.name();
-                module.deprecations().into_iter().map(move |deprecation| (name, deprecation))
+                module
+                    .deprecations()
+                    .into_iter()
+                    .filter(|deprecation| !deprecation.is_tool())
+                    .map(move |deprecation| (name, deprecation))
             })
             .collect()
     }
@@ -212,8 +232,41 @@ impl Modules {
         let mut seen = std::collections::BTreeSet::new();
         for module in &self.modules {
             let name = module.name();
-            for tool in module.tools() {
-                let tool = tool.qualify(name);
+            let declared = module.tools();
+            let short: Vec<String> = declared.iter().map(|tool| tool.name().to_owned()).collect();
+            let deprecated: Vec<crate::http::Deprecation> = module
+                .deprecations()
+                .into_iter()
+                .filter(|deprecation| deprecation.is_tool())
+                .collect();
+            // Tool deprecated và tool dùng thay phải có trong `tools()` của chính module.
+            for deprecation in &deprecated {
+                for (role, tool) in
+                    [("deprecation", deprecation.tool), ("successor", deprecation.successor)]
+                {
+                    if let Some(tool) = tool
+                        && !short.iter().any(|known| known == tool)
+                    {
+                        problems.push(format!(
+                            "module `{name}` declares a tool {role} `{tool}`, but it has no such \
+                             tool in Module::tools"
+                        ));
+                    }
+                }
+            }
+            for tool in declared {
+                let mut tool = tool.qualify(name);
+                if let Some(deprecation) = deprecated.iter().find(|deprecation| {
+                    deprecation.tool.is_some_and(|short| tool.name() == format!("{name}.{short}"))
+                }) {
+                    tool = tool.deprecated(crate::mcp::ToolDeprecation {
+                        since: deprecation.since.to_owned(),
+                        sunset: deprecation.sunset.map(str::to_owned),
+                        successor: deprecation
+                            .successor
+                            .map(|successor| format!("{name}.{successor}")),
+                    });
+                }
                 problems.extend(tool.problems(name));
                 for permission in tool.permission().into_iter().chain(tool.alternative()) {
                     if !self.permissions.contains(permission.name()) {
@@ -394,8 +447,15 @@ impl Modules {
 
     /// Route của từng module kèm tên module, theo thứ tự đăng ký. Gọi sau
     /// [`start`](Self::start).
+    /// Ngoài route của từng module còn có `("me", …)`: endpoint "của tôi" do kernel phục vụ dưới
+    /// `/api/v1/me` (cờ theo người dùng, D-207) — `me` là tên dành riêng, không module nào dùng.
     pub fn routes(&self) -> Vec<(&'static str, OpenApiRouter)> {
-        self.modules.iter().map(|module| (module.name(), module.routes())).collect()
+        let mut routes: Vec<(&'static str, OpenApiRouter)> =
+            self.modules.iter().map(|module| (module.name(), module.routes())).collect();
+        if let Some(flags) = self.user_flags.get() {
+            routes.push((crate::user_flags::ME, crate::user_flags::routes(flags)));
+        }
+        routes
     }
 
     /// Migrator chạy migration của mọi module.
@@ -407,6 +467,48 @@ impl Modules {
                 .collect(),
         )
     }
+}
+
+/// Event vòng đời mọi module khai, sau khi kiểm: event phải do chính module đó khai, loại phải
+/// thuộc module đó, một event chỉ khai một lần. Lỗi thêm vào `problems`.
+fn checked_resource_events(
+    modules: &[Box<dyn Module>],
+    events: &EventCatalog,
+    problems: &mut Vec<String>,
+) -> Vec<crate::resource::ResourceEvent> {
+    let mut found: Vec<crate::resource::ResourceEvent> = Vec::new();
+    for module in modules {
+        let name = module.name();
+        let own = |text: &str| {
+            text.strip_prefix(name).and_then(|rest| rest.strip_prefix('.')).is_some_and(|rest| {
+                !rest.is_empty()
+                    && rest
+                        .chars()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+            })
+        };
+        for declared in module.resource_events() {
+            if !own(declared.kind) {
+                problems.push(format!(
+                    "module `{name}` declares a lifecycle event for resource type `{}`; it must \
+                     be `{name}.<lower_case_name>`",
+                    declared.kind
+                ));
+            }
+            if !own(declared.event) || !events.contains(declared.event) {
+                problems.push(format!(
+                    "module `{name}` declares `{}` as a lifecycle event, but does not declare \
+                     that event in `Module::events`",
+                    declared.event
+                ));
+            }
+            if found.iter().any(|known| known.event == declared.event) {
+                problems.push(format!("lifecycle event `{}` is declared twice", declared.event));
+            }
+            found.push(declared);
+        }
+    }
+    found
 }
 
 impl fmt::Debug for Modules {
@@ -447,6 +549,40 @@ mod tests {
             self.limit = reader.get(&LIMIT)?;
             Ok(())
         }
+    }
+
+    /// Module sở hữu đối tượng `shop.item`, khai event vòng đời.
+    struct Shop(Vec<crate::resource::ResourceEvent>);
+
+    impl Module for Shop {
+        fn name(&self) -> &'static str {
+            "shop"
+        }
+
+        fn events(&self) -> Vec<crate::event::EventInfo> {
+            vec![crate::event::EventInfo::new("shop.item_deleted", "An item was deleted.")]
+        }
+
+        fn resource_events(&self) -> Vec<crate::resource::ResourceEvent> {
+            self.0.clone()
+        }
+    }
+
+    #[test]
+    fn event_vong_doi_duoc_kiem_luc_khoi_dong() {
+        use crate::resource::{ResourceChange, ResourceEvent};
+        let good = ResourceEvent::new("shop.item_deleted", "shop.item", ResourceChange::Removed);
+        let modules = Modules::new(vec![Box::new(Shop(vec![good]))]).unwrap();
+        assert_eq!(modules.resource_events, [good]);
+        for bad in [
+            ResourceEvent::new("shop.item_gone", "shop.item", ResourceChange::Removed),
+            ResourceEvent::new("shop.item_deleted", "media.item", ResourceChange::Removed),
+        ] {
+            let error = Modules::new(vec![Box::new(Shop(vec![bad]))]).unwrap_err();
+            assert!(error.to_string().contains("lifecycle event"), "{error}");
+        }
+        let error = Modules::new(vec![Box::new(Shop(vec![good, good]))]).unwrap_err();
+        assert!(error.to_string().contains("declared twice"), "{error}");
     }
 
     /// Module đọc một biến bắt buộc.
@@ -554,7 +690,8 @@ mod tests {
         // Chỉ biến của hai module nội bộ `kernel` và `antispam`.
         let names: Vec<&str> = reader.values().iter().map(|value| value.setting.name).collect();
         let internal = |name: &&str| {
-            ["AUTOXIDE_SECRET_KEY", "AUTOXIDE_HTTP_PUBLIC_URL"].contains(name)
+            ["AUTOXIDE_SECRET_KEY", "AUTOXIDE_HTTP_PUBLIC_URL", "AUTOXIDE_USER_FLAGS_MAX"]
+                .contains(name)
                 || name.starts_with("AUTOXIDE_ANTISPAM_")
         };
         assert!(names.iter().all(internal), "{names:?}");

@@ -18,7 +18,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 /// Get one note.
-#[utoipa::path(get, path = "/{id}", responses((status = 200, description = "The note.")))]
+#[utoipa::path(get, path = "/{id}", extensions(("x-public" = json!(true))), responses((status = 200, description = "The note.")))]
 async fn get_note(Path(id): Path<u32>) -> Result<String, Error> {
     if id == 404 {
         return Err(Error::not_found("notes.note_not_found", "No such note."));

@@ -2,7 +2,7 @@
 
 > Lộ trình: `docs/ROADMAP.md` bước 36 · Thiết kế: `docs/research/business-foundation.md` trụ 4, mục 7, mục 9
 > · Quyết định: D-180 (Money), D-181 (rows), D-182 (write_with_retry), D-183 (chuỗi băm audit),
-> D-184 (reference), D-186, D-187, D-188, D-190, D-194
+> D-184 (reference), D-186, D-187, D-188, D-190, D-194, D-237 (tỉ giá thuộc `ledger`)
 
 ## Mục tiêu
 
@@ -48,8 +48,8 @@ sao kê của đối tác. Module thương mại (41–49) và tính tiền SaaS
 | Crate | Sở hữu | Công bố |
 |---|---|---|
 | `modules/tax` · `autoxide-tax` | vùng thuế, nhóm thuế, biểu thuế, gói dữ liệu (mặt điều khiển); hồ sơ thuế (cấp khách) | `dyn TaxEngine` |
-| `modules/ledger` · `autoxide-ledger` | sổ, tài khoản, bút toán, kỳ, chuỗi băm; thanh toán, webhook đối tác, chi trả, tạm giữ, VietQR, sao kê, hàng chờ sai lệch, cài đặt dòng tiền | `dyn Ledger` |
-| `modules/invoices` · `autoxide-invoices` | chứng từ, ký hiệu, uỷ nhiệm lập hoá đơn, hoá đơn điện tử, tỉ giá, mẫu in, bản xuất kế toán, bản lưu trữ | `dyn Invoices` |
+| `modules/ledger` · `autoxide-ledger` | sổ, tài khoản, bút toán, kỳ, chuỗi băm; thanh toán, webhook đối tác, chi trả, tạm giữ, VietQR, sao kê, hàng chờ sai lệch, cài đặt dòng tiền, tỉ giá (D-237) | `dyn Ledger` |
+| `modules/invoices` · `autoxide-invoices` | chứng từ, ký hiệu, uỷ nhiệm lập hoá đơn, hoá đơn điện tử, mẫu in, bản xuất kế toán, bản lưu trữ | `dyn Invoices` |
 
 Thanh toán nằm trong `ledger` (không tách module `payments`): mọi đồng tiền đi qua đối tác đều phải
 thành bút toán và được đối soát với sổ — một module giữ cả hai thì không có transaction xuyên module.
@@ -211,6 +211,9 @@ pub struct TaxQuote { pub lines: Vec<TaxedLine> /* net, taxes: Vec<TaxComponent>
     async fn refund(&self, tenant: &TenantContext, actor: Actor, refund: NewRefund) -> Result<Submitted<Refund>, Error>;
     async fn create_payout(&self, tenant: &TenantContext, actor: Actor, payout: NewPayout) -> Result<Submitted<Payout>, Error>;
     async fn journal(&self, tenant: &TenantContext, query: JournalQuery) -> Result<Page<JournalLine>, Error>; // cho xuất kế toán
+    /// Tỉ giá hiệu lực ngày `on` (D-237: tỉ giá thuộc `ledger` — `ledger` đăng ký trước `invoices` nên không gọi
+    /// được `Invoices`; `invoices`, `marketplace`, báo cáo gộp 38 và đa tiền tệ 63 đọc qua đây).
+    async fn exchange_rate(&self, tenant: &TenantContext, base: Currency, quote: Currency, on: NaiveDate) -> Result<Option<ExchangeRate>, Error>;
 }
 pub struct AccountKey { pub book: OrgId, pub purpose: Purpose, pub counterparty: Option<Counterparty>, pub currency: Currency }
 pub struct Counterparty { pub kind: String /* "org" | "customer" | "carrier" | "partner" */, pub id: String }
@@ -234,7 +237,6 @@ khi xuất kế toán; khách sửa được ánh xạ của sổ mình.
     async fn create_document(&self, tenant: &TenantContext, actor: Actor, draft: NewDocument) -> Result<Submitted<Document>, Error>;
     async fn issue(&self, tenant: &TenantContext, actor: Actor, document: Uuid) -> Result<Document, Error>; // gọi lại → cùng số
     async fn document(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<Document>, Error>;
-    async fn exchange_rate(&self, tenant: &TenantContext, base: Currency, quote: Currency, on: NaiveDate) -> Result<Option<ExchangeRate>, Error>;
     async fn render(&self, tenant: &TenantContext, document: Uuid, format: RenderFormat, locale: &str) -> Result<Rendered, Error>;
     /// Gói lưu trữ kế toán của khách trước khi xoá khách (bước 35 gọi). Trả id bản lưu ở mặt điều khiển.
     async fn archive(&self, tenant: &TenantContext, actor: Actor) -> Result<Uuid, Error>;
@@ -306,7 +308,7 @@ Kèm `event::outbox_migration("ledger")`, `job::jobs_migration("ledger")`.
 | `invoices_documents` | `id`, `tenant_id`, `org_id` (bên lập), `on_behalf_of_org_id` (uỷ nhiệm), `kind`, `series_id`, `number` (null khi nháp), `status` (`draft`/`issued`/`submitting`/`accepted`/`rejected`/`cancelled`/`replaced`/`adjusted`), `issue_date`, `price_mode`, `subtotal_*`, `tax_*`, `total_*`, `base_total_minor`/`_currency`, `exchange_rate`, `exchange_rate_id`, `buyer` (JSON ảnh chụp: tên, MST, `Address`, email, loại), `seller` (JSON ảnh chụp), `tax_snapshot` (JSON), `related_document_id`, `provider_ref`, `authority_code` (mã CQT), `lookup_code`, `xml_key`/`pdf_key` (khoá file trong `Storage`), `source_module`, `source_id`, `reference`, `reference_fingerprint`, `retention_until` (date), `issued_by`, `created_at`, `updated_at` | unique (`tenant_id`, `series_id`, `number`); unique (`tenant_id`, `source_module`, `reference`); index (`tenant_id`, `org_id`, `issue_date`, `id`) |
 | `invoices_lines` | `id`, `tenant_id`, `document_id`, `line_no`, `kind` (`goods`/`service`/`discount`/`note`), `item_ref`, `description`, `unit`, `quantity` (chữ thập phân), `unit_price_*`, `discount_*`, `net_*`, `tax_category`, `rate_percent`, `tax_*`, `total_*` | index (`tenant_id`, `document_id`, `line_no`) |
 | `invoices_mandates` | uỷ nhiệm lập hoá đơn: `id`, `tenant_id`, `principal_org_id` (bên uỷ nhiệm, người bán), `agent_org_id` (bên nhận, sàn), `kinds` (JSON), `valid_from`, `valid_to`, `document_file_id`, `status` (`active`/`revoked`), `created_at` | index (`tenant_id`, `principal_org_id`, `status`) |
-| `invoices_exchange_rates` | `id`, `tenant_id`, `base`, `quote`, `rate` (chữ), `effective_date`, `source` (`manual`/`provider:<tên>`), `created_by`, `created_at` | unique (`tenant_id`, `base`, `quote`, `effective_date`, `source`) |
+| `ledger_fx_rates` (D-237) | `id`, `tenant_id`, `base`, `quote`, `rate` (chữ), `effective_date`, `source` (`manual`/`provider:<tên>`), `created_by`, `created_at` | unique (`tenant_id`, `base`, `quote`, `effective_date`, `source`) |
 | `invoices_templates` | `id`, `tenant_id`, `org_id` (null = cả khách), `kind`, `locale`, `version`, `body`, `status` (`draft`/`active`), `updated_at` | unique (`tenant_id`, `org_id`, `kind`, `locale`, `version`) — cột null dùng chuỗi rỗng / UUID nil |
 | `invoices_exports` | `id`, `tenant_id`, `org_id`, `profile`, `format` (`csv`/`xlsx`), `period_from`, `period_to`, `status`, `file_key`, `error`, `created_by`, `created_at` | index (`tenant_id`, `created_at`) |
 | `invoices_archives` | **mặt điều khiển** (khách đã xoá vẫn còn): `id`, `tenant_id`, `created_at`, `retain_until`, `storage_prefix`, `manifest_sha256` | index (`tenant_id`) |
@@ -317,7 +319,7 @@ Kèm outbox, jobs migration. Mẫu in mặc định nằm trong repo: `modules/i
 
 1. **Một bút toán = một sổ, một loại tiền gốc**, ≥ 2 dòng, mỗi dòng `amount > 0`; tổng nợ = tổng có
    (lỗi `ledger.unbalanced`) ở cả tiền gốc và tiền hạch toán (`base_*`; ngoại tệ quy đổi bằng tỉ giá
-   lấy từ `dyn Invoices::exchange_rate` TRƯỚC transaction, phần lệch làm tròn chia bằng `allocate`).
+   lấy từ `Ledger::exchange_rate` TRƯỚC transaction, phần lệch làm tròn chia bằng `allocate`).
    Đổi tiền giữa hai loại = hai bút toán qua tài khoản `fx.gain_loss` / tài khoản trung gian.
 2. **Chỉ thêm.** Không `UPDATE`/`DELETE` trên `ledger_entries`/`ledger_lines` (xtask hay test kiểm không
    có entity `ActiveModel` update cho hai bảng). Sửa sai = `POST /entries/{id}/reverse`: bút toán mới đảo
@@ -432,7 +434,7 @@ thì không khấu trừ — D-187).
   NĐ 123/2020 Điều 19 sửa bởi NĐ 70/2025 — cần đối chiếu) hay `cancel` theo thông báo sai sót.
 - Hoá đơn từ máy tính tiền: kind `cash_register_invoice`, ký hiệu có nhà cung cấp hỗ trợ
   `CashRegister`; không ký số, mã do phần mềm sinh, nhà cung cấp chuyển cơ quan thuế trong ngày.
-- Chứng từ ngoại tệ: lấy tỉ giá ngày `issue_date` (nguồn ưu tiên: `manual` rồi nhà cung cấp; không có →
+- Chứng từ ngoại tệ: lấy tỉ giá ngày `issue_date` qua `Ledger::exchange_rate` (D-237; nguồn ưu tiên: `manual` rồi nhà cung cấp; không có →
   `invoices.rate_missing`), lưu `exchange_rate` + `exchange_rate_id` + `base_total` — không tính lại.
 - Mọi dòng lưu ảnh chụp: mô tả, đơn vị, giá, `rate_percent`, nhóm thuế, `tax_snapshot` của `TaxQuote`.
 - **Lưu trữ**: chứng từ `issued` trở đi không xoá được (`invoices.retention_hold`); khi nhận
@@ -470,7 +472,8 @@ Mọi route dưới `/api/v1/<module>`, `TenantContext` + `Principal` (trừ web
 `POST /payments` (`ledger.payments_create`), `GET /payments`, `GET /payments/{id}`,
 `POST /payments/{id}/refunds` (`ledger.refunds_create`) · `POST /payouts` (`ledger.payouts_create`),
 `GET /payouts`, `GET /payouts/{id}` · `GET|POST /bank-accounts`, `PATCH /bank-accounts/{id}` ·
-`GET /exceptions`, `POST /exceptions/{id}/resolve` (`ledger.reconcile`) · `POST /reconciliations`
+`GET /exceptions`, `POST /exceptions/{id}/resolve` (`ledger.reconcile`) ·
+`GET /exchange-rates?base=&quote=&on=`, `POST /exchange-rates`, `POST /exchange-rates/fetch` (`ledger.settings_manage`; D-237) · `POST /reconciliations`
 (chạy ngay), `GET /reconciliations` · **công khai**: `POST /webhooks/{provider}`, `POST /bank-feeds/{provider}`.
 Đọc dùng `ledger.read` (phạm vi theo nút: `unit` / `subtree` / `tenant` lọc theo `org_id` của sổ).
 
@@ -479,7 +482,6 @@ Mọi route dưới `/api/v1/<module>`, `TenantContext` + `Principal` (trừ web
 (`invoices.correct`) · `GET /documents/{id}/render?format=html|pdf&locale=&template_id=` ·
 `GET /documents/{id}/einvoice?format=xml|pdf` · `GET|POST /series`, `PATCH /series/{id}` · `GET|POST /mandates`,
 `POST /mandates/{id}/revoke` · `GET|POST /templates`, `GET|PUT /templates/{id}`, `POST /templates/preview` ·
-`GET /exchange-rates?base=&quote=&on=`, `POST /exchange-rates`, `POST /exchange-rates/fetch` ·
 `GET /export-profiles`, `POST /exports`, `GET /exports/{id}`, `GET /exports/{id}/download`.
 
 ### Tool MCP
@@ -503,9 +505,10 @@ email, số điện thoại. Bên nhận chịu được nhận lại (D-054).
 
 `ledger.process_gateway_event`, `ledger.process_payout_event`, `ledger.send_payout`, `ledger.match_bank_transaction`;
 lịch `ledger.seal_entries` (10 s), `ledger.poll_bank_feed` (`AUTOXIDE_LEDGER_BANK_FEED_POLL_SECONDS`),
-`ledger.release_holds` (5 phút), `ledger.expire_payments` (1 phút), `ledger.reconcile` (24 giờ) ·
+`ledger.release_holds` (5 phút), `ledger.expire_payments` (1 phút), `ledger.reconcile` (24 giờ),
+`ledger.fetch_exchange_rates` (24 giờ) ·
 `invoices.submit_einvoice`, `invoices.poll_einvoice_status` (lịch 5 phút cho chứng từ `submitting`),
-`invoices.build_export`, `invoices.fetch_exchange_rates` (24 giờ), `invoices.purge_expired` (24 giờ).
+`invoices.build_export`, `invoices.purge_expired` (24 giờ).
 Mọi bộ chạy chịu được chạy lại (unique theo `reference` / `unique_key`).
 
 ### Cấu hình (Setting)
@@ -594,7 +597,8 @@ Mỗi dòng là một commit (hoặc vài commit nhỏ), `./gate.sh --quick` tr�
 7. `ledger` VietQR, tài khoản ngân hàng, `BankFeed`, khớp tự động → **mục 9**.
 8. Kernel `einvoice`; module `invoices`: ký hiệu, chứng từ, phát hành, uỷ nhiệm, điều chỉnh / thay thế,
    máy tính tiền → **mục 6, 8**.
-9. `invoices` tỉ giá + `ExchangeRateSource`; ngoại tệ trên chứng từ và bút toán → **mục 10**.
+9. `ledger` tỉ giá (`ledger_fx_rates`, `Ledger::exchange_rate`, D-237) + `ExchangeRateSource`; ngoại tệ trên chứng
+   từ và bút toán → **mục 10**.
 10. Lưu trữ 10 năm: `retention_until`, chặn xoá, `USER_DELETED`, `purge_expired`, `archive` → **nửa còn
     lại mục 7**.
 11. Mẫu in HTML + PDF (chọn thư viện, ghi `STACK.md` + quyết định) → **mục 11**.
@@ -730,3 +734,37 @@ Ghi mỗi quyết định vào `docs/DECISIONS.md` (skill `record-decision`).
   cấp cho ký hiệu đó; khuyến nghị theo `EInvoiceCapabilities::assigns_numbers` từng ký hiệu.
 - **Ánh xạ tài khoản "vn"** và hồ sơ xuất cho phần mềm kế toán cụ thể: chỉ đưa vào khi đối chiếu được nguồn
   công bố; không thì để hồ sơ chung và cho khách tự ánh xạ.
+
+## Bổ sung theo đối chiếu thiết kế 2 (D-208…D-218)
+
+> Nguồn: `docs/prompts/ui-trace-roadmap.md`; mã `A-…` / `B-…` trỏ tới `docs/research/ui-trace/`.
+
+- **Thống nhất với 45, 46 (D-218, B-b3, B-3.2d).** Bộ tên tài khoản ở đây là bộ duy nhất; tiền thu hộ ghi
+  lúc thu vào `clearing.*`; phí sàn và khấu trừ thay ghi lúc `orders.order_completed`; `ledger_holds` là cơ
+  chế tạm giữ duy nhất — `api` thêm `Ledger::hold_status(source_module, source_id)` cho `marketplace`.
+- **Một hạn thanh toán (D-218, B-b10).** `AUTOXIDE_LEDGER_PAYMENT_EXPIRY_MINUTES` (30) là nguồn duy nhất,
+  kể cả VietQR; `api` trả `expires_at` cho `orders`.
+- **COD (D-216, B-b1).** `ledger_flow_settings.cod_remittance` (`partner_collection` / `seller_direct`):
+  tiền COD về tài khoản thu hộ của đối tác hay thẳng người bán, **không bao giờ** về tài khoản của nhà vận
+  hành sàn; `seller_direct` thì phí và khấu trừ thay thu bằng hoá đơn phí định kỳ hay công nợ
+  (`receivable.seller[S]`).
+- **Mã số thuế 12 số (B-c11).** Hồ sơ thuế nhận cả mã số thuế 10 / 13 số và số định danh cá nhân 12 số dùng
+  làm mã số thuế (TT 86/2024/TT-BTC — **cần đối chiếu văn bản gốc**). Tuỳ chọn trait
+  `TaxpayerDirectory::lookup(tax_id)` (bản giả cho test; bản nối thật cần tài khoản đối tác — khi đó dừng
+  lại hỏi chủ dự án).
+- **Bút toán theo chứng từ nguồn (B-c12).** `GET /api/v1/ledger/entries?source_module&source_id`
+  (`ledger.entries.read`, phạm vi theo nút).
+- **Phí sàn và khấu trừ thay (B-3.2e, f).** Hoá đơn phí sàn tách thuế GTGT riêng; khấu trừ thay chỉ áp cho
+  hộ và cá nhân kinh doanh, doanh nghiệp tự kê khai (theo `tax_profile.kind`). Căn cứ NĐ 117/2025/NĐ-CP —
+  **cần đối chiếu văn bản gốc**.
+
+## Bổ sung theo đối chiếu thiết kế đợt 2 (D-223…D-227)
+
+> Nguồn: `docs/prompts/ui-phase2-api.md`; màn tương ứng ghi trong `docs/research/ui-traceability.md` (đợt 2).
+
+- **Trạng thái niêm phong.** Bút toán trả `sealed_at` (từ `ledger_entry_seals`, NULL là chưa vào chuỗi băm) và
+  `sequence`. `GET /api/v1/ledger/books/{id}/seal-status?period_id` trả `total`, `sealed`, `oldest_unsealed_at` —
+  đếm bằng index, không quét bảng. `autoxide doctor` cảnh báo khi bút toán chưa niêm phong quá 10 phút.
+- **Số dư theo đối tượng cho module khác.** `Ledger::balances(tenant, keys: &[AccountKey], as_of)` (tối đa 500
+  khoá, một query) — `inventory` dùng cho cột "đang nợ" của nhà cung cấp, không đọc bảng sổ cái.
+  `Counterparty.kind` thêm `supplier`.

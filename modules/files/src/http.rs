@@ -79,6 +79,7 @@ pub(crate) struct UploadQuery {
 #[utoipa::path(
     get,
     path = "/",
+    extensions(("x-permissions" = json!(["files.upload"]))),
     operation_id = "list_files",
     security(("bearer" = [])),
     params(PageQuery),
@@ -107,6 +108,7 @@ async fn list_files(
 #[utoipa::path(
     post,
     path = "/",
+    extensions(("x-permissions" = json!(["files.upload"]))),
     operation_id = "upload_file",
     security(("bearer" = [])),
     params(UploadQuery),
@@ -163,6 +165,7 @@ async fn upload_file(
 #[utoipa::path(
     get,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["files.upload", "files.manage"]))),
     operation_id = "get_file",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the file.")),
@@ -189,6 +192,7 @@ async fn get_file(
 #[utoipa::path(
     get,
     path = "/{id}/content",
+    extensions(("x-permissions" = json!(["files.upload", "files.manage"]))),
     operation_id = "download_file",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the file.")),
@@ -231,6 +235,7 @@ async fn download_file(
 #[utoipa::path(
     delete,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["files.upload", "files.manage"]))),
     operation_id = "delete_file",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the file.")),

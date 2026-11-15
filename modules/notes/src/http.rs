@@ -90,6 +90,7 @@ pub(crate) struct UpdateNoteRequest {
 #[utoipa::path(
     get,
     path = "/",
+    extensions(("x-permissions" = json!(["notes.read"]))),
     operation_id = "list_notes",
     security(("bearer" = [])),
     params(PageQuery),
@@ -116,6 +117,7 @@ async fn list_notes(
 #[utoipa::path(
     post,
     path = "/",
+    extensions(("x-permissions" = json!(["notes.write"]))),
     operation_id = "create_note",
     security(("bearer" = [])),
     request_body = CreateNoteRequest,
@@ -143,6 +145,7 @@ async fn create_note(
 #[utoipa::path(
     get,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["notes.read"]))),
     operation_id = "get_note",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the note.")),
@@ -169,6 +172,7 @@ async fn get_note(
 #[utoipa::path(
     patch,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["notes.write"]))),
     operation_id = "update_note",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the note."), ("If-Match" = Option<String>, Header, description = "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.")),
@@ -203,6 +207,7 @@ async fn update_note(
 #[utoipa::path(
     delete,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["notes.write"]))),
     operation_id = "delete_note",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the note.")),

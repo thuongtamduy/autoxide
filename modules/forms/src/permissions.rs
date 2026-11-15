@@ -3,10 +3,11 @@
 //! mail báo (mail chứa câu trả lời) cần thêm `forms.read`. Gửi bài mà không qua lớp chống spam
 //! cho người lạ cần `forms.submit` — chỉ đăng nhập thôi là chưa đủ.
 
-use autoxide_kernel::access::Permission;
+use autoxide_kernel::access::{Permission, Risk};
 
 pub(crate) const FORMS_READ: Permission =
-    Permission::new("forms.read", "Read forms and their submissions (personal data).");
+    Permission::new("forms.read", "Read forms and their submissions (personal data).")
+        .with_risk(Risk::SensitiveData);
 pub(crate) const FORMS_MANAGE: Permission = Permission::new(
     "forms.manage",
     "Create, change, open, close and delete forms. Setting `notify_emails` (the mails carry \
@@ -19,7 +20,8 @@ pub(crate) const FORMS_REVIEW: Permission = Permission::new(
 pub(crate) const FORMS_EXPORT: Permission = Permission::new(
     "forms.export",
     "Export submissions as CSV, and export or delete every submission of an email address.",
-);
+)
+.with_risk(Risk::SensitiveData);
 
 pub(crate) const FORMS_SUBMIT: Permission = Permission::new(
     "forms.submit",

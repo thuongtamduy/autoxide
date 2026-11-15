@@ -270,6 +270,10 @@ sàn), các bước 41–46 còn thiếu:
 | Bán đa kênh (Shopee, Lazada, TikTok Shop, Facebook / Zalo) | Người bán Việt Nam bán cùng lúc nhiều nơi; một kho, một danh sách sản phẩm | Bước 48 `channels` |
 | Tiếp thị liên kết, livestream | Kênh bán lớn; luật buộc xác thực danh tính, thuế khấu trừ người nhận hoa hồng | Bước 49 `affiliate` |
 
+Bổ sung sau (D-219): **banner, bộ sưu tập, thông tin cửa hàng** cho giao diện tự dựng (bước 55) và
+**chuyển dữ liệu từ nền tảng khác** — Shopify, WooCommerce, Haravan, Sapo, KiotViet — giữ đường dẫn
+cũ bằng chuyển hướng 301 (bước 56).
+
 Để sau, chưa cần cho phần lớn khách: bán sỉ B2B, đặt lịch dịch vụ, chat chăm sóc khách, sản phẩm thuê
 bao định kỳ, bán xuyên biên giới, quảng cáo trong sàn.
 

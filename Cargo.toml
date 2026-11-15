@@ -12,7 +12,7 @@ resolver = "3"
 members = ["crates/*", "modules/*", "xtask"]
 
 [workspace.package]
-version = "0.12.0"
+version = "0.14.0"
 edition = "2024"
 rust-version = "1.99"
 license = "MIT OR Apache-2.0"
@@ -50,6 +50,7 @@ autoxide-content = { path = "modules/content" }
 autoxide-forms = { path = "modules/forms" }
 autoxide-newsletter = { path = "modules/newsletter" }
 autoxide-comments = { path = "modules/comments" }
+autoxide-menus = { path = "modules/menus" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
@@ -192,9 +193,16 @@ opentelemetry-otlp = { version = "0.33", default-features = false, features = [
 ] }
 tracing-opentelemetry = { version = "0.34", default-features = false }
 
+# Markdown giới hạn của bình luận (D-252): chỉ bộ phân tích (pull parser); HTML do `comments` tự
+# dựng theo danh sách thẻ cho phép, nên tắt feature `html` và `getopts` (công cụ dòng lệnh).
+pulldown-cmark = { version = "0.13", default-features = false }
+
 # --- Chỉ dùng trong test ---
 # `ServiceExt::oneshot`: gửi một request thẳng vào router, không cần mở port.
 tower = { version = "0.5", features = ["util"] }
+# Property test cho bộ kiểm đầu vào (đặc tả 31 B3): sinh đầu vào ngẫu nhiên, thu gọn ca hỏng.
+# Bỏ `fork` / `timeout` (chạy mỗi ca trong tiến trình con): không cần.
+proptest = { version = "1.12", default-features = false, features = ["std"] }
 
 # Bản build để dev và test chỉ giữ thông tin dòng code (đủ để backtrace và panic chỉ đúng file,
 # dòng), bỏ thông tin biến cho debugger: `target/` nhỏ đi và biên dịch, link nhanh hơn (D-172).

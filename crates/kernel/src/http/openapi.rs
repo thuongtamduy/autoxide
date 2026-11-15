@@ -162,6 +162,14 @@ pub(super) fn finish(openapi: &mut OpenApi, idempotency: bool) {
     }
     for item in openapi.paths.paths.values_mut() {
         for (method, operation) in operations_mut(item) {
+            // Lỗi thật luôn trả `application/problem+json` (`response::Problem`), nhưng `body =
+            // Problem` trong `#[utoipa::path]` khai `application/json`: sửa thành đúng media type để
+            // tài liệu không hứa sai (đặc tả 31 B4).
+            for response in operation.responses.responses.values_mut() {
+                if let RefOr::T(response) = response {
+                    problem_media_type(response);
+                }
+            }
             // Mọi response 201 đến từ `response::Created`, luôn có `Location`.
             if let Some(RefOr::T(created)) = operation.responses.responses.get_mut("201") {
                 created.headers.entry("Location".to_owned()).or_insert_with(|| {
@@ -185,6 +193,63 @@ pub(super) fn finish(openapi: &mut OpenApi, idempotency: bool) {
                 parameters.push(RefOr::T(idempotency_key()));
             }
         }
+    }
+}
+
+/// Response có thân là `Problem` khai dưới `application/json` thì chuyển sang
+/// `application/problem+json`.
+fn problem_media_type(response: &mut utoipa::openapi::Response) {
+    let problem_ref = format!("#/components/schemas/{}", Problem::name());
+    let is_problem = response.content.get("application/json").is_some_and(|content| {
+        matches!(
+            content,
+            RefOr::T(content) if matches!(&content.schema, Some(RefOr::Ref(reference)) if reference.ref_location == problem_ref)
+        )
+    });
+    if is_problem && let Some(content) = response.content.shift_remove("application/json") {
+        response.content.insert(PROBLEM_CONTENT_TYPE.to_owned(), content);
+    }
+}
+
+/// Hợp đồng quyền đọc được bằng máy (D-205, đặc tả 54 P1, D-245): mỗi operation khai đúng một trong
+/// - `x-public: true` — gọi được không cần đăng nhập;
+/// - `x-permissions: [..]` — cần đăng nhập và một trong các permission (danh sách rỗng: chỉ cần đăng
+///   nhập).
+///
+/// Mỗi permission khai phải được nói tới trong mô tả hay response 403 của operation, để chữ cho người
+/// đọc không lệch khai báo.
+fn access_problems(endpoint: &str, operation: &utoipa::openapi::path::Operation) -> Vec<String> {
+    let extensions = operation.extensions.as_ref();
+    let public = extensions.and_then(|extensions| extensions.get("x-public"));
+    let permissions = extensions.and_then(|extensions| extensions.get("x-permissions"));
+    match (public, permissions) {
+        (Some(serde_json::Value::Bool(true)), None) => Vec::new(),
+        (None, Some(serde_json::Value::Array(names))) => {
+            let mut text = format!(
+                "{} {}",
+                operation.summary.as_deref().unwrap_or_default(),
+                operation.description.as_deref().unwrap_or_default()
+            );
+            if let Some(RefOr::T(forbidden)) = operation.responses.responses.get("403") {
+                text.push_str(&forbidden.description);
+            }
+            names
+                .iter()
+                .filter_map(|name| match name.as_str() {
+                    Some(name) if text.contains(&format!("`{name}`")) => None,
+                    Some(name) => Some(format!(
+                        "{endpoint}: `x-permissions` lists `{name}`, but neither the description nor \
+                         the 403 response mentions it"
+                    )),
+                    None => Some(format!("{endpoint}: `x-permissions` must list permission names")),
+                })
+                .collect()
+        }
+        _ => vec![format!(
+            "{endpoint}: declare who may call it — add `extensions((\"x-permissions\" = \
+             json!([\"<module>.<permission>\"])))` (`[]`: any signed-in caller) or \
+             `extensions((\"x-public\" = json!(true)))` to `#[utoipa::path]` (D-245)"
+        )],
     }
 }
 
@@ -225,6 +290,7 @@ pub fn lint(openapi: &OpenApi) -> Vec<String> {
                     problems.push(format!("{endpoint}: response {status} has no description"));
                 }
             }
+            problems.extend(access_problems(&endpoint, operation));
         }
     }
     match serde_json::to_value(openapi) {

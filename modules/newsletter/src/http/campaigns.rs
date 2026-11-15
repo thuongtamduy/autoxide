@@ -170,6 +170,7 @@ pub(crate) struct TestRequest {
 #[utoipa::path(
     get,
     path = "/campaigns",
+    extensions(("x-permissions" = json!(["newsletter.read"]))),
     operation_id = "list_newsletter_campaigns",
     security(("bearer" = [])),
     params(CampaignsQuery, PageQuery),
@@ -208,6 +209,7 @@ pub(crate) async fn list_campaigns(
 #[utoipa::path(
     post,
     path = "/campaigns",
+    extensions(("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "create_newsletter_campaign",
     security(("bearer" = [])),
     request_body = CreateCampaignRequest,
@@ -242,6 +244,7 @@ pub(crate) async fn create_campaign(
 #[utoipa::path(
     get,
     path = "/campaigns/{id}",
+    extensions(("x-permissions" = json!(["newsletter.read"]))),
     operation_id = "get_newsletter_campaign",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the campaign.")),
@@ -271,6 +274,7 @@ pub(crate) async fn get_campaign(
 #[utoipa::path(
     patch,
     path = "/campaigns/{id}",
+    extensions(("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "update_newsletter_campaign",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the campaign."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -305,6 +309,7 @@ pub(crate) async fn update_campaign(
 #[utoipa::path(
     delete,
     path = "/campaigns/{id}",
+    extensions(("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "delete_newsletter_campaign",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the campaign."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -340,6 +345,7 @@ pub(crate) async fn delete_campaign(
 #[utoipa::path(
     post,
     path = "/campaigns/{id}/send",
+    extensions(("x-permissions" = json!(["newsletter.send"]))),
     operation_id = "send_newsletter_campaign",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the campaign."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -373,6 +379,7 @@ pub(crate) async fn send_campaign(
 #[utoipa::path(
     post,
     path = "/campaigns/{id}/schedule",
+    extensions(("x-permissions" = json!(["newsletter.send"]))),
     operation_id = "schedule_newsletter_campaign",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the campaign."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -409,6 +416,7 @@ pub(crate) async fn schedule_campaign(
 #[utoipa::path(
     post,
     path = "/campaigns/{id}/pause",
+    extensions(("x-permissions" = json!(["newsletter.send"]))),
     operation_id = "pause_newsletter_campaign",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the campaign."), ("If-Match" = String, Header, description = "Optional: the `ETag` you read.")),
@@ -439,6 +447,7 @@ pub(crate) async fn pause_campaign(
 #[utoipa::path(
     post,
     path = "/campaigns/{id}/resume",
+    extensions(("x-permissions" = json!(["newsletter.send"]))),
     operation_id = "resume_newsletter_campaign",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the campaign."), ("If-Match" = String, Header, description = "Optional: the `ETag` you read.")),
@@ -470,6 +479,7 @@ pub(crate) async fn resume_campaign(
 #[utoipa::path(
     post,
     path = "/campaigns/{id}/cancel",
+    extensions(("x-permissions" = json!(["newsletter.send"]))),
     operation_id = "cancel_newsletter_campaign",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the campaign."), ("If-Match" = String, Header, description = "Optional: the `ETag` you read.")),
@@ -500,6 +510,7 @@ pub(crate) async fn cancel_campaign(
 #[utoipa::path(
     post,
     path = "/campaigns/{id}/test",
+    extensions(("x-permissions" = json!(["newsletter.send"]))),
     operation_id = "test_newsletter_campaign",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the campaign.")),

@@ -13,7 +13,7 @@ pub struct Model {
     pub name: String,
     /// `open` hoặc `closed`.
     pub status: String,
-    /// JSON: danh sách trường của phiên bản hiện hành (xem `fields.rs`).
+    /// JSON: danh sách trường của phiên bản hiện hành (xem `forms/fields.rs`).
     pub fields: String,
     /// Phiên bản hiện hành của danh sách trường (bắt đầu từ 1).
     pub version: i32,

@@ -1,6 +1,6 @@
-# Đặc tả từng bước (30–52)
+# Đặc tả từng bước (30–68)
 
-Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51, 52, có một file đặc tả ở đây (bước 50 chỉ là việc của chủ dự án). Đặc tả nói **cách làm**:
+Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51 tới 68, có một file đặc tả ở đây (bước 50 chỉ là việc của chủ dự án). Đặc tả nói **cách làm**:
 
 - bảng dữ liệu, API, permission, event, mã lỗi;
 - thứ tự commit, test bắt buộc, tiêu chí xong;
@@ -24,6 +24,10 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51, 52, có 
 3. Phần "Agent làm bước này tự quyết" của mỗi đặc tả: người làm chọn, rồi ghi vào `docs/DECISIONS.md`.
    Không dừng lại hỏi trừ khi `CLAUDE.md` bảo phải hỏi (secret thật, việc không hoàn tác được ở bên ngoài).
 4. Thấy đặc tả sai hay thiếu thì sửa đặc tả trong cùng PR, ghi một dòng lý do trong commit.
+5. **Một đặc tả, một phiên bản đúng (D-228).** Quyết định mới làm đổi đặc tả thì sửa thẳng vào thân (đúng
+   bảng, đúng mục API, test…), xoá câu cũ bị thay, ghi số quyết định trong ngoặc — không nối thêm mục
+   "Bổ sung theo …" ở cuối. Đặc tả nào còn mục "Bổ sung" cũ thì commit đầu tiên của bước đó gộp chúng vào
+   thân trước khi viết code.
 
 | Bước | Đặc tả | Module / phần chính |
 |---|---|---|
@@ -40,6 +44,15 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51, 52, có 
 | 40 | [40-core-capabilities.md](40-core-capabilities.md) | Header bảo mật, MCP, OIDC, tải thẳng S3, SSE, rate limit |
 | 51 | [51-ui-contracts.md](51-ui-contracts.md) | Sổ điều hướng, hộp việc, tìm xuyên phân hệ, số liệu tóm tắt, hoạt động, nhúng bản ghi trong nội dung (D-200); view đã lưu, thao tác hàng loạt, giải thích quyền, lệnh cần duyệt cho agent, ghi chú trên bản ghi (D-201) |
 | 52 | [52-admin-experience.md](52-admin-experience.md) | Bàn kỹ thuật, hoàn tác, AI trong quản trị, thông báo, sức khoẻ người bán và tuân thủ (D-201) |
+| 53 | [53-support.md](53-support.md) | `support`: phiếu hỗ trợ khách hàng, SLA theo giờ làm, phân công theo nút, chuyển sang khiếu nại (D-204) |
+| 54 | [54-authorization.md](54-authorization.md) | Phân quyền chuẩn hàng đầu: hợp đồng quyền trong OpenAPI, deny, rào, chia sẻ bản ghi, step-up, nâng quyền đúng lúc, hai người, quyền theo trường, mô phỏng, rà soát, AuthZEN (D-205) |
+| 55 | [55-storefront.md](55-storefront.md) | Banner theo vị trí, bộ sưu tập sản phẩm, thông tin cửa hàng công khai (D-219) |
+| 56 | [56-imports.md](56-imports.md) | `imports`: chuyển dữ liệu từ Shopify, WooCommerce, Haravan, Sapo, KiotViet, giữ đường dẫn cũ (D-219) |
+| 57 | [57-analytics.md](57-analytics.md) | `analytics`: số liệu truy cập không cookie, phễu, theo dõi theo người khi đồng ý (D-220) |
+| 58 | [58-automations.md](58-automations.md) | `automations`: luật "khi … thì …" chạy tool MCP với quyền người tạo, chờ duyệt, chống vòng lặp (D-220) |
+| 67 | [67-page-builder.md](67-page-builder.md) | Trang dựng từ khối, AI tạo trang, bộ giao diện website, kiểm tra sức khoẻ website (`content` + sổ khối của kernel, D-229) |
+| 68 | [68-menus.md](68-menus.md) | Menu của website trỏ tới bản ghi của mọi module (`menus` + sổ đối tượng, D-238) |
+| 59–66 | [59](59-wholesale.md) · [60](60-bookings.md) · [61](61-conversations.md) · [62](62-recurring.md) · [63](63-multi-currency.md) · [64](64-ads.md) · [65](65-apps.md) · [66](66-scim.md) | Bán sỉ B2B, đặt lịch, chat, bán theo kỳ, đa tiền tệ, quảng cáo trong sàn, chợ ứng dụng OAuth, SCIM (D-221) |
 | 41–49 | [41](41-catalog.md) · [42](42-inventory.md) · [43](43-promotions.md) · [44](44-shipping.md) · [45](45-orders.md) · [46](46-marketplace.md) · [47](47-customers.md) · [48](48-channels.md) · [49](49-affiliate.md) | Module thương mại |
 
 ## Luật chung đã chốt (D-198)
@@ -67,6 +80,8 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51, 52, có 
   - `kernel_tenants`, `kernel_placements`, `kernel_backups`, `kernel_relocations`
   - danh mục đơn vị hành chính của `address`
   - dữ liệu luật dùng chung: `catalog_restriction_rules`, `promotions_legal_limits`, `promotions_notice_rules`
+  - trang mẫu dùng chung: dòng `tenant_id` NULL của `content_page_templates` (bước 67)
+  - chợ ứng dụng trả phí: bảng `apps_*` về giá, phí, chia doanh thu, chi trả nhà phát triển (bước 65, gom xuyên khách)
   - `invoices_archives` (bản lưu kế toán còn sau khi xoá khách)
 - `kernel_sequences` (đánh số chứng từ) là bảng **cấp khách hàng**, có ở mọi database dữ liệu: số phải cấp
   trong cùng transaction với chứng từ.
@@ -81,9 +96,11 @@ Mỗi bước của `docs/ROADMAP.md` từ 30 tới 49, và bước 51, 52, có 
 ```
 kernel → address → organizations → auth (và các module sẵn có theo thứ tự hiện tại,
          trừ newsletter, comments)
-       → tax → ledger → invoices → compliance → notifications → newsletter, comments → plans
-       → catalog → inventory, promotions, shipping → orders → marketplace → affiliate, customers, channels
-       → reporting
+       → tax → ledger → invoices → compliance → notifications → newsletter, comments, support, analytics,
+         bookings, conversations, apps → plans
+       → catalog → inventory, promotions, shipping → orders → marketplace → affiliate, customers, channels,
+         wholesale, recurring, ads
+       → imports → reporting → automations   (cuối cùng: nghe event và gọi tool của mọi module)
 ```
 
 - `compliance` đứng trước `notifications`, nên `compliance` gửi mail bằng `dyn Mailer` và OTP bằng
@@ -95,7 +112,8 @@ kernel → address → organizations → auth (và các module sẵn có theo th
 - Module đăng ký trước không `require` được trait của module đăng ký sau.
 - Khi module trước cần gọi tới module sau, module trước công bố một "điểm cắm" trong `api` của nó.
   Ví dụ: `OrderExtensions` của `orders` cho `marketplace`, `customers`; `ListingGate` của `catalog` cho
-  `marketplace`.
+  `marketplace`; `ContentLinks` của `content` cho `catalog`, `promotions` (bước 55); `SiteExtensions` của `content`
+  cho `compliance` (khung website, bước 67 — D-235).
 - Module sau gắn vào điểm cắm lúc `start`. Không có module sau thì điểm cắm rỗng.
 
 **Event giữa module thương mại.**
@@ -137,6 +155,11 @@ sau dùng lại, không làm lại.
 | `Resource::image`, node `embed` của `content` | 51 (sau 33) | 41 (`catalog.product`) |
 | `navigation` (`Module::navigation`), `work::WorkSource`, `finder::FinderSource`, `summary::SummaryMetric`, `EventInfo::activity` | 51 (sau 34–35) | 41–49 |
 | `x-autoxide-filters`, `kernel_saved_views`, `BulkAction`, `resolve`, `kernel_work_states`, `SetupStep`, `/me/can`, `ApiKeyKind`, `ActorKind`, `kernel_approval_requests`, `kernel_record_notes` | 51 (D-201) | 41–49, 52 |
+| `custom_fields` (`Module::custom_field_targets`, `CustomFields::validate`, `index_migration`, `CustomIndex`), `tags` (`taggable`, `kernel_tags`), `Module::overridable_texts` + `kernel_text_overrides` (D-235) | 51 (P19–P21) | 37 (câu banner), 41–49, 53, 59–62, 67 (loại nội dung) |
+| `blocks` (`BlockType`, `Module::blocks`, `BlockData`, `GET /kernel/blocks`) | 67 (D-229) | 41, 43, 45 (khai khối) |
+| `voice::VoiceProvider` + bộ giả (D-232) | 61 | — |
+| `signature::SignatureProvider` + bộ giả (D-232) | 59 (luồng ký trong `compliance`) | 46, 49 |
+| `entitlement::AddonBilling` (D-232) | 65 | 35 (`plans` cộng dòng phí thêm) |
 
 ## Việc chỉ chủ dự án làm được
 

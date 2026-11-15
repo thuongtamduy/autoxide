@@ -113,6 +113,7 @@ impl From<CreatedApiKey> for CreatedApiKeyResponse {
 #[utoipa::path(
     get,
     path = "/api-keys",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "list_api_keys",
     security(("bearer" = [])),
     params(PageQuery),
@@ -139,6 +140,7 @@ async fn list_api_keys(
 #[utoipa::path(
     post,
     path = "/api-keys",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "create_api_key",
     security(("bearer" = [])),
     request_body = CreateApiKeyRequest,
@@ -165,6 +167,7 @@ async fn create_api_key(
 #[utoipa::path(
     delete,
     path = "/api-keys/{id}",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "revoke_api_key",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the key.")),

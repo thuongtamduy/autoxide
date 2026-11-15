@@ -2,7 +2,8 @@
 //! xoá bài quá thời hạn giữ của form (`retention_days`, mặc định theo
 //! `AUTOXIDE_FORMS_RETENTION_DAYS`; 0 là giữ mãi), xoá dấu vết IP quá
 //! `AUTOXIDE_FORMS_IP_RETENTION_DAYS`, xoá bài "mồ côi" (form của nó không còn — lưới an toàn,
-//! vì không có foreign key), và dọn nonce, bộ đếm đã hết hạn. Chạy lại bao nhiêu lần cũng ra
+//! vì không có foreign key), xoá bản xuất CSV quá `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` (file
+//! trước, dòng sau), và dọn nonce, bộ đếm đã hết hạn. Chạy lại bao nhiêu lần cũng ra
 //! cùng kết quả.
 
 use std::sync::Arc;
@@ -19,8 +20,8 @@ use serde_json::json;
 
 use crate::entity::{form, submission};
 use crate::events::{self, Change};
-use crate::inbox::SubmissionStatus;
 use crate::service::{FormsService, now};
+use crate::submissions::inbox::SubmissionStatus;
 
 pub(crate) const CLEANUP: &str = "forms.cleanup";
 
@@ -32,6 +33,8 @@ pub(crate) struct Cleaned {
     pub fingerprints: u64,
     /// Bài của form đã bị xoá.
     pub orphans: u64,
+    /// Bản xuất CSV quá hạn giữ (file và dòng).
+    pub exports: u64,
 }
 
 pub(crate) struct Cleanup(pub Arc<FormsService>);
@@ -80,6 +83,8 @@ impl FormsService {
             .exec(write)
             .await?
             .rows_affected;
+        let expired = self.expired_exports(now).await?;
+        cleaned.exports = self.purge_exports(expired).await?;
         self.guard.purge_nonces(write, "forms").await?;
         Throttle::new(self.database.clone(), "forms", 1, Duration::from_secs(3600))?
             .purge(now - chrono::Duration::days(1))
@@ -90,6 +95,7 @@ impl FormsService {
                 expired = cleaned.expired,
                 fingerprints = cleaned.fingerprints,
                 orphans = cleaned.orphans,
+                exports = cleaned.exports,
                 "forms cleanup"
             );
         }

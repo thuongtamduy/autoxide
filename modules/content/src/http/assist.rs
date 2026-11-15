@@ -109,6 +109,7 @@ impl From<Suggestion> for SeoSuggestion {
 #[utoipa::path(
     get,
     path = "/entries/{id}/seo-check",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "check_content_seo",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry.")),
@@ -138,6 +139,7 @@ pub(crate) async fn seo_check(
 #[utoipa::path(
     post,
     path = "/entries/{id}/seo-suggestions",
+    extensions(("x-permissions" = json!(["content.write", "content.write_own"]))),
     operation_id = "suggest_content_seo",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry.")),
@@ -260,6 +262,7 @@ impl IntoResponse for Accepted {
 #[utoipa::path(
     post,
     path = "/entries/{id}/translate",
+    extensions(("x-permissions" = json!(["content.write", "content.write_own"]))),
     operation_id = "translate_content_entry",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry to translate.")),
@@ -290,6 +293,7 @@ pub(crate) async fn translate(
 #[utoipa::path(
     get,
     path = "/translation-requests/{id}",
+    extensions(("x-permissions" = json!(["content.read", "content.write", "content.write_own"]))),
     operation_id = "get_content_translation_request",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the translation request.")),
@@ -314,6 +318,7 @@ pub(crate) async fn get_translation_request(
 #[utoipa::path(
     get,
     path = "/entries/{id}/translation-requests",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "list_content_translation_requests",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the source entry."), PageQuery),
@@ -446,6 +451,7 @@ fn page_of(hits: Vec<crate::ai::semantic::Hit>, limit: Option<u32>) -> Page<Sear
 #[utoipa::path(
     get,
     path = "/search",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "search_content",
     security(("bearer" = [])),
     params(SearchParams),
@@ -475,6 +481,7 @@ pub(crate) async fn search(
 #[utoipa::path(
     get,
     path = "/public/search",
+    extensions(("x-public" = json!(true))),
     operation_id = "search_public_content",
     security((), ("bearer" = [])),
     params(SearchParams),

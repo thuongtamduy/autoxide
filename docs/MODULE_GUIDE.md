@@ -122,7 +122,25 @@ and are mounted under `/api/v1/<name>`; a module declares only the tail (`/`, `/
 - Document every handler: a `///` line (the summary), the required permission, and a
   `description` for every response with the error `code`s. Doc comments on handlers and
   schema types are English, written for API callers.
+- Declare who may call each endpoint in `#[utoipa::path]`, right after `path`:
+  `extensions(("x-permissions" = json!(["notes.write"])))` (one of the listed permissions is
+  enough; `[]` means any signed-in caller) or `extensions(("x-public" = json!(true)))`. The
+  description or the 403 response must name the same permissions. The gate checks every
+  endpoint: no token → 401, a caller without the permission → 403 `permission_denied`. Check
+  the permission first in the handler, before reading the input, so a caller without it
+  never gets a 422. An MCP tool either `.requires(…)` a permission or says
+  `.for_any_signed_in()`; a read-only tool must be callable with a `read`-level permission.
+- A permission's risk (`read`, `write`, `destructive`, `sensitive_data`, `money`) follows from
+  its name (`….read` is `read`, others `write`); set another with
+  `Permission::new(…).with_risk(Risk::Destructive)`.
 - Breaking change: add a new endpoint and declare the old one in `Module::deprecations`.
+  The gate (`cargo xtask api-diff`) compares `docs/openapi.json` with the last release and
+  refuses breaking changes, naming each one and the way to do it right.
+- MCP tools are a contract too, kept in `docs/mcp-tools.json`
+  (`cargo run -p autoxide -- mcp-manifest > docs/mcp-tools.json`). For a breaking change add
+  a new tool (e.g. `create_note_v2`) and declare the old one with
+  `Deprecation::tool("create_note", "YYYY-MM-DD").sunset(…).successor("create_note_v2")`
+  in `Module::deprecations`: agents see it in `tools/list` and in every result.
 
 ### 6. Events and the audit log
 
@@ -162,6 +180,26 @@ Publish a trait in `src/api.rs` and provide it in `Module::start` with
 `context.require::<dyn Trait>()` and is registered after you. The core's own shared
 services work the same way: `dyn Mailer` (send mail; module `mail`) and `dyn Storage`
 (store files; module `files`).
+
+### Records other modules attach things to
+
+Modules such as `comments` attach data to records of other modules without depending on them
+(`autoxide_kernel::resource`):
+
+- `context.resource_type("shop.item", resolver)` in `Module::start` lets others ask whether an
+  item exists and is public, and get its title, path and picture (`Resource::image`). Implement
+  `resolve_many` (many ids in one query, titles in a language) when others look up your items in
+  batches, e.g. website menus; a type with a tree (categories) returns `true` from `has_children`
+  and lists sub-items in `children`. All three have defaults, so older resolvers keep working.
+- `Module::resource_events` declares which of your events (from `Module::events`, subject
+  `<kind>:<id>`) mean `ResourceChange::Closed` (takes nothing new) or `ResourceChange::Removed`
+  (gone: close and hide what is attached). The kernel checks them at start.
+- `context.badge_source(kind, &["seller"], resolver)` computes badges of an author on a record of
+  any kind, e.g. `seller` for someone who manages a product. Each badge of a kind comes from one
+  module; badges are stable codes, never sentences.
+- `context.posting_verifier(…)` (one module in the whole program) answers whether an account is
+  verified to post content (phone or identity); `context.posting_verification()` asks it. With no
+  verifier registered every signed-in account counts as verified.
 
 ### Personal data
 
@@ -237,7 +275,7 @@ databases.
 - Work an operator runs by hand now and then (rebuild derived data after a setting
   changed, a one-off clean-up) is a task in `Module::tasks`: a `Task` with its
   `TaskArgument`s and a `TaskRun`, run with `autoxide task <module>.<task> name=value`. It
-  calls the service, like REST does. See `modules/media/src/refresh.rs`.
+  calls the service, like REST does. See `modules/media/src/images/refresh.rs`.
 
 ### 10. Translations
 

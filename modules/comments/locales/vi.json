@@ -4,6 +4,7 @@
   "comments.target_closed": "Đích này không nhận bình luận mới.",
   "comments.disabled": "Máy chủ này đang tắt bình luận.",
   "comments.guests_not_allowed": "Hãy đăng nhập để bình luận ở đây: đích này không nhận bình luận của khách.",
+  "comments.verification_required": "Chỉ tài khoản đã xác thực số điện thoại hoặc định danh mới được viết ở đây. Hãy đăng nhập và xác thực tài khoản trước.",
   "comments.parent_not_found": "Bình luận định trả lời không có, chưa hiện, hoặc thuộc đích khác.",
   "comments.banned": "Bạn không được phép bình luận.",
   "comments.banned_word": "Bình luận có từ không được phép dùng ở đây. Hãy sửa rồi gửi lại.",

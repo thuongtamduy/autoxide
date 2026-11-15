@@ -450,7 +450,7 @@ impl UserService {
         let subject = id.to_string();
         OneTimeTokens::new("auth").revoke(&transaction, "email_verification", &subject).await?;
         if mode == PasswordWrite::Recovery {
-            crate::passkey::remove_all_in(&transaction, &self.outbox, actor, id).await?;
+            crate::passkey::remove_all_in(&transaction, &self.outbox, actor, id, false).await?;
             crate::api_key::revoke_all_in(&transaction, &self.outbox, actor, id).await?;
             OneTimeTokens::new("auth").revoke(&transaction, "password_reset", &subject).await?;
         }
@@ -458,6 +458,38 @@ impl UserService {
         self.outbox.record(&transaction, actor, events::user_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, "password changed");
+        Ok(())
+    }
+}
+
+impl UserService {
+    /// Khoá tài khoản `id` trong `transaction` khi chủ của nó báo "không phải tôi" sau một lần
+    /// đổi email (`email_report.rs`): kẻ chiếm đã biết mật khẩu (đổi email cần nó) và có thể đã
+    /// gắn MFA hay passkey của nó. Bỏ mật khẩu (không đăng nhập bằng mật khẩu được nữa; chủ
+    /// tài khoản đặt lại qua mail), thu hồi mọi phiên, refresh token, API key, passkey, mọi
+    /// token xác minh email / đặt lại mật khẩu, và tắt TOTP kèm recovery code.
+    pub(crate) async fn lock_out_in(
+        &self,
+        transaction: &DatabaseTransaction,
+        actor: Actor,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        Entity::update_many()
+            .col_expr(Column::PasswordHash, Expr::value(Option::<String>::None))
+            .col_expr(Column::UpdatedAt, Expr::value(now()))
+            .filter(Column::Id.eq(id))
+            .exec(transaction)
+            .await?;
+        SessionService::revoke_user(transaction, id).await?;
+        SessionService::drop_mfa_challenges(transaction, id).await?;
+        crate::passkey::drop_ceremonies_in(transaction, id).await?;
+        crate::passkey::remove_all_in(transaction, &self.outbox, actor, id, false).await?;
+        crate::api_key::revoke_all_in(transaction, &self.outbox, actor, id).await?;
+        crate::mfa::service::remove_in(transaction, &self.outbox, actor, id, false).await?;
+        let subject = id.to_string();
+        for purpose in ["email_verification", "password_reset"] {
+            OneTimeTokens::new("auth").revoke(transaction, purpose, &subject).await?;
+        }
         Ok(())
     }
 }

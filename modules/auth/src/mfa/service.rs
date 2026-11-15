@@ -9,7 +9,9 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, Condition, DatabaseTransaction, EntityTrait, QueryFilter, Set,
+};
 use totp_rs::{Algorithm, Builder, Secret, Totp};
 use uuid::Uuid;
 
@@ -253,18 +255,7 @@ impl MfaService {
 
     async fn remove(&self, actor: Actor, user_id: Uuid, by_admin: bool) -> Result<(), Error> {
         let transaction = self.database.begin_write().await?;
-        let removed =
-            Entity::delete_many().filter(Column::UserId.eq(user_id)).exec(&transaction).await?;
-        recovery::remove(&transaction, user_id).await?;
-        // Chưa bật thì không có gì thay đổi: không ghi event.
-        if removed.rows_affected > 0 {
-            let event = events::MfaDisabled {
-                before: Some(json!({"method": "totp"})),
-                after: Some(json!({"by_administrator": by_admin})),
-            };
-            let subject = events::user_subject(user_id);
-            self.outbox.record(&transaction, actor, subject, &event).await?;
-        }
+        remove_in(&transaction, &self.outbox, actor, user_id, by_admin).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "two-step sign-in turned off");
         Ok(())
@@ -303,6 +294,30 @@ impl MfaService {
             .build()
             .map_err(|error| Error::internal(format!("totp: {error:?}")))
     }
+}
+
+/// Tắt TOTP và xoá recovery code của `user_id` trong `transaction` (kèm event
+/// `auth.mfa_disabled` khi đã bật). Dùng chung cho tắt MFA và cho báo "không phải tôi" khi đổi
+/// email (`email_report.rs`).
+pub(crate) async fn remove_in(
+    transaction: &DatabaseTransaction,
+    outbox: &Outbox,
+    actor: Actor,
+    user_id: Uuid,
+    by_admin: bool,
+) -> Result<(), Error> {
+    let removed =
+        Entity::delete_many().filter(Column::UserId.eq(user_id)).exec(transaction).await?;
+    recovery::remove(transaction, user_id).await?;
+    // Chưa bật thì không có gì thay đổi: không ghi event.
+    if removed.rows_affected > 0 {
+        let event = events::MfaDisabled {
+            before: Some(json!({"method": "totp"})),
+            after: Some(json!({"by_administrator": by_admin})),
+        };
+        outbox.record(transaction, actor, events::user_subject(user_id), &event).await?;
+    }
+    Ok(())
 }
 
 fn unix_now() -> u64 {

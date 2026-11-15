@@ -17,7 +17,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::page_request;
-use crate::bounces::{BounceKind, BounceOutcome, SuppressionFilter};
+use crate::audience::bounces::{BounceKind, BounceOutcome, SuppressionFilter};
 use crate::entity::suppression;
 use crate::service::NewsletterService;
 
@@ -83,6 +83,7 @@ pub(crate) struct BounceRequest {
 #[utoipa::path(
     get,
     path = "/suppressions",
+    extensions(("x-permissions" = json!(["newsletter.read"]))),
     operation_id = "list_newsletter_suppressions",
     security(("bearer" = [])),
     params(SuppressionsQuery, PageQuery),
@@ -111,6 +112,7 @@ pub(crate) async fn list_suppressions(
 #[utoipa::path(
     post,
     path = "/suppressions",
+    extensions(("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "create_newsletter_suppression",
     security(("bearer" = [])),
     request_body = CreateSuppressionRequest,
@@ -136,6 +138,7 @@ pub(crate) async fn create_suppression(
 #[utoipa::path(
     delete,
     path = "/suppressions/{id}",
+    extensions(("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "delete_newsletter_suppression",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the suppression.")),
@@ -164,6 +167,7 @@ pub(crate) async fn delete_suppression(
 #[utoipa::path(
     post,
     path = "/bounces",
+    extensions(("x-permissions" = json!(["newsletter.manage"]))),
     operation_id = "report_newsletter_bounce",
     security(("bearer" = [])),
     request_body = BounceRequest,

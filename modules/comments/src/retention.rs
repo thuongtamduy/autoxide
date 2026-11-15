@@ -24,9 +24,9 @@ use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::authoring::{Deletion, soft_delete};
 use crate::entity::{comment, report, subscription};
 use crate::events::{self, Change};
+use crate::posting::authoring::{Deletion, soft_delete};
 use crate::service::{CommentsService, MODULE, Status, now, shift_counts};
 
 pub(crate) const CLEANUP: &str = "comments.cleanup";
@@ -48,7 +48,7 @@ pub(crate) struct Cleaned {
 /// Trạng thái hết hạn được (khi chưa từng hiện).
 const EXPIRING: [&str; 2] = ["pending", "spam"];
 
-/// Tiền tố khoá người báo của khách (`reports.rs`).
+/// Tiền tố khoá người báo của khách (`moderation/reports.rs`).
 pub(crate) const GUEST_REPORTER: &str = "ip:";
 
 /// Một bình luận hết hạn đã được dọn thế nào.

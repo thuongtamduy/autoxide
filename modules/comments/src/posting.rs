@@ -18,6 +18,9 @@
 //! được (kể cả email người khác đã xác minh), nên email không bao giờ giúp vượt kiểm duyệt. Chỉ
 //! bình luận ĐANG hiện mới tính (bình luận về sau bị đánh spam / từ chối thì không).
 
+pub(crate) mod authoring;
+pub(crate) mod targets;
+
 use std::time::Duration;
 
 use autoxide_kernel::access::Principal;
@@ -38,12 +41,12 @@ use crate::entity::{ban, comment, profile};
 use crate::events::{self, Change};
 use crate::notify::VERIFY;
 use crate::permissions::{COMMENTS_MODERATE, COMMENTS_POST};
+use crate::posting::targets::target_closed;
 use crate::service::{
     Comment, CommentsService, MODULE, Status, comment_not_found, delta, ensure_target, now,
     shift_counts, shift_target_counts, summary,
 };
-use crate::targets::target_closed;
-use crate::text;
+use crate::text::{self, Format};
 
 const HOUR: Duration = Duration::from_secs(3600);
 const DAY: Duration = Duration::from_secs(24 * 3600);
@@ -60,6 +63,8 @@ pub(crate) struct NewComment {
     /// Trả lời bình luận này (gốc hay trả lời khác cùng luồng).
     pub parent_id: Option<Uuid>,
     pub body: String,
+    /// `text` (mặc định) hay `markdown` (D-252).
+    pub format: Format,
     /// Tên của khách (người dùng đăng nhập lấy tên ở hồ sơ).
     pub author_name: Option<String>,
     pub email: Option<String>,
@@ -89,6 +94,14 @@ fn guests_not_allowed() -> Error {
     Error::forbidden(
         "comments.guests_not_allowed",
         "Sign in to comment here: comments from guests are not taken on this target.",
+    )
+}
+
+pub(crate) fn verification_required() -> Error {
+    Error::forbidden(
+        "comments.verification_required",
+        "Only accounts with a verified phone number or identity may write here. Sign in and \
+         verify your account first.",
     )
 }
 
@@ -140,11 +153,23 @@ impl CommentsService {
             }
             None => {}
         }
+        // Loại đích chỉ cho tài khoản đã xác thực (NĐ 147/2024, D-202): khách bị từ chối, người
+        // dùng hỏi qua điểm nối của kernel (module giữ trạng thái xác thực, bước 37).
+        if self.config.verified_only.contains(&kind) {
+            let verified = match principal {
+                Some(principal) => self.verification.is_verified(principal.user_id()).await?,
+                None => false,
+            };
+            if !verified {
+                return Err(verification_required());
+            }
+        }
         let moderator = principal.is_some_and(|principal| principal.has(&COMMENTS_MODERATE));
 
         // Độ dài và lọc nội dung; mọi lỗi của đầu vào báo một lần (D-083).
         let mut problems = Vec::new();
         let body = text::clean_body(&input.body, self.config.max_length, &mut problems);
+        let format = self.check_format(input.format, &mut problems);
         let locale = locale(input.locale.as_deref(), &mut problems);
         let name = if guest {
             match input.author_name.as_deref() {
@@ -204,6 +229,12 @@ impl CommentsService {
 
         // Đích có thật, công khai (sổ đối tượng — có thể gọi module khác), đang mở.
         let resource = self.resolve_target(&kind, &target_id).await?;
+        // Nhãn của tác giả trên đích (vd `seller`, `verified_buyer`), tính một lần lúc ghi qua
+        // sổ đối tượng — có thể gọi module khác nên ở NGOÀI transaction (D-202).
+        let badges = match principal {
+            Some(principal) => self.resources.badges(&kind, &target_id, principal).await?.join(","),
+            None => String::new(),
+        };
         let now = now();
         if !self.target(&kind, &target_id).await?.is_open(now) {
             return Err(target_closed());
@@ -260,7 +291,7 @@ impl CommentsService {
         if text::contains_word(&body, &self.config.suspect_words) {
             holds.push("suspect_word");
         }
-        if text::link_count(&body) > self.config.max_links {
+        if text::links(&body, format) > self.config.max_links {
             holds.push("too_many_links");
         }
 
@@ -299,6 +330,7 @@ impl CommentsService {
                     author_email: None,
                     email_verified: false,
                     body,
+                    format: format.as_str().to_owned(),
                     status: Status::Pending.as_str().to_owned(),
                     hold_reason: None,
                     edit_token_hash: None,
@@ -308,6 +340,8 @@ impl CommentsService {
                     locale: locale.map(str::to_owned),
                     content_hash,
                     search_key: String::new(),
+                    match_key: String::new(),
+                    badges,
                     reply_count: 0,
                     report_count: 0,
                     reports_held_at: None,
@@ -375,7 +409,13 @@ impl CommentsService {
                 "{body} {}",
                 name.as_deref().unwrap_or_default()
             )),
+            match_key: autoxide_kernel::search::exact_key(&format!(
+                "{body} {}",
+                name.as_deref().unwrap_or_default()
+            )),
+            badges,
             body,
+            format: format.as_str().to_owned(),
             status: status.as_str().to_owned(),
             hold_reason,
             edit_token_hash: edit_token.as_deref().map(sha256),
@@ -569,6 +609,21 @@ impl CommentsService {
 }
 
 /// `en` / `vi` tuỳ chọn; sai thì thêm lỗi.
+impl CommentsService {
+    /// Định dạng của bài: Markdown chỉ khi máy chủ bật `AUTOXIDE_COMMENTS_MARKDOWN`; tắt mà
+    /// gửi `markdown` thì lỗi ở trường `format` (gom cùng các lỗi khác).
+    pub(crate) fn check_format(&self, format: Format, problems: &mut Vec<FieldError>) -> Format {
+        if format == Format::Markdown && !self.config.markdown {
+            problems.push(FieldError::new(
+                "format",
+                "disabled",
+                "Markdown is turned off on this server (`AUTOXIDE_COMMENTS_MARKDOWN`); send `text`",
+            ));
+        }
+        format
+    }
+}
+
 pub(crate) fn locale(raw: Option<&str>, problems: &mut Vec<FieldError>) -> Option<&'static str> {
     match raw.map(str::trim).filter(|raw| !raw.is_empty())?.to_ascii_lowercase().as_str() {
         "en" => Some("en"),

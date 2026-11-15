@@ -30,7 +30,8 @@ pub fn all() -> Vec<Box<dyn Module>> {
         Box::new(autoxide_media::module()),
         // Sau `media`: `content` cần `dyn Media` mà `media` công bố.
         Box::new(autoxide_content::module()),
-        // Biểu mẫu: cần `dyn Mailer` (mail báo quản trị viên), nên đứng sau `mail`.
+        // Biểu mẫu: cần `dyn Mailer` (mail báo quản trị viên) và `dyn Storage` (file xuất CSV lớn),
+        // nên đứng sau `mail` và `files`.
         Box::new(autoxide_forms::module()),
         // Bản tin: cần `dyn Mailer` (sau `mail`), nghe bài mới của `content` qua sổ đối tượng của
         // kernel (sau `content`).
@@ -38,6 +39,10 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Bình luận: cần `dyn Mailer` (sau `mail`), kiểm đích qua sổ đối tượng của kernel và nghe
         // event lưu trữ / xoá của `content` (sau `content`).
         Box::new(autoxide_comments::module()),
+        // Menu của website (D-238): cần `dyn Media` (ảnh của ô gợi ý) và đọc menu cũ của
+        // `content` để nhập sang, nên đứng sau cả hai. Đối tượng đích tra qua sổ đối tượng của
+        // kernel, nên module đăng ký sau vẫn được menu trỏ tới.
+        Box::new(autoxide_menus::module()),
     ]
 }
 

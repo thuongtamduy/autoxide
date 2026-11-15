@@ -34,14 +34,33 @@ Guests need none: everything under `/api/v1/comments/public/` is open.
 When another module resolves a kind (the `content` module resolves `content.entry`), a comment
 is only taken when the target exists and is public; other kinds are taken as given. A target
 gets its row on its first comment, holding its state (`open` / `closed`, `hidden`,
-`closes_at`) and its counts. When `content` archives an entry its comments close; when it
-deletes one they are also hidden. `AUTOXIDE_COMMENTS_AUTO_CLOSE_DAYS` closes targets some days
-after their first comment.
+`closes_at`) and its counts. The module owning a kind declares which of its events close or
+remove a target: when `content` archives an entry its comments close; when it deletes one they
+are also hidden. `AUTOXIDE_COMMENTS_AUTO_CLOSE_DAYS` closes targets some days after their first
+comment.
+
+## Questions and answers
+
+The same threads serve as product questions: a question is a top-level comment, answers are its
+replies. A module owning the target may give authors **badges**, computed when the comment is
+written and returned as stable codes in `badges` (e.g. `seller` for someone who manages the
+product, `verified_buyer` for someone who received it); show your own label for each code.
+
+- Search a target's questions: `GET /api/v1/comments/public/threads?target_type=…&target_id=…&q=bảo hành`
+  — ignores case and accents; matches with the exact accents come first.
+- Tab counts: `GET /api/v1/comments/public/counts` returns `thread_count` (shown questions) next to
+  `count` (all shown comments); the target answers `thread_count` too, and moderators also get
+  `pending_thread_count`.
+- Unanswered questions (no shown reply yet): `GET /api/v1/comments?status=published&unanswered=true`.
+- `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` lists kinds where only verified accounts may ask or answer:
+  guests are refused and signed-in users are checked with the module that keeps account
+  verification (`comments.verification_required`, 403). With no such module installed, every
+  signed-in account counts as verified.
 
 ## The website
 
 1. `GET /api/v1/comments/public/settings` — limits and switches (guests allowed, edit minutes,
-   maximum length, whether reply mails are on).
+   maximum length, whether reply mails are on, whether Markdown is on).
 2. `GET /api/v1/comments/public/threads?target_type=content.entry&target_id=…&order=desc&limit=20&replies_limit=3`
    — shown top-level comments with their first replies and `reply_count`; follow
    `pagination.next_cursor`. More replies: `GET /api/v1/comments/public/comments/{id}/replies`.
@@ -49,7 +68,7 @@ after their first comment.
    (up to 100). Whether the box is open: `GET /api/v1/comments/public/targets/{type}/{id}`.
 3. Show `body_html` (everything escaped, line breaks as `<br>`, `http(s)` addresses as links
    with `rel="nofollow ugc noopener"`); never insert `body` as HTML. Label guests as guests
-   (`author.kind`).
+   (`author.kind`). See "Text and Markdown" below.
 4. Each time the box is shown (never in cached HTML): `GET /api/v1/antispam/token?scope=comments:content.entry`.
    Show a hidden trap input that people leave empty.
 5. `POST /api/v1/comments/public/comments`:
@@ -90,6 +109,24 @@ after their first comment.
 - Report: `POST /api/v1/comments/public/comments/{id}/reports {"reason": "spam" | "abuse" |
   "illegal" | "other", "note": "…"}`. Each account reports a comment once; guests are counted
   by network block (`/24` for IPv4, `/48` for IPv6).
+
+## Text and Markdown
+
+A comment is sent with `format`: `text` (the default) or `markdown`, the latter only when
+`GET /api/v1/comments/public/settings` says `markdown: true` (`AUTOXIDE_COMMENTS_MARKDOWN`, on by
+default; when off, `markdown` is refused on the field `format`). An edit without `format` keeps
+the comment's format. Old comments are `text` and show as before.
+
+- `text`: plain text. A `*` stays a `*`; line breaks are kept; `http(s)` addresses become links.
+- `markdown`: a small part of Markdown — `**bold**`, `*italics*`, `[links](https://…)` and
+  `<https://…>`, `> quotes`, `` `code` `` and code blocks. Headings and list items show as
+  paragraphs; images show as their text (no image is ever loaded); raw HTML shows as text.
+  Only `http(s)` links work, all with `rel="nofollow ugc noopener"`.
+
+The server builds `body_html` from a fixed list of tags (`p`, `br`, `strong`, `em`, `a`,
+`blockquote`, `code`, `pre`), so the website inserts `body_html` as it is in either format.
+Markdown links count towards `AUTOXIDE_COMMENTS_MAX_LINKS` like bare addresses. Banned words
+are checked on the text as written.
 
 ## Moderation
 
@@ -164,8 +201,8 @@ original legal texts — check them for your case before you rely on them.**
   moderation records (2 years is mentioned). The module offers `AUTOXIDE_COMMENTS_ENABLED`,
   `AUTOXIDE_COMMENTS_ALLOW_GUESTS`, `AUTOXIDE_COMMENTS_SIGNED_IN_ONLY_TYPES`, closing or hiding
   a target, deleting for good (`DELETE /api/v1/comments/{id}`, recorded with who and when in
-  the audit log), and the `illegal` report reason. Phone verification of accounts is not part
-  of this module. How long the audit log is kept is set by the `audit` module.
+  the audit log), and the `illegal` report reason. `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES` asks the
+  module that keeps phone or identity verification (not this module) before taking a comment. How long the audit log is kept is set by the `audit` module.
 - **Vietnam, Personal Data Protection Law 91/2025/QH15 and Decree 356/2025:** people may ask
   for their data and its erasure; the module exports and clears by email and by account, keeps
   network data only as a hash and for a set time. Check the deadlines for answering requests,
@@ -179,8 +216,11 @@ original legal texts — check them for your case before you rely on them.**
 Tools `comments.queue` and `comments.get` (`comments.read`), `comments.moderate`
 (`comments.moderate`; pass the `version` you read, like `If-Match`) and
 `comments.set_target_state` (`comments.manage`), with the same permissions and checks as REST.
-There is no tool to write a comment (that is for readers on the website) and no tool to delete
-one for good (use REST).
+For questions: `comments.unanswered` (`comments.read`) lists shown questions without a shown
+answer, and `comments.answer` (`comments.post`) answers one as the caller — like a signed-in user
+on the website, with the same badges, verification and moderation (set a display name first with
+`PUT /api/v1/comments/profile`). There is no tool to start a thread (that is for readers on the
+website) and no tool to delete a comment for good (use REST).
 
 ## Settings
 
@@ -190,11 +230,13 @@ one for good (use REST).
 | `AUTOXIDE_COMMENTS_TARGET_TYPES`           | `content.entry`                             |
 | `AUTOXIDE_COMMENTS_ALLOW_GUESTS`           | `true`                                      |
 | `AUTOXIDE_COMMENTS_SIGNED_IN_ONLY_TYPES`   | —                                           |
+| `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES`    | —                                           |
 | `AUTOXIDE_COMMENTS_GUEST_MODERATION`       | `pre`                                       |
 | `AUTOXIDE_COMMENTS_USER_MODERATION`        | `first_time`                                |
 | `AUTOXIDE_COMMENTS_MODERATION_BY_TYPE`     | —                                           |
 | `AUTOXIDE_COMMENTS_MAX_LENGTH`             | `4000`                                      |
 | `AUTOXIDE_COMMENTS_MAX_LINKS`              | `2`                                         |
+| `AUTOXIDE_COMMENTS_MARKDOWN`               | `true`                                      |
 | `AUTOXIDE_COMMENTS_EDIT_MINUTES`           | `15`                                        |
 | `AUTOXIDE_COMMENTS_REPORT_THRESHOLD`       | `3`                                         |
 | `AUTOXIDE_COMMENTS_AUTO_CLOSE_DAYS`        | `0` (never)                                 |

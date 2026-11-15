@@ -18,11 +18,11 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
+use crate::audience::subscribers::SubscriberFilter;
 use crate::campaigns::{Action, Campaign, CampaignInput};
 use crate::http::{CampaignResponse, ListResponse, SubscriberResponse, choice, page_request};
 use crate::permissions::{NEWSLETTER_MANAGE, NEWSLETTER_READ, NEWSLETTER_SEND};
 use crate::service::NewsletterService;
-use crate::subscribers::SubscriberFilter;
 
 /// Chiến dịch kèm `version` (giá trị `ETag`) để gửi lại khi gửi / hẹn giờ.
 #[derive(Debug, Serialize)]

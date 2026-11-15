@@ -219,6 +219,14 @@ the server, then sign in with the password and turn it on again:
 sudo -u autoxide autoxide user reset-mfa --email you@example.com
 ```
 
+Lost the devices holding its passkeys? Remove them from the server, then sign in with the
+password and add new ones. Other administrators can do the same through the API with the
+permission `auth.passkeys.manage` (`DELETE /api/v1/auth/users/{id}/passkeys`).
+
+```bash
+sudo -u autoxide autoxide user remove-passkeys --email you@example.com
+```
+
 ### 4. Run as a service
 
 `/etc/systemd/system/autoxide.service`:

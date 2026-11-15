@@ -103,6 +103,24 @@ curl -X POST http://localhost:8080/api/v1/forms \
 - `GET /api/v1/forms/{id}/submissions/export?format=csv` — CSV cho bảng tính. Ô bắt đầu bằng `=`,
   `+`, `-`, `@`, tab hay CR được thêm `'` ở đầu để không bao giờ chạy như công thức.
 
+### Xuất lớn
+
+Form có nhiều bài thì xuất chạy nền, không giữ một request mở lâu:
+
+1. `POST /api/v1/forms/{id}/submissions/exports` (thân không bắt buộc: `{"status": "new"}`, như
+   `status` của bản xuất ở trên) trả `201` ngay, địa chỉ của bản xuất ở `Location`. Mỗi form chỉ
+   một bản xuất đang chạy; yêu cầu lại trong lúc đó thì trả `409` `forms.export_in_progress`.
+2. `GET /api/v1/forms/exports/{export_id}` cho `state`: `pending`, `running`, rồi `ready` (hoặc
+   `failed`: yêu cầu bản mới). Khi `ready`, `download_url` là link tới file — cùng nội dung với
+   bản xuất ở trên, từng byte.
+3. Link không cần đăng nhập nên mở được trong trình duyệt; nó dùng được trong
+   `AUTOXIDE_FORMS_EXPORT_LINK_MINUTES` (mặc định 60) phút. Đừng chia sẻ nó. Đọc lại bản xuất để có
+   link mới. Link là URL tuyệt đối khi đã đặt `AUTOXIDE_HTTP_PUBLIC_URL`.
+
+Cả hai cần `forms.export`. File được ghi vào nơi lưu file chung (module `files`, ổ đĩa hay S3) dưới
+`forms/exports/` và bị job dọn dẹp hằng ngày xoá sau `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` (mặc định
+24) giờ.
+
 ## Dữ liệu cá nhân
 
 - `GET /api/v1/forms/data?email=…` liệt kê, `DELETE /api/v1/forms/data?email=…` xoá hẳn mọi bài
@@ -119,6 +137,11 @@ curl -X POST http://localhost:8080/api/v1/forms \
 - Tài khoản bị xoá: form người đó tạo vẫn giữ; `created_by` thành `null`.
 - Xoá form thì xoá luôn bài gửi của nó. Bài gửi mà form không còn thì bị job dọn dẹp hằng ngày
   xoá.
+- Bản xuất lớn chứa dữ liệu cá nhân. Xoá bài gửi của một địa chỉ, hay xoá một form, thì xoá luôn
+  mọi file xuất của các form liên quan. File xuất còn lại bị xoá sau
+  `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS`. Backup của nơi lưu file cũng chép `forms/exports/` trong lúc
+  file còn. Event `forms.submissions_exported` ghi ai đã xuất form nào (cho nhật ký audit), không
+  kèm file.
 
 ## Pháp lý
 
@@ -156,6 +179,8 @@ tool gửi form.
 | `AUTOXIDE_FORMS_SPAM_RETENTION_DAYS`            | `30`     |
 | `AUTOXIDE_FORMS_IP_RETENTION_DAYS`              | `90`     |
 | `AUTOXIDE_FORMS_NOTIFY_LANGUAGE`                | `en`     |
+| `AUTOXIDE_FORMS_EXPORT_LINK_MINUTES`            | `60`     |
+| `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS`              | `24`     |
 
 Mỗi form có thể đặt riêng `ip_limit_per_hour`, `email_limit_per_hour` và `retention_days`. Lớp
 chống spam (`AUTOXIDE_ANTISPAM_*`) dùng chung cho mọi module. Mọi biến được mô tả trong

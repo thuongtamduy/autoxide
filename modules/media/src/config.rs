@@ -45,6 +45,13 @@ pub(crate) const AI_SEND_PRIVATE: Setting = Setting::new(
 )
 .with_default("false");
 
+pub(crate) const ALT_LOCALES: Setting = Setting::new(
+    "AUTOXIDE_MEDIA_ALT_LOCALES",
+    "Languages a text alternative (`alt`) may be translated into, comma-separated BCP 47 codes \
+     (e.g. `en,vi,pt-BR`). The item's own `alt` stays the default for every other language.",
+)
+.with_default("en,vi");
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MediaConfig {
     pub limits: Limits,
@@ -53,6 +60,8 @@ pub(crate) struct MediaConfig {
     pub image_widths: Vec<u32>,
     /// Được gửi ảnh riêng tư cho nhà cung cấp AI để gợi ý alt text (D-109).
     pub ai_send_private: bool,
+    /// Ngôn ngữ được dịch `alt` (D-202), đúng dạng đã khai.
+    pub alt_locales: Vec<String>,
 }
 
 /// Giới hạn của nội dung tải lên.
@@ -136,13 +145,42 @@ impl MediaConfig {
             "false" => Ok(false),
             _ => Err("must be `true` or `false`".to_owned()),
         });
+        let alt_locales = reader.get_with(&ALT_LOCALES, |raw| {
+            let mut locales: Vec<String> = Vec::new();
+            for locale in raw.split(',').map(str::trim).filter(|item| !item.is_empty()) {
+                if !is_locale(locale) {
+                    return Err(format!("`{locale}` is not a BCP 47 code like `vi` or `pt-BR`"));
+                }
+                if !locales.iter().any(|known| known.eq_ignore_ascii_case(locale)) {
+                    locales.push(locale.to_owned());
+                }
+            }
+            if locales.is_empty() {
+                Err("must list at least one language".to_owned())
+            } else {
+                Ok(locales)
+            }
+        });
         Ok(MediaConfig {
             limits: Limits { max_bytes: max_bytes?, allowed_types: allowed_types? },
             trash_days: trash_days?,
             image_widths: image_widths?,
             ai_send_private: ai_send_private?,
+            alt_locales: alt_locales?,
         })
     }
+}
+
+/// Mã ngôn ngữ BCP 47 dạng thường gặp: 2–3 chữ, rồi các đoạn 2–8 chữ / số nối bằng `-`.
+pub(crate) fn is_locale(raw: &str) -> bool {
+    let mut parts = raw.split('-');
+    let first = parts.next().unwrap_or_default();
+    raw.len() <= 35
+        && (2..=3).contains(&first.len())
+        && first.chars().all(|c| c.is_ascii_alphabetic())
+        && parts.all(|part| {
+            (2..=8).contains(&part.len()) && part.chars().all(|c| c.is_ascii_alphanumeric())
+        })
 }
 
 #[cfg(test)]
@@ -168,6 +206,11 @@ mod tests {
         let custom = read(&[("AUTOXIDE_MEDIA_IMAGE_WIDTHS", "800, 200,800")]).unwrap();
         assert_eq!(custom.image_widths, [200, 800]);
         assert!(read(&[("AUTOXIDE_MEDIA_IMAGE_WIDTHS", "8")]).is_err());
+        assert_eq!(config.alt_locales, ["en", "vi"]);
+        let locales = read(&[("AUTOXIDE_MEDIA_ALT_LOCALES", "vi, pt-BR,VI")]).unwrap();
+        assert_eq!(locales.alt_locales, ["vi", "pt-BR"]);
+        assert!(read(&[("AUTOXIDE_MEDIA_ALT_LOCALES", "vietnamese")]).is_err());
+        assert!(read(&[("AUTOXIDE_MEDIA_ALT_LOCALES", " , ")]).is_err());
         for allowed in ["image/png", "image/avif", "image/svg+xml", "audio/ogg", "application/pdf"]
         {
             assert!(config.limits.allows(allowed), "{allowed}");

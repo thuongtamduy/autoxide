@@ -18,9 +18,10 @@ use validator::Validate;
 
 use super::page_request;
 use super::views::{EditedComment, PostedComment, PublicComment, TargetResponse, ThreadComment};
+use crate::moderation::reports::ReportReason;
 use crate::posting::NewComment;
-use crate::reports::ReportReason;
 use crate::service::CommentsService;
+use crate::text::Format;
 use crate::threads::{REPLIES_MAX, oldest_first};
 
 /// What a website needs to know to show the comment box.
@@ -34,12 +35,17 @@ pub(crate) struct CommentSettings {
     pub guests_allowed: bool,
     /// Kinds where only signed-in users may comment.
     pub signed_in_only_types: Vec<String>,
+    /// Kinds where only verified accounts (phone number or identity) may comment or answer;
+    /// show "verify your account" instead of the comment box to others.
+    pub verified_only_types: Vec<String>,
     /// Longest comment, in characters.
     pub max_length: usize,
     /// More links than this hold a comment for approval.
     pub max_links: usize,
     /// Minutes during which authors may change their comment (0: never).
     pub edit_minutes: u32,
+    /// Comments may be written in Markdown (`format: markdown`): show formatting buttons.
+    pub markdown: bool,
     /// The server can mail people about replies (show the "notify me" box).
     pub reply_mails: bool,
     /// Ask `GET /api/v1/antispam/token?scope=comments:<target_type>` for a form token each
@@ -54,6 +60,7 @@ pub(crate) struct CommentSettings {
 #[utoipa::path(
     get,
     path = "/public/settings",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_comment_settings",
     security((), ("bearer" = [])),
     responses((status = 200, description = "The settings.", body = Data<CommentSettings>))
@@ -68,9 +75,11 @@ pub(crate) async fn get_settings(
             target_types: config.target_types.clone(),
             guests_allowed: config.allow_guests,
             signed_in_only_types: config.signed_in_only.clone(),
+            verified_only_types: config.verified_only.clone(),
             max_length: config.max_length,
             max_links: config.max_links,
             edit_minutes: config.edit_minutes,
+            markdown: config.markdown,
             reply_mails: config.reply_mails(),
             token_scope: "comments:{target_type}".to_owned(),
         },
@@ -89,7 +98,15 @@ pub(crate) struct ThreadQuery {
     /// Replies to include with each top-level comment, 0 to 10. Defaults to 3.
     #[param(value_type = Option<u32>, minimum = 0, maximum = 10)]
     pub replies_limit: Option<String>,
+    /// Only top-level comments (e.g. questions) whose text or author name contains this, 1 to
+    /// 100 characters, ignoring case and accents. Matches with the exact accents come first,
+    /// then the others; within each group the usual `order` applies.
+    #[param(example = "bảo hành")]
+    pub q: Option<String>,
 }
+
+/// Chữ tìm dài nhất (ký tự).
+const SEARCH_MAX: usize = 100;
 
 /// The target of a query; missing parts are added to `problems`.
 fn target_of(
@@ -111,11 +128,14 @@ fn target_of(
 ///
 /// No sign-in needed. Shown top-level comments, newest first (`order=asc`: oldest first), each
 /// with its first replies (oldest first) and `reply_count`. A top-level comment deleted by its
-/// author stays (with `deleted: true`, no text) while it has replies. Follow
+/// author stays (with `deleted: true`, no text) while it has replies. With `q`, only matching
+/// top-level comments, exact-accent matches first (questions and answers on a product use the
+/// same thread: a question is a top-level comment, answers are its replies). Follow
 /// `pagination.next_cursor` with the same parameters for more.
 #[utoipa::path(
     get,
     path = "/public/threads",
+    extensions(("x-public" = json!(true))),
     operation_id = "list_comment_thread",
     security((), ("bearer" = [])),
     params(ThreadQuery, PageQuery),
@@ -149,8 +169,16 @@ pub(crate) async fn list_thread(
             }
         },
     };
+    let search = query.q.as_deref().map(str::trim).filter(|text| !text.is_empty());
+    if search.is_some_and(|text| text.chars().count() > SEARCH_MAX) {
+        problems.push(FieldError::new(
+            "q",
+            "length",
+            format!("must be at most {SEARCH_MAX} characters long"),
+        ));
+    }
     let page = page_request(paging, problems)?;
-    Ok(service.thread(&kind, &id, &page, replies).await?.map(ThreadComment::from))
+    Ok(service.thread(&kind, &id, &page, replies, search).await?.map(ThreadComment::from))
 }
 
 /// Get a comment (public).
@@ -160,6 +188,7 @@ pub(crate) async fn list_thread(
 #[utoipa::path(
     get,
     path = "/public/comments/{id}",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_public_comment",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -183,6 +212,7 @@ pub(crate) async fn get_public_comment(
 #[utoipa::path(
     get,
     path = "/public/comments/{id}/replies",
+    extensions(("x-public" = json!(true))),
     operation_id = "list_comment_replies",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the top-level comment."), PageQuery),
@@ -215,8 +245,11 @@ pub(crate) struct CreateCommentRequest {
     /// Reply to this comment (a top-level comment or a reply in its thread); omit for a new
     /// thread.
     parent_id: Option<Uuid>,
-    /// Plain text; line breaks are kept, `http(s)` addresses become links.
+    /// The text, as `format` says; line breaks are kept, `http(s)` addresses become links.
     body: String,
+    /// `text` (the default: plain text) or `markdown` (bold, italics, links, quotes, code;
+    /// only when `GET /public/settings` says `markdown: true`).
+    format: Option<Format>,
     /// Guests: the name to show (required). Signed-in users show the name of their profile.
     author_name: Option<String>,
     /// Address for reply mails (never shown). Required with `notify_replies`.
@@ -247,6 +280,7 @@ pub(crate) struct CreateCommentRequest {
 #[utoipa::path(
     post,
     path = "/public/comments",
+    extensions(("x-public" = json!(true))),
     operation_id = "create_comment",
     security((), ("bearer" = [])),
     request_body = CreateCommentRequest,
@@ -273,6 +307,7 @@ pub(crate) async fn create_comment(
         target_id: input.target_id,
         parent_id: input.parent_id,
         body: input.body,
+        format: input.format.unwrap_or_default(),
         author_name: input.author_name,
         email: input.email,
         notify_replies: input.notify_replies,
@@ -295,6 +330,8 @@ pub(crate) async fn create_comment(
 pub(crate) struct EditCommentRequest {
     /// The new text.
     body: String,
+    /// `text` or `markdown`; omitted: as the comment was written.
+    format: Option<Format>,
     /// Guests: the `edit_token` received when posting. Signed-in authors omit it.
     edit_token: Option<String>,
 }
@@ -309,6 +346,7 @@ pub(crate) struct EditCommentRequest {
 #[utoipa::path(
     patch,
     path = "/public/comments/{id}",
+    extensions(("x-public" = json!(true))),
     operation_id = "edit_comment",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -328,8 +366,9 @@ pub(crate) async fn edit_comment(
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<EditCommentRequest>,
 ) -> Result<Data<EditedComment>, Error> {
-    let found =
-        service.edit(principal.as_ref(), id, input.edit_token.as_deref(), &input.body).await?;
+    let found = service
+        .edit(principal.as_ref(), id, input.edit_token.as_deref(), &input.body, input.format)
+        .await?;
     Ok(Data { data: found.into() })
 }
 
@@ -351,6 +390,7 @@ pub(crate) struct DeleteOwnRequest {
 #[utoipa::path(
     post,
     path = "/public/comments/{id}/delete",
+    extensions(("x-public" = json!(true))),
     operation_id = "delete_own_comment",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -403,6 +443,7 @@ pub(crate) struct ReportedResponse {
 #[utoipa::path(
     post,
     path = "/public/comments/{id}/reports",
+    extensions(("x-public" = json!(true))),
     operation_id = "report_comment",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -441,15 +482,18 @@ pub(crate) struct CommentCount {
     pub target_id: String,
     /// Shown comments (top-level and replies).
     pub count: i32,
+    /// Shown top-level comments only (e.g. the number of questions on a product tab).
+    pub thread_count: i32,
 }
 
 /// Count the comments of many targets (public).
 ///
-/// No sign-in needed. Shown comments of up to 100 targets of one kind, in the order asked;
-/// unknown targets count 0.
+/// No sign-in needed. Shown comments (all, and top-level only) of up to 100 targets of one kind,
+/// in the order asked; unknown and hidden targets count 0.
 #[utoipa::path(
     get,
     path = "/public/counts",
+    extensions(("x-public" = json!(true))),
     operation_id = "count_comments",
     security((), ("bearer" = [])),
     params(CountsQuery),
@@ -487,7 +531,7 @@ pub(crate) async fn count_comments(
     Ok(Data {
         data: counts
             .into_iter()
-            .map(|(target_id, count)| CommentCount { target_id, count })
+            .map(|(target_id, count, thread_count)| CommentCount { target_id, count, thread_count })
             .collect(),
     })
 }
@@ -498,6 +542,7 @@ pub(crate) async fn count_comments(
 #[utoipa::path(
     get,
     path = "/public/targets/{target_type}/{target_id}",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_public_comment_target",
     security((), ("bearer" = [])),
     params(
@@ -541,6 +586,7 @@ pub(crate) struct VerifiedResponse {
 #[utoipa::path(
     post,
     path = "/public/verify",
+    extensions(("x-public" = json!(true))),
     operation_id = "verify_comment_email",
     security((), ("bearer" = [])),
     request_body = TokenRequest,
@@ -583,6 +629,7 @@ pub(crate) struct UnsubscribedResponse {
 #[utoipa::path(
     post,
     path = "/public/unsubscribe",
+    extensions(("x-public" = json!(true))),
     operation_id = "unsubscribe_comment_replies",
     security((), ("bearer" = [])),
     request_body = UnsubscribeRequest,
@@ -611,6 +658,7 @@ pub(crate) struct ProfileResponse {
 #[utoipa::path(
     get,
     path = "/profile",
+    extensions(("x-permissions" = json!(["comments.post"]))),
     operation_id = "get_comment_profile",
     security(("bearer" = [])),
     responses(
@@ -648,6 +696,7 @@ pub(crate) struct ProfileRequest {
 #[utoipa::path(
     put,
     path = "/profile",
+    extensions(("x-permissions" = json!(["comments.post"]))),
     operation_id = "set_comment_profile",
     security(("bearer" = [])),
     request_body = ProfileRequest,

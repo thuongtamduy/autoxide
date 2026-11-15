@@ -122,7 +122,25 @@ Route nằm trong `src/http.rs`, đăng ký bằng `OpenApiRouter::routes(routes
 - Viết tài liệu cho mọi handler: một dòng `///` (thành summary), permission cần có, và
   `description` cho mọi response kèm `code` lỗi. Doc comment trên handler và kiểu schema
   viết tiếng Anh, cho người gọi API.
+- Khai ai được gọi mỗi endpoint trong `#[utoipa::path]`, ngay sau `path`:
+  `extensions(("x-permissions" = json!(["notes.write"])))` (có một trong các permission là đủ;
+  `[]` nghĩa là mọi người đã đăng nhập) hoặc `extensions(("x-public" = json!(true)))`. Mô tả
+  hay response 403 phải nêu đúng các permission đó. Gate kiểm mọi endpoint: không token → 401,
+  người không có permission → 403 `permission_denied`. Kiểm permission trước tiên trong
+  handler, trước khi đọc đầu vào, để người không có quyền không bao giờ nhận 422. Tool MCP
+  hoặc `.requires(…)` một permission, hoặc khai `.for_any_signed_in()`; tool chỉ đọc phải gọi
+  được bằng một permission mức `read`.
+- Mức rủi ro của permission (`read`, `write`, `destructive`, `sensitive_data`, `money`) suy từ
+  tên (`….read` là `read`, còn lại `write`); khác thì đặt bằng
+  `Permission::new(…).with_risk(Risk::Destructive)`.
 - Thay đổi phá vỡ: thêm endpoint mới và khai endpoint cũ trong `Module::deprecations`.
+  Gate (`cargo xtask api-diff`) so `docs/openapi.json` với bản phát hành gần nhất và từ chối
+  thay đổi phá vỡ, nêu từng chỗ và cách làm đúng.
+- Tool MCP cũng là hợp đồng, nằm ở `docs/mcp-tools.json`
+  (`cargo run -p autoxide -- mcp-manifest > docs/mcp-tools.json`). Thay đổi phá vỡ thì thêm
+  tool mới (vd `create_note_v2`) và khai tool cũ bằng
+  `Deprecation::tool("create_note", "YYYY-MM-DD").sunset(…).successor("create_note_v2")`
+  trong `Module::deprecations`: agent thấy điều đó trong `tools/list` và trong mọi kết quả.
 
 ### 6. Event và audit log
 
@@ -162,6 +180,26 @@ Công bố một trait trong `src/api.rs` và cung cấp nó trong `Module::star
 `context.require::<dyn Trait>()` và đăng ký sau bạn. Dịch vụ dùng chung của core cũng
 theo cách đó: `dyn Mailer` (gửi mail; module `mail`) và `dyn Storage` (lưu file; module
 `files`).
+
+### Bản ghi mà module khác gắn dữ liệu vào
+
+Module như `comments` gắn dữ liệu vào bản ghi của module khác mà không phụ thuộc module đó
+(`autoxide_kernel::resource`):
+
+- `context.resource_type("shop.item", resolver)` trong `Module::start` cho module khác hỏi bản ghi
+  có không, có công khai không, lấy tiêu đề, đường dẫn và ảnh (`Resource::image`). Cài `resolve_many`
+  (nhiều ID một câu query, tiêu đề theo ngôn ngữ) khi module khác tra bản ghi của bạn theo lô, vd menu
+  của website; loại có cây (danh mục) trả `true` ở `has_children` và liệt kê mục con ở `children`. Cả
+  ba có mặc định nên bộ tra cũ vẫn chạy.
+- `Module::resource_events` khai event nào của bạn (trong `Module::events`, chủ thể `<loại>:<id>`)
+  nghĩa là `ResourceChange::Closed` (không nhận thêm gì) hay `ResourceChange::Removed` (đã gỡ: đóng và
+  ẩn mọi thứ gắn vào). Kernel kiểm lúc khởi động.
+- `context.badge_source(kind, &["seller"], resolver)` tính nhãn của tác giả trên bản ghi của loại bất
+  kỳ, vd `seller` cho người quản lý sản phẩm. Mỗi nhãn của một loại do một module tính; nhãn là mã ổn
+  định, không phải câu chữ.
+- `context.posting_verifier(…)` (một module trong cả chương trình) trả lời tài khoản đã xác thực để
+  đăng nội dung chưa (số điện thoại hay định danh); `context.posting_verification()` để hỏi. Chưa ai
+  đăng ký thì mọi tài khoản đăng nhập tính là đã xác thực.
 
 ### Dữ liệu cá nhân
 
@@ -234,7 +272,7 @@ Module giữ số tiền, số dư hay giao dịch dùng các công cụ của k
 - Việc người vận hành chạy tay thỉnh thoảng (làm lại dữ liệu dẫn xuất sau khi đổi cấu
   hình, dọn một lần) là một lệnh trong `Module::tasks`: một `Task` kèm các `TaskArgument`
   và một `TaskRun`, chạy bằng `autoxide task <module>.<lệnh> tên=giá_trị`. Nó gọi service,
-  như REST. Xem `modules/media/src/refresh.rs`.
+  như REST. Xem `modules/media/src/images/refresh.rs`.
 
 ### 10. Bản dịch
 

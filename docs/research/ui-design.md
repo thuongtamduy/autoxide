@@ -35,6 +35,21 @@ cấu hình chỉ ẩn bớt, không đảo chỗ.
 | 11 | Tuân thủ | `compliance` | 37 | mọi mô hình |
 | 12 | Cài đặt | kernel, `plans`, module kết nối | 33, 35 | mọi mô hình |
 
+Phần của bước 47–49 nằm trong các phân hệ trên, không thêm phân hệ thứ mười ba (đối chiếu thiết kế 2, B-b12):
+
+| Bước | Phần | Phân hệ | Hiện với mô hình |
+|---|---|---|---|
+| 47 | Hồ sơ khách (CRM), nhóm và phân khúc, điểm thưởng, hạng thành viên, thẻ quà tặng | 6 Khách hàng | mọi mô hình có bán hàng |
+| 48 | Kênh bán (Shopee, Lazada, TikTok Shop…), liên kết sản phẩm, phân bổ tồn, nguồn cấp sản phẩm Google / Meta | 2 Bán hàng (đơn từ kênh), 3 Sản phẩm (liên kết, nguồn cấp) | có bán hàng |
+| 49 | Tiếp thị liên kết (người tiếp thị, link, hoa hồng, chi trả), phiên livestream | 4 Tiếp thị | có bán hàng |
+
+Hai vai trò có khung riêng ngoài nhân viên của khách (B-b12):
+
+| Vai trò | Thấy gì | Bước |
+|---|---|---|
+| Người bán trên sàn | Khung quản trị thu gọn trong phạm vi gian hàng của mình (nút người bán): sản phẩm, đơn, trả hàng, tranh chấp, đối soát, phiếu hỗ trợ, sức khoẻ gian hàng; không thấy dữ liệu người bán khác | 46, 52, 53 |
+| Người tiếp thị | Trang riêng: link và mã của mình, đơn ghi nhận, hoa hồng chờ / được chi, chứng từ khấu trừ thuế; không thấy dữ liệu người mua | 49 |
+
 Ngoài ra có **mặt điều khiển** của nền tảng (khách hàng, gói, cấp phát, đội database, thuê bao, vào
 dữ liệu của khách để hỗ trợ) — một khung riêng cho nhân sự vận hành, khách không thấy.
 

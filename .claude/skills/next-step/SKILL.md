@@ -10,8 +10,9 @@ hứng, đừng nhảy cóc.
 
 ## 1. Xác định đang ở đâu
 
-1. Đọc `docs/ROADMAP.md`. Bước hiện tại là bước có số nhỏ nhất còn mục `[ ]`;
-   việc cần làm là mục `[ ]` đầu tiên trong bước đó.
+1. Đọc `docs/ROADMAP.md`. Các bước xếp theo **thứ tự làm**, không theo số (D-228). Bước hiện tại là
+   bước đầu tiên từ trên xuống còn mục `[ ]` mà các bước nó phụ thuộc (bảng "Phụ thuộc giữa các bước")
+   đã xong; việc cần làm là mục `[ ]` đầu tiên trong bước đó. Bước đã xong nằm ở `docs/roadmap/done.md`.
 2. Chạy `git status` và `git log --oneline -10`. Nếu cây làm việc có thay đổi
    chưa commit thì đó là việc dở của phiên trước: đọc diff, hoàn thành nó trước
    khi mở mục mới. Không vứt bỏ thay đổi dở.
@@ -67,8 +68,9 @@ hứng, đừng nhảy cóc.
    ```
 
    Kết thúc thông điệp bằng dòng ghi công mà phiên làm việc yêu cầu.
-4. Mục vừa xong là mục cuối của bước (mọi mục của bước đã `[x]`): **tự phát hành** theo
-   `docs/RELEASING.md` (D-171), không hỏi. Còn mục chưa xong thì **không push**.
+4. Mục vừa xong là mục cuối của bước (mọi mục của bước đã `[x]`): chạy gate đầy đủ rồi
+   **merge vào `main`**, không phát hành. Chỉ phát hành (theo `docs/RELEASING.md`, không hỏi) khi
+   bước đó là bước cuối của một giai đoạn của lộ trình, hay khi chủ dự án bảo (D-248).
 
 ## 6. Đi tiếp hay dừng
 

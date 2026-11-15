@@ -29,7 +29,10 @@ pub async fn render(settings: Settings) -> Result<String, String> {
     let runtime = runtime::start(settings, runtime::Migrations::Ignore).await?;
     let mut problems = http::lint(&runtime.api.openapi);
     problems.extend(runtime.api.schema_conflicts.iter().cloned());
-    let document = runtime.api.openapi.to_pretty_json();
+    // Qua `Value` để mọi khoá được sắp theo tên: extension của operation (`x-permissions`,
+    // `x-sunset`) nằm trong một `HashMap` của utoipa, thứ tự đổi giữa các lần sinh.
+    let document = serde_json::to_value(&runtime.api.openapi)
+        .and_then(|document| serde_json::to_string_pretty(&document));
     runtime.database.close().await.map_err(|error| format!("database: {error}"))?;
 
     if !problems.is_empty() {

@@ -75,4 +75,23 @@ mod tests {
             assert!(!is_valid(bad), "{bad}");
         }
     }
+
+    // Property test (đặc tả 31 B3): slug sinh từ tiêu đề bất kỳ (kể cả emoji, chữ lạ) luôn hợp
+    // lệ; thêm hậu tố vào slug hợp lệ vẫn hợp lệ.
+    proptest::proptest! {
+        #[test]
+        fn slug_tu_tieu_de_bat_ky_luon_hop_le(title in "\\PC{0,300}", id in proptest::prelude::any::<u128>()) {
+            let slug = from_title(&title, Uuid::from_u128(id));
+            proptest::prop_assert!(is_valid(&slug), "{slug:?} from {title:?}");
+        }
+
+        #[test]
+        fn them_hau_to_van_hop_le(base in "[a-z0-9]{1,30}(-[a-z0-9]{1,30}){0,6}", n in proptest::prelude::any::<u32>()) {
+            proptest::prop_assume!(is_valid(&base));
+            let slug = with_suffix(&base, n);
+            proptest::prop_assert!(is_valid(&slug), "{slug:?}");
+            let suffix = format!("-{n}");
+            proptest::prop_assert!(slug.ends_with(&suffix));
+        }
+    }
 }

@@ -38,6 +38,15 @@ pub(crate) const SIGNED_IN_ONLY: Setting = Setting::new(
 )
 .with_example("media.item");
 
+pub(crate) const VERIFIED_ONLY: Setting = Setting::new(
+    "AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES",
+    "Comma-separated target kinds where only verified accounts may comment or answer (e.g. \
+     product questions, Vietnam's Decree 147/2024): guests are refused, and signed-in users are \
+     checked with the module that keeps account verification. With no such module installed, \
+     every signed-in account counts as verified.",
+)
+.with_example("catalog.product");
+
 pub(crate) const GUEST_MODERATION: Setting = Setting::new(
     "AUTOXIDE_COMMENTS_GUEST_MODERATION",
     "When a guest's comment needs approval: `pre` (always), `first_time` (guests have no account \
@@ -68,6 +77,13 @@ pub(crate) const MAX_LINKS: Setting = Setting::new(
     "A comment with more links than this is held for approval (0 to 100).",
 )
 .with_default("2");
+
+pub(crate) const MARKDOWN: Setting = Setting::new(
+    "AUTOXIDE_COMMENTS_MARKDOWN",
+    "Whether comments may be written in Markdown (`true` or `false`): bold, italics, links, \
+     quotes and code, rendered to safe HTML. Plain text works either way.",
+)
+.with_default("true");
 
 pub(crate) const EDIT_MINUTES: Setting = Setting::new(
     "AUTOXIDE_COMMENTS_EDIT_MINUTES",
@@ -207,12 +223,16 @@ pub(crate) struct CommentsConfig {
     pub target_types: Vec<String>,
     pub allow_guests: bool,
     pub signed_in_only: Vec<String>,
+    /// Loại đích chỉ tài khoản đã xác thực được viết (D-202).
+    pub verified_only: Vec<String>,
     pub guest_mode: Mode,
     pub user_mode: Mode,
     /// (loại đích, `true` = khách) → chế độ.
     pub mode_overrides: BTreeMap<(String, bool), Mode>,
     pub max_length: usize,
     pub max_links: usize,
+    /// Nhận bài viết bằng Markdown (D-252).
+    pub markdown: bool,
     pub edit_minutes: u32,
     pub report_threshold: u32,
     /// 0: không tự đóng.
@@ -240,11 +260,13 @@ impl Default for CommentsConfig {
             target_types: vec!["content.entry".to_owned()],
             allow_guests: true,
             signed_in_only: Vec::new(),
+            verified_only: Vec::new(),
             guest_mode: Mode::Pre,
             user_mode: Mode::FirstTime,
             mode_overrides: BTreeMap::new(),
             max_length: 4000,
             max_links: 2,
+            markdown: true,
             edit_minutes: 15,
             report_threshold: 3,
             auto_close_days: 0,
@@ -277,12 +299,15 @@ impl CommentsConfig {
         let guests = reader.get_with(&ALLOW_GUESTS, flag);
         let signed_in_only =
             reader.optional_with(&SIGNED_IN_ONLY, kinds).map(Option::unwrap_or_default);
+        let verified_only =
+            reader.optional_with(&VERIFIED_ONLY, kinds).map(Option::unwrap_or_default);
         let guest_mode = reader.get_with(&GUEST_MODERATION, mode);
         let user_mode = reader.get_with(&USER_MODERATION, mode);
         let overrides =
             reader.optional_with(&MODERATION_BY_TYPE, overrides).map(Option::unwrap_or_default);
         let max_length = reader.get_with(&MAX_LENGTH, |raw| parse_in_range(raw, 10usize, 20_000));
         let max_links = reader.get_with(&MAX_LINKS, |raw| parse_in_range(raw, 0usize, 100));
+        let markdown = reader.get_with(&MARKDOWN, flag);
         let edit = reader.get_with(&EDIT_MINUTES, |raw| parse_in_range(raw, 0u32, 1440));
         let threshold = reader.get_with(&REPORT_THRESHOLD, |raw| parse_in_range(raw, 1u32, 1000));
         let close = reader.get_with(&AUTO_CLOSE_DAYS, |raw| parse_in_range(raw, 0u32, 36_500));
@@ -317,11 +342,13 @@ impl CommentsConfig {
             target_types,
             allow_guests: guests?,
             signed_in_only: signed_in_only?,
+            verified_only: verified_only?,
             guest_mode: guest_mode?,
             user_mode: user_mode?,
             mode_overrides,
             max_length: max_length?,
             max_links: max_links?,
+            markdown: markdown?,
             edit_minutes: edit?,
             report_threshold: threshold?,
             auto_close_days: close?,

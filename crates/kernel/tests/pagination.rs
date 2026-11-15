@@ -284,3 +284,83 @@ async fn sap_theo_cot_khac_lat_trang_khong_trung_khong_sot() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn trang_theo_tang_xep_tang_truoc_lat_khong_trung_khong_sot() {
+    use autoxide_kernel::pagination::{PageQuery, fetch_page_tiers};
+    use sea_orm::Condition;
+
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        // 9 dòng: a, b, c, a, b, c… — tầng 1 là `b`, tầng 2 là `a` (không khớp tầng 1); `c` bị bỏ.
+        let mut ids = Vec::new();
+        for index in 0..9 {
+            let id = Uuid::now_v7();
+            let kind = ["a", "b", "c"][index % 3];
+            item::ActiveModel { id: Set(id), kind: Set(kind.to_owned()) }
+                .insert(db.write())
+                .await
+                .unwrap();
+            ids.push((kind, id));
+        }
+        let tiers = [
+            Condition::all().add(item::Column::Kind.eq("b")),
+            Condition::all().add(item::Column::Kind.is_in(["a", "b"])),
+        ];
+        for (direction, order) in [("asc", Order::Asc), ("desc", Order::Desc)] {
+            let mut cursor: Option<String> = None;
+            let (mut seen, mut pages) = (Vec::new(), 0);
+            loop {
+                let query = PageQuery::new(
+                    Some("2".to_owned()),
+                    cursor.clone(),
+                    Some(direction.to_owned()),
+                );
+                let request = PageRequest::try_from(query).unwrap();
+                let page = fetch_page_tiers(
+                    item::Entity::find(),
+                    &tiers,
+                    item::Column::Id,
+                    |row| row.id,
+                    &request,
+                    db.read(),
+                )
+                .await
+                .unwrap();
+                pages += 1;
+                seen.extend(page.data.iter().map(|row| row.id));
+                match page.pagination.next_cursor {
+                    Some(next) => cursor = Some(next),
+                    None => break,
+                }
+            }
+            let tier = |kind: &str| {
+                let mut found: Vec<Uuid> =
+                    ids.iter().filter(|(k, _)| *k == kind).map(|(_, id)| *id).collect();
+                if order == Order::Desc {
+                    found.reverse();
+                }
+                found
+            };
+            let expected: Vec<Uuid> = tier("b").into_iter().chain(tier("a")).collect();
+            assert_eq!(seen, expected, "{direction}");
+            assert_eq!(pages, 3, "6 rows, 2 per page, no empty last page");
+        }
+
+        // Con trỏ theo ID không dùng được cho danh sách theo tầng.
+        let request = PageRequest::first(2, Order::Asc).after(ids[0].1);
+        let error = fetch_page_tiers(
+            item::Entity::find(),
+            &tiers,
+            item::Column::Id,
+            |row| row.id,
+            &request,
+            db.read(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.fields()[0].field, "cursor");
+    })
+    .await
+    .unwrap();
+}

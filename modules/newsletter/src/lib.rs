@@ -7,23 +7,18 @@
 //! Mail đi qua `dyn Mailer` nên module đăng ký SAU module `mail`; bài mới lấy qua sổ đối tượng
 //! của kernel nên đăng ký SAU `content`. Hướng dẫn dùng: `docs/NEWSLETTER.md`.
 
-mod bounces;
+mod audience;
 mod campaigns;
-mod compose;
 mod config;
 mod entity;
 mod events;
 mod http;
-mod lists;
 mod migration;
-mod new_posts;
 mod permissions;
 mod privacy;
 mod public;
 mod retention;
-mod sending;
 mod service;
-mod subscribers;
 mod text;
 mod tools;
 
@@ -109,7 +104,7 @@ impl Module for NewsletterModule {
         };
         // Nghe event của module khác bằng tên — chỉ khi module đó có trong chương trình (đăng ký
         // nhận một event không ai khai là lỗi khởi động).
-        self.listens_published = context.events().contains(new_posts::ENTRY_PUBLISHED);
+        self.listens_published = context.events().contains(campaigns::new_posts::ENTRY_PUBLISHED);
         self.listens_failures = context.events().contains(autoxide_kernel::mail::DELIVERY_FAILED);
         let service = Arc::new(NewsletterService::new(parts, config));
         context.personal_data(service.clone())?;
@@ -127,14 +122,14 @@ impl Module for NewsletterModule {
         ];
         if self.listens_published {
             subscriptions.push(Subscription::new(
-                new_posts::ENTRY_PUBLISHED,
-                Arc::new(new_posts::NewPostHandler(service.clone())),
+                campaigns::new_posts::ENTRY_PUBLISHED,
+                Arc::new(campaigns::new_posts::NewPostHandler(service.clone())),
             ));
         }
         if self.listens_failures {
             subscriptions.push(Subscription::new(
                 autoxide_kernel::mail::DELIVERY_FAILED,
-                Arc::new(bounces::DeliveryFailures(service)),
+                Arc::new(audience::bounces::DeliveryFailures(service)),
             ));
         }
         subscriptions
@@ -144,10 +139,13 @@ impl Module for NewsletterModule {
         self.service.clone().map_or_else(Vec::new, |service| {
             vec![
                 JobRegistration::new(
-                    sending::PREPARE,
-                    Arc::new(sending::Preparer(service.clone())),
+                    campaigns::sending::PREPARE,
+                    Arc::new(campaigns::sending::Preparer(service.clone())),
                 ),
-                JobRegistration::new(sending::SEND, Arc::new(sending::Sender(service.clone()))),
+                JobRegistration::new(
+                    campaigns::sending::SEND,
+                    Arc::new(campaigns::sending::Sender(service.clone())),
+                ),
                 JobRegistration::new(
                     public::SUBSCRIBE,
                     Arc::new(public::Subscriber(service.clone())),

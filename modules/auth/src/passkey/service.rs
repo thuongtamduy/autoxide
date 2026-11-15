@@ -176,8 +176,39 @@ impl PasskeyService {
         fetch_page(select, passkey::Column::Id, |row| row.id, page, self.database.read()).await
     }
 
-    /// Xoá passkey `id` của người dùng `user_id`.
+    /// Xoá passkey `id` của người dùng `user_id` (chính người đó gỡ).
     pub(crate) async fn delete(&self, user_id: Uuid, id: Uuid) -> Result<(), Error> {
+        self.remove(Actor::user(user_id), user_id, id, false).await
+    }
+
+    /// Quản trị viên (`actor`) gỡ passkey `id` của người dùng `user_id`; event ghi
+    /// `by_administrator`. Bên gọi đã kiểm permission và `require_covers`.
+    pub(crate) async fn remove_for(
+        &self,
+        actor: Actor,
+        user_id: Uuid,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        self.remove(actor, user_id, id, true).await
+    }
+
+    /// Quản trị viên (hay người vận hành qua CLI) gỡ mọi passkey của `user_id`. Trả số passkey
+    /// đã gỡ.
+    pub(crate) async fn remove_all_for(&self, actor: Actor, user_id: Uuid) -> Result<u64, Error> {
+        let transaction = self.database.begin_write().await?;
+        let removed = remove_all_in(&transaction, &self.outbox, actor, user_id, true).await?;
+        transaction.commit().await?;
+        tracing::info!(user_id = %user_id, removed, "passkeys removed by an administrator");
+        Ok(removed)
+    }
+
+    async fn remove(
+        &self,
+        actor: Actor,
+        user_id: Uuid,
+        id: Uuid,
+        by_admin: bool,
+    ) -> Result<(), Error> {
         let transaction = self.database.begin_write().await?;
         let row = passkey::Entity::find_by_id(id)
             .one(&transaction)
@@ -189,10 +220,8 @@ impl PasskeyService {
             transaction.rollback().await?;
             return Err(passkey_not_found(id));
         }
-        let event = events::PasskeyRemoved { before: Some(json!({"name": row.name})), after: None };
-        self.outbox
-            .record(&transaction, Actor::user(user_id), events::user_subject(user_id), &event)
-            .await?;
+        let event = removed_event(&row.name, by_admin);
+        self.outbox.record(&transaction, actor, events::user_subject(user_id), &event).await?;
         transaction.commit().await?;
         Ok(())
     }
@@ -347,15 +376,25 @@ pub(crate) async fn remove_all_in<C: ConnectionTrait>(
     outbox: &Outbox,
     actor: Actor,
     user_id: Uuid,
+    by_admin: bool,
 ) -> Result<u64, Error> {
     let rows =
         passkey::Entity::find().filter(passkey::Column::UserId.eq(user_id)).all(connection).await?;
     for row in &rows {
         passkey::Entity::delete_by_id(row.id).exec(connection).await?;
-        let event = events::PasskeyRemoved { before: Some(json!({"name": row.name})), after: None };
+        let event = removed_event(&row.name, by_admin);
         outbox.record(connection, actor, events::user_subject(user_id), &event).await?;
     }
     Ok(rows.len() as u64)
+}
+
+/// Event `auth.passkey_removed`; quản trị viên gỡ thì `after.by_administrator` (như
+/// `auth.mfa_disabled`, D-159).
+fn removed_event(name: &str, by_admin: bool) -> events::PasskeyRemoved {
+    events::PasskeyRemoved {
+        before: Some(json!({"name": name})),
+        after: by_admin.then(|| json!({"by_administrator": true})),
+    }
 }
 
 /// Bỏ mọi nghi thức đăng ký passkey đang dở của `user_id` trong `connection`: đổi mật khẩu thì

@@ -1,0 +1,26 @@
+[
+  {
+    "base": "v0.13.0",
+    "rule": "response.type_changed",
+    "at": "GET /api/v1/forms/data 200 $.data.submissions[].answers[].value",
+    "decision": "D-241"
+  },
+  {
+    "base": "v0.13.0",
+    "rule": "response.type_changed",
+    "at": "GET /api/v1/forms/submissions/{id} 200 $.data.answers[].value",
+    "decision": "D-241"
+  },
+  {
+    "base": "v0.13.0",
+    "rule": "response.type_changed",
+    "at": "GET /api/v1/forms/{id}/submissions 200 $.data[].answers[].value",
+    "decision": "D-241"
+  },
+  {
+    "base": "v0.13.0",
+    "rule": "response.type_changed",
+    "at": "PATCH /api/v1/forms/submissions/{id} 200 $.data.answers[].value",
+    "decision": "D-241"
+  }
+]

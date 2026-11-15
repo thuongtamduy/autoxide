@@ -9,7 +9,7 @@ Autoxide: lõi backend Rust, core trước, module cắm vào sau.
 
 - **Dùng gì, vì sao** → [`STACK.md`](STACK.md)
 - **Làm gì tiếp** → [`docs/ROADMAP.md`](docs/ROADMAP.md)
-- **Làm một bước thế nào** → [`docs/steps/`](docs/steps/README.md) (đặc tả bước 30–49)
+- **Làm một bước thế nào** → [`docs/steps/`](docs/steps/README.md) (đặc tả bước 30–56)
 - **Đã quyết gì** → [`docs/DECISIONS.md`](docs/DECISIONS.md)
 
 ## Mục tiêu — không được quên
@@ -56,11 +56,13 @@ Hệ quả cho agent:
 - Người lạ phải tự cài và dùng được: cấu hình có giá trị mặc định hợp lý, thông báo
   lỗi rõ, tài liệu cài đặt đủ để làm theo mà không cần hỏi ai.
 - Chỉ dựng module nghiệp vụ chủ dự án đã giao: `media` (D-091), `content` (D-096, D-098),
-  `forms`, `newsletter`, `comments` (D-112), module mẫu `notes`, module nền `address` (đơn vị
-  hành chính, D-193) và `notifications` (D-194), và module thương mại của bước 41–49: `catalog`,
+  `forms`, `newsletter`, `comments` (D-112), `menus` (menu của website, bước 68, D-238), module mẫu
+  `notes`, module nền `address` (đơn vị hành chính, D-193) và `notifications` (D-194), và module thương mại của bước 41–49: `catalog`,
   `inventory`, `promotions`, `shipping`, `orders`, `marketplace` (D-191), `customers`, `channels`,
-  `affiliate` (D-194). Khái niệm của `content` (bài viết, trang, slug…) và của thương
-  mại (sản phẩm, đơn hàng, kho…) không vào core.
+  `affiliate` (D-194), cùng `support` (hỗ trợ khách hàng, bước 53, D-204), `imports` (chuyển dữ liệu,
+  bước 56, D-219), `analytics` (bước 57), `automations` (bước 58, D-220), `wholesale`, `bookings`,
+  `conversations`, `recurring`, `ads`, `apps` (bước 59–65, D-221). Khái niệm của `content`
+  (bài viết, trang, slug…) và của thương mại (sản phẩm, đơn hàng, kho…) không vào core.
 - Repo là công khai: mọi file, commit message, comment và tài liệu đều viết với
   giả định người lạ sẽ đọc. Không ghi tên máy chủ, IP, đường dẫn riêng hay thông
   tin cá nhân của chủ dự án. **Công khai không áp cho secret** — secret không bao
@@ -180,8 +182,9 @@ sẵn lệnh.
   miễn) hoặc trong `tests/` với dòng `#![allow(…)]` đầu file như các file sẵn có.
   Trong `src/` không được tắt các lint này — `cargo xtask check` chặn.
 - Xong một mục: đánh dấu trong `docs/ROADMAP.md`, rồi `git commit` cục bộ. Xong trọn một
-  bước (mọi mục `[x]`) thì tự phát hành theo `docs/RELEASING.md` (D-171); ngoài lúc đó không
-  push khi chủ dự án chưa yêu cầu.
+  bước (mọi mục `[x]`, gate đầy đủ xanh) thì merge vào `main`, **không** phát hành: gom nhiều
+  bước thành một bản lớn, phát hành khi xong một giai đoạn của lộ trình hay khi chủ dự án bảo
+  (D-248, thay D-171). Theo `docs/RELEASING.md`.
 
 ## Bố cục workspace
 

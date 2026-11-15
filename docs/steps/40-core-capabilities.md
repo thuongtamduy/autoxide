@@ -276,7 +276,7 @@ Endpoint (mỗi module, dưới tiền tố của nó):
   `AUTOXIDE_FILES_DIRECT_MAX_BYTES`, loại thuộc `AUTOXIDE_FILES_ALLOWED_TYPES`, tên hợp lệ — gom lỗi
   một lần (D-083). Giữ chỗ hạn mức dung lượng của khách (`Entitlements::reserve`, mã tham chiếu = id).
 - `POST /api/v1/files/uploads/{id}/complete` → `head` (cỡ đúng), đọc `get_range(0..HEAD_BYTES)` kiểm
-  loại thật (cách của `media/src/sniff.rs`), nếu nơi lưu không xác nhận checksum thì đọc luồng băm
+  loại thật (cách của `media/src/library/sniff.rs`), nếu nơi lưu không xác nhận checksum thì đọc luồng băm
   SHA-256; đạt → tạo bản ghi + event `files.file_uploaded` trong một transaction, xác nhận hạn mức;
   không đạt → xoá object, `files.upload_mismatch` (422, nói rõ cỡ / loại / hash nào sai). Gọi lại sau
   khi đã xong → 200 trả cùng bản ghi (agent hay retry; có `Idempotency-Key` càng tốt).
@@ -504,3 +504,35 @@ Mọi test chạm database qua `TestDatabase::run` (SQLite và Postgres), qua RE
 - `k` của lô rate limit, ngưỡng giữ `memory` mặc định, `grace` và chu kỳ hỏi của SSE — theo số đo.
 - Có thêm `/llms-full.txt` (gộp hướng dẫn các module) hay không — khuyến nghị chưa, tới khi có module
   khai tài liệu riêng cho agent.
+
+## Bổ sung theo D-220
+
+### P7 — Bộ máy tìm kiếm thay được (sau bước 33)
+
+`autoxide_kernel::search` hiện là "chứa chuỗi" trên cột khoá tìm (`LIKE`), tài liệu ghi chỉ đủ cho vài trăm
+nghìn dòng. Thêm trait để sàn có hàng triệu sản phẩm cắm bộ tìm chuyên dụng mà module không phải sửa:
+
+```rust
+#[async_trait] pub trait SearchBackend: Send + Sync {
+    async fn index(&self, tenant: &TenantContext, docs: &[SearchDoc]) -> Result<(), Error>;   // upsert
+    async fn remove(&self, tenant: &TenantContext, kind: &str, ids: &[Uuid]) -> Result<(), Error>;
+    async fn query(&self, tenant: &TenantContext, q: &SearchQuery) -> Result<SearchHits, Error>;
+}
+pub struct SearchDoc { pub kind: String, pub id: Uuid, pub org_id: OrgId, pub locale: String,
+    pub fields: BTreeMap<String, String> /* đã khai trọng số */, pub filters: BTreeMap<String, Value> }
+```
+
+- **Mặc định `DatabaseSearch`** (trong kernel): bảng `kernel_search_docs` (một dòng mỗi tài liệu, cột
+  `exact_key` và `fold_key` như D-202, bộ lọc là cột có index), hai tầng đúng dấu / không dấu
+  (`fetch_page_tiers`) — chạy như nhau trên hai database, không cần dịch vụ ngoài.
+- **Bộ cắm ngoài** (Meilisearch, Typesense, OpenSearch) là module riêng làm khi có nhu cầu đo được, đăng ký
+  bằng `context.search_backend(…)`; chọn bằng `AUTOXIDE_SEARCH_BACKEND` (`database` mặc định). Gọi mạng
+  ngoài transaction: module ghi tài liệu cần đánh chỉ mục vào outbox, job đồng bộ sang backend (chịu nhận lại).
+- Module khai loại tài liệu tìm được (`Module::search_documents` → loại, trường, trọng số, bộ lọc, quyền
+  đọc) — dùng chung cho tìm công khai (gợi ý tìm bước 41) và tìm xuyên phân hệ (P3 bước 51). Kết quả luôn lọc
+  theo khách và phạm vi nút **trong** backend (bộ lọc `org_id`), không lọc sau.
+- `autoxide task kernel.reindex [--kind]` dựng lại chỉ mục. Đo trên bộ dữ liệu lớn của bước 39 trước khi
+  khuyên dùng backend ngoài; ghi số đo vào `docs/BENCHMARKS.md`.
+- Test (cả hai database): `tim_khong_dau_dung_dau_xep_truoc`, `ket_qua_khong_lo_sang_khach_khac`,
+  `ket_qua_loc_theo_pham_vi_nut`, `xoa_ban_ghi_thi_bien_khoi_ket_qua`, `dong_bo_chiu_nhan_lai_event`,
+  `backend_gia_thay_duoc_khong_sua_module`.

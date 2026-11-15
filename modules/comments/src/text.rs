@@ -1,11 +1,16 @@
 //! Chữ của bình luận: lọc, đếm link, dựng HTML an toàn, so từ cấm, email, tên.
 //!
-//! Bản đầu chỉ có **chữ thường** (D-112 mục 11 của khảo sát): máy chủ lưu đúng chữ người viết
-//! (đã lọc ký tự điều khiển) và dựng HTML khi trả về: escape mọi ký tự đặc biệt, xuống dòng thành
-//! `<br>`, chỉ địa chỉ `http://` / `https://` thành link, có `rel="nofollow ugc noopener"`. Tự
-//! viết vài chục dòng thay vì thêm thư viện (Markdown + sanitizer để sau).
+//! Hai định dạng ([`Format`]); máy chủ lưu đúng chữ người viết (đã lọc ký tự điều khiển) và dựng
+//! HTML khi trả về:
+//!
+//! - **chữ thường** (D-112): escape mọi ký tự đặc biệt, xuống dòng thành `<br>`, chỉ địa chỉ
+//!   `http://` / `https://` thành link, có `rel="nofollow ugc noopener"`;
+//! - **Markdown giới hạn** (D-252): `pulldown-cmark` đọc, bộ dựng ở đây chỉ ra một danh sách
+//!   thẻ cố định — không có đường nào cho HTML của người viết đi qua.
 
 use autoxide_kernel::error::FieldError;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Giá trị `rel` của mọi link trong bình luận (Google khuyên `ugc` cho nội dung người dùng).
 pub(crate) const LINK_REL: &str = "nofollow ugc noopener";
@@ -218,20 +223,164 @@ pub(crate) fn link_count(body: &str) -> usize {
     pieces(body).iter().filter(|piece| matches!(piece, Piece::Link(_))).count()
 }
 
-/// HTML an toàn của bài: mọi chữ đã escape, xuống dòng thành `<br>`, link `http(s)` có
-/// `rel="nofollow ugc noopener"`.
-pub(crate) fn to_html(body: &str) -> String {
+/// HTML an toàn của bài chữ thường: mọi chữ đã escape, xuống dòng thành `<br>`, link `http(s)`
+/// có `rel="nofollow ugc noopener"`.
+fn plain_html(body: &str) -> String {
     let mut html = String::with_capacity(body.len() + 32);
-    for piece in pieces(body) {
+    push_plain(&mut html, body, &mut 0);
+    html
+}
+
+/// Thêm `text` (chữ thường) vào `html`: escape, xuống dòng thành `<br>`, địa chỉ `http(s)`
+/// thành link (đếm vào `links`).
+fn push_plain(html: &mut String, text: &str, links: &mut usize) {
+    for piece in pieces(text) {
         match piece {
             Piece::Text(text) => html.push_str(&escape(text).replace('\n', "<br>\n")),
             Piece::Link(link) => {
+                *links += 1;
                 let link = escape(link);
                 html.push_str(&format!("<a href=\"{link}\" rel=\"{LINK_REL}\">{link}</a>"));
             }
         }
     }
-    html
+}
+
+/// How the body of a comment is written: `text` (plain text; addresses become links) or
+/// `markdown` (a small part of Markdown: bold, italics, links, quotes, code).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum Format {
+    #[default]
+    Text,
+    Markdown,
+}
+
+impl Format {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Format::Text => "text",
+            Format::Markdown => "markdown",
+        }
+    }
+
+    /// Định dạng lưu trong cột `format`; giá trị lạ (không có) thì coi là chữ thường.
+    pub(crate) fn from_column(raw: &str) -> Self {
+        if raw == "markdown" { Format::Markdown } else { Format::Text }
+    }
+}
+
+/// HTML an toàn của bài theo định dạng của nó.
+pub(crate) fn to_html(body: &str, format: Format) -> String {
+    match format {
+        Format::Text => plain_html(body),
+        Format::Markdown => markdown(body).0,
+    }
+}
+
+/// Số link trong bài theo định dạng của nó: địa chỉ trần và (Markdown) link `[a](url)`,
+/// `<url>`, link kiểu tham chiếu — giới hạn link của chống spam không bị lách.
+pub(crate) fn links(body: &str, format: Format) -> usize {
+    match format {
+        Format::Text => link_count(body),
+        Format::Markdown => markdown(body).1,
+    }
+}
+
+/// Dựng HTML từ Markdown theo **danh sách thẻ cho phép** (D-252): chỉ ra `<p>`, `<br>`,
+/// `<strong>`, `<em>`, `<a href rel>`, `<blockquote>`, `<code>`, `<pre><code>`. Mọi chữ đi qua
+/// `escape`; HTML thô thành chữ đã escape; link chỉ `http(s)` (link khác thành chữ của nó); ảnh
+/// thành chữ `alt` (không có `<img>`: chặn ảnh theo dõi); tiêu đề, mục danh sách thành đoạn văn;
+/// đường kẻ bỏ. Bảng, chú thích, gạch ngang… không bật (`Options::empty()`). Trả HTML và số link.
+fn markdown(body: &str) -> (String, usize) {
+    use pulldown_cmark::{Event, Options, Parser, Tag};
+
+    let mut html = String::with_capacity(body.len() + body.len() / 4 + 16);
+    let mut links = 0;
+    // Thẻ đóng ứng với mỗi thẻ mở, theo thứ tự lồng: mỗi `Start` có đúng một `End`.
+    let mut closing: Vec<&'static str> = Vec::new();
+    // Đang trong link / ảnh (chữ không tự thành link lồng nhau) hay khối code (giữ xuống dòng).
+    let mut in_link = 0usize;
+    let mut in_image = 0usize;
+    let mut in_code_block = false;
+    for event in Parser::new_ext(body, Options::empty()) {
+        match event {
+            Event::Start(tag) => {
+                let (open, close): (String, &'static str) = match tag {
+                    Tag::Paragraph | Tag::Heading { .. } | Tag::Item | Tag::HtmlBlock => {
+                        ("<p>".to_owned(), "</p>\n")
+                    }
+                    Tag::BlockQuote(_) => ("<blockquote>\n".to_owned(), "</blockquote>\n"),
+                    Tag::CodeBlock(_) => {
+                        in_code_block = true;
+                        ("<pre><code>".to_owned(), "</code></pre>\n")
+                    }
+                    Tag::Emphasis => ("<em>".to_owned(), "</em>"),
+                    Tag::Strong => ("<strong>".to_owned(), "</strong>"),
+                    Tag::Link { dest_url, .. } if in_link == 0 && in_image == 0 => {
+                        in_link += 1;
+                        if is_web_link(&dest_url) {
+                            links += 1;
+                            let href = escape(&dest_url);
+                            (format!("<a href=\"{href}\" rel=\"{LINK_REL}\">"), "</a>")
+                        } else {
+                            (String::new(), "")
+                        }
+                    }
+                    Tag::Link { .. } => {
+                        in_link += 1;
+                        (String::new(), "")
+                    }
+                    Tag::Image { .. } => {
+                        in_image += 1;
+                        (String::new(), "")
+                    }
+                    _ => (String::new(), ""),
+                };
+                html.push_str(&open);
+                closing.push(close);
+            }
+            Event::End(end) => {
+                use pulldown_cmark::TagEnd;
+                match end {
+                    TagEnd::Link => in_link = in_link.saturating_sub(1),
+                    TagEnd::Image => in_image = in_image.saturating_sub(1),
+                    TagEnd::CodeBlock => in_code_block = false,
+                    _ => {}
+                }
+                html.push_str(closing.pop().unwrap_or_default());
+            }
+            Event::Text(text) => {
+                if in_code_block {
+                    html.push_str(&escape(&text));
+                } else if in_link > 0 || in_image > 0 {
+                    html.push_str(&escape(&text).replace('\n', "<br>\n"));
+                } else {
+                    push_plain(&mut html, &text, &mut links);
+                }
+            }
+            Event::Code(code) => {
+                html.push_str("<code>");
+                html.push_str(&escape(&code));
+                html.push_str("</code>");
+            }
+            // HTML thô không bao giờ ra như HTML: thành chữ người đọc thấy.
+            Event::Html(raw) | Event::InlineHtml(raw) => {
+                html.push_str(&escape(&raw).replace('\n', "<br>\n"));
+            }
+            Event::SoftBreak | Event::HardBreak => html.push_str("<br>\n"),
+            _ => {}
+        }
+    }
+    (html, links)
+}
+
+/// Link được phép trong bài: chỉ `http://` / `https://` (không `javascript:`, `data:`,
+/// `mailto:`, đường dẫn tương đối…), như bài chữ thường.
+fn is_web_link(url: &str) -> bool {
+    let lower = url.trim().to_ascii_lowercase();
+    (lower.starts_with("http://") && lower.len() > 7)
+        || (lower.starts_with("https://") && lower.len() > 8)
 }
 
 /// Dạng đem so của từ / tên: không hoa thường, không dấu, mỗi từ cách một khoảng trắng.
@@ -401,7 +550,7 @@ mod tests {
 
     #[test]
     fn xss_bi_chan() {
-        let html = to_html("<script>alert(1)</script> <img src=x onerror=alert(1)>");
+        let html = to_html("<script>alert(1)</script> <img src=x onerror=alert(1)>", Format::Text);
         assert_eq!(
             html,
             "&lt;script&gt;alert(1)&lt;/script&gt; &lt;img src=x onerror=alert(1)&gt;"
@@ -410,23 +559,89 @@ mod tests {
         for text in
             ["javascript:alert(1)", "JaVaScRiPt:alert(1)", "data:text/html,<b>x</b>", "vbscript:x"]
         {
-            assert!(!to_html(text).contains("<a "), "{text}");
+            assert!(!to_html(text, Format::Text).contains("<a "), "{text}");
         }
         // Link có dấu ngoặc kép / thuộc tính chèn vào thì bị cắt trước ký tự đó và escape.
-        let html = to_html("https://example.com/\"onmouseover=\"alert(1)");
+        let html = to_html("https://example.com/\"onmouseover=\"alert(1)", Format::Text);
         assert_eq!(
             html,
             "<a href=\"https://example.com/\" rel=\"nofollow ugc noopener\">https://example.com/</a>&quot;onmouseover=&quot;alert(1)"
         );
-        let html = to_html("x https://a.example/?q=<b>&r=1");
+        let html = to_html("x https://a.example/?q=<b>&r=1", Format::Text);
         assert!(html.contains("href=\"https://a.example/?q=\""), "{html}");
         assert!(html.contains("&lt;b&gt;&amp;r=1"), "{html}");
         assert!(!html.contains("<b>"), "{html}");
     }
 
     #[test]
+    fn markdown_chi_ra_the_cho_phep() {
+        let rel = LINK_REL;
+        assert_eq!(
+            to_html("**đậm** và *nghiêng*, `x<y`", Format::Markdown),
+            "<p><strong>đậm</strong> và <em>nghiêng</em>, <code>x&lt;y</code></p>\n"
+        );
+        let html = to_html("> trích\n\n```\na < b\n```", Format::Markdown);
+        assert_eq!(
+            html,
+            "<blockquote>\n<p>trích</p>\n</blockquote>\n<pre><code>a &lt; b\n</code></pre>\n"
+        );
+        let html =
+            to_html("[Ví dụ](https://example.com/a) và <https://b.example>", Format::Markdown);
+        assert_eq!(
+            html,
+            format!(
+                "<p><a href=\"https://example.com/a\" rel=\"{rel}\">Ví dụ</a> và <a href=\"https://b.example\" rel=\"{rel}\">https://b.example</a></p>\n"
+            )
+        );
+        // Tiêu đề, danh sách thành đoạn văn; đường kẻ bỏ; xuống dòng giữ.
+        assert_eq!(
+            to_html("# Tiêu đề\n\n- một\n- hai\n\n---\ndòng 1\ndòng 2", Format::Markdown),
+            "<p>Tiêu đề</p>\n<p>một</p>\n<p>hai</p>\n<p>dòng 1<br>\ndòng 2</p>\n"
+        );
+        // Link kiểu tham chiếu và địa chỉ trần cũng là link, và được đếm.
+        let text = "[a][1] rồi https://c.example\n\n[1]: https://a.example";
+        assert_eq!(links(text, Format::Markdown), 2);
+        assert_eq!(to_html(text, Format::Markdown).matches("<a ").count(), 2);
+    }
+
+    #[test]
+    fn markdown_xss_bi_chan() {
+        for (text, forbidden) in [
+            ("<script>alert(1)</script>", "<script"),
+            ("<div onclick=\"x()\">hi</div>", "<div"),
+            ("a <b onmouseover=x>b</b>", "<b "),
+            ("[x](javascript:alert(1))", "javascript:\""),
+            ("[x](JAVASCRIPT:alert(1))", "href"),
+            ("[x](data:text/html,<b>x</b>)", "href"),
+            ("[x](/relative)", "href"),
+            ("<javascript:alert(1)>", "href"),
+            ("![theo dõi](https://tracker.example/p.gif)", "<img"),
+            ("[![a](https://i.example/x.png)](https://x.example)", "<img"),
+            ("[[lồng](https://a.example)](https://b.example)", "\"><a "),
+            ("&lt;script&gt; &#60;b&#62;", "<b>"),
+            ("<a href=\"https://x.example\" onclick=\"y\">z</a>", "onclick=\""),
+        ] {
+            let html = to_html(text, Format::Markdown);
+            assert!(!html.contains(forbidden), "{text} → {html}");
+            assert!(tags_allowed(&html, true).is_ok(), "{text} → {html}");
+        }
+        // Ảnh thành chữ `alt`; HTML thô thành chữ người đọc thấy.
+        assert_eq!(
+            to_html("![theo dõi](https://tracker.example/p.gif)", Format::Markdown),
+            "<p>theo dõi</p>\n"
+        );
+        assert_eq!(
+            to_html("<script>alert(1)</script>", Format::Markdown),
+            "<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>\n"
+        );
+        // Bài chữ thường có `*` không đổi nghĩa: chỉ Markdown mới định dạng.
+        assert_eq!(to_html("**không đậm**", Format::Text), "**không đậm**");
+    }
+
+    #[test]
     fn link_va_xuong_dong() {
-        let html = to_html("Xem https://example.com/a_(b), và HTTP://Example.com.\nHết");
+        let html =
+            to_html("Xem https://example.com/a_(b), và HTTP://Example.com.\nHết", Format::Text);
         assert_eq!(
             html,
             "Xem <a href=\"https://example.com/a_(b)\" rel=\"nofollow ugc noopener\">https://example.com/a_(b)</a>, và <a href=\"HTTP://Example.com\" rel=\"nofollow ugc noopener\">HTTP://Example.com</a>.<br>\nHết"
@@ -436,7 +651,7 @@ mod tests {
             2
         );
         assert_eq!(
-            to_html("(see https://x.example)"),
+            to_html("(see https://x.example)", Format::Text),
             "(see <a href=\"https://x.example\" rel=\"nofollow ugc noopener\">https://x.example</a>)"
         );
     }
@@ -524,5 +739,91 @@ mod tests {
         // Tên tiếng Nga, Hy Lạp thật không bị coi là tên dành riêng.
         assert!(!contains_name("Анна Каренина", &reserved));
         assert!(!contains_name("Σωκράτης", &reserved));
+    }
+
+    // Property test (đặc tả 31 B3, chống XSS): với chữ bất kỳ, HTML ra chỉ có `<a href="http(s)://…"
+    // rel="nofollow ugc noopener">`, `</a>`, `<br>`; `escape` không để lọt ký tự HTML thô; số link
+    // đếm được bằng số thẻ `<a`.
+    fn tags_are_safe(html: &str) -> Result<(), String> {
+        tags_allowed(html, false)
+    }
+
+    /// Thẻ Markdown được phép thêm (D-252), ngoài `<a>` và `<br>`.
+    const MARKDOWN_TAGS: [&str; 14] = [
+        "<p>",
+        "</p>",
+        "<strong>",
+        "</strong>",
+        "<em>",
+        "</em>",
+        "<blockquote>",
+        "</blockquote>",
+        "<code>",
+        "</code>",
+        "<pre>",
+        "</pre>",
+        "<pre><code>",
+        "</code></pre>",
+    ];
+
+    fn tags_allowed(html: &str, markdown: bool) -> Result<(), String> {
+        let open = format!("\" rel=\"{LINK_REL}\">");
+        let mut rest = html;
+        while let Some(at) = rest.find('<') {
+            let tail = &rest[at..];
+            if let Some(after) = tail.strip_prefix("<a href=\"") {
+                let end = after.find('"').ok_or("unterminated href")?;
+                let href = after[..end].to_ascii_lowercase();
+                if !(href.starts_with("http://") || href.starts_with("https://")) {
+                    return Err(format!("href `{href}` is not http(s)"));
+                }
+                if !after[end..].starts_with(&open) {
+                    return Err(format!("link without rel: {tail}"));
+                }
+                rest = &after[end + open.len()..];
+            } else if let Some(after) =
+                tail.strip_prefix("</a>").or_else(|| tail.strip_prefix("<br>"))
+            {
+                rest = after;
+            } else if let Some(tag) =
+                MARKDOWN_TAGS.iter().filter(|_| markdown).find(|tag| tail.starts_with(**tag))
+            {
+                rest = &tail[tag.len()..];
+            } else {
+                return Err(format!(
+                    "unexpected tag at `{}`",
+                    tail.chars().take(20).collect::<String>()
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn html_cua_binh_luan_chi_co_the_an_toan(
+            raw in "\\PC{0,120}|([a-z <>\"'&]{0,10}(https?|HTTP)://[a-z0-9./?=&()<>\"'-]{0,30}[ .,)\n]{0,3}){1,4}|([*_`>#\\[\\]()!<:a-z \n-]|https?://|javascript:|<script>|<img |&#){1,40}",
+        ) {
+            let mut problems = Vec::new();
+            let body = clean_body(&raw, 10_000, &mut problems);
+            for text in [raw.as_str(), body.as_str()] {
+                let html = to_html(text, Format::Text);
+                proptest::prop_assert!(tags_are_safe(&html).is_ok(), "{:?} from {text:?}", tags_are_safe(&html));
+                proptest::prop_assert_eq!(link_count(text), html.matches("<a ").count());
+                // Markdown (D-252): chỉ thẻ trong danh sách cho phép; số link đếm = số thẻ `<a`.
+                let html = to_html(text, Format::Markdown);
+                proptest::prop_assert!(tags_allowed(&html, true).is_ok(), "{:?} from {text:?}", tags_allowed(&html, true));
+                proptest::prop_assert_eq!(links(text, Format::Markdown), html.matches("<a ").count());
+                let escaped = escape(text);
+                proptest::prop_assert!(!escaped.contains(['<', '>', '"', '\'']), "{escaped:?}");
+                let without_entities = escaped
+                    .replace("&amp;", "")
+                    .replace("&lt;", "")
+                    .replace("&gt;", "")
+                    .replace("&quot;", "")
+                    .replace("&#39;", "");
+                proptest::prop_assert!(!without_entities.contains('&'), "{escaped:?}");
+            }
+        }
     }
 }
