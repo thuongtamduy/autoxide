@@ -20,6 +20,22 @@ endpoints are marked deprecated with a sunset date first.
   read-only tool that now writes…). Modules deprecate a tool with `Deprecation::tool(…)` in
   `Module::deprecations`; `tools/list` says so and every result carries `_meta.autoxide/deprecation` and a
   warning. The module catalog lists a tool's `deprecation`.
+- `cargo xtask semver`: lists breaking changes to the Rust contract (`autoxide-kernel`, `autoxide-testkit`)
+  against the last release, with `cargo-semver-checks`; run when releasing. It only reports while the
+  version is `0.x`, and refuses breaking changes from `1.0` or with `--deny`.
+
+### Fixed
+
+- The OpenAPI document declared `application/json` for error responses; it now declares
+  `application/problem+json`, the media type errors are sent with.
+- The OpenAPI document declared the `value` of a form answer as an object; it is any JSON value (a string,
+  a number, an array or `true`), as it always was.
+
+### Changed
+
+- For module authors: `TestRequest::send` (testkit) checks every response against the OpenAPI document of
+  the app — status, media type and body — and fails the test with the place that differs.
+  `TestRequest::unchecked()` skips the check for tests that send out-of-contract answers on purpose.
 
 ## [0.13.0] - 2026-11-14
 

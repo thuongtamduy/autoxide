@@ -2,6 +2,8 @@
 //!
 //! - `api-diff [--base <ref>]` — chặn thay đổi phá vỡ của `/api/v1` so với bản phát hành gần
 //!   nhất (xem `api_diff.rs`). `./gate.sh` gọi lệnh này ở cả hai mức.
+//! - `semver [--base <tag>] [--deny] [--markdown]` — báo thay đổi phá vỡ của hợp đồng Rust
+//!   (kernel, testkit) bằng `cargo semver-checks`; chạy lúc phát hành (xem `semver.rs`).
 //! - `check` — kiểm luật ranh giới của workspace (xem `boundaries.rs`), bản dịch i18n
 //!   (`i18n.rs`) và tài liệu EN / VI (`docs.rs`). `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
 //! - `new-module <module> <entity>` — sinh module mới từ khuôn `modules/notes` (xem
@@ -15,12 +17,14 @@ mod boundaries;
 mod docs;
 mod i18n;
 mod scaffold;
+mod semver;
 mod workspace;
 
 use std::process::ExitCode;
 
 const USAGE: &str = "usage: cargo xtask check
        cargo xtask api-diff [--base <ref>]       default base: the last release tag before HEAD
+       cargo xtask semver [--base <tag>] [--deny] [--markdown]
        cargo xtask new-module <module> <entity>   e.g. new-module bookmarks bookmark
        cargo xtask test-affected [--base <ref>]   default base: origin/main";
 
@@ -33,6 +37,7 @@ fn main() -> ExitCode {
         ["check"] => check(),
         ["api-diff"] => api_diff(None),
         ["api-diff", "--base", base] => api_diff(Some(base)),
+        ["semver", rest @ ..] => semver(rest),
         ["new-module", module, entity] => new_module(module, entity),
         ["test-affected"] => test_affected(None),
         ["test-affected", "--base", base] => test_affected(Some(base)),
@@ -56,6 +61,38 @@ fn api_diff(base: Option<&str>) -> ExitCode {
         Ok(false) => ExitCode::FAILURE,
         Err(error) => {
             eprintln!("xtask api-diff: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn semver(args: &[&str]) -> ExitCode {
+    let mut base = None;
+    let (mut deny, mut markdown) = (false, false);
+    let mut args = args.iter();
+    while let Some(arg) = args.next() {
+        match *arg {
+            "--deny" => deny = true,
+            "--markdown" => markdown = true,
+            "--base" => base = args.next().copied(),
+            _ => {
+                eprintln!("{USAGE}");
+                return ExitCode::FAILURE;
+            }
+        }
+    }
+    let root = match workspace::load() {
+        Ok(workspace) => workspace.root,
+        Err(error) => {
+            eprintln!("xtask semver: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    match semver::run(&root, base, deny, markdown) {
+        Ok(true) => ExitCode::SUCCESS,
+        Ok(false) => ExitCode::FAILURE,
+        Err(error) => {
+            eprintln!("xtask semver: {error}");
             ExitCode::FAILURE
         }
     }

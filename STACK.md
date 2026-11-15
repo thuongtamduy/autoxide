@@ -172,6 +172,7 @@ repo này; giao diện là dự án riêng dùng API.
 | Kiểm ranh giới      | `cargo xtask check` — bố cục, license, lint, chiều phụ thuộc, bề mặt module (D-031) |
 | Kiểm phụ thuộc      | `cargo-deny` (license, lỗ hổng đã công bố, nguồn) — cấu hình `deny.toml`, chạy trong gate |
 | Postgres cho test   | Docker — `gate.sh` tự dựng một container dùng xong bỏ           |
+| Hợp đồng Rust       | `cargo-semver-checks` 0.51.0 (`cargo install cargo-semver-checks --version 0.51.0 --locked`) — `cargo xtask semver` báo thay đổi phá vỡ của kernel, testkit lúc phát hành, không trong gate (D-242) |
 | Quét secret         | `gitleaks` (cài sẵn hoặc image Docker ghim) — cấu hình `.gitleaks.toml`, chạy trong gate (D-108) |
 | Gate                | `./gate.sh` — chạy tất cả các mục trên theo thứ tự; `--quick` chỉ test crate bị sửa trên SQLite (D-173) |
 

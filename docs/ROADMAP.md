@@ -98,7 +98,7 @@ Nhóm A — hợp đồng và người gọi API:
       `TestApp` trong gate (hay một lệnh `xtask` gate gọi), để tài liệu không lệch code
 - [x] Hợp đồng tool MCP (D-233, D-240): `docs/mcp-tools.json` sinh từ code, `api-diff` chặn thay đổi phá vỡ của tool
       (bỏ tool, thêm tham số bắt buộc, `read_only` thành ghi…), tool cũ khai deprecated như endpoint
-- [ ] `cargo semver-checks` cho kernel và testkit trong quy trình phát hành (D-233): báo cáo khi còn `0.x`, chặn
+- [x] `cargo semver-checks` cho kernel và testkit trong quy trình phát hành (D-233, D-242): báo cáo khi còn `0.x`, chặn
       từ `1.0` hay khi công bố framework (giữ lý do D-167)
 
 Nhóm B — chống hồi quy:
@@ -113,7 +113,7 @@ Nhóm B — chống hồi quy:
       (`autoxide_kernel::email`), con trỏ pagination, CSV chống injection, chữ và link của bình
       luận (chống XSS) — sinh đầu vào ngẫu nhiên, không panic, giữ bất biến; thêm thư viện thì ghi
       `STACK.md`
-- [ ] Response thật khớp hợp đồng: test HTTP qua `TestApp` kiểm mỗi response (thân và mã) khớp
+- [x] Response thật khớp hợp đồng (D-241): test HTTP qua `TestApp` kiểm mỗi response (thân và mã) khớp
       schema của endpoint đó trong `docs/openapi.json`, để tài liệu không hứa điều code không làm
 - [ ] Hợp đồng quyền đọc được bằng máy (D-205, đặc tả 54 mục P1): mỗi operation OpenAPI có
       `x-permissions` hay `x-public`, sinh từ một khai báo cạnh handler; `Permission` có mức rủi ro
