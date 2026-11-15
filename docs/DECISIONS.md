@@ -5846,3 +5846,37 @@ Lý do:
 - Một trait chung cho mọi module có menu cũ: chỉ `content` có, nên dùng trait riêng của `content` là đủ.
 
 Thay: phần menu của D-096, D-102, D-105 (bước 17).
+
+## D-239 · `cargo xtask api-diff`: luật phá vỡ của `/api/v1`, chỉ `x-sunset` trong tài liệu (bước 31 A1) — 2026-11-15 — agent quyết
+
+Quyết định:
+- `cargo xtask api-diff [--base <ref>]` (`xtask/src/api_diff.rs`) so `docs/openapi.json` với bản ở tag phát hành
+  gần nhất là tổ tiên của `HEAD` (`git describe --tags --abbrev=0 --match 'v*.*.*'`). Chạy trong `./gate.sh` ở cả
+  hai mức, ngay sau `cargo xtask check`; job gate của CI lấy cả lịch sử (`fetch-depth: 0`).
+- Bật mọi luật trong bảng của đặc tả 31 A1, kể cả các luật ngoài chữ của ROADMAP: `parameter.removed`,
+  `request.constraint_tightened`, `response.status_removed`, `response.media_type_removed`,
+  `schema.composite_changed`.
+- Thêm một luật ngoài bảng: `request.property_removed`. Áp khi bản mới bỏ một trường của thân request **và** thân
+  đó có `additionalProperties: false`. Thân request của Autoxide dùng `deny_unknown_fields`, nên client cũ gửi
+  trường đó sẽ bị từ chối.
+- Enum:
+  - bỏ giá trị là phá vỡ ở cả hai chiều;
+  - thêm giá trị trong request là `note`;
+  - thêm giá trị trong response là `warning` (client chặt có thể vỡ), không đỏ;
+  - request từ tự do thành danh sách cố định là `request.constraint_tightened`.
+- `oneOf` / `anyOf` khác số biến thể là `schema.composite_changed`. Cùng số biến thể thì so từng cặp theo thứ tự.
+- Tài liệu OpenAPI chỉ thêm **một** extension: `x-sunset`. Không thêm `x-deprecated-since`, `x-successor`: hai
+  thông tin đó đã có trong câu của `description`. `Extensions` của utoipa là `HashMap`, nhiều khoá thì thứ tự trong
+  `openapi.json` đổi giữa các lần sinh. Bản cũ chưa có `x-sunset` thì đọc câu "removed on YYYY-MM-DD".
+- Ngoại lệ có chủ đích nằm ở `xtask/api-breaking-allow.json`. Mỗi mục cần `decision` và chỉ có hiệu lực với đúng
+  `base`.
+
+Lý do:
+- Mỗi luật thêm đều là trường hợp client cũ hỏng mà không có lỗi rõ.
+- Thử với các tag cũ: so với v0.3.0, lệnh bắt đúng một thay đổi phá vỡ thật (thân của
+  `POST /api/v1/auth/me/mfa/totp` thành bắt buộc). Từ v0.8.0 tới nay không có thay đổi phá vỡ nào.
+
+Đã cân nhắc:
+- Dùng `oasdiff` (Go): thêm công cụ ngoài, và không biết hai cách viết nullable của utoipa.
+- Báo đỏ khi thêm giá trị enum trong response: chặn cả việc thêm trạng thái mới hợp lệ; cảnh báo là đủ để người
+  phát hành xem lại.

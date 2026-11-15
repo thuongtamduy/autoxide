@@ -52,6 +52,9 @@ jobs:
       GATE_S3_ENDPOINT: http://127.0.0.1:5000
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Cả lịch sử và tag: `cargo xtask api-diff` so với tag phát hành gần nhất.
+          fetch-depth: 0
       # Toolchain theo rust-toolchain.toml: không đối số thì rustup cài đúng bản ghim.
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
