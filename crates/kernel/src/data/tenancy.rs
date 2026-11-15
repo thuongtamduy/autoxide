@@ -19,6 +19,7 @@ pub mod migration;
 mod registry;
 pub(crate) mod request;
 pub(crate) mod schema;
+mod scope;
 
 use std::fmt;
 use std::sync::Arc;
@@ -32,6 +33,7 @@ use crate::error::Error;
 pub use config::{TenancyConfig, WorkerPlacements};
 pub use registry::DatabaseRegistry;
 pub use request::{TENANT_HEADER, TenantHint};
+pub use scope::{ScopeExt, TenantScoped};
 
 pub(crate) use config::read_setting;
 

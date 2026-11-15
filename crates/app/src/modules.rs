@@ -51,11 +51,15 @@ mod tests {
     use autoxide_kernel::config::ConfigSource;
     use autoxide_kernel::database::Database;
     use autoxide_kernel::tenancy::TenantContext;
-    use autoxide_testkit::{TestDatabase, schema_ownership_violations};
+    use autoxide_testkit::{
+        PENDING_TENANCY, TestDatabase, schema_ownership_violations, schema_snapshot,
+        schema_tenancy_violations,
+    };
 
     /// Chạy mọi migration của chương trình trên một database trống rồi hỏi chính
     /// database: mỗi bảng có thuộc đúng một module không, có foreign key nào xuyên
-    /// module không. Gate chạy bài này trên cả SQLite và Postgres.
+    /// module không, bảng cấp khách hàng có `tenant_id` đúng luật không. Gate chạy bài này
+    /// trên cả SQLite và Postgres.
     #[tokio::test]
     async fn moi_bang_thuoc_mot_module_va_khong_foreign_key_xuyen_module() {
         TestDatabase::run(async |database| {
@@ -68,6 +72,11 @@ mod tests {
             migrator.up(&db).await.unwrap();
 
             let violations = schema_ownership_violations(db.write(), &names).await.unwrap();
+            assert_eq!(violations, Vec::<String>::new());
+            // Bảng cấp khách hàng có `tenant_id`, khoá và index bắt đầu bằng nó (bước 33).
+            let snapshot = schema_snapshot(db.write()).await.unwrap();
+            let control_plane = settings.modules.control_plane_tables();
+            let violations = schema_tenancy_violations(&snapshot, &control_plane, PENDING_TENANCY);
             assert_eq!(violations, Vec::<String>::new());
 
             // Migration nào cũng phải gỡ được: xuống hết rồi lên lại.

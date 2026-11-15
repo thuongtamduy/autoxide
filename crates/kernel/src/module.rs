@@ -79,6 +79,14 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Bảng mặt điều khiển của module (bước 33, D-253): bảng không có `tenant_id` vì chung cả nền
+    /// tảng, chỉ có dữ liệu ở database điều khiển. Mọi bảng khác của module (trừ `<m>_migrations`)
+    /// là bảng cấp khách hàng và phải có `tenant_id` — testkit và `cargo xtask check` kiểm.
+    /// Mặc định rỗng: module nghiệp vụ hầu như không có bảng loại này.
+    fn control_plane_tables(&self) -> Vec<&'static str> {
+        Vec::new()
+    }
+
     /// Đọc cấu hình riêng của module và giữ lại trong chính nó. Gọi một lần lúc
     /// khởi động, trước mọi việc khác. Lỗi ghi vào `reader`, được báo chung một
     /// lượt với lỗi cấu hình của kernel và các module khác.

@@ -40,6 +40,7 @@ mod schema;
 mod sqlite;
 mod stale;
 mod storage;
+mod tenancy;
 
 pub use app::{TestApp, TestAppBuilder, TestAppError, TestRequest, TestResponse, tool};
 pub use ownership::schema_ownership_violations;
@@ -48,6 +49,7 @@ pub use s3::{
 };
 pub use schema::{ColumnSnapshot, IndexSnapshot, SchemaSnapshot, TableSnapshot, schema_snapshot};
 pub use storage::MemoryStorage;
+pub use tenancy::{PENDING_TENANCY, schema_tenancy_violations};
 
 use std::fmt;
 use std::path::PathBuf;
