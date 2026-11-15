@@ -37,3 +37,8 @@ regexTarget = "match"
 regexes = [
   '''Idempotency-Key: 0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11''',
 ]
+
+[[allowlists]]
+description = "Chuỗi giả `sk-live-0123456789` làm giá trị secret trong test cấu hình theo khách, lỡ commit ở aabb4f6 (đã thay ở commit sau) — không phải secret của ai"
+commits = ["aabb4f6e63daf8f7c1441c968c93c0867af5ee6b"]
+paths = ['''crates/kernel/tests/tenant_settings\.rs''']

@@ -99,10 +99,11 @@ pub(crate) struct FormTokenResponse {
 )]
 pub(crate) async fn token(
     State(guard): State<Arc<SpamGuard>>,
+    tenant: crate::tenancy::TenantContext,
     _principal: Option<Principal>,
     Query(query): Query<TokenQuery>,
 ) -> Result<Response, Error> {
-    let issued = guard.issue(&query.scope).await?;
+    let issued = guard.issue(&tenant, &query.scope).await?;
     let data = FormTokenResponse {
         token: issued.token,
         expires_at: issued.expires_at,

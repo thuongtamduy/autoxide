@@ -84,7 +84,7 @@ async fn bay_token_va_qua_nhanh() {
         let limits = Limits::default();
         // Bộ công bố bởi module nội bộ `antispam`: mặc định giữ lại bài gửi trong 3 giây đầu.
         let default = modules.api::<SpamGuard>().unwrap();
-        let issued = default.issue("demo:contact").await.unwrap();
+        let issued = default.issue(&tenant, "demo:contact").await.unwrap();
         assert!(issued.submit_after > chrono::Utc::now());
         let checked = default
             .check(&tenant, &submission(&visitor, Some(&issued.token)), &limits)
@@ -93,7 +93,7 @@ async fn bay_token_va_qua_nhanh() {
         assert_eq!(checked.verdict, Verdict::Quarantine { reasons: vec!["too_fast"] });
 
         let guard = make_guard(&database, quick());
-        let token = guard.issue("demo:contact").await.unwrap().token;
+        let token = guard.issue(&tenant, "demo:contact").await.unwrap().token;
         let mut trapped = submission(&visitor, Some(&token));
         trapped.honeypot = Some("http://spam.example");
         assert_eq!(
@@ -102,7 +102,7 @@ async fn bay_token_va_qua_nhanh() {
         );
         let missing = guard.check(&tenant, &submission(&visitor, None), &limits).await.unwrap_err();
         assert_eq!(missing.code(), "antispam.token_missing");
-        let other = guard.issue("demo:other").await.unwrap().token;
+        let other = guard.issue(&tenant, "demo:other").await.unwrap().token;
         assert_eq!(
             guard
                 .check(&tenant, &submission(&visitor, Some(&other)), &limits)
@@ -137,7 +137,7 @@ async fn bay_token_va_qua_nhanh() {
 
         // Token sống 1 giây: sau 2 giây là hết hạn.
         let short = make_guard(&database, quick().token_max_age(Duration::from_secs(1)));
-        let token = short.issue("demo:contact").await.unwrap().token;
+        let token = short.issue(&tenant, "demo:contact").await.unwrap().token;
         tokio::time::sleep(Duration::from_millis(2100)).await;
         assert_eq!(
             short
@@ -162,7 +162,7 @@ async fn gioi_han_theo_ip_va_nguoi_dung() {
         let limits = Limits::default().ip(Some(throttle(2))).user(Some(throttle(1)));
         // Cùng khối /24: chung bộ đếm.
         for ip in ["203.0.113.9", "203.0.113.10"] {
-            let token = guard.issue("demo:contact").await.unwrap().token;
+            let token = guard.issue(&tenant, "demo:contact").await.unwrap().token;
             let visitor = client(ip);
             assert_eq!(
                 guard
@@ -173,7 +173,7 @@ async fn gioi_han_theo_ip_va_nguoi_dung() {
                 Verdict::Accept
             );
         }
-        let token = guard.issue("demo:contact").await.unwrap().token;
+        let token = guard.issue(&tenant, "demo:contact").await.unwrap().token;
         let visitor = client("203.0.113.11");
         let third =
             guard.check(&tenant, &submission(&visitor, Some(&token)), &limits).await.unwrap();
@@ -212,7 +212,7 @@ async fn nonce_la_idempotency_cho_nguoi_la() {
         let tenant = TenantContext::legacy_default(&database);
         let guard = Arc::new(make_guard(&database, quick()));
         let visitor = client("203.0.113.9");
-        let token = guard.issue("demo:contact").await.unwrap().token;
+        let token = guard.issue(&tenant, "demo:contact").await.unwrap().token;
         let first = guard
             .check(&tenant, &submission(&visitor, Some(&token)), &Limits::default())
             .await
@@ -231,7 +231,7 @@ async fn nonce_la_idempotency_cho_nguoi_la() {
             again.claim(database.write(), &tenant, "demo", Some("record-2")).await.unwrap();
         assert_eq!(replay, Claim::Replay { result: Some("record-1".to_owned()) });
 
-        let token = guard.issue("demo:contact").await.unwrap().token;
+        let token = guard.issue(&tenant, "demo:contact").await.unwrap().token;
         let tasks: Vec<_> = (0..10)
             .map(|index| {
                 let (guard, database, token, visitor, tenant) = (
@@ -284,7 +284,7 @@ async fn gui_lai_token_da_dung_khong_dem_gioi_han() {
         let email = Throttle::new("demo", 2, Duration::from_secs(3600)).unwrap();
         let limits = Limits::default().email(Some(email));
         let visitor = client("203.0.113.9");
-        let token = guard.issue("demo:contact").await.unwrap().token;
+        let token = guard.issue(&tenant, "demo:contact").await.unwrap().token;
         let mut sent = submission(&visitor, Some(&token));
         sent.email = Some("victim@example.com");
         let first = guard.check(&tenant, &sent, &limits).await.unwrap();
@@ -302,7 +302,7 @@ async fn gui_lai_token_da_dung_khong_dem_gioi_han() {
             assert_eq!(replay, Claim::Replay { result: Some("r1".to_owned()) });
         }
         // Chỉ lần đầu được đếm: người thật vẫn gửi được một lần nữa.
-        let fresh = guard.issue("demo:contact").await.unwrap().token;
+        let fresh = guard.issue(&tenant, "demo:contact").await.unwrap().token;
         let mut real = submission(&visitor, Some(&fresh));
         real.email = Some("victim@example.com");
         assert_eq!(guard.check(&tenant, &real, &limits).await.unwrap().verdict, Verdict::Accept);
@@ -327,7 +327,7 @@ async fn endpoint_lay_token() {
             &http,
             utoipa_axum::router::OpenApiRouter::new(),
             modules.routes(),
-            Default::default(),
+            autoxide_kernel::http::Extras::default().tenancy(modules.tenancy().unwrap()),
         );
         let get = |uri: &str| Request::builder().uri(uri).body(Body::empty()).unwrap();
         let ok = api
@@ -399,7 +399,7 @@ async fn de_altcha() {
         let tenant = TenantContext::legacy_default(&database);
         let guard = make_guard(&database, quick().challenge(ChallengeKind::Altcha { cost: 20 }));
         let visitor = client("203.0.113.9");
-        let first = guard.issue("demo:contact").await.unwrap();
+        let first = guard.issue(&tenant, "demo:contact").await.unwrap();
         let challenge = first.challenge.clone().unwrap();
         assert_eq!(challenge["parameters"]["algorithm"], "SHA-256");
         let solution = solve(&challenge);
@@ -414,7 +414,7 @@ async fn de_altcha() {
             Verdict::Accept
         );
 
-        let second = guard.issue("demo:contact").await.unwrap();
+        let second = guard.issue(&tenant, "demo:contact").await.unwrap();
         let mut reused = submission(&visitor, Some(&second.token));
         reused.challenge = Some(&solution);
         assert_eq!(

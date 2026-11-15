@@ -56,6 +56,10 @@ endpoints are marked deprecated with a sunset date first.
   of stored data that needs the configuration, such as encrypting old secrets. Named `u0001_…`, recorded with the
   migrations of the module, run by `autoxide migrate up` right after the migration they name; `serve` refuses to
   start while one is pending.
+- For module authors: `autoxide_kernel::storage::TenantStorage` keeps one tenant's files under its own prefix
+  (none for the default tenant, so existing files stay where they are; `tenants/<id>/` for others) and refuses
+  keys that climb out of it; `SecretKey::derive_for(tenant, purpose)` gives a signing key per tenant (the default
+  tenant keeps the key `derive` gives).
 - For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
   errors.
 
@@ -89,6 +93,9 @@ endpoints are marked deprecated with a sunset date first.
   `autoxide_media::api::Media`, `autoxide_notes::api::Notes`, `autoxide_content::api::LegacyMenus`.
 - For module authors: the trait `autoxide_auth::api::AccountRecovery` has a new method `remove_passkeys`; only
   `auth` implements it.
+- Form tokens (`GET /api/v1/antispam/token`) and `Idempotency-Key` scopes belong to one tenant: a token or a key
+  of one tenant means nothing in another. `SpamGuard::issue` takes the tenant. Nothing changes for the default
+  tenant: tokens and keys already handed out keep working.
 - Interface flags (`/api/v1/me/flags`) are kept per tenant: the same account in two tenants has two sets.
 - Internal, no change in behaviour: the code of `newsletter`, `comments`, `media` and `forms` is grouped by
   feature like `content` and `auth`, and the kernel's files sit in private groups (`contracts`, `data`,

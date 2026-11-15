@@ -467,14 +467,15 @@ impl SpamGuard {
         self
     }
 
-    /// Phát token form cho `scope`.
-    pub async fn issue(&self, scope: &str) -> Result<IssuedToken, Error> {
+    /// Phát token form cho `scope` của khách `tenant` (ký bằng khoá của khách: dùng ở khách khác
+    /// thì như token sai).
+    pub async fn issue(&self, tenant: &TenantContext, scope: &str) -> Result<IssuedToken, Error> {
         check_scope(scope)?;
         let now = Utc::now().trunc_subsecs(0);
         let mut nonce = [0u8; 16];
         getrandom::fill(&mut nonce)
             .map_err(|error| Error::internal(format!("random number generator: {error}")))?;
-        let key = self.secret.derive(token::PURPOSE).await?;
+        let key = self.secret.derive_for(tenant.id(), token::PURPOSE).await?;
         let binding = token::encode_nonce(&nonce);
         Ok(IssuedToken {
             token: token::sign(&key, scope, now, &nonce)?,
@@ -512,7 +513,7 @@ impl SpamGuard {
                     .form_token
                     .filter(|token| !token.trim().is_empty())
                     .ok_or_else(token_missing)?;
-                let key = self.secret.derive(token::PURPOSE).await?;
+                let key = self.secret.derive_for(tenant.id(), token::PURPOSE).await?;
                 let form = token::open(&key, raw)
                     .filter(|form| form.scope == submission.scope)
                     .ok_or_else(token_invalid)?;

@@ -70,7 +70,15 @@ fn visitor(ip: &str) -> ClientInfo {
 }
 
 async fn token(service: &FormsService, key: &str) -> String {
-    service.guard.issue(&scope(key)).await.unwrap().token
+    service
+        .guard
+        .issue(
+            &autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
+            &scope(key),
+        )
+        .await
+        .unwrap()
+        .token
 }
 
 fn answers(name: &str, email: &str) -> serde_json::Map<String, Value> {

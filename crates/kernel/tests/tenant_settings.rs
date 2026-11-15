@@ -123,7 +123,7 @@ async fn texts(database: &Database, sql: &str) -> Vec<String> {
 async fn setting_secret_khong_bao_gio_tra_ra() {
     TestDatabase::run(async |test| {
         let (database, modules, app) = start(test).await;
-        let secret = "sk-live-0123456789";
+        let secret = "not-a-real-partner-value";
         let path = "/api/v1/kernel/settings/demo.api_key";
         let (status, body) =
             call(&app, Method::PUT, path, "admin", Some(json!({"value": secret}))).await;
