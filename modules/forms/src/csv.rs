@@ -46,4 +46,63 @@ mod tests {
              \"'\tx\",\"dòng 1\ndòng 2, \"\"trích\"\"\"\r\n"
         );
     }
+
+    /// Bộ đọc RFC 4180 tối giản: ô trong ngoặc kép, `""` là một ngoặc kép, dòng ngăn bằng CRLF.
+    fn read(text: &str) -> Vec<Vec<String>> {
+        let text = text.strip_prefix('\u{feff}').unwrap();
+        let mut rows = vec![Vec::new()];
+        let mut chars = text.chars().peekable();
+        while let Some(c) = chars.next() {
+            match c {
+                '"' => {
+                    let mut cell = String::new();
+                    loop {
+                        match chars.next().unwrap() {
+                            '"' if chars.peek() == Some(&'"') => {
+                                chars.next();
+                                cell.push('"');
+                            }
+                            '"' => break,
+                            other => cell.push(other),
+                        }
+                    }
+                    rows.last_mut().unwrap().push(cell);
+                }
+                ',' => {}
+                '\r' => {
+                    assert_eq!(chars.next(), Some('\n'));
+                    rows.push(Vec::new());
+                }
+                other => panic!("unexpected {other:?} outside a quoted cell"),
+            }
+        }
+        assert!(rows.pop().unwrap().is_empty(), "the file ends with CRLF");
+        rows
+    }
+
+    // Property test (đặc tả 31 B3): đọc lại ra đúng số dòng, số ô và nội dung; không ô nào mở
+    // đầu bằng ký tự công thức mà thiếu `'`.
+    proptest::proptest! {
+        #[test]
+        fn csv_doc_lai_dung_va_khong_co_cong_thuc(
+            rows in proptest::collection::vec(proptest::collection::vec("\\PC{0,20}|[=+@\t\r-].{0,10}", 3), 0..8),
+        ) {
+            let header = vec!["a".to_owned(), "b".to_owned(), "c".to_owned()];
+            let text = write(&header, &rows);
+            let read_back = read(&text);
+            proptest::prop_assert_eq!(read_back.len(), rows.len() + 1);
+            for (written, read) in rows.iter().zip(read_back.iter().skip(1)) {
+                proptest::prop_assert_eq!(read.len(), written.len());
+                for (value, cell) in written.iter().zip(read) {
+                    proptest::prop_assert!(!cell.starts_with(['=', '+', '-', '@', '\t', '\r']), "{cell:?}");
+                    let original = if value.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+                        format!("'{value}")
+                    } else {
+                        value.clone()
+                    };
+                    proptest::prop_assert_eq!(cell, &original);
+                }
+            }
+        }
+    }
 }

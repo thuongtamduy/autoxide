@@ -34,6 +34,8 @@ endpoints are marked deprecated with a sunset date first.
 - For module authors (testkit): `schema_snapshot` (tables, columns, indexes of a SQLite or Postgres
   database, to compare schemas) and `TestAppBuilder::boxed_module`. Every module's real migrations are
   tested up → down → up, on an empty database and with data, on both databases.
+- Property tests (`proptest`, tests only) for the input checks: email, pagination cursors, post bodies,
+  slugs, CSV export, comment text and links (no HTML but safe links ever comes out).
 
 ### Fixed
 

@@ -166,3 +166,24 @@ async fn tool_mcp_dung_chung_service() {
     .await
     .unwrap();
 }
+
+/// Con trỏ rác (chữ lạ, base64 của JSON sai, của chuỗi có NUL) qua HTTP ra 422 ở trường `cursor`,
+/// không bao giờ 500 (đặc tả 31 B3).
+#[tokio::test]
+async fn con_tro_rac_qua_http_ra_422() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        // base64url của `{"c":"x","v":{"s":"\u0000"},"id":"…"}` và của `{}`.
+        let nul = "eyJjIjoieCIsInYiOnsicyI6Ilx1MDAwMCJ9LCJpZCI6IjAxOTNlM2E0LTdiMWMtN2YwMC05YTUxLTZmMmI4YzBkNGUxMSJ9";
+        for cursor in ["nope", "%F0%9F%98%80", "e30", nul] {
+            let answer = send(&app, "GET", &format!("?cursor={cursor}"), Some("reader"), &[], None).await;
+            assert_eq!(answer.status(), StatusCode::UNPROCESSABLE_ENTITY, "{cursor}");
+            assert_eq!(answer.json()["errors"][0]["field"], "cursor", "{cursor}");
+        }
+        // NUL thô trong query bị lớp HTTP của kernel từ chối sớm hơn (400, D-157) — vẫn không 500.
+        let answer = send(&app, "GET", "?cursor=%00", Some("reader"), &[], None).await;
+        assert_eq!(answer.status(), StatusCode::BAD_REQUEST, "{}", answer.text());
+    })
+    .await
+    .unwrap();
+}

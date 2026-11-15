@@ -57,6 +57,7 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | Đọc file `.env`    | `dotenvy`                       | 0.15      | Chỉ đọc thành cặp tên / giá trị; biến môi trường thật thắng |
 | Trait `async` qua `dyn` | `async-trait`                | 0.1       | Hợp đồng giữa các module (`api`); đã có sẵn trong cây phụ thuộc qua SeaORM |
 | Gọi router trong test | `tower` (feature `util`)     | 0.5       | Chỉ dùng trong test: gửi request thẳng vào router   |
+| Property test      | `proptest` (chỉ `std`)          | 1.12      | Chỉ dùng trong test: sinh đầu vào ngẫu nhiên cho bộ kiểm đầu vào (email, con trỏ, thân bài, slug, CSV, bình luận), thu gọn ca hỏng (đặc tả 31 B3) |
 
 Kết nối database dùng TLS của `rustls` (feature `runtime-tokio-rustls` của SeaORM):
 binary không phụ thuộc OpenSSL của hệ điều hành.

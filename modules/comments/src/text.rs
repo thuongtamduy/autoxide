@@ -525,4 +525,60 @@ mod tests {
         assert!(!contains_name("Анна Каренина", &reserved));
         assert!(!contains_name("Σωκράτης", &reserved));
     }
+
+    // Property test (đặc tả 31 B3, chống XSS): với chữ bất kỳ, HTML ra chỉ có `<a href="http(s)://…"
+    // rel="nofollow ugc noopener">`, `</a>`, `<br>`; `escape` không để lọt ký tự HTML thô; số link
+    // đếm được bằng số thẻ `<a`.
+    fn tags_are_safe(html: &str) -> Result<(), String> {
+        let open = format!("\" rel=\"{LINK_REL}\">");
+        let mut rest = html;
+        while let Some(at) = rest.find('<') {
+            let tail = &rest[at..];
+            if let Some(after) = tail.strip_prefix("<a href=\"") {
+                let end = after.find('"').ok_or("unterminated href")?;
+                let href = after[..end].to_ascii_lowercase();
+                if !(href.starts_with("http://") || href.starts_with("https://")) {
+                    return Err(format!("href `{href}` is not http(s)"));
+                }
+                if !after[end..].starts_with(&open) {
+                    return Err(format!("link without rel: {tail}"));
+                }
+                rest = &after[end + open.len()..];
+            } else if let Some(after) =
+                tail.strip_prefix("</a>").or_else(|| tail.strip_prefix("<br>"))
+            {
+                rest = after;
+            } else {
+                return Err(format!(
+                    "unexpected tag at `{}`",
+                    tail.chars().take(20).collect::<String>()
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn html_cua_binh_luan_chi_co_the_an_toan(
+            raw in "\\PC{0,120}|([a-z <>\"'&]{0,10}(https?|HTTP)://[a-z0-9./?=&()<>\"'-]{0,30}[ .,)\n]{0,3}){1,4}",
+        ) {
+            let mut problems = Vec::new();
+            let body = clean_body(&raw, 10_000, &mut problems);
+            for text in [raw.as_str(), body.as_str()] {
+                let html = to_html(text);
+                proptest::prop_assert!(tags_are_safe(&html).is_ok(), "{:?} from {text:?}", tags_are_safe(&html));
+                proptest::prop_assert_eq!(link_count(text), html.matches("<a ").count());
+                let escaped = escape(text);
+                proptest::prop_assert!(!escaped.contains(['<', '>', '"', '\'']), "{escaped:?}");
+                let without_entities = escaped
+                    .replace("&amp;", "")
+                    .replace("&lt;", "")
+                    .replace("&gt;", "")
+                    .replace("&quot;", "")
+                    .replace("&#39;", "");
+                proptest::prop_assert!(!without_entities.contains('&'), "{escaped:?}");
+            }
+        }
+    }
 }

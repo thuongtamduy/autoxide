@@ -136,4 +136,23 @@ mod tests {
         assert_eq!(problems.len(), 1);
         assert_eq!((problems[0].field.as_str(), problems[0].code.as_str()), ("reply_to", "email"));
     }
+
+    // Property test (đặc tả 31 B3): chuỗi bất kỳ, kể cả Unicode lạ; độ dài đếm theo byte (D-174).
+    proptest::proptest! {
+        #[test]
+        fn email_bat_bien(raw in "\\PC{0,80}|[a-zA-Z0-9._%+-]{1,70}@[a-z0-9-]{1,70}(\\.[a-z0-9-]{1,70}){1,3}") {
+            let email = normalize(&raw);
+            proptest::prop_assert_eq!(normalize(&email), email.clone(), "normalize is idempotent");
+            if is_valid(&email) {
+                proptest::prop_assert!(email.len() <= MAX_LENGTH);
+                let (local, domain) = email.split_once('@').unwrap();
+                proptest::prop_assert!((1..=LOCAL_MAX).contains(&local.len()));
+                proptest::prop_assert!(domain.contains('.'));
+                proptest::prop_assert!(domain.split('.').all(|label| (1..=LABEL_MAX).contains(&label.len())));
+            }
+            let mut problems = Vec::new();
+            proptest::prop_assert_eq!(checked(&raw, "email", &mut problems).is_some(), is_valid(&email));
+            proptest::prop_assert_eq!(problems.is_empty(), is_valid(&email));
+        }
+    }
 }

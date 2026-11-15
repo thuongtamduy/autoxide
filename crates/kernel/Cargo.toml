@@ -43,6 +43,7 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+proptest.workspace = true
 # MCP client thật cho test của endpoint MCP.
 rmcp = { workspace = true, features = [
   "client",

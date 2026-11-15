@@ -600,4 +600,38 @@ mod tests {
             serde_json::Value::Null
         );
     }
+
+    // Property test (đặc tả 31 B3): con trỏ đi một vòng mã hoá / giải mã nguyên vẹn; chuỗi bất kỳ
+    // làm con trỏ không bao giờ panic — hoặc là con trỏ hợp lệ, hoặc lỗi 422 `cursor`.
+    fn sort_value() -> impl proptest::strategy::Strategy<Value = SortValue> {
+        use proptest::prelude::*;
+        prop_oneof![
+            any::<i64>().prop_map(SortValue::Integer),
+            "[^\\x00]{0,40}".prop_map(SortValue::Text),
+            (0i64..4_102_444_800_000_000).prop_map(|micros| {
+                SortValue::Time(chrono::DateTime::from_timestamp_micros(micros).unwrap())
+            }),
+        ]
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn con_tro_ma_hoa_roi_giai_ma_nguyen_ven(
+            column in "[a-z_]{1,20}",
+            value in sort_value(),
+            id in proptest::prelude::any::<u128>(),
+        ) {
+            let cursor = KeyCursor { column, value, id: Uuid::from_u128(id) };
+            proptest::prop_assert_eq!(KeyCursor::decode(&cursor.encode()), Some(cursor));
+        }
+
+        #[test]
+        fn con_tro_rac_khong_panic(raw in "\\PC{0,120}") {
+            let _ = KeyCursor::decode(&raw);
+            let query = PageQuery { limit: None, cursor: Some(raw.clone()), order: None };
+            if let Err(error) = PageRequest::try_from(query) {
+                proptest::prop_assert_eq!(error.fields()[0].field.as_str(), "cursor");
+            }
+        }
+    }
 }
