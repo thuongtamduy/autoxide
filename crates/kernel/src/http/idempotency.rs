@@ -99,7 +99,10 @@ async fn run(
     let authorization =
         request.headers().get(header::AUTHORIZATION).and_then(|value| value.to_str().ok());
     let principal = match &settings.authenticator {
-        Some(authenticator) => authenticator.authenticate(authorization).await.ok(),
+        Some(authenticator) => {
+            let hint = crate::tenancy::TenantHint::from_headers(request.headers());
+            authenticator.authenticate(authorization, &hint).await.ok()
+        }
         None => None,
     };
     let Some(principal) = principal else {

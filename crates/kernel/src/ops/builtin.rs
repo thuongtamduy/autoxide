@@ -80,7 +80,7 @@ impl Module for KernelModule {
     }
 
     fn permissions(&self) -> Vec<Permission> {
-        vec![module_catalog::MODULES_READ]
+        vec![module_catalog::MODULES_READ, TENANTS_OPERATE]
     }
 
     fn routes(&self) -> OpenApiRouter {
@@ -108,6 +108,15 @@ impl Module for KernelModule {
         context.provide::<PublicUrl>(Arc::new(self.public_url.clone()))
     }
 }
+
+/// Nhân sự của khách nền tảng vào khách khác bằng header `Autoxide-Tenant` (bước 33). Quyền
+/// giữ nguyên tên permission đã có trong khách đích.
+pub(crate) const TENANTS_OPERATE: Permission = Permission::new(
+    "kernel.tenants.operate",
+    "Act inside another tenant with the header `Autoxide-Tenant` (platform staff only: it works \
+     only for accounts of the platform tenant).",
+)
+.with_risk(crate::access::Risk::SensitiveData);
 
 /// Bảng `kernel_secrets`: mỗi dòng một khoá chương trình tự sinh (tên → giá trị).
 struct CreateSecrets;

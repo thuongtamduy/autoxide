@@ -62,6 +62,8 @@ pub struct Modules {
     catalog: crate::module_catalog::ModuleCatalog,
     /// Cờ theo người dùng của module `kernel`, phục vụ dưới `/api/v1/me` (D-207).
     user_flags: crate::user_flags::Handle,
+    /// Sổ database (bước 33); có sau [`start`](Self::start).
+    tenancy: Option<crate::tenancy::DatabaseRegistry>,
 }
 
 impl Modules {
@@ -126,6 +128,7 @@ impl Modules {
                 apis: Apis::default(),
                 catalog,
                 user_flags,
+                tenancy: None,
             })
         } else {
             Err(ModuleError(problems.join("; ")))
@@ -154,9 +157,19 @@ impl Modules {
         result
     }
 
-    /// Khởi động từng module theo thứ tự đăng ký. Module nào hỏng thì dừng và báo
-    /// tên module đó.
+    /// Khởi động từng module theo thứ tự đăng ký, chế độ một khách trên `database`. Module nào
+    /// hỏng thì dừng và báo tên module đó.
     pub fn start(&mut self, database: &Database) -> Result<(), ModuleError> {
+        self.start_in(&crate::tenancy::DatabaseRegistry::single(database.clone()))
+    }
+
+    /// Như [`start`](Self::start), với sổ database `registry` (chế độ của bản cài, các
+    /// placement): database của chương trình là database điều khiển của nó.
+    pub fn start_in(
+        &mut self,
+        registry: &crate::tenancy::DatabaseRegistry,
+    ) -> Result<(), ModuleError> {
+        let database = registry.control();
         let mut apis = Apis::default();
         for module in &mut self.modules {
             let name = module.name();
@@ -172,15 +185,22 @@ impl Modules {
                 resources: &self.resources,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
+                tenancy: registry,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
             })?;
         }
         self.apis = apis;
+        self.tenancy = Some(registry.clone());
         // Sau khi MỌI module đã khởi động: tool, job, lịch của module chỉ có từ lúc này.
         self.catalog.fill(&self.modules);
         Ok(())
+    }
+
+    /// Sổ database đã dùng lúc khởi động; `None` trước [`start`](Self::start).
+    pub fn tenancy(&self) -> Option<crate::tenancy::DatabaseRegistry> {
+        self.tenancy.clone()
     }
 
     /// Trait `T` mà một module đã công bố lúc khởi động, nếu có. Dùng ở binary để

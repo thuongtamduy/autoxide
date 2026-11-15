@@ -87,12 +87,14 @@ pub(super) fn router(
 /// Lớp xác thực: đặt [`Principal`] vào request, hoặc trả 401.
 async fn authenticate(
     authenticator: Arc<dyn Authenticator>,
-    mut request: Request,
+    request: Request,
     next: Next,
 ) -> Response {
-    let authorization =
-        request.headers().get(header::AUTHORIZATION).and_then(|value| value.to_str().ok());
-    match authenticator.authenticate(authorization).await {
+    let (mut parts, body) = request.into_parts();
+    let authenticated =
+        Box::pin(crate::tenancy::request::authenticate(&authenticator, &mut parts)).await;
+    let mut request = Request::from_parts(parts, body);
+    match authenticated {
         Ok(principal) => {
             request.extensions_mut().insert(principal);
             let secret = SecretResult::default();

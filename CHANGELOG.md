@@ -40,6 +40,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Changed
 
+- For module authors: `Authenticator::authenticate` takes a second argument, the `TenantHint` of the request
+  (domain and `Autoxide-Tenant` header). `Principal` carries a tenant (`tenant_id`, `in_tenant`, `operator_from`).
+  Handlers may take `tenant: TenantContext` (`autoxide_kernel::tenancy`), and the module start context gives the
+  `DatabaseRegistry` (`StartContext::tenancy`).
 - For module authors: the trait `autoxide_auth::api::AccountRecovery` has a new method `remove_passkeys`; only
   `auth` implements it.
 - Internal, no change in behaviour: the code of `newsletter`, `comments`, `media` and `forms` is grouped by

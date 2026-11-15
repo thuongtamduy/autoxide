@@ -200,11 +200,19 @@ pub struct StartContext<'a> {
     resources: &'a crate::resource::ResourceDirectory,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
+    tenancy: &'a crate::tenancy::DatabaseRegistry,
 }
 
 impl StartContext<'_> {
-    /// Database của chương trình (hai pool đọc / ghi). `Database` clone rẻ: module
-    /// giữ một bản trong service của mình.
+    /// Sổ database (bước 33): chế độ của bản cài và database của từng khách. Service lấy database
+    /// của dữ liệu cấp khách hàng qua [`TenantContext`](crate::tenancy::TenantContext), không qua
+    /// [`database`](Self::database).
+    pub fn tenancy(&self) -> crate::tenancy::DatabaseRegistry {
+        self.tenancy.clone()
+    }
+
+    /// Database của chương trình (database điều khiển: hai pool đọc / ghi). Cho chỗ thật sự của
+    /// cả bản cài (vd khoá ký gốc); dữ liệu cấp khách hàng đi qua `TenantContext` (bước 33).
     pub fn database(&self) -> &Database {
         self.database
     }

@@ -261,13 +261,16 @@ impl<'a> TestAppBuilder<'a> {
         } else {
             Some(Arc::new(FakeAuthenticator(self.users)))
         };
-        let extras = Extras::default()
+        let mut extras = Extras::default()
             .authenticator(authenticator)
             .idempotency(modules.api::<dyn IdempotencyStore>())
             .deprecations(modules.deprecations())
             .body_limits(modules.body_limits())
             .tools(modules.tools().map_err(|e| fail("tools", e))?)
             .translations(modules.translations().clone());
+        if let Some(registry) = modules.tenancy() {
+            extras = extras.tenancy(registry);
+        }
         let root = http::health_routes(database.clone(), http::Draining::default());
         let api = http::build(&config.http, root, modules.routes(), extras);
         if !api.schema_conflicts.is_empty() {
@@ -300,7 +303,11 @@ struct FakeAuthenticator(HashMap<String, Principal>);
 
 #[async_trait::async_trait]
 impl Authenticator for FakeAuthenticator {
-    async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
+    async fn authenticate(
+        &self,
+        authorization: Option<&str>,
+        _: &autoxide_kernel::tenancy::TenantHint,
+    ) -> Result<Principal, Error> {
         let user = authorization
             .and_then(|value| value.strip_prefix("Bearer "))
             .and_then(|token| self.0.get(token));

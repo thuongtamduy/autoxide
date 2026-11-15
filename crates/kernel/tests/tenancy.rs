@@ -222,3 +222,210 @@ async fn multi_tra_theo_id_slug_ten_mien_va_gioi_han_so_pool() {
     .await
     .unwrap();
 }
+
+// --- Ngữ cảnh khách của request (bước 33 A2) -----------------------------------------------------
+
+mod request {
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    use autoxide_kernel::access::{Authenticator, Principal};
+    use autoxide_kernel::config::{ConfigReader, ConfigSource, HttpConfig};
+    use autoxide_kernel::error::Error;
+    use autoxide_kernel::http;
+    use autoxide_kernel::response::Data;
+    use autoxide_kernel::tenancy::{
+        DatabaseRegistry, MAIN_PLACEMENT, TenancyConfig, TenancyMode, TenantContext, TenantHint,
+        TenantId,
+    };
+    use autoxide_testkit::TestDatabase;
+    use axum::Router;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use serde_json::{Value, json};
+    use tower::ServiceExt;
+    use utoipa_axum::router::OpenApiRouter;
+    use utoipa_axum::routes;
+    use uuid::Uuid;
+
+    use super::{control, domain, tenant};
+
+    /// Token → bên gọi (kèm khách của credential).
+    struct Tokens(HashMap<&'static str, Principal>);
+
+    #[async_trait::async_trait]
+    impl Authenticator for Tokens {
+        async fn authenticate(
+            &self,
+            authorization: Option<&str>,
+            _: &TenantHint,
+        ) -> Result<Principal, Error> {
+            authorization
+                .and_then(|value| value.strip_prefix("Bearer "))
+                .and_then(|token| self.0.get(token))
+                .cloned()
+                .ok_or_else(|| Error::unauthenticated("auth.missing_token", "Sign in."))
+        }
+    }
+
+    /// Khách của request và (nếu đăng nhập) bên gọi.
+    #[utoipa::path(get, path = "/", responses((status = 200, description = "Who and where.")))]
+    async fn whoami(
+        tenant: TenantContext,
+        principal: Option<Principal>,
+    ) -> Result<Data<Value>, Error> {
+        Ok(Data {
+            data: json!({
+                "tenant": tenant.slug(),
+                "operator_from": principal.as_ref().and_then(Principal::operator_from).map(|id| id.to_string()),
+            }),
+        })
+    }
+
+    fn app(registry: DatabaseRegistry, tokens: HashMap<&'static str, Principal>) -> Router {
+        let source = ConfigSource::default();
+        let mut reader = ConfigReader::new(&source);
+        let config = HttpConfig::read(&mut reader);
+        let config = reader.finish(config).unwrap().0;
+        let routes = OpenApiRouter::new().routes(routes!(whoami));
+        let authenticator: Arc<dyn Authenticator> = Arc::new(Tokens(tokens));
+        http::build(
+            &config,
+            OpenApiRouter::new(),
+            vec![("probe", routes)],
+            http::Extras::default().authenticator(Some(authenticator)).tenancy(registry),
+        )
+        .router
+    }
+
+    async fn call(app: &Router, headers: &[(&str, &str)]) -> (StatusCode, Value) {
+        let mut request = Request::builder().uri("/api/v1/probe");
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+        let response = app.clone().oneshot(request.body(Body::empty()).unwrap()).await.unwrap();
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        (status, serde_json::from_slice(&bytes).unwrap())
+    }
+
+    #[tokio::test]
+    async fn single_bo_qua_host_va_header() {
+        TestDatabase::run(async |test| {
+            let (database, _) = control(test).await;
+            let tokens = HashMap::from([("a", Principal::new(Uuid::nil(), []))]);
+            let app = app(DatabaseRegistry::single(database), tokens);
+            for headers in [
+                vec![],
+                vec![("host", "shop.example"), ("autoxide-tenant", "other")],
+                vec![("authorization", "Bearer a"), ("autoxide-tenant", "other")],
+            ] {
+                let (status, body) = call(&app, &headers).await;
+                assert_eq!(
+                    (status, body["data"]["tenant"].as_str()),
+                    (StatusCode::OK, Some("default")),
+                    "{headers:?}"
+                );
+            }
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn multi_credential_header_host_va_nhan_su_nen_tang() {
+        TestDatabase::run(async |test| {
+            let (database, base) = control(test).await;
+            let main = MAIN_PLACEMENT.as_uuid();
+            let a = tenant(&database, "a", "active", main).await;
+            let b = tenant(&database, "b", "active", main).await;
+            let locked = tenant(&database, "locked", "suspended", main).await;
+            domain(&database, b, "shop-b.example", "verified").await;
+            let platform = autoxide_kernel::tenancy::DEFAULT_TENANT;
+            let user = |tenant: TenantId, permissions: &[&str]| {
+                Principal::new(Uuid::now_v7(), permissions.iter().map(|p| (*p).to_owned()))
+                    .in_tenant(tenant)
+            };
+            let tokens = HashMap::from([
+                ("a", user(a, &[])),
+                ("staff", user(platform, &["kernel.tenants.operate"])),
+                ("plain-staff", user(platform, &[])),
+                ("admin-a", Principal::with_all_permissions(Uuid::now_v7()).in_tenant(a)),
+            ]);
+            let config = TenancyConfig::with_mode(TenancyMode::Multi);
+            let app = app(DatabaseRegistry::new(database, base, config), tokens);
+            let tenant_of = async |headers: &[(&str, &str)]| {
+                let (status, body) = call(&app, headers).await;
+                (
+                    status,
+                    body["data"]["tenant"]
+                        .as_str()
+                        .map(str::to_owned)
+                        .or_else(|| body["code"].as_str().map(str::to_owned)),
+                )
+            };
+
+            // Credential: khách của credential.
+            assert_eq!(
+                tenant_of(&[("authorization", "Bearer a")]).await,
+                (StatusCode::OK, Some("a".to_owned()))
+            );
+            // Không gì cả: phải nói rõ cách sửa.
+            assert_eq!(
+                tenant_of(&[]).await,
+                (StatusCode::BAD_REQUEST, Some("tenant_required".to_owned()))
+            );
+            // Route công khai: header hay tên miền đã xác minh chọn khách.
+            assert_eq!(tenant_of(&[("autoxide-tenant", "b")]).await.1.as_deref(), Some("b"));
+            assert_eq!(
+                tenant_of(&[("autoxide-tenant", &b.to_string())]).await.1.as_deref(),
+                Some("b")
+            );
+            assert_eq!(tenant_of(&[("host", "Shop-B.example:443")]).await.1.as_deref(), Some("b"));
+            assert_eq!(
+                tenant_of(&[("host", "unknown.example")]).await.1.as_deref(),
+                Some("tenant_required")
+            );
+            // Credential của khách A trỏ sang khách B (header hay tên miền): `tenant_mismatch`.
+            for headers in [
+                [("authorization", "Bearer a"), ("autoxide-tenant", "b")],
+                [("authorization", "Bearer a"), ("host", "shop-b.example")],
+            ] {
+                assert_eq!(
+                    tenant_of(&headers).await,
+                    (StatusCode::FORBIDDEN, Some("tenant_mismatch".to_owned()))
+                );
+            }
+            // Admin của khách thường có mọi permission nhưng không phải nhân sự nền tảng.
+            let (status, body) =
+                call(&app, &[("authorization", "Bearer admin-a"), ("autoxide-tenant", "b")]).await;
+            assert_eq!(
+                (status, body["code"].as_str()),
+                (StatusCode::FORBIDDEN, Some("tenant_mismatch"))
+            );
+            // Nhân sự nền tảng có `kernel.tenants.operate`: vào khách B, ghi lại từ đâu tới.
+            let (status, body) =
+                call(&app, &[("authorization", "Bearer staff"), ("autoxide-tenant", "b")]).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            assert_eq!(body["data"]["tenant"], "b");
+            assert_eq!(body["data"]["operator_from"], platform.to_string());
+            // Thiếu permission: không vào được.
+            let (status, _) =
+                call(&app, &[("authorization", "Bearer plain-staff"), ("autoxide-tenant", "b")])
+                    .await;
+            assert_eq!(status, StatusCode::FORBIDDEN);
+            // Khách tạm khoá; khách không có.
+            assert_eq!(
+                tenant_of(&[("autoxide-tenant", "locked")]).await.1.as_deref(),
+                Some("tenant_suspended")
+            );
+            let _ = locked;
+            assert_eq!(
+                tenant_of(&[("autoxide-tenant", "ghost")]).await.1.as_deref(),
+                Some("tenant_not_found")
+            );
+        })
+        .await
+        .unwrap();
+    }
+}
