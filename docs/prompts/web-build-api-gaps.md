@@ -451,3 +451,17 @@ Giao diện đã chịu được cả hai dạng; nên sửa mô tả hoặc gi�
 | [ ] | `GET /kernel/client-config`, `content.post_path_prefix` | ví dụ `/blog/` | `blog` (không có dấu `/`) |
 | [ ] | `CommentDetail.target_title` | — | chỉ có khi đích đang công khai; bình luận trên bài nháp chỉ có id (nên ghi rõ trong mô tả) |
 
+## Website bán hàng (`apps/storefront`, W-026 của web)
+
+Website công khai chỉ gọi endpoint công khai, từ máy chủ của nó. Phần thương mại dùng dữ liệu mẫu (cùng sản phẩm,
+giá, cửa hàng với dữ liệu mẫu của trang quản trị) tới khi các bước 41–46 có.
+
+| [ ] | Màn | Cần | Bước | Website đang làm gì |
+|---|---|---|---|---|
+| [ ] | Chân trang, đầu trang | Hồ sơ công khai của khách: tên, thông tin pháp lý (mã số doanh nghiệp, địa chỉ), logo đã thông báo Bộ Công Thương, cấu hình giao diện (kiểu `market` / `minimal` / `luxe`) | 34 (+ 55) | Ô `[…]`; kiểu giao diện đặt bằng biến `AUTOXIDE_STOREFRONT_THEME` |
+| [ ] | `/blog` | Danh sách danh mục và thẻ công khai của `content` (kèm số bài) | mới | Gom chủ đề từ các bài trên trang đang xem |
+| [ ] | Bài viết | Nhúng bản ghi trong nội dung (khối sản phẩm trong bài) | 51 | Khối "sản phẩm nhắc tới trong bài" là dữ liệu mẫu |
+| [ ] | Menu | Bộ biểu tượng của menu có biểu tượng ngành hàng (chảo, nồi, dao…) | mới (`menus`) | Dùng biểu tượng chung |
+| [ ] | Địa chỉ đã gỡ | `resolve` trả 410 cho địa chỉ đã gỡ; website (App Router) chưa trả được 410 nên đang trả 404 | — (ghi để biết) | 404 |
+| [ ] | Trang chủ, danh mục, sản phẩm, giỏ, đặt hàng, gian hàng | Catalog, giá theo cửa hàng, tồn theo cửa hàng, giá khi áp mã, giỏ, đơn, người bán (công khai) | 41–46 | Dữ liệu mẫu |
+
