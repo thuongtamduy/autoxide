@@ -254,3 +254,35 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/platform.t
 | [ ] | Sức khoẻ | Cảnh báo đang bật kèm câu "làm gì": `GET /kernel/ops/alerts` | mới |
 | [ ] | Vào dữ liệu khách | `GET/POST/DELETE /auth/support-grants` | 34 |
 | [ ] | Vào dữ liệu khách | Nhà vận hành đọc cài đặt `auth.support_access` của khách; danh sách nhân sự nền tảng | mới |
+
+## Tiếp thị › Khuyến mại (`/marketing/promotions`), Bán hàng › Vận chuyển (`/sales/shipping`)
+
+Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/promotions.ts` và `src/sample/shipping.ts`.
+
+| | Màn | Cần | Bước |
+|---|---|---|---|
+| [ ] | Khuyến mại | `GET/POST /promotions/promotions`, `GET/PATCH/DELETE /{id}`, `PUT /{id}/translations/{locale}`, `/targets`, `/flash-items` | 43 |
+| [ ] | Khuyến mại | `POST /{id}/activate`, `/pause`, `/resume`, `/end`, `/cancel` | 43 |
+| [ ] | Khuyến mại | Kiểm trước khi bật: `POST /{id}/activate?dry_run=true` trả danh sách điều kiện; `last_activation_error` | 43 (ui-phase2) |
+| [ ] | Khuyến mại | Danh sách kèm tên nút, mục tiêu đọc thành chữ, mã đầu tiên, `held_count`; endpoint đếm cho số liệu đầu trang | mới |
+| [ ] | Khuyến mại | `GET /legal-limits?at`, `GET /notice-rules?at`, cờ `needs_review` (căn cứ cần đối chiếu) | 43 (cờ: mới) |
+| [ ] | Khuyến mại | `POST /evaluate` trả thêm `skipped` (chương trình không áp + lý do `promotions.skip.*`); `code_not_applicable` mang `condition` có tham số | 43 (`skipped`: mới) |
+| [ ] | Khuyến mại | Giá ngay trước khuyến mại → giá sau khuyến mại cho từng biến thể mục tiêu | 43 + `reference_prices` của 41 |
+| [ ] | Khuyến mại | Mã lỗi mới: `promotions.reference_price_missing`, `targets_missing`, `extend_only`, `raise_only`, `not_a_discount`, `not_code_based`, `per_customer_over_total`, `target_unknown`, `line_format`, `no_price`, `too_many_generated`, `notice_not_required` | mới |
+| [ ] | Mã giảm giá | Danh sách mọi mã của khách; `remaining` là số thật, `held_count`, `source`; `POST /{id}/codes` trả kết quả job; `GET /{id}/codes/export` | 43 (danh sách chung: mới) |
+| [ ] | Flash sale | Flash item kèm giá tham chiếu, % giảm, giá thấp nhất được phép theo trần | 43 |
+| [ ] | Thông báo Sở Công Thương | `POST /{id}/notice-export?format=csv\|json`, `PATCH /{id}/notice`; địa bàn, hạn nộp; một chương trình nhiều nơi nhận | 43 (nhiều nơi: hở) |
+| [ ] | Lịch sử phiên bản | `GET /{id}/versions`; danh sách chung; `change {code, params, reason}` cho mỗi phiên bản | 43 (chung, `change`: mới) |
+| [ ] | Vận chuyển | `GET /shipping/shipments?status&tracking&q`, `GET /{id}` (kiện, món, hành trình), `POST /shipments` | 44 |
+| [ ] | Vận chuyển | `POST /{id}/book`, `/cancel`, `/split`, `PUT /{id}/parcels`, `POST /{id}/status` | 44 |
+| [ ] | Vận chuyển | Hỏi lại hành trình theo yêu cầu: `POST /shipments/{id}/track` | mới |
+| [ ] | Vận chuyển | `eta_from` / `eta_to` chụp lúc tạo, `max_attempts`, cân tính phí / cân quy đổi; endpoint đếm theo trạng thái | 44 + mới |
+| [ ] | Vận chuyển | `GET /shipments/{id}/label` (in nhãn, chưa dựng) | 44 |
+| [ ] | Phí vận chuyển | `GET/POST /methods`, `PATCH /{id}`, `PUT /{id}/rates`, `/pickup-points`, `GET/POST /zones`; kèm "ghi đè nút cha", tên và tình trạng hãng | 44 (kèm: mới) |
+| [ ] | Phí vận chuyển | `POST /quote` trả `eta_from` / `eta_to`, `order_by`, `ready_at`, `hold_days`, `free_shipping_missing`, `unavailable[].reason_code` | 44 (`free_shipping_missing`: mới) |
+| [ ] | Phí vận chuyển | Giờ chốt riêng của phương thức (`cutoff`); `tax_category` của phí giao | 44, 45 |
+| [ ] | Lịch giao | `GET/POST /calendars` (phiên bản có ngày hiệu lực), `POST /calendars/holidays`, ngày nghỉ "chờ thông báo" | 44 (hở) |
+| [ ] | Đối soát COD | `GET/POST /cod/statements`, `GET /cod/discrepancies`, `POST /{id}/resolve`; `payee`; số liệu phải thu / lệch / quá hạn | 44 (`payee`: 46) |
+| [ ] | Hãng vận chuyển | `GET/POST /carrier-accounts`, `PATCH /{id}`, `POST /{id}/test`; `check_status`, `checked_at`, `last_error`, `capabilities`, `secret_set_at` | 44 |
+| [ ] | Vận chuyển | Mã lỗi mới: `shipping.discrepancy_not_found`, `discrepancy_resolved`, `calendar_exists`, `parcel_count`, `days_range`, `outside_area`, `weight_out_of_range`, `no_pickup_point`, `carrier_name_taken` | mới |
+| [ ] | Vận chuyển | Danh mục tỉnh / xã cho ô địa chỉ | 34 (`address`) |
