@@ -14,6 +14,7 @@ mod api_key;
 mod cleanup;
 mod config;
 mod doctor;
+mod email_report;
 mod events;
 mod http;
 mod mfa;
@@ -66,6 +67,7 @@ struct AuthModule {
     state: Option<http::HttpState>,
     cleanup: Option<Arc<cleanup::Cleanup>>,
     resets: Option<Arc<reset::PasswordResets>>,
+    verifications: Option<Arc<verify::EmailVerifications>>,
     administrator: Option<Arc<doctor::Administrator>>,
 }
 
@@ -138,7 +140,9 @@ impl Module for AuthModule {
             mailer: mailer.clone(),
             translations: context.translations().clone(),
             outbox: outbox.clone(),
+            jobs: context.jobs(),
             url: config.email_verification_url.clone(),
+            report_url: config.email_change_report_url.clone(),
         });
         let roles = Arc::new(RoleService::new(
             database.clone(),
@@ -190,11 +194,12 @@ impl Module for AuthModule {
             api_keys,
             mfa,
             resets: resets.clone(),
-            verifications,
+            verifications: verifications.clone(),
             passkeys,
             self_registration: config.self_registration,
         });
         self.resets = Some(resets);
+        self.verifications = Some(verifications);
         Ok(())
     }
 
@@ -218,6 +223,10 @@ impl Module for AuthModule {
         if let Some(resets) = &self.resets {
             let mailer = Arc::new(reset::ResetMailer(resets.clone()));
             jobs.push(JobRegistration::new(reset::SEND_RESET, mailer));
+        }
+        if let Some(verifications) = &self.verifications {
+            let mailer = Arc::new(email_report::EmailChangedMailer(verifications.clone()));
+            jobs.push(JobRegistration::new(email_report::SEND_EMAIL_CHANGED, mailer));
         }
         jobs
     }
@@ -373,7 +382,9 @@ pub(crate) mod testing {
             mailer: mails.clone(),
             translations: translations.clone(),
             outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+            jobs: autoxide_kernel::job::JobQueue::new("auth"),
             url: None,
+            report_url: None,
         });
         let passkey_config = crate::config::PasskeyConfig {
             rp_id: PASSKEY_RP_ID.to_owned(),
@@ -436,6 +447,31 @@ pub(crate) mod testing {
     ) {
         services.resets.request(email, language).await.unwrap();
         send_resets(services).await;
+    }
+
+    /// Payload của các job loại `kind` đang chờ, theo thứ tự xếp hàng; đánh dấu chúng là xong.
+    pub async fn take_jobs(services: &Services, kind: &str) -> Vec<String> {
+        use sea_orm::ConnectionTrait as _;
+        use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query};
+        let select = Query::select()
+            .columns([Alias::new("id"), Alias::new("payload")])
+            .from(Alias::new("auth_jobs"))
+            .and_where(Expr::col(Alias::new("kind")).eq(kind))
+            .and_where(Expr::col(Alias::new("completed_at")).is_null())
+            .order_by(Alias::new("id"), Order::Asc)
+            .to_owned();
+        let mut payloads = Vec::new();
+        for row in services.database.write().query_all(&select).await.unwrap() {
+            let id: uuid::Uuid = row.try_get("", "id").unwrap();
+            payloads.push(row.try_get("", "payload").unwrap());
+            let done = Query::update()
+                .table(Alias::new("auth_jobs"))
+                .value(Alias::new("completed_at"), chrono::Utc::now())
+                .and_where(Expr::col(Alias::new("id")).eq(id))
+                .to_owned();
+            services.database.write().execute(&done).await.unwrap();
+        }
+        payloads
     }
 
     /// Chạy mọi job gửi mail đặt lại mật khẩu đang chờ, theo thứ tự xếp hàng.

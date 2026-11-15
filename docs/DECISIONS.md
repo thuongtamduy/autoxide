@@ -6260,3 +6260,43 @@ hay người có chuyên môn pháp lý cho trường hợp cụ thể (D-186).
 Đã cân nhắc:
 - Trả bản đang chạy thay vì 409: client không biết đó là bản cũ hay bản mình vừa yêu cầu.
 - Link tải cần đăng nhập: không mở được trong trình duyệt khi client dùng token. Chữ ký gắn với id và hạn là đủ.
+
+## D-250 · `auth`: đổi email thì báo địa chỉ cũ, kèm cách báo "không phải tôi" (bước 32 B1) — 2026-11-15 — agent quyết
+
+Bối cảnh: D-065 ghi "báo địa chỉ cũ để sau". Kẻ biết mật khẩu đổi được email sang địa chỉ của nó: chủ thật mất cả
+đường đặt lại mật khẩu, mà không hay biết gì.
+
+Quyết định:
+
+- **Mail báo đi qua job, xếp trong transaction của `confirm`.**
+  - `EmailVerifications::confirm` (khi email thực sự đổi) xếp job `auth.send_email_changed` trong cùng
+    transaction. Xác nhận rollback (vd địa chỉ bị người khác lấy) thì không có mail. Request không chờ mail.
+  - Payload: `user_id`, hai địa chỉ, lúc đổi, ngôn ngữ (`Accept-Language` của người xác nhận). Job queue xoá
+    payload khi xong (D-079).
+- **Job:** tạo token một lần (`OneTimeTokens::new("auth")`, mục đích `email_change_report`, `subject` = id,
+  `data` = địa chỉ cũ, sống **7 ngày** — hằng số `REPORT_DAYS`, vì mail báo hay được đọc muộn). Mail tới **địa chỉ
+  cũ** ghi địa chỉ mới **che bớt** (`n***@example.org`: đủ để chủ nhận ra, không lộ trọn địa chỉ kẻ chiếm cho ai
+  đọc trộm hộp thư cũ). Mẫu `auth.mail.email_changed_link` dẫn tới Setting mới
+  `AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL` (có `{token}`); không đặt thì `auth.mail.email_changed_code` chứa token.
+- **`POST /api/v1/auth/email-change/report`** (`x-public`, thân `{ "token" }`, trả 204). Một transaction:
+  1. dùng token; khoá dòng người dùng (`rows::lock_one`), nên hai lần báo đồng thời chỉ một bên được (có test);
+  2. địa chỉ cũ còn trống thì trả email về đó (kiểm trước, vì lỗi unique làm hỏng cả transaction trên Postgres);
+  3. khoá tài khoản bằng `UserService::lock_out_in`: bỏ mật khẩu (`NULL`: không đăng nhập bằng mật khẩu được
+     nữa), thu hồi phiên và refresh token, API key, passkey, token xác minh / đặt lại / báo đang chờ, tắt TOTP
+     kèm recovery code (`mfa::service::remove_in`, tách từ hàm tắt MFA sẵn có);
+  4. event mới `auth.email_change_reported` (`before.email`, `after.email`, `after.restored`);
+  5. khi email đã về địa chỉ cũ: xếp job `auth.send_password_reset` (D-162) tới đó.
+- **Địa chỉ cũ đã bị người khác lấy:** tài khoản vẫn bị khoá nhưng không gửi mail đặt lại nào. Mail đó sẽ tới
+  người khác, hay tới kẻ chiếm. Chủ tài khoản nhờ quản trị viên (`autoxide user …`).
+- Token sai, hết hạn, đã dùng, hay tài khoản đã bị xoá: cùng một lỗi 400 `auth.invalid_email_change_report_token`,
+  không cho dò gì.
+- Không thêm giới hạn lượt riêng cho endpoint: token 256 bit ngẫu nhiên không đoán được, như
+  `/password-reset/confirm`.
+- `EmailVerifications::confirm` nhận thêm `Language` (cho mail báo).
+
+Lý do: chủ tài khoản biết ngay khi email bị đổi, và lấy lại được tài khoản chỉ bằng hộp thư cũ. Kẻ chiếm mất mọi
+đường vào đã tạo (phiên, API key, passkey, MFA).
+
+Đã cân nhắc:
+- Gửi mail báo trực tiếp trong request: chậm request, và gửi cả khi transaction rollback.
+- Giữ mật khẩu cũ, chỉ thu hồi phiên: kẻ chiếm đã biết mật khẩu nên đăng nhập lại ngay được.

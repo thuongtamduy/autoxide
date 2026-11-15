@@ -7,7 +7,8 @@
 //!   của mình.
 //! - `confirm(token)`: token đúng, chưa dùng, chưa hết hạn thì ghi nhận email đã xác
 //!   minh (và thay email nếu là đổi email); mọi token xác minh khác của người đó hết
-//!   hiệu lực.
+//!   hiệu lực. Email đổi thì địa chỉ cũ nhận mail báo kèm cách báo "không phải tôi"
+//!   (`email_report.rs`).
 
 use std::sync::Arc;
 
@@ -15,6 +16,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
+use autoxide_kernel::job::JobQueue;
 use autoxide_kernel::mail::{MailTemplate, Mailer};
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
@@ -22,6 +24,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::api::User;
+use crate::email_report::EmailChangedJob;
 use crate::events;
 use crate::session::SessionService;
 use crate::user::{self, UserService};
@@ -60,8 +63,12 @@ pub(crate) struct EmailVerifications {
     pub mailer: Arc<dyn Mailer>,
     pub translations: Translations,
     pub outbox: Outbox,
+    /// Hàng đợi job của `auth`: mail báo địa chỉ cũ khi đổi email (`email_report.rs`).
+    pub jobs: JobQueue,
     /// Trang của giao diện, có `{token}`; `None`: mail chứa token.
     pub url: Option<String>,
+    /// Trang báo "không phải tôi", có `{token}`; `None`: mail chứa token.
+    pub report_url: Option<String>,
 }
 
 impl EmailVerifications {
@@ -113,8 +120,9 @@ impl EmailVerifications {
         self.send(Actor::user(user_id), &user, &email, language).await
     }
 
-    /// Xác nhận email bằng `token` lấy từ mail. Trả tài khoản sau khi xác minh.
-    pub(crate) async fn confirm(&self, token: &str) -> Result<User, Error> {
+    /// Xác nhận email bằng `token` lấy từ mail. Trả tài khoản sau khi xác minh. Email đổi thì
+    /// xếp mail báo tới địa chỉ cũ (bằng `language`) trong cùng transaction.
+    pub(crate) async fn confirm(&self, token: &str, language: Language) -> Result<User, Error> {
         let now = now();
         let transaction = self.database.begin_write().await?;
         let consumed = tokens().consume(&transaction, PURPOSE, token).await?;
@@ -131,6 +139,14 @@ impl EmailVerifications {
         // Email đổi: mail đặt lại mật khẩu đã gửi tới địa chỉ cũ hết dùng được (D-156).
         if old != email {
             tokens().revoke(&transaction, "password_reset", &user_id.to_string()).await?;
+            let job = EmailChangedJob {
+                user_id,
+                old_email: old.clone(),
+                new_email: email.clone(),
+                changed_at: now,
+                language: language.tag().to_owned(),
+            };
+            self.enqueue_email_changed(&transaction, &job).await?;
         }
         let before = (old != email).then(|| json!({"email": old}));
         let event = events::EmailVerified { before, after: Some(json!({"email": email})) };
@@ -268,14 +284,14 @@ mod tests {
             verifications.send_current(ada.id, Language::En).await.unwrap();
             assert_eq!(sent(&services), 1);
 
-            let verified = verifications.confirm(&token).await.unwrap();
+            let verified = verifications.confirm(&token, Language::En).await.unwrap();
             assert_eq!(verified.email, "ada@example.com");
             assert!(verified.email_verified_at.is_some());
-            let again = verifications.confirm(&token).await.unwrap_err();
+            let again = verifications.confirm(&token, Language::En).await.unwrap_err();
             assert_eq!(again.code(), "auth.invalid_verification_token");
             let done = verifications.send_current(ada.id, Language::En).await.unwrap_err();
             assert_eq!(done.code(), "auth.email_already_verified");
-            let unknown = verifications.confirm("nope").await.unwrap_err();
+            let unknown = verifications.confirm("nope", Language::En).await.unwrap_err();
             assert_eq!(unknown.code(), "auth.invalid_verification_token");
         })
         .await
@@ -291,7 +307,7 @@ mod tests {
 
             time_passes(&services, 25).await;
 
-            let expired = services.verifications.confirm(&token).await.unwrap_err();
+            let expired = services.verifications.confirm(&token, Language::En).await.unwrap_err();
             assert_eq!(expired.code(), "auth.invalid_verification_token");
         })
         .await
@@ -334,13 +350,13 @@ mod tests {
             let before = services.users.get(ada.id).await.unwrap().unwrap();
             assert_eq!(before.email, "ada@example.com");
 
-            let changed = verifications.confirm(&token).await.unwrap();
+            let changed = verifications.confirm(&token, Language::En).await.unwrap();
             assert_eq!(changed.email, "ada@new.example");
             assert!(changed.email_verified_at.is_some());
             services.sessions.login("ada@new.example", PASSWORD, None).await.unwrap();
             assert!(services.sessions.login("ada@example.com", PASSWORD, None).await.is_err());
             // Token cũ (cho địa chỉ cũ) hết dùng được: không quay email về được.
-            let stale = verifications.confirm(&old_token).await.unwrap_err();
+            let stale = verifications.confirm(&old_token, Language::En).await.unwrap_err();
             assert_eq!(stale.code(), "auth.invalid_verification_token");
         })
         .await
@@ -364,7 +380,7 @@ mod tests {
             };
             services.users.create(Actor::system(), carol).await.unwrap();
 
-            let taken = verifications.confirm(&token).await.unwrap_err();
+            let taken = verifications.confirm(&token, Language::En).await.unwrap_err();
 
             assert_eq!(taken.code(), "auth.email_taken");
             let ada = services.users.get(ada.id).await.unwrap().unwrap();
@@ -386,7 +402,7 @@ mod tests {
                 .map(|_| {
                     let verifications = services.verifications.clone();
                     let token = token.clone();
-                    tokio::spawn(async move { verifications.confirm(&token).await })
+                    tokio::spawn(async move { verifications.confirm(&token, Language::En).await })
                 })
                 .collect();
             let mut succeeded = 0;

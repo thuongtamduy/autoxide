@@ -289,8 +289,13 @@ New accounts receive a mail asking to confirm their address; the token in it (va
 24 hours) is confirmed with `POST /api/v1/auth/email-verification/confirm`, and
 `email_verified_at` then shows when. To change their email, users call
 `POST /api/v1/auth/me/email` with the new address and their password: the email
-changes only once the new address is confirmed the same way. Set
-`AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` to link these mails to your own page.
+changes only once the new address is confirmed the same way. The old address then gets a
+mail saying so, with a token (valid 7 days) to report a change the owner did not make:
+`POST /api/v1/auth/email-change/report` signs the account out everywhere, removes its
+password, passkeys, API keys and two-step sign-in, gives the old address back when it is
+still free, and sends a password-reset mail there. Set
+`AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` and `AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL` to link
+these mails to your own pages.
 
 For production, set `AUTOXIDE_AUTH_TOKEN_SECRET` (the key that signs access tokens)
 to a long random value, the same on every server:

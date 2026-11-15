@@ -54,6 +54,7 @@ events! {
     EMAIL_VERIFICATION_REQUESTED, EmailVerificationRequested, "auth.email_verification_requested", "A mail to confirm an email address was sent; `after.email` is that address.";
     EMAIL_VERIFIED, EmailVerified, "auth.email_verified", "A user confirmed an email address; when it was a new one, it replaced the old (`before.email`).";
     PASSKEY_ADDED, PasskeyAdded, "auth.passkey_added", "A user added a passkey; `after.name` is its name.";
+    EMAIL_CHANGE_REPORTED, EmailChangeReported, "auth.email_change_reported", "The owner of an account reported an email change they did not make (from the mail sent to the old address): the account was signed out everywhere, its password, passkeys, API keys and two-step sign-in removed, and the old address restored when free (`before.email`, `after.email`).";
     PASSKEY_REMOVED, PasskeyRemoved, "auth.passkey_removed", "A user removed a passkey; `before.name` is its name.";
     RECOVERY_CODES_REPLACED, RecoveryCodesReplaced, "auth.recovery_codes_replaced", "A user made new recovery codes.";
 }

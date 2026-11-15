@@ -2513,6 +2513,11 @@ export type EditedComment = PublicComment & {
   status: CommentVisibility;
 };
 
+/** The token from the mail sent to the old address after an email change. */
+export type EmailChangeReport = {
+  token: string;
+};
+
 /** Everything the forms hold about one email address. */
 export type EmailDataResponse = {
   /** The address, as matched (lower case). */
@@ -5705,6 +5710,19 @@ export interface paths {
         204: void;
         401: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/email-change/report": {
+    /** Report an email change you did not make. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: EmailChangeReport;
+      responses: {
+        204: void;
+        400: Problem;
+        422: Problem;
         default: Problem;
       };
     };

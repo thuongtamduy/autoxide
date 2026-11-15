@@ -83,7 +83,7 @@ Nhóm A — bố cục:
 
 Nhóm B — việc nhật ký quyết định đã ghi "để sau":
 
-- [ ] `auth`: đổi email thì gửi thêm mail báo tới địa chỉ cũ (kèm cách báo "không phải tôi" — vd
+- [x] `auth`: đổi email thì gửi thêm mail báo tới địa chỉ cũ (kèm cách báo "không phải tôi" — vd
       khoá phiên và đặt lại mật khẩu), để chủ tài khoản biết khi tài khoản bị chiếm (đã ghi để sau
       ở mục về xác minh email trong `docs/DECISIONS.md`); mail qua job, không làm chậm request
 - [ ] `auth`: quản trị viên xem và gỡ passkey của người khác (permission riêng, ghi event cho

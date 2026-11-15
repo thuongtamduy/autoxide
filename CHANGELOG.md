@@ -16,6 +16,11 @@ endpoints are marked deprecated with a sunset date first.
   sign-in and expires (`AUTOXIDE_FORMS_EXPORT_LINK_MINUTES`). The file has the same content as the existing
   export. It is kept `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS`, and deleted with the submissions of an address or with
   the form. New event `forms.submissions_exported`.
+- `auth`: when an account's email changes, the old address gets a mail saying so, with a token (valid 7 days)
+  to report a change the owner did not make. `POST /api/v1/auth/email-change/report` signs the account out
+  everywhere, removes its password, passkeys, API keys and two-step sign-in, gives the old address back when it is
+  free, and sends a password-reset mail there. New setting `AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL`, new event
+  `auth.email_change_reported`.
 - For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
   errors.
 
