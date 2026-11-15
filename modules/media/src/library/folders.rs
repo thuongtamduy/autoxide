@@ -8,15 +8,19 @@
 //!   item / thư mục con vào thì "chạm" thư mục đó trước (`touch_folder`), nên hai bên chờ
 //!   nhau và bên sau thấy kết quả của bên trước;
 //! - không chuyển thư mục vào chính nó hay thư mục con của nó: mọi lệnh chuyển cập nhật
-//!   dòng `media_lock.folder_tree` trước, nên chạy lần lượt và thấy cây đã đổi của nhau.
+//!   dòng `media_lock.folder_tree` của khách trước, nên chạy lần lượt và thấy cây đã đổi của
+//!   nhau. Mỗi khách một cây, một dòng khoá (gieo khi tạo khách, [`seed_lock`]).
+//!
+//! Theo khách (bước 33): mọi truy vấn lọc theo khách; tên thư mục chỉ không trùng trong cùng khách
+//! (unique `(tenant_id, parent_id, name_key)`, thư mục gốc vẫn là UUID toàn số 0).
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
-use sea_orm::sea_query::{Expr, ExprTrait as _};
+use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
     QueryFilter, Set, SqlErr,
@@ -34,6 +38,9 @@ use crate::service::{FolderFilter, MediaService, check_name, folder_gone, now, t
 
 /// Một thư mục.
 pub(crate) type Folder = folder::Model;
+
+/// Tên dòng khoá cây thư mục trong `media_lock`.
+const FOLDER_TREE: &str = "folder_tree";
 
 /// Độ sâu tối đa của cây thư mục; sâu hơn coi như dữ liệu hỏng (vòng lặp).
 const MAX_DEPTH: usize = 1000;
@@ -62,6 +69,7 @@ impl MediaService {
     /// Tạo thư mục `name` trong `parent` (`None`: gốc). Cần `media.write`.
     pub(crate) async fn create_folder(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         name: &str,
         parent: Option<Uuid>,
@@ -70,19 +78,20 @@ impl MediaService {
         let mut problems = Vec::new();
         let name = check_name(name, &mut problems);
         if let Some(parent) = parent {
-            self.check_folder_exists(parent, "parent_id", &mut problems).await?;
+            self.check_folder_exists(tenant, parent, "parent_id", &mut problems).await?;
         }
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
         let parent = stored_folder(parent);
         let now = now();
-        let transaction = self.database.begin_write().await?;
-        if !touch_folder(&transaction, parent).await? {
+        let transaction = tenant.database().begin_write().await?;
+        if !touch_folder(&transaction, tenant, parent).await? {
             return Err(folder_gone("parent_id"));
         }
         let folder = folder::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             parent_id: Set(parent),
             name_key: Set(autoxide_kernel::search::normalize(&name)),
             name: Set(name.clone()),
@@ -95,13 +104,7 @@ impl MediaService {
         let event = events::FolderCreated(Change { before: None, after: Some(snapshot(&folder)) });
         let actor = Actor::from(principal);
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::folder_subject(folder.id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::folder_subject(folder.id), &event)
             .await?;
         transaction.commit().await?;
         Ok(folder)
@@ -110,18 +113,20 @@ impl MediaService {
     /// Một trang thư mục. Cần `media.read`.
     pub(crate) async fn list_folders(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         parent: FolderFilter,
         sort: FolderSort,
         page: &PageRequest,
     ) -> Result<Page<Folder>, Error> {
         principal.require(&MEDIA_READ)?;
+        let select = Entity::find().scoped(tenant);
         let select = match parent {
-            FolderFilter::Any => Entity::find(),
-            FolderFilter::Root => Entity::find().filter(Column::ParentId.eq(ROOT)),
-            FolderFilter::Id(id) => Entity::find().filter(Column::ParentId.eq(id)),
+            FolderFilter::Any => select,
+            FolderFilter::Root => select.filter(Column::ParentId.eq(ROOT)),
+            FolderFilter::Id(id) => select.filter(Column::ParentId.eq(id)),
         };
-        let read = self.database.read();
+        let read = tenant.database().read();
         match sort {
             FolderSort::CreatedAt => fetch_page(select, Column::Id, |row| row.id, page, read).await,
             FolderSort::Name => {
@@ -135,16 +140,22 @@ impl MediaService {
     /// Thư mục `id`. Cần `media.read`.
     pub(crate) async fn get_folder(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<Folder, Error> {
         principal.require(&MEDIA_READ)?;
-        Entity::find_by_id(id).one(self.database.read()).await?.ok_or_else(|| folder_not_found(id))
+        Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .ok_or_else(|| folder_not_found(id))
     }
 
     /// Đổi tên hay chuyển thư mục `id`. Cần `media.write`.
     pub(crate) async fn update_folder(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         changes: FolderChanges,
@@ -154,23 +165,22 @@ impl MediaService {
         let mut problems = Vec::new();
         let name = changes.name.as_deref().map(|name| check_name(name, &mut problems));
         if let Some(Some(parent)) = changes.parent_id {
-            self.check_folder_exists(parent, "parent_id", &mut problems).await?;
+            self.check_folder_exists(tenant, parent, "parent_id", &mut problems).await?;
         }
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
 
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         if changes.parent_id.is_some() {
-            // Lệnh chuyển chạy lần lượt (xem đầu file).
-            lock::Entity::update_many()
-                .col_expr(lock::Column::Counter, Expr::col(lock::Column::Counter).add(1))
-                .filter(lock::Column::Name.eq("folder_tree"))
-                .exec(&transaction)
-                .await?;
+            // Lệnh chuyển (của cùng khách) chạy lần lượt (xem đầu file).
+            lock_tree(&transaction, tenant).await?;
         }
-        let before =
-            Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| folder_not_found(id))?;
+        let before = Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+            .ok_or_else(|| folder_not_found(id))?;
         let mut row = before.clone().into_active_model();
         if let Some(name) = &name {
             row.name = Set(name.clone());
@@ -179,20 +189,20 @@ impl MediaService {
         if let Some(parent) = changes.parent_id {
             let parent = stored_folder(parent);
             if parent != before.parent_id {
-                if contains(&transaction, id, parent).await? {
+                if contains(&transaction, tenant, id, parent).await? {
                     return Err(Error::conflict(
                         "media.folder_cycle",
                         "A folder cannot be moved into itself or into one of its subfolders.",
                     ));
                 }
-                if !touch_folder(&transaction, parent).await? {
+                if !touch_folder(&transaction, tenant, parent).await? {
                     return Err(folder_gone("parent_id"));
                 }
             }
             row.parent_id = Set(parent);
         }
         row.updated_at = Set(now());
-        let mut update = Entity::update(row).validate()?;
+        let mut update = Entity::update(row).validate()?.scoped(tenant);
         if let Some(expected) = expected {
             update = update.filter(Column::UpdatedAt.eq(expected));
         }
@@ -208,36 +218,43 @@ impl MediaService {
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let actor = Actor::from(principal);
         let event = events::FolderUpdated(change);
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::folder_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, events::folder_subject(id), &event).await?;
         transaction.commit().await?;
         Ok(after)
     }
 
     /// Xoá thư mục `id` nếu trống (không thư mục con, không item — kể cả item trong thùng
     /// rác). Cần `media.write`.
-    pub(crate) async fn delete_folder(&self, principal: &Principal, id: Uuid) -> Result<(), Error> {
+    pub(crate) async fn delete_folder(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<(), Error> {
         principal.require(&MEDIA_WRITE)?;
-        let transaction = self.database.begin_write().await?;
-        let folder =
-            Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| folder_not_found(id))?;
+        let transaction = tenant.database().begin_write().await?;
+        let folder = Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+            .ok_or_else(|| folder_not_found(id))?;
         // Xoá dòng TRƯỚC khi đếm: dòng bị khoá tới hết transaction, ai đang thêm vào thư
         // mục này phải chờ (xem đầu file).
-        let deleted = Entity::delete_by_id(id).exec(&transaction).await?;
+        let deleted = Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         if deleted.rows_affected == 0 {
             transaction.rollback().await?;
             return Err(folder_not_found(id));
         }
-        let folders = Entity::find().filter(Column::ParentId.eq(id)).count(&transaction).await?;
-        let items =
-            item::Entity::find().filter(item::Column::FolderId.eq(id)).count(&transaction).await?;
+        let folders = Entity::find()
+            .scoped(tenant)
+            .filter(Column::ParentId.eq(id))
+            .count(&transaction)
+            .await?;
+        let items = item::Entity::find()
+            .scoped(tenant)
+            .filter(item::Column::FolderId.eq(id))
+            .count(&transaction)
+            .await?;
         if folders + items > 0 {
             transaction.rollback().await?;
             return Err(Error::conflict(
@@ -250,15 +267,7 @@ impl MediaService {
         }
         let event = events::FolderDeleted(Change { before: Some(snapshot(&folder)), after: None });
         let actor = Actor::from(principal);
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::folder_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, events::folder_subject(id), &event).await?;
         transaction.commit().await?;
         Ok(())
     }
@@ -267,6 +276,7 @@ impl MediaService {
 /// Thư mục `ancestor` có phải `folder` hay một thư mục cha (ông…) của nó không.
 async fn contains<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     ancestor: Uuid,
     folder: Uuid,
 ) -> Result<bool, Error> {
@@ -278,12 +288,54 @@ async fn contains<C: ConnectionTrait>(
         if current == ROOT {
             return Ok(false);
         }
-        match Entity::find_by_id(current).one(connection).await? {
+        match Entity::find_by_id(current).scoped(tenant).one(connection).await? {
             Some(row) => current = row.parent_id,
             None => return Ok(false),
         }
     }
     Err(Error::internal("the media folder tree is deeper than expected; it may contain a cycle"))
+}
+
+/// Gieo dòng khoá cây thư mục của khách `tenant` (khi tạo khách). Chạy lại vô hại.
+pub(crate) async fn seed_lock<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+) -> Result<(), Error> {
+    let row = lock::ActiveModel {
+        tenant_id: Set(tenant.id().as_uuid()),
+        name: Set(FOLDER_TREE.to_owned()),
+        counter: Set(0),
+    };
+    lock::Entity::insert(row)
+        .on_conflict(
+            OnConflict::columns([lock::Column::TenantId, lock::Column::Name])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_without_returning(connection)
+        .await?;
+    Ok(())
+}
+
+/// Cập nhật dòng khoá cây thư mục của khách `tenant` (khoá tới hết `transaction`). Khách chưa có
+/// dòng (tạo trước khi module có bộ gieo) thì gieo ngay rồi khoá.
+async fn lock_tree<C: ConnectionTrait>(
+    transaction: &C,
+    tenant: &TenantContext,
+) -> Result<(), Error> {
+    for _ in 0..2 {
+        let locked = lock::Entity::update_many()
+            .col_expr(lock::Column::Counter, Expr::col(lock::Column::Counter).add(1))
+            .filter(lock::Column::Name.eq(FOLDER_TREE))
+            .scoped(tenant)
+            .exec(transaction)
+            .await?;
+        if locked.rows_affected > 0 {
+            return Ok(());
+        }
+        seed_lock(transaction, tenant).await?;
+    }
+    Err(Error::internal("the media folder lock row cannot be created"))
 }
 
 /// Vi phạm index unique (thư mục cha, tên) thành lỗi 409 dễ hiểu.

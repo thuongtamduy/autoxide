@@ -6945,3 +6945,17 @@ Chủ dự án hỏi merge vào `main` mà không phát hành có được khôn
   qua sổ database, rồi dọn theo khách (thời hạn giữ của từng form, bản xuất quá hạn, event ghi đúng khách). Khách
   không còn trong sổ thì bỏ qua (không đoán). Xoá dấu vết IP, bài mồ côi, nonce, bộ đếm quét cả database
   (`forms_submissions_created_sweep_idx`).
+
+## D-280 · `media` theo khách: item, thư mục, nhãn, ảnh thu nhỏ theo khách; khoá cây thư mục gieo mỗi khách (bước 33 B9) — 2026-11-15 — agent quyết
+
+- Bảy bảng của `media` mang `tenant_id`; mọi unique, index và khoá chính có `tenant_id` đứng đầu (thư mục gốc vẫn
+  dùng UUID toàn số 0 thay cho `NULL`, nên tên thư mục duy nhất trong cùng thư mục cha vẫn chống trùng được trên cả
+  hai database, nay trong từng khách). Service không giữ database; trait `media::api::Media` vốn đã nhận
+  `&TenantContext`, nay dùng thật.
+- Dòng khoá `folder_tree` của `media_lock` gieo cho mỗi khách mới (`Module::seed_tenant`, chèn bỏ qua nếu đã có);
+  khách mặc định giữ dòng cũ. Thiếu dòng (khách tạo trước khi có bước gieo) thì gieo rồi thử lại một lần.
+- Nội dung qua `TenantStorage`: khách mặc định giữ `media/<id>/<version>`, khách khác dưới `tenants/<khách>/`.
+- Job theo lịch chạy một lần cho mỗi database: dọn thùng rác tìm khách có item quá hạn (`media_item_trashed_sweep_idx`)
+  rồi xoá theo từng khách (event ghi đúng khách); dọn mồ côi liệt kê khoá của mọi khách, đối chiếu với database của
+  chính khách đó, khoá của khách không còn trong sổ thì để nguyên. Lệnh `autoxide task media.refresh_variants` duyệt
+  mọi database và mọi khách trên đó.

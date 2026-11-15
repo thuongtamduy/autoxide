@@ -2,8 +2,9 @@
 //! cho website và module khác dùng lại (D-086).
 //!
 //! Nội dung lưu ở nơi lưu chung của chương trình (`dyn Storage` do module `files` công
-//! bố — ổ đĩa hay S3), dưới khoá `media/<item_id>/<version_id>`; thông tin nằm trong
-//! `media_item` / `media_folder`. Module không đọc, ghi hay tham chiếu bảng của `files`.
+//! bố — ổ đĩa hay S3), dưới khoá `media/<item_id>/<version_id>` (khách khác khách mặc định: dưới
+//! `tenants/<khách>/`); thông tin nằm trong `media_item` / `media_folder`. Module không đọc, ghi
+//! hay tham chiếu bảng của `files`. Mọi bảng theo khách (bước 33).
 //!
 //! REST ở `/api/v1/media` (hướng dẫn: `docs/MEDIA.md`), tool MCP, trait [`api::Media`]
 //! cho module khác, hai job định kỳ (dọn thùng rác, dọn nội dung mồ côi).
@@ -58,6 +59,8 @@ struct MediaModule {
     config: Option<MediaConfig>,
     /// Có sau `start`.
     service: Option<Arc<MediaService>>,
+    /// Sổ database, có sau `start`: job dọn dẹp và lệnh `refresh_variants` tra ngữ cảnh từng khách.
+    databases: Option<autoxide_kernel::tenancy::DatabaseRegistry>,
 }
 
 impl Module for MediaModule {
@@ -110,17 +113,11 @@ impl Module for MediaModule {
         let storage = context.require::<dyn Storage>()?;
         let ai = context.require::<dyn autoxide_kernel::ai::TextModel>()?;
         let service = Arc::new(
-            MediaService::new(
-                context.database().clone(),
-                storage,
-                context.outbox()?,
-                context.jobs(),
-                ai,
-                config,
-            )
-            .with_resources(context.resources()),
+            MediaService::new(storage, context.outbox()?, context.jobs(), ai, config)
+                .with_resources(context.resources()),
         );
         self.service = Some(service.clone());
+        self.databases = Some(context.tenancy());
         context.personal_data(service.clone())?;
         context.provide::<dyn api::Media>(service)
     }
@@ -132,14 +129,25 @@ impl Module for MediaModule {
         })
     }
 
+    fn seed_tenant(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::TenantSeed>> {
+        Some(Arc::new(LockSeed))
+    }
+
     fn jobs(&self) -> Vec<JobRegistration> {
-        self.service.clone().map_or_else(Vec::new, |service| {
-            vec![
-                JobRegistration::new(PURGE_TRASH, Arc::new(PurgeTrash(service.clone()))),
-                JobRegistration::new(CLEAN_ORPHANS, Arc::new(CleanOrphans(service.clone()))),
+        match (self.service.clone(), self.databases.clone()) {
+            (Some(service), Some(databases)) => vec![
+                JobRegistration::new(
+                    PURGE_TRASH,
+                    Arc::new(PurgeTrash { service: service.clone(), databases: databases.clone() }),
+                ),
+                JobRegistration::new(
+                    CLEAN_ORPHANS,
+                    Arc::new(CleanOrphans { service: service.clone(), databases }),
+                ),
                 JobRegistration::new(MAKE_VARIANTS, Arc::new(Generator(service))),
-            ]
-        })
+            ],
+            _ => Vec::new(),
+        }
     }
 
     fn schedules(&self) -> Vec<Schedule> {
@@ -155,11 +163,25 @@ impl Module for MediaModule {
     }
 
     fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
-        self.service.clone().map_or_else(Vec::new, |service| vec![images::refresh::task(service)])
+        match (self.service.clone(), self.databases.clone()) {
+            (Some(service), Some(databases)) => vec![images::refresh::task(service, databases)],
+            _ => Vec::new(),
+        }
     }
 
     fn tools(&self) -> Vec<Tool> {
         self.service.as_ref().map_or_else(Vec::new, tools::all)
+    }
+}
+
+/// Gieo dòng khoá cây thư mục (`media_lock.folder_tree`) cho khách mới (bước 33). Khách mặc định
+/// có dòng từ migration `m0001`.
+struct LockSeed;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::tenancy::TenantSeed for LockSeed {
+    async fn seed(&self, tenant: &autoxide_kernel::tenancy::TenantContext) -> Result<(), Error> {
+        library::folders::seed_lock(tenant.database().write(), tenant).await
     }
 }
 
@@ -225,7 +247,6 @@ pub(crate) mod testing {
             alt_locales: vec!["en".to_owned(), "vi".to_owned()],
         };
         let service = MediaService::new(
-            database.clone(),
             storage.clone(),
             Outbox::standalone("media"),
             autoxide_kernel::job::JobQueue::new("media"),

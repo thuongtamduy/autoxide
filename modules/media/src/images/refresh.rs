@@ -2,6 +2,9 @@
 //! `AUTOXIDE_MEDIA_IMAGE_WIDTHS`, ảnh đã tải lên trước đó vẫn giữ bộ ảnh thu nhỏ cũ. Lệnh này tìm
 //! các ảnh có bộ ảnh thu nhỏ không còn khớp cấu hình — hay thiếu bản WebP (ảnh làm trước D-196)
 //! — và xếp job làm lại (job sẵn có, D-093).
+//!
+//! Theo khách (bước 33): lệnh duyệt mọi database máy chủ này chạy job cho, và trên mỗi database
+//! từng khách có ảnh; job xếp vào hàng đợi của đúng khách.
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -9,8 +12,9 @@ use std::sync::Arc;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::EnqueueOptions;
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use uuid::Uuid;
 
 use crate::entity::item;
 use crate::images::variants::{MakeVariants, SOURCES, variants_of, wanted_widths};
@@ -19,14 +23,14 @@ use crate::service::{Item, MediaService};
 /// Số item đọc mỗi lượt: đủ lớn để ít câu query, đủ nhỏ để transaction ghi ngắn.
 const BATCH: u64 = 200;
 
-pub(crate) fn task(service: Arc<MediaService>) -> Task {
+pub(crate) fn task(service: Arc<MediaService>, databases: DatabaseRegistry) -> Task {
     Task::new(
         "refresh_variants",
         "Queue new smaller copies for every image whose copies no longer match \
          AUTOXIDE_MEDIA_IMAGE_WIDTHS (run it after changing that setting) or have no WebP copy \
          yet (images processed before WebP copies were added). The worker makes them in the background; \
          nothing else changes.",
-        Arc::new(Refresh(service)),
+        Arc::new(Refresh { service, databases }),
     )
     .argument(TaskArgument::optional(
         "dry_run",
@@ -34,13 +38,16 @@ pub(crate) fn task(service: Arc<MediaService>) -> Task {
     ))
 }
 
-struct Refresh(Arc<MediaService>);
+struct Refresh {
+    service: Arc<MediaService>,
+    databases: DatabaseRegistry,
+}
 
 #[async_trait::async_trait]
 impl TaskRun for Refresh {
     async fn run(&self, args: &TaskArgs) -> Result<String, Error> {
         let dry_run = args.flag("dry_run", false)?;
-        let (checked, stale) = self.0.refresh_variants(dry_run).await?;
+        let (checked, stale) = self.service.refresh_variants(&self.databases, dry_run).await?;
         Ok(if dry_run {
             format!(
                 "{stale} of {checked} image(s) need new smaller copies; run again without \
@@ -53,26 +60,63 @@ impl TaskRun for Refresh {
 }
 
 impl MediaService {
-    /// Duyệt mọi ảnh làm được ảnh thu nhỏ, theo lô; xếp job cho ảnh lệch cấu hình (trừ khi
-    /// `dry_run`). Trả (số ảnh đã xem, số ảnh lệch).
-    pub(crate) async fn refresh_variants(&self, dry_run: bool) -> Result<(usize, usize), Error> {
+    /// Duyệt mọi ảnh làm được ảnh thu nhỏ của mọi khách trên mọi database; xếp job cho ảnh lệch
+    /// cấu hình (trừ khi `dry_run`). Trả (số ảnh đã xem, số ảnh lệch).
+    pub(crate) async fn refresh_variants(
+        &self,
+        databases: &DatabaseRegistry,
+        dry_run: bool,
+    ) -> Result<(usize, usize), Error> {
+        let (mut checked, mut stale) = (0, 0);
+        for (_, name, database) in databases.databases().await? {
+            // Khách có ảnh trên database này.
+            let tenants: Vec<Uuid> = item::Entity::find()
+                .select_only()
+                .column(item::Column::TenantId)
+                .distinct()
+                .into_tuple::<Uuid>()
+                .all(database.read())
+                .await?;
+            for id in tenants {
+                match databases.tenant(TenantId::from_uuid(id)).await {
+                    Ok(tenant) => {
+                        let (seen, outdated) = self.refresh_tenant(&tenant, dry_run).await?;
+                        checked += seen;
+                        stale += outdated;
+                    }
+                    Err(error) => {
+                        tracing::warn!(tenant_id = %id, database = name, error = %error, "media variants refresh skipped a tenant");
+                    }
+                }
+            }
+        }
+        Ok((checked, stale))
+    }
+
+    /// Phần của khách `tenant`: duyệt ảnh theo lô, xếp job cho ảnh lệch cấu hình.
+    async fn refresh_tenant(
+        &self,
+        tenant: &TenantContext,
+        dry_run: bool,
+    ) -> Result<(usize, usize), Error> {
         let mut checked = 0;
         let mut stale = 0;
         let mut after = None;
         loop {
             let mut query = item::Entity::find()
+                .scoped(tenant)
                 .filter(item::Column::ContentType.is_in(SOURCES))
                 .order_by_asc(item::Column::Id)
                 .limit(BATCH);
             if let Some(after) = after {
                 query = query.filter(item::Column::Id.gt(after));
             }
-            let items = query.all(self.database.read()).await?;
+            let items = query.all(tenant.database().read()).await?;
             let Some(last) = items.last() else {
                 break;
             };
             after = Some(last.id);
-            let made = variants_of(self.database.read(), &items).await?;
+            let made = variants_of(tenant.database().read(), tenant, &items).await?;
             let outdated: Vec<&Item> = items
                 .iter()
                 .filter(|item| {
@@ -90,20 +134,13 @@ impl MediaService {
             stale += outdated.len();
             if !dry_run && !outdated.is_empty() {
                 // Một transaction ngắn mỗi lô: chỉ ghi dòng job.
-                let transaction = self.database.begin_write().await?;
+                let transaction = tenant.database().begin_write().await?;
                 for item in outdated {
                     let job = MakeVariants { item_id: item.id, version_id: item.version_id };
                     // Chạy lệnh hai lần trước khi worker kịp làm: không xếp trùng.
                     let options = EnqueueOptions::default()
                         .unique_key(format!("refresh:{}:{}", item.id, item.version_id));
-                    self.jobs
-                        .enqueue(
-                            &transaction,
-                            &TenantContext::legacy_default(&self.database),
-                            &job,
-                            options,
-                        )
-                        .await?;
+                    self.jobs.enqueue(&transaction, tenant, &job, options).await?;
                 }
                 transaction.commit().await?;
             }
@@ -148,7 +185,6 @@ mod tests {
         let mut config = media.config.clone();
         config.image_widths = widths.to_vec();
         MediaService::new(
-            media.database.clone(),
             media.storage.clone(),
             Outbox::standalone("media"),
             JobQueue::new("media"),
@@ -157,11 +193,11 @@ mod tests {
         )
     }
 
-    async fn queued(media: &MediaService) -> i64 {
-        let backend = media.database.read().get_database_backend();
+    async fn queued(database: &autoxide_kernel::database::Database) -> i64 {
+        let backend = database.read().get_database_backend();
         let sql = "SELECT COUNT(*) AS n FROM media_jobs WHERE kind = 'media.make_variants' \
                    AND completed_at IS NULL";
-        let row = media.database.read().query_one_raw(Statement::from_string(backend, sql));
+        let row = database.read().query_one_raw(Statement::from_string(backend, sql));
         let row = row.await.unwrap().unwrap();
         row.try_get::<i64>("", "n").unwrap()
     }
@@ -180,10 +216,13 @@ mod tests {
     #[tokio::test]
     async fn doi_co_anh_thi_xep_lam_lai() {
         TestDatabase::run(async |test| {
-            let (media, _, _) = service(test, limits()).await;
+            let (media, _, database) = service(test, limits()).await;
+            let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
+            let registry = DatabaseRegistry::single(database.clone());
             let ada = editor();
             let photo = media
                 .upload(
+                    &tenant,
                     &ada,
                     upload("photo.png", "image/png"),
                     body(&encoded(300, 240, ImageFormat::Png, false)),
@@ -193,27 +232,27 @@ mod tests {
                 .item;
             let icon = upload("icon.gif", "image/gif");
             media
-                .upload(&ada, icon, body(&encoded(32, 16, ImageFormat::Gif, false)))
+                .upload(&tenant, &ada, icon, body(&encoded(32, 16, ImageFormat::Gif, false)))
                 .await
                 .unwrap();
             // Cấu hình của `testing::service`: 100 và 200.
-            assert_eq!(media.make_variants(photo.id, photo.version_id).await.unwrap(), 2);
-            let before = queued(&media).await;
-            assert_eq!(media.refresh_variants(true).await.unwrap(), (2, 0));
+            assert_eq!(media.make_variants(&tenant, photo.id, photo.version_id).await.unwrap(), 2);
+            let before = queued(&database).await;
+            assert_eq!(media.refresh_variants(&registry, true).await.unwrap(), (2, 0));
 
             let wider = with_widths(&media, &[100, 150, 200]);
-            assert_eq!(wider.refresh_variants(true).await.unwrap(), (2, 1));
-            assert_eq!(queued(&media).await, before, "dry run queues nothing");
-            assert_eq!(wider.refresh_variants(false).await.unwrap(), (2, 1));
-            assert_eq!(wider.refresh_variants(false).await.unwrap(), (2, 1));
-            assert_eq!(queued(&media).await, before + 1, "the same image is queued once");
+            assert_eq!(wider.refresh_variants(&registry, true).await.unwrap(), (2, 1));
+            assert_eq!(queued(&database).await, before, "dry run queues nothing");
+            assert_eq!(wider.refresh_variants(&registry, false).await.unwrap(), (2, 1));
+            assert_eq!(wider.refresh_variants(&registry, false).await.unwrap(), (2, 1));
+            assert_eq!(queued(&database).await, before + 1, "the same image is queued once");
 
-            assert_eq!(wider.make_variants(photo.id, photo.version_id).await.unwrap(), 3);
-            assert_eq!(wider.refresh_variants(true).await.unwrap(), (2, 0));
+            assert_eq!(wider.make_variants(&tenant, photo.id, photo.version_id).await.unwrap(), 3);
+            assert_eq!(wider.refresh_variants(&registry, true).await.unwrap(), (2, 0));
 
             // Bỏ bớt cỡ: ảnh thu nhỏ ở cỡ đã bỏ là lệch.
             let narrower = with_widths(&media, &[100]);
-            assert_eq!(narrower.refresh_variants(true).await.unwrap(), (2, 1));
+            assert_eq!(narrower.refresh_variants(&registry, true).await.unwrap(), (2, 1));
         })
         .await
         .unwrap();
@@ -224,9 +263,12 @@ mod tests {
     #[tokio::test]
     async fn anh_chua_co_webp_thi_xep_lam_lai() {
         TestDatabase::run(async |test| {
-            let (media, _, _) = service(test, limits()).await;
+            let (media, _, database) = service(test, limits()).await;
+            let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
+            let registry = DatabaseRegistry::single(database.clone());
             let photo = media
                 .upload(
+                    &tenant,
                     &editor(),
                     upload("photo.png", "image/png"),
                     body(&encoded(300, 240, ImageFormat::Png, false)),
@@ -234,17 +276,17 @@ mod tests {
                 .await
                 .unwrap()
                 .item;
-            assert_eq!(media.make_variants(photo.id, photo.version_id).await.unwrap(), 2);
-            assert_eq!(media.refresh_variants(true).await.unwrap(), (1, 0));
+            assert_eq!(media.make_variants(&tenant, photo.id, photo.version_id).await.unwrap(), 2);
+            assert_eq!(media.refresh_variants(&registry, true).await.unwrap(), (1, 0));
 
-            let backend = media.database.write().get_database_backend();
+            let backend = database.write().get_database_backend();
             let sql = "DELETE FROM media_variant WHERE content_type = 'image/webp'";
-            let deleted = media.database.write().execute_raw(Statement::from_string(backend, sql));
+            let deleted = database.write().execute_raw(Statement::from_string(backend, sql));
             assert_eq!(deleted.await.unwrap().rows_affected(), 2);
-            assert_eq!(media.refresh_variants(true).await.unwrap(), (1, 1));
+            assert_eq!(media.refresh_variants(&registry, true).await.unwrap(), (1, 1));
 
-            assert_eq!(media.make_variants(photo.id, photo.version_id).await.unwrap(), 2);
-            assert_eq!(media.refresh_variants(true).await.unwrap(), (1, 0));
+            assert_eq!(media.make_variants(&tenant, photo.id, photo.version_id).await.unwrap(), 2);
+            assert_eq!(media.refresh_variants(&registry, true).await.unwrap(), (1, 0));
         })
         .await
         .unwrap();
@@ -253,8 +295,8 @@ mod tests {
     #[tokio::test]
     async fn lenh_bao_ket_qua_bang_loi() {
         TestDatabase::run(async |test| {
-            let (media, _, _) = service(test, limits()).await;
-            let task = task(media);
+            let (media, _, database) = service(test, limits()).await;
+            let task = task(media, DatabaseRegistry::single(database));
             let args = task.parse(&["dry_run=true".to_owned()]).unwrap();
             let report = task.run(&args).await.unwrap();
             assert_eq!(

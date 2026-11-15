@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{PageQuery, PageRequest};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
@@ -203,27 +204,31 @@ impl From<Folder> for FolderResponse {
 /// Item như API trả về (kèm nhãn và ảnh thu nhỏ).
 pub(crate) async fn describe(
     service: &MediaService,
+    tenant: &TenantContext,
     item: Item,
 ) -> Result<MediaItemResponse, Error> {
-    Ok(service.describe_one(item).await?.into())
+    Ok(service.describe_one(tenant, item).await?.into())
 }
 
 /// Item kèm `ETag` (phiên bản của bản ghi).
 pub(crate) async fn tagged(
     service: &MediaService,
+    tenant: &TenantContext,
     item: Item,
 ) -> Result<autoxide_kernel::version::Tagged<MediaItemResponse>, Error> {
     let version = item.updated_at;
-    Ok(autoxide_kernel::version::Tagged { version, data: describe(service, item).await? })
+    Ok(autoxide_kernel::version::Tagged { version, data: describe(service, tenant, item).await? })
 }
 
 /// Một trang item như API trả về; nhãn và ảnh thu nhỏ của cả trang đọc chung một lần.
 pub(crate) async fn page_of(
     service: &MediaService,
+    tenant: &TenantContext,
     page: autoxide_kernel::pagination::Page<Item>,
 ) -> Result<autoxide_kernel::pagination::Page<MediaItemResponse>, Error> {
     let autoxide_kernel::pagination::Page { data, pagination } = page;
-    let data = service.describe(data).await?.into_iter().map(MediaItemResponse::from).collect();
+    let data =
+        service.describe(tenant, data).await?.into_iter().map(MediaItemResponse::from).collect();
     Ok(autoxide_kernel::pagination::Page { data, pagination })
 }
 

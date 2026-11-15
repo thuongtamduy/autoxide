@@ -48,8 +48,12 @@ async fn events(database: &Database) -> Vec<String> {
     rows.unwrap().iter().map(|row| row.try_get("", "name").unwrap()).collect()
 }
 
-async fn content(service: &crate::service::MediaService, item: &Item) -> Vec<u8> {
-    let stored = service.read(item, None).await.unwrap();
+async fn content(
+    tenant: &autoxide_kernel::tenancy::TenantContext,
+    service: &crate::service::MediaService,
+    item: &Item,
+) -> Vec<u8> {
+    let stored = service.read(tenant, item, None).await.unwrap();
     let chunks: Vec<bytes::Bytes> = stored.content.try_collect().await.unwrap();
     chunks.concat()
 }

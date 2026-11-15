@@ -267,7 +267,8 @@ pub(crate) async fn list_items(
     let mut problems = Vec::new();
     let filter = query.filter(&mut problems);
     let page = page_request(paging, problems)?;
-    let page = page_of(&service, service.list(&principal, &filter, &page).await?).await?;
+    let page = page_of(&service, &tenant, service.list(&tenant, &principal, &filter, &page).await?)
+        .await?;
     if query.include != Some(ItemInclude::Uploader) {
         return Ok(page);
     }
@@ -315,9 +316,10 @@ pub(crate) struct LibrarySummaryResponse {
 )]
 pub(crate) async fn library_summary(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
 ) -> Result<Data<LibrarySummaryResponse>, Error> {
-    let summary = service.summary(&principal).await?;
+    let summary = service.summary(&tenant, &principal).await?;
     Ok(Data {
         data: LibrarySummaryResponse {
             items: summary.items,
@@ -360,6 +362,7 @@ pub(crate) async fn library_summary(
 )]
 pub(crate) async fn upload_item(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<UploadQuery>,
     headers: HeaderMap,
@@ -378,7 +381,7 @@ pub(crate) async fn upload_item(
             .unwrap_or_default(),
     };
     let content = body_stream(body, service.config.limits.max_bytes);
-    let uploaded = service.upload(&principal, input, content).await?;
+    let uploaded = service.upload(&tenant, &principal, input, content).await?;
     let duplicates = uploaded
         .duplicates
         .into_iter()
@@ -389,7 +392,7 @@ pub(crate) async fn upload_item(
             folder_id: api_folder(item.folder_id),
         })
         .collect();
-    let item = super::describe(&service, uploaded.item).await?;
+    let item = super::describe(&service, &tenant, uploaded.item).await?;
     let location = format!("/media/{}", item.id_ref());
     Ok(Created::new(location, UploadedResponse { item, duplicates }))
 }
@@ -413,11 +416,12 @@ pub(crate) async fn upload_item(
 )]
 pub(crate) async fn get_item(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<MediaItemResponse>, Error> {
-    let item = service.get(&principal, id).await?;
-    tagged(&service, item).await
+    let item = service.get(&tenant, &principal, id).await?;
+    tagged(&service, &tenant, item).await
 }
 
 /// Change the details of a media item.
@@ -446,14 +450,15 @@ pub(crate) async fn get_item(
 )]
 pub(crate) async fn update_item(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
     autoxide_kernel::http::ValidJson(input): autoxide_kernel::http::ValidJson<UpdateItemRequest>,
 ) -> Result<Tagged<MediaItemResponse>, Error> {
     let expected = if_match.required()?;
-    let item = service.update(&principal, id, input.into(), expected).await?;
-    tagged(&service, item).await
+    let item = service.update(&tenant, &principal, id, input.into(), expected).await?;
+    tagged(&service, &tenant, item).await
 }
 
 /// A translation of an item's text alternative.
@@ -497,14 +502,16 @@ pub(crate) struct AltRequest {
 )]
 pub(crate) async fn set_alt(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path((id, locale)): Path<(Uuid, String)>,
     if_match: IfMatch,
     autoxide_kernel::http::ValidJson(input): autoxide_kernel::http::ValidJson<AltRequest>,
 ) -> Result<Tagged<MediaItemResponse>, Error> {
     let expected = if_match.required()?;
-    let item = service.set_alt(&principal, id, &locale, Some(&input.alt), expected).await?;
-    tagged(&service, item).await
+    let item =
+        service.set_alt(&tenant, &principal, id, &locale, Some(&input.alt), expected).await?;
+    tagged(&service, &tenant, item).await
 }
 
 /// Remove the text alternative of a media item in one language.
@@ -535,13 +542,14 @@ pub(crate) async fn set_alt(
 )]
 pub(crate) async fn delete_alt(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path((id, locale)): Path<(Uuid, String)>,
     if_match: IfMatch,
 ) -> Result<Tagged<MediaItemResponse>, Error> {
     let expected = if_match.required()?;
-    let item = service.set_alt(&principal, id, &locale, None, expected).await?;
-    tagged(&service, item).await
+    let item = service.set_alt(&tenant, &principal, id, &locale, None, expected).await?;
+    tagged(&service, &tenant, item).await
 }
 
 /// Move a media item to the trash.
@@ -566,11 +574,12 @@ pub(crate) async fn delete_alt(
 )]
 pub(crate) async fn trash_item(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<MediaItemResponse>, Error> {
-    let item = service.trash(&principal, id).await?;
-    tagged(&service, item).await
+    let item = service.trash(&tenant, &principal, id).await?;
+    tagged(&service, &tenant, item).await
 }
 
 /// Restore a media item from the trash.
@@ -593,11 +602,12 @@ pub(crate) async fn trash_item(
 )]
 pub(crate) async fn restore_item(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<MediaItemResponse>, Error> {
-    let item = service.restore(&principal, id).await?;
-    tagged(&service, item).await
+    let item = service.restore(&tenant, &principal, id).await?;
+    tagged(&service, &tenant, item).await
 }
 
 /// Delete a media item in the trash for good.
@@ -621,10 +631,11 @@ pub(crate) async fn restore_item(
 )]
 pub(crate) async fn purge_item(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    service.purge(&principal, id).await?;
+    service.purge(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

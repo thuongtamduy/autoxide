@@ -934,3 +934,117 @@ async fn trang_thu_vien_cua_giao_dien() {
     .await
     .unwrap();
 }
+
+/// Hai khách (một dùng chung database, một database riêng): người của khách B không đọc được
+/// item, thư mục hay nhãn của khách A qua bất kỳ `GET` hay tool MCP chỉ đọc nào; link công khai
+/// của item khách A không mở được dưới khách B. Khách mới có sẵn dòng khoá cây thư mục (bộ gieo
+/// của module) và chuyển thư mục được.
+#[tokio::test]
+async fn hai_khach_khong_thay_media_cua_nhau() {
+    TestDatabase::run(async |test| {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let all = ["media.read", "media.write", "media.purge"];
+        let app = TestApp::builder(test)
+            .tenant("a")
+            .tenant_dedicated("b")
+            .user_in("a", "admin-a", 1, &all)
+            .user_in("b", "admin-b", 2, &all)
+            .provide::<dyn Storage>(storage)
+            .provide::<dyn TextModel>(text)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let marker = "marker-media-a";
+        let answer = app
+            .post(&format!("/api/v1/media?name={marker}.png&tags={marker}"))
+            .token("admin-a")
+            .header("content-type", "image/png")
+            .bytes(samples::png(2, 2))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::CREATED, "{}", answer.json());
+        let item = answer.json()["data"]["id"].as_str().unwrap().to_owned();
+        let etag = app.get(&format!("/api/v1/media/{item}")).token("admin-a").send().await.unwrap();
+        let etag = etag.header("etag").to_owned();
+        let public = app
+            .patch(&format!("/api/v1/media/{item}"))
+            .token("admin-a")
+            .header("if-match", &etag)
+            .json(json!({"visibility": "public"}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(public.status(), StatusCode::OK, "{}", public.json());
+        let folder = app
+            .post("/api/v1/media/folders")
+            .token("admin-a")
+            .json(json!({"name": marker}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(folder.status(), StatusCode::CREATED, "{}", folder.json());
+        let folder = folder.json()["data"]["id"].as_str().unwrap().to_owned();
+        let tags = app.get("/api/v1/media/tags").token("admin-a").send().await.unwrap();
+        let tag = tags.json()["data"][0]["id"].as_str().unwrap().to_owned();
+
+        // Link công khai: mở được dưới khách A, không dưới khách B.
+        for (slug, status) in [("a", StatusCode::OK), ("b", StatusCode::NOT_FOUND)] {
+            let answer = app
+                .get(&format!("/api/v1/media/{item}/content"))
+                .header("autoxide-tenant", slug)
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(answer.status(), status, "tenant {slug}");
+        }
+
+        // Khách B (database riêng) có dòng khoá cây thư mục, chuyển thư mục được.
+        use autoxide_kernel::tenancy::ScopeExt as _;
+        use sea_orm::{ColumnTrait as _, EntityTrait as _, PaginatorTrait as _, QueryFilter as _};
+        let b = app.tenant("b").await.unwrap();
+        let locks = crate::entity::lock::Entity::find()
+            .scoped(&b)
+            .filter(crate::entity::lock::Column::Name.eq("folder_tree"))
+            .count(b.database().read())
+            .await
+            .unwrap();
+        assert_eq!(locks, 1);
+        let mut created = Vec::new();
+        for name in ["Outer", "Inner"] {
+            let answer = app
+                .post("/api/v1/media/folders")
+                .token("admin-b")
+                .json(json!({"name": name}))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(answer.status(), StatusCode::CREATED, "{}", answer.json());
+            created.push(answer.json()["data"]["id"].as_str().unwrap().to_owned());
+        }
+        let moved = app
+            .patch(&format!("/api/v1/media/folders/{}", created[1]))
+            .token("admin-b")
+            .header("if-match", "*")
+            .json(json!({"parent_id": created[0]}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(moved.status(), StatusCode::OK, "{}", moved.json());
+
+        let seeded = [
+            ("id", item.clone()),
+            ("id", folder.clone()),
+            ("folder_id", folder.clone()),
+            ("parent_id", folder),
+            ("id", tag),
+        ];
+        let violations =
+            autoxide_testkit::leak_check(&app, "admin-b", marker, &seeded).await.unwrap();
+        assert_eq!(violations, Vec::<String>::new());
+    })
+    .await
+    .unwrap();
+}

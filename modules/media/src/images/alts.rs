@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, HashMap};
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
@@ -26,6 +26,7 @@ use crate::service::{ALT_MAX_LENGTH, Item, MediaService, in_trash, item_not_foun
 /// Bản dịch `alt` của các item `ids`: item → (ngôn ngữ → alt). Một câu query.
 pub(crate) async fn alts_of<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     ids: &[Uuid],
 ) -> Result<HashMap<Uuid, BTreeMap<String, String>>, Error> {
     let mut found: HashMap<Uuid, BTreeMap<String, String>> = HashMap::new();
@@ -33,6 +34,7 @@ pub(crate) async fn alts_of<C: ConnectionTrait>(
         return Ok(found);
     }
     let rows = alt_translation::Entity::find()
+        .scoped(tenant)
         .filter(alt_translation::Column::MediaId.is_in(ids.to_vec()))
         .all(connection)
         .await?;
@@ -45,6 +47,7 @@ pub(crate) async fn alts_of<C: ConnectionTrait>(
 /// `alt` bằng ngôn ngữ `locale` của các item `ids` (chỉ item có bản dịch). Một câu query.
 pub(crate) async fn alts_in<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     ids: &[Uuid],
     locale: &str,
 ) -> Result<HashMap<Uuid, String>, Error> {
@@ -52,6 +55,7 @@ pub(crate) async fn alts_in<C: ConnectionTrait>(
         return Ok(HashMap::new());
     }
     Ok(alt_translation::Entity::find()
+        .scoped(tenant)
         .filter(alt_translation::Column::MediaId.is_in(ids.to_vec()))
         .filter(alt_translation::Column::Locale.eq(locale))
         .all(connection)
@@ -95,6 +99,7 @@ impl MediaService {
     /// gọi đã đọc (`If-Match`). Xoá bản dịch không có thì không đổi gì.
     pub(crate) async fn set_alt(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         locale: &str,
@@ -115,16 +120,20 @@ impl MediaService {
             ]));
         }
 
-        let transaction = self.database.begin_write().await?;
-        let before =
-            Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| item_not_found(id))?;
+        let transaction = tenant.database().begin_write().await?;
+        let before = Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+            .ok_or_else(|| item_not_found(id))?;
         if before.trashed_at.is_some() {
             return Err(in_trash(id));
         }
         if expected.is_some_and(|expected| expected != before.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
-        let alts_before = alts_of(&transaction, &[id]).await?.remove(&id).unwrap_or_default();
+        let alts_before =
+            alts_of(&transaction, tenant, &[id]).await?.remove(&id).unwrap_or_default();
         let mut alts_after = alts_before.clone();
         match alt {
             Some(alt) => {
@@ -146,18 +155,20 @@ impl MediaService {
         row.updated_at = Set(now);
         let update = Entity::update(row)
             .validate()?
+            .scoped(tenant)
             .filter(Column::TrashedAt.is_null())
             .filter(Column::UpdatedAt.eq(before.updated_at));
         let after = match update.exec(&transaction).await {
             Ok(after) => after,
             Err(sea_orm::DbErr::RecordNotUpdated) => {
-                return Err(self.why_not_changed(id, &transaction).await);
+                return Err(self.why_not_changed(tenant, id, &transaction).await);
             }
             Err(error) => return Err(error.into()),
         };
         match alt {
             Some(alt) => {
                 let row = alt_translation::ActiveModel {
+                    tenant_id: Set(tenant.id().as_uuid()),
                     media_id: Set(id),
                     locale: Set(locale.clone()),
                     alt: Set(alt.to_owned()),
@@ -166,6 +177,7 @@ impl MediaService {
                 alt_translation::Entity::insert(row)
                     .on_conflict(
                         OnConflict::columns([
+                            alt_translation::Column::TenantId,
                             alt_translation::Column::MediaId,
                             alt_translation::Column::Locale,
                         ])
@@ -179,7 +191,8 @@ impl MediaService {
                     .await?;
             }
             None => {
-                alt_translation::Entity::delete_by_id((id, locale.clone()))
+                alt_translation::Entity::delete_by_id((tenant.id().as_uuid(), id, locale.clone()))
+                    .scoped(tenant)
                     .exec(&transaction)
                     .await?;
             }
@@ -189,13 +202,7 @@ impl MediaService {
             after: Some(with_alts(snapshot(&after), &alts_after)),
         });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                Actor::from(principal),
-                events::item_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, Actor::from(principal), events::item_subject(id), &event)
             .await?;
         transaction.commit().await?;
         tracing::info!(media_item_id = %id, locale = %locale, removed = alt.is_none(), "media alt translation changed");
@@ -204,8 +211,13 @@ impl MediaService {
 }
 
 /// Xoá mọi bản dịch của item `id` (khi xoá hẳn item), trong transaction của lệnh xoá.
-pub(crate) async fn delete_alts<C: ConnectionTrait>(connection: &C, id: Uuid) -> Result<(), Error> {
+pub(crate) async fn delete_alts<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    id: Uuid,
+) -> Result<(), Error> {
     alt_translation::Entity::delete_many()
+        .scoped(tenant)
         .filter(alt_translation::Column::MediaId.eq(id))
         .exec(connection)
         .await?;

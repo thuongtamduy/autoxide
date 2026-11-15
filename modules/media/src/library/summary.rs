@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::{Expr, Func};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use uuid::Uuid;
@@ -31,12 +31,17 @@ pub(crate) struct LibrarySummary {
 impl MediaService {
     /// Tổng số item, tổng dung lượng, số ảnh thiếu `alt` (ngoài thùng rác) và số item trong thùng
     /// rác. Cần `media.read`.
-    pub(crate) async fn summary(&self, principal: &Principal) -> Result<LibrarySummary, Error> {
+    pub(crate) async fn summary(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+    ) -> Result<LibrarySummary, Error> {
         principal.require(&MEDIA_READ)?;
-        let read = self.database.read();
+        let read = tenant.database().read();
         // `SUM` của cột BIGINT trên Postgres ra NUMERIC: ép về BIGINT để đọc như nhau trên hai
         // database; không có dòng nào thì `SUM` là NULL.
         let (items, bytes): (i64, Option<i64>) = Entity::find()
+            .scoped(tenant)
             .select_only()
             .expr(Func::count(Expr::col(Column::Id)))
             .expr(Func::cast_as(Func::sum(Expr::col(Column::Size)), "BIGINT"))
@@ -47,13 +52,14 @@ impl MediaService {
             .unwrap_or_default();
         let images_missing_alt = Self::count(
             Entity::find()
+                .scoped(tenant)
                 .filter(Column::TrashedAt.is_null())
                 .filter(crate::service::alt_missing()),
             read,
         )
         .await?;
-        let trashed_items =
-            Self::count(Entity::find().filter(Column::TrashedAt.is_not_null()), read).await?;
+        let trashed = Entity::find().scoped(tenant).filter(Column::TrashedAt.is_not_null());
+        let trashed_items = Self::count(trashed, read).await?;
         Ok(LibrarySummary { items, bytes: bytes.unwrap_or(0), images_missing_alt, trashed_items })
     }
 
@@ -74,12 +80,14 @@ impl MediaService {
     /// thư mục không có item thì vắng trong kết quả.
     pub(crate) async fn folder_item_counts(
         &self,
+        tenant: &TenantContext,
         folders: &[Uuid],
     ) -> Result<HashMap<Uuid, i64>, Error> {
         if folders.is_empty() {
             return Ok(HashMap::new());
         }
         let rows: Vec<(Uuid, i64)> = Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(Column::FolderId)
             .expr(Func::count(Expr::col(Column::Id)))
@@ -87,7 +95,7 @@ impl MediaService {
             .filter(Column::FolderId.is_in(folders.iter().copied()))
             .group_by(Column::FolderId)
             .into_tuple()
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         Ok(rows.into_iter().collect())
     }

@@ -12,7 +12,6 @@
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::job::JobQueue;
@@ -21,8 +20,8 @@ use autoxide_kernel::pagination::{
 };
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::rows;
-use autoxide_kernel::storage::{Storage, StoredFile};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::storage::{Storage, StoredFile, TenantStorage};
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -146,8 +145,8 @@ pub(crate) struct ItemDetails {
     pub variants: Vec<crate::images::variants::VariantPair>,
 }
 
+// Service không giữ database: mỗi hàm nhận `tenant` và dùng database của khách đó (bước 33).
 pub(crate) struct MediaService {
-    pub(crate) database: Database,
     pub(crate) storage: Arc<dyn Storage>,
     pub(crate) outbox: Outbox,
     pub(crate) jobs: JobQueue,
@@ -160,7 +159,6 @@ pub(crate) struct MediaService {
 
 impl MediaService {
     pub(crate) fn new(
-        database: Database,
         storage: Arc<dyn Storage>,
         outbox: Outbox,
         jobs: JobQueue,
@@ -168,7 +166,13 @@ impl MediaService {
         config: MediaConfig,
     ) -> Self {
         let resources = autoxide_kernel::resource::ResourceDirectory::default();
-        MediaService { database, storage, outbox, jobs, ai, config, resources }
+        MediaService { storage, outbox, jobs, ai, config, resources }
+    }
+
+    /// Nơi lưu nội dung của khách `tenant`: khoá có tiền tố khách (`tenants/<id>/…`), khách mặc
+    /// định không tiền tố nên khoá cũ vẫn đúng (D-259).
+    pub(crate) fn store(&self, tenant: &TenantContext) -> TenantStorage {
+        TenantStorage::new(self.storage.clone(), tenant)
     }
 
     /// Dùng sổ đối tượng của chương trình (tên người tải lên).
@@ -183,12 +187,13 @@ impl MediaService {
     /// Một trang item theo bộ lọc. Cần `media.read`.
     pub(crate) async fn list(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         filter: &ItemFilter,
         page: &PageRequest,
     ) -> Result<Page<Item>, Error> {
         principal.require(&MEDIA_READ)?;
-        let mut select = Entity::find();
+        let mut select = Entity::find().scoped(tenant);
         select = if filter.trashed {
             select.filter(Column::TrashedAt.is_not_null())
         } else {
@@ -216,15 +221,16 @@ impl MediaService {
             select = select.filter(if missing { condition } else { condition.not() });
         }
         if let Some(tag) = filter.tag.as_deref().filter(|tag| !tag.trim().is_empty()) {
-            let Some(tag_id) = crate::library::tags::find_tag(self.database.read(), tag).await?
+            let Some(tag_id) =
+                crate::library::tags::find_tag(tenant.database().read(), tenant, tag).await?
             else {
                 // Không có nhãn đó: không item nào mang nó.
                 let pagination = Pagination::new(page.limit(), None);
                 return Ok(Page { data: Vec::new(), pagination });
             };
-            select = select.filter(crate::library::tags::has_tag(tag_id));
+            select = select.filter(crate::library::tags::has_tag(tenant, tag_id));
         }
-        let read = self.database.read();
+        let read = tenant.database().read();
         match filter.sort {
             ItemSort::CreatedAt => fetch_page(select, Column::Id, |row| row.id, page, read).await,
             ItemSort::Name => {
@@ -241,12 +247,16 @@ impl MediaService {
 
     /// Kèm nhãn, bản dịch `alt` và ảnh thu nhỏ cho từng item (thêm ba, bốn câu query cho cả
     /// danh sách).
-    pub(crate) async fn describe(&self, items: Vec<Item>) -> Result<Vec<ItemDetails>, Error> {
-        let read = self.database.read();
+    pub(crate) async fn describe(
+        &self,
+        tenant: &TenantContext,
+        items: Vec<Item>,
+    ) -> Result<Vec<ItemDetails>, Error> {
+        let read = tenant.database().read();
         let ids: Vec<Uuid> = items.iter().map(|item| item.id).collect();
-        let mut tags = crate::library::tags::tags_of(read, &ids).await?;
-        let mut alts = crate::images::alts::alts_of(read, &ids).await?;
-        let mut variants = crate::images::variants::variants_of(read, &items).await?;
+        let mut tags = crate::library::tags::tags_of(read, tenant, &ids).await?;
+        let mut alts = crate::images::alts::alts_of(read, tenant, &ids).await?;
+        let mut variants = crate::images::variants::variants_of(read, tenant, &items).await?;
         Ok(items
             .into_iter()
             .map(|item| ItemDetails {
@@ -261,15 +271,28 @@ impl MediaService {
     }
 
     /// Như [`describe`](Self::describe), cho một item.
-    pub(crate) async fn describe_one(&self, item: Item) -> Result<ItemDetails, Error> {
-        let details = self.describe(vec![item]).await?.into_iter().next();
+    pub(crate) async fn describe_one(
+        &self,
+        tenant: &TenantContext,
+        item: Item,
+    ) -> Result<ItemDetails, Error> {
+        let details = self.describe(tenant, vec![item]).await?.into_iter().next();
         details.ok_or_else(|| Error::internal("describing a media item returned nothing"))
     }
 
     /// Item `id` (kể cả trong thùng rác). Cần `media.read`.
-    pub(crate) async fn get(&self, principal: &Principal, id: Uuid) -> Result<Item, Error> {
+    pub(crate) async fn get(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<Item, Error> {
         principal.require(&MEDIA_READ)?;
-        Entity::find_by_id(id).one(self.database.read()).await?.ok_or_else(|| item_not_found(id))
+        Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .ok_or_else(|| item_not_found(id))
     }
 
     /// Item `id` nếu người gọi được tải nội dung của nó: item công khai ngoài thùng rác thì
@@ -277,10 +300,11 @@ impl MediaService {
     /// như không có — không để lộ item riêng tư có tồn tại.
     pub(crate) async fn viewable(
         &self,
+        tenant: &TenantContext,
         principal: Option<&Principal>,
         id: Uuid,
     ) -> Result<Item, Error> {
-        let item = Entity::find_by_id(id).one(self.database.read()).await?;
+        let item = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
         let reader = principal.is_some_and(|principal| principal.has(&MEDIA_READ));
         item.filter(|item| {
             reader || (Visibility::of(item) == Visibility::Public && item.trashed_at.is_none())
@@ -291,21 +315,25 @@ impl MediaService {
     /// Nội dung hiện tại của `item`, cả file hoặc đoạn `range`.
     pub(crate) async fn read(
         &self,
+        tenant: &TenantContext,
         item: &Item,
         range: Option<std::ops::Range<u64>>,
     ) -> Result<StoredFile, Error> {
-        self.read_key(&item.storage_key(), range).await
+        self.read_key(tenant, &item.storage_key(), range).await
     }
 
-    /// Nội dung ở khoá `key` (của module), cả file hoặc đoạn `range`.
+    /// Nội dung ở khoá `key` (của module, trong nơi lưu của khách `tenant`), cả file hoặc đoạn
+    /// `range`.
     pub(crate) async fn read_key(
         &self,
+        tenant: &TenantContext,
         key: &str,
         range: Option<std::ops::Range<u64>>,
     ) -> Result<StoredFile, Error> {
+        let store = self.store(tenant);
         let stored = match range {
-            None => self.storage.get(key).await?,
-            Some(range) => self.storage.get_range(key, range).await?,
+            None => store.get(key).await?,
+            Some(range) => store.get_range(key, range).await?,
         };
         // Có dòng mà không có nội dung: nơi lưu bị đổi từ bên ngoài.
         stored.ok_or_else(|| {
@@ -317,6 +345,7 @@ impl MediaService {
     /// trước. `expected`: phiên bản người gọi đã đọc (`If-Match`).
     pub(crate) async fn update(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         changes: ItemChanges,
@@ -333,7 +362,7 @@ impl MediaService {
             check_length(field, value.as_deref(), max, &mut problems);
         }
         if let Some(Some(folder)) = changes.folder_id {
-            self.check_folder_exists(folder, "folder_id", &mut problems).await?;
+            self.check_folder_exists(tenant, folder, "folder_id", &mut problems).await?;
         }
         let tags = changes
             .tags
@@ -343,9 +372,12 @@ impl MediaService {
             return Err(Error::validation(problems));
         }
 
-        let transaction = self.database.begin_write().await?;
-        let before =
-            Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| item_not_found(id))?;
+        let transaction = tenant.database().begin_write().await?;
+        let before = Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+            .ok_or_else(|| item_not_found(id))?;
         if before.trashed_at.is_some() {
             return Err(in_trash(id));
         }
@@ -365,7 +397,7 @@ impl MediaService {
         }
         if let Some(folder) = changes.folder_id {
             let folder = stored_folder(folder);
-            if folder != before.folder_id && !touch_folder(&transaction, folder).await? {
+            if folder != before.folder_id && !touch_folder(&transaction, tenant, folder).await? {
                 return Err(folder_gone("folder_id"));
             }
             row.folder_id = Set(folder);
@@ -377,7 +409,8 @@ impl MediaService {
             row.visibility = Set(visibility.as_str().to_owned());
         }
         row.updated_at = Set(now());
-        let mut update = Entity::update(row).validate()?.filter(Column::TrashedAt.is_null());
+        let mut update =
+            Entity::update(row).validate()?.scoped(tenant).filter(Column::TrashedAt.is_null());
         if let Some(expected) = expected {
             // Kiểm phiên bản ngay trong câu `UPDATE`: người khác vừa sửa thì 0 dòng (D-084).
             update = update.filter(Column::UpdatedAt.eq(expected));
@@ -385,16 +418,18 @@ impl MediaService {
         let after = match update.exec(&transaction).await {
             Ok(after) => after,
             Err(sea_orm::DbErr::RecordNotUpdated) => {
-                return Err(self.why_not_changed(id, &transaction).await);
+                return Err(self.why_not_changed(tenant, id, &transaction).await);
             }
             Err(error) => return Err(error.into()),
         };
-        let tags_before = crate::library::tags::tags_of(&transaction, &[id])
+        let tags_before = crate::library::tags::tags_of(&transaction, tenant, &[id])
             .await?
             .remove(&id)
             .unwrap_or_default();
         let tags_after = match &tags {
-            Some(tags) => crate::library::tags::set_item_tags(&transaction, id, tags).await?,
+            Some(tags) => {
+                crate::library::tags::set_item_tags(&transaction, tenant, id, tags).await?
+            }
             None => tags_before.clone(),
         };
         let event = events::ItemUpdated(Change {
@@ -402,15 +437,7 @@ impl MediaService {
             after: Some(with_tags(snapshot(&after), &tags_after)),
         });
         let actor = Actor::from(principal);
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::item_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, events::item_subject(id), &event).await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -418,26 +445,40 @@ impl MediaService {
     /// Chuyển item `id` vào thùng rác. Cần `media.write`. Item vẫn đọc được với
     /// `media.read`, link công khai thôi chạy; khôi phục được trong
     /// `AUTOXIDE_MEDIA_TRASH_DAYS` ngày.
-    pub(crate) async fn trash(&self, principal: &Principal, id: Uuid) -> Result<Item, Error> {
+    pub(crate) async fn trash(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<Item, Error> {
         principal.require(&MEDIA_WRITE)?;
-        self.set_trashed(principal, id, true).await
+        self.set_trashed(tenant, principal, id, true).await
     }
 
     /// Lấy item `id` ra khỏi thùng rác. Cần `media.write`.
-    pub(crate) async fn restore(&self, principal: &Principal, id: Uuid) -> Result<Item, Error> {
+    pub(crate) async fn restore(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<Item, Error> {
         principal.require(&MEDIA_WRITE)?;
-        self.set_trashed(principal, id, false).await
+        self.set_trashed(tenant, principal, id, false).await
     }
 
     async fn set_trashed(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         trash: bool,
     ) -> Result<Item, Error> {
-        let transaction = self.database.begin_write().await?;
-        let before =
-            Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| item_not_found(id))?;
+        let transaction = tenant.database().begin_write().await?;
+        let before = Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+            .ok_or_else(|| item_not_found(id))?;
         let now = now();
         let mut row = before.clone().into_active_model();
         row.trashed_at = Set(trash.then_some(now));
@@ -445,7 +486,8 @@ impl MediaService {
         // Điều kiện trong câu `UPDATE`: hai request cùng lúc thì một bên nhận 409.
         let state =
             if trash { Column::TrashedAt.is_null() } else { Column::TrashedAt.is_not_null() };
-        let after = match Entity::update(row).validate()?.filter(state).exec(&transaction).await {
+        let update = Entity::update(row).validate()?.scoped(tenant).filter(state);
+        let after = match update.exec(&transaction).await {
             Ok(after) => after,
             Err(sea_orm::DbErr::RecordNotUpdated) => {
                 return Err(if trash { in_trash(id) } else { not_in_trash(id) });
@@ -457,23 +499,11 @@ impl MediaService {
         let subject = events::item_subject(id);
         if trash {
             self.outbox
-                .record(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    actor,
-                    subject,
-                    &events::ItemTrashed(change),
-                )
+                .record(&transaction, tenant, actor, subject, &events::ItemTrashed(change))
                 .await?;
         } else {
             self.outbox
-                .record(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    actor,
-                    subject,
-                    &events::ItemRestored(change),
-                )
+                .record(&transaction, tenant, actor, subject, &events::ItemRestored(change))
                 .await?;
         }
         transaction.commit().await?;
@@ -482,16 +512,22 @@ impl MediaService {
     }
 
     /// Xoá hẳn item `id` đang trong thùng rác. Cần `media.purge`.
-    pub(crate) async fn purge(&self, principal: &Principal, id: Uuid) -> Result<(), Error> {
+    pub(crate) async fn purge(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<(), Error> {
         principal.require(&MEDIA_PURGE)?;
         let item = Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| item_not_found(id))?;
         if item.trashed_at.is_none() {
             return Err(not_in_trash(id));
         }
-        if !self.purge_item(Actor::from(principal), &item).await? {
+        if !self.purge_item(tenant, Actor::from(principal), &item).await? {
             return Err(item_not_found(id));
         }
         Ok(())
@@ -499,9 +535,15 @@ impl MediaService {
 
     /// Xoá dòng (kèm event) rồi nội dung của `item` nếu nó còn trong thùng rác. `false`:
     /// không còn gì để xoá (một request khác vừa xoá, hay vừa khôi phục).
-    pub(crate) async fn purge_item(&self, actor: Actor, item: &Item) -> Result<bool, Error> {
-        let transaction = self.database.begin_write().await?;
+    pub(crate) async fn purge_item(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        item: &Item,
+    ) -> Result<bool, Error> {
+        let transaction = tenant.database().begin_write().await?;
         let deleted = Entity::delete_many()
+            .scoped(tenant)
             .filter(Column::Id.eq(item.id))
             .filter(Column::TrashedAt.is_not_null())
             .exec(&transaction)
@@ -511,33 +553,31 @@ impl MediaService {
             return Ok(false);
         }
         crate::entity::item_tag::Entity::delete_many()
+            .scoped(tenant)
             .filter(crate::entity::item_tag::Column::ItemId.eq(item.id))
             .exec(&transaction)
             .await?;
-        crate::images::alts::delete_alts(&transaction, item.id).await?;
+        crate::images::alts::delete_alts(&transaction, tenant, item.id).await?;
         let copies = crate::entity::variant::Entity::find()
+            .scoped(tenant)
             .filter(crate::entity::variant::Column::ItemId.eq(item.id))
             .all(&transaction)
             .await?;
         crate::entity::variant::Entity::delete_many()
+            .scoped(tenant)
             .filter(crate::entity::variant::Column::ItemId.eq(item.id))
             .exec(&transaction)
             .await?;
         let event = events::ItemPurged(Change { before: Some(snapshot(item)), after: None });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::item_subject(item.id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::item_subject(item.id), &event)
             .await?;
         transaction.commit().await?;
         let keys =
             std::iter::once(item.storage_key()).chain(copies.iter().map(|copy| copy.storage_key()));
+        let store = self.store(tenant);
         for key in keys {
-            if let Err(error) = self.storage.delete(&key).await {
+            if let Err(error) = store.delete(&key).await {
                 // Job dọn mồ côi sẽ xoá sau.
                 tracing::warn!(media_item_id = %item.id, error = %error, "media item purged but its content remains");
             }
@@ -548,14 +588,19 @@ impl MediaService {
     }
 
     /// Item có cùng nội dung (SHA-256) với `item`, ngoài thùng rác, trừ chính nó.
-    pub(crate) async fn duplicates(&self, item: &Item) -> Result<Vec<Item>, Error> {
+    pub(crate) async fn duplicates(
+        &self,
+        tenant: &TenantContext,
+        item: &Item,
+    ) -> Result<Vec<Item>, Error> {
         Ok(Entity::find()
+            .scoped(tenant)
             .filter(Column::Sha256.eq(item.sha256.as_str()))
             .filter(Column::Id.ne(item.id))
             .filter(Column::TrashedAt.is_null())
             .order_by_asc(Column::Id)
             .limit(DUPLICATES_SHOWN)
-            .all(self.database.write())
+            .all(tenant.database().write())
             .await?)
     }
 
@@ -563,10 +608,11 @@ impl MediaService {
     /// thùng rác, hay đã bị người khác sửa.
     pub(crate) async fn why_not_changed<C: ConnectionTrait>(
         &self,
+        tenant: &TenantContext,
         id: Uuid,
         connection: &C,
     ) -> Error {
-        match Entity::find_by_id(id).one(connection).await {
+        match Entity::find_by_id(id).scoped(tenant).one(connection).await {
             Ok(None) => item_not_found(id),
             Ok(Some(item)) if item.trashed_at.is_some() => in_trash(id),
             Ok(Some(_)) => autoxide_kernel::version::changed(),
@@ -577,11 +623,14 @@ impl MediaService {
     /// Thêm lỗi `field` nếu không có thư mục `id`.
     pub(crate) async fn check_folder_exists(
         &self,
+        tenant: &TenantContext,
         id: Uuid,
         field: &str,
         problems: &mut Vec<FieldError>,
     ) -> Result<(), Error> {
-        if folder::Entity::find_by_id(id).one(self.database.read()).await?.is_none() {
+        let found =
+            folder::Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
+        if found.is_none() {
             problems.push(FieldError::new(field, "not_found", "no media folder has this id"));
         }
         Ok(())
@@ -591,11 +640,12 @@ impl MediaService {
 /// Thông tin item của một người dùng đã tải lên, cho bản xuất dữ liệu cá nhân.
 #[async_trait::async_trait]
 impl PersonalData for MediaService {
-    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+    async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let items = Entity::find()
+            .scoped(tenant)
             .filter(Column::UploadedBy.eq(user_id))
             .order_by_asc(Column::Id)
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         Ok(Value::Array(
             items
@@ -622,10 +672,13 @@ impl EventHandler for MediaService {
         let Some(user_id) = deleted_user(event) else {
             return Ok(());
         };
+        // Tài khoản thuộc một khách: chỉ item của khách đó (event mang ngữ cảnh khách).
+        let tenant = &event.tenant;
         let updated = Entity::update_many()
             .col_expr(Column::UploadedBy, Expr::value(Option::<Uuid>::None))
             .filter(Column::UploadedBy.eq(user_id))
-            .exec(self.database.write())
+            .scoped(tenant)
+            .exec(tenant.database().write())
             .await?;
         tracing::info!(user_id = %user_id, items = updated.rows_affected, "media items of a deleted user unlinked");
         Ok(())
@@ -636,12 +689,14 @@ impl EventHandler for MediaService {
 /// mới (D-086). `false` nếu thư mục không còn. Thư mục gốc luôn có.
 pub(crate) async fn touch_folder<C: ConnectionTrait>(
     transaction: &C,
+    tenant: &TenantContext,
     folder: Uuid,
 ) -> Result<bool, Error> {
     if folder == crate::entity::ROOT {
         return Ok(true);
     }
-    Ok(rows::lock_one(transaction, folder::Entity::find_by_id(folder)).await?.is_some())
+    let found = folder::Entity::find_by_id(folder).scoped(tenant);
+    Ok(rows::lock_one(transaction, found).await?.is_some())
 }
 
 /// Kiểm tên (bỏ khoảng trắng hai đầu; 1 tới 255 ký tự; không `/`, `\` hay ký tự điều
@@ -766,7 +821,7 @@ impl crate::api::Media for MediaService {
         };
         let ids: Vec<Uuid> = found.iter().map(|item| item.id).collect();
         let mut translated =
-            crate::images::alts::alts_in(self.database.read(), &ids, &locale).await?;
+            crate::images::alts::alts_in(tenant.database().read(), tenant, &ids, &locale).await?;
         for item in &mut found {
             if let Some(alt) = translated.remove(&item.id) {
                 item.alt = alt;
@@ -777,7 +832,7 @@ impl crate::api::Media for MediaService {
 
     async fn find_many(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
         ids: &[Uuid],
     ) -> Result<Vec<crate::api::MediaRef>, Error> {
         use crate::api::{MAX_IDS, MediaRef, MediaVisibility};
@@ -791,12 +846,14 @@ impl crate::api::Media for MediaService {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
+        let read = tenant.database().read();
         let rows = Entity::find()
+            .scoped(tenant)
             .filter(Column::Id.is_in(ids.to_vec()))
             .filter(Column::TrashedAt.is_null())
-            .all(self.database.read())
+            .all(read)
             .await?;
-        let mut copies = crate::images::variants::variants_of(self.database.read(), &rows).await?;
+        let mut copies = crate::images::variants::variants_of(read, tenant, &rows).await?;
         let mut found: std::collections::HashMap<Uuid, Item> =
             rows.into_iter().map(|item| (item.id, item)).collect();
         Ok(ids

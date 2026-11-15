@@ -8,6 +8,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -87,6 +88,7 @@ pub(crate) struct RenameTagRequest {
 )]
 pub(crate) async fn list_tags(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<TagsQuery>,
     Query(paging): Query<PageQuery>,
@@ -95,7 +97,7 @@ pub(crate) async fn list_tags(
     let order: TagSort = sort(query.sort.as_deref(), "`name`, `created_at`", &mut problems);
     let page = page_request(paging, problems)?;
     Ok(service
-        .list_tags(&principal, query.q.as_deref(), order, &page)
+        .list_tags(&tenant, &principal, query.q.as_deref(), order, &page)
         .await?
         .map(TagResponse::from))
 }
@@ -119,10 +121,11 @@ pub(crate) async fn list_tags(
 )]
 pub(crate) async fn get_tag(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<TagResponse>, Error> {
-    let found = service.get_tag(&principal, id).await?;
+    let found = service.get_tag(&tenant, &principal, id).await?;
     Ok(Tagged { version: found.tag.updated_at, data: found.into() })
 }
 
@@ -151,13 +154,14 @@ pub(crate) async fn get_tag(
 )]
 pub(crate) async fn rename_tag(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
     ValidJson(input): ValidJson<RenameTagRequest>,
 ) -> Result<Tagged<TagResponse>, Error> {
     let expected = if_match.required()?;
-    let found = service.rename_tag(&principal, id, &input.name, expected).await?;
+    let found = service.rename_tag(&tenant, &principal, id, &input.name, expected).await?;
     Ok(Tagged { version: found.tag.updated_at, data: found.into() })
 }
 
@@ -180,9 +184,10 @@ pub(crate) async fn rename_tag(
 )]
 pub(crate) async fn delete_tag(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    service.delete_tag(&principal, id).await?;
+    service.delete_tag(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
