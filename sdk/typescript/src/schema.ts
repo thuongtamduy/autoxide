@@ -2130,6 +2130,23 @@ export type Data_TagResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_TenantSettingState = {
+  /** A setting the installed modules take per tenant, and its state in the current tenant. */
+  data: {
+    description: string;
+    /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
+    is_set: boolean;
+    /** `<module>.<key>`, e.g. `mail.smtp_url`. */
+    name: string;
+    /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
+    secret: boolean;
+    updated_at?: string | null;
+    /** The value, for settings that are not secret and are set. */
+    value?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_TermResponse = {
   /** A category or tag, with its names in every language. */
   data: {
@@ -2430,6 +2447,22 @@ export type Data_Vec_ScheduleResponse = {
     /** `scheduled`, `succeeded`, `failed` or `canceled`. */
     status: string;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_TenantSettingState = {
+  data: {
+    description: string;
+    /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
+    is_set: boolean;
+    /** `<module>.<key>`, e.g. `mail.smtp_url`. */
+    name: string;
+    /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
+    secret: boolean;
+    updated_at?: string | null;
+    /** The value, for settings that are not secret and are set. */
+    value?: string | null;
   }[];
 };
 
@@ -5294,6 +5327,26 @@ export type TargetRequest = {
 /** What a term groups. */
 export type Taxonomy = "category" | "tag";
 
+/** A setting the installed modules take per tenant, and its state in the current tenant. */
+export type TenantSettingState = {
+  description: string;
+  /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
+  is_set: boolean;
+  /** `<module>.<key>`, e.g. `mail.smtp_url`. */
+  name: string;
+  /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
+  secret: boolean;
+  updated_at?: string | null;
+  /** The value, for settings that are not secret and are set. */
+  value?: string | null;
+};
+
+/** The new value of a setting. */
+export type TenantSettingValue = {
+  /** 1 to 4000 characters. Secret values are stored encrypted and never returned. */
+  value: string;
+};
+
 /** The name of a term in one language, and its parent. Omitted fields stay as they are. */
 export type TermFields = {
   description?: string | null;
@@ -7778,6 +7831,43 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/settings": {
+    /** List this tenant's settings. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_TenantSettingState;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/settings/{name}": {
+    /** Set one of this tenant's settings. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { name: string }; };
+      requestBody: TenantSettingValue;
+      responses: {
+        200: Data_TenantSettingState;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove one of this tenant's settings. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { name: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };

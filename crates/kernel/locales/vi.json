@@ -55,6 +55,7 @@
   "tenant_platform_only": "Chỉ quản trị của nền tảng mới làm được việc này.",
   "tenant_required": "Không xác định được khách hàng của yêu cầu. Gửi tới tên miền của khách, kèm header `Autoxide-Tenant: <slug>`, hoặc đăng nhập.",
   "tenant_single_mode": "Bản cài đang chạy chế độ một khách hàng; đặt AUTOXIDE_TENANCY_MODE=multi để thêm khách.",
+  "tenant_setting_unknown": "Không module nào nhận cấu hình `{name}`. Xem danh sách bằng `GET /api/v1/kernel/settings`.",
   "tenant_slug_taken": "Tên rút gọn `{slug}` đã có khách hàng khác dùng.",
   "tenant_suspended": "Khách hàng này đang bị tạm khoá. Liên hệ nhà cung cấp dịch vụ.",
   "too_many_requests": "Quá nhiều request. Hãy chờ rồi thử lại.",

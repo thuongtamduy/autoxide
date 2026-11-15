@@ -36,6 +36,10 @@ pub(crate) struct KernelModule {
     max_flags: u64,
     /// Service cờ theo người dùng, dùng chung với `Modules::routes`; điền lúc `start`.
     flags: user_flags::Handle,
+    /// Sổ cấu hình theo khách của mọi module (điền khi dựng `Modules`).
+    tenant_settings: crate::tenancy::settings::Catalog,
+    /// Service cấu hình theo khách; có sau `start`.
+    settings: Option<Arc<crate::tenancy::settings::SettingsService>>,
 }
 
 impl KernelModule {
@@ -43,9 +47,12 @@ impl KernelModule {
         catalog: ModuleCatalog,
         flags: user_flags::Handle,
         keys: crate::secret::KeyConfig,
+        tenant_settings: crate::tenancy::settings::Catalog,
     ) -> Self {
         KernelModule {
             keys,
+            tenant_settings,
+            settings: None,
             public_url: PublicUrl::default(),
             catalog,
             database: None,
@@ -71,6 +78,15 @@ impl Module for KernelModule {
             Box::new(user_flags::CreateUserFlags),
             // Bảng mặt điều khiển của phần đa khách, gieo khách mặc định (bước 33, D-253).
             Box::new(crate::tenancy::schema::CreateTenancy),
+            user_flags::adopt_tenancy(),
+            // Cấu hình theo khách (D-258) và bảng event của kernel (`kernel.setting_changed`).
+            Box::new(crate::tenancy::settings::CreateTenantSettings),
+            crate::event::outbox_migration("m0006_create_events", NAME),
+            crate::event::outbox_actor_migration("m0007_add_event_actor", NAME),
+            crate::tenancy::migration::adopt(
+                "m0008_tenancy_events",
+                vec![crate::event::tenant_table(NAME)],
+            ),
         ]
     }
 
@@ -91,11 +107,23 @@ impl Module for KernelModule {
     }
 
     fn permissions(&self) -> Vec<Permission> {
-        vec![module_catalog::MODULES_READ, TENANTS_OPERATE]
+        vec![module_catalog::MODULES_READ, TENANTS_OPERATE, crate::tenancy::SETTINGS_MANAGE]
+    }
+
+    fn events(&self) -> Vec<crate::event::EventInfo> {
+        vec![crate::tenancy::settings::SETTING_CHANGED]
+    }
+
+    fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
+        vec![crate::tenancy::PUBLIC_URL]
     }
 
     fn routes(&self) -> OpenApiRouter {
-        self.catalog_state().map_or_else(OpenApiRouter::new, module_catalog::routes)
+        let catalog = self.catalog_state().map_or_else(OpenApiRouter::new, module_catalog::routes);
+        match &self.settings {
+            Some(settings) => catalog.merge(crate::tenancy::settings::routes(settings.clone())),
+            None => catalog,
+        }
     }
 
     fn subscriptions(&self) -> Vec<crate::event::Subscription> {
@@ -106,15 +134,26 @@ impl Module for KernelModule {
     }
 
     fn tools(&self) -> Vec<crate::mcp::Tool> {
-        self.catalog_state().map_or_else(Vec::new, module_catalog::tools)
+        let mut tools = self.catalog_state().map_or_else(Vec::new, module_catalog::tools);
+        if let Some(settings) = &self.settings {
+            tools.extend(crate::tenancy::settings::tools(settings.clone()));
+        }
+        tools
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         self.database = Some(context.database().clone());
-        let flags = Arc::new(UserFlags::new(context.database().clone(), self.max_flags));
+        let flags = Arc::new(UserFlags::new(self.max_flags));
         context.personal_data(flags.clone())?;
         self.flags.fill(flags);
         let key = self.keys.key_for(context.database());
+        let settings = Arc::new(crate::tenancy::settings::SettingsService::new(
+            self.tenant_settings.clone(),
+            key.clone(),
+            context.outbox()?,
+        ));
+        self.settings = Some(settings.clone());
+        context.provide::<dyn crate::tenancy::TenantSettings>(settings)?;
         context.provide::<SecretKey>(Arc::new(key))?;
         context.provide::<PublicUrl>(Arc::new(self.public_url.clone()))
     }

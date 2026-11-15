@@ -85,6 +85,13 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Cấu hình module nhận theo khách (D-258): tên `<module>.<khoá>`, đọc bằng
+    /// `context.require::<dyn TenantSettings>()` (`autoxide_kernel::tenancy`). Khách chưa đặt thì
+    /// module dùng cấu hình chung. Mặc định rỗng.
+    fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
+        Vec::new()
+    }
+
     /// Bảng mặt điều khiển của module (bước 33, D-253): bảng không có `tenant_id` vì chung cả nền
     /// tảng, chỉ có dữ liệu ở database điều khiển. Mọi bảng khác của module (trừ `<m>_migrations`)
     /// là bảng cấp khách hàng và phải có `tenant_id` — testkit và `cargo xtask check` kiểm.

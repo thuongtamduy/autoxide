@@ -42,6 +42,11 @@ endpoints are marked deprecated with a sunset date first.
   platform. testkit: `schema_tenancy_violations` checks a migrated database (every other table has
   `tenant_id` NOT NULL without a default; unique keys and indexes start with it, except keys made only of UUIDs
   and sweep indexes named `…_sweep_idx`); `cargo xtask check` refuses an entity without `tenant_id`.
+- Settings per tenant: `GET /api/v1/kernel/settings`, `PUT` and `DELETE /api/v1/kernel/settings/{name}` (new
+  permission `kernel.settings.manage`) and the MCP tool `kernel.list_settings`. Modules declare what they take
+  (`Module::tenant_settings`) and read it with `autoxide_kernel::tenancy::TenantSettings`; unset settings fall back
+  to the server-wide configuration. Secret values are stored encrypted and never returned, logged or put in events
+  (new event `kernel.setting_changed` carries the name only). The kernel declares `kernel.public_url`.
 - Secrets the server must read back are stored encrypted (AES-256-GCM) with a key derived from
   `AUTOXIDE_SECRET_KEY`: `autoxide_kernel::secret::Sealer` (`SecretKey::sealer`). Rotating the key: new value in
   `AUTOXIDE_SECRET_KEY`, old one in the new setting `AUTOXIDE_SECRET_KEY_PREVIOUS`, then the new command
@@ -84,6 +89,7 @@ endpoints are marked deprecated with a sunset date first.
   `autoxide_media::api::Media`, `autoxide_notes::api::Notes`, `autoxide_content::api::LegacyMenus`.
 - For module authors: the trait `autoxide_auth::api::AccountRecovery` has a new method `remove_passkeys`; only
   `auth` implements it.
+- Interface flags (`/api/v1/me/flags`) are kept per tenant: the same account in two tenants has two sets.
 - Internal, no change in behaviour: the code of `newsletter`, `comments`, `media` and `forms` is grouped by
   feature like `content` and `auth`, and the kernel's files sit in private groups (`contracts`, `data`,
   `security`, `ops`, `values`). Every public path (`autoxide_kernel::ai::TextModel`, …) is unchanged, and a

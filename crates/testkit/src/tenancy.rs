@@ -66,8 +66,6 @@ pub const PENDING_TENANCY: &[&str] = &[
     "forms_submissions",
     // idempotency
     "idempotency_record",
-    // kernel
-    "kernel_user_flags",
     // media
     "media_alt_translations",
     "media_folder",
