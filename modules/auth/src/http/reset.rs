@@ -6,6 +6,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::response::Problem;
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::State;
 use axum::http::StatusCode;
 use serde::Deserialize;
@@ -57,10 +58,11 @@ pub(crate) struct ResetConfirmation {
 )]
 async fn request_reset(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     language: Language,
     ValidJson(input): ValidJson<ResetRequest>,
 ) -> Result<StatusCode, Error> {
-    state.resets.request(&input.email, language).await?;
+    state.resets.request(&tenant, &input.email, language).await?;
     Ok(StatusCode::ACCEPTED)
 }
 
@@ -82,9 +84,12 @@ async fn request_reset(
 )]
 async fn confirm_reset(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     ValidJson(input): ValidJson<ResetConfirmation>,
 ) -> Result<StatusCode, Error> {
-    state.resets.confirm(&input.token, input.password).await?;
+    // B12b: credential mang khách — token trong link đặt lại mật khẩu;
+    // tạm dùng khách của request (tên miền / header).
+    state.resets.confirm(&tenant, &input.token, input.password).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

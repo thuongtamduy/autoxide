@@ -8,50 +8,42 @@
 
 use std::time::Duration;
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::{Outcome, Throttle};
 
 pub(crate) struct LoginThrottle {
     inner: Throttle,
-    // Chuyển tiếp (bước 33 A4): đếm cho khách mặc định trên database này; phần B (module `auth`)
-    // cho mỗi hàm nhận khách của request.
-    database: Database,
 }
 
 impl LoginThrottle {
-    pub(crate) fn new(
-        database: Database,
-        max_failures: u32,
-        period: Duration,
-    ) -> Result<Self, Error> {
-        Ok(LoginThrottle { inner: Throttle::new("auth", max_failures, period)?, database })
+    pub(crate) fn new(max_failures: u32, period: Duration) -> Result<Self, Error> {
+        Ok(LoginThrottle { inner: Throttle::new("auth", max_failures, period)? })
     }
 
     /// Lỗi 429 `auth.login_throttled` nếu đăng nhập của `email` đang bị khoá (không đếm).
     #[cfg(test)]
-    pub(crate) async fn check(&self, email: &str) -> Result<(), Error> {
-        refuse(self.inner.check(&TenantContext::legacy_default(&self.database), &key(email)).await?)
+    pub(crate) async fn check(&self, tenant: &TenantContext, email: &str) -> Result<(), Error> {
+        refuse(self.inner.check(tenant, &key(email)).await?)
     }
 
     /// Xin một lượt thử cho `email`, TRƯỚC khi kiểm mật khẩu hay mã: đếm lượt này, rồi
     /// từ chối nếu email đang (hoặc vừa) bị khoá. Đếm trước rồi mới kiểm nên nhiều request
     /// bắn cùng lúc không vượt được số lần cho phép (D-079). Thử đúng thì gọi
     /// [`clear`](Self::clear).
-    pub(crate) async fn reserve(&self, email: &str) -> Result<(), Error> {
-        refuse(self.inner.hit(&TenantContext::legacy_default(&self.database), &key(email)).await?)
+    pub(crate) async fn reserve(&self, tenant: &TenantContext, email: &str) -> Result<(), Error> {
+        refuse(self.inner.hit(tenant, &key(email)).await?)
     }
 
     /// Trả lại lượt vừa xin bằng [`reserve`](Self::reserve) khi lần thử đó không sai (vd
     /// mật khẩu đúng, còn chờ mã MFA): người dùng thật không bị tính oan.
-    pub(crate) async fn refund(&self, email: &str) -> Result<(), Error> {
-        self.inner.refund(&TenantContext::legacy_default(&self.database), &key(email)).await
+    pub(crate) async fn refund(&self, tenant: &TenantContext, email: &str) -> Result<(), Error> {
+        self.inner.refund(tenant, &key(email)).await
     }
 
     /// Đăng nhập đúng: quên các lần sai trước đó.
-    pub(crate) async fn clear(&self, email: &str) -> Result<(), Error> {
-        self.inner.clear(&TenantContext::legacy_default(&self.database), &key(email)).await
+    pub(crate) async fn clear(&self, tenant: &TenantContext, email: &str) -> Result<(), Error> {
+        self.inner.clear(tenant, &key(email)).await
     }
 }
 
@@ -81,30 +73,31 @@ mod tests {
     use autoxide_kernel::error::ErrorKind;
     use autoxide_testkit::TestDatabase;
 
-    async fn throttle(test: &TestDatabase, max_failures: u32) -> LoginThrottle {
+    async fn throttle(test: &TestDatabase, max_failures: u32) -> (LoginThrottle, TenantContext) {
         let database = crate::testing::database(test).await;
-        LoginThrottle::new(database, max_failures, Duration::from_secs(15 * 60)).unwrap()
+        let throttle = LoginThrottle::new(max_failures, Duration::from_secs(15 * 60)).unwrap();
+        (throttle, TenantContext::default_on(database))
     }
 
     #[tokio::test]
     async fn sai_qua_so_lan_thi_khoa_roi_dung_thi_quen() {
         TestDatabase::run(async |test| {
-            let throttle = throttle(test, 3).await;
+            let (throttle, tenant) = throttle(test, 3).await;
 
             // Ba lượt đầu được kiểm (dù sai); lượt thứ tư bị khoá.
             for _ in 0..3 {
-                throttle.reserve("Ada@Example.com").await.unwrap();
+                throttle.reserve(&tenant, "Ada@Example.com").await.unwrap();
             }
-            let error = throttle.reserve(" ADA@example.com").await.unwrap_err();
+            let error = throttle.reserve(&tenant, " ADA@example.com").await.unwrap_err();
             assert_eq!(error.kind(), ErrorKind::TooManyRequests);
             assert_eq!(error.code(), "auth.login_throttled");
             let wait = error.retry_after().unwrap();
             assert!((899..=900).contains(&wait), "{wait}");
             // Email khác không bị ảnh hưởng.
-            throttle.check("bob@example.com").await.unwrap();
+            throttle.check(&tenant, "bob@example.com").await.unwrap();
 
-            throttle.clear("ada@example.com").await.unwrap();
-            throttle.check("ada@example.com").await.unwrap();
+            throttle.clear(&tenant, "ada@example.com").await.unwrap();
+            throttle.check(&tenant, "ada@example.com").await.unwrap();
         })
         .await
         .unwrap();
@@ -115,12 +108,14 @@ mod tests {
     #[tokio::test]
     async fn thu_dong_thoi_khong_vuot_so_lan_cho_phep() {
         TestDatabase::run(async |test| {
-            let throttle = Arc::new(throttle(test, 5).await);
+            let (throttle, tenant) = throttle(test, 5).await;
+            let throttle = Arc::new(throttle);
 
             let attempts: Vec<_> = (0..40)
                 .map(|_| {
-                    let throttle = throttle.clone();
-                    tokio::spawn(async move { throttle.reserve("ada@example.com").await })
+                    let (throttle, tenant) = (throttle.clone(), tenant.clone());
+                    let tenant = tenant.clone();
+                    tokio::spawn(async move { throttle.reserve(&tenant, "ada@example.com").await })
                 })
                 .collect();
             let mut allowed = 0;
@@ -131,7 +126,7 @@ mod tests {
             }
 
             assert!(allowed <= 5, "{allowed} attempts got through");
-            assert!(throttle.check("ada@example.com").await.is_err());
+            assert!(throttle.check(&tenant, "ada@example.com").await.is_err());
         })
         .await
         .unwrap();

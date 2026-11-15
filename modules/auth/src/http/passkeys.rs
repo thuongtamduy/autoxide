@@ -11,6 +11,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -144,12 +145,15 @@ pub(crate) struct PasskeyLoginRequest {
 )]
 async fn start_registration(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<StartPasskeyRegistrationRequest>,
 ) -> Result<Data<CeremonyResponse>, Error> {
     require_session(&principal)?;
-    let ceremony =
-        state.passkeys.start_registration(principal.user_id(), &input.current_password).await?;
+    let ceremony = state
+        .passkeys
+        .start_registration(&tenant, principal.user_id(), &input.current_password)
+        .await?;
     Ok(Data { data: ceremony.into() })
 }
 
@@ -175,13 +179,20 @@ async fn start_registration(
 )]
 async fn add_passkey(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<AddPasskeyRequest>,
 ) -> Result<Created<PasskeyResponse>, Error> {
     require_session(&principal)?;
     let passkey = state
         .passkeys
-        .finish_registration(principal.user_id(), input.ceremony_id, &input.name, &input.credential)
+        .finish_registration(
+            &tenant,
+            principal.user_id(),
+            input.ceremony_id,
+            &input.name,
+            &input.credential,
+        )
         .await?;
     Ok(Created::new(format!("/auth/me/passkeys/{}", passkey.id), passkey.into()))
 }
@@ -204,10 +215,12 @@ async fn add_passkey(
 )]
 async fn list_passkeys(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<PasskeyResponse>, Error> {
-    let page = state.passkeys.list(principal.user_id(), &PageRequest::try_from(query)?).await?;
+    let page =
+        state.passkeys.list(&tenant, principal.user_id(), &PageRequest::try_from(query)?).await?;
     Ok(page.map(PasskeyResponse::from))
 }
 
@@ -231,20 +244,26 @@ async fn list_passkeys(
 )]
 async fn delete_passkey(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
     require_session(&principal)?;
-    state.passkeys.delete(principal.user_id(), id).await?;
+    state.passkeys.delete(&tenant, principal.user_id(), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 /// Checks for the administrator endpoints: permission, the user exists, and the user has no
 /// permission the caller lacks.
-async fn check_admin(state: &HttpState, principal: &Principal, id: Uuid) -> Result<(), Error> {
+async fn check_admin(
+    state: &HttpState,
+    tenant: &TenantContext,
+    principal: &Principal,
+    id: Uuid,
+) -> Result<(), Error> {
     principal.require(&PASSKEYS_MANAGE)?;
-    state.users.get(id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
-    state.roles.require_covers(principal, id).await
+    state.users.get(tenant, id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
+    state.roles.require_covers(tenant, principal, id).await
 }
 
 /// List the passkeys of a user.
@@ -269,13 +288,14 @@ async fn check_admin(state: &HttpState, principal: &Principal, id: Uuid) -> Resu
 )]
 async fn list_user_passkeys(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<PasskeyResponse>, Error> {
     let page = PageRequest::try_from(query)?;
-    check_admin(&state, &principal, id).await?;
-    Ok(state.passkeys.list(id, &page).await?.map(PasskeyResponse::from))
+    check_admin(&state, &tenant, &principal, id).await?;
+    Ok(state.passkeys.list(&tenant, id, &page).await?.map(PasskeyResponse::from))
 }
 
 /// Remove one passkey of a user who lost the device.
@@ -300,11 +320,12 @@ async fn list_user_passkeys(
 )]
 async fn remove_user_passkey(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path((id, passkey_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, Error> {
-    check_admin(&state, &principal, id).await?;
-    state.passkeys.remove_for(Actor::from(&principal), id, passkey_id).await?;
+    check_admin(&state, &tenant, &principal, id).await?;
+    state.passkeys.remove_for(&tenant, Actor::from(&principal), id, passkey_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -329,11 +350,12 @@ async fn remove_user_passkey(
 )]
 async fn remove_user_passkeys(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    check_admin(&state, &principal, id).await?;
-    state.passkeys.remove_all_for(Actor::from(&principal), id).await?;
+    check_admin(&state, &tenant, &principal, id).await?;
+    state.passkeys.remove_all_for(&tenant, Actor::from(&principal), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -350,8 +372,11 @@ async fn remove_user_passkeys(
         (status = 403, description = "Passkeys are off on this server; code `auth.passkeys_disabled`.", body = Problem),
     )
 )]
-async fn start_login(State(state): State<Arc<HttpState>>) -> Result<Data<CeremonyResponse>, Error> {
-    Ok(Data { data: state.passkeys.start_login().await?.into() })
+async fn start_login(
+    State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
+) -> Result<Data<CeremonyResponse>, Error> {
+    Ok(Data { data: state.passkeys.start_login(&tenant).await?.into() })
 }
 
 /// Sign in with a passkey: finish the ceremony from `POST /api/v1/auth/login/passkey/options`.
@@ -374,19 +399,21 @@ async fn start_login(State(state): State<Arc<HttpState>>) -> Result<Data<Ceremon
 )]
 async fn login(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     headers: axum::http::HeaderMap,
     ValidJson(input): ValidJson<PasskeyLoginRequest>,
 ) -> Result<Data<TokenResponse>, Error> {
     let user_agent = super::user_agent(&headers);
-    let tokens =
-        state.passkeys.finish_login(input.ceremony_id, &input.credential, user_agent).await?;
-    super::note_country(&state, &headers, tokens.session_id).await;
+    let tokens = state
+        .passkeys
+        .finish_login(&tenant, input.ceremony_id, &input.credential, user_agent)
+        .await?;
+    super::note_country(&state, &tenant, &headers, tokens.session_id).await;
     Ok(Data { data: tokens.into() })
 }
 
 #[cfg(test)]
 mod tests {
-    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -459,7 +486,7 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            crate::api::Accounts::create(services.users.as_ref(), &TenantContext::legacy_default(&services.database), root).await.unwrap();
+            crate::api::Accounts::create(services.users.as_ref(), &services.tenant, root).await.unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let body = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": PASSWORD});
             let (status, _, key) = call(&app, "POST", "/api-keys", Some(&admin), Some(body)).await;
@@ -486,6 +513,7 @@ mod tests {
 
         TestDatabase::run(async |test| {
             let (app, services) = app(test).await;
+            let tenant = services.tenant.clone();
             let account = |email: &str, admin: bool| NewAccount {
                 email: email.to_owned(),
                 name: "Someone".to_owned(),
@@ -494,25 +522,26 @@ mod tests {
             };
             let root = Accounts::create(
                 services.users.as_ref(),
-                &TenantContext::legacy_default(&services.database),
+                &services.tenant,
                 account("root@example.com", true),
             )
             .await
             .unwrap();
             let bob = Accounts::create(
                 services.users.as_ref(),
-                &TenantContext::legacy_default(&services.database),
+                &services.tenant,
                 account("bob@example.com", false),
             )
             .await
             .unwrap();
             for (user, seed) in [(bob.id, 1), (bob.id, 2), (root.id, 3)] {
                 let mut device = SoftAuthenticator::new(seed);
-                let ceremony = services.passkeys.start_registration(user, PASSWORD).await.unwrap();
+                let ceremony =
+                    services.passkeys.start_registration(&tenant, user, PASSWORD).await.unwrap();
                 let credential = device.register(&ceremony.options);
                 services
                     .passkeys
-                    .finish_registration(user, ceremony.id, "Phone", &credential)
+                    .finish_registration(&tenant, user, ceremony.id, "Phone", &credential)
                     .await
                     .unwrap();
             }
@@ -521,11 +550,12 @@ mod tests {
                 description: String::new(),
                 permissions: vec!["auth.passkeys.manage".to_owned()],
             };
-            let helpdesk = services.roles.create(Actor::system(), helpdesk).await.unwrap();
-            let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
+            let helpdesk = services.roles.create(&tenant, Actor::system(), helpdesk).await.unwrap();
+            let ada =
+                services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap();
             services
                 .roles
-                .set_user_roles(Actor::system(), ada.id, vec![helpdesk.id])
+                .set_user_roles(&tenant, Actor::system(), ada.id, vec![helpdesk.id])
                 .await
                 .unwrap();
             let ada = bearer(&app, "ada@example.com", PASSWORD).await;

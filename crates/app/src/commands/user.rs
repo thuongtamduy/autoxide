@@ -42,6 +42,10 @@ pub enum Action {
         /// generating one: `printf '%s' "$PASSWORD" | autoxide user create …`.
         #[arg(long)]
         password_stdin: bool,
+        /// Short name (slug) of the tenant the account belongs to. Defaults to the default
+        /// tenant (the only one in `single` mode).
+        #[arg(long)]
+        tenant: Option<String>,
     },
     /// Turn off two-step sign-in (authenticator app and recovery codes) of an account.
     ///
@@ -52,6 +56,9 @@ pub enum Action {
         /// Email of the account.
         #[arg(long)]
         email: String,
+        /// Short name (slug) of the tenant of the account. Defaults to the default tenant.
+        #[arg(long)]
+        tenant: Option<String>,
     },
     /// Remove every passkey of an account.
     ///
@@ -62,17 +69,22 @@ pub enum Action {
         /// Email of the account.
         #[arg(long)]
         email: String,
+        /// Short name (slug) of the tenant of the account. Defaults to the default tenant.
+        #[arg(long)]
+        tenant: Option<String>,
     },
 }
 
 pub fn run(arguments: &Arguments) -> ExitCode {
-    let (email, name, admin, password_stdin) = match arguments.action.clone() {
-        Action::Create { email, name, admin, password_stdin } => {
-            (email, name, admin, password_stdin)
+    let (email, name, admin, password_stdin, tenant) = match arguments.action.clone() {
+        Action::Create { email, name, admin, password_stdin, tenant } => {
+            (email, name, admin, password_stdin, tenant)
         }
-        Action::ResetMfa { email } => return recovery_command(Recovery::ResetMfa(email)),
-        Action::RemovePasskeys { email } => {
-            return recovery_command(Recovery::RemovePasskeys(email));
+        Action::ResetMfa { email, tenant } => {
+            return recovery_command(Recovery::ResetMfa(email), tenant);
+        }
+        Action::RemovePasskeys { email, tenant } => {
+            return recovery_command(Recovery::RemovePasskeys(email), tenant);
         }
     };
     let settings = match settings::load() {
@@ -93,7 +105,7 @@ pub fn run(arguments: &Arguments) -> ExitCode {
     };
     let account = NewAccount { email, name, password: Some(password.clone()), admin };
     let config = settings.config.clone();
-    match run_with_observability(&config, create(settings, account)) {
+    match run_with_observability(&config, create(settings, account, tenant)) {
         Ok(report) => {
             print!("{report}");
             if generated {
@@ -106,17 +118,38 @@ pub fn run(arguments: &Arguments) -> ExitCode {
     }
 }
 
+/// Khách `slug` (bỏ trống: khách mặc định) qua sổ database của chương trình (bước 33).
+async fn tenant_of(
+    runtime: &runtime::Runtime,
+    slug: Option<&str>,
+) -> Result<TenantContext, String> {
+    let registry = runtime
+        .modules
+        .tenancy()
+        .ok_or_else(|| "the modules were not started with a tenancy registry".to_owned())?;
+    match slug.map(str::trim) {
+        Some(slug) => registry.tenant_by_slug(slug).await.map_err(|error| describe(&error)),
+        None => Ok(registry.default_tenant()),
+    }
+}
+
 /// Khởi động chương trình, tạo tài khoản, trả về nội dung in ra (chưa có mật khẩu).
-async fn create(settings: Settings, account: NewAccount) -> Result<String, String> {
+async fn create(
+    settings: Settings,
+    account: NewAccount,
+    tenant: Option<String>,
+) -> Result<String, String> {
     let admin = account.admin;
     let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
-    let outcome = match runtime.modules.api::<dyn Accounts>() {
-        Some(accounts) => accounts
-            .create(&TenantContext::legacy_default(&runtime.database), account)
-            .await
-            .map_err(|error| describe(&error)),
-        None => Err("no registered module manages user accounts (`auth`)".to_owned()),
-    };
+    let outcome =
+        match (runtime.modules.api::<dyn Accounts>(), tenant_of(&runtime, tenant.as_deref()).await)
+        {
+            (Some(accounts), Ok(tenant)) => {
+                accounts.create(&tenant, account).await.map_err(|error| describe(&error))
+            }
+            (None, _) => Err("no registered module manages user accounts (`auth`)".to_owned()),
+            (_, Err(error)) => Err(error),
+        };
     // Đóng kết nối cả khi tạo hỏng; lỗi tạo quan trọng hơn lỗi lúc đóng.
     let closed = runtime.database.close().await.map_err(|error| format!("database: {error}"));
     let user = outcome?;
@@ -135,14 +168,14 @@ enum Recovery {
     RemovePasskeys(String),
 }
 
-/// Lệnh `reset-mfa` / `remove-passkeys`: đọc cấu hình, làm `action`, in kết quả.
-fn recovery_command(action: Recovery) -> ExitCode {
+/// Lệnh `reset-mfa` / `remove-passkeys`: đọc cấu hình, làm `action` ở khách `tenant`, in kết quả.
+fn recovery_command(action: Recovery, tenant: Option<String>) -> ExitCode {
     let settings = match settings::load() {
         Ok(settings) => settings,
         Err(errors) => return report_invalid_configuration(&errors),
     };
     let config = settings.config.clone();
-    match run_with_observability(&config, recover(settings, action)) {
+    match run_with_observability(&config, recover(settings, action, tenant)) {
         Ok(report) => {
             print!("{report}");
             ExitCode::SUCCESS
@@ -152,11 +185,16 @@ fn recovery_command(action: Recovery) -> ExitCode {
 }
 
 /// Khởi động chương trình, làm `action`, đóng database. Trả câu báo cho người vận hành.
-async fn recover(settings: Settings, action: Recovery) -> Result<String, String> {
+async fn recover(
+    settings: Settings,
+    action: Recovery,
+    tenant: Option<String>,
+) -> Result<String, String> {
     let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
-    let outcome = match runtime.modules.api::<dyn AccountRecovery>() {
-        Some(recovery) => match action {
-            Recovery::ResetMfa(email) => recovery.reset_mfa(&TenantContext::legacy_default(&runtime.database), &email).await.map(|user| {
+    let found = tenant_of(&runtime, tenant.as_deref()).await;
+    let outcome = match (runtime.modules.api::<dyn AccountRecovery>(), found) {
+        (Some(recovery), Ok(tenant)) => match action {
+            Recovery::ResetMfa(email) => recovery.reset_mfa(&tenant, &email).await.map(|user| {
                 format!(
                     "Two-step sign-in of {} (id {}) is off. Sign in with the password, then turn \
                      it on again.\n",
@@ -164,7 +202,7 @@ async fn recover(settings: Settings, action: Recovery) -> Result<String, String>
                 )
             }),
             Recovery::RemovePasskeys(email) => {
-                recovery.remove_passkeys(&TenantContext::legacy_default(&runtime.database), &email).await.map(|(user, removed)| {
+                recovery.remove_passkeys(&tenant, &email).await.map(|(user, removed)| {
                     format!(
                         "Removed {removed} passkey(s) of {} (id {}). Sign in with the password, \
                          then add new passkeys.\n",
@@ -174,7 +212,8 @@ async fn recover(settings: Settings, action: Recovery) -> Result<String, String>
             }
         }
         .map_err(|error| describe(&error)),
-        None => Err("no registered module manages user accounts (`auth`)".to_owned()),
+        (None, _) => Err("no registered module manages user accounts (`auth`)".to_owned()),
+        (_, Err(error)) => Err(error),
     };
     let closed = runtime.database.close().await.map_err(|error| format!("database: {error}"));
     let report = outcome?;

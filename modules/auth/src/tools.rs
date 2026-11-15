@@ -110,29 +110,36 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "list_roles",
             "List roles with the permissions they grant; follow `pagination.next_cursor` for more.",
-            move |_tenant: TenantContext, _: Principal, input: PageInput| {
+            move |tenant: TenantContext, _: Principal, input: PageInput| {
                 let state = list.clone();
                 async move {
-                    let page = state.roles.list(&input.page()?).await?;
+                    let page = state.roles.list(&tenant, &input.page()?).await?;
                     Ok::<Page<RoleResponse>, Error>(page.map(RoleResponse::from))
                 }
             },
         )
         .requires(ROLES_READ)
         .read_only(),
-        Tool::new("get_role", "Get one role.", move |_tenant: TenantContext, _: Principal, input: IdInput| {
-            let state = get.clone();
-            async move { Ok::<_, Error>(RoleResponse::from(state.roles.get(input.id).await?)) }
-        })
+        Tool::new(
+            "get_role",
+            "Get one role.",
+            move |tenant: TenantContext, _: Principal, input: IdInput| {
+                let state = get.clone();
+                async move {
+                    Ok::<_, Error>(RoleResponse::from(state.roles.get(&tenant, input.id).await?))
+                }
+            },
+        )
         .requires(ROLES_READ)
         .read_only(),
         Tool::new(
             "create_role",
             "Create a role that grants the listed permissions (see `list_permissions`).",
-            move |_tenant: TenantContext, principal: Principal, input: RoleRequest| {
+            move |tenant: TenantContext, principal: Principal, input: RoleRequest| {
                 let state = create.clone();
                 async move {
-                    let role = state.roles.create(Actor::from(&principal), input.into()).await?;
+                    let role =
+                        state.roles.create(&tenant, Actor::from(&principal), input.into()).await?;
                     Ok::<_, Error>(RoleResponse::from(role))
                 }
             },
@@ -142,7 +149,7 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
             "replace_role",
             "Replace the name, description and permissions of a role. The built-in `admin` \
              role cannot be changed.",
-            move |_tenant: TenantContext, principal: Principal, input: ReplaceRoleInput| {
+            move |tenant: TenantContext, principal: Principal, input: ReplaceRoleInput| {
                 let state = replace.clone();
                 async move {
                     let role = RoleInput {
@@ -150,8 +157,10 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
                         description: input.description,
                         permissions: input.permissions,
                     };
-                    let role =
-                        state.roles.update(Actor::from(&principal), input.id, role, None).await?;
+                    let role = state
+                        .roles
+                        .update(&tenant, Actor::from(&principal), input.id, role, None)
+                        .await?;
                     Ok::<_, Error>(RoleResponse::from(role))
                 }
             },
@@ -161,10 +170,10 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
             "delete_role",
             "Delete a role; users who had it lose its permissions. The built-in `admin` role \
              cannot be deleted.",
-            move |_tenant: TenantContext, principal: Principal, input: IdInput| {
+            move |tenant: TenantContext, principal: Principal, input: IdInput| {
                 let state = delete.clone();
                 async move {
-                    state.roles.delete(Actor::from(&principal), input.id).await?;
+                    state.roles.delete(&tenant, Actor::from(&principal), input.id).await?;
                     Ok::<_, Error>(serde_json::json!({ "deleted": input.id }))
                 }
             },
@@ -174,9 +183,11 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "get_user_roles",
             "List the roles of a user (`id` is the user's id).",
-            move |_tenant: TenantContext, _: Principal, input: IdInput| {
+            move |tenant: TenantContext, _: Principal, input: IdInput| {
                 let state = of_user.clone();
-                async move { Ok::<_, Error>(roles_response(state.roles.user_roles(input.id).await?)) }
+                async move {
+                    Ok::<_, Error>(roles_response(state.roles.user_roles(&tenant, input.id).await?))
+                }
             },
         )
         .requires(USERS_READ)
@@ -185,11 +196,12 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
             "set_user_roles",
             "Replace every role of a user with `role_ids`. The last administrator cannot lose \
              the `admin` role.",
-            move |_tenant: TenantContext, principal: Principal, input: SetUserRolesInput| {
+            move |tenant: TenantContext, principal: Principal, input: SetUserRolesInput| {
                 let state = set.clone();
                 async move {
                     let actor = Actor::from(&principal);
-                    let roles = state.roles.set_user_roles(actor, input.user_id, input.role_ids);
+                    let roles =
+                        state.roles.set_user_roles(&tenant, actor, input.user_id, input.role_ids);
                     Ok::<_, Error>(roles_response(roles.await?))
                 }
             },
@@ -205,10 +217,11 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "list_api_keys",
             "List your API keys (never their secrets); follow `pagination.next_cursor` for more.",
-            move |_tenant: TenantContext, principal: Principal, input: PageInput| {
+            move |tenant: TenantContext, principal: Principal, input: PageInput| {
                 let state = list.clone();
                 async move {
-                    let page = state.api_keys.list(principal.user_id(), &input.page()?).await?;
+                    let page =
+                        state.api_keys.list(&tenant, principal.user_id(), &input.page()?).await?;
                     Ok::<Page<ApiKeyResponse>, Error>(page.map(ApiKeyResponse::from))
                 }
             },
@@ -220,10 +233,10 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
             "Create an API key that acts as you, limited to the listed permissions. Needs your \
              current password and a password session: an API key cannot create keys. The \
              result carries the key, shown only once.",
-            move |_tenant: TenantContext, principal: Principal, input: CreateApiKeyRequest| {
+            move |tenant: TenantContext, principal: Principal, input: CreateApiKeyRequest| {
                 let state = create.clone();
                 async move {
-                    let created = state.api_keys.create(&principal, input.into()).await?;
+                    let created = state.api_keys.create(&tenant, &principal, input.into()).await?;
                     Ok::<_, Error>(CreatedApiKeyResponse::from(created))
                 }
             },
@@ -233,10 +246,10 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "revoke_api_key",
             "Revoke one of your API keys; it stops working at once.",
-            move |_tenant: TenantContext, principal: Principal, input: IdInput| {
+            move |tenant: TenantContext, principal: Principal, input: IdInput| {
                 let state = revoke.clone();
                 async move {
-                    state.api_keys.revoke(&principal, input.id).await?;
+                    state.api_keys.revoke(&tenant, &principal, input.id).await?;
                     Ok::<_, Error>(serde_json::json!({ "revoked": input.id }))
                 }
             },
@@ -259,12 +272,12 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
             "whoami",
             "Get the calling user (id, email, name) and the permissions they hold. Start here to \
              learn what you may do.",
-            move |_tenant: TenantContext, principal: Principal, _: NoInput| {
+            move |tenant: TenantContext, principal: Principal, _: NoInput| {
                 let state = me.clone();
                 async move {
-                    let user = state.users.get(principal.user_id()).await?;
+                    let user = state.users.get(&tenant, principal.user_id()).await?;
                     let user = user.ok_or_else(crate::token::invalid_token)?;
-                    MeResponse::load(&state, user, &principal).await
+                    MeResponse::load(&state, &tenant, user, &principal).await
                 }
             },
         )
@@ -289,13 +302,16 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
             "list_users",
             "List user accounts, newest first; `search` finds users by email or name. Follow \
              `pagination.next_cursor` for more.",
-            move |_tenant: TenantContext, _: Principal, input: ListUsersInput| {
+            move |tenant: TenantContext, _: Principal, input: ListUsersInput| {
                 let state = list.clone();
                 async move {
                     let page = PageInput::new(input.limit, input.cursor, input.order);
+                    let page = state
+                        .users
+                        .list(&tenant, input.search.as_deref(), None, &page.page()?)
+                        .await?;
                     let page =
-                        state.users.list(input.search.as_deref(), None, &page.page()?).await?;
-                    let page = describe_page(&state.users, &state.roles, page, false).await?;
+                        describe_page(&state.users, &state.roles, &tenant, page, false).await?;
                     Ok::<Page<UserResponse>, Error>(page)
                 }
             },
@@ -306,17 +322,17 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
             "update_user",
             "Rename, disable or enable a user account. Disabling signs the user out \
              everywhere; the last active administrator cannot be disabled.",
-            move |_tenant: TenantContext, principal: Principal, input: UpdateUserInput| {
+            move |tenant: TenantContext, principal: Principal, input: UpdateUserInput| {
                 let state = update.clone();
                 async move {
                     // Như REST: không tác động lên người có permission mà mình không có.
-                    state.roles.require_covers(&principal, input.id).await?;
+                    state.roles.require_covers(&tenant, &principal, input.id).await?;
                     let changes = UserChanges { name: input.name, disabled: input.disabled };
                     let user = state
                         .users
-                        .update(Actor::from(&principal), input.id, changes, None)
+                        .update(&tenant, Actor::from(&principal), input.id, changes, None)
                         .await?;
-                    describe(&state.users, user).await
+                    describe(&state.users, &tenant, user).await
                 }
             },
         )
@@ -364,10 +380,11 @@ mod tests {
     async fn tool_goi_cung_service_voi_rest() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let ada =
                 NewUser { email: "ada@example.com".into(), name: "Ada".into(), password: None };
-            let ada = services.users.create(Actor::system(), ada).await.unwrap();
-            let tenant = TenantContext::legacy_default(&services.database);
+            let ada = services.users.create(&tenant, Actor::system(), ada).await.unwrap();
+            let tenant = services.tenant.clone();
             let tools = all(&state(&services));
             let admin = Principal::with_all_permissions(ada.id);
             let nobody = Principal::new(ada.id, []);
@@ -424,14 +441,15 @@ mod tests {
     async fn tool_role_va_api_key_dung_service_cua_rest() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let password = "correct horse battery staple".to_owned();
             let ada = NewUser {
                 email: "ada@example.com".into(),
                 name: "Ada".into(),
                 password: Some(password.clone()),
             };
-            let ada = services.users.create(Actor::system(), ada).await.unwrap();
-            let tenant = TenantContext::legacy_default(&services.database);
+            let ada = services.users.create(&tenant, Actor::system(), ada).await.unwrap();
+            let tenant = services.tenant.clone();
             let tools = all(&state(&services));
             let admin = Principal::with_all_permissions(ada.id);
             let reader = Principal::new(ada.id, ["auth.roles.read".to_owned()]);

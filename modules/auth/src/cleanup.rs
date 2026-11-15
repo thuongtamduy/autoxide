@@ -4,7 +4,6 @@
 
 use std::time::Duration;
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler, Schedule};
 use chrono::Utc;
@@ -19,22 +18,16 @@ pub(crate) fn schedule() -> Schedule {
     Schedule::new(KIND, KIND, Duration::from_secs(3600))
 }
 
-pub(crate) struct Cleanup {
-    database: Database,
-}
-
-impl Cleanup {
-    pub(crate) fn new(database: Database) -> Self {
-        Cleanup { database }
-    }
-}
+/// Lịch chạy một lần mỗi database (bước 33): quét dòng hết hạn của MỌI khách trên database đó
+/// bằng các index `…_sweep_idx`; không ghi event nên không cần biết khách của từng dòng.
+pub(crate) struct Cleanup;
 
 #[async_trait::async_trait]
 impl JobHandler for Cleanup {
-    async fn run(&self, _job: &JobContext) -> Result<(), Error> {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
         let now = Utc::now();
         let day_ago = now - chrono::Duration::days(1);
-        let connection = self.database.write();
+        let connection = job.database.write();
         let mut removed = 0;
         // Số đếm của cửa sổ đã qua lâu và không còn khoá (bảng `auth_throttle` của kernel).
         let throttle = autoxide_kernel::throttle::Throttle::new(
@@ -42,7 +35,7 @@ impl JobHandler for Cleanup {
             1,
             std::time::Duration::from_secs(60),
         )?;
-        removed += throttle.purge(&self.database, day_ago).await?;
+        removed += throttle.purge(&job.database, day_ago).await?;
         // Refresh token đã hết hạn, hay đã thu hồi hơn một ngày (gửi lại token đã xoá
         // vẫn bị từ chối như token lạ).
         // Hai lệnh, mỗi lệnh dùng một index (`OR` của hai cột không dùng được index nào).
@@ -102,6 +95,7 @@ async fn delete<C: ConnectionTrait>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use autoxide_kernel::database::Database;
     use autoxide_kernel::event::Actor;
     use autoxide_testkit::TestDatabase;
     use sea_orm::Statement;
@@ -130,16 +124,17 @@ mod tests {
     async fn don_du_lieu_het_han_giu_du_lieu_con_dung() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let database = services.database.clone();
             let input = NewUser {
                 email: "ada@example.com".to_owned(),
                 name: "Ada".to_owned(),
                 password: Some("correct horse battery staple".to_owned()),
             };
-            services.users.create(Actor::system(), input).await.unwrap();
+            services.users.create(&tenant, Actor::system(), input).await.unwrap();
             let old = match services
                 .sessions
-                .login("ada@example.com", "correct horse battery staple", None)
+                .login(&tenant, "ada@example.com", "correct horse battery staple", None)
                 .await
                 .unwrap()
             {
@@ -148,16 +143,16 @@ mod tests {
             };
             services
                 .sessions
-                .login("ada@example.com", "correct horse battery staple", None)
+                .login(&tenant, "ada@example.com", "correct horse battery staple", None)
                 .await
                 .unwrap();
-            services.sessions.login("bob@example.com", "wrong", None).await.unwrap_err();
-            services.sessions.login("eve@example.com", "wrong", None).await.unwrap_err();
+            services.sessions.login(&tenant, "bob@example.com", "wrong", None).await.unwrap_err();
+            services.sessions.login(&tenant, "eve@example.com", "wrong", None).await.unwrap_err();
             // Một token và một số đếm đã cũ.
             age(&database, "UPDATE auth_refresh_token SET expires_at = created_at").await;
             services
                 .sessions
-                .login("ada@example.com", "correct horse battery staple", None)
+                .login(&tenant, "ada@example.com", "correct horse battery staple", None)
                 .await
                 .unwrap();
             age(
@@ -165,21 +160,17 @@ mod tests {
                 "UPDATE auth_throttle SET window_started_at = '2000-01-01 00:00:00+00:00'",
             )
             .await;
-            services.sessions.login("bob@example.com", "wrong", None).await.unwrap_err();
+            services.sessions.login(&tenant, "bob@example.com", "wrong", None).await.unwrap_err();
             assert_eq!(count(&database, "auth_refresh_token").await, 3);
 
-            let context = JobContext::for_tenant(
-                autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
-                KIND,
-                serde_json::Value::Null,
-                1,
-            );
-            Cleanup::new(database.clone()).run(&context).await.unwrap();
+            let context =
+                JobContext::for_database(database.clone(), KIND, serde_json::Value::Null, 1);
+            Cleanup.run(&context).await.unwrap();
 
             // Còn token mới nhất (chưa hết hạn) và số đếm vừa ghi của bob.
             assert_eq!(count(&database, "auth_refresh_token").await, 1);
             assert_eq!(count(&database, "auth_throttle").await, 1);
-            assert!(services.sessions.refresh(&old.refresh_token).await.is_err());
+            assert!(services.sessions.refresh(&tenant, &old.refresh_token).await.is_err());
         })
         .await
         .unwrap();

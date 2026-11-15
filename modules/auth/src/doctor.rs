@@ -1,19 +1,22 @@
 //! Bước kiểm của `auth` cho `autoxide doctor` (D-166): đã có quản trị viên đang hoạt động chưa.
 //! Bản cài mới chưa có ai thì không ai đăng nhập quản lý được — lỗi hay gặp nhất của người tự cài.
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::doctor::{Finding, Probe};
+use autoxide_kernel::tenancy::DatabaseRegistry;
 
 use crate::role::count_active_admins_unlocked;
 
+/// Kiểm quản trị viên của khách mặc định (khách nền tảng, bước 33): người vận hành bản cài quản
+/// lý nó; khách khác có role `admin` riêng, gieo khi tạo khách.
 pub(crate) struct Administrator {
-    pub database: Database,
+    pub databases: DatabaseRegistry,
 }
 
 #[async_trait::async_trait]
 impl Probe for Administrator {
     async fn probe(&self) -> Finding {
-        match count_active_admins_unlocked(self.database.read()).await {
+        let tenant = self.databases.default_tenant();
+        match count_active_admins_unlocked(tenant.database().read(), &tenant).await {
             Ok(0) => Finding::warning("No active account has the `admin` role, so nobody can sign in to manage this server.")
                 .with_hint("Run `autoxide user create --email <email> --name <name> --admin`."),
             Ok(count) => Finding::ok(format!("{count} active administrator(s).")),
@@ -36,7 +39,10 @@ mod tests {
     async fn bao_khi_chua_co_quan_tri_vien() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
-            let probe = Administrator { database: services.database.clone() };
+            let tenant = services.tenant.clone();
+            let databases =
+                autoxide_kernel::tenancy::DatabaseRegistry::single(services.database.clone());
+            let probe = Administrator { databases };
 
             let finding = probe.probe().await;
             assert_eq!(finding.status, Status::Warning, "{finding:?}");
@@ -47,10 +53,14 @@ mod tests {
                 name: "Ada".to_owned(),
                 password: None,
             };
-            services.users.create(Actor::system(), user("member@example.com")).await.unwrap();
+            services
+                .users
+                .create(&tenant, Actor::system(), user("member@example.com"))
+                .await
+                .unwrap();
             assert_eq!(probe.probe().await.status, Status::Warning);
             let admin = user("admin@example.com");
-            services.users.create_with_roles(Actor::system(), admin, true).await.unwrap();
+            services.users.create_with_roles(&tenant, Actor::system(), admin, true).await.unwrap();
             let finding = probe.probe().await;
             assert_eq!(
                 (finding.status, finding.message.as_str()),

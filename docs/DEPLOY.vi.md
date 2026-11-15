@@ -231,6 +231,13 @@ mật khẩu và thêm passkey mới. Quản trị viên khác làm được đi
 sudo -u autoxide autoxide user remove-passkeys --email you@example.com
 ```
 
+Ba lệnh này làm việc với khách mặc định. Khi có nhiều khách (`AUTOXIDE_TENANCY_MODE=multi`), thêm
+`--tenant <slug>` để làm với tài khoản của khách khác, ví dụ quản trị viên đầu tiên của khách đó:
+
+```bash
+sudo -u autoxide autoxide user create --tenant acme --email owner@acme.example --name "Owner" --admin
+```
+
 ### 4. Chạy như một service
 
 `/etc/systemd/system/autoxide.service`:

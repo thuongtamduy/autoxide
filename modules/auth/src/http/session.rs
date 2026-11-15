@@ -6,6 +6,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -159,11 +160,13 @@ impl MeResponse {
     /// Tài khoản của người gọi, kèm có mật khẩu chưa và email đang chờ xác minh.
     pub(crate) async fn load(
         state: &HttpState,
+        tenant: &TenantContext,
         user: User,
         principal: &Principal,
     ) -> Result<Self, Error> {
-        let facts = state.users.facts(&[user.id]).await?.remove(&user.id).unwrap_or_default();
-        let pending = state.verifications.pending_change(&user).await?;
+        let facts =
+            state.users.facts(tenant, &[user.id]).await?.remove(&user.id).unwrap_or_default();
+        let pending = state.verifications.pending_change(tenant, &user).await?;
         Ok(MeResponse {
             id: user.id,
             email: user.email,
@@ -202,14 +205,15 @@ impl MeResponse {
 )]
 async fn login(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     headers: HeaderMap,
     ValidJson(input): ValidJson<LoginRequest>,
 ) -> Result<Response, Error> {
     let user_agent = super::user_agent(&headers);
     // Hai kết quả, hai hình dạng: `Response` là kiểu chung của mọi response.
-    Ok(match state.sessions.login(&input.email, &input.password, user_agent).await? {
+    Ok(match state.sessions.login(&tenant, &input.email, &input.password, user_agent).await? {
         LoginOutcome::Tokens(tokens) => {
-            super::note_country(&state, &headers, tokens.session_id).await;
+            super::note_country(&state, &tenant, &headers, tokens.session_id).await;
             Data { data: TokenResponse::from(tokens) }.into_response()
         }
         LoginOutcome::MfaRequired { mfa_token, expires_in } => {
@@ -247,12 +251,16 @@ const METHODS: [&str; 2] = ["totp", "recovery_code"];
 )]
 async fn login_mfa(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     headers: HeaderMap,
     ValidJson(input): ValidJson<LoginMfaRequest>,
 ) -> Result<Data<TokenResponse>, Error> {
     let user_agent = super::user_agent(&headers);
-    let tokens = state.sessions.complete_mfa(&input.mfa_token, &input.code, user_agent).await?;
-    super::note_country(&state, &headers, tokens.session_id).await;
+    // B12b: credential mang khách — `mfa_token` của lượt chờ mã;
+    // tạm dùng khách của request (tên miền / header).
+    let tokens =
+        state.sessions.complete_mfa(&tenant, &input.mfa_token, &input.code, user_agent).await?;
+    super::note_country(&state, &tenant, &headers, tokens.session_id).await;
     Ok(Data { data: tokens.into() })
 }
 
@@ -275,9 +283,12 @@ async fn login_mfa(
 )]
 async fn refresh(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     ValidJson(input): ValidJson<RefreshRequest>,
 ) -> Result<Data<TokenResponse>, Error> {
-    let tokens = state.sessions.refresh(&input.refresh_token).await?;
+    // B12b: credential mang khách — refresh token;
+    // tạm dùng khách của request (tên miền / header).
+    let tokens = state.sessions.refresh(&tenant, &input.refresh_token).await?;
     Ok(Data { data: tokens.into() })
 }
 
@@ -298,9 +309,12 @@ async fn refresh(
 )]
 async fn logout(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     ValidJson(input): ValidJson<RefreshRequest>,
 ) -> Result<StatusCode, Error> {
-    state.sessions.logout(&input.refresh_token).await?;
+    // B12b: credential mang khách — refresh token;
+    // tạm dùng khách của request (tên miền / header).
+    state.sessions.logout(&tenant, &input.refresh_token).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -319,11 +333,15 @@ async fn logout(
 )]
 async fn me(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
 ) -> Result<Data<MeResponse>, Error> {
-    let user =
-        state.users.get(principal.user_id()).await?.ok_or_else(crate::token::invalid_token)?;
-    Ok(Data { data: MeResponse::load(&state, user, &principal).await? })
+    let user = state
+        .users
+        .get(&tenant, principal.user_id())
+        .await?
+        .ok_or_else(crate::token::invalid_token)?;
+    Ok(Data { data: MeResponse::load(&state, &tenant, user, &principal).await? })
 }
 
 /// Change your own password.
@@ -350,6 +368,7 @@ async fn me(
 )]
 async fn change_password(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     headers: HeaderMap,
     ValidJson(input): ValidJson<ChangePasswordRequest>,
@@ -359,13 +378,14 @@ async fn change_password(
     let tokens = state
         .sessions
         .change_password(
+            &tenant,
             principal.user_id(),
             &input.current_password,
             input.new_password,
             user_agent,
         )
         .await?;
-    super::note_country(&state, &headers, tokens.session_id).await;
+    super::note_country(&state, &tenant, &headers, tokens.session_id).await;
     Ok(Data { data: tokens.into() })
 }
 

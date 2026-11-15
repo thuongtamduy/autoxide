@@ -107,17 +107,20 @@ async fn export_personal_data(
 )]
 async fn delete_own_account(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<DeleteAccountRequest>,
 ) -> Result<StatusCode, Error> {
     super::require_session(&principal)?;
-    state.sessions.delete_own_account(principal.user_id(), &input.current_password).await?;
+    state
+        .sessions
+        .delete_own_account(&tenant, principal.user_id(), &input.current_password)
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 #[cfg(test)]
 mod tests {
-    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -129,6 +132,7 @@ mod tests {
     async fn xuat_du_lieu_roi_tu_xoa_tai_khoan() {
         TestDatabase::run(async |test| {
             let (app, services) = app(test).await;
+            let tenant = services.tenant.clone();
             let ada = bearer(&app, "ada@example.com", PASSWORD).await;
 
             let (status, _, export) = call(&app, "GET", "/me/export", Some(&ada), None).await;
@@ -146,7 +150,9 @@ mod tests {
             let body = json!({"current_password": PASSWORD});
             let (status, _, _) = call(&app, "DELETE", "/me", Some(&ada), Some(body)).await;
             assert_eq!(status, StatusCode::NO_CONTENT);
-            assert!(services.users.find_by_email("ada@example.com").await.unwrap().is_none());
+            assert!(
+                services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().is_none()
+            );
             // Access token còn hạn nhưng tài khoản không còn: bị từ chối.
             let (status, _, _) = call(&app, "GET", "/me", Some(&ada), None).await;
             assert_eq!(status, StatusCode::UNAUTHORIZED);
@@ -161,13 +167,7 @@ mod tests {
                 password: None,
                 admin: false,
             };
-            Accounts::create(
-                services.users.as_ref(),
-                &TenantContext::legacy_default(&services.database),
-                again,
-            )
-            .await
-            .unwrap();
+            Accounts::create(services.users.as_ref(), &services.tenant, again).await.unwrap();
         })
         .await
         .unwrap();
@@ -177,21 +177,18 @@ mod tests {
     async fn quan_tri_vien_xoa_tai_khoan_nhung_khong_xoa_admin_cuoi() {
         TestDatabase::run(async |test| {
             let (app, services) = app(test).await;
+            let tenant = services.tenant.clone();
             let root = NewAccount {
                 email: "root@example.com".to_owned(),
                 name: "Root".to_owned(),
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            let root = Accounts::create(
-                services.users.as_ref(),
-                &TenantContext::legacy_default(&services.database),
-                root,
-            )
-            .await
-            .unwrap();
+            let root =
+                Accounts::create(services.users.as_ref(), &services.tenant, root).await.unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
-            let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
+            let ada =
+                services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap();
 
             let path = format!("/users/{}", root.id);
             let (status, _, problem) = call(&app, "DELETE", &path, Some(&admin), None).await;
@@ -219,7 +216,6 @@ mod tests {
 #[cfg(test)]
 mod web_requests {
     use autoxide_kernel::event::Actor;
-    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -231,7 +227,7 @@ mod web_requests {
     async fn danh_sach_nguoi_dung_kem_du_kien_va_role() {
         TestDatabase::run(async |test| {
             let (app, services) = app(test).await;
-            let tenant = TenantContext::legacy_default(&services.database);
+            let tenant = services.tenant.clone();
             let root = NewAccount {
                 email: "root@example.com".to_owned(),
                 name: "Root".to_owned(),
@@ -248,7 +244,7 @@ mod web_requests {
             let pk =
                 Accounts::create(services.users.as_ref(), &tenant, passkey_only).await.unwrap();
             let changes = crate::user::UserChanges { name: None, disabled: Some(true) };
-            services.users.update(Actor::system(), pk.id, changes, None).await.unwrap();
+            services.users.update(&tenant, Actor::system(), pk.id, changes, None).await.unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
 
             let (status, _, page) =

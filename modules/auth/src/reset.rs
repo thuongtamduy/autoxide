@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
@@ -74,13 +73,16 @@ pub(crate) struct ResetMailer(pub Arc<PasswordResets>);
 #[async_trait::async_trait]
 impl JobHandler for ResetMailer {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let tenant = job
+            .tenant
+            .as_ref()
+            .ok_or_else(|| Error::internal("a password-reset mail job must belong to a tenant"))?;
         let job: ResetJob = serde_json::from_value(job.payload.clone()).map_err(Error::internal)?;
-        self.0.send(&job).await
+        self.0.send(tenant, &job).await
     }
 }
 
 pub(crate) struct PasswordResets {
-    pub database: Database,
     pub jobs: JobQueue,
     pub users: Arc<UserService>,
     pub mailer: Arc<dyn Mailer>,
@@ -93,23 +95,22 @@ pub(crate) struct PasswordResets {
 impl PasswordResets {
     /// Xếp việc gửi mail đặt lại mật khẩu cho `email`. Như nhau dù email có tồn tại hay không
     /// — kể cả thời gian: việc tra tài khoản, tạo token, gửi mail chạy trong job (D-162).
-    pub(crate) async fn request(&self, email: &str, language: Language) -> Result<(), Error> {
+    pub(crate) async fn request(
+        &self,
+        tenant: &TenantContext,
+        email: &str,
+        language: Language,
+    ) -> Result<(), Error> {
         let job = ResetJob { email: email.trim().to_owned(), language: language.tag().to_owned() };
-        self.jobs
-            .enqueue(
-                self.database.write(),
-                &TenantContext::legacy_default(&self.database),
-                &job,
-                EnqueueOptions::default(),
-            )
-            .await?;
+        let write = tenant.database().write();
+        self.jobs.enqueue(write, tenant, &job, EnqueueOptions::default()).await?;
         Ok(())
     }
 
     /// Job: gửi mail đặt lại mật khẩu nếu email là của một tài khoản đang hoạt động.
-    pub(crate) async fn send(&self, job: &ResetJob) -> Result<(), Error> {
+    pub(crate) async fn send(&self, tenant: &TenantContext, job: &ResetJob) -> Result<(), Error> {
         let language = if job.language == Language::Vi.tag() { Language::Vi } else { Language::En };
-        let Some(user) = self.users.find_by_email(&job.email).await? else {
+        let Some(user) = self.users.find_by_email(tenant, &job.email).await? else {
             return Ok(());
         };
         if !user.is_active() {
@@ -119,43 +120,19 @@ impl PasswordResets {
         let subject = user.id.to_string();
         let since = now - chrono::Duration::seconds(COOLDOWN_SECONDS);
         if !tokens()
-            .recent(
-                self.database.write(),
-                &TenantContext::legacy_default(&self.database),
-                PURPOSE,
-                &subject,
-                since,
-            )
+            .recent(tenant.database().write(), tenant, PURPOSE, &subject, since)
             .await?
             .is_empty()
         {
             return Ok(());
         }
 
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let ttl = chrono::Duration::minutes(TOKEN_MINUTES);
-        let token = tokens()
-            .issue(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                PURPOSE,
-                &subject,
-                None,
-                ttl,
-            )
-            .await?
-            .token;
+        let token = tokens().issue(&transaction, tenant, PURPOSE, &subject, None, ttl).await?.token;
         let event = events::PasswordResetRequested::default();
         let subject = events::user_subject(user.id);
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                Actor::system(),
-                subject,
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, Actor::system(), subject, &event).await?;
         transaction.commit().await?;
 
         let minutes = TOKEN_MINUTES.to_string();
@@ -172,11 +149,16 @@ impl PasswordResets {
                 RESET_CODE.mail(&user.email, &self.translations, language, &params)
             }
         };
-        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await
+        self.mailer.send(tenant, mail).await
     }
 
     /// Đặt mật khẩu mới bằng `token` lấy từ mail.
-    pub(crate) async fn confirm(&self, token: &str, new_password: String) -> Result<(), Error> {
+    pub(crate) async fn confirm(
+        &self,
+        tenant: &TenantContext,
+        token: &str,
+        new_password: String,
+    ) -> Result<(), Error> {
         // Kiểm luật mật khẩu TRƯỚC khi dùng token: mật khẩu sai thì token còn dùng lại được.
         let problems: Vec<FieldError> = FieldError::blank("token", token)
             .into_iter()
@@ -185,24 +167,17 @@ impl PasswordResets {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let consumed = tokens()
-            .consume(
-                self.database.write(),
-                &TenantContext::legacy_default(&self.database),
-                PURPOSE,
-                token,
-            )
-            .await?;
+        let consumed = tokens().consume(tenant.database().write(), tenant, PURPOSE, token).await?;
         let Some(user_id) = consumed.and_then(|consumed| consumed.subject.parse::<Uuid>().ok())
         else {
-            let tenant = TenantContext::legacy_default(&self.database);
-            let why = tokens().rejection(self.database.read(), &tenant, PURPOSE, token).await?;
+            let read = tenant.database().read();
+            let why = tokens().rejection(read, tenant, PURPOSE, token).await?;
             return Err(invalid_token().with_reason(why.as_str()));
         };
         let actor = Actor::user(user_id);
         // Một transaction: mật khẩu mới, thu hồi phiên, passkey, API key, token đặt lại và
         // đổi email khác (D-156).
-        self.users.recover_password(actor, user_id, new_password).await
+        self.users.recover_password(tenant, actor, user_id, new_password).await
     }
 }
 
@@ -232,12 +207,13 @@ mod tests {
 
     async fn setup(test: &TestDatabase) -> Services {
         let services = crate::testing::services(test).await;
+        let tenant = services.tenant.clone();
         let ada = NewUser {
             email: "ada@example.com".to_owned(),
             name: "Ada".to_owned(),
             password: Some(OLD.to_owned()),
         };
-        services.users.create(Actor::system(), ada).await.unwrap();
+        services.users.create(&tenant, Actor::system(), ada).await.unwrap();
         services
     }
 
@@ -276,11 +252,13 @@ mod tests {
     async fn xoa_tai_khoan_xoa_luon_token() {
         TestDatabase::run(async |test| {
             let services = setup(test).await;
+            let tenant = services.tenant.clone();
             crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let token = last_token(&services);
-            let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
-            services.users.delete(Actor::system(), ada.id).await.unwrap();
-            let error = services.resets.confirm(&token, NEW.to_owned()).await.unwrap_err();
+            let ada =
+                services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap();
+            services.users.delete(&tenant, Actor::system(), ada.id).await.unwrap();
+            let error = services.resets.confirm(&tenant, &token, NEW.to_owned()).await.unwrap_err();
             assert_eq!(error.code(), "auth.invalid_reset_token");
         })
         .await
@@ -291,6 +269,7 @@ mod tests {
     async fn chi_email_co_that_nhan_mail_va_theo_ngon_ngu() {
         TestDatabase::run(async |test| {
             let services = setup(test).await;
+            let tenant = services.tenant.clone();
 
             crate::testing::request_reset(&services, "ghost@example.com", Language::En).await;
             assert_eq!(sent(&services), 0);
@@ -311,9 +290,10 @@ mod tests {
             assert_eq!(services.mails.sent.lock().unwrap()[1].subject, "Reset your password");
 
             // Tài khoản bị khoá: không gửi.
-            let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
+            let ada =
+                services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap();
             let disable = UserChanges { name: None, disabled: Some(true) };
-            services.users.update(Actor::system(), ada.id, disable, None).await.unwrap();
+            services.users.update(&tenant, Actor::system(), ada.id, disable, None).await.unwrap();
             time_passes(&services, 2).await;
             crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             assert_eq!(sent(&services), 2);
@@ -326,26 +306,34 @@ mod tests {
     async fn dat_mat_khau_moi_bang_token_mot_lan() {
         TestDatabase::run(async |test| {
             let services = setup(test).await;
-            let session =
-                services.sessions.login("ada@example.com", OLD, None).await.unwrap().tokens();
+            let tenant = services.tenant.clone();
+            let session = services
+                .sessions
+                .login(&tenant, "ada@example.com", OLD, None)
+                .await
+                .unwrap()
+                .tokens();
             crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let token = last_token(&services);
 
             // Mật khẩu sai luật: báo lỗi, token vẫn còn dùng được.
-            let short = services.resets.confirm(&token, "short".to_owned()).await.unwrap_err();
+            let short =
+                services.resets.confirm(&tenant, &token, "short".to_owned()).await.unwrap_err();
             assert_eq!(short.code(), "validation_failed");
-            services.resets.confirm(&token, NEW.to_owned()).await.unwrap();
+            services.resets.confirm(&tenant, &token, NEW.to_owned()).await.unwrap();
 
-            let again = services.resets.confirm(&token, NEW.to_owned()).await.unwrap_err();
+            let again = services.resets.confirm(&tenant, &token, NEW.to_owned()).await.unwrap_err();
             assert_eq!(again.kind(), ErrorKind::BadRequest);
             assert_eq!(again.code(), "auth.invalid_reset_token");
             assert_eq!(again.reason(), Some("used"));
-            assert!(services.sessions.login("ada@example.com", OLD, None).await.is_err());
-            let login = services.sessions.login("ada@example.com", NEW, None).await.unwrap();
+            assert!(services.sessions.login(&tenant, "ada@example.com", OLD, None).await.is_err());
+            let login =
+                services.sessions.login(&tenant, "ada@example.com", NEW, None).await.unwrap();
             assert!(matches!(login, LoginOutcome::Tokens(_)));
             // Phiên cũ đã bị huỷ.
-            assert!(services.sessions.refresh(&session.refresh_token).await.is_err());
-            let unknown = services.resets.confirm("nope", NEW.to_owned()).await.unwrap_err();
+            assert!(services.sessions.refresh(&tenant, &session.refresh_token).await.is_err());
+            let unknown =
+                services.resets.confirm(&tenant, "nope", NEW.to_owned()).await.unwrap_err();
             assert_eq!(unknown.code(), "auth.invalid_reset_token");
         })
         .await
@@ -356,22 +344,24 @@ mod tests {
     async fn token_het_han_va_token_cu_khong_dung_duoc() {
         TestDatabase::run(async |test| {
             let services = setup(test).await;
+            let tenant = services.tenant.clone();
             crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let older = last_token(&services);
             time_passes(&services, 2).await;
             crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let newer = last_token(&services);
 
-            services.resets.confirm(&newer, NEW.to_owned()).await.unwrap();
+            services.resets.confirm(&tenant, &newer, NEW.to_owned()).await.unwrap();
             // Đặt lại xong thì token cũ hơn cũng hết dùng được.
-            let stale = services.resets.confirm(&older, NEW.to_owned()).await.unwrap_err();
+            let stale = services.resets.confirm(&tenant, &older, NEW.to_owned()).await.unwrap_err();
             assert_eq!(stale.code(), "auth.invalid_reset_token");
 
             time_passes(&services, 2).await;
             crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let expiring = last_token(&services);
             time_passes(&services, 31).await;
-            let expired = services.resets.confirm(&expiring, NEW.to_owned()).await.unwrap_err();
+            let expired =
+                services.resets.confirm(&tenant, &expiring, NEW.to_owned()).await.unwrap_err();
             assert_eq!(expired.code(), "auth.invalid_reset_token");
             assert_eq!(expired.reason(), Some("expired"));
         })
@@ -385,6 +375,7 @@ mod tests {
     async fn dung_cung_token_dong_thoi_chi_mot_ben_duoc() {
         TestDatabase::run(async |test| {
             let services = setup(test).await;
+            let tenant = services.tenant.clone();
             crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let token = last_token(&services);
 
@@ -392,8 +383,9 @@ mod tests {
                 .map(|index| {
                     let resets = services.resets.clone();
                     let token = token.clone();
+                    let tenant = tenant.clone();
                     tokio::spawn(async move {
-                        resets.confirm(&token, format!("{NEW} number {index}")).await
+                        resets.confirm(&tenant, &token, format!("{NEW} number {index}")).await
                     })
                 })
                 .collect();

@@ -94,6 +94,7 @@ pub(super) fn user_agent(headers: &axum::http::HeaderMap) -> Option<&str> {
 /// để người dùng nhận ra phiên: ghi lỗi thì ghi log rồi bỏ qua, không làm hỏng lần đăng nhập.
 pub(super) async fn note_country(
     state: &HttpState,
+    tenant: &autoxide_kernel::tenancy::TenantContext,
     headers: &axum::http::HeaderMap,
     session_id: uuid::Uuid,
 ) {
@@ -109,7 +110,7 @@ pub(super) async fn note_country(
     else {
         return;
     };
-    if let Err(error) = state.sessions.note_country(session_id, &country).await {
+    if let Err(error) = state.sessions.note_country(tenant, session_id, &country).await {
         tracing::warn!(%session_id, %error, "could not record the country of a session");
     }
 }
@@ -173,6 +174,7 @@ pub(crate) mod test_support {
     /// bên kia đọc được.
     pub async fn app_with(test: &TestDatabase, self_registration: bool) -> (TestApp, Services) {
         let services = crate::testing::services(test).await;
+        let tenant = services.tenant.clone();
         let mailer: std::sync::Arc<dyn Mailer> = services.mails.clone();
         let app = TestApp::builder(test)
             .setting("AUTOXIDE_AUTH_TOKEN_SECRET", crate::testing::TOKEN_SECRET)
@@ -189,6 +191,7 @@ pub(crate) mod test_support {
         services
             .users
             .create(
+                &tenant,
                 Actor::system(),
                 NewUser {
                     email: "ada@example.com".to_owned(),

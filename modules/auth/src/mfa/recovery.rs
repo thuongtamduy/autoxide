@@ -5,6 +5,7 @@
 //! mã: 80 bit ngẫu nhiên thì băm nhanh vẫn không đoán ngược được.
 
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -24,15 +25,17 @@ const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
 /// Thay bộ mã của `user_id` bằng [`COUNT`] mã mới; trả về các mã (chỉ lần này).
 pub(crate) async fn replace<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     user_id: Uuid,
     now: DateTime<Utc>,
 ) -> Result<Vec<String>, Error> {
-    remove(connection, user_id).await?;
+    remove(connection, tenant, user_id).await?;
     let mut codes = Vec::with_capacity(COUNT);
     for _ in 0..COUNT {
         let code = generate()?;
         recovery_code::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             user_id: Set(user_id),
             code_hash: Set(hash(&code)),
             used_at: Set(None),
@@ -49,6 +52,7 @@ pub(crate) async fn replace<C: ConnectionTrait>(
 /// một câu `UPDATE`: hai request dùng cùng mã thì chỉ một bên được nhận.
 pub(crate) async fn redeem<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     user_id: Uuid,
     code: &str,
     now: DateTime<Utc>,
@@ -61,6 +65,7 @@ pub(crate) async fn redeem<C: ConnectionTrait>(
         .filter(Column::UserId.eq(user_id))
         .filter(Column::CodeHash.eq(hash(&normalized)))
         .filter(Column::UsedAt.is_null())
+        .scoped(tenant)
         .exec(connection)
         .await?;
     Ok(used.rows_affected == 1)
@@ -69,17 +74,27 @@ pub(crate) async fn redeem<C: ConnectionTrait>(
 /// Số mã chưa dùng của `user_id`.
 pub(crate) async fn remaining<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     user_id: Uuid,
 ) -> Result<u64, Error> {
     Ok(Entity::find()
         .filter(Column::UserId.eq(user_id))
         .filter(Column::UsedAt.is_null())
+        .scoped(tenant)
         .count(connection)
         .await?)
 }
 
-pub(crate) async fn remove<C: ConnectionTrait>(connection: &C, user_id: Uuid) -> Result<(), Error> {
-    Entity::delete_many().filter(Column::UserId.eq(user_id)).exec(connection).await?;
+pub(crate) async fn remove<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    user_id: Uuid,
+) -> Result<(), Error> {
+    Entity::delete_many()
+        .filter(Column::UserId.eq(user_id))
+        .scoped(tenant)
+        .exec(connection)
+        .await?;
     Ok(())
 }
 

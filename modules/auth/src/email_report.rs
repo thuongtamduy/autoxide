@@ -23,7 +23,7 @@ use autoxide_kernel::i18n::Language;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::mail::MailTemplate;
 use autoxide_kernel::rows;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
@@ -89,9 +89,13 @@ pub(crate) struct EmailChangedMailer(pub Arc<EmailVerifications>);
 #[async_trait::async_trait]
 impl JobHandler for EmailChangedMailer {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let tenant = job
+            .tenant
+            .as_ref()
+            .ok_or_else(|| Error::internal("an email-changed mail job must belong to a tenant"))?;
         let job: EmailChangedJob =
             serde_json::from_value(job.payload.clone()).map_err(Error::internal)?;
-        self.0.send_email_changed(&job).await
+        self.0.send_email_changed(tenant, &job).await
     }
 }
 
@@ -99,35 +103,26 @@ impl EmailVerifications {
     /// Xếp mail báo tới địa chỉ cũ, trong `transaction` của việc đổi email.
     pub(crate) async fn enqueue_email_changed(
         &self,
+        tenant: &TenantContext,
         transaction: &sea_orm::DatabaseTransaction,
         job: &EmailChangedJob,
     ) -> Result<(), Error> {
-        self.jobs
-            .enqueue(
-                transaction,
-                &TenantContext::legacy_default(&self.database),
-                job,
-                EnqueueOptions::default(),
-            )
-            .await?;
+        self.jobs.enqueue(transaction, tenant, job, EnqueueOptions::default()).await?;
         Ok(())
     }
 
     /// Job: tạo token báo và gửi mail tới địa chỉ cũ.
-    pub(crate) async fn send_email_changed(&self, job: &EmailChangedJob) -> Result<(), Error> {
+    pub(crate) async fn send_email_changed(
+        &self,
+        tenant: &TenantContext,
+        job: &EmailChangedJob,
+    ) -> Result<(), Error> {
         let language = if job.language == Language::Vi.tag() { Language::Vi } else { Language::En };
         let ttl = chrono::Duration::days(REPORT_DAYS);
         let subject = job.user_id.to_string();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let token = tokens()
-            .issue(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                PURPOSE,
-                &subject,
-                Some(&job.old_email),
-                ttl,
-            )
+            .issue(&transaction, tenant, PURPOSE, &subject, Some(&job.old_email), ttl)
             .await?
             .token;
         transaction.commit().await?;
@@ -157,26 +152,28 @@ impl EmailVerifications {
                 CHANGED_CODE.mail(&job.old_email, &self.translations, language, &params)
             }
         };
-        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await
+        self.mailer.send(tenant, mail).await
     }
 
     /// Chủ tài khoản báo "không phải tôi" bằng `token` trong mail gửi tới địa chỉ cũ.
-    pub(crate) async fn report(&self, token: &str, language: Language) -> Result<(), Error> {
-        let transaction = self.database.begin_write().await?;
-        let consumed = tokens()
-            .consume(&transaction, &TenantContext::legacy_default(&self.database), PURPOSE, token)
-            .await?;
+    pub(crate) async fn report(
+        &self,
+        tenant: &TenantContext,
+        token: &str,
+        language: Language,
+    ) -> Result<(), Error> {
+        let transaction = tenant.database().begin_write().await?;
+        let consumed = tokens().consume(&transaction, tenant, PURPOSE, token).await?;
         let found = consumed
             .and_then(|consumed| Some((consumed.subject.parse::<Uuid>().ok()?, consumed.data?)));
         let Some((user_id, old_email)) = found else {
-            let tenant = TenantContext::legacy_default(&self.database);
-            let why = tokens().rejection(&transaction, &tenant, PURPOSE, token).await?;
+            let why = tokens().rejection(&transaction, tenant, PURPOSE, token).await?;
             transaction.rollback().await?;
             return Err(invalid_report_token().with_reason(why.as_str()));
         };
         // Khoá dòng người dùng: hai lần báo cùng lúc (hay báo trong lúc đổi email) xét lần lượt.
-        let Some(row) = rows::lock_one(&transaction, user_row::Entity::find_by_id(user_id)).await?
-        else {
+        let locked = user_row::Entity::find_by_id(user_id).scoped(tenant);
+        let Some(row) = rows::lock_one(&transaction, locked).await? else {
             // Tài khoản đã bị xoá: cùng lỗi như token sai, không cho dò gì.
             transaction.rollback().await?;
             return Err(invalid_report_token());
@@ -187,48 +184,31 @@ impl EmailVerifications {
         let taken = user_row::Entity::find()
             .filter(user_row::Column::Email.eq(old_email.as_str()))
             .filter(user_row::Column::Id.ne(user_id))
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .is_some();
         let restored = !taken;
         if restored && current != old_email {
-            self.users.apply_verified_email(&transaction, user_id, &old_email, now()).await?;
+            self.users
+                .apply_verified_email(tenant, &transaction, user_id, &old_email, now())
+                .await?;
         }
         let actor = Actor::user(user_id);
-        self.users.lock_out_in(&transaction, actor, user_id).await?;
+        self.users.lock_out_in(tenant, &transaction, actor, user_id).await?;
         // Mọi token báo khác của người này cũng hết dùng được.
-        tokens()
-            .revoke(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                PURPOSE,
-                &user_id.to_string(),
-            )
-            .await?;
+        tokens().revoke(&transaction, tenant, PURPOSE, &user_id.to_string()).await?;
         let after = if restored { old_email.clone() } else { current.clone() };
         let event = events::EmailChangeReported {
             before: Some(json!({"email": current})),
             after: Some(json!({"email": after, "restored": restored})),
         };
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::user_subject(user_id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::user_subject(user_id), &event)
             .await?;
         if restored {
             let job = ResetJob { email: old_email, language: language.tag().to_owned() };
-            self.jobs
-                .enqueue(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    &job,
-                    EnqueueOptions::default(),
-                )
-                .await?;
+            self.jobs.enqueue(&transaction, tenant, &job, EnqueueOptions::default()).await?;
         }
         transaction.commit().await?;
         tracing::warn!(user_id = %user_id, restored, "an email change was reported as not made by the owner");
@@ -288,25 +268,27 @@ mod tests {
     /// Ada đổi email sang `new_email` và xác nhận; chạy job báo. Trả token báo trong mail tới
     /// địa chỉ cũ.
     async fn change(services: &Services, ada: Uuid, new_email: &str) -> String {
+        let tenant = services.tenant.clone();
         let verifications = &services.verifications;
-        verifications.change_email(ada, PASSWORD, new_email, Language::En).await.unwrap();
+        verifications.change_email(&tenant, ada, PASSWORD, new_email, Language::En).await.unwrap();
         let confirm = token_to(services, new_email);
-        verifications.confirm(&confirm, Language::Vi).await.unwrap();
+        verifications.confirm(&tenant, &confirm, Language::Vi).await.unwrap();
         let jobs = take_jobs(services, SEND_EMAIL_CHANGED).await;
         assert_eq!(jobs.len(), 1, "one notice per confirmed change");
         let job: EmailChangedJob = serde_json::from_str(&jobs[0]).unwrap();
-        verifications.send_email_changed(&job).await.unwrap();
+        verifications.send_email_changed(&tenant, &job).await.unwrap();
         token_to(services, "ada@example.com")
     }
 
     async fn setup(test: &TestDatabase) -> (Services, Uuid) {
         let services = crate::testing::services(test).await;
+        let tenant = services.tenant.clone();
         let ada = NewUser {
             email: "ada@example.com".to_owned(),
             name: "Ada".to_owned(),
             password: Some(PASSWORD.to_owned()),
         };
-        let ada = services.users.create(Actor::system(), ada).await.unwrap();
+        let ada = services.users.create(&tenant, Actor::system(), ada).await.unwrap();
         (services, ada.id)
     }
 
@@ -316,6 +298,7 @@ mod tests {
     async fn doi_email_xep_mail_bao_dia_chi_cu() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
             change(&services, ada, "ada@new.example").await;
             let mail = services.mails.sent.lock().unwrap().last().unwrap().clone();
             assert_eq!(mail.to, "ada@example.com");
@@ -326,7 +309,7 @@ mod tests {
             // Xác nhận hỏng (người khác lấy địa chỉ trong lúc chờ): rollback, không có mail báo.
             let verifications = &services.verifications;
             verifications
-                .change_email(ada, PASSWORD, "taken@example.com", Language::En)
+                .change_email(&tenant, ada, PASSWORD, "taken@example.com", Language::En)
                 .await
                 .unwrap();
             let pending = token_to(&services, "taken@example.com");
@@ -335,8 +318,8 @@ mod tests {
                 name: "Bob".to_owned(),
                 password: None,
             };
-            services.users.create(Actor::system(), bob).await.unwrap();
-            let error = verifications.confirm(&pending, Language::En).await.unwrap_err();
+            services.users.create(&tenant, Actor::system(), bob).await.unwrap();
+            let error = verifications.confirm(&tenant, &pending, Language::En).await.unwrap_err();
             assert_eq!(error.code(), "auth.email_taken");
             assert!(take_jobs(&services, SEND_EMAIL_CHANGED).await.is_empty());
         })
@@ -351,18 +334,20 @@ mod tests {
     async fn bao_khong_phai_toi_thu_hoi_moi_thu_va_tra_email_cu() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
             // Kẻ chiếm (biết mật khẩu) đăng nhập, gắn passkey, API key, TOTP, rồi đổi email.
             let crate::session::LoginOutcome::Tokens(tokens) =
-                services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap()
+                services.sessions.login(&tenant, "ada@example.com", PASSWORD, None).await.unwrap()
             else {
                 panic!("no second factor yet");
             };
             let mut device = SoftAuthenticator::new(7);
-            let ceremony = services.passkeys.start_registration(ada, PASSWORD).await.unwrap();
+            let ceremony =
+                services.passkeys.start_registration(&tenant, ada, PASSWORD).await.unwrap();
             let credential = device.register(&ceremony.options);
             services
                 .passkeys
-                .finish_registration(ada, ceremony.id, "Phone", &credential)
+                .finish_registration(&tenant, ada, ceremony.id, "Phone", &credential)
                 .await
                 .unwrap();
             let key = crate::api_key::NewApiKey {
@@ -373,30 +358,39 @@ mod tests {
                 second_factor: None,
             };
             let admin = autoxide_kernel::access::Principal::with_all_permissions(ada);
-            services.api_keys.create(&admin, key).await.unwrap();
-            let setup = services.mfa.start_totp(ada, "ada@example.com").await.unwrap();
+            services.api_keys.create(&tenant, &admin, key).await.unwrap();
+            let setup = services.mfa.start_totp(&tenant, ada, "ada@example.com").await.unwrap();
             let unix = u64::try_from(Utc::now().timestamp()).unwrap();
             let code = crate::mfa::service::tests::code_at(&setup.secret, unix);
-            services.mfa.confirm_totp(ada, &code).await.unwrap();
+            services.mfa.confirm_totp(&tenant, ada, &code).await.unwrap();
             let report = change(&services, ada, "thief@evil.example").await;
 
-            services.verifications.report(&report, Language::En).await.unwrap();
-            let user = services.users.get(ada).await.unwrap().unwrap();
+            services.verifications.report(&tenant, &report, Language::En).await.unwrap();
+            let user = services.users.get(&tenant, ada).await.unwrap().unwrap();
             assert_eq!(user.email, "ada@example.com");
-            assert!(services.sessions.refresh(&tokens.refresh_token).await.is_err());
-            assert!(services.sessions.login("ada@example.com", PASSWORD, None).await.is_err());
-            assert!(services.sessions.login("thief@evil.example", PASSWORD, None).await.is_err());
+            assert!(services.sessions.refresh(&tenant, &tokens.refresh_token).await.is_err());
+            assert!(
+                services.sessions.login(&tenant, "ada@example.com", PASSWORD, None).await.is_err()
+            );
+            assert!(
+                services
+                    .sessions
+                    .login(&tenant, "thief@evil.example", PASSWORD, None)
+                    .await
+                    .is_err()
+            );
             let page = PageRequest::first(10, Order::Asc);
-            assert!(services.api_keys.list(ada, &page).await.unwrap().data.is_empty());
-            assert!(services.passkeys.list(ada, &page).await.unwrap().data.is_empty());
-            assert!(!services.mfa.status(ada).await.unwrap().totp_enabled);
+            assert!(services.api_keys.list(&tenant, ada, &page).await.unwrap().data.is_empty());
+            assert!(services.passkeys.list(&tenant, ada, &page).await.unwrap().data.is_empty());
+            assert!(!services.mfa.status(&tenant, ada).await.unwrap().totp_enabled);
             let resets = take_jobs(&services, crate::reset::SEND_RESET).await;
             assert_eq!(resets.len(), 1);
             assert!(resets[0].contains("ada@example.com"), "{}", resets[0]);
 
             // Token dùng một lần; token lạ: cùng lỗi.
             for token in [report.as_str(), "nope"] {
-                let error = services.verifications.report(token, Language::En).await.unwrap_err();
+                let error =
+                    services.verifications.report(&tenant, token, Language::En).await.unwrap_err();
                 assert_eq!(error.code(), "auth.invalid_email_change_report_token");
             }
         })
@@ -410,20 +404,23 @@ mod tests {
     async fn dia_chi_cu_da_bi_nguoi_khac_lay() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
             let report = change(&services, ada, "ada@new.example").await;
             let bob = NewUser {
                 email: "ada@example.com".to_owned(),
                 name: "Bob".to_owned(),
                 password: Some(PASSWORD.to_owned()),
             };
-            services.users.create(Actor::system(), bob).await.unwrap();
-            services.verifications.report(&report, Language::En).await.unwrap();
-            let user = services.users.get(ada).await.unwrap().unwrap();
+            services.users.create(&tenant, Actor::system(), bob).await.unwrap();
+            services.verifications.report(&tenant, &report, Language::En).await.unwrap();
+            let user = services.users.get(&tenant, ada).await.unwrap().unwrap();
             assert_eq!(user.email, "ada@new.example");
-            assert!(services.sessions.login("ada@new.example", PASSWORD, None).await.is_err());
+            assert!(
+                services.sessions.login(&tenant, "ada@new.example", PASSWORD, None).await.is_err()
+            );
             assert!(take_jobs(&services, crate::reset::SEND_RESET).await.is_empty());
             // Bob không bị gì.
-            services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap();
+            services.sessions.login(&tenant, "ada@example.com", PASSWORD, None).await.unwrap();
         })
         .await
         .unwrap();
@@ -434,10 +431,11 @@ mod tests {
     async fn bao_dong_thoi_chi_mot_ben_duoc() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
             let report = change(&services, ada, "ada@new.example").await;
             let (first, second) = tokio::join!(
-                services.verifications.report(&report, Language::En),
-                services.verifications.report(&report, Language::En),
+                services.verifications.report(&tenant, &report, Language::En),
+                services.verifications.report(&tenant, &report, Language::En),
             );
             assert_eq!(usize::from(first.is_ok()) + usize::from(second.is_ok()), 1);
         })
@@ -449,6 +447,7 @@ mod tests {
     async fn token_bao_het_han_thi_khong_dung_duoc() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
             let report = change(&services, ada, "ada@new.example").await;
             use sea_orm::ConnectionTrait as _;
             use sea_orm::sea_query::{Alias, Query};
@@ -457,7 +456,8 @@ mod tests {
                 .value(Alias::new("expires_at"), Utc::now() - chrono::Duration::minutes(1))
                 .to_owned();
             services.database.write().execute(&expire).await.unwrap();
-            let error = services.verifications.report(&report, Language::En).await.unwrap_err();
+            let error =
+                services.verifications.report(&tenant, &report, Language::En).await.unwrap_err();
             assert_eq!(error.code(), "auth.invalid_email_change_report_token");
         })
         .await

@@ -8,6 +8,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -177,11 +178,12 @@ async fn list_permissions(
 )]
 async fn list_roles(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<RoleResponse>, Error> {
     principal.require(&ROLES_READ)?;
-    let page = state.roles.list(&PageRequest::try_from(query)?).await?;
+    let page = state.roles.list(&tenant, &PageRequest::try_from(query)?).await?;
     Ok(page.map(RoleResponse::from))
 }
 
@@ -205,11 +207,12 @@ async fn list_roles(
 )]
 async fn create_role(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<RoleRequest>,
 ) -> Result<Created<RoleResponse>, Error> {
     principal.require(&ROLES_MANAGE)?;
-    let role = state.roles.create(Actor::from(&principal), input.into()).await?;
+    let role = state.roles.create(&tenant, Actor::from(&principal), input.into()).await?;
     Ok(Created::new(format!("/auth/roles/{}", role.id), role.into()))
 }
 
@@ -232,11 +235,12 @@ async fn create_role(
 )]
 async fn get_role(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<RoleResponse>, Error> {
     principal.require(&ROLES_READ)?;
-    let role = state.roles.get(id).await?;
+    let role = state.roles.get(&tenant, id).await?;
     Ok(Tagged { version: role.updated_at, data: role.into() })
 }
 
@@ -264,6 +268,7 @@ async fn get_role(
 )]
 async fn replace_role(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
@@ -271,7 +276,8 @@ async fn replace_role(
 ) -> Result<Tagged<RoleResponse>, Error> {
     principal.require(&ROLES_MANAGE)?;
     let expected = if_match.expected()?;
-    let role = state.roles.update(Actor::from(&principal), id, input.into(), expected).await?;
+    let role =
+        state.roles.update(&tenant, Actor::from(&principal), id, input.into(), expected).await?;
     Ok(Tagged { version: role.updated_at, data: role.into() })
 }
 
@@ -295,11 +301,12 @@ async fn replace_role(
 )]
 async fn delete_role(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
     principal.require(&ROLES_MANAGE)?;
-    state.roles.delete(Actor::from(&principal), id).await?;
+    state.roles.delete(&tenant, Actor::from(&principal), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -322,11 +329,12 @@ async fn delete_role(
 )]
 async fn get_user_roles(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<Vec<RoleResponse>>, Error> {
     principal.require(&USERS_READ)?;
-    Ok(roles(state.roles.user_roles(id).await?))
+    Ok(roles(state.roles.user_roles(&tenant, id).await?))
 }
 
 /// Replace the roles of a user.
@@ -352,12 +360,15 @@ async fn get_user_roles(
 )]
 async fn replace_user_roles(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     ValidJson(input): ValidJson<UserRolesRequest>,
 ) -> Result<Data<Vec<RoleResponse>>, Error> {
     principal.require(&ROLES_MANAGE)?;
-    Ok(roles(state.roles.set_user_roles(Actor::from(&principal), id, input.role_ids).await?))
+    Ok(roles(
+        state.roles.set_user_roles(&tenant, Actor::from(&principal), id, input.role_ids).await?,
+    ))
 }
 
 #[cfg(test)]
@@ -374,6 +385,7 @@ mod tests {
     async fn chua_co_quyen_thi_bi_tu_choi_admin_thi_lam_duoc_het() {
         TestDatabase::run(async |test| {
             let (app, services) = app(test).await;
+            let tenant = services.tenant.clone();
             let ada = bearer(&app, "ada@example.com", PASSWORD).await;
 
             // Chưa có role nào: đăng nhập được nhưng không làm được gì.
@@ -384,10 +396,16 @@ mod tests {
             assert_eq!(status, StatusCode::UNAUTHORIZED);
 
             // Cho Ada role `admin` (như lệnh CLI tạo người dùng đầu tiên sẽ làm).
-            let page = services.roles.list(&PageRequest::first(10, Order::Asc)).await.unwrap();
+            let page =
+                services.roles.list(&tenant, &PageRequest::first(10, Order::Asc)).await.unwrap();
             let admin = page.data.iter().find(|role| role.all_permissions).unwrap();
-            let user = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
-            services.roles.set_user_roles(Actor::system(), user.id, vec![admin.id]).await.unwrap();
+            let user =
+                services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap();
+            services
+                .roles
+                .set_user_roles(&tenant, Actor::system(), user.id, vec![admin.id])
+                .await
+                .unwrap();
 
             let (status, _, me) = call(&app, "GET", "/me", Some(&ada), None).await;
             assert_eq!(status, StatusCode::OK, "{me}");
@@ -440,9 +458,11 @@ mod tests {
     async fn role_co_permission_nao_thi_lam_duoc_dung_viec_do() {
         TestDatabase::run(async |test| {
             let (app, services) = app(test).await;
+            let tenant = services.tenant.clone();
             let reader = services
                 .roles
                 .create(
+                    &tenant,
                     Actor::system(),
                     crate::role::RoleInput {
                         name: "reader".to_owned(),
@@ -452,8 +472,13 @@ mod tests {
                 )
                 .await
                 .unwrap();
-            let user = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
-            services.roles.set_user_roles(Actor::system(), user.id, vec![reader.id]).await.unwrap();
+            let user =
+                services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap();
+            services
+                .roles
+                .set_user_roles(&tenant, Actor::system(), user.id, vec![reader.id])
+                .await
+                .unwrap();
             let ada = bearer(&app, "ada@example.com", PASSWORD).await;
 
             let (status, _, _) = call(&app, "GET", "/roles", Some(&ada), None).await;

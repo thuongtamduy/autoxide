@@ -9,10 +9,11 @@ pub(crate) mod api_key {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
+        /// Khách sở hữu dòng (bước 33).
+        pub tenant_id: Uuid,
         pub user_id: Uuid,
         pub name: String,
         pub prefix: String,
-        #[sea_orm(unique)]
         pub key_hash: String,
         pub expires_at: Option<DateTimeUtc>,
         pub last_used_at: Option<DateTimeUtc>,
@@ -20,6 +21,12 @@ pub(crate) mod api_key {
     }
 
     impl ActiveModelBehavior for ActiveModel {}
+
+    impl autoxide_kernel::tenancy::TenantScoped for Entity {
+        fn tenant_column() -> Self::Column {
+            Column::TenantId
+        }
+    }
 }
 
 pub(crate) mod api_key_permission {
@@ -31,9 +38,17 @@ pub(crate) mod api_key_permission {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
+        /// Khách sở hữu dòng (bước 33).
+        pub tenant_id: Uuid,
         pub api_key_id: Uuid,
         pub permission: String,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
+
+    impl autoxide_kernel::tenancy::TenantScoped for Entity {
+        fn tenant_column() -> Self::Column {
+            Column::TenantId
+        }
+    }
 }

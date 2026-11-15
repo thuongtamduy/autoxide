@@ -18,8 +18,8 @@ pub(crate) struct OperatorRecovery {
 }
 
 impl OperatorRecovery {
-    async fn account(&self, email: &str) -> Result<User, Error> {
-        self.users.find_by_email(email).await?.ok_or_else(|| {
+    async fn account(&self, tenant: &TenantContext, email: &str) -> Result<User, Error> {
+        self.users.find_by_email(tenant, email).await?.ok_or_else(|| {
             Error::not_found(
                 "auth.account_not_found",
                 "There is no account with the email {email}.",
@@ -31,21 +31,21 @@ impl OperatorRecovery {
 
 #[async_trait::async_trait]
 impl AccountRecovery for OperatorRecovery {
-    async fn reset_mfa(&self, _tenant: &TenantContext, email: &str) -> Result<User, Error> {
-        let user = self.account(email).await?;
+    async fn reset_mfa(&self, tenant: &TenantContext, email: &str) -> Result<User, Error> {
+        let user = self.account(tenant, email).await?;
         // Người vận hành máy chủ, tức "hệ thống"; event ghi `by_administrator`.
-        self.mfa.reset(Actor::system(), user.id).await?;
+        self.mfa.reset(tenant, Actor::system(), user.id).await?;
         tracing::info!(user_id = %user.id, "two-step sign-in turned off by the server operator");
         Ok(user)
     }
 
     async fn remove_passkeys(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
         email: &str,
     ) -> Result<(User, u64), Error> {
-        let user = self.account(email).await?;
-        let removed = self.passkeys.remove_all_for(Actor::system(), user.id).await?;
+        let user = self.account(tenant, email).await?;
+        let removed = self.passkeys.remove_all_for(tenant, Actor::system(), user.id).await?;
         Ok((user, removed))
     }
 }
@@ -61,24 +61,20 @@ mod tests {
     async fn nguoi_van_hanh_go_mfa_va_passkey_theo_email() {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
+            let tenant = services.tenant.clone();
             let account = NewAccount {
                 email: "ada@example.com".to_owned(),
                 name: "Ada".to_owned(),
                 password: None,
                 admin: true,
             };
-            let ada = Accounts::create(
-                services.users.as_ref(),
-                &TenantContext::legacy_default(&services.database),
-                account,
-            )
-            .await
-            .unwrap();
-            let setup = services.mfa.start_totp(ada.id, "ada@example.com").await.unwrap();
+            let ada =
+                Accounts::create(services.users.as_ref(), &services.tenant, account).await.unwrap();
+            let setup = services.mfa.start_totp(&tenant, ada.id, "ada@example.com").await.unwrap();
             let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
             let code = crate::mfa::service::tests::code_at(&setup.secret, now);
-            services.mfa.confirm_totp(ada.id, &code).await.unwrap();
-            assert!(services.mfa.status(ada.id).await.unwrap().totp_enabled);
+            services.mfa.confirm_totp(&tenant, ada.id, &code).await.unwrap();
+            assert!(services.mfa.status(&tenant, ada.id).await.unwrap().totp_enabled);
 
             let recovery = OperatorRecovery {
                 users: services.users.clone(),
@@ -86,64 +82,39 @@ mod tests {
                 passkeys: services.passkeys.clone(),
             };
             assert_eq!(
-                recovery
-                    .reset_mfa(
-                        &TenantContext::legacy_default(&services.database),
-                        " ADA@example.com "
-                    )
-                    .await
-                    .unwrap()
-                    .id,
+                recovery.reset_mfa(&services.tenant, " ADA@example.com ").await.unwrap().id,
                 ada.id
             );
-            assert!(!services.mfa.status(ada.id).await.unwrap().totp_enabled);
-            let missing = recovery
-                .reset_mfa(&TenantContext::legacy_default(&services.database), "ghost@example.com")
-                .await
-                .unwrap_err();
+            assert!(!services.mfa.status(&tenant, ada.id).await.unwrap().totp_enabled);
+            let missing =
+                recovery.reset_mfa(&services.tenant, "ghost@example.com").await.unwrap_err();
             assert_eq!(missing.code(), "auth.account_not_found");
 
             // Gỡ passkey (đặc tả 32 B2).
             let pass = "correct horse battery staple";
             services
                 .users
-                .set_initial_password(Actor::system(), ada.id, pass.to_owned())
+                .set_initial_password(&tenant, Actor::system(), ada.id, pass.to_owned())
                 .await
                 .unwrap();
             let mut device = crate::passkey::testing::SoftAuthenticator::new(4);
-            let ceremony = services.passkeys.start_registration(ada.id, pass).await.unwrap();
+            let ceremony =
+                services.passkeys.start_registration(&tenant, ada.id, pass).await.unwrap();
             let credential = device.register(&ceremony.options);
             services
                 .passkeys
-                .finish_registration(ada.id, ceremony.id, "Phone", &credential)
+                .finish_registration(&tenant, ada.id, ceremony.id, "Phone", &credential)
                 .await
                 .unwrap();
-            let (user, removed) = recovery
-                .remove_passkeys(
-                    &TenantContext::legacy_default(&services.database),
-                    "ada@example.com",
-                )
-                .await
-                .unwrap();
+            let (user, removed) =
+                recovery.remove_passkeys(&services.tenant, "ada@example.com").await.unwrap();
             assert_eq!((user.id, removed), (ada.id, 1));
             assert_eq!(
-                recovery
-                    .remove_passkeys(
-                        &TenantContext::legacy_default(&services.database),
-                        "ada@example.com"
-                    )
-                    .await
-                    .unwrap()
-                    .1,
+                recovery.remove_passkeys(&services.tenant, "ada@example.com").await.unwrap().1,
                 0
             );
-            let missing = recovery
-                .remove_passkeys(
-                    &TenantContext::legacy_default(&services.database),
-                    "ghost@example.com",
-                )
-                .await
-                .unwrap_err();
+            let missing =
+                recovery.remove_passkeys(&services.tenant, "ghost@example.com").await.unwrap_err();
             assert_eq!(missing.code(), "auth.account_not_found");
         })
         .await

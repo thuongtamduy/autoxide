@@ -8,7 +8,6 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
@@ -25,7 +24,7 @@ use crate::role::RoleService;
 use crate::token;
 use crate::user::UserService;
 use autoxide_kernel::event::{Actor, Outbox};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use serde_json::json;
 
 /// Mọi API key bắt đầu bằng chuỗi này: nhìn là biết đây là API key (không phải access
@@ -90,7 +89,6 @@ pub(crate) enum Reauth {
 }
 
 pub(crate) struct ApiKeyService {
-    database: Database,
     users: Arc<UserService>,
     roles: Arc<RoleService>,
     sessions: Arc<crate::session::SessionService>,
@@ -101,7 +99,6 @@ pub(crate) struct ApiKeyService {
 
 impl ApiKeyService {
     pub(crate) fn new(
-        database: Database,
         users: Arc<UserService>,
         roles: Arc<RoleService>,
         sessions: Arc<crate::session::SessionService>,
@@ -109,12 +106,13 @@ impl ApiKeyService {
         mfa: Arc<crate::mfa::MfaService>,
         passkeys: Arc<crate::passkey::PasskeyService>,
     ) -> Self {
-        ApiKeyService { database, users, roles, sessions, outbox, mfa, passkeys }
+        ApiKeyService { users, roles, sessions, outbox, mfa, passkeys }
     }
 
     /// Tạo key cho `creator`, với permission nằm trong số permission `creator` đang có.
     pub(crate) async fn create(
         &self,
+        tenant: &TenantContext,
         creator: &Principal,
         input: NewApiKey,
     ) -> Result<CreatedApiKey, Error> {
@@ -150,10 +148,13 @@ impl ApiKeyService {
         };
         let user_id = creator.user_id();
         let verified_hash = match &input.second_factor {
-            None => Some(self.sessions.check_password(user_id, &input.current_password).await?.1),
+            None => {
+                let current = &input.current_password;
+                Some(self.sessions.check_password(tenant, user_id, current).await?.1)
+            }
             Some(Reauth::Totp(code)) => {
                 // Lỗi "mã sai" của MFA chỉ ô `code`; ở đây ô tên là `totp_code`.
-                self.mfa.reauthenticate(user_id, code).await.map_err(|error| {
+                self.mfa.reauthenticate(tenant, user_id, code).await.map_err(|error| {
                     if error.kind() == ErrorKind::Validation {
                         let fields = error
                             .fields()
@@ -172,13 +173,14 @@ impl ApiKeyService {
                 None
             }
             Some(Reauth::Passkey { ceremony_id, credential }) => {
-                self.passkeys.reauthenticate(user_id, *ceremony_id, credential).await?;
+                self.passkeys.reauthenticate(tenant, user_id, *ceremony_id, credential).await?;
                 None
             }
         };
         let existing = api_key::Entity::find()
             .filter(api_key::Column::UserId.eq(user_id))
-            .count(self.database.read())
+            .scoped(tenant)
+            .count(tenant.database().read())
             .await?;
         if existing >= MAX_KEYS_PER_USER {
             return Err(Error::conflict(
@@ -191,15 +193,17 @@ impl ApiKeyService {
         let secret = format!("{API_KEY_PREFIX}{}", token::random_token(KEY_BYTES)?);
         let prefix: String = secret.chars().take(PREFIX_LENGTH).collect();
         let id = Uuid::now_v7();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         // Mật khẩu vừa kiểm phải còn là mật khẩu hiện tại: đặt lại mật khẩu xen giữa thì không
         // tạo key (D-156).
-        if !crate::session::lock_grant(&transaction, user_id, verified_hash.as_deref()).await? {
+        let verified = verified_hash.as_deref();
+        if !crate::session::lock_grant(&transaction, tenant, user_id, verified).await? {
             transaction.rollback().await?;
             return Err(crate::user::invalid_credentials());
         }
         api_key::ActiveModel {
             id: Set(id),
+            tenant_id: Set(tenant.id().as_uuid()),
             user_id: Set(user_id),
             name: Set(name.clone()),
             prefix: Set(prefix.clone()),
@@ -213,6 +217,7 @@ impl ApiKeyService {
         for permission in &permissions {
             api_key_permission::ActiveModel {
                 id: Set(Uuid::now_v7()),
+                tenant_id: Set(tenant.id().as_uuid()),
                 api_key_id: Set(id),
                 permission: Set(permission.clone()),
             }
@@ -228,13 +233,7 @@ impl ApiKeyService {
         });
         let event = events::ApiKeyCreated { before: None, after: Some(after) };
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                Actor::from(creator),
-                key_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, Actor::from(creator), key_subject(id), &event)
             .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, api_key_id = %id, "API key created");
@@ -254,14 +253,16 @@ impl ApiKeyService {
     /// Một trang key của người dùng `user_id`, mới tạo trước (mặc định).
     pub(crate) async fn list(
         &self,
+        tenant: &TenantContext,
         user_id: Uuid,
         page: &PageRequest,
     ) -> Result<Page<ApiKey>, Error> {
-        let connection = self.database.read();
-        let select = api_key::Entity::find().filter(api_key::Column::UserId.eq(user_id));
+        let connection = tenant.database().read();
+        let select =
+            api_key::Entity::find().filter(api_key::Column::UserId.eq(user_id)).scoped(tenant);
         let page = fetch_page(select, api_key::Column::Id, |row| row.id, page, connection).await?;
         let mut permissions =
-            permissions_of(connection, page.data.iter().map(|row| row.id)).await?;
+            permissions_of(connection, tenant, page.data.iter().map(|row| row.id)).await?;
         Ok(page.map(|row| {
             let granted = permissions.remove(&row.id).unwrap_or_default();
             to_api_key(row, granted)
@@ -272,19 +273,20 @@ impl ApiKeyService {
     /// `auth.api_keys.manage` (D-272).
     pub(crate) async fn list_all(
         &self,
+        tenant: &TenantContext,
         caller: &Principal,
         owner: Option<Uuid>,
         page: &PageRequest,
     ) -> Result<Page<ApiKey>, Error> {
         caller.require(&crate::permissions::API_KEYS_MANAGE)?;
-        let connection = self.database.read();
-        let mut select = api_key::Entity::find();
+        let connection = tenant.database().read();
+        let mut select = api_key::Entity::find().scoped(tenant);
         if let Some(owner) = owner {
             select = select.filter(api_key::Column::UserId.eq(owner));
         }
         let page = fetch_page(select, api_key::Column::Id, |row| row.id, page, connection).await?;
         let mut permissions =
-            permissions_of(connection, page.data.iter().map(|row| row.id)).await?;
+            permissions_of(connection, tenant, page.data.iter().map(|row| row.id)).await?;
         Ok(page.map(|row| {
             let granted = permissions.remove(&row.id).unwrap_or_default();
             to_api_key(row, granted)
@@ -292,25 +294,36 @@ impl ApiKeyService {
     }
 
     /// Thu hồi key `id` của bất kỳ ai. Cần `auth.api_keys.manage`; event ghi người thu hồi.
-    pub(crate) async fn revoke_any(&self, caller: &Principal, id: Uuid) -> Result<(), Error> {
+    pub(crate) async fn revoke_any(
+        &self,
+        tenant: &TenantContext,
+        caller: &Principal,
+        id: Uuid,
+    ) -> Result<(), Error> {
         caller.require(&crate::permissions::API_KEYS_MANAGE)?;
-        self.revoke_where(caller, id, None).await
+        self.revoke_where(tenant, caller, id, None).await
     }
 
     /// Thu hồi (xoá) key `id` của bên gọi. Key thôi dùng được ngay.
-    pub(crate) async fn revoke(&self, caller: &Principal, id: Uuid) -> Result<(), Error> {
-        self.revoke_where(caller, id, Some(caller.user_id())).await
+    pub(crate) async fn revoke(
+        &self,
+        tenant: &TenantContext,
+        caller: &Principal,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        self.revoke_where(tenant, caller, id, Some(caller.user_id())).await
     }
 
     /// Thu hồi key `id`; `owner`: chỉ khi key là của người này.
     async fn revoke_where(
         &self,
+        tenant: &TenantContext,
         caller: &Principal,
         id: Uuid,
         owner: Option<Uuid>,
     ) -> Result<(), Error> {
-        let transaction = self.database.begin_write().await?;
-        let mut find = api_key::Entity::find_by_id(id);
+        let transaction = tenant.database().begin_write().await?;
+        let mut find = api_key::Entity::find_by_id(id).scoped(tenant);
         if let Some(owner) = owner {
             find = find.filter(api_key::Column::UserId.eq(owner));
         }
@@ -319,29 +332,30 @@ impl ApiKeyService {
                 .with_param("id", id)
         })?;
         let user_id = row.user_id;
-        api_key::Entity::delete_by_id(id).exec(&transaction).await?;
+        api_key::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         let before = json!({"user_id": user_id, "name": row.name, "prefix": row.prefix});
         let event = events::ApiKeyRevoked { before: Some(before), after: None };
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                Actor::from(caller),
-                key_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, Actor::from(caller), key_subject(id), &event)
             .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, api_key_id = %id, "API key revoked");
         Ok(())
     }
 
-    /// Bên gọi của một request mang API key `secret`.
-    pub(crate) async fn authenticate(&self, secret: &str) -> Result<Principal, Error> {
+    /// Bên gọi của một request mang API key `secret`, tra ở khách `tenant`.
+    // B12b: credential mang khách — key mới mang ID khách để chọn database trước khi tra bản băm;
+    // nay bên gọi (`RequestAuthenticator`) đưa khách mặc định.
+    pub(crate) async fn authenticate(
+        &self,
+        tenant: &TenantContext,
+        secret: &str,
+    ) -> Result<Principal, Error> {
         let now = now();
         let row = api_key::Entity::find()
             .filter(api_key::Column::KeyHash.eq(token::sha256(secret)))
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(invalid_api_key)?;
         if row.expires_at.is_some_and(|expires_at| expires_at <= now) {
@@ -350,26 +364,27 @@ impl ApiKeyService {
                 "This API key has expired. Create a new one.",
             ));
         }
-        let user = self.users.get(row.user_id).await?.ok_or_else(invalid_api_key)?;
+        let user = self.users.get(tenant, row.user_id).await?.ok_or_else(invalid_api_key)?;
         if !user.is_active() {
             return Err(crate::user::user_disabled());
         }
-        let owner = self.roles.principal(user.id).await?;
+        let owner = self.roles.principal(tenant, user.id).await?;
         let granted = api_key_permission::Entity::find()
             .filter(api_key_permission::Column::ApiKeyId.eq(row.id))
-            .all(self.database.read())
+            .scoped(tenant)
+            .all(tenant.database().read())
             .await?
             .into_iter()
             .map(|row| row.permission)
             .filter(|permission| owner.allows(permission));
-        let principal = Principal::new(user.id, granted).via_api_key(row.id);
-        self.touch(&row, now).await;
+        let principal = Principal::new(user.id, granted).via_api_key(row.id).in_tenant(tenant.id());
+        self.touch(tenant, &row, now).await;
         Ok(principal)
     }
 
     /// Ghi lần dùng gần nhất, nhiều nhất một lần mỗi phút. Hỏng thì chỉ ghi log: không
     /// từ chối một request hợp lệ vì một dòng thống kê.
-    async fn touch(&self, row: &api_key::Model, now: DateTime<Utc>) {
+    async fn touch(&self, tenant: &TenantContext, row: &api_key::Model, now: DateTime<Utc>) {
         let stale = now - chrono::Duration::seconds(LAST_USED_RESOLUTION_SECONDS);
         if row.last_used_at.is_some_and(|last| last > stale) {
             return;
@@ -383,7 +398,8 @@ impl ApiKeyService {
                     .add(api_key::Column::LastUsedAt.is_null())
                     .add(api_key::Column::LastUsedAt.lte(stale)),
             )
-            .exec(self.database.write())
+            .scoped(tenant)
+            .exec(tenant.database().write())
             .await;
         if let Err(error) = result {
             tracing::warn!(api_key_id = %row.id, error = %error, "cannot record API key use");
@@ -451,10 +467,12 @@ impl ApiKeyService {
 /// Permission của từng key trong `key_ids`, một câu truy vấn cho cả danh sách.
 async fn permissions_of<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     key_ids: impl IntoIterator<Item = Uuid>,
 ) -> Result<HashMap<Uuid, Vec<String>>, Error> {
     let rows = api_key_permission::Entity::find()
         .filter(api_key_permission::Column::ApiKeyId.is_in(key_ids))
+        .scoped(tenant)
         .order_by_asc(api_key_permission::Column::Permission)
         .all(connection)
         .await?;
@@ -504,10 +522,13 @@ pub(crate) async fn revoke_all_in<C: ConnectionTrait>(
     actor: Actor,
     user_id: Uuid,
 ) -> Result<u64, Error> {
-    let rows =
-        api_key::Entity::find().filter(api_key::Column::UserId.eq(user_id)).all(connection).await?;
+    let rows = api_key::Entity::find()
+        .filter(api_key::Column::UserId.eq(user_id))
+        .scoped(tenant)
+        .all(connection)
+        .await?;
     for row in &rows {
-        api_key::Entity::delete_by_id(row.id).exec(connection).await?;
+        api_key::Entity::delete_by_id(row.id).scoped(tenant).exec(connection).await?;
         let before = json!({"user_id": user_id, "name": row.name, "prefix": row.prefix});
         let event = events::ApiKeyRevoked { before: Some(before), after: None };
         outbox.record(connection, tenant, actor, key_subject(row.id), &event).await?;
@@ -530,22 +551,18 @@ mod tests {
     /// Người dùng `ada` có role cấp `auth.users.read` và `auth.roles.read`.
     async fn setup(test: &TestDatabase) -> (Services, Principal) {
         let services = crate::testing::services(test).await;
+        let tenant = services.tenant.clone();
         let ada = NewAccount {
             email: "ada@example.com".to_owned(),
             name: "Ada".to_owned(),
             password: Some(PASSWORD.to_owned()),
             admin: false,
         };
-        let ada = Accounts::create(
-            services.users.as_ref(),
-            &TenantContext::legacy_default(&services.database),
-            ada,
-        )
-        .await
-        .unwrap();
+        let ada = Accounts::create(services.users.as_ref(), &services.tenant, ada).await.unwrap();
         let role = services
             .roles
             .create(
+                &tenant,
                 Actor::system(),
                 RoleInput {
                     name: "reader".to_owned(),
@@ -555,8 +572,12 @@ mod tests {
             )
             .await
             .unwrap();
-        services.roles.set_user_roles(Actor::system(), ada.id, vec![role.id]).await.unwrap();
-        let principal = services.roles.principal(ada.id).await.unwrap();
+        services
+            .roles
+            .set_user_roles(&tenant, Actor::system(), ada.id, vec![role.id])
+            .await
+            .unwrap();
+        let principal = services.roles.principal(&tenant, ada.id).await.unwrap();
         (services, principal)
     }
 
@@ -576,15 +597,19 @@ mod tests {
     async fn tao_key_roi_xac_thuc_bang_no() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
 
-            let created =
-                services.api_keys.create(&ada, new_key(&["auth.users.read"])).await.unwrap();
+            let created = services
+                .api_keys
+                .create(&tenant, &ada, new_key(&["auth.users.read"]))
+                .await
+                .unwrap();
 
             assert!(created.secret.starts_with("axk_"));
             assert_eq!(created.secret.len(), 4 + 43);
             assert!(created.secret.starts_with(&created.key.prefix));
             assert_eq!(created.key.permissions, ["auth.users.read"]);
-            let principal = services.api_keys.authenticate(&created.secret).await.unwrap();
+            let principal = services.api_keys.authenticate(&tenant, &created.secret).await.unwrap();
             assert_eq!(principal.user_id(), ada.user_id());
             assert_eq!(principal.api_key_id(), Some(created.key.id));
             // Key chỉ có đúng những gì ghi trên nó, dù chủ key có nhiều hơn.
@@ -593,7 +618,7 @@ mod tests {
 
             let page = services
                 .api_keys
-                .list(ada.user_id(), &PageRequest::first(10, Order::Desc))
+                .list(&tenant, ada.user_id(), &PageRequest::first(10, Order::Desc))
                 .await
                 .unwrap();
             assert_eq!(page.data.len(), 1);
@@ -607,6 +632,7 @@ mod tests {
     async fn key_khong_vuot_quyen_chu_key() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
             let past = Utc::now() - chrono::Duration::hours(1);
             let input = NewApiKey {
                 name: " ".to_owned(),
@@ -620,7 +646,7 @@ mod tests {
                 second_factor: None,
             };
 
-            let error = services.api_keys.create(&ada, input).await.unwrap_err();
+            let error = services.api_keys.create(&tenant, &ada, input).await.unwrap_err();
 
             let fields: Vec<(&str, &str)> =
                 error.fields().iter().map(|f| (f.field.as_str(), f.code.as_str())).collect();
@@ -633,7 +659,7 @@ mod tests {
                     ("expires_at", "past"),
                 ]
             );
-            let empty = services.api_keys.create(&ada, new_key(&[])).await.unwrap_err();
+            let empty = services.api_keys.create(&tenant, &ada, new_key(&[])).await.unwrap_err();
             assert_eq!(empty.fields()[0].field, "permissions");
         })
         .await
@@ -644,16 +670,29 @@ mod tests {
     async fn chu_key_mat_quyen_hay_bi_khoa_thi_key_mat_theo() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
-            let created =
-                services.api_keys.create(&ada, new_key(&["auth.users.read"])).await.unwrap();
+            let tenant = services.tenant.clone();
+            let created = services
+                .api_keys
+                .create(&tenant, &ada, new_key(&["auth.users.read"]))
+                .await
+                .unwrap();
 
-            services.roles.set_user_roles(Actor::system(), ada.user_id(), vec![]).await.unwrap();
-            let after_role = services.api_keys.authenticate(&created.secret).await.unwrap();
+            services
+                .roles
+                .set_user_roles(&tenant, Actor::system(), ada.user_id(), vec![])
+                .await
+                .unwrap();
+            let after_role =
+                services.api_keys.authenticate(&tenant, &created.secret).await.unwrap();
             assert!(!after_role.allows("auth.users.read"));
 
             let disable = UserChanges { name: None, disabled: Some(true) };
-            services.users.update(Actor::system(), ada.user_id(), disable, None).await.unwrap();
-            let error = services.api_keys.authenticate(&created.secret).await.unwrap_err();
+            services
+                .users
+                .update(&tenant, Actor::system(), ada.user_id(), disable, None)
+                .await
+                .unwrap();
+            let error = services.api_keys.authenticate(&tenant, &created.secret).await.unwrap_err();
             assert_eq!(error.code(), "auth.user_disabled");
         })
         .await
@@ -664,29 +703,32 @@ mod tests {
     async fn thu_hoi_va_het_han() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
             let keys = &services.api_keys;
-            let revoked = keys.create(&ada, new_key(&["auth.users.read"])).await.unwrap();
-            let expiring = keys.create(&ada, new_key(&["auth.users.read"])).await.unwrap();
+            let revoked = keys.create(&tenant, &ada, new_key(&["auth.users.read"])).await.unwrap();
+            let expiring = keys.create(&tenant, &ada, new_key(&["auth.users.read"])).await.unwrap();
 
             // Người khác không thu hồi được key của Ada.
-            let other =
-                keys.revoke(&Principal::new(Uuid::now_v7(), []), revoked.key.id).await.unwrap_err();
+            let other = keys
+                .revoke(&tenant, &Principal::new(Uuid::now_v7(), []), revoked.key.id)
+                .await
+                .unwrap_err();
             assert_eq!(other.code(), "auth.api_key_not_found");
-            keys.revoke(&ada, revoked.key.id).await.unwrap();
-            let error = keys.authenticate(&revoked.secret).await.unwrap_err();
+            keys.revoke(&tenant, &ada, revoked.key.id).await.unwrap();
+            let error = keys.authenticate(&tenant, &revoked.secret).await.unwrap_err();
             assert_eq!(error.kind(), ErrorKind::Unauthenticated);
             assert_eq!(error.code(), "auth.invalid_api_key");
 
             api_key::Entity::update_many()
                 .col_expr(api_key::Column::ExpiresAt, Expr::value(Some(now())))
                 .filter(api_key::Column::Id.eq(expiring.key.id))
-                .exec(keys.database.write())
+                .exec(tenant.database().write())
                 .await
                 .unwrap();
-            let error = keys.authenticate(&expiring.secret).await.unwrap_err();
+            let error = keys.authenticate(&tenant, &expiring.secret).await.unwrap_err();
             assert_eq!(error.code(), "auth.api_key_expired");
             assert_eq!(
-                keys.authenticate("axk_nope").await.unwrap_err().code(),
+                keys.authenticate(&tenant, "axk_nope").await.unwrap_err().code(),
                 "auth.invalid_api_key"
             );
         })
@@ -698,13 +740,17 @@ mod tests {
     async fn api_key_khong_tao_duoc_api_key() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
-            let created =
-                services.api_keys.create(&ada, new_key(&["auth.users.read"])).await.unwrap();
-            let via_key = services.api_keys.authenticate(&created.secret).await.unwrap();
+            let tenant = services.tenant.clone();
+            let created = services
+                .api_keys
+                .create(&tenant, &ada, new_key(&["auth.users.read"]))
+                .await
+                .unwrap();
+            let via_key = services.api_keys.authenticate(&tenant, &created.secret).await.unwrap();
 
             let error = services
                 .api_keys
-                .create(&via_key, new_key(&["auth.users.read"]))
+                .create(&tenant, &via_key, new_key(&["auth.users.read"]))
                 .await
                 .unwrap_err();
 
@@ -721,14 +767,19 @@ mod tests {
     async fn dung_key_dong_thoi() {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
-            let created =
-                services.api_keys.create(&ada, new_key(&["auth.users.read"])).await.unwrap();
+            let tenant = services.tenant.clone();
+            let created = services
+                .api_keys
+                .create(&tenant, &ada, new_key(&["auth.users.read"]))
+                .await
+                .unwrap();
 
             let attempts: Vec<_> = (0..8)
                 .map(|_| {
                     let keys = services.api_keys.clone();
                     let secret = created.secret.clone();
-                    tokio::spawn(async move { keys.authenticate(&secret).await })
+                    let tenant = tenant.clone();
+                    tokio::spawn(async move { keys.authenticate(&tenant, &secret).await })
                 })
                 .collect();
             for attempt in attempts {

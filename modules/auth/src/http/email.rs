@@ -7,6 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::State;
 use axum::http::StatusCode;
 use serde::Deserialize;
@@ -68,10 +69,11 @@ pub(crate) struct EmailChangeReport {
 )]
 async fn resend_verification(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     language: Language,
 ) -> Result<StatusCode, Error> {
-    state.verifications.send_current(principal.user_id(), language).await?;
+    state.verifications.send_current(&tenant, principal.user_id(), language).await?;
     Ok(StatusCode::ACCEPTED)
 }
 
@@ -103,6 +105,7 @@ async fn resend_verification(
 )]
 async fn change_email(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     language: Language,
     ValidJson(input): ValidJson<ChangeEmailRequest>,
@@ -110,7 +113,13 @@ async fn change_email(
     super::require_session(&principal)?;
     state
         .verifications
-        .change_email(principal.user_id(), &input.current_password, &input.new_email, language)
+        .change_email(
+            &tenant,
+            principal.user_id(),
+            &input.current_password,
+            &input.new_email,
+            language,
+        )
         .await?;
     Ok(StatusCode::ACCEPTED)
 }
@@ -134,9 +143,10 @@ async fn change_email(
 )]
 async fn cancel_email_change(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
 ) -> Result<StatusCode, Error> {
-    state.verifications.cancel_change(principal.user_id()).await?;
+    state.verifications.cancel_change(&tenant, principal.user_id()).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -161,11 +171,14 @@ async fn cancel_email_change(
 )]
 async fn confirm_email(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     language: Language,
     ValidJson(input): ValidJson<VerificationConfirmation>,
 ) -> Result<Data<UserResponse>, Error> {
-    let user = state.verifications.confirm(&input.token, language).await?;
-    Ok(Data { data: super::users::describe(&state.users, user).await? })
+    // B12b: credential mang khách — token trong link xác minh email;
+    // tạm dùng khách của request (tên miền / header).
+    let user = state.verifications.confirm(&tenant, &input.token, language).await?;
+    Ok(Data { data: super::users::describe(&state.users, &tenant, user).await? })
 }
 
 /// Report an email change you did not make.
@@ -190,10 +203,13 @@ async fn confirm_email(
 )]
 async fn report_email_change(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     language: Language,
     ValidJson(input): ValidJson<EmailChangeReport>,
 ) -> Result<StatusCode, Error> {
-    state.verifications.report(&input.token, language).await?;
+    // B12b: credential mang khách — token trong link báo "không phải tôi";
+    // tạm dùng khách của request (tên miền / header).
+    state.verifications.report(&tenant, &input.token, language).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

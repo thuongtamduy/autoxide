@@ -4,6 +4,7 @@
 //! [`CHALLENGE_TTL_SECONDS`], dùng một lần, cho sai tối đa [`MAX_ATTEMPTS`] lần.
 
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
@@ -27,8 +28,9 @@ mod entity {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
+        /// Khách sở hữu dòng (bước 33).
+        pub tenant_id: Uuid,
         pub user_id: Uuid,
-        #[sea_orm(unique)]
         pub token_hash: String,
         pub attempts: i32,
         pub expires_at: DateTimeUtc,
@@ -36,17 +38,25 @@ mod entity {
     }
 
     impl ActiveModelBehavior for ActiveModel {}
+
+    impl autoxide_kernel::tenancy::TenantScoped for Entity {
+        fn tenant_column() -> Self::Column {
+            Column::TenantId
+        }
+    }
 }
 
 /// Mở một lượt cho `user_id`; trả về `mfa_token` (chỉ lần này).
 pub(crate) async fn open<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     user_id: Uuid,
     now: DateTime<Utc>,
 ) -> Result<String, Error> {
     let mfa_token = token::random_token(32)?;
     entity::ActiveModel {
         id: Set(Uuid::now_v7()),
+        tenant_id: Set(tenant.id().as_uuid()),
         user_id: Set(user_id),
         token_hash: Set(token::sha256(&mfa_token)),
         attempts: Set(0),
@@ -63,11 +73,13 @@ pub(crate) async fn open<C: ConnectionTrait>(
 /// cùng lúc không vượt được [`MAX_ATTEMPTS`] lần đoán (D-079).
 pub(crate) async fn claim_attempt<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     mfa_token: &str,
     now: DateTime<Utc>,
 ) -> Result<(Uuid, Uuid), Error> {
     let row = Entity::find()
         .filter(Column::TokenHash.eq(token::sha256(mfa_token)))
+        .scoped(tenant)
         .one(connection)
         .await?
         .ok_or_else(invalid_mfa_token)?;
@@ -76,6 +88,7 @@ pub(crate) async fn claim_attempt<C: ConnectionTrait>(
         .filter(Column::Id.eq(row.id))
         .filter(Column::Attempts.lt(MAX_ATTEMPTS))
         .filter(Column::ExpiresAt.gt(now))
+        .scoped(tenant)
         .exec(connection)
         .await?;
     if claimed.rows_affected == 0 {
@@ -86,17 +99,27 @@ pub(crate) async fn claim_attempt<C: ConnectionTrait>(
 
 /// Dùng hết lượt (đã nhập đúng). `false` nếu request khác vừa dùng nó: mỗi lượt cấp
 /// token đúng một lần.
-pub(crate) async fn consume<C: ConnectionTrait>(connection: &C, id: Uuid) -> Result<bool, Error> {
-    let deleted = Entity::delete_many().filter(Column::Id.eq(id)).exec(connection).await?;
+pub(crate) async fn consume<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    id: Uuid,
+) -> Result<bool, Error> {
+    let deleted =
+        Entity::delete_many().filter(Column::Id.eq(id)).scoped(tenant).exec(connection).await?;
     Ok(deleted.rows_affected == 1)
 }
 
 /// Xoá mọi lượt chờ của `user_id`.
 pub(crate) async fn drop_for_user<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     user_id: Uuid,
 ) -> Result<(), Error> {
-    Entity::delete_many().filter(Column::UserId.eq(user_id)).exec(connection).await?;
+    Entity::delete_many()
+        .filter(Column::UserId.eq(user_id))
+        .scoped(tenant)
+        .exec(connection)
+        .await?;
     Ok(())
 }
 

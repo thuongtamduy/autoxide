@@ -12,7 +12,8 @@ pub struct Model {
     // UUIDv7 sinh trong ứng dụng, không để database tự tăng.
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
-    #[sea_orm(unique)]
+    /// Khách sở hữu dòng (bước 33).
+    pub tenant_id: Uuid,
     pub email: String,
     pub name: String,
     pub password_hash: Option<String>,
@@ -27,6 +28,12 @@ pub struct Model {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl autoxide_kernel::tenancy::TenantScoped for Entity {
+    fn tenant_column() -> Self::Column {
+        Column::TenantId
+    }
+}
 
 impl From<Model> for User {
     fn from(model: Model) -> Self {

@@ -232,6 +232,14 @@ permission `auth.passkeys.manage` (`DELETE /api/v1/auth/users/{id}/passkeys`).
 sudo -u autoxide autoxide user remove-passkeys --email you@example.com
 ```
 
+These three commands act on the default tenant. With several tenants
+(`AUTOXIDE_TENANCY_MODE=multi`), add `--tenant <slug>` to act on the account of another tenant,
+for example its first administrator:
+
+```bash
+sudo -u autoxide autoxide user create --tenant acme --email owner@acme.example --name "Owner" --admin
+```
+
 ### 4. Run as a service
 
 `/etc/systemd/system/autoxide.service`:

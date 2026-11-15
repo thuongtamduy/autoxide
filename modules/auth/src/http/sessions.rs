@@ -9,6 +9,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -107,12 +108,13 @@ pub(crate) struct EndedSessionsResponse {
 )]
 async fn list_sessions(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<SessionResponse>, Error> {
     super::require_session(&principal)?;
     let page = PageRequest::try_from(query)?;
-    let sessions = state.sessions.list_sessions(principal.user_id(), &page).await?;
+    let sessions = state.sessions.list_sessions(&tenant, principal.user_id(), &page).await?;
     Ok(sessions.map(SessionResponse::from))
 }
 
@@ -137,11 +139,12 @@ async fn list_sessions(
 )]
 async fn end_session(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
     super::require_session(&principal)?;
-    state.sessions.revoke_session(principal.user_id(), id).await?;
+    state.sessions.revoke_session(&tenant, principal.user_id(), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -165,13 +168,16 @@ async fn end_session(
 )]
 async fn end_sessions(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<EndSessionsQuery>,
 ) -> Result<Data<EndedSessionsResponse>, Error> {
     super::require_session(&principal)?;
     let user_id = principal.user_id();
-    let ended =
-        state.sessions.revoke_sessions(Actor::from(&principal), user_id, query.keep).await?;
+    let ended = state
+        .sessions
+        .revoke_sessions(&tenant, Actor::from(&principal), user_id, query.keep)
+        .await?;
     Ok(Data { data: EndedSessionsResponse { ended } })
 }
 
@@ -196,19 +202,19 @@ async fn end_sessions(
 )]
 async fn end_user_sessions(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<EndedSessionsResponse>, Error> {
     principal.require(&USERS_MANAGE)?;
-    state.users.get(id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
-    state.roles.require_covers(&principal, id).await?;
-    let ended = state.sessions.revoke_sessions(Actor::from(&principal), id, None).await?;
+    state.users.get(&tenant, id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
+    state.roles.require_covers(&tenant, &principal, id).await?;
+    let ended = state.sessions.revoke_sessions(&tenant, Actor::from(&principal), id, None).await?;
     Ok(Data { data: EndedSessionsResponse { ended } })
 }
 
 #[cfg(test)]
 mod tests {
-    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::{Value, json};
@@ -279,23 +285,19 @@ mod tests {
     async fn quan_tri_vien_dang_xuat_moi_phien_cua_nguoi_dung() {
         TestDatabase::run(async |test| {
             let (app, services) = app(test).await;
+            let tenant = services.tenant.clone();
             let root = NewAccount {
                 email: "root@example.com".to_owned(),
                 name: "Root".to_owned(),
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(
-                services.users.as_ref(),
-                &TenantContext::legacy_default(&services.database),
-                root,
-            )
-            .await
-            .unwrap();
+            Accounts::create(services.users.as_ref(), &services.tenant, root).await.unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let (ada, ada_tokens) = sign_in(&app, "Phone").await;
             sign_in(&app, "Laptop").await;
-            let ada_id = services.users.find_by_email("ada@example.com").await.unwrap().unwrap().id;
+            let ada_id =
+                services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap().id;
 
             // Người không có quyền thì không được; người dùng thường không đụng được admin.
             let path = format!("/users/{ada_id}/sessions");

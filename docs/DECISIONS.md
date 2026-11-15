@@ -7010,3 +7010,23 @@ Khách chọn được bằng header `autoxide-tenant` (ngoài tên miền). End
 nội dung): một cache dùng chung đứng trước API (CDN, reverse proxy) không biết header này sẽ trả bản của khách này cho
 khách khác. Kernel thêm `autoxide-tenant` vào `Vary` của mọi response (cả lỗi và 304), giữ các giá trị `Vary` đã có.
 Một lớp ở kernel thay cho việc mỗi module tự nhớ — áp cho cả endpoint của module sau này.
+
+## D-285 · `auth` theo khách, lượt dữ liệu: bảng, role `admin` gieo mỗi khách, TOTP lưu mã hoá, CLI `--tenant` (bước 33 B12a) — 2026-11-15 — agent quyết
+
+- 12 bảng `auth_*` mang `tenant_id`, migration `m0026_tenancy`: email, tên role, băm key / refresh token / lượt MFA,
+  credential passkey, TOTP của người dùng duy nhất **trong khách** (cùng email ở hai khách được); index thường có
+  `tenant_id` đứng đầu; index hạn dùng của refresh token / lượt passkey thành `_sweep_idx` (job dọn mỗi giờ quét cả
+  database); thêm `auth_mfa_challenge_user_idx`, `auth_mfa_challenge_expires_sweep_idx`,
+  `auth_passkey_ceremony_user_idx` (đổi mật khẩu và job dọn dùng). Khoá chính giữ `id`, foreign key trong `auth` giữ.
+  `down` của `adopt` dựng lại bảng theo tên index hiện tại, nên `m0026` bọc `adopt` và tự đặt lại tên index cũ khi
+  `down` (để `down` của migration cũ chạy được) — module đầu tiên cần.
+- Secret TOTP lưu bằng `Sealer` (D-257), mục đích `auth.totp_secret`, dữ liệu đi kèm khách + ID dòng; chỉ mở khi kiểm
+  mã. Upgrade `u0001_seal_totp` mã hoá secret cũ (chạy lại được, có `down`); `m0027_widen_totp_secret` đổi cột thành
+  `text` trên Postgres. Bản backup sau `migrate up` không còn secret TOTP dạng đọc được. Căn cứ: Luật Bảo vệ dữ liệu
+  cá nhân 91/2025/QH15 + NĐ 356/2025/NĐ-CP (hiệu lực 01/01/2026) về biện pháp bảo vệ dữ liệu — cần đối chiếu điều khoản
+  cụ thể với người có chuyên môn pháp lý.
+- Khách mới được gieo role `admin` (mọi permission; bỏ qua nếu khách đã có role mọi quyền). Đăng nhập, đăng ký, xin
+  đặt lại mật khẩu lấy khách theo request (tên miền / header). `autoxide user create | reset-mfa | remove-passkeys`
+  nhận `--tenant <slug>` (bỏ trống: khách mặc định).
+- Chưa xong ở lượt này (B12b): access token, API key, refresh token và token trong link mail chưa mang khách — bộ xác
+  thực còn tra ở khách mặc định (chỗ đánh dấu `// B12b` trong code).
