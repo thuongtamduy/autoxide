@@ -286,3 +286,30 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/promotions
 | [ ] | Hãng vận chuyển | `GET/POST /carrier-accounts`, `PATCH /{id}`, `POST /{id}/test`; `check_status`, `checked_at`, `last_error`, `capabilities`, `secret_set_at` | 44 |
 | [ ] | Vận chuyển | Mã lỗi mới: `shipping.discrepancy_not_found`, `discrepancy_resolved`, `calendar_exists`, `parcel_count`, `days_range`, `outside_area`, `weight_out_of_range`, `no_pickup_point`, `carrier_name_taken` | mới |
 | [ ] | Vận chuyển | Danh mục tỉnh / xã cho ô địa chỉ | 34 (`address`) |
+
+## Tài chính › Kế toán (`/finance`)
+
+Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/finance.ts`, `finance-invoices.ts`, `tax.ts`, trừ chỗ ghi khác.
+
+| | Màn | Cần | Bước |
+|---|---|---|---|
+| [ ] | Sổ cái | `GET /ledger/books`, `/accounts`, `/entries` (kèm `reversed_by_entry_id`, seal, `channel`), `GET /entries/{id}` | 36 |
+| [ ] | Sổ cái | `POST /ledger/entries`, `POST /entries/{id}/reverse` | 36 |
+| [ ] | Sổ cái | `GET /ledger/trial-balance?book_id=&from=&to=`; số dư phát sinh trong kỳ cho ô số liệu | 36 |
+| [ ] | Hàng chờ sai lệch | `GET /ledger/exceptions`, `POST /exceptions/{id}/resolve`, `GET/POST /reconciliations`, `GET /payments` | 36 |
+| [ ] | Hàng chờ sai lệch | Lọc thanh toán chờ theo số tiền + nút (`GET /payments?amount=&org_id=&status=`); mã `ledger.exception_not_open` | mới |
+| [ ] | Hàng chờ sai lệch | Gửi thông báo cho người mua xác nhận tài khoản nhận hoàn | mới (chưa làm) |
+| [ ] | Tài khoản ngân hàng | `GET/POST /ledger/bank-accounts`, `PATCH /bank-accounts/{id}`; mã `ledger.bank_account_taken`, `ledger.feed_not_connected` | 36 |
+| [ ] | Tài khoản ngân hàng | Thử chuỗi VietQR mà không tạo thanh toán (`POST /ledger/vietqr/preview`) | mới |
+| [ ] | Hoá đơn điện tử | `GET /invoices/documents`, `PATCH /documents/{id}`, `POST …/issue`, `/adjust`, `/replace`, `/cancel`, `DELETE` | 36 |
+| [ ] | Hoá đơn điện tử | Hỏi lại nhà cung cấp ngay (`POST /documents/{id}/refresh`); mã `invoices.document_state`, `invoices.correction_pending` | mới |
+| [ ] | Hoá đơn điện tử | Tải `GET /documents/{id}/einvoice?format=xml\|pdf`, `GET …/render` | 36 (chưa làm) |
+| [ ] | Ký hiệu và uỷ nhiệm | `GET/POST /invoices/series`, `PATCH /series/{id}`, `GET/POST /mandates`, `POST /mandates/{id}/revoke`; mã `invoices.series_taken`, `invoices.mandate_overlap` | 36 (mã lỗi: mới) |
+| [ ] | Ký hiệu và uỷ nhiệm | Đính kèm văn bản uỷ nhiệm (`document_file_id` qua media) | 36 (giao diện chỉ có ô đánh dấu) |
+| [ ] | Thuế | `GET /tax/rates`, `/packs`, `/profiles`, `PUT /profiles/{org_id}`, `POST /tax/quote` | 36 |
+| [ ] | Thuế | `GET /tax/withholding-rates`, `GET /tax/rules` | mới (bảng đã có trong đặc tả, endpoint chưa) |
+| [ ] | Thuế | GTGT đầu ra / đầu vào theo kỳ và thuế suất (`GET /tax/vat-summary?book_id=&from=&to=`) | mới |
+| [ ] | Kỳ kế toán | `GET /ledger/periods` (kèm số bút toán / đã niêm phong), `POST /periods/{id}/close` | 36 |
+| [ ] | Kỳ kế toán | Kiểm trước khi khoá; mã `ledger.period_not_ended`; kết quả kiểm chuỗi băm qua API (`GET /ledger/integrity`) | mới |
+| [ ] | Xuất kế toán | `POST /invoices/exports`, `GET /exports/{id}`, `GET /exports/{id}/download` | 36 |
+| [ ] | Xuất kế toán | Danh sách bản xuất (`GET /exports`), lập lại bản lỗi (`POST /exports/{id}/retry`) | mới |
