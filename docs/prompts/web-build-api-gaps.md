@@ -91,3 +91,30 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Trình soạn | Lịch đăng mang theo `ai_reviewed` | mới | Hẹn giờ không gửi được dấu "đã duyệt" |
 | [ ] | Trình soạn | Kết quả kiểm SEO trả `message` theo `Accept-Language` | mới | Giao diện tự dịch theo `code`; mã lạ thì hiện câu tiếng Anh |
 | [ ] | Trình soạn | Tìm tác giả và danh mục theo chữ (hiện chỉ lấy một trang 200) | mới | Lấy 200 mục đầu |
+
+## Cài đặt (`/settings`, `/settings/api-keys`, `/settings/developers`)
+
+| | Màn | Cần | Bước | Giao diện đang làm gì |
+|---|---|---|---|---|
+| [ ] | Gói và thuê bao | `GET /plans/subscription`, `/entitlements` (hạn mức kèm `used`, `over_limit`), `/catalog`, `/billing-periods`, `GET/PUT /billing-profile`, `POST /subscription/change`, `/cancel`, `/resume`; trả kèm tên gói và giá | 35 | Dữ liệu mẫu (`src/sample/settings.ts`) |
+| [ ] | Gói và thuê bao | `POST /billing-periods/{id}/pay` (trả tiền qua cổng của nhà vận hành) | 35 | Chưa có nút "Trả tiền" |
+| [ ] | Tên miền | `GET/POST/DELETE /kernel/domains`, `POST /{id}/verify` | 33 | Dữ liệu mẫu (`src/sample/settings.ts`) |
+| [ ] | Tên miền | Gắn tên miền với nút: `PATCH /kernel/domains/{id} {org_id}` | 33, 34 | Chỉ hiện nút, chưa đổi được |
+| [ ] | Kết nối đối tác | `GET /kernel/settings`, `PUT/DELETE /settings/{name}`; tên setting theo nhà cung cấp (SMS, cổng thanh toán, hoá đơn điện tử) | 33 (tên setting: 36, 39) | Dữ liệu mẫu (`src/sample/settings.ts`) |
+| [ ] | Kết nối đối tác | `POST /kernel/settings/{name}/test`, `last_used_at`, `last_error` | mới (đề xuất ở `ui-trace-roadmap.md`, chưa vào lộ trình) | Dữ liệu mẫu |
+| [ ] | Kết nối đối tác | "Địa chỉ công khai" dùng trong link email, theo khách | mới | Chưa dựng |
+| [ ] | Job | `GET /kernel/jobs?status=` (theo khách, tóm tắt, tiến độ, người yêu cầu), `POST /jobs/{id}/retry` có audit | 52 | Dữ liệu mẫu (`src/sample/settings.ts`); core hiện chỉ có lệnh CLI `autoxide jobs` |
+| [ ] | Webhook | `EndpointResponse` trả lần giao gần nhất (trạng thái, lúc, HTTP); lọc endpoint theo trạng thái | mới | Gọi `/deliveries?limit=1` cho từng endpoint; lọc trên trang đang xem |
+| [ ] | Webhook | Mô tả event theo `Accept-Language` | mới | Hiện tiếng Anh cả khi chọn tiếng Việt |
+| [ ] | Nhà phát triển › Webhook | Danh sách lần giao xuyên endpoint có lọc; gửi lại một lần giao | 52 | Gộp `/webhooks/{id}/deliveries` (25 lần mỗi endpoint); chưa có "Gửi lại" |
+| [ ] | Nhật ký audit | `actor_kind` (người / agent / dịch vụ / hỗ trợ nền tảng) và tham số lọc `actor_kind=` | 51, 52 | Chưa có chip lọc theo loại người làm |
+| [ ] | Nhật ký audit | Mục audit trả kèm tên người làm (hoặc `include=actor`) | mới | Gọi `GET /auth/users/{id}` cho mỗi người trên trang; không có quyền thì hiện mã rút gọn |
+| [ ] | API key | `kind` của key (người, agent, dịch vụ) | 51 | Chưa hiện loại key |
+| [ ] | API key | Quản trị viên xem và thu hồi key của mọi người trong khách | mới | Chỉ key của chính mình |
+| [ ] | API key | Xác nhận lại bằng passkey hoặc TOTP thay cho mật khẩu khi tạo key | mới | Chỉ mật khẩu |
+| [ ] | Tạo API key | Sổ permission đọc được khi không có `auth.roles.read` (vd `GET /me/permissions` kèm mô tả) | mới | Chỉ thấy tên permission, không có mô tả |
+| [ ] | Chờ duyệt | `GET /kernel/approvals`, `POST /approvals/{id}/approve`, `/reject` | 51 | Dữ liệu mẫu (`src/sample/agent.ts`) |
+| [ ] | Nhật ký gọi tool MCP | Nhật ký các lần agent gọi tool | 51, 52 | Dữ liệu mẫu (`src/sample/agent.ts`) |
+| [ ] | Kết nối MCP | Core công bố địa chỉ công khai (`AUTOXIDE_HTTP_PUBLIC_URL`) | mới | Dùng `AUTOXIDE_API_URL` của giao diện |
+| [ ] | Nhà phát triển › Request | `GET /kernel/requests?status_class=&api_key_id=` | 52 | Dữ liệu mẫu (`src/sample/devtools.ts`) |
+| [ ] | Nhà phát triển › Event theo bản ghi | `GET /kernel/records/{kind}/{id}/events` | 52 | Dữ liệu mẫu (`src/sample/devtools.ts`) |
