@@ -118,9 +118,19 @@ pub struct Extras {
     /// Bản dịch thông báo lỗi (mặc định: chỉ bản dịch của kernel thì dùng
     /// `Translations::new(Vec::new())`; rỗng thì mọi lỗi bằng tiếng Anh).
     pub translations: Translations,
+    /// Sổ database của bản cài (bước 33): handler nhận
+    /// [`TenantContext`](crate::tenancy::TenantContext) dùng nó. `None`: handler cần khách trả
+    /// lỗi 500 nói rõ thiếu gì.
+    pub tenancy: Option<crate::tenancy::DatabaseRegistry>,
 }
 
 impl Extras {
+    /// Sets the database registry (tenancy).
+    pub fn tenancy(mut self, registry: crate::tenancy::DatabaseRegistry) -> Self {
+        self.tenancy = Some(registry);
+        self
+    }
+
     /// Sets the authenticator a module published.
     pub fn authenticator(mut self, authenticator: Option<Arc<dyn Authenticator>>) -> Self {
         self.authenticator = authenticator;
@@ -207,6 +217,10 @@ pub fn build(
         router = router.merge(mcp);
     }
 
+    if let Some(registry) = extras.tenancy {
+        // Sổ database trong "extensions" của mọi request, nơi extractor `TenantContext` tìm nó.
+        router = router.layer(Extension(registry));
+    }
     if let Some(authenticator) = limited {
         // Đặt bộ xác thực vào "extensions" của mọi request, nơi extractor
         // `Principal` tìm nó.
@@ -326,6 +340,7 @@ fn cors(origins: &CorsOrigins) -> CorsLayer {
             header::RANGE,
             idempotency::IDEMPOTENCY_KEY,
             REQUEST_ID_HEADER,
+            crate::tenancy::TENANT_HEADER,
             // Header của giao thức MCP (endpoint `/mcp`).
             HeaderName::from_static("mcp-protocol-version"),
             HeaderName::from_static("mcp-session-id"),

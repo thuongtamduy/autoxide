@@ -25,6 +25,7 @@ use uuid::Uuid;
 
 use crate::error::Error;
 use crate::module::is_identifier;
+use crate::tenancy::{DEFAULT_TENANT, TenantHint, TenantId};
 
 /// Một permission do module khai.
 ///
@@ -187,6 +188,10 @@ pub struct Principal {
     grants: Grants,
     /// ID của API key, khi request đến bằng API key thay vì phiên đăng nhập.
     api_key: Option<Uuid>,
+    /// Khách của bên gọi (bước 33): khách mặc định trừ khi credential mang khách khác.
+    tenant: TenantId,
+    /// Khách nền tảng của nhân sự đang vào khách khác qua header `Autoxide-Tenant`.
+    operator_from: Option<TenantId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -203,12 +208,46 @@ impl Principal {
             user_id,
             grants: Grants::Only(Arc::new(permissions.into_iter().collect())),
             api_key: None,
+            tenant: DEFAULT_TENANT,
+            operator_from: None,
         }
     }
 
     /// Người dùng `user_id` có mọi permission.
     pub fn with_all_permissions(user_id: Uuid) -> Self {
-        Principal { user_id, grants: Grants::All, api_key: None }
+        Principal {
+            user_id,
+            grants: Grants::All,
+            api_key: None,
+            tenant: DEFAULT_TENANT,
+            operator_from: None,
+        }
+    }
+
+    /// Bên gọi thuộc khách `tenant` (bộ xác thực đặt theo khách trong credential).
+    pub fn in_tenant(mut self, tenant: TenantId) -> Self {
+        self.tenant = tenant;
+        self
+    }
+
+    /// Khách của request: khách của credential, hay khách nhân sự nền tảng đang vào.
+    pub fn tenant_id(&self) -> TenantId {
+        self.tenant
+    }
+
+    /// Khách nền tảng của nhân sự đang vào khách khác (`Autoxide-Tenant`); `None` khi gọi trong
+    /// chính khách của mình.
+    pub fn operator_from(&self) -> Option<TenantId> {
+        self.operator_from
+    }
+
+    /// Nhân sự nền tảng vào khách `target`: quyền giữ nguyên, khách của request đổi.
+    pub fn operating(mut self, target: TenantId) -> Self {
+        if target != self.tenant {
+            self.operator_from = Some(self.tenant);
+            self.tenant = target;
+        }
+        self
     }
 
     /// Đánh dấu request đến bằng API key `id`.
@@ -273,9 +312,15 @@ impl Principal {
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait Authenticator: Send + Sync {
-    /// `authorization` là nguyên giá trị header (`None` khi không có). Lỗi trả về
-    /// thường là 401 (thiếu, sai, hết hạn) hoặc 403 (tài khoản bị khoá).
-    async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error>;
+    /// `authorization` là nguyên giá trị header (`None` khi không có); `hint` là khách mà request
+    /// nhắm tới (tên miền, header `Autoxide-Tenant`) — credential cấp trước bước 33 không mang khách,
+    /// bộ xác thực dùng nó để biết tìm ở database nào. Lỗi trả về thường là 401 (thiếu, sai, hết
+    /// hạn) hoặc 403 (tài khoản bị khoá).
+    async fn authenticate(
+        &self,
+        authorization: Option<&str>,
+        hint: &TenantHint,
+    ) -> Result<Principal, Error>;
 }
 
 /// Hỏi "tài khoản này đã xác thực (số điện thoại / định danh) để đăng nội dung chưa" — điểm nối
@@ -364,9 +409,10 @@ impl<S: Send + Sync> FromRequestParts<S> for Principal {
                      `dyn Authenticator`; register the `auth` module",
                 )
             })?;
-        let authorization =
-            parts.headers.get(header::AUTHORIZATION).and_then(|value| value.to_str().ok());
-        authenticator.authenticate(authorization).await
+        // Xác thực và kiểm khách của credential với tên miền / header (bước 33). `Box::pin`: future
+        // này lồng nhiều tầng (bộ xác thực, sổ database); đóng hộp để future của mọi handler nhận
+        // `Principal` không phình theo, tránh vượt giới hạn độ sâu của trình biên dịch.
+        Box::pin(crate::tenancy::request::authenticate(&authenticator, parts)).await
     }
 }
 

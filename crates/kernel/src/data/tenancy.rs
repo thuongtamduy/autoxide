@@ -16,6 +16,7 @@
 
 mod config;
 mod registry;
+pub(crate) mod request;
 pub(crate) mod schema;
 
 use std::fmt;
@@ -29,6 +30,7 @@ use crate::error::Error;
 
 pub use config::{TenancyConfig, WorkerPlacements};
 pub use registry::DatabaseRegistry;
+pub use request::{TENANT_HEADER, TenantHint};
 
 pub(crate) use config::read_setting;
 

@@ -50,7 +50,13 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         let _ = database.close().await;
         return Err(error);
     }
-    if let Err(error) = modules.start(&database) {
+    // Sổ database: chế độ (`AUTOXIDE_TENANCY_MODE`) và các placement (bước 33).
+    let registry = autoxide_kernel::tenancy::DatabaseRegistry::new(
+        database.clone(),
+        config.database.clone(),
+        config.tenancy.clone(),
+    );
+    if let Err(error) = modules.start_in(&registry) {
         // Đóng kết nối trước khi báo lỗi; lỗi khởi động quan trọng hơn lỗi lúc đóng.
         let _ = database.close().await;
         return Err(error.to_string());
@@ -107,13 +113,16 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
     } else {
         (Vec::new(), None, Vec::new())
     };
-    let extras = http::Extras::default()
+    let mut extras = http::Extras::default()
         .authenticator(authenticator)
         .idempotency(modules.api::<dyn IdempotencyStore>())
         .translations(modules.translations().clone())
         .deprecations(modules.deprecations())
         .body_limits(modules.body_limits())
         .tools(tools);
+    if let Some(registry) = modules.tenancy() {
+        extras = extras.tenancy(registry);
+    }
     let api = http::build(&config.http, root, routes, extras);
     Ok(Runtime { config, database, modules, api, dispatcher, worker, draining })
 }

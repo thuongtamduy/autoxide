@@ -145,7 +145,11 @@ struct FakeAuthenticator;
 
 #[async_trait::async_trait]
 impl Authenticator for FakeAuthenticator {
-    async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
+    async fn authenticate(
+        &self,
+        authorization: Option<&str>,
+        _: &autoxide_kernel::tenancy::TenantHint,
+    ) -> Result<Principal, Error> {
         match authorization {
             Some("Bearer admin") => Ok(Principal::new(
                 Uuid::nil(),
