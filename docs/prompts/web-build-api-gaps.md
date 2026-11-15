@@ -41,7 +41,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Ctrl K | Tìm dữ liệu xuyên phân hệ (đơn, bài viết, người dùng…), tìm không dấu, theo quyền | 51 (`FinderSource`) | Chỉ tìm tên màn để "Đi tới" |
 | [ ] | `/` Tổng quan | Hộp việc, số liệu tóm tắt, hoạt động gần đây | 51 | Hộp việc, số liệu, các bước thiết lập, doanh thu hôm nay, hoạt động (audit thật); phần chưa có API là dữ liệu mẫu (W-020) |
 | [ ] | Góc trên bên trái | Khách hàng và nút tổ chức đang chọn, đổi phạm vi | 33, 34 | Hiện "Autoxide Quản trị", chưa đổi phạm vi được |
-| [ ] | Menu tài khoản: giao diện sáng / tối | Lưu lựa chọn theo tài khoản để theo người dùng sang thiết bị khác. Nên gộp vào `/me/preferences` của bước 37 | mới (gộp vào 37) | Lưu cookie `ax_theme` trên từng trình duyệt; có thể dùng `/me/flags` (v0.14.0) mà không cần API mới |
+| [x] | Menu tài khoản: giao diện sáng / tối | Lưu lựa chọn theo tài khoản để theo người dùng sang thiết bị khác | v0.14.0 (`/me/flags`) | Cờ `ui.theme`, đặt lại cookie khi đăng nhập (W-024 của web) |
 | [ ] | Nút "?" (trợ giúp theo trang) | Bài hướng dẫn theo trang (tiêu đề, tóm tắt, link) do core hay module khai, theo `Accept-Language` | mới | Danh sách viết cứng ở `src/help/pages.ts`, 8 trang |
 | [ ] | Nút "?" › Có gì mới | Nguồn tin "Có gì mới" theo phiên bản core và module đang chạy | mới | Danh sách viết cứng ở `src/help/whats-new.ts`; mốc đã xem lưu ở `/me/flags` (`whatsnew.seen`) |
 | [ ] | Nút ⓘ của số liệu | Trường `definition` của `GET /kernel/summary` (D-207) | 51 (P4) | Chưa có nút ⓘ cho số liệu; câu cách tính hiện dưới khối |
