@@ -79,6 +79,12 @@ enum Command {
     /// database (modules build their services) but does not need migrations.
     Openapi,
 
+    /// Print the contract of every MCP tool (name, permissions, input schema, deprecation) as JSON.
+    ///
+    /// Kept in `docs/mcp-tools.json`; `cargo xtask api-diff` refuses breaking changes to it.
+    /// Connects to the database (modules build their services) but does not need migrations.
+    McpManifest,
+
     /// Restore a backup made by `autoxide backup` into a new, empty database.
     ///
     /// Restores into the database of `DATABASE_URL` (which gets every migration first)
@@ -120,6 +126,7 @@ fn main() -> ExitCode {
         Command::Jobs(arguments) => commands::jobs::run(&arguments),
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
         Command::Openapi => commands::openapi::run(),
+        Command::McpManifest => commands::mcp_manifest::run(),
         Command::Restore(arguments) => commands::backup::restore(&arguments),
         Command::Serve => commands::serve::run(),
         Command::Task(arguments) => commands::task::run(&arguments),

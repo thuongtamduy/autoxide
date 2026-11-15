@@ -123,6 +123,13 @@ Route nằm trong `src/http.rs`, đăng ký bằng `OpenApiRouter::routes(routes
   `description` cho mọi response kèm `code` lỗi. Doc comment trên handler và kiểu schema
   viết tiếng Anh, cho người gọi API.
 - Thay đổi phá vỡ: thêm endpoint mới và khai endpoint cũ trong `Module::deprecations`.
+  Gate (`cargo xtask api-diff`) so `docs/openapi.json` với bản phát hành gần nhất và từ chối
+  thay đổi phá vỡ, nêu từng chỗ và cách làm đúng.
+- Tool MCP cũng là hợp đồng, nằm ở `docs/mcp-tools.json`
+  (`cargo run -p autoxide -- mcp-manifest > docs/mcp-tools.json`). Thay đổi phá vỡ thì thêm
+  tool mới (vd `create_note_v2`) và khai tool cũ bằng
+  `Deprecation::tool("create_note", "YYYY-MM-DD").sunset(…).successor("create_note_v2")`
+  trong `Module::deprecations`: agent thấy điều đó trong `tools/list` và trong mọi kết quả.
 
 ### 6. Event và audit log
 

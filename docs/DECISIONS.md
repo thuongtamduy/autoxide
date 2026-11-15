@@ -5880,3 +5880,34 @@ Lý do:
 - Dùng `oasdiff` (Go): thêm công cụ ngoài, và không biết hai cách viết nullable của utoipa.
 - Báo đỏ khi thêm giá trị enum trong response: chặn cả việc thêm trạng thái mới hợp lệ; cảnh báo là đủ để người
   phát hành xem lại.
+
+## D-240 · Hợp đồng tool MCP: `docs/mcp-tools.json`, `Deprecation::tool`, cảnh báo trong kết quả (bước 31 A6) — 2026-11-15 — agent quyết
+
+Quyết định (chi tiết D-233 giao cho agent):
+- **Lưu deprecation của tool:** thêm trường `tool: Option<&'static str>` và hàm tạo `Deprecation::tool(name, since)`
+  vào `Deprecation` sẵn có, không đổi trường công khai cũ (hợp đồng module, D-167). Với tool, `method` / `path` không
+  dùng.
+  - `Modules::deprecations()` chỉ trả endpoint: lớp HTTP và mục `deprecations` của danh mục module không thấy tool.
+  - `Modules::tools()` gắn deprecation vào tool (`Tool::deprecation()`). Tool hay tool dùng thay không có trong
+    `tools()` của chính module thì là lỗi khởi động.
+  - Danh mục module (`ModuleTool`) có thêm trường `deprecation` (thêm trường response, không phá vỡ).
+- **Báo cho agent** (`rmcp` 3.9: `CallToolResult` có `meta` và `content` công khai):
+  - `tools/list` nối câu "Tool `x` is deprecated since …; It will be removed on …; Use `y` instead.";
+  - kết quả giữ envelope `{"data": …}`, thêm `_meta` `{"autoxide/deprecation": {since, sunset, successor}}` và một
+    đoạn văn bản "Warning: …";
+  - số đo `mcp_deprecated_tool_calls_total{tool}`. Tên tool là tập cố định do code khai, nên dùng làm nhãn được.
+- **Manifest:** `autoxide mcp-manifest` in `docs/mcp-tools.json`.
+  - Tool sắp theo tên; khoá tự sắp.
+  - `requires_approval_for_agent` luôn `false` tới bước 51.
+  - `output_schema` luôn `null`, vì `Tool` chưa khai schema kết quả.
+  - Test giữ file khớp code như `docs/openapi.json`.
+- **`cargo xtask api-diff`** so cả manifest với tag trước, mã `tool.*` theo bảng của đặc tả 31 A6. Phần so schema
+  dùng lại bộ so của A1, ánh xạ mã `request.*` / `response.*` sang `tool.*`. Tag chưa có manifest (v0.13.0 trở
+  về trước) thì bỏ qua.
+
+Lý do: không thêm hàm mới vào `Module` (D-038) và không có hai bộ so schema. Đặt cảnh báo ngoài `{"data": …}` để
+client đang đọc `data` không vỡ.
+
+Đã cân nhắc:
+- Gom `method` / `path` vào một enum đích: đổi trường công khai của `Deprecation`, phá vỡ hợp đồng Rust.
+- Thêm `Module::tool_deprecations`: thêm một hàm vào trait cho việc mà hàm sẵn có làm được.

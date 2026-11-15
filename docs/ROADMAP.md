@@ -96,7 +96,7 @@ Nhóm A — hợp đồng và người gọi API:
       permission cần, giới hạn (rate limit theo API key, bản nháp chờ duyệt — D-109)
 - [ ] Ví dụ trong tài liệu được test: các ví dụ của hai mục trên chạy thật trên app dựng bằng
       `TestApp` trong gate (hay một lệnh `xtask` gate gọi), để tài liệu không lệch code
-- [ ] Hợp đồng tool MCP (D-233): `docs/mcp-tools.json` sinh từ code, `api-diff` chặn thay đổi phá vỡ của tool
+- [x] Hợp đồng tool MCP (D-233, D-240): `docs/mcp-tools.json` sinh từ code, `api-diff` chặn thay đổi phá vỡ của tool
       (bỏ tool, thêm tham số bắt buộc, `read_only` thành ghi…), tool cũ khai deprecated như endpoint
 - [ ] `cargo semver-checks` cho kernel và testkit trong quy trình phát hành (D-233): báo cáo khi còn `0.x`, chặn
       từ `1.0` hay khi công bố framework (giữ lý do D-167)

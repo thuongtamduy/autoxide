@@ -207,13 +207,18 @@ impl Modules {
         &self.permissions
     }
 
-    /// Endpoint deprecated của mọi module: `(tên module, khai báo)`.
+    /// Endpoint deprecated của mọi module: `(tên module, khai báo)`. Không gồm tool deprecated
+    /// (chúng đi theo tool, xem [`tools`](Self::tools)).
     pub fn deprecations(&self) -> Vec<(&'static str, crate::http::Deprecation)> {
         self.modules
             .iter()
             .flat_map(|module| {
                 let name = module.name();
-                module.deprecations().into_iter().map(move |deprecation| (name, deprecation))
+                module
+                    .deprecations()
+                    .into_iter()
+                    .filter(|deprecation| !deprecation.is_tool())
+                    .map(move |deprecation| (name, deprecation))
             })
             .collect()
     }
@@ -227,8 +232,41 @@ impl Modules {
         let mut seen = std::collections::BTreeSet::new();
         for module in &self.modules {
             let name = module.name();
-            for tool in module.tools() {
-                let tool = tool.qualify(name);
+            let declared = module.tools();
+            let short: Vec<String> = declared.iter().map(|tool| tool.name().to_owned()).collect();
+            let deprecated: Vec<crate::http::Deprecation> = module
+                .deprecations()
+                .into_iter()
+                .filter(|deprecation| deprecation.is_tool())
+                .collect();
+            // Tool deprecated và tool dùng thay phải có trong `tools()` của chính module.
+            for deprecation in &deprecated {
+                for (role, tool) in
+                    [("deprecation", deprecation.tool), ("successor", deprecation.successor)]
+                {
+                    if let Some(tool) = tool
+                        && !short.iter().any(|known| known == tool)
+                    {
+                        problems.push(format!(
+                            "module `{name}` declares a tool {role} `{tool}`, but it has no such \
+                             tool in Module::tools"
+                        ));
+                    }
+                }
+            }
+            for tool in declared {
+                let mut tool = tool.qualify(name);
+                if let Some(deprecation) = deprecated.iter().find(|deprecation| {
+                    deprecation.tool.is_some_and(|short| tool.name() == format!("{name}.{short}"))
+                }) {
+                    tool = tool.deprecated(crate::mcp::ToolDeprecation {
+                        since: deprecation.since.to_owned(),
+                        sunset: deprecation.sunset.map(str::to_owned),
+                        successor: deprecation
+                            .successor
+                            .map(|successor| format!("{name}.{successor}")),
+                    });
+                }
                 problems.extend(tool.problems(name));
                 for permission in tool.permission().into_iter().chain(tool.alternative()) {
                     if !self.permissions.contains(permission.name()) {

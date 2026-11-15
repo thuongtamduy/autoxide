@@ -114,7 +114,33 @@ fn hint(rule: &str, detail: &str) -> String {
             "The variants of a oneOf / anyOf changed in a way that cannot be shown to be safe. \
              Keep the old variants, or add a new endpoint."
         }
-        _ => "See docs/steps/31-api-contract.md (A1).",
+        "tool.removed" => {
+            "Keep it working; declare it in Module::deprecations (Deprecation::tool) with a sunset \
+             date and add the replacement as a new tool, e.g. `<name>_v2` (D-233, D-240). It may be \
+             removed after the sunset date."
+        }
+        "tool.parameter_added_required" | "tool.parameter_became_required" => {
+            "Agents built for the old version do not send it. Make it optional, or add a new tool."
+        }
+        "tool.parameter_removed" => {
+            "Tool inputs refuse unknown fields, so agents that send it now fail. Keep accepting it, \
+             or add a new tool."
+        }
+        "tool.parameter_type_changed" | "tool.constraint_tightened" => {
+            "Values the old version accepted are now refused. Keep accepting them, or add a new tool."
+        }
+        "tool.no_longer_read_only" => {
+            "Clients call read-only tools without asking the user. Keep it read-only and add a new \
+             tool that writes."
+        }
+        "tool.approval_added" => {
+            "Agents running unattended now get `approval_required`. Add a new tool that needs \
+             approval instead."
+        }
+        "tool.result_property_removed" | "tool.result_changed" => {
+            "Agents read this result as before. Keep it, or add a new tool."
+        }
+        _ => "See docs/steps/31-api-contract.md (A1, A6).",
     };
     format!("{detail}. {fix}")
 }
@@ -869,6 +895,139 @@ fn content(value: &Value) -> BTreeMap<&str, Option<&Value>> {
         .unwrap_or_default()
 }
 
+/// So hai manifest tool MCP (`docs/mcp-tools.json`, D-233). Tool ghép theo tên; schema đầu vào so
+/// theo chiều request, schema kết quả theo chiều response, bằng cùng bộ so của OpenAPI.
+pub fn diff_tools(old: &Value, new: &Value, today: NaiveDate) -> Report {
+    let mut report = Report::default();
+    let index = |manifest: &Value| -> BTreeMap<String, Value> {
+        manifest
+            .get("tools")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|tool| Some((tool.get("name")?.as_str()?.to_owned(), tool.clone())))
+            .collect()
+    };
+    let (old_tools, new_tools) = (index(old), index(new));
+    for (name, old_tool) in &old_tools {
+        let Some(new_tool) = new_tools.get(name) else {
+            let sunset = old_tool
+                .pointer("/deprecation/sunset")
+                .and_then(Value::as_str)
+                .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok());
+            match sunset {
+                Some(sunset) if sunset <= today => report.push(
+                    Level::Note,
+                    "",
+                    name.clone(),
+                    format!("tool removed after its sunset date {sunset}"),
+                ),
+                _ => report.breaking_at(
+                    "tool.removed",
+                    name.clone(),
+                    "This tool of the base version is gone",
+                ),
+            }
+            continue;
+        };
+        let flag = |tool: &Value, key: &str| {
+            tool.pointer(&format!("/annotations/{key}")).and_then(Value::as_bool) == Some(true)
+        };
+        if flag(old_tool, "read_only") && !flag(new_tool, "read_only") {
+            report.breaking_at(
+                "tool.no_longer_read_only",
+                name.clone(),
+                "The tool is no longer read-only",
+            );
+        }
+        if !flag(old_tool, "requires_approval_for_agent")
+            && flag(new_tool, "requires_approval_for_agent")
+        {
+            report.breaking_at(
+                "tool.approval_added",
+                name.clone(),
+                "Agents now need an approval to call it",
+            );
+        }
+        if !flag(old_tool, "destructive") && flag(new_tool, "destructive") {
+            report.push(
+                Level::Warning,
+                "tool.now_destructive",
+                name.clone(),
+                "clients may now ask the user before calling it",
+            );
+        }
+        if old_tool.get("permissions") != new_tool.get("permissions") {
+            report.push(
+                Level::Warning,
+                "tool.permissions_changed",
+                name.clone(),
+                "agents with an old key may no longer see the tool; review before releasing",
+            );
+        }
+        let mut inner = Report::default();
+        let mut compare =
+            Comparison { old_doc: old, new_doc: new, report: &mut inner, visited: HashSet::new() };
+        if let (Some(old_input), Some(new_input)) =
+            (old_tool.get("input_schema"), new_tool.get("input_schema"))
+        {
+            compare.schema(&format!("{name} $"), old_input, new_input, Direction::Request, 0);
+        }
+        match (old_tool.get("output_schema"), new_tool.get("output_schema")) {
+            (Some(old_output), Some(new_output))
+                if !old_output.is_null() && !new_output.is_null() =>
+            {
+                compare.schema(
+                    &format!("{name} result $"),
+                    old_output,
+                    new_output,
+                    Direction::Response,
+                    0,
+                );
+            }
+            (Some(old_output), new_output)
+                if !old_output.is_null() && new_output.is_none_or(Value::is_null) =>
+            {
+                inner.breaking_at(
+                    "tool.result_changed",
+                    format!("{name} result"),
+                    "The result schema is gone",
+                );
+            }
+            _ => {}
+        }
+        for finding in inner.findings {
+            let rule = match (finding.level, finding.rule) {
+                (Level::Breaking, "request.property_required")
+                    if finding.message.starts_with("A new") =>
+                {
+                    "tool.parameter_added_required"
+                }
+                (Level::Breaking, "request.property_required") => "tool.parameter_became_required",
+                (Level::Breaking, "request.property_removed") => "tool.parameter_removed",
+                (Level::Breaking, "request.type_narrowed" | "schema.composite_changed")
+                    if !finding.at.contains(" result ") =>
+                {
+                    "tool.parameter_type_changed"
+                }
+                (Level::Breaking, "request.constraint_tightened" | "enum.value_removed")
+                    if !finding.at.contains(" result ") =>
+                {
+                    "tool.constraint_tightened"
+                }
+                (Level::Breaking, "response.property_removed") => "tool.result_property_removed",
+                (Level::Breaking, _) => "tool.result_changed",
+                (_, rule) => rule,
+            };
+            report.push(finding.level, rule, finding.at, finding.message);
+        }
+    }
+    for name in new_tools.keys().filter(|name| !old_tools.contains_key(*name)) {
+        report.push(Level::Note, "", name.clone(), "new tool");
+    }
+    report
+}
+
 /// Một ngoại lệ có chủ đích (`xtask/api-breaking-allow.json`).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -940,6 +1099,18 @@ pub fn run(root: &Path, base: Option<&str>, today: NaiveDate) -> Result<bool, St
     let new: Value = serde_json::from_str(&new_text)
         .map_err(|error| format!("docs/openapi.json is not JSON: {error}"))?;
     let mut report = diff(&old, &new, today);
+    match git(root, &["show", &format!("{base}:docs/mcp-tools.json")]) {
+        Err(_) => println!("api-diff: no MCP tool manifest in {base}; nothing to compare"),
+        Ok(old_text) => {
+            let old: Value = serde_json::from_str(&old_text)
+                .map_err(|error| format!("docs/mcp-tools.json in {base} is not JSON: {error}"))?;
+            let new_text = std::fs::read_to_string(root.join("docs/mcp-tools.json"))
+                .map_err(|error| format!("cannot read docs/mcp-tools.json: {error}"))?;
+            let new: Value = serde_json::from_str(&new_text)
+                .map_err(|error| format!("docs/mcp-tools.json is not JSON: {error}"))?;
+            report.findings.extend(diff_tools(&old, &new, today).findings);
+        }
+    }
     let allowed = read_allowlist(root)?;
     let skipped = apply_allowlist(&mut report, &allowed, &base)?;
     for finding in report.findings.iter().filter(|finding| finding.level != Level::Breaking) {
@@ -951,7 +1122,7 @@ pub fn run(root: &Path, base: Option<&str>, today: NaiveDate) -> Result<bool, St
     }
     if breaking.is_empty() {
         println!(
-            "api-diff: no breaking change to /api/v1 since {base}{}",
+            "api-diff: no breaking change to /api/v1 or the MCP tools since {base}{}",
             if skipped > 0 {
                 format!(" ({skipped} allowed in {ALLOW_FILE})")
             } else {
@@ -961,8 +1132,8 @@ pub fn run(root: &Path, base: Option<&str>, today: NaiveDate) -> Result<bool, St
         Ok(true)
     } else {
         eprintln!(
-            "api-diff: {} breaking change(s) to /api/v1 since {base}. An intended break needs an \
-             entry in {ALLOW_FILE} with the decision that explains it.",
+            "api-diff: {} breaking change(s) to /api/v1 or the MCP tools since {base}. An intended \
+             break needs an entry in {ALLOW_FILE} with the decision that explains it.",
             breaking.len()
         );
         Ok(false)
@@ -1396,5 +1567,186 @@ mod tests {
         let old = doc("/metrics", "get", returns(json!({"type": "string"})), json!({}));
         let new = doc("/other", "get", returns(json!({"type": "string"})), json!({}));
         assert!(rules(&old, &new).is_empty());
+    }
+
+    // --- Hợp đồng tool MCP (A6) ---
+
+    fn tool(name: &str, input: Value) -> Value {
+        json!({
+            "name": name,
+            "description": "x",
+            "permissions": ["notes.write"],
+            "annotations": {"read_only": false, "destructive": false, "returns_secret": false,
+                            "requires_approval_for_agent": false},
+            "input_schema": input,
+            "output_schema": null,
+            "deprecation": null
+        })
+    }
+
+    fn manifest(tools: Vec<Value>) -> Value {
+        json!({"manifest_version": 1, "tools": tools})
+    }
+
+    fn input(properties: Value, required: &[&str]) -> Value {
+        json!({"type": "object", "properties": properties, "required": required, "additionalProperties": false})
+    }
+
+    fn tool_rules(old: Vec<Value>, new: Vec<Value>) -> Vec<&'static str> {
+        diff_tools(&manifest(old), &manifest(new), today())
+            .breaking()
+            .map(|finding| finding.rule)
+            .collect()
+    }
+
+    fn plain() -> Value {
+        tool("notes.add", input(json!({"title": {"type": "string"}}), &[]))
+    }
+
+    #[test]
+    fn tool_bi_bo() {
+        assert_eq!(tool_rules(vec![plain()], vec![]), ["tool.removed"]);
+        let report = diff_tools(&manifest(vec![plain()]), &manifest(vec![]), today());
+        assert!(report.breaking().next().unwrap().to_string().contains("Deprecation::tool"));
+    }
+
+    #[test]
+    fn tool_deprecated_qua_sunset_duoc_bo_chua_toi_thi_do() {
+        let deprecated = |sunset: &str| {
+            let mut old = plain();
+            old["deprecation"] =
+                json!({"since": "2026-01-01", "sunset": sunset, "successor": "notes.add_v2"});
+            old
+        };
+        assert!(tool_rules(vec![deprecated("2026-11-15")], vec![]).is_empty());
+        assert_eq!(tool_rules(vec![deprecated("2026-12-01")], vec![]), ["tool.removed"]);
+    }
+
+    #[test]
+    fn tool_them_moi_va_them_tham_so_tuy_chon_thi_qua() {
+        let wider = tool(
+            "notes.add",
+            input(json!({"title": {"type": "string"}, "body": {"type": "string"}}), &[]),
+        );
+        assert!(tool_rules(vec![plain()], vec![wider]).is_empty());
+        assert!(tool_rules(vec![], vec![plain()]).is_empty());
+        let mut described = plain();
+        described["description"] = json!("Another text");
+        assert!(tool_rules(vec![plain()], vec![described]).is_empty());
+    }
+
+    #[test]
+    fn tool_tham_so_bat_buoc_moi_va_tuy_chon_thanh_bat_buoc() {
+        let added = tool(
+            "notes.add",
+            input(
+                json!({"title": {"type": "string"}, "folder_id": {"type": "string"}}),
+                &["folder_id"],
+            ),
+        );
+        assert_eq!(tool_rules(vec![plain()], vec![added]), ["tool.parameter_added_required"]);
+        let became = tool("notes.add", input(json!({"title": {"type": "string"}}), &["title"]));
+        assert_eq!(tool_rules(vec![plain()], vec![became]), ["tool.parameter_became_required"]);
+        // Lồng sâu cũng tính.
+        let nested = |required: &[&str]| {
+            tool(
+                "notes.add",
+                input(
+                    json!({"page": {"type": "object", "properties": {"limit": {"type": "integer"}}, "required": required}}),
+                    &[],
+                ),
+            )
+        };
+        assert_eq!(
+            tool_rules(vec![nested(&[])], vec![nested(&["limit"])]),
+            ["tool.parameter_became_required"]
+        );
+    }
+
+    #[test]
+    fn tool_bo_tham_so_doi_kieu_va_rang_buoc() {
+        let empty = tool("notes.add", input(json!({}), &[]));
+        assert_eq!(tool_rules(vec![plain()], vec![empty]), ["tool.parameter_removed"]);
+        let integer = tool("notes.add", input(json!({"title": {"type": "integer"}}), &[]));
+        assert_eq!(tool_rules(vec![plain()], vec![integer]), ["tool.parameter_type_changed"]);
+        let short =
+            tool("notes.add", input(json!({"title": {"type": "string", "maxLength": 5}}), &[]));
+        assert_eq!(tool_rules(vec![plain()], vec![short]), ["tool.constraint_tightened"]);
+        let fixed = |values: Value| {
+            tool("notes.add", input(json!({"title": {"type": "string", "enum": values}}), &[]))
+        };
+        assert_eq!(
+            tool_rules(vec![fixed(json!(["a", "b"]))], vec![fixed(json!(["a"]))]),
+            ["tool.constraint_tightened"]
+        );
+        assert!(tool_rules(vec![fixed(json!(["a"]))], vec![fixed(json!(["a", "b"]))]).is_empty());
+    }
+
+    #[test]
+    fn tool_khong_con_chi_doc_va_them_duyet() {
+        let mut read_only = plain();
+        read_only["annotations"]["read_only"] = json!(true);
+        assert_eq!(
+            tool_rules(vec![read_only.clone()], vec![plain()]),
+            ["tool.no_longer_read_only"]
+        );
+        assert!(
+            tool_rules(vec![plain()], vec![read_only]).is_empty(),
+            "becoming read-only is fine"
+        );
+        let mut approval = plain();
+        approval["annotations"]["requires_approval_for_agent"] = json!(true);
+        assert_eq!(tool_rules(vec![plain()], vec![approval.clone()]), ["tool.approval_added"]);
+        assert!(tool_rules(vec![approval], vec![plain()]).is_empty());
+    }
+
+    #[test]
+    fn tool_thanh_pha_huy_hay_doi_permission_chi_canh_bao() {
+        let mut destructive = plain();
+        destructive["annotations"]["destructive"] = json!(true);
+        destructive["permissions"] = json!(["notes.manage"]);
+        let report = diff_tools(&manifest(vec![plain()]), &manifest(vec![destructive]), today());
+        assert_eq!(report.breaking().count(), 0);
+        let warnings: Vec<&str> = report
+            .findings
+            .iter()
+            .filter(|finding| finding.level == Level::Warning)
+            .map(|finding| finding.rule)
+            .collect();
+        assert_eq!(warnings, ["tool.now_destructive", "tool.permissions_changed"]);
+    }
+
+    #[test]
+    fn tool_ket_qua_bo_truong_hay_doi() {
+        let with_output = |output: Value| {
+            let mut tool = plain();
+            tool["output_schema"] = output;
+            tool
+        };
+        let full = with_output(
+            json!({"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}),
+        );
+        let without = with_output(json!({"type": "object", "properties": {}}));
+        let nullable = with_output(
+            json!({"type": "object", "properties": {"id": {"type": ["string", "null"]}}, "required": ["id"]}),
+        );
+        assert_eq!(tool_rules(vec![full.clone()], vec![without]), ["tool.result_property_removed"]);
+        assert_eq!(tool_rules(vec![full.clone()], vec![nullable]), ["tool.result_changed"]);
+        assert_eq!(
+            tool_rules(vec![full.clone()], vec![plain()]),
+            ["tool.result_changed"],
+            "schema dropped"
+        );
+        assert!(tool_rules(vec![plain()], vec![full]).is_empty(), "adding a result schema is fine");
+    }
+
+    #[test]
+    fn so_docs_mcp_tools_voi_chinh_no_khong_co_gi() {
+        let text =
+            std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/mcp-tools.json"))
+                .unwrap();
+        let document: Value = serde_json::from_str(&text).unwrap();
+        let report = diff_tools(&document, &document, today());
+        assert!(report.findings.is_empty(), "{:?}", report.findings.first());
     }
 }

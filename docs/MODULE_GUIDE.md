@@ -123,6 +123,13 @@ and are mounted under `/api/v1/<name>`; a module declares only the tail (`/`, `/
   `description` for every response with the error `code`s. Doc comments on handlers and
   schema types are English, written for API callers.
 - Breaking change: add a new endpoint and declare the old one in `Module::deprecations`.
+  The gate (`cargo xtask api-diff`) compares `docs/openapi.json` with the last release and
+  refuses breaking changes, naming each one and the way to do it right.
+- MCP tools are a contract too, kept in `docs/mcp-tools.json`
+  (`cargo run -p autoxide -- mcp-manifest > docs/mcp-tools.json`). For a breaking change add
+  a new tool (e.g. `create_note_v2`) and declare the old one with
+  `Deprecation::tool("create_note", "YYYY-MM-DD").sunset(…).successor("create_note_v2")`
+  in `Module::deprecations`: agents see it in `tools/list` and in every result.
 
 ### 6. Events and the audit log
 
