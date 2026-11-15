@@ -20,6 +20,7 @@ mod registry;
 pub(crate) mod request;
 pub(crate) mod schema;
 mod scope;
+pub(crate) mod settings;
 
 use std::fmt;
 use std::sync::Arc;
@@ -34,6 +35,7 @@ pub use config::{TenancyConfig, WorkerPlacements};
 pub use registry::DatabaseRegistry;
 pub use request::{TENANT_HEADER, TenantHint};
 pub use scope::{ScopeExt, TenantScoped};
+pub use settings::{PUBLIC_URL, SETTINGS_MANAGE, SettingValue, TenantSetting, TenantSettings};
 
 pub(crate) use config::read_setting;
 
@@ -364,6 +366,15 @@ pub mod errors {
     pub fn tenant_slug_taken(slug: &str) -> Error {
         Error::conflict("tenant_slug_taken", "Another tenant already uses the slug `{slug}`.")
             .with_param("slug", slug)
+    }
+
+    pub fn tenant_setting_unknown(name: &str) -> Error {
+        Error::new(
+            crate::error::ErrorKind::Validation,
+            "tenant_setting_unknown",
+            "No module takes the setting `{name}`. List them with `GET /api/v1/kernel/settings`.",
+        )
+        .with_param("name", name)
     }
 
     pub fn tenant_placement_not_found(placement: &str) -> Error {

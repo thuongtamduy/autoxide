@@ -6080,6 +6080,57 @@
         ],
         "type": "object"
       },
+      "Data_TenantSettingState": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A setting the installed modules take per tenant, and its state in the current tenant.",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "is_set": {
+                "description": "Whether this tenant has set it; otherwise the server-wide configuration applies.",
+                "type": "boolean"
+              },
+              "name": {
+                "description": "`<module>.<key>`, e.g. `mail.smtp_url`.",
+                "example": "kernel.public_url",
+                "type": "string"
+              },
+              "secret": {
+                "description": "Secret settings are stored encrypted and never returned: `value` is always `null`.",
+                "type": "boolean"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value": {
+                "description": "The value, for settings that are not secret and are set.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "description",
+              "secret",
+              "is_set"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_TermResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -6969,6 +7020,60 @@
                 "status",
                 "created_at",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_TenantSettingState": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A setting the installed modules take per tenant, and its state in the current tenant.",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "is_set": {
+                  "description": "Whether this tenant has set it; otherwise the server-wide configuration applies.",
+                  "type": "boolean"
+                },
+                "name": {
+                  "description": "`<module>.<key>`, e.g. `mail.smtp_url`.",
+                  "example": "kernel.public_url",
+                  "type": "string"
+                },
+                "secret": {
+                  "description": "Secret settings are stored encrypted and never returned: `value` is always `null`.",
+                  "type": "boolean"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "value": {
+                  "description": "The value, for settings that are not secret and are set.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "secret",
+                "is_set"
               ],
               "type": "object"
             },
@@ -15466,6 +15571,63 @@
           "tag"
         ],
         "type": "string"
+      },
+      "TenantSettingState": {
+        "description": "A setting the installed modules take per tenant, and its state in the current tenant.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "is_set": {
+            "description": "Whether this tenant has set it; otherwise the server-wide configuration applies.",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "`<module>.<key>`, e.g. `mail.smtp_url`.",
+            "example": "kernel.public_url",
+            "type": "string"
+          },
+          "secret": {
+            "description": "Secret settings are stored encrypted and never returned: `value` is always `null`.",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "description": "The value, for settings that are not secret and are set.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "secret",
+          "is_set"
+        ],
+        "type": "object"
+      },
+      "TenantSettingValue": {
+        "additionalProperties": false,
+        "description": "The new value of a setting.",
+        "properties": {
+          "value": {
+            "description": "1 to 4000 characters. Secret values are stored encrypted and never returned.",
+            "example": "https://shop.example",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "type": "object"
       },
       "TermFields": {
         "additionalProperties": false,
@@ -34975,6 +35137,293 @@
         ],
         "x-permissions": [
           "kernel.modules.read"
+        ]
+      }
+    },
+    "/api/v1/kernel/settings": {
+      "get": {
+        "description": "Requires `kernel.settings.manage`. Every setting the installed modules take per tenant, with\nwhether this tenant has set it; unset ones use the server-wide configuration. Values of\nsecret settings are never returned.",
+        "operationId": "kernel_list_tenant_settings",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_TenantSettingState"
+                }
+              }
+            },
+            "description": "Every setting, sorted by name."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.settings.manage`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List this tenant's settings.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.settings.manage"
+        ]
+      }
+    },
+    "/api/v1/kernel/settings/{name}": {
+      "delete": {
+        "description": "Requires `kernel.settings.manage`. The server-wide configuration applies again. Removing a\nsetting this tenant never set changes nothing.",
+        "operationId": "kernel_delete_tenant_setting",
+        "parameters": [
+          {
+            "description": "Name of the setting.",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The setting is unset (or never was)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.settings.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No module takes this setting; code `tenant_setting_unknown`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove one of this tenant's settings.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.settings.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `kernel.settings.manage`. Creates or replaces the value; sending it again is safe.\nA secret value is stored encrypted and the answer does not contain it.",
+        "operationId": "kernel_set_tenant_setting",
+        "parameters": [
+          {
+            "description": "Name of the setting, `<module>.<key>`, e.g. `kernel.public_url`.",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantSettingValue"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TenantSettingState"
+                }
+              }
+            },
+            "description": "The setting as stored (without a secret value)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.settings.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No module takes this setting (code `tenant_setting_unknown`) or the value is empty or too long; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set one of this tenant's settings.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.settings.manage"
         ]
       }
     },

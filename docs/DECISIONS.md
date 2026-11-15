@@ -6538,3 +6538,25 @@ bảo vệ dữ liệu (mã hoá là biện pháp được nêu); Luật An ninh
 văn bản gốc hay người có chuyên môn pháp lý (D-186).
 
 Bổ sung D-253. Thay phần "mã hoá dữ liệu nhạy cảm" của bước 37 (D-190 đã dời sang bước 33).
+
+## D-258 · Cấu hình và secret theo khách (bước 33 A7, D-190) — 2026-11-15 — agent quyết
+
+1. **Khai báo tĩnh, đọc qua trait**: module khai `Module::tenant_settings()` (`TenantSetting::new(name, mô tả)`,
+   `.secret()`), kernel kiểm tên `<module>.<khoá>`, không trùng, có mô tả — lỗi khai báo báo lúc dựng `Modules`.
+   Module đọc bằng `dyn TenantSettings` (`get(&tenant, &SETTING)` → `Option<SettingValue>`); khách chưa đặt thì
+   module tự rơi về cấu hình chung (biến môi trường) — kernel không tự trộn hai nguồn, vì mỗi module biết cấu hình
+   chung của nó.
+2. **Bảng `kernel_tenant_settings`** cấp khách hàng (PK `(tenant_id, name)`), nằm ở database của khách. Secret mã
+   hoá bằng `Sealer` (D-257), AAD = khách + tên cấu hình. `SettingValue` xoá bộ nhớ khi bỏ (`Zeroizing`), `Debug`
+   không in secret. API, tool và event `kernel.setting_changed` không bao giờ mang giá trị secret; event chỉ mang
+   tên (cấu hình thường cũng không mang giá trị — audit log không cần nó, và một cấu hình thường hôm nay có thể
+   thành secret mai sau).
+3. **Một tool MCP chỉ đọc** (`kernel.list_settings`), không tool ghi: đặt khoá đối tác là việc của người quản trị
+   qua REST (đặc tả 33).
+4. **Áp cho `mail` và `ai`** (đặc tả liệt kê `mail.smtp_url`, `mail.from`, `ai.provider`, `ai.api_key`,
+   `ai.model`): làm cùng lúc chuyển hai module đó (phần B3, B4) — chúng cần nhận khách ở mọi đường gửi / gọi trước.
+5. Cùng phần này, `kernel_user_flags` chuyển sang theo khách (bảng cấp khách hàng đầu tiên của kernel): cùng
+   tài khoản ở hai khách là hai bộ cờ. Bảng `kernel_events` (để ghi `kernel.setting_changed`) tạo bằng helper và
+   nâng theo khách như mọi module.
+
+Bổ sung D-253.

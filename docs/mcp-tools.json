@@ -2333,6 +2333,26 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List the settings of the current tenant: every setting the installed modules take per tenant, whether it is set, and its value unless it is secret.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "kernel.list_settings",
+      "output_schema": null,
+      "permissions": [
+        "kernel.settings.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Get a media item: name, type, size, image width and height, texts, visibility, and the `url` of its content.",
       "input_schema": {
         "additionalProperties": false,

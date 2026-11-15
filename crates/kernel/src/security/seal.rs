@@ -182,9 +182,11 @@ mod tests {
         assert!(sealer.open(other, "demo.secret", "row-1", &sealed).is_err(), "other tenant");
         assert!(sealer.open(DEFAULT_TENANT, "demo.secret", "row-2", &sealed).is_err());
         assert!(sealer.open(DEFAULT_TENANT, "demo.other", "row-1", &sealed).is_err());
-        let mut tampered = sealed.clone();
-        tampered.pop();
-        tampered.push('A');
+        // Đổi một ký tự ở giữa phần mã hoá (luôn khác ký tự cũ).
+        let mut tampered: Vec<char> = sealed.chars().collect();
+        let middle = tampered.len() - 10;
+        tampered[middle] = if tampered[middle] == 'A' { 'B' } else { 'A' };
+        let tampered: String = tampered.into_iter().collect();
         assert!(sealer.open(DEFAULT_TENANT, "demo.secret", "row-1", &tampered).is_err());
         assert!(!sealer.needs_reseal(&sealed));
         // Chữ thường cũ: đọc được, cần mã hoá.

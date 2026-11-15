@@ -87,11 +87,13 @@ impl Modules {
         let catalog = crate::module_catalog::ModuleCatalog::default();
         let user_flags = crate::user_flags::Handle::default();
         let keys = crate::secret::KeyConfig::default();
+        let settings = crate::tenancy::settings::Catalog::default();
         let mut all: Vec<Box<dyn Module>> = vec![
             Box::new(crate::builtin::KernelModule::new(
                 catalog.clone(),
                 user_flags.clone(),
                 keys.clone(),
+                settings.clone(),
             )),
             Box::new(crate::antispam::module::AntispamModule::default()),
         ];
@@ -110,6 +112,18 @@ impl Modules {
             EventCatalog::default()
         });
         let resource_events = checked_resource_events(&modules, &events, &mut problems);
+        let mut seen = Vec::new();
+        let mut declared_settings = Vec::new();
+        for module in &modules {
+            let declared = module.tenant_settings();
+            problems.extend(crate::tenancy::settings::declaration_problems(
+                module.name(),
+                &declared,
+                &mut seen,
+            ));
+            declared_settings.extend(declared);
+        }
+        settings.fill(declared_settings);
         for module in &modules {
             for deprecation in module.deprecations() {
                 problems.extend(deprecation.problems(module.name()));
