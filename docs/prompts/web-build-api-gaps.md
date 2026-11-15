@@ -188,3 +188,42 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Hồ sơ › Nhãn AI | Lọc và bỏ nhãn AI cho sản phẩm và alt media | mới | Dữ liệu mẫu |
 | [ ] | Hồ sơ › Yêu cầu của chủ thể | `GET/POST /compliance/subject-requests`, `POST …/{id}/status`; số lần tự xuất / tự xoá trong 30 ngày | mới | Dữ liệu mẫu |
 | [ ] | Hồ sơ › Yêu cầu của chủ thể | Một API tra / xoá dữ liệu cá nhân theo email chung cho mọi module | mới (bước 37 chỉ có `/consents?subject=`) | Dẫn tới 3 tab "dữ liệu theo email" thật |
+
+## Sản phẩm › Sản phẩm và giá (`/catalog`), Tồn kho (`/catalog/inventory`)
+
+Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/catalog.ts`, `inventory.ts`, `tax.ts`, trừ chỗ ghi khác.
+
+| | Màn | Cần | Bước |
+|---|---|---|---|
+| [ ] | Sản phẩm | `GET/POST /catalog/products` (lọc `status`, `kind`, `category_id` gồm cả nhánh, `q` không dấu), `GET/PATCH/DELETE /products/{id}`, `POST /products/{id}/status` | 41 |
+| [ ] | Sản phẩm | Danh sách trả kèm khoảng giá ở bảng giá của nút đang xem, ảnh đầu, tóm tắt SKU; đếm theo trạng thái | mới (gộp 41) |
+| [ ] | Sản phẩm | Tình trạng "mở bán được chưa": `GET /products/{id}/readiness` hoặc trường `issues`, kèm lọc `blocked=true` | mới |
+| [ ] | Chi tiết | `POST /products/{id}/variants`, `PATCH /variants/{id}`, `PUT /products/{id}/options`, `GET /variants?code=` | 41 |
+| [ ] | Chi tiết | Thuộc tính đồ bếp có cấu trúc theo **từng biến thể** (số người ăn, trong hộp có gì / không kèm, dùng và chăm sóc theo ngôn ngữ, máy rửa bát, tệp PDF). Đề xuất `PUT /products/{id}/kitchen` | mới (gộp 41; đã ghi ở `ui-phase3-api.md`) |
+| [ ] | Chi tiết | `PUT /products/{id}/media` (media công khai, gắn biến thể); alt theo ngôn ngữ | 41 (alt theo ngôn ngữ: mới) |
+| [ ] | Chi tiết | `PUT /products/{id}/translations/{locale}`, `PUT /products/{id}/attributes` | 41 |
+| [ ] | Chi tiết | Đọc tiền tố đường dẫn công khai (`AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX`) | mới (cấu hình cho giao diện) |
+| [ ] | Chi tiết | Dòng thời gian thay đổi của một sản phẩm | 52 |
+| [ ] | Danh mục | `GET/POST /categories`, `PATCH`, `POST /{id}/move`, `PUT /{id}/attributes` (ngày hiệu lực, căn cứ), `PUT /{id}/restrictions`; kèm số sản phẩm cả nhánh | 41 (số sản phẩm: mới) |
+| [ ] | Thuộc tính | `GET/POST /attributes`, `PUT /{id}/options`; mã lỗi trùng `catalog.attribute_code_taken` | 41 (mã lỗi: mới) |
+| [ ] | Hàng cấm | `GET /restriction-rules` (gói "vn", chỉ đọc) | 41 |
+| [ ] | Giấy tờ | `GET/POST/DELETE /products/{id}/documents`; danh sách xuyên sản phẩm `GET /documents?status=expiring\|missing` | 41 (xuyên sản phẩm: mới) |
+| [ ] | Bảng giá | `GET/POST /price-lists`, `PATCH`, `POST /{id}/prices` (`reference`), `GET /{id}/prices?variant_id=`; kèm tên nút và số dòng | 41 |
+| [ ] | Bảng giá | Giá theo cửa hàng cho mọi biến thể một lần: `GET /stores/{org_id}/prices` | mới |
+| [ ] | Bảng giá | Lịch sử giá của một biến thể gộp mọi bảng giá | mới |
+| [ ] | Bảng giá | `GET /variants/{id}/price` trả mọi bảng ứng viên kèm lý do bị bỏ qua | 41 (hở) |
+| [ ] | Nhóm thuế | `GET /tax/categories`, `GET /tax/rates?jurisdiction=VN&category=` | 36 |
+| [ ] | Nhập CSV | `POST /imports`, `GET /imports/{id}`, `POST /exports`, `GET /exports/{id}/content` | 41 |
+| [ ] | Nhập CSV | Chạy thử `POST /imports?dry_run=true`; danh sách việc nhập / xuất | mới |
+| [ ] | Bản nháp AI | `POST /products/{id}/suggestions`, `POST /suggestions/{id}/apply\|discard`; danh sách chờ `GET /suggestions?status=pending` | 41 (danh sách: mới) |
+| [ ] | Tồn | `GET /inventory/levels` (lọc `org_id`, `below_reorder`, `q`; kèm tên biến thể và kho), `GET /levels/{id}` kèm chỗ giữ, lô, serial, biến động | 42 (`q`, kèm tên, kèm chi tiết: mới) |
+| [ ] | Tồn | `PATCH /levels/{id}` (`reorder_point`) | 42 |
+| [ ] | Tồn | `GET /reports/valuation` theo kho, kèm đếm dưới mức / hết hàng / phiếu đang đi đường | 42 (phần đếm: mới) |
+| [ ] | Sổ biến động | `GET /movements`, `POST /adjustments` (`reference`, serial cho hàng theo serial) | 42 (serial: hở) |
+| [ ] | Chuyển kho | `GET/POST /transfers`, `POST /{id}/ship\|receive\|close\|cancel` (nhận một phần) | 42 |
+| [ ] | Kiểm kê | `GET/POST /counts`, `PUT /{id}/lines`, `POST /{id}/apply\|cancel` | 42 |
+| [ ] | Lô | `GET /lots?status=`; loại bỏ một lô sớm | mới |
+| [ ] | Serial | `GET /serials?variant_id=&status=`; hàng khách trả: cho bán lại / loại bỏ | mới |
+| [ ] | Nhà cung cấp | `GET/POST /suppliers`, `PATCH`; công nợ phải trả đọc từ sổ cái | 42 (công nợ: 36) |
+| [ ] | Nhập hàng | `GET/POST /purchase-orders`, `POST /{id}/order\|close\|cancel`, `POST/GET /receipts` (`reference`), `POST/GET /supplier-returns`; kèm tình trạng job ghi sổ cái | 42 (tình trạng ghi sổ: mới) |
+| [ ] | Nhập hàng | Phải trả và giá trị nhập trong tháng | mới (đọc sổ cái, 36) |
