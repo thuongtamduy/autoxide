@@ -137,6 +137,7 @@ impl Module for AuthModule {
             throttle,
             mfa.clone(),
             outbox.clone(),
+            databases.clone(),
         )?);
         let passkeys = Arc::new(passkey::PasskeyService::new(
             users.clone(),
@@ -153,6 +154,7 @@ impl Module for AuthModule {
             jobs: context.jobs(),
             url: config.email_verification_url.clone(),
             report_url: config.email_change_report_url.clone(),
+            databases: databases.clone(),
         });
         let roles = Arc::new(
             RoleService::new(context.permissions().clone(), outbox.clone())
@@ -173,6 +175,7 @@ impl Module for AuthModule {
             translations: context.translations().clone(),
             outbox: outbox.clone(),
             url: config.password_reset_url.clone(),
+            databases: databases.clone(),
         });
         let authenticator = RequestAuthenticator {
             sessions: sessions.clone(),
@@ -338,6 +341,8 @@ pub(crate) mod testing {
 
     pub async fn services(test: &TestDatabase) -> Services {
         let database = database(test).await;
+        // Một khách (khách mặc định) trên database của test: token mang khách tra qua sổ này.
+        let registry = autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone());
         let outbox = autoxide_kernel::event::Outbox::standalone("auth");
         let users = Arc::new(crate::user::UserService::new(
             crate::password::Passwords::new(),
@@ -362,6 +367,7 @@ pub(crate) mod testing {
                     .unwrap(),
                 mfa.clone(),
                 outbox.clone(),
+                registry.clone(),
             )
             .unwrap(),
         );
@@ -390,6 +396,7 @@ pub(crate) mod testing {
             jobs: autoxide_kernel::job::JobQueue::new("auth"),
             url: None,
             report_url: None,
+            databases: registry.clone(),
         });
         let passkey_config = crate::config::PasskeyConfig {
             rp_id: PASSKEY_RP_ID.to_owned(),
@@ -419,6 +426,7 @@ pub(crate) mod testing {
             translations: translations.clone(),
             outbox: autoxide_kernel::event::Outbox::standalone("auth"),
             url: None,
+            databases: registry.clone(),
         });
         let personal_data = autoxide_kernel::privacy::PersonalDataExport::default();
         personal_data

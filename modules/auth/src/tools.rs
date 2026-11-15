@@ -480,7 +480,7 @@ mod tests {
             assert_eq!(wrong.code(), "auth.wrong_password");
             let input = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": password});
             let created = call(&tools, &tenant, "create_api_key", admin.clone(), input.clone()).await.unwrap();
-            assert!(created["key"].as_str().unwrap().starts_with("axk_"));
+            assert!(created["key"].as_str().unwrap().starts_with("axk1_"));
             // Kết quả có secret: response MCP mang `Cache-Control: no-store` (D-149).
             assert!(tools.iter().any(|tool| tool.name() == "create_api_key" && tool.is_secret()));
             let key_id: Uuid = created["id"].as_str().unwrap().parse().unwrap();

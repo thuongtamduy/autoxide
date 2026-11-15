@@ -14,8 +14,8 @@ use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
 use autoxide_kernel::mail::{MailTemplate, Mailer};
-use autoxide_kernel::tenancy::TenantContext;
-use autoxide_kernel::tokens::OneTimeTokens;
+use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, link_token};
+use autoxide_kernel::tokens::{OneTimeTokens, TokenRejection};
 use chrono::{DateTime, SubsecRound, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -90,6 +90,8 @@ pub(crate) struct PasswordResets {
     pub outbox: Outbox,
     /// Trang của giao diện, có `{token}`; `None`: mail chứa token.
     pub url: Option<String>,
+    /// Sổ database: tìm khách ghi trong token của link.
+    pub databases: DatabaseRegistry,
 }
 
 impl PasswordResets {
@@ -129,7 +131,9 @@ impl PasswordResets {
 
         let transaction = tenant.database().begin_write().await?;
         let ttl = chrono::Duration::minutes(TOKEN_MINUTES);
-        let token = tokens().issue(&transaction, tenant, PURPOSE, &subject, None, ttl).await?.token;
+        let raw = tokens().issue(&transaction, tenant, PURPOSE, &subject, None, ttl).await?.token;
+        // Token trong mail mang khách: link mở trên tên miền chính vẫn tìm được khách.
+        let token = link_token(tenant, &raw);
         let event = events::PasswordResetRequested::default();
         let subject = events::user_subject(user.id);
         self.outbox.record(&transaction, tenant, Actor::system(), subject, &event).await?;
@@ -152,10 +156,11 @@ impl PasswordResets {
         self.mailer.send(tenant, mail).await
     }
 
-    /// Đặt mật khẩu mới bằng `token` lấy từ mail.
+    /// Đặt mật khẩu mới bằng `token` lấy từ mail. Khách lấy từ token (`request`: khách của
+    /// request, nếu xác định được — xem `token::resolve`).
     pub(crate) async fn confirm(
         &self,
-        tenant: &TenantContext,
+        request: Option<&TenantContext>,
         token: &str,
         new_password: String,
     ) -> Result<(), Error> {
@@ -167,6 +172,11 @@ impl PasswordResets {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
+        let Some((tenant, token)) = crate::token::resolve(&self.databases, request, token).await?
+        else {
+            return Err(invalid_token().with_reason(TokenRejection::Unknown.as_str()));
+        };
+        let tenant = &tenant;
         let consumed = tokens().consume(tenant.database().write(), tenant, PURPOSE, token).await?;
         let Some(user_id) = consumed.and_then(|consumed| consumed.subject.parse::<Uuid>().ok())
         else {
@@ -258,7 +268,8 @@ mod tests {
             let ada =
                 services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap();
             services.users.delete(&tenant, Actor::system(), ada.id).await.unwrap();
-            let error = services.resets.confirm(&tenant, &token, NEW.to_owned()).await.unwrap_err();
+            let error =
+                services.resets.confirm(Some(&tenant), &token, NEW.to_owned()).await.unwrap_err();
             assert_eq!(error.code(), "auth.invalid_reset_token");
         })
         .await
@@ -317,12 +328,16 @@ mod tests {
             let token = last_token(&services);
 
             // Mật khẩu sai luật: báo lỗi, token vẫn còn dùng được.
-            let short =
-                services.resets.confirm(&tenant, &token, "short".to_owned()).await.unwrap_err();
+            let short = services
+                .resets
+                .confirm(Some(&tenant), &token, "short".to_owned())
+                .await
+                .unwrap_err();
             assert_eq!(short.code(), "validation_failed");
-            services.resets.confirm(&tenant, &token, NEW.to_owned()).await.unwrap();
+            services.resets.confirm(Some(&tenant), &token, NEW.to_owned()).await.unwrap();
 
-            let again = services.resets.confirm(&tenant, &token, NEW.to_owned()).await.unwrap_err();
+            let again =
+                services.resets.confirm(Some(&tenant), &token, NEW.to_owned()).await.unwrap_err();
             assert_eq!(again.kind(), ErrorKind::BadRequest);
             assert_eq!(again.code(), "auth.invalid_reset_token");
             assert_eq!(again.reason(), Some("used"));
@@ -331,9 +346,11 @@ mod tests {
                 services.sessions.login(&tenant, "ada@example.com", NEW, None).await.unwrap();
             assert!(matches!(login, LoginOutcome::Tokens(_)));
             // Phiên cũ đã bị huỷ.
-            assert!(services.sessions.refresh(&tenant, &session.refresh_token).await.is_err());
+            assert!(
+                services.sessions.refresh(Some(&tenant), &session.refresh_token).await.is_err()
+            );
             let unknown =
-                services.resets.confirm(&tenant, "nope", NEW.to_owned()).await.unwrap_err();
+                services.resets.confirm(Some(&tenant), "nope", NEW.to_owned()).await.unwrap_err();
             assert_eq!(unknown.code(), "auth.invalid_reset_token");
         })
         .await
@@ -351,17 +368,21 @@ mod tests {
             crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let newer = last_token(&services);
 
-            services.resets.confirm(&tenant, &newer, NEW.to_owned()).await.unwrap();
+            services.resets.confirm(Some(&tenant), &newer, NEW.to_owned()).await.unwrap();
             // Đặt lại xong thì token cũ hơn cũng hết dùng được.
-            let stale = services.resets.confirm(&tenant, &older, NEW.to_owned()).await.unwrap_err();
+            let stale =
+                services.resets.confirm(Some(&tenant), &older, NEW.to_owned()).await.unwrap_err();
             assert_eq!(stale.code(), "auth.invalid_reset_token");
 
             time_passes(&services, 2).await;
             crate::testing::request_reset(&services, "ada@example.com", Language::En).await;
             let expiring = last_token(&services);
             time_passes(&services, 31).await;
-            let expired =
-                services.resets.confirm(&tenant, &expiring, NEW.to_owned()).await.unwrap_err();
+            let expired = services
+                .resets
+                .confirm(Some(&tenant), &expiring, NEW.to_owned())
+                .await
+                .unwrap_err();
             assert_eq!(expired.code(), "auth.invalid_reset_token");
             assert_eq!(expired.reason(), Some("expired"));
         })
@@ -385,7 +406,7 @@ mod tests {
                     let token = token.clone();
                     let tenant = tenant.clone();
                     tokio::spawn(async move {
-                        resets.confirm(&tenant, &token, format!("{NEW} number {index}")).await
+                        resets.confirm(Some(&tenant), &token, format!("{NEW} number {index}")).await
                     })
                 })
                 .collect();

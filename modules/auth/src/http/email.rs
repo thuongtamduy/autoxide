@@ -7,7 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::response::{Data, Problem};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use axum::extract::State;
 use axum::http::StatusCode;
 use serde::Deserialize;
@@ -155,7 +155,7 @@ async fn cancel_email_change(
 /// Needs no sign-in: the token proves the mail was received. When the token was sent
 /// for a new address (`POST /api/v1/auth/me/email`), the account's email becomes that
 /// address; sign in with it from now on. Every other verification token of the
-/// account stops working.
+/// account stops working. Needs no tenant header: the token names its tenant.
 #[utoipa::path(
     post,
     path = "/email-verification/confirm",
@@ -171,13 +171,13 @@ async fn cancel_email_change(
 )]
 async fn confirm_email(
     State(state): State<Arc<HttpState>>,
-    tenant: TenantContext,
+    OptionalTenant(tenant): OptionalTenant,
     language: Language,
     ValidJson(input): ValidJson<VerificationConfirmation>,
 ) -> Result<Data<UserResponse>, Error> {
-    // B12b: credential mang khách — token trong link xác minh email;
-    // tạm dùng khách của request (tên miền / header).
-    let user = state.verifications.confirm(&tenant, &input.token, language).await?;
+    // Khách lấy từ token trong link: chạy cả trên tên miền chính không header.
+    let (tenant, user) =
+        state.verifications.confirm(tenant.as_ref(), &input.token, language).await?;
     Ok(Data { data: super::users::describe(&state.users, &tenant, user).await? })
 }
 
@@ -189,6 +189,7 @@ async fn confirm_email(
 /// keys, passkeys, two-step sign-in and pending tokens removed. When no other account took
 /// the old address meanwhile, the email goes back to it and a mail to choose a new password
 /// is sent there (in the language of `Accept-Language`); otherwise ask an administrator.
+/// Needs no tenant header: the token names its tenant.
 #[utoipa::path(
     post,
     path = "/email-change/report",
@@ -203,13 +204,12 @@ async fn confirm_email(
 )]
 async fn report_email_change(
     State(state): State<Arc<HttpState>>,
-    tenant: TenantContext,
+    OptionalTenant(tenant): OptionalTenant,
     language: Language,
     ValidJson(input): ValidJson<EmailChangeReport>,
 ) -> Result<StatusCode, Error> {
-    // B12b: credential mang khách — token trong link báo "không phải tôi";
-    // tạm dùng khách của request (tên miền / header).
-    state.verifications.report(&tenant, &input.token, language).await?;
+    // Khách lấy từ token trong link: chạy cả trên tên miền chính không header.
+    state.verifications.report(tenant.as_ref(), &input.token, language).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

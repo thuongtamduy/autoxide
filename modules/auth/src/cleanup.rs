@@ -170,7 +170,7 @@ mod tests {
             // Còn token mới nhất (chưa hết hạn) và số đếm vừa ghi của bob.
             assert_eq!(count(&database, "auth_refresh_token").await, 1);
             assert_eq!(count(&database, "auth_throttle").await, 1);
-            assert!(services.sessions.refresh(&tenant, &old.refresh_token).await.is_err());
+            assert!(services.sessions.refresh(Some(&tenant), &old.refresh_token).await.is_err());
         })
         .await
         .unwrap();

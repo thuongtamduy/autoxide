@@ -1265,7 +1265,7 @@ mod update_tests {
             assert_eq!(again.disabled_at, disabled.disabled_at);
             // Đăng xuất ở mọi nơi: refresh token cũ hết dùng được.
             let refresh =
-                services.sessions.refresh(&tenant, &tokens.refresh_token).await.unwrap_err();
+                services.sessions.refresh(Some(&tenant), &tokens.refresh_token).await.unwrap_err();
             assert_eq!(refresh.code(), "auth.invalid_refresh_token");
             let login = services
                 .sessions

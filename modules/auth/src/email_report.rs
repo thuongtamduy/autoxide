@@ -23,8 +23,8 @@ use autoxide_kernel::i18n::Language;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::mail::MailTemplate;
 use autoxide_kernel::rows;
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use autoxide_kernel::tokens::OneTimeTokens;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext, link_token};
+use autoxide_kernel::tokens::{OneTimeTokens, TokenRejection};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
@@ -121,11 +121,13 @@ impl EmailVerifications {
         let ttl = chrono::Duration::days(REPORT_DAYS);
         let subject = job.user_id.to_string();
         let transaction = tenant.database().begin_write().await?;
-        let token = tokens()
+        let raw = tokens()
             .issue(&transaction, tenant, PURPOSE, &subject, Some(&job.old_email), ttl)
             .await?
             .token;
         transaction.commit().await?;
+        // Token trong mail mang khách: link mở trên tên miền chính vẫn tìm được khách.
+        let token = link_token(tenant, &raw);
         let new_email = mask(&job.new_email);
         let at = job.changed_at.format("%Y-%m-%d %H:%M").to_string();
         let days = REPORT_DAYS.to_string();
@@ -156,12 +158,19 @@ impl EmailVerifications {
     }
 
     /// Chủ tài khoản báo "không phải tôi" bằng `token` trong mail gửi tới địa chỉ cũ.
+    /// Khách lấy từ token (`request`: khách của request, nếu xác định được — xem
+    /// `token::resolve`).
     pub(crate) async fn report(
         &self,
-        tenant: &TenantContext,
+        request: Option<&TenantContext>,
         token: &str,
         language: Language,
     ) -> Result<(), Error> {
+        let Some((tenant, token)) = crate::token::resolve(&self.databases, request, token).await?
+        else {
+            return Err(invalid_report_token().with_reason(TokenRejection::Unknown.as_str()));
+        };
+        let tenant = &tenant;
         let transaction = tenant.database().begin_write().await?;
         let consumed = tokens().consume(&transaction, tenant, PURPOSE, token).await?;
         let found = consumed
@@ -272,7 +281,7 @@ mod tests {
         let verifications = &services.verifications;
         verifications.change_email(&tenant, ada, PASSWORD, new_email, Language::En).await.unwrap();
         let confirm = token_to(services, new_email);
-        verifications.confirm(&tenant, &confirm, Language::Vi).await.unwrap();
+        verifications.confirm(Some(&tenant), &confirm, Language::Vi).await.unwrap();
         let jobs = take_jobs(services, SEND_EMAIL_CHANGED).await;
         assert_eq!(jobs.len(), 1, "one notice per confirmed change");
         let job: EmailChangedJob = serde_json::from_str(&jobs[0]).unwrap();
@@ -319,7 +328,8 @@ mod tests {
                 password: None,
             };
             services.users.create(&tenant, Actor::system(), bob).await.unwrap();
-            let error = verifications.confirm(&tenant, &pending, Language::En).await.unwrap_err();
+            let error =
+                verifications.confirm(Some(&tenant), &pending, Language::En).await.unwrap_err();
             assert_eq!(error.code(), "auth.email_taken");
             assert!(take_jobs(&services, SEND_EMAIL_CHANGED).await.is_empty());
         })
@@ -365,10 +375,10 @@ mod tests {
             services.mfa.confirm_totp(&tenant, ada, &code).await.unwrap();
             let report = change(&services, ada, "thief@evil.example").await;
 
-            services.verifications.report(&tenant, &report, Language::En).await.unwrap();
+            services.verifications.report(Some(&tenant), &report, Language::En).await.unwrap();
             let user = services.users.get(&tenant, ada).await.unwrap().unwrap();
             assert_eq!(user.email, "ada@example.com");
-            assert!(services.sessions.refresh(&tenant, &tokens.refresh_token).await.is_err());
+            assert!(services.sessions.refresh(Some(&tenant), &tokens.refresh_token).await.is_err());
             assert!(
                 services.sessions.login(&tenant, "ada@example.com", PASSWORD, None).await.is_err()
             );
@@ -389,8 +399,11 @@ mod tests {
 
             // Token dùng một lần; token lạ: cùng lỗi.
             for token in [report.as_str(), "nope"] {
-                let error =
-                    services.verifications.report(&tenant, token, Language::En).await.unwrap_err();
+                let error = services
+                    .verifications
+                    .report(Some(&tenant), token, Language::En)
+                    .await
+                    .unwrap_err();
                 assert_eq!(error.code(), "auth.invalid_email_change_report_token");
             }
         })
@@ -412,7 +425,7 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
             };
             services.users.create(&tenant, Actor::system(), bob).await.unwrap();
-            services.verifications.report(&tenant, &report, Language::En).await.unwrap();
+            services.verifications.report(Some(&tenant), &report, Language::En).await.unwrap();
             let user = services.users.get(&tenant, ada).await.unwrap().unwrap();
             assert_eq!(user.email, "ada@new.example");
             assert!(
@@ -434,8 +447,8 @@ mod tests {
             let tenant = services.tenant.clone();
             let report = change(&services, ada, "ada@new.example").await;
             let (first, second) = tokio::join!(
-                services.verifications.report(&tenant, &report, Language::En),
-                services.verifications.report(&tenant, &report, Language::En),
+                services.verifications.report(Some(&tenant), &report, Language::En),
+                services.verifications.report(Some(&tenant), &report, Language::En),
             );
             assert_eq!(usize::from(first.is_ok()) + usize::from(second.is_ok()), 1);
         })
@@ -456,8 +469,11 @@ mod tests {
                 .value(Alias::new("expires_at"), Utc::now() - chrono::Duration::minutes(1))
                 .to_owned();
             services.database.write().execute(&expire).await.unwrap();
-            let error =
-                services.verifications.report(&tenant, &report, Language::En).await.unwrap_err();
+            let error = services
+                .verifications
+                .report(Some(&tenant), &report, Language::En)
+                .await
+                .unwrap_err();
             assert_eq!(error.code(), "auth.invalid_email_change_report_token");
         })
         .await

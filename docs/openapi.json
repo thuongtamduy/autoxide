@@ -235,8 +235,8 @@
             "type": "array"
           },
           "prefix": {
-            "description": "The first characters of the key, to recognize it.",
-            "example": "axk_3q9ZbXcV",
+            "description": "A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the\nkey's random part (after the tenant part). Keys created in older versions (`axk_…`) show\ntheir first 12 characters.",
+            "example": "axk1_…3q9ZbXcV",
             "type": "string"
           }
         },
@@ -2294,8 +2294,8 @@
           {
             "properties": {
               "key": {
-                "description": "The key. Send it as `Authorization: Bearer <key>`. Store it now: it cannot be\nshown again.",
-                "example": "axk_3q9ZbXcV…",
+                "description": "The key. Send it as `Authorization: Bearer <key>`; no other header is needed: the key\nnames its tenant. Store it now: it cannot be shown again. Shape: `axk1_`, the tenant ID\n(32 lowercase hex digits), `_`, then a random part. Keys created in older versions start\nwith `axk_` and keep working.",
+                "example": "axk1_0193c5c0d2f87b2a9e4f6a1b2c3d4e5f_3q9ZbXcV…",
                 "type": "string"
               }
             },
@@ -3476,8 +3476,8 @@
               {
                 "properties": {
                   "key": {
-                    "description": "The key. Send it as `Authorization: Bearer <key>`. Store it now: it cannot be\nshown again.",
-                    "example": "axk_3q9ZbXcV…",
+                    "description": "The key. Send it as `Authorization: Bearer <key>`; no other header is needed: the key\nnames its tenant. Store it now: it cannot be shown again. Shape: `axk1_`, the tenant ID\n(32 lowercase hex digits), `_`, then a random part. Keys created in older versions start\nwith `axk_` and keep working.",
+                    "example": "axk1_0193c5c0d2f87b2a9e4f6a1b2c3d4e5f_3q9ZbXcV…",
                     "type": "string"
                   }
                 },
@@ -10834,8 +10834,8 @@
                   "type": "array"
                 },
                 "prefix": {
-                  "description": "The first characters of the key, to recognize it.",
-                  "example": "axk_3q9ZbXcV",
+                  "description": "A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the\nkey's random part (after the tenant part). Keys created in older versions (`axk_…`) show\ntheir first 12 characters.",
+                  "example": "axk1_…3q9ZbXcV",
                   "type": "string"
                 }
               },
@@ -19766,7 +19766,7 @@
     },
     "/api/v1/auth/email-change/report": {
       "post": {
-        "description": "Needs no sign-in: the token comes from the mail sent to the old address after the\naccount's email changed. The account is then locked against whoever changed it: signed\nout everywhere, its password removed (sign-in with a password stops working), its API\nkeys, passkeys, two-step sign-in and pending tokens removed. When no other account took\nthe old address meanwhile, the email goes back to it and a mail to choose a new password\nis sent there (in the language of `Accept-Language`); otherwise ask an administrator.",
+        "description": "Needs no sign-in: the token comes from the mail sent to the old address after the\naccount's email changed. The account is then locked against whoever changed it: signed\nout everywhere, its password removed (sign-in with a password stops working), its API\nkeys, passkeys, two-step sign-in and pending tokens removed. When no other account took\nthe old address meanwhile, the email goes back to it and a mail to choose a new password\nis sent there (in the language of `Accept-Language`); otherwise ask an administrator.\nNeeds no tenant header: the token names its tenant.",
         "operationId": "auth_report_email_change",
         "parameters": [
           {
@@ -19836,7 +19836,7 @@
     },
     "/api/v1/auth/email-verification/confirm": {
       "post": {
-        "description": "Needs no sign-in: the token proves the mail was received. When the token was sent\nfor a new address (`POST /api/v1/auth/me/email`), the account's email becomes that\naddress; sign in with it from now on. Every other verification token of the\naccount stops working.",
+        "description": "Needs no sign-in: the token proves the mail was received. When the token was sent\nfor a new address (`POST /api/v1/auth/me/email`), the account's email becomes that\naddress; sign in with it from now on. Every other verification token of the\naccount stops working. Needs no tenant header: the token names its tenant.",
         "operationId": "auth_confirm_email_verification",
         "parameters": [
           {
@@ -19923,7 +19923,7 @@
     },
     "/api/v1/auth/login": {
       "post": {
-        "description": "Returns a short-lived access token and a refresh token. When the account has\ntwo-step sign-in on, answers 202 instead: send the `mfa_token` and a code to\n`POST /api/v1/auth/login/mfa`. The same error answers an unknown email and a\nwrong password. After several failed attempts the email is locked for a while,\neven for the right password.",
+        "description": "Returns a short-lived access token and a refresh token. When the account has\ntwo-step sign-in on, answers 202 instead: send the `mfa_token` and a code to\n`POST /api/v1/auth/login/mfa`. The same error answers an unknown email and a\nwrong password. After several failed attempts the email is locked for a while,\neven for the right password. On a server with several tenants, sign in on the\ntenant's domain or with the `Autoxide-Tenant` header; the tokens returned name\ntheir tenant, so later requests need neither.",
         "operationId": "auth_login",
         "parameters": [
           {
@@ -20030,7 +20030,7 @@
     },
     "/api/v1/auth/login/mfa": {
       "post": {
-        "description": "Send the `mfa_token` from `POST /api/v1/auth/login` within its `expires_in`\nseconds. Each `mfa_token` allows five wrong codes; wrong codes also count\ntowards the sign-in lock of the email.",
+        "description": "Send the `mfa_token` from `POST /api/v1/auth/login` within its `expires_in`\nseconds. Each `mfa_token` allows five wrong codes; wrong codes also count\ntowards the sign-in lock of the email. Needs no tenant header: the `mfa_token`\nnames its tenant.",
         "operationId": "auth_login_mfa",
         "parameters": [
           {
@@ -20281,7 +20281,7 @@
     },
     "/api/v1/auth/logout": {
       "post": {
-        "description": "Every refresh token of the session stops working; access tokens already issued\nkeep working until they expire. Safe to repeat.",
+        "description": "Every refresh token of the session stops working; access tokens already issued\nkeep working until they expire. Safe to repeat. Needs no tenant header: the\nrefresh token names its tenant.",
         "operationId": "auth_logout",
         "parameters": [
           {
@@ -22369,7 +22369,7 @@
     },
     "/api/v1/auth/password-reset/confirm": {
       "post": {
-        "description": "Signs the account out everywhere; every other reset token of the account stops\nworking. Then sign in with the new password.",
+        "description": "Signs the account out everywhere; every other reset token of the account stops\nworking. Then sign in with the new password. Needs no tenant header: the token\nnames its tenant.",
         "operationId": "auth_confirm_password_reset",
         "parameters": [
           {
@@ -22513,7 +22513,7 @@
     },
     "/api/v1/auth/refresh": {
       "post": {
-        "description": "The refresh token sent is used up. Sending a used refresh token again ends the\nwhole session (it may have been stolen): sign in again.",
+        "description": "The refresh token sent is used up. Sending a used refresh token again ends the\nwhole session (it may have been stolen): sign in again. Needs no tenant header:\nthe refresh token names its tenant (a header of another tenant makes it invalid).",
         "operationId": "auth_refresh",
         "parameters": [
           {

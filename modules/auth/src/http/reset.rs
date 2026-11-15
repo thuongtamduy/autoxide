@@ -6,7 +6,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::response::Problem;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use axum::extract::State;
 use axum::http::StatusCode;
 use serde::Deserialize;
@@ -69,7 +69,8 @@ async fn request_reset(
 /// Choose a new password with the token from the reset mail.
 ///
 /// Signs the account out everywhere; every other reset token of the account stops
-/// working. Then sign in with the new password.
+/// working. Then sign in with the new password. Needs no tenant header: the token
+/// names its tenant.
 #[utoipa::path(
     post,
     path = "/password-reset/confirm",
@@ -84,12 +85,11 @@ async fn request_reset(
 )]
 async fn confirm_reset(
     State(state): State<Arc<HttpState>>,
-    tenant: TenantContext,
+    OptionalTenant(tenant): OptionalTenant,
     ValidJson(input): ValidJson<ResetConfirmation>,
 ) -> Result<StatusCode, Error> {
-    // B12b: credential mang khách — token trong link đặt lại mật khẩu;
-    // tạm dùng khách của request (tên miền / header).
-    state.resets.confirm(&tenant, &input.token, input.password).await?;
+    // Khách lấy từ token trong link: chạy cả trên tên miền chính không header.
+    state.resets.confirm(tenant.as_ref(), &input.token, input.password).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::i18n::Language;
 use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::migration::{DataUpgrade, UpgradeContext};
 use autoxide_kernel::pagination::{Order, PageRequest};
@@ -244,6 +245,277 @@ async fn khong_ro_ri_giua_khach() {
         let violations =
             autoxide_testkit::leak_check(&app, "admin-b", marker, &seeded).await.unwrap();
         assert_eq!(violations, Vec::<String>::new());
+    })
+    .await
+    .unwrap();
+}
+
+/// App hai khách (`a` chung database, `b` database riêng) với module `auth` thật: bộ xác thực
+/// của module (không có người dùng giả), mail vào `services.mails`.
+async fn two_tenant_app(
+    test: &TestDatabase,
+    services: &crate::testing::Services,
+) -> (TestApp, TenantContext, TenantContext) {
+    let mailer: Arc<dyn Mailer> = services.mails.clone();
+    let app = TestApp::builder(test)
+        .tenant("a")
+        .tenant_dedicated("b")
+        .provide::<dyn Mailer>(mailer)
+        .module(crate::module())
+        .build()
+        .await
+        .unwrap();
+    let (a, b) = (app.tenant("a").await.unwrap(), app.tenant("b").await.unwrap());
+    (app, a, b)
+}
+
+/// Đăng nhập `email` ở khách `slug` (header `Autoxide-Tenant`): dữ liệu của response.
+async fn sign_in(app: &TestApp, slug: &str, email: &str, password: &str) -> serde_json::Value {
+    let body = json!({"email": email, "password": password});
+    let request = app.post("/api/v1/auth/login").header("autoxide-tenant", slug);
+    let response = request.json(body).send().await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK, "{}", response.json());
+    response.json()["data"].clone()
+}
+
+/// `GET /me` bằng `token`, không header khách (trừ `tenant`): (status, thân).
+async fn me(app: &TestApp, token: &str, tenant: Option<&str>) -> (StatusCode, serde_json::Value) {
+    let mut request = app.get("/api/v1/auth/me").token(token);
+    if let Some(tenant) = tenant {
+        request = request.header("autoxide-tenant", tenant);
+    }
+    let response = request.send().await.unwrap();
+    (response.status(), response.json())
+}
+
+/// Cùng email và mật khẩu ở hai khách: đăng nhập theo khách request nêu; access token mang khách
+/// (`tid`) nên dùng KHÔNG cần header vẫn vào đúng khách; token của `a` kèm header `b` →
+/// `tenant_mismatch`; refresh không header ở lại đúng khách; `tid` giả (giữ chữ ký) → 401.
+#[tokio::test]
+async fn email_trung_o_hai_khach_dang_nhap_dung_khach() {
+    use base64::Engine as _;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+    TestDatabase::run(async |test| {
+        let services = crate::testing::services(test).await;
+        let (app, a, b) = two_tenant_app(test, &services).await;
+        let email = "shared@example.com";
+        let mut ids = Vec::new();
+        for tenant in [&a, &b] {
+            let user = services.users.create(tenant, Actor::system(), new_user(email, PASSWORD));
+            ids.push(user.await.unwrap().id.to_string());
+        }
+
+        for (slug, id, other) in [("a", &ids[0], "b"), ("b", &ids[1], "a")] {
+            let tokens = sign_in(&app, slug, email, PASSWORD).await;
+            let access = tokens["access_token"].as_str().unwrap();
+            let (status, body) = me(&app, access, None).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            assert_eq!(body["data"]["id"].as_str(), Some(id.as_str()));
+            let (status, body) = me(&app, access, Some(slug)).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            let (status, body) = me(&app, access, Some(other)).await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+            assert_eq!(body["code"], "tenant_mismatch");
+
+            // Refresh trên tên miền chính, không header: ở lại khách của token.
+            let refresh = json!({"refresh_token": tokens["refresh_token"]});
+            let renewed = app.post("/api/v1/auth/refresh").json(refresh).send().await.unwrap();
+            assert_eq!(renewed.status(), StatusCode::OK, "{}", renewed.json());
+            let renewed = renewed.json()["data"].clone();
+            let (status, body) = me(&app, renewed["access_token"].as_str().unwrap(), None).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            assert_eq!(body["data"]["id"].as_str(), Some(id.as_str()));
+            // Refresh token của khách này kèm header khách kia: như token sai.
+            let crossed = json!({"refresh_token": renewed["refresh_token"]});
+            let request = app.post("/api/v1/auth/refresh").header("autoxide-tenant", other);
+            let crossed = request.json(crossed).send().await.unwrap();
+            assert_eq!(crossed.status(), StatusCode::UNAUTHORIZED, "{}", crossed.json());
+            assert_eq!(crossed.json()["code"], "auth.invalid_refresh_token");
+            // Đăng xuất không header.
+            let out = json!({"refresh_token": renewed["refresh_token"]});
+            let out = app.post("/api/v1/auth/logout").json(out).send().await.unwrap();
+            assert_eq!(out.status(), StatusCode::NO_CONTENT);
+            let again = json!({"refresh_token": renewed["refresh_token"]});
+            let again = app.post("/api/v1/auth/refresh").json(again).send().await.unwrap();
+            assert_eq!(again.json()["code"], "auth.invalid_refresh_token");
+        }
+
+        // Refresh token của khách `b` mang khách trong chuỗi; đổi tiền tố sang khách `a` → sai.
+        let tokens = sign_in(&app, "b", email, PASSWORD).await;
+        let refresh = tokens["refresh_token"].as_str().unwrap();
+        let prefix = format!("t{}.", b.id().as_uuid().simple());
+        assert!(refresh.starts_with(&prefix), "{refresh}");
+        let forged = refresh.replacen(&prefix, &format!("t{}.", a.id().as_uuid().simple()), 1);
+        let forged = json!({"refresh_token": forged});
+        let forged = app.post("/api/v1/auth/refresh").json(forged).send().await.unwrap();
+        assert_eq!(forged.status(), StatusCode::UNAUTHORIZED);
+
+        // Access token của `a` đổi `tid` sang `b`, giữ chữ ký: 401, không lộ gì.
+        let tokens = sign_in(&app, "a", email, PASSWORD).await;
+        let access = tokens["access_token"].as_str().unwrap();
+        let mut parts = access.split('.');
+        let (header, payload, signature) =
+            (parts.next().unwrap(), parts.next().unwrap(), parts.next().unwrap());
+        let mut claims: serde_json::Value =
+            serde_json::from_slice(&URL_SAFE_NO_PAD.decode(payload).unwrap()).unwrap();
+        assert_eq!(claims["tid"], json!(a.id().to_string()));
+        for tid in [b.id().to_string(), Uuid::now_v7().to_string()] {
+            claims["tid"] = json!(tid);
+            let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
+            let forged = format!("{header}.{payload}.{signature}");
+            let (status, body) = me(&app, &forged, None).await;
+            assert_eq!(status, StatusCode::UNAUTHORIZED, "{body}");
+            assert_eq!(body["code"], "auth.invalid_token");
+        }
+    })
+    .await
+    .unwrap();
+}
+
+/// API key của khách `b` (database riêng) mang ID khách: dùng không header vẫn đọc dữ liệu của
+/// `b`; ghép ID của `a` với phần ngẫu nhiên của key → 401; key dạng cũ `axk_…` vẫn chạy cho khách
+/// mặc định.
+#[tokio::test]
+async fn api_key_dinh_tuyen_dung_database() {
+    TestDatabase::run(async |test| {
+        let services = crate::testing::services(test).await;
+        let (app, a, b) = two_tenant_app(test, &services).await;
+        let new_key = || NewApiKey {
+            name: "agent".to_owned(),
+            permissions: vec!["auth.users.read".to_owned()],
+            expires_at: None,
+            current_password: PASSWORD.to_owned(),
+            second_factor: None,
+        };
+        let user =
+            services.users.create(&b, Actor::system(), new_user("bob@example.com", PASSWORD));
+        let bob = user.await.unwrap();
+        let owner = Principal::new(bob.id, ["auth.users.read".to_owned()]).in_tenant(b.id());
+        let key = services.api_keys.create(&b, &owner, new_key()).await.unwrap().secret;
+        let head = format!("axk1_{}_", b.id().as_uuid().simple());
+        assert!(key.starts_with(&head), "{key}");
+
+        let (status, body) = me(&app, &key, None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["data"]["id"], json!(bob.id));
+        let (status, body) = me(&app, &key, Some("a")).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+        assert_eq!(body["code"], "tenant_mismatch");
+
+        // ID của `a` (hay khách không có) ghép với phần ngẫu nhiên của key `b`.
+        let random = &key[head.len()..];
+        for tenant in [a.id().as_uuid(), Uuid::now_v7()] {
+            let forged = format!("axk1_{}_{random}", tenant.simple());
+            let (status, body) = me(&app, &forged, None).await;
+            assert_eq!(status, StatusCode::UNAUTHORIZED, "{body}");
+            assert_eq!(body["code"], "auth.invalid_api_key");
+        }
+
+        // Key cấp trước bước 33: `axk_<ngẫu nhiên>`, bản băm của cả chuỗi, ở khách mặc định.
+        let default = app.default_tenant();
+        let user =
+            services.users.create(&default, Actor::system(), new_user("old@example.com", PASSWORD));
+        let old = user.await.unwrap();
+        let owner = Principal::new(old.id, ["auth.users.read".to_owned()]).in_tenant(default.id());
+        let created = services.api_keys.create(&default, &owner, new_key()).await.unwrap();
+        let legacy = format!("axk_{}", crate::token::random_token(32).unwrap());
+        let database = default.database().write();
+        let backend = database.get_database_backend();
+        let update = Statement::from_sql_and_values(
+            backend,
+            match backend {
+                sea_orm::DatabaseBackend::Postgres => {
+                    "UPDATE auth_api_key SET key_hash = $1 WHERE id = $2"
+                }
+                _ => "UPDATE auth_api_key SET key_hash = ? WHERE id = ?",
+            },
+            [crate::token::sha256(&legacy).into(), created.key.id.into()],
+        );
+        assert_eq!(database.execute_raw(update).await.unwrap().rows_affected(), 1);
+        let (status, body) = me(&app, &legacy, None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["data"]["id"], json!(old.id));
+    })
+    .await
+    .unwrap();
+}
+
+/// Token mang khách trong mail cuối cùng: `t<ID khách>.<43 ký tự>`.
+fn tenant_token_in_mail(services: &crate::testing::Services) -> String {
+    let sent = services.mails.sent.lock().unwrap();
+    let text = &sent.last().unwrap().text;
+    text.split_whitespace()
+        .find(|word| {
+            matches!(autoxide_kernel::tenancy::split_link_token(word),
+                Some((Some(_), raw)) if raw.len() == 43)
+        })
+        .unwrap()
+        .to_owned()
+}
+
+/// Link đặt lại mật khẩu và xác minh email của khách `b` chạy trên tên miền chính không header;
+/// đổi tiền tố khách của token, hay kèm header của khách khác → token sai.
+#[tokio::test]
+async fn token_trong_mail_mang_khach() {
+    TestDatabase::run(async |test| {
+        let services = crate::testing::services(test).await;
+        let (app, a, b) = two_tenant_app(test, &services).await;
+        let user =
+            services.users.create(&b, Actor::system(), new_user("bob@example.com", PASSWORD));
+        let bob = user.await.unwrap();
+
+        // Đặt lại mật khẩu: job của khách `b` gửi mail.
+        let job = crate::reset::ResetJob {
+            email: "bob@example.com".to_owned(),
+            language: "en".to_owned(),
+        };
+        services.resets.send(&b, &job).await.unwrap();
+        let token = tenant_token_in_mail(&services);
+        let prefix = format!("t{}.", b.id().as_uuid().simple());
+        assert!(token.starts_with(&prefix), "{token}");
+        let new_password = "a brand new passphrase";
+        let confirm = async |token: &str, tenant: Option<&str>| {
+            let mut request = app.post("/api/v1/auth/password-reset/confirm");
+            if let Some(tenant) = tenant {
+                request = request.header("autoxide-tenant", tenant);
+            }
+            let body = json!({"token": token, "password": new_password});
+            request.json(body).send().await.unwrap()
+        };
+        let forged = token.replacen(&prefix, &format!("t{}.", a.id().as_uuid().simple()), 1);
+        let rejected = confirm(&forged, None).await;
+        assert_eq!(rejected.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(rejected.json()["code"], "auth.invalid_reset_token");
+        let crossed = confirm(&token, Some("a")).await;
+        assert_eq!(crossed.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(crossed.json()["code"], "auth.invalid_reset_token");
+        let done = confirm(&token, None).await;
+        assert_eq!(done.status(), StatusCode::NO_CONTENT, "{}", done.json());
+        sign_in(&app, "b", "bob@example.com", new_password).await;
+
+        // Xác minh email.
+        services.verifications.send_current(&b, bob.id, Language::En).await.unwrap();
+        let token = tenant_token_in_mail(&services);
+        assert!(token.starts_with(&prefix), "{token}");
+        let forged = token.replacen(&prefix, &format!("t{}.", a.id().as_uuid().simple()), 1);
+        let rejected = app
+            .post("/api/v1/auth/email-verification/confirm")
+            .json(json!({"token": forged}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(rejected.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(rejected.json()["code"], "auth.invalid_verification_token");
+        let verified = app
+            .post("/api/v1/auth/email-verification/confirm")
+            .json(json!({"token": token}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(verified.status(), StatusCode::OK, "{}", verified.json());
+        assert_eq!(verified.json()["data"]["id"], json!(bob.id));
+        assert!(verified.json()["data"]["email_verified_at"].is_string());
     })
     .await
     .unwrap();

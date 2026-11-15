@@ -130,8 +130,10 @@ pub(crate) struct ApiKeyResponse {
     /// What the key is for.
     #[schema(example = "nightly report agent")]
     name: String,
-    /// The first characters of the key, to recognize it.
-    #[schema(example = "axk_3q9ZbXcV")]
+    /// A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the
+    /// key's random part (after the tenant part). Keys created in older versions (`axk_…`) show
+    /// their first 12 characters.
+    #[schema(example = "axk1_…3q9ZbXcV")]
     prefix: String,
     /// Permissions the key may use, sorted by name. The key never has more than its
     /// owner has at the moment of the request.
@@ -161,9 +163,11 @@ impl From<ApiKey> for ApiKeyResponse {
 /// A new API key, with its secret. The secret is shown only here.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(crate) struct CreatedApiKeyResponse {
-    /// The key. Send it as `Authorization: Bearer <key>`. Store it now: it cannot be
-    /// shown again.
-    #[schema(example = "axk_3q9ZbXcV…")]
+    /// The key. Send it as `Authorization: Bearer <key>`; no other header is needed: the key
+    /// names its tenant. Store it now: it cannot be shown again. Shape: `axk1_`, the tenant ID
+    /// (32 lowercase hex digits), `_`, then a random part. Keys created in older versions start
+    /// with `axk_` and keep working.
+    #[schema(example = "axk1_0193c5c0d2f87b2a9e4f6a1b2c3d4e5f_3q9ZbXcV…")]
     key: String,
     #[serde(flatten)]
     details: ApiKeyResponse,
@@ -351,7 +355,7 @@ mod tests {
             // Secret chỉ trả một lần: không ai được lưu response (D-149).
             assert_eq!(headers["cache-control"], "no-store");
             let key = created["data"]["key"].as_str().unwrap().to_owned();
-            assert!(key.starts_with("axk_"));
+            assert!(key.starts_with("axk1_"), "{key}");
             assert_eq!(created["data"]["permissions"], json!(["auth.users.read"]));
             let id = created["data"]["id"].as_str().unwrap().to_owned();
 
@@ -370,7 +374,8 @@ mod tests {
             let (status, _, list) = call(&app, "GET", "/api-keys", Some(&session), None).await;
             assert_eq!(status, StatusCode::OK, "{list}");
             assert!(list["data"][0].get("key").is_none());
-            assert_eq!(list["data"][0]["prefix"], json!(&key[..12]));
+            // `axk1_` + ID khách (32 hex) + `_`: phần nhận diện là đầu phần ngẫu nhiên.
+            assert_eq!(list["data"][0]["prefix"], json!(format!("axk1_…{}", &key[38..46])));
 
             let path = format!("/api-keys/{id}");
             let (status, _, _) = call(&app, "DELETE", &path, Some(&session), None).await;

@@ -27,7 +27,7 @@ curl -sS "$API/api/v1/auth/api-keys" -H "Authorization: Bearer $TOKEN" \
 
 ## Dùng key
 
-Gửi như token: `Authorization: Bearer axk_…`.
+Gửi như token: `Authorization: Bearer axk1_…`. Key có dạng `axk1_<ID khách, 32 chữ hex>_<phần ngẫu nhiên>`: key ghi sẵn khách của nó, nên chạy được mà không cần header `Autoxide-Tenant` hay tên miền của khách. Key do bản cũ tạo bắt đầu bằng `axk_` và vẫn dùng được.
 
 <!-- example: use-key -->
 ```bash
@@ -72,7 +72,7 @@ Có permission `auth.api_keys.manage` thì `GET /api/v1/auth/all-api-keys` (lọ
 import { createClient } from "@autoxide/sdk";
 
 // A build script. Never write the key in the code: read it from your secret store.
-const api = createClient({ baseUrl: "https://api.example.com", token: "axk_…" /* read it from your secret store */ });
+const api = createClient({ baseUrl: "https://api.example.com", token: "axk1_…" /* read it from your secret store */ });
 
 for await (const entry of api.paginate("/api/v1/content/entries", { query: { status: "published" } })) {
   console.log(entry.title);

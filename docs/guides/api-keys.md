@@ -27,7 +27,7 @@ curl -sS "$API/api/v1/auth/api-keys" -H "Authorization: Bearer $TOKEN" \
 
 ## Use it
 
-Send it like a token: `Authorization: Bearer axk_…`.
+Send it like a token: `Authorization: Bearer axk1_…`. A key looks like `axk1_<tenant ID, 32 hex digits>_<random part>`: it names its tenant, so it works without the `Autoxide-Tenant` header or the tenant's domain. Keys created by older versions start with `axk_` and keep working.
 
 <!-- example: use-key -->
 ```bash
@@ -72,7 +72,7 @@ With the permission `auth.api_keys.manage`, `GET /api/v1/auth/all-api-keys` (fil
 import { createClient } from "@autoxide/sdk";
 
 // A build script. Never write the key in the code: read it from your secret store.
-const api = createClient({ baseUrl: "https://api.example.com", token: "axk_…" /* read it from your secret store */ });
+const api = createClient({ baseUrl: "https://api.example.com", token: "axk1_…" /* read it from your secret store */ });
 
 for await (const entry of api.paginate("/api/v1/content/entries", { query: { status: "published" } })) {
   console.log(entry.title);

@@ -24,17 +24,25 @@ use crate::role::RoleService;
 use crate::token;
 use crate::user::UserService;
 use autoxide_kernel::event::{Actor, Outbox};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{DEFAULT_TENANT, ScopeExt, TenantContext, TenantId};
 use serde_json::json;
+use uuid::fmt::Simple;
 
 /// Mọi API key bắt đầu bằng chuỗi này: nhìn là biết đây là API key (không phải access
 /// token), và công cụ quét secret nhận ra được khi key lỡ bị commit.
-pub(crate) const API_KEY_PREFIX: &str = "axk_";
+///
+/// Dạng key (bước 33, D-285): `axk1_<ID khách: 32 chữ hex thường>_<phần ngẫu nhiên>` — khách đọc
+/// được theo độ dài cố định để chọn database TRƯỚC khi tra bản băm (phần ngẫu nhiên là base64url,
+/// có thể chứa `_`, nên không tách theo `_`). Key cấp trước bước 33 có dạng `axk_<phần ngẫu nhiên>`
+/// ([`LEGACY_API_KEY_PREFIX`]) và thuộc khách mặc định.
+pub(crate) const API_KEY_PREFIX: &str = "axk1_";
+/// Tiền tố của key cấp trước bước 33 (không mang khách).
+pub(crate) const LEGACY_API_KEY_PREFIX: &str = "axk_";
 
 /// Số byte ngẫu nhiên của một key: 256 bit.
 const KEY_BYTES: usize = 32;
-/// Số ký tự đầu của key được lưu và hiện ra để nhận diện (`axk_` + 8 ký tự).
-const PREFIX_LENGTH: usize = 12;
+/// Số ký tự đầu của phần ngẫu nhiên được lưu và hiện ra để nhận diện key (sau `axk1_…`).
+const PREFIX_RANDOM_CHARS: usize = 8;
 const NAME_MAX_LENGTH: usize = 100;
 const MAX_PERMISSIONS: usize = 200;
 /// Số key tối đa của một người dùng.
@@ -190,8 +198,11 @@ impl ApiKeyService {
             .with_param("limit", MAX_KEYS_PER_USER));
         }
 
-        let secret = format!("{API_KEY_PREFIX}{}", token::random_token(KEY_BYTES)?);
-        let prefix: String = secret.chars().take(PREFIX_LENGTH).collect();
+        let random = token::random_token(KEY_BYTES)?;
+        let secret = format!("{API_KEY_PREFIX}{}_{random}", tenant_hex(tenant.id()));
+        // Mọi key của một khách cùng phần đầu (ID khách): phần nhận diện là đầu phần ngẫu nhiên.
+        let start = random.get(..PREFIX_RANDOM_CHARS).unwrap_or_default();
+        let prefix = format!("{API_KEY_PREFIX}…{start}");
         let id = Uuid::now_v7();
         let transaction = tenant.database().begin_write().await?;
         // Mật khẩu vừa kiểm phải còn là mật khẩu hiện tại: đặt lại mật khẩu xen giữa thì không
@@ -343,9 +354,9 @@ impl ApiKeyService {
         Ok(())
     }
 
-    /// Bên gọi của một request mang API key `secret`, tra ở khách `tenant`.
-    // B12b: credential mang khách — key mới mang ID khách để chọn database trước khi tra bản băm;
-    // nay bên gọi (`RequestAuthenticator`) đưa khách mặc định.
+    /// Bên gọi của một request mang API key `secret`, tra ở khách `tenant` — khách ghi trong key
+    /// ([`tenant_of`]). Bản băm là của cả key, nên ghép ID khách khác vào phần ngẫu nhiên của key
+    /// này thì không khớp dòng nào.
     pub(crate) async fn authenticate(
         &self,
         tenant: &TenantContext,
@@ -501,7 +512,30 @@ fn key_subject(id: Uuid) -> Option<String> {
     Some(format!("auth.api_key:{id}"))
 }
 
-fn invalid_api_key() -> Error {
+/// ID khách dạng 32 chữ hex thường, như trong key.
+fn tenant_hex(tenant: TenantId) -> Simple {
+    tenant.as_uuid().simple()
+}
+
+/// Khách ghi trong chuỗi `token` nếu nó là API key: `Ok(None)` khi không phải API key (vd access
+/// token); key cũ `axk_…` thuộc khách mặc định; key `axk1_…` sai dạng → `auth.invalid_api_key`.
+pub(crate) fn tenant_of(token: &str) -> Result<Option<TenantId>, Error> {
+    if let Some(rest) = token.strip_prefix(API_KEY_PREFIX) {
+        // Độ dài cố định: 32 chữ hex, `_`, rồi phần ngẫu nhiên (không rỗng).
+        let hex = rest.get(..32).ok_or_else(invalid_api_key)?;
+        let random = rest.get(32..).and_then(|rest| rest.strip_prefix('_'));
+        if random.is_none_or(str::is_empty)
+            || !hex.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+        {
+            return Err(invalid_api_key());
+        }
+        let id = Uuid::try_parse(hex).map_err(|_| invalid_api_key())?;
+        return Ok(Some(TenantId::from_uuid(id)));
+    }
+    Ok(token.starts_with(LEGACY_API_KEY_PREFIX).then_some(DEFAULT_TENANT))
+}
+
+pub(crate) fn invalid_api_key() -> Error {
     Error::unauthenticated(
         "auth.invalid_api_key",
         "The API key is unknown or was revoked. Check that the whole key was sent, or create \
@@ -547,6 +581,31 @@ mod tests {
     use crate::role::RoleInput;
     use crate::testing::Services;
     use crate::user::UserChanges;
+
+    /// Khách đọc theo độ dài cố định: phần ngẫu nhiên có `_` vẫn đúng; key cũ thuộc khách mặc
+    /// định; access token không phải key; `axk1_` sai dạng là key sai.
+    #[test]
+    fn doc_khach_trong_key() {
+        let id = Uuid::now_v7();
+        let hex = id.simple();
+        let key = format!("axk1_{hex}_ab_cd-ef");
+        assert_eq!(tenant_of(&key).unwrap(), Some(TenantId::from_uuid(id)));
+        assert_eq!(tenant_of("axk_abc").unwrap(), Some(DEFAULT_TENANT));
+        assert_eq!(tenant_of("eyJhbGciOiJIUzI1NiJ9.e30.sig").unwrap(), None);
+        let upper = format!("axk1_{}_x", hex.to_string().to_uppercase());
+        let short = format!("axk1_{}_x", &hex.to_string()[..31]);
+        for bad in [
+            format!("axk1_{hex}_"),
+            format!("axk1_{hex}x"),
+            format!("axk1_{hex}"),
+            upper,
+            short,
+            "axk1_".to_owned(),
+            format!("axk1_{}_x", "g".repeat(32)),
+        ] {
+            assert_eq!(tenant_of(&bad).unwrap_err().code(), "auth.invalid_api_key", "{bad}");
+        }
+    }
 
     /// Người dùng `ada` có role cấp `auth.users.read` và `auth.roles.read`.
     async fn setup(test: &TestDatabase) -> (Services, Principal) {
@@ -605,9 +664,12 @@ mod tests {
                 .await
                 .unwrap();
 
-            assert!(created.secret.starts_with("axk_"));
-            assert_eq!(created.secret.len(), 4 + 43);
-            assert!(created.secret.starts_with(&created.key.prefix));
+            // `axk1_<ID khách>_<phần ngẫu nhiên>`; phần nhận diện là đầu phần ngẫu nhiên.
+            let head = format!("axk1_{}_", tenant.id().as_uuid().simple());
+            assert!(created.secret.starts_with(&head), "{}", created.secret);
+            assert_eq!(created.secret.len(), head.len() + 43);
+            assert_eq!(created.key.prefix, format!("axk1_…{}", &created.secret[head.len()..][..8]));
+            assert_eq!(tenant_of(&created.secret).unwrap(), Some(tenant.id()));
             assert_eq!(created.key.permissions, ["auth.users.read"]);
             let principal = services.api_keys.authenticate(&tenant, &created.secret).await.unwrap();
             assert_eq!(principal.user_id(), ada.user_id());

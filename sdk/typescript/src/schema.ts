@@ -89,7 +89,11 @@ export type ApiKeyResponse = {
    * owner has at the moment of the request.
    */
   permissions: string[];
-  /** The first characters of the key, to recognize it. */
+  /**
+   * A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the
+   * key's random part (after the tenant part). Keys created in older versions (`axk_…`) show
+   * their first 12 characters.
+   */
   prefix: string;
 };
 
@@ -848,8 +852,10 @@ export type CreateUserRequest = {
 /** A new API key, with its secret. The secret is shown only here. */
 export type CreatedApiKeyResponse = ApiKeyResponse & {
   /**
-   * The key. Send it as `Authorization: Bearer <key>`. Store it now: it cannot be
-   * shown again.
+   * The key. Send it as `Authorization: Bearer <key>`; no other header is needed: the key
+   * names its tenant. Store it now: it cannot be shown again. Shape: `axk1_`, the tenant ID
+   * (32 lowercase hex digits), `_`, then a random part. Keys created in older versions start
+   * with `axk_` and keep working.
    */
   key: string;
 };
@@ -1289,8 +1295,10 @@ export type Data_CreatedApiKeyResponse = {
   /** A new API key, with its secret. The secret is shown only here. */
   data: ApiKeyResponse & {
     /**
-     * The key. Send it as `Authorization: Bearer <key>`. Store it now: it cannot be
-     * shown again.
+     * The key. Send it as `Authorization: Bearer <key>`; no other header is needed: the key
+     * names its tenant. Store it now: it cannot be shown again. Shape: `axk1_`, the tenant ID
+     * (32 lowercase hex digits), `_`, then a random part. Keys created in older versions start
+     * with `axk_` and keep working.
      */
     key: string;
   };
@@ -3873,7 +3881,11 @@ export type Page_ApiKeyResponse = {
      * owner has at the moment of the request.
      */
     permissions: string[];
-    /** The first characters of the key, to recognize it. */
+    /**
+     * A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the
+     * key's random part (after the tenant part). Keys created in older versions (`axk_…`) show
+     * their first 12 characters.
+     */
     prefix: string;
   }[];
   pagination: Pagination;

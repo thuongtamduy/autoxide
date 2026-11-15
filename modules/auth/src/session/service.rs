@@ -12,6 +12,12 @@
 //! một refresh token đã đổi rồi mà bị gửi lại nghĩa là có hai bên giữ nó — người
 //! dùng và kẻ đã đánh cắp. Không biết bên nào là thật, nên thu hồi cả họ: cả hai
 //! đều phải đăng nhập lại.
+//!
+//! **Khách của token (bước 33):** access token mang claim `tid` (xem `token.rs`); refresh token
+//! và `mfa_token` mang khách theo `autoxide_kernel::tenancy::link_token` (khách mặc định giữ dạng
+//! cũ, khách khác `t<ID khách>.<phần thô>`) — đổi, đăng xuất, nhập mã MFA chạy được trên tên miền
+//! chính không header: khách lấy từ chính token ([`token::resolve`]). Database chỉ giữ bản băm
+//! của phần thô.
 
 use std::sync::Arc;
 
@@ -34,7 +40,7 @@ use super::{LoginThrottle, challenge};
 use crate::events;
 use crate::mfa::MfaService;
 use autoxide_kernel::event::{Actor, Outbox};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId, link_token};
 use serde_json::json;
 
 /// Mã lỗi khi sai email hoặc mật khẩu (tạo ở `user::service`).
@@ -95,6 +101,8 @@ pub(crate) struct SessionService {
     throttle: LoginThrottle,
     mfa: Arc<MfaService>,
     outbox: Outbox,
+    /// Sổ database: tìm khách ghi trong refresh token / `mfa_token`.
+    databases: DatabaseRegistry,
 }
 
 /// Kết quả của bước nhập mật khẩu.
@@ -125,10 +133,19 @@ impl SessionService {
         throttle: LoginThrottle,
         mfa: Arc<MfaService>,
         outbox: Outbox,
+        databases: DatabaseRegistry,
     ) -> Result<Self, Error> {
         let refresh_token_ttl = chrono::Duration::from_std(refresh_token_ttl)
             .map_err(|error| Error::internal(format!("refresh token lifetime: {error}")))?;
-        Ok(SessionService { users, access_tokens, refresh_token_ttl, throttle, mfa, outbox })
+        Ok(SessionService {
+            users,
+            access_tokens,
+            refresh_token_ttl,
+            throttle,
+            mfa,
+            outbox,
+            databases,
+        })
     }
 
     /// Đăng nhập bằng email và mật khẩu. Tài khoản chưa bật MFA: mở một họ refresh
@@ -153,9 +170,9 @@ impl SessionService {
             // mật khẩu mới là nửa đường.
             self.throttle.refund(tenant, email).await?;
             let write = tenant.database().write();
-            let mfa_token = challenge::open(write, tenant, user.id, now()).await?;
+            let raw = challenge::open(write, tenant, user.id, now()).await?;
             return Ok(LoginOutcome::MfaRequired {
-                mfa_token,
+                mfa_token: link_token(tenant, &raw),
                 expires_in: challenge::CHALLENGE_TTL_SECONDS.unsigned_abs(),
             });
         }
@@ -279,8 +296,24 @@ impl SessionService {
     }
 
     /// Bước hai của đăng nhập: `code` là mã TOTP hoặc một recovery code. Mỗi lần sai
-    /// được tính vào login throttling của email, như một lần sai mật khẩu.
+    /// được tính vào login throttling của email, như một lần sai mật khẩu. Khách lấy từ
+    /// `mfa_token` (`request`: khách của request, nếu xác định được — xem [`token::resolve`]);
+    /// trả kèm khách đó.
     pub(crate) async fn complete_mfa(
+        &self,
+        request: Option<&TenantContext>,
+        mfa_token: &str,
+        code: &str,
+        user_agent: Option<&str>,
+    ) -> Result<(TenantContext, Tokens), Error> {
+        let Some((tenant, raw)) = token::resolve(&self.databases, request, mfa_token).await? else {
+            return Err(challenge::invalid_mfa_token());
+        };
+        let tokens = self.complete_mfa_in(&tenant, raw, code, user_agent).await?;
+        Ok((tenant, tokens))
+    }
+
+    async fn complete_mfa_in(
         &self,
         tenant: &TenantContext,
         mfa_token: &str,
@@ -373,11 +406,24 @@ impl SessionService {
         self.outbox.record(&transaction, tenant, Actor::user(user_id), subject, &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "signed in");
-        self.tokens(user_id, family_id, refresh_token, expires_at, now)
+        self.tokens(tenant, user_id, family_id, &refresh_token, expires_at, now)
     }
 
-    /// Đổi refresh token lấy cặp token mới. Refresh token cũ hết dùng được.
+    /// Đổi refresh token lấy cặp token mới. Refresh token cũ hết dùng được. Khách lấy từ token
+    /// (`request`: khách của request, nếu xác định được — xem [`token::resolve`]).
     pub(crate) async fn refresh(
+        &self,
+        request: Option<&TenantContext>,
+        refresh_token: &str,
+    ) -> Result<Tokens, Error> {
+        let Some((tenant, raw)) = token::resolve(&self.databases, request, refresh_token).await?
+        else {
+            return Err(invalid_refresh_token());
+        };
+        self.refresh_in(&tenant, raw).await
+    }
+
+    async fn refresh_in(
         &self,
         tenant: &TenantContext,
         refresh_token: &str,
@@ -441,16 +487,24 @@ impl SessionService {
         }
         new_row.insert(&transaction).await?;
         transaction.commit().await?;
-        self.tokens(user.id, row.family_id, new_token, expires_at, now)
+        self.tokens(tenant, user.id, row.family_id, &new_token, expires_at, now)
     }
 
     /// Đăng xuất: thu hồi họ của `refresh_token`. Token lạ hay đã thu hồi cũng coi
-    /// như xong — gọi lại nhiều lần vẫn cùng kết quả.
+    /// như xong — gọi lại nhiều lần vẫn cùng kết quả. Khách lấy từ token như [`refresh`].
+    ///
+    /// [`refresh`]: Self::refresh
     pub(crate) async fn logout(
         &self,
-        tenant: &TenantContext,
+        request: Option<&TenantContext>,
         refresh_token: &str,
     ) -> Result<(), Error> {
+        let Some((tenant, refresh_token)) =
+            token::resolve(&self.databases, request, refresh_token).await?
+        else {
+            return Ok(());
+        };
+        let tenant = &tenant;
         let row = Entity::find()
             .filter(Column::TokenHash.eq(token::hash_refresh_token(refresh_token)))
             .scoped(tenant)
@@ -470,22 +524,40 @@ impl SessionService {
         Ok(())
     }
 
-    /// Người dùng của access token trong header `Authorization` (nguyên giá trị), tra ở khách
-    /// `tenant`.
-    // B12b: credential mang khách — access token mang claim `tid`; nay bên gọi
-    // (`RequestAuthenticator`) đưa khách mặc định.
-    pub(crate) async fn authenticate(
+    /// Kiểm access token `token` (không có chữ `Bearer`): (khách ghi trong token, người dùng).
+    /// Chữ ký đã kiểm bằng khoá của đúng khách đó; chưa hỏi database nào.
+    pub(crate) fn verify_access(&self, token: &str) -> Result<(TenantId, Uuid), Error> {
+        self.access_tokens.verify(token, Utc::now())
+    }
+
+    /// Người dùng `user_id` của một access token đã kiểm, tra ở khách `tenant` của token: không
+    /// còn thì token sai; bị khoá thì `auth.user_disabled`.
+    pub(crate) async fn token_user(
         &self,
         tenant: &TenantContext,
-        authorization: Option<&str>,
+        user_id: Uuid,
     ) -> Result<User, Error> {
-        let token = bearer_token(authorization)?;
-        let user_id = self.access_tokens.verify(token, Utc::now())?;
         let user = self.users.get(tenant, user_id).await?.ok_or_else(token::invalid_token)?;
         if !user.is_active() {
             return Err(crate::user::user_disabled());
         }
         Ok(user)
+    }
+
+    /// Người dùng của access token trong header `Authorization` (nguyên giá trị), ở khách
+    /// `tenant` đã biết: token của khách khác là token sai. Cho test; request đi qua
+    /// `RequestAuthenticator` (khách lấy từ token).
+    #[cfg(test)]
+    pub(crate) async fn authenticate(
+        &self,
+        tenant: &TenantContext,
+        authorization: Option<&str>,
+    ) -> Result<User, Error> {
+        let (tenant_id, user_id) = self.verify_access(bearer_token(authorization)?)?;
+        if tenant_id != tenant.id() {
+            return Err(token::invalid_token());
+        }
+        self.token_user(tenant, user_id).await
     }
 
     /// Thu hồi mọi refresh token của người dùng (vd sau khi đổi mật khẩu). Chạy
@@ -653,18 +725,21 @@ impl SessionService {
         )
     }
 
+    /// Cặp token của khách `tenant`: access token mang `tid`, refresh token (phần thô
+    /// `refresh_token`) mang khách như token trong link.
     fn tokens(
         &self,
+        tenant: &TenantContext,
         user_id: Uuid,
         session_id: Uuid,
-        refresh_token: String,
+        refresh_token: &str,
         refresh_token_expires_at: DateTime<Utc>,
         now: DateTime<Utc>,
     ) -> Result<Tokens, Error> {
         Ok(Tokens {
-            access_token: self.access_tokens.issue(user_id, now)?,
+            access_token: self.access_tokens.issue(tenant.id(), user_id, now)?,
             expires_in: self.access_tokens.ttl().as_secs(),
-            refresh_token,
+            refresh_token: link_token(tenant, refresh_token),
             refresh_token_expires_at,
             session_id,
         })
@@ -883,7 +958,7 @@ mod tests {
                 let sessions = sessions.clone();
                 let tenant = tenant.clone();
                 tasks.push(tokio::spawn(async move {
-                    sessions.refresh(&tenant, &token).await.map(|_| ())
+                    sessions.refresh(Some(&tenant), &token).await.map(|_| ())
                 }));
             }
             let (revoker, in_task) = (sessions.clone(), tenant.clone());
@@ -1000,13 +1075,13 @@ mod tests {
             let first =
                 sessions.login(&tenant, "ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
-            let second = sessions.refresh(&tenant, &first.refresh_token).await.unwrap();
-            let third = sessions.refresh(&tenant, &second.refresh_token).await.unwrap();
+            let second = sessions.refresh(Some(&tenant), &first.refresh_token).await.unwrap();
+            let third = sessions.refresh(Some(&tenant), &second.refresh_token).await.unwrap();
 
             assert_ne!(second.refresh_token, first.refresh_token);
             assert_ne!(third.refresh_token, second.refresh_token);
             assert_eq!(sessions.authenticate(&tenant, Some(&bearer(&third))).await.unwrap(), user);
-            let unknown = sessions.refresh(&tenant, "no-such-token").await.unwrap_err();
+            let unknown = sessions.refresh(Some(&tenant), "no-such-token").await.unwrap_err();
             assert_eq!(unknown.code(), "auth.invalid_refresh_token");
         })
         .await
@@ -1019,19 +1094,19 @@ mod tests {
             let (sessions, _, _, tenant) = setup(test).await;
             let first =
                 sessions.login(&tenant, "ada@example.com", PASSWORD, None).await.unwrap().tokens();
-            let second = sessions.refresh(&tenant, &first.refresh_token).await.unwrap();
+            let second = sessions.refresh(Some(&tenant), &first.refresh_token).await.unwrap();
             // Một phiên khác của cùng người dùng không bị ảnh hưởng.
             let other =
                 sessions.login(&tenant, "ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
-            let reused = sessions.refresh(&tenant, &first.refresh_token).await.unwrap_err();
+            let reused = sessions.refresh(Some(&tenant), &first.refresh_token).await.unwrap_err();
 
             assert_eq!(reused.kind(), ErrorKind::Unauthenticated);
             assert_eq!(reused.code(), "auth.refresh_token_reused");
             // Token mới nhất của họ đó cũng mất hiệu lực: kẻ trộm không giữ được phiên.
-            let revoked = sessions.refresh(&tenant, &second.refresh_token).await.unwrap_err();
+            let revoked = sessions.refresh(Some(&tenant), &second.refresh_token).await.unwrap_err();
             assert_eq!(revoked.code(), "auth.invalid_refresh_token");
-            assert!(sessions.refresh(&tenant, &other.refresh_token).await.is_ok());
+            assert!(sessions.refresh(Some(&tenant), &other.refresh_token).await.is_ok());
         })
         .await
         .unwrap();
@@ -1051,7 +1126,7 @@ mod tests {
                     let sessions = sessions.clone();
                     let token = tokens.refresh_token.clone();
                     let tenant = tenant.clone();
-                    tokio::spawn(async move { sessions.refresh(&tenant, &token).await })
+                    tokio::spawn(async move { sessions.refresh(Some(&tenant), &token).await })
                 })
                 .collect();
             let mut winners = Vec::new();
@@ -1063,7 +1138,8 @@ mod tests {
             }
 
             assert_eq!(winners.len(), 1);
-            let winner = sessions.refresh(&tenant, &winners[0].refresh_token).await.unwrap_err();
+            let winner =
+                sessions.refresh(Some(&tenant), &winners[0].refresh_token).await.unwrap_err();
             assert_eq!(winner.code(), "auth.invalid_refresh_token");
         })
         .await
@@ -1076,13 +1152,13 @@ mod tests {
             let (sessions, _, _, tenant) = setup(test).await;
             let first =
                 sessions.login(&tenant, "ada@example.com", PASSWORD, None).await.unwrap().tokens();
-            let second = sessions.refresh(&tenant, &first.refresh_token).await.unwrap();
+            let second = sessions.refresh(Some(&tenant), &first.refresh_token).await.unwrap();
 
-            sessions.logout(&tenant, &first.refresh_token).await.unwrap();
-            sessions.logout(&tenant, &first.refresh_token).await.unwrap();
-            sessions.logout(&tenant, "no-such-token").await.unwrap();
+            sessions.logout(Some(&tenant), &first.refresh_token).await.unwrap();
+            sessions.logout(Some(&tenant), &first.refresh_token).await.unwrap();
+            sessions.logout(Some(&tenant), "no-such-token").await.unwrap();
 
-            let error = sessions.refresh(&tenant, &second.refresh_token).await.unwrap_err();
+            let error = sessions.refresh(Some(&tenant), &second.refresh_token).await.unwrap_err();
             assert_eq!(error.code(), "auth.invalid_refresh_token");
         })
         .await
@@ -1101,7 +1177,7 @@ mod tests {
                 .await
                 .unwrap();
 
-            let error = sessions.refresh(&tenant, &tokens.refresh_token).await.unwrap_err();
+            let error = sessions.refresh(Some(&tenant), &tokens.refresh_token).await.unwrap_err();
 
             assert_eq!(error.code(), "auth.invalid_refresh_token");
         })
@@ -1159,7 +1235,8 @@ mod tests {
                 .unwrap();
 
             for tokens in [first, second] {
-                let error = sessions.refresh(&tenant, &tokens.refresh_token).await.unwrap_err();
+                let error =
+                    sessions.refresh(Some(&tenant), &tokens.refresh_token).await.unwrap_err();
                 assert_eq!(error.code(), "auth.invalid_refresh_token");
             }
         })
@@ -1176,7 +1253,7 @@ mod tests {
             crate::user::entity_for_tests::disable(tenant.database().write(), user.id).await;
 
             let me = sessions.authenticate(&tenant, Some(&bearer(&tokens))).await.unwrap_err();
-            let refresh = sessions.refresh(&tenant, &tokens.refresh_token).await.unwrap_err();
+            let refresh = sessions.refresh(Some(&tenant), &tokens.refresh_token).await.unwrap_err();
 
             assert_eq!(me.code(), "auth.user_disabled");
             assert_eq!(refresh.code(), "auth.user_disabled");
@@ -1246,7 +1323,8 @@ mod mfa_login_tests {
 
             let mfa_token = challenge(&sessions, &tenant).await;
             let code = code_at(&secret, unix_now() + 30);
-            let tokens = sessions.complete_mfa(&tenant, &mfa_token, &code, None).await.unwrap();
+            let (_, tokens) =
+                sessions.complete_mfa(Some(&tenant), &mfa_token, &code, None).await.unwrap();
 
             assert!(
                 sessions
@@ -1255,9 +1333,11 @@ mod mfa_login_tests {
                     .is_ok()
             );
             // Mỗi lượt chỉ cấp token một lần.
-            let again = sessions.complete_mfa(&tenant, &mfa_token, &code, None).await.unwrap_err();
+            let again =
+                sessions.complete_mfa(Some(&tenant), &mfa_token, &code, None).await.unwrap_err();
             assert_eq!(again.code(), "auth.invalid_mfa_token");
-            let unknown = sessions.complete_mfa(&tenant, "nope", &code, None).await.unwrap_err();
+            let unknown =
+                sessions.complete_mfa(Some(&tenant), "nope", &code, None).await.unwrap_err();
             assert_eq!(unknown.code(), "auth.invalid_mfa_token");
         })
         .await
@@ -1270,11 +1350,13 @@ mod mfa_login_tests {
             let (sessions, _, codes, tenant) = setup(test).await;
 
             let mfa_token = challenge(&sessions, &tenant).await;
-            sessions.complete_mfa(&tenant, &mfa_token, &codes[0], None).await.unwrap();
+            sessions.complete_mfa(Some(&tenant), &mfa_token, &codes[0], None).await.unwrap();
 
             let mfa_token = challenge(&sessions, &tenant).await;
-            let reused =
-                sessions.complete_mfa(&tenant, &mfa_token, &codes[0], None).await.unwrap_err();
+            let reused = sessions
+                .complete_mfa(Some(&tenant), &mfa_token, &codes[0], None)
+                .await
+                .unwrap_err();
             assert_eq!(reused.code(), "auth.invalid_mfa_code");
         })
         .await
@@ -1288,15 +1370,17 @@ mod mfa_login_tests {
             let mfa_token = challenge(&sessions, &tenant).await;
 
             for _ in 0..5 {
-                let error =
-                    sessions.complete_mfa(&tenant, &mfa_token, "000000", None).await.unwrap_err();
+                let error = sessions
+                    .complete_mfa(Some(&tenant), &mfa_token, "000000", None)
+                    .await
+                    .unwrap_err();
                 assert_eq!(error.kind(), ErrorKind::Unauthenticated);
                 assert_eq!(error.code(), "auth.invalid_mfa_code");
             }
 
             // Hết lượt nhập sai của token này…
             let used_up =
-                sessions.complete_mfa(&tenant, &mfa_token, "000000", None).await.unwrap_err();
+                sessions.complete_mfa(Some(&tenant), &mfa_token, "000000", None).await.unwrap_err();
             assert_eq!(used_up.code(), "auth.invalid_mfa_token");
             // …và các lần sai đã khoá đăng nhập của email, kể cả đúng mật khẩu.
             let locked =
@@ -1322,7 +1406,7 @@ mod mfa_login_tests {
                     let (mfa_token, code) = (mfa_token.clone(), code.clone());
                     let tenant = tenant.clone();
                     tokio::spawn(async move {
-                        sessions.complete_mfa(&tenant, &mfa_token, &code, None).await
+                        sessions.complete_mfa(Some(&tenant), &mfa_token, &code, None).await
                     })
                 })
                 .collect();
@@ -1379,8 +1463,8 @@ mod change_password_tests {
                 .unwrap();
 
             // Phiên cũ kết thúc; phiên mới dùng tiếp được.
-            assert!(sessions.refresh(&tenant, &old_session.refresh_token).await.is_err());
-            sessions.refresh(&tenant, &tokens.refresh_token).await.unwrap();
+            assert!(sessions.refresh(Some(&tenant), &old_session.refresh_token).await.is_err());
+            sessions.refresh(Some(&tenant), &tokens.refresh_token).await.unwrap();
             assert!(sessions.login(&tenant, "ada@example.com", OLD, None).await.is_err());
             sessions.login(&tenant, "ada@example.com", NEW, None).await.unwrap().tokens();
         })

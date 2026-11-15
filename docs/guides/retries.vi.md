@@ -51,7 +51,7 @@ Lưu ý:
 ```ts
 import { AutoxideError, createClient } from "@autoxide/sdk";
 
-const api = createClient({ baseUrl: "https://api.example.com", token: "axk_…" /* read it from your secret store */ });
+const api = createClient({ baseUrl: "https://api.example.com", token: "axk1_…" /* read it from your secret store */ });
 
 // One key per logical operation, reused on every retry of it.
 const key = crypto.randomUUID();

@@ -50,7 +50,7 @@ Keep the other parameters (`limit`, `order`, filters) the same from page to page
 ```ts
 import { createClient } from "@autoxide/sdk";
 
-const api = createClient({ baseUrl: "https://api.example.com", token: "axk_…" /* read it from your secret store */ });
+const api = createClient({ baseUrl: "https://api.example.com", token: "axk1_…" /* read it from your secret store */ });
 
 let count = 0;
 for await (const entry of api.paginate("/api/v1/content/entries", { query: { limit: 100, order: "asc" } })) {

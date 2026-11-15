@@ -7030,3 +7030,24 @@ Một lớp ở kernel thay cho việc mỗi module tự nhớ — áp cho cả 
   nhận `--tenant <slug>` (bỏ trống: khách mặc định).
 - Chưa xong ở lượt này (B12b): access token, API key, refresh token và token trong link mail chưa mang khách — bộ xác
   thực còn tra ở khách mặc định (chỗ đánh dấu `// B12b` trong code).
+
+## D-286 · `auth` theo khách, lượt credential: token và API key mang khách (bước 33 B12b) — 2026-11-15 — agent quyết
+
+- **Access token (JWT)** có claim `tid`. Khoá ký riêng mỗi khách dẫn từ `AUTOXIDE_AUTH_TOKEN_SECRET` bằng
+  `HMAC-SHA256(secret, "auth.access_token\0tenant\0<id>")` (cùng cách `SecretKey::derive_for`; khoá này không phải
+  `SecretKey` nên dẫn tại chỗ); khách mặc định dùng nguyên secret đã cấu hình, nên token cấp trước nâng cấp (không có
+  `tid`) vẫn hợp lệ và thuộc khách mặc định. Kiểm: đọc `tid` (chưa tin) chỉ để chọn khoá, chữ ký phải khớp khoá của khách
+  đó — sửa `tid` thì chữ ký sai.
+- **API key** mới có dạng `axk1_<UUID khách, 32 hex thường>_<phần ngẫu nhiên>` cho mọi khách (cả khách mặc định), tách
+  theo độ dài cố định (phần ngẫu nhiên chứa `_` vẫn đúng); key cũ `axk_…` thuộc khách mặc định, vẫn dùng được. Băm lưu
+  như cũ (băm cả key), một lần tra có index trong database của khách. `prefix` hiển thị là `axk1_` + 8 ký tự ngẫu nhiên
+  đầu (12 ký tự đầu như cũ chỉ là ID khách, mọi key của một khách giống nhau).
+- **Refresh token, `mfa_token`, token đặt lại mật khẩu, xác minh email, báo đổi email** dùng `link_token` của kernel
+  (D-282). Endpoint đổi token (`/login/mfa`, `/refresh`, `/logout`, `/password-reset/confirm`,
+  `/email-verification/confirm`, `/email-change/report`) nhận `OptionalTenant`: chạy trên tên miền chính không cần
+  header; request nêu khách khác khách của token thì coi như token sai.
+- Bộ xác thực chọn khách từ credential, không từ header / tên miền (kernel vẫn kiểm `tenant_mismatch` và nhân sự nền
+  tảng). Khách không có → cùng lỗi 401 như credential sai. Khách **tạm khoá / bảo trì** → `tenant_suspended` (403) /
+  `tenant_maintenance` (503 + `Retry-After`) như trước bước này, không 401: 401 làm client vứt phiên và key còn hợp lệ
+  trong lúc dời khách. Với JWT chữ ký được kiểm trước nên không lộ gì; với API key chỉ lộ trạng thái của một khách mà
+  bên gọi đã biết ID (ID khách không phải bí mật — nằm trong key và link mail).

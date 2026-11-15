@@ -263,7 +263,7 @@ async fn can_mat_khau_va_dat_lai_mat_khau_thu_hoi_passkey() {
         let token = crate::testing::last_token(&services);
         services
             .resets
-            .confirm(&tenant, &token, "a brand new passphrase".to_owned())
+            .confirm(Some(&tenant), &token, "a brand new passphrase".to_owned())
             .await
             .unwrap();
 
@@ -379,7 +379,7 @@ async fn dat_lai_mat_khau_dong_moi_cua_mo_bang_mat_khau_cu() {
         let reset = crate::testing::last_token(&services);
         services
             .resets
-            .confirm(&tenant, &reset, "a brand new passphrase".to_owned())
+            .confirm(Some(&tenant), &reset, "a brand new passphrase".to_owned())
             .await
             .unwrap();
 
@@ -387,11 +387,14 @@ async fn dat_lai_mat_khau_dong_moi_cua_mo_bang_mat_khau_cu() {
             services.passkeys.finish_registration(&tenant, ada, ceremony.id, "Evil", &credential);
         assert_eq!(added.await.unwrap_err().code(), "auth.invalid_passkey_ceremony");
         assert!(list(&services, ada).await.is_empty());
-        let changed =
-            services.verifications.confirm(&tenant, &change_token, Language::En).await.unwrap_err();
+        let changed = services
+            .verifications
+            .confirm(Some(&tenant), &change_token, Language::En)
+            .await
+            .unwrap_err();
         assert_eq!(changed.code(), "auth.invalid_verification_token");
         let finished =
-            services.sessions.complete_mfa(&tenant, &mfa_token, &recovery[0], None).await;
+            services.sessions.complete_mfa(Some(&tenant), &mfa_token, &recovery[0], None).await;
         assert_eq!(finished.unwrap_err().code(), "auth.invalid_mfa_token");
         let still = services.users.get(&tenant, ada).await.unwrap().unwrap();
         assert_eq!(still.email, "ada@example.com");
@@ -421,9 +424,11 @@ async fn dat_lai_mat_khau_dong_moi_cua_mo_bang_mat_khau_cu() {
             .await
             .unwrap();
         let confirm = crate::testing::last_token(&services);
-        services.verifications.confirm(&tenant, &confirm, Language::En).await.unwrap();
-        let stale =
-            services.resets.confirm(&tenant, &old_reset, "another new passphrase".to_owned()).await;
+        services.verifications.confirm(Some(&tenant), &confirm, Language::En).await.unwrap();
+        let stale = services
+            .resets
+            .confirm(Some(&tenant), &old_reset, "another new passphrase".to_owned())
+            .await;
         assert_eq!(stale.unwrap_err().code(), "auth.invalid_reset_token");
     })
     .await
