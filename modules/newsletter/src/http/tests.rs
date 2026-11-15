@@ -20,7 +20,7 @@ struct App {
 impl App {
     /// Chạy các job tới hạn tới khi hết (như worker của chương trình).
     async fn work(&self) {
-        let worker = self.http.modules().worker(self.http.database(), 4).unwrap();
+        let worker = self.http.modules().worker(4).unwrap();
         for _ in 0..20 {
             if worker.run_once().await.unwrap() == 0 {
                 break;

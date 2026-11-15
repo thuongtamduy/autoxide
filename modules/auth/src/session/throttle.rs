@@ -10,10 +10,14 @@ use std::time::Duration;
 
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::{Outcome, Throttle};
 
 pub(crate) struct LoginThrottle {
     inner: Throttle,
+    // Chuyển tiếp (bước 33 A4): đếm cho khách mặc định trên database này; phần B (module `auth`)
+    // cho mỗi hàm nhận khách của request.
+    database: Database,
 }
 
 impl LoginThrottle {
@@ -22,13 +26,13 @@ impl LoginThrottle {
         max_failures: u32,
         period: Duration,
     ) -> Result<Self, Error> {
-        Ok(LoginThrottle { inner: Throttle::new(database, "auth", max_failures, period)? })
+        Ok(LoginThrottle { inner: Throttle::new("auth", max_failures, period)?, database })
     }
 
     /// Lỗi 429 `auth.login_throttled` nếu đăng nhập của `email` đang bị khoá (không đếm).
     #[cfg(test)]
     pub(crate) async fn check(&self, email: &str) -> Result<(), Error> {
-        refuse(self.inner.check(&key(email)).await?)
+        refuse(self.inner.check(&TenantContext::legacy_default(&self.database), &key(email)).await?)
     }
 
     /// Xin một lượt thử cho `email`, TRƯỚC khi kiểm mật khẩu hay mã: đếm lượt này, rồi
@@ -36,18 +40,18 @@ impl LoginThrottle {
     /// bắn cùng lúc không vượt được số lần cho phép (D-079). Thử đúng thì gọi
     /// [`clear`](Self::clear).
     pub(crate) async fn reserve(&self, email: &str) -> Result<(), Error> {
-        refuse(self.inner.hit(&key(email)).await?)
+        refuse(self.inner.hit(&TenantContext::legacy_default(&self.database), &key(email)).await?)
     }
 
     /// Trả lại lượt vừa xin bằng [`reserve`](Self::reserve) khi lần thử đó không sai (vd
     /// mật khẩu đúng, còn chờ mã MFA): người dùng thật không bị tính oan.
     pub(crate) async fn refund(&self, email: &str) -> Result<(), Error> {
-        self.inner.refund(&key(email)).await
+        self.inner.refund(&TenantContext::legacy_default(&self.database), &key(email)).await
     }
 
     /// Đăng nhập đúng: quên các lần sai trước đó.
     pub(crate) async fn clear(&self, email: &str) -> Result<(), Error> {
-        self.inner.clear(&key(email)).await
+        self.inner.clear(&TenantContext::legacy_default(&self.database), &key(email)).await
     }
 }
 

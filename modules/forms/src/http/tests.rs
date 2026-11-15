@@ -392,7 +392,7 @@ async fn xuat_csv_lon_qua_http() {
         let busy = app.post(&path).token("admin").json(json!({})).send().await.unwrap();
         assert_eq!((busy.status(), busy.json()["code"].as_str()), (StatusCode::CONFLICT, Some("forms.export_in_progress")));
 
-        let worker = app.modules().worker(app.database(), 4).unwrap();
+        let worker = app.modules().worker(4).unwrap();
         while worker.run_once().await.unwrap() > 0 {}
         let ready = send(&app, "GET", &format!("/forms/exports/{export}"), Some("admin"), &[], None).await;
         assert_eq!(ready.status(), StatusCode::OK, "{}", ready.json());

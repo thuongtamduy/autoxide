@@ -7,6 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Order, Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -199,12 +200,24 @@ impl FormsService {
             after: Some(summary(&after, &before.form_key)),
         };
         self.outbox
-            .record(&transaction, actor, subject.clone(), &events::SubmissionStatusChanged(change))
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                subject.clone(),
+                &events::SubmissionStatusChanged(change),
+            )
             .await?;
         if before.status() == SubmissionStatus::Spam {
             let received = Change { before: None, after: Some(summary(&after, &before.form_key)) };
             self.outbox
-                .record(&transaction, actor, subject, &events::SubmissionReceived(received))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::SubmissionReceived(received),
+                )
                 .await?;
         }
         transaction.commit().await?;
@@ -228,6 +241,7 @@ impl FormsService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::submission_subject(id),
                 &events::SubmissionDeleted(change),
@@ -277,7 +291,13 @@ impl FormsService {
             after: None,
         };
         self.outbox
-            .record(&transaction, Actor::from(principal), None, &events::SubmissionsErased(change))
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                None,
+                &events::SubmissionsErased(change),
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(count = deleted.rows_affected, "submissions of an email address erased");

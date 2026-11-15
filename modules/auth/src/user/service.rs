@@ -20,6 +20,7 @@ use crate::events;
 use crate::password::{self, Passwords, Verification};
 use crate::session::SessionService;
 use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::json;
 
 /// Độ dài tối đa của email (RFC 5321) và của tên hiển thị, theo ký tự.
@@ -199,7 +200,15 @@ impl UserService {
         }
         let after = Some(json!({"email": row.email, "name": row.name, "admin": admin}));
         let event = events::UserCreated { before: None, after };
-        self.outbox.record(&transaction, actor, events::user_subject(row.id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(row.id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %row.id, admin, "user created");
         Ok(row.into())
@@ -280,7 +289,15 @@ impl UserService {
             Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| user_not_found(id))?;
         let event =
             events::UserUpdated { before: Some(snapshot(&before)), after: Some(snapshot(&row)) };
-        self.outbox.record(&transaction, actor, events::user_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, disabled = ?changes.disabled, "user changed");
         Ok(row.into())
@@ -308,12 +325,20 @@ impl UserService {
             return Err(crate::role::last_admin());
         }
         autoxide_kernel::tokens::OneTimeTokens::new("auth")
-            .forget(&transaction, &id.to_string())
+            .forget(&transaction, &TenantContext::legacy_default(&self.database), &id.to_string())
             .await?;
         // Chỉ ghi id: audit log không giữ lại email hay tên của người đã xin xoá.
         let event =
             events::UserDeleted { before: Some(serde_json::json!({"id": id})), after: None };
-        self.outbox.record(&transaction, actor, events::user_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, "user deleted");
         Ok(())
@@ -448,14 +473,51 @@ impl UserService {
         SessionService::drop_mfa_challenges(&transaction, id).await?;
         crate::passkey::drop_ceremonies_in(&transaction, id).await?;
         let subject = id.to_string();
-        OneTimeTokens::new("auth").revoke(&transaction, "email_verification", &subject).await?;
+        OneTimeTokens::new("auth")
+            .revoke(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                "email_verification",
+                &subject,
+            )
+            .await?;
         if mode == PasswordWrite::Recovery {
-            crate::passkey::remove_all_in(&transaction, &self.outbox, actor, id, false).await?;
-            crate::api_key::revoke_all_in(&transaction, &self.outbox, actor, id).await?;
-            OneTimeTokens::new("auth").revoke(&transaction, "password_reset", &subject).await?;
+            crate::passkey::remove_all_in(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                &self.outbox,
+                actor,
+                id,
+                false,
+            )
+            .await?;
+            crate::api_key::revoke_all_in(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                &self.outbox,
+                actor,
+                id,
+            )
+            .await?;
+            OneTimeTokens::new("auth")
+                .revoke(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    "password_reset",
+                    &subject,
+                )
+                .await?;
         }
         let event = events::PasswordChanged::default();
-        self.outbox.record(&transaction, actor, events::user_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, "password changed");
         Ok(())
@@ -483,12 +545,42 @@ impl UserService {
         SessionService::revoke_user(transaction, id).await?;
         SessionService::drop_mfa_challenges(transaction, id).await?;
         crate::passkey::drop_ceremonies_in(transaction, id).await?;
-        crate::passkey::remove_all_in(transaction, &self.outbox, actor, id, false).await?;
-        crate::api_key::revoke_all_in(transaction, &self.outbox, actor, id).await?;
-        crate::mfa::service::remove_in(transaction, &self.outbox, actor, id, false).await?;
+        crate::passkey::remove_all_in(
+            transaction,
+            &TenantContext::legacy_default(&self.database),
+            &self.outbox,
+            actor,
+            id,
+            false,
+        )
+        .await?;
+        crate::api_key::revoke_all_in(
+            transaction,
+            &TenantContext::legacy_default(&self.database),
+            &self.outbox,
+            actor,
+            id,
+        )
+        .await?;
+        crate::mfa::service::remove_in(
+            transaction,
+            &TenantContext::legacy_default(&self.database),
+            &self.outbox,
+            actor,
+            id,
+            false,
+        )
+        .await?;
         let subject = id.to_string();
         for purpose in ["email_verification", "password_reset"] {
-            OneTimeTokens::new("auth").revoke(transaction, purpose, &subject).await?;
+            OneTimeTokens::new("auth")
+                .revoke(
+                    transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    purpose,
+                    &subject,
+                )
+                .await?;
         }
         Ok(())
     }

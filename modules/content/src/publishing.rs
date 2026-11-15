@@ -11,6 +11,7 @@ pub(crate) mod schedules;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -137,6 +138,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::entry_subject(id),
                 &events::EntryPublished(change),
@@ -224,11 +226,23 @@ impl ContentService {
         let subject = events::entry_subject(id);
         if to == Status::Archived {
             self.outbox
-                .record(&transaction, actor, subject, &events::EntryArchived(change))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::EntryArchived(change),
+                )
                 .await?;
         } else {
             self.outbox
-                .record(&transaction, actor, subject, &events::EntryUnpublished(change))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::EntryUnpublished(change),
+                )
                 .await?;
         }
         transaction.commit().await?;
@@ -300,6 +314,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::entry_subject(id),
                 &events::EntryDeleted(change),
@@ -398,6 +413,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::entry_subject(id),
                 &events::EntryMoved(change),

@@ -18,6 +18,7 @@ use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::storage::{ByteStream, Storage};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, SubsecRound, Utc};
 use futures_util::StreamExt as _;
 use sea_orm::{
@@ -158,7 +159,15 @@ impl FileService {
         }
         let event = events::FileDeleted { before: details(&file) };
         let actor = Actor::from(principal);
-        self.outbox.record(&transaction, actor, events::file_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::file_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         if let Err(error) = self.storage.delete(&file.storage_key()).await {
             tracing::warn!(file_id = %id, error = %error, "file deleted but its content remains");
@@ -230,7 +239,15 @@ impl FileService {
         .await?;
         let event = events::FileUploaded { after: details(&file) };
         let actor = Actor::from(principal);
-        self.outbox.record(&transaction, actor, events::file_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::file_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(file)
     }
@@ -466,6 +483,7 @@ mod tests {
             assert_eq!(exported[0]["name"], "a.txt");
 
             let deleted = Delivered::new(
+                autoxide_kernel::tenancy::TenantContext::legacy_default(&files.database),
                 "auth",
                 autoxide_kernel::privacy::USER_DELETED.to_owned(),
                 json!({"before": {"id": ada.user_id()}}),

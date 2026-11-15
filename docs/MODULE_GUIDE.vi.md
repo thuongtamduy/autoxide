@@ -87,8 +87,9 @@ mà mọi module khai.
 
 `src/service.rs` giữ mọi luật. Nó nhận một `Actor` (ai làm; lấy bằng
 `Actor::from(&principal)`) để event ghi lại người làm. Mỗi lệnh ghi ghi event của nó
-trong cùng transaction bằng `Outbox::record(&transaction, actor, subject, &event)` —
-thay đổi và dòng audit log cùng có, hoặc cùng không.
+trong cùng transaction bằng `Outbox::record(&transaction, &tenant, actor, subject, &event)` —
+thay đổi và dòng audit log cùng có, hoặc cùng không. `tenant` là `TenantContext` của khách
+hàng sở hữu dữ liệu (`autoxide_kernel::tenancy`).
 
 ### 5. REST API và OpenAPI
 

@@ -41,6 +41,7 @@ async fn xoa_tai_khoan_va_xuat_du_lieu() {
         );
 
         let deleted = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
             "auth",
             autoxide_kernel::privacy::USER_DELETED.to_owned(),
             json!({"before": {"id": ada.user_id()}}),

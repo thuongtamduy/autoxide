@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 use super::{Actor, Event, table_name};
 use crate::error::Error;
+use crate::tenancy::TenantContext;
 
 /// Nơi một module ghi event của mình. Lấy bằng `StartContext::outbox()` lúc khởi
 /// động; clone rẻ.
@@ -32,12 +33,13 @@ impl Outbox {
         Outbox::with_wake(module, Arc::new(Notify::new()))
     }
 
-    /// Ghi `event` do `actor` gây ra, về bản ghi `subject` (dạng `<loại>:<id>`, nếu
-    /// có). Gọi với transaction đang ghi thay đổi: event chỉ tồn tại khi transaction
-    /// commit.
+    /// Ghi `event` của khách `tenant` do `actor` gây ra, về bản ghi `subject` (dạng
+    /// `<loại>:<id>`, nếu có). Gọi với transaction đang ghi thay đổi: event chỉ tồn tại khi
+    /// transaction commit.
     pub async fn record<C, E>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         actor: Actor,
         subject: Option<String>,
         event: &E,
@@ -61,6 +63,7 @@ impl Outbox {
         insert
             .into_table(Alias::new(&*self.table))
             .columns([
+                Alias::new("tenant_id"),
                 Alias::new("id"),
                 Alias::new("name"),
                 Alias::new("actor_user_id"),
@@ -73,6 +76,7 @@ impl Outbox {
                 Alias::new("next_attempt_at"),
             ])
             .values([
+                tenant.id().as_uuid().into(),
                 Uuid::now_v7().into(),
                 E::NAME.into(),
                 actor.user_id.into(),

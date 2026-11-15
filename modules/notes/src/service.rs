@@ -9,6 +9,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set,
@@ -67,7 +68,15 @@ impl NoteService {
         .await
         .map_err(|error| title_conflict(error, &title))?;
         let event = events::NoteCreated(Change { before: None, after: Some(snapshot(&note)) });
-        self.outbox.record(&transaction, actor, events::note_subject(note.id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::note_subject(note.id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(note_id = %note.id, "note created");
         Ok(note)
@@ -119,7 +128,15 @@ impl NoteService {
         })?;
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::NoteUpdated(change);
-        self.outbox.record(&transaction, actor, events::note_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::note_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -139,7 +156,15 @@ impl NoteService {
             return Err(not_found(id));
         }
         let event = events::NoteDeleted(Change { before: Some(snapshot(&note)), after: None });
-        self.outbox.record(&transaction, actor, events::note_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::note_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(())
     }

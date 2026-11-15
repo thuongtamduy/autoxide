@@ -6,6 +6,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
@@ -167,6 +168,7 @@ impl NewsletterService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::list_subject(created.row.id),
                 &event,
@@ -327,7 +329,13 @@ impl NewsletterService {
             after: Some(after.summary()),
         });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::list_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::list_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         Ok(after)
@@ -387,7 +395,13 @@ impl NewsletterService {
         }
         let event = events::ListDeleted(Change { before: Some(summary), after: None });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::list_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::list_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(list_id = %id, "newsletter list deleted");

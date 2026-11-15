@@ -114,20 +114,32 @@ mod tests {
         assert_eq!(data["notes"][0]["title"], "a");
     }
 
-    #[test]
-    fn doc_id_nguoi_dung_tu_event_xoa() {
-        let id = Uuid::now_v7();
-        let mut event = Delivered {
-            id: Uuid::now_v7(),
-            module: "auth",
-            name: USER_DELETED.to_owned(),
-            actor: Actor::system(),
-            subject: None,
-            payload: json!({"before": {"id": id}}),
-            occurred_at: chrono::Utc::now(),
-        };
-        assert_eq!(deleted_user(&event), Some(id));
-        event.name = "auth.user_updated".to_owned();
-        assert_eq!(deleted_user(&event), None);
+    #[tokio::test]
+    async fn doc_id_nguoi_dung_tu_event_xoa() {
+        autoxide_testkit::TestDatabase::run(async |test| {
+            let id = Uuid::now_v7();
+            let source = crate::config::ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
+            let mut reader = crate::config::ConfigReader::new(&source);
+            let config = crate::config::DatabaseConfig::read(&mut reader);
+            let database = crate::database::Database::connect(&reader.finish(config).unwrap().0)
+                .await
+                .unwrap();
+            let tenant = crate::tenancy::TenantContext::default_on(database);
+            let mut event = Delivered {
+                id: Uuid::now_v7(),
+                tenant,
+                module: "auth",
+                name: USER_DELETED.to_owned(),
+                actor: Actor::system(),
+                subject: None,
+                payload: json!({"before": {"id": id}}),
+                occurred_at: chrono::Utc::now(),
+            };
+            assert_eq!(deleted_user(&event), Some(id));
+            event.name = "auth.user_updated".to_owned();
+            assert_eq!(deleted_user(&event), None);
+        })
+        .await
+        .unwrap();
     }
 }

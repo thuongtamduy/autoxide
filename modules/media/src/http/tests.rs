@@ -510,7 +510,7 @@ async fn anh_thu_nho_qua_worker_va_tham_so_w() {
         assert_eq!(item["variants"], json!([]), "made in the background");
 
         // Worker chạy mọi job đang chờ (cả hai lịch định kỳ của module lẫn job làm ảnh).
-        let worker = app.http.modules().worker(app.http.database(), 4).unwrap();
+        let worker = app.http.modules().worker(4).unwrap();
         while worker.run_once().await.unwrap() > 0 {}
         let id = item["id"].as_str().unwrap();
         let auth = as_user("reader");

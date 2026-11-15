@@ -320,11 +320,21 @@ mod tests {
             .unwrap();
     }
 
-    fn event(name: &str, subject: &str, payload: serde_json::Value) -> Delivered {
-        Delivered::new("auth", name.to_owned(), payload)
-            .actor(Actor::user(Uuid::now_v7()))
-            .subject(Some(subject.to_owned()))
-            .occurred_at(Utc::now().trunc_subsecs(6))
+    fn event(
+        database: &Database,
+        name: &str,
+        subject: &str,
+        payload: serde_json::Value,
+    ) -> Delivered {
+        Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(database),
+            "auth",
+            name.to_owned(),
+            payload,
+        )
+        .actor(Actor::user(Uuid::now_v7()))
+        .subject(Some(subject.to_owned()))
+        .occurred_at(Utc::now().trunc_subsecs(6))
     }
 
     /// Ghi `count` event; trả ID theo thứ tự ghi.
@@ -333,6 +343,7 @@ mod tests {
         let mut ids = Vec::new();
         for index in 0..count {
             let event = event(
+                database,
                 "auth.user_updated",
                 &format!("auth.user:{index}"),
                 json!({"before": {"name": "a"}, "after": {"name": format!("b{index}")}}),
@@ -386,7 +397,8 @@ mod tests {
             assert_eq!(verdict(&database).await, Verdict::Intact(0));
             record(&database, 3).await;
             let recorder = Recorder::new(database.clone());
-            let again = event("notes.note_created", "notes.note:1", json!({"after": {}}));
+            let again =
+                event(&database, "notes.note_created", "notes.note:1", json!({"after": {}}));
             recorder.handle(&again).await.unwrap();
             recorder.handle(&again).await.unwrap();
             assert_eq!(verdict(&database).await, Verdict::Intact(4));
@@ -470,11 +482,12 @@ mod tests {
             let user = Uuid::now_v7();
             let subject = format!("auth.user:{user}");
             let created = event(
+                &database,
                 "auth.user_created",
                 &subject,
                 json!({"after": {"email": "ada@example.com"}}),
             );
-            let deleted = event(USER_DELETED, &subject, json!({"before": {"id": user}}));
+            let deleted = event(&database, USER_DELETED, &subject, json!({"before": {"id": user}}));
             recorder.handle(&created).await.unwrap();
             record(&database, 1).await;
             recorder.handle(&deleted).await.unwrap();
@@ -495,10 +508,14 @@ mod tests {
             let recorder = Arc::new(Recorder::new(database.clone()));
             let mut tasks = tokio::task::JoinSet::new();
             for index in 0..24 {
-                let recorder = recorder.clone();
+                let (recorder, database) = (recorder.clone(), database.clone());
                 tasks.spawn(async move {
-                    let event =
-                        event("auth.user_updated", &format!("auth.user:{index}"), json!({}));
+                    let event = event(
+                        &database,
+                        "auth.user_updated",
+                        &format!("auth.user:{index}"),
+                        json!({}),
+                    );
                     recorder.handle(&event).await.unwrap();
                     // Giao lại ngay: không thêm dòng.
                     recorder.handle(&event).await.unwrap();

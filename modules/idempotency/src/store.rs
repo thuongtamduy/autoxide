@@ -521,7 +521,12 @@ mod tests {
                 .exec(database.write())
                 .await
                 .unwrap();
-            let context = JobContext::new(CLEANUP, serde_json::Value::Null, 1);
+            let context = JobContext::for_tenant(
+                autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                CLEANUP,
+                serde_json::Value::Null,
+                1,
+            );
             Cleanup::new(database.clone()).run(&context).await.unwrap();
             assert!(matches!(
                 store.begin("s", "k", "different", soon).await.unwrap(),

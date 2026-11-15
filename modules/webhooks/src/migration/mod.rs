@@ -14,5 +14,13 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::job::jobs_migration("m0003_create_jobs", "webhooks"),
         // Cột `actor_kind` của bảng `webhooks_events` (người lạ khác hệ thống, D-122).
         autoxide_kernel::event::outbox_actor_migration("m0004_add_event_actor", "webhooks"),
+        // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0005_tenancy_helpers",
+            vec![
+                autoxide_kernel::event::tenant_table("webhooks"),
+                autoxide_kernel::job::tenant_table("webhooks"),
+            ],
+        ),
     ]
 }

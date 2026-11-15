@@ -102,7 +102,12 @@ mod tests {
                 .unwrap();
             let recorder = crate::recorder::Recorder::new(database.clone());
             for (module, name) in [("auth", "auth.user_updated"), ("files", "files.file_deleted")] {
-                let event = Delivered::new(module, name.to_owned(), json!({"after": {"x": 1}}));
+                let event = Delivered::new(
+                    autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                    module,
+                    name.to_owned(),
+                    json!({"after": {"x": 1}}),
+                );
                 recorder.handle(&event).await.unwrap();
             }
             let tools = all(&Arc::new(AuditService::new(database)));

@@ -17,6 +17,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::EnqueueOptions;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
@@ -211,7 +212,13 @@ impl NewsletterService {
         let row = row.into_active_model().insert(&transaction).await?;
         let event = events::CampaignCreated(Change { before: None, after: Some(summary(&row)) });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::campaign_subject(row.id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::campaign_subject(row.id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(campaign_id = %row.id, "newsletter campaign created");
@@ -355,7 +362,13 @@ impl NewsletterService {
             after: Some(summary(&after)),
         });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::campaign_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::campaign_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         if unscheduled {
@@ -401,7 +414,13 @@ impl NewsletterService {
         let event =
             events::CampaignDeleted(Change { before: Some(summary(&before.row)), after: None });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::campaign_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::campaign_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         Ok(())
@@ -515,27 +534,57 @@ impl NewsletterService {
         match action {
             Action::Send => {
                 self.outbox
-                    .record(&transaction, actor, subject, &events::CampaignStarted(change))
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        actor,
+                        subject,
+                        &events::CampaignStarted(change),
+                    )
                     .await?
             }
             Action::Schedule(_) => {
                 self.outbox
-                    .record(&transaction, actor, subject, &events::CampaignScheduled(change))
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        actor,
+                        subject,
+                        &events::CampaignScheduled(change),
+                    )
                     .await?
             }
             Action::Pause => {
                 self.outbox
-                    .record(&transaction, actor, subject, &events::CampaignPaused(change))
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        actor,
+                        subject,
+                        &events::CampaignPaused(change),
+                    )
                     .await?
             }
             Action::Resume => {
                 self.outbox
-                    .record(&transaction, actor, subject, &events::CampaignResumed(change))
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        actor,
+                        subject,
+                        &events::CampaignResumed(change),
+                    )
                     .await?
             }
             Action::Cancel => {
                 self.outbox
-                    .record(&transaction, actor, subject, &events::CampaignCancelled(change))
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        actor,
+                        subject,
+                        &events::CampaignCancelled(change),
+                    )
                     .await?
             }
         }
@@ -592,7 +641,14 @@ impl NewsletterService {
         if let Some(run_at) = run_at {
             options = options.run_at(run_at);
         }
-        self.jobs.enqueue(connection, &PrepareJob { campaign_id: id, run, after }, options).await?;
+        self.jobs
+            .enqueue(
+                connection,
+                &TenantContext::legacy_default(&self.database),
+                &PrepareJob { campaign_id: id, run, after },
+                options,
+            )
+            .await?;
         Ok(())
     }
 
@@ -610,7 +666,14 @@ impl NewsletterService {
         if let Some(run_at) = run_at {
             options = options.run_at(run_at);
         }
-        self.jobs.enqueue(connection, &SendJob { campaign_id: id, run, seq }, options).await?;
+        self.jobs
+            .enqueue(
+                connection,
+                &TenantContext::legacy_default(&self.database),
+                &SendJob { campaign_id: id, run, seq },
+                options,
+            )
+            .await?;
         Ok(())
     }
 

@@ -22,9 +22,21 @@ use crate::moderation::reports::{ReportReason, all_oldest};
 use crate::posting::targets::OwnerEvents;
 use crate::service::Status;
 use crate::testing::{admin, config, service};
+use autoxide_kernel::database::Database;
 
-fn delivered(name: &str, subject: Option<String>, payload: serde_json::Value) -> Delivered {
-    Delivered::new("test", name.to_owned(), payload).subject(subject)
+fn delivered(
+    database: &Database,
+    name: &str,
+    subject: Option<String>,
+    payload: serde_json::Value,
+) -> Delivered {
+    Delivered::new(
+        autoxide_kernel::tenancy::TenantContext::legacy_default(database),
+        "test",
+        name.to_owned(),
+        payload,
+    )
+    .subject(subject)
 }
 
 /// Nhiều báo cáo tới cùng lúc vượt ngưỡng: bình luận về chờ duyệt ĐÚNG MỘT LẦN (số đếm, event).
@@ -247,7 +259,12 @@ async fn mail_bao_tra_loi() {
         reply.parent_id = Some(root);
         let reply = as_guest(&h.service, &client, reply).await.unwrap().comment.row.id;
         let handler = crate::notify::ReplyNotifier(Arc::clone(&h.service));
-        let event = delivered("comments.comment_published", None, json!({"after": {"id": reply}}));
+        let event = delivered(
+            &h.service.database,
+            "comments.comment_published",
+            None,
+            json!({"after": {"id": reply}}),
+        );
         handler.handle(&event).await.unwrap();
         handler.handle(&event).await.unwrap();
         let mails: Vec<_> = h
@@ -369,7 +386,12 @@ async fn du_lieu_ca_nhan() {
         let exported = h.service.export(bob.user_id()).await.unwrap();
         assert_eq!(exported["profile"]["display_name"], "Bob");
         assert_eq!(exported["comments"][0]["body"], "Của Bob");
-        let event = delivered(USER_DELETED, None, json!({"before": {"id": bob.user_id()}}));
+        let event = delivered(
+            &h.service.database,
+            USER_DELETED,
+            None,
+            json!({"before": {"id": bob.user_id()}}),
+        );
         h.service.handle(&event).await.unwrap();
         h.service.handle(&event).await.unwrap();
         let gone = h.service.find(mine).await.unwrap();
@@ -472,7 +494,8 @@ async fn event_cua_chu_dich_dong_va_an() {
             ),
         };
         let subject = Some(format!("{KIND}:{POST}"));
-        let archived = delivered("content.entry_archived", subject.clone(), json!({}));
+        let archived =
+            delivered(&h.service.database, "content.entry_archived", subject.clone(), json!({}));
         handler.handle(&archived).await.unwrap();
         handler.handle(&archived).await.unwrap();
         let closed = events(&h.database)
@@ -491,7 +514,10 @@ async fn event_cua_chu_dich_dong_va_an() {
             "closed, still shown"
         );
 
-        handler.handle(&delivered("content.entry_deleted", subject, json!({}))).await.unwrap();
+        handler
+            .handle(&delivered(&h.service.database, "content.entry_deleted", subject, json!({})))
+            .await
+            .unwrap();
         assert!(
             h.service
                 .thread(KIND, POST, &page(Order::Desc), 3, None)

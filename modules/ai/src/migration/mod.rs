@@ -10,5 +10,10 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0001_create_usage::Migration),
         // Bảng `ai_jobs` (job queue): dọn số đếm cũ.
         autoxide_kernel::job::jobs_migration("m0002_create_jobs", "ai"),
+        // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0003_tenancy_helpers",
+            vec![autoxide_kernel::job::tenant_table("ai")],
+        ),
     ]
 }

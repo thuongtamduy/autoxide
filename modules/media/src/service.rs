@@ -22,6 +22,7 @@ use autoxide_kernel::pagination::{
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::rows;
 use autoxide_kernel::storage::{Storage, StoredFile};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -377,7 +378,15 @@ impl MediaService {
             after: Some(with_tags(snapshot(&after), &tags_after)),
         });
         let actor = Actor::from(principal);
-        self.outbox.record(&transaction, actor, events::item_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::item_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -423,9 +432,25 @@ impl MediaService {
         let actor = Actor::from(principal);
         let subject = events::item_subject(id);
         if trash {
-            self.outbox.record(&transaction, actor, subject, &events::ItemTrashed(change)).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::ItemTrashed(change),
+                )
+                .await?;
         } else {
-            self.outbox.record(&transaction, actor, subject, &events::ItemRestored(change)).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::ItemRestored(change),
+                )
+                .await?;
         }
         transaction.commit().await?;
         tracing::info!(media_item_id = %id, trashed = trash, "media item trash state changed");
@@ -475,7 +500,15 @@ impl MediaService {
             .exec(&transaction)
             .await?;
         let event = events::ItemPurged(Change { before: Some(snapshot(item)), after: None });
-        self.outbox.record(&transaction, actor, events::item_subject(item.id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::item_subject(item.id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         let keys =
             std::iter::once(item.storage_key()).chain(copies.iter().map(|copy| copy.storage_key()));

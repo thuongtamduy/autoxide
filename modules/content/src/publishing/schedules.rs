@@ -16,6 +16,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -146,11 +147,14 @@ impl ContentService {
         .await?;
         let job = RunSchedule { schedule_id: row.id };
         let options = EnqueueOptions::default().run_at(run_at);
-        self.jobs.enqueue(&transaction, &job, options).await?;
+        self.jobs
+            .enqueue(&transaction, &TenantContext::legacy_default(&self.database), &job, options)
+            .await?;
         let change = Change { before: None, after: Some(schedule_summary(&row)), published: None };
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::entry_subject(entry_id),
                 &events::ScheduleCreated(change),
@@ -201,6 +205,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::entry_subject(before.entry_id),
                 &events::ScheduleCanceled(change),
@@ -243,6 +248,7 @@ impl ContentService {
                     self.outbox
                         .record(
                             &transaction,
+                            &TenantContext::legacy_default(&self.database),
                             row.created_by.map_or_else(Actor::system, Actor::user),
                             events::entry_subject(row.entry_id),
                             &events::ScheduleFailed(change),
@@ -336,6 +342,7 @@ impl ContentService {
                 self.outbox
                     .record(
                         &transaction,
+                        &TenantContext::legacy_default(&self.database),
                         actor,
                         events::entry_subject(after.id),
                         &events::EntryPublished(change),
@@ -371,6 +378,7 @@ impl ContentService {
                 self.outbox
                     .record(
                         &transaction,
+                        &TenantContext::legacy_default(&self.database),
                         actor,
                         events::entry_subject(after.id),
                         &events::EntryUnpublished(change),
@@ -435,6 +443,7 @@ impl ContentService {
             self.outbox
                 .record(
                     transaction,
+                    &TenantContext::legacy_default(&self.database),
                     actor,
                     events::entry_subject(entry_id),
                     &events::ScheduleCanceled(change),
@@ -471,6 +480,7 @@ impl ContentService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     Actor::system(),
                     events::entry_subject(before.entry_id),
                     &events::ScheduleCanceled(change),

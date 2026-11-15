@@ -38,12 +38,11 @@ impl JobHandler for Cleanup {
         let mut removed = 0;
         // Số đếm của cửa sổ đã qua lâu và không còn khoá (bảng `auth_throttle` của kernel).
         let throttle = autoxide_kernel::throttle::Throttle::new(
-            self.database.clone(),
             "auth",
             1,
             std::time::Duration::from_secs(60),
         )?;
-        removed += throttle.purge(day_ago).await?;
+        removed += throttle.purge(&self.database, day_ago).await?;
         // Refresh token đã hết hạn, hay đã thu hồi hơn một ngày (gửi lại token đã xoá
         // vẫn bị từ chối như token lạ).
         // Hai lệnh, mỗi lệnh dùng một index (`OR` của hai cột không dùng được index nào).
@@ -169,7 +168,12 @@ mod tests {
             services.sessions.login("bob@example.com", "wrong", None).await.unwrap_err();
             assert_eq!(count(&database, "auth_refresh_token").await, 3);
 
-            let context = JobContext::new(KIND, serde_json::Value::Null, 1);
+            let context = JobContext::for_tenant(
+                autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                KIND,
+                serde_json::Value::Null,
+                1,
+            );
             Cleanup::new(database.clone()).run(&context).await.unwrap();
 
             // Còn token mới nhất (chưa hết hạn) và số đếm vừa ghi của bob.

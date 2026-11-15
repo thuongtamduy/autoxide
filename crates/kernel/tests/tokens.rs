@@ -10,7 +10,9 @@ use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, Modules};
-use autoxide_kernel::tokens::{OneTimeTokens, tokens_migration};
+use autoxide_kernel::tenancy::migration::adopt;
+use autoxide_kernel::tenancy::{MAIN_PLACEMENT, TenantContext, TenantId, TenantStatus};
+use autoxide_kernel::tokens::{OneTimeTokens, tenant_table, tokens_migration};
 use autoxide_testkit::TestDatabase;
 use chrono::{Duration, Utc};
 use sea_orm::{ConnectionTrait, Statement};
@@ -23,7 +25,10 @@ impl Module for Demo {
     }
 
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        vec![tokens_migration("m0001_create_tokens", "demo")]
+        vec![
+            tokens_migration("m0001_create_tokens", "demo"),
+            adopt("m0002_tenancy", vec![tenant_table("demo")]),
+        ]
     }
 }
 
@@ -40,32 +45,35 @@ async fn database(test: &TestDatabase) -> Database {
 async fn dung_mot_lan_dung_muc_dich_con_han() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
+        let tenant = TenantContext::legacy_default(&database);
         let tokens = OneTimeTokens::new("demo");
         let write = database.write();
         let issued = tokens
-            .issue(write, "confirm", "sub-1", Some("a@example.com"), Duration::hours(1))
+            .issue(write, &tenant, "confirm", "sub-1", Some("a@example.com"), Duration::hours(1))
             .await
             .unwrap();
         assert_eq!(issued.token.len(), 43);
         assert!(
-            tokens.consume(write, "other", &issued.token).await.unwrap().is_none(),
+            tokens.consume(write, &tenant, "other", &issued.token).await.unwrap().is_none(),
             "wrong purpose"
         );
-        let used = tokens.consume(write, "confirm", &issued.token).await.unwrap().unwrap();
+        let used = tokens.consume(write, &tenant, "confirm", &issued.token).await.unwrap().unwrap();
         assert_eq!(
             (used.id, used.subject.as_str(), used.data.as_deref()),
             (issued.id, "sub-1", Some("a@example.com"))
         );
         assert!(
-            tokens.consume(write, "confirm", &issued.token).await.unwrap().is_none(),
+            tokens.consume(write, &tenant, "confirm", &issued.token).await.unwrap().is_none(),
             "used once"
         );
-        assert!(tokens.consume(write, "confirm", "nonsense").await.unwrap().is_none());
+        assert!(tokens.consume(write, &tenant, "confirm", "nonsense").await.unwrap().is_none());
 
-        let expired =
-            tokens.issue(write, "confirm", "sub-1", None, Duration::seconds(-1)).await.unwrap();
+        let expired = tokens
+            .issue(write, &tenant, "confirm", "sub-1", None, Duration::seconds(-1))
+            .await
+            .unwrap();
         assert!(
-            tokens.consume(write, "confirm", &expired.token).await.unwrap().is_none(),
+            tokens.consume(write, &tenant, "confirm", &expired.token).await.unwrap().is_none(),
             "expired"
         );
         // Token không lưu nguyên văn.
@@ -82,36 +90,40 @@ async fn dung_mot_lan_dung_muc_dich_con_han() {
 async fn gan_day_thu_hoi_va_don_dep() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
+        let tenant = TenantContext::legacy_default(&database);
         let tokens = OneTimeTokens::new("demo");
         let write = database.write();
         let first = tokens
-            .issue(write, "verify", "user-1", Some("a@example.com"), Duration::hours(1))
+            .issue(write, &tenant, "verify", "user-1", Some("a@example.com"), Duration::hours(1))
             .await
             .unwrap();
         tokens
-            .issue(write, "verify", "user-1", Some("b@example.com"), Duration::hours(1))
+            .issue(write, &tenant, "verify", "user-1", Some("b@example.com"), Duration::hours(1))
             .await
             .unwrap();
-        tokens.issue(write, "verify", "user-2", None, Duration::hours(1)).await.unwrap();
+        tokens.issue(write, &tenant, "verify", "user-2", None, Duration::hours(1)).await.unwrap();
         let recent = tokens
-            .recent(write, "verify", "user-1", Utc::now() - Duration::minutes(1))
+            .recent(write, &tenant, "verify", "user-1", Utc::now() - Duration::minutes(1))
             .await
             .unwrap();
         let data: Vec<_> = recent.iter().map(|token| token.data.as_deref()).collect();
         assert_eq!(data, [Some("b@example.com"), Some("a@example.com")]);
         assert!(
             tokens
-                .recent(write, "verify", "user-1", Utc::now() + Duration::minutes(1))
+                .recent(write, &tenant, "verify", "user-1", Utc::now() + Duration::minutes(1))
                 .await
                 .unwrap()
                 .is_empty()
         );
 
-        assert_eq!(tokens.revoke(write, "verify", "user-1").await.unwrap(), 2);
-        let other = tokens.issue(write, "other", "user-3", None, Duration::hours(1)).await.unwrap();
-        assert_eq!(tokens.forget(write, "user-3").await.unwrap(), 1);
-        assert!(tokens.consume(write, "other", &other.token).await.unwrap().is_none());
-        assert!(tokens.consume(write, "verify", &first.token).await.unwrap().is_none());
+        assert_eq!(tokens.revoke(write, &tenant, "verify", "user-1").await.unwrap(), 2);
+        let other = tokens
+            .issue(write, &tenant, "other", "user-3", None, Duration::hours(1))
+            .await
+            .unwrap();
+        assert_eq!(tokens.forget(write, &tenant, "user-3").await.unwrap(), 1);
+        assert!(tokens.consume(write, &tenant, "other", &other.token).await.unwrap().is_none());
+        assert!(tokens.consume(write, &tenant, "verify", &first.token).await.unwrap().is_none());
         // Dọn theo hạn (cột có index, D-158): chưa token nào hết hạn thì không xoá gì; qua hạn
         // thì xoá cả token đã dùng (thu hồi) lẫn token chưa dùng.
         assert_eq!(tokens.purge(write, Utc::now() + Duration::minutes(1)).await.unwrap(), 0);
@@ -126,16 +138,19 @@ async fn gan_day_thu_hoi_va_don_dep() {
 async fn dung_dong_thoi_mot_ben_thang() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
+        let tenant = TenantContext::legacy_default(&database);
         let tokens = Arc::new(OneTimeTokens::new("demo"));
-        let issued =
-            tokens.issue(database.write(), "confirm", "s", None, Duration::hours(1)).await.unwrap();
+        let issued = tokens
+            .issue(database.write(), &tenant, "confirm", "s", None, Duration::hours(1))
+            .await
+            .unwrap();
         let tasks: Vec<_> = (0..12)
             .map(|_| {
-                let (tokens, database, token) =
-                    (tokens.clone(), database.clone(), issued.token.clone());
-                tokio::spawn(
-                    async move { tokens.consume(database.write(), "confirm", &token).await },
-                )
+                let (tokens, database, token, tenant) =
+                    (tokens.clone(), database.clone(), issued.token.clone(), tenant.clone());
+                tokio::spawn(async move {
+                    tokens.consume(database.write(), &tenant, "confirm", &token).await
+                })
             })
             .collect();
         let mut winners = 0;
@@ -145,6 +160,32 @@ async fn dung_dong_thoi_mot_ben_thang() {
             }
         }
         assert_eq!(winners, 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// Token của khách này dùng ở khách khác: như token lạ (không tiêu, không lộ).
+#[tokio::test]
+async fn token_cua_khach_khac_nhu_token_la() {
+    TestDatabase::run(async |test| {
+        let database = database(test).await;
+        let ours = TenantContext::legacy_default(&database);
+        let theirs = TenantContext::new(
+            TenantId::from_uuid(uuid::Uuid::now_v7()),
+            "other",
+            "Other",
+            TenantStatus::Active,
+            MAIN_PLACEMENT,
+            database.clone(),
+        );
+        let tokens = OneTimeTokens::new("demo");
+        let write = database.write();
+        let issued =
+            tokens.issue(write, &ours, "confirm", "s", None, Duration::hours(1)).await.unwrap();
+        assert!(tokens.consume(write, &theirs, "confirm", &issued.token).await.unwrap().is_none());
+        assert_eq!(tokens.revoke(write, &theirs, "confirm", "s").await.unwrap(), 0);
+        assert!(tokens.consume(write, &ours, "confirm", &issued.token).await.unwrap().is_some());
     })
     .await
     .unwrap();

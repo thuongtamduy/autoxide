@@ -23,6 +23,7 @@ use autoxide_kernel::i18n::Language;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::mail::MailTemplate;
 use autoxide_kernel::rows;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
@@ -101,7 +102,14 @@ impl EmailVerifications {
         transaction: &sea_orm::DatabaseTransaction,
         job: &EmailChangedJob,
     ) -> Result<(), Error> {
-        self.jobs.enqueue(transaction, job, EnqueueOptions::default()).await?;
+        self.jobs
+            .enqueue(
+                transaction,
+                &TenantContext::legacy_default(&self.database),
+                job,
+                EnqueueOptions::default(),
+            )
+            .await?;
         Ok(())
     }
 
@@ -111,8 +119,17 @@ impl EmailVerifications {
         let ttl = chrono::Duration::days(REPORT_DAYS);
         let subject = job.user_id.to_string();
         let transaction = self.database.begin_write().await?;
-        let token =
-            tokens().issue(&transaction, PURPOSE, &subject, Some(&job.old_email), ttl).await?.token;
+        let token = tokens()
+            .issue(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &subject,
+                Some(&job.old_email),
+                ttl,
+            )
+            .await?
+            .token;
         transaction.commit().await?;
         let new_email = mask(&job.new_email);
         let at = job.changed_at.format("%Y-%m-%d %H:%M").to_string();
@@ -146,7 +163,9 @@ impl EmailVerifications {
     /// Chủ tài khoản báo "không phải tôi" bằng `token` trong mail gửi tới địa chỉ cũ.
     pub(crate) async fn report(&self, token: &str, language: Language) -> Result<(), Error> {
         let transaction = self.database.begin_write().await?;
-        let consumed = tokens().consume(&transaction, PURPOSE, token).await?;
+        let consumed = tokens()
+            .consume(&transaction, &TenantContext::legacy_default(&self.database), PURPOSE, token)
+            .await?;
         let found = consumed
             .and_then(|consumed| Some((consumed.subject.parse::<Uuid>().ok()?, consumed.data?)));
         let Some((user_id, old_email)) = found else {
@@ -176,16 +195,38 @@ impl EmailVerifications {
         let actor = Actor::user(user_id);
         self.users.lock_out_in(&transaction, actor, user_id).await?;
         // Mọi token báo khác của người này cũng hết dùng được.
-        tokens().revoke(&transaction, PURPOSE, &user_id.to_string()).await?;
+        tokens()
+            .revoke(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &user_id.to_string(),
+            )
+            .await?;
         let after = if restored { old_email.clone() } else { current.clone() };
         let event = events::EmailChangeReported {
             before: Some(json!({"email": current})),
             after: Some(json!({"email": after, "restored": restored})),
         };
-        self.outbox.record(&transaction, actor, events::user_subject(user_id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(user_id),
+                &event,
+            )
+            .await?;
         if restored {
             let job = ResetJob { email: old_email, language: language.tag().to_owned() };
-            self.jobs.enqueue(&transaction, &job, EnqueueOptions::default()).await?;
+            self.jobs
+                .enqueue(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    &job,
+                    EnqueueOptions::default(),
+                )
+                .await?;
         }
         transaction.commit().await?;
         tracing::warn!(user_id = %user_id, restored, "an email change was reported as not made by the owner");

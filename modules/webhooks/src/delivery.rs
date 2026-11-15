@@ -15,6 +15,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use serde::{Deserialize, Serialize};
@@ -110,7 +111,14 @@ impl Fanout {
             Err(error) => return Err(error.into()),
         }
         let options = EnqueueOptions::default().max_attempts(MAX_ATTEMPTS);
-        self.jobs.enqueue(&transaction, &Send { delivery_id: id }, options).await?;
+        self.jobs
+            .enqueue(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                &Send { delivery_id: id },
+                options,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(())
     }

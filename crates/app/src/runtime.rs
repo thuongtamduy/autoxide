@@ -72,8 +72,8 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
              hashes. Set it (outside the database, the same on every server) in production."
         );
     }
-    let background = modules.dispatcher(&database).and_then(|dispatcher| {
-        let worker = modules.worker(&database, config.process.job_concurrency)?;
+    let background = modules.dispatcher().and_then(|dispatcher| {
+        let worker = modules.worker(config.process.job_concurrency)?;
         Ok((dispatcher, worker))
     });
     let (dispatcher, worker) = match background {

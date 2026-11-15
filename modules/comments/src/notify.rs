@@ -21,6 +21,7 @@ use autoxide_kernel::event::{Delivered, Event, EventHandler};
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::mail::MailTemplate;
 use autoxide_kernel::resource::Resource;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tokens::Issued;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
@@ -130,7 +131,16 @@ impl CommentsService {
     /// theo dõi trả lời của nó.
     pub(crate) async fn verify(&self, token: &str) -> Result<(), Error> {
         let transaction = self.database.begin_write().await?;
-        let Some(consumed) = self.tokens.consume(&transaction, VERIFY, token.trim()).await? else {
+        let Some(consumed) = self
+            .tokens
+            .consume(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                VERIFY,
+                token.trim(),
+            )
+            .await?
+        else {
             transaction.rollback().await?;
             return Err(link_invalid());
         };
@@ -169,7 +179,15 @@ impl CommentsService {
     /// Token lạ / đã dùng không phải lỗi (không lộ gì). Trả số dòng theo dõi đã xoá.
     pub(crate) async fn unsubscribe(&self, token: &str, all: bool) -> Result<u64, Error> {
         let transaction = self.database.begin_write().await?;
-        let Some(consumed) = self.tokens.consume(&transaction, UNSUBSCRIBE, token.trim()).await?
+        let Some(consumed) = self
+            .tokens
+            .consume(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                UNSUBSCRIBE,
+                token.trim(),
+            )
+            .await?
         else {
             transaction.rollback().await?;
             return Ok(0);
@@ -229,6 +247,7 @@ impl CommentsService {
                 .tokens
                 .issue(
                     self.database.write(),
+                    &TenantContext::legacy_default(&self.database),
                     UNSUBSCRIBE,
                     &follower.id.to_string(),
                     None,

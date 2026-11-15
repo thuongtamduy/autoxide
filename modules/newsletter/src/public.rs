@@ -34,6 +34,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::Throttle;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
@@ -207,6 +208,7 @@ impl NewsletterService {
         let checked = self
             .guard
             .check(
+                &TenantContext::legacy_default(&self.database),
                 &Check::new(SCOPE, client)
                     .principal(trusted)
                     .honeypot(input.trap.as_deref())
@@ -253,8 +255,18 @@ impl NewsletterService {
         // xác nhận, mail) chạy trong job, nên thời gian trả lời không lộ địa chỉ đã có hay chưa
         // (D-154). Nonce đã có (gửi lại cùng token) → rollback: không xếp job thứ hai.
         let transaction = self.database.begin_write().await?;
-        self.jobs.enqueue(&transaction, &job, EnqueueOptions::default()).await?;
-        if let Claim::Replay { .. } = checked.claim(&transaction, MODULE, None).await? {
+        self.jobs
+            .enqueue(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                &job,
+                EnqueueOptions::default(),
+            )
+            .await?;
+        if let Claim::Replay { .. } = checked
+            .claim(&transaction, &TenantContext::legacy_default(&self.database), MODULE, None)
+            .await?
+        {
             transaction.rollback().await?;
             return Ok(());
         }
@@ -328,10 +340,26 @@ impl NewsletterService {
                     let subject = events::subscriber_subject(row.id);
                     if double {
                         let event = events::SubscriptionRequested(change);
-                        self.outbox.record(&transaction, actor, subject, &event).await?;
+                        self.outbox
+                            .record(
+                                &transaction,
+                                &TenantContext::legacy_default(&self.database),
+                                actor,
+                                subject,
+                                &event,
+                            )
+                            .await?;
                     } else {
                         let event = events::SubscriptionConfirmed(change);
-                        self.outbox.record(&transaction, actor, subject, &event).await?;
+                        self.outbox
+                            .record(
+                                &transaction,
+                                &TenantContext::legacy_default(&self.database),
+                                actor,
+                                subject,
+                                &event,
+                            )
+                            .await?;
                     }
                 }
             }
@@ -346,7 +374,14 @@ impl NewsletterService {
             let subject = row.id.to_string();
             Some(
                 self.tokens
-                    .issue(&transaction, CONFIRM, &subject, Some(&ids.join(",")), ttl)
+                    .issue(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        CONFIRM,
+                        &subject,
+                        Some(&ids.join(",")),
+                        ttl,
+                    )
                     .await?,
             )
         };
@@ -383,14 +418,16 @@ impl NewsletterService {
     /// Đếm một lần cho `email` vào bộ đếm mail xác nhận (tối đa
     /// `AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` một ngày); `true` nếu còn được gửi.
     async fn confirm_mail_allowed(&self, email: &str) -> Result<bool, Error> {
-        let throttle =
-            Throttle::new(self.database.clone(), MODULE, self.config.confirm_mails_per_day, DAY)?;
-        Ok(throttle.hit(&format!("confirm:{email}")).await?.is_allowed())
+        let throttle = Throttle::new(MODULE, self.config.confirm_mails_per_day, DAY)?;
+        Ok(throttle
+            .hit(&TenantContext::legacy_default(&self.database), &format!("confirm:{email}"))
+            .await?
+            .is_allowed())
     }
 
     /// Giới hạn số lần đăng ký (theo IP băm, email, người dùng), trên bảng `newsletter_throttle`.
     fn limits(&self) -> Result<Limits, Error> {
-        let throttle = |limit: u32| Throttle::new(self.database.clone(), MODULE, limit, HOUR);
+        let throttle = |limit: u32| Throttle::new(MODULE, limit, HOUR);
         Ok(Limits::default()
             .ip(Some(throttle(self.config.per_ip_per_hour)?))
             .email(Some(throttle(self.config.per_email_per_hour)?))
@@ -401,7 +438,16 @@ impl NewsletterService {
     /// vừa (hay đã) được xác nhận.
     pub(crate) async fn confirm(&self, token: &str) -> Result<Vec<List>, Error> {
         let transaction = self.database.begin_write().await?;
-        let Some(consumed) = self.tokens.consume(&transaction, CONFIRM, token.trim()).await? else {
+        let Some(consumed) = self
+            .tokens
+            .consume(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                CONFIRM,
+                token.trim(),
+            )
+            .await?
+        else {
             transaction.rollback().await?;
             return Err(Error::bad_request(
                 "newsletter.confirmation_invalid",
@@ -436,6 +482,7 @@ impl NewsletterService {
                     self.outbox
                         .record(
                             &transaction,
+                            &TenantContext::legacy_default(&self.database),
                             Actor::public(),
                             events::subscriber_subject(subscriber_id),
                             &events::SubscriptionConfirmed(change),
@@ -619,6 +666,7 @@ impl NewsletterService {
                 self.outbox
                     .record(
                         &transaction,
+                        &TenantContext::legacy_default(&self.database),
                         Actor::public(),
                         subject.clone(),
                         &events::SubscriptionConfirmed(change),

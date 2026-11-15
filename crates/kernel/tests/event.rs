@@ -45,6 +45,10 @@ impl Module for Notes {
         vec![
             outbox_migration("m0001_create_events", "notes"),
             autoxide_kernel::event::outbox_actor_migration("m0002_add_event_actor", "notes"),
+            autoxide_kernel::tenancy::migration::adopt(
+                "m0003_tenancy",
+                vec![autoxide_kernel::event::tenant_table("notes")],
+            ),
         ]
     }
 
@@ -121,7 +125,13 @@ async fn record(setup: &Setup, title: &str) {
     let transaction = setup.database.begin_write().await.unwrap();
     setup
         .outbox
-        .record(&transaction, actor, Some(format!("notes.note:{title}")), &event)
+        .record(
+            &transaction,
+            &autoxide_kernel::tenancy::TenantContext::legacy_default(&setup.database),
+            actor,
+            Some(format!("notes.note:{title}")),
+            &event,
+        )
         .await
         .unwrap();
     transaction.commit().await.unwrap();
@@ -137,11 +147,21 @@ async fn event_chi_ton_tai_khi_transaction_commit_roi_duoc_giao_mot_lan() {
         // Transaction bị huỷ: không có event nào.
         let transaction = setup.database.begin_write().await.unwrap();
         let event = NoteCreated { title: "draft".to_owned() };
-        setup.outbox.record(&transaction, Actor::system(), None, &event).await.unwrap();
+        setup
+            .outbox
+            .record(
+                &transaction,
+                &autoxide_kernel::tenancy::TenantContext::legacy_default(&setup.database),
+                Actor::system(),
+                None,
+                &event,
+            )
+            .await
+            .unwrap();
         transaction.rollback().await.unwrap();
         record(&setup, "first").await;
 
-        let dispatcher = setup.modules.dispatcher(&setup.database).unwrap();
+        let dispatcher = setup.modules.dispatcher().unwrap();
         assert_eq!(dispatcher.run_once().await.unwrap(), 1);
         assert_eq!(dispatcher.run_once().await.unwrap(), 0);
 
@@ -167,10 +187,20 @@ async fn nguoi_la_khac_he_thong() {
         for actor in [Actor::public(), Actor::system()] {
             let transaction = setup.database.begin_write().await.unwrap();
             let event = NoteCreated { title: actor.kind().to_owned() };
-            setup.outbox.record(&transaction, actor, None, &event).await.unwrap();
+            setup
+                .outbox
+                .record(
+                    &transaction,
+                    &autoxide_kernel::tenancy::TenantContext::legacy_default(&setup.database),
+                    actor,
+                    None,
+                    &event,
+                )
+                .await
+                .unwrap();
             transaction.commit().await.unwrap();
         }
-        let dispatcher = setup.modules.dispatcher(&setup.database).unwrap();
+        let dispatcher = setup.modules.dispatcher().unwrap();
         assert_eq!(dispatcher.run_once().await.unwrap(), 2);
         let seen = recorder.seen.lock().unwrap();
         let kinds: Vec<(&str, bool)> =
@@ -189,7 +219,7 @@ async fn ben_nhan_loi_thi_giao_lai_roi_danh_dau_hong() {
         let listener = Listener { event: Subscription::ALL, recorder: recorder.clone() };
         let setup = setup(test, listener).await;
         record(&setup, "doomed").await;
-        let dispatcher = setup.modules.dispatcher(&setup.database).unwrap();
+        let dispatcher = setup.modules.dispatcher().unwrap();
 
         for attempt in 1..=MAX_ATTEMPTS {
             assert_eq!(dispatcher.run_once().await.unwrap(), 1, "attempt {attempt}");
@@ -236,7 +266,7 @@ async fn event_xoa_tai_khoan_thu_lai_mai() {
         let rename =
             format!("UPDATE notes_events SET name = '{}'", autoxide_kernel::privacy::USER_DELETED);
         setup.database.write().execute_raw(Statement::from_string(backend, rename)).await.unwrap();
-        let dispatcher = setup.modules.dispatcher(&setup.database).unwrap();
+        let dispatcher = setup.modules.dispatcher().unwrap();
 
         for attempt in 1..=MAX_ATTEMPTS + 2 {
             assert_eq!(dispatcher.run_once().await.unwrap(), 1, "attempt {attempt}");
@@ -272,8 +302,8 @@ async fn nhieu_bo_phat_dong_thoi_khong_giao_trung() {
             record(&setup, &format!("note-{index}")).await;
         }
 
-        let first = setup.modules.dispatcher(&setup.database).unwrap();
-        let second = setup.modules.dispatcher(&setup.database).unwrap();
+        let first = setup.modules.dispatcher().unwrap();
+        let second = setup.modules.dispatcher().unwrap();
         let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
         assert_eq!(a.unwrap() + b.unwrap(), 30);
@@ -294,8 +324,9 @@ async fn khai_sai_thi_bao_ro() {
         let listener = Listener { event: "notes.nothing", recorder: Arc::default() };
         let setup = setup(test, listener).await;
 
-        let error = setup.modules.dispatcher(&setup.database).err().unwrap().to_string();
+        let error = setup.modules.dispatcher().err().unwrap().to_string();
         assert!(error.contains("subscribes to event `notes.nothing`"), "{error}");
+        let tenant = autoxide_kernel::tenancy::TenantContext::legacy_default(&setup.database);
 
         // Ghi event của module khác qua outbox của `notes` là lỗi của người viết code.
         #[derive(Serialize)]
@@ -303,8 +334,10 @@ async fn khai_sai_thi_bao_ro() {
         impl Event for Foreign {
             const NAME: &'static str = "tags.tag_created";
         }
-        let error =
-            setup.outbox.record(setup.database.write(), Actor::system(), None, &Foreign).await;
+        let error = setup
+            .outbox
+            .record(setup.database.write(), &tenant, Actor::system(), None, &Foreign)
+            .await;
         assert_eq!(error.unwrap_err().code(), "internal_error");
     })
     .await
@@ -331,7 +364,7 @@ async fn ben_nhan_panic_hay_dong_hong_khong_chan_event_sau() {
             .to_owned();
         setup.database.write().execute(&damage).await.unwrap();
 
-        let dispatcher = setup.modules.dispatcher(&setup.database).unwrap();
+        let dispatcher = setup.modules.dispatcher().unwrap();
         dispatcher.run_once().await.unwrap();
         let seen: Vec<String> = recorder
             .seen

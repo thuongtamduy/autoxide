@@ -19,6 +19,7 @@ use super::entity::{role, role_permission, user_role};
 use crate::events;
 use crate::user::entity as user;
 use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::json;
 
 const NAME_MAX_LENGTH: usize = 64;
@@ -109,7 +110,15 @@ impl RoleService {
         let after =
             Some(json!({"name": name, "description": description, "permissions": permissions}));
         let event = events::RoleCreated { before: None, after };
-        self.outbox.record(&transaction, actor, role_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                role_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role created");
         self.get(id).await
@@ -155,7 +164,15 @@ impl RoleService {
         insert_permissions(&transaction, id, &permissions).await?;
         let after = json!({"name": name, "description": description, "permissions": permissions});
         let event = events::RoleUpdated { before: Some(before), after: Some(after) };
-        self.outbox.record(&transaction, actor, role_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                role_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role changed");
         self.get(id).await
@@ -174,7 +191,15 @@ impl RoleService {
         let before = role_snapshot(&transaction, &current).await?;
         role::Entity::delete_by_id(id).exec(&transaction).await?;
         let event = events::RoleDeleted { before: Some(before), after: None };
-        self.outbox.record(&transaction, actor, role_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                role_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role deleted");
         Ok(())
@@ -253,7 +278,15 @@ impl RoleService {
         let after = roles_of_user(&transaction, user_id).await?;
         let event =
             events::UserRolesChanged { before: Some(before), after: Some(role_names(&after)) };
-        self.outbox.record(&transaction, actor, events::user_subject(user_id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(user_id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, roles = role_ids.len(), "user roles changed");
         Ok(after)

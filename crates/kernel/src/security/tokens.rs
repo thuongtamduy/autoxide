@@ -10,6 +10,7 @@
 //!   database.
 //! - Chống gửi dồn (dùng API làm công cụ spam hộp thư người khác): bên gọi xem
 //!   [`OneTimeTokens::recent`] trước khi phát token mới.
+//! - Theo khách (bước 33): token mang khách; dùng token ở khách khác thì như token lạ.
 
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
@@ -22,6 +23,7 @@ use uuid::Uuid;
 
 use crate::error::Error;
 use crate::secret::{random_token, sha256};
+use crate::tenancy::TenantContext;
 
 /// Token vừa phát: giá trị gửi cho người dùng (không lưu ở đâu cả) và hạn dùng.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,10 +63,11 @@ impl OneTimeTokens {
         OneTimeTokens { table: table_name(module) }
     }
 
-    /// Phát một token cho `subject`, dùng cho `purpose`, sống `ttl`.
+    /// Phát một token của khách `tenant` cho `subject`, dùng cho `purpose`, sống `ttl`.
     pub async fn issue<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         purpose: &str,
         subject: &str,
         data: Option<&str>,
@@ -77,10 +80,20 @@ impl OneTimeTokens {
         let insert = Query::insert()
             .into_table(Alias::new(&self.table))
             .columns(
-                ["id", "purpose", "subject", "data", "token_hash", "expires_at", "created_at"]
-                    .map(Alias::new),
+                [
+                    "tenant_id",
+                    "id",
+                    "purpose",
+                    "subject",
+                    "data",
+                    "token_hash",
+                    "expires_at",
+                    "created_at",
+                ]
+                .map(Alias::new),
             )
             .values_panic([
+                tenant.id().as_uuid().into(),
                 id.into(),
                 purpose.into(),
                 subject.into(),
@@ -98,6 +111,7 @@ impl OneTimeTokens {
     pub async fn recent<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         purpose: &str,
         subject: &str,
         since: DateTime<Utc>,
@@ -105,6 +119,7 @@ impl OneTimeTokens {
         let select = Query::select()
             .columns([Alias::new("data"), Alias::new("created_at")])
             .from(Alias::new(&self.table))
+            .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
             .and_where(Expr::col(Alias::new("purpose")).eq(purpose))
             .and_where(Expr::col(Alias::new("subject")).eq(subject))
             .and_where(Expr::col(Alias::new("created_at")).gt(since))
@@ -126,14 +141,17 @@ impl OneTimeTokens {
     pub async fn consume<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         purpose: &str,
         token: &str,
     ) -> Result<Option<Consumed>, Error> {
         let hash = sha256(token);
         let now = now();
+        let tenant = tenant.id().as_uuid();
         let claim = Query::update()
             .table(Alias::new(&self.table))
             .value(Alias::new("used_at"), Some(now))
+            .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant))
             .and_where(Expr::col(Alias::new("token_hash")).eq(hash.as_str()))
             .and_where(Expr::col(Alias::new("purpose")).eq(purpose))
             .and_where(Expr::col(Alias::new("used_at")).is_null())
@@ -145,6 +163,7 @@ impl OneTimeTokens {
         let select = Query::select()
             .columns([Alias::new("id"), Alias::new("subject"), Alias::new("data")])
             .from(Alias::new(&self.table))
+            .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant))
             .and_where(Expr::col(Alias::new("token_hash")).eq(hash.as_str()))
             .to_owned();
         let Some(row) = connection.query_one(&select).await? else {
@@ -162,12 +181,14 @@ impl OneTimeTokens {
     pub async fn revoke<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         purpose: &str,
         subject: &str,
     ) -> Result<u64, Error> {
         let update = Query::update()
             .table(Alias::new(&self.table))
             .value(Alias::new("used_at"), Some(now()))
+            .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
             .and_where(Expr::col(Alias::new("purpose")).eq(purpose))
             .and_where(Expr::col(Alias::new("subject")).eq(subject))
             .and_where(Expr::col(Alias::new("used_at")).is_null())
@@ -180,16 +201,18 @@ impl OneTimeTokens {
     pub async fn forget<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         subject: &str,
     ) -> Result<u64, Error> {
         let delete = Query::delete()
             .from_table(Alias::new(&self.table))
+            .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
             .and_where(Expr::col(Alias::new("subject")).eq(subject))
             .to_owned();
         Ok(connection.execute(&delete).await?.rows_affected())
     }
 
-    /// Xoá token đã hết hạn trước `before` (job dọn dẹp của module) — token đã dùng cũng đi
+    /// Xoá token (mọi khách) đã hết hạn trước `before` (job dọn dẹp của module) — token đã dùng cũng đi
     /// theo khi tới hạn của nó (vài phút tới một ngày). Một điều kiện trên cột có index thay vì
     /// `OR` với `used_at` (không index, buộc duyệt cả bảng — D-158). Trả số dòng đã xoá.
     pub async fn purge<C: ConnectionTrait>(
@@ -277,4 +300,16 @@ impl MigrationTrait for TokensMigration {
             .drop_table(Table::drop().table(Alias::new(table_name(self.module))).to_owned())
             .await
     }
+}
+
+/// Bảng `<module>_tokens` sau khi nâng theo khách (bước 33 A4): token duy nhất trong khách; index
+/// tra theo đối tượng bắt đầu bằng `tenant_id`; index dọn dẹp (mọi khách) `…_expires_sweep_idx`.
+/// Thêm vào migration của module như [`event::tenant_table`](crate::event::tenant_table).
+pub fn tenant_table(module: &str) -> crate::tenancy::migration::TenantTable {
+    let table = table_name(module);
+    crate::tenancy::migration::TenantTable::new(&table)
+        .unique(format!("{table}_token_hash_unique"), ["tenant_id", "token_hash"])
+        .index(format!("{table}_subject_idx"), ["tenant_id", "purpose", "subject", "created_at"])
+        .sweep_index(format!("{table}_expires_sweep_idx"), ["expires_at"])
+        .drop_index(format!("{table}_expires_idx"))
 }

@@ -1,5 +1,6 @@
 //! `Throttle` đếm trong database: chặn khi vượt giới hạn, hết cửa sổ thì đếm lại, đếm đồng thời
-//! không mất lần nào, bắn đồng thời không vượt giới hạn. Chạy trên cả SQLite và Postgres.
+//! không mất lần nào, bắn đồng thời không vượt giới hạn, mỗi khách đếm riêng. Chạy trên cả SQLite
+//! và Postgres.
 
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -11,7 +12,9 @@ use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, Modules};
-use autoxide_kernel::throttle::{Outcome, Throttle, throttle_migration};
+use autoxide_kernel::tenancy::migration::adopt;
+use autoxide_kernel::tenancy::{MAIN_PLACEMENT, TenantContext, TenantId, TenantStatus};
+use autoxide_kernel::throttle::{Outcome, Throttle, tenant_table, throttle_migration};
 use autoxide_testkit::TestDatabase;
 use sea_orm::{ConnectionTrait, Statement};
 
@@ -23,7 +26,10 @@ impl Module for Demo {
     }
 
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        vec![throttle_migration("m0001_create_throttle", "demo")]
+        vec![
+            throttle_migration("m0001_create_throttle", "demo"),
+            adopt("m0002_tenancy", vec![tenant_table("demo")]),
+        ]
     }
 }
 
@@ -46,25 +52,28 @@ async fn sql(database: &Database, text: &str) -> i64 {
 async fn vuot_gioi_han_thi_chan_roi_xoa_thi_quen() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let throttle =
-            Throttle::new(database.clone(), "demo", 3, Duration::from_secs(900)).unwrap();
+        let tenant = TenantContext::legacy_default(&database);
+        let throttle = Throttle::new("demo", 3, Duration::from_secs(900)).unwrap();
         for _ in 0..3 {
-            assert_eq!(throttle.hit("ip:a").await.unwrap(), Outcome::Allowed);
+            assert_eq!(throttle.hit(&tenant, "ip:a").await.unwrap(), Outcome::Allowed);
         }
-        let Outcome::Limited { retry_after } = throttle.hit("ip:a").await.unwrap() else {
+        let Outcome::Limited { retry_after } = throttle.hit(&tenant, "ip:a").await.unwrap() else {
             panic!()
         };
         assert!((899..=900).contains(&retry_after), "{retry_after}");
         // Đang bị chặn: lần sau không đếm thêm, vẫn bị chặn.
-        assert!(!throttle.hit("ip:a").await.unwrap().is_allowed());
-        assert!(throttle.check("ip:b").await.unwrap().is_allowed(), "other keys are not affected");
+        assert!(!throttle.hit(&tenant, "ip:a").await.unwrap().is_allowed());
+        assert!(
+            throttle.check(&tenant, "ip:b").await.unwrap().is_allowed(),
+            "other keys are not affected"
+        );
         // Khoá không lưu nguyên văn.
         assert_eq!(
             sql(&database, "SELECT COUNT(*) FROM demo_throttle WHERE key = 'ip:a'").await,
             0
         );
-        throttle.clear("ip:a").await.unwrap();
-        assert!(throttle.check("ip:a").await.unwrap().is_allowed());
+        throttle.clear(&tenant, "ip:a").await.unwrap();
+        assert!(throttle.check(&tenant, "ip:a").await.unwrap().is_allowed());
     })
     .await
     .unwrap();
@@ -74,29 +83,30 @@ async fn vuot_gioi_han_thi_chan_roi_xoa_thi_quen() {
 async fn het_cua_so_thi_dem_lai_va_don_dep() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let throttle = Throttle::new(database.clone(), "demo", 2, Duration::from_secs(60))
+        let tenant = TenantContext::legacy_default(&database);
+        let throttle = Throttle::new("demo", 2, Duration::from_secs(60))
             .unwrap()
             .with_lock(Duration::from_secs(600))
             .unwrap();
         for _ in 0..3 {
-            let _ = throttle.hit("k").await.unwrap();
+            let _ = throttle.hit(&tenant, "k").await.unwrap();
         }
-        let Outcome::Limited { retry_after } = throttle.check("k").await.unwrap() else { panic!() };
+        let Outcome::Limited { retry_after } = throttle.check(&tenant, "k").await.unwrap() else { panic!() };
         assert!(retry_after > 60, "lock is longer than the window: {retry_after}");
         // Thời gian trôi qua: hết chặn và hết cửa sổ.
         let backend = database.write().get_database_backend();
         let past = "UPDATE demo_throttle SET locked_until = '2000-01-01 00:00:00+00:00', window_started_at = '2000-01-01 00:00:00+00:00'";
         database.write().execute_raw(Statement::from_string(backend, past)).await.unwrap();
-        assert!(throttle.hit("k").await.unwrap().is_allowed());
+        assert!(throttle.hit(&tenant, "k").await.unwrap().is_allowed());
         assert_eq!(sql(&database, "SELECT CAST(count AS BIGINT) FROM demo_throttle").await, 1);
-        throttle.refund("k").await.unwrap();
+        throttle.refund(&tenant, "k").await.unwrap();
         assert_eq!(sql(&database, "SELECT CAST(count AS BIGINT) FROM demo_throttle").await, 0);
         // Dọn: dòng của cửa sổ cũ, không còn chặn.
-        throttle.record("old").await.unwrap();
+        throttle.record(&tenant, "old").await.unwrap();
         let old = "UPDATE demo_throttle SET window_started_at = '2000-01-01 00:00:00+00:00'";
         database.write().execute_raw(Statement::from_string(backend, old)).await.unwrap();
-        throttle.record("fresh").await.unwrap();
-        let removed = throttle.purge(chrono::Utc::now() - chrono::Duration::days(1)).await.unwrap();
+        throttle.record(&tenant, "fresh").await.unwrap();
+        let removed = throttle.purge(&database, chrono::Utc::now() - chrono::Duration::days(1)).await.unwrap();
         assert_eq!(removed, 2);
         assert_eq!(sql(&database, "SELECT COUNT(*) FROM demo_throttle").await, 1);
     })
@@ -109,13 +119,12 @@ async fn het_cua_so_thi_dem_lai_va_don_dep() {
 async fn dem_dong_thoi_du_tung_lan() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let throttle = Arc::new(
-            Throttle::new(database.clone(), "demo", 100, Duration::from_secs(900)).unwrap(),
-        );
+        let tenant = TenantContext::legacy_default(&database);
+        let throttle = Arc::new(Throttle::new("demo", 100, Duration::from_secs(900)).unwrap());
         let tasks: Vec<_> = (0..8)
             .map(|_| {
-                let throttle = throttle.clone();
-                tokio::spawn(async move { throttle.record("k").await })
+                let (throttle, tenant) = (throttle.clone(), tenant.clone());
+                tokio::spawn(async move { throttle.record(&tenant, "k").await })
             })
             .collect();
         for task in tasks {
@@ -132,12 +141,12 @@ async fn dem_dong_thoi_du_tung_lan() {
 async fn ban_dong_thoi_khong_vuot_gioi_han() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let throttle =
-            Arc::new(Throttle::new(database, "demo", 5, Duration::from_secs(900)).unwrap());
+        let tenant = TenantContext::legacy_default(&database);
+        let throttle = Arc::new(Throttle::new("demo", 5, Duration::from_secs(900)).unwrap());
         let tasks: Vec<_> = (0..40)
             .map(|_| {
-                let throttle = throttle.clone();
-                tokio::spawn(async move { throttle.hit("k").await })
+                let (throttle, tenant) = (throttle.clone(), tenant.clone());
+                tokio::spawn(async move { throttle.hit(&tenant, "k").await })
             })
             .collect();
         let mut allowed = 0;
@@ -147,7 +156,33 @@ async fn ban_dong_thoi_khong_vuot_gioi_han() {
             }
         }
         assert!(allowed <= 5, "{allowed} got through");
-        assert!(!throttle.check("k").await.unwrap().is_allowed());
+        assert!(!throttle.check(&tenant, "k").await.unwrap().is_allowed());
+    })
+    .await
+    .unwrap();
+}
+
+/// Hai khách cùng một khoá: đếm riêng, khách này bị chặn không làm khách kia bị chặn.
+#[tokio::test]
+async fn moi_khach_dem_rieng() {
+    TestDatabase::run(async |test| {
+        let database = database(test).await;
+        let ours = TenantContext::legacy_default(&database);
+        let theirs = TenantContext::new(
+            TenantId::from_uuid(uuid::Uuid::now_v7()),
+            "other",
+            "Other",
+            TenantStatus::Active,
+            MAIN_PLACEMENT,
+            database.clone(),
+        );
+        let throttle = Throttle::new("demo", 1, Duration::from_secs(900)).unwrap();
+        assert!(throttle.hit(&ours, "email:ada").await.unwrap().is_allowed());
+        assert!(!throttle.hit(&ours, "email:ada").await.unwrap().is_allowed());
+        assert!(throttle.check(&theirs, "email:ada").await.unwrap().is_allowed());
+        assert!(throttle.hit(&theirs, "email:ada").await.unwrap().is_allowed());
+        throttle.clear(&theirs, "email:ada").await.unwrap();
+        assert!(!throttle.check(&ours, "email:ada").await.unwrap().is_allowed(), "only theirs");
     })
     .await
     .unwrap();

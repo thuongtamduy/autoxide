@@ -56,7 +56,7 @@ async fn setup_with_database(
     modules.migrator().unwrap().up(&database).await.unwrap();
     modules.start(&database).unwrap();
     let mailer = modules.api::<dyn Mailer>().unwrap();
-    let worker = modules.worker(&database, 4).unwrap();
+    let worker = modules.worker(4).unwrap();
     (mailer, worker, database)
 }
 

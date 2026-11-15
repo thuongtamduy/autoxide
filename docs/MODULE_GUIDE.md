@@ -86,8 +86,9 @@ administrators from the permissions every module declares.
 
 `src/service.rs` holds every rule. It takes an `Actor` (who acts; from
 `Actor::from(&principal)`) so that events record who did it. Each write records its
-event in the same transaction with `Outbox::record(&transaction, actor, subject,
-&event)` — the change and its audit entry exist together or not at all.
+event in the same transaction with `Outbox::record(&transaction, &tenant, actor, subject,
+&event)` — the change and its audit entry exist together or not at all. `tenant` is the
+`TenantContext` of the customer the data belongs to (`autoxide_kernel::tenancy`).
 
 ### 5. REST API and OpenAPI
 

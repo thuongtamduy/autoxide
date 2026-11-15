@@ -118,3 +118,22 @@ impl MigrationTrait for ActorKindMigration {
             .await
     }
 }
+
+/// Bảng `<module>_events` sau khi nâng theo khách (bước 33 A4): `tenant_id` đứng đầu; index quét
+/// của bộ phát (mọi khách) đổi tên `…_pending_sweep_idx`. Module thêm vào migration của mình:
+///
+/// ```ignore
+/// autoxide_kernel::tenancy::migration::adopt(
+///     "m0004_tenancy_helpers",
+///     vec![autoxide_kernel::event::tenant_table("notes")],
+/// ),
+/// ```
+pub fn tenant_table(module: &str) -> crate::tenancy::migration::TenantTable {
+    let table = super::table_name(module);
+    crate::tenancy::migration::TenantTable::new(&table)
+        .sweep_index(
+            format!("{table}_pending_sweep_idx"),
+            ["delivered_at", "failed_at", "next_attempt_at"],
+        )
+        .drop_index(format!("{table}_pending_idx"))
+}

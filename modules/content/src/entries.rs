@@ -13,6 +13,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::rows;
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::ExprTrait as _;
 use sea_orm::{
@@ -293,6 +294,7 @@ impl ContentService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     Actor::from(principal),
                     events::entry_subject(entry.id),
                     &event,
@@ -446,10 +448,24 @@ impl ContentService {
         let subject = events::entry_subject(id);
         if restored_from.is_some() {
             self.outbox
-                .record(&transaction, actor, subject, &events::EntryRestored(change))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::EntryRestored(change),
+                )
                 .await?;
         } else {
-            self.outbox.record(&transaction, actor, subject, &events::EntryUpdated(change)).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::EntryUpdated(change),
+                )
+                .await?;
         }
         transaction.commit().await?;
         Ok(after)

@@ -25,6 +25,7 @@ use crate::role::RoleService;
 use crate::token;
 use crate::user::UserService;
 use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::json;
 
 /// Mọi API key bắt đầu bằng chuỗi này: nhìn là biết đây là API key (không phải access
@@ -175,7 +176,15 @@ impl ApiKeyService {
             "expires_at": input.expires_at,
         });
         let event = events::ApiKeyCreated { before: None, after: Some(after) };
-        self.outbox.record(&transaction, Actor::from(creator), key_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(creator),
+                key_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, api_key_id = %id, "API key created");
         let key = ApiKey {
@@ -226,7 +235,15 @@ impl ApiKeyService {
         api_key::Entity::delete_by_id(id).exec(&transaction).await?;
         let before = json!({"user_id": user_id, "name": row.name, "prefix": row.prefix});
         let event = events::ApiKeyRevoked { before: Some(before), after: None };
-        self.outbox.record(&transaction, Actor::from(caller), key_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(caller),
+                key_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, api_key_id = %id, "API key revoked");
         Ok(())
@@ -388,6 +405,7 @@ fn now() -> DateTime<Utc> {
 /// đặt lại mật khẩu). Mỗi key một event. Trả số key đã thu hồi.
 pub(crate) async fn revoke_all_in<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     outbox: &Outbox,
     actor: Actor,
     user_id: Uuid,
@@ -398,7 +416,7 @@ pub(crate) async fn revoke_all_in<C: ConnectionTrait>(
         api_key::Entity::delete_by_id(row.id).exec(connection).await?;
         let before = json!({"user_id": user_id, "name": row.name, "prefix": row.prefix});
         let event = events::ApiKeyRevoked { before: Some(before), after: None };
-        outbox.record(connection, actor, key_subject(row.id), &event).await?;
+        outbox.record(connection, tenant, actor, key_subject(row.id), &event).await?;
     }
     Ok(rows.len() as u64)
 }

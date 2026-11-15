@@ -15,6 +15,7 @@ use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
 use autoxide_kernel::mail::{MailTemplate, Mailer};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use serde::{Deserialize, Serialize};
@@ -94,7 +95,14 @@ impl PasswordResets {
     /// — kể cả thời gian: việc tra tài khoản, tạo token, gửi mail chạy trong job (D-162).
     pub(crate) async fn request(&self, email: &str, language: Language) -> Result<(), Error> {
         let job = ResetJob { email: email.trim().to_owned(), language: language.tag().to_owned() };
-        self.jobs.enqueue(self.database.write(), &job, EnqueueOptions::default()).await?;
+        self.jobs
+            .enqueue(
+                self.database.write(),
+                &TenantContext::legacy_default(&self.database),
+                &job,
+                EnqueueOptions::default(),
+            )
+            .await?;
         Ok(())
     }
 
@@ -110,16 +118,44 @@ impl PasswordResets {
         let now = now();
         let subject = user.id.to_string();
         let since = now - chrono::Duration::seconds(COOLDOWN_SECONDS);
-        if !tokens().recent(self.database.write(), PURPOSE, &subject, since).await?.is_empty() {
+        if !tokens()
+            .recent(
+                self.database.write(),
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &subject,
+                since,
+            )
+            .await?
+            .is_empty()
+        {
             return Ok(());
         }
 
         let transaction = self.database.begin_write().await?;
         let ttl = chrono::Duration::minutes(TOKEN_MINUTES);
-        let token = tokens().issue(&transaction, PURPOSE, &subject, None, ttl).await?.token;
+        let token = tokens()
+            .issue(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &subject,
+                None,
+                ttl,
+            )
+            .await?
+            .token;
         let event = events::PasswordResetRequested::default();
         let subject = events::user_subject(user.id);
-        self.outbox.record(&transaction, Actor::system(), subject, &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::system(),
+                subject,
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
 
         let minutes = TOKEN_MINUTES.to_string();
@@ -149,7 +185,14 @@ impl PasswordResets {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let consumed = tokens().consume(self.database.write(), PURPOSE, token).await?;
+        let consumed = tokens()
+            .consume(
+                self.database.write(),
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                token,
+            )
+            .await?;
         let user_id = consumed
             .and_then(|consumed| consumed.subject.parse::<Uuid>().ok())
             .ok_or_else(invalid_token)?;

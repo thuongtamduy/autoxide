@@ -552,6 +552,7 @@ async fn du_lieu_ca_nhan() {
         assert_eq!(exported[0]["name"], "a.png");
 
         let deleted = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(&media.database),
             "auth",
             autoxide_kernel::privacy::USER_DELETED.to_owned(),
             json!({"before": {"id": ada.user_id()}}),

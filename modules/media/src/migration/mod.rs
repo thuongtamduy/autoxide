@@ -23,5 +23,13 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0007_variant_formats::Migration),
         // `alt` theo ngôn ngữ (D-202).
         Box::new(m0008_alt_translations::Migration),
+        // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0009_tenancy_helpers",
+            vec![
+                autoxide_kernel::event::tenant_table("media"),
+                autoxide_kernel::job::tenant_table("media"),
+            ],
+        ),
     ]
 }
