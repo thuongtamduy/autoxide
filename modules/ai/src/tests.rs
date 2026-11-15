@@ -10,7 +10,6 @@ use autoxide_kernel::ai::{Effort, EmbedKind, Embedder, Part, Prompt, TextModel};
 use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::migration::{Migrator, ModuleMigrations};
-use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::TestDatabase;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
@@ -119,7 +118,7 @@ async fn database(test: &TestDatabase) -> Database {
 fn text(provider: Box<dyn providers::Provider>, book: Arc<UsageBook>) -> Text {
     let capabilities =
         autoxide_kernel::ai::Capabilities::enabled("x".into(), "model-x".into()).images(true);
-    Text { provider: Some(provider), capabilities, book }
+    Text { provider: Some(Arc::from(provider)), capabilities, book, tenant_override: None }
 }
 
 fn schema() -> Value {
@@ -163,8 +162,9 @@ async fn anthropic_dang_request_va_ket_qua() {
         let (url, fake) =
             server(vec![ok(anthropic_answer(r#"{"title": "Đà Lạt"}"#, "end_turn"))]).await;
         let database = database(test).await;
-        let tenant = TenantContext::legacy_default(&database);
-        let book = Arc::new(UsageBook::new(database, 0));
+        let tenant =
+            autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()).default_tenant();
+        let book = Arc::new(UsageBook::new(0));
         let model = text(
             Box::new(Anthropic::new(&text_config(Provider::Anthropic, &url)).unwrap()),
             book.clone(),
@@ -176,7 +176,7 @@ async fn anthropic_dang_request_va_ket_qua() {
             .unwrap();
         assert_eq!(done.output, json!({"title": "Đà Lạt"}));
         assert_eq!((done.usage.input_tokens, done.usage.output_tokens), (12, 5));
-        assert_eq!(book.used_today().await.unwrap(), 17);
+        assert_eq!(book.used_today(&tenant).await.unwrap(), 17);
 
         let seen = fake.seen.lock().unwrap()[0].clone();
         assert_eq!(seen.path, "/v1/messages");
@@ -208,8 +208,9 @@ async fn anthropic_dang_request_va_ket_qua() {
 async fn anthropic_cac_nhanh_loi() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let tenant = TenantContext::legacy_default(&database);
-        let book = Arc::new(UsageBook::new(database, 0));
+        let tenant =
+            autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()).default_tenant();
+        let book = Arc::new(UsageBook::new(0));
         let answers = vec![
             ok(anthropic_answer("", "refusal")),
             ok(anthropic_answer(r#"{"title": "x"#, "max_tokens")),
@@ -253,8 +254,8 @@ async fn anthropic_cac_nhanh_loi() {
 async fn openai_dang_request_va_cac_nhanh() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let tenant = TenantContext::legacy_default(&database);
-        let book = Arc::new(UsageBook::new(database, 0));
+        let tenant = autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()).default_tenant();
+        let book = Arc::new(UsageBook::new(0));
         let refusal = json!({"model": "m", "choices": [{"finish_reason": "stop", "message": {"content": null, "refusal": "I can't."}}]});
         let answers = vec![
             ok(openai_answer(r#"{"title": "A"}"#, "stop")),
@@ -269,7 +270,7 @@ async fn openai_dang_request_va_cac_nhanh() {
         let image = Part::Image { media_type: "image/jpeg".into(), bytes: vec![255] };
         let done = strict.generate(&tenant, prompt(vec![Part::Text("x".into()), image])).await.unwrap();
         assert_eq!(done.output, json!({"title": "A"}));
-        assert_eq!(book.used_today().await.unwrap(), 10);
+        assert_eq!(book.used_today(&tenant).await.unwrap(), 10);
         let seen = fake.seen.lock().unwrap()[0].clone();
         assert_eq!(seen.path, "/chat/completions");
         assert_eq!(seen.headers["authorization"], "Bearer test-key");
@@ -308,8 +309,8 @@ async fn openai_dang_request_va_cac_nhanh() {
 async fn embedding_chia_lo_va_kiem_so_chieu() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let tenant = TenantContext::legacy_default(&database);
-        let book = Arc::new(UsageBook::new(database, 0));
+        let tenant = autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()).default_tenant();
+        let book = Arc::new(UsageBook::new(0));
         let answers = vec![
             ok(json!({"data": [{"index": 1, "embedding": [0.0, 1.0]}, {"index": 0, "embedding": [1.0, 0.0]}], "usage": {"prompt_tokens": 4}})),
             ok(json!({"data": [{"index": 0, "embedding": [0.5, 0.5]}], "usage": {"total_tokens": 2}})),
@@ -331,7 +332,7 @@ async fn embedding_chia_lo_va_kiem_so_chieu() {
         let texts: Vec<String> = ["a", "b", "c"].map(str::to_owned).to_vec();
         let vectors = embeddings.embed(&tenant, "test.embed", &texts, EmbedKind::Document).await.unwrap();
         assert_eq!(vectors, [vec![1.0, 0.0], vec![0.0, 1.0], vec![0.5, 0.5]]);
-        assert_eq!(book.used_today().await.unwrap(), 6);
+        assert_eq!(book.used_today(&tenant).await.unwrap(), 6);
         let seen = fake.seen.lock().unwrap().clone();
         assert_eq!(seen[0].path, "/embeddings");
         assert_eq!(seen[0].body, json!({"model": "bge-m3", "input": ["a", "b"], "dimensions": 2}));
@@ -349,9 +350,15 @@ async fn embedding_chia_lo_va_kiem_so_chieu() {
 async fn tat_khong_doc_anh_va_het_han_muc() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let tenant = TenantContext::legacy_default(&database);
-        let book = Arc::new(UsageBook::new(database.clone(), 0));
-        let off = Text { provider: None, capabilities: Default::default(), book: book.clone() };
+        let tenant =
+            autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()).default_tenant();
+        let book = Arc::new(UsageBook::new(0));
+        let off = Text {
+            provider: None,
+            capabilities: Default::default(),
+            book: book.clone(),
+            tenant_override: None,
+        };
         assert!(!off.capabilities().enabled);
         assert_eq!(
             off.generate(&tenant, prompt(Vec::new())).await.unwrap_err().code(),
@@ -373,7 +380,7 @@ async fn tat_khong_doc_anh_va_het_han_muc() {
             "ai.unsupported_input"
         );
 
-        let limited = Arc::new(UsageBook::new(database, 15));
+        let limited = Arc::new(UsageBook::new(15));
         let model = text(
             Box::new(Anthropic::new(&text_config(Provider::Anthropic, &url)).unwrap()),
             limited.clone(),
@@ -393,26 +400,81 @@ async fn tat_khong_doc_anh_va_het_han_muc() {
 async fn cong_token_dong_thoi() {
     TestDatabase::run(async |test| {
         let database = database(test).await;
-        let book = Arc::new(UsageBook::new(database.clone(), 0));
+        let tenant =
+            autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()).default_tenant();
+        let book = Arc::new(UsageBook::new(0));
         let tasks: Vec<_> = (0..12)
             .map(|_| {
                 let book = book.clone();
+                let tenant = tenant.clone();
                 tokio::spawn(async move {
                     let usage = autoxide_kernel::ai::Usage::new(3, 2);
-                    book.record("test.parallel", usage).await
+                    book.record(&tenant, "test.parallel", usage).await
                 })
             })
             .collect();
         for task in tasks {
             task.await.unwrap().unwrap();
         }
-        assert_eq!(book.used_today().await.unwrap(), 60);
+        assert_eq!(book.used_today(&tenant).await.unwrap(), 60);
         use sea_orm::{EntityTrait, PaginatorTrait};
         let rows = crate::usage::entity::Entity::find().count(database.read()).await.unwrap();
         assert_eq!(rows, 1);
         let row = crate::usage::entity::Entity::find().one(database.read()).await.unwrap().unwrap();
         assert_eq!(row.requests, 12);
-        assert_eq!(book.prune(1).await.unwrap(), 0);
+        assert_eq!(book.prune(&database, 1).await.unwrap(), 0);
+    })
+    .await
+    .unwrap();
+}
+
+/// Bước 33 (D-275): khách đặt khoá và mô hình riêng thì lời gọi của khách đi bằng chúng; hạn mức
+/// đếm riêng từng khách.
+#[tokio::test]
+async fn khoa_mo_hinh_va_han_muc_theo_khach() {
+    TestDatabase::run(async |test| {
+        let answers =
+            (0..3).map(|_| ok(anthropic_answer(r#"{"title": "x"}"#, "end_turn"))).collect();
+        let (url, fake) = server(answers).await;
+        let app = autoxide_testkit::TestApp::builder(test)
+            .setting("AUTOXIDE_AI_PROVIDER", "anthropic")
+            .setting("AUTOXIDE_AI_API_KEY", "server-key")
+            .setting("AUTOXIDE_AI_BASE_URL", &url)
+            .setting("AUTOXIDE_AI_MODEL", "server-model")
+            .setting("AUTOXIDE_AI_DAILY_TOKEN_LIMIT", "20")
+            .tenant("shop")
+            .user_in("shop", "owner", 1, &["kernel.settings.manage"])
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        for (name, value) in [("ai.api_key", "shop-key"), ("ai.model", "shop-model")] {
+            let answer = app
+                .request(axum::http::Method::PUT, &format!("/api/v1/kernel/settings/{name}"))
+                .token("owner")
+                .json(json!({"value": value}))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(answer.status(), StatusCode::OK, "{}", answer.json());
+        }
+        let model = app.modules().api::<dyn TextModel>().unwrap();
+        let shop = app.tenant("shop").await.unwrap();
+        let home = app.default_tenant();
+        model.generate(&shop, prompt(vec![Part::Text("a".into())])).await.unwrap();
+        model.generate(&home, prompt(vec![Part::Text("b".into())])).await.unwrap();
+        let seen = fake.seen.lock().unwrap().clone();
+        assert_eq!(seen[0].headers["x-api-key"], "shop-key");
+        assert_eq!(seen[0].body["model"], "shop-model");
+        assert_eq!(seen[1].headers["x-api-key"], "server-key");
+        assert_eq!(seen[1].body["model"], "server-model");
+
+        // Mỗi lời gọi tốn 17 token, hạn mức 20 mỗi khách: `shop` đã dùng 17 < 20 nên còn gọi được
+        // một lần, lần sau thì hết — lời gọi của khách mặc định không tính vào hạn mức của `shop`.
+        model.generate(&shop, prompt(vec![Part::Text("c".into())])).await.unwrap();
+        let error = model.generate(&shop, prompt(vec![Part::Text("d".into())])).await.unwrap_err();
+        assert_eq!(error.code(), "ai.quota_exceeded");
+        assert_eq!(fake.seen.lock().unwrap().len(), 3, "a tenant over its limit does not call");
     })
     .await
     .unwrap();

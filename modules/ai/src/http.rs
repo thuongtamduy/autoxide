@@ -57,7 +57,7 @@ pub(crate) struct AiStatus {
 }
 
 impl Status {
-    async fn read(&self, principal: &Principal) -> Result<AiStatus, Error> {
+    async fn read(&self, tenant: &TenantContext, principal: &Principal) -> Result<AiStatus, Error> {
         principal.require(&AI_VIEW)?;
         let capabilities = self.text.capabilities();
         Ok(AiStatus {
@@ -68,7 +68,7 @@ impl Status {
             embeddings_enabled: self.embeddings.enabled(),
             embedding_model: self.embeddings.model_id().to_owned(),
             embedding_dimensions: self.embeddings.dimensions(),
-            tokens_today: self.book.used_today().await?,
+            tokens_today: self.book.used_today(tenant).await?,
             daily_token_limit: self.book.limit(),
         })
     }
@@ -98,9 +98,10 @@ pub(crate) fn routes(status: Arc<Status>) -> OpenApiRouter {
 )]
 async fn get_status(
     State(status): State<Arc<Status>>,
+    tenant: TenantContext,
     principal: Principal,
 ) -> Result<Data<AiStatus>, Error> {
-    Ok(Data { data: status.read(&principal).await? })
+    Ok(Data { data: status.read(&tenant, &principal).await? })
 }
 
 pub(crate) fn tools(status: &Arc<Status>) -> Vec<Tool> {
@@ -111,9 +112,9 @@ pub(crate) fn tools(status: &Arc<Status>) -> Vec<Tool> {
             "Tell whether the server's AI features are on (text generation, image reading, \
              embeddings), which provider and models they use, and today's token use against the \
              daily limit.",
-            move |_tenant: TenantContext, principal: Principal, _: NoInput| {
+            move |tenant: TenantContext, principal: Principal, _: NoInput| {
                 let status = status.clone();
-                async move { status.read(&principal).await }
+                async move { status.read(&tenant, &principal).await }
             },
         )
         .requires(AI_VIEW)

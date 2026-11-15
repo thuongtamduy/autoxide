@@ -6886,3 +6886,15 @@ Chủ dự án hỏi merge vào `main` mà không phát hành có được khôn
   cấu hình của khách khác.
 - `client-config` của `mail` (D-271) vẫn chỉ nói về cấu hình chung của máy chủ; khách xem cấu hình của mình qua
   `GET /api/v1/kernel/settings`.
+
+## D-275 · `ai` theo khách: hạn mức đếm riêng, khoá và mô hình riêng của khách (bước 33 B4) — 2026-11-15 — agent quyết
+
+- `ai_usage` mang `tenant_id`; unique `(tenant_id, day, purpose)`. `AUTOXIDE_AI_DAILY_TOKEN_LIMIT` là hạn mức **mỗi
+  khách** mỗi ngày: khách này dùng hết không chặn khách khác. Job dọn quét cả database theo `ai_usage_day_sweep_idx`.
+- Cấu hình theo khách: `ai.api_key` (secret) và `ai.model`. Đặc tả 33 nêu cả `ai.provider`; **không làm**: đổi nhà
+  cung cấp kéo theo địa chỉ, cách gọi, tuỳ chọn riêng của từng nhà (base URL, schema mode, fallback…) — mở cho khách
+  đổi nghĩa là đưa cả bộ đó thành cấu hình theo khách. Khách dùng tài khoản riêng **của cùng nhà cung cấp và địa chỉ**
+  máy chủ đã cấu hình. Máy chủ chưa bật AI thì khoá của khách không bật AI (cần cấu hình nền của máy chủ).
+- Embedding chưa theo khách: vector đã lưu phải cùng một mô hình trong cả database (tìm theo ý nghĩa của `content`);
+  đổi theo khách là việc của bước sau nếu có nhu cầu.
+- Adapter dựng theo (khoá, mô hình) một lần rồi dùng lại; khoá không vào log hay lỗi.
