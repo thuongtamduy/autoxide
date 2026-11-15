@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Foundations for serving many customers (tenants) from one installation: the control-plane tables
+  `kernel_tenants`, `kernel_placements` and `kernel_tenant_domains` (the existing data belongs to the default tenant),
+  and the settings `AUTOXIDE_TENANCY_*`. The default mode `single` changes nothing; `multi` is refused until every
+  module keeps its data per tenant.
+
 - `forms`: large CSV exports in the background. `POST /api/v1/forms/{id}/submissions/exports` answers at once;
   `GET /api/v1/forms/exports/{export_id}` gives the state and, once ready, a signed download link that needs no
   sign-in and expires (`AUTOXIDE_FORMS_EXPORT_LINK_MINUTES`). The file has the same content as the existing

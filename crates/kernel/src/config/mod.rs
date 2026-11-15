@@ -41,6 +41,8 @@ pub struct Config {
     pub log: LogConfig,
     pub trace: TraceConfig,
     pub process: ProcessConfig,
+    /// Đa khách (`AUTOXIDE_TENANCY_*`, bước 33).
+    pub tenancy: crate::tenancy::TenancyConfig,
 }
 
 impl Config {
@@ -52,7 +54,15 @@ impl Config {
         let log = LogConfig::read(reader);
         let trace = TraceConfig::read(reader);
         let process = ProcessConfig::read(reader);
-        Ok(Config { database: database?, http: http?, log: log?, trace: trace?, process: process? })
+        let tenancy = crate::tenancy::read_setting(reader);
+        Ok(Config {
+            database: database?,
+            http: http?,
+            log: log?,
+            trace: trace?,
+            process: process?,
+            tenancy: tenancy?,
+        })
     }
 }
 
