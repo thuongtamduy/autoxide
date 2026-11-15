@@ -311,6 +311,9 @@ impl Worker {
         let now = now();
         for (placement, _, database) in databases {
             for schedule in &self.schedules {
+                if schedule.control_only && *placement != crate::tenancy::MAIN_PLACEMENT {
+                    continue;
+                }
                 let every =
                     i64::try_from(std::cmp::max(schedule.every.as_secs(), 1)).unwrap_or(i64::MAX);
                 let slot = now.timestamp().div_euclid(every);

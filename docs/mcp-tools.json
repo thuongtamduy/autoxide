@@ -2301,6 +2301,36 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Add a domain (e.g. `shop.example`) to the current tenant. Returns it `pending` with the DNS TXT record to set; then call `kernel.verify_domain`. Adding a domain the tenant already has returns it unchanged.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A domain to add to the tenant.",
+        "properties": {
+          "domain": {
+            "description": "The domain, e.g. `shop.example` (punycode for international names). Not an IP address,\n`localhost` or the platform's own domain.",
+            "example": "shop.example",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.add_domain",
+      "output_schema": null,
+      "permissions": [
+        "kernel.domains.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -2372,6 +2402,52 @@
       "output_schema": null,
       "permissions": [
         "kernel.tenants.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the current tenant's own domains, newest first, with their status (`pending`, `verified`, `failed`) and the DNS TXT record that verifies each.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.list_domains",
+      "output_schema": null,
+      "permissions": [
+        "kernel.domains.manage"
       ]
     },
     {
@@ -2458,6 +2534,36 @@
       "output_schema": null,
       "permissions": [
         "kernel.tenants.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Look up the DNS TXT record of one of the current tenant's domains now and return its new status: `verified`, or still `pending` with the reason in `check_error`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which domain to verify.",
+        "properties": {
+          "id": {
+            "description": "Id of the domain, from `kernel.list_domains` or `kernel.add_domain`.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.verify_domain",
+      "output_schema": null,
+      "permissions": [
+        "kernel.domains.manage"
       ]
     },
     {

@@ -151,6 +151,10 @@ lettre = { version = "0.11", default-features = false, features = [
 ] }
 # Đọc file `.env` (chỉ đọc thành cặp tên/giá trị, không sửa môi trường tiến trình).
 dotenvy = "0.15"
+# Tra bản ghi TXT khi xác minh tên miền riêng của khách (bước 33, D-190). Chỉ bật `tokio` (chạy trên
+# runtime sẵn có) và `system-config` (đọc `/etc/resolv.conf` / cấu hình DNS của hệ điều hành); không
+# bật DNS-over-TLS / HTTPS / QUIC hay DNSSEC (kéo thêm rustls provider và quinn).
+hickory-resolver = { version = "0.26", default-features = false, features = ["system-config", "tokio"] }
 
 # --- Bảo mật (STACK.md, bảng "Bảo mật") ---
 # Bộ feature mặc định: `alloc`, `getrandom` (salt ngẫu nhiên), `password-hash` (chuỗi PHC).

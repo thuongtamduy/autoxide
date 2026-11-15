@@ -33,6 +33,7 @@
 pub mod ai;
 mod app;
 mod contract;
+mod dns;
 mod leak;
 mod ownership;
 mod postgres;
@@ -44,6 +45,7 @@ mod storage;
 mod tenancy;
 
 pub use app::{TestApp, TestAppBuilder, TestAppError, TestRequest, TestResponse, tool};
+pub use dns::FakeDns;
 pub use leak::leak_check;
 pub use ownership::schema_ownership_violations;
 pub use s3::{

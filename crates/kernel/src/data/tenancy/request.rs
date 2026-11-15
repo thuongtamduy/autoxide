@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
-use axum::http::{HeaderMap, HeaderName, header};
+use axum::http::{Extensions, HeaderMap, HeaderName, header};
 use uuid::Uuid;
 
 use super::{DatabaseRegistry, TenancyMode, TenantContext, ensure_serving, errors};
@@ -62,6 +62,18 @@ impl TenantHint {
         TenantHint::new(text(&header::HOST), text(&TENANT_HEADER))
     }
 
+    /// Gợi ý của request: tên miền proxy tin cậy chuyển tới (`X-Forwarded-Host`, lớp
+    /// `client::attach`) hay header `Host`, và header `Autoxide-Tenant`.
+    pub(crate) fn of_request(headers: &HeaderMap, extensions: &Extensions) -> Self {
+        match extensions.get::<crate::http::ForwardedHost>() {
+            Some(forwarded) => {
+                let tenant = headers.get(&TENANT_HEADER).and_then(|value| value.to_str().ok());
+                TenantHint::new(Some(forwarded.0.clone()), tenant.map(str::to_owned))
+            }
+            None => TenantHint::from_headers(headers),
+        }
+    }
+
     /// Tên miền (chữ thường, không cổng, không dấu chấm cuối).
     pub fn host(&self) -> Option<&str> {
         self.host.as_deref()
@@ -100,7 +112,7 @@ pub(crate) async fn authenticate(
     if let Some(Authenticated(principal)) = parts.extensions.get::<Authenticated>() {
         return Ok(principal.clone());
     }
-    let hint = TenantHint::from_headers(&parts.headers);
+    let hint = TenantHint::of_request(&parts.headers, &parts.extensions);
     let authorization =
         parts.headers.get(header::AUTHORIZATION).and_then(|value| value.to_str().ok());
     let principal = authenticator.authenticate(authorization, &hint).await?;
@@ -187,7 +199,7 @@ pub(crate) async fn tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
 
 /// Khách theo header `autoxide-tenant` / tên miền, bỏ qua credential (request không đăng nhập).
 async fn by_hint(registry: &DatabaseRegistry, parts: &Parts) -> Result<TenantContext, Error> {
-    let hint = TenantHint::from_headers(&parts.headers);
+    let hint = TenantHint::of_request(&parts.headers, &parts.extensions);
     match (hint.tenant(), hint.host()) {
         (Some(target), _) => lookup(registry, target).await,
         (None, Some(host)) => {

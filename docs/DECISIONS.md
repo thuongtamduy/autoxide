@@ -7104,3 +7104,26 @@ Backup chép database chính (sổ khách, khách trên placement chung) và m�
 của placement khác chưa được chép (bước 39 làm đủ). Thay vì im lặng, lệnh in `WARNING: …` nêu tên từng placement bị bỏ
 và ghi log; hướng dẫn deploy (EN + VI) nói backup chúng bằng công cụ của database và cất `AUTOXIDE_SECRET_KEY` tách khỏi
 bản backup. Chế độ `single` không đổi gì.
+
+## D-291 · Tên miền riêng của khách (bước 33 C1, D-190) — 2026-11-15 — agent quyết
+
+1. Xác minh bằng bản ghi TXT `_autoxide-challenge.<tên miền>` = `autoxide-verify=<token>` (token ngẫu nhiên 24 byte),
+   tra qua trait `DnsTxtLookup` của kernel. Bản thật dùng thư viện mới `hickory-resolver` 0.26 (chỉ feature `tokio`,
+   `system-config`; thư viện chuẩn không tra được TXT): đọc cấu hình DNS của hệ điều hành, cache tối đa 60 giây, chờ
+   tối đa 10 giây. Test dùng `FakeDns` của testkit (mọi `TestApp` có sẵn, không bao giờ tra DNS thật).
+2. Chuẩn hoá: chữ thường, bỏ cổng và dấu chấm cuối, chỉ nhãn ASCII chữ / số / `-` (punycode), tối đa 253 ký tự, ít
+   nhất hai nhãn. Từ chối IP, `localhost`, `*.localhost` và đúng tên máy của `AUTOXIDE_HTTP_PUBLIC_URL`.
+3. Chỉ `pending` / `verified` giữ tên miền; `failed` / `revoked` thì khách khác nhận lại được (dòng cũ, token mới) —
+   không ai chiếm chỗ mãi mà không chứng minh sở hữu. `pending` quá 7 ngày (tính từ lần đổi trạng thái) thành `failed`.
+   Đổi trạng thái bằng UPDATE có điều kiện: hai lượt xác minh cùng lúc chỉ một bên ghi event.
+4. Job `kernel.verify_domains` mỗi 10 phút, chỉ ở chế độ `multi`. Thêm `Schedule::on_control_only()`: lịch chỉ xếp job
+   ở database điều khiển (tên miền chỉ nằm ở đó). Kernel có thêm bảng `kernel_jobs` (migration m0009/m0010).
+5. `X-Forwarded-Host` / `Forwarded: host=` chỉ đọc khi kết nối đến từ dải `AUTOXIDE_HTTP_TRUSTED_PROXIES` (cấu hình chỉ
+   đếm proxy thì không đọc); không có thì dùng `Host`.
+6. `GET /api/v1/kernel/domains/allowed` công khai, cho `ask` của Caddy on-demand TLS; đi qua cache của sổ database và
+   rate limiting theo địa chỉ. REST: `GET`/`POST /domains`, `POST /domains/{id}/verify` (luôn 200 kèm trạng thái mới;
+   lý do còn chờ ở `check_error`), `DELETE /domains/{id}` (→ `revoked`). Chế độ `single`: thêm tên miền → 409
+   `tenant_single_mode`.
+7. Một permission `kernel.domains.manage` (mức `write`); tool chỉ đọc `kernel.list_domains` là ngoại lệ của luật "tool
+   chỉ đọc cần permission mức xem", như `files.list_files`. Không có tool MCP xoá tên miền (làm qua REST).
+8. Chưa làm (dòng lộ trình riêng): kiểm lại hằng ngày tên miền `verified`, `failed` sau 3 lần trượt liên tiếp.

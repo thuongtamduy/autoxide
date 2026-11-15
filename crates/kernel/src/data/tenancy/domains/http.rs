@@ -1,0 +1,258 @@
+//! REST (`/api/v1/kernel/domains…`) và tool MCP của tên miền riêng — gọi đúng các hàm của
+//! [`TenantDomains`].
+
+use std::sync::Arc;
+
+use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
+use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
+use uuid::Uuid;
+use validator::Validate;
+
+use super::{DOMAINS_MANAGE, TenantDomain, TenantDomains, tenant_domain_not_found};
+use crate::access::Principal;
+use crate::error::Error;
+use crate::event::Actor;
+use crate::mcp::{PageInput, Tool};
+use crate::pagination::{Page, PageQuery, PageRequest};
+use crate::response::{Created, Data, Problem};
+use crate::tenancy::TenantContext;
+
+/// A domain to add to the tenant.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = NewTenantDomain)]
+pub(crate) struct NewDomain {
+    /// The domain, e.g. `shop.example` (punycode for international names). Not an IP address,
+    /// `localhost` or the platform's own domain.
+    #[schema(example = "shop.example")]
+    domain: String,
+}
+
+/// Which domain to ask about.
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct AllowedQuery {
+    /// The domain, as the TLS server sees it (e.g. `shop.example`).
+    domain: String,
+}
+
+/// A domain that may get a TLS certificate.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = AllowedTenantDomain)]
+pub(crate) struct Allowed {
+    #[schema(example = "shop.example")]
+    domain: String,
+}
+
+/// List this tenant's domains.
+///
+/// Requires `kernel.domains.manage`. Domains added to the tenant, with their status and the DNS
+/// record that verifies them; removed domains are not listed. Newest first unless `order=asc`.
+#[utoipa::path(
+    get,
+    path = "/domains",
+    extensions(("x-permissions" = json!(["kernel.domains.manage"]))),
+    operation_id = "list_tenant_domains",
+    security(("bearer" = [])),
+    params(PageQuery),
+    responses(
+        (status = 200, description = "One page of the tenant's domains.", body = Page<TenantDomain>),
+        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.domains.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
+    )
+)]
+async fn list_domains(
+    State(service): State<Arc<TenantDomains>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Query(page): Query<PageQuery>,
+) -> Result<Page<TenantDomain>, Error> {
+    principal.require(&DOMAINS_MANAGE)?;
+    service.list(&tenant, &PageRequest::try_from(page)?).await
+}
+
+/// Add a domain to this tenant.
+///
+/// Requires `kernel.domains.manage`. The domain starts `pending`: set the returned DNS `record`
+/// (TXT `_autoxide-challenge.<domain>`) at your DNS provider, then call
+/// `POST /domains/{id}/verify` (pending domains are also checked every 10 minutes for 7 days).
+/// Point the domain itself (A/AAAA or CNAME) at the platform's server. Adding a domain the tenant
+/// already has returns it unchanged; retry safely with an `Idempotency-Key` header.
+#[utoipa::path(
+    post,
+    path = "/domains",
+    extensions(("x-permissions" = json!(["kernel.domains.manage"]))),
+    operation_id = "add_tenant_domain",
+    security(("bearer" = [])),
+    request_body = NewDomain,
+    responses(
+        (status = 201, description = "The domain, with the DNS record to set.", body = Data<TenantDomain>),
+        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.domains.manage`; code `permission_denied`.", body = Problem),
+        (status = 409, description = "Another tenant has the domain (`tenant_domain_taken`), or the installation runs one tenant (`tenant_single_mode`).", body = Problem),
+        (status = 422, description = "Not a usable domain; code `tenant_domain_invalid`.", body = Problem),
+    )
+)]
+async fn add_domain(
+    State(service): State<Arc<TenantDomains>>,
+    tenant: TenantContext,
+    principal: Principal,
+    crate::http::ValidJson(input): crate::http::ValidJson<NewDomain>,
+) -> Result<Created<TenantDomain>, Error> {
+    principal.require(&DOMAINS_MANAGE)?;
+    let domain = service.add(Actor::from(&principal), &tenant, &input.domain).await?;
+    Ok(Created::new(format!("/kernel/domains/{}", domain.id), domain))
+}
+
+/// Verify a domain now.
+///
+/// Requires `kernel.domains.manage`. Looks up the domain's TXT record right away and returns the
+/// new status: `verified` when the record holds the expected value, otherwise still `pending`
+/// with the reason in `check_error`. A `failed` domain can be verified again this way.
+#[utoipa::path(
+    post,
+    path = "/domains/{id}/verify",
+    extensions(("x-permissions" = json!(["kernel.domains.manage"]))),
+    operation_id = "verify_tenant_domain",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the domain.")),
+    responses(
+        (status = 200, description = "The domain after the lookup.", body = Data<TenantDomain>),
+        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.domains.manage`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "The tenant has no such domain; code `tenant_domain_not_found`.", body = Problem),
+    )
+)]
+async fn verify_domain(
+    State(service): State<Arc<TenantDomains>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<Data<TenantDomain>, Error> {
+    principal.require(&DOMAINS_MANAGE)?;
+    Ok(Data { data: service.verify(Actor::from(&principal), &tenant, id).await? })
+}
+
+/// Remove a domain from this tenant.
+///
+/// Requires `kernel.domains.manage`. The domain becomes `revoked`: requests to it no longer reach
+/// the tenant (other servers follow within `AUTOXIDE_TENANCY_CACHE_SECONDS`) and no new TLS
+/// certificate is issued for it. Removing it again changes nothing.
+#[utoipa::path(
+    delete,
+    path = "/domains/{id}",
+    extensions(("x-permissions" = json!(["kernel.domains.manage"]))),
+    operation_id = "remove_tenant_domain",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the domain.")),
+    responses(
+        (status = 204, description = "The domain is removed."),
+        (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.domains.manage`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "The tenant has no such domain; code `tenant_domain_not_found`.", body = Problem),
+    )
+)]
+async fn remove_domain(
+    State(service): State<Arc<TenantDomains>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, Error> {
+    principal.require(&DOMAINS_MANAGE)?;
+    service.revoke(Actor::from(&principal), &tenant, id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Tell whether a domain may get a TLS certificate.
+///
+/// No sign-in needed. For the `ask` URL of a reverse proxy that issues certificates on demand
+/// (Caddy `on_demand_tls`): `200` when the domain is a verified domain of an active tenant,
+/// `404` otherwise. Answers from a short cache; counted by the per-address rate limit.
+#[utoipa::path(
+    get,
+    path = "/domains/allowed",
+    extensions(("x-public" = json!(true))),
+    operation_id = "check_tenant_domain_allowed",
+    params(AllowedQuery),
+    responses(
+        (status = 200, description = "The domain is verified and its tenant is active.", body = Data<Allowed>),
+        (status = 400, description = "The `domain` parameter is missing; code `bad_request`.", body = Problem),
+        (status = 404, description = "Not a verified domain of an active tenant; code `tenant_domain_not_found`.", body = Problem),
+        (status = 429, description = "Too many requests from this address; code `rate_limited`.", body = Problem),
+    )
+)]
+async fn domain_allowed(
+    State(service): State<Arc<TenantDomains>>,
+    Query(query): Query<AllowedQuery>,
+) -> Result<Data<Allowed>, Error> {
+    // Không dùng extractor khách: câu hỏi đến từ proxy, không thuộc khách nào.
+    if service.allowed(&query.domain).await? {
+        let domain = super::normalize_domain(&query.domain).unwrap_or(query.domain);
+        Ok(Data { data: Allowed { domain } })
+    } else {
+        Err(tenant_domain_not_found())
+    }
+}
+
+/// Route dưới `/api/v1/kernel`.
+pub(crate) fn routes(service: Arc<TenantDomains>) -> OpenApiRouter {
+    OpenApiRouter::new()
+        .routes(routes!(list_domains, add_domain))
+        .routes(routes!(domain_allowed))
+        .routes(routes!(verify_domain))
+        .routes(routes!(remove_domain))
+        .with_state(service)
+}
+
+// Đầu vào của tool `verify_domain`.
+/// Which domain to verify.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DomainRef {
+    /// Id of the domain, from `kernel.list_domains` or `kernel.add_domain`.
+    id: Uuid,
+}
+
+/// Tool MCP — gọi đúng các hàm REST dùng. Không có tool xoá tên miền (việc phá huỷ, làm qua REST).
+pub(crate) fn tools(service: Arc<TenantDomains>) -> Vec<Tool> {
+    let (list, add, verify) = (service.clone(), service.clone(), service);
+    vec![
+        Tool::new(
+            "list_domains",
+            "List the current tenant's own domains, newest first, with their status (`pending`, \
+             `verified`, `failed`) and the DNS TXT record that verifies each.",
+            move |tenant: TenantContext, _principal: Principal, input: PageInput| {
+                let list = list.clone();
+                async move { list.list(&tenant, &input.page()?).await }
+            },
+        )
+        .requires(DOMAINS_MANAGE)
+        .read_only(),
+        Tool::new(
+            "add_domain",
+            "Add a domain (e.g. `shop.example`) to the current tenant. Returns it `pending` with \
+             the DNS TXT record to set; then call `kernel.verify_domain`. Adding a domain the \
+             tenant already has returns it unchanged.",
+            move |tenant: TenantContext, principal: Principal, input: NewDomain| {
+                let add = add.clone();
+                async move { add.add(Actor::from(&principal), &tenant, &input.domain).await }
+            },
+        )
+        .requires(DOMAINS_MANAGE),
+        Tool::new(
+            "verify_domain",
+            "Look up the DNS TXT record of one of the current tenant's domains now and return its \
+             new status: `verified`, or still `pending` with the reason in `check_error`.",
+            move |tenant: TenantContext, principal: Principal, input: DomainRef| {
+                let verify = verify.clone();
+                async move { verify.verify(Actor::from(&principal), &tenant, input.id).await }
+            },
+        )
+        .requires(DOMAINS_MANAGE),
+    ]
+}

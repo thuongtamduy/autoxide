@@ -37,6 +37,11 @@ export type AiStatus = {
   tokens_today: number;
 };
 
+/** A domain that may get a TLS certificate. */
+export type AllowedTenantDomain = {
+  domain: string;
+};
+
 /** What the alt text is for. */
 export type AltRequest = {
   /**
@@ -903,6 +908,14 @@ export type Data_AiStatus = {
     provider: string;
     /** Tokens used today (UTC), text and embeddings together. */
     tokens_today: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_AllowedTenantDomain = {
+  /** A domain that may get a TLS certificate. */
+  data: {
+    domain: string;
   };
 };
 
@@ -2479,6 +2492,31 @@ export type Data_Tenant = {
 };
 
 /** Envelope of a single result. */
+export type Data_TenantDomain = {
+  /** A domain of the tenant: requests to a verified domain reach this tenant. */
+  data: {
+    /** Why the last lookup did not verify the domain. */
+    check_error?: string | null;
+    created_at: string;
+    /** Lower case, without port or trailing dot; international names in punycode. */
+    domain: string;
+    id: string;
+    /** Last time the DNS record was looked up. */
+    last_checked_at?: string | null;
+    /** The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`. */
+    record: TenantDomainRecord;
+    /**
+     * `pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7
+     * days: fix the record and verify again).
+     */
+    status: string;
+    /** When the status last changed; a `pending` domain fails 7 days after it. */
+    updated_at: string;
+    verified_at?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_TenantSettingState = {
   /** A setting the installed modules take per tenant, and its state in the current tenant. */
   data: {
@@ -3777,6 +3815,15 @@ export type NewTenant = {
   slug: string;
 };
 
+/** A domain to add to the tenant. */
+export type NewTenantDomain = {
+  /**
+   * The domain, e.g. `shop.example` (punycode for international names). Not an IP address,
+   * `localhost` or the platform's own domain.
+   */
+  domain: string;
+};
+
 /** One mail of a campaign to the person. */
 export type NewsletterDelivery = {
   campaign_id: string;
@@ -4872,6 +4919,32 @@ export type Page_Tenant = {
     /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
     status: string;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_TenantDomain = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Why the last lookup did not verify the domain. */
+    check_error?: string | null;
+    created_at: string;
+    /** Lower case, without port or trailing dot; international names in punycode. */
+    domain: string;
+    id: string;
+    /** Last time the DNS record was looked up. */
+    last_checked_at?: string | null;
+    /** The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`. */
+    record: TenantDomainRecord;
+    /**
+     * `pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7
+     * days: fix the record and verify again).
+     */
+    status: string;
+    /** When the status last changed; a `pending` domain fails 7 days after it. */
+    updated_at: string;
+    verified_at?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -6162,6 +6235,38 @@ export type TenantChanges = {
   name?: string | null;
   /** `active` or `suspended`. */
   status?: string | null;
+};
+
+/** A domain of the tenant: requests to a verified domain reach this tenant. */
+export type TenantDomain = {
+  /** Why the last lookup did not verify the domain. */
+  check_error?: string | null;
+  created_at: string;
+  /** Lower case, without port or trailing dot; international names in punycode. */
+  domain: string;
+  id: string;
+  /** Last time the DNS record was looked up. */
+  last_checked_at?: string | null;
+  /** The DNS record to set at your DNS provider, then call `POST /domains/{id}/verify`. */
+  record: TenantDomainRecord;
+  /**
+   * `pending` (waits for the DNS record), `verified`, or `failed` (not verified within 7
+   * days: fix the record and verify again).
+   */
+  status: string;
+  /** When the status last changed; a `pending` domain fails 7 days after it. */
+  updated_at: string;
+  verified_at?: string | null;
+};
+
+/** The DNS record that proves the tenant owns the domain. */
+export type TenantDomainRecord = {
+  /** Full name of the record. */
+  name: string;
+  /** Always `TXT`. */
+  type: string;
+  /** Exact value of the record. */
+  value: string;
 };
 
 /** A setting the installed modules take per tenant, and its state in the current tenant. */
@@ -8744,6 +8849,71 @@ export interface paths {
       responses: {
         200: Data_ClientConfigResponse;
         500: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/domains": {
+    /** List this tenant's domains. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_TenantDomain;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a domain to this tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewTenantDomain;
+      responses: {
+        201: Data_TenantDomain;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/domains/allowed": {
+    /** Tell whether a domain may get a TLS certificate. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { domain: string }; };
+      responses: {
+        200: Data_AllowedTenantDomain;
+        400: Problem;
+        404: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/domains/{id}": {
+    /** Remove a domain from this tenant. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/domains/{id}/verify": {
+    /** Verify a domain now. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_TenantDomain;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

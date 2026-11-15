@@ -337,6 +337,66 @@ database mới.
 Kiểm cấu hình mà không khởi động gì: `autoxide config`. Lệnh liệt kê mọi biến kèm giá
 trị (secret được giấu) và báo mọi vấn đề cùng một lượt.
 
+## Tên miền riêng của khách hàng
+
+Khi chạy nhiều khách hàng (`AUTOXIDE_TENANCY_MODE=multi`), mỗi khách có thể phục vụ trang của mình ở
+tên miền riêng, vd `shop.example`: request tới một tên miền đã xác minh vào thẳng khách đó, không
+cần header `Autoxide-Tenant`. Bản cài chỉ một khách thì không cần việc này: tên miền của nó là tên
+miền của nền tảng.
+
+1. Quản trị viên của khách (permission `kernel.domains.manage`) thêm tên miền:
+
+   ```bash
+   curl -X POST https://api.example.com/api/v1/kernel/domains \
+     -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+     -d '{"domain": "shop.example"}'
+   ```
+
+   Câu trả lời có `"status": "pending"` và `record` cần tạo ở nhà cung cấp DNS của tên miền: một
+   bản ghi TXT tên `_autoxide-challenge.shop.example` với giá trị `autoxide-verify=…`.
+2. Ở nhà cung cấp DNS, tạo bản ghi TXT đó và trỏ chính tên miền về máy chủ của bạn (bản ghi
+   `A` / `AAAA`, hoặc `CNAME` tới tên miền của nền tảng).
+3. Xác minh: `POST /api/v1/kernel/domains/{id}/verify` tra bản ghi ngay và trả `verified`, hoặc vẫn
+   `pending` kèm lý do trong `check_error`. Tên miền đang chờ cũng được tra lại mỗi 10 phút; quá 7
+   ngày chưa xác minh được thì thành `failed` (sửa bản ghi rồi xác minh lại).
+   `DELETE /api/v1/kernel/domains/{id}` gỡ một tên miền.
+
+Tên miền của chính nền tảng (tên máy trong `AUTOXIDE_HTTP_PUBLIC_URL`), địa chỉ IP và `localhost`
+bị từ chối. Mỗi lúc một tên miền chỉ thuộc một khách: khách khác chỉ nhận được sau khi nó bị gỡ hay
+xác minh hỏng.
+
+**Chứng chỉ TLS.** Để Caddy lấy chứng chỉ khi người xem đầu tiên của một tên miền tới (on-demand
+TLS), sau khi hỏi Autoxide tên miền đó có được phép không:
+`GET /api/v1/kernel/domains/allowed?domain=…` chỉ trả `200` cho tên miền đã xác minh của khách đang
+hoạt động, nên không ai khiến máy chủ của bạn xin chứng chỉ cho tên bạn không phục vụ.
+
+```text
+{
+    on_demand_tls {
+        ask http://127.0.0.1:8080/api/v1/kernel/domains/allowed
+    }
+}
+
+api.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+
+https:// {
+    tls {
+        on_demand
+    }
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+`reverse_proxy` của Caddy chuyển nguyên header `Host`, và Autoxide nhận ra khách nhờ header đó. Khi
+có proxy khác đứng trước và viết lại `Host`, proxy đó phải gửi tên miền người xem gõ trong
+`X-Forwarded-Host` (hoặc `Forwarded: host=…`), và địa chỉ của nó phải có trong
+`AUTOXIDE_HTTP_TRUSTED_PROXIES`: Autoxide chỉ đọc các header đó từ proxy tin cậy. Endpoint `ask`
+cũng bị tính vào rate limiting theo địa chỉ như mọi endpoint khác; Caddy chỉ hỏi một lần cho mỗi
+chứng chỉ mới. Xác minh, gỡ tên miền hay tạm khoá khách có hiệu lực trên mọi máy chủ sau tối đa
+`AUTOXIDE_TENANCY_CACHE_SECONDS` giây (mặc định `10`).
+
 ## Chạy nhiều máy chủ
 
 Với PostgreSQL, chạy bao nhiêu tiến trình `app` cũng được sau reverse proxy: chúng chỉ

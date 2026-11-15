@@ -10,6 +10,8 @@
 //!   (vị trí dữ liệu: chung `shared` hay riêng `dedicated`), mở lười, có giới hạn.
 //! - Chế độ ([`TenancyMode`], `AUTOXIDE_TENANCY_MODE`): `single` (mặc định — một khách, không truy
 //!   vấn gì thêm mỗi request) hay `multi`.
+//! - Tên miền riêng của khách ([`TenantDomains`], `domains.rs`): xác minh bằng bản ghi TXT, request
+//!   tới tên miền đã xác minh vào thẳng khách (D-190).
 //! - Token trong link của thư mang khách ([`link_token`], [`resolve_link_token`],
 //!   [`OptionalTenant`]): bấm link ở tên miền chính vẫn tới đúng khách (D-281).
 //!
@@ -18,6 +20,7 @@
 
 pub(crate) mod admin;
 mod config;
+pub(crate) mod domains;
 mod link_token;
 pub mod migration;
 mod placements;
@@ -41,6 +44,10 @@ pub use admin::{
     TenantAdmin, TenantChanges, TenantFilter, TenantSeed, require_platform,
 };
 pub use config::{TenancyConfig, WorkerPlacements};
+pub use domains::{
+    CHALLENGE_PREFIX, CHALLENGE_VALUE_PREFIX, DOMAINS_MANAGE, DnsTxtLookup, DomainRecord,
+    TenantDomain, TenantDomains, normalize_domain,
+};
 pub use link_token::{OptionalTenant, link_token, resolve_link_token, split_link_token};
 pub use placements::{NewPlacement, PlacementCheck, PlacementMigrations, Placements, SchemaState};
 pub use registry::{DatabaseRegistry, PLACEMENT_READ_URL, PLACEMENT_URL};
@@ -429,6 +436,36 @@ pub mod errors {
     pub fn tenant_placement_not_found(placement: &str) -> Error {
         Error::not_found("tenant_placement_not_found", "There is no placement `{placement}`.")
             .with_param("placement", placement)
+    }
+
+    pub fn tenant_domain_invalid(domain: &str) -> Error {
+        // Giá trị do client gửi: chỉ nhắc lại phần đầu.
+        let shown: String = domain.chars().take(100).collect();
+        Error::new(
+            crate::error::ErrorKind::Validation,
+            "tenant_domain_invalid",
+            "`{domain}` is not a domain that can be used: send a name such as `shop.example` \
+             (punycode for international names), not an IP address, `localhost` or the \
+             platform's own domain.",
+        )
+        .with_param("domain", shown)
+    }
+
+    pub fn tenant_domain_taken(domain: &str) -> Error {
+        Error::conflict("tenant_domain_taken", "The domain `{domain}` belongs to another tenant.")
+            .with_param("domain", domain)
+    }
+
+    pub fn tenant_domain_not_found() -> Error {
+        Error::not_found(
+            "tenant_domain_not_found",
+            "This domain is not one of the current tenant's domains.",
+        )
+    }
+
+    pub fn tenant_domain_dns_failed(error: &str) -> Error {
+        Error::unavailable("tenant_domain_dns_failed", "The DNS lookup failed: {error}")
+            .with_param("error", error)
     }
 }
 

@@ -276,8 +276,9 @@ async fn moi_endpoint_khong_cong_khai_tra_401_va_403() {
         // Tool MCP: mỗi tool đòi permission hay khai `for_any_signed_in`; tool chỉ đọc gọi được bằng
         // ít nhất một permission mức xem (`read` / `sensitive_data`). Ngoại lệ có lý do (D-245):
         // `files.list_files` — `files.upload` gồm cả xem file của chính mình, `files` không có
-        // permission chỉ đọc.
-        const READ_ONLY_EXCEPTIONS: [&str; 1] = ["files.list_files"];
+        // permission chỉ đọc; `kernel.list_domains` — tên miền riêng chỉ có một permission
+        // `kernel.domains.manage` (đặc tả 33), xem là một phần của quản lý.
+        const READ_ONLY_EXCEPTIONS: [&str; 2] = ["files.list_files", "kernel.list_domains"];
         for tool in app.modules().tools().unwrap() {
             let permissions: Vec<_> = tool.permission().into_iter().chain(tool.alternative()).collect();
             if permissions.is_empty() && !tool.is_for_any_signed_in() {

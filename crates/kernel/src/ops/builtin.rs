@@ -46,6 +46,10 @@ pub(crate) struct KernelModule {
     seeds: crate::tenancy::admin::Seeds,
     /// Service quản lý khách; có sau `start`.
     admin: Option<Arc<crate::tenancy::TenantAdmin>>,
+    /// Bộ tra DNS cho tên miền riêng (điền sau khi mọi module khởi động).
+    dns: crate::tenancy::domains::DnsSlot,
+    /// Service tên miền riêng của khách; có sau `start`.
+    domains: Option<Arc<crate::tenancy::TenantDomains>>,
     /// Bản dịch của mọi module (dịch mô tả permission, event trong sổ module); có sau `start`.
     translations: crate::i18n::Translations,
 }
@@ -58,8 +62,11 @@ impl KernelModule {
         keys: crate::secret::KeyConfig,
         tenant_settings: crate::tenancy::settings::Catalog,
         seeds: crate::tenancy::admin::Seeds,
+        dns: crate::tenancy::domains::DnsSlot,
     ) -> Self {
         KernelModule {
+            dns,
+            domains: None,
             keys,
             tenant_settings,
             settings: None,
@@ -105,6 +112,12 @@ impl Module for KernelModule {
                 "m0008_tenancy_events",
                 vec![crate::event::tenant_table(NAME)],
             ),
+            // Hàng đợi job của kernel (`kernel.verify_domains`, D-190), theo khách từ đầu.
+            crate::job::jobs_migration("m0009_create_jobs", NAME),
+            crate::tenancy::migration::adopt(
+                "m0010_tenancy_jobs",
+                vec![crate::job::tenant_table(NAME)],
+            ),
         ]
     }
 
@@ -142,6 +155,7 @@ impl Module for KernelModule {
             crate::tenancy::TENANTS_READ,
             crate::tenancy::TENANTS_MANAGE,
             crate::tenancy::PLACEMENTS_READ,
+            crate::tenancy::DOMAINS_MANAGE,
         ]
     }
 
@@ -150,6 +164,9 @@ impl Module for KernelModule {
             crate::tenancy::settings::SETTING_CHANGED,
             crate::tenancy::admin::TENANT_CREATED,
             crate::tenancy::admin::TENANT_UPDATED,
+            crate::tenancy::domains::DOMAIN_ADDED,
+            crate::tenancy::domains::DOMAIN_VERIFIED,
+            crate::tenancy::domains::DOMAIN_REVOKED,
         ]
     }
 
@@ -166,6 +183,9 @@ impl Module for KernelModule {
         }
         if let Some(admin) = &self.admin {
             routes = routes.merge(crate::tenancy::admin::routes(admin.clone()));
+        }
+        if let Some(domains) = &self.domains {
+            routes = routes.merge(crate::tenancy::domains::routes(domains.clone()));
         }
         routes
     }
@@ -193,7 +213,27 @@ impl Module for KernelModule {
         if let Some(admin) = &self.admin {
             tools.extend(crate::tenancy::admin::tools(admin.clone()));
         }
+        if let Some(domains) = &self.domains {
+            tools.extend(crate::tenancy::domains::tools(domains.clone()));
+        }
         tools
+    }
+
+    fn jobs(&self) -> Vec<crate::job::JobRegistration> {
+        self.domains.as_ref().map_or_else(Vec::new, |domains| {
+            vec![crate::job::JobRegistration::new(
+                crate::tenancy::domains::VERIFY_DOMAINS,
+                Arc::new(crate::tenancy::domains::VerifyDomains(domains.clone())),
+            )]
+        })
+    }
+
+    fn schedules(&self) -> Vec<crate::job::Schedule> {
+        // Tên miền riêng chỉ có ở chế độ `multi`: chế độ `single` không thêm job nào mỗi 10 phút.
+        match &self.domains {
+            Some(domains) if domains.multi_tenant() => vec![crate::tenancy::domains::schedule()],
+            _ => Vec::new(),
+        }
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
@@ -218,6 +258,16 @@ impl Module for KernelModule {
         ));
         self.admin = Some(admin.clone());
         context.provide::<crate::tenancy::TenantAdmin>(admin)?;
+        let platform_host =
+            self.public_url.base().ok().and_then(crate::tenancy::domains::host_of_url);
+        let domains = Arc::new(crate::tenancy::TenantDomains::new(
+            context.tenancy().clone(),
+            context.outbox()?,
+            self.dns.clone(),
+            platform_host,
+        ));
+        self.domains = Some(domains.clone());
+        context.provide::<crate::tenancy::TenantDomains>(domains)?;
         context.provide::<dyn crate::tenancy::TenantSettings>(settings)?;
         context.provide::<SecretKey>(Arc::new(key))?;
         context.provide::<PublicUrl>(Arc::new(self.public_url.clone()))

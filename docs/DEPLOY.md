@@ -340,6 +340,66 @@ into a new database.
 Check the configuration without starting anything: `autoxide config`. It lists every
 setting with its value (secrets hidden) and reports every problem at once.
 
+## Custom domains of tenants
+
+With several tenants (`AUTOXIDE_TENANCY_MODE=multi`), each tenant can serve its site on its own
+domain, such as `shop.example`: a request to a verified domain reaches that tenant without the
+`Autoxide-Tenant` header. An installation with one tenant does not need this: its domain is the
+platform's.
+
+1. An administrator of the tenant (permission `kernel.domains.manage`) adds the domain:
+
+   ```bash
+   curl -X POST https://api.example.com/api/v1/kernel/domains \
+     -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+     -d '{"domain": "shop.example"}'
+   ```
+
+   The answer has `"status": "pending"` and a `record` to create at the domain's DNS provider: a
+   TXT record named `_autoxide-challenge.shop.example` with the value `autoxide-verify=…`.
+2. At the DNS provider, create that TXT record and point the domain itself at your server (an
+   `A` / `AAAA` record, or a `CNAME` to the platform's domain).
+3. Verify: `POST /api/v1/kernel/domains/{id}/verify` looks the record up at once and answers
+   `verified`, or still `pending` with the reason in `check_error`. Pending domains are also
+   checked every 10 minutes; one not verified within 7 days becomes `failed` (fix the record,
+   then verify it again). `DELETE /api/v1/kernel/domains/{id}` removes a domain.
+
+The platform's own domain (the host of `AUTOXIDE_HTTP_PUBLIC_URL`), IP addresses and `localhost`
+are refused. A domain belongs to one tenant at a time: another tenant can claim it only after it
+was removed or failed.
+
+**TLS certificates.** Let Caddy get a certificate when the first visitor of a domain arrives
+(on-demand TLS), after asking Autoxide whether the domain is allowed:
+`GET /api/v1/kernel/domains/allowed?domain=…` answers `200` only for a verified domain of an
+active tenant, so nobody can make your server request certificates for names you do not serve.
+
+```text
+{
+    on_demand_tls {
+        ask http://127.0.0.1:8080/api/v1/kernel/domains/allowed
+    }
+}
+
+api.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+
+https:// {
+    tls {
+        on_demand
+    }
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+Caddy's `reverse_proxy` passes the original `Host` header on, and that is how Autoxide tells the
+tenant. When another proxy in front rewrites `Host`, it must send the visitor's domain in
+`X-Forwarded-Host` (or `Forwarded: host=…`), and its addresses must be listed in
+`AUTOXIDE_HTTP_TRUSTED_PROXIES`: Autoxide reads those headers only from trusted proxies. The
+`ask` endpoint counts toward the per-address rate limit like any other; Caddy asks once per new
+certificate. Verifying, removing a domain or suspending its tenant reaches every server within
+`AUTOXIDE_TENANCY_CACHE_SECONDS` (default `10`).
+
 ## Running several servers
 
 With PostgreSQL, run as many `app` processes as you need behind the reverse proxy: they

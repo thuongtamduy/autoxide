@@ -220,6 +220,13 @@ impl DatabaseRegistry {
         }
     }
 
+    /// Bỏ tên miền `domain` khỏi cache (sau khi xác minh, thu hồi hay đổi khách của nó trên máy chủ
+    /// này): request kế tiếp tra lại bảng.
+    pub fn invalidate_domain(&self, domain: &str) {
+        let domain = domain.trim().trim_end_matches('.').to_ascii_lowercase();
+        lock(&self.0.domains).remove(&domain);
+    }
+
     /// Bỏ khách `id` khỏi cache (sau khi sửa khách trên máy chủ này).
     pub fn invalidate(&self, id: TenantId) {
         lock(&self.0.tenants).remove(&id);

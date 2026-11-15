@@ -1,5 +1,5 @@
 //! Theo khách qua HTTP (bước 33): endpoint công khai trả bài của đúng khách theo header
-//! `autoxide-tenant` (tên miền riêng đi cùng đường định tuyến đó), `ETag` khác nhau giữa khách;
+//! `autoxide-tenant` hay tên miền riêng đã xác minh (`Host`), `ETag` khác nhau giữa khách;
 //! link xem trước mang khách của nó; người của khách B không đọc được gì của khách A qua mọi `GET`
 //! và mọi tool MCP chỉ đọc. Khách `a` và `c` dùng chung database chính, khách `b` có database
 //! riêng.
@@ -29,6 +29,8 @@ async fn app(test: &TestDatabase) -> TestApp {
         .tenant("a")
         .tenant_dedicated("b")
         .tenant("c")
+        // Tên miền riêng đã xác minh của khách `b` (database riêng).
+        .domain("b", "shop-b.test")
         .user_in("a", "admin-a", 1, &ALL)
         .user_in("b", "admin-b", 2, &ALL)
         .user_in("c", "admin-c", 3, &ALL)
@@ -146,6 +148,19 @@ async fn trang_cong_khai_theo_host() {
         )
         .await;
         assert_eq!(same.status(), StatusCode::NOT_MODIFIED);
+        // Tên miền riêng của `b`, không header: cùng bài của `b`, cùng `ETag`.
+        let by_host = send(&app, Method::GET, path, None, &[("host", "shop-b.test")], None).await;
+        assert_eq!(
+            (by_host.status(), by_host.json()["data"]["entry"]["excerpt"].as_str()),
+            (StatusCode::OK, Some("Body B")),
+            "{}",
+            by_host.json()
+        );
+        assert_eq!(by_host.header(header::ETAG), etags[1]);
+        // Người của `a` gửi tới tên miền của `b`: từ chối, không lẫn khách.
+        let mismatch =
+            send(&app, Method::GET, path, Some("admin-a"), &[("host", "shop-b.test")], None).await;
+        assert_eq!(mismatch.json()["code"], "tenant_mismatch");
 
         // Link xem trước của `b`: mở được trên tên miền chính không header; ở khách `a` thì không.
         let uri = format!("/entries/{b}/preview-token");

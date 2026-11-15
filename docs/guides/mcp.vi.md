@@ -118,12 +118,15 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `forms.list_submissions` | `forms.read` | read-only |
 | `forms.set_submission_status` | `forms.review` | writes |
 | `forms.update` | `forms.manage` | writes |
+| `kernel.add_domain` | `kernel.domains.manage` | writes |
 | `kernel.current_tenant` | — | read-only |
 | `kernel.get_module` | `kernel.modules.read` | read-only |
 | `kernel.get_tenant` | `kernel.tenants.read` | read-only |
+| `kernel.list_domains` | `kernel.domains.manage` | read-only |
 | `kernel.list_modules` | `kernel.modules.read` | read-only |
 | `kernel.list_settings` | `kernel.settings.manage` | read-only |
 | `kernel.list_tenants` | `kernel.tenants.read` | read-only |
+| `kernel.verify_domain` | `kernel.domains.manage` | writes |
 | `media.get` | `media.read` | read-only |
 | `media.list` | `media.read` | read-only |
 | `media.list_tags` | `media.read` | read-only |

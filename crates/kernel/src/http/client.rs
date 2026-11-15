@@ -57,6 +57,14 @@ pub(super) struct ClientAddress {
 #[derive(Debug, Clone, Copy)]
 pub(super) struct ClientIp(pub(super) Option<IpAddr>);
 
+/// Tên miền client gõ, theo `Forwarded: host=…` / `X-Forwarded-Host` của proxy tin cậy (lớp
+/// [`attach`]). Chỉ có khi kết nối đến từ một dải `AUTOXIDE_HTTP_TRUSTED_PROXIES`: client gọi thẳng
+/// thì header đó do nó tự viết. Không có thì dùng `Host` (proxy như Caddy chuyển nguyên `Host`).
+#[derive(Debug, Clone)]
+pub(crate) struct ForwardedHost(pub(crate) String);
+
+const X_FORWARDED_HOST: HeaderName = HeaderName::from_static("x-forwarded-host");
+
 impl ClientAddress {
     pub(super) fn new(
         header: Option<HeaderName>,
@@ -68,6 +76,37 @@ impl ClientAddress {
 
     fn is_trusted(&self, address: IpAddr) -> bool {
         self.trusted_ranges.iter().any(|range| range.contains(address))
+    }
+
+    /// Tên miền proxy tin cậy chuyển tới (`Forwarded: host=…`, rồi `X-Forwarded-Host`); `None` khi
+    /// kết nối không đến từ dải proxy tin cậy hay không có header. Lấy giá trị cuối: do proxy gần
+    /// nhất (tin cậy) ghi.
+    pub(super) fn forwarded_host(
+        &self,
+        headers: &HeaderMap,
+        connection: Option<IpAddr>,
+    ) -> Option<String> {
+        let connection = connection.map(|ip| ip.to_canonical());
+        if self.trusted_ranges.is_empty() || !connection.is_some_and(|ip| self.is_trusted(ip)) {
+            return None;
+        }
+        let last = |name: &HeaderName| {
+            headers
+                .get_all(name)
+                .iter()
+                .filter_map(|value| value.to_str().ok())
+                .flat_map(|line| line.split(','))
+                .map(str::trim)
+                .rfind(|entry| !entry.is_empty())
+                .map(str::to_owned)
+        };
+        let forwarded = last(&header::FORWARDED).and_then(|element| {
+            element.split(';').find_map(|pair| {
+                let (key, value) = pair.trim().split_once('=')?;
+                key.eq_ignore_ascii_case("host").then(|| value.trim().trim_matches('"').to_owned())
+            })
+        });
+        forwarded.or_else(|| last(&X_FORWARDED_HOST)).filter(|host| !host.is_empty())
     }
 
     /// Địa chỉ client của request có `headers`, đến từ kết nối `connection`.
@@ -141,6 +180,9 @@ pub(super) async fn attach(
     let connection = request.extensions().get::<ConnectInfo<SocketAddr>>().map(|info| info.0.ip());
     let address = resolver.resolve(request.headers(), connection);
     request.extensions_mut().insert(ClientIp(address));
+    if let Some(host) = resolver.forwarded_host(request.headers(), connection) {
+        request.extensions_mut().insert(ForwardedHost(host));
+    }
     next.run(request).await
 }
 
@@ -324,6 +366,26 @@ mod tests {
             resolver.resolve(&via_cdn, Some(ip("::ffff:10.0.0.5"))),
             Some(ip("203.0.113.9"))
         );
+    }
+
+    #[test]
+    fn ten_mien_chuyen_tiep_chi_tin_proxy_trong_dai() {
+        let resolver = ranges("10.0.0.0/8");
+        let proxy = Some(ip("10.0.0.5"));
+        let mut map = HeaderMap::new();
+        map.append("x-forwarded-host", HeaderValue::from_static("forged.example, shop.example"));
+        assert_eq!(resolver.forwarded_host(&map, proxy).as_deref(), Some("shop.example"));
+        // `Forwarded` (RFC 7239) đứng trước `X-Forwarded-Host`.
+        map.append(
+            header::FORWARDED,
+            HeaderValue::from_static("for=203.0.113.9;host=\"Shop.Test\";proto=https"),
+        );
+        assert_eq!(resolver.forwarded_host(&map, proxy).as_deref(), Some("Shop.Test"));
+        // Kết nối không từ proxy tin cậy, hay chỉ cấu hình đếm proxy: bỏ qua header.
+        assert_eq!(resolver.forwarded_host(&map, Some(ip("203.0.113.50"))), None);
+        assert_eq!(resolver.forwarded_host(&map, None), None);
+        assert_eq!(proxies(1).forwarded_host(&map, proxy), None);
+        assert_eq!(resolver.forwarded_host(&HeaderMap::new(), proxy), None);
     }
 
     #[test]

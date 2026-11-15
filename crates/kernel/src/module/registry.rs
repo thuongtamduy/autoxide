@@ -68,6 +68,9 @@ pub struct Modules {
     keys: crate::secret::KeyConfig,
     /// Bộ gieo dữ liệu cho khách mới của mọi module; điền sau khi mọi module khởi động.
     seeds: crate::tenancy::admin::Seeds,
+    /// Bộ tra DNS cho tên miền riêng của khách: bản một module công bố (`dyn DnsTxtLookup`), không
+    /// thì bộ tra của hệ điều hành; điền sau khi mọi module khởi động.
+    dns: crate::tenancy::domains::DnsSlot,
     /// Sổ database (bước 33); có sau [`start`](Self::start).
     tenancy: Option<crate::tenancy::DatabaseRegistry>,
 }
@@ -94,6 +97,7 @@ impl Modules {
         let keys = crate::secret::KeyConfig::default();
         let settings = crate::tenancy::settings::Catalog::default();
         let seeds = crate::tenancy::admin::Seeds::default();
+        let dns = crate::tenancy::domains::DnsSlot::default();
         let mut all: Vec<Box<dyn Module>> = vec![
             Box::new(crate::builtin::KernelModule::new(
                 catalog.clone(),
@@ -102,6 +106,7 @@ impl Modules {
                 keys.clone(),
                 settings.clone(),
                 seeds.clone(),
+                dns.clone(),
             )),
             Box::new(crate::antispam::module::AntispamModule::default()),
         ];
@@ -160,6 +165,7 @@ impl Modules {
                 user_flags,
                 keys,
                 seeds,
+                dns,
                 tenancy: None,
             })
         } else {
@@ -223,6 +229,7 @@ impl Modules {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
             })?;
         }
+        self.dns.fill(apis.get::<dyn crate::tenancy::DnsTxtLookup>());
         self.apis = apis;
         self.tenancy = Some(registry.clone());
         // Sau khi MỌI module đã khởi động: tool, job, lịch của module chỉ có từ lúc này.
@@ -235,6 +242,13 @@ impl Modules {
                 .collect(),
         );
         Ok(())
+    }
+
+    /// Dùng `lookup` thay bộ tra DNS của hệ điều hành khi xác minh tên miền riêng của khách. Gọi
+    /// trước [`start`](Self::start) (testkit dùng bộ giả, không hỏi DNS thật); lần gọi sau và bản
+    /// một module công bố sau đó bị bỏ qua.
+    pub fn use_dns(&self, lookup: Arc<dyn crate::tenancy::DnsTxtLookup>) {
+        self.dns.fill(Some(lookup));
     }
 
     /// Sổ database đã dùng lúc khởi động; `None` trước [`start`](Self::start).

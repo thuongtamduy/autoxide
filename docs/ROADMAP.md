@@ -105,9 +105,11 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
       `dedicated` được bucket riêng); cache trong bộ nhớ (vd cache tìm theo ý nghĩa của `content`),
       rate limiting, login throttling, idempotency key, con trỏ pagination có khách trong khoá;
       token và URL đã ký mang khách, dùng ở khách khác thì bị từ chối
-- [ ] Tên miền riêng của khách (D-190): xác minh quyền sở hữu bằng bản ghi DNS TXT, trạng thái tên
+- [x] Tên miền riêng của khách (D-190): xác minh quyền sở hữu bằng bản ghi DNS TXT, trạng thái tên
       miền, endpoint "có phục vụ tên miền này không" cho reverse proxy cấp chứng chỉ TLS tự động
       (vd Caddy on-demand TLS); tài liệu deploy (EN + VI)
+- [ ] Kiểm lại hằng ngày tên miền đã xác minh: bản ghi TXT mất 3 lần liên tiếp thì `failed` (cột đếm lần trượt,
+      migration mới; D-291 mục 8)
 - [x] An toàn khi nhiều database (D-190): mỗi database ghi phiên bản migration của nó; database
       chưa migrate xong thì chỉ các khách trên nó nhận lỗi `tenant_maintenance` (503), các khách khác
       chạy bình thường; `migrate --all` chạy lại được từ chỗ dừng; worker chia lượt công bằng giữa
