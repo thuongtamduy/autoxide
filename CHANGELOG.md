@@ -42,6 +42,11 @@ endpoints are marked deprecated with a sunset date first.
   every endpoint answers 401 without a token and 403 `permission_denied` without the permission.
 - For module authors: `Permission::with_risk`, `Risk`, `Tool::for_any_signed_in`; the OpenAPI lint asks
   every handler for `x-permissions` or `x-public`.
+- An upgrade test from the last release: `cargo xtask upgrade-test` runs the previous release's Docker
+  image, writes sample data through its API (users, tokens, API keys, images, posts, forms, newsletter
+  lists, webhooks, menus), then runs this version on the same database and data directory and checks every
+  record, the old tokens and a few writes — on SQLite and PostgreSQL. It runs in CI and before every
+  release (Linux, needs Docker).
 
 ### Fixed
 

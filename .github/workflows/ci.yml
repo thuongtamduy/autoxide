@@ -88,6 +88,48 @@ jobs:
         working-directory: sdk/typescript
         run: npm ci && npx tsc --noEmit
 
+  upgrade:
+    # Bản phát hành trước ghi dữ liệu, bản này đọc lại trên cùng database (đặc tả 31 B1, D-246).
+    # Không trong `./gate.sh`: cần tải hay build image của tag cũ.
+    name: upgrade from the last release (${{ matrix.database }})
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      # Tải image của bản trước từ ghcr.io.
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+      GATE_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Cả lịch sử và tag: chọn tag phát hành trước HEAD.
+          fetch-depth: 0
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: cargo xtask upgrade-test --database ${{ matrix.database }}
+
   secrets:
     name: secret scan (gitleaks)
     if: ${{ !github.event.repository.private }}

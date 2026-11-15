@@ -6083,3 +6083,45 @@ quyền của từng endpoint từ tài liệu.
 - Macro riêng bọc `#[utoipa::path]`: thêm một thứ phải học, trong khi `extensions` đã đủ.
 - Sinh `x-permissions` tự động từ lời gọi `principal.require` trong code: không đọc được lúc biên dịch, và có
   service kiểm quyền theo điều kiện.
+
+## D-246 · Test nâng cấp từ bản phát hành trước: Docker, ngoài gate (bước 31 B1) — 2026-11-15 — agent quyết
+
+Bối cảnh: migration và dữ liệu cũ chỉ được thử trên database do **chính bản hiện tại** dựng. Lỗi chỉ lộ khi nâng
+cấp thật (migration mới hỏng trên dữ liệu của bản cũ, đổi cách lưu token, đổi định dạng file) thì không test nào
+bắt.
+
+Quyết định:
+
+- **Test** `crates/app/tests/upgrade.rs`, chạy trên database `TestDatabase` chọn (SQLite hay Postgres):
+  - bản cũ chạy bằng image Docker của nó (`TEST_UPGRADE_IMAGE`): `migrate up`, `user create`, `serve`;
+  - ghi dữ liệu mẫu qua HTTP thật: role, API key, ảnh PNG (chờ job ảnh nhỏ), bài nháp, bài đã đăng có ảnh đại diện
+    và ảnh trong thân, form, danh sách newsletter, webhook, menu (từ 0.13.0, đọc `--version` của image);
+  - dừng bằng `docker stop` (SIGTERM), kiểm container thoát 0;
+  - bản hiện tại (binary vừa build) trên **cùng database và cùng thư mục `data/`**: `migrate up`, `doctor`,
+    `serve`;
+  - đọc lại mọi bản ghi: mọi trường bản cũ trả về, bản mới trả y hệt (bản mới được thêm trường);
+  - access token, refresh token, API key và mật khẩu cũ còn dùng được;
+  - vài lệnh ghi: sửa bài, tải ảnh mới, tạo role; rồi `task media.refresh_variants`.
+- **Chưa đặt `TEST_UPGRADE_IMAGE` thì test in "skipped" và qua**, như test S3 với `TEST_S3_ENDPOINT`. Vì thế test
+  có trong `cargo test --workspace` nhưng không làm gì khi chạy `./gate.sh`.
+- **Lệnh `cargo xtask upgrade-test [--from <tag>] [--image <image>] [--database sqlite|postgres|both]`:**
+  - tag cũ mặc định là tag phát hành gần nhất trước HEAD (HEAD chính là tag thì lấy tag trước nó);
+  - image: thử tải `ghcr.io/<chủ>/<repo>:X.Y.Z` (và `:vX.Y.Z`); không được thì dùng `autoxide:vX.Y.Z` đã build
+    trên máy, hay build từ tag (`git worktree add` → `docker build --network host`, truyền biến proxy chuẩn);
+  - chạy test trên SQLite, rồi trên Postgres (`GATE_POSTGRES_URL`, không có thì dựng container như `gate.sh`).
+- **Không vào `./gate.sh`.** Lệnh cần Docker, tải hay build bản release của tag cũ, mất nhiều phút. Nó chạy ở job
+  `upgrade` của CI (ma trận `sqlite` / `postgres`, đăng nhập ghcr.io bằng `GITHUB_TOKEN` để tải image) và ở bước 4
+  của `docs/RELEASING.md`, trước khi gắn tag: đỏ thì không phát hành.
+- **Giới hạn:** container chạy với `--network host`, nên lệnh chỉ chạy trên Linux. Nhờ vậy bản cũ gọi được Postgres
+  của test, và test gọi được bản cũ ở `127.0.0.1` mà không cần ánh xạ port. Container chạy bằng uid/gid của máy để
+  file trong thư mục gắn vào ghi được và xoá được.
+- `reqwest` (đã có trong workspace) thêm vào `[dev-dependencies]` của `autoxide` làm client HTTP của test.
+
+Lý do: chỉ image thật của bản cũ mới đúng là thứ người dùng đang chạy. Build lại bản cũ từ mã nguồn trong cùng
+workspace thì không được, vì hai bản trùng tên crate.
+
+Đã cân nhắc:
+- Giữ sẵn file database mẫu của từng bản trong repo: không thử được Postgres, và file phải sinh lại mỗi lần phát
+  hành.
+- Chạy trong gate: mỗi lần gate lại tốn thêm một lần build bản release và cần Docker. Trong khi đó gate phải chạy
+  được trên máy chỉ có Postgres (`GATE_POSTGRES_URL`).
