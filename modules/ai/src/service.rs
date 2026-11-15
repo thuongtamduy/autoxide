@@ -8,6 +8,7 @@ use autoxide_kernel::ai::{
     Capabilities, EmbedKind, Embedder, Generation, Part, Prompt, TextModel, Usage, schema,
 };
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantContext;
 
 use crate::embedding::OpenAiEmbeddings;
 use crate::errors;
@@ -31,7 +32,7 @@ impl TextModel for Text {
         if self.provider.is_some() { Ok(()) } else { Err(errors::disabled()) }
     }
 
-    async fn generate(&self, prompt: Prompt) -> Result<Generation, Error> {
+    async fn generate(&self, tenant: &TenantContext, prompt: Prompt) -> Result<Generation, Error> {
         let Some(provider) = &self.provider else {
             return Err(errors::disabled());
         };
@@ -45,7 +46,7 @@ impl TextModel for Text {
         let started = Instant::now();
         // Hai lần: mô hình đôi khi trả sai dạng (nhất là máy chủ bỏ qua schema mà không báo).
         for attempt in 1..=2 {
-            let raw = match provider.generate(&prompt).await {
+            let raw = match provider.generate(tenant, &prompt).await {
                 Ok(raw) => raw,
                 Err(error) => {
                     count(purpose, error.code());
@@ -104,6 +105,7 @@ impl Embedder for Embeddings {
 
     async fn embed(
         &self,
+        tenant: &TenantContext,
         purpose: &'static str,
         texts: &[String],
         _kind: EmbedKind,
@@ -115,7 +117,7 @@ impl Embedder for Embeddings {
             return Ok(Vec::new());
         }
         self.book.check().await?;
-        match client.embed(purpose, texts).await {
+        match client.embed(tenant, purpose, texts).await {
             Ok((vectors, usage)) => {
                 self.book.record(purpose, usage).await?;
                 tokens(purpose, usage);

@@ -3,6 +3,7 @@ use crate::publishing::redirects::Resolved;
 use crate::taxonomy::authors::AuthorInput;
 use crate::taxonomy::menus::ItemInput;
 use crate::taxonomy::terms::{Taxonomy, TermInput};
+use autoxide_kernel::tenancy::TenantContext;
 
 fn name(locale: &str, name: &str) -> TermInput {
     TermInput { locale: Some(locale.into()), name: Some(name.into()), ..Default::default() }
@@ -296,7 +297,10 @@ async fn so_doi_tuong_content_term() {
         let food = content.create_term(&ada, Taxonomy::Tag, name("en", "Food")).await.unwrap();
 
         let wanted = vec![travel.term.id.to_string(), food.term.id.to_string(), "x".to_owned()];
-        let found = resolver.resolve_many(&wanted, Some("vi")).await.unwrap();
+        let found = resolver
+            .resolve_many(&TenantContext::legacy_default(&content.database), &wanted, Some("vi"))
+            .await
+            .unwrap();
         assert_eq!(found.len(), 2, "malformed IDs are absent");
         let travel_vi = &found[&travel.term.id.to_string()];
         assert_eq!(
@@ -310,18 +314,60 @@ async fn so_doi_tuong_content_term() {
             "falls back to the default language"
         );
         assert_eq!(
-            resolver.resolve(&food.term.id.to_string()).await.unwrap().unwrap().title,
+            resolver
+                .resolve(
+                    &TenantContext::legacy_default(&content.database),
+                    &food.term.id.to_string()
+                )
+                .await
+                .unwrap()
+                .unwrap()
+                .title,
             "Food"
         );
-        assert!(resolver.resolve(&Uuid::now_v7().to_string()).await.unwrap().is_none());
+        assert!(
+            resolver
+                .resolve(
+                    &TenantContext::legacy_default(&content.database),
+                    &Uuid::now_v7().to_string()
+                )
+                .await
+                .unwrap()
+                .is_none()
+        );
 
         assert!(resolver.has_children());
-        let children = resolver.children(&travel.term.id.to_string(), None, 2).await.unwrap();
+        let children = resolver
+            .children(
+                &TenantContext::legacy_default(&content.database),
+                &travel.term.id.to_string(),
+                None,
+                2,
+            )
+            .await
+            .unwrap();
         let expected: Vec<ResourceRef> =
             ids.iter().take(2).map(|id| ResourceRef::new("content.term", id.to_string())).collect();
         assert_eq!(children, expected, "creation order, cut at the limit");
-        assert!(resolver.children(&food.term.id.to_string(), None, 5).await.unwrap().is_empty());
-        assert!(resolver.children("x", None, 5).await.unwrap().is_empty());
+        assert!(
+            resolver
+                .children(
+                    &TenantContext::legacy_default(&content.database),
+                    &food.term.id.to_string(),
+                    None,
+                    5
+                )
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            resolver
+                .children(&TenantContext::legacy_default(&content.database), "x", None, 5)
+                .await
+                .unwrap()
+                .is_empty()
+        );
 
         let cover = media.add(true);
         let mut new = post("Cover");
@@ -329,7 +375,14 @@ async fn so_doi_tuong_content_term() {
         let entry = content.create(&ada, new).await.unwrap();
         content.publish(&ada, entry.id, None, None, false).await.unwrap();
         let entries = crate::resource::EntryResolver(content.clone());
-        let found = entries.resolve_many(&[entry.id.to_string()], None).await.unwrap();
+        let found = entries
+            .resolve_many(
+                &TenantContext::legacy_default(&content.database),
+                &[entry.id.to_string()],
+                None,
+            )
+            .await
+            .unwrap();
         assert_eq!(found[&entry.id.to_string()].image, Some(cover));
     })
     .await
@@ -365,7 +418,8 @@ async fn doc_menu_cu() {
             },
         ];
         content.put_menu(&ada, "main", None, tree, None).await.unwrap();
-        let menus = content.legacy_menus().await.unwrap();
+        let menus =
+            content.legacy_menus(&TenantContext::legacy_default(&content.database)).await.unwrap();
         assert_eq!(menus.len(), 1);
         assert_eq!((menus[0].key.as_str(), menus[0].locale.as_str()), ("main", "en"));
         assert_eq!(

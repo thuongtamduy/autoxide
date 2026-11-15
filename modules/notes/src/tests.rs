@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::database::Database;
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode};
 use rmcp::service::{RoleClient, RunningService};
@@ -228,9 +229,16 @@ async fn module_khac_dung_trait_cong_bo() {
 
         let notes = app.modules().api::<dyn Notes>().unwrap();
 
-        let found = notes.find(id).await.unwrap().unwrap();
+        let found =
+            notes.find(&TenantContext::legacy_default(app.database()), id).await.unwrap().unwrap();
         assert_eq!((found.owner_id, found.title.as_str()), (ADA, "Shared"));
-        assert!(notes.find(Uuid::now_v7()).await.unwrap().is_none());
+        assert!(
+            notes
+                .find(&TenantContext::legacy_default(app.database()), Uuid::now_v7())
+                .await
+                .unwrap()
+                .is_none()
+        );
     })
     .await
     .unwrap();
@@ -277,7 +285,12 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
         // Bộ phát event dựng được dù chưa có module tài khoản nào khai event xoá.
         app.modules().dispatcher().unwrap();
 
-        let exported = app.modules().personal_data().export(ADA).await.unwrap();
+        let exported = app
+            .modules()
+            .personal_data()
+            .export(&TenantContext::legacy_default(app.database()), ADA)
+            .await
+            .unwrap();
         let titles: Vec<_> =
             exported["notes"].as_array().unwrap().iter().map(|n| n["title"].clone()).collect();
         assert_eq!(titles, vec![json!("one"), json!("two")]);
@@ -292,9 +305,19 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
         );
         service.handle(&deleted).await.unwrap();
         service.handle(&deleted).await.unwrap();
-        let exported = app.modules().personal_data().export(ADA).await.unwrap();
+        let exported = app
+            .modules()
+            .personal_data()
+            .export(&TenantContext::legacy_default(app.database()), ADA)
+            .await
+            .unwrap();
         assert_eq!(exported["notes"], json!([]));
-        let exported = app.modules().personal_data().export(BOB).await.unwrap();
+        let exported = app
+            .modules()
+            .personal_data()
+            .export(&TenantContext::legacy_default(app.database()), BOB)
+            .await
+            .unwrap();
         assert_eq!(exported["notes"].as_array().unwrap().len(), 1);
     })
     .await

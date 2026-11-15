@@ -95,7 +95,13 @@ impl CommentsService {
         if !self.resources.knows(&row.target_type) {
             return Ok(None);
         }
-        self.resources.resolve(&row.target_type, &row.target_id).await
+        self.resources
+            .resolve(
+                &TenantContext::legacy_default(&self.database),
+                &row.target_type,
+                &row.target_id,
+            )
+            .await
     }
 
     /// Đường dẫn đầy đủ tới trang của đích, khi biết địa chỉ website và đường dẫn.
@@ -124,7 +130,7 @@ impl CommentsService {
             [("target", target.as_str()), ("link", link.as_str()), ("hours", hours.as_str())];
         let mut mail = VERIFY_MAIL.mail(email, &self.translations, language, &params);
         mail.dedupe_key = Some(format!("comments.verify:{}", issued.id));
-        self.mailer.send(mail).await
+        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await
     }
 
     /// Xác minh email bằng token trong mail: bình luận được đánh dấu email đã xác minh và email đó
@@ -262,7 +268,7 @@ impl CommentsService {
             ];
             let mut mail = REPLY_MAIL.mail(&follower.email, &self.translations, language, &params);
             mail.dedupe_key = Some(format!("comments.reply:{id}:{}", follower.id));
-            self.mailer.send(mail).await?;
+            self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await?;
             sent += 1;
         }
         Ok(sent)

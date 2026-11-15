@@ -7,6 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::Page;
+use autoxide_kernel::tenancy::TenantContext;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use bytes::Bytes;
@@ -60,7 +61,7 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
         Tool::new(
             "list_files",
             "List the files you uploaded, newest first; follow `pagination.next_cursor` for more.",
-            move |principal: Principal, input: PageInput| {
+            move |_tenant: TenantContext, principal: Principal, input: PageInput| {
                 let service = list.clone();
                 async move {
                     let page = service.list(&principal, &input.page()?).await?;
@@ -74,7 +75,7 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
             "get_file",
             "Get the details of a file (name, type, size, SHA-256). Your own files need \
              `files.upload`; anyone's need `files.manage`.",
-            move |principal: Principal, input: FileId| {
+            move |_tenant: TenantContext, principal: Principal, input: FileId| {
                 let service = get.clone();
                 async move {
                     Ok::<_, Error>(FileResponse::from(service.get(&principal, input.id).await?))
@@ -88,7 +89,7 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
             "read_file",
             "Get a file with its content as base64, for files up to 1 MiB; download larger ones \
              with `GET /api/v1/files/{id}/content`. Same access as `get_file`.",
-            move |principal: Principal, input: FileId| {
+            move |_tenant: TenantContext, principal: Principal, input: FileId| {
                 let service = read.clone();
                 async move {
                     let file = service.get(&principal, input.id).await?;
@@ -112,7 +113,7 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
             "upload_file",
             "Upload a small file, its content base64-encoded (the size and type limits of the \
              server apply). Upload large files with `POST /api/v1/files`.",
-            move |principal: Principal, input: UploadInput| {
+            move |_tenant: TenantContext, principal: Principal, input: UploadInput| {
                 let service = upload.clone();
                 async move {
                     let content = STANDARD.decode(input.content_base64.trim()).map_err(|_| {
@@ -133,7 +134,7 @@ pub(crate) fn all(service: &Arc<FileService>) -> Vec<Tool> {
         Tool::new(
             "delete_file",
             "Delete a file and its content; it cannot be restored. Same access as `get_file`.",
-            move |principal: Principal, input: FileId| {
+            move |_tenant: TenantContext, principal: Principal, input: FileId| {
                 let service = delete.clone();
                 async move {
                     service.delete(&principal, input.id).await?;
@@ -173,28 +174,29 @@ mod tests {
             let (files, _) = service(test, no_limits()).await;
             let tools = all(&files);
             let tool = |name: &str| tools.iter().find(|tool| tool.name() == name).unwrap();
+            let tenant = TenantContext::legacy_default(&files.database);
             let ada = Principal::new(Uuid::now_v7(), ["files.upload".to_owned()]);
             let bob = Principal::new(Uuid::now_v7(), ["files.upload".to_owned()]);
 
             let input = json!({"name": "a.txt", "content_type": "text/plain", "content_base64": "aGVsbG8="});
-            let file = tool("upload_file").call(ada.clone(), input).await.unwrap();
+            let file = tool("upload_file").call(tenant.clone(), ada.clone(), input).await.unwrap();
             assert_eq!((file["name"].as_str(), file["size"].as_u64()), (Some("a.txt"), Some(5)));
             let id = file["id"].clone();
 
-            let read = tool("read_file").call(ada.clone(), json!({"id": id})).await.unwrap();
+            let read = tool("read_file").call(tenant.clone(), ada.clone(), json!({"id": id})).await.unwrap();
             assert_eq!(read["content_base64"], "aGVsbG8=");
             assert_eq!(read["sha256"], file["sha256"]);
-            let page = tool("list_files").call(ada.clone(), json!({})).await.unwrap();
+            let page = tool("list_files").call(tenant.clone(), ada.clone(), json!({})).await.unwrap();
             assert_eq!(page["data"][0]["id"], id);
             // File của người khác: như không có, giống REST.
-            let theirs = tool("get_file").call(bob, json!({"id": id})).await.unwrap_err();
+            let theirs = tool("get_file").call(tenant.clone(), bob, json!({"id": id})).await.unwrap_err();
             assert_eq!(theirs.code(), "files.file_not_found");
             let bad = json!({"name": "b.txt", "content_base64": "%%%"});
-            let bad = tool("upload_file").call(ada.clone(), bad).await.unwrap_err();
+            let bad = tool("upload_file").call(tenant.clone(), ada.clone(), bad).await.unwrap_err();
             assert_eq!(bad.code(), "files.invalid_base64");
 
-            tool("delete_file").call(ada.clone(), json!({"id": id})).await.unwrap();
-            let gone = tool("read_file").call(ada, json!({"id": id})).await.unwrap_err();
+            tool("delete_file").call(tenant.clone(), ada.clone(), json!({"id": id})).await.unwrap();
+            let gone = tool("read_file").call(tenant.clone(), ada, json!({"id": id})).await.unwrap_err();
             assert_eq!(gone.code(), "files.file_not_found");
         })
         .await
@@ -213,7 +215,8 @@ mod tests {
             let file = files.upload(&ada, "big.bin", None, stream).await.unwrap();
             let tools = all(&files);
             let read = tools.iter().find(|tool| tool.name() == "read_file").unwrap();
-            let error = read.call(ada, json!({"id": file.id})).await.unwrap_err();
+            let tenant = TenantContext::legacy_default(&files.database);
+            let error = read.call(tenant, ada, json!({"id": file.id})).await.unwrap_err();
             assert_eq!(error.code(), "files.too_large_for_tool");
             assert!(error.to_string().contains(&format!("/api/v1/files/{}/content", file.id)));
         })

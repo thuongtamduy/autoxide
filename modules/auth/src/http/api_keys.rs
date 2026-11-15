@@ -188,6 +188,7 @@ async fn revoke_api_key(
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -205,7 +206,7 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(services.users.as_ref(), &TenantContext::legacy_default(&services.database), root).await.unwrap();
             let session = bearer(&app, "root@example.com", PASSWORD).await;
 
             // Thiếu hay sai mật khẩu hiện tại: không tạo được (token lộ không đủ).

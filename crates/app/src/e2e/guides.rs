@@ -19,6 +19,7 @@ use std::path::{Path, PathBuf};
 
 use autoxide_auth::api::{Accounts, NewAccount};
 use autoxide_kernel::mcp::Tool;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::Method;
 use serde_json::Value;
@@ -269,7 +270,11 @@ async fn app(test: &TestDatabase) -> TestApp {
         password: Some(ADMIN_PASSWORD.to_owned()),
         admin: true,
     };
-    app.api::<dyn Accounts>().unwrap().create(account).await.unwrap();
+    app.api::<dyn Accounts>()
+        .unwrap()
+        .create(&TenantContext::legacy_default(app.database()), account)
+        .await
+        .unwrap();
     app
 }
 

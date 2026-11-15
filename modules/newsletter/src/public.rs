@@ -401,7 +401,11 @@ impl NewsletterService {
                         &issued.token,
                         issued.id,
                     ) {
-                        Ok(mail) => self.mailer.send(mail).await,
+                        Ok(mail) => {
+                            self.mailer
+                                .send(&TenantContext::legacy_default(&self.database), mail)
+                                .await
+                        }
                         Err(error) => Err(error),
                     }
                 }

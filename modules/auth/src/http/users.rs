@@ -354,6 +354,7 @@ async fn set_user_password(
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -377,7 +378,13 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
             let path = format!("/users/{}", ada.id);
@@ -430,7 +437,13 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let fields = |problem: &serde_json::Value| {
                 let mut fields: Vec<String> = problem["errors"]
@@ -481,7 +494,13 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             for (email, name) in [("dat@example.vn", "Trần Đạt"), ("x_y@example.com", "100% Bob")]
             {
                 let account = NewAccount {
@@ -490,7 +509,13 @@ mod tests {
                     password: None,
                     admin: false,
                 };
-                Accounts::create(services.users.as_ref(), account).await.unwrap();
+                Accounts::create(
+                    services.users.as_ref(),
+                    &TenantContext::legacy_default(&services.database),
+                    account,
+                )
+                .await
+                .unwrap();
             }
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let emails = async |search: &str| {
@@ -547,14 +572,26 @@ mod tests {
                 password: None,
                 admin: true,
             };
-            let root = Accounts::create(services.users.as_ref(), root).await.unwrap();
+            let root = Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             let bob = NewAccount {
                 email: "bob@example.com".to_owned(),
                 name: "Bob".to_owned(),
                 password: None,
                 admin: false,
             };
-            let bob = Accounts::create(services.users.as_ref(), bob).await.unwrap();
+            let bob = Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                bob,
+            )
+            .await
+            .unwrap();
             let helpdesk = crate::role::RoleInput {
                 name: "helpdesk".to_owned(),
                 description: String::new(),
@@ -606,7 +643,13 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let ada = bearer(&app, "ada@example.com", PASSWORD).await;
 
@@ -698,6 +741,7 @@ mod tests {
 
 #[cfg(test)]
 mod event_tests {
+    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -718,7 +762,7 @@ mod event_tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            let root = Accounts::create(services.users.as_ref(), root).await.unwrap();
+            let root = Accounts::create(services.users.as_ref(), &TenantContext::legacy_default(&services.database), root).await.unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
 
             let body = json!({"email": "bob@example.com", "name": "Bob", "password": PASSWORD});
@@ -794,7 +838,13 @@ mod event_tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let body = json!({"email": "bob@example.com", "name": "Bob"});
             let (_, _, created) = call(&app, "POST", "/users", Some(&admin), Some(body)).await;

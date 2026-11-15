@@ -399,7 +399,13 @@ pub(crate) mod tests {
             password: None,
             admin: false,
         };
-        let ada = Accounts::create(services.users.as_ref(), ada).await.unwrap();
+        let ada = Accounts::create(
+            services.users.as_ref(),
+            &TenantContext::legacy_default(&services.database),
+            ada,
+        )
+        .await
+        .unwrap();
         (services.mfa, ada.id)
     }
 
@@ -552,7 +558,13 @@ mod recovery_tests {
             password: None,
             admin: false,
         };
-        let ada = Accounts::create(services.users.as_ref(), ada).await.unwrap();
+        let ada = Accounts::create(
+            services.users.as_ref(),
+            &TenantContext::legacy_default(&services.database),
+            ada,
+        )
+        .await
+        .unwrap();
         let setup = services.mfa.start_totp(ada.id, "ada@example.com").await.unwrap();
         let codes =
             services.mfa.confirm_totp(ada.id, &code_at(&setup.secret, unix_now())).await.unwrap();

@@ -24,7 +24,7 @@ use crate::text;
 
 #[async_trait::async_trait]
 impl PersonalData for CommentsService {
-    async fn export(&self, user_id: Uuid) -> Result<Value, Error> {
+    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let mut rows = comment::Entity::find()
             .filter(comment::Column::UserId.eq(user_id))
             .all(self.database.read())

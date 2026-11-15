@@ -361,7 +361,15 @@ impl MenuService {
         }
         let mut found: HashSet<(String, String)> = HashSet::new();
         for (kind, ids) in by_kind {
-            let resolved = self.resources.resolve_many(kind, &ids, Some(locale)).await?;
+            let resolved = self
+                .resources
+                .resolve_many(
+                    &TenantContext::legacy_default(&self.database),
+                    kind,
+                    &ids,
+                    Some(locale),
+                )
+                .await?;
             found.extend(resolved.into_keys().map(|id| (kind.to_owned(), id)));
         }
         for (path, kind, id) in &wanted {

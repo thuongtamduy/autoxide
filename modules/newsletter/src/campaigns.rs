@@ -609,7 +609,7 @@ impl NewsletterService {
         let list = self.find_list(campaign.row.list_id).await?;
         let token = autoxide_kernel::secret::random_token(32)?;
         let mail = self.campaign_mail(&campaign.row, &list, &email, &token, None)?;
-        self.mailer.send(mail).await?;
+        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await?;
         tracing::info!(campaign_id = %id, "newsletter test mail queued");
         Ok(())
     }

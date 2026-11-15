@@ -10,6 +10,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use utoipa::ToSchema;
@@ -153,7 +154,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             "List media items (images, video, audio, documents), newest first. Filter by \
              folder, type, visibility, trash or name; sort by `created_at`, `name` or `size`. \
              Follow `pagination.next_cursor` with the same filters for more.",
-            move |principal: Principal, input: ListMediaInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ListMediaInput| {
                 let service = list.clone();
                 async move {
                     let query = ItemsQuery {
@@ -180,7 +181,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             "get",
             "Get a media item: name, type, size, image width and height, texts, visibility, \
              and the `url` of its content.",
-            move |principal: Principal, input: MediaId| {
+            move |_tenant: TenantContext, principal: Principal, input: MediaId| {
                 let service = get.clone();
                 async move {
                     let item = service.get(&principal, input.id).await?;
@@ -195,7 +196,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             "Change the details of a media item: name, alt text, title, caption, folder or \
              visibility. Pass the `updated_at` you read; the change is refused if someone \
              changed the item since.",
-            move |principal: Principal, input: UpdateMediaInput| {
+            move |_tenant: TenantContext, principal: Principal, input: UpdateMediaInput| {
                 let service = update.clone();
                 async move {
                     let visibility = match input.visibility.as_deref() {
@@ -233,7 +234,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
              language, e.g. `vi` on a bilingual site; the item's own `alt` stays the default for \
              other languages. Pass the `updated_at` you read; the change is refused if someone \
              changed the item since.",
-            move |principal: Principal, input: SetAltInput| {
+            move |_tenant: TenantContext, principal: Principal, input: SetAltInput| {
                 let service = set_alt.clone();
                 async move {
                     let item = service
@@ -254,7 +255,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             "trash",
             "Move a media item to the trash. Its public link stops working; it can be \
              restored until the server deletes it for good (30 days by default).",
-            move |principal: Principal, input: MediaId| {
+            move |_tenant: TenantContext, principal: Principal, input: MediaId| {
                 let service = trash.clone();
                 async move {
                     let item = service.trash(&principal, input.id).await?;
@@ -269,7 +270,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
              checks the content really is of its type and reads image sizes. Upload larger \
              files with `POST /api/v1/media`. The answer lists items that already had the same \
              content in `duplicates`.",
-            move |principal: Principal, input: UploadMediaInput| {
+            move |_tenant: TenantContext, principal: Principal, input: UploadMediaInput| {
                 let service = upload.clone();
                 async move {
                     let bytes = STANDARD.decode(input.content_base64.trim()).map_err(|_| {
@@ -309,7 +310,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
         Tool::new(
             "list_tags",
             "List media tags by name, each with the number of items carrying it.",
-            move |principal: Principal, input: ListTagsInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ListTagsInput| {
                 let service = list_tags.clone();
                 async move {
                     let paging = PageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, Some("asc".to_owned()));
@@ -328,7 +329,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
             "Ask the server's AI model to suggest alt text for an image (JPEG, PNG, GIF, WebP) in a \
              language, optionally with context such as the post title. Saves nothing: store what \
              you accept with `update`. Uses AI tokens.",
-            move |principal: Principal, input: SuggestAltInput| {
+            move |_tenant: TenantContext, principal: Principal, input: SuggestAltInput| {
                 let service = alt.clone();
                 async move {
                     let suggestion = service

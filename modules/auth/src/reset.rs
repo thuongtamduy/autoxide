@@ -172,7 +172,7 @@ impl PasswordResets {
                 RESET_CODE.mail(&user.email, &self.translations, language, &params)
             }
         };
-        self.mailer.send(mail).await
+        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await
     }
 
     /// Đặt mật khẩu mới bằng `token` lấy từ mail.

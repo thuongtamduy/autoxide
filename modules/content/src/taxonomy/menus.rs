@@ -463,7 +463,10 @@ fn menu_not_found(key: &str, locale: &str) -> Error {
 // của người vận hành máy chủ.
 #[async_trait::async_trait]
 impl crate::api::LegacyMenus for ContentService {
-    async fn legacy_menus(&self) -> Result<Vec<crate::api::LegacyMenu>, Error> {
+    async fn legacy_menus(
+        &self,
+        _tenant: &TenantContext,
+    ) -> Result<Vec<crate::api::LegacyMenu>, Error> {
         let menus = menu::Entity::find()
             .order_by_asc(menu::Column::Key)
             .order_by_asc(menu::Column::Locale)

@@ -196,6 +196,7 @@ async fn end_user_sessions(
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::{Value, json};
@@ -272,7 +273,13 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let (ada, ada_tokens) = sign_in(&app, "Phone").await;
             sign_in(&app, "Laptop").await;

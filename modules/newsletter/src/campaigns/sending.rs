@@ -373,7 +373,7 @@ impl NewsletterService {
         if claimed.rows_affected != 1 {
             return Ok(None);
         }
-        match self.mailer.send(mail).await {
+        match self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await {
             Ok(()) => {
                 delivery::Entity::update_many()
                     .col_expr(delivery::Column::Status, Expr::value(DeliveryStatus::Sent.as_str()))

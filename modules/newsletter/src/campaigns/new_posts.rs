@@ -68,7 +68,11 @@ impl NewsletterService {
         if !self.resources.knows(ENTRY) {
             return Ok(0);
         }
-        let Some(resource) = self.resources.resolve(ENTRY, &entry_id.to_string()).await? else {
+        let Some(resource) = self
+            .resources
+            .resolve(&TenantContext::legacy_default(&self.database), ENTRY, &entry_id.to_string())
+            .await?
+        else {
             return Ok(0);
         };
         if !resource.public {

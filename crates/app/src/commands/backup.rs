@@ -342,6 +342,7 @@ fn describe(error: Error) -> String {
 mod tests {
     use super::*;
     use autoxide_auth::api::{Accounts, NewAccount};
+    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use futures_util::TryStreamExt as _;
 
@@ -389,7 +390,10 @@ mod tests {
         database.close().await.unwrap();
         let runtime = runtime::start(settings, Migrations::RequireApplied).await.unwrap();
         let accounts = runtime.modules.api::<dyn Accounts>().unwrap();
-        accounts.create(admin("root@example.com")).await.unwrap();
+        accounts
+            .create(&TenantContext::legacy_default(&runtime.database), admin("root@example.com"))
+            .await
+            .unwrap();
         let storage = runtime.modules.api::<dyn Storage>().unwrap();
         for (key, text) in [("files/a", "first file"), ("files/b/c", "second file")] {
             let chunks = vec![Ok(bytes::Bytes::from(text))];
@@ -404,7 +408,10 @@ mod tests {
             .await
             .unwrap();
         let accounts = runtime.modules.api::<dyn Accounts>().unwrap();
-        let duplicate = accounts.create(admin("root@example.com")).await.unwrap_err();
+        let duplicate = accounts
+            .create(&TenantContext::legacy_default(&runtime.database), admin("root@example.com"))
+            .await
+            .unwrap_err();
         assert_eq!(duplicate.code(), "auth.email_taken");
         let storage = runtime.modules.api::<dyn Storage>().unwrap();
         assert_eq!(storage.keys().await.unwrap(), ["files/a", "files/b/c"]);
@@ -539,7 +546,7 @@ mod tests {
                 .await
                 .unwrap();
             let media = runtime.modules.api::<dyn Media>().unwrap();
-            let item = media.find(id).await.unwrap().unwrap();
+            let item = media.find(&TenantContext::legacy_default(&runtime.database), id).await.unwrap().unwrap();
             assert_eq!((item.width, item.height, item.alt.as_str()), (Some(7), Some(5), "Seven by five"));
             assert_eq!(item.visibility, MediaVisibility::Public);
             let storage = runtime.modules.api::<dyn Storage>().unwrap();

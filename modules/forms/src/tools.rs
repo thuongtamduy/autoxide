@@ -18,6 +18,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::error::FieldError;
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, etag};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -237,7 +238,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
             "list",
             "List forms, newest first, with their fields and settings. Follow \
              `pagination.next_cursor` for more.",
-            move |principal: Principal, input: ListFormsInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ListFormsInput| {
                 let service = list.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -264,7 +265,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
             "get",
             "Get a form: its fields (keys, types, labels, options), status, settings, and its \
              `etag`, needed to change it.",
-            move |principal: Principal, input: FormId| {
+            move |_tenant: TenantContext, principal: Principal, input: FormId| {
                 let service = get.clone();
                 async move {
                     Ok::<VersionedForm, Error>(versioned_form(
@@ -284,7 +285,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                  answers). ",
                 fields_help!()
             ),
-            move |principal: Principal, input: CreateFormInput| {
+            move |_tenant: TenantContext, principal: Principal, input: CreateFormInput| {
                 let service = create.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -325,7 +326,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                  `forms.read` (the mails carry the answers). ",
                 fields_help!()
             ),
-            move |principal: Principal, input: UpdateFormInput| {
+            move |_tenant: TenantContext, principal: Principal, input: UpdateFormInput| {
                 let service = update.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -364,7 +365,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
             "List the submissions of a form, newest first, with their answers and the labels \
              of the form version they were sent with. Spam is left out unless `status` is \
              `spam`. Follow `pagination.next_cursor` with the same filters for more.",
-            move |principal: Principal, input: ListSubmissionsInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ListSubmissionsInput| {
                 let service = submissions.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -392,7 +393,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
             "get_submission",
             "Get a submission: answers with labels, sender email, status, and its `version`, \
              needed to change its status.",
-            move |principal: Principal, input: SubmissionId| {
+            move |_tenant: TenantContext, principal: Principal, input: SubmissionId| {
                 let service = submission.clone();
                 async move {
                     Ok::<Versioned, Error>(versioned(
@@ -408,7 +409,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
             "Mark a submission `read`, `archived`, `spam`, or `new` (not spam after all: the \
              notification mail is then sent as for a new submission). Pass the `version` you \
              read.",
-            move |principal: Principal, input: SetStatusInput| {
+            move |_tenant: TenantContext, principal: Principal, input: SetStatusInput| {
                 let service = status.clone();
                 async move {
                     let mut problems = Vec::new();

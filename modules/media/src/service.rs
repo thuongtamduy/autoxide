@@ -567,7 +567,7 @@ impl MediaService {
 /// Thông tin item của một người dùng đã tải lên, cho bản xuất dữ liệu cá nhân.
 #[async_trait::async_trait]
 impl PersonalData for MediaService {
-    async fn export(&self, user_id: Uuid) -> Result<Value, Error> {
+    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let items = Entity::find()
             .filter(Column::UploadedBy.eq(user_id))
             .order_by_asc(Column::Id)
@@ -727,10 +727,11 @@ pub(crate) fn too_large(max: u64) -> Error {
 impl crate::api::Media for MediaService {
     async fn find_many_in(
         &self,
+        tenant: &TenantContext,
         ids: &[Uuid],
         locale: &str,
     ) -> Result<Vec<crate::api::MediaRef>, Error> {
-        let mut found = self.find_many(ids).await?;
+        let mut found = self.find_many(tenant, ids).await?;
         // Ngôn ngữ không được khai thì không có bản dịch nào: giữ `alt` mặc định.
         let Ok(locale) = self.alt_locale(locale) else {
             return Ok(found);
@@ -746,7 +747,11 @@ impl crate::api::Media for MediaService {
         Ok(found)
     }
 
-    async fn find_many(&self, ids: &[Uuid]) -> Result<Vec<crate::api::MediaRef>, Error> {
+    async fn find_many(
+        &self,
+        _tenant: &TenantContext,
+        ids: &[Uuid],
+    ) -> Result<Vec<crate::api::MediaRef>, Error> {
         use crate::api::{MAX_IDS, MediaRef, MediaVisibility};
 
         if ids.len() > MAX_IDS {

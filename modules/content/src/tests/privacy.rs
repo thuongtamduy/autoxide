@@ -1,5 +1,6 @@
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::PersonalData;
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{Duration, Utc};
 
 use super::*;
@@ -32,11 +33,17 @@ async fn xoa_tai_khoan_va_xuat_du_lieu() {
             .await
             .unwrap();
 
-        let exported = content.export(ada.user_id()).await.unwrap();
+        let exported = content
+            .export(&TenantContext::legacy_default(&content.database), ada.user_id())
+            .await
+            .unwrap();
         assert_eq!(exported["authors"][0]["display_name"], "Ada");
         assert_eq!(exported["entries"][0]["title"], "Ada's post");
         assert_eq!(
-            content.export(Uuid::now_v7()).await.unwrap(),
+            content
+                .export(&TenantContext::legacy_default(&content.database), Uuid::now_v7())
+                .await
+                .unwrap(),
             json!({"authors": [], "entries": []})
         );
 
@@ -69,7 +76,10 @@ async fn xoa_tai_khoan_va_xuat_du_lieu() {
             0
         );
         assert_eq!(
-            content.export(ada.user_id()).await.unwrap(),
+            content
+                .export(&TenantContext::legacy_default(&content.database), ada.user_id())
+                .await
+                .unwrap(),
             json!({"authors": [], "entries": []})
         );
     })

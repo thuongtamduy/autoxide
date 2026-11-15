@@ -173,6 +173,7 @@ impl Module for NewsletterModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
+    use autoxide_kernel::tenancy::TenantContext;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
@@ -220,7 +221,7 @@ pub(crate) mod testing {
 
     #[async_trait::async_trait]
     impl Mailer for FakeMailer {
-        async fn send(&self, mail: Mail) -> Result<(), Error> {
+        async fn send(&self, _tenant: &TenantContext, mail: Mail) -> Result<(), Error> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             let mut mails = self.mails.lock().unwrap();
             let duplicate = mail.dedupe_key.is_some()

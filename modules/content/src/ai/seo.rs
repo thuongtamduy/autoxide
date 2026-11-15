@@ -7,6 +7,7 @@ use std::collections::BTreeSet;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::ai::{Effort, Part, Prompt};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -152,7 +153,8 @@ impl ContentService {
             .all(self.database.read())
             .await?;
         let prompt = seo_prompt(&entry, &terms);
-        let answer = self.ai.generate(prompt).await?;
+        let answer =
+            self.ai.generate(&TenantContext::legacy_default(&self.database), prompt).await?;
         let text = |name: &str, max: usize| {
             answer
                 .output

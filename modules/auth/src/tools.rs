@@ -9,6 +9,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::mcp::{NoInput, PageInput, Tool};
 use autoxide_kernel::pagination::Page;
+use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -109,7 +110,7 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "list_roles",
             "List roles with the permissions they grant; follow `pagination.next_cursor` for more.",
-            move |_: Principal, input: PageInput| {
+            move |_tenant: TenantContext, _: Principal, input: PageInput| {
                 let state = list.clone();
                 async move {
                     let page = state.roles.list(&input.page()?).await?;
@@ -119,7 +120,7 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         )
         .requires(ROLES_READ)
         .read_only(),
-        Tool::new("get_role", "Get one role.", move |_: Principal, input: IdInput| {
+        Tool::new("get_role", "Get one role.", move |_tenant: TenantContext, _: Principal, input: IdInput| {
             let state = get.clone();
             async move { Ok::<_, Error>(RoleResponse::from(state.roles.get(input.id).await?)) }
         })
@@ -128,7 +129,7 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "create_role",
             "Create a role that grants the listed permissions (see `list_permissions`).",
-            move |principal: Principal, input: RoleRequest| {
+            move |_tenant: TenantContext, principal: Principal, input: RoleRequest| {
                 let state = create.clone();
                 async move {
                     let role = state.roles.create(Actor::from(&principal), input.into()).await?;
@@ -141,7 +142,7 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
             "replace_role",
             "Replace the name, description and permissions of a role. The built-in `admin` \
              role cannot be changed.",
-            move |principal: Principal, input: ReplaceRoleInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ReplaceRoleInput| {
                 let state = replace.clone();
                 async move {
                     let role = RoleInput {
@@ -160,7 +161,7 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
             "delete_role",
             "Delete a role; users who had it lose its permissions. The built-in `admin` role \
              cannot be deleted.",
-            move |principal: Principal, input: IdInput| {
+            move |_tenant: TenantContext, principal: Principal, input: IdInput| {
                 let state = delete.clone();
                 async move {
                     state.roles.delete(Actor::from(&principal), input.id).await?;
@@ -173,7 +174,7 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "get_user_roles",
             "List the roles of a user (`id` is the user's id).",
-            move |_: Principal, input: IdInput| {
+            move |_tenant: TenantContext, _: Principal, input: IdInput| {
                 let state = of_user.clone();
                 async move { Ok::<_, Error>(roles_response(state.roles.user_roles(input.id).await?)) }
             },
@@ -184,7 +185,7 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
             "set_user_roles",
             "Replace every role of a user with `role_ids`. The last administrator cannot lose \
              the `admin` role.",
-            move |principal: Principal, input: SetUserRolesInput| {
+            move |_tenant: TenantContext, principal: Principal, input: SetUserRolesInput| {
                 let state = set.clone();
                 async move {
                     let actor = Actor::from(&principal);
@@ -204,7 +205,7 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "list_api_keys",
             "List your API keys (never their secrets); follow `pagination.next_cursor` for more.",
-            move |principal: Principal, input: PageInput| {
+            move |_tenant: TenantContext, principal: Principal, input: PageInput| {
                 let state = list.clone();
                 async move {
                     let page = state.api_keys.list(principal.user_id(), &input.page()?).await?;
@@ -219,7 +220,7 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
             "Create an API key that acts as you, limited to the listed permissions. Needs your \
              current password and a password session: an API key cannot create keys. The \
              result carries the key, shown only once.",
-            move |principal: Principal, input: CreateApiKeyRequest| {
+            move |_tenant: TenantContext, principal: Principal, input: CreateApiKeyRequest| {
                 let state = create.clone();
                 async move {
                     let created = state.api_keys.create(&principal, input.into()).await?;
@@ -232,7 +233,7 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "revoke_api_key",
             "Revoke one of your API keys; it stops working at once.",
-            move |principal: Principal, input: IdInput| {
+            move |_tenant: TenantContext, principal: Principal, input: IdInput| {
                 let state = revoke.clone();
                 async move {
                     state.api_keys.revoke(&principal, input.id).await?;
@@ -258,7 +259,7 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
             "whoami",
             "Get the calling user (id, email, name) and the permissions they hold. Start here to \
              learn what you may do.",
-            move |principal: Principal, _: NoInput| {
+            move |_tenant: TenantContext, principal: Principal, _: NoInput| {
                 let state = me.clone();
                 async move {
                     let user = state.users.get(principal.user_id()).await?;
@@ -272,7 +273,7 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
         Tool::new(
             "list_permissions",
             "List every permission that roles can grant, with what each allows.",
-            move |_: Principal, _: NoInput| {
+            move |_tenant: TenantContext, _: Principal, _: NoInput| {
                 let state = catalog.clone();
                 async move { Ok::<_, Error>(PermissionResponse::catalog(&state.roles)) }
             },
@@ -283,7 +284,7 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
             "list_users",
             "List user accounts, newest first; `search` finds users by email or name. Follow \
              `pagination.next_cursor` for more.",
-            move |_: Principal, input: ListUsersInput| {
+            move |_tenant: TenantContext, _: Principal, input: ListUsersInput| {
                 let state = list.clone();
                 async move {
                     let page = PageInput::new(input.limit, input.cursor, input.order);
@@ -298,7 +299,7 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
             "update_user",
             "Rename, disable or enable a user account. Disabling signs the user out \
              everywhere; the last active administrator cannot be disabled.",
-            move |principal: Principal, input: UpdateUserInput| {
+            move |_tenant: TenantContext, principal: Principal, input: UpdateUserInput| {
                 let state = update.clone();
                 async move {
                     // Như REST: không tác động lên người có permission mà mình không có.
@@ -341,13 +342,14 @@ mod tests {
 
     async fn call(
         tools: &[Tool],
+        tenant: &TenantContext,
         name: &str,
         principal: Principal,
         input: Value,
     ) -> Result<Value, Error> {
         let tool = tools.iter().find(|tool| tool.name() == name).unwrap();
         assert!(tool.allows(&principal), "`{name}` is not allowed");
-        tool.call(principal, input).await
+        tool.call(tenant.clone(), principal, input).await
     }
 
     #[tokio::test]
@@ -357,11 +359,12 @@ mod tests {
             let ada =
                 NewUser { email: "ada@example.com".into(), name: "Ada".into(), password: None };
             let ada = services.users.create(Actor::system(), ada).await.unwrap();
+            let tenant = TenantContext::legacy_default(&services.database);
             let tools = all(&state(&services));
             let admin = Principal::with_all_permissions(ada.id);
             let nobody = Principal::new(ada.id, []);
 
-            let me = call(&tools, "whoami", nobody.clone(), Value::Null).await.unwrap();
+            let me = call(&tools, &tenant, "whoami", nobody.clone(), Value::Null).await.unwrap();
             assert_eq!(
                 (me["email"].as_str(), me["all_permissions"].as_bool()),
                 (Some("ada@example.com"), Some(false))
@@ -373,31 +376,36 @@ mod tests {
                 assert!(!tool.allows(&nobody), "{name}");
             }
 
-            let catalog = call(&tools, "list_permissions", admin.clone(), json!({})).await.unwrap();
+            let catalog =
+                call(&tools, &tenant, "list_permissions", admin.clone(), json!({})).await.unwrap();
             assert!(
                 catalog.as_array().unwrap().iter().any(|item| item["name"] == "auth.users.read")
             );
-            let page =
-                call(&tools, "list_users", admin.clone(), json!({"limit": 1})).await.unwrap();
+            let page = call(&tools, &tenant, "list_users", admin.clone(), json!({"limit": 1}))
+                .await
+                .unwrap();
             assert_eq!(page["data"][0]["email"], "ada@example.com");
             assert!(page["pagination"].is_object());
             let found = json!({"search": "ADA@"});
-            let page = call(&tools, "list_users", admin.clone(), found).await.unwrap();
+            let page = call(&tools, &tenant, "list_users", admin.clone(), found).await.unwrap();
             assert_eq!(page["data"].as_array().unwrap().len(), 1);
             let none = json!({"search": "nobody"});
-            let page = call(&tools, "list_users", admin.clone(), none).await.unwrap();
+            let page = call(&tools, &tenant, "list_users", admin.clone(), none).await.unwrap();
             assert_eq!(page["data"], json!([]));
-            let bad = call(&tools, "list_users", admin.clone(), json!({"order": "sideways"})).await;
+            let bad =
+                call(&tools, &tenant, "list_users", admin.clone(), json!({"order": "sideways"}))
+                    .await;
             assert_eq!(bad.unwrap_err().code(), "validation_failed");
 
             let input = json!({"id": ada.id, "name": "Ada Lovelace"});
-            let changed = call(&tools, "update_user", admin.clone(), input).await.unwrap();
+            let changed = call(&tools, &tenant, "update_user", admin.clone(), input).await.unwrap();
             assert_eq!(changed["name"], "Ada Lovelace");
             let input = json!({"id": ada.id, "name": ""});
-            let invalid = call(&tools, "update_user", admin.clone(), input).await.unwrap_err();
+            let invalid =
+                call(&tools, &tenant, "update_user", admin.clone(), input).await.unwrap_err();
             assert_eq!(invalid.code(), "validation_failed");
             let input = json!({"id": Uuid::now_v7(), "name": "Ghost"});
-            let missing = call(&tools, "update_user", admin, input).await.unwrap_err();
+            let missing = call(&tools, &tenant, "update_user", admin, input).await.unwrap_err();
             assert_eq!(missing.code(), "auth.user_not_found");
         })
         .await
@@ -415,6 +423,7 @@ mod tests {
                 password: Some(password.clone()),
             };
             let ada = services.users.create(Actor::system(), ada).await.unwrap();
+            let tenant = TenantContext::legacy_default(&services.database);
             let tools = all(&state(&services));
             let admin = Principal::with_all_permissions(ada.id);
             let reader = Principal::new(ada.id, ["auth.roles.read".to_owned()]);
@@ -424,40 +433,40 @@ mod tests {
                 assert!(!tool.allows(&reader), "{name}");
             }
             let input = json!({"name": "editor", "permissions": ["auth.users.read"]});
-            let role = call(&tools, "create_role", admin.clone(), input).await.unwrap();
+            let role = call(&tools, &tenant, "create_role", admin.clone(), input).await.unwrap();
             assert_eq!(role["permissions"], json!(["auth.users.read"]));
             let id = role["id"].clone();
             let input = json!({"id": id, "name": "editor", "permissions": []});
-            let replaced = call(&tools, "replace_role", admin.clone(), input).await.unwrap();
+            let replaced = call(&tools, &tenant, "replace_role", admin.clone(), input).await.unwrap();
             assert_eq!(replaced["permissions"], json!([]));
-            let page = call(&tools, "list_roles", reader.clone(), json!({})).await.unwrap();
+            let page = call(&tools, &tenant, "list_roles", reader.clone(), json!({})).await.unwrap();
             assert!(page["data"].as_array().unwrap().iter().any(|role| role["name"] == "editor"));
             let input = json!({"user_id": ada.id, "role_ids": [id]});
-            let set = call(&tools, "set_user_roles", admin.clone(), input).await.unwrap();
+            let set = call(&tools, &tenant, "set_user_roles", admin.clone(), input).await.unwrap();
             assert_eq!(set[0]["name"], "editor");
             let of_user = json!({"id": ada.id});
-            let roles = call(&tools, "get_user_roles", admin.clone(), of_user).await.unwrap();
+            let roles = call(&tools, &tenant, "get_user_roles", admin.clone(), of_user).await.unwrap();
             assert_eq!(roles.as_array().unwrap().len(), 1);
 
             // API key: cần mật khẩu như REST; key không tạo được key.
             let input = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": "nope"});
-            let wrong = call(&tools, "create_api_key", admin.clone(), input).await.unwrap_err();
+            let wrong = call(&tools, &tenant, "create_api_key", admin.clone(), input).await.unwrap_err();
             assert_eq!(wrong.code(), "auth.wrong_password");
             let input = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": password});
-            let created = call(&tools, "create_api_key", admin.clone(), input.clone()).await.unwrap();
+            let created = call(&tools, &tenant, "create_api_key", admin.clone(), input.clone()).await.unwrap();
             assert!(created["key"].as_str().unwrap().starts_with("axk_"));
             // Kết quả có secret: response MCP mang `Cache-Control: no-store` (D-149).
             assert!(tools.iter().any(|tool| tool.name() == "create_api_key" && tool.is_secret()));
             let key_id: Uuid = created["id"].as_str().unwrap().parse().unwrap();
             let via_key = admin.clone().via_api_key(key_id);
-            let refused = call(&tools, "create_api_key", via_key, input).await.unwrap_err();
+            let refused = call(&tools, &tenant, "create_api_key", via_key, input).await.unwrap_err();
             assert_eq!(refused.code(), "auth.api_key_cannot_create_keys");
-            let keys = call(&tools, "list_api_keys", admin.clone(), json!({})).await.unwrap();
+            let keys = call(&tools, &tenant, "list_api_keys", admin.clone(), json!({})).await.unwrap();
             assert!(keys["data"][0].get("key").is_none());
-            let revoked = call(&tools, "revoke_api_key", admin.clone(), json!({"id": key_id})).await;
+            let revoked = call(&tools, &tenant, "revoke_api_key", admin.clone(), json!({"id": key_id})).await;
             assert_eq!(revoked.unwrap()["revoked"], key_id.to_string());
 
-            let deleted = call(&tools, "delete_role", admin, json!({"id": id})).await.unwrap();
+            let deleted = call(&tools, &tenant, "delete_role", admin, json!({"id": id})).await.unwrap();
             assert_eq!(deleted["deleted"], id);
         })
         .await

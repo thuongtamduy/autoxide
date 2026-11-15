@@ -157,7 +157,7 @@ impl EmailVerifications {
                 CHANGED_CODE.mail(&job.old_email, &self.translations, language, &params)
             }
         };
-        self.mailer.send(mail).await
+        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await
     }
 
     /// Chủ tài khoản báo "không phải tôi" bằng `token` trong mail gửi tới địa chỉ cũ.

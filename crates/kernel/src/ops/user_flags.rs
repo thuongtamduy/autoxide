@@ -258,7 +258,11 @@ impl UserFlags {
 
 #[async_trait::async_trait]
 impl PersonalData for UserFlags {
-    async fn export(&self, user_id: Uuid) -> Result<Value, Error> {
+    async fn export(
+        &self,
+        _tenant: &crate::tenancy::TenantContext,
+        user_id: Uuid,
+    ) -> Result<Value, Error> {
         let rows = Entity::find()
             .filter(Column::UserId.eq(user_id))
             .order_by_asc(Column::Key)
@@ -558,7 +562,13 @@ mod tests {
             let (ada, bob) = (user(), user());
             flags.put(&ada, "hint.views", "dismissed").await.unwrap();
             flags.put(&bob, "hint.views", "dismissed").await.unwrap();
-            let exported = flags.export(ada.user_id()).await.unwrap();
+            let exported = flags
+                .export(
+                    &crate::tenancy::TenantContext::legacy_default(&flags.database),
+                    ada.user_id(),
+                )
+                .await
+                .unwrap();
             assert_eq!(exported["user_flags"][0]["key"], "hint.views");
 
             let event = Delivered::new(
@@ -571,7 +581,16 @@ mod tests {
             flags.handle(&event).await.unwrap();
             assert!(flags.list(&ada, None).await.unwrap().is_empty());
             assert_eq!(flags.list(&bob, None).await.unwrap().len(), 1, "others keep theirs");
-            assert_eq!(flags.export(ada.user_id()).await.unwrap()["user_flags"], json!([]));
+            assert_eq!(
+                flags
+                    .export(
+                        &crate::tenancy::TenantContext::legacy_default(&flags.database),
+                        ada.user_id()
+                    )
+                    .await
+                    .unwrap()["user_flags"],
+                json!([])
+            );
         })
         .await
         .unwrap();

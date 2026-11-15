@@ -2,6 +2,7 @@
 //! quyền tải, job dọn, API cho module khác, dữ liệu cá nhân, tìm không dấu.
 
 use super::*;
+use autoxide_kernel::tenancy::TenantContext;
 
 /// Mỗi định dạng ảnh: nội dung, SHA-256, loại và kích thước đúng; loại không khai thì máy
 /// chủ tự nhận.
@@ -525,15 +526,33 @@ async fn api_lay_nhieu_item_mot_lan() {
         media.trash(&ada, ids[1]).await.unwrap();
 
         let asked = [ids[2], Uuid::now_v7(), ids[1], ids[0]];
-        let found = media.find_many(&asked).await.unwrap();
+        let found =
+            media.find_many(&TenantContext::legacy_default(&media.database), &asked).await.unwrap();
         assert_eq!(found.iter().map(|item| item.id).collect::<Vec<_>>(), [ids[2], ids[0]]);
         assert_eq!(found[0].visibility, MediaVisibility::Public);
         assert_eq!((found[0].width, found[0].alt.as_str()), (Some(3), "Alt"));
         assert!(found[0].url.starts_with(&format!("/api/v1/media/{}/content?v=", ids[2])));
         assert_eq!(found[1].visibility, MediaVisibility::Private);
-        assert!(media.find(ids[1]).await.unwrap().is_none());
-        assert!(media.find_many(&[]).await.unwrap().is_empty());
-        assert!(media.find_many(&vec![Uuid::nil(); 501]).await.is_err());
+        assert!(
+            media
+                .find(&TenantContext::legacy_default(&media.database), ids[1])
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            media
+                .find_many(&TenantContext::legacy_default(&media.database), &[])
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            media
+                .find_many(&TenantContext::legacy_default(&media.database), &vec![Uuid::nil(); 501])
+                .await
+                .is_err()
+        );
     })
     .await
     .unwrap();
@@ -548,7 +567,10 @@ async fn du_lieu_ca_nhan() {
         let item =
             media.upload(&ada, upload("a.png", "image/png"), body(&samples::png(1, 1))).await;
         let item = item.unwrap().item;
-        let exported = media.export(ada.user_id()).await.unwrap();
+        let exported = media
+            .export(&TenantContext::legacy_default(&media.database), ada.user_id())
+            .await
+            .unwrap();
         assert_eq!(exported[0]["name"], "a.png");
 
         let deleted = Delivered::new(
@@ -560,7 +582,13 @@ async fn du_lieu_ca_nhan() {
         media.handle(&deleted).await.unwrap();
         media.handle(&deleted).await.unwrap();
         assert_eq!(media.get(&ada, item.id).await.unwrap().uploaded_by, None);
-        assert_eq!(media.export(ada.user_id()).await.unwrap(), json!([]));
+        assert_eq!(
+            media
+                .export(&TenantContext::legacy_default(&media.database), ada.user_id())
+                .await
+                .unwrap(),
+            json!([])
+        );
     })
     .await
     .unwrap();

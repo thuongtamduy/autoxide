@@ -16,6 +16,7 @@ use uuid::Uuid;
 
 use crate::error::Error;
 use crate::event::Delivered;
+use crate::tenancy::TenantContext;
 
 /// Tên event phát khi một tài khoản người dùng bị xoá. `payload.before.id` là id của
 /// người dùng.
@@ -35,9 +36,9 @@ pub fn deleted_user(event: &Delivered) -> Option<Uuid> {
 // `#[async_trait]`: Rust chưa cho gọi hàm `async` của trait qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait PersonalData: Send + Sync {
-    /// Mọi dữ liệu của người dùng `user_id` mà module giữ, dạng JSON đọc được (không
-    /// có secret, hash hay token).
-    async fn export(&self, user_id: Uuid) -> Result<Value, Error>;
+    /// Mọi dữ liệu của người dùng `user_id` của khách `tenant` mà module giữ, dạng JSON đọc
+    /// được (không có secret, hash hay token).
+    async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error>;
 }
 
 /// Phần của một module: (tên module, bộ xuất).
@@ -71,12 +72,17 @@ impl PersonalDataExport {
         Ok(())
     }
 
-    /// Dữ liệu của người dùng `user_id` từ mọi module đã đăng ký, theo tên module.
-    pub async fn export(&self, user_id: Uuid) -> Result<BTreeMap<&'static str, Value>, Error> {
+    /// Dữ liệu của người dùng `user_id` của khách `tenant` từ mọi module đã đăng ký, theo tên
+    /// module.
+    pub async fn export(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<BTreeMap<&'static str, Value>, Error> {
         let exporters = self.exporters.read().map_err(|_| poisoned())?.clone();
         let mut data = BTreeMap::new();
         for (module, exporter) in exporters {
-            data.insert(module, exporter.export(user_id).await?);
+            data.insert(module, exporter.export(tenant, user_id).await?);
         }
         Ok(data)
     }
@@ -96,7 +102,11 @@ mod tests {
 
     #[async_trait::async_trait]
     impl PersonalData for Fixed {
-        async fn export(&self, _: Uuid) -> Result<Value, Error> {
+        async fn export(
+            &self,
+            _tenant: &crate::tenancy::TenantContext,
+            _: Uuid,
+        ) -> Result<Value, Error> {
             Ok(self.0.clone())
         }
     }
@@ -109,7 +119,7 @@ mod tests {
         registry.register("auth", Arc::new(Fixed(json!({"email": "ada@example.com"})))).unwrap();
         assert!(registry.register("notes", Arc::new(Fixed(Value::Null))).is_err());
 
-        let data = early.export(Uuid::now_v7()).await.unwrap();
+        let data = early.export(&crate::tenancy::test_tenant(), Uuid::now_v7()).await.unwrap();
         assert_eq!(data.keys().copied().collect::<Vec<_>>(), vec!["auth", "notes"]);
         assert_eq!(data["notes"][0]["title"], "a");
     }

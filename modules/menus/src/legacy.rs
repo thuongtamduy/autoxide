@@ -12,6 +12,7 @@ use autoxide_content::api::{LegacyMenuItem, LegacyTarget};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::task::{Task, TaskArgs, TaskRun};
+use autoxide_kernel::tenancy::TenantContext;
 
 use crate::config::canonical_locale;
 use crate::items::{ItemInput, RefInput};
@@ -39,7 +40,7 @@ impl MenuService {
             )
         })?;
         let mut report = ImportReport::default();
-        for old in legacy.legacy_menus().await? {
+        for old in legacy.legacy_menus(&TenantContext::legacy_default(&self.database)).await? {
             let pair = (old.key.clone(), old.locale.clone());
             let Some(locale) =
                 canonical_locale(&old.locale).filter(|locale| self.config.locales.contains(locale))

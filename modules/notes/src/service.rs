@@ -173,7 +173,7 @@ impl NoteService {
 /// Mọi ghi chú của người dùng, cho bản xuất dữ liệu cá nhân.
 #[async_trait::async_trait]
 impl PersonalData for NoteService {
-    async fn export(&self, user_id: Uuid) -> Result<Value, Error> {
+    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let notes = Entity::find()
             .filter(Column::OwnerId.eq(user_id))
             .order_by_asc(Column::Id)
@@ -214,7 +214,7 @@ impl EventHandler for NoteService {
 
 #[async_trait::async_trait]
 impl Notes for NoteService {
-    async fn find(&self, id: Uuid) -> Result<Option<NoteSummary>, Error> {
+    async fn find(&self, _tenant: &TenantContext, id: Uuid) -> Result<Option<NoteSummary>, Error> {
         let note = Entity::find_by_id(id).one(self.database.read()).await?;
         Ok(note.map(|note| NoteSummary { id: note.id, owner_id: note.owner_id, title: note.title }))
     }

@@ -8,6 +8,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::State;
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -65,12 +66,13 @@ pub(crate) struct PersonalDataResponse {
 )]
 async fn export_personal_data(
     State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
     principal: Principal,
 ) -> Result<Data<PersonalDataResponse>, Error> {
     super::require_session(&principal)?;
     let mut modules: BTreeMap<String, Value> = state
         .personal_data
-        .export(principal.user_id())
+        .export(&tenant, principal.user_id())
         .await?
         .into_iter()
         .map(|(module, value)| (module.to_owned(), value))
@@ -114,6 +116,7 @@ async fn delete_own_account(
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -157,7 +160,13 @@ mod tests {
                 password: None,
                 admin: false,
             };
-            Accounts::create(services.users.as_ref(), again).await.unwrap();
+            Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                again,
+            )
+            .await
+            .unwrap();
         })
         .await
         .unwrap();
@@ -173,7 +182,13 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            let root = Accounts::create(services.users.as_ref(), root).await.unwrap();
+            let root = Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
 

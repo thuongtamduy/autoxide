@@ -57,6 +57,15 @@ endpoints are marked deprecated with a sunset date first.
   `Claim::claim` takes a `ClaimRequest`. `Modules::worker(concurrency)` and `Modules::dispatcher()` no longer take
   a database: they run on every database of the registry, and the worker shares the free slots fairly between
   the tenants that have jobs due. For tests: `TestDatabase::extra_database`.
+- For module authors: every kernel trait that reaches the data of a customer names the tenant:
+  `PersonalData::export(&tenant, user_id)`, `ResourceResolver::{resolve, resolve_many, children}(&tenant, …)`,
+  `BadgeResolver::badges(&tenant, …)`, `Mailer::send(&tenant, mail)`, `TextModel::generate(&tenant, prompt)`,
+  `Embedder::embed(&tenant, …)`, `IdempotencyStore::{begin, complete, abandon}(&tenant, …)`,
+  `PostingVerifier::is_verified(&tenant, user_id)`, and the matching `ResourceDirectory`,
+  `PersonalDataExport` and `PostingVerification` methods. An MCP tool's handler receives the tenant of the
+  request first: `Tool::new(name, description, |tenant: TenantContext, principal: Principal, input| …)`. The
+  `api` traits of modules take it too: `autoxide_auth::api::{Users, Accounts, AccountRecovery}`,
+  `autoxide_media::api::Media`, `autoxide_notes::api::Notes`, `autoxide_content::api::LegacyMenus`.
 - For module authors: the trait `autoxide_auth::api::AccountRecovery` has a new method `remove_passkeys`; only
   `auth` implements it.
 - Internal, no change in behaviour: the code of `newsletter`, `comments`, `media` and `forms` is grouped by

@@ -9,6 +9,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::Page;
+use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -46,7 +47,7 @@ pub(crate) fn all(service: &Arc<NoteService>) -> Vec<Tool> {
         Tool::new(
             "list_notes",
             "List your notes, newest first; follow `pagination.next_cursor` for more.",
-            move |principal: Principal, input: PageInput| {
+            move |_tenant: TenantContext, principal: Principal, input: PageInput| {
                 let service = list.clone();
                 async move {
                     let page = service.list(Actor::from(&principal), &input.page()?).await?;
@@ -59,7 +60,7 @@ pub(crate) fn all(service: &Arc<NoteService>) -> Vec<Tool> {
         Tool::new(
             "get_note",
             "Get one of your notes.",
-            move |principal: Principal, input: NoteId| {
+            move |_tenant: TenantContext, principal: Principal, input: NoteId| {
                 let service = get.clone();
                 async move {
                     let note = service.get(Actor::from(&principal), input.id).await?;
@@ -72,7 +73,7 @@ pub(crate) fn all(service: &Arc<NoteService>) -> Vec<Tool> {
         Tool::new(
             "create_note",
             "Create a note. Titles are unique among your notes.",
-            move |principal: Principal, input: CreateNoteRequest| {
+            move |_tenant: TenantContext, principal: Principal, input: CreateNoteRequest| {
                 let service = create.clone();
                 async move {
                     let note = service.create(Actor::from(&principal), input.into()).await?;
@@ -84,7 +85,7 @@ pub(crate) fn all(service: &Arc<NoteService>) -> Vec<Tool> {
         Tool::new(
             "update_note",
             "Change the title or text of one of your notes.",
-            move |principal: Principal, input: UpdateNoteInput| {
+            move |_tenant: TenantContext, principal: Principal, input: UpdateNoteInput| {
                 let service = update.clone();
                 async move {
                     let changes = NoteChanges { title: input.title, body: input.body };
@@ -98,7 +99,7 @@ pub(crate) fn all(service: &Arc<NoteService>) -> Vec<Tool> {
         Tool::new(
             "delete_note",
             "Delete one of your notes. It cannot be restored.",
-            move |principal: Principal, input: NoteId| {
+            move |_tenant: TenantContext, principal: Principal, input: NoteId| {
                 let service = delete.clone();
                 async move {
                     service.delete(Actor::from(&principal), input.id).await?;

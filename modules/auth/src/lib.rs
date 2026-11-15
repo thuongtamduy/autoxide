@@ -522,6 +522,7 @@ pub(crate) mod testing {
     impl autoxide_kernel::mail::Mailer for FakeMailer {
         async fn send(
             &self,
+            _tenant: &autoxide_kernel::tenancy::TenantContext,
             mail: autoxide_kernel::mail::Mail,
         ) -> Result<(), autoxide_kernel::error::Error> {
             self.sent.lock().unwrap().push(mail);

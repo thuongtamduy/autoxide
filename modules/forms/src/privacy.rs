@@ -9,6 +9,7 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -16,7 +17,7 @@ use crate::service::FormsService;
 
 #[async_trait::async_trait]
 impl PersonalData for FormsService {
-    async fn export(&self, user_id: Uuid) -> Result<Value, Error> {
+    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let forms = self.forms_created_by(user_id).await?;
         Ok(json!({
             "forms": forms.iter().map(|form| json!({

@@ -1,6 +1,7 @@
 //! `alt` theo ngôn ngữ (D-202).
 
 use super::*;
+use autoxide_kernel::tenancy::TenantContext;
 
 /// Số bản dịch `alt` đang lưu của item `id`.
 async fn alt_rows(database: &Database, id: Uuid) -> u64 {
@@ -33,12 +34,22 @@ async fn alt_theo_ngon_ngu_lui_ve_mac_dinh() {
         assert_eq!(details.item.alt, "Black induction hob", "the default stays");
 
         let alt_in = async |locale: &str| {
-            media.find_many_in(&[item.id], locale).await.unwrap()[0].alt.clone()
+            media
+                .find_many_in(&TenantContext::legacy_default(&database), &[item.id], locale)
+                .await
+                .unwrap()[0]
+                .alt
+                .clone()
         };
         assert_eq!(alt_in("vi").await, "Bếp từ màu đen");
         assert_eq!(alt_in("en").await, "Black induction hob", "no translation: the default");
         assert_eq!(alt_in("fr").await, "Black induction hob", "not offered: the default");
-        assert_eq!(media.find_many(&[item.id]).await.unwrap()[0].alt, "Black induction hob");
+        assert_eq!(
+            media.find_many(&TenantContext::legacy_default(&database), &[item.id]).await.unwrap()
+                [0]
+            .alt,
+            "Black induction hob"
+        );
 
         let stale = media.set_alt(&ada, item.id, "vi", Some("Khác"), Some(item.updated_at)).await;
         assert_eq!(stale.unwrap_err().code(), "precondition_failed");

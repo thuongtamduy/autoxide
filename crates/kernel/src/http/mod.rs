@@ -217,6 +217,7 @@ pub fn build(
         router = router.merge(mcp);
     }
 
+    let databases = extras.tenancy.clone();
     if let Some(registry) = extras.tenancy {
         // Sổ database trong "extensions" của mọi request, nơi extractor `TenantContext` tìm nó.
         router = router.layer(Extension(registry));
@@ -235,6 +236,7 @@ pub fn build(
             authenticator: extras.authenticator.clone(),
             body_limits: body_limits.clone(),
             request_timeout: config.request_timeout,
+            databases: databases.clone(),
         })
     });
     let limiter = rate_limit::RateLimiter::new(config.rate_limit).map(Arc::new);

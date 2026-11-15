@@ -8,6 +8,7 @@ use std::sync::Arc;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{MAX_LIMIT, Order, Page, PageRequest};
 use autoxide_kernel::privacy::PersonalData;
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -29,7 +30,7 @@ pub(crate) struct AuthPersonalData {
 
 #[async_trait::async_trait]
 impl PersonalData for AuthPersonalData {
-    async fn export(&self, user_id: Uuid) -> Result<Value, Error> {
+    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let user = self.users.get(user_id).await?.ok_or_else(|| user_not_found(user_id))?;
         let roles = self.roles.user_roles(user_id).await?;
         let sessions = all_pages(|page| {

@@ -588,7 +588,7 @@ impl UserService {
 
 #[async_trait::async_trait]
 impl Accounts for UserService {
-    async fn create(&self, account: NewAccount) -> Result<User, Error> {
+    async fn create(&self, _tenant: &TenantContext, account: NewAccount) -> Result<User, Error> {
         let input =
             NewUser { email: account.email, name: account.name, password: account.password };
         // Chỉ lệnh CLI dùng trait này: người vận hành máy chủ, tức "hệ thống".
@@ -598,7 +598,7 @@ impl Accounts for UserService {
 
 #[async_trait::async_trait]
 impl Users for UserService {
-    async fn find(&self, id: Uuid) -> Result<Option<User>, Error> {
+    async fn find(&self, _tenant: &TenantContext, id: Uuid) -> Result<Option<User>, Error> {
         self.get(id).await
     }
 }
@@ -965,9 +965,10 @@ mod tests {
             let service = std::sync::Arc::new(service(test).await);
             let created =
                 service.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
+            let tenant = TenantContext::legacy_default(&service.database);
             let users: std::sync::Arc<dyn Users> = service;
 
-            assert_eq!(users.find(created.id).await.unwrap(), Some(created));
+            assert_eq!(users.find(&tenant, created.id).await.unwrap(), Some(created));
         })
         .await
         .unwrap();
@@ -1052,8 +1053,20 @@ mod account_tests {
             let services = crate::testing::services(test).await;
             let accounts: &dyn Accounts = services.users.as_ref();
 
-            let admin = accounts.create(account("ada@example.com", true)).await.unwrap();
-            let plain = accounts.create(account("bob@example.com", false)).await.unwrap();
+            let admin = accounts
+                .create(
+                    &TenantContext::legacy_default(&services.database),
+                    account("ada@example.com", true),
+                )
+                .await
+                .unwrap();
+            let plain = accounts
+                .create(
+                    &TenantContext::legacy_default(&services.database),
+                    account("bob@example.com", false),
+                )
+                .await
+                .unwrap();
 
             assert!(services.roles.principal(admin.id).await.unwrap().has_all_permissions());
             let bob = services.roles.principal(plain.id).await.unwrap();
@@ -1069,9 +1082,21 @@ mod account_tests {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
             let accounts: &dyn Accounts = services.users.as_ref();
-            accounts.create(account("ada@example.com", true)).await.unwrap();
+            accounts
+                .create(
+                    &TenantContext::legacy_default(&services.database),
+                    account("ada@example.com", true),
+                )
+                .await
+                .unwrap();
 
-            let error = accounts.create(account("ADA@example.com", true)).await.unwrap_err();
+            let error = accounts
+                .create(
+                    &TenantContext::legacy_default(&services.database),
+                    account("ADA@example.com", true),
+                )
+                .await
+                .unwrap_err();
 
             assert_eq!(error.code(), "auth.email_taken");
             let page = services
@@ -1112,9 +1137,20 @@ mod update_tests {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
             let users = &services.users;
-            Accounts::create(users.as_ref(), account("root@example.com", true)).await.unwrap();
-            let ada =
-                Accounts::create(users.as_ref(), account("ada@example.com", false)).await.unwrap();
+            Accounts::create(
+                users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("root@example.com", true),
+            )
+            .await
+            .unwrap();
+            let ada = Accounts::create(
+                users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("ada@example.com", false),
+            )
+            .await
+            .unwrap();
             let tokens =
                 services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
@@ -1168,8 +1204,13 @@ mod update_tests {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
             let users = &services.users;
-            let root =
-                Accounts::create(users.as_ref(), account("root@example.com", true)).await.unwrap();
+            let root = Accounts::create(
+                users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("root@example.com", true),
+            )
+            .await
+            .unwrap();
 
             let error =
                 users.update(Actor::system(), root.id, disable(true), None).await.unwrap_err();
@@ -1178,7 +1219,13 @@ mod update_tests {
             assert_eq!(error.code(), "auth.last_admin");
             assert!(users.get(root.id).await.unwrap().unwrap().is_active());
             // Có admin khác còn hoạt động thì khoá được.
-            Accounts::create(users.as_ref(), account("second@example.com", true)).await.unwrap();
+            Accounts::create(
+                users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("second@example.com", true),
+            )
+            .await
+            .unwrap();
             users.update(Actor::system(), root.id, disable(true), None).await.unwrap();
         })
         .await
@@ -1192,8 +1239,20 @@ mod update_tests {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
             let users = services.users.clone();
-            let a = Accounts::create(users.as_ref(), account("a@example.com", true)).await.unwrap();
-            let b = Accounts::create(users.as_ref(), account("b@example.com", true)).await.unwrap();
+            let a = Accounts::create(
+                users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("a@example.com", true),
+            )
+            .await
+            .unwrap();
+            let b = Accounts::create(
+                users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("b@example.com", true),
+            )
+            .await
+            .unwrap();
             let (first, second) = (users.clone(), users.clone());
             let delete_a = tokio::spawn(async move { first.delete(Actor::system(), a.id).await });
             let disable_b = tokio::spawn(async move {

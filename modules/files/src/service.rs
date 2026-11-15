@@ -46,7 +46,7 @@ pub(crate) struct Download {
 }
 
 pub(crate) struct FileService {
-    database: Database,
+    pub(crate) database: Database,
     storage: Arc<dyn Storage>,
     outbox: Outbox,
     limits: Limits,
@@ -310,7 +310,11 @@ const ERASE_BATCH: u64 = 100;
 /// nhân. Nội dung tải từng file bằng `GET /api/v1/files/{id}/content`.
 #[async_trait::async_trait]
 impl PersonalData for FileService {
-    async fn export(&self, user_id: Uuid) -> Result<serde_json::Value, Error> {
+    async fn export(
+        &self,
+        _tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<serde_json::Value, Error> {
         let files = Entity::find()
             .filter(Column::OwnerId.eq(user_id))
             .order_by_asc(Column::Id)
@@ -478,7 +482,10 @@ mod tests {
             files.upload(&ada, "b.txt", None, body("b")).await.unwrap();
             files.upload(&bob, "c.txt", None, body("c")).await.unwrap();
 
-            let exported = files.export(ada.user_id()).await.unwrap();
+            let exported = files
+                .export(&TenantContext::legacy_default(&files.database), ada.user_id())
+                .await
+                .unwrap();
             assert_eq!(exported.as_array().unwrap().len(), 2);
             assert_eq!(exported[0]["name"], "a.txt");
 
@@ -490,9 +497,24 @@ mod tests {
             );
             files.handle(&deleted).await.unwrap();
             files.handle(&deleted).await.unwrap();
-            assert_eq!(files.export(ada.user_id()).await.unwrap(), json!([]));
+            assert_eq!(
+                files
+                    .export(&TenantContext::legacy_default(&files.database), ada.user_id())
+                    .await
+                    .unwrap(),
+                json!([])
+            );
             assert!(files.storage.get(&mine.storage_key()).await.unwrap().is_none());
-            assert_eq!(files.export(bob.user_id()).await.unwrap().as_array().unwrap().len(), 1);
+            assert_eq!(
+                files
+                    .export(&TenantContext::legacy_default(&files.database), bob.user_id())
+                    .await
+                    .unwrap()
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                1
+            );
         })
         .await
         .unwrap();

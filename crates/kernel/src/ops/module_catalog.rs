@@ -416,7 +416,7 @@ pub(crate) fn tools(state: CatalogState) -> Vec<Tool> {
             "List the modules installed in this server, in start order, with the permissions, \
              events, jobs, schedules, MCP tools, deprecated endpoints and migrations each \
              declares. Use it to learn what this server can do.",
-            move |_principal: Principal, _: NoInput| {
+            move |_tenant: crate::tenancy::TenantContext, _principal: Principal, _: NoInput| {
                 let catalog = list.catalog.clone();
                 async move { catalog.list() }
             },
@@ -427,7 +427,9 @@ pub(crate) fn tools(state: CatalogState) -> Vec<Tool> {
             "get_module",
             "Describe one installed module, like an item of `kernel.list_modules`, plus whether \
              each of its migrations is applied to the database.",
-            move |_principal: Principal, input: ModuleNameInput| {
+            move |_tenant: crate::tenancy::TenantContext,
+                  _principal: Principal,
+                  input: ModuleNameInput| {
                 let state = get.clone();
                 async move { state.catalog.get(&state.database, &input.name).await }
             },

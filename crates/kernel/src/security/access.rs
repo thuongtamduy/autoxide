@@ -25,6 +25,7 @@ use uuid::Uuid;
 
 use crate::error::Error;
 use crate::module::is_identifier;
+use crate::tenancy::TenantContext;
 use crate::tenancy::{DEFAULT_TENANT, TenantHint, TenantId};
 
 /// Một permission do module khai.
@@ -332,8 +333,8 @@ pub trait Authenticator: Send + Sync {
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait PostingVerifier: Send + Sync {
-    /// Người dùng `user_id` đã xác thực để đăng nội dung chưa.
-    async fn is_verified(&self, user_id: Uuid) -> Result<bool, Error>;
+    /// Người dùng `user_id` của khách `tenant` đã xác thực để đăng nội dung chưa.
+    async fn is_verified(&self, tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error>;
 }
 
 /// Chỗ giữ bộ [`PostingVerifier`] duy nhất của chương trình. Clone rẻ: mọi bản clone thấy cùng
@@ -380,13 +381,13 @@ impl PostingVerification {
     }
 
     /// Người dùng `user_id` đã xác thực chưa; `true` khi chưa module nào đăng ký bộ hỏi.
-    pub async fn is_verified(&self, user_id: Uuid) -> Result<bool, Error> {
+    pub async fn is_verified(&self, tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error> {
         let verifier = {
             let slot = self.verifier.read().map_err(|_| poisoned_verification())?;
             slot.as_ref().map(|(_, verifier)| verifier.clone())
         };
         match verifier {
-            Some(verifier) => verifier.is_verified(user_id).await,
+            Some(verifier) => verifier.is_verified(tenant, user_id).await,
             None => Ok(true),
         }
     }
@@ -444,7 +445,11 @@ mod tests {
 
     #[async_trait::async_trait]
     impl PostingVerifier for OnlyOne {
-        async fn is_verified(&self, user_id: Uuid) -> Result<bool, Error> {
+        async fn is_verified(
+            &self,
+            _tenant: &crate::tenancy::TenantContext,
+            user_id: Uuid,
+        ) -> Result<bool, Error> {
             Ok(user_id == self.0)
         }
     }
@@ -455,12 +460,15 @@ mod tests {
         let early = slot.clone();
         let (verified, other) = (Uuid::now_v7(), Uuid::now_v7());
         assert!(!slot.is_registered());
-        assert!(slot.is_verified(other).await.unwrap(), "no verifier: as before D-202");
+        assert!(
+            slot.is_verified(&crate::tenancy::test_tenant(), other).await.unwrap(),
+            "no verifier: as before D-202"
+        );
         slot.register("auth", Arc::new(OnlyOne(verified))).unwrap();
         assert!(slot.register("compliance", Arc::new(OnlyOne(verified))).is_err(), "one only");
         assert!(early.is_registered(), "clones see a later registration");
-        assert!(early.is_verified(verified).await.unwrap());
-        assert!(!early.is_verified(other).await.unwrap());
+        assert!(early.is_verified(&crate::tenancy::test_tenant(), verified).await.unwrap());
+        assert!(!early.is_verified(&crate::tenancy::test_tenant(), other).await.unwrap());
     }
     const WRITE: Permission = Permission::new("notes.write", "Write notes.");
 
