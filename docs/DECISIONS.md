@@ -6865,3 +6865,12 @@ Xếp vào lộ trình: các mục của đề bài này là việc sửa API c�
    hạn sai và chống dùng lại như lúc đăng nhập; passkey phải là của chính người gọi. Dùng lại nghi thức đăng nhập
    passkey sẵn có thay vì thêm endpoint "bắt đầu xác nhận lại". Khi không dùng mật khẩu, transaction tạo key vẫn khoá
    dòng người dùng (`lock_grant`) để tài khoản vừa bị khoá không tạo được key.
+
+## D-273 · Merge vào `main` giữa bước 33 để giao diện dùng API mới, không phát hành — 2026-11-15 — chủ dự án quyết
+
+Chủ dự án hỏi merge vào `main` mà không phát hành có được không, rồi bảo "làm hết luôn đừng chờ gì". Quyết định:
+- Merge nhánh làm việc vào `main` khi **gate đầy đủ xanh** (SQLite + Postgres), kể cả khi bước 33 còn mục `[ ]` —
+  ngoại lệ cho D-248 ("merge khi xong trọn một bước"), vì team giao diện cần các endpoint của đề bài A–D ngay.
+- Không phát hành, không tạo tag: bản phát hành vẫn theo D-248 (cuối giai đoạn A hay khi chủ dự án bảo).
+- Điều kiện để `main` luôn dùng được: phần dở của bước 33 không đổi hành vi mặc định (chế độ `single`; `multi` vẫn bị
+  từ chối tới khi mọi module theo khách), và mọi thay đổi chỉ thêm (D-059).
