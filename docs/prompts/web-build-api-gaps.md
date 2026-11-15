@@ -107,7 +107,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Gói và thuê bao | `POST /billing-periods/{id}/pay` (trả tiền qua cổng của nhà vận hành) | 35 | Chưa có nút "Trả tiền" |
 | [ ] | Tên miền | `GET/POST/DELETE /kernel/domains`, `POST /{id}/verify` | 33 | Dữ liệu mẫu (`src/sample/settings.ts`) |
 | [ ] | Tên miền | Gắn tên miền với nút: `PATCH /kernel/domains/{id} {org_id}` | 33, 34 | Chỉ hiện nút, chưa đổi được |
-| [ ] | Kết nối đối tác | `GET /kernel/settings`, `PUT/DELETE /settings/{name}`; tên setting theo nhà cung cấp (SMS, cổng thanh toán, hoá đơn điện tử) | 33 (tên setting: 36, 39) | Dữ liệu mẫu (`src/sample/settings.ts`) |
+| [ ] | Kết nối đối tác | `GET /kernel/settings`, `PUT/DELETE /settings/{name}`; tên setting theo nhà cung cấp (SMS, cổng thanh toán, hoá đơn điện tử) | 33 (tên setting: 36, 39) | Đã nối `GET/PUT/DELETE /kernel/settings` (W-027 của web); tên setting theo nhà cung cấp chờ bước 36, 39 |
 | [ ] | Kết nối đối tác | `POST /kernel/settings/{name}/test`, `last_used_at`, `last_error` | mới (đề xuất ở `ui-trace-roadmap.md`, chưa vào lộ trình) | Dữ liệu mẫu |
 | [ ] | Kết nối đối tác | "Địa chỉ công khai" dùng trong link email, theo khách | mới | Chưa dựng |
 | [ ] | Job | `GET /kernel/jobs?status=` (theo khách, tóm tắt, tiến độ, người yêu cầu), `POST /jobs/{id}/retry` có audit | 52 | Dữ liệu mẫu (`src/sample/settings.ts`); core hiện chỉ có lệnh CLI `autoxide jobs` |
@@ -247,12 +247,12 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/platform.t
 
 | | Màn | Cần | Bước |
 |---|---|---|---|
-| [ ] | Mọi màn | Biết người đăng nhập thuộc khách nền tảng (`GET /kernel/tenant`) để hiện mặt điều khiển; permission của nhân sự vận hành | 33, 34 |
+| [ ] | Mọi màn | Biết người đăng nhập thuộc khách nền tảng (`GET /kernel/tenant`) để hiện mặt điều khiển; permission của nhân sự vận hành | 33, 34 | Đã nối `GET /kernel/tenant` để hiện mặt điều khiển (W-027 của web); permission của nhân sự nền tảng chờ bước 34 |
 | [ ] | Mọi màn | Sổ điều hướng của core có khái niệm không gian (khách / nền tảng) | 51 |
-| [ ] | Khách hàng | `GET /kernel/tenants` (lọc `status`, `parent_id`), `GET /kernel/placements` | 33 |
+| [x] | Khách hàng | `GET /kernel/tenants` (lọc `status`, `parent_id`), `GET /kernel/placements` | 33 | Đã nối (W-027 của web): màn Khách hàng và Đội database đọc API thật, ghép với dữ liệu mẫu cho trường core chưa có |
 | [ ] | Khách hàng | Trường của khách `business_model`, `primary_domain`; của placement `pending_migrations`, `location` | mới |
 | [ ] | Khách hàng | Số đếm tóm tắt và hạn mức gần chạm nhất của mọi khách trong một lần gọi | mới |
-| [ ] | Chi tiết khách | `PATCH /kernel/tenants/{id}` `{status}` kèm `reason` để ghi audit | 33 (`reason`: mới) |
+| [ ] | Chi tiết khách | `PATCH /kernel/tenants/{id}` `{status}` kèm `reason` để ghi audit | 33 (`reason`: mới) | `PATCH {status}` đã nối (W-027 của web); `reason` để ghi audit vẫn thiếu |
 | [ ] | Chi tiết khách | Dời khách chung ↔ riêng qua API: `POST /kernel/tenants/{id}/move` `{to, dry_run}` | mới (33 mới có CLI) |
 | [ ] | Chi tiết khách | Xuất toàn bộ dữ liệu khách: `POST/GET /kernel/tenants/{id}/exports` và link tải | mới (33 mới có CLI) |
 | [ ] | Chi tiết khách | Quyền dùng của một khách bất kỳ: `GET /plans/tenants/{id}/entitlements` | mới |
@@ -439,3 +439,15 @@ thì chỉ thay phần đọc. Ba nguồn đọc API thật (bình luận chờ 
 | [ ] | Đã ghim | `GET/PUT/DELETE /me/pins` | chưa có trong lộ trình | Tab chỉ hiện khi bật dữ liệu mẫu |
 | [ ] | Tuỳ chọn thông báo | `GET/PUT /me/notification-preferences` theo loại việc và kênh | 37, 52 | Tab chỉ hiện khi bật dữ liệu mẫu |
 | [ ] | Ngôn ngữ ưa dùng | Lưu ngôn ngữ của người dùng ở core (`/me`) để email và thông báo theo đó | 52 | Chỉ nhớ bằng cookie của trình duyệt |
+
+## Core trả khác mô tả OpenAPI (gặp khi nối, 16/11/2026)
+
+Giao diện đã chịu được cả hai dạng; nên sửa mô tả hoặc giá trị cho khớp nhau.
+
+| [ ] | Chỗ | Mô tả OpenAPI | Core trả |
+|---|---|---|---|
+| [ ] | `LastDelivery.status` (webhook) | `pending` / `delivered` / `failed` | `succeeded` thay cho `delivered` |
+| [ ] | `POST /kernel/tenants`, header `Location` | đường dẫn đầy đủ | `/kernel/tenants/{id}`, thiếu tiền tố `/api/v1` |
+| [ ] | `GET /kernel/client-config`, `content.post_path_prefix` | ví dụ `/blog/` | `blog` (không có dấu `/`) |
+| [ ] | `CommentDetail.target_title` | — | chỉ có khi đích đang công khai; bình luận trên bài nháp chỉ có id (nên ghi rõ trong mô tả) |
+
