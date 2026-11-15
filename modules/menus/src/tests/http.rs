@@ -187,3 +187,66 @@ async fn con_tro_rac_qua_http_ra_422() {
     .await
     .unwrap();
 }
+
+/// Đề bài giao diện A6 (D-264): `POST` trả `ETag` (sửa tiếp không cần đọc lại), `PUT` giữ id của
+/// mục có `id`, danh sách có số mục và người sửa cuối; câu lỗi từng ô theo `Accept-Language`.
+#[tokio::test]
+async fn giu_id_muc_etag_khi_tao_va_so_muc_trong_danh_sach() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let body = json!({"key": "footer", "items": [
+            {"label": "A", "url": "/a", "children": [{"label": "A1", "url": "/a1"}]},
+            {"label": "B", "url": "/b"}
+        ]});
+        let created = send(&app, "POST", "", Some("admin"), &[], Some(body)).await;
+        assert_eq!(created.status(), StatusCode::CREATED);
+        let etag = created.header(header::ETAG).to_owned();
+        assert!(etag.starts_with('"'), "{etag}");
+        let menu = created.json()["data"].clone();
+        let id = menu["id"].as_str().unwrap().to_owned();
+        let a = menu["items"][0]["id"].clone();
+        let a1 = menu["items"][0]["children"][0]["id"].clone();
+
+        // Đổi thứ tự, sửa nhãn, thêm một mục mới: hai mục cũ giữ id.
+        let items = json!({"items": [
+            {"label": "B mới", "url": "/b"},
+            {"id": a, "label": "A đổi tên", "url": "/a", "children": [{"id": a1, "label": "A1", "url": "/a1"}]}
+        ]});
+        let replaced =
+            send(&app, "PUT", &format!("/{id}"), Some("admin"), &[("if-match", &etag)], Some(items)).await;
+        assert_eq!(replaced.status(), StatusCode::OK, "{}", replaced.json());
+        let saved = replaced.json()["data"].clone();
+        assert_eq!(saved["items"][1]["id"], a);
+        assert_eq!(saved["items"][1]["label"], "A đổi tên");
+        assert_eq!(saved["items"][1]["children"][0]["id"], a1);
+        assert_ne!(saved["items"][0]["id"], menu["items"][1]["id"], "B was sent without an id");
+
+        // Id lạ, hay hai mục cùng id: lỗi đúng ô, dịch theo ngôn ngữ.
+        let etag = replaced.header(header::ETAG).to_owned();
+        let strange = json!({"items": [
+            {"id": uuid::Uuid::now_v7(), "label": "X", "url": "/x"},
+            {"id": a, "label": "A", "url": "/a"},
+            {"id": a, "label": "A again", "url": "/a2"}
+        ]});
+        let headers = [("if-match", etag.as_str()), ("accept-language", "vi")];
+        let refused = send(&app, "PUT", &format!("/{id}"), Some("admin"), &headers, Some(strange)).await;
+        assert_eq!(refused.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let errors = refused.json()["errors"].clone();
+        let fields: Vec<&str> = errors.as_array().unwrap().iter().map(|e| e["field"].as_str().unwrap()).collect();
+        assert!(fields.contains(&"items[2].id"), "{errors}");
+        assert!(fields.contains(&"items[0].id"), "{errors}");
+        let unknown = errors.as_array().unwrap().iter().find(|e| e["field"] == "items[0].id").unwrap();
+        assert_eq!(unknown["detail"], "không phải mục của menu này; bỏ `id` với mục mới");
+        // Tạo menu mới không nhận `id`.
+        let with_id = json!({"key": "x", "items": [{"id": a, "label": "A", "url": "/a"}]});
+        let refused = send(&app, "POST", "", Some("admin"), &[], Some(with_id)).await;
+        assert_eq!(refused.json()["errors"][0]["field"], "items[0].id");
+
+        let listed = send(&app, "GET", "", Some("reader"), &[], None).await;
+        let row = listed.json()["data"][0].clone();
+        assert_eq!(row["item_count"], 3);
+        assert_eq!(row["updated_by"], uuid::Uuid::from_u128(1).to_string());
+    })
+    .await
+    .unwrap();
+}

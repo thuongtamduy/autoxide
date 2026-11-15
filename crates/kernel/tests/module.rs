@@ -244,7 +244,7 @@ async fn module_nhan_database_va_khai_route() {
                 vec![],
                 vec!["/".to_owned()],
                 vec![],
-                vec!["/flags".to_owned(), "/flags/{key}".to_owned()]
+                vec!["/flags".to_owned(), "/flags/{key}".to_owned(), "/permissions".to_owned()]
             ]
         );
     })

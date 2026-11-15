@@ -2399,12 +2399,28 @@ export type Data_Vec_ModuleInfo = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_MyPermission = {
+  data: {
+    /** What it allows, in the language of `Accept-Language`. */
+    description: string;
+    name: string;
+    /** How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`. */
+    risk: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_PermissionResponse = {
   data: {
-    /** What the permission allows. */
+    /** What the permission allows, in the language of `Accept-Language`. */
     description: string;
     /** `<module>.<action>`. */
     name: string;
+    /**
+     * How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or
+     * `money`.
+     */
+    risk: string;
   }[];
 };
 
@@ -3334,6 +3350,15 @@ export type MoveRequest = {
   parent_id?: string | null;
 };
 
+/** A permission the caller holds. */
+export type MyPermission = {
+  /** What it allows, in the language of `Accept-Language`. */
+  description: string;
+  name: string;
+  /** How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`. */
+  risk: string;
+};
+
 /** What happens when a post is published (by the `content` module). */
 export type NewPosts = "off" | "draft" | "send";
 
@@ -4110,9 +4135,16 @@ export type Page_SiteMenuSummary = {
   data: {
     created_at: string;
     id: string;
+    /** How many items the menu holds, at every level. */
+    item_count: number;
     key: string;
     locale: string;
     updated_at: string;
+    /**
+     * Who created the menu or last replaced its items; `null` when unknown (menus saved
+     * before this field existed, or changed by the system).
+     */
+    updated_by?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -4375,10 +4407,15 @@ export type PasskeyResponse = {
 
 /** A permission that roles can grant. */
 export type PermissionResponse = {
-  /** What the permission allows. */
+  /** What the permission allows, in the language of `Accept-Language`. */
   description: string;
   /** `<module>.<action>`. */
   name: string;
+  /**
+   * How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or
+   * `money`.
+   */
+  risk: string;
 };
 
 /**
@@ -4504,6 +4541,11 @@ export type Problem = {
   detail: string;
   /** One entry per invalid input field. Present only for validation problems. */
   errors?: ProblemField[];
+  /**
+   * Finer, stable reason for some codes, documented with the code — e.g. for a refused link
+   * token: `expired`, `used` or `unknown`.
+   */
+  reason?: string | null;
   /** The HTTP status code, repeated in the body. */
   status: number;
   /** The standard phrase for the HTTP status, e.g. `Not Found`. */
@@ -5189,6 +5231,11 @@ export type SiteMenuItemInput = {
    */
   icon?: string | null;
   /**
+   * The item's id from the menu as read, to keep it across this save (the response of
+   * `PUT` shows the same id). Leave it out for a new item, and when creating a menu.
+   */
+  id?: string | null;
+  /**
    * Up to 200 characters. Needed unless `ref` is given; empty with `ref` shows the title of
    * the object, in the menu's language.
    */
@@ -5202,9 +5249,16 @@ export type SiteMenuItemInput = {
 export type SiteMenuSummary = {
   created_at: string;
   id: string;
+  /** How many items the menu holds, at every level. */
+  item_count: number;
   key: string;
   locale: string;
   updated_at: string;
+  /**
+   * Who created the menu or last replaced its items; `null` when unknown (menus saved
+   * before this field existed, or changed by the system).
+   */
+  updated_by?: string | null;
 };
 
 /** One address of the sitemap. */
@@ -8110,6 +8164,17 @@ export interface paths {
         204: void;
         401: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/me/permissions": {
+    /** List your own permissions. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_MyPermission;
+        401: Problem;
         default: Problem;
       };
     };

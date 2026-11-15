@@ -45,7 +45,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Nút "?" (trợ giúp theo trang) | Bài hướng dẫn theo trang (tiêu đề, tóm tắt, link) do core hay module khai, theo `Accept-Language` | mới | Danh sách viết cứng ở `src/help/pages.ts`, 8 trang |
 | [ ] | Nút "?" › Có gì mới | Nguồn tin "Có gì mới" theo phiên bản core và module đang chạy | mới | Danh sách viết cứng ở `src/help/whats-new.ts`; mốc đã xem lưu ở `/me/flags` (`whatsnew.seen`) |
 | [ ] | Nút ⓘ của số liệu | Trường `definition` của `GET /kernel/summary` (D-207) | 51 (P4) | Chưa có nút ⓘ cho số liệu; câu cách tính hiện dưới khối |
-| [ ] | Bộ chọn permission (role, API key) | `risk` trong `GET /auth/permissions` (hiện chỉ có ở `GET /kernel/modules`, cần thêm `kernel.modules.read`) | mới | Gọi thêm sổ module; thiếu quyền thì không có nhãn rủi ro |
+| [x] | Bộ chọn permission (role, API key) | `risk` trong `GET /auth/permissions` (hiện chỉ có ở `GET /kernel/modules`, cần thêm `kernel.modules.read`) | mới | Gọi thêm sổ module; thiếu quyền thì không có nhãn rủi ro |
 
 ## Tài khoản của tôi (`/account`)
 
@@ -60,7 +60,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Hồ sơ | Email đang chờ xác minh sau khi yêu cầu đổi (`pending_email`, hạn), và endpoint huỷ yêu cầu đổi | mới | Chỉ báo "đã gửi thư tới …" |
 | [ ] | Phiên đăng nhập | Mỗi phiên trả cách đăng nhập (mật khẩu, mật khẩu + mã, passkey) và IP hay vị trí gần đúng (lưu theo luật dữ liệu cá nhân, có hạn) | mới | Chỉ hiện trình duyệt và hệ điều hành (giao diện đã chuyển `User-Agent` thật cho core) |
 | [ ] | Đăng nhập và bảo mật | Passkey trả loại authenticator (AAGUID → tên như Touch ID, Windows Hello) | mới | Hiện tên người dùng tự đặt |
-| [ ] | Mọi biểu mẫu có mật khẩu | `detail` của `auth.wrong_password` đang nhắc `POST /api/v1/auth/password-reset`: câu cho người gọi API, người dùng thường không hiểu. Viết câu cho người dùng; đưa hướng dẫn cho máy vào tài liệu OpenAPI | mới | Hiện nguyên câu của core |
+| [x] | Mọi biểu mẫu có mật khẩu | `detail` của `auth.wrong_password` đang nhắc `POST /api/v1/auth/password-reset`: câu cho người gọi API, người dùng thường không hiểu. Viết câu cho người dùng; đưa hướng dẫn cho máy vào tài liệu OpenAPI | mới | Hiện nguyên câu của core |
 
 ## Tổ chức › Người dùng và role (`/org/access`)
 
@@ -70,10 +70,10 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Người dùng | Lọc theo trạng thái (đang dùng / đã khoá) và theo role | mới (lọc theo role: 34, `GET /memberships?role_id=`) | Chỉ tìm theo email hoặc tên |
 | [ ] | Chi tiết người dùng | `UserResponse` có `has_password`, `mfa_enabled`, lần đăng nhập cuối | mới | Luôn hiện "Đặt mật khẩu đầu tiên" và "Tắt xác thực hai bước"; đặt lần hai thì hiện lỗi `auth.password_already_set` |
 | [ ] | Role | Số người giữ mỗi role, "xem người giữ role" | 34 (`GET /memberships?role_id=`); số đếm: mới | Chưa có cột này |
-| [ ] | Chi tiết role | Mô tả của permission theo `Accept-Language` | mới | Hiện mô tả tiếng Anh cả khi chọn tiếng Việt |
+| [x] | Chi tiết role | Mô tả của permission theo `Accept-Language` | mới | Hiện mô tả tiếng Anh cả khi chọn tiếng Việt |
 | [ ] | Chi tiết role | Độ sâu theo nút (`grants: [{permission, scope}]`, lưới permission × độ sâu), membership theo nút | 34 | Chưa dựng; chỉ chọn permission ở phạm vi toàn khách |
-| [ ] | `/verify-email`, `/reset-password` | Mã lỗi tách "hết hạn" và "đã dùng" (hiện chung `auth.invalid_*_token`) | mới | Hiện `detail` của core kèm cách xin link mới |
-| [ ] | Mọi form quản trị người dùng | `detail` của `auth.password_already_set`, `auth.invalid_verification_token` đang nhắc tên endpoint (câu cho máy) | mới (cùng loại với `auth.wrong_password`) | Hiện nguyên câu của core |
+| [x] | `/verify-email`, `/reset-password` | Mã lỗi tách "hết hạn" và "đã dùng" (hiện chung `auth.invalid_*_token`) | mới | Hiện `detail` của core kèm cách xin link mới |
+| [x] | Mọi form quản trị người dùng | `detail` của `auth.password_already_set`, `auth.invalid_verification_token` đang nhắc tên endpoint (câu cho máy) | mới (cùng loại với `auth.wrong_password`) | Hiện nguyên câu của core |
 | [ ] | Lời mời | `GET/POST /auth/invitations`, `DELETE /{id}`, `POST /{id}/resend`; trả kèm tên role và người mời | 34 | Dữ liệu mẫu (`src/sample/org.ts`) |
 | [ ] | Uỷ quyền | `GET/POST/DELETE /auth/delegations`; danh sách khách con | 34 (khách con: 33) | Dữ liệu mẫu (`src/sample/org.ts`) |
 | [ ] | Hồ sơ công khai | Hồ sơ công khai của nút (`PATCH /organizations/units/{id}`), giờ mở cửa theo ngày và ngày nghỉ, danh mục tỉnh / xã | 34 (D-200, `address`) | Dữ liệu mẫu (`src/sample/org.ts`); cùng một giờ cho mọi ngày |
@@ -112,14 +112,14 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Kết nối đối tác | "Địa chỉ công khai" dùng trong link email, theo khách | mới | Chưa dựng |
 | [ ] | Job | `GET /kernel/jobs?status=` (theo khách, tóm tắt, tiến độ, người yêu cầu), `POST /jobs/{id}/retry` có audit | 52 | Dữ liệu mẫu (`src/sample/settings.ts`); core hiện chỉ có lệnh CLI `autoxide jobs` |
 | [ ] | Webhook | `EndpointResponse` trả lần giao gần nhất (trạng thái, lúc, HTTP); lọc endpoint theo trạng thái | mới | Gọi `/deliveries?limit=1` cho từng endpoint; lọc trên trang đang xem |
-| [ ] | Webhook | Mô tả event theo `Accept-Language` | mới | Hiện tiếng Anh cả khi chọn tiếng Việt |
+| [x] | Webhook | Mô tả event theo `Accept-Language` | mới | Hiện tiếng Anh cả khi chọn tiếng Việt |
 | [ ] | Nhà phát triển › Webhook | Danh sách lần giao xuyên endpoint có lọc; gửi lại một lần giao | 52 | Gộp `/webhooks/{id}/deliveries` (25 lần mỗi endpoint); chưa có "Gửi lại" |
 | [ ] | Nhật ký audit | `actor_kind` (người / agent / dịch vụ / hỗ trợ nền tảng) và tham số lọc `actor_kind=` | 51, 52 | Chưa có chip lọc theo loại người làm |
 | [ ] | Nhật ký audit | Mục audit trả kèm tên người làm (hoặc `include=actor`) | mới | Gọi `GET /auth/users/{id}` cho mỗi người trên trang; không có quyền thì hiện mã rút gọn |
 | [ ] | API key | `kind` của key (người, agent, dịch vụ) | 51 | Chưa hiện loại key |
 | [ ] | API key | Quản trị viên xem và thu hồi key của mọi người trong khách | mới | Chỉ key của chính mình |
 | [ ] | API key | Xác nhận lại bằng passkey hoặc TOTP thay cho mật khẩu khi tạo key | mới | Chỉ mật khẩu |
-| [ ] | Tạo API key | Sổ permission đọc được khi không có `auth.roles.read` (vd `GET /me/permissions` kèm mô tả) | mới | Chỉ thấy tên permission, không có mô tả |
+| [x] | Tạo API key | Sổ permission đọc được khi không có `auth.roles.read` (vd `GET /me/permissions` kèm mô tả) | mới | Chỉ thấy tên permission, không có mô tả |
 | [ ] | Chờ duyệt | `GET /kernel/approvals`, `POST /approvals/{id}/approve`, `/reject` | 51 | Dữ liệu mẫu (`src/sample/agent.ts`) |
 | [ ] | Nhật ký gọi tool MCP | Nhật ký các lần agent gọi tool | 51, 52 | Dữ liệu mẫu (`src/sample/agent.ts`) |
 | [ ] | Kết nối MCP | Core công bố địa chỉ công khai (`AUTOXIDE_HTTP_PUBLIC_URL`) | mới | Dùng `AUTOXIDE_API_URL` của giao diện |
@@ -168,9 +168,9 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Menu | Sổ đối tượng: danh sách loại kèm cờ "có cây"; tìm đối tượng | 51 (P6) + đề bài menus, điểm 1–2 | Hai loại của `content` ghi cứng; bài và danh mục đọc qua API content (200 đầu); loại thương mại là dữ liệu mẫu, core từ chối khi lưu (`menus.ref_unknown_kind`) |
 | [ ] | Menu | Đọc menu kèm tiêu đề và trạng thái của từng đích, cho người có `menus.read` | mới (đề bài menus, điểm 3) | Tự tra từ bài và danh mục đã đọc; đích ngoài danh sách chỉ hiện id |
 | [ ] | Menu | Lệnh nhập menu cũ có chạy thử; ghi lần nhập gần nhất | mới (đề bài menus, điểm 9) | Tự tính bản xem trước từ dữ liệu thật, hiện câu lệnh `autoxide task menus.import_content_menus`; chưa có nút chạy |
-| [ ] | Menu | Danh sách menu kèm số mục (`item_count`), người và lúc sửa cuối | mới | Bảng không có cột "Mục" |
-| [ ] | Menu | `POST /menus` trả `ETag` như `GET` và `PUT` | mới | Đọc lại menu sau khi tạo |
-| [ ] | Menu | Giữ id của mục giữa các lần lưu (nhận `id` trong `SiteMenuItemInput`); hiện `PUT` cấp id mới cho mọi mục | mới | Giữ mục đang chọn theo vị trí trong cây |
+| [x] | Menu | Danh sách menu kèm số mục (`item_count`), người và lúc sửa cuối | mới | Bảng không có cột "Mục" |
+| [x] | Menu | `POST /menus` trả `ETag` như `GET` và `PUT` | mới | Đọc lại menu sau khi tạo |
+| [x] | Menu | Giữ id của mục giữa các lần lưu (nhận `id` trong `SiteMenuItemInput`); hiện `PUT` cấp id mới cho mọi mục | mới | Giữ mục đang chọn theo vị trí trong cây |
 | [ ] | Menu | Ngôn ngữ được phép của menu (`AUTOXIDE_MENUS_LOCALES`) qua API | mới | Dùng danh sách ngôn ngữ của content; core vẫn kiểm |
 | [x] | Menu | Header `Deprecation` / `Sunset` trên `/content/menus…` | v0.14.0 | Lấy ngày từ header `Sunset` thật |
 

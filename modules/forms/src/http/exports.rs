@@ -96,7 +96,7 @@ impl From<ExportView> for ExportResponse {
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `forms.export`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No form has this id; code `forms.not_found`.", body = Problem),
-        (status = 409, description = "The form already has an export that is not finished; code `forms.export_in_progress` (its id is in the message).", body = Problem),
+        (status = 409, description = "The form already has an export that is not finished; code `forms.export_in_progress` (its id is in the message; follow it with `GET /api/v1/forms/exports/{export_id}`).", body = Problem),
         (status = 422, description = "`status` is invalid; see `errors`.", body = Problem),
     )
 )]

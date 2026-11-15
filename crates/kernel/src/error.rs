@@ -174,11 +174,21 @@ pub struct Error {
     template: Cow<'static, str>,
     params: Vec<(Cow<'static, str>, String)>,
     fields: Vec<FieldError>,
-    source: Option<Source>,
-    /// Số giây client nên chờ trước khi thử lại (header `Retry-After`). `NonZeroU32`
-    /// thay vì `u64`: `Option` của nó chỉ tốn 4 byte, giữ `Error` đủ nhỏ để trả về
+    /// Phần ít khi dùng (nguyên nhân gốc, `Retry-After`, `reason`), để trong hộp: giữ `Error` đủ nhỏ để trả về
     /// trong `Result` mà không phải chép nhiều (clippy `result_large_err`).
+    extra: Option<Box<Extra>>,
+}
+
+/// Phần ít khi dùng của [`Error`].
+#[derive(Debug, Default)]
+struct Extra {
+    /// Nguyên nhân gốc, chỉ cho log.
+    source: Option<Source>,
+    /// Số giây client nên chờ trước khi thử lại (header `Retry-After`).
     retry_after: Option<NonZeroU32>,
+    /// Lý do ổn định cho máy, chi tiết hơn `code` (vd `expired` / `used` của token): trường mở
+    /// rộng `reason` của Problem (RFC 9457 cho phép trường mở rộng).
+    reason: Option<&'static str>,
 }
 
 /// Mã và thông báo của lỗi nội bộ. Client chỉ thấy đúng hai thứ này.
@@ -202,8 +212,7 @@ impl Error {
             template: message.into(),
             params: Vec::new(),
             fields: Vec::new(),
-            source: None,
-            retry_after: None,
+            extra: None,
         }
     }
 
@@ -287,7 +296,7 @@ impl Error {
 
     /// Gắn nguyên nhân gốc (cho log).
     pub fn with_source(mut self, source: impl Into<Source>) -> Self {
-        self.source = Some(source.into());
+        self.extra.get_or_insert_default().source = Some(source.into());
         self
     }
 
@@ -296,13 +305,28 @@ impl Error {
     /// Ít nhất 1 giây.
     pub fn with_retry_after(mut self, seconds: u64) -> Self {
         let seconds = u32::try_from(seconds).unwrap_or(u32::MAX).max(1);
-        self.retry_after = NonZeroU32::new(seconds);
+        self.extra.get_or_insert_default().retry_after = NonZeroU32::new(seconds);
         self
+    }
+
+    /// Gắn lý do ổn định cho máy (trường `reason` của Problem), vd `expired`.
+    #[must_use]
+    pub fn with_reason(mut self, reason: &'static str) -> Self {
+        self.extra.get_or_insert_default().reason = Some(reason);
+        self
+    }
+
+    /// Lý do gắn bằng [`with_reason`](Self::with_reason), nếu có.
+    pub fn reason(&self) -> Option<&'static str> {
+        self.extra.as_ref().and_then(|extra| extra.reason)
     }
 
     /// Số giây nên chờ trước khi thử lại, nếu lỗi có nêu.
     pub fn retry_after(&self) -> Option<u64> {
-        self.retry_after.map(|seconds| u64::from(seconds.get()))
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.retry_after)
+            .map(|seconds| u64::from(seconds.get()))
     }
 
     pub fn kind(&self) -> ErrorKind {
@@ -348,7 +372,7 @@ fn fill(template: &str, params: &[(Cow<'static, str>, String)]) -> String {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.code, self.message())?;
-        if let Some(source) = &self.source {
+        if let Some(source) = self.extra.as_ref().and_then(|extra| extra.source.as_ref()) {
             write!(f, " (caused by: {source})")?;
         }
         Ok(())
@@ -358,7 +382,8 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         // Đổi `&Box<dyn Error + Send + Sync>` thành `&dyn Error`.
-        self.source.as_deref().map(|source| source as &(dyn std::error::Error + 'static))
+        let source = self.extra.as_ref().and_then(|extra| extra.source.as_deref());
+        source.map(|source| source as &(dyn std::error::Error + 'static))
     }
 }
 

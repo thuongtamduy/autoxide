@@ -89,7 +89,7 @@ pub(crate) struct EndedSessionsResponse {
     responses(
         (status = 200, description = "One page of your sessions.", body = Page<SessionResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "The request used an API key; code `auth.session_required`.", body = Problem),
+        (status = 403, description = "The request used an API key; code `auth.session_required`. Sign in with `POST /api/v1/auth/login` and use that access token.", body = Problem),
         (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
@@ -119,7 +119,7 @@ async fn list_sessions(
     responses(
         (status = 204, description = "The session was ended."),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "The request used an API key; code `auth.session_required`.", body = Problem),
+        (status = 403, description = "The request used an API key; code `auth.session_required`. Sign in with `POST /api/v1/auth/login` and use that access token.", body = Problem),
         (status = 404, description = "You have no active session with this id; code `auth.session_not_found`.", body = Problem),
     )
 )]
@@ -147,7 +147,7 @@ async fn end_session(
     responses(
         (status = 200, description = "The sessions were ended.", body = Data<EndedSessionsResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "The request used an API key; code `auth.session_required`.", body = Problem),
+        (status = 403, description = "The request used an API key; code `auth.session_required`. Sign in with `POST /api/v1/auth/login` and use that access token.", body = Problem),
         (status = 422, description = "`keep` is not a valid id.", body = Problem),
     )
 )]

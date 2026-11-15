@@ -515,7 +515,13 @@ impl Modules {
         let mut routes: Vec<(&'static str, OpenApiRouter)> =
             self.modules.iter().map(|module| (module.name(), module.routes())).collect();
         if let Some(flags) = self.user_flags.get() {
-            routes.push((crate::user_flags::ME, crate::user_flags::routes(flags)));
+            let mine = crate::ops::my_permissions::MyPermissions {
+                catalog: self.permissions.clone(),
+                translations: self.translations.clone(),
+            };
+            let me =
+                crate::user_flags::routes(flags).merge(crate::ops::my_permissions::routes(mine));
+            routes.push((crate::user_flags::ME, me));
         }
         routes
     }

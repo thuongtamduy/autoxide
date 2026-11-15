@@ -225,12 +225,8 @@ impl ApiKeyService {
             .one(&transaction)
             .await?
             .ok_or_else(|| {
-                Error::not_found(
-                    "auth.api_key_not_found",
-                    "You have no API key with id `{id}`. List your keys with \
-                     `GET /api/v1/auth/api-keys`.",
-                )
-                .with_param("id", id)
+                Error::not_found("auth.api_key_not_found", "You have no API key with id `{id}`.")
+                    .with_param("id", id)
             })?;
         api_key::Entity::delete_by_id(id).exec(&transaction).await?;
         let before = json!({"user_id": user_id, "name": row.name, "prefix": row.prefix});
@@ -260,7 +256,7 @@ impl ApiKeyService {
         if row.expires_at.is_some_and(|expires_at| expires_at <= now) {
             return Err(Error::unauthenticated(
                 "auth.api_key_expired",
-                "This API key has expired. Create a new one with `POST /api/v1/auth/api-keys`.",
+                "This API key has expired. Create a new one.",
             ));
         }
         let user = self.users.get(row.user_id).await?.ok_or_else(invalid_api_key)?;
@@ -340,7 +336,7 @@ impl ApiKeyService {
                 problems.push(FieldError::new(
                     field,
                     "unknown",
-                    "is not a permission of this system; see `GET /api/v1/auth/permissions`",
+                    "is not a permission of this system",
                 ));
             } else if !creator.allows(permission) {
                 problems.push(FieldError::new(

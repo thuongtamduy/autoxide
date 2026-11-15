@@ -105,8 +105,7 @@ impl AccessTokens {
         if claims.exp <= now.timestamp() {
             return Err(Error::unauthenticated(
                 "auth.token_expired",
-                "The access token has expired. Get a new one with your refresh token \
-                 (`POST /api/v1/auth/refresh`).",
+                "Your session has expired. Sign in again.",
             ));
         }
         Ok(claims.sub)
@@ -126,11 +125,7 @@ fn decode_json<T: serde::de::DeserializeOwned>(part: &str) -> Result<T, Error> {
 }
 
 pub(crate) fn invalid_token() -> Error {
-    Error::unauthenticated(
-        "auth.invalid_token",
-        "The access token is not valid. Sign in again (`POST /api/v1/auth/login`) to get a new \
-         one.",
-    )
+    Error::unauthenticated("auth.invalid_token", "Your sign-in is not valid. Sign in again.")
 }
 
 /// Băm SHA-256 của refresh token, để lưu. Database chỉ giữ bản băm: lộ bảng cũng

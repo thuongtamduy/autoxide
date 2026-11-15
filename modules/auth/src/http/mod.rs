@@ -75,8 +75,7 @@ fn require_session(
     if principal.api_key_id().is_some() {
         return Err(autoxide_kernel::error::Error::forbidden(
             "auth.session_required",
-            "This action needs a signed-in session; an API key cannot do it. Sign in with your \
-             password (`POST /api/v1/auth/login`) and use that access token.",
+            "This action needs you to be signed in with your password; an API key cannot do it.",
         ));
     }
     Ok(())

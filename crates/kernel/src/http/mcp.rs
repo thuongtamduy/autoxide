@@ -191,6 +191,9 @@ impl McpServer {
             "code": error.code(),
             "message": self.translations.message(error, language),
         });
+        if let Some(reason) = error.reason() {
+            body["reason"] = Value::from(reason);
+        }
         if !error.fields().is_empty() {
             // Cùng hình dạng với `errors` của Problem trong REST.
             let fields: Vec<Value> = error

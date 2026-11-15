@@ -87,13 +87,16 @@ impl Module for WebhooksModule {
             .clone()
             .ok_or_else(|| Error::internal("module `webhooks` started before it was configured"))?;
         let database = context.database().clone();
-        let service = Arc::new(WebhookService::new(
-            database.clone(),
-            context.outbox()?,
-            context.events().clone(),
-            config.allow_http,
-            config.allow_private_networks,
-        ));
+        let service = Arc::new(
+            WebhookService::new(
+                database.clone(),
+                context.outbox()?,
+                context.events().clone(),
+                config.allow_http,
+                config.allow_private_networks,
+            )
+            .with_translations(context.translations().clone()),
+        );
         let sender = Arc::new(Sender {
             database: database.clone(),
             client: Sender::client(config.timeout, config.allow_private_networks)?,

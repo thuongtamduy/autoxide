@@ -126,10 +126,7 @@ pub(crate) fn banned_word() -> Error {
 }
 
 pub(crate) fn profile_required() -> Error {
-    Error::conflict(
-        "comments.profile_required",
-        "Choose a display name first with `PUT /api/v1/comments/profile`.",
-    )
+    Error::conflict("comments.profile_required", "Choose a display name for your comments first.")
 }
 
 impl CommentsService {

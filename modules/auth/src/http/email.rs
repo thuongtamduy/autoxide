@@ -93,7 +93,7 @@ async fn resend_verification(
     request_body = ChangeEmailRequest,
     responses(
         (status = 202, description = "A verification mail is on its way to the new address."),
-        (status = 400, description = "The current password is wrong; code `auth.wrong_password`.", body = Problem),
+        (status = 400, description = "The current password is wrong; code `auth.wrong_password`. A user who forgot it resets it with `POST /api/v1/auth/password-reset`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Called with an API key (code `auth.session_required`), or the account is disabled (code `auth.user_disabled`).", body = Problem),
         (status = 409, description = "Another account has this email (code `auth.email_taken`), or it is already your verified address (code `auth.email_already_verified`).", body = Problem),
@@ -129,7 +129,7 @@ async fn change_email(
     request_body = VerificationConfirmation,
     responses(
         (status = 200, description = "Verified; the account as it is now.", body = Data<UserResponse>),
-        (status = 400, description = "The token is unknown, expired or used; code `auth.invalid_verification_token`.", body = Problem),
+        (status = 400, description = "The token is unknown, expired or used; code `auth.invalid_verification_token`, with `reason` (`expired`, `used` or `unknown`). Ask for a new mail with `POST /api/v1/auth/me/email/verification`.", body = Problem),
         (status = 409, description = "Another account took this address meanwhile; code `auth.email_taken`.", body = Problem),
         (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
     )
@@ -159,7 +159,7 @@ async fn confirm_email(
     request_body = EmailChangeReport,
     responses(
         (status = 204, description = "Reported; the account is locked and, when the old address was free, given back to it."),
-        (status = 400, description = "The token is unknown, expired or used; code `auth.invalid_email_change_report_token`.", body = Problem),
+        (status = 400, description = "The token is unknown, expired or used; code `auth.invalid_email_change_report_token`, with `reason` (`expired`, `used` or `unknown`).", body = Problem),
         (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
     )
 )]

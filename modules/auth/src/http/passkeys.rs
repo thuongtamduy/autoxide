@@ -124,7 +124,7 @@ pub(crate) struct PasskeyLoginRequest {
     request_body = StartPasskeyRegistrationRequest,
     responses(
         (status = 200, description = "Options for the browser, and the ceremony to finish with `POST /api/v1/auth/me/passkeys`.", body = Data<CeremonyResponse>),
-        (status = 400, description = "The current password is wrong; code `auth.wrong_password`.", body = Problem),
+        (status = 400, description = "The current password is wrong; code `auth.wrong_password`. A user who forgot it resets it with `POST /api/v1/auth/password-reset`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Called with an API key (`auth.session_required`), or passkeys are off (`auth.passkeys_disabled`).", body = Problem),
         (status = 409, description = "You already have the most passkeys allowed; code `auth.passkey_limit`.", body = Problem),

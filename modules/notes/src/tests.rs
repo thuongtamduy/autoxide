@@ -343,3 +343,30 @@ async fn sua_dong_thoi_cung_phien_ban_chi_mot_nguoi_thang() {
     .await
     .unwrap();
 }
+
+/// `GET /api/v1/me/permissions` (đề bài giao diện A5): permission của chính người gọi, mô tả theo
+/// `Accept-Language`, kèm mức rủi ro — không cần quyền đọc sổ permission.
+#[tokio::test]
+async fn permission_cua_toi_kem_mo_ta_va_rui_ro() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let answer =
+            app.get("/api/v1/me/permissions").token("bob").header("accept-language", "vi").send();
+        let answer = answer.await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK);
+        assert_eq!(
+            answer.json()["data"],
+            json!([{"name": "notes.read", "description": "Xem ghi chú của chính bạn.", "risk": "read"}])
+        );
+        let english = app.get("/api/v1/me/permissions").token("ada").send().await.unwrap();
+        let listed = english.json();
+        let names: Vec<&str> =
+            listed["data"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
+        assert_eq!(names, ["notes.read", "notes.write"]);
+        assert_eq!(english.json()["data"][1]["description"], "Create, change and delete your own notes.");
+        let anonymous = app.get("/api/v1/me/permissions").send().await.unwrap();
+        assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    })
+    .await
+    .unwrap();
+}

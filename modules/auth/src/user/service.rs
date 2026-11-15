@@ -671,9 +671,7 @@ pub(crate) fn invalid_credentials() -> Error {
 fn password_already_set() -> Error {
     Error::conflict(
         "auth.password_already_set",
-        "This account already has a password. Only its owner can change it \
-         (`POST /api/v1/auth/me/password`), or reset it by email \
-         (`POST /api/v1/auth/password-reset`).",
+        "This account already has a password. Only its owner can change it, or reset it by email.",
     )
 }
 

@@ -144,11 +144,10 @@ impl Module for AuthModule {
             url: config.email_verification_url.clone(),
             report_url: config.email_change_report_url.clone(),
         });
-        let roles = Arc::new(RoleService::new(
-            database.clone(),
-            context.permissions().clone(),
-            outbox.clone(),
-        ));
+        let roles = Arc::new(
+            RoleService::new(database.clone(), context.permissions().clone(), outbox.clone())
+                .with_translations(context.translations().clone()),
+        );
         let api_keys = Arc::new(ApiKeyService::new(
             database.clone(),
             users.clone(),

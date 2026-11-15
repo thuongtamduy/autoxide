@@ -37,19 +37,27 @@ pub(crate) struct PermissionResponse {
     /// `<module>.<action>`.
     #[schema(example = "auth.roles.read")]
     name: String,
-    /// What the permission allows.
+    /// What the permission allows, in the language of `Accept-Language`.
     description: String,
+    /// How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or
+    /// `money`.
+    #[schema(example = "read")]
+    risk: String,
 }
 
 impl PermissionResponse {
     /// Mọi permission, theo thứ tự tên.
-    pub(crate) fn catalog(roles: &crate::role::RoleService) -> Vec<PermissionResponse> {
+    pub(crate) fn catalog(
+        roles: &crate::role::RoleService,
+        language: autoxide_kernel::i18n::Language,
+    ) -> Vec<PermissionResponse> {
         roles
             .catalog()
             .iter()
             .map(|permission| PermissionResponse {
                 name: permission.name().to_owned(),
-                description: permission.description().to_owned(),
+                description: roles.describe(permission.description(), language),
+                risk: permission.risk().as_str().to_owned(),
             })
             .collect()
     }
@@ -127,7 +135,8 @@ fn roles(roles: Vec<Role>) -> Data<Vec<RoleResponse>> {
 /// List every permission that roles can grant.
 ///
 /// Requires `auth.roles.read`. Each module declares its own permissions; the list
-/// grows when modules are added.
+/// grows when modules are added. Descriptions follow `Accept-Language`. Without
+/// `auth.roles.read`, read your own permissions with `GET /api/v1/me/permissions`.
 #[utoipa::path(
     get,
     path = "/permissions",
@@ -143,9 +152,10 @@ fn roles(roles: Vec<Role>) -> Data<Vec<RoleResponse>> {
 async fn list_permissions(
     State(state): State<Arc<HttpState>>,
     principal: Principal,
+    language: autoxide_kernel::i18n::Language,
 ) -> Result<Data<Vec<PermissionResponse>>, Error> {
     principal.require(&ROLES_READ)?;
-    Ok(Data { data: PermissionResponse::catalog(&state.roles) })
+    Ok(Data { data: PermissionResponse::catalog(&state.roles, language) })
 }
 
 /// List roles.

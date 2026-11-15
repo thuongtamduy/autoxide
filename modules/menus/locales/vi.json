@@ -2,6 +2,8 @@
   "field:`{kind}` has no sub-items to take": "`{kind}` không có mục con để lấy",
   "field:at most {max_items} items": "tối đa {max_items} mục",
   "field:give at most one of `url` and `ref`": "chỉ ghi tối đa một trong `url` và `ref`",
+  "field:is given to another item too": "đã dùng cho một mục khác",
+  "field:is not an item of this menu; leave `id` out for a new item": "không phải mục của menu này; bỏ `id` với mục mới",
   "field:is not valid: {reason}": "không hợp lệ: {reason}",
   "field:menus nest at most {max_depth} levels": "menu lồng tối đa {max_depth} cấp",
   "field:must be 1 to 64 characters": "phải dài 1 đến 64 ký tự",
@@ -12,6 +14,7 @@
   "field:must be `https://`, `http://`, `mailto:` or a path starting with a single `/`": "phải là `https://`, `http://`, `mailto:` hay đường dẫn bắt đầu bằng một dấu `/`",
   "field:must be a resource type like `content.term`": "phải là loại đối tượng như `content.term`",
   "field:must be after `from`": "phải sau `from`",
+  "field:must be left out when creating a menu": "phải bỏ trống khi tạo menu",
   "field:must be one of: {allowed}": "phải là một trong: {allowed}",
   "field:needs `ref`: sub-items are taken from the object it points to": "cần có `ref`: mục con lấy từ đối tượng mà nó trỏ tới",
   "field:no `{kind}` has this id": "không có `{kind}` nào mang id này",
@@ -24,5 +27,10 @@
   "menus.menu_not_found": "Không có menu `{id}`.",
   "menus.public_menu_not_found": "Không có menu `{key}` ở ngôn ngữ `{locale}`.",
   "menus.ref_not_found": "Có mục trỏ tới một đối tượng không tồn tại; xem `errors`.",
-  "menus.ref_unknown_kind": "Có mục trỏ tới một loại đối tượng không module nào cung cấp; xem `errors`."
+  "menus.ref_unknown_kind": "Có mục trỏ tới một loại đối tượng không module nào cung cấp; xem `errors`.",
+  "text:A website menu was created.": "Một menu website được tạo.",
+  "text:A website menu was deleted.": "Một menu website bị xoá.",
+  "text:Create, change and delete website menus.": "Tạo, sửa và xoá menu website.",
+  "text:See website menus as they are saved.": "Xem menu website như đã lưu.",
+  "text:The items of a website menu were replaced.": "Các mục của một menu website được thay."
 }

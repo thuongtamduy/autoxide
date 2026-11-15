@@ -336,7 +336,7 @@ async fn register(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
-        (status = 409, description = "The account already has a password; code `auth.password_already_set`.", body = Problem),
+        (status = 409, description = "The account already has a password; code `auth.password_already_set`. Its owner changes it with `POST /api/v1/auth/me/password` or resets it with `POST /api/v1/auth/password-reset`.", body = Problem),
         (status = 422, description = "The password breaks the rules; see `errors`.", body = Problem),
     )
 )]

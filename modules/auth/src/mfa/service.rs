@@ -367,8 +367,7 @@ pub(crate) fn invalid_code() -> Error {
 fn setup_not_started() -> Error {
     Error::conflict(
         "auth.mfa_setup_not_started",
-        "There is no two-step sign-in setup to confirm. Start one with \
-         `POST /api/v1/auth/me/mfa/totp`.",
+        "There is no two-step sign-in setup to confirm. Start the setup again.",
     )
 }
 

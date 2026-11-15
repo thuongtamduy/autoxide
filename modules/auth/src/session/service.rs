@@ -238,8 +238,7 @@ impl SessionService {
             }
             Err(error) if error.code() == INVALID_CREDENTIALS => Err(Error::bad_request(
                 "auth.wrong_password",
-                "The current password is incorrect. If you forgot it, reset it by email \
-                     (`POST /api/v1/auth/password-reset`).",
+                "The current password is incorrect. If you forgot it, you can reset it by email.",
             )),
             Err(error) => Err(error),
         }
@@ -704,12 +703,8 @@ fn live_tokens(user_id: Uuid, now: DateTime<Utc>) -> sea_orm::Select<Entity> {
 }
 
 fn session_not_found(id: Uuid) -> Error {
-    Error::not_found(
-        "auth.session_not_found",
-        "You have no active session `{id}`. List your sessions with \
-         `GET /api/v1/auth/me/sessions`.",
-    )
-    .with_param("id", id)
+    Error::not_found("auth.session_not_found", "You have no active session `{id}`.")
+        .with_param("id", id)
 }
 
 /// Thu hồi mọi refresh token của họ `family_id`.
@@ -756,13 +751,7 @@ fn new_refresh_token(
 /// Lấy token từ giá trị header `Authorization: Bearer <token>` (RFC 6750). Chữ
 /// `Bearer` không phân biệt hoa thường.
 pub(crate) fn bearer_token(authorization: Option<&str>) -> Result<&str, Error> {
-    let missing = || {
-        Error::unauthenticated(
-            "auth.missing_token",
-            "This endpoint needs an access token: send `Authorization: Bearer <access token>`. \
-             Get one with `POST /api/v1/auth/login`.",
-        )
-    };
+    let missing = || Error::unauthenticated("auth.missing_token", "You need to sign in.");
     let value = authorization.ok_or_else(missing)?.trim();
     let (scheme, token) = value.split_once(' ').ok_or_else(missing)?;
     let token = token.trim();
@@ -773,11 +762,7 @@ pub(crate) fn bearer_token(authorization: Option<&str>) -> Result<&str, Error> {
 }
 
 fn invalid_refresh_token() -> Error {
-    Error::unauthenticated(
-        "auth.invalid_refresh_token",
-        "The refresh token is unknown, expired or revoked. Sign in again \
-         (`POST /api/v1/auth/login`).",
-    )
+    Error::unauthenticated("auth.invalid_refresh_token", "Your session has ended. Sign in again.")
 }
 
 /// Bây giờ, cắt tới micro giây để hai database lưu cùng một giá trị.

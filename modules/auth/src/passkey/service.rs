@@ -128,8 +128,7 @@ impl PasskeyService {
             engine.finish_registration(&state, credential).map_err(|Rejected(reason)| {
                 Error::bad_request(
                     "auth.passkey_rejected",
-                    "The passkey was not accepted: {reason}. Start again with `POST \
-                 /api/v1/auth/me/passkeys/registration`.",
+                    "The passkey was not accepted: {reason}. Try adding it again.",
                 )
                 .with_param("reason", reason)
             })?;

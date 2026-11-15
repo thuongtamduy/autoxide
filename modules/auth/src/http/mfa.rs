@@ -124,9 +124,9 @@ async fn mfa_status(
     request_body = StartTotpRequest,
     responses(
         (status = 200, description = "Add this secret to the authenticator app, then confirm.", body = Data<TotpSetupResponse>),
-        (status = 400, description = "The current password is wrong; code `auth.wrong_password`.", body = Problem),
+        (status = 400, description = "The current password is wrong; code `auth.wrong_password`. A user who forgot it resets it with `POST /api/v1/auth/password-reset`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "The request used an API key; code `auth.session_required`.", body = Problem),
+        (status = 403, description = "The request used an API key; code `auth.session_required`. Sign in with `POST /api/v1/auth/login` and use that access token.", body = Problem),
         (status = 409, description = "Two-step sign-in is already on; code `auth.mfa_already_enabled`.", body = Problem),
     )
 )]
@@ -154,8 +154,8 @@ async fn start_totp(
     responses(
         (status = 200, description = "Two-step sign-in is on; store the recovery codes now.", body = Data<RecoveryCodesResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "The request used an API key; code `auth.session_required`.", body = Problem),
-        (status = 409, description = "No setup was started (`auth.mfa_setup_not_started`), or it is already on (`auth.mfa_already_enabled`).", body = Problem),
+        (status = 403, description = "The request used an API key; code `auth.session_required`. Sign in with `POST /api/v1/auth/login` and use that access token.", body = Problem),
+        (status = 409, description = "No setup was started (`auth.mfa_setup_not_started`; start one with `POST /api/v1/auth/me/mfa/totp`), or it is already on (`auth.mfa_already_enabled`).", body = Problem),
         (status = 422, description = "The code is wrong or expired; `errors` names the field `code`.", body = Problem),
     )
 )]
@@ -183,7 +183,7 @@ async fn confirm_totp(
     responses(
         (status = 200, description = "The new codes; store them now.", body = Data<RecoveryCodesResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "The request used an API key; code `auth.session_required`.", body = Problem),
+        (status = 403, description = "The request used an API key; code `auth.session_required`. Sign in with `POST /api/v1/auth/login` and use that access token.", body = Problem),
         (status = 409, description = "Two-step sign-in is not on; code `auth.mfa_not_enabled`.", body = Problem),
         (status = 422, description = "The code is wrong or expired; `errors` names the field `code`.", body = Problem),
     )
@@ -213,7 +213,7 @@ async fn regenerate_recovery_codes(
     responses(
         (status = 200, description = "Two-step sign-in is off.", body = Data<MfaStatusResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "The request used an API key; code `auth.session_required`.", body = Problem),
+        (status = 403, description = "The request used an API key; code `auth.session_required`. Sign in with `POST /api/v1/auth/login` and use that access token.", body = Problem),
         (status = 409, description = "Two-step sign-in is not on; code `auth.mfa_not_enabled`.", body = Problem),
         (status = 422, description = "The code is wrong or expired; `errors` names the field `code`.", body = Problem),
     )

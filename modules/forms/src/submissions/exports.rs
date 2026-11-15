@@ -434,8 +434,7 @@ pub(crate) fn export_not_found() -> Error {
 fn in_progress(id: Uuid) -> Error {
     Error::conflict(
         "forms.export_in_progress",
-        "This form already has an export that is not finished: `{export_id}`. Wait for it \
-         (`GET /api/v1/forms/exports/{export_id}`) before asking for another.",
+        "This form already has an export that is not finished: `{export_id}`. Wait for it before asking for another.",
     )
     .with_param("export_id", id)
 }

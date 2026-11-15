@@ -6678,3 +6678,31 @@ Quyết định (giữ D-173, bỏ phần thêm của đặc tả 33):
 4. Thay đổi ở `kernel` gom một lượt, để cả workspace chỉ dựng lại một lần.
 
 Luật "gate đầy đủ xanh mới merge" không đổi.
+
+## D-264 · Đề bài giao diện, nhóm A: câu lỗi cho người dùng, `reason` của token, mô tả theo ngôn ngữ, `/me/permissions`, menu giữ id mục — 2026-11-15 — agent quyết
+
+Đề bài `docs/prompts/web-api-requests.md` mục A (sau A1 ở D-262). Mọi thay đổi chỉ thêm (D-059): không đổi `code`.
+
+1. **Câu `detail` viết cho người dùng** (A2): các lỗi đang nhắc tên endpoint (`auth.wrong_password`,
+   `auth.password_already_set`, các lỗi token của `auth`, `comments.profile_required`, `media.item_in_trash`…) giờ
+   nói người dùng làm gì; endpoint cần gọi chuyển vào mô tả response của OpenAPI (máy và agent đọc ở đó). Đổi câu
+   không phá hợp đồng: `code` mới là hợp đồng (CLAUDE.md "Luật code").
+2. **`reason` của Problem** (A3): trường mở rộng tuỳ chọn (RFC 9457 cho phép), `Error::with_reason`. Token dùng một
+   lần bị từ chối thì `OneTimeTokens::rejection` đọc lại dòng token: `used` (đã dùng hay bị thu hồi), `expired`,
+   `unknown` (không có, hay đã bị dọn sau khi hết hạn). Chỉ người giữ token mới hỏi được về token đó, nên không lộ gì
+   về token của người khác. Áp cho ba mã của `auth` mà trang `/verify-email`, `/reset-password` cần; mã token ở
+   module khác thêm khi giao diện cần.
+3. **Mô tả permission và event theo `Accept-Language`** (A4): cùng cách D-262 — câu tiếng Anh là khoá, tiền tố
+   `text:`; `Translations::describe`. Áp ở `GET /auth/permissions`, `GET /kernel/modules`, `GET /webhooks/events` và
+   `/me/permissions`. `cargo xtask check` đòi bản dịch cho mọi `Permission::new`, `EventInfo::new` và event khai bằng
+   macro `events!`. Tool MCP giữ tiếng Anh (agent đọc, kết quả tool không theo ngôn ngữ).
+4. **`risk` trong `GET /auth/permissions` và `GET /api/v1/me/permissions`** (A5): endpoint mới của kernel, mọi người
+   đã đăng nhập gọi được (`x-permissions: []`), chỉ trả permission người gọi đang có — đúng tập một API key của họ được
+   phép có; không mở sổ permission của cả hệ thống cho người không có `auth.roles.read`.
+5. **`menus`** (A6): `Created::tagged(version)` cho `POST` trả `ETag` như `GET`/`PUT`. `PUT` nhận `id` tuỳ chọn của
+   từng mục: mục có `id` đang thuộc chính menu đó giữ id; `id` lạ hay trùng là lỗi đúng ô (không âm thầm cấp id mới
+   — agent gửi nhầm id sẽ biết); `POST` không nhận `id`. Danh sách có `item_count` (một câu đếm cho cả trang) và
+   `updated_by` (cột mới, `NULL` với menu cũ).
+
+Xếp vào lộ trình: các mục của đề bài này là việc sửa API của module đã có, làm ngay giữa bước 33 theo lệnh chủ dự án
+(15/11/2026); không thêm bước mới. Phần thuộc bước sau (mục E của đề bài) làm cùng bước đó.

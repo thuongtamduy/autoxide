@@ -44,11 +44,13 @@ pub fn check_translations(workspace: &Workspace) -> Result<Vec<Violation>, Strin
             for (line, code) in error_codes(&text) {
                 codes.entry(code).or_insert_with(|| format!("{}/{file}:{line}", package.dir));
             }
-            for (line, site) in field_messages(&text) {
+            let fields = field_messages(&text).into_iter().map(|site| (FIELD_PREFIX, site));
+            let texts = descriptions(&text).into_iter().map(|site| (TEXT_PREFIX, site));
+            for (prefix, (line, site)) in fields.chain(texts) {
                 let location = format!("{}/{file}:{line}", package.dir);
                 match site {
                     FieldMessage::Template(template) => {
-                        codes.entry(format!("{FIELD_PREFIX}{template}")).or_insert(location);
+                        codes.entry(format!("{prefix}{template}")).or_insert(location);
                     }
                     FieldMessage::Built(expression) => violations.push(Violation {
                         rule: "i18n-field",
@@ -93,14 +95,15 @@ pub fn check_package(
     let file = format!("{}/locales/vi.json", package.dir);
     let module = package.dir.strip_prefix("modules/");
     for (code, location) in codes {
-        if let Some(template) = code.strip_prefix(FIELD_PREFIX) {
+        let shared = code.strip_prefix(FIELD_PREFIX).or_else(|| code.strip_prefix(TEXT_PREFIX));
+        if let Some(template) = shared {
             let translated = translations.as_ref().is_some_and(|map| map.contains_key(code));
             if !translated {
                 violations.push(Violation {
                     rule: "i18n-field",
                     location: location.clone(),
                     message: format!(
-                        "field error message `{template}` has no Vietnamese translation; add \
+                        "text `{template}` has no Vietnamese translation; add \
                          `\"{code}\": \"…\"` to {file}"
                     ),
                 });
@@ -145,6 +148,9 @@ pub fn check_package(
 /// Tiền tố khoá bản dịch của câu lỗi từng ô (như `autoxide_kernel::i18n::FIELD_PREFIX`).
 const FIELD_PREFIX: &str = "field:";
 
+/// Tiền tố khoá bản dịch của mô tả permission / event (như `autoxide_kernel::i18n::TEXT_PREFIX`).
+const TEXT_PREFIX: &str = "text:";
+
 /// Câu của một `FieldError::new(…)`: chuỗi mẫu (đã bỏ escape), hay biểu thức dựng lúc chạy.
 #[derive(Debug, PartialEq, Eq)]
 pub enum FieldMessage {
@@ -154,15 +160,67 @@ pub enum FieldMessage {
 
 /// Câu của mọi `FieldError::new(ô, mã, câu)` trong `text` kèm số dòng, bỏ chú thích và test.
 pub fn field_messages(text: &str) -> Vec<(usize, FieldMessage)> {
+    call_arguments(text, "FieldError::new(", 2)
+}
+
+/// Mô tả của mọi `Permission::new(tên, mô tả)` và `EventInfo::new(tên, mô tả)` (D-264).
+/// Event khai bằng macro `events! { … "tên", "mô tả" … }` của module: lấy cặp chuỗi (tên event,
+/// mô tả) trong khối gọi macro; tham số `$mô_tả` của định nghĩa macro thì bỏ qua.
+pub fn descriptions(text: &str) -> Vec<(usize, FieldMessage)> {
+    let mut found = call_arguments(text, "Permission::new(", 1);
+    found.extend(call_arguments(text, "EventInfo::new(", 1));
+    found.retain(
+        |(_, site)| !matches!(site, FieldMessage::Built(expression) if expression.starts_with('$')),
+    );
+    let source = without_tests_and_comments(text);
+    if let Some(start) = source.find("\nevents! {") {
+        let block = &source[start..];
+        let mut literals = Vec::new();
+        let mut rest = block;
+        let mut offset = start;
+        while let Some(open) = rest.find('"') {
+            let after = &rest[open..];
+            let mut end = 1;
+            let bytes = after.as_bytes();
+            while end < bytes.len() && bytes[end] != b'"' {
+                end += if bytes[end] == b'\\' { 2 } else { 1 };
+            }
+            let literal = &after[..=end.min(bytes.len() - 1)];
+            literals.push((
+                offset + open,
+                literal.to_owned(),
+                after[end + 1..].trim_start().to_owned(),
+            ));
+            offset += open + end + 1;
+            rest = &after[end + 1..];
+        }
+        for pair in literals.windows(2) {
+            let (_, name, after) = &pair[0];
+            let (position, description, _) = &pair[1];
+            let is_name =
+                string_literal(name).is_some_and(|name| is_code(&name) && name.contains('.'));
+            if is_name
+                && after.starts_with(',')
+                && let Some(description) = string_literal(description)
+            {
+                let line = source[..*position].matches('\n').count() + 1;
+                found.push((line, FieldMessage::Template(description)));
+            }
+        }
+    }
+    found
+}
+
+/// Tham số thứ `position` (từ 0) của mọi lời gọi `needle…)` trong `text`.
+fn call_arguments(text: &str, needle: &str, position: usize) -> Vec<(usize, FieldMessage)> {
     let source = without_tests_and_comments(text);
     let mut found = Vec::new();
-    let needle = "FieldError::new(";
     let mut index = 0;
     while let Some(offset) = source[index..].find(needle) {
         let start = index + offset + needle.len();
         index = start;
         let arguments = split_arguments(&source[start..]);
-        let Some(message) = arguments.get(2) else { continue };
+        let Some(message) = arguments.get(position) else { continue };
         let line = source[..start].matches('\n').count() + 1;
         let message = message.trim();
         let site = match string_literal(message) {

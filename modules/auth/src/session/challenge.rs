@@ -103,7 +103,6 @@ pub(crate) async fn drop_for_user<C: ConnectionTrait>(
 pub(crate) fn invalid_mfa_token() -> Error {
     Error::unauthenticated(
         "auth.invalid_mfa_token",
-        "This sign-in attempt is unknown, expired or used up. Sign in again with your email \
-         and password (`POST /api/v1/auth/login`).",
+        "This sign-in attempt is unknown, expired or used up. Sign in again with your email and password.",
     )
 }

@@ -61,7 +61,7 @@ pub(crate) struct PersonalDataResponse {
     responses(
         (status = 200, description = "Your data, by module.", body = Data<PersonalDataResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "The request used an API key; code `auth.session_required`.", body = Problem),
+        (status = 403, description = "The request used an API key; code `auth.session_required`. Sign in with `POST /api/v1/auth/login` and use that access token.", body = Problem),
     )
 )]
 async fn export_personal_data(
@@ -96,9 +96,9 @@ async fn export_personal_data(
     request_body = DeleteAccountRequest,
     responses(
         (status = 204, description = "The account was deleted."),
-        (status = 400, description = "The current password is wrong; code `auth.wrong_password`.", body = Problem),
+        (status = 400, description = "The current password is wrong; code `auth.wrong_password`. A user who forgot it resets it with `POST /api/v1/auth/password-reset`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "The request used an API key; code `auth.session_required`.", body = Problem),
+        (status = 403, description = "The request used an API key; code `auth.session_required`. Sign in with `POST /api/v1/auth/login` and use that access token.", body = Problem),
         (status = 409, description = "You are the last active administrator; give the `admin` role to someone else first. Code `auth.last_admin`.", body = Problem),
         (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
         (status = 429, description = "Too many wrong passwords for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.", body = Problem),

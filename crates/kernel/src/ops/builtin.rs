@@ -44,6 +44,8 @@ pub(crate) struct KernelModule {
     seeds: crate::tenancy::admin::Seeds,
     /// Service quản lý khách; có sau `start`.
     admin: Option<Arc<crate::tenancy::TenantAdmin>>,
+    /// Bản dịch của mọi module (dịch mô tả permission, event trong sổ module); có sau `start`.
+    translations: crate::i18n::Translations,
 }
 
 impl KernelModule {
@@ -65,12 +67,17 @@ impl KernelModule {
             database: None,
             max_flags: 500,
             flags,
+            translations: crate::i18n::Translations::default(),
         }
     }
 
     fn catalog_state(&self) -> Option<CatalogState> {
         let database = self.database.clone()?;
-        Some(CatalogState { catalog: self.catalog.clone(), database })
+        Some(CatalogState {
+            catalog: self.catalog.clone(),
+            database,
+            translations: self.translations.clone(),
+        })
     }
 }
 
@@ -168,6 +175,7 @@ impl Module for KernelModule {
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         self.database = Some(context.database().clone());
+        self.translations = context.translations().clone();
         let flags = Arc::new(UserFlags::new(self.max_flags));
         context.personal_data(flags.clone())?;
         self.flags.fill(flags);

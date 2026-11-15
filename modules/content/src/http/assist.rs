@@ -272,7 +272,7 @@ impl IntoResponse for Accepted {
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry (or its translation) is not yours and you only have `content.write_own` (code `content.not_owner`).", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
-        (status = 409, description = "A translation into this language is already queued or running (code `content.translation_in_progress`), or the parent page has no translation yet (code `content.parent_not_translated`).", body = Problem),
+        (status = 409, description = "A translation into this language is already queued or running (code `content.translation_in_progress`; follow it with `GET /api/v1/content/entries/{id}/translation-requests`), or the parent page has no translation yet (code `content.parent_not_translated`).", body = Problem),
         (status = 422, description = "The language is not supported or is the entry's own; see `errors`.", body = Problem),
         (status = 503, description = "AI is off on this server; code `ai.disabled`.", body = Problem),
     )

@@ -83,6 +83,7 @@ fn convert(old: &LegacyMenuItem) -> ItemInput {
         LegacyTarget::Url(url) => (Some(url.clone()), None),
     };
     ItemInput {
+        id: None,
         label: Some(old.label.clone()),
         url,
         target,

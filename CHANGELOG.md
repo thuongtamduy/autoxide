@@ -11,6 +11,14 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `GET /api/v1/me/permissions`: the caller's own permissions with description and risk, for anyone signed in
+  (e.g. to pick the permissions of a new API key without `auth.roles.read`).
+- `GET /api/v1/auth/permissions` gives the `risk` of each permission. Permission descriptions (there, in
+  `GET /api/v1/kernel/modules`) and event descriptions (`GET /api/v1/webhooks/events`) follow `Accept-Language`.
+- Problem responses may carry `reason`: a refused link token (`auth.invalid_verification_token`,
+  `auth.invalid_reset_token`, `auth.invalid_email_change_report_token`) says `expired`, `used` or `unknown`.
+- `menus`: `POST /api/v1/menus` answers with an `ETag`; an item sent to `PUT /api/v1/menus/{id}` with the `id` it had
+  keeps that id; the menu list gives `item_count` and `updated_by`.
 - The text of each field problem (`errors[].detail` of a `422` Problem, and `errors` of an MCP tool error) follows
   `Accept-Language` like `detail` already did. For module authors: `FieldError::new` takes an English template with
   `{name}` placeholders filled by `.with_param(name, value)`; its translation is keyed by the template
@@ -91,6 +99,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Changed
 
+- The `detail` of some errors no longer names an endpoint: it says what the user can do (`auth.wrong_password`,
+  `auth.password_already_set`, the token errors of `auth`, `media.item_in_trash`…). Which endpoint to call is in the
+  description of the response in `docs/openapi.json`. Codes are unchanged.
 - For module authors: `Authenticator::authenticate` takes a second argument, the `TenantHint` of the request
   (domain and `Autoxide-Tenant` header). `Principal` carries a tenant (`tenant_id`, `in_tenant`, `operator_from`).
   Handlers may take `tenant: TenantContext` (`autoxide_kernel::tenancy`), and the module start context gives the

@@ -84,6 +84,10 @@ fn parse_quality(raw: &str) -> u16 {
 /// Tiền tố khoá bản dịch của câu mẫu lỗi từng ô (D-262): `field:must not be empty`.
 pub const FIELD_PREFIX: &str = "field:";
 
+/// Tiền tố khoá bản dịch của câu mô tả cho người dùng (mô tả permission, event — D-264):
+/// `text:<câu tiếng Anh>`.
+pub const TEXT_PREFIX: &str = "text:";
+
 /// Mọi bản dịch của chương trình: kernel và các module.
 #[derive(Debug, Clone, Default)]
 pub struct Translations {
@@ -123,7 +127,7 @@ impl Translations {
                 for (code, text) in entries {
                     // Câu mẫu của lỗi từng ô (`field:<câu tiếng Anh>`, D-262) là của chung: hai module
                     // cùng câu thì phải cùng bản dịch.
-                    if code.starts_with(FIELD_PREFIX) {
+                    if code.starts_with(FIELD_PREFIX) || code.starts_with(TEXT_PREFIX) {
                         if let Some(known) = vi.get(&code)
                             && known != &text
                         {
@@ -161,6 +165,19 @@ impl Translations {
         };
         let params: Vec<(&str, &str)> = error.params().collect();
         fill_all(template, &params).unwrap_or_else(|| error.message())
+    }
+
+    /// Câu mô tả `english` (mô tả permission, event…) bằng `language`: bản dịch của khoá
+    /// `text:<english>`; chưa có thì nguyên câu tiếng Anh.
+    pub fn describe(&self, english: &str, language: Language) -> String {
+        match language {
+            Language::En => english.to_owned(),
+            Language::Vi => self
+                .vi
+                .get(&format!("{TEXT_PREFIX}{english}"))
+                .cloned()
+                .unwrap_or_else(|| english.to_owned()),
+        }
     }
 
     /// Câu của lỗi từng ô `field` bằng `language`: bản dịch của câu mẫu (khoá `field:<câu mẫu>`),

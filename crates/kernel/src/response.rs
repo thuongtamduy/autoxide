@@ -47,18 +47,28 @@ impl<T: Serialize> IntoResponse for Data<T> {
 pub struct Created<T> {
     pub path: String,
     pub data: T,
+    /// Phiên bản của bản ghi vừa tạo: có thì response mang `ETag` như `GET` (client sửa tiếp
+    /// với `If-Match` mà không phải đọc lại).
+    pub version: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl<T> Created<T> {
     pub fn new(path: impl Into<String>, data: T) -> Self {
-        Created { path: path.into(), data }
+        Created { path: path.into(), data, version: None }
+    }
+
+    /// Kèm `ETag` của phiên bản `version` (cột `updated_at` của bản ghi).
+    #[must_use]
+    pub fn tagged(mut self, version: chrono::DateTime<chrono::Utc>) -> Self {
+        self.version = Some(version);
+        self
     }
 }
 
 impl<T: Serialize> IntoResponse for Created<T> {
     fn into_response(self) -> Response {
         let location = format!("{}{}", crate::http::API_PREFIX, self.path);
-        match axum::http::HeaderValue::from_str(&location) {
+        let mut response = match axum::http::HeaderValue::from_str(&location) {
             Ok(location) => (
                 axum::http::StatusCode::CREATED,
                 [(axum::http::header::LOCATION, location)],
@@ -69,7 +79,13 @@ impl<T: Serialize> IntoResponse for Created<T> {
             Err(_) => {
                 (axum::http::StatusCode::CREATED, Json(Data { data: self.data })).into_response()
             }
+        };
+        if let Some(version) = self.version
+            && let Ok(value) = axum::http::HeaderValue::from_str(&crate::version::etag(version))
+        {
+            response.headers_mut().insert(axum::http::header::ETAG, value);
         }
+        response
     }
 }
 
@@ -96,6 +112,11 @@ pub struct Problem {
     /// One entry per invalid input field. Present only for validation problems.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<ProblemField>,
+    /// Finer, stable reason for some codes, documented with the code — e.g. for a refused link
+    /// token: `expired`, `used` or `unknown`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = "expired")]
+    pub reason: Option<String>,
 }
 
 /// One invalid field of the request.
@@ -134,6 +155,7 @@ impl From<&Error> for Problem {
                     detail: field.message.clone(),
                 })
                 .collect(),
+            reason: error.reason().map(str::to_owned),
         }
     }
 }

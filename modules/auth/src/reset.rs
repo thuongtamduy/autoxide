@@ -193,9 +193,12 @@ impl PasswordResets {
                 token,
             )
             .await?;
-        let user_id = consumed
-            .and_then(|consumed| consumed.subject.parse::<Uuid>().ok())
-            .ok_or_else(invalid_token)?;
+        let Some(user_id) = consumed.and_then(|consumed| consumed.subject.parse::<Uuid>().ok())
+        else {
+            let tenant = TenantContext::legacy_default(&self.database);
+            let why = tokens().rejection(self.database.read(), &tenant, PURPOSE, token).await?;
+            return Err(invalid_token().with_reason(why.as_str()));
+        };
         let actor = Actor::user(user_id);
         // Một transaction: mật khẩu mới, thu hồi phiên, passkey, API key, token đặt lại và
         // đổi email khác (D-156).
@@ -206,8 +209,7 @@ impl PasswordResets {
 fn invalid_token() -> Error {
     Error::bad_request(
         "auth.invalid_reset_token",
-        "The password-reset token is unknown, expired or already used. Ask for a new reset mail \
-         (`POST /api/v1/auth/password-reset`).",
+        "This password-reset link is unknown, expired or already used. Ask for a new one.",
     )
 }
 
@@ -337,6 +339,7 @@ mod tests {
             let again = services.resets.confirm(&token, NEW.to_owned()).await.unwrap_err();
             assert_eq!(again.kind(), ErrorKind::BadRequest);
             assert_eq!(again.code(), "auth.invalid_reset_token");
+            assert_eq!(again.reason(), Some("used"));
             assert!(services.sessions.login("ada@example.com", OLD, None).await.is_err());
             let login = services.sessions.login("ada@example.com", NEW, None).await.unwrap();
             assert!(matches!(login, LoginOutcome::Tokens(_)));
@@ -370,6 +373,7 @@ mod tests {
             time_passes(&services, 31).await;
             let expired = services.resets.confirm(&expiring, NEW.to_owned()).await.unwrap_err();
             assert_eq!(expired.code(), "auth.invalid_reset_token");
+            assert_eq!(expired.reason(), Some("expired"));
         })
         .await
         .unwrap();

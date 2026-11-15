@@ -55,11 +55,31 @@ pub(crate) struct RoleService {
     database: Database,
     catalog: PermissionCatalog,
     outbox: Outbox,
+    /// Bản dịch mô tả permission (D-264); mặc định rỗng (tiếng Anh).
+    translations: autoxide_kernel::i18n::Translations,
 }
 
 impl RoleService {
     pub(crate) fn new(database: Database, catalog: PermissionCatalog, outbox: Outbox) -> Self {
-        RoleService { database, catalog, outbox }
+        RoleService { database, catalog, outbox, translations: Default::default() }
+    }
+
+    /// Dịch mô tả permission bằng `translations`.
+    pub(crate) fn with_translations(
+        mut self,
+        translations: autoxide_kernel::i18n::Translations,
+    ) -> Self {
+        self.translations = translations;
+        self
+    }
+
+    /// Mô tả permission `english` bằng `language`.
+    pub(crate) fn describe(
+        &self,
+        english: &str,
+        language: autoxide_kernel::i18n::Language,
+    ) -> String {
+        self.translations.describe(english, language)
     }
 
     /// Mọi permission của chương trình.
@@ -397,7 +417,7 @@ impl RoleService {
                 problems.push(FieldError::new(
                     format!("permissions[{index}]"),
                     "unknown",
-                    "is not a permission of this system; see `GET /api/v1/auth/permissions`",
+                    "is not a permission of this system",
                 ));
             }
         }

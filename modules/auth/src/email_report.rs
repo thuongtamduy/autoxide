@@ -169,8 +169,10 @@ impl EmailVerifications {
         let found = consumed
             .and_then(|consumed| Some((consumed.subject.parse::<Uuid>().ok()?, consumed.data?)));
         let Some((user_id, old_email)) = found else {
+            let tenant = TenantContext::legacy_default(&self.database);
+            let why = tokens().rejection(&transaction, &tenant, PURPOSE, token).await?;
             transaction.rollback().await?;
-            return Err(invalid_report_token());
+            return Err(invalid_report_token().with_reason(why.as_str()));
         };
         // Khoá dòng người dùng: hai lần báo cùng lúc (hay báo trong lúc đổi email) xét lần lượt.
         let Some(row) = rows::lock_one(&transaction, user_row::Entity::find_by_id(user_id)).await?
@@ -249,7 +251,7 @@ pub(crate) fn mask(email: &str) -> String {
 pub(crate) fn invalid_report_token() -> Error {
     Error::bad_request(
         "auth.invalid_email_change_report_token",
-        "The report token is unknown, expired or already used.",
+        "This link is unknown, expired or already used.",
     )
 }
 

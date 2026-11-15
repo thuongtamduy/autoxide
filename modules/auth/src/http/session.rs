@@ -240,7 +240,7 @@ async fn login_mfa(
     request_body = RefreshRequest,
     responses(
         (status = 200, description = "A new pair of tokens.", body = Data<TokenResponse>),
-        (status = 401, description = "The refresh token is unknown, expired or revoked (code `auth.invalid_refresh_token`), or was already used (code `auth.refresh_token_reused`); sign in again.", body = Problem),
+        (status = 401, description = "The refresh token is unknown, expired or revoked (code `auth.invalid_refresh_token`), or was already used (code `auth.refresh_token_reused`); sign in again with `POST /api/v1/auth/login`.", body = Problem),
         (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
         (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
     )
@@ -285,7 +285,7 @@ async fn logout(
     security(("bearer" = [])),
     responses(
         (status = 200, description = "The user the access token belongs to, with the permissions of their roles.", body = Data<MeResponse>),
-        (status = 401, description = "The access token is missing (code `auth.missing_token`), invalid (`auth.invalid_token`) or expired (`auth.token_expired`).", body = Problem),
+        (status = 401, description = "The access token is missing (code `auth.missing_token`), invalid (`auth.invalid_token`) or expired (`auth.token_expired`; get a new one with `POST /api/v1/auth/refresh`). Without a usable refresh token, sign in with `POST /api/v1/auth/login`.", body = Problem),
         (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
     )
 )]
@@ -313,7 +313,7 @@ async fn me(
     request_body = ChangePasswordRequest,
     responses(
         (status = 200, description = "Changed; use these tokens from now on.", body = Data<TokenResponse>),
-        (status = 400, description = "The current password is wrong; code `auth.wrong_password`.", body = Problem),
+        (status = 400, description = "The current password is wrong; code `auth.wrong_password`. A user who forgot it resets it with `POST /api/v1/auth/password-reset`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Called with an API key (code `auth.session_required`), or the account is disabled (code `auth.user_disabled`).", body = Problem),
         (status = 422, description = "The body is missing a field, or the new password breaks the rules (see `errors`).", body = Problem),

@@ -99,6 +99,8 @@ pub(crate) struct WebhookService {
     catalog: EventCatalog,
     allow_http: bool,
     allow_private_networks: bool,
+    /// Bản dịch mô tả event (D-264); mặc định rỗng (tiếng Anh).
+    translations: autoxide_kernel::i18n::Translations,
 }
 
 impl WebhookService {
@@ -109,7 +111,32 @@ impl WebhookService {
         allow_http: bool,
         allow_private_networks: bool,
     ) -> Self {
-        WebhookService { database, outbox, catalog, allow_http, allow_private_networks }
+        WebhookService {
+            database,
+            outbox,
+            catalog,
+            allow_http,
+            allow_private_networks,
+            translations: Default::default(),
+        }
+    }
+
+    /// Dịch mô tả event bằng `translations`.
+    pub(crate) fn with_translations(
+        mut self,
+        translations: autoxide_kernel::i18n::Translations,
+    ) -> Self {
+        self.translations = translations;
+        self
+    }
+
+    /// Mô tả event `english` bằng `language`.
+    pub(crate) fn describe(
+        &self,
+        english: &str,
+        language: autoxide_kernel::i18n::Language,
+    ) -> String {
+        self.translations.describe(english, language)
     }
 
     /// Mọi loại event có thể đăng ký, theo tên.

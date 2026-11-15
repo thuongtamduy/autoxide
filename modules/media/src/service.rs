@@ -685,11 +685,8 @@ pub(crate) fn item_not_found(id: Uuid) -> Error {
 }
 
 pub(crate) fn in_trash(id: Uuid) -> Error {
-    Error::conflict(
-        "media.item_in_trash",
-        "Media item `{id}` is in the trash. Restore it first with `POST /api/v1/media/{id}/restore`.",
-    )
-    .with_param("id", id)
+    Error::conflict("media.item_in_trash", "Media item `{id}` is in the trash. Restore it first.")
+        .with_param("id", id)
 }
 
 fn not_in_trash(id: Uuid) -> Error {

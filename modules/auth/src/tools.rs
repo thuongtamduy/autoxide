@@ -275,7 +275,12 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
             "List every permission that roles can grant, with what each allows.",
             move |_tenant: TenantContext, _: Principal, _: NoInput| {
                 let state = catalog.clone();
-                async move { Ok::<_, Error>(PermissionResponse::catalog(&state.roles)) }
+                async move {
+                    Ok::<_, Error>(PermissionResponse::catalog(
+                        &state.roles,
+                        autoxide_kernel::i18n::Language::En,
+                    ))
+                }
             },
         )
         .requires(ROLES_READ)

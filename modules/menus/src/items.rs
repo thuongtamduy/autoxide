@@ -53,6 +53,8 @@ pub(crate) struct BadgeInput {
 /// Một mục như người gọi gửi (cây).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ItemInput {
+    /// Id của mục đã lưu, để giữ id qua lần lưu này; `None`: mục mới.
+    pub id: Option<Uuid>,
     pub label: Option<String>,
     pub url: Option<String>,
     pub target: Option<RefInput>,
@@ -69,6 +71,8 @@ pub(crate) struct ItemInput {
 pub(crate) struct Flat {
     pub row: item::Model,
     pub path: String,
+    /// Id do người gọi gửi (giữ id của mục đã lưu).
+    pub kept: bool,
 }
 
 /// Một mục kèm các mục con.
@@ -82,6 +86,16 @@ pub(crate) struct Node {
 pub(crate) fn flatten(items: &[ItemInput], problems: &mut Vec<FieldError>) -> Vec<Flat> {
     let mut flat = Vec::new();
     walk(items, None, 1, "items", &mut flat, problems);
+    let mut seen = std::collections::HashSet::new();
+    for entry in flat.iter().filter(|entry| entry.kept) {
+        if !seen.insert(entry.row.id) {
+            problems.push(FieldError::new(
+                format!("{}.id", entry.path),
+                "duplicate",
+                "is given to another item too",
+            ));
+        }
+    }
     if flat.len() > MAX_ITEMS {
         problems.push(
             FieldError::new("items", "length", "at most {max_items} items")
@@ -113,8 +127,11 @@ fn walk(
         }
         let mut row = check(input, depth, &here, problems);
         row.parent_id = parent;
+        if let Some(kept) = input.id {
+            row.id = kept;
+        }
         let id = row.id;
-        flat.push(Flat { row, path: here.clone() });
+        flat.push(Flat { row, path: here.clone(), kept: input.id.is_some() });
         walk(&input.children, Some(id), depth + 1, &format!("{here}.children"), flat, problems);
     }
 }

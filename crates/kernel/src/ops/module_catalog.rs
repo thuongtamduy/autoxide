@@ -30,6 +30,7 @@ use validator::Validate;
 use crate::access::{Permission, Principal};
 use crate::database::Database;
 use crate::error::Error;
+use crate::i18n::Language;
 use crate::mcp::{NoInput, Tool};
 use crate::migration::{Migrator, ModuleMigrations};
 use crate::module::Module;
@@ -333,6 +334,20 @@ pub(crate) struct ModuleMigration {
 pub(crate) struct CatalogState {
     pub(crate) catalog: ModuleCatalog,
     pub(crate) database: Database,
+    pub(crate) translations: crate::i18n::Translations,
+}
+
+impl ModuleInfo {
+    /// Mô tả permission và event theo `language` (D-264).
+    fn localized(mut self, translations: &crate::i18n::Translations, language: Language) -> Self {
+        for permission in &mut self.permissions {
+            permission.description = translations.describe(&permission.description, language);
+        }
+        for event in &mut self.events {
+            event.description = translations.describe(&event.description, language);
+        }
+        self
+    }
 }
 
 /// Route của sổ, gắn dưới `/api/v1/kernel`.
@@ -364,9 +379,12 @@ pub(crate) fn routes(state: CatalogState) -> OpenApiRouter {
 async fn list_modules(
     State(state): State<Arc<CatalogState>>,
     principal: Principal,
+    language: Language,
 ) -> Result<Data<Vec<ModuleInfo>>, Error> {
     principal.require(&MODULES_READ)?;
-    Ok(Data { data: state.catalog.list()? })
+    let modules = state.catalog.list()?;
+    let data = modules.into_iter().map(|info| info.localized(&state.translations, language));
+    Ok(Data { data: data.collect() })
 }
 
 /// Get one installed module.
@@ -391,9 +409,11 @@ async fn get_module(
     State(state): State<Arc<CatalogState>>,
     principal: Principal,
     Path(name): Path<String>,
+    language: Language,
 ) -> Result<Data<ModuleInfo>, Error> {
     principal.require(&MODULES_READ)?;
-    Ok(Data { data: state.catalog.get(&state.database, &name).await? })
+    let info = state.catalog.get(&state.database, &name).await?;
+    Ok(Data { data: info.localized(&state.translations, language) })
 }
 
 // Đầu vào của tool `get_module`.

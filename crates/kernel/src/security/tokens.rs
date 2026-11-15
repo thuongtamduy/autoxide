@@ -43,6 +43,25 @@ pub struct Consumed {
     pub data: Option<String>,
 }
 
+/// Vì sao một token bị từ chối.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenRejection {
+    Expired,
+    Used,
+    Unknown,
+}
+
+impl TokenRejection {
+    /// Giá trị `reason` của Problem: `expired`, `used`, `unknown`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TokenRejection::Expired => "expired",
+            TokenRejection::Used => "used",
+            TokenRejection::Unknown => "unknown",
+        }
+    }
+}
+
 /// Token phát gần đây cho một đối tượng (để bên gọi quyết định có phát thêm không).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -174,6 +193,36 @@ impl OneTimeTokens {
             subject: row.try_get::<String>("", "subject")?,
             data: row.try_get::<Option<String>>("", "data")?,
         }))
+    }
+
+    /// Vì sao `token` không dùng được cho `purpose` (sau khi [`consume`](Self::consume) trả
+    /// `None`): đã dùng, hết hạn hay không có. Người giữ token biết token của mình; không lộ gì
+    /// về token khác. Token quá hạn lâu đã bị dọn (`purge`) thì là `Unknown`.
+    pub async fn rejection<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        tenant: &TenantContext,
+        purpose: &str,
+        token: &str,
+    ) -> Result<TokenRejection, Error> {
+        let select = Query::select()
+            .columns([Alias::new("used_at"), Alias::new("expires_at")])
+            .from(Alias::new(&self.table))
+            .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
+            .and_where(Expr::col(Alias::new("token_hash")).eq(sha256(token).as_str()))
+            .and_where(Expr::col(Alias::new("purpose")).eq(purpose))
+            .to_owned();
+        let Some(row) = connection.query_one(&select).await? else {
+            return Ok(TokenRejection::Unknown);
+        };
+        if row.try_get::<Option<DateTime<Utc>>>("", "used_at")?.is_some() {
+            return Ok(TokenRejection::Used);
+        }
+        if row.try_get::<DateTime<Utc>>("", "expires_at")? <= now() {
+            return Ok(TokenRejection::Expired);
+        }
+        // Còn hạn, chưa dùng: vừa có bên khác dùng xong giữa hai câu, hay sai mục đích.
+        Ok(TokenRejection::Used)
     }
 
     /// Mọi token chưa dùng của `subject` cho `purpose` hết hiệu lực (vd sau khi đặt lại mật

@@ -291,7 +291,7 @@ pub(crate) struct CreateCommentRequest {
         (status = 400, description = "The form token or challenge is missing, invalid or expired (codes `antispam.token_missing`, `antispam.token_invalid`, `antispam.token_expired`, `antispam.challenge_required`, `antispam.challenge_failed`): reload the form.", body = Problem),
         (status = 403, description = "Comments are off (`comments.disabled`), guests may not comment here (`comments.guests_not_allowed`), the author is banned (`comments.banned`), or a signed-in caller lacks `comments.post` (`permission_denied`).", body = Problem),
         (status = 404, description = "The target takes no comments (`comments.target_not_found`), or the comment to reply to is not shown (`comments.parent_not_found`).", body = Problem),
-        (status = 409, description = "The target is closed (`comments.target_closed`), or a signed-in user has no display name yet (`comments.profile_required`).", body = Problem),
+        (status = 409, description = "The target is closed (`comments.target_closed`), or a signed-in user has no display name yet (`comments.profile_required`; set one with `PUT /api/v1/comments/profile`).", body = Problem),
         (status = 413, description = "The body is too large; code `payload_too_large`.", body = Problem),
         (status = 422, description = "Invalid input (see `errors`), or a banned word (`comments.banned_word`).", body = Problem),
         (status = 429, description = "A signed-in user posted too many; code `antispam.rate_limited`.", body = Problem),

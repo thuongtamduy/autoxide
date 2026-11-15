@@ -164,7 +164,7 @@ impl From<Delivery> for DeliveryResponse {
 
 /// List the kinds of events endpoints can receive.
 ///
-/// Requires `webhooks.manage`. Sorted by name.
+/// Requires `webhooks.manage`. Sorted by name; descriptions follow `Accept-Language`.
 #[utoipa::path(
     get,
     path = "/events",
@@ -180,6 +180,7 @@ impl From<Delivery> for DeliveryResponse {
 async fn list_event_types(
     State(service): State<Arc<WebhookService>>,
     principal: Principal,
+    language: autoxide_kernel::i18n::Language,
 ) -> Result<Data<Vec<EventTypeResponse>>, Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
     let data = service
@@ -187,7 +188,7 @@ async fn list_event_types(
         .iter()
         .map(|event| EventTypeResponse {
             name: event.name().to_owned(),
-            description: event.description().to_owned(),
+            description: service.describe(event.description(), language),
         })
         .collect();
     Ok(Data { data })

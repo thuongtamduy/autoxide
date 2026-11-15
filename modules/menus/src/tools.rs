@@ -105,7 +105,7 @@ pub(crate) fn all(service: &Arc<MenuService>) -> Vec<Tool> {
                 let service = list.clone();
                 async move {
                     let page = service.list(&principal, &input.page()?).await?;
-                    Ok::<Page<SiteMenuSummary>, Error>(page.map(SiteMenuSummary::from))
+                    Ok::<Page<SiteMenuSummary>, Error>(page.map(|(menu, items)| SiteMenuSummary::new(menu, items)))
                 }
             },
         )

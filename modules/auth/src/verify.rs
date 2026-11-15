@@ -132,8 +132,10 @@ impl EmailVerifications {
         let found = consumed
             .and_then(|consumed| Some((consumed.subject.parse::<Uuid>().ok()?, consumed.data?)));
         let Some((user_id, email)) = found else {
+            let tenant = TenantContext::legacy_default(&self.database);
+            let why = tokens().rejection(&transaction, &tenant, PURPOSE, token).await?;
             transaction.rollback().await?;
-            return Err(invalid_token());
+            return Err(invalid_token().with_reason(why.as_str()));
         };
         let old = self.users.apply_verified_email(&transaction, user_id, &email, now).await?;
         // Token khác của người này (mail cũ hơn, hay cho địa chỉ khác) hết dùng được.
@@ -254,8 +256,7 @@ impl EmailVerifications {
 fn invalid_token() -> Error {
     Error::bad_request(
         "auth.invalid_verification_token",
-        "The email-verification token is unknown, expired or already used. Ask for a new \
-         verification mail (`POST /api/v1/auth/me/email/verification`).",
+        "This verification link is unknown, expired or already used. Ask for a new verification mail.",
     )
 }
 
@@ -340,10 +341,13 @@ mod tests {
             assert!(verified.email_verified_at.is_some());
             let again = verifications.confirm(&token, Language::En).await.unwrap_err();
             assert_eq!(again.code(), "auth.invalid_verification_token");
+            // Giao diện nói được "link đã dùng rồi" thay vì "link sai".
+            assert_eq!(again.reason(), Some("used"));
             let done = verifications.send_current(ada.id, Language::En).await.unwrap_err();
             assert_eq!(done.code(), "auth.email_already_verified");
             let unknown = verifications.confirm("nope", Language::En).await.unwrap_err();
             assert_eq!(unknown.code(), "auth.invalid_verification_token");
+            assert_eq!(unknown.reason(), Some("unknown"));
         })
         .await
         .unwrap();
@@ -360,6 +364,7 @@ mod tests {
 
             let expired = services.verifications.confirm(&token, Language::En).await.unwrap_err();
             assert_eq!(expired.code(), "auth.invalid_verification_token");
+            assert_eq!(expired.reason(), Some("expired"));
         })
         .await
         .unwrap();

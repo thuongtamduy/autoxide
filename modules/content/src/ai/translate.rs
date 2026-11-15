@@ -170,8 +170,7 @@ impl ContentService {
             Err(error) if is_unique_violation(&error) => {
                 return Err(Error::conflict(
                     "content.translation_in_progress",
-                    "A translation of this entry into `{locale}` is already queued or running. \
-                     Wait for it to finish (`GET /api/v1/content/entries/{id}/translation-requests`).",
+                    "A translation of this entry into `{locale}` is already queued or running. Wait for it to finish.",
                 )
                 .with_param("locale", &target_locale)
                 .with_param("id", source.id));

@@ -332,8 +332,7 @@ impl ContentService {
             if !self.config.public_semantic_search {
                 return Err(Error::not_found(
                     "content.semantic_search_disabled",
-                    "Search by meaning is not offered to the public on this server \
-                     (AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH). Use `GET /api/v1/content/public/posts?q=`.",
+                    "Search by meaning is not offered to the public on this server (AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH); search by words instead.",
                 ));
             }
         } else {

@@ -70,7 +70,7 @@ impl From<AltSuggestion> for AltSuggestionResponse {
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `media.write` (code `permission_denied`), or the image is private and may not be sent (code `media.ai_private_not_allowed`).", body = Problem),
         (status = 404, description = "No media item has this id; code `media.item_not_found`.", body = Problem),
-        (status = 409, description = "The item is in the trash; code `media.item_in_trash`.", body = Problem),
+        (status = 409, description = "The item is in the trash; code `media.item_in_trash`. Restore it with `POST /api/v1/media/{id}/restore`.", body = Problem),
         (status = 422, description = "A value is invalid (see `errors`), the item is not a readable JPEG, PNG, GIF or WebP image (code `media.ai_unsupported_image`), the model reads no images (code `ai.unsupported_input`), or it declined the image (code `ai.refused`).", body = Problem),
         (status = 429, description = "Today's AI token limit is used up; code `ai.quota_exceeded`, with `Retry-After`.", body = Problem),
         (status = 503, description = "AI is off (code `ai.disabled`), misconfigured (code `ai.misconfigured`), the provider is busy (code `ai.provider_unavailable`, maybe with `Retry-After`), or its answer had the wrong shape twice (code `ai.output_invalid`).", body = Problem),
