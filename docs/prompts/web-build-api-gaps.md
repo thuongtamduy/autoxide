@@ -247,12 +247,12 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/platform.t
 
 | | Màn | Cần | Bước |
 |---|---|---|---|
-| [ ] | Mọi màn | Biết người đăng nhập thuộc khách nền tảng (`GET /kernel/tenant`) để hiện mặt điều khiển; permission của nhân sự vận hành | 33, 34 | Đã nối `GET /kernel/tenant` để hiện mặt điều khiển (W-027 của web); permission của nhân sự nền tảng chờ bước 34 |
+| [ ] | Mọi màn | Biết người đăng nhập thuộc khách nền tảng (`GET /kernel/tenant`) để hiện mặt điều khiển; permission của nhân sự vận hành | 33, 34 — Đã nối `GET /kernel/tenant` để hiện mặt điều khiển (W-027 của web); permission của nhân sự nền tảng chờ bước 34 |
 | [ ] | Mọi màn | Sổ điều hướng của core có khái niệm không gian (khách / nền tảng) | 51 |
-| [x] | Khách hàng | `GET /kernel/tenants` (lọc `status`, `parent_id`), `GET /kernel/placements` | 33 | Đã nối (W-027 của web): màn Khách hàng và Đội database đọc API thật, ghép với dữ liệu mẫu cho trường core chưa có |
+| [x] | Khách hàng | `GET /kernel/tenants` (lọc `status`, `parent_id`), `GET /kernel/placements` | 33 — Đã nối (W-027 của web): màn Khách hàng và Đội database đọc API thật, ghép với dữ liệu mẫu cho trường core chưa có |
 | [ ] | Khách hàng | Trường của khách `business_model`, `primary_domain`; của placement `pending_migrations`, `location` | mới |
 | [ ] | Khách hàng | Số đếm tóm tắt và hạn mức gần chạm nhất của mọi khách trong một lần gọi | mới |
-| [ ] | Chi tiết khách | `PATCH /kernel/tenants/{id}` `{status}` kèm `reason` để ghi audit | 33 (`reason`: mới) | `PATCH {status}` đã nối (W-027 của web); `reason` để ghi audit vẫn thiếu |
+| [ ] | Chi tiết khách | `PATCH /kernel/tenants/{id}` `{status}` kèm `reason` để ghi audit | 33 (`reason`: mới) — `PATCH {status}` đã nối (W-027 của web); `reason` để ghi audit vẫn thiếu |
 | [ ] | Chi tiết khách | Dời khách chung ↔ riêng qua API: `POST /kernel/tenants/{id}/move` `{to, dry_run}` | mới (33 mới có CLI) |
 | [ ] | Chi tiết khách | Xuất toàn bộ dữ liệu khách: `POST/GET /kernel/tenants/{id}/exports` và link tải | mới (33 mới có CLI) |
 | [ ] | Chi tiết khách | Quyền dùng của một khách bất kỳ: `GET /plans/tenants/{id}/entitlements` | mới |
