@@ -118,3 +118,22 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Kết nối MCP | Core công bố địa chỉ công khai (`AUTOXIDE_HTTP_PUBLIC_URL`) | mới | Dùng `AUTOXIDE_API_URL` của giao diện |
 | [ ] | Nhà phát triển › Request | `GET /kernel/requests?status_class=&api_key_id=` | 52 | Dữ liệu mẫu (`src/sample/devtools.ts`) |
 | [ ] | Nhà phát triển › Event theo bản ghi | `GET /kernel/records/{kind}/{id}/events` | 52 | Dữ liệu mẫu (`src/sample/devtools.ts`) |
+
+## Tiếp thị › Biểu mẫu, Bản tin, Bình luận (`/marketing/...`)
+
+| | Màn | Cần | Bước | Giao diện đang làm gì |
+|---|---|---|---|---|
+| [ ] | Biểu mẫu | `FormResponse` kèm số bài nộp theo trạng thái (cột "Bài mới", số trên chip lọc) | mới (số đếm menu: 51) | Gọi `GET /forms/{id}/submissions?status=new&limit=100` cho từng form, hiện "100+" |
+| [ ] | Bài nộp | Xuất CSV lớn bằng job, trả link tải có hạn | 32 | Xuất ngay qua route của giao diện |
+| [ ] | Bài nộp | `AnswerResponse` kèm nhãn lựa chọn của đúng phiên bản form lúc gửi; kiểu `value` trong `openapi.json` đang là object | mới | Lấy nhãn từ form hiện tại; lựa chọn đã bỏ thì hiện giá trị thô |
+| [ ] | Bản tin | `GET /newsletter/settings`: nhãn quảng cáo, giới hạn thư / ngày, tốc độ gửi, đã đặt URL công khai / trang chọn danh sách / địa chỉ người gửi chưa | mới | Hiện mặc định `[QC]`, 3 thư / ngày; thiếu cấu hình thì hiện lỗi 503 của core khi gửi |
+| [ ] | Chiến dịch | Xem trước thư đúng như khi gửi (kèm chân thư): `GET /campaigns/{id}/preview` | mới | Xem trước HTML của người soạn; chân thư mô tả bằng chữ |
+| [ ] | Chiến dịch | Số huỷ đăng ký / bounce sau thư này | mới | Không hiện |
+| [ ] | Danh sách nhận tin | Tổng số đăng ký và số địa chỉ không gửi của cả khách | 51 (số liệu tóm tắt) | Cộng các danh sách ở trang đầu (≤ 50) |
+| [ ] | Người đăng ký | Lọc theo trạng thái người đăng ký (`blocked`); tham số `status` hiện lọc theo trạng thái đăng ký | mới | Không có chip "Bị chặn"; nhãn hiện trên dòng |
+| [ ] | Bình luận | `CommentDetail` kèm tiêu đề và link của đích (sổ đối tượng D-123) | mới | `content.entry`: đọc bài qua API `content`; loại khác hiện id |
+| [ ] | Bình luận › Theo bài | `GET /comments/targets`: danh sách đích có số đếm, lọc theo trạng thái | mới | Lấy đích từ 200 bình luận mới nhất |
+| [ ] | Menu Bình luận, Biểu mẫu | Số việc đang chờ (bình luận chờ duyệt, bài nộp mới) | 51 (hộp việc) | Chưa hiện số |
+| [ ] | Bình luận › Cài đặt | Cài đặt bình luận theo khách (bật / tắt, chế độ duyệt) | 33 | Dữ liệu mẫu (`src/sample/engage.ts`) |
+| [ ] | Bình luận › Cài đặt | Chính sách `posting.comments` (xác thực tài khoản, NĐ 147/2024) | 37 | Dữ liệu mẫu (`src/sample/engage.ts`) |
+| [ ] | Ba tab "Dữ liệu theo email" | Một yêu cầu của chủ thể dữ liệu gom mọi module, gắn với hồ sơ ở Tuân thủ | 37 | Ba tab riêng, mỗi module tra / xoá một lần |
