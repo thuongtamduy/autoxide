@@ -16,6 +16,11 @@ endpoints are marked deprecated with a sunset date first.
   `security`, `ops`, `values`). Every public path (`autoxide_kernel::ai::TextModel`, …) is unchanged, and a
   test keeps it so.
 
+### Fixed
+
+- `./gate.sh` ran `cargo xtask api-diff` and `cargo xtask sdk --check` before it stopped on errors, so a
+  breaking API change or an outdated SDK did not turn the gate red. They now run as steps like the others.
+
 ## [0.14.0] - 2026-11-15
 
 ### Added
