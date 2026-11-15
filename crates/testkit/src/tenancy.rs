@@ -6,28 +6,11 @@
 //! - mọi khoá unique (kể cả khoá chính) bắt đầu bằng `tenant_id`, trừ khoá chỉ gồm cột UUID (ID
 //!   sinh trong ứng dụng, duy nhất toàn cục — vd khoá chính `id`);
 //! - mọi index thường bắt đầu bằng `tenant_id`, trừ index quét cả database có tên `…_sweep_idx`.
-//!
-//! Trong lúc chuyển module (phần B của bước 33), bảng chưa chuyển nằm trong [`PENDING_TENANCY`];
-//! mỗi commit chuyển module xoá bảng của nó khỏi danh sách, commit cuối xoá cả danh sách.
 
 use crate::schema::{SchemaSnapshot, TableSnapshot};
 
-/// Bảng cấp khách hàng chưa có `tenant_id` (chưa chuyển). Bảng đã có `tenant_id` mà còn trong danh
-/// sách cũng là vi phạm — để danh sách chỉ ngắn đi.
-pub const PENDING_TENANCY: &[&str] = &[
-    // forms
-    // media
-    // menus
-    // newsletter
-];
-
-/// Các vi phạm (đã sắp xếp); rỗng nghĩa là hợp lệ. `control_plane`: bảng mặt điều khiển đã khai;
-/// `pending`: bảng chưa chuyển (thường là [`PENDING_TENANCY`]).
-pub fn schema_tenancy_violations(
-    snapshot: &SchemaSnapshot,
-    control_plane: &[&str],
-    pending: &[&str],
-) -> Vec<String> {
+/// Các vi phạm (đã sắp xếp); rỗng nghĩa là hợp lệ. `control_plane`: bảng mặt điều khiển đã khai.
+pub fn schema_tenancy_violations(snapshot: &SchemaSnapshot, control_plane: &[&str]) -> Vec<String> {
     let mut violations = Vec::new();
     for table in &snapshot.tables {
         let name = table.name.as_str();
@@ -35,14 +18,6 @@ pub fn schema_tenancy_violations(
             continue;
         }
         let tenant = table.columns.iter().find(|column| column.name == "tenant_id");
-        if pending.contains(&name) {
-            if tenant.is_some() {
-                violations.push(format!(
-                    "table `{name}` has `tenant_id`: remove it from `PENDING_TENANCY`"
-                ));
-            }
-            continue;
-        }
         match tenant {
             None => {
                 // Thiếu cột thì báo một lần; khoá và index của bảng xét sau khi nâng.
@@ -171,20 +146,14 @@ mod tests {
                     vec![],
                 ),
                 table("shop_plain", vec![id()], vec![index("shop_plain_x", &["x"], false)]),
-                table("shop_moved", vec![tenant(), id()], vec![]),
-                table("shop_waiting", vec![id()], vec![]),
                 table("shop_migrations", vec![], vec![]),
                 table("kernel_secrets", vec![id()], vec![]),
             ],
         };
-        let violations = schema_tenancy_violations(
-            &snapshot,
-            &["kernel_secrets"],
-            &["shop_moved", "shop_waiting"],
-        );
+        let violations = schema_tenancy_violations(&snapshot, &["kernel_secrets"]);
         let found: Vec<&str> =
             violations.iter().map(|text| text.split(':').next().unwrap_or_default()).collect();
-        assert_eq!(violations.len(), 6, "{violations:#?}");
+        assert_eq!(violations.len(), 5, "{violations:#?}");
         assert!(violations.iter().any(|v| v.contains("`shop_bad.tenant_id` must be NOT NULL")));
         assert!(
             violations.iter().any(|v| v.contains("`shop_defaulted.tenant_id` must be NOT NULL"))
@@ -192,7 +161,6 @@ mod tests {
         assert!(violations.iter().any(|v| v.contains("unique index `shop_bad_sku`")));
         assert!(violations.iter().any(|v| v.contains("index `shop_bad_sku_idx`")));
         assert!(violations.iter().any(|v| v.contains("table `shop_plain` has no `tenant_id`")));
-        assert!(violations.iter().any(|v| v.contains("`shop_moved` has `tenant_id`: remove it")));
         assert!(!found.iter().any(|v| v.contains("shop_item") || v.contains("kernel_secrets")));
     }
 }

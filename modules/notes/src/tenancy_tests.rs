@@ -198,8 +198,7 @@ async fn bang_dung_luat_theo_khach() {
         let app = TestApp::builder(test).module(crate::module()).build().await.unwrap();
         let snapshot = autoxide_testkit::schema_snapshot(app.database().write()).await.unwrap();
         let control_plane = app.modules().control_plane_tables();
-        let violations =
-            autoxide_testkit::schema_tenancy_violations(&snapshot, &control_plane, &[]);
+        let violations = autoxide_testkit::schema_tenancy_violations(&snapshot, &control_plane);
         assert_eq!(violations, Vec::<String>::new());
     })
     .await

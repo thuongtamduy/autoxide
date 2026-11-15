@@ -4,7 +4,7 @@ Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và Postgres**; agen
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
 Trạng thái: **bước 0–32 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 33 đang
-làm: nhóm A (nền kernel) xong, tiếp theo nhóm B (chuyển module)**; bước 50 chờ
+làm: nhóm A (nền kernel) và nhóm B (13 module theo khách) xong, tiếp theo nhóm C (tên miền, dời khách, vận hành)**; bước 50 chờ
 chủ dự án công khai repo (D-199); bản phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai
 (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
@@ -77,28 +77,28 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
 - [x] Mặt điều khiển: sổ khách hàng (trạng thái, khách cha), vị trí dữ liệu (`shared` /
       `dedicated`, database nào), tên miền → khách / nút; chế độ `single` mặc định (một khách,
       mặt điều khiển và dữ liệu chung một database, không cấu hình gì thêm)
-- [ ] Ngữ cảnh khách hàng cho mọi request: suy từ tên miền, API key, access token, header của nhân
+- [x] Ngữ cảnh khách hàng cho mọi request: suy từ tên miền, API key, access token, header của nhân
       sự nền tảng; sổ kết nối database theo khách (mở lười, có giới hạn); extractor cho handler,
       tool MCP; thiếu ngữ cảnh ở route cần khách thì lỗi rõ
-- [ ] Phân loại bảng: mặt điều khiển hay cấp khách hàng; mọi bảng cấp khách hàng của 14 module có
+- [x] Phân loại bảng: mặt điều khiển hay cấp khách hàng; mọi bảng cấp khách hàng của 14 module có
       `tenant_id` (migration mới), khoá unique và index bắt đầu bằng nó; testkit và `cargo xtask
       check` chặn bảng cấp khách hàng thiếu `tenant_id`; sổ đối tượng nhận khách ở `resolve`,
       `resolve_many`, `children` và cache menu công khai của `menus` theo khách (D-238)
-- [ ] Mọi truy vấn của service lọc theo khách qua một công cụ của kernel; testkit có bài **rò rỉ
+- [x] Mọi truy vấn của service lọc theo khách qua một công cụ của kernel; testkit có bài **rò rỉ
       giữa khách** chạy cho mọi module (ghi ở khách A, đọc bằng người của khách B: không thấy gì)
 - [ ] Job, event, outbox, lịch chạy theo từng database; worker và bộ phát event duyệt mọi database
       được giao; `autoxide migrate up --all` cho cả đội database; dời một khách `shared` ↔ `dedicated`
       bằng chép dữ liệu (mở rộng `autoxide copy`)
 - [ ] Đo đường nóng trước và sau (`scripts/loadtest.sh`); hướng dẫn viết module (EN + VI) có quy
       tắc phân loại bảng và lọc theo khách
-- [ ] Mã hoá dữ liệu nhạy cảm khi lưu (dời từ bước 37, D-190 — kho secret theo khách cần nó):
+- [x] Mã hoá dữ liệu nhạy cảm khi lưu (dời từ bước 37, D-190 — kho secret theo khách cần nó):
       secret TOTP của MFA (hiện lưu chữ thường trong `auth`), secret ký webhook và mọi secret module cần đọc lại được — mã hoá bằng khoá nằm ngoài
       database (dẫn xuất từ `AUTOXIDE_SECRET_KEY`), có số phiên bản khoá để xoay khoá; một công cụ
       dùng chung trong `kernel`, thuật toán chuẩn (AEAD) qua thư viện đã kiểm; migration mã hoá dữ
       liệu cũ; bản backup không còn chứa các secret này ở dạng đọc được. Khi `AUTOXIDE_SECRET_KEY`
       chưa đặt thì khoá gốc nằm trong database (`kernel/src/security/secret.rs`), mã hoá không bảo vệ được
       bản backup: `autoxide doctor` và log lúc khởi động nói rõ điều đó. Ghi quyết định
-- [ ] Cấu hình và secret theo khách (D-190): thông tin kết nối đối tác của từng khách (cổng thanh
+- [x] Cấu hình và secret theo khách (D-190): thông tin kết nối đối tác của từng khách (cổng thanh
       toán, SMTP, hoá đơn điện tử, khoá AI) lưu mã hoá bằng cơ chế trên; module đọc qua một trait
       của kernel, không đọc biến môi trường cho thứ thuộc về khách
 - [ ] Mọi thứ ngoài bảng cũng theo khách (D-190): khoá file lưu trữ có tiền tố khách (khách

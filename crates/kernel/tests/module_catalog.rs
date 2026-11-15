@@ -345,7 +345,7 @@ async fn tool_mcp_tra_cung_ket_qua_voi_rest() {
         let tools = modules.tools().unwrap();
         let tool = |name: &str| tools.iter().find(|tool| tool.name() == name).unwrap().clone();
         let admin = Principal::new(Uuid::nil(), ["kernel.modules.read".to_owned()]);
-        let tenant = TenantContext::legacy_default(&db);
+        let tenant = TenantContext::default_on(db.clone());
         let writer = Principal::new(Uuid::nil(), ["notes.write".to_owned()]);
 
         let list = tool("kernel.list_modules");

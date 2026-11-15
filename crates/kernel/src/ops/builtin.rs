@@ -114,7 +114,17 @@ impl Module for KernelModule {
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
-        let secret = crate::secret::read_setting(reader);
+        let secret = match crate::secret::read_setting(reader) {
+            // Chế độ `multi` bắt buộc khoá gốc ngoài database (bước 33): nhiều khách chung một bản
+            // cài thì khoá nằm trong database không bảo vệ được bản backup của khách nào.
+            Ok(None) if multi_tenant(reader) => reader.reject(
+                &crate::secret::SECRET_KEY,
+                "is required when AUTOXIDE_TENANCY_MODE=multi: secrets of every tenant are \
+                 encrypted with it, and a key kept in the database does not protect a backup. \
+                 Generate one with `openssl rand -base64 48` and back it up apart from the database",
+            ),
+            other => other,
+        };
         let previous = crate::secret::read_previous(reader);
         let public_url = crate::public_url::read_setting(reader);
         let max_flags = user_flags::read_setting(reader);
@@ -250,4 +260,11 @@ impl MigrationTrait for CreateSecrets {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.drop_table(Table::drop().table("kernel_secrets").to_owned()).await
     }
+}
+
+/// Cấu hình kernel (đọc trước module) đặt `AUTOXIDE_TENANCY_MODE=multi`.
+fn multi_tenant(reader: &ConfigReader<'_>) -> bool {
+    reader.values().iter().any(|value| {
+        value.setting.name == "AUTOXIDE_TENANCY_MODE" && value.display_value().trim() == "multi"
+    })
 }

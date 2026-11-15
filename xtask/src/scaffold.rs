@@ -321,6 +321,13 @@ mod tests {
         let lib = fs::read_to_string(target.join("src/lib.rs")).unwrap();
         assert!(lib.starts_with("//! Module `bookmarks`."), "{lib}");
         assert!(lib.contains("pub fn module() -> impl Module"));
+        // Module sinh ra theo khách ngay từ đầu (bước 33): bảng có `tenant_id`, có bài rò rỉ.
+        let entity = fs::read_to_string(target.join("src/entity.rs")).unwrap();
+        assert!(
+            entity.contains("pub tenant_id: Uuid") && entity.contains("TenantScoped"),
+            "{entity}"
+        );
+        assert!(target.join("src/tenancy_tests.rs").exists());
         fs::remove_dir_all(target.parent().unwrap()).unwrap();
     }
 }

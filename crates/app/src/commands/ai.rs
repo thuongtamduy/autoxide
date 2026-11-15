@@ -56,7 +56,7 @@ async fn check(settings: Settings) -> Result<(String, bool), String> {
     let embedder = runtime.modules.api::<dyn Embedder>();
     let outcome = match (text, embedder) {
         (Some(text), Some(embedder)) => {
-            Ok(report(&TenantContext::legacy_default(&runtime.database), text, embedder).await)
+            Ok(report(&TenantContext::default_on(runtime.database.clone()), text, embedder).await)
         }
         _ => Err("the `ai` module is not registered".to_owned()),
     };

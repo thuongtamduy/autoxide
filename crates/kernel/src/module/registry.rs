@@ -768,6 +768,26 @@ mod tests {
         assert!(message.contains("AUTOXIDE_TAGS_KEY: is required but not set"), "{message}");
     }
 
+    /// Chế độ `multi` mà không đặt `AUTOXIDE_SECRET_KEY`: lỗi cấu hình nói rõ phải làm gì;
+    /// `single` thì không bắt buộc.
+    #[test]
+    fn che_do_multi_bat_buoc_khoa_goc() {
+        let check = |pairs: &[(&str, &str)]| {
+            let source = ConfigSource::from_pairs(pairs.iter().copied());
+            let mut reader = ConfigReader::new(&source);
+            let kernel = crate::config::Config::read(&mut reader);
+            let mut modules = Modules::new(bare(&["auth"])).unwrap();
+            let configured = modules.configure(&mut reader).and(kernel.map(|_| ()));
+            reader.finish(configured).map(|_| ()).map_err(|error| error.to_string())
+        };
+        let error = check(&[("AUTOXIDE_TENANCY_MODE", "multi")]).unwrap_err();
+        assert!(error.contains("AUTOXIDE_SECRET_KEY: is required when"), "{error}");
+        let key = "k".repeat(40);
+        check(&[("AUTOXIDE_TENANCY_MODE", "multi"), ("AUTOXIDE_SECRET_KEY", key.as_str())])
+            .unwrap();
+        check(&[]).unwrap();
+    }
+
     #[test]
     fn module_khong_khai_gi_thi_khong_co_migration_va_cau_hinh() {
         let source = ConfigSource::default();

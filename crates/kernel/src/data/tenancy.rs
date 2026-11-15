@@ -128,9 +128,9 @@ pub const NO_TENANT: TenantId = TenantId(Uuid::nil());
 pub const MAIN_PLACEMENT: PlacementId =
     PlacementId(Uuid::from_u128(0x0000_0000_0000_7000_8000_0000_0000_0002));
 
-/// `false` tới khi mọi module đã chuyển sang theo khách (D-253 mục 6): trước đó chế độ `multi` là
-/// lỗi cấu hình — không ai bật được nó trên bản đang chuyển dở. Testkit vẫn bật được.
-pub const MULTI_TENANT_READY: bool = false;
+/// `true` từ khi mọi module đã chuyển sang theo khách (bước 33 B14, D-253 mục 6): bật được chế độ
+/// `multi` bằng `AUTOXIDE_TENANCY_MODE`.
+pub const MULTI_TENANT_READY: bool = true;
 
 /// Chế độ của bản cài (`AUTOXIDE_TENANCY_MODE`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -278,6 +278,9 @@ impl TenantContext {
     /// dùng khách mặc định trên database nó đang giữ. Bị `#[deprecated]` khi phần B xong (không còn
     /// ai gọi), xoá ở đầu bước 34 (D-253 mục 7).
     #[doc(hidden)]
+    #[deprecated(
+        note = "dùng `TenantContext` của request, job hay event; cần khách mặc định thì `default_on`"
+    )]
     pub fn legacy_default(database: &Database) -> Self {
         Self::default_on(database.clone())
     }

@@ -391,7 +391,7 @@ mod tests {
         let runtime = runtime::start(settings, Migrations::RequireApplied).await.unwrap();
         let accounts = runtime.modules.api::<dyn Accounts>().unwrap();
         accounts
-            .create(&TenantContext::legacy_default(&runtime.database), admin("root@example.com"))
+            .create(&TenantContext::default_on(runtime.database.clone()), admin("root@example.com"))
             .await
             .unwrap();
         let storage = runtime.modules.api::<dyn Storage>().unwrap();
@@ -409,7 +409,7 @@ mod tests {
             .unwrap();
         let accounts = runtime.modules.api::<dyn Accounts>().unwrap();
         let duplicate = accounts
-            .create(&TenantContext::legacy_default(&runtime.database), admin("root@example.com"))
+            .create(&TenantContext::default_on(runtime.database.clone()), admin("root@example.com"))
             .await
             .unwrap_err();
         assert_eq!(duplicate.code(), "auth.email_taken");
@@ -546,7 +546,7 @@ mod tests {
                 .await
                 .unwrap();
             let media = runtime.modules.api::<dyn Media>().unwrap();
-            let item = media.find(&TenantContext::legacy_default(&runtime.database), id).await.unwrap().unwrap();
+            let item = media.find(&TenantContext::default_on(runtime.database.clone()), id).await.unwrap().unwrap();
             assert_eq!((item.width, item.height, item.alt.as_str()), (Some(7), Some(5), "Seven by five"));
             assert_eq!(item.visibility, MediaVisibility::Public);
             let storage = runtime.modules.api::<dyn Storage>().unwrap();

@@ -7082,3 +7082,18 @@ và `Principal` không đổi.
   đếm theo khách; `ETag` của `/public/resolve` băm cả ID khách. Job của khách (`run_schedule`, `index_embeddings`,
   `translate`) đọc `job.tenant`; job theo lịch (`prune_revisions`, `catch_up_embeddings`) chạy mỗi database, tra từng khách
   qua sổ database. API menu cũ cho `menus` đọc đúng khách được truyền (D-283 hết điều kiện chờ).
+
+## D-289 · Đóng phần B bước 33: chế độ `multi` bật được, bắt buộc `AUTOXIDE_SECRET_KEY` — 2026-11-15 — agent quyết
+
+- Cả 13 module đã theo khách (D-274…D-288): xoá `PENDING_TENANCY` khỏi testkit, app và `cargo xtask check` — kiểm
+  schema theo khách không còn ngoại lệ tạm. `TenantContext::legacy_default` bị `#[deprecated]` (không còn ai gọi; xoá
+  đầu bước 34, D-253 mục 7); code và test dùng `TenantContext` của request / job / event, hay `default_on` khi thật sự
+  cần khách mặc định (lệnh CLI, test).
+- `MULTI_TENANT_READY = true`: `AUTOXIDE_TENANCY_MODE=multi` bật được. Chế độ `multi` **bắt buộc**
+  `AUTOXIDE_SECRET_KEY` (theo khuyến nghị của đặc tả 33): secret của mọi khách mã hoá bằng khoá gốc; khoá nằm trong
+  database không bảo vệ được bản backup của khách nào. Thiếu → lỗi cấu hình nói rõ cách tạo và phải backup khoá riêng
+  khỏi database. Chế độ `single` vẫn chỉ cảnh báo như trước (bản cài cũ không phải cấu hình gì thêm).
+- `cargo xtask new-module` chép khuôn `notes` (đã theo khách từ B1): module sinh ra có `tenant_id`, `TenantScoped`, bài
+  rò rỉ; test của scaffold chặn khuôn mất điều đó.
+- Còn lại cho phần C (dòng lộ trình "Mọi thứ ngoài bảng" chưa đánh dấu): bucket lưu trữ riêng cho khách `dedicated`
+  (`kernel_placements.storage_sealed` đã có cột, chưa dùng), con trỏ pagination mang khách.
