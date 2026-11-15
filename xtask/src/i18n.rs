@@ -169,6 +169,8 @@ pub fn field_messages(text: &str) -> Vec<(usize, FieldMessage)> {
 pub fn descriptions(text: &str) -> Vec<(usize, FieldMessage)> {
     let mut found = call_arguments(text, "Permission::new(", 1);
     found.extend(call_arguments(text, "EventInfo::new(", 1));
+    // Câu kết quả kiểm SEO của `content` (câu mẫu, D-264).
+    found.extend(call_arguments(text, "Finding::new(", 3));
     found.retain(
         |(_, site)| !matches!(site, FieldMessage::Built(expression) if expression.starts_with('$')),
     );

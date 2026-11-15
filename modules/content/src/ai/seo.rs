@@ -44,13 +44,33 @@ pub(crate) struct Finding {
     pub level: Level,
     /// Trường hay vị trí trong thân bài (`body.content[2].attrs.alt`).
     pub field: String,
-    /// Câu tiếng Anh nói phải sửa gì.
+    /// Câu tiếng Anh nói phải sửa gì (đã điền giá trị).
     pub message: String,
+    /// Câu mẫu (khoá dịch `text:<câu mẫu>`, D-264) và giá trị điền vào nó.
+    pub template: &'static str,
+    pub params: Vec<(&'static str, String)>,
 }
 
 impl Finding {
-    fn new(code: &'static str, level: Level, field: &str, message: impl Into<String>) -> Self {
-        Finding { code, level, field: field.to_owned(), message: message.into() }
+    /// Phát hiện `code` ở `field`, câu mẫu `template` (chỗ thay đổi viết `{tên}`, điền bằng
+    /// [`with`](Self::with)).
+    fn new(code: &'static str, level: Level, field: &str, template: &'static str) -> Self {
+        Finding {
+            code,
+            level,
+            field: field.to_owned(),
+            message: template.to_owned(),
+            template,
+            params: Vec::new(),
+        }
+    }
+
+    /// Điền `{name}` của câu mẫu.
+    fn with(mut self, name: &'static str, value: impl ToString) -> Self {
+        let value = value.to_string();
+        self.message = self.message.replace(&format!("{{{name}}}"), &value);
+        self.params.push((name, value));
+        self
     }
 }
 
@@ -91,15 +111,16 @@ impl ContentService {
             .count(read)
             .await?;
         if same_title > 0 {
-            findings.push(Finding::new(
-                "seo.title_duplicate",
-                Level::Warning,
-                "title",
-                format!(
+            findings.push(
+                Finding::new(
+                    "seo.title_duplicate",
+                    Level::Warning,
+                    "title",
                     "{same_title} other entries in this language have the same title; search \
-                     engines may treat the pages as duplicates"
-                ),
-            ));
+                 engines may treat the pages as duplicates",
+                )
+                .with("same_title", same_title),
+            );
         }
         let translated: BTreeSet<String> = entry::Entity::find()
             .select_only()
@@ -118,12 +139,15 @@ impl ContentService {
             .filter(|locale| !translated.contains(*locale))
             .collect();
         if !missing.is_empty() {
-            findings.push(Finding::new(
-                "seo.translation_missing",
-                Level::Warning,
-                "locale",
-                format!("no translation yet in: {}", missing.join(", ")),
-            ));
+            findings.push(
+                Finding::new(
+                    "seo.translation_missing",
+                    Level::Warning,
+                    "locale",
+                    "no translation yet in: {missing}",
+                )
+                .with("missing", missing.join(", ")),
+            );
         }
         Ok(findings)
     }
@@ -236,24 +260,34 @@ fn seo_prompt(entry: &Entry, terms: &[(Uuid, String)]) -> Prompt {
 fn check_fields(entry: &Entry, findings: &mut Vec<Finding>) {
     let length = |text: &str| text.chars().count();
     if entry.meta_title.is_empty() {
-        let note = if length(&entry.title) > META_TITLE_IDEAL {
-            format!("; the title used instead is longer than {META_TITLE_IDEAL} characters")
+        let finding = if length(&entry.title) > META_TITLE_IDEAL {
+            Finding::new(
+                "seo.meta_title_missing",
+                Level::Warning,
+                "meta_title",
+                "no title for search engines: the title is used; the title used instead is \
+                 longer than {max} characters",
+            )
+            .with("max", META_TITLE_IDEAL)
         } else {
-            String::new()
+            Finding::new(
+                "seo.meta_title_missing",
+                Level::Warning,
+                "meta_title",
+                "no title for search engines: the title is used",
+            )
         };
-        findings.push(Finding::new(
-            "seo.meta_title_missing",
-            Level::Warning,
-            "meta_title",
-            format!("no title for search engines: the title is used{note}"),
-        ));
+        findings.push(finding);
     } else if length(&entry.meta_title) > META_TITLE_IDEAL {
-        findings.push(Finding::new(
-            "seo.meta_title_too_long",
-            Level::Warning,
-            "meta_title",
-            format!("longer than {META_TITLE_IDEAL} characters; search engines may cut it"),
-        ));
+        findings.push(
+            Finding::new(
+                "seo.meta_title_too_long",
+                Level::Warning,
+                "meta_title",
+                "longer than {max} characters; search engines may cut it",
+            )
+            .with("max", META_TITLE_IDEAL),
+        );
     }
     if entry.meta_description.is_empty() {
         findings.push(Finding::new(
@@ -263,12 +297,15 @@ fn check_fields(entry: &Entry, findings: &mut Vec<Finding>) {
             "no description for search engines: they pick a sentence of the page themselves",
         ));
     } else if length(&entry.meta_description) > META_DESCRIPTION_IDEAL {
-        findings.push(Finding::new(
-            "seo.meta_description_too_long",
-            Level::Warning,
-            "meta_description",
-            format!("longer than {META_DESCRIPTION_IDEAL} characters; search engines may cut it"),
-        ));
+        findings.push(
+            Finding::new(
+                "seo.meta_description_too_long",
+                Level::Warning,
+                "meta_description",
+                "longer than {max} characters; search engines may cut it",
+            )
+            .with("max", META_DESCRIPTION_IDEAL),
+        );
     }
     if entry.excerpt.is_empty() {
         findings.push(Finding::new(
@@ -322,14 +359,16 @@ fn walk(node: &Value, at: &str, last_level: &mut u64, findings: &mut Vec<Finding
         Some("heading") => {
             let level = node.pointer("/attrs/level").and_then(Value::as_u64).unwrap_or(2);
             if level > *last_level + 1 {
-                findings.push(Finding::new(
-                    "seo.heading_skipped",
-                    Level::Warning,
-                    &format!("{at}.attrs.level"),
-                    format!(
-                        "heading level {level} comes after level {last_level}; do not skip levels"
-                    ),
-                ));
+                findings.push(
+                    Finding::new(
+                        "seo.heading_skipped",
+                        Level::Warning,
+                        &format!("{at}.attrs.level"),
+                        "heading level {level} comes after level {last_level}; do not skip levels",
+                    )
+                    .with("level", level)
+                    .with("last_level", *last_level),
+                );
             }
             *last_level = level;
         }

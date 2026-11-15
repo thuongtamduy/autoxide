@@ -750,6 +750,12 @@ pub(crate) struct PreviewEntryResponse {
     term_ids: Vec<Uuid>,
     /// Authors, in order (the first is the main one).
     author_ids: Vec<Uuid>,
+    /// The main image with its address and smaller copies, as on the public entry; `null` when
+    /// there is none or it is not public yet.
+    featured_media: Option<PublicMedia>,
+    /// The public images used in `body`, in order of appearance (find one by the `mediaId` of
+    /// its node). Images that are not public yet are left out.
+    body_media: Vec<PublicMedia>,
 }
 
 /// Bản nháp như link xem trước trả: chỉ nội dung, không ID người dùng hay trường nội bộ (ai tạo,
@@ -761,7 +767,30 @@ async fn preview_entry(
     let ids = [entry.id];
     let term_ids = service.term_ids(&ids).await?.remove(&entry.id);
     let author_ids = service.author_ids(&ids).await?.remove(&entry.id);
+    // Địa chỉ ảnh như bài công khai (đề bài giao diện B4): chỉ ảnh đã công khai.
+    let body_ids = crate::entries::body::stored_image_ids(&entry.body);
+    let mut wanted: Vec<Uuid> =
+        entry.featured_media_id.into_iter().chain(body_ids.clone()).collect();
+    wanted.sort_unstable();
+    wanted.dedup();
+    let mut found: std::collections::HashMap<Uuid, autoxide_media::api::MediaRef> =
+        std::collections::HashMap::new();
+    let tenant = autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database);
+    for chunk in wanted.chunks(autoxide_media::api::MAX_IDS) {
+        for item in service.media.find_many_in(&tenant, chunk, &entry.locale).await? {
+            if item.visibility == autoxide_media::api::MediaVisibility::Public {
+                found.insert(item.id, item);
+            }
+        }
+    }
+    let featured_media = media(
+        entry.featured_media_id.and_then(|id| found.get(&id).cloned()),
+        &entry.featured_media_alt,
+    );
+    let body_media = body_ids.iter().filter_map(|id| media(found.get(id).cloned(), "")).collect();
     Ok(PreviewEntryResponse {
+        featured_media,
+        body_media,
         kind: Kind::parse(&entry.kind).unwrap_or(Kind::Post),
         status: crate::entries::Status::of(&entry),
         body: serde_json::from_str(&entry.body).unwrap_or(Value::Null),

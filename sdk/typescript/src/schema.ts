@@ -152,6 +152,8 @@ export type AuthorResponse = {
   bio: string;
   created_at: string;
   display_name: string;
+  /** How many entries (in any status) list this author. Only in the list. */
+  entry_count?: number | null;
   id: string;
   /** Unique. */
   slug: string;
@@ -846,6 +848,8 @@ export type Data_AuthorResponse = {
     bio: string;
     created_at: string;
     display_name: string;
+    /** How many entries (in any status) list this author. Only in the list. */
+    entry_count?: number | null;
     id: string;
     /** Unique. */
     slug: string;
@@ -1258,6 +1262,14 @@ export type Data_EntryResponse = {
     og_media_id?: string | null;
     /** The parent page (pages only); `null` at the root. */
     parent_id?: string | null;
+    /**
+     * Address of the public version, e.g. `/blog/duong-den-da-lat` or `/about/team` (a page
+     * carries the path of its parents); `null` while the entry is not public. It does not hold
+     * the language: the website decides how `locale` shows in its addresses.
+     */
+    path?: string | null;
+    /** When the public version was last published; `null` while the entry is not public. */
+    published_at?: string | null;
     reading_time_minutes: number;
     /**
      * When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no
@@ -1288,6 +1300,11 @@ export type Data_EntryResponse = {
      */
     translation_outdated: boolean;
     updated_at: string;
+    /**
+     * The entry's `ETag` (as `GET /entries/{id}` sends it): send it in `If-Match` to change the
+     * entry straight from a list.
+     */
+    version: string;
     /** Words in the body (for Vietnamese: syllables). */
     word_count: number;
   };
@@ -1730,9 +1747,15 @@ export type Data_PreviewEntryResponse = {
     /** Authors, in order (the first is the main one). */
     author_ids: string[];
     body: BodyNode;
+    /**
+     * The public images used in `body`, in order of appearance (find one by the `mediaId` of
+     * its node). Images that are not public yet are left out.
+     */
+    body_media: PublicMedia[];
     body_schema_version: number;
     canonical_url: string;
     excerpt: string;
+    featured_media?: PublicMedia | null;
     featured_media_alt: string;
     /** Main image (a media item id). */
     featured_media_id?: string | null;
@@ -1993,6 +2016,8 @@ export type Data_ScheduleResponse = {
   /** A scheduled publish or take-down. */
   data: {
     action: Action;
+    /** `true` when whoever scheduled it confirmed that the AI-generated content was reviewed. */
+    ai_reviewed: boolean;
     created_at: string;
     created_by?: string | null;
     entry_id: string;
@@ -2214,6 +2239,8 @@ export type Data_TermResponse = {
   /** A category or tag, with its names in every language. */
   data: {
     created_at: string;
+    /** How many entries (in any status) have this term. Only in the list. */
+    entry_count?: number | null;
     id: string;
     names: TermName[];
     /** Parent category; `null` at the top (always for tags). */
@@ -2544,6 +2571,8 @@ export type Data_Vec_RoleResponse = {
 export type Data_Vec_ScheduleResponse = {
   data: {
     action: Action;
+    /** `true` when whoever scheduled it confirmed that the AI-generated content was reviewed. */
+    ai_reviewed: boolean;
     created_at: string;
     created_by?: string | null;
     entry_id: string;
@@ -2784,6 +2813,14 @@ export type EntryResponse = {
   og_media_id?: string | null;
   /** The parent page (pages only); `null` at the root. */
   parent_id?: string | null;
+  /**
+   * Address of the public version, e.g. `/blog/duong-den-da-lat` or `/about/team` (a page
+   * carries the path of its parents); `null` while the entry is not public. It does not hold
+   * the language: the website decides how `locale` shows in its addresses.
+   */
+  path?: string | null;
+  /** When the public version was last published; `null` while the entry is not public. */
+  published_at?: string | null;
   reading_time_minutes: number;
   /**
    * When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no
@@ -2814,6 +2851,11 @@ export type EntryResponse = {
    */
   translation_outdated: boolean;
   updated_at: string;
+  /**
+   * The entry's `ETag` (as `GET /entries/{id}` sends it): send it in `If-Match` to change the
+   * entry straight from a list.
+   */
+  version: string;
   /** Words in the body (for Vietnamese: syllables). */
   word_count: number;
 };
@@ -3542,6 +3584,8 @@ export type Page_AuthorResponse = {
     bio: string;
     created_at: string;
     display_name: string;
+    /** How many entries (in any status) list this author. Only in the list. */
+    entry_count?: number | null;
     id: string;
     /** Unique. */
     slug: string;
@@ -3762,6 +3806,14 @@ export type Page_EntryResponse = {
     og_media_id?: string | null;
     /** The parent page (pages only); `null` at the root. */
     parent_id?: string | null;
+    /**
+     * Address of the public version, e.g. `/blog/duong-den-da-lat` or `/about/team` (a page
+     * carries the path of its parents); `null` while the entry is not public. It does not hold
+     * the language: the website decides how `locale` shows in its addresses.
+     */
+    path?: string | null;
+    /** When the public version was last published; `null` while the entry is not public. */
+    published_at?: string | null;
     reading_time_minutes: number;
     /**
      * When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no
@@ -3792,6 +3844,11 @@ export type Page_EntryResponse = {
      */
     translation_outdated: boolean;
     updated_at: string;
+    /**
+     * The entry's `ETag` (as `GET /entries/{id}` sends it): send it in `If-Match` to change the
+     * entry straight from a list.
+     */
+    version: string;
     /** Words in the body (for Vietnamese: syllables). */
     word_count: number;
   }[];
@@ -4138,6 +4195,29 @@ export type Page_RoleResponse = {
 };
 
 /** One page of a list. */
+export type Page_ScheduleResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    action: Action;
+    /** `true` when whoever scheduled it confirmed that the AI-generated content was reviewed. */
+    ai_reviewed: boolean;
+    created_at: string;
+    created_by?: string | null;
+    entry_id: string;
+    /** Why it failed, an error code such as `content.schedule_outdated`. */
+    error_code?: string | null;
+    id: string;
+    /** The revision that will be published (for `publish`). */
+    revision_id?: string | null;
+    run_at: string;
+    /** `scheduled`, `succeeded`, `failed` or `canceled`. */
+    status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_SearchHit = {
   /** The items of this page, in the requested order. */
   data: {
@@ -4352,6 +4432,8 @@ export type Page_TermResponse = {
   /** The items of this page, in the requested order. */
   data: {
     created_at: string;
+    /** How many entries (in any status) have this term. Only in the list. */
+    entry_count?: number | null;
     id: string;
     names: TermName[];
     /** Parent category; `null` at the top (always for tags). */
@@ -4575,9 +4657,15 @@ export type PreviewEntryResponse = {
   /** Authors, in order (the first is the main one). */
   author_ids: string[];
   body: BodyNode;
+  /**
+   * The public images used in `body`, in order of appearance (find one by the `mediaId` of
+   * its node). Images that are not public yet are left out.
+   */
+  body_media: PublicMedia[];
   body_schema_version: number;
   canonical_url: string;
   excerpt: string;
+  featured_media?: PublicMedia | null;
   featured_media_alt: string;
   /** Main image (a media item id). */
   featured_media_id?: string | null;
@@ -5149,6 +5237,11 @@ export type RoleResponse = {
 /** A new schedule. */
 export type ScheduleRequest = {
   action: Action;
+  /**
+   * For a `publish` of AI-generated content: you confirm a person reviewed it, as with
+   * `ai_reviewed` when publishing at once. Only a signed-in person may send `true`.
+   */
+  ai_reviewed?: boolean;
   /** When to run; must be in the future. */
   run_at: string;
 };
@@ -5156,6 +5249,8 @@ export type ScheduleRequest = {
 /** A scheduled publish or take-down. */
 export type ScheduleResponse = {
   action: Action;
+  /** `true` when whoever scheduled it confirmed that the AI-generated content was reviewed. */
+  ai_reviewed: boolean;
   created_at: string;
   created_by?: string | null;
   entry_id: string;
@@ -5210,7 +5305,7 @@ export type SeoFinding = {
   /** The field, or the place in the body JSON (e.g. `body.content[2].attrs.alt`). */
   field: string;
   level: FindingLevel;
-  /** What to fix, in English. */
+  /** What to fix, in the language of `Accept-Language`. */
   message: string;
 };
 
@@ -5642,6 +5737,8 @@ export type TermName = {
 /** A category or tag, with its names in every language. */
 export type TermResponse = {
   created_at: string;
+  /** How many entries (in any status) have this term. Only in the list. */
+  entry_count?: number | null;
   id: string;
   names: TermName[];
   /** Parent category; `null` at the top (always for tags). */
@@ -7073,7 +7170,7 @@ export interface paths {
   "/api/v1/content/authors": {
     /** List author profiles. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_AuthorResponse;
         401: Problem;
@@ -7139,7 +7236,7 @@ export interface paths {
   "/api/v1/content/entries": {
     /** List posts and pages (drafts included). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_EntryResponse;
         401: Problem;
@@ -7700,6 +7797,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/content/schedules": {
+    /** List the schedules of every entry. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ScheduleResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/content/schedules/{id}": {
     /** Cancel a pending schedule. */
     delete: {
@@ -7730,7 +7840,7 @@ export interface paths {
   "/api/v1/content/terms": {
     /** List categories and tags. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { taxonomy?: "category" | "tag"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { taxonomy?: "category" | "tag"; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_TermResponse;
         401: Problem;

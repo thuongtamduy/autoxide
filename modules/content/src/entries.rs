@@ -173,6 +173,16 @@ pub(crate) struct EntryFilter {
     pub author_id: Option<Uuid>,
     pub translation_group_id: Option<Uuid>,
     pub sort: EntrySort,
+    /// Chỉ bài đang (`true`) / không (`false`) chờ duyệt.
+    pub review_requested: Option<bool>,
+    /// Chỉ bài có (`true`) / không có (`false`) lịch đăng hay gỡ đang chờ.
+    pub scheduled: Option<bool>,
+    /// Chỉ bài do người này tạo (`created_by=me` đổi thành người gọi ở tầng HTTP).
+    pub created_by: Option<Uuid>,
+    /// Chỉ bài do AI viết (`true`) / không (`false`).
+    pub ai_generated: Option<bool>,
+    /// Chỉ bài chưa có bản dịch sang ngôn ngữ này (không mục nào cùng nhóm bản dịch mang nó).
+    pub missing_locale: Option<String>,
 }
 
 impl ContentService {
@@ -347,6 +357,39 @@ impl ContentService {
         if let Some(author) = filter.author_id {
             select = select.filter(crate::taxonomy::authors::has_author(author));
         }
+        select = match filter.review_requested {
+            Some(true) => select.filter(Column::ReviewRequestedAt.is_not_null()),
+            Some(false) => select.filter(Column::ReviewRequestedAt.is_null()),
+            None => select,
+        };
+        if let Some(scheduled) = filter.scheduled {
+            let waiting = sea_orm::sea_query::Query::select()
+                .column(crate::entity::schedule::Column::EntryId)
+                .from(crate::entity::schedule::Entity)
+                .and_where(crate::entity::schedule::Column::Status.eq("scheduled"))
+                .to_owned();
+            select = if scheduled {
+                select.filter(Column::Id.in_subquery(waiting))
+            } else {
+                select.filter(Column::Id.not_in_subquery(waiting))
+            };
+        }
+        if let Some(creator) = filter.created_by {
+            select = select.filter(Column::CreatedBy.eq(creator));
+        }
+        if let Some(ai) = filter.ai_generated {
+            select = select.filter(Column::AiGenerated.eq(ai));
+        }
+        if let Some(missing) = &filter.missing_locale {
+            // Nhóm bản dịch đã có mục bằng ngôn ngữ đó thì loại; mục chính nó bằng ngôn ngữ đó
+            // cũng bị loại theo (cùng nhóm).
+            let translated = sea_orm::sea_query::Query::select()
+                .column(Column::TranslationGroupId)
+                .from(Entity)
+                .and_where(Column::Locale.eq(missing.as_str()))
+                .to_owned();
+            select = select.filter(Column::TranslationGroupId.not_in_subquery(translated));
+        }
         let read = self.database.read();
         match filter.sort {
             EntrySort::CreatedAt => fetch_page(select, Column::Id, |row| row.id, page, read).await,
@@ -356,6 +399,27 @@ impl ContentService {
                     .await
             }
         }
+    }
+
+    /// Đường dẫn và lúc đăng của bản công khai của từng mục trong `ids` (một câu cho cả trang).
+    pub(crate) async fn published_paths(
+        &self,
+        ids: &[Uuid],
+    ) -> Result<std::collections::HashMap<Uuid, (String, DateTime<Utc>)>, Error> {
+        if ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        use crate::entity::published;
+        let rows: Vec<(Uuid, String, DateTime<Utc>)> = published::Entity::find()
+            .select_only()
+            .column(published::Column::EntryId)
+            .column(published::Column::Path)
+            .column(published::Column::PublishedAt)
+            .filter(published::Column::EntryId.is_in(ids.iter().copied()))
+            .into_tuple()
+            .all(self.database.read())
+            .await?;
+        Ok(rows.into_iter().map(|(id, path, at)| (id, (path, at))).collect())
     }
 
     /// Sửa bản nháp của mục `id`. Cần `content.write`. Mục đang công khai thì bật

@@ -16,6 +16,11 @@ endpoints are marked deprecated with a sunset date first.
   gives `has_password` and `pending_email` (an email change waiting for its link, with expiry);
   `DELETE /api/v1/auth/me/email` cancels that change. New event `auth.email_change_cancelled`. Users are an object
   type `auth.user` of the object directory (their display name), for other modules.
+- `content`: `GET /api/v1/content/entries` filters by `review_requested`, `scheduled`, `created_by` (`me` for the
+  caller), `ai_generated` and `missing_locale`; each entry carries `published_at`, `path` (of the public version)
+  and `version` (the `ETag` value). Categories, tags and authors carry `entry_count`; categories and authors take
+  `q` (accents ignored). `GET /api/v1/content/schedules` lists the schedules of every entry; a schedule takes
+  `ai_reviewed`. SEO check messages follow `Accept-Language`; a preview gives the addresses of its public images.
 - `audit`: `include=actor` adds `actor_name`, the display name of who made each change.
 - `webhooks`: each endpoint carries `last_delivery` (status, HTTP status, time) in the list and when read;
   `status` (`active`, `disabled`) filters the list.

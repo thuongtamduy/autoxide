@@ -29,6 +29,8 @@ pub(crate) struct ContentService {
     pub(crate) config: ContentConfig,
     /// Vector và câu tìm giữ trong bộ nhớ của tiến trình (tìm theo ý nghĩa).
     pub(crate) search_cache: crate::ai::semantic::SearchCache,
+    /// Bản dịch của chương trình: câu kết quả kiểm SEO theo `Accept-Language` (D-264).
+    pub(crate) translations: autoxide_kernel::i18n::Translations,
 }
 
 /// Những gì service dùng từ module khác.
@@ -48,7 +50,26 @@ impl ContentService {
     ) -> Self {
         let Dependencies { media, ai, embedder } = dependencies;
         let search_cache = crate::ai::semantic::SearchCache::default();
-        ContentService { database, outbox, jobs, media, ai, embedder, config, search_cache }
+        ContentService {
+            database,
+            outbox,
+            jobs,
+            media,
+            ai,
+            embedder,
+            config,
+            search_cache,
+            translations: Default::default(),
+        }
+    }
+
+    /// Dịch câu kết quả kiểm SEO bằng `translations`.
+    pub(crate) fn with_translations(
+        mut self,
+        translations: autoxide_kernel::i18n::Translations,
+    ) -> Self {
+        self.translations = translations;
+        self
     }
 
     /// `locale` đã chuẩn hoá nếu được hỗ trợ; không thì thêm lỗi `field`.

@@ -274,7 +274,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
                         input.order,
                     );
                     let mut problems = Vec::new();
-                    let filter = query.filter(&mut problems);
+                    let filter = query.filter(principal.user_id(), &mut problems);
                     let page = page_request(paging, problems)?;
                     let Page { data, pagination } =
                         service.list(&principal, &filter, &page).await?;
@@ -431,7 +431,12 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
                 let service = seo_check.clone();
                 async move {
                     let findings = service.seo_check(&principal, input.id).await?;
-                    Ok::<SeoReport, Error>(SeoReport::from(findings))
+                    let language = autoxide_kernel::i18n::Language::En;
+                    Ok::<SeoReport, Error>(SeoReport::new(
+                        findings,
+                        &service.translations,
+                        language,
+                    ))
                 }
             },
         )

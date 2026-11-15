@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Query;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
-    QueryOrder, Set,
+    QueryOrder, QuerySelect, Set,
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -130,17 +130,49 @@ impl ContentService {
     pub(crate) async fn list_authors(
         &self,
         principal: &Principal,
+        search: Option<&str>,
         page: &PageRequest,
     ) -> Result<Page<Author>, Error> {
         principal.require(&CONTENT_READ)?;
-        fetch_page(
-            author::Entity::find(),
-            author::Column::Id,
-            |row| row.id,
-            page,
-            self.database.read(),
-        )
-        .await
+        let mut select = author::Entity::find();
+        if let Some(search) = search.map(str::trim).filter(|search| !search.is_empty()) {
+            // Như tìm danh mục: so tên bỏ dấu trong bộ nhớ.
+            let wanted = autoxide_kernel::search::fold(search);
+            let names: Vec<(Uuid, String)> = author::Entity::find()
+                .select_only()
+                .column(author::Column::Id)
+                .column(author::Column::DisplayName)
+                .into_tuple()
+                .all(self.database.read())
+                .await?;
+            let ids: Vec<Uuid> = names
+                .into_iter()
+                .filter(|(_, name)| autoxide_kernel::search::fold(name).contains(&wanted))
+                .map(|(id, _)| id)
+                .collect();
+            select = select.filter(author::Column::Id.is_in(ids));
+        }
+        fetch_page(select, author::Column::Id, |row| row.id, page, self.database.read()).await
+    }
+
+    /// Số bài (mọi trạng thái) của từng tác giả trong `ids` — một câu cho cả trang.
+    pub(crate) async fn author_entry_counts(
+        &self,
+        ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, u64>, Error> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let rows: Vec<(Uuid, i64)> = entry_author::Entity::find()
+            .select_only()
+            .column(entry_author::Column::AuthorId)
+            .column_as(entry_author::Column::EntryId.count(), "entries")
+            .filter(entry_author::Column::AuthorId.is_in(ids.iter().copied()))
+            .group_by(entry_author::Column::AuthorId)
+            .into_tuple()
+            .all(self.database.read())
+            .await?;
+        Ok(rows.into_iter().map(|(id, count)| (id, u64::try_from(count).unwrap_or(0))).collect())
     }
 
     pub(crate) async fn get_author(

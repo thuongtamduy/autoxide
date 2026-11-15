@@ -124,13 +124,16 @@ impl Module for ContentModule {
             ai: context.require::<dyn autoxide_kernel::ai::TextModel>()?,
             embedder: context.require::<dyn autoxide_kernel::ai::Embedder>()?,
         };
-        let service = Arc::new(ContentService::new(
-            context.database().clone(),
-            context.outbox()?,
-            context.jobs(),
-            dependencies,
-            config,
-        ));
+        let service = Arc::new(
+            ContentService::new(
+                context.database().clone(),
+                context.outbox()?,
+                context.jobs(),
+                dependencies,
+                config,
+            )
+            .with_translations(context.translations().clone()),
+        );
         context.personal_data(service.clone())?;
         context
             .resource_type(resource::ENTRY, Arc::new(resource::EntryResolver(service.clone())))?;

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use axum::extract::{Path, Query, State};
@@ -42,20 +43,22 @@ pub(crate) struct SeoFinding {
     /// The field, or the place in the body JSON (e.g. `body.content[2].attrs.alt`).
     #[schema(example = "body.content[2].attrs.alt")]
     field: String,
-    /// What to fix, in English.
+    /// What to fix, in the language of `Accept-Language`.
     message: String,
 }
 
-impl From<Finding> for SeoFinding {
-    fn from(finding: Finding) -> Self {
+impl SeoFinding {
+    fn new(finding: Finding, translations: &Translations, language: Language) -> Self {
+        let params: Vec<(&str, &str)> =
+            finding.params.iter().map(|(name, value)| (*name, value.as_str())).collect();
         SeoFinding {
             code: finding.code.to_owned(),
             level: match finding.level {
                 Level::Error => FindingLevel::Error,
                 Level::Warning => FindingLevel::Warning,
             },
+            message: translations.describe_with(finding.template, &params, language),
             field: finding.field,
-            message: finding.message,
         }
     }
 }
@@ -67,9 +70,17 @@ pub(crate) struct SeoReport {
     findings: Vec<SeoFinding>,
 }
 
-impl From<Vec<Finding>> for SeoReport {
-    fn from(findings: Vec<Finding>) -> Self {
-        SeoReport { findings: findings.into_iter().map(SeoFinding::from).collect() }
+impl SeoReport {
+    pub(crate) fn new(
+        findings: Vec<Finding>,
+        translations: &Translations,
+        language: Language,
+    ) -> Self {
+        let findings = findings
+            .into_iter()
+            .map(|finding| SeoFinding::new(finding, translations, language))
+            .collect();
+        SeoReport { findings }
     }
 }
 
@@ -124,8 +135,10 @@ pub(crate) async fn seo_check(
     State(service): State<Arc<ContentService>>,
     principal: Principal,
     Path(id): Path<Uuid>,
+    language: Language,
 ) -> Result<Data<SeoReport>, Error> {
-    Ok(Data { data: SeoReport::from(service.seo_check(&principal, id).await?) })
+    let findings = service.seo_check(&principal, id).await?;
+    Ok(Data { data: SeoReport::new(findings, &service.translations, language) })
 }
 
 /// Suggest SEO fields with AI.

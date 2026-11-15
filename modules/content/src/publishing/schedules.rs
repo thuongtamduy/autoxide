@@ -82,6 +82,7 @@ impl JobHandler for Runner {
 impl ContentService {
     /// Đặt lịch `action` cho mục `entry_id` lúc `run_at` (phải ở tương lai). Cần
     /// `content.publish`. `expected`: phiên bản mục đã đọc (`If-Match`).
+    #[cfg(test)]
     pub(crate) async fn create_schedule(
         &self,
         principal: &Principal,
@@ -90,7 +91,28 @@ impl ContentService {
         run_at: DateTime<Utc>,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Schedule, Error> {
+        self.create_schedule_reviewed(principal, entry_id, action, run_at, expected, false).await
+    }
+
+    /// Như [`create_schedule`](Self::create_schedule); `ai_reviewed`: người đặt lịch xác nhận đã
+    /// duyệt nội dung do AI tạo (như `ai_reviewed` khi đăng ngay) — chỉ người đăng nhập, không
+    /// phải API key; lịch chạy thì bản công khai mang xác nhận đó.
+    pub(crate) async fn create_schedule_reviewed(
+        &self,
+        principal: &Principal,
+        entry_id: Uuid,
+        action: Action,
+        run_at: DateTime<Utc>,
+        expected: Option<DateTime<Utc>>,
+        ai_reviewed: bool,
+    ) -> Result<Schedule, Error> {
         principal.require(&CONTENT_PUBLISH)?;
+        if ai_reviewed && principal.api_key_id().is_some() {
+            return Err(Error::forbidden(
+                "content.ai_review_requires_human",
+                "Only a person signed in (not an API key) can confirm that AI-generated content was reviewed.",
+            ));
+        }
         let entry = self.load_checked(entry_id, expected).await?;
         let now = now();
         if run_at <= now {
@@ -140,6 +162,8 @@ impl ContentService {
             status: Set("scheduled".to_owned()),
             error_code: Set(None),
             created_by: Set(by),
+            ai_reviewed_by: Set((ai_reviewed && action == Action::Publish && current.ai_generated)
+                .then_some(principal.user_id())),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -162,6 +186,32 @@ impl ContentService {
             .await?;
         transaction.commit().await?;
         Ok(row)
+    }
+
+    /// Lịch của mọi mục, theo giờ chạy (`order=asc`: sớm nhất trước), lọc theo `status` (vd
+    /// `scheduled`: đang chờ) — màn "Sắp đăng" (đề bài giao diện B4). Cần `content.read`.
+    pub(crate) async fn list_all_schedules(
+        &self,
+        principal: &Principal,
+        status: Option<&str>,
+        page: &autoxide_kernel::pagination::PageRequest,
+    ) -> Result<autoxide_kernel::pagination::Page<Schedule>, Error> {
+        principal.require(&CONTENT_READ)?;
+        let mut select = schedule::Entity::find();
+        if let Some(status) = status {
+            select = select.filter(schedule::Column::Status.eq(status));
+        }
+        let key = |row: &Schedule| autoxide_kernel::pagination::SortValue::Time(row.run_at);
+        autoxide_kernel::pagination::fetch_page_by(
+            select,
+            schedule::Column::RunAt,
+            key,
+            schedule::Column::Id,
+            |row| row.id,
+            page,
+            self.database.read(),
+        )
+        .await
     }
 
     /// Lịch của mục `entry_id`, mới trước. Cần `content.read`.
@@ -320,7 +370,7 @@ impl ContentService {
                             published_at: None,
                             now,
                             by: row.created_by,
-                            ai_reviewed_by: None,
+                            ai_reviewed_by: row.ai_reviewed_by,
                         },
                     )
                     .await?;

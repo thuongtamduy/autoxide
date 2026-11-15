@@ -13,6 +13,8 @@ mod public;
 mod redirects;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_web;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -63,6 +65,7 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(history::restore_revision))
         .routes(routes!(history::list_schedules, history::create_schedule))
         .routes(routes!(history::cancel_schedule))
+        .routes(routes!(history::list_all_schedules))
         .routes(routes!(redirects::list_redirects, redirects::create_redirect))
         .routes(routes!(
             redirects::get_redirect,

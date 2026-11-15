@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Query;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
-    IntoActiveModel, PaginatorTrait, QueryFilter, QueryOrder, Set,
+    IntoActiveModel, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -184,6 +184,7 @@ impl ContentService {
         &self,
         principal: &Principal,
         taxonomy: Option<Taxonomy>,
+        search: Option<&str>,
         page: &PageRequest,
     ) -> Result<Page<TermWithTexts>, Error> {
         principal.require(&CONTENT_READ)?;
@@ -191,12 +192,52 @@ impl ContentService {
         if let Some(taxonomy) = taxonomy {
             select = select.filter(term::Column::Taxonomy.eq(taxonomy.as_str()));
         }
+        if let Some(search) = search.map(str::trim).filter(|search| !search.is_empty()) {
+            // Tên nằm ở bảng bản dịch, không có cột tìm dạng bỏ dấu: so trong bộ nhớ bằng
+            // `search::fold` (cùng cách tìm bài) — danh mục và thẻ của một khách không nhiều.
+            let wanted = autoxide_kernel::search::fold(search);
+            let names: Vec<(Uuid, String)> = term_translation::Entity::find()
+                .select_only()
+                .column(term_translation::Column::TermId)
+                .column(term_translation::Column::Name)
+                .into_tuple()
+                .all(self.database.read())
+                .await?;
+            let mut ids: Vec<Uuid> = names
+                .into_iter()
+                .filter(|(_, name)| autoxide_kernel::search::fold(name).contains(&wanted))
+                .map(|(id, _)| id)
+                .collect();
+            ids.sort_unstable();
+            ids.dedup();
+            select = select.filter(term::Column::Id.is_in(ids));
+        }
         let page =
             fetch_page(select, term::Column::Id, |row| row.id, page, self.database.read()).await?;
         let ids: Vec<Uuid> = page.data.iter().map(|term| term.id).collect();
         let mut texts = self.texts_of(&ids).await?;
         Ok(page
             .map(|term| TermWithTexts { texts: texts.remove(&term.id).unwrap_or_default(), term }))
+    }
+
+    /// Số bài (mọi trạng thái) gắn với từng term trong `ids` — một câu cho cả trang.
+    pub(crate) async fn term_entry_counts(
+        &self,
+        ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, u64>, Error> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let rows: Vec<(Uuid, i64)> = entry_term::Entity::find()
+            .select_only()
+            .column(entry_term::Column::TermId)
+            .column_as(entry_term::Column::EntryId.count(), "entries")
+            .filter(entry_term::Column::TermId.is_in(ids.iter().copied()))
+            .group_by(entry_term::Column::TermId)
+            .into_tuple()
+            .all(self.database.read())
+            .await?;
+        Ok(rows.into_iter().map(|(id, count)| (id, u64::try_from(count).unwrap_or(0))).collect())
     }
 
     pub(crate) async fn get_term(

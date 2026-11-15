@@ -6726,3 +6726,24 @@ Xếp vào lộ trình: các mục của đề bài này là việc sửa API c�
    không có `auth` thì không có tên. Các nơi khác cần tên người (người tải tệp media, người sửa phiên bản) dùng lại
    loại này.
 6. Lọc người dùng theo role để cho bước 34 (`GET /memberships?role_id=`).
+
+## D-266 · Đề bài giao diện, nhóm B (content): lọc bài, đường dẫn công khai, lịch đăng mọi bài, SEO theo ngôn ngữ — 2026-11-15 — agent quyết
+
+1. **Lọc bài** (`GET /content/entries`): `review_requested`, `scheduled` (có lịch đăng/gỡ đang chờ — subquery trên
+   `content_schedule`), `created_by` (`me` đổi thành người gọi ở tầng HTTP), `ai_generated`, `missing_locale` (nhóm
+   bản dịch chưa có mục mang ngôn ngữ đó). Một câu truy vấn, chạy như nhau trên SQLite và Postgres.
+2. **`path` của bài là đường dẫn đã lưu ở bản công khai** (`content_published.path`), **không** kèm tiền tố ngôn ngữ:
+   core không quyết website đặt ngôn ngữ vào đường dẫn thế nào (`/vi/…`, tên miền riêng, tham số) — đó là việc của
+   website. `published_at` và `path` lấy cho cả trang bằng một câu; `version` là chính giá trị của `ETag`, dùng cho
+   `If-Match` khi sửa từ danh sách.
+3. **`entry_count` và `q`** cho danh mục, thẻ, tác giả: đếm theo lô một câu `GROUP BY`; tìm theo chữ so trên tên đã
+   bỏ dấu (`search::fold`) trong bộ nhớ, vì số danh mục/tác giả của một website nhỏ (hàng trăm) — không thêm cột
+   khoá tìm kiếm. Đo thấy chậm thì thêm cột gấp chữ như `media` (D-117).
+4. **`GET /content/schedules`**: lịch đăng của mọi bài, lọc `status`, phân trang chuẩn. Lịch đăng nhận `ai_reviewed`
+   (cột `ai_reviewed_by` mới): người duyệt là người đặt lịch; API key không được đánh dấu đã duyệt
+   (`content.ai_review_requires_human`), giữ luật "AI không tự đăng" (D-109). Khi chạy lịch, dấu duyệt ghi theo
+   người đã duyệt lúc đặt.
+5. **Câu của kết quả kiểm SEO** là câu mẫu tiếng Anh làm khoá (`"text:<câu>"`, cùng cơ chế mô tả D-264), dịch theo
+   `Accept-Language`; `code` giữ nguyên cho máy.
+6. **Bản xem trước** trả `featured_media` và `body_media` (địa chỉ ảnh) chỉ cho tệp media công khai, đọc qua trait
+   của `media` — không lộ tệp riêng tư qua link xem trước.

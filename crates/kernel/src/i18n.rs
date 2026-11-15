@@ -180,6 +180,24 @@ impl Translations {
         }
     }
 
+    /// Như [`describe`](Self::describe), cho câu mẫu `template` có chỗ điền `{tên}`: dịch câu
+    /// mẫu (khoá `text:<câu mẫu>`) rồi điền `params` một lượt; chưa dịch thì câu tiếng Anh đã điền.
+    pub fn describe_with(
+        &self,
+        template: &str,
+        params: &[(&str, &str)],
+        language: Language,
+    ) -> String {
+        let english = || fill_all(template, params).unwrap_or_else(|| template.to_owned());
+        match language {
+            Language::En => english(),
+            Language::Vi => match self.vi.get(&format!("{TEXT_PREFIX}{template}")) {
+                Some(translated) => fill_all(translated, params).unwrap_or_else(english),
+                None => english(),
+            },
+        }
+    }
+
     /// Câu của lỗi từng ô `field` bằng `language`: bản dịch của câu mẫu (khoá `field:<câu mẫu>`),
     /// điền giá trị; chưa có bản dịch thì câu tiếng Anh.
     pub fn field_message(&self, field: &FieldError, language: Language) -> String {
