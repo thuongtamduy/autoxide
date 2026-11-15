@@ -165,6 +165,21 @@ impl SecretKey {
         derive_from(self.master().await?, purpose)
     }
 
+    /// Khoá 32 byte riêng cho mục đích `purpose` **của khách `tenant`** (bước 33): token ký bằng
+    /// khoá của khách này mang sang khách khác thì không mở được. Khách mặc định dùng đúng khoá
+    /// của [`derive`](Self::derive) — bản cài một khách không đổi khoá nào khi nâng cấp.
+    pub async fn derive_for(
+        &self,
+        tenant: crate::tenancy::TenantId,
+        purpose: &str,
+    ) -> Result<[u8; 32], Error> {
+        if tenant == crate::tenancy::DEFAULT_TENANT {
+            return self.derive(purpose).await;
+        }
+        // Byte 0 ngăn cách: không ghép (mục đích, khách) khác nhau thành cùng một nhãn.
+        derive_from(self.master().await?, &format!("{purpose}\0tenant\0{tenant}"))
+    }
+
     async fn master(&self) -> Result<&[u8], Error> {
         if let Some(configured) = &self.configured {
             return Ok(configured.as_slice());

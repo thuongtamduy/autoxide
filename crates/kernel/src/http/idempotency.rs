@@ -116,8 +116,14 @@ async fn run(
     };
     // Khách người gọi đang làm việc (kể cả nhân sự nền tảng vào khách khác bằng header).
     let tenant = databases.tenant(principal.tenant_id()).await?;
+    // Người gọi trong khách: cùng tài khoản (cùng `user_id`) ở hai khách là hai phạm vi. Khách mặc
+    // định giữ phạm vi như trước bước 33: nâng cấp không làm mất key đang còn hiệu lực.
     let api_key = principal.api_key_id().map(|id| id.as_bytes().to_vec()).unwrap_or_default();
-    let scope = hash(&[principal.user_id().as_bytes(), &api_key]);
+    let scope = if tenant.is_platform() {
+        hash(&[principal.user_id().as_bytes(), &api_key])
+    } else {
+        hash(&[tenant.id().as_uuid().as_bytes(), principal.user_id().as_bytes(), &api_key])
+    };
     let limit = settings.body_limits.for_request(&request);
     let declared = request
         .headers()

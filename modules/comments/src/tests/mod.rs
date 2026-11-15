@@ -38,7 +38,15 @@ pub(super) fn visitor(ip: &str) -> ClientInfo {
 }
 
 pub(super) async fn token(service: &CommentsService, kind: &str) -> String {
-    service.guard.issue(&format!("comments:{kind}")).await.unwrap().token
+    service
+        .guard
+        .issue(
+            &autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
+            &format!("comments:{kind}"),
+        )
+        .await
+        .unwrap()
+        .token
 }
 
 /// Bình luận của khách `name` trên bài `POST`.

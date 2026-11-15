@@ -6560,3 +6560,25 @@ Bổ sung D-253. Thay phần "mã hoá dữ liệu nhạy cảm" của bước 3
    nâng theo khách như mọi module.
 
 Bổ sung D-253.
+
+## D-259 · Thứ ngoài bảng theo khách ở kernel (bước 33 A8, D-190) — 2026-11-15 — agent quyết
+
+1. **Khoá ký theo khách**: `SecretKey::derive_for(tenant, purpose)` = HMAC của `purpose \0tenant\0 <id>` trên khoá
+   gốc; **khách mặc định dùng đúng khoá `derive(purpose)`** — bản cài một khách nâng cấp không đổi khoá nào, token
+   đã phát vẫn dùng được. Token form chống spam ký bằng khoá của khách (`SpamGuard::issue(&tenant, …)`); endpoint
+   `GET /api/v1/antispam/token` nhận khách của request (tên miền / header ở chế độ nhiều khách).
+2. **Idempotency**: phạm vi băm thêm ID khách; khách mặc định giữ phạm vi cũ (key đang còn hiệu lực không mất khi
+   nâng cấp). Bản ghi nằm ở database của khách (module `idempotency` chuyển ở phần B2).
+3. **`TenantStorage`** bọc `dyn Storage`: tiền tố `storage_prefix()` (khách mặc định không tiền tố — file cũ không
+   phải dời; khách khác `tenants/<id>/`), từ chối khoá có `..`, `.`, `\`, đoạn rỗng hay bắt đầu bằng `/`; liệt kê
+   chỉ trả file của khách (khách mặc định bỏ phần `tenants/`). Module `files` / `media` dùng nó ở phần B6, B9.
+4. **Rate limiting theo IP giữ khoá theo IP, không thêm khách** — khác đặc tả ("khoá theo `(tenant, IP)` khi đã biết
+   khách"). Ở lớp rate limit (chạy trước xác thực), "biết khách" chỉ có thể từ `Host` / header do client gửi: thêm
+   vào khoá thì kẻ tấn công né giới hạn bằng cách đổi `Host` mỗi request; tra sổ khách để chỉ nhận tên miền thật thì
+   mỗi request lạ thành một truy vấn database trước khi bị chặn. Giới hạn theo IP là để chặn một client gửi dồn, không
+   giữ dữ liệu của khách nào nên không có gì để lộ giữa khách. Giới hạn theo API key vốn riêng từng key (ID toàn cục).
+   Login throttling theo khách qua `Throttle` (D-254).
+5. **Con trỏ pagination** không đổi định dạng: dữ liệu đã lọc theo khách nên con trỏ của khách khác không lộ gì —
+   bài kiểm làm cùng module đầu tiên chuyển sang theo khách (B1).
+
+Bổ sung D-253.
