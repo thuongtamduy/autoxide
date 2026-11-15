@@ -470,4 +470,11 @@ giá, cửa hàng với dữ liệu mẫu của trang quản trị) tới khi c�
 | [ ] | Sản phẩm | Thông tin hiển thị theo biến thể trong `by-slug` (số người ăn, trong hộp có gì, cách dùng / chăm sóc theo ngôn ngữ, máy rửa bát) | 41 (mới) | Dữ liệu mẫu |
 | [ ] | Sản phẩm | Phí và ngày giao theo tỉnh khi chưa có giỏ, kèm giờ chốt đơn trong ngày | 44 (mới) | Dữ liệu mẫu, giờ chốt 16:00 |
 | [ ] | Khuyến mại | Số thông báo Sở Công Thương và trần giảm theo luật trong `GET /public/promotions` | 43 (mới) | Dữ liệu mẫu |
+| [ ] | Tài khoản người mua | Đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay passkey | 47 (mới) | Mẫu: số điện thoại + mã cố định, không nhận mật khẩu |
+| [ ] | Đặt hàng | Endpoint công khai cho đơn vị hành chính của module `address` (tỉnh, phường) | D-193 (mới) | Dữ liệu mẫu |
+| [ ] | Giỏ, đặt hàng | Báo giá giỏ trả thêm: số điểm tối đa dùng được, cách trả dùng được cho giỏ (COD theo từng người bán), ngày giao dự kiến theo từng nơi bán | 45 (mới) | Dữ liệu mẫu |
+| [ ] | Đơn của tôi | `return_until`, `buyer_cancel_until` có sẵn trong đơn | 45 (mới) | Tự tính hạn 7 ngày |
+| [ ] | Gian hàng người bán | Catalog công khai lọc theo người bán và đường dẫn trang sản phẩm cho hàng người bán; hồ sơ người bán có số sản phẩm theo nhóm, tỉ lệ giao đúng hạn, trạng thái tạm ngừng | 41, 46 (mới) | Dữ liệu mẫu; hàng người bán mở ở gian hàng |
+| [ ] | Mời người bán | Phí sàn công khai (hiện `/fee-rules/preview` cần `marketplace.sell`); đăng ký bán trước khi có tài khoản | 46 (mới) | Dữ liệu mẫu; form đăng ký dùng `forms/public/ban-tren-cho` nếu cửa hàng đã tạo |
+| [ ] | Quyền riêng tư của người mua | Đối chiếu đủ endpoint tải về / xoá dữ liệu cá nhân từ website | 37 | Dữ liệu mẫu |
 
