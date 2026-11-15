@@ -72,3 +72,22 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Hồ sơ công khai | Hồ sơ công khai của nút (`PATCH /organizations/units/{id}`), giờ mở cửa theo ngày và ngày nghỉ, danh mục tỉnh / xã | 34 (D-200, `address`) | Dữ liệu mẫu (`src/sample/org.ts`); cùng một giờ cho mọi ngày |
 | [ ] | Quyền vào hỗ trợ | `GET /auth/support-access`, cài đặt `auth.support_access` | 34 | Dữ liệu mẫu (`src/sample/org.ts`) |
 | [ ] | Quyền vào hỗ trợ | Khách tự thu hồi một lần cấp quyền vào hỗ trợ (bước 34 chỉ cho nhà vận hành thu hồi) | mới | Dữ liệu mẫu (`src/sample/org.ts`), ghi "theo API đề xuất" |
+
+## Nội dung › Bài viết và trình soạn bài (`/content`)
+
+| | Màn | Cần | Bước | Giao diện đang làm gì |
+|---|---|---|---|---|
+| [ ] | Danh sách | Lọc "chờ duyệt" (`review_requested=true`) và "đã lên lịch" trong `GET /content/entries` | mới | Tab chỉ có Tất cả / Bản nháp / Đã đăng / Đã lưu trữ; nhãn "Chờ duyệt" hiện trên từng dòng |
+| [ ] | Danh sách | Số bài của từng tab trạng thái | 51 (số đếm) | Chưa hiện số |
+| [ ] | Danh sách | Lọc "Bài của tôi" (`created_by=me`) và "thiếu bản dịch ngôn ngữ X" | mới | Chưa dựng |
+| [ ] | Danh sách | "Sắp đăng": lịch đăng của mọi bài (`GET /content/schedules?status=scheduled`) | mới | Chỉ xem lịch trong từng bài |
+| [ ] | Danh sách, trình soạn | Cấu hình cho giao diện: danh sách ngôn ngữ (`AUTOXIDE_CONTENT_LOCALES`), đầu đường dẫn bài viết, host được nhúng | mới | Dùng giá trị mặc định của core: en/vi, `/blog/`, YouTube/Vimeo |
+| [ ] | Danh sách, trình soạn | `published_at` trong `EntryResponse` của trang quản trị | mới | Cột ngày dùng `updated_at` |
+| [ ] | Danh sách | Website theo tên miền | 37 (`GET /compliance/websites`) | Dữ liệu mẫu (`src/sample/content.ts`) |
+| [ ] | Danh sách | Trang bắt buộc của website, tạo từ mẫu | 37 (`…/websites/{id}/checklist`, `POST /content/templates/{key}/drafts`) | Dữ liệu mẫu (`src/sample/content.ts`) |
+| [ ] | Danh sách, trình soạn | Bài thuộc website / nút sở hữu nào, lọc theo nút | mới (bước 34 giữ `content` ở cấp khách) | Dữ liệu mẫu (`src/sample/content.ts`) |
+| [ ] | Xem trước | Địa chỉ website của khách, để link xem trước trỏ về website thật | 33, 37 | Trang `/preview` của chính trang quản trị |
+| [ ] | Xem trước | Bản xem trước trả kèm địa chỉ ảnh (hiện chỉ có id media) | mới | Ảnh hiện thành ô giữ chỗ |
+| [ ] | Trình soạn | Lịch đăng mang theo `ai_reviewed` | mới | Hẹn giờ không gửi được dấu "đã duyệt" |
+| [ ] | Trình soạn | Kết quả kiểm SEO trả `message` theo `Accept-Language` | mới | Giao diện tự dịch theo `code`; mã lạ thì hiện câu tiếng Anh |
+| [ ] | Trình soạn | Tìm tác giả và danh mục theo chữ (hiện chỉ lấy một trang 200) | mới | Lấy 200 mục đầu |
