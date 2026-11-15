@@ -11,6 +11,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use super::*;
 use crate::entity::translation_request;
 use crate::testing::service_with;
+use autoxide_kernel::tenancy::TenantContext;
 
 fn translator() -> FakeTextModel {
     FakeTextModel::new(|prompt: &Prompt| {
@@ -32,9 +33,10 @@ async fn yeu_cau_ket_bi_thay_va_huy_khong_bi_ghi_de() {
             Arc::new(FakeEmbedder::disabled()),
         )
         .await;
+        let tenant = TenantContext::default_on(database.clone());
         let ada = editor();
-        let source = content.create(&ada, post("Hello")).await.unwrap();
-        let stuck = content.request_translation(&ada, source.id, "vi").await.unwrap();
+        let source = content.create(&tenant, &ada, post("Hello")).await.unwrap();
+        let stuck = content.request_translation(&tenant, &ada, source.id, "vi").await.unwrap();
         // Như một job bị worker cắt ngang ở lần cuối: `running`, đứng yên 20 phút.
         translation_request::Entity::update_many()
             .col_expr(translation_request::Column::Status, Expr::value("running"))
@@ -46,7 +48,7 @@ async fn yeu_cau_ket_bi_thay_va_huy_khong_bi_ghi_de() {
             .exec(database.write())
             .await
             .unwrap();
-        let fresh = content.request_translation(&ada, source.id, "vi").await.unwrap();
+        let fresh = content.request_translation(&tenant, &ada, source.id, "vi").await.unwrap();
         let old = translation_request::Entity::find_by_id(stuck.id)
             .one(database.read())
             .await
@@ -57,7 +59,7 @@ async fn yeu_cau_ket_bi_thay_va_huy_khong_bi_ghi_de() {
             ("failed", Some("content.translation_stale"), None)
         );
         // Job cũ chạy tới: thấy đã xong, không làm gì.
-        content.run_translation(stuck.id, 8).await.unwrap();
+        content.run_translation(&tenant, stuck.id, 8).await.unwrap();
         assert_eq!(
             translation_request::Entity::find_by_id(stuck.id)
                 .one(database.read())
@@ -69,8 +71,8 @@ async fn yeu_cau_ket_bi_thay_va_huy_khong_bi_ghi_de() {
         );
 
         // Huỷ (tài khoản bị xoá) rồi job chạy: vẫn là huỷ.
-        assert_eq!(content.cancel_translations_of(ada.user_id()).await.unwrap(), 1);
-        content.run_translation(fresh.id, 1).await.unwrap();
+        assert_eq!(content.cancel_translations_of(&tenant, ada.user_id()).await.unwrap(), 1);
+        content.run_translation(&tenant, fresh.id, 1).await.unwrap();
         let canceled = translation_request::Entity::find_by_id(fresh.id)
             .one(database.read())
             .await

@@ -11,7 +11,7 @@ pub(crate) mod schedules;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -57,6 +57,7 @@ impl ContentService {
     /// (`content.path_has_redirect`: bản công khai sẽ che chuyển hướng đó).
     pub(crate) async fn publish(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         expected: Option<DateTime<Utc>>,
@@ -71,7 +72,7 @@ impl ContentService {
             ));
         }
         // Quyền trước, phiên bản sau: người không có quyền không biết được mục có đổi hay không.
-        let entry = self.load_checked(id, None).await?;
+        let entry = self.load_checked(tenant, id, None).await?;
         permissions::require_publish(principal, &entry)?;
         let own_only = permissions::publish_own_only(principal);
         if own_only {
@@ -91,16 +92,18 @@ impl ContentService {
         }
         check_version(&entry, expected)?;
         // Ảnh phải tồn tại và công khai; hỏi `media` TRƯỚC transaction.
-        self.check_publishable(&entry).await?;
+        self.check_publishable(tenant, &entry).await?;
         let now = now();
         let by = Some(principal.user_id());
-        let transaction = self.database.begin_write().await?;
-        paths::lock_tree(&transaction, &entry.locale).await?;
-        let current = self.reload(&transaction, id, expected.unwrap_or(entry.updated_at)).await?;
+        let transaction = tenant.database().begin_write().await?;
+        paths::lock_tree(&transaction, tenant, &entry.locale).await?;
+        let current =
+            self.reload(tenant, &transaction, id, expected.unwrap_or(entry.updated_at)).await?;
         if own_only
             && let Ok(path) =
-                paths::path_of(&transaction, &current, &self.config.post_path_prefix).await?
-            && paths::manual_redirect_at(&transaction, &current.locale, &path).await?
+                paths::path_of(&transaction, tenant, &current, &self.config.post_path_prefix)
+                    .await?
+            && paths::manual_redirect_at(&transaction, tenant, &current.locale, &path).await?
         {
             // `resolve` xem bản công khai trước chuyển hướng: đăng ở đây sẽ lặng lẽ vô hiệu một
             // chuyển hướng biên tập viên đặt. Chỉ người có `content.publish` được quyết điều đó.
@@ -111,10 +114,11 @@ impl ContentService {
             .with_param("path", &path));
         }
         let revision =
-            revisions::record(&transaction, &current, Reason::Published, by, now).await?;
+            revisions::record(&transaction, tenant, &current, Reason::Published, by, now).await?;
         let reviewed_by = (ai_reviewed && current.ai_generated).then(|| principal.user_id());
         let (path, moved) = self
             .put_published(
+                tenant,
                 &transaction,
                 &current,
                 revision.id,
@@ -128,17 +132,17 @@ impl ContentService {
         after.review_requested_at = None;
         after.review_requested_by = None;
         after.updated_at = now;
-        let after = self.save_state(&transaction, &current, &after).await?;
+        let after = self.save_state(tenant, &transaction, &current, &after).await?;
         let change = Change {
             before: Some(summary(&current)),
             after: Some(summary(&after)),
             published: Some(published_payload(&after, Some(&path), &moved)),
         };
-        self.enqueue_index(&transaction, id).await?;
+        self.enqueue_index(tenant, &transaction, id).await?;
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::entry_subject(id),
                 &events::EntryPublished(change),
@@ -153,25 +157,28 @@ impl ContentService {
     /// Cần `content.publish`.
     pub(crate) async fn unpublish(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Entry, Error> {
-        self.take_down(principal, id, expected, Status::Draft).await
+        self.take_down(tenant, principal, id, expected, Status::Draft).await
     }
 
     /// Lưu trữ mục `id`: gỡ và ghi "đã gỡ" (410) ở đường dẫn của nó. Cần `content.publish`.
     pub(crate) async fn archive(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Entry, Error> {
-        self.take_down(principal, id, expected, Status::Archived).await
+        self.take_down(tenant, principal, id, expected, Status::Archived).await
     }
 
     async fn take_down(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         expected: Option<DateTime<Utc>>,
@@ -184,7 +191,7 @@ impl ContentService {
         } else {
             principal.require(&CONTENT_PUBLISH)?;
         }
-        let entry = self.load_checked(id, None).await?;
+        let entry = self.load_checked(tenant, id, None).await?;
         if to == Status::Draft {
             permissions::require_publish(principal, &entry)?;
         }
@@ -194,13 +201,15 @@ impl ContentService {
         }
         let now = now();
         let by = Some(principal.user_id());
-        let transaction = self.database.begin_write().await?;
-        paths::lock_tree(&transaction, &entry.locale).await?;
-        let current = self.reload(&transaction, id, expected.unwrap_or(entry.updated_at)).await?;
-        let removed =
-            self.remove_published(&transaction, &current, to == Status::Archived, by, now).await?;
+        let transaction = tenant.database().begin_write().await?;
+        paths::lock_tree(&transaction, tenant, &entry.locale).await?;
+        let current =
+            self.reload(tenant, &transaction, id, expected.unwrap_or(entry.updated_at)).await?;
+        let removed = self
+            .remove_published(tenant, &transaction, &current, to == Status::Archived, by, now)
+            .await?;
         if to == Status::Draft {
-            revisions::record(&transaction, &current, Reason::Unpublished, by, now).await?;
+            revisions::record(&transaction, tenant, &current, Reason::Unpublished, by, now).await?;
         }
         // Lịch đăng đang chờ sẽ đăng lại mục vừa gỡ: huỷ. Lưu trữ thì lịch gỡ cũng vô nghĩa.
         let actions: &[Action] = if to == Status::Archived {
@@ -208,12 +217,13 @@ impl ContentService {
         } else {
             &[Action::Publish]
         };
-        self.cancel_pending_schedules(&transaction, Actor::from(principal), id, actions).await?;
+        self.cancel_pending_schedules(tenant, &transaction, Actor::from(principal), id, actions)
+            .await?;
         let mut after = current.clone();
         after.status = to.as_str().to_owned();
         after.has_unpublished_changes = false;
         after.updated_at = now;
-        let after = self.save_state(&transaction, &current, &after).await?;
+        let after = self.save_state(tenant, &transaction, &current, &after).await?;
         let stale: Vec<Moved> =
             removed.iter().map(|path| (id, path.clone(), String::new())).collect();
         let change = Change {
@@ -221,28 +231,16 @@ impl ContentService {
             after: Some(summary(&after)),
             published: removed.as_ref().map(|_| published_payload(&after, None, &stale)),
         };
-        self.enqueue_index(&transaction, id).await?;
+        self.enqueue_index(tenant, &transaction, id).await?;
         let actor = Actor::from(principal);
         let subject = events::entry_subject(id);
         if to == Status::Archived {
             self.outbox
-                .record(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    actor,
-                    subject,
-                    &events::EntryArchived(change),
-                )
+                .record(&transaction, tenant, actor, subject, &events::EntryArchived(change))
                 .await?;
         } else {
             self.outbox
-                .record(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    actor,
-                    subject,
-                    &events::EntryUnpublished(change),
-                )
+                .record(&transaction, tenant, actor, subject, &events::EntryUnpublished(change))
                 .await?;
         }
         transaction.commit().await?;
@@ -253,18 +251,21 @@ impl ContentService {
     /// Cần `content.delete` (tách khỏi `content.publish`, D-109).
     pub(crate) async fn delete(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         expected: Option<DateTime<Utc>>,
     ) -> Result<(), Error> {
         principal.require(&CONTENT_DELETE)?;
-        let entry = self.load_checked(id, expected).await?;
+        let entry = self.load_checked(tenant, id, expected).await?;
         let now = now();
         let by = Some(principal.user_id());
-        let transaction = self.database.begin_write().await?;
-        paths::lock_tree(&transaction, &entry.locale).await?;
-        let current = self.reload(&transaction, id, expected.unwrap_or(entry.updated_at)).await?;
+        let transaction = tenant.database().begin_write().await?;
+        paths::lock_tree(&transaction, tenant, &entry.locale).await?;
+        let current =
+            self.reload(tenant, &transaction, id, expected.unwrap_or(entry.updated_at)).await?;
         let children = entry::Entity::find()
+            .scoped(tenant)
             .filter(entry::Column::ParentKey.eq(id))
             .count(&transaction)
             .await?;
@@ -276,26 +277,31 @@ impl ContentService {
             )
             .with_param("count", children));
         }
-        let removed = self.remove_published(&transaction, &current, true, by, now).await?;
-        entry::Entity::delete_by_id(id).exec(&transaction).await?;
+        let removed = self.remove_published(tenant, &transaction, &current, true, by, now).await?;
+        entry::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         revision::Entity::delete_many()
+            .scoped(tenant)
             .filter(revision::Column::EntryId.eq(id))
             .exec(&transaction)
             .await?;
         schedule::Entity::delete_many()
+            .scoped(tenant)
             .filter(schedule::Column::EntryId.eq(id))
             .exec(&transaction)
             .await?;
         entry_term::Entity::delete_many()
+            .scoped(tenant)
             .filter(entry_term::Column::EntryId.eq(id))
             .exec(&transaction)
             .await?;
         entry_author::Entity::delete_many()
+            .scoped(tenant)
             .filter(entry_author::Column::EntryId.eq(id))
             .exec(&transaction)
             .await?;
         // Chuyển hướng trỏ tới mục này: đích không còn, thành "đã gỡ".
         redirect::Entity::update_many()
+            .scoped(tenant)
             .col_expr(redirect::Column::ToEntryId, Expr::value(Option::<Uuid>::None))
             .col_expr(redirect::Column::StatusCode, Expr::value(410))
             .col_expr(redirect::Column::Source, Expr::value("gone"))
@@ -310,11 +316,11 @@ impl ContentService {
             after: None,
             published: removed.as_ref().map(|_| published_payload(&current, None, &stale)),
         };
-        self.enqueue_index(&transaction, id).await?;
+        self.enqueue_index(tenant, &transaction, id).await?;
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::entry_subject(id),
                 &events::EntryDeleted(change),
@@ -331,13 +337,14 @@ impl ContentService {
     /// nếu trang đang công khai.
     pub(crate) async fn move_page(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         parent: Option<Uuid>,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Entry, Error> {
         permissions::require_create(principal)?;
-        let entry = self.load_checked(id, None).await?;
+        let entry = self.load_checked(tenant, id, None).await?;
         permissions::require_write(principal, &entry)?;
         check_version(&entry, expected)?;
         if entry.kind != Kind::Page.as_str() {
@@ -352,15 +359,18 @@ impl ContentService {
         }
         let now = now();
         let by = Some(principal.user_id());
-        let transaction = self.database.begin_write().await?;
-        paths::lock_tree(&transaction, &entry.locale).await?;
-        let current = self.reload(&transaction, id, expected.unwrap_or(entry.updated_at)).await?;
+        let transaction = tenant.database().begin_write().await?;
+        paths::lock_tree(&transaction, tenant, &entry.locale).await?;
+        let current =
+            self.reload(tenant, &transaction, id, expected.unwrap_or(entry.updated_at)).await?;
         if let Some(parent) = parent {
-            if let Some(row) = entry::Entity::find_by_id(parent).one(&transaction).await? {
+            if let Some(row) =
+                entry::Entity::find_by_id(parent).scoped(tenant).one(&transaction).await?
+            {
                 permissions::require_parent(principal, &row)?;
             }
-            if crate::entries::depth(&transaction, parent).await.is_ok()
-                && self.is_ancestor(&transaction, id, parent).await?
+            if crate::entries::depth(&transaction, tenant, parent).await.is_ok()
+                && self.is_ancestor(tenant, &transaction, id, parent).await?
             {
                 return Err(Error::conflict(
                     "content.tree_cycle",
@@ -368,7 +378,7 @@ impl ContentService {
                 ));
             }
             let mut problems = Vec::new();
-            self.check_parent(&transaction, &current, parent, &mut problems).await?;
+            self.check_parent(tenant, &transaction, &current, parent, &mut problems).await?;
             if !problems.is_empty() {
                 return Err(invalid(problems));
             }
@@ -377,31 +387,43 @@ impl ContentService {
         after.parent_id = parent;
         after.parent_key = parent.unwrap_or(ROOT);
         after.updated_at = now;
-        let after = self.save_state(&transaction, &current, &after).await?;
+        let after = self.save_state(tenant, &transaction, &current, &after).await?;
 
         let mut moved = Vec::new();
         let mut path = None;
-        if let Some(old) = published::Entity::find_by_id(id).one(&transaction).await? {
+        if let Some(old) = published::Entity::find()
+            .scoped(tenant)
+            .filter(published::Column::EntryId.eq(id))
+            .one(&transaction)
+            .await?
+        {
             // Đường dẫn công khai mới tính từ slug ĐÃ ĐĂNG: slug của nháp chỉ ra ngoài khi đăng.
             let mut moved_entry = after.clone();
             moved_entry.slug.clone_from(&old.slug);
-            let new = paths::path_of(&transaction, &moved_entry, &self.config.post_path_prefix)
-                .await?
-                .map_err(|()| parent_not_published())?;
-            if paths::path_used(&transaction, &after.locale, &new, id).await? {
+            let new =
+                paths::path_of(&transaction, tenant, &moved_entry, &self.config.post_path_prefix)
+                    .await?
+                    .map_err(|()| parent_not_published())?;
+            if paths::path_used(&transaction, tenant, &after.locale, &new, id).await? {
                 return Err(path_taken(&new));
             }
             let mut row = old.clone().into_active_model();
             row.parent_id = Set(parent);
             row.path = Set(new.clone());
             row.updated_at = Set(now);
-            row.update(&transaction).await.map_err(|error| unique_path(error, &new))?;
+            published::Entity::update(row)
+                .validate()?
+                .scoped(tenant)
+                .exec(&transaction)
+                .await
+                .map_err(|error| unique_path(error, &new))?;
             if old.path != new {
                 moved.push((id, old.path.clone(), new.clone()));
                 moved.extend(
-                    paths::repath_descendants(&transaction, id, &old.path, &new, now).await?,
+                    paths::repath_descendants(&transaction, tenant, id, &old.path, &new, now)
+                        .await?,
                 );
-                paths::redirect_moved(&transaction, &after.locale, &moved, by, now).await?;
+                paths::redirect_moved(&transaction, tenant, &after.locale, &moved, by, now).await?;
             }
             path = Some(new);
         }
@@ -413,7 +435,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::entry_subject(id),
                 &events::EntryMoved(change),
@@ -427,21 +449,27 @@ impl ContentService {
     /// `transaction` (đã khoá cây). Trả đường dẫn mới và các đường dẫn đã đổi.
     pub(crate) async fn put_published<C: ConnectionTrait>(
         &self,
+        tenant: &TenantContext,
         transaction: &C,
         version: &Entry,
         revision_id: Uuid,
         stamp: PublishStamp,
     ) -> Result<(String, Vec<Moved>), Error> {
         let PublishStamp { published_at, now, by, ai_reviewed_by } = stamp;
-        let path = paths::path_of(transaction, version, &self.config.post_path_prefix)
+        let path = paths::path_of(transaction, tenant, version, &self.config.post_path_prefix)
             .await?
             .map_err(|()| parent_not_published())?;
-        if paths::path_used(transaction, &version.locale, &path, version.id).await? {
+        if paths::path_used(transaction, tenant, &version.locale, &path, version.id).await? {
             return Err(path_taken(&path));
         }
-        let old = published::Entity::find_by_id(version.id).one(transaction).await?;
+        let old = published::Entity::find()
+            .scoped(tenant)
+            .filter(published::Column::EntryId.eq(version.id))
+            .one(transaction)
+            .await?;
         let row = published::Model {
             entry_id: version.id,
+            tenant_id: tenant.id().as_uuid(),
             kind: version.kind.clone(),
             locale: version.locale.clone(),
             translation_group_id: version.translation_group_id,
@@ -477,13 +505,26 @@ impl ContentService {
             Some(old) => {
                 // Mọi cột đổi theo phiên bản mới; khoá chính giữ nguyên.
                 let mut active = row.into_active_model().reset_all();
+                active.tenant_id = sea_orm::ActiveValue::Unchanged(tenant.id().as_uuid());
                 active.entry_id = sea_orm::ActiveValue::Unchanged(version.id);
-                active.update(transaction).await.map_err(|error| unique_path(error, &path))?;
+                published::Entity::update(active)
+                    .validate()?
+                    .scoped(tenant)
+                    .exec(transaction)
+                    .await
+                    .map_err(|error| unique_path(error, &path))?;
                 if old.path != path {
                     moved.push((version.id, old.path.clone(), path.clone()));
                     moved.extend(
-                        paths::repath_descendants(transaction, version.id, &old.path, &path, now)
-                            .await?,
+                        paths::repath_descendants(
+                            transaction,
+                            tenant,
+                            version.id,
+                            &old.path,
+                            &path,
+                            now,
+                        )
+                        .await?,
                     );
                 }
             }
@@ -494,8 +535,8 @@ impl ContentService {
                     .map_err(|error| unique_path(error, &path))?;
             }
         }
-        paths::clear_automatic(transaction, &version.locale, &path).await?;
-        paths::redirect_moved(transaction, &version.locale, &moved, by, now).await?;
+        paths::clear_automatic(transaction, tenant, &version.locale, &path).await?;
+        paths::redirect_moved(transaction, tenant, &version.locale, &moved, by, now).await?;
         Ok((path, moved))
     }
 
@@ -503,16 +544,23 @@ impl ContentService {
     /// gỡ trang còn trang con đang công khai. Trả đường dẫn đã bỏ.
     pub(crate) async fn remove_published<C: ConnectionTrait>(
         &self,
+        tenant: &TenantContext,
         transaction: &C,
         entry: &Entry,
         gone: bool,
         by: Option<Uuid>,
         now: DateTime<Utc>,
     ) -> Result<Option<String>, Error> {
-        let Some(old) = published::Entity::find_by_id(entry.id).one(transaction).await? else {
+        let Some(old) = published::Entity::find()
+            .scoped(tenant)
+            .filter(published::Column::EntryId.eq(entry.id))
+            .one(transaction)
+            .await?
+        else {
             return Ok(None);
         };
         let children = published::Entity::find()
+            .scoped(tenant)
             .filter(published::Column::ParentId.eq(entry.id))
             .count(transaction)
             .await?;
@@ -523,7 +571,11 @@ impl ContentService {
             )
             .with_param("count", children));
         }
-        published::Entity::delete_by_id(entry.id).exec(transaction).await?;
+        published::Entity::delete_many()
+            .scoped(tenant)
+            .filter(published::Column::EntryId.eq(entry.id))
+            .exec(transaction)
+            .await?;
         if gone {
             let row = Generated {
                 locale: &entry.locale,
@@ -534,13 +586,17 @@ impl ContentService {
                 by,
                 at: now,
             };
-            paths::put_redirect(transaction, row).await?;
+            paths::put_redirect(transaction, tenant, row).await?;
         }
         Ok(Some(old.path))
     }
 
     /// Ảnh của mục phải tồn tại và công khai; thân bài phải hợp lệ.
-    pub(crate) async fn check_publishable(&self, entry: &Entry) -> Result<(), Error> {
+    pub(crate) async fn check_publishable(
+        &self,
+        tenant: &TenantContext,
+        entry: &Entry,
+    ) -> Result<(), Error> {
         let body: Value = serde_json::from_str(&entry.body).unwrap_or_else(|_| body::empty());
         let mut problems = Vec::new();
         let info = match body::check(&body, self.config.max_body_bytes, &self.config.embed_hosts) {
@@ -550,18 +606,20 @@ impl ContentService {
                 body::BodyInfo::default()
             }
         };
-        self.check_media(entry, &info.media_ids, true, &mut problems).await?;
+        self.check_media(tenant, entry, &info.media_ids, true, &mut problems).await?;
         if problems.is_empty() { Ok(()) } else { Err(invalid(problems)) }
     }
 
     /// Đọc mục `id`, kiểm phiên bản người gọi đã đọc (412 nếu khác).
     pub(crate) async fn load_checked(
         &self,
+        tenant: &TenantContext,
         id: Uuid,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Entry, Error> {
         let entry = entry::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| entry_not_found(id))?;
         if expected.is_some_and(|expected| expected != entry.updated_at) {
@@ -573,11 +631,13 @@ impl ContentService {
     /// Đọc lại mục trong `transaction`; đã đổi khác `version` thì 412.
     pub(crate) async fn reload<C: ConnectionTrait>(
         &self,
+        tenant: &TenantContext,
         transaction: &C,
         id: Uuid,
         version: DateTime<Utc>,
     ) -> Result<Entry, Error> {
         let entry = entry::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(transaction)
             .await?
             .ok_or_else(|| entry_not_found(id))?;
@@ -590,12 +650,14 @@ impl ContentService {
     /// Ghi các cột đổi từ `before` sang `after`, với điều kiện phiên bản vẫn là của `before`.
     pub(crate) async fn save_state<C: ConnectionTrait>(
         &self,
+        tenant: &TenantContext,
         transaction: &C,
         before: &Entry,
         after: &Entry,
     ) -> Result<Entry, Error> {
         let update = entry::Entity::update(changed_columns(before, after))
             .validate()?
+            .scoped(tenant)
             .filter(entry::Column::UpdatedAt.eq(before.updated_at));
         match update.exec(transaction).await {
             Ok(saved) => Ok(saved),
@@ -612,6 +674,7 @@ impl ContentService {
     /// Trang `ancestor` có phải `id` hay tổ tiên của `id` không (đi ngược lên từ `id`).
     async fn is_ancestor<C: ConnectionTrait>(
         &self,
+        tenant: &TenantContext,
         connection: &C,
         ancestor: Uuid,
         id: Uuid,
@@ -622,8 +685,11 @@ impl ContentService {
             if id == ancestor {
                 return Ok(true);
             }
-            current =
-                entry::Entity::find_by_id(id).one(connection).await?.and_then(|row| row.parent_id);
+            current = entry::Entity::find_by_id(id)
+                .scoped(tenant)
+                .one(connection)
+                .await?
+                .and_then(|row| row.parent_id);
         }
         Err(Error::internal("the page tree is deeper than expected; it may contain a cycle"))
     }

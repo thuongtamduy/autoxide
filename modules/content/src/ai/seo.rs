@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::ai::{Effort, Part, Prompt};
 use autoxide_kernel::error::Error;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -89,12 +89,14 @@ impl ContentService {
     /// Kiểm SEO của bản nháp mục `id`, không dùng AI. Cần `content.read`.
     pub(crate) async fn seo_check(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<Vec<Finding>, Error> {
         principal.require(&CONTENT_READ)?;
         let entry = entry::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| entry_not_found(id))?;
         let mut findings = Vec::new();
@@ -103,8 +105,9 @@ impl ContentService {
         let mut last_level = 1;
         walk(&body, "body", &mut last_level, &mut findings);
 
-        let read = self.database.read();
+        let read = tenant.database().read();
         let same_title = entry::Entity::find()
+            .scoped(tenant)
             .filter(entry::Column::Locale.eq(entry.locale.as_str()))
             .filter(entry::Column::Title.eq(entry.title.as_str()))
             .filter(entry::Column::Id.ne(entry.id))
@@ -123,6 +126,7 @@ impl ContentService {
             );
         }
         let translated: BTreeSet<String> = entry::Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(entry::Column::Locale)
             .filter(entry::Column::TranslationGroupId.eq(entry.translation_group_id))
@@ -157,28 +161,30 @@ impl ContentService {
     /// trên mục của mình (mỗi lần gọi tốn token).
     pub(crate) async fn suggest_seo(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<Suggestion, Error> {
         permissions::require_create(principal)?;
         let entry = entry::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| entry_not_found(id))?;
         permissions::require_write(principal, &entry)?;
         self.ai.ready()?;
         let terms: Vec<(Uuid, String)> = term_translation::Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(term_translation::Column::TermId)
             .column(term_translation::Column::Name)
             .filter(term_translation::Column::Locale.eq(entry.locale.as_str()))
             .limit(TERMS_OFFERED_MAX)
             .into_tuple()
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         let prompt = seo_prompt(&entry, &terms);
-        let answer =
-            self.ai.generate(&TenantContext::legacy_default(&self.database), prompt).await?;
+        let answer = self.ai.generate(tenant, prompt).await?;
         let text = |name: &str, max: usize| {
             answer
                 .output

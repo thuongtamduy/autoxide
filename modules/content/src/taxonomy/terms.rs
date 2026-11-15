@@ -8,7 +8,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Query;
 use sea_orm::{
@@ -85,22 +85,27 @@ pub(crate) struct TermInput {
 }
 
 /// Điều kiện "mục mang term `term_id`", cho bộ lọc danh sách quản trị.
-pub(crate) fn has_term(term_id: Uuid) -> sea_orm::sea_query::SimpleExpr {
+pub(crate) fn has_term(tenant: &TenantContext, term_id: Uuid) -> sea_orm::sea_query::SimpleExpr {
     entry::Column::Id.in_subquery(
         Query::select()
             .column(entry_term::Column::EntryId)
             .from(entry_term::Entity)
+            .and_where(entry_term::Column::TenantId.eq(tenant.id().as_uuid()))
             .and_where(entry_term::Column::TermId.eq(term_id))
             .to_owned(),
     )
 }
 
 /// Như [`has_term`], cho bảng bản công khai.
-pub(crate) fn published_has_term(term_id: Uuid) -> sea_orm::sea_query::SimpleExpr {
+pub(crate) fn published_has_term(
+    tenant: &TenantContext,
+    term_id: Uuid,
+) -> sea_orm::sea_query::SimpleExpr {
     published::Column::EntryId.in_subquery(
         Query::select()
             .column(entry_term::Column::EntryId)
             .from(entry_term::Entity)
+            .and_where(entry_term::Column::TenantId.eq(tenant.id().as_uuid()))
             .and_where(entry_term::Column::TermId.eq(term_id))
             .to_owned(),
     )
@@ -109,6 +114,7 @@ pub(crate) fn published_has_term(term_id: Uuid) -> sea_orm::sea_query::SimpleExp
 /// ID term của từng mục trong `ids`, theo thứ tự gắn.
 pub(crate) async fn term_ids_of<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     ids: &[Uuid],
 ) -> Result<HashMap<Uuid, Vec<Uuid>>, Error> {
     let mut found: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
@@ -116,6 +122,7 @@ pub(crate) async fn term_ids_of<C: ConnectionTrait>(
         return Ok(found);
     }
     let links = entry_term::Entity::find()
+        .scoped(tenant)
         .filter(entry_term::Column::EntryId.is_in(ids.to_vec()))
         .order_by_asc(entry_term::Column::SortOrder)
         .all(connection)
@@ -128,24 +135,30 @@ pub(crate) async fn term_ids_of<C: ConnectionTrait>(
 
 impl ContentService {
     /// ID term của từng mục trong `ids`, theo thứ tự gắn (để API trả mục kèm term).
-    pub(crate) async fn term_ids(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, Vec<Uuid>>, Error> {
-        term_ids_of(self.database.read(), ids).await
+    pub(crate) async fn term_ids(
+        &self,
+        tenant: &TenantContext,
+        ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, Vec<Uuid>>, Error> {
+        term_ids_of(tenant.database().read(), tenant, ids).await
     }
 }
 
 /// Term của từng bản công khai trong `rows` (theo thứ tự gắn), tên theo ngôn ngữ của mục.
 pub(crate) async fn terms_of<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     ids: &[Uuid],
     default_locale: &str,
     rows: &[Published],
 ) -> Result<HashMap<Uuid, Vec<TermRef>>, Error> {
-    let links = term_ids_of(connection, ids).await?;
+    let links = term_ids_of(connection, tenant, ids).await?;
     let term_ids: Vec<Uuid> = links.values().flatten().copied().collect();
     if term_ids.is_empty() {
         return Ok(HashMap::new());
     }
     let texts = term_translation::Entity::find()
+        .scoped(tenant)
         .filter(term_translation::Column::TermId.is_in(term_ids))
         .all(connection)
         .await?;
@@ -182,13 +195,14 @@ fn pick(texts: &[TermText], id: Uuid, locale: &str, default_locale: &str) -> Opt
 impl ContentService {
     pub(crate) async fn list_terms(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         taxonomy: Option<Taxonomy>,
         search: Option<&str>,
         page: &PageRequest,
     ) -> Result<Page<TermWithTexts>, Error> {
         principal.require(&CONTENT_READ)?;
-        let mut select = term::Entity::find();
+        let mut select = term::Entity::find().scoped(tenant);
         if let Some(taxonomy) = taxonomy {
             select = select.filter(term::Column::Taxonomy.eq(taxonomy.as_str()));
         }
@@ -197,11 +211,12 @@ impl ContentService {
             // `search::fold` (cùng cách tìm bài) — danh mục và thẻ của một khách không nhiều.
             let wanted = autoxide_kernel::search::fold(search);
             let names: Vec<(Uuid, String)> = term_translation::Entity::find()
+                .scoped(tenant)
                 .select_only()
                 .column(term_translation::Column::TermId)
                 .column(term_translation::Column::Name)
                 .into_tuple()
-                .all(self.database.read())
+                .all(tenant.database().read())
                 .await?;
             let mut ids: Vec<Uuid> = names
                 .into_iter()
@@ -213,9 +228,10 @@ impl ContentService {
             select = select.filter(term::Column::Id.is_in(ids));
         }
         let page =
-            fetch_page(select, term::Column::Id, |row| row.id, page, self.database.read()).await?;
+            fetch_page(select, term::Column::Id, |row| row.id, page, tenant.database().read())
+                .await?;
         let ids: Vec<Uuid> = page.data.iter().map(|term| term.id).collect();
-        let mut texts = self.texts_of(&ids).await?;
+        let mut texts = self.texts_of(tenant, &ids).await?;
         Ok(page
             .map(|term| TermWithTexts { texts: texts.remove(&term.id).unwrap_or_default(), term }))
     }
@@ -223,35 +239,39 @@ impl ContentService {
     /// Số bài (mọi trạng thái) gắn với từng term trong `ids` — một câu cho cả trang.
     pub(crate) async fn term_entry_counts(
         &self,
+        tenant: &TenantContext,
         ids: &[Uuid],
     ) -> Result<HashMap<Uuid, u64>, Error> {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
         let rows: Vec<(Uuid, i64)> = entry_term::Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(entry_term::Column::TermId)
             .column_as(entry_term::Column::EntryId.count(), "entries")
             .filter(entry_term::Column::TermId.is_in(ids.iter().copied()))
             .group_by(entry_term::Column::TermId)
             .into_tuple()
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         Ok(rows.into_iter().map(|(id, count)| (id, u64::try_from(count).unwrap_or(0))).collect())
     }
 
     pub(crate) async fn get_term(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
     ) -> Result<TermWithTexts, Error> {
         principal.require(&CONTENT_READ)?;
-        self.term_with_texts(id).await
+        self.term_with_texts(tenant, id).await
     }
 
     /// Tạo term với tên trong một ngôn ngữ. Cần `content.manage`.
     pub(crate) async fn create_term(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         taxonomy: Taxonomy,
         input: TermInput,
@@ -266,17 +286,26 @@ impl ContentService {
             );
         }
         let parent = input.parent_id.flatten();
-        self.check_term_parent(self.database.read(), taxonomy, None, parent, &mut problems).await?;
+        self.check_term_parent(
+            tenant,
+            tenant.database().read(),
+            taxonomy,
+            None,
+            parent,
+            &mut problems,
+        )
+        .await?;
         let id = Uuid::now_v7();
-        let text = self.term_text(id, taxonomy, &locale, None, &input, &mut problems)?;
+        let text = Self::term_text(tenant, id, taxonomy, &locale, None, &input, &mut problems)?;
         if !problems.is_empty() {
             return Err(invalid(problems));
         }
         let now = now();
-        let transaction = self.database.begin_write().await?;
-        self.recheck_term_parent(&transaction, taxonomy, None, parent).await?;
+        let transaction = tenant.database().begin_write().await?;
+        self.recheck_term_parent(tenant, &transaction, taxonomy, None, parent).await?;
         let row = term::ActiveModel {
             id: Set(id),
+            tenant_id: Set(tenant.id().as_uuid()),
             taxonomy: Set(taxonomy.as_str().to_owned()),
             parent_id: Set(parent),
             created_at: Set(now),
@@ -297,7 +326,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::subject("term", id),
                 &events::TermChanged(change),
@@ -310,19 +339,27 @@ impl ContentService {
     /// Đổi tên / mô tả trong một ngôn ngữ (thêm nếu chưa có) và cha. Cần `content.manage`.
     pub(crate) async fn update_term(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         input: TermInput,
         expected: Option<DateTime<Utc>>,
     ) -> Result<TermWithTexts, Error> {
         principal.require(&CONTENT_MANAGE)?;
-        let before = self.term_with_texts(id).await?;
+        let before = self.term_with_texts(tenant, id).await?;
         let taxonomy =
             if before.term.taxonomy == "category" { Taxonomy::Category } else { Taxonomy::Tag };
         let mut problems = Vec::new();
         if let Some(parent) = input.parent_id {
-            self.check_term_parent(self.database.read(), taxonomy, Some(id), parent, &mut problems)
-                .await?;
+            self.check_term_parent(
+                tenant,
+                tenant.database().read(),
+                taxonomy,
+                Some(id),
+                parent,
+                &mut problems,
+            )
+            .await?;
         }
         let text = match &input.locale {
             None if input.name.is_some() || input.slug.is_some() || input.description.is_some() => {
@@ -346,16 +383,24 @@ impl ContentService {
                         "a new language needs a name",
                     ));
                 }
-                Some(self.term_text(id, taxonomy, &locale, existing, &input, &mut problems)?)
+                Some(Self::term_text(
+                    tenant,
+                    id,
+                    taxonomy,
+                    &locale,
+                    existing,
+                    &input,
+                    &mut problems,
+                )?)
             }
         };
         if !problems.is_empty() {
             return Err(invalid(problems));
         }
         let now = now();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         if let Some(parent) = input.parent_id {
-            self.recheck_term_parent(&transaction, taxonomy, Some(id), parent).await?;
+            self.recheck_term_parent(tenant, &transaction, taxonomy, Some(id), parent).await?;
         }
         let mut row = before.term.clone().into_active_model();
         if let Some(parent) = input.parent_id {
@@ -364,6 +409,7 @@ impl ContentService {
         row.updated_at = Set(now);
         let after = term::Entity::update(row)
             .validate()?
+            .scoped(tenant)
             .filter(term::Column::UpdatedAt.eq(expected.unwrap_or(before.term.updated_at)))
             .exec(&transaction)
             .await
@@ -373,6 +419,7 @@ impl ContentService {
             })?;
         if let Some(text) = text {
             term_translation::Entity::delete_many()
+                .scoped(tenant)
                 .filter(term_translation::Column::TermId.eq(id))
                 .filter(term_translation::Column::Locale.eq(text.locale.as_str()))
                 .exec(&transaction)
@@ -383,6 +430,7 @@ impl ContentService {
                 .map_err(|error| slug_conflict(error, &input))?;
         }
         let texts = term_translation::Entity::find()
+            .scoped(tenant)
             .filter(term_translation::Column::TermId.eq(id))
             .all(&transaction)
             .await?;
@@ -394,7 +442,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::subject("term", id),
                 &events::TermChanged(change),
@@ -405,20 +453,28 @@ impl ContentService {
     }
 
     /// Xoá term (gỡ khỏi mọi mục). Danh mục còn danh mục con thì không được. Cần `content.manage`.
-    pub(crate) async fn delete_term(&self, principal: &Principal, id: Uuid) -> Result<(), Error> {
+    pub(crate) async fn delete_term(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<(), Error> {
         principal.require(&CONTENT_MANAGE)?;
-        let before = self.term_with_texts(id).await?;
-        let transaction = self.database.begin_write().await?;
+        let before = self.term_with_texts(tenant, id).await?;
+        let transaction = tenant.database().begin_write().await?;
         // Cùng khoá với tạo / đổi cha của danh mục: không tạo được danh mục con dưới một danh
         // mục đang bị xoá.
-        lock_categories(&transaction).await?;
-        let deleted = term::Entity::delete_by_id(id).exec(&transaction).await?;
+        lock_categories(&transaction, tenant).await?;
+        let deleted = term::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         if deleted.rows_affected == 0 {
             transaction.rollback().await?;
             return Err(term_not_found(id));
         }
-        let children =
-            term::Entity::find().filter(term::Column::ParentId.eq(id)).count(&transaction).await?;
+        let children = term::Entity::find()
+            .scoped(tenant)
+            .filter(term::Column::ParentId.eq(id))
+            .count(&transaction)
+            .await?;
         if children > 0 {
             transaction.rollback().await?;
             return Err(Error::conflict(
@@ -428,10 +484,12 @@ impl ContentService {
             .with_param("count", children));
         }
         term_translation::Entity::delete_many()
+            .scoped(tenant)
             .filter(term_translation::Column::TermId.eq(id))
             .exec(&transaction)
             .await?;
         entry_term::Entity::delete_many()
+            .scoped(tenant)
             .filter(entry_term::Column::TermId.eq(id))
             .exec(&transaction)
             .await?;
@@ -443,7 +501,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::subject("term", id),
                 &events::TermChanged(change),
@@ -459,12 +517,13 @@ impl ContentService {
     /// khai.
     pub(crate) async fn set_entry_terms(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         entry_id: Uuid,
         term_ids: Vec<Uuid>,
     ) -> Result<Vec<Uuid>, Error> {
         crate::permissions::require_create(principal)?;
-        let entry = self.load_checked(entry_id, None).await?;
+        let entry = self.load_checked(tenant, entry_id, None).await?;
         crate::permissions::require_write(principal, &entry)?;
         let mut ids: Vec<Uuid> = Vec::new();
         for id in term_ids {
@@ -478,17 +537,18 @@ impl ContentService {
                     .with_param("max_per_entry", MAX_PER_ENTRY),
             ]));
         }
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         // Khoá dòng mục trước khi xoá rồi chèn lại liên kết: hai lệnh gắn cùng lúc chạy lần lượt
         // (không vấp unique thành lỗi 500 trên Postgres), và lệnh xoá mục chạy cùng lúc không để
         // lại liên kết mồ côi. Trạng thái (cần quyền đăng không) đọc lại sau khi khoá.
-        let entry = crate::entries::lock_entry(&transaction, entry.id).await?;
+        let entry = crate::entries::lock_entry(&transaction, tenant, entry.id).await?;
         if crate::entries::Status::of(&entry) == crate::entries::Status::Published {
             // Gắn có hiệu lực ngay cả trên bản công khai: như mọi thay đổi người đọc thấy, mục
             // đang công khai thì cần quyền đăng.
             crate::permissions::require_publish(principal, &entry)?;
         }
         let known = term::Entity::find()
+            .scoped(tenant)
             .filter(term::Column::Id.is_in(ids.clone()))
             .count(&transaction)
             .await?;
@@ -499,14 +559,18 @@ impl ContentService {
                 "every id must be an existing category or tag",
             )]));
         }
-        let before =
-            term_ids_of(&transaction, &[entry_id]).await?.remove(&entry_id).unwrap_or_default();
+        let before = term_ids_of(&transaction, tenant, &[entry_id])
+            .await?
+            .remove(&entry_id)
+            .unwrap_or_default();
         entry_term::Entity::delete_many()
+            .scoped(tenant)
             .filter(entry_term::Column::EntryId.eq(entry_id))
             .exec(&transaction)
             .await?;
         for (order, term_id) in ids.iter().enumerate() {
             entry_term::ActiveModel {
+                tenant_id: Set(tenant.id().as_uuid()),
                 entry_id: Set(entry_id),
                 term_id: Set(*term_id),
                 sort_order: Set(i32::try_from(order).unwrap_or(i32::MAX)),
@@ -514,8 +578,14 @@ impl ContentService {
             .insert(&transaction)
             .await?;
         }
-        self.record_link_change(&transaction, principal, &entry, "term_ids", before, ids.clone())
-            .await?;
+        self.record_link_change(
+            tenant,
+            &transaction,
+            principal,
+            &entry,
+            LinkChange { field: "term_ids", before, after: ids.clone() },
+        )
+        .await?;
         transaction.commit().await?;
         Ok(ids)
     }
@@ -523,15 +593,19 @@ impl ContentService {
     /// Event "mục đổi" khi term / tác giả đổi; mục đang công khai thì kèm dữ liệu làm mới cache.
     pub(crate) async fn record_link_change<C: ConnectionTrait>(
         &self,
+        tenant: &TenantContext,
         transaction: &C,
         principal: &Principal,
         entry: &crate::entries::Entry,
-        field: &str,
-        before: Vec<Uuid>,
-        after: Vec<Uuid>,
+        link: LinkChange<'_>,
     ) -> Result<(), Error> {
-        let path =
-            published::Entity::find_by_id(entry.id).one(transaction).await?.map(|row| row.path);
+        let LinkChange { field, before, after } = link;
+        let path = published::Entity::find()
+            .scoped(tenant)
+            .filter(published::Column::EntryId.eq(entry.id))
+            .one(transaction)
+            .await?
+            .map(|row| row.path);
         let change = Change {
             before: Some(json!({ field: before })),
             after: Some(json!({ field: after })),
@@ -542,7 +616,7 @@ impl ContentService {
         self.outbox
             .record(
                 transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::entry_subject(entry.id),
                 &events::EntryUpdated(change),
@@ -554,6 +628,7 @@ impl ContentService {
     /// Term công khai theo slug trong `locale` (thiếu bản dịch thì tìm ở ngôn ngữ mặc định).
     pub(crate) async fn term_by_slug(
         &self,
+        tenant: &TenantContext,
         taxonomy: Taxonomy,
         locale: &str,
         slug: &str,
@@ -566,10 +641,11 @@ impl ContentService {
         let mut found = None;
         for language in [locale.as_str(), self.config.default_locale.as_str()] {
             found = term_translation::Entity::find()
+                .scoped(tenant)
                 .filter(term_translation::Column::Taxonomy.eq(taxonomy.as_str()))
                 .filter(term_translation::Column::Locale.eq(language))
                 .filter(term_translation::Column::Slug.eq(slug))
-                .one(self.database.read())
+                .one(tenant.database().read())
                 .await?;
             if found.is_some() {
                 break;
@@ -579,30 +655,40 @@ impl ContentService {
             Error::not_found("content.term_not_found", "No category or tag has the slug `{slug}`.")
                 .with_param("slug", slug)
         })?;
-        let full = self.term_with_texts(text.term_id).await?;
+        let full = self.term_with_texts(tenant, text.term_id).await?;
         let shown = pick(&full.texts, text.term_id, &locale, &self.config.default_locale)
             .ok_or_else(|| Error::internal("a term without names"))?;
         Ok((full, shown))
     }
 
-    async fn term_with_texts(&self, id: Uuid) -> Result<TermWithTexts, Error> {
+    async fn term_with_texts(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<TermWithTexts, Error> {
         let term = term::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(|| term_not_found(id))?;
-        let texts = self.texts_of(&[id]).await?.remove(&id).unwrap_or_default();
+        let texts = self.texts_of(tenant, &[id]).await?.remove(&id).unwrap_or_default();
         Ok(TermWithTexts { term, texts })
     }
 
-    async fn texts_of(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, Vec<TermText>>, Error> {
+    async fn texts_of(
+        &self,
+        tenant: &TenantContext,
+        ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, Vec<TermText>>, Error> {
         let mut found: HashMap<Uuid, Vec<TermText>> = HashMap::new();
         if ids.is_empty() {
             return Ok(found);
         }
         for text in term_translation::Entity::find()
+            .scoped(tenant)
             .filter(term_translation::Column::TermId.is_in(ids.to_vec()))
             .order_by_asc(term_translation::Column::Locale)
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?
         {
             found.entry(text.term_id).or_default().push(text);
@@ -615,6 +701,7 @@ impl ContentService {
     /// thể vừa bị xoá. Lần kiểm trước transaction chỉ để gom lỗi báo một lần.
     async fn recheck_term_parent(
         &self,
+        tenant: &TenantContext,
         transaction: &DatabaseTransaction,
         taxonomy: Taxonomy,
         id: Option<Uuid>,
@@ -623,15 +710,16 @@ impl ContentService {
         if parent.is_none() {
             return Ok(());
         }
-        lock_categories(transaction).await?;
+        lock_categories(transaction, tenant).await?;
         let mut problems = Vec::new();
-        self.check_term_parent(transaction, taxonomy, id, parent, &mut problems).await?;
+        self.check_term_parent(tenant, transaction, taxonomy, id, parent, &mut problems).await?;
         if problems.is_empty() { Ok(()) } else { Err(invalid(problems)) }
     }
 
     /// Cha của danh mục: là danh mục, có thật, không tạo vòng. Thẻ không có cha.
     async fn check_term_parent<C: ConnectionTrait>(
         &self,
+        tenant: &TenantContext,
         connection: &C,
         taxonomy: Taxonomy,
         id: Option<Uuid>,
@@ -658,7 +746,7 @@ impl ContentService {
                 ));
                 return Ok(());
             }
-            match term::Entity::find_by_id(here).one(connection).await? {
+            match term::Entity::find_by_id(here).scoped(tenant).one(connection).await? {
                 Some(row) if row.taxonomy == "category" => current = row.parent_id,
                 _ => {
                     problems.push(FieldError::new(
@@ -675,7 +763,7 @@ impl ContentService {
 
     /// Dòng tên của term trong `locale`, từ `existing` (nếu có) cộng `input`; kiểm mọi trường.
     fn term_text(
-        &self,
+        tenant: &TenantContext,
         id: Uuid,
         taxonomy: Taxonomy,
         locale: &str,
@@ -684,6 +772,7 @@ impl ContentService {
         problems: &mut Vec<FieldError>,
     ) -> Result<TermText, Error> {
         let mut text = existing.unwrap_or_else(|| TermText {
+            tenant_id: tenant.id().as_uuid(),
             term_id: id,
             locale: locale.to_owned(),
             taxonomy: taxonomy.as_str().to_owned(),
@@ -754,8 +843,18 @@ pub(crate) fn term_not_found(id: Uuid) -> Error {
         .with_param("id", id)
 }
 
+/// Danh sách liên kết của một mục đổi (term hay tác giả): tên trường, trước, sau.
+pub(crate) struct LinkChange<'a> {
+    pub field: &'a str,
+    pub before: Vec<Uuid>,
+    pub after: Vec<Uuid>,
+}
+
 /// Khoá chung cho cây danh mục (mọi ngôn ngữ dùng một cây): dùng lại bảng khoá cây trang với
 /// một khoá không thể trùng mã ngôn ngữ BCP 47.
-async fn lock_categories(transaction: &DatabaseTransaction) -> Result<(), Error> {
-    crate::publishing::paths::lock_tree(transaction, "#categories").await
+async fn lock_categories(
+    transaction: &DatabaseTransaction,
+    tenant: &TenantContext,
+) -> Result<(), Error> {
+    crate::publishing::paths::lock_tree(transaction, tenant, "#categories").await
 }

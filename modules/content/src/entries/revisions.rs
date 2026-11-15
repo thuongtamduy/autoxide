@@ -79,6 +79,7 @@ impl Snapshot {
 /// Ghi một revision của `entry` (trạng thái hiện tại của nó), trong `connection`.
 pub(crate) async fn record<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     entry: &entry::Model,
     reason: Reason,
     by: Option<Uuid>,
@@ -87,6 +88,7 @@ pub(crate) async fn record<C: ConnectionTrait>(
     let snapshot = serde_json::to_string(&Snapshot::of(entry)).map_err(Error::internal)?;
     Ok(revision::ActiveModel {
         id: Set(Uuid::now_v7()),
+        tenant_id: Set(tenant.id().as_uuid()),
         entry_id: Set(entry.id),
         snapshot: Set(snapshot),
         reason: Set(reason.as_str().to_owned()),
@@ -98,8 +100,10 @@ pub(crate) async fn record<C: ConnectionTrait>(
 }
 
 use autoxide_kernel::access::Principal;
+use autoxide_kernel::database::Database;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantId};
 use sea_orm::sea_query::ExprTrait as _;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
@@ -116,25 +120,29 @@ impl ContentService {
     /// Revision của mục `entry_id`, mới trước (mặc định). Cần `content.read`.
     pub(crate) async fn list_revisions(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         entry_id: Uuid,
         page: &PageRequest,
     ) -> Result<Page<Revision>, Error> {
-        self.get(principal, entry_id).await?;
-        let select = revision::Entity::find().filter(revision::Column::EntryId.eq(entry_id));
-        fetch_page(select, revision::Column::Id, |row| row.id, page, self.database.read()).await
+        self.get(tenant, principal, entry_id).await?;
+        let select =
+            revision::Entity::find().scoped(tenant).filter(revision::Column::EntryId.eq(entry_id));
+        fetch_page(select, revision::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
     /// Revision `id` của mục `entry_id`. Cần `content.read`.
     pub(crate) async fn get_revision(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         entry_id: Uuid,
         id: Uuid,
     ) -> Result<Revision, Error> {
         principal.require(&CONTENT_READ)?;
         revision::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .filter(|row| row.entry_id == entry_id)
             .ok_or_else(|| revision_not_found(id))
@@ -144,6 +152,7 @@ impl ContentService {
     /// đăng. Cần `content.write`.
     pub(crate) async fn restore(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         entry_id: Uuid,
         id: Uuid,
@@ -153,7 +162,8 @@ impl ContentService {
         // Không cần `content.read`: khôi phục là sửa mục, quyền sửa (kể cả `content.write_own`
         // trên mục của mình) kiểm ở `update_inner`; ở đây chỉ kiểm revision thuộc mục.
         let revision = revision::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .filter(|row| row.entry_id == entry_id)
             .ok_or_else(|| revision_not_found(id))?;
@@ -161,53 +171,89 @@ impl ContentService {
         let snapshot: Snapshot =
             serde_json::from_str(&revision.snapshot).map_err(Error::internal)?;
         self.update_inner(
+            tenant,
             principal,
             entry_id,
             fields_of(snapshot),
-            Some(Reason::Restored),
+            crate::entries::Revise { forced: Some(Reason::Restored), restored_from: Some(id) },
             expected,
-            Some(id),
         )
         .await
     }
 
-    /// Bớt revision của mỗi mục xuống `AUTOXIDE_CONTENT_MAX_REVISIONS`, cũ đi trước — trừ
-    /// revision bản công khai hay một lịch đang chờ còn trỏ tới. Trả số revision đã xoá.
-    pub(crate) async fn prune_revisions(&self) -> Result<u64, Error> {
+    /// Bớt revision của mỗi mục trên `database` xuống `AUTOXIDE_CONTENT_MAX_REVISIONS`, cũ đi
+    /// trước — trừ revision bản công khai hay một lịch đang chờ còn trỏ tới. Job theo lịch chạy
+    /// một lần mỗi database (bước 33): tìm (khách, mục) có quá nhiều revision trên cả database,
+    /// rồi xoá theo từng khách. Trả số revision đã xoá.
+    pub(crate) async fn prune_revisions(&self, database: &Database) -> Result<u64, Error> {
         let keep = u64::from(self.config.max_revisions);
-        let crowded: Vec<Uuid> = revision::Entity::find()
+        // Quét cả database qua index `(tenant_id, entry_id, …)`.
+        let crowded: Vec<(Uuid, Uuid)> = revision::Entity::find()
             .select_only()
+            .column(revision::Column::TenantId)
             .column(revision::Column::EntryId)
+            .group_by(revision::Column::TenantId)
             .group_by(revision::Column::EntryId)
             .having(revision::Column::Id.count().gt(i64::try_from(keep).unwrap_or(i64::MAX)))
             .into_tuple()
-            .all(self.database.read())
+            .all(database.read())
             .await?;
+        let mut by_tenant: std::collections::BTreeMap<Uuid, Vec<Uuid>> = Default::default();
+        for (tenant, entry) in crowded {
+            by_tenant.entry(tenant).or_default().push(entry);
+        }
+        let mut removed = 0;
+        for (id, entries) in by_tenant {
+            match self.databases.tenant(TenantId::from_uuid(id)).await {
+                Ok(tenant) => removed += self.prune_tenant(&tenant, keep, entries).await?,
+                // Khách đã bị xoá khỏi sổ: dữ liệu còn lại do việc xoá khách lo, không đoán ở đây.
+                Err(error) => {
+                    tracing::warn!(tenant_id = %id, error = %error, "content revision pruning skipped a tenant");
+                }
+            }
+        }
+        if removed > 0 {
+            tracing::info!(revisions = removed, "old content revisions removed");
+        }
+        Ok(removed)
+    }
+
+    /// Phần của khách `tenant` trong [`prune_revisions`](Self::prune_revisions): các mục `crowded`.
+    async fn prune_tenant(
+        &self,
+        tenant: &TenantContext,
+        keep: u64,
+        crowded: Vec<Uuid>,
+    ) -> Result<u64, Error> {
         let mut removed = 0;
         for entry_id in crowded {
             let ids: Vec<Uuid> = revision::Entity::find()
+                .scoped(tenant)
                 .select_only()
                 .column(revision::Column::Id)
                 .filter(revision::Column::EntryId.eq(entry_id))
                 .order_by_desc(revision::Column::CreatedAt)
                 .order_by_desc(revision::Column::Id)
                 .into_tuple::<Uuid>()
-                .all(self.database.read())
+                .all(tenant.database().read())
                 .await?
                 .into_iter()
                 .skip(usize::try_from(keep).unwrap_or(usize::MAX))
                 .collect();
-            let mut protected: Vec<Uuid> = crate::entity::published::Entity::find_by_id(entry_id)
-                .one(self.database.read())
+            let mut protected: Vec<Uuid> = crate::entity::published::Entity::find()
+                .scoped(tenant)
+                .filter(crate::entity::published::Column::EntryId.eq(entry_id))
+                .one(tenant.database().read())
                 .await?
                 .map(|row| row.revision_id)
                 .into_iter()
                 .collect();
             protected.extend(
                 crate::entity::schedule::Entity::find()
+                    .scoped(tenant)
                     .filter(crate::entity::schedule::Column::EntryId.eq(entry_id))
                     .filter(crate::entity::schedule::Column::Status.eq("scheduled"))
-                    .all(self.database.read())
+                    .all(tenant.database().read())
                     .await?
                     .into_iter()
                     .filter_map(|row| row.revision_id),
@@ -217,6 +263,7 @@ impl ContentService {
                 continue;
             }
             let deleted = revision::Entity::delete_many()
+                .scoped(tenant)
                 .filter(revision::Column::Id.is_in(doomed))
                 // Lịch có thể vừa ghim một revision trong lúc này: không xoá revision đang được trỏ tới.
                 .filter(
@@ -224,6 +271,9 @@ impl ContentService {
                         sea_orm::sea_query::Query::select()
                             .column(crate::entity::schedule::Column::RevisionId)
                             .from(crate::entity::schedule::Entity)
+                            .and_where(
+                                crate::entity::schedule::Column::TenantId.eq(tenant.id().as_uuid()),
+                            )
                             .and_where(crate::entity::schedule::Column::Status.eq("scheduled"))
                             .and_where(crate::entity::schedule::Column::RevisionId.is_not_null())
                             .to_owned(),
@@ -235,26 +285,28 @@ impl ContentService {
                         sea_orm::sea_query::Query::select()
                             .column(crate::entity::published::Column::RevisionId)
                             .from(crate::entity::published::Entity)
+                            .and_where(
+                                crate::entity::published::Column::TenantId
+                                    .eq(tenant.id().as_uuid()),
+                            )
                             .to_owned(),
                     ),
                 )
-                .exec(self.database.write())
+                .exec(tenant.database().write())
                 .await?;
             removed += deleted.rows_affected;
-        }
-        if removed > 0 {
-            tracing::info!(revisions = removed, "old content revisions removed");
         }
         Ok(removed)
     }
 
     /// Số revision của mục `entry_id` (cho test).
     #[cfg(test)]
-    pub(crate) async fn revision_count(&self, entry_id: Uuid) -> u64 {
+    pub(crate) async fn revision_count(&self, tenant: &TenantContext, entry_id: Uuid) -> u64 {
         use sea_orm::PaginatorTrait as _;
         revision::Entity::find()
+            .scoped(tenant)
             .filter(revision::Column::EntryId.eq(entry_id))
-            .count(self.database.read())
+            .count(tenant.database().read())
             .await
             .unwrap_or(0)
     }
@@ -265,8 +317,8 @@ pub(crate) struct Prune(pub std::sync::Arc<ContentService>);
 
 #[async_trait::async_trait]
 impl JobHandler for Prune {
-    async fn run(&self, _: &JobContext) -> Result<(), Error> {
-        self.0.prune_revisions().await.map(|_| ())
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        self.0.prune_revisions(&job.database).await.map(|_| ())
     }
 }
 
@@ -292,9 +344,14 @@ pub(crate) fn fields_of(snapshot: Snapshot) -> EntryFields {
 /// Revision `id`, đọc thẳng (không kiểm quyền — cho job).
 pub(crate) async fn revision_entity<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     id: Uuid,
 ) -> Result<Revision, Error> {
-    revision::Entity::find_by_id(id).one(connection).await?.ok_or_else(|| revision_not_found(id))
+    revision::Entity::find_by_id(id)
+        .scoped(tenant)
+        .one(connection)
+        .await?
+        .ok_or_else(|| revision_not_found(id))
 }
 
 pub(crate) fn revision_not_found(id: Uuid) -> Error {

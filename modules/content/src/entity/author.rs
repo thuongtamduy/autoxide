@@ -8,6 +8,8 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
+    /// Khách sở hữu dòng (bước 33).
+    pub tenant_id: Uuid,
     /// Tài khoản gắn với hồ sơ (không foreign key sang `auth`); để trống được.
     pub user_id: Option<Uuid>,
     pub display_name: String,
@@ -20,3 +22,9 @@ pub struct Model {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl autoxide_kernel::tenancy::TenantScoped for Entity {
+    fn tenant_column() -> Self::Column {
+        Column::TenantId
+    }
+}

@@ -8,6 +8,7 @@ mod m0006_embeddings;
 mod m0009_schedule_ai_review;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::tenancy::migration::TenantTable;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -34,5 +35,94 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Lịch đăng mang xác nhận đã duyệt nội dung AI (D-266).
         Box::new(m0009_schedule_ai_review::Migration),
+        // Mọi bảng riêng của `content` thuộc một khách (bước 33): slug, đường dẫn công khai, tác
+        // giả, menu, chuyển hướng, term, khoá cây, yêu cầu dịch, embedding chỉ không trùng trong
+        // cùng khách. Không index nào quét cả database: job định kỳ (dọn revision, lập index bù)
+        // tìm khách qua index có `tenant_id` đứng đầu rồi làm theo từng khách; lịch đăng chạy
+        // bằng job của khách.
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0010_tenancy",
+            vec![
+                TenantTable::new("content_entries")
+                    .unique(
+                        "content_entries_translation_unique",
+                        ["tenant_id", "translation_group_id", "locale"],
+                    )
+                    .unique(
+                        "content_entries_slug_unique",
+                        ["tenant_id", "locale", "kind", "parent_key", "slug"],
+                    )
+                    .index("content_entries_list_idx", ["tenant_id", "kind", "locale", "id"])
+                    .index("content_entries_parent_idx", ["tenant_id", "parent_key", "id"])
+                    .index("content_entries_status_idx", ["tenant_id", "status", "id"])
+                    .index("content_entries_updated_idx", ["tenant_id", "updated_at", "id"])
+                    .index("content_entries_created_by_idx", ["tenant_id", "created_by"]),
+                // Khoá chính `entry_id` thành `(tenant_id, entry_id)`: helper chỉ giữ khoá `id`.
+                TenantTable::new("content_published")
+                    .primary_key(["tenant_id", "entry_id"])
+                    .unique("content_published_path_unique", ["tenant_id", "locale", "path"])
+                    .index(
+                        "content_published_list_idx",
+                        ["tenant_id", "locale", "kind", "published_at", "entry_id"],
+                    )
+                    .index(
+                        "content_published_modified_idx",
+                        ["tenant_id", "content_modified_at", "entry_id"],
+                    )
+                    .index("content_published_group_idx", ["tenant_id", "translation_group_id"])
+                    .index("content_published_parent_idx", ["tenant_id", "parent_id"]),
+                TenantTable::new("content_revisions").index(
+                    "content_revisions_entry_idx",
+                    ["tenant_id", "entry_id", "created_at", "id"],
+                ),
+                TenantTable::new("content_schedules")
+                    .index("content_schedules_due_idx", ["tenant_id", "status", "run_at"])
+                    .index("content_schedules_entry_idx", ["tenant_id", "entry_id", "status"]),
+                TenantTable::new("content_redirects")
+                    .unique("content_redirects_path_unique", ["tenant_id", "locale", "from_path"])
+                    .index("content_redirects_target_idx", ["tenant_id", "to_entry_id"]),
+                TenantTable::new("content_tree_locks").primary_key(["tenant_id", "locale"]),
+                TenantTable::new("content_terms"),
+                TenantTable::new("content_term_translations")
+                    .primary_key(["tenant_id", "term_id", "locale"])
+                    .unique(
+                        "content_term_slug_unique",
+                        ["tenant_id", "taxonomy", "locale", "slug"],
+                    ),
+                TenantTable::new("content_entry_terms")
+                    .primary_key(["tenant_id", "entry_id", "term_id"])
+                    .index("content_entry_terms_term_idx", ["tenant_id", "term_id", "entry_id"]),
+                TenantTable::new("content_authors")
+                    .unique("content_authors_slug_unique", ["tenant_id", "slug"])
+                    .index("content_authors_user_idx", ["tenant_id", "user_id"]),
+                TenantTable::new("content_entry_authors")
+                    .primary_key(["tenant_id", "entry_id", "author_id"])
+                    .index(
+                        "content_entry_authors_author_idx",
+                        ["tenant_id", "author_id", "entry_id"],
+                    ),
+                TenantTable::new("content_menus")
+                    .unique("content_menus_unique", ["tenant_id", "key", "locale"]),
+                TenantTable::new("content_menu_items")
+                    .index("content_menu_items_menu_idx", ["tenant_id", "menu_id", "sort_order"]),
+                TenantTable::new("content_translation_requests")
+                    .unique(
+                        "content_translation_requests_active_unique",
+                        ["tenant_id", "active_key"],
+                    )
+                    .index(
+                        "content_translation_requests_source_idx",
+                        ["tenant_id", "source_entry_id", "id"],
+                    ),
+                TenantTable::new("content_embeddings")
+                    .unique(
+                        "content_embeddings_chunk_unique",
+                        ["tenant_id", "entry_id", "scope", "chunk_index"],
+                    )
+                    .index("content_embeddings_scope_idx", ["tenant_id", "scope", "locale"]),
+                TenantTable::new("content_embedding_state")
+                    .unique("content_embedding_state_unique", ["tenant_id", "scope", "locale"]),
+            ],
+        ),
     ]
 }

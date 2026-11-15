@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::ai::{Embedder, TextModel};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_media::api::Media;
 use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
 use autoxide_testkit::{TestApp, TestDatabase, TestResponse, tool};
@@ -312,14 +313,16 @@ async fn da_duyet_ai_van_hien_sau_xoa_tai_khoan() {
     use autoxide_kernel::event::{Delivered, EventHandler};
 
     TestDatabase::run(async |test| {
-        let (content, _, _) = crate::testing::service(test, crate::testing::config(&[])).await;
+        let (content, _, database) =
+            crate::testing::service(test, crate::testing::config(&[])).await;
+        let tenant = TenantContext::default_on(database.clone());
         let ada = crate::testing::editor();
         let mut input = crate::tests::post("Reviewed");
         input.fields.ai_generated = Some(true);
-        let entry = content.create(&ada, input).await.unwrap();
-        content.publish(&ada, entry.id, None, None, true).await.unwrap();
+        let entry = content.create(&tenant, &ada, input).await.unwrap();
+        content.publish(&tenant, &ada, entry.id, None, None, true).await.unwrap();
         let deleted = Delivered::new(
-            autoxide_kernel::tenancy::TenantContext::legacy_default(&content.database),
+            tenant.clone(),
             "auth",
             autoxide_kernel::privacy::USER_DELETED.to_owned(),
             json!({"before": {"id": ada.user_id()}}),
@@ -327,7 +330,7 @@ async fn da_duyet_ai_van_hien_sau_xoa_tai_khoan() {
         content.handle(&deleted).await.unwrap();
         content.handle(&deleted).await.unwrap();
         let (resolution, _) =
-            super::public::resolution(&content, "en", "/blog/reviewed").await.unwrap();
+            super::public::resolution(&content, &tenant, "en", "/blog/reviewed").await.unwrap();
         let shown = serde_json::to_value(resolution).unwrap();
         assert_eq!(
             (shown["entry"]["ai_generated"].as_bool(), shown["entry"]["ai_reviewed"].as_bool()),

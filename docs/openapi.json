@@ -32777,7 +32777,7 @@
     },
     "/api/v1/content/public/preview": {
       "get": {
-        "description": "No sign-in needed: the signed token is the permission. Returns the content of the latest\ndraft, without the internal fields of the admin view. Answers with `Cache-Control: no-store`.",
+        "description": "No sign-in needed: the signed token is the permission. Returns the content of the latest\ndraft, without the internal fields of the admin view. Answers with `Cache-Control: no-store`.\nNeeds no tenant header: the token names its tenant.",
         "operationId": "content_get_public_content_preview",
         "parameters": [
           {

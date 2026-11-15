@@ -7,6 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use chrono::{DateTime, Utc};
@@ -104,13 +105,14 @@ pub(crate) struct EntryResponse {
 /// cũ (bản gốc sửa sau revision đã dịch).
 pub(crate) async fn describe(
     service: &ContentService,
+    tenant: &TenantContext,
     entries: Vec<Entry>,
 ) -> Result<Vec<EntryResponse>, Error> {
     let ids: Vec<Uuid> = entries.iter().map(|entry| entry.id).collect();
-    let mut terms = service.term_ids(&ids).await?;
-    let mut authors = service.author_ids(&ids).await?;
-    let outdated = service.outdated_translations(&entries).await?;
-    let mut live = service.published_paths(&ids).await?;
+    let mut terms = service.term_ids(tenant, &ids).await?;
+    let mut authors = service.author_ids(tenant, &ids).await?;
+    let outdated = service.outdated_translations(tenant, &entries).await?;
+    let mut live = service.published_paths(tenant, &ids).await?;
     Ok(entries
         .into_iter()
         .map(|entry| {
@@ -180,10 +182,11 @@ fn entry_response(
 /// Một mục kèm `ETag`.
 pub(crate) async fn tagged(
     service: &ContentService,
+    tenant: &TenantContext,
     entry: Entry,
 ) -> Result<Tagged<EntryResponse>, Error> {
     let version = entry.updated_at;
-    let data = describe(service, vec![entry])
+    let data = describe(service, tenant, vec![entry])
         .await?
         .into_iter()
         .next()
@@ -385,6 +388,7 @@ pub(crate) struct UpdateEntryRequest {
 )]
 pub(crate) async fn list_entries(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<EntriesQuery>,
     Query(paging): Query<PageQuery>,
@@ -392,9 +396,9 @@ pub(crate) async fn list_entries(
     let mut problems = Vec::new();
     let filter = query.filter(principal.user_id(), &mut problems);
     let page = page_request(paging, problems)?;
-    let page = service.list(&principal, &filter, &page).await?;
+    let page = service.list(&tenant, &principal, &filter, &page).await?;
     let autoxide_kernel::pagination::Page { data, pagination } = page;
-    Ok(Page { data: describe(&service, data).await?, pagination })
+    Ok(Page { data: describe(&service, &tenant, data).await?, pagination })
 }
 
 /// Create a post or page as a draft.
@@ -420,6 +424,7 @@ pub(crate) async fn list_entries(
 )]
 pub(crate) async fn create_entry(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CreateEntryRequest>,
 ) -> Result<Created<EntryResponse>, Error> {
@@ -429,9 +434,9 @@ pub(crate) async fn create_entry(
         parent_id: input.parent_id,
         fields: input.fields.into(),
     };
-    let entry = service.create(&principal, new).await?;
+    let entry = service.create(&tenant, &principal, new).await?;
     let location = format!("/content/entries/{}", entry.id);
-    Ok(Created::new(location, tagged(&service, entry).await?.data))
+    Ok(Created::new(location, tagged(&service, &tenant, entry).await?.data))
 }
 
 /// Get a post or page (its draft).
@@ -453,10 +458,11 @@ pub(crate) async fn create_entry(
 )]
 pub(crate) async fn get_entry(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<EntryResponse>, Error> {
-    tagged(&service, service.get(&principal, id).await?).await
+    tagged(&service, &tenant, service.get(&tenant, &principal, id).await?).await
 }
 
 /// Change the draft of a post or page.
@@ -485,13 +491,15 @@ pub(crate) async fn get_entry(
 )]
 pub(crate) async fn update_entry(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
     ValidJson(input): ValidJson<UpdateEntryRequest>,
 ) -> Result<Tagged<EntryResponse>, Error> {
     let expected = if_match.required()?;
-    let entry =
-        service.update(&principal, id, input.fields.into(), input.save_revision, expected).await?;
-    tagged(&service, entry).await
+    let entry = service
+        .update(&tenant, &principal, id, input.fields.into(), input.save_revision, expected)
+        .await?;
+    tagged(&service, &tenant, entry).await
 }

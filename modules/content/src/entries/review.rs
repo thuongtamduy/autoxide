@@ -20,18 +20,20 @@ impl ContentService {
     /// `content.write_own` trên mục của mình. `If-Match` bắt buộc như mọi thay đổi mục.
     pub(crate) async fn set_review_request(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         expected: Option<DateTime<Utc>>,
         withdraw: bool,
     ) -> Result<Entry, Error> {
         permissions::require_create(principal)?;
-        let entry = self.load_checked(id, None).await?;
+        let entry = self.load_checked(tenant, id, None).await?;
         permissions::require_write(principal, &entry)?;
         crate::publishing::check_version(&entry, expected)?;
         let now = now();
-        let transaction = self.database.begin_write().await?;
-        let current = self.reload(&transaction, id, expected.unwrap_or(entry.updated_at)).await?;
+        let transaction = tenant.database().begin_write().await?;
+        let current =
+            self.reload(tenant, &transaction, id, expected.unwrap_or(entry.updated_at)).await?;
         let mut after = current.clone();
         if withdraw {
             after.review_requested_at = None;
@@ -41,7 +43,7 @@ impl ContentService {
             after.review_requested_by = Some(principal.user_id());
         }
         after.updated_at = now;
-        let after = self.save_state(&transaction, &current, &after).await?;
+        let after = self.save_state(tenant, &transaction, &current, &after).await?;
         let mut before_summary = summary(&current);
         let mut after_summary = summary(&after);
         for (value, row) in [(&mut before_summary, &current), (&mut after_summary, &after)] {
@@ -58,23 +60,11 @@ impl ContentService {
         let subject = events::entry_subject(id);
         if withdraw {
             self.outbox
-                .record(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    actor,
-                    subject,
-                    &events::ReviewWithdrawn(change),
-                )
+                .record(&transaction, tenant, actor, subject, &events::ReviewWithdrawn(change))
                 .await?;
         } else {
             self.outbox
-                .record(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    actor,
-                    subject,
-                    &events::ReviewRequested(change),
-                )
+                .record(&transaction, tenant, actor, subject, &events::ReviewRequested(change))
                 .await?;
         }
         transaction.commit().await?;

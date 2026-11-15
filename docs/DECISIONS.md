@@ -7060,3 +7060,25 @@ extractor khách xác thực trước và trả `auth.token_expired` — không 
 (`Unauthenticated`) trong `OptionalTenant` bị bỏ qua: khách chọn theo header / tên miền như request không đăng nhập (không
 có thì `None`, token tự nêu khách). Lỗi khác (`tenant_mismatch`, khách tạm khoá…) vẫn từ chối. Extractor `TenantContext`
 và `Principal` không đổi.
+
+## D-288 · `content` theo khách (bước 33 B13) — 2026-11-15 — agent quyết
+
+- 16 bảng `content_*` mang `tenant_id`, migration `m0010_tenancy` (một `adopt`): slug, đường dẫn công khai
+  `(tenant_id, locale, path)`, tác giả, thẻ, chuyển hướng, menu cũ, yêu cầu dịch, embedding duy nhất **trong khách**; mọi
+  index có `tenant_id` đứng đầu. Khoá chính đổi: `content_tree_locks (tenant_id, locale)`, `content_term_translations`,
+  `content_entry_terms`, `content_entry_authors` (tenant đứng đầu). Dòng khoá cây và trạng thái embedding tạo khi cần lần
+  đầu (ON CONFLICT theo khách), không cần `seed_tenant`.
+- **Lệch đặc tả, có lý do:**
+  1. Khoá chính `content_published` thành `(tenant_id, entry_id)` thay vì giữ `entry_id`: `adopt` chỉ giữ khoá chính một
+     cột tên `id`. Ngữ nghĩa không đổi (một bản đăng mỗi mục).
+  2. `content_schedules_due_idx` giữ tên, thành `(tenant_id, status, run_at)`, không thành `_sweep_idx`: lịch đăng chạy
+     bằng job của từng khách, xếp cùng transaction lúc tạo lịch — không job nào quét lịch cả database; index phục vụ
+     danh sách "Sắp đăng" của một khách.
+  3. Link xem trước ký bằng `AUTOXIDE_CONTENT_PREVIEW_SECRET` như cũ (không thêm cấu hình); khách không mặc định ghi ID
+     khách trong phần đã ký và ký bằng khoá dẫn từ secret theo khách (cùng cách `derive_for`); khách mặc định giữ dạng và
+     khoá cũ (link đã phát vẫn mở). Endpoint dùng `OptionalTenant` (mở trên tên miền chính); request nêu khách khác khách
+     của token → `content.preview_token_invalid`.
+- Cache tìm theo ý nghĩa khoá `(khách, scope, locale)`, cache câu tìm `(khách, mô hình + câu)`, ngân sách tìm công khai
+  đếm theo khách; `ETag` của `/public/resolve` băm cả ID khách. Job của khách (`run_schedule`, `index_embeddings`,
+  `translate`) đọc `job.tenant`; job theo lịch (`prune_revisions`, `catch_up_embeddings`) chạy mỗi database, tra từng khách
+  qua sổ database. API menu cũ cho `menus` đọc đúng khách được truyền (D-283 hết điều kiện chờ).

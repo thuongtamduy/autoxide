@@ -251,13 +251,14 @@ pub(crate) fn public_cache(mut response: Response) -> Response {
 /// Điều có ở đường dẫn `path`, kèm phiên bản (khi là một mục). Dùng chung cho REST và MCP.
 pub(crate) async fn resolution(
     service: &ContentService,
+    tenant: &TenantContext,
     locale: &str,
     path: &str,
 ) -> Result<(Resolution, Option<DateTime<Utc>>), Error> {
-    Ok(match service.resolve(locale, path).await? {
+    Ok(match service.resolve(tenant, locale, path).await? {
         Resolved::Entry(row) => {
             let version = row.updated_at;
-            let view = service.public_views(vec![*row]).await?.into_iter().next();
+            let view = service.public_views(tenant, vec![*row]).await?.into_iter().next();
             let view =
                 view.ok_or_else(|| Error::internal("public view of a published entry is missing"))?;
             (Resolution::Entry { entry: Box::new(public_entry(view)) }, Some(version))
@@ -289,15 +290,16 @@ pub(crate) async fn resolution(
 )]
 pub(crate) async fn resolve(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Query(query): Query<ResolveQuery>,
 ) -> Result<Response, Error> {
-    let (resolution, version) = resolution(&service, &query.locale, &query.path).await?;
+    let (resolution, version) = resolution(&service, &tenant, &query.locale, &query.path).await?;
     let data = Data { data: resolution };
     // ETag là dấu vân tay của CẢ câu trả lời, không phải `updated_at` của bản công khai: câu
     // trả lời còn gộp danh mục, thẻ, tác giả, bản dịch, ảnh — đổi những thứ đó không chạm
     // `updated_at`, và một ETag theo thời gian sẽ làm website nhận 304 với nội dung cũ.
-    let etag = version.map(|_| fingerprint(&data)).transpose()?;
+    let etag = version.map(|_| fingerprint(&tenant, &data)).transpose()?;
     let mut response = data.into_response();
     if let Some(etag) = etag
         && let Ok(value) = HeaderValue::from_str(&etag)
@@ -307,19 +309,24 @@ pub(crate) async fn resolve(
     Ok(public_cache(response))
 }
 
-/// `ETag` mạnh từ nội dung: SHA-256 của JSON, 16 byte đầu, base64url, trong ngoặc kép.
-fn fingerprint<T: Serialize>(value: &T) -> Result<String, Error> {
+/// `ETag` mạnh từ nội dung: SHA-256 của ID khách và JSON, 16 byte đầu, base64url, trong ngoặc
+/// kép. Có ID khách: hai khách trả cùng nội dung vẫn khác `ETag` (cache dùng chung giữa các khách
+/// không trả 304 nhầm khách).
+fn fingerprint<T: Serialize>(tenant: &TenantContext, value: &T) -> Result<String, Error> {
     use base64::Engine;
     use sha2::{Digest, Sha256};
     let bytes = serde_json::to_vec(value)
         .map_err(|error| Error::internal(format!("cannot serialize the answer: {error}")))?;
-    let digest = Sha256::digest(&bytes);
+    let mut hasher = Sha256::new();
+    hasher.update(tenant.id().as_uuid().as_bytes());
+    hasher.update(&bytes);
+    let digest = hasher.finalize();
     let short = digest.get(..16).unwrap_or_default();
     Ok(format!("\"{}\"", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(short)))
 }
 
 use autoxide_kernel::pagination::{Page, PageQuery};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use axum::extract::Path;
 
 use super::page_request;
@@ -329,10 +336,11 @@ use crate::taxonomy::terms::Taxonomy;
 /// Ghép thông tin cho một trang bản công khai.
 async fn views(
     service: &ContentService,
+    tenant: &TenantContext,
     page: Page<crate::publishing::Published>,
 ) -> Result<Page<PublicEntryResponse>, Error> {
     let Page { data, pagination } = page;
-    let data = service.public_views(data).await?.into_iter().map(public_entry).collect();
+    let data = service.public_views(tenant, data).await?.into_iter().map(public_entry).collect();
     Ok(Page { data, pagination })
 }
 
@@ -370,6 +378,7 @@ pub(crate) struct PostsQuery {
 )]
 pub(crate) async fn list_posts(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Query(query): Query<PostsQuery>,
     Query(paging): Query<PageQuery>,
@@ -391,7 +400,8 @@ pub(crate) async fn list_posts(
     let page = page_request(paging, problems)?;
     let filter =
         PostFilter { locale, term_id: query.term_id, author_id: query.author_id, search: query.q };
-    let page = views(&service, service.public_posts(&filter, &page).await?).await?;
+    let page =
+        views(&service, &tenant, service.public_posts(&tenant, &filter, &page).await?).await?;
     Ok(public_cache(page.into_response()))
 }
 
@@ -463,11 +473,12 @@ pub(crate) struct LocaleQuery {
 )]
 pub(crate) async fn get_menu(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Path(key): Path<String>,
     Query(query): Query<LocaleQuery>,
 ) -> Result<Response, Error> {
-    let (menu, nodes) = service.public_menu(&key, &query.locale).await?;
+    let (menu, nodes) = service.public_menu(&tenant, &key, &query.locale).await?;
     let data = PublicMenu { key: menu.key, locale: menu.locale, items: menu_items(nodes) };
     Ok(public_cache(Data { data }.into_response()))
 }
@@ -505,11 +516,12 @@ pub(crate) struct PublicTermPage {
 )]
 pub(crate) async fn get_term(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Path((taxonomy, slug)): Path<(Taxonomy, String)>,
     Query(query): Query<LocaleQuery>,
 ) -> Result<Response, Error> {
-    let (full, shown) = service.term_by_slug(taxonomy, &query.locale, &slug).await?;
+    let (full, shown) = service.term_by_slug(&tenant, taxonomy, &query.locale, &slug).await?;
     let text = full.texts.iter().find(|text| text.locale == shown.locale).cloned();
     let text = text.ok_or_else(|| Error::internal("term name missing"))?;
     let data = PublicTermPage {
@@ -561,14 +573,15 @@ pub(crate) struct PublicAuthorPage {
 )]
 pub(crate) async fn get_author(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Path(slug): Path<String>,
 ) -> Result<Response, Error> {
-    let author = service.author_by_slug(&slug).await?;
+    let author = service.author_by_slug(&tenant, &slug).await?;
     let avatar = match author.avatar_media_id {
         Some(id) => service
             .media
-            .find(&TenantContext::legacy_default(&service.database), id)
+            .find(&tenant, id)
             .await?
             .filter(|item| item.visibility == autoxide_media::api::MediaVisibility::Public),
         None => None,
@@ -624,6 +637,7 @@ pub(crate) struct SitemapQuery {
 )]
 pub(crate) async fn sitemap(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Query(query): Query<SitemapQuery>,
     Query(paging): Query<PageQuery>,
@@ -634,8 +648,8 @@ pub(crate) async fn sitemap(
         .as_deref()
         .map(|locale| service.check_locale(Some(locale), "locale", &mut problems));
     let page = page_request(paging, problems)?;
-    let found = service.sitemap(locale.as_deref(), &page).await?;
-    let mut translations = service.translations_of(&found.data).await?;
+    let found = service.sitemap(&tenant, locale.as_deref(), &page).await?;
+    let mut translations = service.translations_of(&tenant, &found.data).await?;
     let page = found.map(|row| SitemapItem {
         translations: translations
             .remove(&row.entry_id)
@@ -682,6 +696,7 @@ pub(crate) struct FeedQuery {
 )]
 pub(crate) async fn feed(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Query(query): Query<FeedQuery>,
 ) -> Result<Response, Error> {
@@ -698,9 +713,9 @@ pub(crate) async fn feed(
     if !problems.is_empty() {
         return Err(Error::validation(problems));
     }
-    let rows = service.feed(&locale, limit).await?;
+    let rows = service.feed(&tenant, &locale, limit).await?;
     let data: Vec<PublicEntryResponse> =
-        service.public_views(rows).await?.into_iter().map(public_entry).collect();
+        service.public_views(&tenant, rows).await?.into_iter().map(public_entry).collect();
     Ok(public_cache(Data { data }.into_response()))
 }
 
@@ -762,11 +777,12 @@ pub(crate) struct PreviewEntryResponse {
 /// ai xin duyệt, tạo bằng gì) — token xem trước có thể tới tay người ngoài.
 async fn preview_entry(
     service: &ContentService,
+    tenant: &TenantContext,
     entry: crate::entries::Entry,
 ) -> Result<PreviewEntryResponse, Error> {
     let ids = [entry.id];
-    let term_ids = service.term_ids(&ids).await?.remove(&entry.id);
-    let author_ids = service.author_ids(&ids).await?.remove(&entry.id);
+    let term_ids = service.term_ids(tenant, &ids).await?.remove(&entry.id);
+    let author_ids = service.author_ids(tenant, &ids).await?.remove(&entry.id);
     // Địa chỉ ảnh như bài công khai (đề bài giao diện B4): chỉ ảnh đã công khai.
     let body_ids = crate::entries::body::stored_image_ids(&entry.body);
     let mut wanted: Vec<Uuid> =
@@ -775,9 +791,8 @@ async fn preview_entry(
     wanted.dedup();
     let mut found: std::collections::HashMap<Uuid, autoxide_media::api::MediaRef> =
         std::collections::HashMap::new();
-    let tenant = autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database);
     for chunk in wanted.chunks(autoxide_media::api::MAX_IDS) {
-        for item in service.media.find_many_in(&tenant, chunk, &entry.locale).await? {
+        for item in service.media.find_many_in(tenant, chunk, &entry.locale).await? {
             if item.visibility == autoxide_media::api::MediaVisibility::Public {
                 found.insert(item.id, item);
             }
@@ -822,6 +837,7 @@ async fn preview_entry(
 ///
 /// No sign-in needed: the signed token is the permission. Returns the content of the latest
 /// draft, without the internal fields of the admin view. Answers with `Cache-Control: no-store`.
+/// Needs no tenant header: the token names its tenant.
 #[utoipa::path(
     get,
     path = "/public/preview",
@@ -837,11 +853,13 @@ async fn preview_entry(
 )]
 pub(crate) async fn preview(
     State(service): State<Arc<ContentService>>,
+    OptionalTenant(request): OptionalTenant,
     _principal: Option<Principal>,
     Query(query): Query<PreviewQuery>,
 ) -> Result<Response, Error> {
-    let entry = service.preview(&query.token).await?;
-    let data = preview_entry(&service, entry).await?;
+    // Khách lấy từ token khi token ghi khách: link mở được cả trên tên miền chính không header.
+    let (tenant, entry) = service.preview(request.as_ref(), &query.token).await?;
+    let data = preview_entry(&service, &tenant, entry).await?;
     let mut response = Data { data }.into_response();
     response.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(response)
@@ -876,10 +894,11 @@ pub(crate) struct PreviewToken {
 )]
 pub(crate) async fn preview_token(
     State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<PreviewToken>, Error> {
-    let (token, expires_at) = service.preview_token(&principal, id).await?;
+    let (token, expires_at) = service.preview_token(&tenant, &principal, id).await?;
     Ok(Data { data: PreviewToken { token, expires_at } })
 }
 

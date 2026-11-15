@@ -5,6 +5,10 @@
 //! Chỉ API: giao diện quản trị và website là repo riêng (D-097). Ảnh là ID của module
 //! `media` (đăng ký SAU `media`, kiểm qua `autoxide_media::api::Media`). Hướng dẫn dùng:
 //! `docs/CONTENT.md`.
+//!
+//! Theo khách (bước 33): mọi bảng mang `tenant_id`, mọi truy vấn lọc theo khách; endpoint công
+//! khai trả site của khách theo tên miền / header; job định kỳ (dọn revision, lập index bù) chạy
+//! một lần mỗi database rồi làm theo từng khách có dữ liệu ở đó.
 
 mod ai;
 pub mod api;
@@ -133,7 +137,7 @@ impl Module for ContentModule {
         };
         let service = Arc::new(
             ContentService::new(
-                context.database().clone(),
+                context.tenancy(),
                 context.outbox()?,
                 context.jobs(),
                 dependencies,
@@ -142,8 +146,7 @@ impl Module for ContentModule {
             .with_translations(context.translations().clone()),
         );
         context.personal_data(service.clone())?;
-        context
-            .resource_type(resource::ENTRY, Arc::new(resource::EntryResolver(service.clone())))?;
+        context.resource_type(resource::ENTRY, Arc::new(resource::EntryResolver))?;
         context.resource_type(resource::TERM, Arc::new(resource::TermResolver(service.clone())))?;
         // Menu cũ cho module `menus` nhập sang (D-238).
         context.provide::<dyn api::LegacyMenus>(service.clone())?;
@@ -199,7 +202,7 @@ impl Module for ContentModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
-    use autoxide_kernel::tenancy::TenantContext;
+    use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
 
@@ -294,6 +297,27 @@ pub(crate) mod testing {
         ai: Arc<dyn autoxide_kernel::ai::TextModel>,
         embedder: Arc<dyn autoxide_kernel::ai::Embedder>,
     ) -> (Arc<ContentService>, Arc<FakeMedia>, Database) {
+        build(test, config, ai, embedder, None).await
+    }
+
+    /// Như [`service_with`], tra khách qua sổ `registry` (vd sổ nhiều khách của một `TestApp`).
+    pub async fn service_in(
+        test: &TestDatabase,
+        config: ContentConfig,
+        ai: Arc<dyn autoxide_kernel::ai::TextModel>,
+        embedder: Arc<dyn autoxide_kernel::ai::Embedder>,
+        registry: DatabaseRegistry,
+    ) -> (Arc<ContentService>, Arc<FakeMedia>, Database) {
+        build(test, config, ai, embedder, Some(registry)).await
+    }
+
+    async fn build(
+        test: &TestDatabase,
+        config: ContentConfig,
+        ai: Arc<dyn autoxide_kernel::ai::TextModel>,
+        embedder: Arc<dyn autoxide_kernel::ai::Embedder>,
+        registry: Option<DatabaseRegistry>,
+    ) -> (Arc<ContentService>, Arc<FakeMedia>, Database) {
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
         let kernel = Config::read(&mut reader);
@@ -307,7 +331,7 @@ pub(crate) mod testing {
         let media = Arc::new(FakeMedia::default());
         let dependencies = crate::service::Dependencies { media: media.clone(), ai, embedder };
         let service = ContentService::new(
-            database.clone(),
+            registry.unwrap_or_else(|| DatabaseRegistry::single(database.clone())),
             Outbox::standalone("content"),
             autoxide_kernel::job::JobQueue::new("content"),
             dependencies,

@@ -6,12 +6,13 @@
 //!   transaction bằng việc khoá dòng của ngôn ngữ đó trong `content_tree_locks`
 //!   (`rows::lock_one`, D-181; cột `version` không còn dùng): các thay đổi chạy lần lượt —
 //!   hai lệnh chuyển chéo nhau không cùng qua được bước kiểm vòng lặp; SQLite vốn chỉ có một
-//!   người ghi.
+//!   người ghi. Mỗi khách một bộ dòng khoá (bước 33): khách này không chờ khách kia.
 
 use std::collections::HashMap;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::rows;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
@@ -23,16 +24,27 @@ use crate::entries::{Entry, Kind};
 /// Khoá cây của ngôn ngữ `locale` tới hết `transaction`.
 pub(crate) async fn lock_tree<C: ConnectionTrait>(
     transaction: &C,
+    tenant: &TenantContext,
     locale: &str,
 ) -> Result<(), Error> {
+    // Dòng khoá của (khách, ngôn ngữ) tạo khi cần lần đầu (khách mới không phải gieo trước).
     tree_lock::Entity::insert(tree_lock::ActiveModel {
+        tenant_id: Set(tenant.id().as_uuid()),
         locale: Set(locale.to_owned()),
         version: Set(0),
     })
-    .on_conflict(OnConflict::column(tree_lock::Column::Locale).do_nothing().to_owned())
+    .on_conflict(
+        OnConflict::columns([tree_lock::Column::TenantId, tree_lock::Column::Locale])
+            .do_nothing()
+            .to_owned(),
+    )
     .exec_without_returning(transaction)
     .await?;
-    rows::lock_one(transaction, tree_lock::Entity::find_by_id(locale)).await?;
+    rows::lock_one(
+        transaction,
+        tree_lock::Entity::find().scoped(tenant).filter(tree_lock::Column::Locale.eq(locale)),
+    )
+    .await?;
     Ok(())
 }
 
@@ -40,6 +52,7 @@ pub(crate) async fn lock_tree<C: ConnectionTrait>(
 /// `Err(None)` khi trang cha chưa công khai.
 pub(crate) async fn path_of<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     entry: &Entry,
     post_prefix: &str,
 ) -> Result<Result<String, ()>, Error> {
@@ -49,15 +62,23 @@ pub(crate) async fn path_of<C: ConnectionTrait>(
     let Some(parent) = entry.parent_id else {
         return Ok(Ok(format!("/{}", entry.slug)));
     };
-    Ok(match published::Entity::find_by_id(parent).one(connection).await? {
-        Some(parent) => Ok(format!("{}/{}", parent.path, entry.slug)),
-        None => Err(()),
-    })
+    Ok(
+        match published::Entity::find()
+            .scoped(tenant)
+            .filter(published::Column::EntryId.eq(parent))
+            .one(connection)
+            .await?
+        {
+            Some(parent) => Ok(format!("{}/{}", parent.path, entry.slug)),
+            None => Err(()),
+        },
+    )
 }
 
 /// Bản công khai của mọi trang con, cháu… (đang công khai) của trang `id`.
 pub(crate) async fn published_descendants<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     id: Uuid,
 ) -> Result<Vec<published::Model>, Error> {
     let mut found = Vec::new();
@@ -67,6 +88,7 @@ pub(crate) async fn published_descendants<C: ConnectionTrait>(
             break;
         }
         let children = published::Entity::find()
+            .scoped(tenant)
             .filter(published::Column::ParentId.is_in(current.clone()))
             .all(connection)
             .await?;
@@ -83,22 +105,24 @@ pub(crate) type Moved = (Uuid, String, String);
 /// trả danh sách thay đổi (để ghi chuyển hướng và event).
 pub(crate) async fn repath_descendants<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     id: Uuid,
     old: &str,
     new: &str,
     at: DateTime<Utc>,
 ) -> Result<Vec<Moved>, Error> {
     let mut moved = Vec::new();
-    for child in published_descendants(connection, id).await? {
+    for child in published_descendants(connection, tenant, id).await? {
         let Some(rest) = child.path.strip_prefix(old) else { continue };
         let path = format!("{new}{rest}");
         // Đường dẫn mới của trang con có thể trùng một bản công khai khác (vd bài viết ở
         // `/blog/x`): báo `content.path_taken` như với chính trang được đổi, không để câu
         // `UPDATE` vấp unique rồi thành lỗi 500.
-        if path_used(connection, &child.locale, &path, child.entry_id).await? {
+        if path_used(connection, tenant, &child.locale, &path, child.entry_id).await? {
             return Err(crate::publishing::path_taken(&path));
         }
         published::Entity::update_many()
+            .scoped(tenant)
             .col_expr(published::Column::Path, Expr::value(path.clone()))
             .col_expr(published::Column::UpdatedAt, Expr::value(at))
             .filter(published::Column::EntryId.eq(child.entry_id))
@@ -112,11 +136,13 @@ pub(crate) async fn repath_descendants<C: ConnectionTrait>(
 /// Đường dẫn `path` (ngôn ngữ `locale`) đã có bản công khai nào khác `except` dùng chưa.
 pub(crate) async fn path_used<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     locale: &str,
     path: &str,
     except: Uuid,
 ) -> Result<bool, Error> {
     Ok(published::Entity::find()
+        .scoped(tenant)
         .filter(published::Column::Locale.eq(locale))
         .filter(published::Column::Path.eq(path))
         .filter(published::Column::EntryId.ne(except))
@@ -128,10 +154,12 @@ pub(crate) async fn path_used<C: ConnectionTrait>(
 /// Ở `path` (ngôn ngữ `locale`) có chuyển hướng làm tay (`manual`) không.
 pub(crate) async fn manual_redirect_at<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     locale: &str,
     path: &str,
 ) -> Result<bool, Error> {
     Ok(redirect::Entity::find()
+        .scoped(tenant)
         .filter(redirect::Column::Locale.eq(locale))
         .filter(redirect::Column::FromPath.eq(path))
         .filter(redirect::Column::Source.eq("manual"))
@@ -144,13 +172,14 @@ pub(crate) async fn manual_redirect_at<C: ConnectionTrait>(
 /// `moved`; bỏ chuyển hướng tự động / "đã gỡ" đang chiếm đường dẫn mới.
 pub(crate) async fn redirect_moved<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     locale: &str,
     moved: &[Moved],
     by: Option<Uuid>,
     at: DateTime<Utc>,
 ) -> Result<(), Error> {
     for (entry_id, old, new) in moved {
-        clear_automatic(connection, locale, new).await?;
+        clear_automatic(connection, tenant, locale, new).await?;
         let row = Generated {
             locale,
             from: old,
@@ -160,7 +189,7 @@ pub(crate) async fn redirect_moved<C: ConnectionTrait>(
             by,
             at,
         };
-        put_redirect(connection, row).await?;
+        put_redirect(connection, tenant, row).await?;
     }
     Ok(())
 }
@@ -168,10 +197,12 @@ pub(crate) async fn redirect_moved<C: ConnectionTrait>(
 /// Bỏ chuyển hướng tự động hay "đã gỡ" ở `path` (chuyển hướng làm tay thì giữ).
 pub(crate) async fn clear_automatic<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     locale: &str,
     path: &str,
 ) -> Result<(), Error> {
     redirect::Entity::delete_many()
+        .scoped(tenant)
         .filter(redirect::Column::Locale.eq(locale))
         .filter(redirect::Column::FromPath.eq(path))
         .filter(redirect::Column::Source.is_in(["auto", "gone"]))
@@ -194,11 +225,13 @@ pub(crate) struct Generated<'a> {
 /// Ghi (thay) chuyển hướng tự động ở `row.from` — chuyển hướng làm tay đang có thì giữ nguyên.
 pub(crate) async fn put_redirect<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     row: Generated<'_>,
 ) -> Result<(), Error> {
-    clear_automatic(connection, row.locale, row.from).await?;
+    clear_automatic(connection, tenant, row.locale, row.from).await?;
     redirect::Entity::insert(redirect::ActiveModel {
         id: Set(Uuid::now_v7()),
+        tenant_id: Set(tenant.id().as_uuid()),
         locale: Set(row.locale.to_owned()),
         from_path: Set(row.from.to_owned()),
         to_entry_id: Set(row.to_entry),
@@ -210,9 +243,13 @@ pub(crate) async fn put_redirect<C: ConnectionTrait>(
         updated_at: Set(row.at),
     })
     .on_conflict(
-        OnConflict::columns([redirect::Column::Locale, redirect::Column::FromPath])
-            .do_nothing()
-            .to_owned(),
+        OnConflict::columns([
+            redirect::Column::TenantId,
+            redirect::Column::Locale,
+            redirect::Column::FromPath,
+        ])
+        .do_nothing()
+        .to_owned(),
     )
     .exec_without_returning(connection)
     .await?;
@@ -248,12 +285,14 @@ pub(crate) fn is_site_link(raw: &str) -> bool {
 /// Đường dẫn công khai của các mục trong `ids` (mục không công khai thì không có mặt).
 pub(crate) async fn paths<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     ids: &[Uuid],
 ) -> Result<HashMap<Uuid, String>, Error> {
     if ids.is_empty() {
         return Ok(HashMap::new());
     }
     Ok(published::Entity::find()
+        .scoped(tenant)
         .filter(published::Column::EntryId.is_in(ids.to_vec()))
         .all(connection)
         .await?
