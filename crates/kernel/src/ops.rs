@@ -2,6 +2,7 @@
 //! `kernel` (`builtin`) với sổ module đã cài và cờ theo người dùng.
 
 pub(crate) mod builtin;
+pub(crate) mod client_config;
 pub mod doctor;
 pub mod logging;
 pub mod metrics;

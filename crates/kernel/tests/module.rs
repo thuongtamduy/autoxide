@@ -231,6 +231,7 @@ async fn module_nhan_database_va_khai_route() {
             paths,
             [
                 vec![
+                    "/client-config".to_owned(),
                     "/modules".to_owned(),
                     "/modules/{name}".to_owned(),
                     "/placements".to_owned(),

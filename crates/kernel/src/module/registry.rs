@@ -60,6 +60,8 @@ pub struct Modules {
     verification: crate::access::PostingVerification,
     /// Sổ module đã cài (module `kernel` phục vụ); điền ở cuối [`start`](Self::start).
     catalog: crate::module_catalog::ModuleCatalog,
+    /// Cấu hình cho giao diện của mọi module (D-271), điền sau `start`.
+    client_configs: crate::ops::client_config::ClientConfigs,
     /// Cờ theo người dùng của module `kernel`, phục vụ dưới `/api/v1/me` (D-207).
     user_flags: crate::user_flags::Handle,
     /// Cấu hình khoá gốc (module `kernel` điền lúc `configure`), cho upgrade dữ liệu.
@@ -87,6 +89,7 @@ impl Modules {
             }
         }
         let catalog = crate::module_catalog::ModuleCatalog::default();
+        let client_configs = crate::ops::client_config::ClientConfigs::default();
         let user_flags = crate::user_flags::Handle::default();
         let keys = crate::secret::KeyConfig::default();
         let settings = crate::tenancy::settings::Catalog::default();
@@ -94,6 +97,7 @@ impl Modules {
         let mut all: Vec<Box<dyn Module>> = vec![
             Box::new(crate::builtin::KernelModule::new(
                 catalog.clone(),
+                client_configs.clone(),
                 user_flags.clone(),
                 keys.clone(),
                 settings.clone(),
@@ -152,6 +156,7 @@ impl Modules {
                 verification: crate::access::PostingVerification::default(),
                 apis: Apis::default(),
                 catalog,
+                client_configs,
                 user_flags,
                 keys,
                 seeds,
@@ -222,6 +227,7 @@ impl Modules {
         self.tenancy = Some(registry.clone());
         // Sau khi MỌI module đã khởi động: tool, job, lịch của module chỉ có từ lúc này.
         self.catalog.fill(&self.modules);
+        self.client_configs.fill(&self.modules);
         self.seeds.fill(
             self.modules
                 .iter()

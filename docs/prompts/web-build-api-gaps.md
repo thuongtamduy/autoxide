@@ -88,7 +88,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Danh sách | Số bài của từng tab trạng thái | 51 (số đếm) | Chưa hiện số |
 | [x] | Danh sách | Lọc "Bài của tôi" (`created_by=me`) và "thiếu bản dịch ngôn ngữ X" | mới | Chưa dựng |
 | [x] | Danh sách | "Sắp đăng": lịch đăng của mọi bài (`GET /content/schedules?status=scheduled`) | mới | Chỉ xem lịch trong từng bài |
-| [ ] | Danh sách, trình soạn | Cấu hình cho giao diện: danh sách ngôn ngữ (`AUTOXIDE_CONTENT_LOCALES`), đầu đường dẫn bài viết, host được nhúng | mới | Dùng giá trị mặc định của core: en/vi, `/blog/`, YouTube/Vimeo |
+| [x] | Danh sách, trình soạn | Cấu hình cho giao diện: danh sách ngôn ngữ (`AUTOXIDE_CONTENT_LOCALES`), đầu đường dẫn bài viết, host được nhúng | mới | Dùng giá trị mặc định của core: en/vi, `/blog/`, YouTube/Vimeo |
 | [x] | Danh sách, trình soạn | `published_at` trong `EntryResponse` của trang quản trị | mới | Cột ngày dùng `updated_at` |
 | [ ] | Danh sách | Website theo tên miền | 37 (`GET /compliance/websites`) | Dữ liệu mẫu (`src/sample/content.ts`) |
 | [ ] | Danh sách | Trang bắt buộc của website, tạo từ mẫu | 37 (`…/websites/{id}/checklist`, `POST /content/templates/{key}/drafts`) | Dữ liệu mẫu (`src/sample/content.ts`) |
@@ -122,7 +122,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Tạo API key | Sổ permission đọc được khi không có `auth.roles.read` (vd `GET /me/permissions` kèm mô tả) | mới | Chỉ thấy tên permission, không có mô tả |
 | [ ] | Chờ duyệt | `GET /kernel/approvals`, `POST /approvals/{id}/approve`, `/reject` | 51 | Dữ liệu mẫu (`src/sample/agent.ts`) |
 | [ ] | Nhật ký gọi tool MCP | Nhật ký các lần agent gọi tool | 51, 52 | Dữ liệu mẫu (`src/sample/agent.ts`) |
-| [ ] | Kết nối MCP | Core công bố địa chỉ công khai (`AUTOXIDE_HTTP_PUBLIC_URL`) | mới | Dùng `AUTOXIDE_API_URL` của giao diện |
+| [x] | Kết nối MCP | Core công bố địa chỉ công khai (`AUTOXIDE_HTTP_PUBLIC_URL`) | mới | Dùng `AUTOXIDE_API_URL` của giao diện |
 | [ ] | Nhà phát triển › Request | `GET /kernel/requests?status_class=&api_key_id=` | 52 | Dữ liệu mẫu (`src/sample/devtools.ts`) |
 | [ ] | Nhà phát triển › Event theo bản ghi | `GET /kernel/records/{kind}/{id}/events` | 52 | Dữ liệu mẫu (`src/sample/devtools.ts`) |
 
@@ -154,10 +154,10 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Thư viện media | Số tệp trong mỗi thư mục (`item_count` trong `FolderResponse`) | mới | Không hiện số |
 | [x] | Thư viện media | Alt theo từng ngôn ngữ (`PUT/DELETE /media/{id}/alts/{locale}`, `alts` trong tệp) | v0.14.0 | Đã nối API thật (W-021 của web) |
 | [x] | Thư viện media | Cờ "ảnh chỉ để trang trí" (alt để trống có chủ ý, khác "chưa có alt") | mới | Dữ liệu mẫu (`src/sample/media.ts`) |
-| [ ] | Thư viện media | Danh sách ngôn ngữ alt máy chủ mở (`AUTOXIDE_MEDIA_ALT_LOCALES`) qua API, để giao diện chỉ hiện ô của ngôn ngữ được nhận | mới | Hiện ô theo ngôn ngữ của nội dung; ngôn ngữ không mở thì hiện lỗi `media.unsupported_locale` của core |
+| [x] | Thư viện media | Danh sách ngôn ngữ alt máy chủ mở (`AUTOXIDE_MEDIA_ALT_LOCALES`) qua API, để giao diện chỉ hiện ô của ngôn ngữ được nhận | mới | Hiện ô theo ngôn ngữ của nội dung; ngôn ngữ không mở thì hiện lỗi `media.unsupported_locale` của core |
 | [ ] | Thư viện media | "Đang dùng ở": bài, trang, sản phẩm nào dùng tệp (`GET /media/{id}/usages`) | 51 (D-267) | Ghi "máy chủ chưa liệt kê được" |
 | [x] | Thư viện media | Tên người tải lên (hiện chỉ có id) | mới | Không hiện |
-| [ ] | Thư viện media | Giới hạn tải lên cho giao diện: dung lượng tối đa, loại cho phép | mới (cùng loại "cấu hình cho giao diện") | Để core báo lỗi theo `code` sau khi gửi |
+| [x] | Thư viện media | Giới hạn tải lên cho giao diện: dung lượng tối đa, loại cho phép | mới (cùng loại "cấu hình cho giao diện") | Để core báo lỗi theo `code` sau khi gửi |
 | [x] | Mọi biểu mẫu | `detail` trong `errors[]` của Problem dịch theo `Accept-Language` (vd lỗi `to_url` của chuyển hướng ra tiếng Anh) | mới | Hiện nguyên câu của core |
 | [ ] | Trang và cấu trúc | Số bài theo danh mục, thẻ, tác giả (`entry_count`) | mới | Ghi "chưa hiện số" |
 | [ ] | Trang và cấu trúc | Đường dẫn đầy đủ của trang (`path`) trong `EntryResponse` | mới | Tự ghép slug theo cây, chưa có tiền tố ngôn ngữ |
@@ -171,7 +171,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Menu | Danh sách menu kèm số mục (`item_count`), người và lúc sửa cuối | mới | Bảng không có cột "Mục" |
 | [x] | Menu | `POST /menus` trả `ETag` như `GET` và `PUT` | mới | Đọc lại menu sau khi tạo |
 | [x] | Menu | Giữ id của mục giữa các lần lưu (nhận `id` trong `SiteMenuItemInput`); hiện `PUT` cấp id mới cho mọi mục | mới | Giữ mục đang chọn theo vị trí trong cây |
-| [ ] | Menu | Ngôn ngữ được phép của menu (`AUTOXIDE_MENUS_LOCALES`) qua API | mới | Dùng danh sách ngôn ngữ của content; core vẫn kiểm |
+| [x] | Menu | Ngôn ngữ được phép của menu (`AUTOXIDE_MENUS_LOCALES`) qua API | mới | Dùng danh sách ngôn ngữ của content; core vẫn kiểm |
 | [x] | Menu | Header `Deprecation` / `Sunset` trên `/content/menus…` | v0.14.0 | Lấy ngày từ header `Sunset` thật |
 
 ## Tổ chức › Cây tổ chức (`/org`) và Tuân thủ (`/compliance`)

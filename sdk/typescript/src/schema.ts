@@ -313,6 +313,69 @@ export type ChangePasswordRequest = {
   new_password: string;
 };
 
+/** Settings of the server an interface needs, by module: only values safe to show anyone. A module without such settings is absent. */
+export type ClientConfigResponse = {
+  /** Content settings an interface needs. */
+  content: {
+    /** Language of a new entry when none is given. */
+    default_locale: string;
+    /** Hosts whose videos and posts may be embedded in an entry (`AUTOXIDE_CONTENT_EMBED_HOSTS`). */
+    embed_hosts: string[];
+    /** Languages entries may be written in (`AUTOXIDE_CONTENT_LOCALES`), the default first. */
+    locales: string[];
+    /** Largest entry body accepted, in bytes. */
+    max_body_bytes: number;
+    /** Path prefix of posts on the website (`AUTOXIDE_CONTENT_POST_PATH_PREFIX`), e.g. `/blog/`. */
+    post_path_prefix: string;
+  };
+  /** Kernel's own section. */
+  kernel: {
+    /**
+     * The public address of the API (`AUTOXIDE_HTTP_PUBLIC_URL`), used in links of mails and by
+     * MCP clients (`<public_url>/mcp`); `null` when the operator did not set it.
+     */
+    public_url?: string | null;
+    /** Version of the server. */
+    version: string;
+  };
+  /** Mail settings an interface needs. */
+  mail: {
+    /** Sender of every mail (`AUTOXIDE_MAIL_FROM`). */
+    from: string;
+    /**
+     * `true` when mail goes out through an SMTP server; `false` when it is only written to
+     * files on the server (`AUTOXIDE_MAIL_SMTP_URL` not set) — nobody receives it.
+     */
+    sends: boolean;
+  };
+  /** Media library settings an interface needs. */
+  media: {
+    /**
+     * Media types accepted at upload (`AUTOXIDE_MEDIA_ALLOWED_TYPES`): `type/subtype` or
+     * `type/*`.
+     */
+    allowed_types: string[];
+    /**
+     * Languages of `alt` translations (`AUTOXIDE_MEDIA_ALT_LOCALES`): show one alt field per
+     * language.
+     */
+    alt_locales: string[];
+    /** Widths of the smaller copies made of images, in pixels. */
+    image_widths: number[];
+    /** Largest upload, in bytes (`AUTOXIDE_MEDIA_MAX_BYTES`). */
+    max_bytes: number;
+    /** Days an item stays in the trash before it is deleted for good. */
+    trash_days: number;
+  };
+  /** Menu settings an interface needs. */
+  menus: {
+    /** Language of a menu when none is given. */
+    default_locale: string;
+    /** Languages menus may be written in (`AUTOXIDE_MENUS_LOCALES`), the default first. */
+    locales: string[];
+  };
+};
+
 /** A code from the authenticator app, or (where stated) a recovery code. */
 export type CodeRequest = {
   /**
@@ -969,6 +1032,17 @@ export type Data_CeremonyResponse = {
      * `navigator.credentials.create()` / `.get()`.
      */
     options: Record<string, unknown>;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ClientConfigResponse = {
+  /**
+   * Settings of the server an interface needs, by module (`kernel`, `content`, `media`…): only
+   * values safe to show anyone. A module without such settings is absent.
+   */
+  data: {
+    [key: string]: unknown;
   };
 };
 
@@ -8520,6 +8594,17 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/client-config": {
+    /** Get the settings an interface needs. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_ClientConfigResponse;
+        500: Problem;
         default: Problem;
       };
     };

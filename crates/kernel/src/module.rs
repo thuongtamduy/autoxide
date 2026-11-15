@@ -15,6 +15,7 @@
 //! job, tool MCP) thêm một hàm vào [`Module`], luôn kèm cài đặt mặc định "không
 //! có gì" — module cũ không phải sửa khi hợp đồng thêm hàm mới.
 
+pub use crate::ops::client_config::ClientSection;
 use std::any::{Any, TypeId};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
@@ -205,6 +206,13 @@ pub trait Module: Send + Sync {
     /// phải có bản dịch (`cargo xtask check` kiểm).
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         Vec::new()
+    }
+
+    /// Giá trị cấu hình không phải secret mà giao diện cần (ngôn ngữ, giới hạn tải lên…), phục vụ
+    /// ở `GET /api/v1/kernel/client-config` dưới tên module (D-271). Endpoint không cần đăng
+    /// nhập: chỉ đưa giá trị ai xem cũng được. Gọi một lần sau `start` của mọi module.
+    fn client_config(&self) -> Result<Option<ClientSection>, Error> {
+        Ok(None)
     }
 
     /// Các route REST của module, kèm tài liệu OpenAPI của chúng. Gọi sau `start`.

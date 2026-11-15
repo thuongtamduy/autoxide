@@ -269,6 +269,10 @@ databases.
   `context.jobs()` to enqueue.
 - A route that needs a larger request body than the default declares it in
   `Module::body_limits`.
+- Settings an interface needs (languages, upload limits…) go in `Module::client_config`: a
+  `ClientSection::new(&value)` of a `Serialize + ToSchema` struct with plain fields. They appear
+  under the module's name in `GET /api/v1/kernel/client-config`, which needs no sign-in — put
+  only values safe to show anyone, never a secret.
 - Anything an installer can get wrong (a directory that is not writable, an external
   service that does not answer, missing initial data) gets a check in `Module::checks`:
   a `Check` whose `Probe` returns a `Finding` (ok, warning or failed, with a hint). It runs

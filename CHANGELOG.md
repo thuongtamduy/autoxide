@@ -16,6 +16,10 @@ endpoints are marked deprecated with a sunset date first.
   gives `has_password` and `pending_email` (an email change waiting for its link, with expiry);
   `DELETE /api/v1/auth/me/email` cancels that change. New event `auth.email_change_cancelled`. Users are an object
   type `auth.user` of the object directory (their display name), for other modules.
+- `GET /api/v1/kernel/client-config` (no sign-in): the settings an interface needs, by module —
+  `kernel` (public address, version), `content` (languages, post path prefix, embed hosts),
+  `media` (upload limit and types, alt languages), `menus` (languages), `mail` (sender, whether
+  mail is really sent). For module authors: `Module::client_config` with `ClientSection`.
 - `comments`: comments in the moderation list and when read carry `target_title` and `target_url`
   (from the module that owns the target, when public); `GET /api/v1/comments/targets` lists the
   targets with comments, their counts, title and path, filtered by kind, state or pending.

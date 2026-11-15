@@ -6816,3 +6816,21 @@ Xếp vào lộ trình: các mục của đề bài này là việc sửa API c�
 3. `title` / `url` trong `TargetResponse` chỉ có ở danh sách của quản trị viên; câu trả lời công khai giữ nguyên
    hình dạng (D-059). Chưa thêm tool MCP cho danh sách đích: tool `comments.queue` đã đủ cho việc kiểm duyệt của
    agent; thêm khi có nhu cầu (luật kiến trúc 8 chỉ cấm MCP làm hơn REST).
+
+## D-271 · Cấu hình cho giao diện: `Module::client_config` và `GET /api/v1/kernel/client-config` (đề bài giao diện C) — 2026-11-15 — agent quyết
+
+1. **Một endpoint chỉ đọc**, `GET /api/v1/kernel/client-config`, gom phần của từng module dưới tên module.
+   **Không cần đăng nhập** (giao diện cần ngôn ngữ, địa chỉ công khai ngay cả ở trang đăng nhập); đổi lại, luật cho
+   module: chỉ đưa giá trị ai xem cũng được — không secret, không URL có mật khẩu (`mail` chỉ cho địa chỉ người gửi
+   và cờ `sends`, không bao giờ `AUTOXIDE_MAIL_SMTP_URL`).
+2. **Hàm mới của `Module`** có cài đặt mặc định trả `None` (D-038): `fn client_config(&self) ->
+   Result<Option<ClientSection>, Error>`. `ClientSection::new(&value)` nhận struct `Serialize + ToSchema`; giá trị
+   đọc một lần sau khi mọi module khởi động (cấu hình không đổi khi chương trình đang chạy).
+3. **Tài liệu OpenAPI đủ từng trường** mà kernel không biết module nào: lược đồ `ClientConfigResponse` được ghép
+   lúc dựng route từ lược đồ của từng phần (`T::schema()`), mỗi module một thuộc tính bắt buộc. Testkit kiểm câu
+   trả lời thật theo lược đồ ghép này (D-241). Struct của phần chỉ nên có trường đơn giản: lược đồ được chép nguyên,
+   không kéo theo component khác.
+4. Phần đã khai: `kernel` (`public_url`, `version`), `content` (ngôn ngữ, ngôn ngữ mặc định, tiền tố đường dẫn
+   bài, host được nhúng, cỡ thân bài tối đa), `media` (cỡ tải lên, loại cho phép, ngôn ngữ alt, cỡ ảnh thu nhỏ, số
+   ngày trong thùng rác), `menus` (ngôn ngữ), `mail` (người gửi, có gửi thật không). "Địa chỉ công khai theo
+   khách" (dòng của đề bài ở mục Kết nối đối tác) chưa làm: địa chỉ theo khách thuộc tên miền của khách, bước 33 C1.

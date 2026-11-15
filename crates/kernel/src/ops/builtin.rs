@@ -30,6 +30,8 @@ pub(crate) struct KernelModule {
     public_url: PublicUrl,
     /// Sổ module, do `Modules::start` điền sau khi mọi module khởi động.
     catalog: ModuleCatalog,
+    /// Cấu hình cho giao diện của mọi module (D-271), điền cùng lúc với sổ module.
+    client_configs: crate::ops::client_config::ClientConfigs,
     /// Database của chương trình; có sau `start` (để đọc trạng thái migration).
     database: Option<crate::database::Database>,
     /// `AUTOXIDE_USER_FLAGS_MAX`; có sau `configure`.
@@ -51,6 +53,7 @@ pub(crate) struct KernelModule {
 impl KernelModule {
     pub(crate) fn new(
         catalog: ModuleCatalog,
+        client_configs: crate::ops::client_config::ClientConfigs,
         flags: user_flags::Handle,
         keys: crate::secret::KeyConfig,
         tenant_settings: crate::tenancy::settings::Catalog,
@@ -64,6 +67,7 @@ impl KernelModule {
             admin: None,
             public_url: PublicUrl::default(),
             catalog,
+            client_configs,
             database: None,
             max_flags: 500,
             flags,
@@ -145,7 +149,8 @@ impl Module for KernelModule {
 
     fn routes(&self) -> OpenApiRouter {
         let catalog = self.catalog_state().map_or_else(OpenApiRouter::new, module_catalog::routes);
-        let mut routes = catalog;
+        let mut routes =
+            catalog.merge(crate::ops::client_config::routes(self.client_configs.clone()));
         if let Some(settings) = &self.settings {
             routes = routes.merge(crate::tenancy::settings::routes(settings.clone()));
         }
@@ -153,6 +158,14 @@ impl Module for KernelModule {
             routes = routes.merge(crate::tenancy::admin::routes(admin.clone()));
         }
         routes
+    }
+
+    fn client_config(&self) -> Result<Option<crate::module::ClientSection>, Error> {
+        let section = crate::ops::client_config::KernelClientConfig {
+            public_url: self.public_url.base().ok().map(str::to_owned),
+            version: env!("CARGO_PKG_VERSION").to_owned(),
+        };
+        crate::module::ClientSection::new(&section).map(Some)
     }
 
     fn subscriptions(&self) -> Vec<crate::event::Subscription> {

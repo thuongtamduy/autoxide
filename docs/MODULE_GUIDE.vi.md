@@ -266,6 +266,10 @@ Module giữ số tiền, số dư hay giao dịch dùng các công cụ của k
 - Việc nền: `Module::jobs` (bộ chạy), `Module::schedules` (job định kỳ), và
   `context.jobs()` để đưa job vào hàng đợi.
 - Route cần thân request lớn hơn mặc định thì khai trong `Module::body_limits`.
+- Cấu hình giao diện cần (ngôn ngữ, giới hạn tải lên…) khai trong `Module::client_config`: một
+  `ClientSection::new(&value)` của struct `Serialize + ToSchema` có trường đơn giản. Nó hiện dưới
+  tên module trong `GET /api/v1/kernel/client-config`, endpoint không cần đăng nhập — chỉ đưa giá
+  trị ai xem cũng được, không bao giờ đưa secret.
 - Thứ người cài có thể làm sai (thư mục không ghi được, dịch vụ ngoài không trả lời,
   thiếu dữ liệu ban đầu) thì có một bước kiểm trong `Module::checks`: một `Check` có
   `Probe` trả `Finding` (ok, warning hay failed, kèm gợi ý sửa). Nó chạy trong

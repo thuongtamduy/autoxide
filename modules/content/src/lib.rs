@@ -8,6 +8,7 @@
 
 mod ai;
 pub mod api;
+mod client_config;
 mod config;
 mod entity;
 mod entries;
@@ -103,6 +104,12 @@ impl Module for ContentModule {
                 .sunset(SUNSET)
                 .successor("/api/v1/menus/public/{key}"),
         ]
+    }
+
+    fn client_config(
+        &self,
+    ) -> Result<Option<autoxide_kernel::module::ClientSection>, autoxide_kernel::error::Error> {
+        self.config.as_ref().map_or(Ok(None), client_config::section)
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
