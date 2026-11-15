@@ -418,3 +418,85 @@ async fn xuat_csv_lon_qua_http() {
     .await
     .unwrap();
 }
+
+/// Đề bài giao diện B6: số bài gửi theo trạng thái trong danh sách form, nhãn lựa chọn theo đúng
+/// phiên bản form lúc gửi (kể cả khi form đổi sau đó).
+#[tokio::test]
+async fn so_bai_va_nhan_lua_chon() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let created = send(&app, "POST", "/forms", Some("admin"), &[], Some(definition())).await;
+        assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        assert!(created.json()["data"].get("submissions").is_none());
+
+        let listed = send(&app, "GET", "/forms", Some("reader"), &[], None).await;
+        assert_eq!(
+            listed.json()["data"][0]["submissions"],
+            json!({"new": 0, "read": 0, "archived": 0, "spam": 0})
+        );
+
+        let signed = json!({"data": {"name": "Web", "email": "web@example.com", "topic": "sales"}});
+        let sent = send(
+            &app,
+            "POST",
+            "/forms/public/contact/submissions",
+            Some("website"),
+            &[],
+            Some(signed),
+        )
+        .await;
+        assert_eq!(sent.status(), StatusCode::CREATED, "{}", sent.json());
+        let submission = sent.json()["data"]["id"].as_str().unwrap().to_owned();
+
+        // Đổi nhãn lựa chọn: bài cũ vẫn mang nhãn của phiên bản lúc gửi.
+        let read = send(&app, "GET", &format!("/forms/{id}"), Some("admin"), &[], None).await;
+        assert_eq!(read.json()["data"]["submissions"]["new"], 1);
+        let etag = read.header(header::ETAG).to_owned();
+        let mut fields = definition()["fields"].clone();
+        fields[3]["options"] = json!([{"value": "support", "label": {"en": "Support"}}]);
+        let changed = send(
+            &app,
+            "PATCH",
+            &format!("/forms/{id}"),
+            Some("admin"),
+            &[("if-match", &etag)],
+            Some(json!({"fields": fields})),
+        )
+        .await;
+        assert_eq!(changed.status(), StatusCode::OK, "{}", changed.json());
+
+        let one = send(
+            &app,
+            "GET",
+            &format!("/forms/submissions/{submission}"),
+            Some("reader"),
+            &[],
+            None,
+        )
+        .await;
+        assert_eq!(one.status(), StatusCode::OK, "{}", one.json());
+        let answers = one.json()["data"]["answers"].clone();
+        let topic = answers
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|answer| answer["key"] == "topic")
+            .unwrap()
+            .clone();
+        assert_eq!(
+            topic["choices"],
+            json!([{"value": "sales", "label": {"en": "Sales", "vi": "Bán hàng"}}])
+        );
+        let name = answers
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|answer| answer["key"] == "name")
+            .unwrap()
+            .clone();
+        assert!(name.get("choices").is_none(), "{name}");
+    })
+    .await
+    .unwrap();
+}

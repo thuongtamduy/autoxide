@@ -6767,3 +6767,16 @@ Xếp vào lộ trình: các mục của đề bài này là việc sửa API c�
    bảng của module khác (luật kiến trúc 1), và bắt từng module tự báo qua một trait riêng cho media sẽ lặp lại
    đúng thứ sổ đối tượng của bước 51 dựng chung. Đến bước 51: mỗi module khai tham chiếu tới đối tượng khác qua
    sổ đối tượng, `media` trả danh sách đó. Trong lúc chờ, giao diện giữ dòng "máy chủ chưa liệt kê được".
+
+## D-268 · Đề bài giao diện, nhóm B (forms): số bài theo trạng thái, nhãn lựa chọn theo phiên bản, kiểu của `value` — 2026-11-15 — agent quyết
+
+1. **`submissions` của form** (`new`, `read`, `archived`, `spam`): một câu `GROUP BY form_id, status` cho cả trang;
+   có ở danh sách và khi đọc một form (REST và tool MCP `forms.list`), vắng trong câu trả lời của tạo / sửa — ở
+   đó con số không phải thứ người gọi vừa hỏi, và bớt một câu truy vấn trên đường ghi.
+2. **`answers[].choices`** cho trường `select`, `radio`, `checkbox`: lựa chọn đã chọn kèm nhãn của **đúng phiên
+   bản form lúc gửi** (ảnh chụp trường đã lưu theo phiên bản, D-150). Giá trị không còn trong phiên bản đó (dữ liệu
+   cũ hơn luật kiểm) đi kèm nhãn rỗng thay vì bị bỏ — giao diện hiện giá trị thô.
+3. **Kiểu của `value`** trong hợp đồng: `oneOf` bốn kiểu `string | number | string[] | boolean` (trước là "kiểu
+   nào cũng được", D-241). Server chưa bao giờ trả kiểu khác, nên với client đây là thu hẹp an toàn; `api-diff`
+   không chứng minh được điều đó cho `oneOf` nên bốn chỗ được ghi ngoại lệ trong `xtask/api-breaking-allow.json`
+   với quyết định này. Bộ kiểm hợp đồng của testkit (D-241) kiểm mọi response thật theo kiểu mới.

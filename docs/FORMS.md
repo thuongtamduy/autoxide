@@ -56,8 +56,9 @@ curl -X POST http://localhost:8080/api/v1/forms \
   `max_length`. Labels, help texts, placeholders and option labels are `{"en": …, "vi": …}`.
 - Every problem of a definition is reported at once (`fields[2].options`…).
 - **Versions.** Changing `fields` makes a new `version`. Each submission keeps the version it
-  was sent with and is always shown with that version's labels (`answers[]`), so old
-  submissions stay readable after the form changes.
+  was sent with and is always shown with that version's labels (`answers[]`, and for choice
+  fields the chosen options with their labels in `answers[].choices`), so old submissions stay
+  readable after the form changes.
 - `PATCH` and `DELETE` of a form need `If-Match` (the `ETag` you read). Closing a form
   (`{"status": "closed"}`) keeps its submissions; deleting it deletes them too.
 - `notify_emails` are mailed for each new submission, with `Reply-To` set to the sender's
@@ -99,6 +100,8 @@ curl -X POST http://localhost:8080/api/v1/forms \
 
 ## The inbox
 
+- `GET /api/v1/forms` and `GET /api/v1/forms/{id}` give each form's `submissions`: how many are
+  `new`, `read`, `archived` and `spam`.
 - `GET /api/v1/forms/{id}/submissions?status=&q=` — newest first, `spam` left out unless
   asked; `q` searches the answers ignoring case and accents.
 - `PATCH /api/v1/forms/submissions/{id}` `{"status": "read" | "archived" | "spam" | "new"}`

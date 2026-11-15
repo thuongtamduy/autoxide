@@ -84,20 +84,20 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 
 | | Màn | Cần | Bước | Giao diện đang làm gì |
 |---|---|---|---|---|
-| [x] || Danh sách | Lọc "chờ duyệt" (`review_requested=true`) và "đã lên lịch" trong `GET /content/entries` | mới | Tab chỉ có Tất cả / Bản nháp / Đã đăng / Đã lưu trữ; nhãn "Chờ duyệt" hiện trên từng dòng |
+| [x] | Danh sách | Lọc "chờ duyệt" (`review_requested=true`) và "đã lên lịch" trong `GET /content/entries` | mới | Tab chỉ có Tất cả / Bản nháp / Đã đăng / Đã lưu trữ; nhãn "Chờ duyệt" hiện trên từng dòng |
 | [ ] | Danh sách | Số bài của từng tab trạng thái | 51 (số đếm) | Chưa hiện số |
-| [x] || Danh sách | Lọc "Bài của tôi" (`created_by=me`) và "thiếu bản dịch ngôn ngữ X" | mới | Chưa dựng |
-| [x] || Danh sách | "Sắp đăng": lịch đăng của mọi bài (`GET /content/schedules?status=scheduled`) | mới | Chỉ xem lịch trong từng bài |
+| [x] | Danh sách | Lọc "Bài của tôi" (`created_by=me`) và "thiếu bản dịch ngôn ngữ X" | mới | Chưa dựng |
+| [x] | Danh sách | "Sắp đăng": lịch đăng của mọi bài (`GET /content/schedules?status=scheduled`) | mới | Chỉ xem lịch trong từng bài |
 | [ ] | Danh sách, trình soạn | Cấu hình cho giao diện: danh sách ngôn ngữ (`AUTOXIDE_CONTENT_LOCALES`), đầu đường dẫn bài viết, host được nhúng | mới | Dùng giá trị mặc định của core: en/vi, `/blog/`, YouTube/Vimeo |
-| [x] || Danh sách, trình soạn | `published_at` trong `EntryResponse` của trang quản trị | mới | Cột ngày dùng `updated_at` |
+| [x] | Danh sách, trình soạn | `published_at` trong `EntryResponse` của trang quản trị | mới | Cột ngày dùng `updated_at` |
 | [ ] | Danh sách | Website theo tên miền | 37 (`GET /compliance/websites`) | Dữ liệu mẫu (`src/sample/content.ts`) |
 | [ ] | Danh sách | Trang bắt buộc của website, tạo từ mẫu | 37 (`…/websites/{id}/checklist`, `POST /content/templates/{key}/drafts`) | Dữ liệu mẫu (`src/sample/content.ts`) |
 | [ ] | Danh sách, trình soạn | Bài thuộc website / nút sở hữu nào, lọc theo nút | mới (bước 34 giữ `content` ở cấp khách) | Dữ liệu mẫu (`src/sample/content.ts`) |
 | [ ] | Xem trước | Địa chỉ website của khách, để link xem trước trỏ về website thật | 33, 37 | Trang `/preview` của chính trang quản trị |
-| [x] || Xem trước | Bản xem trước trả kèm địa chỉ ảnh (hiện chỉ có id media) | mới | Ảnh hiện thành ô giữ chỗ |
-| [x] || Trình soạn | Lịch đăng mang theo `ai_reviewed` | mới | Hẹn giờ không gửi được dấu "đã duyệt" |
-| [x] || Trình soạn | Kết quả kiểm SEO trả `message` theo `Accept-Language` | mới | Giao diện tự dịch theo `code`; mã lạ thì hiện câu tiếng Anh |
-| [x] || Trình soạn | Tìm tác giả và danh mục theo chữ (hiện chỉ lấy một trang 200) | mới | Lấy 200 mục đầu |
+| [x] | Xem trước | Bản xem trước trả kèm địa chỉ ảnh (hiện chỉ có id media) | mới | Ảnh hiện thành ô giữ chỗ |
+| [x] | Trình soạn | Lịch đăng mang theo `ai_reviewed` | mới | Hẹn giờ không gửi được dấu "đã duyệt" |
+| [x] | Trình soạn | Kết quả kiểm SEO trả `message` theo `Accept-Language` | mới | Giao diện tự dịch theo `code`; mã lạ thì hiện câu tiếng Anh |
+| [x] | Trình soạn | Tìm tác giả và danh mục theo chữ (hiện chỉ lấy một trang 200) | mới | Lấy 200 mục đầu |
 
 ## Cài đặt (`/settings`, `/settings/api-keys`, `/settings/developers`)
 
@@ -130,9 +130,9 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 
 | | Màn | Cần | Bước | Giao diện đang làm gì |
 |---|---|---|---|---|
-| [ ] | Biểu mẫu | `FormResponse` kèm số bài nộp theo trạng thái (cột "Bài mới", số trên chip lọc) | mới (số đếm menu: 51) | Gọi `GET /forms/{id}/submissions?status=new&limit=100` cho từng form, hiện "100+" |
-| [ ] | Bài nộp | Xuất CSV lớn bằng job, trả link tải có hạn | 32 | Xuất ngay qua route của giao diện |
-| [ ] | Bài nộp | `AnswerResponse` kèm nhãn lựa chọn của đúng phiên bản form lúc gửi; kiểu `value` trong `openapi.json` đang là object | mới | Lấy nhãn từ form hiện tại; lựa chọn đã bỏ thì hiện giá trị thô |
+| [x] | Biểu mẫu | `FormResponse` kèm số bài nộp theo trạng thái (cột "Bài mới", số trên chip lọc) | mới (số đếm menu: 51) | Gọi `GET /forms/{id}/submissions?status=new&limit=100` cho từng form, hiện "100+" |
+| [x] | Bài nộp | Xuất CSV lớn bằng job, trả link tải có hạn | 32 | Xuất ngay qua route của giao diện |
+| [x] | Bài nộp | `AnswerResponse` kèm nhãn lựa chọn của đúng phiên bản form lúc gửi; kiểu `value` trong `openapi.json` đang là object | mới | Lấy nhãn từ form hiện tại; lựa chọn đã bỏ thì hiện giá trị thô |
 | [ ] | Bản tin | `GET /newsletter/settings`: nhãn quảng cáo, giới hạn thư / ngày, tốc độ gửi, đã đặt URL công khai / trang chọn danh sách / địa chỉ người gửi chưa | mới | Hiện mặc định `[QC]`, 3 thư / ngày; thiếu cấu hình thì hiện lỗi 503 của core khi gửi |
 | [ ] | Chiến dịch | Xem trước thư đúng như khi gửi (kèm chân thư): `GET /campaigns/{id}/preview` | mới | Xem trước HTML của người soạn; chân thư mô tả bằng chữ |
 | [ ] | Chiến dịch | Số huỷ đăng ký / bounce sau thư này | mới | Không hiện |
@@ -149,14 +149,14 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 
 | | Màn | Cần | Bước | Giao diện đang làm gì |
 |---|---|---|---|---|
-| [x] || Thư viện media | Lọc "thiếu alt" (`alt_missing=true`) và số ảnh thiếu alt | mới | Lọc trên trang đang xem (48 tệp) |
-| [x] || Thư viện media | Tóm tắt cả thư viện: tổng tệp, dung lượng, số ảnh thiếu alt | mới | Tính trên trang đang xem |
-| [x] || Thư viện media | Số tệp trong mỗi thư mục (`item_count` trong `FolderResponse`) | mới | Không hiện số |
+| [x] | Thư viện media | Lọc "thiếu alt" (`alt_missing=true`) và số ảnh thiếu alt | mới | Lọc trên trang đang xem (48 tệp) |
+| [x] | Thư viện media | Tóm tắt cả thư viện: tổng tệp, dung lượng, số ảnh thiếu alt | mới | Tính trên trang đang xem |
+| [x] | Thư viện media | Số tệp trong mỗi thư mục (`item_count` trong `FolderResponse`) | mới | Không hiện số |
 | [x] | Thư viện media | Alt theo từng ngôn ngữ (`PUT/DELETE /media/{id}/alts/{locale}`, `alts` trong tệp) | v0.14.0 | Đã nối API thật (W-021 của web) |
-| [x] || Thư viện media | Cờ "ảnh chỉ để trang trí" (alt để trống có chủ ý, khác "chưa có alt") | mới | Dữ liệu mẫu (`src/sample/media.ts`) |
+| [x] | Thư viện media | Cờ "ảnh chỉ để trang trí" (alt để trống có chủ ý, khác "chưa có alt") | mới | Dữ liệu mẫu (`src/sample/media.ts`) |
 | [ ] | Thư viện media | Danh sách ngôn ngữ alt máy chủ mở (`AUTOXIDE_MEDIA_ALT_LOCALES`) qua API, để giao diện chỉ hiện ô của ngôn ngữ được nhận | mới | Hiện ô theo ngôn ngữ của nội dung; ngôn ngữ không mở thì hiện lỗi `media.unsupported_locale` của core |
 | [ ] | Thư viện media | "Đang dùng ở": bài, trang, sản phẩm nào dùng tệp (`GET /media/{id}/usages`) | 51 (D-267) | Ghi "máy chủ chưa liệt kê được" |
-| [x] || Thư viện media | Tên người tải lên (hiện chỉ có id) | mới | Không hiện |
+| [x] | Thư viện media | Tên người tải lên (hiện chỉ có id) | mới | Không hiện |
 | [ ] | Thư viện media | Giới hạn tải lên cho giao diện: dung lượng tối đa, loại cho phép | mới (cùng loại "cấu hình cho giao diện") | Để core báo lỗi theo `code` sau khi gửi |
 | [x] | Mọi biểu mẫu | `detail` trong `errors[]` của Problem dịch theo `Accept-Language` (vd lỗi `to_url` của chuyển hướng ra tiếng Anh) | mới | Hiện nguyên câu của core |
 | [ ] | Trang và cấu trúc | Số bài theo danh mục, thẻ, tác giả (`entry_count`) | mới | Ghi "chưa hiện số" |
@@ -197,7 +197,7 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Hồ sơ › Đăng nội dung | Thống kê người mua đã xác thực số điện thoại / định danh | mới | Dữ liệu mẫu |
 | [ ] | Hồ sơ › Văn bản | `GET /documents`, `POST /documents/{id}/versions`, `GET …/acceptances`; số người đã chấp nhận theo phiên bản | 37 (số đếm: mới) | Dữ liệu mẫu; trang nguồn đọc thật |
 | [ ] | Hồ sơ › Vụ việc | `GET /cases`, `POST /cases/{id}/restrict`, `…/restore`, `…/decision`, `POST …/entries` | 37 | Dữ liệu mẫu |
-| [x] || Hồ sơ › Nhãn AI | Bộ lọc `ai_generated=true` trên `GET /content/entries` | mới | Đọc 100 bài sửa gần nhất rồi lọc (API thật) |
+| [x] | Hồ sơ › Nhãn AI | Bộ lọc `ai_generated=true` trên `GET /content/entries` | mới | Đọc 100 bài sửa gần nhất rồi lọc (API thật) |
 | [ ] | Hồ sơ › Nhãn AI | Lọc và bỏ nhãn AI cho sản phẩm và alt media | mới | Dữ liệu mẫu |
 | [ ] | Hồ sơ › Yêu cầu của chủ thể | `GET/POST /compliance/subject-requests`, `POST …/{id}/status`; số lần tự xuất / tự xoá trong 30 ngày | mới | Dữ liệu mẫu |
 | [ ] | Hồ sơ › Yêu cầu của chủ thể | Một API tra / xoá dữ liệu cá nhân theo email chung cho mọi module | mới (bước 37 chỉ có `/consents?subject=`) | Dẫn tới 3 tab "dữ liệu theo email" thật |

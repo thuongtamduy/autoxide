@@ -55,7 +55,8 @@ curl -X POST http://localhost:8080/api/v1/forms \
   lựa chọn viết `{"en": …, "vi": …}`.
 - Mọi lỗi của định nghĩa được báo một lần (`fields[2].options`…).
 - **Phiên bản.** Đổi `fields` thì tạo `version` mới. Mỗi bài gửi giữ phiên bản lúc gửi và luôn
-  hiện với nhãn của đúng phiên bản đó (`answers[]`), nên bài cũ vẫn đọc được sau khi form đổi.
+  hiện với nhãn của đúng phiên bản đó (`answers[]`; trường lựa chọn có thêm các lựa chọn đã chọn
+  kèm nhãn ở `answers[].choices`), nên bài cũ vẫn đọc được sau khi form đổi.
 - `PATCH` và `DELETE` form cần `If-Match` (`ETag` đã đọc). Đóng form (`{"status": "closed"}`)
   giữ bài gửi; xoá form thì xoá luôn bài gửi.
 - `notify_emails` nhận mail cho mỗi bài mới, `Reply-To` là địa chỉ người gửi (bỏ đi nếu dịch vụ
@@ -96,6 +97,8 @@ curl -X POST http://localhost:8080/api/v1/forms \
 
 ## Hộp thư
 
+- `GET /api/v1/forms` và `GET /api/v1/forms/{id}` cho `submissions` của từng form: số bài `new`,
+  `read`, `archived` và `spam`.
 - `GET /api/v1/forms/{id}/submissions?status=&q=` — mới trước, không có `spam` trừ khi hỏi;
   `q` tìm trong câu trả lời, không phân biệt hoa thường và dấu.
 - `PATCH /api/v1/forms/submissions/{id}` `{"status": "read" | "archived" | "spam" | "new"}` kèm

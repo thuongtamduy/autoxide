@@ -60,15 +60,18 @@ export type AltSuggestionResponse = {
 
 /** One answer, with the field as it was when the submission was sent. */
 export type AnswerResponse = {
+  /**
+   * For `select`, `radio` and `checkbox`: the chosen options with their labels in the form
+   * version the submission was sent with (in the order of `value`). A value no longer among
+   * that version's options comes with an empty label. Absent for other types.
+   */
+  choices?: FieldOption[] | null;
   key: string;
   /** The field's label in the form version the submission was sent with. */
   label: Localized;
   type: FieldType;
-  /**
-   * A string; a number for `number`; an array of values for `checkbox`; `true` for
-   * `consent`.
-   */
-  value: unknown;
+  /** A string; a number for `number`; an array of values for `checkbox`; `true` for `consent`. */
+  value: string | number | string[] | boolean;
 };
 
 /** An API key, without its secret. */
@@ -1420,6 +1423,7 @@ export type Data_FormResponse = {
     /** Days submissions are kept (`0`: until deleted); `null`: the server default. */
     retention_days?: number | null;
     status: FormStatus;
+    submissions?: SubmissionCounts | null;
     /** Shown to the sender after sending. */
     success_message: Localized;
     /** The `scope` to ask `GET /api/v1/antispam/token` for, e.g. `forms:contact`. */
@@ -3044,6 +3048,7 @@ export type FormResponse = {
   /** Days submissions are kept (`0`: until deleted); `null`: the server default. */
   retention_days?: number | null;
   status: FormStatus;
+  submissions?: SubmissionCounts | null;
   /** Shown to the sender after sending. */
   success_message: Localized;
   /** The `scope` to ask `GET /api/v1/antispam/token` for, e.g. `forms:contact`. */
@@ -3984,6 +3989,7 @@ export type Page_FormResponse = {
     /** Days submissions are kept (`0`: until deleted); `null`: the server default. */
     retention_days?: number | null;
     status: FormStatus;
+    submissions?: SubmissionCounts | null;
     /** Shown to the sender after sending. */
     success_message: Localized;
     /** The `scope` to ask `GET /api/v1/antispam/token` for, e.g. `forms:contact`. */
@@ -5539,6 +5545,14 @@ export type StartTotpRequest = {
 
 /** Where an entry is in its life. */
 export type Status = "draft" | "published" | "archived";
+
+/** Submissions of a form by status. */
+export type SubmissionCounts = {
+  archived: number;
+  new: number;
+  read: number;
+  spam: number;
+};
 
 /** A submission. */
 export type SubmissionResponse = {

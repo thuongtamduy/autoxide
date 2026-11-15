@@ -20,7 +20,7 @@ use utoipa_axum::routes;
 
 use crate::service::FormsService;
 
-pub(crate) use admin::FormResponse;
+pub(crate) use admin::{FormResponse, counted as counted_forms};
 pub(crate) use inbox::SubmissionResponse;
 
 pub(crate) fn routes(service: Arc<FormsService>) -> OpenApiRouter {

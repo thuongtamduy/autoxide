@@ -143,6 +143,16 @@
       "AnswerResponse": {
         "description": "One answer, with the field as it was when the submission was sent.",
         "properties": {
+          "choices": {
+            "description": "For `select`, `radio` and `checkbox`: the chosen options with their labels in the form\nversion the submission was sent with (in the order of `value`). A value no longer among\nthat version's options comes with an empty label. Absent for other types.",
+            "items": {
+              "$ref": "#/components/schemas/FieldOption"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
           "key": {
             "type": "string"
           },
@@ -154,7 +164,24 @@
             "$ref": "#/components/schemas/FieldType"
           },
           "value": {
-            "description": "A string; a number for `number`; an array of values for `checkbox`; `true` for\n`consent`."
+            "description": "A string; a number for `number`; an array of values for `checkbox`; `true` for `consent`.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
           }
         },
         "required": [
@@ -3935,6 +3962,17 @@
               },
               "status": {
                 "$ref": "#/components/schemas/FormStatus"
+              },
+              "submissions": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/SubmissionCounts",
+                    "description": "Submissions by status (`new`, `read`, `archived`, `spam`), in the list and when one form is\nread; absent in the answers of a create or a change."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "success_message": {
                 "$ref": "#/components/schemas/Localized",
@@ -8700,6 +8738,17 @@
           "status": {
             "$ref": "#/components/schemas/FormStatus"
           },
+          "submissions": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SubmissionCounts",
+                "description": "Submissions by status (`new`, `read`, `archived`, `spam`), in the list and when one form is\nread; absent in the answers of a create or a change."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "success_message": {
             "$ref": "#/components/schemas/Localized",
             "description": "Shown to the sender after sending."
@@ -11469,6 +11518,17 @@
                 },
                 "status": {
                   "$ref": "#/components/schemas/FormStatus"
+                },
+                "submissions": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SubmissionCounts",
+                      "description": "Submissions by status (`new`, `read`, `archived`, `spam`), in the list and when one form is\nread; absent in the answers of a create or a change."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "success_message": {
                   "$ref": "#/components/schemas/Localized",
@@ -16054,6 +16114,34 @@
           "archived"
         ],
         "type": "string"
+      },
+      "SubmissionCounts": {
+        "description": "Submissions of a form by status.",
+        "properties": {
+          "archived": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "new": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "read": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "spam": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "new",
+          "read",
+          "archived",
+          "spam"
+        ],
+        "type": "object"
       },
       "SubmissionResponse": {
         "description": "A submission.",

@@ -260,7 +260,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                     );
                     let page = page_request(paging, problems)?;
                     let found = service.list_forms(&principal, state, &page).await?;
-                    Ok::<Page<FormResponse>, Error>(found.map(FormResponse::from))
+                    crate::http::counted_forms(&service, found).await
                 }
             },
         )
