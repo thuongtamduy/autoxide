@@ -20,12 +20,12 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{choice, page_request, present, required, uuid_param};
-use crate::entity::delivery;
-use crate::service::NewsletterService;
-use crate::subscribers::{
+use crate::audience::subscribers::{
     ImportInput, ImportPerson, ImportReport, Membership, Subscriber, SubscriberChange,
     SubscriberFilter, SubscriberStatus, SubscriptionStatus,
 };
+use crate::entity::delivery;
+use crate::service::NewsletterService;
 use crate::text::Locale;
 
 /// A subscription of a subscriber to one list.

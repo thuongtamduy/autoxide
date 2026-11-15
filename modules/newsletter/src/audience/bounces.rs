@@ -20,10 +20,10 @@ use serde_json::json;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::campaigns::sending::DeliveryStatus;
 use crate::entity::{delivery, subscriber, suppression};
 use crate::events::{self, Change};
 use crate::permissions::{NEWSLETTER_MANAGE, NEWSLETTER_READ};
-use crate::sending::DeliveryStatus;
 use crate::service::{NewsletterService, now, suppression_not_found};
 use crate::text;
 

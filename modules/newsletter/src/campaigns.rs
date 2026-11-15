@@ -1,10 +1,14 @@
 //! Chiến dịch: soạn (nháp), sửa, xoá; gửi, hẹn giờ, tạm dừng, tiếp tục, huỷ; gửi thử. Gửi thật
-//! nằm ở `sending.rs` (job chụp người nhận, job gửi theo lô).
+//! nằm ở `campaigns/sending.rs` (job chụp người nhận, job gửi theo lô).
 //!
 //! Đổi trạng thái là MỘT câu `UPDATE … WHERE status = <trạng thái đã đọc> AND updated_at = <phiên
 //! bản>`: hai lệnh cùng lúc thì một bên nhận 412, trên cả hai database. Mỗi lần gửi / hẹn giờ /
 //! tiếp tục tăng `run`; job của lượt cũ thấy khác số thì dừng — tạm dừng rồi tiếp tục không để
 //! hai chuỗi job cùng chạy.
+
+pub(crate) mod compose;
+pub(crate) mod new_posts;
+pub(crate) mod sending;
 
 use std::collections::HashMap;
 
@@ -24,10 +28,10 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::campaigns::sending::{DeliveryStatus, PrepareJob, SendJob};
 use crate::entity::{campaign, delivery};
 use crate::events::{self, Change};
 use crate::permissions::{NEWSLETTER_MANAGE, NEWSLETTER_READ, NEWSLETTER_SEND};
-use crate::sending::{DeliveryStatus, PrepareJob, SendJob};
 use crate::service::{NewsletterService, campaign_not_found, now};
 use crate::text::{self, Locale};
 

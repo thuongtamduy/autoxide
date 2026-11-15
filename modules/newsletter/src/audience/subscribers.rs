@@ -17,9 +17,9 @@ use serde_json::{Map, Value, json};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::audience::lists::List;
 use crate::entity::{delivery, subscriber, subscription, suppression};
 use crate::events::{self, Change};
-use crate::lists::List;
 use crate::permissions::{NEWSLETTER_EXPORT, NEWSLETTER_MANAGE, NEWSLETTER_READ};
 use crate::service::{NewsletterService, from_json, now, subscriber_not_found, to_json};
 use crate::text::{self, Locale};

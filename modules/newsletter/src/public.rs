@@ -40,15 +40,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::entity::{campaign, delivery, subscriber, subscription, suppression};
-use crate::events::{self, Change};
-use crate::lists::List;
-use crate::permissions::NEWSLETTER_SUBSCRIBE;
-use crate::service::{MODULE, NewsletterService, now, to_json};
-use crate::subscribers::{
+use crate::audience::lists::List;
+use crate::audience::subscribers::{
     ImportPerson, SubscriberStatus, SubscriptionStatus, Wanted, set_subscription,
     subscription_summary, upsert_subscriber,
 };
+use crate::entity::{campaign, delivery, subscriber, subscription, suppression};
+use crate::events::{self, Change};
+use crate::permissions::NEWSLETTER_SUBSCRIBE;
+use crate::service::{MODULE, NewsletterService, now, to_json};
 use crate::text::{self, Locale};
 
 /// Phạm vi của token form cho đăng ký (`GET /api/v1/antispam/token?scope=newsletter:subscribe`).

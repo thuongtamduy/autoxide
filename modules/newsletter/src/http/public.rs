@@ -21,10 +21,10 @@ use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
 
 use super::{present, required};
-use crate::lists::List;
+use crate::audience::lists::List;
+use crate::audience::subscribers::SubscriptionStatus;
 use crate::public::{Preferences, PreferencesChange, SCOPE, SubscribeRequest};
 use crate::service::NewsletterService;
-use crate::subscribers::SubscriptionStatus;
 use crate::text::{Locale, Localized};
 
 /// A list open to public sign-up, in one language.

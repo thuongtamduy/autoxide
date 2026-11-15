@@ -18,7 +18,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{page_request, present};
-use crate::lists::{List, ListInput, NewPosts, SubscriptionCounts};
+use crate::audience::lists::{List, ListInput, NewPosts, SubscriptionCounts};
 use crate::service::NewsletterService;
 use crate::text::{Locale, Localized};
 

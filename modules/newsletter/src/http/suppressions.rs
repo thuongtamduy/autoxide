@@ -17,7 +17,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::page_request;
-use crate::bounces::{BounceKind, BounceOutcome, SuppressionFilter};
+use crate::audience::bounces::{BounceKind, BounceOutcome, SuppressionFilter};
 use crate::entity::suppression;
 use crate::service::NewsletterService;
 

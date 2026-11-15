@@ -9,8 +9,8 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::mail::{Mail, MailTemplate};
 
+use crate::audience::lists::List;
 use crate::entity::campaign;
-use crate::lists::List;
 use crate::service::NewsletterService;
 use crate::text::{Locale, token_link};
 
