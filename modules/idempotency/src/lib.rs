@@ -42,9 +42,8 @@ impl Module for IdempotencyModule {
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
-        let database = context.database().clone();
-        self.cleanup = Some(Arc::new(store::Cleanup::new(database.clone())));
-        context.provide::<dyn IdempotencyStore>(Arc::new(store::Store::new(database)))
+        self.cleanup = Some(Arc::new(store::Cleanup));
+        context.provide::<dyn IdempotencyStore>(Arc::new(store::Store))
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {

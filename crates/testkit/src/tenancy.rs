@@ -64,8 +64,6 @@ pub const PENDING_TENANCY: &[&str] = &[
     "forms_form_versions",
     "forms_forms",
     "forms_submissions",
-    // idempotency
-    "idempotency_record",
     // media
     "media_alt_translations",
     "media_folder",
