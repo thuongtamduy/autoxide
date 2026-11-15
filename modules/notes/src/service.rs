@@ -3,13 +3,16 @@
 //!
 //! Mỗi lệnh ghi đi cùng một event trong CÙNG transaction (luật kiến trúc 3): thay đổi
 //! và dòng audit log hoặc cùng có, hoặc cùng không.
+//!
+//! Ghi chú thuộc một khách (bước 33): mọi hàm nhận `&TenantContext`, lấy database qua
+//! `tenant.database()` và lọc MỌI truy vấn bằng `.scoped(tenant)`; `INSERT` đặt `tenant_id`. Quên
+//! khách thì không có database để truy vấn — trình biên dịch chặn.
 
-use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set,
@@ -39,25 +42,31 @@ pub(crate) struct NoteChanges {
     pub body: Option<String>,
 }
 
+// Service không giữ database: database là của khách, đi theo `TenantContext` của từng lời gọi.
 pub(crate) struct NoteService {
-    database: Database,
     outbox: Outbox,
 }
 
 impl NoteService {
-    pub(crate) fn new(database: Database, outbox: Outbox) -> Self {
-        NoteService { database, outbox }
+    pub(crate) fn new(outbox: Outbox) -> Self {
+        NoteService { outbox }
     }
 
-    /// Tạo ghi chú của `actor`. Tên trùng với ghi chú khác của cùng người thì
-    /// `notes.title_taken`.
-    pub(crate) async fn create(&self, actor: Actor, input: NewNote) -> Result<Note, Error> {
+    /// Tạo ghi chú của `actor` trong khách `tenant`. Tên trùng với ghi chú khác của cùng người
+    /// thì `notes.title_taken`.
+    pub(crate) async fn create(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        input: NewNote,
+    ) -> Result<Note, Error> {
         let owner = owner(actor)?;
         let title = check(Some(&input.title), Some(&input.body))?.unwrap_or_default();
         let now = now();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let note = entity::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             owner_id: Set(owner),
             title: Set(title.clone()),
             body: Set(input.body),
@@ -69,13 +78,7 @@ impl NoteService {
         .map_err(|error| title_conflict(error, &title))?;
         let event = events::NoteCreated(Change { before: None, after: Some(snapshot(&note)) });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::note_subject(note.id),
-                &event,
-            )
+            .record(&transaction, tenant, actor, events::note_subject(note.id), &event)
             .await?;
         transaction.commit().await?;
         tracing::info!(note_id = %note.id, "note created");
@@ -83,28 +86,40 @@ impl NoteService {
     }
 
     /// Một trang ghi chú của `actor`, mới tạo trước (mặc định).
-    pub(crate) async fn list(&self, actor: Actor, page: &PageRequest) -> Result<Page<Note>, Error> {
-        let select = Entity::find().filter(Column::OwnerId.eq(owner(actor)?));
-        fetch_page(select, Column::Id, |row| row.id, page, self.database.read()).await
+    pub(crate) async fn list(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        page: &PageRequest,
+    ) -> Result<Page<Note>, Error> {
+        let select = Entity::find().filter(Column::OwnerId.eq(owner(actor)?)).scoped(tenant);
+        fetch_page(select, Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 
-    /// Ghi chú `id` của `actor`. Ghi chú của người khác báo như không có.
-    pub(crate) async fn get(&self, actor: Actor, id: Uuid) -> Result<Note, Error> {
-        let note = Entity::find_by_id(id).one(self.database.read()).await?;
+    /// Ghi chú `id` của `actor`. Ghi chú của người khác (hay của khách khác) báo như không có.
+    pub(crate) async fn get(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        id: Uuid,
+    ) -> Result<Note, Error> {
+        let note = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
         note.filter(|note| Some(note.owner_id) == actor.user_id).ok_or_else(|| not_found(id))
     }
 
     /// Đổi tên hay nội dung ghi chú `id` của `actor`.
     pub(crate) async fn update(
         &self,
+        tenant: &TenantContext,
         actor: Actor,
         id: Uuid,
         changes: NoteChanges,
         expected: Option<DateTime<Utc>>,
     ) -> Result<Note, Error> {
         let title = check(changes.title.as_deref(), changes.body.as_deref())?;
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let before = Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .filter(|note| Some(note.owner_id) == actor.user_id)
@@ -117,7 +132,7 @@ impl NoteService {
             row.body = Set(body);
         }
         row.updated_at = Set(now());
-        let mut update = Entity::update(row).validate()?;
+        let mut update = Entity::update(row).validate()?.scoped(tenant);
         if let Some(expected) = expected {
             // Kiểm phiên bản ngay trong câu `UPDATE`: người khác vừa sửa thì 0 dòng (D-084).
             update = update.filter(Column::UpdatedAt.eq(expected));
@@ -128,43 +143,37 @@ impl NoteService {
         })?;
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::NoteUpdated(change);
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::note_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, events::note_subject(id), &event).await?;
         transaction.commit().await?;
         Ok(after)
     }
 
     /// Xoá ghi chú `id` của `actor`. Hai request xoá cùng lúc: một bên nhận
     /// `notes.note_not_found`.
-    pub(crate) async fn delete(&self, actor: Actor, id: Uuid) -> Result<(), Error> {
-        let transaction = self.database.begin_write().await?;
+    pub(crate) async fn delete(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        let transaction = tenant.database().begin_write().await?;
         let note = Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .filter(|note| Some(note.owner_id) == actor.user_id)
             .ok_or_else(|| not_found(id))?;
-        let deleted = Entity::delete_by_id(id).exec(&transaction).await?;
+        let deleted = Entity::delete_many()
+            .filter(Column::Id.eq(id))
+            .scoped(tenant)
+            .exec(&transaction)
+            .await?;
         if deleted.rows_affected == 0 {
             transaction.rollback().await?;
             return Err(not_found(id));
         }
         let event = events::NoteDeleted(Change { before: Some(snapshot(&note)), after: None });
-        self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                events::note_subject(id),
-                &event,
-            )
-            .await?;
+        self.outbox.record(&transaction, tenant, actor, events::note_subject(id), &event).await?;
         transaction.commit().await?;
         Ok(())
     }
@@ -173,11 +182,12 @@ impl NoteService {
 /// Mọi ghi chú của người dùng, cho bản xuất dữ liệu cá nhân.
 #[async_trait::async_trait]
 impl PersonalData for NoteService {
-    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+    async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let notes = Entity::find()
             .filter(Column::OwnerId.eq(user_id))
+            .scoped(tenant)
             .order_by_asc(Column::Id)
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         let notes: Vec<Value> = notes
             .iter()
@@ -195,17 +205,19 @@ impl PersonalData for NoteService {
     }
 }
 
-/// Tài khoản bị xoá thì xoá mọi ghi chú của người đó. Nhận lại event cũng không sao:
-/// lần sau không còn gì để xoá.
+/// Tài khoản bị xoá thì xoá mọi ghi chú của người đó — trong khách của event (cùng người ở khách
+/// khác là tài khoản khác). Nhận lại event cũng không sao: lần sau không còn gì để xoá.
 #[async_trait::async_trait]
 impl EventHandler for NoteService {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         let Some(user_id) = deleted_user(event) else {
             return Ok(());
         };
+        let tenant = &event.tenant;
         let deleted = Entity::delete_many()
             .filter(Column::OwnerId.eq(user_id))
-            .exec(self.database.write())
+            .scoped(tenant)
+            .exec(tenant.database().write())
             .await?;
         tracing::info!(user_id = %user_id, notes = deleted.rows_affected, "notes of a deleted user removed");
         Ok(())
@@ -214,8 +226,8 @@ impl EventHandler for NoteService {
 
 #[async_trait::async_trait]
 impl Notes for NoteService {
-    async fn find(&self, _tenant: &TenantContext, id: Uuid) -> Result<Option<NoteSummary>, Error> {
-        let note = Entity::find_by_id(id).one(self.database.read()).await?;
+    async fn find(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<NoteSummary>, Error> {
+        let note = Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
         Ok(note.map(|note| NoteSummary { id: note.id, owner_id: note.owner_id, title: note.title }))
     }
 }

@@ -84,8 +84,6 @@ pub const PENDING_TENANCY: &[&str] = &[
     "newsletter_subscribers",
     "newsletter_subscriptions",
     "newsletter_suppressions",
-    // notes
-    "notes_note",
     // webhooks
     "webhooks_delivery",
     "webhooks_endpoint",

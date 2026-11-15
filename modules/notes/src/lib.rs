@@ -15,6 +15,8 @@ mod service;
 mod tools;
 
 #[cfg(test)]
+mod tenancy_tests;
+#[cfg(test)]
 mod tests;
 
 use std::sync::Arc;
@@ -62,7 +64,7 @@ impl Module for NotesModule {
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
-        let service = Arc::new(NoteService::new(context.database().clone(), context.outbox()?));
+        let service = Arc::new(NoteService::new(context.outbox()?));
         self.service = Some(service.clone());
         // `Arc<NoteService>` tự đổi thành `Arc<dyn Notes>`: module khác chỉ thấy trait.
         context.personal_data(service.clone())?;

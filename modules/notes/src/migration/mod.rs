@@ -4,6 +4,7 @@
 mod m0001_create_note;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::tenancy::migration::TenantTable;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -16,6 +17,16 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::tenancy::migration::adopt(
             "m0004_tenancy_helpers",
             vec![autoxide_kernel::event::tenant_table("notes")],
+        ),
+        // Ghi chú thuộc một khách (bước 33): `tenant_id` đứng đầu mọi index — tên trùng chỉ bị
+        // chặn trong cùng khách.
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0005_tenancy",
+            vec![
+                TenantTable::new("notes_note")
+                    .unique("notes_note_owner_title_unique", ["tenant_id", "owner_id", "title"])
+                    .index("notes_note_owner_idx", ["tenant_id", "owner_id", "id"]),
+            ],
         ),
     ]
 }
