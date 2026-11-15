@@ -343,3 +343,34 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/orders.ts`
 | [ ] | Ca thu ngân | `GET /pos/shifts`; `difference_reason` khi đóng ca lệch; tiền mặt dự kiến của ca | 45 + mới |
 | [ ] | Đánh giá | `GET /reviews`, `/reply`, `/moderation`; trạng thái "đã xem"; danh sách lý do ẩn | 45 |
 | [ ] | Đánh giá | Bản nháp tóm tắt đánh giá bằng AI: tạo, duyệt, bỏ | 45 |
+
+## Sàn › Vận hành sàn (`/market`), Trung tâm người bán (`/seller`)
+
+Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/market.ts`, `market-data.ts`, trừ chỗ ghi khác.
+
+| | Màn | Cần | Bước |
+|---|---|---|---|
+| [ ] | Người bán | `GET /marketplace/sellers?status=`, `GET /sellers/{org_id}` | 46 |
+| [ ] | Người bán | Kèm "điều kiện bán" từng mục (KYC, quy chế, hợp đồng, giấy tờ, tài khoản nhận tiền, duyệt) và `can_sell`, tên ngành hàng | mới |
+| [ ] | Người bán | `POST /sellers/{org_id}/transitions` (approve / reject / suspend / reinstate / terminate, `reason`, `If-Match`); `POST /documents/{id}/decision` | 46 |
+| [ ] | Người bán | Tự gỡ tạm khoá khi KYC / văn bản đủ lại (đặc tả mới có chiều tự tạm khoá) | mới (bổ sung đặc tả 46) |
+| [ ] | Người bán | Mời người bán (lời mời của bước 34 gắn nút sàn, hoặc `POST /marketplace/seller-invitations`) | mới |
+| [ ] | Người bán | `POST /penalties`, `GET /sellers/{org_id}/performance` | 46 |
+| [ ] | Duyệt sản phẩm | `GET /listing-reviews?status=&seller=`, `POST /listing-reviews/{id}/decision` | 46 |
+| [ ] | Duyệt sản phẩm | Tóm tắt sản phẩm trong lượt duyệt; chuyển về `pending` để Hoàn tác "Duyệt" | mới |
+| [ ] | Phí sàn | `GET /fee-rules`, `POST /fee-rules`, `POST /fee-rules/{id}/close`, `GET /fee-rules/preview` | 46 |
+| [ ] | Chi trả | `GET /payouts`, `GET /settlements`, `POST /payouts/{id}/retry` | 46 |
+| [ ] | Chi trả | Gửi ngay một đợt chi đang lập (`POST /payouts/{id}/send`); `seller_can_receive` | mới |
+| [ ] | Chi trả, Tiền của người bán | Số liệu tổng: đang giữ ở đối tác, chờ chi, đã chi trong tháng | mới |
+| [ ] | Tranh chấp | `GET /disputes?status=&seller=`, `POST /disputes/{id}/transitions` (`resolution`, `amount`, `reason`), tin nhắn | 46 |
+| [ ] | Trung tâm người bán | `GET /sellers/me` kèm điều kiện bán | 46 |
+| [ ] | Trung tâm người bán | `POST /sellers/me/submit` (422 kèm `errors[]`); `POST /sellers/me/documents` | 46 |
+| [ ] | Trung tâm người bán | Người bán tự chấp nhận văn bản: `POST /compliance/documents/{id}/acceptances` | 37 |
+| [ ] | Gian hàng | `PUT /sellers/me` (cách giao, COD, tài khoản nhận tiền vào kho secret, chỉ trả 4 số cuối) | 46 |
+| [ ] | Sản phẩm của người bán | `POST /catalog/products` ở nút người bán; `GET /listing-reviews?seller=me` | 41, 46 |
+| [ ] | Đơn của người bán | `GET /orders?seller=me` | 45 |
+| [ ] | Tranh chấp phía người bán | `POST /disputes/{id}/transitions` (trả lời / đồng ý hoàn), `GET /disputes?seller=me` | 46 |
+| [ ] | Điểm vi phạm | `GET /sellers/me/performance`, `POST /penalties/{id}/appeal` | 46 |
+| [ ] | Tiền của người bán | `GET /settlements?seller=me`, `GET /payouts?seller=me`, `GET /statements` (CSV) | 46 (CSV qua route của giao diện) |
+| [ ] | "Xem như người bán" | Đọc gian hàng như người bán thấy, chỉ đọc, cho `marketplace.sellers.read` / `marketplace.finance.read` | 46 (cookie `ax_seller_view` trên dữ liệu mẫu) |
+| [ ] | Mọi màn Sàn | Mã lỗi chưa có trong đặc tả: `marketplace.listing_not_found`, `fee_rule_not_found`, `fee_rule_in_effect`, `payout_not_found`, `document_not_found`, `penalty_not_found`, `penalty_already_appealed`, `not_ready` | mới |
