@@ -7003,3 +7003,10 @@ Chủ dự án hỏi merge vào `main` mà không phát hành có được khôn
 - Lệnh `menus.import_content_menus` nhận `tenant=<slug>` (bỏ trống: khách mặc định, nơi có mọi menu cũ làm trước bước
   33), không tự duyệt mọi khách vì `menus` không biết khách nào có menu cũ trong `content`. Chạy lại bỏ qua menu đã có.
   Đọc đúng menu cũ của từng khách khi `content` chuyển xong (B13).
+
+## D-284 · Mọi response mang `Vary: autoxide-tenant` (bước 33) — 2026-11-15 — agent quyết
+
+Khách chọn được bằng header `autoxide-tenant` (ngoài tên miền). Endpoint công khai trả `Cache-Control: public` (vd menu,
+nội dung): một cache dùng chung đứng trước API (CDN, reverse proxy) không biết header này sẽ trả bản của khách này cho
+khách khác. Kernel thêm `autoxide-tenant` vào `Vary` của mọi response (cả lỗi và 304), giữ các giá trị `Vary` đã có.
+Một lớp ở kernel thay cho việc mỗi module tự nhớ — áp cho cả endpoint của module sau này.
