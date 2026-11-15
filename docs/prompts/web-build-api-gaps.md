@@ -159,9 +159,9 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Thư viện media | Tên người tải lên (hiện chỉ có id) | mới | Không hiện |
 | [x] | Thư viện media | Giới hạn tải lên cho giao diện: dung lượng tối đa, loại cho phép | mới (cùng loại "cấu hình cho giao diện") | Để core báo lỗi theo `code` sau khi gửi |
 | [x] | Mọi biểu mẫu | `detail` trong `errors[]` của Problem dịch theo `Accept-Language` (vd lỗi `to_url` của chuyển hướng ra tiếng Anh) | mới | Hiện nguyên câu của core |
-| [ ] | Trang và cấu trúc | Số bài theo danh mục, thẻ, tác giả (`entry_count`) | mới | Ghi "chưa hiện số" |
-| [ ] | Trang và cấu trúc | Đường dẫn đầy đủ của trang (`path`) trong `EntryResponse` | mới | Tự ghép slug theo cây, chưa có tiền tố ngôn ngữ |
-| [ ] | Trang và cấu trúc | ETag (hoặc `version`) của từng dòng trong danh sách | mới | Đọc lại bản ghi trước khi sửa, so `updated_at` |
+| [x] | Trang và cấu trúc | Số bài theo danh mục, thẻ, tác giả (`entry_count`) | mới | Đã nối (W-028 của web): cột số bài, ô tìm `q` |
+| [x] | Trang và cấu trúc | Đường dẫn đầy đủ của trang (`path`) trong `EntryResponse` | mới | Đã nối (W-028 của web) |
+| [x] | Trang và cấu trúc | ETag (hoặc `version`) của từng dòng trong danh sách | mới | Đã nối cho bài và trang (W-028 của web); danh mục, thẻ, tác giả, chuyển hướng chưa có `version` trong danh sách |
 | [ ] | Trang và cấu trúc | Lấy cả cây trang khi hơn 200 trang | mới | Lấy 200 trang đầu, có ghi chú |
 | [ ] | Lịch sử phiên bản | Tên người sửa của phiên bản (hiện chỉ có id) | mới | Hiện lý do giữ phiên bản và thời điểm |
 | [x] | Menu | Module `menus`: `GET/POST /menus`, `GET/PUT/DELETE /menus/{id}`, `GET /menus/public/{key}` | v0.14.0 | API thật (W-022 của web) |
@@ -433,7 +433,7 @@ thì chỉ thay phần đọc. Ba nguồn đọc API thật (bình luận chờ 
 | [ ] | Ô số liệu Tổng quan | `GET /kernel/summary` (doanh thu hôm nay, đơn chờ, sắp hết hàng, bài chờ duyệt…) | 51 | 3 số thật, 3 số mẫu |
 | [ ] | Các bước thiết lập | `GET /kernel/setup` theo mô hình kinh doanh, bước pháp lý chặn bán đánh dấu | 51 | 8 bước tính ở `setup.ts` |
 | [ ] | Hoạt động | `GET /audit/activity` trả câu đã dịch (ai làm gì với gì), không chỉ bản ghi audit thô | 51 | Tự dựng câu từ `GET /audit` |
-| [ ] | Bài chờ duyệt | Tham số lọc `review_requested=true` cho `GET /content/posts` và tổng số thật | 51 | Lọc trên một trang bản nháp |
+| [ ] | Bài chờ duyệt | Tham số lọc `review_requested=true` cho `GET /content/posts` và tổng số thật | 51 | Lọc `review_requested=true` đã nối (W-028 của web); tổng số thật chờ bước 51 |
 | [ ] | Tổng số | `total` (hay `total_estimate`) trong pagination để ô số liệu không phải đếm từng trang | 51 | Đếm trên một trang, ghi "≥" khi còn trang |
 | [ ] | Thao tác hàng loạt | `dry_run` (GET, không ghi) và `expected_count` → 409 `kernel.bulk_count_changed` | 51 | `src/sample/bulk.ts` |
 | [ ] | Đã ghim | `GET/PUT/DELETE /me/pins` | chưa có trong lộ trình | Tab chỉ hiện khi bật dữ liệu mẫu |
