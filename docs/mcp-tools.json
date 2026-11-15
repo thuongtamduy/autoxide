@@ -139,7 +139,7 @@
         "description": "A key to create.",
         "properties": {
           "current_password": {
-            "description": "Your current password: a stolen access token alone must not create a key that\noutlives it.",
+            "description": "Your current password: a stolen access token alone must not create a key that\noutlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and\n`passkey_credential`) instead — exactly one of the three.",
             "type": "string"
           },
           "expires_at": {
@@ -155,6 +155,21 @@
             "example": "nightly report agent",
             "type": "string"
           },
+          "passkey_ceremony_id": {
+            "description": "One of your passkeys, instead of the password: start with\n`POST /api/v1/auth/login/passkey/options`, let the browser sign its `options`, and send the\n`ceremony_id` here with the browser's answer in `passkey_credential`.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "passkey_credential": {
+            "description": "The browser's `AuthenticationResponseJSON` (from `navigator.credentials.get`) for\n`passkey_ceremony_id`.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "permissions": {
             "description": "Permissions the key may use: at least one, each one you have yourself (see\n`GET /api/v1/auth/me`). Give a key only what its job needs.",
             "example": [
@@ -164,12 +179,19 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "totp_code": {
+            "description": "A code from your authenticator app, instead of the password (two-step sign-in must be\non). Wrong codes count towards the same limit as at sign-in.",
+            "example": "123456",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
           "name",
-          "permissions",
-          "current_password"
+          "permissions"
         ],
         "type": "object"
       },

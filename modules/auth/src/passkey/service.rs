@@ -147,6 +147,7 @@ impl PasskeyService {
             name: Set(name),
             created_at: Set(now()),
             last_used_at: Set(None),
+            aaguid: Set(registered.aaguid),
         }
         .insert(&transaction)
         .await
@@ -266,6 +267,34 @@ impl PasskeyService {
         credential: &Value,
         user_agent: Option<&str>,
     ) -> Result<Tokens, Error> {
+        let stored = self.verify_assertion(ceremony_id, credential).await?;
+        self.sessions.login_with_passkey(stored.user_id, stored.id, user_agent).await
+    }
+
+    /// Xác nhận lại người đang đăng nhập `user_id` bằng passkey (D-272), thay cho mật khẩu ở thao
+    /// tác nhạy cảm (tạo API key). Nghi thức lấy từ `POST /login/passkey/options` như khi đăng
+    /// nhập; passkey phải là của chính `user_id`. Trả ID của passkey đã dùng.
+    pub(crate) async fn reauthenticate(
+        &self,
+        user_id: Uuid,
+        ceremony_id: Uuid,
+        credential: &Value,
+    ) -> Result<Uuid, Error> {
+        let stored = self.verify_assertion(ceremony_id, credential).await?;
+        if stored.user_id != user_id {
+            tracing::info!(passkey_id = %stored.id, "passkey of another account used to confirm");
+            return Err(sign_in_failed());
+        }
+        Ok(stored.id)
+    }
+
+    /// Kiểm câu trả lời của nghi thức đăng nhập `ceremony_id` (dùng hết nghi thức), cập nhật bộ
+    /// đếm và lần dùng cuối; trả passkey đã ký.
+    async fn verify_assertion(
+        &self,
+        ceremony_id: Uuid,
+        credential: &Value,
+    ) -> Result<passkey::Model, Error> {
         let engine = self.engine()?;
         // Đọc câu trả lời trước khi dùng nghi thức: JSON hỏng thì nghi thức còn dùng được.
         let assertion = engine.read_assertion(credential).map_err(|Rejected(reason)| {
@@ -304,7 +333,7 @@ impl PasskeyService {
             update = update.col_expr(passkey::Column::DynamicState, Expr::value(dynamic));
         }
         update.exec(self.database.write()).await?;
-        self.sessions.login_with_passkey(stored.user_id, stored.id, user_agent).await
+        Ok(stored)
     }
 
     async fn save_ceremony(

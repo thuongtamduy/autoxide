@@ -155,6 +155,8 @@ impl Module for AuthModule {
             roles.clone(),
             sessions.clone(),
             outbox.clone(),
+            mfa.clone(),
+            passkeys.clone(),
         ));
         let resets = Arc::new(reset::PasswordResets {
             database: database.clone(),
@@ -200,6 +202,7 @@ impl Module for AuthModule {
             verifications: verifications.clone(),
             passkeys,
             self_registration: config.self_registration,
+            country_header: config.country_header.clone(),
         });
         self.resets = Some(resets);
         self.verifications = Some(verifications);
@@ -364,13 +367,6 @@ pub(crate) mod testing {
         .unwrap();
         let roles =
             Arc::new(crate::role::RoleService::new(database.clone(), catalog, outbox.clone()));
-        let api_keys = Arc::new(crate::api_key::ApiKeyService::new(
-            database.clone(),
-            users.clone(),
-            roles.clone(),
-            sessions.clone(),
-            outbox,
-        ));
         let mails = Arc::new(FakeMailer::default());
         let translations = autoxide_kernel::i18n::Translations::new(vec![(
             "auth",
@@ -403,6 +399,15 @@ pub(crate) mod testing {
             )
             .unwrap(),
         );
+        let api_keys = Arc::new(crate::api_key::ApiKeyService::new(
+            database.clone(),
+            users.clone(),
+            roles.clone(),
+            sessions.clone(),
+            outbox,
+            mfa.clone(),
+            passkeys.clone(),
+        ));
         let resets = Arc::new(crate::reset::PasswordResets {
             database: database.clone(),
             jobs: autoxide_kernel::job::JobQueue::new("auth"),

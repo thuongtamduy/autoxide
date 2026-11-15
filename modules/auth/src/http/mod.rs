@@ -39,6 +39,9 @@ pub(crate) struct HttpState {
     pub personal_data: autoxide_kernel::privacy::PersonalDataExport,
     /// Cho người lạ tự đăng ký (`POST /register`).
     pub self_registration: bool,
+    /// Header mang quốc gia của người gọi do proxy tin cậy đặt (`AUTOXIDE_AUTH_COUNTRY_HEADER`,
+    /// D-272); `None`: phiên không có quốc gia.
+    pub country_header: Option<axum::http::HeaderName>,
 }
 
 pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
@@ -84,6 +87,31 @@ fn require_session(
 /// Header `User-Agent` của request, để người dùng nhận ra thiết bị trong danh sách phiên.
 pub(super) fn user_agent(headers: &axum::http::HeaderMap) -> Option<&str> {
     headers.get(axum::http::header::USER_AGENT).and_then(|value| value.to_str().ok())
+}
+
+/// Ghi quốc gia gần đúng của phiên vừa mở, lấy từ header của proxy tin cậy (D-272). Chỉ nhận mã
+/// hai chữ ISO 3166-1 (`XX`, `T1` — "không biết", "Tor" của Cloudflare — bị bỏ). Chỉ là thông tin
+/// để người dùng nhận ra phiên: ghi lỗi thì ghi log rồi bỏ qua, không làm hỏng lần đăng nhập.
+pub(super) async fn note_country(
+    state: &HttpState,
+    headers: &axum::http::HeaderMap,
+    session_id: uuid::Uuid,
+) {
+    let Some(name) = &state.country_header else {
+        return;
+    };
+    let Some(country) = headers
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.trim().to_ascii_uppercase())
+        .filter(|code| code.len() == 2 && code.bytes().all(|byte| byte.is_ascii_uppercase()))
+        .filter(|code| code != "XX")
+    else {
+        return;
+    };
+    if let Err(error) = state.sessions.note_country(session_id, &country).await {
+        tracing::warn!(%session_id, %error, "could not record the country of a session");
+    }
 }
 
 #[cfg(test)]
@@ -151,6 +179,7 @@ pub(crate) mod test_support {
             .setting("AUTOXIDE_AUTH_SELF_REGISTRATION", &self_registration.to_string())
             .setting("AUTOXIDE_AUTH_PASSKEY_RP_ID", crate::testing::PASSKEY_RP_ID)
             .setting("AUTOXIDE_AUTH_PASSKEY_ORIGINS", crate::testing::PASSKEY_ORIGIN)
+            .setting("AUTOXIDE_AUTH_COUNTRY_HEADER", "CF-IPCountry")
             .provide::<dyn Mailer>(mailer)
             .module(crate::module())
             .module(NotesPermissions)

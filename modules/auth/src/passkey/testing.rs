@@ -17,6 +17,8 @@ pub struct SoftAuthenticator {
     counter: u32,
     pub origin: String,
     rp_id: String,
+    /// Loại authenticator khai lúc đăng ký (mặc định toàn số 0: không khai).
+    pub aaguid: [u8; 16],
 }
 
 impl SoftAuthenticator {
@@ -29,6 +31,7 @@ impl SoftAuthenticator {
             counter: 0,
             origin: "https://example.com".to_owned(),
             rp_id: "example.com".to_owned(),
+            aaguid: [0; 16],
         }
     }
 
@@ -42,7 +45,7 @@ impl SoftAuthenticator {
         cose.push(0x22);
         bytes(&mut cose, point.y().unwrap());
         let mut data = self.header(0x01 | 0x04 | 0x40);
-        data.extend_from_slice(&[0u8; 16]); // AAGUID
+        data.extend_from_slice(&self.aaguid); // AAGUID
         data.extend_from_slice(&u16::try_from(self.credential_id.len()).unwrap().to_be_bytes());
         data.extend_from_slice(&self.credential_id);
         data.extend_from_slice(&cose);

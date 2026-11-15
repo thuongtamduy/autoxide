@@ -426,6 +426,19 @@ impl UserService {
         Ok(page.map(User::from))
     }
 
+    /// Những người `ids` (để hiện tên, email chủ của bản ghi) — một câu cho cả trang. Người đã
+    /// bị xoá: vắng.
+    pub(crate) async fn by_ids(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, User>, Error> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let rows = Entity::find()
+            .filter(Column::Id.is_in(ids.iter().copied()))
+            .all(self.database.read())
+            .await?;
+        Ok(rows.into_iter().map(|row| (row.id, User::from(row))).collect())
+    }
+
     /// Dữ kiện tài khoản của những người `ids` cho trang quản trị (có mật khẩu chưa, đã bật đăng
     /// nhập hai bước chưa, lần đăng nhập cuối) — hai câu truy vấn cho cả trang, không theo từng
     /// người (đề bài giao diện B1).

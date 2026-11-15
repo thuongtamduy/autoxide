@@ -344,6 +344,7 @@ mod tests {
             passkeys: services.passkeys.clone(),
             personal_data: services.personal_data.clone(),
             self_registration: false,
+            country_header: None,
         })
     }
 

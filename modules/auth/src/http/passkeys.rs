@@ -67,6 +67,13 @@ pub(crate) struct PasskeyResponse {
     created_at: DateTime<Utc>,
     /// When it was last used to sign in; `null` if never.
     last_used_at: Option<DateTime<Utc>>,
+    /// Kind of authenticator, as it identified itself when registered (its AAGUID); `null` when
+    /// it did not say (or registered before this was kept).
+    aaguid: Option<Uuid>,
+    /// Name of that kind of authenticator, e.g. `Windows Hello`, `Apple Passwords`,
+    /// `Google Password Manager`; `null` when the kind is not known to the server.
+    #[schema(example = "Windows Hello")]
+    authenticator: Option<String>,
 }
 
 impl From<Passkey> for PasskeyResponse {
@@ -76,6 +83,11 @@ impl From<Passkey> for PasskeyResponse {
             name: passkey.name,
             created_at: passkey.created_at,
             last_used_at: passkey.last_used_at,
+            authenticator: passkey
+                .aaguid
+                .and_then(crate::passkey::authenticators::name)
+                .map(str::to_owned),
+            aaguid: passkey.aaguid,
         }
     }
 }
@@ -368,6 +380,7 @@ async fn login(
     let user_agent = super::user_agent(&headers);
     let tokens =
         state.passkeys.finish_login(input.ceremony_id, &input.credential, user_agent).await?;
+    super::note_country(&state, &headers, tokens.session_id).await;
     Ok(Data { data: tokens.into() })
 }
 

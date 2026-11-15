@@ -39,6 +39,16 @@ pub(crate) struct SessionResponse {
     /// none was sent.
     #[schema(example = "Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0")]
     user_agent: Option<String>,
+    /// How the session was signed in: `password`, `password_and_mfa` (password and a code),
+    /// `passkey`, or `password_change` (a new session after changing the password); `null` for
+    /// sessions older than this information.
+    #[schema(example = "password_and_mfa")]
+    sign_in_method: Option<String>,
+    /// Approximate country of the sign-in (ISO 3166-1 two-letter code), from the server's
+    /// reverse proxy when it is set up for it (`AUTOXIDE_AUTH_COUNTRY_HEADER`); `null` when not
+    /// known. The IP address is never kept.
+    #[schema(example = "VN")]
+    country: Option<String>,
     /// When the session was signed in.
     started_at: DateTime<Utc>,
     /// Last time the session got tokens (sign-in or refresh).
@@ -52,6 +62,8 @@ impl From<Session> for SessionResponse {
         SessionResponse {
             id: session.id,
             user_agent: session.user_agent,
+            sign_in_method: session.sign_in_method,
+            country: session.country,
             started_at: session.started_at,
             last_active_at: session.last_active_at,
             expires_at: session.expires_at,
@@ -305,6 +317,39 @@ mod tests {
             let revoked: Vec<_> =
                 events.iter().filter(|event| event.0 == "auth.sessions_revoked").collect();
             assert_eq!(revoked.len(), 1);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Đề bài giao diện D: phiên mang cách đăng nhập và quốc gia gần đúng từ header của proxy
+    /// (`AUTOXIDE_AUTH_COUNTRY_HEADER`, test đặt `CF-IPCountry`); mã lạ bị bỏ; refresh giữ nguyên.
+    #[tokio::test]
+    async fn phien_kem_cach_dang_nhap_va_quoc_gia() {
+        TestDatabase::run(async |test| {
+            let (app, _) = app(test).await;
+            let body = json!({"email": "ada@example.com", "password": PASSWORD});
+            let headers = [("user-agent", "Phone"), ("cf-ipcountry", "vn")];
+            let (status, _, phone) =
+                call_with(&app, "POST", "/login", &headers, Some(body.clone())).await;
+            assert_eq!(status, StatusCode::OK, "{phone}");
+            let headers = [("user-agent", "Tor"), ("cf-ipcountry", "XX")];
+            let (_, _, hidden) = call_with(&app, "POST", "/login", &headers, Some(body)).await;
+            let refresh = json!({"refresh_token": phone["data"]["refresh_token"]});
+            let (status, _, _) = call(&app, "POST", "/refresh", None, Some(refresh)).await;
+            assert_eq!(status, StatusCode::OK);
+
+            let auth = format!("Bearer {}", hidden["data"]["access_token"].as_str().unwrap());
+            let (status, _, list) = call(&app, "GET", "/me/sessions", Some(&auth), None).await;
+            assert_eq!(status, StatusCode::OK, "{list}");
+            let sessions = list["data"].as_array().unwrap();
+            let find =
+                |agent: &str| sessions.iter().find(|s| s["user_agent"] == agent).unwrap().clone();
+            assert_eq!(
+                (find("Phone")["country"].as_str(), find("Phone")["sign_in_method"].as_str()),
+                (Some("VN"), Some("password"))
+            );
+            assert!(find("Tor")["country"].is_null(), "{list}");
         })
         .await
         .unwrap();

@@ -370,6 +370,7 @@ mod tests {
                 permissions: vec!["auth.users.read".to_owned()],
                 expires_at: None,
                 current_password: PASSWORD.to_owned(),
+                second_factor: None,
             };
             let admin = autoxide_kernel::access::Principal::with_all_permissions(ada);
             services.api_keys.create(&admin, key).await.unwrap();

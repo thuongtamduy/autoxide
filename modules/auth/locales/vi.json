@@ -97,5 +97,7 @@
   "text:Several sessions of a user were ended at once: by the user (`after.kept` is the session they kept) or by an administrator; `after.count` is how many.": "Nhiều phiên đăng nhập của một người dùng bị kết thúc cùng lúc: bởi chính họ (`after.kept` là phiên họ giữ lại) hay bởi quản trị viên; `after.count` là số phiên.",
   "text:The owner of an account reported an email change they did not make (from the mail sent to the old address): the account was signed out everywhere, its password, passkeys, API keys and two-step sign-in removed, and the old address restored when free (`before.email`, `after.email`).": "Chủ tài khoản báo một lần đổi email không phải do họ (từ thư gửi tới địa chỉ cũ): tài khoản bị đăng xuất khỏi mọi nơi, mật khẩu, passkey, API key và đăng nhập hai bước bị gỡ, địa chỉ cũ được trả lại nếu còn trống (`before.email`, `after.email`).",
   "text:The roles of a user changed.": "Role của một người dùng thay đổi.",
-  "text:Two-step sign-in was turned off, by the user or by an administrator.": "Đăng nhập hai bước bị tắt, bởi người dùng hay quản trị viên."
+  "text:Two-step sign-in was turned off, by the user or by an administrator.": "Đăng nhập hai bước bị tắt, bởi người dùng hay quản trị viên.",
+  "field:give either the current password or a second factor, not both": "chỉ gửi mật khẩu hiện tại hoặc một yếu tố xác nhận khác, không gửi cả hai",
+  "text:See the API keys of every user (never their secrets) and revoke any of them, e.g. when a key leaks or its owner leaves. Give it only to administrators.": "Xem API key của mọi người dùng (không bao giờ thấy phần bí mật) và thu hồi bất kỳ key nào, vd khi key bị lộ hay chủ của nó rời đi. Chỉ cấp cho quản trị viên."
 }

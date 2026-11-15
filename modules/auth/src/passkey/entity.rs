@@ -18,6 +18,8 @@ pub(crate) mod passkey {
         pub name: String,
         pub created_at: DateTimeUtc,
         pub last_used_at: Option<DateTimeUtc>,
+        /// Loại authenticator nó tự khai lúc đăng ký (D-272); `None` khi không biết.
+        pub aaguid: Option<Uuid>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

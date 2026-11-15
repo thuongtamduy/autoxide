@@ -638,9 +638,10 @@ export type ConfirmedList = {
 export type CreateApiKeyRequest = {
   /**
    * Your current password: a stolen access token alone must not create a key that
-   * outlives it.
+   * outlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and
+   * `passkey_credential`) instead — exactly one of the three.
    */
-  current_password: string;
+  current_password?: string;
   /**
    * When the key stops working (RFC 3339, in the future). Omit for a key that does
    * not expire.
@@ -649,10 +650,26 @@ export type CreateApiKeyRequest = {
   /** What the key is for, 1 to 100 characters. */
   name: string;
   /**
+   * One of your passkeys, instead of the password: start with
+   * `POST /api/v1/auth/login/passkey/options`, let the browser sign its `options`, and send the
+   * `ceremony_id` here with the browser's answer in `passkey_credential`.
+   */
+  passkey_ceremony_id?: string | null;
+  /**
+   * The browser's `AuthenticationResponseJSON` (from `navigator.credentials.get`) for
+   * `passkey_ceremony_id`.
+   */
+  passkey_credential?: Record<string, unknown> | null;
+  /**
    * Permissions the key may use: at least one, each one you have yourself (see
    * `GET /api/v1/auth/me`). Give a key only what its job needs.
    */
   permissions: string[];
+  /**
+   * A code from your authenticator app, instead of the password (two-step sign-in must be
+   * on). Wrong codes count towards the same limit as at sign-in.
+   */
+  totp_code?: string | null;
 };
 
 /** A new draft campaign. */
@@ -1909,6 +1926,16 @@ export type Data_NewsletterSettingsResponse = {
 export type Data_PasskeyResponse = {
   /** A passkey of the signed-in user. Holds no secret. */
   data: {
+    /**
+     * Kind of authenticator, as it identified itself when registered (its AAGUID); `null` when
+     * it did not say (or registered before this was kept).
+     */
+    aaguid?: string | null;
+    /**
+     * Name of that kind of authenticator, e.g. `Windows Hello`, `Apple Passwords`,
+     * `Google Password Manager`; `null` when the kind is not known to the server.
+     */
+    authenticator?: string | null;
     created_at: string;
     id: string;
     /** When it was last used to sign in; `null` if never. */
@@ -3407,6 +3434,16 @@ export type LoginRequest = {
   password: string;
 };
 
+/** An API key of any user, for administrators. */
+export type ManagedApiKeyResponse = ApiKeyResponse & {
+  /** Email of that user; `null` like `user_name`. */
+  user_email?: string | null;
+  /** The user the key acts as. */
+  user_id: string;
+  /** Display name of that user; `null` when the account no longer exists. */
+  user_name?: string | null;
+};
+
 /** How a result matched. */
 export type MatchedBy = "meaning" | "text";
 
@@ -4309,6 +4346,20 @@ export type Page_ListResponse = {
 };
 
 /** One page of a list. */
+export type Page_ManagedApiKeyResponse = {
+  /** The items of this page, in the requested order. */
+  data: (ApiKeyResponse & {
+    /** Email of that user; `null` like `user_name`. */
+    user_email?: string | null;
+    /** The user the key acts as. */
+    user_id: string;
+    /** Display name of that user; `null` when the account no longer exists. */
+    user_name?: string | null;
+  })[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_MediaItemResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -4383,6 +4434,16 @@ export type Page_MediaItemResponse = {
 export type Page_PasskeyResponse = {
   /** The items of this page, in the requested order. */
   data: {
+    /**
+     * Kind of authenticator, as it identified itself when registered (its AAGUID); `null` when
+     * it did not say (or registered before this was kept).
+     */
+    aaguid?: string | null;
+    /**
+     * Name of that kind of authenticator, e.g. `Windows Hello`, `Apple Passwords`,
+     * `Google Password Manager`; `null` when the kind is not known to the server.
+     */
+    authenticator?: string | null;
     created_at: string;
     id: string;
     /** When it was last used to sign in; `null` if never. */
@@ -4611,12 +4672,24 @@ export type Page_SearchHit = {
 export type Page_SessionResponse = {
   /** The items of this page, in the requested order. */
   data: {
+    /**
+     * Approximate country of the sign-in (ISO 3166-1 two-letter code), from the server's
+     * reverse proxy when it is set up for it (`AUTOXIDE_AUTH_COUNTRY_HEADER`); `null` when not
+     * known. The IP address is never kept.
+     */
+    country?: string | null;
     /** When the session ends unless refreshed before. */
     expires_at: string;
     /** Same as `session_id` in the token response of the client that holds it. */
     id: string;
     /** Last time the session got tokens (sign-in or refresh). */
     last_active_at: string;
+    /**
+     * How the session was signed in: `password`, `password_and_mfa` (password and a code),
+     * `passkey`, or `password_change` (a new session after changing the password); `null` for
+     * sessions older than this information.
+     */
+    sign_in_method?: string | null;
     /** When the session was signed in. */
     started_at: string;
     /**
@@ -4913,6 +4986,16 @@ export type PasskeyLoginRequest = {
 
 /** A passkey of the signed-in user. Holds no secret. */
 export type PasskeyResponse = {
+  /**
+   * Kind of authenticator, as it identified itself when registered (its AAGUID); `null` when
+   * it did not say (or registered before this was kept).
+   */
+  aaguid?: string | null;
+  /**
+   * Name of that kind of authenticator, e.g. `Windows Hello`, `Apple Passwords`,
+   * `Google Password Manager`; `null` when the kind is not known to the server.
+   */
+  authenticator?: string | null;
   created_at: string;
   id: string;
   /** When it was last used to sign in; `null` if never. */
@@ -5695,12 +5778,24 @@ export type SeoSuggestion = {
  * tokens.
  */
 export type SessionResponse = {
+  /**
+   * Approximate country of the sign-in (ISO 3166-1 two-letter code), from the server's
+   * reverse proxy when it is set up for it (`AUTOXIDE_AUTH_COUNTRY_HEADER`); `null` when not
+   * known. The IP address is never kept.
+   */
+  country?: string | null;
   /** When the session ends unless refreshed before. */
   expires_at: string;
   /** Same as `session_id` in the token response of the client that holds it. */
   id: string;
   /** Last time the session got tokens (sign-in or refresh). */
   last_active_at: string;
+  /**
+   * How the session was signed in: `password`, `password_and_mfa` (password and a code),
+   * `passkey`, or `password_change` (a new session after changing the password); `null` for
+   * sessions older than this information.
+   */
+  sign_in_method?: string | null;
   /** When the session was signed in. */
   started_at: string;
   /**
@@ -6512,6 +6607,33 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/all-api-keys": {
+    /** List the API keys of every user. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { user_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ManagedApiKeyResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/all-api-keys/{id}": {
+    /** Revoke an API key of any user. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/api-keys": {
     /** List your API keys. */
     get: {
@@ -6529,10 +6651,12 @@ export interface paths {
       requestBody: CreateApiKeyRequest;
       responses: {
         201: Data_CreatedApiKeyResponse;
+        400: Problem;
         401: Problem;
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };

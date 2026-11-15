@@ -48,6 +48,8 @@ const LAST_USED_RESOLUTION_SECONDS: i64 = 60;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ApiKey {
     pub id: Uuid,
+    /// Chủ của key.
+    pub user_id: Uuid,
     pub name: String,
     /// Vài ký tự đầu của key, để nhận diện.
     pub prefix: String,
@@ -72,8 +74,19 @@ pub(crate) struct NewApiKey {
     /// `None`: không hết hạn.
     pub expires_at: Option<DateTime<Utc>>,
     /// Mật khẩu hiện tại của người tạo: access token bị lộ không đủ để tạo key sống lâu
-    /// hơn nó (D-079).
+    /// hơn nó (D-079). Rỗng khi xác nhận bằng `second_factor`.
     pub current_password: String,
+    /// Xác nhận lại bằng mã TOTP hay passkey thay cho mật khẩu (D-272).
+    pub second_factor: Option<Reauth>,
+}
+
+/// Cách xác nhận lại không dùng mật khẩu.
+#[derive(Debug, Clone)]
+pub(crate) enum Reauth {
+    /// Mã 6 số của ứng dụng xác thực (đã bật TOTP).
+    Totp(String),
+    /// Câu trả lời của passkey cho nghi thức `ceremony_id` (từ `POST /login/passkey/options`).
+    Passkey { ceremony_id: Uuid, credential: serde_json::Value },
 }
 
 pub(crate) struct ApiKeyService {
@@ -82,6 +95,8 @@ pub(crate) struct ApiKeyService {
     roles: Arc<RoleService>,
     sessions: Arc<crate::session::SessionService>,
     outbox: Outbox,
+    mfa: Arc<crate::mfa::MfaService>,
+    passkeys: Arc<crate::passkey::PasskeyService>,
 }
 
 impl ApiKeyService {
@@ -91,8 +106,10 @@ impl ApiKeyService {
         roles: Arc<RoleService>,
         sessions: Arc<crate::session::SessionService>,
         outbox: Outbox,
+        mfa: Arc<crate::mfa::MfaService>,
+        passkeys: Arc<crate::passkey::PasskeyService>,
     ) -> Self {
-        ApiKeyService { database, users, roles, sessions, outbox }
+        ApiKeyService { database, users, roles, sessions, outbox, mfa, passkeys }
     }
 
     /// Tạo key cho `creator`, với permission nằm trong số permission `creator` đang có.
@@ -109,8 +126,17 @@ impl ApiKeyService {
             ));
         }
         let now = now();
-        // Kiểm đầu vào (gom mọi lỗi, kể cả thiếu mật khẩu) TRƯỚC khi kiểm mật khẩu.
-        let blank = FieldError::blank("current_password", &input.current_password);
+        // Kiểm đầu vào (gom mọi lỗi, kể cả thiếu mật khẩu) TRƯỚC khi kiểm mật khẩu. Xác nhận bằng
+        // mã hay passkey thì không cần mật khẩu, nhưng không được gửi cả hai (D-272).
+        let blank = match (&input.second_factor, input.current_password.trim().is_empty()) {
+            (None, _) => FieldError::blank("current_password", &input.current_password),
+            (Some(_), true) => None,
+            (Some(_), false) => Some(FieldError::new(
+                "current_password",
+                "conflict",
+                "give either the current password or a second factor, not both",
+            )),
+        };
         let checked = self.check(creator, input.name, input.permissions, input.expires_at, now);
         let (name, permissions) = match (checked, blank) {
             (Ok(checked), None) => checked,
@@ -122,9 +148,34 @@ impl ApiKeyService {
             }
             (Err(error), _) => return Err(error),
         };
-        let (_, verified_hash) =
-            self.sessions.check_password(creator.user_id(), &input.current_password).await?;
         let user_id = creator.user_id();
+        let verified_hash = match &input.second_factor {
+            None => Some(self.sessions.check_password(user_id, &input.current_password).await?.1),
+            Some(Reauth::Totp(code)) => {
+                // Lỗi "mã sai" của MFA chỉ ô `code`; ở đây ô tên là `totp_code`.
+                self.mfa.reauthenticate(user_id, code).await.map_err(|error| {
+                    if error.kind() == ErrorKind::Validation {
+                        let fields = error
+                            .fields()
+                            .iter()
+                            .map(|field| {
+                                let mut field = field.clone();
+                                field.field = "totp_code".to_owned();
+                                field
+                            })
+                            .collect();
+                        Error::validation(fields)
+                    } else {
+                        error
+                    }
+                })?;
+                None
+            }
+            Some(Reauth::Passkey { ceremony_id, credential }) => {
+                self.passkeys.reauthenticate(user_id, *ceremony_id, credential).await?;
+                None
+            }
+        };
         let existing = api_key::Entity::find()
             .filter(api_key::Column::UserId.eq(user_id))
             .count(self.database.read())
@@ -143,7 +194,7 @@ impl ApiKeyService {
         let transaction = self.database.begin_write().await?;
         // Mật khẩu vừa kiểm phải còn là mật khẩu hiện tại: đặt lại mật khẩu xen giữa thì không
         // tạo key (D-156).
-        if !crate::session::lock_grant(&transaction, user_id, Some(&verified_hash)).await? {
+        if !crate::session::lock_grant(&transaction, user_id, verified_hash.as_deref()).await? {
             transaction.rollback().await?;
             return Err(crate::user::invalid_credentials());
         }
@@ -189,6 +240,7 @@ impl ApiKeyService {
         tracing::info!(user_id = %user_id, api_key_id = %id, "API key created");
         let key = ApiKey {
             id,
+            user_id,
             name,
             prefix,
             permissions,
@@ -216,18 +268,57 @@ impl ApiKeyService {
         }))
     }
 
+    /// Một trang key của mọi người dùng (chỉ của `owner` khi có), mới tạo trước (mặc định). Cần
+    /// `auth.api_keys.manage` (D-272).
+    pub(crate) async fn list_all(
+        &self,
+        caller: &Principal,
+        owner: Option<Uuid>,
+        page: &PageRequest,
+    ) -> Result<Page<ApiKey>, Error> {
+        caller.require(&crate::permissions::API_KEYS_MANAGE)?;
+        let connection = self.database.read();
+        let mut select = api_key::Entity::find();
+        if let Some(owner) = owner {
+            select = select.filter(api_key::Column::UserId.eq(owner));
+        }
+        let page = fetch_page(select, api_key::Column::Id, |row| row.id, page, connection).await?;
+        let mut permissions =
+            permissions_of(connection, page.data.iter().map(|row| row.id)).await?;
+        Ok(page.map(|row| {
+            let granted = permissions.remove(&row.id).unwrap_or_default();
+            to_api_key(row, granted)
+        }))
+    }
+
+    /// Thu hồi key `id` của bất kỳ ai. Cần `auth.api_keys.manage`; event ghi người thu hồi.
+    pub(crate) async fn revoke_any(&self, caller: &Principal, id: Uuid) -> Result<(), Error> {
+        caller.require(&crate::permissions::API_KEYS_MANAGE)?;
+        self.revoke_where(caller, id, None).await
+    }
+
     /// Thu hồi (xoá) key `id` của bên gọi. Key thôi dùng được ngay.
     pub(crate) async fn revoke(&self, caller: &Principal, id: Uuid) -> Result<(), Error> {
-        let user_id = caller.user_id();
+        self.revoke_where(caller, id, Some(caller.user_id())).await
+    }
+
+    /// Thu hồi key `id`; `owner`: chỉ khi key là của người này.
+    async fn revoke_where(
+        &self,
+        caller: &Principal,
+        id: Uuid,
+        owner: Option<Uuid>,
+    ) -> Result<(), Error> {
         let transaction = self.database.begin_write().await?;
-        let row = api_key::Entity::find_by_id(id)
-            .filter(api_key::Column::UserId.eq(user_id))
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| {
-                Error::not_found("auth.api_key_not_found", "You have no API key with id `{id}`.")
-                    .with_param("id", id)
-            })?;
+        let mut find = api_key::Entity::find_by_id(id);
+        if let Some(owner) = owner {
+            find = find.filter(api_key::Column::UserId.eq(owner));
+        }
+        let row = find.one(&transaction).await?.ok_or_else(|| {
+            Error::not_found("auth.api_key_not_found", "You have no API key with id `{id}`.")
+                .with_param("id", id)
+        })?;
+        let user_id = row.user_id;
         api_key::Entity::delete_by_id(id).exec(&transaction).await?;
         let before = json!({"user_id": user_id, "name": row.name, "prefix": row.prefix});
         let event = events::ApiKeyRevoked { before: Some(before), after: None };
@@ -377,6 +468,7 @@ async fn permissions_of<C: ConnectionTrait>(
 fn to_api_key(row: api_key::Model, permissions: Vec<String>) -> ApiKey {
     ApiKey {
         id: row.id,
+        user_id: row.user_id,
         name: row.name,
         prefix: row.prefix,
         permissions,
@@ -474,6 +566,7 @@ mod tests {
             permissions: permissions.iter().map(|p| (*p).to_owned()).collect(),
             expires_at: None,
             current_password: PASSWORD.to_owned(),
+            second_factor: None,
         }
     }
 
@@ -524,6 +617,7 @@ mod tests {
                 ],
                 expires_at: Some(past),
                 current_password: PASSWORD.to_owned(),
+                second_factor: None,
             };
 
             let error = services.api_keys.create(&ada, input).await.unwrap_err();

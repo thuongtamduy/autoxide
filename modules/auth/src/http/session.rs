@@ -208,7 +208,10 @@ async fn login(
     let user_agent = super::user_agent(&headers);
     // Hai kết quả, hai hình dạng: `Response` là kiểu chung của mọi response.
     Ok(match state.sessions.login(&input.email, &input.password, user_agent).await? {
-        LoginOutcome::Tokens(tokens) => Data { data: TokenResponse::from(tokens) }.into_response(),
+        LoginOutcome::Tokens(tokens) => {
+            super::note_country(&state, &headers, tokens.session_id).await;
+            Data { data: TokenResponse::from(tokens) }.into_response()
+        }
         LoginOutcome::MfaRequired { mfa_token, expires_in } => {
             let data = MfaChallengeResponse {
                 mfa_token,
@@ -249,6 +252,7 @@ async fn login_mfa(
 ) -> Result<Data<TokenResponse>, Error> {
     let user_agent = super::user_agent(&headers);
     let tokens = state.sessions.complete_mfa(&input.mfa_token, &input.code, user_agent).await?;
+    super::note_country(&state, &headers, tokens.session_id).await;
     Ok(Data { data: tokens.into() })
 }
 
@@ -361,6 +365,7 @@ async fn change_password(
             user_agent,
         )
         .await?;
+    super::note_country(&state, &headers, tokens.session_id).await;
     Ok(Data { data: tokens.into() })
 }
 

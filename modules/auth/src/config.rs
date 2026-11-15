@@ -83,6 +83,16 @@ pub(crate) const EMAIL_CHANGE_REPORT_URL: Setting = Setting::new(
 )
 .with_example("https://app.example.com/not-me?token={token}");
 
+pub(crate) const COUNTRY_HEADER: Setting = Setting::new(
+    "AUTOXIDE_AUTH_COUNTRY_HEADER",
+    "Request header in which your reverse proxy or CDN puts the caller's country (ISO 3166-1 \
+     two-letter code), e.g. `CF-IPCountry` behind Cloudflare. Each sign-in session keeps that \
+     code so people can spot a session they do not know; the IP address itself is never kept. \
+     Set it only when a proxy you trust always sets (or removes) this header. When unset, \
+     sessions have no country.",
+)
+.with_example("CF-IPCountry");
+
 pub(crate) const PASSKEY_RP_ID: Setting = Setting::new(
     "AUTOXIDE_AUTH_PASSKEY_RP_ID",
     "Domain that passkeys belong to (the WebAuthn relying party id), usually your site's \
@@ -123,6 +133,8 @@ pub(crate) struct AuthConfig {
     pub email_verification_url: Option<String>,
     /// Trang báo "không phải tôi" sau khi đổi email, có `{token}`; `None`: mail chứa token.
     pub email_change_report_url: Option<String>,
+    /// Header mang quốc gia của người gọi do proxy tin cậy đặt (D-272).
+    pub country_header: Option<axum::http::HeaderName>,
     /// `None`: passkey tắt.
     pub passkey: Option<PasskeyConfig>,
 }
@@ -170,6 +182,10 @@ impl AuthConfig {
         let password_reset_url = reader.optional_with(&PASSWORD_RESET_URL, token_url);
         let email_verification_url = reader.optional_with(&EMAIL_VERIFICATION_URL, token_url);
         let email_change_report_url = reader.optional_with(&EMAIL_CHANGE_REPORT_URL, token_url);
+        let country_header = reader.optional_with(&COUNTRY_HEADER, |raw| {
+            axum::http::HeaderName::from_bytes(raw.trim().as_bytes())
+                .map_err(|_| "must be an HTTP header name, e.g. `CF-IPCountry`".to_owned())
+        });
         let rp_id = reader.optional_with(&PASSKEY_RP_ID, |raw| {
             let domain = raw.trim().to_ascii_lowercase();
             let valid = !domain.is_empty()
@@ -216,6 +232,7 @@ impl AuthConfig {
             password_reset_url: password_reset_url?,
             email_verification_url: email_verification_url?,
             email_change_report_url: email_change_report_url?,
+            country_header: country_header?,
             passkey: passkey_config(reader, rp_id?, origins?)?,
         })
     }

@@ -16,6 +16,12 @@ endpoints are marked deprecated with a sunset date first.
   gives `has_password` and `pending_email` (an email change waiting for its link, with expiry);
   `DELETE /api/v1/auth/me/email` cancels that change. New event `auth.email_change_cancelled`. Users are an object
   type `auth.user` of the object directory (their display name), for other modules.
+- `auth`: each session gives `sign_in_method` and an approximate `country` (ISO code from a trusted
+  proxy header, new setting `AUTOXIDE_AUTH_COUNTRY_HEADER`; the IP is never kept); each passkey
+  gives `aaguid` and `authenticator` (e.g. `Windows Hello`); `GET` and `DELETE
+  /api/v1/auth/all-api-keys…` let holders of the new permission `auth.api_keys.manage` see and
+  revoke every user's keys; creating an API key accepts `totp_code` or a passkey (`passkey_ceremony_id`,
+  `passkey_credential`) instead of `current_password`.
 - `GET /api/v1/kernel/client-config` (no sign-in): the settings an interface needs, by module —
   `kernel` (public address, version), `content` (languages, post path prefix, embed hosts),
   `media` (upload limit and types, alt languages), `menus` (languages), `mail` (sender, whether

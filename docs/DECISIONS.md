@@ -6834,3 +6834,34 @@ Xếp vào lộ trình: các mục của đề bài này là việc sửa API c�
    bài, host được nhúng, cỡ thân bài tối đa), `media` (cỡ tải lên, loại cho phép, ngôn ngữ alt, cỡ ảnh thu nhỏ, số
    ngày trong thùng rác), `menus` (ngôn ngữ), `mail` (người gửi, có gửi thật không). "Địa chỉ công khai theo
    khách" (dòng của đề bài ở mục Kết nối đối tác) chưa làm: địa chỉ theo khách thuộc tên miền của khách, bước 33 C1.
+
+## D-272 · Đề bài giao diện, nhóm D (auth): cách đăng nhập và quốc gia của phiên, tên loại passkey, quản trị API key, xác nhận lại bằng passkey/TOTP — 2026-11-15 — agent quyết
+
+1. **Phiên đăng nhập** mang `sign_in_method` (`password`, `password_and_mfa`, `passkey`, `password_change`) và
+   `country`: hai cột mới của `auth_refresh_token`, chép sang mỗi token mới của cùng họ như `user_agent`.
+   - **Vị trí gần đúng = mã quốc gia ISO 3166-1, không lưu IP, không tra cơ sở dữ liệu GeoIP.** Lấy từ header do
+     reverse proxy / CDN tin cậy đặt (`AUTOXIDE_AUTH_COUNTRY_HEADER`, vd `CF-IPCountry`); không đặt thì không có. Lý
+     do: tối thiểu hoá dữ liệu cá nhân — quốc gia đủ để người dùng nhận ra phiên lạ; IP và thành phố là dữ liệu chi
+     tiết hơn mức cần, và một cơ sở GeoIP là thư viện / dữ liệu ngoài cần cập nhật. Mã lạ (`XX` "không biết") bị bỏ.
+   - **Hạn lưu = đời của phiên**: dòng token bị job dọn xoá khi phiên hết hạn hay bị thu hồi (D-079), quốc gia mất
+     theo. Căn cứ: nguyên tắc hạn chế mục đích, tối thiểu hoá và hạn lưu trữ của Nghị định 13/2023/NĐ-CP (hiệu lực
+     1/7/2023) và Luật Bảo vệ dữ liệu cá nhân 2025 (hiệu lực 1/1/2026) — cần đối chiếu văn bản gốc / người có
+     chuyên môn pháp lý về thông báo cho chủ thể dữ liệu trong chính sách bảo mật của từng website.
+   - Ghi quốc gia là một lệnh ghi riêng ngay sau khi mở phiên (không đổi chữ ký các hàm đăng nhập); lỗi ghi chỉ ghi
+     log — đây là thông tin để nhận ra phiên, không dùng để quyết định gì.
+2. **Tên loại passkey**: cột `aaguid` của `auth_passkey`, lấy từ dữ liệu đăng ký (`NULL` khi authenticator không
+   khai — mã toàn 0 — hay passkey cũ). Tên tra trong `modules/auth/data/passkey-authenticators.json`: **chỉ cặp mã →
+   tên sản phẩm** (sự kiện do hãng công bố), đối chiếu với danh sách cộng đồng
+   `passkeydeveloper/passkey-authenticator-aaguids`; không chép biểu tượng (danh sách đó không ghi giấy phép). Cập
+   nhật bảng là sửa tệp dữ liệu, không sửa code.
+3. **Quản trị API key**: permission mới `auth.api_keys.manage` (rủi ro `destructive`), `GET /auth/all-api-keys`
+   (lọc `user_id`, kèm tên và email chủ key, không bao giờ có secret) và `DELETE /auth/all-api-keys/{id}`; event
+   `auth.api_key_revoked` ghi người thu hồi. Đặt dưới một đường dẫn riêng để `/auth/api-keys` vẫn chỉ là key của
+   chính mình (D-059). Chưa theo khách: `auth` chưa chuyển sang theo khách (bước 33 B), khi chuyển thì danh sách tự
+   giới hạn trong khách.
+4. **Xác nhận lại khi tạo API key**: ngoài `current_password`, nhận `totp_code` hoặc passkey (`passkey_ceremony_id` từ
+   `POST /auth/login/passkey/options` và `passkey_credential`, câu trả lời của trình duyệt; hai trường phẳng vì tool
+   MCP dùng chung kiểu đầu vào và không nhận kiểu lồng) — đúng một trong ba. Mã TOTP đi qua cùng giới
+   hạn sai và chống dùng lại như lúc đăng nhập; passkey phải là của chính người gọi. Dùng lại nghi thức đăng nhập
+   passkey sẵn có thay vì thêm endpoint "bắt đầu xác nhận lại". Khi không dùng mật khẩu, transaction tạo key vẫn khoá
+   dòng người dùng (`lock_grant`) để tài khoản vừa bị khoá không tạo được key.

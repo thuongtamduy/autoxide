@@ -88,6 +88,16 @@ impl MfaService {
         self.throttle.clear(&key).await
     }
 
+    /// Xác nhận lại người đang đăng nhập bằng mã TOTP (D-272), thay cho mật khẩu ở thao tác nhạy
+    /// cảm. Như mọi lần nhập mã: tính vào giới hạn sai, mã đã dùng không dùng lại được. Chưa bật
+    /// TOTP thì báo `auth.mfa_not_enabled`.
+    pub(crate) async fn reauthenticate(&self, user_id: Uuid, code: &str) -> Result<(), Error> {
+        if !self.status(user_id).await?.totp_enabled {
+            return Err(not_enabled());
+        }
+        self.check_code_limited(user_id, code, false).await
+    }
+
     pub(crate) async fn status(&self, user_id: Uuid) -> Result<MfaStatus, Error> {
         let row = self.row(user_id).await?;
         let remaining = recovery::remaining(self.database.write(), user_id).await?;

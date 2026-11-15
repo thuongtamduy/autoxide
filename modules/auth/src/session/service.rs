@@ -62,6 +62,10 @@ pub(crate) struct Tokens {
 pub(crate) struct Session {
     pub id: Uuid,
     pub user_agent: Option<String>,
+    /// Cách mở phiên; `None` với phiên cũ (D-272).
+    pub sign_in_method: Option<String>,
+    /// Quốc gia gần đúng, khi biết.
+    pub country: Option<String>,
     pub started_at: DateTime<Utc>,
     /// Lần cấp token gần nhất (đăng nhập hoặc refresh).
     pub last_active_at: DateTime<Utc>,
@@ -73,6 +77,8 @@ impl From<entity::Model> for Session {
         Session {
             id: row.family_id,
             user_agent: row.user_agent,
+            sign_in_method: row.sign_in_method,
+            country: row.country,
             started_at: row.session_started_at.unwrap_or(row.created_at),
             last_active_at: row.created_at,
             expires_at: row.expires_at,
@@ -316,7 +322,12 @@ impl SessionService {
             .filter(|agent| !agent.is_empty())
             .map(|agent| agent.chars().take(USER_AGENT_MAX_CHARS).collect());
         let family_id = Uuid::now_v7();
-        let session = SessionDetails { started_at: now, user_agent };
+        let session = SessionDetails {
+            started_at: now,
+            user_agent,
+            sign_in_method: Some(method.to_owned()),
+            country: None,
+        };
         let (refresh_token, row) = new_refresh_token(user_id, family_id, now, expires_at, session)?;
         let transaction = self.database.begin_write().await?;
         let still_valid = match &proof {
@@ -391,6 +402,8 @@ impl SessionService {
         let session = SessionDetails {
             started_at: row.session_started_at.unwrap_or(row.created_at),
             user_agent: row.user_agent.clone(),
+            sign_in_method: row.sign_in_method.clone(),
+            country: row.country.clone(),
         };
         let (new_token, new_row) =
             new_refresh_token(user.id, row.family_id, now, expires_at, session)?;
@@ -490,6 +503,19 @@ impl SessionService {
 
     /// Một trang phiên còn hiệu lực của người dùng `user_id`, mới bắt đầu trước (mặc
     /// định). Mỗi phiên là refresh token còn dùng được của một họ.
+    /// Ghi quốc gia gần đúng `country` (đã kiểm: hai chữ hoa ISO 3166-1) cho phiên `session_id`
+    /// vừa mở (D-272). Chỉ ghi khi phiên chưa có: phiên không đổi quốc gia giữa chừng. Thông tin
+    /// để người dùng nhận ra phiên, không dùng để quyết định gì — lỗi ghi thì bỏ qua ở bên gọi.
+    pub(crate) async fn note_country(&self, session_id: Uuid, country: &str) -> Result<(), Error> {
+        entity::Entity::update_many()
+            .col_expr(entity::Column::Country, Expr::value(Some(country.to_owned())))
+            .filter(entity::Column::FamilyId.eq(session_id))
+            .filter(entity::Column::Country.is_null())
+            .exec(self.database.write())
+            .await?;
+        Ok(())
+    }
+
     pub(crate) async fn list_sessions(
         &self,
         user_id: Uuid,
@@ -728,6 +754,8 @@ async fn revoke_family<C: ConnectionTrait>(connection: &C, family_id: Uuid) -> R
 struct SessionDetails {
     started_at: DateTime<Utc>,
     user_agent: Option<String>,
+    sign_in_method: Option<String>,
+    country: Option<String>,
 }
 
 /// Sinh một refresh token mới và dòng database tương ứng (chưa ghi).
@@ -750,6 +778,8 @@ fn new_refresh_token(
         created_at: Set(now),
         user_agent: Set(session.user_agent),
         session_started_at: Set(Some(session.started_at)),
+        sign_in_method: Set(session.sign_in_method),
+        country: Set(session.country),
     };
     Ok((token, row))
 }

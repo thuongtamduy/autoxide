@@ -30,7 +30,14 @@ pub(crate) const PASSKEYS_MANAGE: Permission = Permission::new(
 )
 .with_risk(Risk::Destructive);
 
+pub(crate) const API_KEYS_MANAGE: Permission = Permission::new(
+    "auth.api_keys.manage",
+    "See the API keys of every user (never their secrets) and revoke any of them, e.g. when a \
+     key leaks or its owner leaves. Give it only to administrators.",
+)
+.with_risk(Risk::Destructive);
+
 /// Mọi permission module `auth` khai.
 pub(crate) fn all() -> Vec<Permission> {
-    vec![ROLES_READ, ROLES_MANAGE, USERS_READ, USERS_MANAGE, PASSKEYS_MANAGE]
+    vec![ROLES_READ, ROLES_MANAGE, USERS_READ, USERS_MANAGE, PASSKEYS_MANAGE, API_KEYS_MANAGE]
 }
