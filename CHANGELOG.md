@@ -28,6 +28,12 @@ endpoints are marked deprecated with a sunset date first.
   tenants on it answer `503` (`tenant_maintenance`) and its jobs wait; `serve` checks the placements every minute in
   the multi-tenant mode. New error codes `tenant_placement_taken`, `tenant_placement_behind` (creating a tenant on
   a placement that is not up to date).
+- For module authors (testing): `TestApp::builder(…).tenant("a")` (a tenant on the shared database),
+  `.tenant_dedicated("b")` (a tenant on a database of its own), `.user_in("a", token, id, permissions)`, then
+  `app.tenant("a")` / `app.default_tenant()`; `autoxide_testkit::leak_check(&app, token_of_b, marker, ids)` calls every
+  `GET` endpoint and every read-only MCP tool as a user of another tenant and lists what shows data of the first.
+- `notes` (the example module) keeps its notes per tenant: the same title may exist in two tenants, a note of one
+  tenant is "not found" in another; existing notes belong to the default tenant.
 - For module authors: `Module::seed_tenant` gives the data a new tenant starts with (roles, counters…); it must be
   safe to run again, because `autoxide tenant provision` repeats a creation that stopped half-way.
 

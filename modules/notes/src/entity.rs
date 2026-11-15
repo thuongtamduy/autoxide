@@ -9,6 +9,8 @@ pub struct Model {
     // UUIDv7 sinh trong ứng dụng, không để database tự tăng.
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
+    /// Khách sở hữu ghi chú (bước 33): mọi truy vấn lọc theo cột này (`.scoped`).
+    pub tenant_id: Uuid,
     pub owner_id: Uuid,
     pub title: String,
     pub body: String,
@@ -17,3 +19,9 @@ pub struct Model {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl autoxide_kernel::tenancy::TenantScoped for Entity {
+    fn tenant_column() -> Self::Column {
+        Column::TenantId
+    }
+}

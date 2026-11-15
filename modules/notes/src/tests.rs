@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use autoxide_kernel::database::Database;
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode};
 use rmcp::service::{RoleClient, RunningService};
@@ -182,18 +181,18 @@ async fn kiem_dau_vao_nhu_nhau_o_rest_va_mcp() {
 async fn tao_trung_ten_dong_thoi_chi_mot_thanh_cong() {
     TestDatabase::run(async |test| {
         let app = app(test).await;
-        let service = crate::service::NoteService::new(
-            app.database().clone(),
-            autoxide_kernel::event::Outbox::standalone("notes"),
-        );
+        let tenant = app.default_tenant();
+        let service =
+            crate::service::NoteService::new(autoxide_kernel::event::Outbox::standalone("notes"));
         let service = Arc::new(service);
 
         let attempts: Vec<_> = (0..6)
             .map(|_| {
                 let service = service.clone();
+                let tenant = tenant.clone();
                 tokio::spawn(async move {
                     let input = NewNote { title: "Same".to_owned(), body: String::new() };
-                    service.create(Actor::user(ADA), input).await
+                    service.create(&tenant, Actor::user(ADA), input).await
                 })
             })
             .collect();
@@ -208,11 +207,12 @@ async fn tao_trung_ten_dong_thoi_chi_mot_thanh_cong() {
 
         // Người khác dùng cùng tên được; đổi tên trùng thì bị chặn.
         let other = NewNote { title: "Same".to_owned(), body: String::new() };
-        service.create(Actor::user(BOB), other).await.unwrap();
+        service.create(&tenant, Actor::user(BOB), other).await.unwrap();
         let second = NewNote { title: "Second".to_owned(), body: String::new() };
-        let second = service.create(Actor::user(ADA), second).await.unwrap();
+        let second = service.create(&tenant, Actor::user(ADA), second).await.unwrap();
         let rename = NoteChanges { title: Some("Same".to_owned()), body: None };
-        let taken = service.update(Actor::user(ADA), second.id, rename, None).await.unwrap_err();
+        let taken =
+            service.update(&tenant, Actor::user(ADA), second.id, rename, None).await.unwrap_err();
         assert_eq!(taken.code(), "notes.title_taken");
     })
     .await
@@ -229,16 +229,9 @@ async fn module_khac_dung_trait_cong_bo() {
 
         let notes = app.modules().api::<dyn Notes>().unwrap();
 
-        let found =
-            notes.find(&TenantContext::legacy_default(app.database()), id).await.unwrap().unwrap();
+        let found = notes.find(&app.default_tenant(), id).await.unwrap().unwrap();
         assert_eq!((found.owner_id, found.title.as_str()), (ADA, "Shared"));
-        assert!(
-            notes
-                .find(&TenantContext::legacy_default(app.database()), Uuid::now_v7())
-                .await
-                .unwrap()
-                .is_none()
-        );
+        assert!(notes.find(&app.default_tenant(), Uuid::now_v7()).await.unwrap().is_none());
     })
     .await
     .unwrap();
@@ -266,18 +259,16 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
 
     TestDatabase::run(async |test| {
         let app = app(test).await;
+        let tenant = app.default_tenant();
         for (who, title) in [("ada", "one"), ("ada", "two"), ("bob", "three")] {
             let body = json!({"title": title, "body": "…"});
             let (status, _) = rest(&app, "POST", "", who, Some(body)).await;
             // bob chỉ đọc được: tạo ghi chú cho bob thẳng qua service.
             if who == "bob" {
                 assert_eq!(status, StatusCode::FORBIDDEN);
-                let service = crate::service::NoteService::new(
-                    app.database().clone(),
-                    Outbox::standalone("notes"),
-                );
+                let service = crate::service::NoteService::new(Outbox::standalone("notes"));
                 let note = NewNote { title: title.to_owned(), body: String::new() };
-                service.create(Actor::user(BOB), note).await.unwrap();
+                service.create(&tenant, Actor::user(BOB), note).await.unwrap();
             } else {
                 assert_eq!(status, StatusCode::CREATED);
             }
@@ -285,39 +276,26 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
         // Bộ phát event dựng được dù chưa có module tài khoản nào khai event xoá.
         app.modules().dispatcher().unwrap();
 
-        let exported = app
-            .modules()
-            .personal_data()
-            .export(&TenantContext::legacy_default(app.database()), ADA)
-            .await
-            .unwrap();
+        let exported =
+            app.modules().personal_data().export(&app.default_tenant(), ADA).await.unwrap();
         let titles: Vec<_> =
             exported["notes"].as_array().unwrap().iter().map(|n| n["title"].clone()).collect();
         assert_eq!(titles, vec![json!("one"), json!("two")]);
 
-        let service =
-            crate::service::NoteService::new(app.database().clone(), Outbox::standalone("notes"));
+        let service = crate::service::NoteService::new(Outbox::standalone("notes"));
         let deleted = Delivered::new(
-            autoxide_kernel::tenancy::TenantContext::legacy_default(app.database()),
+            app.default_tenant(),
             "auth",
             autoxide_kernel::privacy::USER_DELETED.to_owned(),
             json!({"before": {"id": ADA}}),
         );
         service.handle(&deleted).await.unwrap();
         service.handle(&deleted).await.unwrap();
-        let exported = app
-            .modules()
-            .personal_data()
-            .export(&TenantContext::legacy_default(app.database()), ADA)
-            .await
-            .unwrap();
+        let exported =
+            app.modules().personal_data().export(&app.default_tenant(), ADA).await.unwrap();
         assert_eq!(exported["notes"], json!([]));
-        let exported = app
-            .modules()
-            .personal_data()
-            .export(&TenantContext::legacy_default(app.database()), BOB)
-            .await
-            .unwrap();
+        let exported =
+            app.modules().personal_data().export(&app.default_tenant(), BOB).await.unwrap();
         assert_eq!(exported["notes"].as_array().unwrap().len(), 1);
     })
     .await
@@ -332,20 +310,19 @@ async fn sua_dong_thoi_cung_phien_ban_chi_mot_nguoi_thang() {
 
     TestDatabase::run(async |test| {
         let app = app(test).await;
-        let service = Arc::new(crate::service::NoteService::new(
-            app.database().clone(),
-            Outbox::standalone("notes"),
-        ));
+        let tenant = app.default_tenant();
+        let service = Arc::new(crate::service::NoteService::new(Outbox::standalone("notes")));
         let note = NewNote { title: "Shared".to_owned(), body: String::new() };
-        let note = service.create(Actor::user(ADA), note).await.unwrap();
+        let note = service.create(&tenant, Actor::user(ADA), note).await.unwrap();
 
         let attempts: Vec<_> = (0..8)
             .map(|index| {
                 let service = service.clone();
+                let tenant = tenant.clone();
                 let changes = NoteChanges { title: None, body: Some(format!("edit {index}")) };
                 let version = Some(note.updated_at);
                 tokio::spawn(async move {
-                    service.update(Actor::user(ADA), note.id, changes, version).await
+                    service.update(&tenant, Actor::user(ADA), note.id, changes, version).await
                 })
             })
             .collect();
