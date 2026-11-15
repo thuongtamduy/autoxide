@@ -113,7 +113,7 @@ mod tenant {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-mod placement {
+pub(super) mod placement {
     //! Bảng `kernel_placements` (mặt điều khiển).
     use sea_orm::entity::prelude::*;
 
@@ -262,7 +262,7 @@ fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
 }
 
-fn is_slug(slug: &str) -> bool {
+pub(super) fn is_slug(slug: &str) -> bool {
     (1..=63).contains(&slug.len())
         && !slug.starts_with('-')
         && !slug.ends_with('-')
@@ -378,11 +378,17 @@ impl TenantAdmin {
         let placements = self.placement_names().await?;
         let placement = match input.placement.as_deref() {
             None => MAIN_PLACEMENT.as_uuid(),
-            Some(wanted) => placements
-                .iter()
-                .find(|placement| placement.name == wanted)
-                .map(|placement| placement.id)
-                .ok_or_else(|| errors::tenant_placement_not_found(wanted))?,
+            Some(wanted) => {
+                let found = placements
+                    .iter()
+                    .find(|placement| placement.name == wanted)
+                    .ok_or_else(|| errors::tenant_placement_not_found(wanted))?;
+                // Gieo dữ liệu vào placement thiếu bảng sẽ hỏng giữa chừng: báo cách sửa trước.
+                if found.id != MAIN_PLACEMENT.as_uuid() && found.schema_state != "ready" {
+                    return Err(errors::tenant_placement_behind(wanted));
+                }
+                found.id
+            }
         };
         if let Some(parent) = input.parent_id {
             self.find(parent).await?;
@@ -528,17 +534,18 @@ impl TenantAdmin {
     pub async fn placements(&self) -> Result<Vec<Placement>, Error> {
         let mut rows = self.placement_names().await?;
         rows.sort_by(|a, b| a.name.cmp(&b.name));
-        Ok(rows
-            .into_iter()
-            .map(|row| Placement {
-                id: row.id,
-                name: row.name,
-                kind: row.kind,
-                backend: row.backend,
-                schema_state: row.schema_state,
-                created_at: row.created_at,
-            })
-            .collect())
+        Ok(rows.into_iter().map(describe_placement).collect())
+    }
+}
+
+pub(super) fn describe_placement(row: placement::Model) -> Placement {
+    Placement {
+        id: row.id,
+        name: row.name,
+        kind: row.kind,
+        backend: row.backend,
+        schema_state: row.schema_state,
+        created_at: row.created_at,
     }
 }
 
@@ -634,7 +641,7 @@ async fn list_tenants(
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
         (status = 403, description = "Missing permission `kernel.tenants.manage` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`).", body = Problem),
         (status = 404, description = "No such placement or parent; code `tenant_placement_not_found` or `tenant_not_found`.", body = Problem),
-        (status = 409, description = "The slug is taken (`tenant_slug_taken`), or the installation runs one tenant (`tenant_single_mode`).", body = Problem),
+        (status = 409, description = "The slug is taken (`tenant_slug_taken`), the installation runs one tenant (`tenant_single_mode`), or the placement has migrations to apply (`tenant_placement_behind`).", body = Problem),
         (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
     )
 )]

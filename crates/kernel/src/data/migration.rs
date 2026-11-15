@@ -175,6 +175,9 @@ pub struct Migrator {
     modules: Vec<ModuleMigrations>,
     /// Khoá cho upgrade dữ liệu. Mặc định: khoá gốc kernel giữ trong database.
     keys: KeyConfig,
+    /// Database giữ khoá gốc tự sinh (khi `AUTOXIDE_SECRET_KEY` chưa đặt). `None`: chính
+    /// database đang migrate. Placement dùng khoá của database điều khiển ([`Migrator::keyed_on`]).
+    key_database: Option<Database>,
 }
 
 impl Migrator {
@@ -222,7 +225,7 @@ impl Migrator {
             }
         }
         if problems.is_empty() {
-            Ok(Migrator { modules, keys: KeyConfig::default() })
+            Ok(Migrator { modules, keys: KeyConfig::default(), key_database: None })
         } else {
             Err(MigrationError(problems.join("; ")))
         }
@@ -231,6 +234,14 @@ impl Migrator {
     /// Khoá của chương trình cho upgrade dữ liệu (`Modules::migrator` đặt).
     pub(crate) fn with_keys(mut self, keys: KeyConfig) -> Self {
         self.keys = keys;
+        self
+    }
+
+    /// Upgrade dữ liệu dùng khoá gốc của `control` (database điều khiển), dù migrate database nào —
+    /// module mã hoá secret của mọi khách bằng khoá đó, nên upgrade trên placement cũng phải vậy.
+    #[must_use]
+    pub fn keyed_on(mut self, control: &Database) -> Self {
+        self.key_database = Some(control.clone());
         self
     }
 
@@ -336,7 +347,8 @@ fn failure(module: &str, action: &str, error: &DbErr) -> MigrationError {
 
 impl Migrator {
     fn context(&self, database: &Database) -> UpgradeContext {
-        UpgradeContext::new(database.clone(), self.keys.key_for(database))
+        let keyed = self.key_database.as_ref().unwrap_or(database);
+        UpgradeContext::new(database.clone(), self.keys.key_for(keyed))
     }
 }
 

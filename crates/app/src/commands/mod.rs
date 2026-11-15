@@ -9,6 +9,7 @@ pub mod jobs;
 pub mod mcp_manifest;
 pub mod migrate;
 pub mod openapi;
+pub mod placement;
 pub mod secrets;
 pub mod serve;
 pub mod task;
@@ -66,4 +67,14 @@ pub fn block_on<T>(task: impl Future<Output = Result<T, String>>) -> Result<T, S
         .build()
         .map_err(|error| format!("cannot start the async runtime: {error}"))?;
     runtime.block_on(task)
+}
+
+/// Lỗi của service cho người chạy lệnh đọc: mã, thông báo, nguyên nhân (lỗi nội bộ chỉ có nguyên
+/// nhân ở đây — API thì giấu) và lỗi từng trường.
+pub fn describe_error(error: &autoxide_kernel::error::Error) -> String {
+    let mut text = error.to_string();
+    for field in error.fields() {
+        text.push_str(&format!("\n  {}: {}", field.field, field.message));
+    }
+    text
 }

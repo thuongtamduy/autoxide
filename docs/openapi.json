@@ -36209,7 +36209,7 @@
                 }
               }
             },
-            "description": "The slug is taken (`tenant_slug_taken`), or the installation runs one tenant (`tenant_single_mode`)."
+            "description": "The slug is taken (`tenant_slug_taken`), the installation runs one tenant (`tenant_single_mode`), or the placement has migrations to apply (`tenant_placement_behind`)."
           },
           "422": {
             "content": {

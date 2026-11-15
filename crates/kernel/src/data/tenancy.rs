@@ -17,6 +17,7 @@
 pub(crate) mod admin;
 mod config;
 pub mod migration;
+mod placements;
 mod registry;
 pub(crate) mod request;
 pub(crate) mod schema;
@@ -37,7 +38,8 @@ pub use admin::{
     TenantAdmin, TenantChanges, TenantFilter, TenantSeed, require_platform,
 };
 pub use config::{TenancyConfig, WorkerPlacements};
-pub use registry::DatabaseRegistry;
+pub use placements::{NewPlacement, PlacementCheck, PlacementMigrations, Placements, SchemaState};
+pub use registry::{DatabaseRegistry, PLACEMENT_READ_URL, PLACEMENT_URL};
 pub use request::{TENANT_HEADER, TenantHint};
 pub use scope::{ScopeExt, TenantScoped};
 pub use settings::{PUBLIC_URL, SETTINGS_MANAGE, SettingValue, TenantSetting, TenantSettings};
@@ -208,6 +210,7 @@ impl PlacementKind {
 #[derive(Clone)]
 pub struct TenantContext(Arc<Inner>);
 
+#[derive(Clone)]
 struct Inner {
     id: TenantId,
     slug: String,
@@ -215,6 +218,9 @@ struct Inner {
     status: TenantStatus,
     placement: PlacementId,
     database: Database,
+    /// Placement đã áp dụng đủ migration (`schema_state = ready`); chưa thì khách nhận
+    /// `tenant_maintenance`.
+    schema_ready: bool,
 }
 
 impl TenantContext {
@@ -234,7 +240,21 @@ impl TenantContext {
             status,
             placement,
             database,
+            schema_ready: true,
         }))
+    }
+
+    /// Cùng khách, đánh dấu placement chưa áp dụng đủ migration (sổ database dựng khi
+    /// `schema_state` của placement khác `ready`).
+    #[must_use]
+    pub fn with_schema_ready(self, ready: bool) -> Self {
+        let inner = Arc::unwrap_or_clone(self.0);
+        TenantContext(Arc::new(Inner { schema_ready: ready, ..inner }))
+    }
+
+    /// Placement của khách đã áp dụng đủ migration.
+    pub fn schema_ready(&self) -> bool {
+        self.0.schema_ready
     }
 
     /// Khách mặc định trên `database` — chế độ `single`, và đường chuyển tiếp cho code chưa nhận
@@ -368,6 +388,23 @@ pub mod errors {
         )
     }
 
+    pub fn tenant_placement_taken(placement: &str) -> Error {
+        Error::conflict(
+            "tenant_placement_taken",
+            "There is already a placement named `{placement}`.",
+        )
+        .with_param("placement", placement)
+    }
+
+    pub fn tenant_placement_behind(placement: &str) -> Error {
+        Error::conflict(
+            "tenant_placement_behind",
+            "The placement `{placement}` has migrations to apply: run `autoxide migrate up --all` \
+             first.",
+        )
+        .with_param("placement", placement)
+    }
+
     pub fn tenant_slug_taken(slug: &str) -> Error {
         Error::conflict("tenant_slug_taken", "Another tenant already uses the slug `{slug}`.")
             .with_param("slug", slug)
@@ -395,8 +432,11 @@ pub(crate) fn test_tenant() -> TenantContext {
 }
 
 /// Kiểm `tenant` có phục vụ được không: tạm khoá → `tenant_suspended`; bảo trì / đang dời / đang
-/// cấp phát → `tenant_maintenance`.
+/// cấp phát, hay placement của khách chưa áp dụng đủ migration → `tenant_maintenance`.
 pub fn ensure_serving(tenant: &TenantContext) -> Result<(), Error> {
+    if !tenant.schema_ready() && tenant.status() != TenantStatus::Suspended {
+        return Err(errors::tenant_maintenance(30));
+    }
     match tenant.status() {
         TenantStatus::Active => Ok(()),
         TenantStatus::Suspended => Err(errors::tenant_suspended()),

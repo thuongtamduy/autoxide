@@ -3,7 +3,8 @@
 Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
-Trạng thái: **bước 0–32 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); bước 50 chờ
+Trạng thái: **bước 0–32 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); **bước 33 đang
+làm: nhóm A (nền kernel) xong, tiếp theo nhóm B (chuyển module)**; bước 50 chờ
 chủ dự án công khai repo (D-199); bản phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai
 (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
@@ -73,7 +74,7 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
 `single`, `/api/v1` không đổi (gate chặn thay đổi phá vỡ của bước 31 kiểm) và bản cài cũ nâng cấp
 được: migration gán mọi dữ liệu có sẵn cho khách mặc định, test nâng cấp của bước 31 phải xanh.
 
-- [ ] Mặt điều khiển: sổ khách hàng (trạng thái, khách cha), vị trí dữ liệu (`shared` /
+- [x] Mặt điều khiển: sổ khách hàng (trạng thái, khách cha), vị trí dữ liệu (`shared` /
       `dedicated`, database nào), tên miền → khách / nút; chế độ `single` mặc định (một khách,
       mặt điều khiển và dữ liệu chung một database, không cấu hình gì thêm)
 - [ ] Ngữ cảnh khách hàng cho mọi request: suy từ tên miền, API key, access token, header của nhân
@@ -107,7 +108,7 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
 - [ ] Tên miền riêng của khách (D-190): xác minh quyền sở hữu bằng bản ghi DNS TXT, trạng thái tên
       miền, endpoint "có phục vụ tên miền này không" cho reverse proxy cấp chứng chỉ TLS tự động
       (vd Caddy on-demand TLS); tài liệu deploy (EN + VI)
-- [ ] An toàn khi nhiều database (D-190): mỗi database ghi phiên bản migration của nó; database
+- [x] An toàn khi nhiều database (D-190): mỗi database ghi phiên bản migration của nó; database
       chưa migrate xong thì chỉ các khách trên nó nhận lỗi `tenant_maintenance` (503), các khách khác
       chạy bình thường; `migrate --all` chạy lại được từ chỗ dừng; worker chia lượt công bằng giữa
       các khách trong database chung (một khách không chiếm hết job queue)

@@ -130,7 +130,7 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
 
 /// Lỗi nếu database còn migration chưa áp dụng; thông báo nêu từng migration và
 /// lệnh cần chạy.
-async fn require_applied(modules: &Modules, database: &Database) -> Result<(), String> {
+pub(crate) async fn require_applied(modules: &Modules, database: &Database) -> Result<(), String> {
     let migrator = modules.migrator().map_err(|error| error.to_string())?;
     let pending = migrator.pending(database).await.map_err(|error| error.to_string())?;
     if pending.is_empty() {

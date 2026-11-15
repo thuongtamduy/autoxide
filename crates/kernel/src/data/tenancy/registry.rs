@@ -6,11 +6,16 @@
 //! - Chế độ `multi`: tra khách theo ID / slug / tên miền qua bảng mặt điều khiển, kết quả giữ trong
 //!   cache có TTL (`AUTOXIDE_TENANCY_CACHE_SECONDS`); sửa khách trên máy chủ này thì
 //!   [`DatabaseRegistry::invalidate`] ngay, máy chủ khác thấy sau tối đa TTL.
+//! - URL kết nối của placement lưu mã hoá (`Sealer`, mục đích [`PLACEMENT_URL`], gắn với ID
+//!   placement); sổ mở bằng khoá gốc của chương trình — module `kernel` đưa khoá vào lúc khởi
+//!   động ([`DatabaseRegistry::use_secret_key`]).
+//! - Khách trên placement có `schema_state` khác `ready` mang `schema_ready = false` → nhận
+//!   `tenant_maintenance` (đặc tả 33); khách nơi khác chạy bình thường.
 //! - Pool ít dùng nhất bị bỏ khỏi sổ khi cần chỗ; request đang giữ bản clone của nó vẫn chạy tới
 //!   xong (pool tự đóng khi không còn bản clone nào) — không bao giờ gọi `close()` ở đây.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::{Duration, Instant};
 
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query, SelectStatement};
@@ -18,12 +23,18 @@ use sea_orm::{ConnectionTrait, QueryResult};
 use uuid::Uuid;
 
 use super::{
-    DEFAULT_TENANT, MAIN_PLACEMENT, PlacementId, TenancyConfig, TenancyMode, TenantContext,
-    TenantId, TenantStatus, errors,
+    DEFAULT_TENANT, MAIN_PLACEMENT, NO_TENANT, PlacementId, TenancyConfig, TenancyMode,
+    TenantContext, TenantId, TenantStatus, errors,
 };
 use crate::config::{DatabaseConfig, DatabaseUrl};
 use crate::database::Database;
 use crate::error::Error;
+use crate::secret::SecretKey;
+
+/// Mục đích (AAD của `Sealer`) của URL kết nối placement; dòng là ID placement.
+pub const PLACEMENT_URL: &str = "kernel.placement_url";
+/// Mục đích của URL đọc (read replica) của placement.
+pub const PLACEMENT_READ_URL: &str = "kernel.placement_read_url";
 
 /// Sổ database của bản cài. Clone rẻ (bên trong là `Arc`).
 #[derive(Clone)]
@@ -40,6 +51,8 @@ struct Inner {
     slugs: Mutex<HashMap<String, (Instant, TenantId)>>,
     domains: Mutex<HashMap<String, (Instant, Option<TenantId>)>>,
     pools: Mutex<Pools>,
+    /// Khoá gốc để mở URL placement đã mã hoá; module `kernel` đặt lúc khởi động.
+    secret: OnceLock<SecretKey>,
     /// Chỉ một bên mở pool của placement cùng lúc (hai request cùng cần một placement chưa mở
     /// thì bên sau dùng pool bên trước vừa mở).
     opening: tokio::sync::Mutex<()>,
@@ -85,6 +98,7 @@ impl DatabaseRegistry {
             slugs: Mutex::default(),
             domains: Mutex::default(),
             pools: Mutex::default(),
+            secret: OnceLock::new(),
             opening: tokio::sync::Mutex::new(()),
         }))
     }
@@ -127,8 +141,7 @@ impl DatabaseRegistry {
         {
             return Ok(tenant);
         }
-        let select =
-            tenant_select().and_where(Expr::col(Alias::new("id")).eq(id.as_uuid())).to_owned();
+        let select = tenant_select().and_where(tenant_column("id").eq(id.as_uuid())).to_owned();
         let row = self.0.control.read().query_one(&select).await?;
         let row = row.ok_or_else(|| errors::tenant_not_found(&id.to_string()))?;
         self.context_of(&row).await
@@ -149,7 +162,7 @@ impl DatabaseRegistry {
         {
             return self.tenant(id).await;
         }
-        let select = tenant_select().and_where(Expr::col(Alias::new("slug")).eq(slug)).to_owned();
+        let select = tenant_select().and_where(tenant_column("slug").eq(slug)).to_owned();
         let row = self.0.control.read().query_one(&select).await?;
         let row = row.ok_or_else(|| errors::tenant_not_found(slug))?;
         self.context_of(&row).await
@@ -189,6 +202,24 @@ impl DatabaseRegistry {
         }
     }
 
+    /// Khoá gốc dùng mở URL placement đã mã hoá. Đặt một lần (module `kernel` đặt lúc khởi động);
+    /// lần sau bị bỏ qua.
+    pub fn use_secret_key(&self, key: SecretKey) {
+        let _ = self.0.secret.set(key);
+    }
+
+    /// Bỏ mọi khách trên placement `id` khỏi cache (sau khi `schema_state` của nó đổi).
+    pub fn invalidate_placement(&self, id: PlacementId) {
+        let gone: Vec<TenantId> = lock(&self.0.tenants)
+            .iter()
+            .filter(|(_, (_, tenant))| tenant.placement() == id)
+            .map(|(tenant, _)| *tenant)
+            .collect();
+        for tenant in gone {
+            self.invalidate(tenant);
+        }
+    }
+
     /// Bỏ khách `id` khỏi cache (sau khi sửa khách trên máy chủ này).
     pub fn invalidate(&self, id: TenantId) {
         lock(&self.0.tenants).remove(&id);
@@ -196,8 +227,8 @@ impl DatabaseRegistry {
         lock(&self.0.domains).retain(|_, (_, known)| *known != Some(id));
     }
 
-    /// Mọi database máy chủ này chạy job và event cho: `(placement, tên, database)`. Chế độ
-    /// `single`: chỉ database điều khiển.
+    /// Mọi database máy chủ này chạy job và event cho: `(placement, tên, database)` — chỉ placement
+    /// đã đủ migration. Chế độ `single`: chỉ database điều khiển.
     pub async fn databases(&self) -> Result<Vec<(PlacementId, String, Database)>, Error> {
         let mut all = Vec::new();
         if self.0.config.worker_placements.includes("main") {
@@ -206,10 +237,13 @@ impl DatabaseRegistry {
         if self.0.mode == TenancyMode::Single {
             return Ok(all);
         }
+        // Placement chưa đủ migration: job và event của nó đợi tới khi `migrate up --all` xong
+        // (khách trên đó cũng đang nhận `tenant_maintenance`).
         let select = Query::select()
             .columns(["id", "name"].map(Alias::new))
             .from(Alias::new("kernel_placements"))
             .and_where(Expr::col(Alias::new("id")).ne(MAIN_PLACEMENT.as_uuid()))
+            .and_where(Expr::col(Alias::new("schema_state")).eq("ready"))
             .order_by(Alias::new("name"), sea_orm::sea_query::Order::Asc)
             .to_owned();
         for row in self.0.control.read().query_all(&select).await? {
@@ -248,6 +282,11 @@ impl DatabaseRegistry {
             // Không có URL riêng: cùng database điều khiển.
             return Ok(self.0.control.clone());
         };
+        let url = self.unseal(id, PLACEMENT_URL, &url).await?;
+        let read_url = match read_url {
+            Some(sealed) => Some(self.unseal(id, PLACEMENT_READ_URL, &sealed).await?),
+            None => None,
+        };
         let database = self.open(&url, read_url.as_deref()).await?;
         let mut pools = lock(&self.0.pools);
         pools.tick += 1;
@@ -281,7 +320,26 @@ impl DatabaseRegistry {
         })
     }
 
-    async fn open(&self, url: &str, read_url: Option<&str>) -> Result<Database, Error> {
+    /// Mở URL placement đã mã hoá. Giá trị chưa mã hoá (chép tay vào bảng) trả nguyên văn.
+    async fn unseal(&self, id: PlacementId, purpose: &str, sealed: &str) -> Result<String, Error> {
+        if !crate::secret::is_sealed(sealed) {
+            return Ok(sealed.to_owned());
+        }
+        let plain = self.sealer().await?.open(NO_TENANT, purpose, &id.to_string(), sealed)?;
+        String::from_utf8(plain.to_vec())
+            .map_err(|_| Error::internal(format!("placement {id}: the stored URL is not text")))
+    }
+
+    /// Bộ mã hoá của khoá gốc (mã hoá / mở URL placement).
+    pub(super) async fn sealer(&self) -> Result<crate::secret::Sealer, Error> {
+        let key = self.0.secret.get().ok_or_else(|| {
+            Error::internal("the database registry has no secret key to open placement URLs")
+        })?;
+        key.sealer().await
+    }
+
+    /// Mở pool cho một placement (cỡ pool nhỏ của `AUTOXIDE_TENANCY_*_CONNECTIONS`).
+    pub(super) async fn open(&self, url: &str, read_url: Option<&str>) -> Result<Database, Error> {
         let parse = |raw: &str| {
             raw.parse::<DatabaseUrl>()
                 .map_err(|error| Error::internal(format!("placement URL is invalid: {error}")))
@@ -306,8 +364,12 @@ impl DatabaseRegistry {
             Error::internal(format!("tenant {id} has an unknown status `{status}`"))
         })?;
         let placement = PlacementId::from_uuid(row.try_get::<Uuid>("", "placement_id")?);
+        let schema_state: Option<String> = row.try_get("", "schema_state")?;
+        // Database điều khiển luôn đủ migration (`serve` đòi trước khi khởi động).
+        let ready = placement == MAIN_PLACEMENT || schema_state.as_deref() == Some("ready");
         let database = self.placement_database(placement).await?;
-        let tenant = TenantContext::new(id, slug.clone(), name, status, placement, database);
+        let tenant = TenantContext::new(id, slug.clone(), name, status, placement, database)
+            .with_schema_ready(ready);
         let now = Instant::now();
         lock(&self.0.tenants).insert(id, (now, tenant.clone()));
         lock(&self.0.slugs).insert(slug, (now, id));
@@ -315,9 +377,25 @@ impl DatabaseRegistry {
     }
 }
 
+/// Cột `column` của `kernel_tenants` (ghi rõ bảng: câu truy vấn nối thêm `kernel_placements`).
+fn tenant_column(column: &'static str) -> Expr {
+    Expr::col((Alias::new("kernel_tenants"), Alias::new(column)))
+}
+
+/// Khách kèm `schema_state` của placement chứa nó.
 fn tenant_select() -> SelectStatement {
+    let tenants = Alias::new("kernel_tenants");
+    let placements = Alias::new("kernel_placements");
     Query::select()
-        .columns(["id", "slug", "name", "status", "placement_id"].map(Alias::new))
-        .from(Alias::new("kernel_tenants"))
+        .columns(
+            ["id", "slug", "name", "status", "placement_id"]
+                .map(|column| (tenants.clone(), Alias::new(column))),
+        )
+        .column((placements.clone(), Alias::new("schema_state")))
+        .from(tenants.clone())
+        .left_join(
+            placements.clone(),
+            Expr::col((placements, Alias::new("id"))).equals((tenants, Alias::new("placement_id"))),
+        )
         .to_owned()
 }

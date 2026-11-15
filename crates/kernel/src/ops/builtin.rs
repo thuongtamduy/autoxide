@@ -172,6 +172,8 @@ impl Module for KernelModule {
         context.personal_data(flags.clone())?;
         self.flags.fill(flags);
         let key = self.keys.key_for(context.database());
+        // Sổ database mở URL placement đã mã hoá bằng khoá gốc này.
+        context.tenancy().use_secret_key(key.clone());
         let settings = Arc::new(crate::tenancy::settings::SettingsService::new(
             self.tenant_settings.clone(),
             key.clone(),
