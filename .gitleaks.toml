@@ -28,3 +28,10 @@ paths = [
 description = "Chuỗi giả `0123456789abcdef…` làm secret xem trước trong một test của `content`, lỡ commit ở e7ecf3d (đã thay bằng hằng số test ở commit sau) — không phải secret của ai (D-149)"
 commits = ["e7ecf3d3e2a41f91310a1ffb9f815bca8e60919d"]
 paths = ['''modules/content/src/tests\.rs''']
+
+[[allowlists]]
+description = "UUID mẫu của header `Idempotency-Key` trong hướng dẫn (`docs/guides/retries*.md`, cũng là ví dụ trong `docs/openapi.json`) là ID dùng một lần, không phải secret"
+regexTarget = "match"
+regexes = [
+  '''Idempotency-Key: 0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11''',
+]

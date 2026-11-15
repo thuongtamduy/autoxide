@@ -36,6 +36,7 @@ mod contract;
 mod ownership;
 mod postgres;
 mod s3;
+mod schema;
 mod sqlite;
 mod stale;
 
@@ -44,6 +45,7 @@ pub use ownership::schema_ownership_violations;
 pub use s3::{
     TEST_S3_ACCESS_KEY_ID, TEST_S3_BUCKET, TEST_S3_ENDPOINT, TEST_S3_SECRET_ACCESS_KEY, s3_settings,
 };
+pub use schema::{ColumnSnapshot, IndexSnapshot, SchemaSnapshot, TableSnapshot, schema_snapshot};
 
 use std::fmt;
 use std::path::PathBuf;

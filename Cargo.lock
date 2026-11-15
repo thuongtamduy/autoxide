@@ -379,6 +379,7 @@ dependencies = [
  "autoxide-media",
  "autoxide-menus",
  "autoxide-newsletter",
+ "autoxide-notes",
  "autoxide-testkit",
  "autoxide-webhooks",
  "axum",

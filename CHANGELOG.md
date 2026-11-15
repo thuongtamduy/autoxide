@@ -31,6 +31,9 @@ endpoints are marked deprecated with a sunset date first.
   connecting an AI agent over MCP with every tool and its permission. Their `curl` examples run as tests
   on every build; their TypeScript examples are type-checked against the SDK in CI.
 - SDK: `AutoxideError.requestId` (the `X-Request-Id` of the answer).
+- For module authors (testkit): `schema_snapshot` (tables, columns, indexes of a SQLite or Postgres
+  database, to compare schemas) and `TestAppBuilder::boxed_module`. Every module's real migrations are
+  tested up → down → up, on an empty database and with data, on both databases.
 
 ### Fixed
 

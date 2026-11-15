@@ -38,6 +38,8 @@ uuid.workspace = true
 async-trait.workspace = true
 axum.workspace = true
 autoxide-testkit.workspace = true
+# Module mẫu, không đăng ký trong binary: test migration chạy cả migration của nó.
+autoxide-notes.workspace = true
 # MCP client thật cho test đầu-cuối của endpoint MCP.
 rmcp = { workspace = true, features = [
   "client",
