@@ -51,7 +51,7 @@ pub(crate) fn all(service: &Arc<AuditService>) -> Vec<Tool> {
             "list_entries",
             "List audit log entries — who changed what, when, before and after — newest first; \
              filter by user, record, action or module. Follow `pagination.next_cursor` for more.",
-            move |_tenant: TenantContext, _: Principal, input: ListEntriesInput| {
+            move |tenant: TenantContext, _: Principal, input: ListEntriesInput| {
                 let service = list.clone();
                 async move {
                     let page = PageInput::new(input.limit, input.cursor, input.order);
@@ -61,17 +61,23 @@ pub(crate) fn all(service: &Arc<AuditService>) -> Vec<Tool> {
                         action: input.action,
                         module: input.module,
                     };
-                    let page = service.list(filter, &page.page()?).await?;
+                    let page = service.list(&tenant, filter, &page.page()?).await?;
                     Ok::<Page<AuditEntryResponse>, Error>(page.map(AuditEntryResponse::from))
                 }
             },
         )
         .requires(AUDIT_READ)
         .read_only(),
-        Tool::new("get_entry", "Get one audit log entry.", move |_tenant: TenantContext, _: Principal, input: EntryId| {
-            let service = get.clone();
-            async move { Ok::<_, Error>(AuditEntryResponse::from(service.get(input.id).await?)) }
-        })
+        Tool::new(
+            "get_entry",
+            "Get one audit log entry.",
+            move |tenant: TenantContext, _: Principal, input: EntryId| {
+                let service = get.clone();
+                async move {
+                    Ok::<_, Error>(AuditEntryResponse::from(service.get(&tenant, input.id).await?))
+                }
+            },
+        )
         .requires(AUDIT_READ)
         .read_only(),
     ]
@@ -101,18 +107,20 @@ mod tests {
                 .up(&database)
                 .await
                 .unwrap();
-            let recorder = crate::recorder::Recorder::new(database.clone());
+            let recorder = crate::recorder::Recorder;
             for (module, name) in [("auth", "auth.user_updated"), ("files", "files.file_deleted")] {
                 let event = Delivered::new(
-                    autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                    autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone())
+                        .default_tenant(),
                     module,
                     name.to_owned(),
                     json!({"after": {"x": 1}}),
                 );
                 recorder.handle(&event).await.unwrap();
             }
-            let tenant = autoxide_kernel::tenancy::TenantContext::legacy_default(&database);
-            let tools = all(&Arc::new(AuditService::new(database, Default::default())));
+            let tenant = autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone())
+                .default_tenant();
+            let tools = all(&Arc::new(AuditService::new(Default::default())));
             let auditor = Principal::new(Uuid::now_v7(), ["audit.read".to_owned()]);
             let nobody = Principal::new(Uuid::now_v7(), []);
             assert!(tools.iter().all(|tool| !tool.allows(&nobody)));

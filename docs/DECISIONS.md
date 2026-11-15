@@ -6898,3 +6898,15 @@ Chủ dự án hỏi merge vào `main` mà không phát hành có được khôn
 - Embedding chưa theo khách: vector đã lưu phải cùng một mô hình trong cả database (tìm theo ý nghĩa của `content`);
   đổi theo khách là việc của bước sau nếu có nhu cầu.
 - Adapter dựng theo (khoá, mô hình) một lần rồi dùng lại; khoá không vào log hay lỗi.
+
+## D-276 · `audit` theo khách: mỗi khách một chuỗi băm (bước 33 B5) — 2026-11-15 — agent quyết
+
+- `audit_entry` và `audit_chain` mang `tenant_id`. Đầu chuỗi khoá chính `(tenant_id, name)`; số thứ tự duy nhất
+  trong khách (`(tenant_id, sequence)`). Mỗi khách đếm từ 1, khoá đầu chuỗi của riêng mình — ghi của khách này không
+  chờ khoá của khách khác, và dữ liệu của khách không chen vào chuỗi của khách khác (dời khách giữa database mang theo
+  nguyên chuỗi).
+- Dòng ghi vào database của khách mang event (`Delivered::tenant`). Đầu chuỗi trống gieo khi tạo khách
+  (`Module::seed_tenant`); khách mặc định có từ migration `m0004`. Thiếu đầu chuỗi vẫn là lỗi (không tự tạo): tự tạo
+  lại sẽ che việc xoá đầu chuỗi.
+- `doctor audit.chain` duyệt mọi database (placement) và mọi đầu chuỗi trên đó, báo chỗ hỏng kèm khách và placement.
+- Định dạng băm `audit-v1` không đổi (không băm `tenant_id`): chuỗi đã ghi trước bước 33 vẫn kiểm được.

@@ -15,9 +15,6 @@ use crate::schema::{SchemaSnapshot, TableSnapshot};
 /// Bảng cấp khách hàng chưa có `tenant_id` (chưa chuyển). Bảng đã có `tenant_id` mà còn trong danh
 /// sách cũng là vi phạm — để danh sách chỉ ngắn đi.
 pub const PENDING_TENANCY: &[&str] = &[
-    // audit
-    "audit_chain",
-    "audit_entry",
     // auth
     "auth_api_key",
     "auth_api_key_permission",

@@ -9,7 +9,8 @@
 //!   bản ghi nào, lúc nào) và `payload_hash`.
 //!
 //! Bảng `audit_chain` giữ đầu chuỗi (số thứ tự và mã băm của dòng cuối): xoá dòng ở cuối cũng bị
-//! phát hiện. Ghi một dòng mới khoá đầu chuỗi tới hết transaction, nên các dòng nối đuôi nhau
+//! phát hiện. **Mỗi khách một chuỗi** (bước 33, D-276): số thứ tự, đầu chuỗi và việc kiểm đều theo
+//! khách; dữ liệu của khách này không chen vào chuỗi của khách khác. Ghi một dòng mới khoá đầu chuỗi tới hết transaction, nên các dòng nối đuôi nhau
 //! trên cả SQLite và Postgres.
 //!
 //! **Xoá dữ liệu cá nhân vẫn giữ được chuỗi:** khi tài khoản bị xoá, audit bỏ `before` / `after` /
@@ -130,20 +131,48 @@ fn push(text: &mut String, part: Option<&str>) {
     }
 }
 
-/// Khoá đầu chuỗi tới hết `transaction` và trả (số thứ tự, mã băm) của dòng cuối.
-pub(crate) async fn lock_head(transaction: &DatabaseTransaction) -> Result<head::Model, Error> {
-    rows::lock_one(transaction, head::Entity::find_by_id(HEAD))
+/// Khoá đầu chuỗi của khách `tenant` tới hết `transaction` và trả (số thứ tự, mã băm) của dòng
+/// cuối. Đầu chuỗi gieo khi tạo khách ([`seed_head`]); khách mặc định có từ migration `m0004`.
+pub(crate) async fn lock_head(
+    transaction: &DatabaseTransaction,
+    tenant: Uuid,
+) -> Result<head::Model, Error> {
+    rows::lock_one(transaction, head::Entity::find_by_id((tenant, HEAD.to_owned())))
         .await?
         .ok_or_else(|| Error::internal("audit_chain has no head row; run `autoxide migrate up`"))
 }
 
-/// Dời đầu chuỗi tới dòng vừa thêm.
+/// Gieo đầu chuỗi trống (số thứ tự 0) cho khách `tenant`. Chạy lại vô hại: đã có thì giữ nguyên.
+pub(crate) async fn seed_head<C: ConnectionTrait>(
+    connection: &C,
+    tenant: Uuid,
+) -> Result<(), Error> {
+    let row = head::ActiveModel {
+        tenant_id: Set(tenant),
+        name: Set(HEAD.to_owned()),
+        sequence: Set(0),
+        hash: Set(String::new()),
+    };
+    head::Entity::insert(row)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns([head::Column::TenantId, head::Column::Name])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_without_returning(connection)
+        .await?;
+    Ok(())
+}
+
+/// Dời đầu chuỗi của khách `tenant` tới dòng vừa thêm.
 pub(crate) async fn advance<C: ConnectionTrait>(
     connection: &C,
+    tenant: Uuid,
     sequence: i64,
     hash: &str,
 ) -> Result<(), Error> {
     head::Entity::update(head::ActiveModel {
+        tenant_id: Set(tenant),
         name: Set(HEAD.to_owned()),
         sequence: Set(sequence),
         hash: Set(hash.to_owned()),
@@ -168,12 +197,16 @@ pub(crate) enum Verdict {
     Broken { sequence: i64, id: Option<Uuid>, reason: &'static str },
 }
 
-/// Kiểm cả chuỗi từ dòng đầu tới đầu chuỗi, dừng ở dòng hỏng đầu tiên.
-pub(crate) async fn verify<C: ConnectionTrait>(connection: &C) -> Result<Verdict, Error> {
+/// Kiểm cả chuỗi của khách `tenant` từ dòng đầu tới đầu chuỗi, dừng ở dòng hỏng đầu tiên.
+pub(crate) async fn verify<C: ConnectionTrait>(
+    connection: &C,
+    tenant: Uuid,
+) -> Result<Verdict, Error> {
     // Subject đã có event xoá tài khoản: dòng về chúng được phép đã bỏ dữ liệu.
     let forgotten: HashSet<String> = entity::Entity::find()
         .select_only()
         .column(entity::Column::Subject)
+        .filter(entity::Column::TenantId.eq(tenant))
         .filter(entity::Column::Action.eq(USER_DELETED))
         .filter(entity::Column::Subject.is_not_null())
         .into_tuple::<Option<String>>()
@@ -187,6 +220,7 @@ pub(crate) async fn verify<C: ConnectionTrait>(connection: &C) -> Result<Verdict
     let mut expected: i64 = 1;
     loop {
         let rows = entity::Entity::find()
+            .filter(entity::Column::TenantId.eq(tenant))
             .filter(entity::Column::Sequence.gte(expected))
             .order_by_asc(entity::Column::Sequence)
             .limit(BATCH)
@@ -229,8 +263,11 @@ pub(crate) async fn verify<C: ConnectionTrait>(connection: &C) -> Result<Verdict
             break;
         }
     }
-    let unchained =
-        entity::Entity::find().filter(entity::Column::Sequence.is_null()).one(connection).await?;
+    let unchained = entity::Entity::find()
+        .filter(entity::Column::TenantId.eq(tenant))
+        .filter(entity::Column::Sequence.is_null())
+        .one(connection)
+        .await?;
     if let Some(row) = unchained {
         return Ok(Verdict::Broken {
             sequence: expected,
@@ -238,7 +275,7 @@ pub(crate) async fn verify<C: ConnectionTrait>(connection: &C) -> Result<Verdict
             reason: "the entry was inserted outside the chain",
         });
     }
-    let head = head::Entity::find_by_id(HEAD)
+    let head = head::Entity::find_by_id((tenant, HEAD.to_owned()))
         .one(connection)
         .await?
         .ok_or_else(|| Error::internal("audit_chain has no head row"))?;
@@ -252,36 +289,68 @@ pub(crate) async fn verify<C: ConnectionTrait>(connection: &C) -> Result<Verdict
     Ok(Verdict::Intact(u64::try_from(expected - 1).unwrap_or_default()))
 }
 
-/// Bước kiểm `audit.chain` của `autoxide doctor`.
+/// Bước kiểm `audit.chain` của `autoxide doctor`: kiểm chuỗi của từng khách trên từng database.
 pub(crate) struct ChainProbe {
-    pub database: Database,
+    pub databases: autoxide_kernel::tenancy::DatabaseRegistry,
+}
+
+impl ChainProbe {
+    /// Kiểm mọi chuỗi trên `database`: (số dòng đã kiểm, chỗ hỏng đầu tiên nếu có).
+    async fn check(&self, database: &Database) -> Result<(u64, Option<String>), Error> {
+        // Một bức ảnh nhất quán: dòng mới ghi giữa chừng không làm lệch đầu chuỗi với các dòng.
+        let snapshot = database.begin_snapshot().await?;
+        let tenants: Vec<Uuid> = head::Entity::find()
+            .select_only()
+            .column(head::Column::TenantId)
+            .into_tuple()
+            .all(&snapshot)
+            .await?;
+        let mut total = 0;
+        for tenant in tenants {
+            match verify(&snapshot, tenant).await? {
+                Verdict::Intact(count) => total += count,
+                Verdict::Broken { sequence, id, reason } => {
+                    let at = id.map_or_else(String::new, |id| format!(" (id {id})"));
+                    return Ok((
+                        total,
+                        Some(format!("tenant {tenant}: entry #{sequence}{at} — {reason}")),
+                    ));
+                }
+            }
+        }
+        Ok((total, None))
+    }
 }
 
 #[async_trait::async_trait]
 impl Probe for ChainProbe {
     async fn probe(&self) -> Finding {
-        // Một bức ảnh nhất quán: dòng mới ghi giữa chừng không làm lệch đầu chuỗi với các dòng.
-        let snapshot = match self.database.begin_snapshot().await {
-            Ok(snapshot) => snapshot,
-            Err(error) => return Finding::failed(format!("cannot read the audit log: {error}")),
+        let databases = match self.databases.databases().await {
+            Ok(databases) => databases,
+            Err(error) => return Finding::failed(format!("cannot list the databases: {error}")),
         };
-        match verify(&snapshot).await {
-            Ok(Verdict::Intact(count)) => {
-                Finding::ok(format!("The audit log hash chain is intact ({count} entries)."))
+        let mut total = 0;
+        for (_, name, database) in databases {
+            match self.check(&database).await {
+                Ok((count, None)) => total += count,
+                Ok((_, Some(broken))) => {
+                    return Finding::failed(format!(
+                        "The audit log was tampered with on placement `{name}`: {broken} does \
+                         not match the hash chain."
+                    ))
+                    .with_hint(
+                        "Restore the audit_entry table from a backup taken before that entry, and \
+                         find out who had write access to the database.",
+                    );
+                }
+                Err(error) => {
+                    return Finding::failed(format!(
+                        "cannot verify the audit log on placement `{name}`: {error}"
+                    ));
+                }
             }
-            Ok(Verdict::Broken { sequence, id, reason }) => {
-                let at = id.map_or_else(String::new, |id| format!(" (id {id})"));
-                Finding::failed(format!(
-                    "The audit log was tampered with: entry #{sequence}{at} does not match the \
-                     hash chain — {reason}."
-                ))
-                .with_hint(
-                    "Restore the audit_entry table from a backup taken before that entry, and \
-                     find out who had write access to the database.",
-                )
-            }
-            Err(error) => Finding::failed(format!("cannot verify the audit log: {error}")),
         }
+        Finding::ok(format!("The audit log hash chains are intact ({total} entries)."))
     }
 }
 
@@ -327,7 +396,7 @@ mod tests {
         payload: serde_json::Value,
     ) -> Delivered {
         Delivered::new(
-            autoxide_kernel::tenancy::TenantContext::legacy_default(database),
+            autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()).default_tenant(),
             "auth",
             name.to_owned(),
             payload,
@@ -339,7 +408,7 @@ mod tests {
 
     /// Ghi `count` event; trả ID theo thứ tự ghi.
     async fn record(database: &Database, count: usize) -> Vec<Uuid> {
-        let recorder = Recorder::new(database.clone());
+        let recorder = Recorder;
         let mut ids = Vec::new();
         for index in 0..count {
             let event = event(
@@ -364,7 +433,7 @@ mod tests {
     }
 
     async fn verdict(database: &Database) -> Verdict {
-        verify(database.read()).await.unwrap()
+        verify(database.read(), autoxide_kernel::tenancy::DEFAULT_TENANT.as_uuid()).await.unwrap()
     }
 
     #[test]
@@ -396,13 +465,17 @@ mod tests {
             let database = database(test).await;
             assert_eq!(verdict(&database).await, Verdict::Intact(0));
             record(&database, 3).await;
-            let recorder = Recorder::new(database.clone());
+            let recorder = Recorder;
             let again =
                 event(&database, "notes.note_created", "notes.note:1", json!({"after": {}}));
             recorder.handle(&again).await.unwrap();
             recorder.handle(&again).await.unwrap();
             assert_eq!(verdict(&database).await, Verdict::Intact(4));
-            let finding = ChainProbe { database: database.clone() }.probe().await;
+            let finding = ChainProbe {
+                databases: autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
+            }
+            .probe()
+            .await;
             assert_eq!(finding.status, Status::Ok, "{finding:?}");
         })
         .await
@@ -423,7 +496,11 @@ mod tests {
                 broken,
                 Verdict::Broken { sequence: 3, id: Some(ids[2]), reason: "its data was changed" }
             );
-            let finding = ChainProbe { database: database.clone() }.probe().await;
+            let finding = ChainProbe {
+                databases: autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
+            }
+            .probe()
+            .await;
             assert_eq!(finding.status, Status::Failed);
             assert!(finding.message.contains("entry #3"), "{}", finding.message);
             set(&database, ids[2], "after", Some(r#"{"name":"b2"}"#)).await;
@@ -478,7 +555,7 @@ mod tests {
     async fn xoa_du_lieu_ca_nhan_van_giu_chuoi() {
         TestDatabase::run(async |test| {
             let database = database(test).await;
-            let recorder = Recorder::new(database.clone());
+            let recorder = Recorder;
             let user = Uuid::now_v7();
             let subject = format!("auth.user:{user}");
             let created = event(
@@ -505,7 +582,7 @@ mod tests {
     async fn ghi_dong_thoi_van_mot_chuoi() {
         TestDatabase::run(async |test| {
             let database = database(test).await;
-            let recorder = Arc::new(Recorder::new(database.clone()));
+            let recorder = Arc::new(Recorder);
             let mut tasks = tokio::task::JoinSet::new();
             for index in 0..24 {
                 let (recorder, database) = (recorder.clone(), database.clone());
