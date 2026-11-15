@@ -10,5 +10,10 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0001_create_record::Migration),
         // Bảng `idempotency_jobs` (job dọn key hết hạn), định nghĩa ở kernel.
         autoxide_kernel::job::jobs_migration("m0002_create_jobs", "idempotency"),
+        // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0003_tenancy_helpers",
+            vec![autoxide_kernel::job::tenant_table("idempotency")],
+        ),
     ]
 }

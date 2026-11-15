@@ -95,7 +95,7 @@ mod tests {
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             settings.modules.start(&db).unwrap();
             let accounts = settings.modules.api::<dyn Accounts>().unwrap();
-            let dispatcher = settings.modules.dispatcher(&db).unwrap();
+            let dispatcher = settings.modules.dispatcher().unwrap();
 
             let account = NewAccount {
                 email: "ada@example.com".to_owned(),
@@ -135,8 +135,8 @@ mod tests {
             let db = Database::connect(&settings.config.database).await.unwrap();
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             settings.modules.start(&db).unwrap();
-            let first = settings.modules.worker(&db, 4).unwrap();
-            let second = settings.modules.worker(&db, 4).unwrap();
+            let first = settings.modules.worker(4).unwrap();
+            let second = settings.modules.worker(4).unwrap();
 
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 

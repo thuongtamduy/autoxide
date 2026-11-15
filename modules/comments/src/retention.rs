@@ -17,6 +17,7 @@ use std::time::Duration;
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::Throttle;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
@@ -105,6 +106,7 @@ impl CommentsService {
             self.outbox
                 .record(
                     self.database.write(),
+                    &TenantContext::legacy_default(&self.database),
                     Actor::system(),
                     None,
                     &events::CommentsExpired(change),
@@ -148,8 +150,8 @@ impl CommentsService {
         }
         self.guard.purge_nonces(write, MODULE).await?;
         self.tokens.purge(write, now).await?;
-        Throttle::new(self.database.clone(), MODULE, 1, Duration::from_secs(3600))?
-            .purge(now - chrono::Duration::days(1))
+        Throttle::new(MODULE, 1, Duration::from_secs(3600))?
+            .purge(&self.database, now - chrono::Duration::days(1))
             .await?;
         if cleaned != Cleaned::default() {
             tracing::info!(
@@ -214,7 +216,13 @@ impl CommentsService {
                 .filter(subscription::Column::CommentId.eq(row.id))
                 .exec(&transaction)
                 .await?;
-            self.tokens.forget(&transaction, &row.id.to_string()).await?;
+            self.tokens
+                .forget(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    &row.id.to_string(),
+                )
+                .await?;
             Expired::Deleted
         };
         transaction.commit().await?;

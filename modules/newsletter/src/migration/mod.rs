@@ -22,5 +22,16 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::antispam::antispam_migration("m0006_create_antispam_nonces", "newsletter"),
         // Bảng `newsletter_tokens`: token xác nhận đăng ký (dùng một lần, có hạn — D-117).
         autoxide_kernel::tokens::tokens_migration("m0007_create_tokens", "newsletter"),
+        // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0008_tenancy_helpers",
+            vec![
+                autoxide_kernel::event::tenant_table("newsletter"),
+                autoxide_kernel::job::tenant_table("newsletter"),
+                autoxide_kernel::throttle::tenant_table("newsletter"),
+                autoxide_kernel::antispam::tenant_table("newsletter"),
+                autoxide_kernel::tokens::tenant_table("newsletter"),
+            ],
+        ),
     ]
 }

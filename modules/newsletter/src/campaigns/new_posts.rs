@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use uuid::Uuid;
@@ -133,6 +134,7 @@ impl NewsletterService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     Actor::system(),
                     subject.clone(),
                     &events::CampaignCreated(change),
@@ -144,6 +146,7 @@ impl NewsletterService {
                 self.outbox
                     .record(
                         &transaction,
+                        &TenantContext::legacy_default(&self.database),
                         Actor::system(),
                         subject,
                         &events::CampaignStarted(change),

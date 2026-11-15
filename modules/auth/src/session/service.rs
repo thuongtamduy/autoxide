@@ -35,6 +35,7 @@ use super::{LoginThrottle, challenge};
 use crate::events;
 use crate::mfa::MfaService;
 use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::json;
 
 /// Mã lỗi khi sai email hoặc mật khẩu (tạo ở `user::service`).
@@ -342,7 +343,15 @@ impl SessionService {
         row.insert(&transaction).await?;
         let event = events::SignedIn { before: None, after: Some(json!({"method": method})) };
         let subject = events::user_subject(user_id);
-        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::user(user_id),
+                subject,
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "signed in");
         self.tokens(user_id, family_id, refresh_token, expires_at, now)
@@ -420,7 +429,15 @@ impl SessionService {
             revoke_family(&transaction, row.family_id).await?;
             let event = events::SignedOut::default();
             let subject = events::user_subject(row.user_id);
-            self.outbox.record(&transaction, Actor::user(row.user_id), subject, &event).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    Actor::user(row.user_id),
+                    subject,
+                    &event,
+                )
+                .await?;
             transaction.commit().await?;
             tracing::info!(user_id = %row.user_id, "signed out");
         }
@@ -507,7 +524,15 @@ impl SessionService {
         let event =
             events::SignedOut { before: None, after: Some(json!({"session_id": session_id})) };
         let subject = events::user_subject(user_id);
-        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::user(user_id),
+                subject,
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "session ended");
         Ok(())
@@ -541,7 +566,15 @@ impl SessionService {
                 after: Some(json!({"count": ended, "kept": keep})),
             };
             let subject = events::user_subject(user_id);
-            self.outbox.record(&transaction, actor, subject, &event).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &event,
+                )
+                .await?;
         }
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, sessions = ended, "sessions ended");
@@ -560,7 +593,15 @@ impl SessionService {
             revoke_family(&transaction, row.family_id).await?;
             let event = events::RefreshTokenReused::default();
             let subject = events::user_subject(row.user_id);
-            self.outbox.record(&transaction, Actor::user(row.user_id), subject, &event).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    Actor::user(row.user_id),
+                    subject,
+                    &event,
+                )
+                .await?;
             transaction.commit().await?;
             Ok::<(), Error>(())
         }

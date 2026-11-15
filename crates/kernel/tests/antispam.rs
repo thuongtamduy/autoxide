@@ -19,6 +19,8 @@ use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, Modules};
 use autoxide_kernel::secret::SecretKey;
+use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::migration::adopt;
 use autoxide_kernel::throttle::{Throttle, throttle_migration};
 use autoxide_testkit::TestDatabase;
 use uuid::Uuid;
@@ -34,6 +36,13 @@ impl Module for Demo {
         vec![
             throttle_migration("m0001_create_throttle", "demo"),
             antispam_migration("m0002_create_nonces", "demo"),
+            adopt(
+                "m0003_tenancy",
+                vec![
+                    autoxide_kernel::throttle::tenant_table("demo"),
+                    autoxide_kernel::antispam::tenant_table("demo"),
+                ],
+            ),
         ]
     }
 }
@@ -70,14 +79,17 @@ fn submission<'a>(client: &'a ClientInfo, token: Option<&'a str>) -> Submission<
 async fn bay_token_va_qua_nhanh() {
     TestDatabase::run(async |test| {
         let (database, modules) = setup(test).await;
+        let tenant = TenantContext::legacy_default(&database);
         let visitor = client("203.0.113.9");
         let limits = Limits::default();
         // Bộ công bố bởi module nội bộ `antispam`: mặc định giữ lại bài gửi trong 3 giây đầu.
         let default = modules.api::<SpamGuard>().unwrap();
         let issued = default.issue("demo:contact").await.unwrap();
         assert!(issued.submit_after > chrono::Utc::now());
-        let checked =
-            default.check(&submission(&visitor, Some(&issued.token)), &limits).await.unwrap();
+        let checked = default
+            .check(&tenant, &submission(&visitor, Some(&issued.token)), &limits)
+            .await
+            .unwrap();
         assert_eq!(checked.verdict, Verdict::Quarantine { reasons: vec!["too_fast"] });
 
         let guard = make_guard(&database, quick());
@@ -85,28 +97,40 @@ async fn bay_token_va_qua_nhanh() {
         let mut trapped = submission(&visitor, Some(&token));
         trapped.honeypot = Some("http://spam.example");
         assert_eq!(
-            guard.check(&trapped, &limits).await.unwrap().verdict,
+            guard.check(&tenant, &trapped, &limits).await.unwrap().verdict,
             Verdict::Discard { reason: "honeypot" }
         );
-        let missing = guard.check(&submission(&visitor, None), &limits).await.unwrap_err();
+        let missing = guard.check(&tenant, &submission(&visitor, None), &limits).await.unwrap_err();
         assert_eq!(missing.code(), "antispam.token_missing");
         let other = guard.issue("demo:other").await.unwrap().token;
         assert_eq!(
-            guard.check(&submission(&visitor, Some(&other)), &limits).await.unwrap_err().code(),
+            guard
+                .check(&tenant, &submission(&visitor, Some(&other)), &limits)
+                .await
+                .unwrap_err()
+                .code(),
             "antispam.token_invalid"
         );
         assert_eq!(
-            guard.check(&submission(&visitor, Some("x.y")), &limits).await.unwrap_err().code(),
+            guard
+                .check(&tenant, &submission(&visitor, Some("x.y")), &limits)
+                .await
+                .unwrap_err()
+                .code(),
             "antispam.token_invalid"
         );
         let mut duplicate = submission(&visitor, Some(&token));
         duplicate.duplicate = true;
         assert_eq!(
-            guard.check(&duplicate, &limits).await.unwrap().verdict,
+            guard.check(&tenant, &duplicate, &limits).await.unwrap().verdict,
             Verdict::Quarantine { reasons: vec!["duplicate"] }
         );
         assert_eq!(
-            guard.check(&submission(&visitor, Some(&token)), &limits).await.unwrap().verdict,
+            guard
+                .check(&tenant, &submission(&visitor, Some(&token)), &limits)
+                .await
+                .unwrap()
+                .verdict,
             Verdict::Accept
         );
         assert_eq!(content_hash("  Hello\n WORLD "), content_hash("hello world"));
@@ -116,7 +140,11 @@ async fn bay_token_va_qua_nhanh() {
         let token = short.issue("demo:contact").await.unwrap().token;
         tokio::time::sleep(Duration::from_millis(2100)).await;
         assert_eq!(
-            short.check(&submission(&visitor, Some(&token)), &limits).await.unwrap_err().code(),
+            short
+                .check(&tenant, &submission(&visitor, Some(&token)), &limits)
+                .await
+                .unwrap_err()
+                .code(),
             "antispam.token_expired"
         );
     })
@@ -128,23 +156,27 @@ async fn bay_token_va_qua_nhanh() {
 async fn gioi_han_theo_ip_va_nguoi_dung() {
     TestDatabase::run(async |test| {
         let (database, _) = setup(test).await;
+        let tenant = TenantContext::legacy_default(&database);
         let guard = make_guard(&database, quick());
-        let throttle = |limit| {
-            Throttle::new(database.clone(), "demo", limit, Duration::from_secs(3600)).unwrap()
-        };
+        let throttle = |limit| Throttle::new("demo", limit, Duration::from_secs(3600)).unwrap();
         let limits = Limits::default().ip(Some(throttle(2))).user(Some(throttle(1)));
         // Cùng khối /24: chung bộ đếm.
         for ip in ["203.0.113.9", "203.0.113.10"] {
             let token = guard.issue("demo:contact").await.unwrap().token;
             let visitor = client(ip);
             assert_eq!(
-                guard.check(&submission(&visitor, Some(&token)), &limits).await.unwrap().verdict,
+                guard
+                    .check(&tenant, &submission(&visitor, Some(&token)), &limits)
+                    .await
+                    .unwrap()
+                    .verdict,
                 Verdict::Accept
             );
         }
         let token = guard.issue("demo:contact").await.unwrap().token;
         let visitor = client("203.0.113.11");
-        let third = guard.check(&submission(&visitor, Some(&token)), &limits).await.unwrap();
+        let third =
+            guard.check(&tenant, &submission(&visitor, Some(&token)), &limits).await.unwrap();
         assert_eq!(
             third.verdict,
             Verdict::Discard { reason: "rate_limited" },
@@ -152,7 +184,11 @@ async fn gioi_han_theo_ip_va_nguoi_dung() {
         );
         let elsewhere = client("198.51.100.1");
         assert_eq!(
-            guard.check(&submission(&elsewhere, Some(&token)), &limits).await.unwrap().verdict,
+            guard
+                .check(&tenant, &submission(&elsewhere, Some(&token)), &limits)
+                .await
+                .unwrap()
+                .verdict,
             Verdict::Accept
         );
 
@@ -160,8 +196,8 @@ async fn gioi_han_theo_ip_va_nguoi_dung() {
         let website = Principal::new(Uuid::now_v7(), Vec::<String>::new());
         let mut signed = submission(&visitor, None);
         signed.principal = Some(&website);
-        assert_eq!(guard.check(&signed, &limits).await.unwrap().verdict, Verdict::Accept);
-        let error = guard.check(&signed, &limits).await.unwrap_err();
+        assert_eq!(guard.check(&tenant, &signed, &limits).await.unwrap().verdict, Verdict::Accept);
+        let error = guard.check(&tenant, &signed, &limits).await.unwrap_err();
         assert_eq!((error.code(), error.retry_after().is_some()), ("antispam.rate_limited", true));
     })
     .await
@@ -173,32 +209,46 @@ async fn gioi_han_theo_ip_va_nguoi_dung() {
 async fn nonce_la_idempotency_cho_nguoi_la() {
     TestDatabase::run(async |test| {
         let (database, _) = setup(test).await;
+        let tenant = TenantContext::legacy_default(&database);
         let guard = Arc::new(make_guard(&database, quick()));
         let visitor = client("203.0.113.9");
         let token = guard.issue("demo:contact").await.unwrap().token;
-        let first =
-            guard.check(&submission(&visitor, Some(&token)), &Limits::default()).await.unwrap();
+        let first = guard
+            .check(&tenant, &submission(&visitor, Some(&token)), &Limits::default())
+            .await
+            .unwrap();
         let transaction = database.begin_write().await.unwrap();
-        assert_eq!(first.claim(&transaction, "demo", Some("record-1")).await.unwrap(), Claim::New);
+        assert_eq!(
+            first.claim(&transaction, &tenant, "demo", Some("record-1")).await.unwrap(),
+            Claim::New
+        );
         transaction.commit().await.unwrap();
-        let again =
-            guard.check(&submission(&visitor, Some(&token)), &Limits::default()).await.unwrap();
-        let replay = again.claim(database.write(), "demo", Some("record-2")).await.unwrap();
+        let again = guard
+            .check(&tenant, &submission(&visitor, Some(&token)), &Limits::default())
+            .await
+            .unwrap();
+        let replay =
+            again.claim(database.write(), &tenant, "demo", Some("record-2")).await.unwrap();
         assert_eq!(replay, Claim::Replay { result: Some("record-1".to_owned()) });
 
         let token = guard.issue("demo:contact").await.unwrap().token;
         let tasks: Vec<_> = (0..10)
             .map(|index| {
-                let (guard, database, token, visitor) =
-                    (guard.clone(), database.clone(), token.clone(), visitor.clone());
+                let (guard, database, token, visitor, tenant) = (
+                    guard.clone(),
+                    database.clone(),
+                    token.clone(),
+                    visitor.clone(),
+                    tenant.clone(),
+                );
                 tokio::spawn(async move {
                     let checked = guard
-                        .check(&submission(&visitor, Some(&token)), &Limits::default())
+                        .check(&tenant, &submission(&visitor, Some(&token)), &Limits::default())
                         .await
                         .unwrap();
                     let transaction = database.begin_write().await.unwrap();
                     let claim = checked
-                        .claim(&transaction, "demo", Some(&format!("r{index}")))
+                        .claim(&transaction, &tenant, "demo", Some(&format!("r{index}")))
                         .await
                         .unwrap();
                     transaction.commit().await.unwrap();
@@ -229,29 +279,33 @@ async fn nonce_la_idempotency_cho_nguoi_la() {
 async fn gui_lai_token_da_dung_khong_dem_gioi_han() {
     TestDatabase::run(async |test| {
         let (database, _) = setup(test).await;
+        let tenant = TenantContext::legacy_default(&database);
         let guard = make_guard(&database, quick());
-        let email = Throttle::new(database.clone(), "demo", 2, Duration::from_secs(3600)).unwrap();
+        let email = Throttle::new("demo", 2, Duration::from_secs(3600)).unwrap();
         let limits = Limits::default().email(Some(email));
         let visitor = client("203.0.113.9");
         let token = guard.issue("demo:contact").await.unwrap().token;
         let mut sent = submission(&visitor, Some(&token));
         sent.email = Some("victim@example.com");
-        let first = guard.check(&sent, &limits).await.unwrap();
+        let first = guard.check(&tenant, &sent, &limits).await.unwrap();
         assert_eq!(first.verdict, Verdict::Accept);
         let transaction = database.begin_write().await.unwrap();
-        assert_eq!(first.claim(&transaction, "demo", Some("r1")).await.unwrap(), Claim::New);
+        assert_eq!(
+            first.claim(&transaction, &tenant, "demo", Some("r1")).await.unwrap(),
+            Claim::New
+        );
         transaction.commit().await.unwrap();
         for _ in 0..5 {
-            let again = guard.check(&sent, &limits).await.unwrap();
+            let again = guard.check(&tenant, &sent, &limits).await.unwrap();
             assert_eq!(again.verdict, Verdict::Accept);
-            let replay = again.claim(database.write(), "demo", None).await.unwrap();
+            let replay = again.claim(database.write(), &tenant, "demo", None).await.unwrap();
             assert_eq!(replay, Claim::Replay { result: Some("r1".to_owned()) });
         }
         // Chỉ lần đầu được đếm: người thật vẫn gửi được một lần nữa.
         let fresh = guard.issue("demo:contact").await.unwrap().token;
         let mut real = submission(&visitor, Some(&fresh));
         real.email = Some("victim@example.com");
-        assert_eq!(guard.check(&real, &limits).await.unwrap().verdict, Verdict::Accept);
+        assert_eq!(guard.check(&tenant, &real, &limits).await.unwrap().verdict, Verdict::Accept);
     })
     .await
     .unwrap();
@@ -342,6 +396,7 @@ async fn de_altcha() {
     use autoxide_kernel::antispam::ChallengeKind;
     TestDatabase::run(async |test| {
         let (database, _) = setup(test).await;
+        let tenant = TenantContext::legacy_default(&database);
         let guard = make_guard(&database, quick().challenge(ChallengeKind::Altcha { cost: 20 }));
         let visitor = client("203.0.113.9");
         let first = guard.issue("demo:contact").await.unwrap();
@@ -350,17 +405,20 @@ async fn de_altcha() {
         let solution = solve(&challenge);
         let mut sent = submission(&visitor, Some(&first.token));
         assert_eq!(
-            guard.check(&sent, &Limits::default()).await.unwrap_err().code(),
+            guard.check(&tenant, &sent, &Limits::default()).await.unwrap_err().code(),
             "antispam.challenge_required"
         );
         sent.challenge = Some(&solution);
-        assert_eq!(guard.check(&sent, &Limits::default()).await.unwrap().verdict, Verdict::Accept);
+        assert_eq!(
+            guard.check(&tenant, &sent, &Limits::default()).await.unwrap().verdict,
+            Verdict::Accept
+        );
 
         let second = guard.issue("demo:contact").await.unwrap();
         let mut reused = submission(&visitor, Some(&second.token));
         reused.challenge = Some(&solution);
         assert_eq!(
-            guard.check(&reused, &Limits::default()).await.unwrap_err().code(),
+            guard.check(&tenant, &reused, &Limits::default()).await.unwrap_err().code(),
             "antispam.challenge_failed"
         );
     })

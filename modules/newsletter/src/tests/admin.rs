@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::pagination::{Order, PageRequest};
@@ -271,8 +272,9 @@ impl ResourceResolver for Entries {
     }
 }
 
-fn published(entry: Uuid, kind: &str) -> Delivered {
+fn published(database: &Database, entry: Uuid, kind: &str) -> Delivered {
     Delivered::new(
+        autoxide_kernel::tenancy::TenantContext::legacy_default(database),
         "content",
         ENTRY_PUBLISHED.to_owned(),
         json!({"published": {"entry_id": entry, "kind": kind, "locale": "en"}}),
@@ -304,13 +306,13 @@ async fn bai_moi_mot_chien_dich() {
 
         let entry = Uuid::now_v7();
         let handler = NewPostHandler(h.service.clone());
-        let event = published(entry, "post");
+        let event = published(&h.database, entry, "post");
         let (a, b) = tokio::join!(handler.handle(&event), handler.handle(&event));
         a.unwrap();
         b.unwrap();
-        handler.handle(&published(entry, "post")).await.unwrap();
-        handler.handle(&published(Uuid::now_v7(), "page")).await.unwrap();
-        handler.handle(&published(Uuid::nil(), "post")).await.unwrap();
+        handler.handle(&published(&h.database, entry, "post")).await.unwrap();
+        handler.handle(&published(&h.database, Uuid::now_v7(), "page")).await.unwrap();
+        handler.handle(&published(&h.database, Uuid::nil(), "post")).await.unwrap();
         let all = h
             .service
             .list_campaigns(&admin(), &CampaignFilter::default(), &page())
@@ -359,6 +361,7 @@ async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
         let exported = h.service.export(owner.user_id()).await.unwrap();
         assert_eq!(exported["lists"][0]["key"], "weekly");
         let deleted = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(&h.database),
             "auth",
             USER_DELETED.to_owned(),
             json!({"before": {"id": owner.user_id()}}),

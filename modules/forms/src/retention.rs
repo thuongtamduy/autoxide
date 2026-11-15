@@ -12,6 +12,7 @@ use std::time::Duration;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::Throttle;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, Query};
@@ -86,8 +87,8 @@ impl FormsService {
         let expired = self.expired_exports(now).await?;
         cleaned.exports = self.purge_exports(expired).await?;
         self.guard.purge_nonces(write, "forms").await?;
-        Throttle::new(self.database.clone(), "forms", 1, Duration::from_secs(3600))?
-            .purge(now - chrono::Duration::days(1))
+        Throttle::new("forms", 1, Duration::from_secs(3600))?
+            .purge(&self.database, now - chrono::Duration::days(1))
             .await?;
         if cleaned != Cleaned::default() {
             tracing::info!(
@@ -128,6 +129,7 @@ impl FormsService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     Actor::system(),
                     events::form_subject(form.id),
                     &events::SubmissionsExpired(change),

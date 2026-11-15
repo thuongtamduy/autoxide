@@ -9,6 +9,7 @@ use std::sync::Arc;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::EnqueueOptions;
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
 use crate::entity::item;
@@ -95,7 +96,14 @@ impl MediaService {
                     // Chạy lệnh hai lần trước khi worker kịp làm: không xếp trùng.
                     let options = EnqueueOptions::default()
                         .unique_key(format!("refresh:{}:{}", item.id, item.version_id));
-                    self.jobs.enqueue(&transaction, &job, options).await?;
+                    self.jobs
+                        .enqueue(
+                            &transaction,
+                            &TenantContext::legacy_default(&self.database),
+                            &job,
+                            options,
+                        )
+                        .await?;
                 }
                 transaction.commit().await?;
             }

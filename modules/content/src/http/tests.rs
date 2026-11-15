@@ -319,6 +319,7 @@ async fn da_duyet_ai_van_hien_sau_xoa_tai_khoan() {
         let entry = content.create(&ada, input).await.unwrap();
         content.publish(&ada, entry.id, None, None, true).await.unwrap();
         let deleted = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(&content.database),
             "auth",
             autoxide_kernel::privacy::USER_DELETED.to_owned(),
             json!({"before": {"id": ada.user_id()}}),

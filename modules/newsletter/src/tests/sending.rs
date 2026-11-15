@@ -324,7 +324,7 @@ async fn bounce_chan_dia_chi() {
         send(&h.service, draft.row.id).await;
         drain(&h).await;
         let mail = h.mailer.to(&people[0]).remove(0);
-        let failed = Delivered::new("mail", autoxide_kernel::mail::DELIVERY_FAILED.to_owned(), json!({"to": format!("Reader <{}>", people[0]), "dedupe_key": mail.dedupe_key, "code": "550"}));
+        let failed = Delivered::new(autoxide_kernel::tenancy::TenantContext::legacy_default(&h.database), "mail", autoxide_kernel::mail::DELIVERY_FAILED.to_owned(), json!({"to": format!("Reader <{}>", people[0]), "dedupe_key": mail.dedupe_key, "code": "550"}));
         let handler = DeliveryFailures(h.service.clone());
         handler.handle(&failed).await.unwrap();
         handler.handle(&failed).await.unwrap();

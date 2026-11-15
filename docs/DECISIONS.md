@@ -6429,3 +6429,41 @@ Căn cứ pháp lý (ghi ở mục mã hoá và vị trí dữ liệu khi làm):
 (lưu dữ liệu tại Việt Nam, chọn được theo từng khách); Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ 356/2025/NĐ-CP
 (tách biệt dữ liệu, mã hoá khi lưu). Điều khoản cụ thể cần đối chiếu văn bản gốc hay người có chuyên môn pháp lý
 (D-186).
+
+## D-254 · Bảng phụ trợ theo khách, worker và bộ phát trên nhiều database (bước 33 A4) — 2026-11-15 — agent quyết
+
+Phần A4 của bước 33: bảng phụ trợ kernel tạo cho module (`<m>_events`, `<m>_jobs`, `<m>_throttle`, `<m>_tokens`,
+`<m>_antispam_nonces`) mang `tenant_id`; mọi hàm ghi / đọc chúng nhận khách; worker và bộ phát event duyệt mọi
+database của sổ database. Thực thi D-253.
+
+1. **Nâng bảng bằng một dòng migration mỗi module.** Kernel cho `event::tenant_table`, `job::tenant_table`,
+   `throttle::tenant_table`, `tokens::tenant_table`, `antispam::tenant_table` (khai khoá, index của bảng sau khi
+   nâng); module gom chúng vào một `tenancy::migration::adopt("m00xx_tenancy_helpers", …)`. Migration tạo bảng cũ
+   (`jobs_migration`…) giữ nguyên: đã chạy ở bản cài cũ, không được sửa. Module mới vẫn tạo rồi nâng (chép một bảng
+   rỗng, không tốn gì). Index quét mọi khách (bộ phát, worker, dọn dẹp) đổi tên `…_sweep_idx`; khoá chống trùng
+   job thành `(tenant_id, unique_key)`; khoá chính của `throttle` và nonce thành `(tenant_id, …)`; token duy nhất
+   trong khách.
+2. **`Throttle` không giữ database nữa.** Số đếm nằm ở database của khách, nên mỗi hàm nhận `&TenantContext`
+   (nguồn duy nhất của database — D-253 mục 1). `purge` của job dọn dẹp nhận database (quét mọi khách).
+3. **`Delivered` và `JobContext` mang khách**; hàm tạo nhận khách (`Delivered::new(tenant, …)`,
+   `JobContext::for_tenant` / `for_database`) — không có giá trị "khách rỗng" nào để quên. Job của cả database
+   (lịch, `enqueue_database`) ghi `NO_TENANT` và bộ chạy nhận `tenant: None` kèm `database`.
+4. **Chia lượt công bằng**: mỗi lượt, với mỗi database × module, lấy các khách đang có job tới hạn (tối đa 256,
+   `SELECT DISTINCT tenant_id` trên index quét), chia số chỗ trống đều (ít nhất một mỗi khách), điểm bắt đầu xoay
+   vòng giữa các lượt; chỗ thừa đi cho job tới hạn sớm nhất của bất kỳ ai. Chỉ một khách có job thì claim như cũ.
+   Không có job thì câu `DISTINCT` thay câu claim: số truy vấn lúc rảnh không tăng.
+5. **`Claim::claim` nhận `ClaimRequest`** (bảng, khách tuỳ chọn, worker, thời điểm, hạn giữ, số lượng) thay vì
+   bảy tham số rời — thêm điều kiện về sau không phá chữ ký nữa.
+6. **`Modules::worker(concurrency)` / `Modules::dispatcher()` lấy sổ database từ `start`**; giới hạn
+   `concurrency` của mỗi module tính chung mọi database của tiến trình. Bộ phát dựng ngữ cảnh khách cho mỗi event
+   qua `DatabaseRegistry::tenant` (cache có TTL ở `multi`, không truy vấn ở `single`); khách không còn thì event
+   bị đánh dấu hỏng như dòng không đọc được. Outbox chỉ đánh thức bộ phát (lượt sau duyệt mọi database) — không
+   cần kèm placement.
+7. **Module chưa chuyển (phần B) truyền `TenantContext::legacy_default(&database)`** ở mọi chỗ gọi — một chuỗi
+   duy nhất để tìm khi chuyển từng module.
+
+Bài học khi đổi hàng loạt chỗ gọi bằng gợi ý của `rustc`: với hai tham số liền nhau cùng kiểu (`purpose` và
+`token` đều là `&str`), gợi ý "provide the argument" có thể **đổi chỗ** chúng. Mọi lời gọi đã được so lại thứ tự
+tham số với bản trước khi đổi (bỏ tham số khách) trước khi commit.
+
+Thay thế: không. Bổ sung D-253.

@@ -13,6 +13,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
@@ -142,7 +143,13 @@ impl NewsletterService {
             after: None,
         });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::suppression_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::suppression_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         Ok(())
@@ -240,7 +247,13 @@ impl NewsletterService {
                 after: Some(json!({"id": row.id, "reason": row.reason})),
             });
             self.outbox
-                .record(connection, actor, events::suppression_subject(row.id), &event)
+                .record(
+                    connection,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    events::suppression_subject(row.id),
+                    &event,
+                )
                 .await?;
             tracing::info!(suppression_id = %row.id, reason = reason.as_str(), "address suppressed");
         }

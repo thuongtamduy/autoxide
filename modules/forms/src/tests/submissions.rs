@@ -221,8 +221,13 @@ async fn event_khong_mang_cau_tra_loi_va_mail_bao() {
         assert_eq!(payload["after"]["form_key"], "contact");
 
         // Event giao hai lần: hai lời gọi `send` cùng `dedupe_key` (module `mail` bỏ lần sau).
-        let delivered = Delivered::new("forms", "forms.submission_received".to_owned(), payload)
-            .actor(Actor::public());
+        let delivered = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+            "forms",
+            "forms.submission_received".to_owned(),
+            payload,
+        )
+        .actor(Actor::public());
         let notifier = crate::submissions::notify::Notifier(service.clone());
         notifier.handle(&delivered).await.unwrap();
         notifier.handle(&delivered).await.unwrap();

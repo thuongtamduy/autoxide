@@ -48,5 +48,15 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         // Cột `actor_kind` của bảng `auth_events` (người lạ khác hệ thống, D-122).
         autoxide_kernel::event::outbox_actor_migration("m0020_add_event_actor", "auth"),
         Box::new(m0021_add_cleanup_indexes::Migration),
+        // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0022_tenancy_helpers",
+            vec![
+                autoxide_kernel::event::tenant_table("auth"),
+                autoxide_kernel::job::tenant_table("auth"),
+                autoxide_kernel::throttle::tenant_table("auth"),
+                autoxide_kernel::tokens::tenant_table("auth"),
+            ],
+        ),
     ]
 }

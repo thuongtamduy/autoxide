@@ -54,6 +54,14 @@ impl Module for MailModule {
             // Bảng `mail_events` (outbox) cho event mail bị từ chối hẳn.
             autoxide_kernel::event::outbox_migration("m0002_create_events", "mail"),
             autoxide_kernel::event::outbox_actor_migration("m0003_add_event_actor", "mail"),
+            // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+            autoxide_kernel::tenancy::migration::adopt(
+                "m0004_tenancy_helpers",
+                vec![
+                    autoxide_kernel::job::tenant_table("mail"),
+                    autoxide_kernel::event::tenant_table("mail"),
+                ],
+            ),
         ]
     }
 

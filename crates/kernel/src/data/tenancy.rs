@@ -241,6 +241,14 @@ impl TenantContext {
         )
     }
 
+    /// Đường chuyển tiếp (bước 33 A4): code chưa nhận ngữ cảnh khách (module chưa chuyển ở phần B)
+    /// dùng khách mặc định trên database nó đang giữ. Bị `#[deprecated]` khi phần B xong (không còn
+    /// ai gọi), xoá ở đầu bước 34 (D-253 mục 7).
+    #[doc(hidden)]
+    pub fn legacy_default(database: &Database) -> Self {
+        Self::default_on(database.clone())
+    }
+
     pub fn id(&self) -> TenantId {
         self.0.id
     }

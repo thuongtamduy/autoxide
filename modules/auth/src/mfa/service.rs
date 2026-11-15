@@ -20,6 +20,7 @@ use super::recovery;
 use crate::events;
 use crate::session::LoginThrottle;
 use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::json;
 
 /// Độ dài secret: 160 bit, như RFC 4226 khuyến nghị cho HMAC-SHA1.
@@ -164,7 +165,15 @@ impl MfaService {
         let codes = recovery::replace(&transaction, user_id, now).await?;
         let event = events::MfaEnabled { before: None, after: Some(json!({"method": "totp"})) };
         let subject = events::user_subject(user_id);
-        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::user(user_id),
+                subject,
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "two-step sign-in turned on");
         Ok(codes)
@@ -205,7 +214,15 @@ impl MfaService {
         let codes = recovery::replace(&transaction, user_id, now()).await?;
         let event = events::RecoveryCodesReplaced::default();
         let subject = events::user_subject(user_id);
-        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::user(user_id),
+                subject,
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "recovery codes replaced");
         Ok(codes)
@@ -255,7 +272,15 @@ impl MfaService {
 
     async fn remove(&self, actor: Actor, user_id: Uuid, by_admin: bool) -> Result<(), Error> {
         let transaction = self.database.begin_write().await?;
-        remove_in(&transaction, &self.outbox, actor, user_id, by_admin).await?;
+        remove_in(
+            &transaction,
+            &TenantContext::legacy_default(&self.database),
+            &self.outbox,
+            actor,
+            user_id,
+            by_admin,
+        )
+        .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "two-step sign-in turned off");
         Ok(())
@@ -301,6 +326,7 @@ impl MfaService {
 /// email (`email_report.rs`).
 pub(crate) async fn remove_in(
     transaction: &DatabaseTransaction,
+    tenant: &TenantContext,
     outbox: &Outbox,
     actor: Actor,
     user_id: Uuid,
@@ -315,7 +341,7 @@ pub(crate) async fn remove_in(
             before: Some(json!({"method": "totp"})),
             after: Some(json!({"by_administrator": by_admin})),
         };
-        outbox.record(transaction, actor, events::user_subject(user_id), &event).await?;
+        outbox.record(transaction, tenant, actor, events::user_subject(user_id), &event).await?;
     }
     Ok(())
 }

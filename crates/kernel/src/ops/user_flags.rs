@@ -562,6 +562,7 @@ mod tests {
             assert_eq!(exported["user_flags"][0]["key"], "hint.views");
 
             let event = Delivered::new(
+                crate::tenancy::TenantContext::legacy_default(&flags.database),
                 "auth",
                 crate::privacy::USER_DELETED,
                 json!({"before": {"id": ada.user_id()}}),

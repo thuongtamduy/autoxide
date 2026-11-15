@@ -14,6 +14,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::resource::{Resource, ResourceChange, ResourceEvent};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde_json::json;
@@ -289,11 +290,23 @@ impl CommentsService {
             let subject = events::target_subject(kind, id);
             if opened {
                 self.outbox
-                    .record(&transaction, actor, subject, &events::TargetOpened(change))
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        actor,
+                        subject,
+                        &events::TargetOpened(change),
+                    )
                     .await?;
             } else {
                 self.outbox
-                    .record(&transaction, actor, subject, &events::TargetClosed(change))
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        actor,
+                        subject,
+                        &events::TargetClosed(change),
+                    )
                     .await?;
             }
         }

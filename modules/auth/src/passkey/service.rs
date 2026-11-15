@@ -12,6 +12,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -159,7 +160,13 @@ impl PasskeyService {
         })?;
         let event = events::PasskeyAdded { before: None, after: Some(json!({"name": row.name})) };
         self.outbox
-            .record(&transaction, Actor::user(user_id), events::user_subject(user_id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::user(user_id),
+                events::user_subject(user_id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, passkey_id = %row.id, "passkey added");
@@ -196,7 +203,15 @@ impl PasskeyService {
     /// đã gỡ.
     pub(crate) async fn remove_all_for(&self, actor: Actor, user_id: Uuid) -> Result<u64, Error> {
         let transaction = self.database.begin_write().await?;
-        let removed = remove_all_in(&transaction, &self.outbox, actor, user_id, true).await?;
+        let removed = remove_all_in(
+            &transaction,
+            &TenantContext::legacy_default(&self.database),
+            &self.outbox,
+            actor,
+            user_id,
+            true,
+        )
+        .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, removed, "passkeys removed by an administrator");
         Ok(removed)
@@ -221,7 +236,15 @@ impl PasskeyService {
             return Err(passkey_not_found(id));
         }
         let event = removed_event(&row.name, by_admin);
-        self.outbox.record(&transaction, actor, events::user_subject(user_id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(user_id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(())
     }
@@ -373,6 +396,7 @@ fn now() -> DateTime<Utc> {
 /// một event. Trả số passkey đã xoá.
 pub(crate) async fn remove_all_in<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     outbox: &Outbox,
     actor: Actor,
     user_id: Uuid,
@@ -383,7 +407,7 @@ pub(crate) async fn remove_all_in<C: ConnectionTrait>(
     for row in &rows {
         passkey::Entity::delete_by_id(row.id).exec(connection).await?;
         let event = removed_event(&row.name, by_admin);
-        outbox.record(connection, actor, events::user_subject(user_id), &event).await?;
+        outbox.record(connection, tenant, actor, events::user_subject(user_id), &event).await?;
     }
     Ok(rows.len() as u64)
 }

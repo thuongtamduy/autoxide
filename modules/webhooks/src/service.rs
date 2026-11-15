@@ -5,6 +5,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, EventCatalog, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde_json::{Value, json};
@@ -143,7 +144,13 @@ impl WebhookService {
         let event =
             events::EndpointCreated(Change { before: None, after: Some(snapshot(&endpoint)) });
         self.outbox
-            .record(&transaction, actor, events::endpoint_subject(endpoint.id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::endpoint_subject(endpoint.id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(endpoint_id = %endpoint.id, "webhook endpoint created");
@@ -217,7 +224,15 @@ impl WebhookService {
         let after = Endpoint::from_row(updated)?;
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::EndpointUpdated(change);
-        self.outbox.record(&transaction, actor, events::endpoint_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::endpoint_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -241,7 +256,15 @@ impl WebhookService {
             before: None,
             after: Some(json!({"secret_replaced": true})),
         });
-        self.outbox.record(&transaction, actor, events::endpoint_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::endpoint_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(endpoint_id = %id, "webhook secret replaced");
         Ok(secret)
@@ -262,7 +285,15 @@ impl WebhookService {
         let before = Endpoint::from_row(row)?;
         let event =
             events::EndpointDeleted(Change { before: Some(snapshot(&before)), after: None });
-        self.outbox.record(&transaction, actor, events::endpoint_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::endpoint_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(endpoint_id = %id, "webhook endpoint deleted");
         Ok(())

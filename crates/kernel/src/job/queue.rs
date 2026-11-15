@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use super::{Job, foreign_kind, module_of, table_name};
 use crate::error::Error;
+use crate::tenancy::{NO_TENANT, TenantContext, TenantId};
 
 /// Tuỳ chọn khi đưa job vào hàng đợi. Dựng bằng `EnqueueOptions::default()` rồi các hàm đặt
 /// từng trường.
@@ -55,9 +56,34 @@ impl JobQueue {
         JobQueue { module, table: table_name(module) }
     }
 
-    /// Đưa `job` vào hàng đợi, trong `connection` (thường là transaction của thay đổi).
-    /// Trả về ID của job, hoặc `None` nếu đã có job mang cùng `unique_key`.
+    /// Đưa `job` của khách `tenant` vào hàng đợi, trong `connection` (thường là transaction của
+    /// thay đổi, trên `tenant.database()`). Trả về ID của job, hoặc `None` nếu khách đã có job
+    /// mang cùng `unique_key`.
     pub async fn enqueue<C, J>(
+        &self,
+        connection: &C,
+        tenant: &TenantContext,
+        job: &J,
+        options: EnqueueOptions,
+    ) -> Result<Option<Uuid>, Error>
+    where
+        C: ConnectionTrait,
+        J: Job,
+    {
+        self.enqueue_value(
+            connection,
+            tenant.id(),
+            J::KIND,
+            serde_json::to_value(job).map_err(Error::internal)?,
+            options,
+        )
+        .await
+    }
+
+    /// Đưa `job` của cả database (không thuộc khách nào — vd dọn dẹp quét mọi khách) vào hàng
+    /// đợi của database `connection`. Bộ chạy nhận [`JobContext::tenant`](super::JobContext)
+    /// là `None`.
+    pub async fn enqueue_database<C, J>(
         &self,
         connection: &C,
         job: &J,
@@ -69,6 +95,7 @@ impl JobQueue {
     {
         self.enqueue_value(
             connection,
+            NO_TENANT,
             J::KIND,
             serde_json::to_value(job).map_err(Error::internal)?,
             options,
@@ -79,6 +106,7 @@ impl JobQueue {
     pub(crate) async fn enqueue_value<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: TenantId,
         kind: &str,
         payload: serde_json::Value,
         options: EnqueueOptions,
@@ -92,6 +120,7 @@ impl JobQueue {
         insert
             .into_table(Alias::new(&self.table))
             .columns([
+                Alias::new("tenant_id"),
                 Alias::new("id"),
                 Alias::new("kind"),
                 Alias::new("payload"),
@@ -102,6 +131,7 @@ impl JobQueue {
                 Alias::new("created_at"),
             ])
             .values([
+                tenant.as_uuid().into(),
                 id.into(),
                 kind.into(),
                 payload.to_string().into(),
@@ -115,7 +145,11 @@ impl JobQueue {
             // Trùng `unique_key` thì không chèn — bằng `ON CONFLICT DO NOTHING`, KHÔNG để lệnh
             // lỗi rồi bắt lỗi: trong transaction, Postgres đánh dấu cả transaction là hỏng sau
             // một lệnh lỗi (lệnh sau lỗi, `COMMIT` thành `ROLLBACK`), SQLite thì không (D-158).
-            .on_conflict(OnConflict::column(Alias::new("unique_key")).do_nothing().to_owned());
+            .on_conflict(
+                OnConflict::columns([Alias::new("tenant_id"), Alias::new("unique_key")])
+                    .do_nothing()
+                    .to_owned(),
+            );
         let inserted = connection.execute(&insert).await?.rows_affected();
         Ok((inserted == 1).then_some(id))
     }

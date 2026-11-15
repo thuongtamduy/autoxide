@@ -18,6 +18,7 @@ use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::job::JobQueue;
 use autoxide_kernel::mail::{MailTemplate, Mailer};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use serde_json::json;
@@ -125,7 +126,9 @@ impl EmailVerifications {
     pub(crate) async fn confirm(&self, token: &str, language: Language) -> Result<User, Error> {
         let now = now();
         let transaction = self.database.begin_write().await?;
-        let consumed = tokens().consume(&transaction, PURPOSE, token).await?;
+        let consumed = tokens()
+            .consume(&transaction, &TenantContext::legacy_default(&self.database), PURPOSE, token)
+            .await?;
         let found = consumed
             .and_then(|consumed| Some((consumed.subject.parse::<Uuid>().ok()?, consumed.data?)));
         let Some((user_id, email)) = found else {
@@ -135,10 +138,24 @@ impl EmailVerifications {
         let old = self.users.apply_verified_email(&transaction, user_id, &email, now).await?;
         // Token khác của người này (mail cũ hơn, hay cho địa chỉ khác) hết dùng được.
         // Mọi token xác minh khác của người này hết hiệu lực.
-        tokens().revoke(&transaction, PURPOSE, &user_id.to_string()).await?;
+        tokens()
+            .revoke(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &user_id.to_string(),
+            )
+            .await?;
         // Email đổi: mail đặt lại mật khẩu đã gửi tới địa chỉ cũ hết dùng được (D-156).
         if old != email {
-            tokens().revoke(&transaction, "password_reset", &user_id.to_string()).await?;
+            tokens()
+                .revoke(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    "password_reset",
+                    &user_id.to_string(),
+                )
+                .await?;
             let job = EmailChangedJob {
                 user_id,
                 old_email: old.clone(),
@@ -151,7 +168,15 @@ impl EmailVerifications {
         let before = (old != email).then(|| json!({"email": old}));
         let event = events::EmailVerified { before, after: Some(json!({"email": email})) };
         let subject = events::user_subject(user_id);
-        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::user(user_id),
+                subject,
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, changed = old != email, "email verified");
         self.users.get(user_id).await?.ok_or_else(|| user::user_not_found(user_id))
@@ -169,19 +194,45 @@ impl EmailVerifications {
         let now = now();
         let subject = user.id.to_string();
         let since = now - chrono::Duration::seconds(COOLDOWN_SECONDS);
-        let recent = tokens().recent(self.database.write(), PURPOSE, &subject, since).await?;
+        let recent = tokens()
+            .recent(
+                self.database.write(),
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &subject,
+                since,
+            )
+            .await?;
         if recent.iter().any(|token| token.data.as_deref() == Some(email)) {
             return Ok(());
         }
 
         let transaction = self.database.begin_write().await?;
         let ttl = chrono::Duration::hours(TOKEN_HOURS);
-        let token = tokens().issue(&transaction, PURPOSE, &subject, Some(email), ttl).await?.token;
+        let token = tokens()
+            .issue(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &subject,
+                Some(email),
+                ttl,
+            )
+            .await?
+            .token;
         let event = events::EmailVerificationRequested {
             before: None,
             after: Some(json!({"email": email})),
         };
-        self.outbox.record(&transaction, actor, events::user_subject(user.id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(user.id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
 
         let hours = TOKEN_HOURS.to_string();

@@ -32,37 +32,41 @@ use crate::migration::prelude::*;
 /// Một bảng cần nâng, với khoá và index của nó sau khi nâng.
 #[derive(Debug, Clone)]
 pub struct TenantTable {
-    name: &'static str,
+    name: String,
     primary_key: Option<Vec<&'static str>>,
     indexes: Vec<Declared>,
-    drops: Vec<&'static str>,
+    drops: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
 struct Declared {
-    name: &'static str,
+    name: String,
     columns: Vec<&'static str>,
     unique: bool,
 }
 
 impl TenantTable {
-    pub fn new(name: &'static str) -> Self {
-        TenantTable { name, primary_key: None, indexes: Vec::new(), drops: Vec::new() }
+    pub fn new(name: impl Into<String>) -> Self {
+        TenantTable { name: name.into(), primary_key: None, indexes: Vec::new(), drops: Vec::new() }
     }
 
     /// Index unique (cột đầu phải là `tenant_id`).
     pub fn unique<const N: usize>(
         mut self,
-        name: &'static str,
+        name: impl Into<String>,
         columns: [&'static str; N],
     ) -> Self {
-        self.indexes.push(Declared { name, columns: columns.to_vec(), unique: true });
+        self.indexes.push(Declared { name: name.into(), columns: columns.to_vec(), unique: true });
         self
     }
 
     /// Index thường (cột đầu phải là `tenant_id`).
-    pub fn index<const N: usize>(mut self, name: &'static str, columns: [&'static str; N]) -> Self {
-        self.indexes.push(Declared { name, columns: columns.to_vec(), unique: false });
+    pub fn index<const N: usize>(
+        mut self,
+        name: impl Into<String>,
+        columns: [&'static str; N],
+    ) -> Self {
+        self.indexes.push(Declared { name: name.into(), columns: columns.to_vec(), unique: false });
         self
     }
 
@@ -70,10 +74,10 @@ impl TenantTable {
     /// tên kết thúc `_sweep_idx`.
     pub fn sweep_index<const N: usize>(
         mut self,
-        name: &'static str,
+        name: impl Into<String>,
         columns: [&'static str; N],
     ) -> Self {
-        self.indexes.push(Declared { name, columns: columns.to_vec(), unique: false });
+        self.indexes.push(Declared { name: name.into(), columns: columns.to_vec(), unique: false });
         self
     }
 
@@ -84,8 +88,8 @@ impl TenantTable {
     }
 
     /// Bỏ hẳn index cũ `name` (phải nói rõ).
-    pub fn drop_index(mut self, name: &'static str) -> Self {
-        self.drops.push(name);
+    pub fn drop_index(mut self, name: impl Into<String>) -> Self {
+        self.drops.push(name.into());
         self
     }
 
@@ -139,15 +143,15 @@ impl MigrationTrait for Adopt {
         let mut plans = Vec::new();
         for table in &self.tables {
             table.check()?;
-            let old = describe(connection, backend, table.name).await?;
+            let old = describe(connection, backend, &table.name).await?;
             if old.columns.iter().any(|column| column.name == "tenant_id") {
                 return Err(custom(format!("{}: already has `tenant_id`", table.name)));
             }
             let declared: BTreeSet<&str> = table
                 .indexes
                 .iter()
-                .map(|index| index.name)
-                .chain(table.drops.iter().copied())
+                .map(|index| index.name.as_str())
+                .chain(table.drops.iter().map(String::as_str))
                 .collect();
             for index in &old.indexes {
                 if index.inline {
@@ -195,14 +199,14 @@ impl MigrationTrait for Adopt {
                 .indexes
                 .iter()
                 .map(|index| Index {
-                    name: index.name.to_owned(),
+                    name: index.name.clone(),
                     columns: index.columns.iter().map(|column| (*column).to_owned()).collect(),
                     unique: index.unique,
                     inline: false,
                 })
                 .collect();
             plans.push(Plan {
-                table: table.name.to_owned(),
+                table: table.name.clone(),
                 columns,
                 primary_key,
                 foreign_keys: old.foreign_keys,
@@ -224,7 +228,7 @@ impl MigrationTrait for Adopt {
                 backend,
                 &format!(
                     "SELECT COUNT(*) FROM {} WHERE tenant_id <> {}",
-                    quote(table.name),
+                    quote(&table.name),
                     placeholder(backend, 1)
                 ),
                 vec![DEFAULT_TENANT.as_uuid().into()],
@@ -237,7 +241,7 @@ impl MigrationTrait for Adopt {
                     table.name
                 )));
             }
-            let current = describe(connection, backend, table.name).await?;
+            let current = describe(connection, backend, &table.name).await?;
             let without = |columns: &[String]| -> Vec<String> {
                 columns.iter().filter(|column| *column != "tenant_id").cloned().collect()
             };
@@ -255,7 +259,7 @@ impl MigrationTrait for Adopt {
                 .filter(|index| !index.columns.is_empty())
                 .collect();
             plans.push(Plan {
-                table: table.name.to_owned(),
+                table: table.name.clone(),
                 columns,
                 primary_key: without(&current.primary_key),
                 foreign_keys: current.foreign_keys,

@@ -78,3 +78,19 @@ impl MigrationTrait for JobsMigration {
         manager.drop_table(Table::drop().table(Alias::new(&table)).to_owned()).await
     }
 }
+
+/// Bảng `<module>_jobs` sau khi nâng theo khách (bước 33 A4): `tenant_id` đứng đầu; khoá chống
+/// trùng theo khách; index quét của worker (mọi khách) `…_pending_sweep_idx` và index claim theo
+/// khách `…_tenant_pending_idx`. Thêm vào migration của module như
+/// [`event::tenant_table`](crate::event::tenant_table).
+pub fn tenant_table(module: &str) -> crate::tenancy::migration::TenantTable {
+    let table = super::table_name(module);
+    crate::tenancy::migration::TenantTable::new(&table)
+        .sweep_index(format!("{table}_pending_sweep_idx"), ["completed_at", "failed_at", "run_at"])
+        .index(
+            format!("{table}_tenant_pending_idx"),
+            ["tenant_id", "completed_at", "failed_at", "run_at"],
+        )
+        .drop_index(format!("{table}_pending_idx"))
+        .unique(format!("{table}_unique_key"), ["tenant_id", "unique_key"])
+}

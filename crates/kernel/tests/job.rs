@@ -13,11 +13,13 @@ use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{
-    EnqueueOptions, Job, JobContext, JobHandler, JobQueue, JobRegistration, JobStatus, Schedule,
-    claim_for, jobs_migration,
+    ClaimRequest, EnqueueOptions, Job, JobContext, JobHandler, JobQueue, JobRegistration,
+    JobStatus, Schedule, claim_for, jobs_migration, tenant_table,
 };
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, Modules};
+use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::migration::adopt;
 use autoxide_testkit::TestDatabase;
 use chrono::Utc;
 use sea_orm::{ConnectionTrait, Statement};
@@ -67,7 +69,10 @@ impl Module for Reports {
     }
 
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        vec![jobs_migration("m0001_create_jobs", "reports")]
+        vec![
+            jobs_migration("m0001_create_jobs", "reports"),
+            adopt("m0002_tenancy", vec![tenant_table("reports")]),
+        ]
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {
@@ -97,7 +102,11 @@ async fn setup(
 
 async fn enqueue(database: &Database, to: &str, options: EnqueueOptions) -> Option<Uuid> {
     let queue = JobQueue::new("reports");
-    queue.enqueue(database.write(), &SendReport { to: to.to_owned() }, options).await.unwrap()
+    let tenant = TenantContext::legacy_default(database);
+    queue
+        .enqueue(database.write(), &tenant, &SendReport { to: to.to_owned() }, options)
+        .await
+        .unwrap()
 }
 
 /// Cho thời gian trôi qua: mọi job hẹn giờ tới hạn ngay.
@@ -115,11 +124,19 @@ async fn job_trong_transaction_bi_huy_thi_khong_ton_tai() {
 
         let transaction = database.begin_write().await.unwrap();
         let draft = SendReport { to: "draft".to_owned() };
-        queue.enqueue(&transaction, &draft, EnqueueOptions::default()).await.unwrap();
+        queue
+            .enqueue(
+                &transaction,
+                &TenantContext::legacy_default(&database),
+                &draft,
+                EnqueueOptions::default(),
+            )
+            .await
+            .unwrap();
         transaction.rollback().await.unwrap();
         enqueue(&database, "ada", EnqueueOptions::default()).await;
 
-        let worker = modules.worker(&database, 4).unwrap();
+        let worker = modules.worker(4).unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 1);
         assert_eq!(worker.run_once().await.unwrap(), 0);
 
@@ -152,7 +169,7 @@ async fn hen_gio_va_chong_trung() {
         assert!(enqueue(&database, "once", unique()).await.is_some());
         assert!(enqueue(&database, "twice", unique()).await.is_none());
 
-        let worker = modules.worker(&database, 4).unwrap();
+        let worker = modules.worker(4).unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 1);
         assert_eq!(recorder.runs.lock().unwrap()[0].payload["to"], "once");
     })
@@ -172,12 +189,34 @@ async fn trung_khoa_giua_transaction_khong_hong_transaction() {
 
         let transaction = database.begin_write().await.unwrap();
         let again = SendReport { to: "again".to_owned() };
-        assert!(queue.enqueue(&transaction, &again, unique("a")).await.unwrap().is_none());
+        assert!(
+            queue
+                .enqueue(
+                    &transaction,
+                    &TenantContext::legacy_default(&database),
+                    &again,
+                    unique("a")
+                )
+                .await
+                .unwrap()
+                .is_none()
+        );
         let next = SendReport { to: "next".to_owned() };
-        assert!(queue.enqueue(&transaction, &next, unique("b")).await.unwrap().is_some());
+        assert!(
+            queue
+                .enqueue(
+                    &transaction,
+                    &TenantContext::legacy_default(&database),
+                    &next,
+                    unique("b")
+                )
+                .await
+                .unwrap()
+                .is_some()
+        );
         transaction.commit().await.unwrap();
 
-        let worker = modules.worker(&database, 4).unwrap();
+        let worker = modules.worker(4).unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 2);
         let mut sent: Vec<String> = recorder
             .runs
@@ -202,7 +241,7 @@ async fn nhieu_worker_dong_thoi_khong_chay_trung() {
             enqueue(&database, &format!("user-{index}"), EnqueueOptions::default()).await;
         }
 
-        let workers: Vec<_> = (0..3).map(|_| modules.worker(&database, 50).unwrap()).collect();
+        let workers: Vec<_> = (0..3).map(|_| modules.worker(50).unwrap()).collect();
         let (a, b, c) =
             tokio::join!(workers[0].run_once(), workers[1].run_once(), workers[2].run_once());
 
@@ -237,7 +276,10 @@ async fn claim_dong_thoi_tra_ve_cac_tap_roi_nhau() {
                     let until = now + chrono::Duration::minutes(5);
                     let name = format!("w{worker}");
                     claim
-                        .claim(database.write(), "reports_jobs", &name, now, until, 10)
+                        .claim(
+                            database.write(),
+                            &ClaimRequest::new("reports_jobs", &name, now, until, 10),
+                        )
                         .await
                         .unwrap()
                 })
@@ -263,7 +305,7 @@ async fn loi_thi_thu_lai_roi_vao_dead_letter_queue_va_chay_lai_duoc() {
         recorder.fail.store(true, Ordering::SeqCst);
         let options = EnqueueOptions::default().max_attempts(3);
         let id = enqueue(&database, "ada", options).await.unwrap();
-        let worker = modules.worker(&database, 4).unwrap();
+        let worker = modules.worker(4).unwrap();
 
         for attempt in 1..=3 {
             assert_eq!(worker.run_once().await.unwrap(), 1, "attempt {attempt}");
@@ -299,9 +341,9 @@ async fn loi_thi_thu_lai_roi_vao_dead_letter_queue_va_chay_lai_duoc() {
 async fn lich_dinh_ky_khong_sinh_trung() {
     TestDatabase::run(async |test| {
         let schedule = Schedule::new("reports.hourly", "reports.send", Duration::from_secs(3600));
-        let (database, modules, recorder) = setup(test, vec![schedule]).await;
-        let first = modules.worker(&database, 4).unwrap();
-        let second = modules.worker(&database, 4).unwrap();
+        let (_database, modules, recorder) = setup(test, vec![schedule]).await;
+        let first = modules.worker(4).unwrap();
+        let second = modules.worker(4).unwrap();
 
         let (a, b) = tokio::join!(first.run_once(), second.run_once());
         a.unwrap();
@@ -320,9 +362,9 @@ async fn lich_dinh_ky_khong_sinh_trung() {
 async fn khai_bao_sai_bi_tu_choi_luc_khoi_dong() {
     TestDatabase::run(async |test| {
         let wrong = Schedule::new("reports.hourly", "reports.missing", Duration::from_secs(60));
-        let (database, modules, _) = setup(test, vec![wrong]).await;
+        let (_database, modules, _) = setup(test, vec![wrong]).await;
 
-        let error = modules.worker(&database, 4).err().unwrap().to_string();
+        let error = modules.worker(4).err().unwrap().to_string();
 
         assert!(error.contains("runs job kind `reports.missing`, which has no handler"), "{error}");
     })
@@ -340,7 +382,7 @@ async fn job_cham_khong_giu_cac_job_khac() {
         for name in ["a", "b", "c"] {
             enqueue(&database, name, EnqueueOptions::default()).await;
         }
-        let worker = modules.worker(&database, 2).unwrap();
+        let worker = modules.worker(2).unwrap();
         let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
         let task = tokio::spawn(worker.run(async move {
             let _ = stopped.await;
@@ -374,7 +416,7 @@ async fn panic_va_tien_trinh_chet_vao_dead_letter_queue() {
         let (database, modules, _) = setup(test, Vec::new()).await;
         let once = || EnqueueOptions::default().max_attempts(1);
         enqueue(&database, "panic", once()).await;
-        let worker = modules.worker(&database, 4).unwrap();
+        let worker = modules.worker(4).unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 1);
         let failed = worker.list("reports", JobStatus::Failed, 10).await.unwrap();
         assert_eq!(failed.len(), 1);
@@ -391,7 +433,7 @@ async fn panic_va_tien_trinh_chet_vao_dead_letter_queue() {
             .and_where(Expr::col(Alias::new("id")).eq(stuck))
             .to_owned();
         assert_eq!(database.write().execute(&crashed).await.unwrap().rows_affected(), 1);
-        let fresh = modules.worker(&database, 4).unwrap();
+        let fresh = modules.worker(4).unwrap();
         assert_eq!(fresh.run_once().await.unwrap(), 0, "not claimed again");
         let failed = fresh.list("reports", JobStatus::Failed, 10).await.unwrap();
         assert!(failed.iter().any(|job| job.id == stuck), "{failed:?}");

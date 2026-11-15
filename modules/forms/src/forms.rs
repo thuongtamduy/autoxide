@@ -7,6 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
@@ -180,6 +181,7 @@ impl FormsService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::form_subject(created.row.id),
                 &event,
@@ -314,7 +316,13 @@ impl FormsService {
         let event =
             events::FormUpdated(Change { before: Some(before.summary()), after: Some(summary) });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::form_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::form_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         Ok(after)
@@ -355,7 +363,13 @@ impl FormsService {
         }
         let event = events::FormDeleted(Change { before: Some(summary), after: None });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::form_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::form_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(form_id = %id, submissions = submissions.rows_affected, "form deleted");

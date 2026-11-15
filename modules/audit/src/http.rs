@@ -169,6 +169,7 @@ async fn get_entry(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use autoxide_kernel::database::Database;
     use autoxide_kernel::event::{Actor, Delivered, EventHandler};
     use autoxide_testkit::{TestApp, TestDatabase};
     use axum::http::StatusCode;
@@ -188,8 +189,9 @@ mod tests {
         (app, recorder)
     }
 
-    fn event(name: &str, actor: Uuid, subject: &str) -> Delivered {
+    fn event(database: &Database, name: &str, actor: Uuid, subject: &str) -> Delivered {
         Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(database),
             "auth",
             name.to_owned(),
             json!({"before": {"name": "a"}, "after": {"name": "b"}}),
@@ -209,10 +211,16 @@ mod tests {
         TestDatabase::run(async |test| {
             let (app, recorder) = setup(test).await;
             let (ada, bob) = (Uuid::now_v7(), Uuid::now_v7());
-            let first = event("auth.user_updated", ada, "auth.user:1");
+            let first = event(app.database(), "auth.user_updated", ada, "auth.user:1");
             recorder.handle(&first).await.unwrap();
-            recorder.handle(&event("auth.role_created", ada, "auth.role:1")).await.unwrap();
-            recorder.handle(&event("auth.user_updated", bob, "auth.user:2")).await.unwrap();
+            recorder
+                .handle(&event(app.database(), "auth.role_created", ada, "auth.role:1"))
+                .await
+                .unwrap();
+            recorder
+                .handle(&event(app.database(), "auth.user_updated", bob, "auth.user:2"))
+                .await
+                .unwrap();
 
             let (status, all) = get(&app, "/api/v1/audit?order=asc", "auditor").await;
             assert_eq!(status, StatusCode::OK, "{all}");

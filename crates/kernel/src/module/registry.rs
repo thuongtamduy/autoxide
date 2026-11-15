@@ -203,6 +203,13 @@ impl Modules {
         self.tenancy.clone()
     }
 
+    /// Sổ database, có sau [`start`](Self::start).
+    fn started(&self) -> Result<crate::tenancy::DatabaseRegistry, ModuleError> {
+        self.tenancy.clone().ok_or_else(|| {
+            ModuleError("start the modules (`Modules::start`) before building the worker".into())
+        })
+    }
+
     /// Trait `T` mà một module đã công bố lúc khởi động, nếu có. Dùng ở binary để
     /// lấy những trait core cần (vd `dyn Authenticator`). Gọi sau [`start`](Self::start).
     pub fn api<T>(&self) -> Option<Arc<T>>
@@ -327,10 +334,11 @@ impl Modules {
         &self.events
     }
 
-    /// Worker chạy job của mọi module, `concurrency` job cùng lúc mỗi module. Gọi sau
-    /// [`start`](Self::start). Khai báo sai (loại job không thuộc module khai, hai bộ chạy
-    /// cho một loại, lịch cho loại job không ai chạy) là lỗi khởi động.
-    pub fn worker(&self, database: &Database, concurrency: u64) -> Result<Worker, ModuleError> {
+    /// Worker chạy job của mọi module trên mọi database của sổ database, `concurrency` job cùng
+    /// lúc mỗi module. Gọi sau [`start`](Self::start). Khai báo sai (loại job không thuộc module
+    /// khai, hai bộ chạy cho một loại, lịch cho loại job không ai chạy) là lỗi khởi động.
+    pub fn worker(&self, concurrency: u64) -> Result<Worker, ModuleError> {
+        let databases = self.started()?;
         let mut handlers: HashMap<&'static str, Arc<dyn JobHandler>> = HashMap::new();
         let mut modules = Vec::new();
         let mut schedules = Vec::new();
@@ -381,13 +389,14 @@ impl Modules {
         if !problems.is_empty() {
             return Err(ModuleError(problems.join("; ")));
         }
-        Ok(Worker::new(database.clone(), modules, handlers, schedules, concurrency))
+        Ok(Worker::new(databases, modules, handlers, schedules, concurrency))
     }
 
-    /// Bộ phát event: đọc bảng event của mọi module phát event, giao cho các đăng ký
-    /// nhận của mọi module. Gọi sau [`start`](Self::start). Đăng ký nhận một event
-    /// không ai khai là lỗi khởi động.
-    pub fn dispatcher(&self, database: &Database) -> Result<Dispatcher, ModuleError> {
+    /// Bộ phát event: đọc bảng event của mọi module phát event trên mọi database của sổ
+    /// database, giao cho các đăng ký nhận của mọi module. Gọi sau [`start`](Self::start). Đăng
+    /// ký nhận một event không ai khai là lỗi khởi động.
+    pub fn dispatcher(&self) -> Result<Dispatcher, ModuleError> {
+        let databases = self.started()?;
         let mut subscriptions = Vec::new();
         let mut problems = Vec::new();
         for module in &self.modules {
@@ -410,12 +419,7 @@ impl Modules {
         if !problems.is_empty() {
             return Err(ModuleError(problems.join("; ")));
         }
-        Ok(Dispatcher::new(
-            database.clone(),
-            self.events.modules(),
-            subscriptions,
-            Arc::clone(&self.wake),
-        ))
+        Ok(Dispatcher::new(databases, self.events.modules(), subscriptions, Arc::clone(&self.wake)))
     }
 
     /// Bước kiểm của từng module kèm tên module, theo thứ tự đăng ký (`autoxide doctor`). Gọi

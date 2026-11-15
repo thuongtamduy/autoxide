@@ -275,7 +275,7 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
             }
         }
         // Bộ phát event dựng được dù chưa có module tài khoản nào khai event xoá.
-        app.modules().dispatcher(app.database()).unwrap();
+        app.modules().dispatcher().unwrap();
 
         let exported = app.modules().personal_data().export(ADA).await.unwrap();
         let titles: Vec<_> =
@@ -285,6 +285,7 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
         let service =
             crate::service::NoteService::new(app.database().clone(), Outbox::standalone("notes"));
         let deleted = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(app.database()),
             "auth",
             autoxide_kernel::privacy::USER_DELETED.to_owned(),
             json!({"before": {"id": ADA}}),

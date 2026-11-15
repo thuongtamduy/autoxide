@@ -152,6 +152,7 @@ async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
         assert_eq!(exported["forms"][0]["key"], "contact");
 
         let deleted = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
             "auth",
             USER_DELETED.to_owned(),
             json!({"before": {"id": owner.user_id()}}),

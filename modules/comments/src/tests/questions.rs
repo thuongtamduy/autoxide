@@ -276,8 +276,13 @@ async fn luu_tru_dich_thi_dong_va_an_hoi_dap() {
             service: Arc::clone(service),
             events: crate::posting::targets::owner_events(&declared, &service.config.target_types),
         };
-        let event = Delivered::new("catalog", "catalog.product_archived", json!({}))
-            .subject(Some(format!("{PRODUCTS}:{PRODUCT}")));
+        let event = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
+            "catalog",
+            "catalog.product_archived",
+            json!({}),
+        )
+        .subject(Some(format!("{PRODUCTS}:{PRODUCT}")));
         handler.handle(&event).await.unwrap();
         handler.handle(&event).await.unwrap();
 
@@ -295,8 +300,13 @@ async fn luu_tru_dich_thi_dong_va_an_hoi_dap() {
             .unwrap_err();
         assert_eq!(refused.code(), "comments.target_closed");
         // Đích loại khác, hay event không khai: không đụng tới.
-        let other = Delivered::new("catalog", "catalog.product_archived", json!({}))
-            .subject(Some("content.entry:public-1".to_owned()));
+        let other = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
+            "catalog",
+            "catalog.product_archived",
+            json!({}),
+        )
+        .subject(Some("content.entry:public-1".to_owned()));
         handler.handle(&other).await.unwrap();
         assert!(service.target("content.entry", "public-1").await.is_err(), "kind not enabled");
     })

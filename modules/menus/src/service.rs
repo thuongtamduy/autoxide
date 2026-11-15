@@ -14,6 +14,7 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::resource::ResourceDirectory;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_media::api::Media;
 use chrono::{DateTime, Utc};
 use sea_orm::{
@@ -159,7 +160,15 @@ impl MenuService {
         let rows = insert_items(&transaction, saved.id, flat).await?;
         let event =
             events::MenuCreated(Change { before: None, after: Some(snapshot(&saved, rows.len())) });
-        self.outbox.record(&transaction, actor, events::menu_subject(saved.id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::menu_subject(saved.id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         self.cache.clear();
         tracing::info!(menu_id = %saved.id, items = rows.len(), "menu created");
@@ -209,7 +218,13 @@ impl MenuService {
             after: Some(snapshot(&saved, rows.len())),
         });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::menu_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::menu_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         self.cache.clear();
@@ -236,7 +251,13 @@ impl MenuService {
             after: None,
         });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::menu_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::menu_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         self.cache.clear();

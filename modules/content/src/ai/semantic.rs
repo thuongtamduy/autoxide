@@ -19,6 +19,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::ai::{EmbedKind, vector};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
@@ -142,7 +143,12 @@ impl ContentService {
     ) -> Result<(), Error> {
         if self.embedder.enabled() {
             self.jobs
-                .enqueue(connection, &IndexJob { entry_id }, EnqueueOptions::default())
+                .enqueue(
+                    connection,
+                    &TenantContext::legacy_default(&self.database),
+                    &IndexJob { entry_id },
+                    EnqueueOptions::default(),
+                )
                 .await?;
         }
         Ok(())
@@ -292,7 +298,14 @@ impl ContentService {
         for entry_id in &missing {
             let options =
                 EnqueueOptions::default().unique_key(format!("content.index:{entry_id}:{day}"));
-            self.jobs.enqueue(&transaction, &IndexJob { entry_id: *entry_id }, options).await?;
+            self.jobs
+                .enqueue(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    &IndexJob { entry_id: *entry_id },
+                    options,
+                )
+                .await?;
         }
         transaction.commit().await?;
         tracing::info!(entries = missing.len(), "content entries queued for the search index");

@@ -44,6 +44,19 @@ endpoints are marked deprecated with a sunset date first.
   (domain and `Autoxide-Tenant` header). `Principal` carries a tenant (`tenant_id`, `in_tenant`, `operator_from`).
   Handlers may take `tenant: TenantContext` (`autoxide_kernel::tenancy`), and the module start context gives the
   `DatabaseRegistry` (`StartContext::tenancy`).
+- For module authors: the kernel's helper tables (`<module>_events`, `_jobs`, `_throttle`, `_tokens`,
+  `_antispam_nonces`) carry `tenant_id`; a module adds one migration,
+  `tenancy::migration::adopt("…", vec![event::tenant_table("<module>"), job::tenant_table("<module>"), …])`, that
+  moves the existing rows to the default tenant. Every call that writes or reads them names the tenant:
+  `Outbox::record(conn, &tenant, …)`, `JobQueue::enqueue(conn, &tenant, …)` (and `enqueue_database` for a job of
+  the whole database), `OneTimeTokens::{issue, consume, recent, revoke, forget}(conn, &tenant, …)`,
+  `Throttle::new(module, limit, window)` without a database and `Throttle::{check, hit, record, refund,
+  clear}(&tenant, key)`, `Throttle::purge(&database, before)`, `SpamGuard::check(&tenant, …)` and
+  `Checked::claim(conn, &tenant, …)`. `Delivered` and `JobContext` carry the tenant (`Delivered::new(tenant, …)`,
+  `JobContext::for_tenant` / `for_database`; `JobContext::tenant` is `None` for a job of the whole database).
+  `Claim::claim` takes a `ClaimRequest`. `Modules::worker(concurrency)` and `Modules::dispatcher()` no longer take
+  a database: they run on every database of the registry, and the worker shares the free slots fairly between
+  the tenants that have jobs due. For tests: `TestDatabase::extra_database`.
 - For module authors: the trait `autoxide_auth::api::AccountRecovery` has a new method `remove_passkeys`; only
   `auth` implements it.
 - Internal, no change in behaviour: the code of `newsletter`, `comments`, `media` and `forms` is grouped by

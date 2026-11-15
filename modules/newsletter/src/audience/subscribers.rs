@@ -7,6 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{OnConflict, Query};
 use sea_orm::{
@@ -422,7 +423,15 @@ impl NewsletterService {
                     "kept_unsubscribed": part.kept_unsubscribed,
                 })),
             });
-            self.outbox.record(&transaction, Actor::from(principal), None, &event).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    Actor::from(principal),
+                    None,
+                    &event,
+                )
+                .await?;
             transaction.commit().await?;
             report.created += part.created;
             report.subscribed += part.subscribed;
@@ -514,7 +523,15 @@ impl NewsletterService {
             before: Some(summary(&before.row)),
             after: Some(summary(&after)),
         });
-        self.outbox.record(&transaction, actor, events::subscriber_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::subscriber_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         self.find_subscriber(id).await
     }
@@ -556,7 +573,13 @@ impl NewsletterService {
             })),
         });
         self.outbox
-            .record(connection, actor, events::subscriber_subject(subscriber_id), &event)
+            .record(
+                connection,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::subscriber_subject(subscriber_id),
+                &event,
+            )
             .await?;
         Ok(true)
     }
@@ -652,7 +675,9 @@ impl NewsletterService {
             .filter(delivery::Column::SubscriberId.eq(row.id))
             .exec(connection)
             .await?;
-        self.tokens.forget(connection, &row.id.to_string()).await?;
+        self.tokens
+            .forget(connection, &TenantContext::legacy_default(&self.database), &row.id.to_string())
+            .await?;
         subscriber::Entity::delete_by_id(row.id).exec(connection).await?;
         let event = events::SubscriberErased(Change {
             before: Some(json!({
@@ -662,7 +687,15 @@ impl NewsletterService {
             })),
             after: None,
         });
-        self.outbox.record(connection, actor, events::subscriber_subject(row.id), &event).await?;
+        self.outbox
+            .record(
+                connection,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::subscriber_subject(row.id),
+                &event,
+            )
+            .await?;
         Ok(())
     }
 }

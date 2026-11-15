@@ -16,6 +16,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
@@ -178,10 +179,18 @@ impl ContentService {
             Err(error) => return Err(error.into()),
         };
         let options = EnqueueOptions::default().max_attempts(MAX_ATTEMPTS);
-        self.jobs.enqueue(&transaction, &TranslateJob { request_id: request.id }, options).await?;
+        self.jobs
+            .enqueue(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                &TranslateJob { request_id: request.id },
+                options,
+            )
+            .await?;
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::entry_subject(source.id),
                 &events::TranslationRequested(Change {
@@ -480,6 +489,7 @@ impl ContentService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     Actor::system(),
                     subject,
                     &events::TranslationSucceeded(change),
@@ -487,7 +497,13 @@ impl ContentService {
                 .await?;
         } else {
             self.outbox
-                .record(&transaction, Actor::system(), subject, &events::TranslationFailed(change))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    Actor::system(),
+                    subject,
+                    &events::TranslationFailed(change),
+                )
                 .await?;
         }
         transaction.commit().await?;

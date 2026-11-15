@@ -28,6 +28,7 @@ use std::time::{Duration, Instant};
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{Job, JobContext, JobHandler};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set};
@@ -245,6 +246,7 @@ impl NewsletterService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     Actor::system(),
                     events::campaign_subject(row.id),
                     &events::CampaignStarted(change),
@@ -458,6 +460,7 @@ impl NewsletterService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     Actor::system(),
                     events::campaign_subject(row.id),
                     &events::CampaignSent(change),
