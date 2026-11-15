@@ -1,5 +1,6 @@
-//! Service của `comments`: MỌI logic nằm ở đây và các file cùng cấp (`posting.rs`,
-//! `threads.rs`, `moderation.rs`…). Handler REST và tool MCP chỉ lấy dữ liệu vào rồi gọi service
+//! Service của `comments`: MỌI logic nằm ở đây và các file theo tính năng — `posting.rs` +
+//! `posting/` (gửi, sửa của khách, đích), `threads.rs` (đọc), `moderation.rs` + `moderation/`
+//! (kiểm duyệt, báo cáo), `notify.rs`. Handler REST và tool MCP chỉ lấy dữ liệu vào rồi gọi service
 //! — cùng kết quả, cùng permission (luật kiến trúc 8). Mỗi lệnh ghi đi cùng event trong CÙNG
 //! transaction (luật kiến trúc 3); gọi mạng (chống spam, sổ đối tượng, gửi mail) nằm NGOÀI
 //! transaction.

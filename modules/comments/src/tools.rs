@@ -27,8 +27,8 @@ use crate::http::{CommentDetail, TargetResponse, choice, page_request};
 use crate::moderation::QueueFilter;
 use crate::permissions::{COMMENTS_MANAGE, COMMENTS_MODERATE, COMMENTS_POST, COMMENTS_READ};
 use crate::posting::NewComment;
+use crate::posting::targets::TargetChange;
 use crate::service::{Comment, CommentsService, STATUSES, Status};
-use crate::targets::TargetChange;
 
 /// Bình luận kèm `version` (giá trị `ETag`) để gửi lại khi đổi trạng thái.
 #[derive(Debug, Serialize)]

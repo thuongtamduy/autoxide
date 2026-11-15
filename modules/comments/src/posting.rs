@@ -18,6 +18,9 @@
 //! được (kể cả email người khác đã xác minh), nên email không bao giờ giúp vượt kiểm duyệt. Chỉ
 //! bình luận ĐANG hiện mới tính (bình luận về sau bị đánh spam / từ chối thì không).
 
+pub(crate) mod authoring;
+pub(crate) mod targets;
+
 use std::time::Duration;
 
 use autoxide_kernel::access::Principal;
@@ -38,11 +41,11 @@ use crate::entity::{ban, comment, profile};
 use crate::events::{self, Change};
 use crate::notify::VERIFY;
 use crate::permissions::{COMMENTS_MODERATE, COMMENTS_POST};
+use crate::posting::targets::target_closed;
 use crate::service::{
     Comment, CommentsService, MODULE, Status, comment_not_found, delta, ensure_target, now,
     shift_counts, shift_target_counts, summary,
 };
-use crate::targets::target_closed;
 use crate::text;
 
 const HOUR: Duration = Duration::from_secs(3600);

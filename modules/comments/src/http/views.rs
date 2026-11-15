@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use crate::entity::{ban, report};
 use crate::posting::Posted;
+use crate::posting::targets::Target;
 use crate::service::{Comment, Status, badges_of};
-use crate::targets::Target;
 use crate::text;
 use crate::threads::ThreadRoot;
 

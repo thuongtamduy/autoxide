@@ -355,7 +355,7 @@ async fn pipeline_kiem_duyet() {
                 &admin(),
                 KIND,
                 POST,
-                crate::targets::TargetChange {
+                crate::posting::targets::TargetChange {
                     state: Some("closed".to_owned()),
                     ..Default::default()
                 },

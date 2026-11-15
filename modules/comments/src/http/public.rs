@@ -18,8 +18,8 @@ use validator::Validate;
 
 use super::page_request;
 use super::views::{EditedComment, PostedComment, PublicComment, TargetResponse, ThreadComment};
+use crate::moderation::reports::ReportReason;
 use crate::posting::NewComment;
-use crate::reports::ReportReason;
 use crate::service::CommentsService;
 use crate::threads::{REPLIES_MAX, oldest_first};
 

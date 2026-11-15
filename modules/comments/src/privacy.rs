@@ -15,9 +15,9 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::authoring::{Deletion, soft_delete};
 use crate::entity::{comment, profile, report};
 use crate::events::{self, Change};
+use crate::posting::authoring::{Deletion, soft_delete};
 use crate::service::{CommentsService, Status};
 use crate::text;
 
