@@ -9,6 +9,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-15
+
 ### Added
 
 - `cargo xtask api-diff`: the gate refuses breaking changes to `/api/v1` against the last release tag
@@ -622,7 +624,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/thuongtamduy/autoxide/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/thuongtamduy/autoxide/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/thuongtamduy/autoxide/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/thuongtamduy/autoxide/compare/v0.10.0...v0.11.0

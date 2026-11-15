@@ -1,4 +1,4 @@
-# Lộ trình — các bước đã xong (0–30)
+# Lộ trình — các bước đã xong (0–31)
 
 Chuyển nguyên văn từ `docs/ROADMAP.md` theo D-228 để lộ trình chỉ còn việc đang mở. Lịch sử từng bước
 xem `CHANGELOG.md` và `docs/DECISIONS.md`.
@@ -462,3 +462,61 @@ Nhóm C — sản phẩm (D-176):
 - [x] Thử cài như người lạ: máy hay container sạch, làm đúng README tiếng Anh theo đường build từ
       mã nguồn (cả SQLite và Postgres), ghi mọi chỗ vấp rồi sửa README / `docs/DEPLOY.md` (EN + VI
       cùng commit). Thử bằng image đã đăng: bước 50
+
+## 31. Hợp đồng API và chống hồi quy (chủ dự án giao ngày 13/11/2026, D-177)
+
+Đặc tả: [`docs/steps/31-api-contract.md`](../steps/31-api-contract.md) — đọc cùng [`docs/steps/README.md`](../steps/README.md).
+
+Người viết giao diện (repo riêng, D-097), nhà phát triển ngoài và AI agent dùng API không gọi sai;
+hợp đồng, tài liệu và database của bản cũ không bao giờ âm thầm lệch khỏi code. Bước này sửa
+`xtask`, `testkit`, `gate.sh`, tài liệu và thêm thư mục SDK — làm ngay được; riêng test nâng cấp
+cần image Docker của bản cũ (bước 30). Test chạy trên cả SQLite và Postgres; thư viện chỉ cho test
+khai ở `[dev-dependencies]`.
+
+Nhóm A — hợp đồng và người gọi API:
+
+- [x] Gate chặn thay đổi phá vỡ của `/api/v1` (D-059, D-239): so `docs/openapi.json` với bản ở tag phát
+      hành gần nhất (`git show vX.Y.Z:docs/openapi.json`) và báo đỏ khi xoá endpoint hay method,
+      thêm tham số hay trường bắt buộc vào request, xoá trường hay đổi kiểu trong response, bỏ
+      giá trị của enum. Endpoint đã khai deprecated và quá ngày `sunset` thì được bỏ. Viết bằng
+      Rust trong `xtask` (thêm lệnh), có test cho từng loại thay đổi; thông báo nói rõ chỗ nào
+      phá và cách làm đúng (endpoint mới + deprecate endpoint cũ)
+- [x] SDK TypeScript sinh từ `docs/openapi.json` (D-177, D-243: trong repo, không đăng npm), đủ kiểu cho
+      request, response, lỗi `Problem` và pagination; gate kiểm SDK khớp hợp đồng như cách test
+      đang kiểm `openapi.json`. Gate không bắt người lạ cài Node: nếu công cụ sinh cần Node thì chạy
+      qua image Docker ghim phiên bản (như gitleaks) hoặc chỉ kiểm trong CI — chọn và ghi quyết định
+- [x] Hướng dẫn theo tình huống (D-244; EN + VI, thư mục mới trong `docs/`): website đọc bài và ảnh
+      (`srcset`, `body_media`, ETag / 304, cache), đăng nhập và làm mới token, API key cho máy,
+      gọi lại an toàn bằng `Idempotency-Key`, pagination, đọc lỗi (`code`, `errors`, `Retry-After`).
+      Mỗi tình huống có ví dụ `curl` và TypeScript dùng SDK
+- [x] Hướng dẫn nối AI agent qua MCP (D-244) (EN + VI), mở rộng đoạn ngắn trong README: tạo API key quyền
+      tối thiểu cho agent, cấu hình Claude Code và client MCP khác, danh sách tool theo module và
+      permission cần, giới hạn (rate limit theo API key, bản nháp chờ duyệt — D-109)
+- [x] Ví dụ trong tài liệu được test (D-244): các ví dụ của hai mục trên chạy thật trên app dựng bằng
+      `TestApp` trong gate (hay một lệnh `xtask` gate gọi), để tài liệu không lệch code
+- [x] Hợp đồng tool MCP (D-233, D-240): `docs/mcp-tools.json` sinh từ code, `api-diff` chặn thay đổi phá vỡ của tool
+      (bỏ tool, thêm tham số bắt buộc, `read_only` thành ghi…), tool cũ khai deprecated như endpoint
+- [x] `cargo semver-checks` cho kernel và testkit trong quy trình phát hành (D-233, D-242): báo cáo khi còn `0.x`, chặn
+      từ `1.0` hay khi công bố framework (giữ lý do D-167)
+
+Nhóm B — chống hồi quy:
+
+- [x] Test nâng cấp từ bản phát hành trước: dựng database bằng image Docker của bản trước, ghi dữ
+      liệu mẫu qua API của nó, rồi chạy bản hiện tại trên database đó (migration, đọc lại dữ liệu,
+      vài lệnh ghi) — trên cả SQLite và Postgres; chạy trong CI và trước mỗi lần phát hành
+      (`cargo xtask upgrade-test`, D-246)
+- [x] Migration thật của mọi module chạy vòng up → down → up trên database trống và trên database
+      có dữ liệu, trên cả hai database (hiện chỉ có test cơ chế bằng bảng mẫu,
+      `crates/kernel/tests/migration.rs`)
+- [x] Property test cho các bộ kiểm đầu vào: thân bài ProseMirror (`content`), slug, email
+      (`autoxide_kernel::email`), con trỏ pagination, CSV chống injection, chữ và link của bình
+      luận (chống XSS) — sinh đầu vào ngẫu nhiên, không panic, giữ bất biến; thêm thư viện thì ghi
+      `STACK.md`
+- [x] Response thật khớp hợp đồng (D-241): test HTTP qua `TestApp` kiểm mỗi response (thân và mã) khớp
+      schema của endpoint đó trong `docs/openapi.json`, để tài liệu không hứa điều code không làm
+- [x] Hợp đồng quyền đọc được bằng máy (D-245; D-205, đặc tả 54 mục P1): mỗi operation OpenAPI có
+      `x-permissions` hay `x-public`, sinh từ một khai báo cạnh handler; `Permission` có mức rủi ro
+      (`read` / `write` / `destructive` / `sensitive_data` / `money`)
+- [x] Test độ phủ phân quyền trong gate (D-205, D-245): mọi operation không công khai trả 401 khi không token và
+      403 khi token không có quyền; operation thiếu khai báo quyền làm gate đỏ; tool MCP `read_only` chỉ
+      đòi quyền mức `read`
