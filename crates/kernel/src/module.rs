@@ -92,6 +92,13 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Gieo dữ liệu ban đầu của module cho một khách mới (vd role `admin`, dòng khoá) — gọi sau
+    /// `start`, khi tạo khách (`autoxide tenant create`, `POST /api/v1/kernel/tenants`). Phải chạy
+    /// lại được. Mặc định không gieo gì.
+    fn seed_tenant(&self) -> Option<std::sync::Arc<dyn crate::tenancy::TenantSeed>> {
+        None
+    }
+
     /// Bảng mặt điều khiển của module (bước 33, D-253): bảng không có `tenant_id` vì chung cả nền
     /// tảng, chỉ có dữ liệu ở database điều khiển. Mọi bảng khác của module (trừ `<m>_migrations`)
     /// là bảng cấp khách hàng và phải có `tenant_id` — testkit và `cargo xtask check` kiểm.

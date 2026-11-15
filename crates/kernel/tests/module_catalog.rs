@@ -225,7 +225,17 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
         assert_eq!(modules[0]["permissions"][0]["name"], "kernel.modules.read");
         let tools: Vec<&str> =
             modules[0]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-        assert_eq!(tools, ["kernel.list_modules", "kernel.get_module", "kernel.list_settings"]);
+        assert_eq!(
+            tools,
+            [
+                "kernel.list_modules",
+                "kernel.get_module",
+                "kernel.list_settings",
+                "kernel.current_tenant",
+                "kernel.list_tenants",
+                "kernel.get_tenant"
+            ]
+        );
 
         let notes = &modules[2];
         assert_eq!(

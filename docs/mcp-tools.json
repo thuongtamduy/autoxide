@@ -2284,6 +2284,24 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Tell which tenant (customer) this request is for, and whether the installation runs one tenant or many.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "kernel.current_tenant",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Describe one installed module, like an item of `kernel.list_modules`, plus whether each of its migrations is applied to the database.",
       "input_schema": {
         "additionalProperties": false,
@@ -2303,6 +2321,35 @@
       "output_schema": null,
       "permissions": [
         "kernel.modules.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get one tenant of the platform by id or slug (platform staff only).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which tenant to get.",
+        "properties": {
+          "tenant": {
+            "description": "Id or slug of the tenant.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.get_tenant",
+      "output_schema": null,
+      "permissions": [
+        "kernel.tenants.read"
       ]
     },
     {
@@ -2343,6 +2390,52 @@
       "output_schema": null,
       "permissions": [
         "kernel.settings.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the tenants of the platform, newest first (platform staff only).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.list_tenants",
+      "output_schema": null,
+      "permissions": [
+        "kernel.tenants.read"
       ]
     },
     {

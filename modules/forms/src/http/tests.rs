@@ -256,13 +256,13 @@ async fn tool_mcp() {
         names.sort();
         assert_eq!(
             names,
-            ["forms.get", "forms.get_submission", "forms.list", "forms.list_submissions"]
+            ["forms.get", "forms.get_submission", "forms.list", "forms.list_submissions", "kernel.current_tenant"]
         );
         reader.cancel().await.unwrap();
 
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 7);
+        assert_eq!(tools.len(), 8, "with `kernel.current_tenant`");
         for tool in &tools {
             assert!(
                 !serde_json::to_string(&tool.input_schema).unwrap().contains("$ref"),

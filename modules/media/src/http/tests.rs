@@ -450,6 +450,7 @@ async fn tool_mcp_theo_permission() {
         assert_eq!(
             names("writer").await,
             [
+                "kernel.current_tenant",
                 "media.get",
                 "media.list",
                 "media.list_tags",
@@ -460,8 +461,12 @@ async fn tool_mcp_theo_permission() {
                 "media.upload"
             ]
         );
-        assert_eq!(names("reader").await, ["media.get", "media.list", "media.list_tags"]);
-        assert!(names("nobody").await.is_empty());
+        assert_eq!(
+            names("reader").await,
+            ["kernel.current_tenant", "media.get", "media.list", "media.list_tags"]
+        );
+        // Ai đăng nhập cũng xem được khách của mình.
+        assert_eq!(names("nobody").await, ["kernel.current_tenant"]);
 
         let writer = client("writer").await;
         let call = |name: &str, arguments: Value| tool(name, arguments);

@@ -279,13 +279,18 @@ async fn tool_mcp() {
         };
         assert_eq!(
             names("reader").await,
-            ["newsletter.find_subscribers", "newsletter.get_campaign", "newsletter.list_lists"]
+            [
+                "kernel.current_tenant",
+                "newsletter.find_subscribers",
+                "newsletter.get_campaign",
+                "newsletter.list_lists"
+            ]
         );
-        assert_eq!(names("writer").await.len(), 4);
+        assert_eq!(names("writer").await.len(), 5, "with `kernel.current_tenant`");
 
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 6);
+        assert_eq!(tools.len(), 7, "with `kernel.current_tenant`");
         for tool in &tools {
             assert!(
                 !serde_json::to_string(&tool.input_schema).unwrap().contains("$ref"),

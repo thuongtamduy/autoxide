@@ -6582,3 +6582,27 @@ Bổ sung D-253.
    bài kiểm làm cùng module đầu tiên chuyển sang theo khách (B1).
 
 Bổ sung D-253.
+
+## D-260 · Quản lý khách: `TenantAdmin`, `Module::seed_tenant`, REST / MCP / CLI (bước 33 A9a) — 2026-11-15 — agent quyết
+
+1. **Chỉ nhân sự nền tảng quản lý khách.** Role `admin` của khách nào cũng có mọi permission, nên kiểm
+   `kernel.tenants.*` thôi là lỗ hổng: admin của một khách sẽ xem / khoá được khách khác. Mọi thao tác quản lý khách
+   kiểm thêm người gọi thuộc khách mặc định và không đang "vào" khách khác bằng header vận hành
+   (`operator_from` rỗng). Không có permission ở khách thường nào mở được việc này.
+2. **Tạo khách là ba bước chạy lại được**: ghi `kernel_tenants` trạng thái `provisioning` → gọi `TenantSeed` của mọi
+   module theo thứ tự đăng ký → `active`, ghi event `kernel.tenant_created`. Hỏng giữa chừng thì khách giữ
+   `provisioning` (request vào khách đó nhận 503) và `autoxide tenant provision <slug>` chạy lại từ đầu; vì vậy
+   `seed_tenant` của module phải idempotent. Không gói cả ba bước trong một transaction: seed của module ghi vào
+   database của khách, có thể là database khác với control plane.
+3. **`Module::seed_tenant` có cài mặc định** (không gieo gì) — module cũ không phải sửa (D-038). Danh sách seed lấy sau
+   vòng `start` vì seed dùng service module vừa dựng.
+4. **Tên tool MCP** là `kernel.current_tenant`, `kernel.list_tenants`, `kernel.get_tenant` thay vì tên có dấu chấm của
+   đặc tả (`kernel.tenants.current`…): tool của mọi module đặt tên `<module>.<động_từ>_<danh_từ>`, đặc tả viết trước
+   quy ước đó. `kernel.current_tenant` mở cho mọi người đã đăng nhập (chỉ đọc), nên số tool mỗi người dùng thấy tăng
+   một.
+5. **Đổi trạng thái khách dùng `If-Match`** như mọi tài nguyên có phiên bản; khách mặc định không tạm khoá được (khoá
+   nó là khoá cả nhân sự nền tảng).
+6. **Placement chỉ xem, không lộ URL**: `GET /api/v1/kernel/placements` trả tên, trạng thái, số khách; URL kết nối
+   (sẽ mã hoá bằng `Sealer` ở A9b) không bao giờ ra API.
+
+Bổ sung D-253.
