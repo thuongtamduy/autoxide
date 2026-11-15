@@ -778,3 +778,159 @@ async fn alt_theo_ngon_ngu_qua_rest() {
     .await
     .unwrap();
 }
+
+/// Module `auth` giả: chỉ đăng ký loại `auth.user` vào sổ đối tượng; ai cũng tên "Ada".
+struct FakeAuth;
+
+struct Names;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::resource::ResourceResolver for Names {
+    async fn resolve(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: &str,
+    ) -> Result<Option<autoxide_kernel::resource::Resource>, autoxide_kernel::error::Error> {
+        Ok(Some(autoxide_kernel::resource::Resource::new("Ada")))
+    }
+}
+
+impl autoxide_kernel::module::Module for FakeAuth {
+    fn name(&self) -> &'static str {
+        "auth"
+    }
+
+    fn start(
+        &mut self,
+        context: &mut autoxide_kernel::module::StartContext<'_>,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        context.resource_type("auth.user", Arc::new(Names))
+    }
+}
+
+/// Đề bài giao diện B5: cờ `decorative`, lọc `alt_missing`, tóm tắt thư viện, số item của thư
+/// mục, tên người tải lên.
+#[tokio::test]
+async fn trang_thu_vien_cua_giao_dien() {
+    TestDatabase::run(async |test| {
+        let storage: Arc<dyn Storage> = Arc::new(MemoryStorage::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let http = TestApp::builder(test)
+            .setting("AUTOXIDE_MEDIA_IMAGE_WIDTHS", "100")
+            .user("admin", 1, &["media.read", "media.write", "media.purge"])
+            .provide::<dyn Storage>(storage)
+            .provide::<dyn TextModel>(text)
+            .module(FakeAuth)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let app = App { http, storage: Arc::new(MemoryStorage::default()) };
+        let auth = as_user("admin");
+        let get = async |uri: &str| {
+            let answer =
+                send(&app, "GET", uri, &[("authorization", auth.as_str())], Vec::new()).await;
+            assert_eq!(answer.status(), StatusCode::OK, "{uri}: {}", answer.json());
+            answer.json()
+        };
+
+        let empty = get("/summary").await;
+        assert_eq!(
+            empty["data"],
+            json!({"items": 0, "bytes": 0, "images_missing_alt": 0, "trashed_items": 0})
+        );
+
+        let no_alt = upload(&app, "a.png", "image/png", &samples::png(2, 2)).await;
+        let decorative = upload(&app, "line.png", "image/png", &samples::png(1, 1)).await;
+        let described = upload(&app, "c.png", "image/png", &samples::png(1, 1)).await;
+        let pdf = upload(&app, "doc.pdf", "application/pdf", samples::PDF).await;
+        assert_eq!(no_alt["decorative"], false);
+
+        for (item, body) in [
+            (&decorative, json!({"decorative": true})),
+            (&described, json!({"alt": "A red square"})),
+        ] {
+            let id = item["id"].as_str().unwrap();
+            let got = send(
+                &app,
+                "GET",
+                &format!("/{id}"),
+                &[("authorization", auth.as_str())],
+                Vec::new(),
+            )
+            .await;
+            let changed = patch(&app, id, Some(got.header(header::ETAG)), body).await;
+            assert_eq!(changed.status(), StatusCode::OK, "{}", changed.json());
+        }
+
+        let missing = get("?alt_missing=true").await;
+        let ids: Vec<&Value> =
+            missing["data"].as_array().unwrap().iter().map(|i| &i["id"]).collect();
+        assert_eq!(ids, vec![&no_alt["id"]], "{missing}");
+        let others = get("?alt_missing=false").await;
+        assert_eq!(others["data"].as_array().unwrap().len(), 3);
+        let one = get(&format!("/{}", decorative["id"].as_str().unwrap())).await;
+        assert_eq!(one["data"]["decorative"], true);
+
+        let summary = get("/summary").await;
+        assert_eq!(summary["data"]["items"], 4);
+        assert_eq!(summary["data"]["images_missing_alt"], 1);
+        let total: u64 = [&no_alt, &decorative, &described, &pdf]
+            .iter()
+            .map(|item| item["size"].as_u64().unwrap())
+            .sum();
+        assert_eq!(summary["data"]["bytes"], total);
+
+        // Thư mục: số item thẳng bên trong, không tính thùng rác.
+        let body = json!({"name": "Products"}).to_string().into_bytes();
+        let headers = [("authorization", auth.as_str()), ("content-type", "application/json")];
+        let folder = send(&app, "POST", "/folders", &headers, body).await.json()["data"].clone();
+        assert_eq!(folder["item_count"], 0);
+        let folder_id = folder["id"].as_str().unwrap();
+        for item in [&no_alt, &pdf] {
+            let id = item["id"].as_str().unwrap();
+            let got = send(
+                &app,
+                "GET",
+                &format!("/{id}"),
+                &[("authorization", auth.as_str())],
+                Vec::new(),
+            )
+            .await;
+            let moved =
+                patch(&app, id, Some(got.header(header::ETAG)), json!({"folder_id": folder_id}))
+                    .await;
+            assert_eq!(moved.status(), StatusCode::OK, "{}", moved.json());
+        }
+        let trashed = send(
+            &app,
+            "DELETE",
+            &format!("/{}", pdf["id"].as_str().unwrap()),
+            &[("authorization", auth.as_str())],
+            Vec::new(),
+        )
+        .await;
+        assert_eq!(trashed.status(), StatusCode::OK, "{}", trashed.json());
+        let folders = get("/folders").await;
+        assert_eq!(folders["data"][0]["item_count"], 1, "{folders}");
+        assert_eq!(get(&format!("/folders/{folder_id}")).await["data"]["item_count"], 1);
+        assert_eq!(get("/summary").await["data"]["trashed_items"], 1);
+
+        // Tên người tải lên chỉ khi xin.
+        let named = get("?include=uploader").await;
+        assert_eq!(named["data"][0]["uploaded_by_name"], "Ada", "{named}");
+        let plain = get("").await;
+        assert!(plain["data"][0].get("uploaded_by_name").is_none());
+        let bad = send(
+            &app,
+            "GET",
+            "/?include=everything&alt_missing=maybe",
+            &[("authorization", auth.as_str())],
+            Vec::new(),
+        )
+        .await;
+        assert!(bad.status().is_client_error());
+    })
+    .await
+    .unwrap();
+}

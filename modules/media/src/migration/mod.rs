@@ -6,6 +6,7 @@ mod m0004_create_tags_and_variants;
 mod m0005_fold_search_keys;
 mod m0007_variant_formats;
 mod m0008_alt_translations;
+mod m0010_add_decorative;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -31,5 +32,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                 autoxide_kernel::job::tenant_table("media"),
             ],
         ),
+        // Cờ `decorative`: ảnh trang trí, `alt` trống có chủ ý (D-267).
+        Box::new(m0010_add_decorative::Migration),
     ]
 }

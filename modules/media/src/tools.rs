@@ -50,6 +50,8 @@ pub(crate) struct ListMediaInput {
     q: Option<String>,
     /// Only items with this tag, ignoring case.
     tag: Option<String>,
+    /// `true`: only images missing a text alternative (empty `alt`, not `decorative`).
+    alt_missing: Option<bool>,
     /// `created_at` (default), `name` or `size`.
     sort: Option<String>,
     /// Maximum number of items to return, 1 to 200. Defaults to 50.
@@ -86,6 +88,8 @@ pub(crate) struct UpdateMediaInput {
     title: Option<String>,
     /// Caption, up to 2000 characters; `""` clears it.
     caption: Option<String>,
+    /// `true` marks a purely decorative image, whose empty `alt` is on purpose.
+    decorative: Option<bool>,
     /// Move to this folder; `null` moves to the root.
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<Uuid>, nullable)]
@@ -152,7 +156,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
         Tool::new(
             "list",
             "List media items (images, video, audio, documents), newest first. Filter by \
-             folder, type, visibility, trash or name; sort by `created_at`, `name` or `size`. \
+             folder, type, visibility, trash, name or missing alt text; sort by `created_at`, `name` or `size`. \
              Follow `pagination.next_cursor` with the same filters for more.",
             move |_tenant: TenantContext, principal: Principal, input: ListMediaInput| {
                 let service = list.clone();
@@ -164,6 +168,8 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                         trashed: input.trashed.map(|trashed| trashed.to_string()),
                         q: input.q,
                         tag: input.tag,
+                        alt_missing: input.alt_missing.map(|missing| missing.to_string()),
+                        include: None,
                         sort: input.sort,
                     };
                     let paging = PageQuery::new(input.limit.map(|limit| limit.to_string()), input.cursor, input.order);
@@ -193,8 +199,8 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
         .read_only(),
         Tool::new(
             "update",
-            "Change the details of a media item: name, alt text, title, caption, folder or \
-             visibility. Pass the `updated_at` you read; the change is refused if someone \
+            "Change the details of a media item: name, alt text, title, caption, decorative \
+             flag, folder or visibility. Pass the `updated_at` you read; the change is refused if someone \
              changed the item since.",
             move |_tenant: TenantContext, principal: Principal, input: UpdateMediaInput| {
                 let service = update.clone();
@@ -216,6 +222,7 @@ pub(crate) fn all(service: &Arc<MediaService>) -> Vec<Tool> {
                         alt: input.alt,
                         title: input.title,
                         caption: input.caption,
+                        decorative: input.decorative,
                         folder_id: input.folder_id,
                         visibility,
                         tags: input.tags,

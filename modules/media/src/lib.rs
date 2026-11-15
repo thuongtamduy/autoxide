@@ -102,14 +102,17 @@ impl Module for MediaModule {
             .ok_or_else(|| Error::internal("module `media` started before it was configured"))?;
         let storage = context.require::<dyn Storage>()?;
         let ai = context.require::<dyn autoxide_kernel::ai::TextModel>()?;
-        let service = Arc::new(MediaService::new(
-            context.database().clone(),
-            storage,
-            context.outbox()?,
-            context.jobs(),
-            ai,
-            config,
-        ));
+        let service = Arc::new(
+            MediaService::new(
+                context.database().clone(),
+                storage,
+                context.outbox()?,
+                context.jobs(),
+                ai,
+                config,
+            )
+            .with_resources(context.resources()),
+        );
         self.service = Some(service.clone());
         context.personal_data(service.clone())?;
         context.provide::<dyn api::Media>(service)

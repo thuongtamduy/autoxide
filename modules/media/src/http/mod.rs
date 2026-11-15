@@ -32,6 +32,7 @@ pub(crate) use tags::TagResponse;
 pub(crate) fn routes(service: Arc<MediaService>) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(items::list_items, items::upload_item))
+        .routes(routes!(items::library_summary))
         .routes(routes!(folders::list_folders, folders::create_folder))
         .routes(routes!(folders::get_folder, folders::update_folder, folders::delete_folder))
         .routes(routes!(tags::list_tags))
@@ -79,6 +80,9 @@ pub(crate) struct MediaItemResponse {
     title: String,
     /// Caption; empty when unset.
     caption: String,
+    /// `true` for a purely decorative image: its empty `alt` is on purpose (render `alt=""`), so
+    /// it does not count as missing one.
+    decorative: bool,
     visibility: Visibility,
     /// Version of the content; changes when the content is replaced.
     version_id: Uuid,
@@ -90,6 +94,10 @@ pub(crate) struct MediaItemResponse {
     url: String,
     /// The user who uploaded the item; `null` once that account is deleted.
     uploaded_by: Option<Uuid>,
+    /// Display name of `uploaded_by`, with `include=uploader` on the list: `null` when the
+    /// account no longer exists; absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    uploaded_by_name: Option<Option<String>>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     /// When the item was moved to the trash; `null` when it is not in the trash.
@@ -168,8 +176,10 @@ impl From<ItemDetails> for MediaItemResponse {
             alt: item.alt,
             title: item.title,
             caption: item.caption,
+            decorative: item.decorative,
             version_id: item.version_id,
             uploaded_by: item.uploaded_by,
+            uploaded_by_name: None,
             created_at: item.created_at,
             updated_at: item.updated_at,
             trashed_at: item.trashed_at,
@@ -183,6 +193,7 @@ impl From<Folder> for FolderResponse {
             id: folder.id,
             parent_id: api_folder(folder.parent_id),
             name: folder.name,
+            item_count: 0,
             created_at: folder.created_at,
             updated_at: folder.updated_at,
         }
@@ -274,3 +285,19 @@ where
 
 #[cfg(test)]
 mod tests;
+
+impl MediaItemResponse {
+    /// Người tải lên (để tra tên theo lô).
+    pub(crate) fn uploader(&self) -> Option<Uuid> {
+        self.uploaded_by
+    }
+
+    /// Kèm tên người tải lên (`include=uploader`): `null` khi tài khoản không còn.
+    pub(crate) fn with_uploader_name(
+        self,
+        names: &std::collections::HashMap<Uuid, String>,
+    ) -> Self {
+        let uploaded_by_name = self.uploaded_by.map(|id| names.get(&id).cloned());
+        MediaItemResponse { uploaded_by_name, ..self }
+    }
+}

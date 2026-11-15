@@ -6747,3 +6747,23 @@ Xếp vào lộ trình: các mục của đề bài này là việc sửa API c�
    `Accept-Language`; `code` giữ nguyên cho máy.
 6. **Bản xem trước** trả `featured_media` và `body_media` (địa chỉ ảnh) chỉ cho tệp media công khai, đọc qua trait
    của `media` — không lộ tệp riêng tư qua link xem trước.
+
+## D-267 · Đề bài giao diện, nhóm B (media): cờ `decorative`, `alt_missing`, tóm tắt thư viện; "đang dùng ở đâu" dời sang bước 51 — 2026-11-15 — agent quyết
+
+1. **`decorative`** là cột mới của `media_item` (mặc định `false`), sửa qua `PATCH` như `alt`. "Ảnh thiếu alt"
+   = ảnh (`image/*`), `alt` mặc định trống, không `decorative` — một điều kiện dùng chung cho bộ lọc
+   `alt_missing` và cho `images_missing_alt` của `GET /media/summary`, để hai con số luôn khớp. Bản dịch `alt`
+   (D-202) không tính: thiếu bản dịch là việc của từng ngôn ngữ, không phải "ảnh không có alt".
+2. **`GET /media/summary`**: ba câu đếm (số item và tổng dung lượng, ảnh thiếu alt, thùng rác). `SUM` của
+   cột BIGINT ép về `BIGINT` vì Postgres trả NUMERIC; không có dòng nào thì 0. Dung lượng chỉ tính nội dung
+   hiện tại, không tính ảnh thu nhỏ.
+3. **`item_count` của thư mục**: item nằm thẳng trong thư mục, không tính thùng rác, đếm theo lô một câu
+   `GROUP BY` cho cả trang. Trường luôn có (kể cả khi tạo, sửa, đọc một thư mục).
+4. **Tên người tải lên** (`include=uploader` → `uploaded_by_name`) qua sổ đối tượng, loại `auth.user` (D-265
+   mục 5); `media` không phụ thuộc `auth`. Chỉ ở danh sách REST; tool MCP `media.list` nhận `alt_missing`,
+   `media.update` nhận `decorative` (luật kiến trúc 8).
+5. **`GET /media/{id}/usages` ("đang dùng ở đâu") không làm ở đây**, dời sang bước 51. Trả lời đúng cần sổ
+   "ai đang trỏ tới đối tượng nào" cho MỌI module (bài, trang, menu, sản phẩm, form…): `media` không được đọc
+   bảng của module khác (luật kiến trúc 1), và bắt từng module tự báo qua một trait riêng cho media sẽ lặp lại
+   đúng thứ sổ đối tượng của bước 51 dựng chung. Đến bước 51: mỗi module khai tham chiếu tới đối tượng khác qua
+   sổ đối tượng, `media` trả danh sách đó. Trong lúc chờ, giao diện giữ dòng "máy chủ chưa liệt kê được".

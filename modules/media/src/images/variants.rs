@@ -466,6 +466,7 @@ mod tests {
             alt: String::new(),
             title: String::new(),
             caption: String::new(),
+            decorative: false,
             visibility: "private".into(),
             version_id: Uuid::nil(),
             uploaded_by: None,

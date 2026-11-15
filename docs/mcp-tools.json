@@ -2476,11 +2476,18 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List media items (images, video, audio, documents), newest first. Filter by folder, type, visibility, trash or name; sort by `created_at`, `name` or `size`. Follow `pagination.next_cursor` with the same filters for more.",
+      "description": "List media items (images, video, audio, documents), newest first. Filter by folder, type, visibility, trash, name or missing alt text; sort by `created_at`, `name` or `size`. Follow `pagination.next_cursor` with the same filters for more.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Filters, order and paging of the media list; omitted fields do not filter.",
         "properties": {
+          "alt_missing": {
+            "description": "`true`: only images missing a text alternative (empty `alt`, not `decorative`).",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -2737,7 +2744,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Change the details of a media item: name, alt text, title, caption, folder or visibility. Pass the `updated_at` you read; the change is refused if someone changed the item since.",
+      "description": "Change the details of a media item: name, alt text, title, caption, decorative flag, folder or visibility. Pass the `updated_at` you read; the change is refused if someone changed the item since.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Changes to a media item; omitted fields stay as they are.",
@@ -2753,6 +2760,13 @@
             "description": "Caption, up to 2000 characters; `\"\"` clears it.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "decorative": {
+            "description": "`true` marks a purely decorative image, whose empty `alt` is on purpose.",
+            "type": [
+              "boolean",
               "null"
             ]
           },

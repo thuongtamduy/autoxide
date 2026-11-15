@@ -113,6 +113,9 @@ pub(crate) struct ItemFilter {
     pub search: Option<String>,
     /// Chỉ item mang nhãn này (không phân biệt hoa thường).
     pub tag: Option<String>,
+    /// `true`: chỉ ảnh thiếu `alt` (ảnh, `alt` trống, không phải ảnh trang trí); `false`: mọi item
+    /// còn lại.
+    pub alt_missing: Option<bool>,
     pub sort: ItemSort,
 }
 
@@ -123,6 +126,8 @@ pub(crate) struct ItemChanges {
     pub alt: Option<String>,
     pub title: Option<String>,
     pub caption: Option<String>,
+    /// Ảnh trang trí (`alt` trống có chủ ý).
+    pub decorative: Option<bool>,
     /// `Some(None)`: chuyển về thư mục gốc.
     pub folder_id: Option<Option<Uuid>>,
     pub visibility: Option<Visibility>,
@@ -149,6 +154,8 @@ pub(crate) struct MediaService {
     /// Mô hình AI của module `ai` (bản "đã tắt" khi chưa cấu hình): gợi ý alt text (D-109).
     pub(crate) ai: Arc<dyn autoxide_kernel::ai::TextModel>,
     pub(crate) config: MediaConfig,
+    /// Sổ đối tượng của kernel: tên người tải lên (`auth.user`) mà không biết module `auth`.
+    pub(crate) resources: autoxide_kernel::resource::ResourceDirectory,
 }
 
 impl MediaService {
@@ -160,7 +167,17 @@ impl MediaService {
         ai: Arc<dyn autoxide_kernel::ai::TextModel>,
         config: MediaConfig,
     ) -> Self {
-        MediaService { database, storage, outbox, jobs, ai, config }
+        let resources = autoxide_kernel::resource::ResourceDirectory::default();
+        MediaService { database, storage, outbox, jobs, ai, config, resources }
+    }
+
+    /// Dùng sổ đối tượng của chương trình (tên người tải lên).
+    pub(crate) fn with_resources(
+        mut self,
+        resources: autoxide_kernel::resource::ResourceDirectory,
+    ) -> Self {
+        self.resources = resources;
+        self
     }
 
     /// Một trang item theo bộ lọc. Cần `media.read`.
@@ -193,6 +210,10 @@ impl MediaService {
         }
         if let Some(search) = filter.search.as_deref().filter(|search| !search.trim().is_empty()) {
             select = select.filter(autoxide_kernel::search::contains(Column::NameKey, search));
+        }
+        if let Some(missing) = filter.alt_missing {
+            let condition = alt_missing();
+            select = select.filter(if missing { condition } else { condition.not() });
         }
         if let Some(tag) = filter.tag.as_deref().filter(|tag| !tag.trim().is_empty()) {
             let Some(tag_id) = crate::library::tags::find_tag(self.database.read(), tag).await?
@@ -348,6 +369,9 @@ impl MediaService {
                 return Err(folder_gone("folder_id"));
             }
             row.folder_id = Set(folder);
+        }
+        if let Some(decorative) = changes.decorative {
+            row.decorative = Set(decorative);
         }
         if let Some(visibility) = changes.visibility {
             row.visibility = Set(visibility.as_str().to_owned());
@@ -661,6 +685,15 @@ pub(crate) fn with_tags(mut snapshot: Value, tags: &[String]) -> Value {
 }
 
 /// Những gì audit cần biết về một item.
+/// Điều kiện "ảnh thiếu `alt`": ảnh, `alt` (bản mặc định) trống, không đánh dấu trang trí. `alt`
+/// lưu đã cắt khoảng trắng nên so với chuỗi rỗng là đủ.
+pub(crate) fn alt_missing() -> sea_orm::Condition {
+    sea_orm::Condition::all()
+        .add(Column::ContentType.starts_with("image/"))
+        .add(Column::Alt.eq(""))
+        .add(Column::Decorative.eq(false))
+}
+
 pub(crate) fn snapshot(item: &Item) -> Value {
     json!({
         "name": item.name,
@@ -673,6 +706,7 @@ pub(crate) fn snapshot(item: &Item) -> Value {
         "alt": item.alt,
         "title": item.title,
         "caption": item.caption,
+        "decorative": item.decorative,
         "visibility": item.visibility,
         "version_id": item.version_id,
         "trashed_at": item.trashed_at,

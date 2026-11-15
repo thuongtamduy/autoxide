@@ -1381,6 +1381,8 @@ export type Data_FolderResponse = {
   data: {
     created_at: string;
     id: string;
+    /** Items directly in this folder (not in its subfolders), not counting the trash. */
+    item_count: number;
     name: string;
     /** The parent folder; `null` for a folder at the root. */
     parent_id?: string | null;
@@ -1473,6 +1475,27 @@ export type Data_ImportReport = {
 };
 
 /** Envelope of a single result. */
+export type Data_LibrarySummaryResponse = {
+  /** Totals of the media library. */
+  data: {
+    /**
+     * Total size in bytes of the items not in the trash (their current content, without the
+     * smaller copies of images).
+     */
+    bytes: number;
+    /**
+     * Images not in the trash with no text alternative and not marked `decorative`: the items
+     * `GET /api/v1/media?alt_missing=true` lists.
+     */
+    images_missing_alt: number;
+    /** Items not in the trash. */
+    items: number;
+    /** Items in the trash. */
+    trashed_items: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ListResponse = {
   /** A newsletter list, as admins see it. */
   data: {
@@ -1547,6 +1570,11 @@ export type Data_MediaItemResponse = {
     /** Real media type of the content (checked against its first bytes at upload). */
     content_type: string;
     created_at: string;
+    /**
+     * `true` for a purely decorative image: its empty `alt` is on purpose (render `alt=""`), so
+     * it does not count as missing one.
+     */
+    decorative: boolean;
     /** The folder holding the item; `null` for the root. */
     folder_id?: string | null;
     /** Height in pixels; only for raster images. */
@@ -1567,6 +1595,11 @@ export type Data_MediaItemResponse = {
     updated_at: string;
     /** The user who uploaded the item; `null` once that account is deleted. */
     uploaded_by?: string | null;
+    /**
+     * Display name of `uploaded_by`, with `include=uploader` on the list: `null` when the
+     * account no longer exists; absent otherwise.
+     */
+    uploaded_by_name?: string | null;
     /**
      * Where to load the content, with its version: the address changes when the content
      * does, so it may be cached for a long time. Public items load without signing in.
@@ -2975,6 +3008,8 @@ export type FindingLevel = "error" | "warning";
 export type FolderResponse = {
   created_at: string;
   id: string;
+  /** Items directly in this folder (not in its subfolders), not counting the trash. */
+  item_count: number;
   name: string;
   /** The parent folder; `null` for a folder at the root. */
   parent_id?: string | null;
@@ -3102,6 +3137,24 @@ export type LastDelivery = {
   status: string;
 };
 
+/** Totals of the media library. */
+export type LibrarySummaryResponse = {
+  /**
+   * Total size in bytes of the items not in the trash (their current content, without the
+   * smaller copies of images).
+   */
+  bytes: number;
+  /**
+   * Images not in the trash with no text alternative and not marked `decorative`: the items
+   * `GET /api/v1/media?alt_missing=true` lists.
+   */
+  images_missing_alt: number;
+  /** Items not in the trash. */
+  items: number;
+  /** Items in the trash. */
+  trashed_items: number;
+};
+
 /** One list choice. */
 export type ListChoice = {
   key: string;
@@ -3212,6 +3265,11 @@ export type MediaItemResponse = {
   /** Real media type of the content (checked against its first bytes at upload). */
   content_type: string;
   created_at: string;
+  /**
+   * `true` for a purely decorative image: its empty `alt` is on purpose (render `alt=""`), so
+   * it does not count as missing one.
+   */
+  decorative: boolean;
   /** The folder holding the item; `null` for the root. */
   folder_id?: string | null;
   /** Height in pixels; only for raster images. */
@@ -3232,6 +3290,11 @@ export type MediaItemResponse = {
   updated_at: string;
   /** The user who uploaded the item; `null` once that account is deleted. */
   uploaded_by?: string | null;
+  /**
+   * Display name of `uploaded_by`, with `include=uploader` on the list: `null` when the
+   * account no longer exists; absent otherwise.
+   */
+  uploaded_by_name?: string | null;
   /**
    * Where to load the content, with its version: the address changes when the content
    * does, so it may be cached for a long time. Public items load without signing in.
@@ -3881,6 +3944,8 @@ export type Page_FolderResponse = {
   data: {
     created_at: string;
     id: string;
+    /** Items directly in this folder (not in its subfolders), not counting the trash. */
+    item_count: number;
     name: string;
     /** The parent folder; `null` for a folder at the root. */
     parent_id?: string | null;
@@ -3978,6 +4043,11 @@ export type Page_MediaItemResponse = {
     /** Real media type of the content (checked against its first bytes at upload). */
     content_type: string;
     created_at: string;
+    /**
+     * `true` for a purely decorative image: its empty `alt` is on purpose (render `alt=""`), so
+     * it does not count as missing one.
+     */
+    decorative: boolean;
     /** The folder holding the item; `null` for the root. */
     folder_id?: string | null;
     /** Height in pixels; only for raster images. */
@@ -3998,6 +4068,11 @@ export type Page_MediaItemResponse = {
     updated_at: string;
     /** The user who uploaded the item; `null` once that account is deleted. */
     uploaded_by?: string | null;
+    /**
+     * Display name of `uploaded_by`, with `include=uploader` on the list: `null` when the
+     * account no longer exists; absent otherwise.
+     */
+    uploaded_by_name?: string | null;
     /**
      * Where to load the content, with its version: the address changes when the content
      * does, so it may be cached for a long time. Public items load without signing in.
@@ -5926,6 +6001,8 @@ export type UpdateItemRequest = {
   alt?: string | null;
   /** Caption, up to 2000 characters; `""` clears it. */
   caption?: string | null;
+  /** `true` marks a purely decorative image, whose empty `alt` is on purpose. */
+  decorative?: boolean | null;
   /** Move to this folder; `null` moves to the root. */
   folder_id?: string | null;
   /** New file name, 1 to 255 characters, without `/` or `\`. */
@@ -8403,7 +8480,7 @@ export interface paths {
   "/api/v1/media": {
     /** List media items. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { folder_id?: string; type?: string; visibility?: "private" | "public"; trashed?: boolean; q?: string; tag?: string; sort?: "created_at" | "name" | "size"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { folder_id?: string; type?: string; visibility?: "private" | "public"; trashed?: boolean; q?: string; tag?: string; alt_missing?: boolean; include?: "uploader"; sort?: "created_at" | "name" | "size"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_MediaItemResponse;
         401: Problem;
@@ -8491,6 +8568,18 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/media/summary": {
+    /** Get the totals of the media library. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_LibrarySummaryResponse;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
