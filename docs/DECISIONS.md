@@ -6378,3 +6378,54 @@ Quyết định:
   nằm ở cấu hình bộ lọc thay vì ở mã.
 - Tự viết bộ đọc Markdown: Markdown có nhiều ca biên (link kiểu tham chiếu, lồng nhau, escape); thư viện chuẩn
   CommonMark đáng tin hơn vài trăm dòng tự viết.
+
+## D-253 · Thiết kế đa khách: quyết định nền (bước 33) — 2026-11-15 — agent quyết
+
+Bối cảnh: đặc tả `docs/steps/33-tenancy.md` (thiết kế D-185, D-190) đưa ra bảy quyết định nền và vài lựa chọn để agent
+quyết. Mục này chốt chúng trước khi viết code. Các bước 34–38 dựng trên đây.
+
+Quyết định nền:
+
+1. **Ngữ cảnh khách là tham số tường minh.** Mọi hàm service chạm database nhận `tenant: &TenantContext`.
+   `TenantContext` là nguồn duy nhất của `Database` cho dữ liệu cấp khách hàng (`tenant.database()`): quên khách
+   thì không có database để truy vấn, và trình biên dịch bắt được. Không dùng `tokio::task_local!`: nó mất khi
+   `tokio::spawn`, khó đọc, và chỉ hỏng lúc chạy.
+2. **Mọi database có cùng schema** (mọi module, kể cả bảng mặt điều khiển của `kernel`). Bảng mặt điều khiển chỉ
+   có dữ liệu ở database điều khiển (`DATABASE_URL`). Một `Migrator` cho mọi database.
+3. **Khách mặc định có ID cố định** `tenancy::DEFAULT_TENANT` = `00000000-0000-7000-8000-000000000001`, đúng dạng
+   UUIDv7. Đây là ngoại lệ có chủ đích của luật "UUIDv7 sinh trong ứng dụng": migration của module gán dữ liệu cũ
+   cho khách này mà không phải đọc bảng của `kernel`. Khách mặc định cũng là **khách nền tảng**.
+   Placement `main` cũng có ID cố định: `tenancy::MAIN_PLACEMENT` = `00000000-0000-7000-8000-000000000002`.
+4. **`tenancy::NO_TENANT`** = UUID toàn số 0, chỉ cho job của cả database (lịch dọn dẹp). Không dùng `NULL`, vì
+   unique index coi các `NULL` là khác nhau trên cả hai database.
+5. **Nâng bảng bằng cách dựng lại bảng** (tạo bảng mới → chép → xoá bảng cũ → đổi tên), qua một helper của kernel,
+   một đường code cho cả hai database. `tenant_id` không có `DEFAULT`: một `INSERT` quên khách thì lỗi `NOT NULL`
+   ngay, thay vì âm thầm ghi vào khách mặc định.
+6. **Chế độ `multi` bị khoá tới khi mọi module chuyển xong.** Hằng `tenancy::MULTI_TENANT_READY` là `false` tới
+   commit đóng phần B. Khi đó `AUTOXIDE_TENANCY_MODE=multi` là lỗi cấu hình nói rõ lý do; testkit vẫn bật được.
+7. **Đổi chữ ký trait và hàm kernel là thay đổi phá vỡ hợp đồng module** (D-167): được phép ở bản minor khi còn
+   `0.x`, ghi **Changed** trong `CHANGELOG.md`. Hàm chuyển tiếp bị bỏ thì `#[deprecated]` ở commit đóng phần B
+   (khi không còn ai gọi) và xoá ở đầu bước 34.
+
+Lựa chọn của agent (đặc tả mục "Agent làm bước này tự quyết"):
+
+- **`TenantId` là newtype `TenantId(Uuid)`** ở API của kernel (an toàn kiểu ở chữ ký hàm). Entity của module giữ
+  cột `tenant_id: Uuid` trần: ít ma sát với SeaORM, và lọc theo khách đi qua `ScopeExt` chứ không qua tay.
+- **Mã hoá: AES-256-GCM qua `ring`**, sẵn có trong cây phụ thuộc, không thêm thư viện (chi tiết ở mục của phần A6).
+- **DNS: `hickory-resolver`** (chi tiết ở mục của phần C1).
+- **Chế độ `multi` bắt buộc `AUTOXIDE_SECRET_KEY`.** Khi nhiều khách dùng chung một bản cài, khoá nằm trong database
+  không bảo vệ được bản backup của ai cả. Chế độ `single` chỉ cảnh báo.
+- **Gate phủ `multi` bằng `TEST_TENANCY=multi` ở lượt Postgres:** `TestApp` mặc định đưa người dùng giả vào một khách
+  không mặc định. Mọi test sẵn có chạy ở cả hai chế độ mà thời gian gate không tăng gấp đôi.
+- **Bộ canh SQL trong test:** làm nếu bản SeaORM đang ghim có callback số đo dùng được (tra khi làm phần A5).
+- **Mặc định:** cache khách 10 giây, tối đa 32 database mở, pool mỗi placement 2 kết nối ghi và 4 kết nối đọc. Đo
+  lại ở phần C4.
+- **Hàm chuyển tiếp của phần A4:** `TenantContext::legacy_default(&database)`, `#[doc(hidden)]`.
+
+Lý do: mỗi quyết định giữ một đường duy nhất cho việc lọc theo khách, và để trình biên dịch (thay vì thói quen) bắt
+lỗi quên khách. Chế độ `single` không truy vấn thêm gì mỗi request.
+
+Căn cứ pháp lý (ghi ở mục mã hoá và vị trí dữ liệu khi làm): Luật An ninh mạng 116/2025/QH15, NĐ 53/2022/NĐ-CP
+(lưu dữ liệu tại Việt Nam, chọn được theo từng khách); Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ 356/2025/NĐ-CP
+(tách biệt dữ liệu, mã hoá khi lưu). Điều khoản cụ thể cần đối chiếu văn bản gốc hay người có chuyên môn pháp lý
+(D-186).

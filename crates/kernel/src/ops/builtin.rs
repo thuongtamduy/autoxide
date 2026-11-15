@@ -61,7 +61,12 @@ impl Module for KernelModule {
     }
 
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        vec![Box::new(CreateSecrets), Box::new(user_flags::CreateUserFlags)]
+        vec![
+            Box::new(CreateSecrets),
+            Box::new(user_flags::CreateUserFlags),
+            // Bảng mặt điều khiển của phần đa khách, gieo khách mặc định (bước 33, D-253).
+            Box::new(crate::tenancy::schema::CreateTenancy),
+        ]
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
