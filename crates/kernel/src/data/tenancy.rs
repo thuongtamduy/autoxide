@@ -15,6 +15,7 @@
 //! module nội bộ `kernel` tạo (`schema.rs`); chúng chỉ có dữ liệu ở database điều khiển.
 
 mod config;
+pub mod migration;
 mod registry;
 pub(crate) mod request;
 pub(crate) mod schema;
