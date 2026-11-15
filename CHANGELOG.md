@@ -15,6 +15,14 @@ endpoints are marked deprecated with a sunset date first.
   `kernel_tenants`, `kernel_placements` and `kernel_tenant_domains` (the existing data belongs to the default tenant),
   and the settings `AUTOXIDE_TENANCY_*`. The default mode `single` changes nothing; `multi` is refused until every
   module keeps its data per tenant.
+- Tenant management for platform staff (people of the default tenant): `GET /api/v1/kernel/tenant` (the caller's
+  tenant, any signed-in user), `GET`, `POST /api/v1/kernel/tenants`, `GET`, `PATCH /api/v1/kernel/tenants/{id}`
+  (rename, suspend, resume; `If-Match`), `GET /api/v1/kernel/placements` (connection URLs are never shown); MCP tools
+  `kernel.current_tenant`, `kernel.list_tenants`, `kernel.get_tenant`; CLI `autoxide tenant create|list|show|suspend|
+  resume|provision`. New permissions `kernel.tenants.read`, `kernel.tenants.manage`, `kernel.placements.read`, new
+  events `kernel.tenant_created`, `kernel.tenant_updated`. Creating a tenant is refused in the `single` mode.
+- For module authors: `Module::seed_tenant` gives the data a new tenant starts with (roles, counters…); it must be
+  safe to run again, because `autoxide tenant provision` repeats a creation that stopped half-way.
 
 - `forms`: large CSV exports in the background. `POST /api/v1/forms/{id}/submissions/exports` answers at once;
   `GET /api/v1/forms/exports/{export_id}` gives the state and, once ready, a signed download link that needs no

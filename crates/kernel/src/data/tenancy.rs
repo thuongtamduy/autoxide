@@ -14,6 +14,7 @@
 //! Bảng mặt điều khiển (`kernel_tenants`, `kernel_placements`, `kernel_tenant_domains`) do
 //! module nội bộ `kernel` tạo (`schema.rs`); chúng chỉ có dữ liệu ở database điều khiển.
 
+pub(crate) mod admin;
 mod config;
 pub mod migration;
 mod registry;
@@ -31,6 +32,10 @@ use uuid::Uuid;
 use crate::database::Database;
 use crate::error::Error;
 
+pub use admin::{
+    CurrentTenant, NewTenant, PLACEMENTS_READ, Placement, TENANTS_MANAGE, TENANTS_READ, Tenant,
+    TenantAdmin, TenantChanges, TenantFilter, TenantSeed, require_platform,
+};
 pub use config::{TenancyConfig, WorkerPlacements};
 pub use registry::DatabaseRegistry;
 pub use request::{TENANT_HEADER, TenantHint};

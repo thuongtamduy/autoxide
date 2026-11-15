@@ -114,6 +114,12 @@ enum Command {
     /// encrypted secrets. Run `autoxide migrate up` first.
     Secrets(commands::secrets::Arguments),
 
+    /// Manage the tenants (customers) of the installation: create, list, show, suspend, resume.
+    ///
+    /// Runs with the rights of whoever operates the server. Creating tenants needs
+    /// AUTOXIDE_TENANCY_MODE=multi.
+    Tenant(commands::tenant::Arguments),
+
     /// Manage user accounts, e.g. create the first administrator.
     ///
     /// Runs with the rights of whoever operates the server: no sign-in needed.
@@ -137,6 +143,7 @@ fn main() -> ExitCode {
         Command::Secrets(arguments) => commands::secrets::run(&arguments),
         Command::Serve => commands::serve::run(),
         Command::Task(arguments) => commands::task::run(&arguments),
+        Command::Tenant(arguments) => commands::tenant::run(&arguments),
         Command::User(arguments) => commands::user::run(&arguments),
     }
 }

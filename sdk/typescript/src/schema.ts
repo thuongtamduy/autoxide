@@ -740,6 +740,18 @@ export type CreatedEndpointResponse = EndpointResponse & {
   secret: string;
 };
 
+/** The tenant of the caller. */
+export type CurrentTenant = {
+  id: string;
+  /** `single` (one tenant) or `multi` (many tenants on one installation). */
+  mode: string;
+  name: string;
+  /** Whether this is the platform tenant (the operator's own). */
+  platform: boolean;
+  slug: string;
+  status: string;
+};
+
 /** Envelope of a single result. */
 export type Data_AiStatus = {
   /** What the AI features of this server can do now. */
@@ -1119,6 +1131,21 @@ export type Data_CreatedEndpointResponse = {
      * Webhooks). Store it now: it cannot be shown again, only replaced.
      */
     secret: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CurrentTenant = {
+  /** The tenant of the caller. */
+  data: {
+    id: string;
+    /** `single` (one tenant) or `multi` (many tenants on one installation). */
+    mode: string;
+    name: string;
+    /** Whether this is the platform tenant (the operator's own). */
+    platform: boolean;
+    slug: string;
+    status: string;
   };
 };
 
@@ -2130,6 +2157,25 @@ export type Data_TagResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Tenant = {
+  /** A customer (tenant) of the platform. */
+  data: {
+    created_at: string;
+    id: string;
+    name: string;
+    /** Parent tenant, when the tenant belongs to a chain. */
+    parent_id?: string | null;
+    /** Name of the placement (database) that keeps its data. */
+    placement: string;
+    /** Short name: lower-case letters, digits and `-`; unique on the platform. */
+    slug: string;
+    /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_TenantSettingState = {
   /** A setting the installed modules take per tenant, and its state in the current tenant. */
   data: {
@@ -2359,6 +2405,21 @@ export type Data_Vec_PermissionResponse = {
     description: string;
     /** `<module>.<action>`. */
     name: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_Placement = {
+  data: {
+    /** `sqlite` or `postgres`. */
+    backend: string;
+    created_at: string;
+    id: string;
+    /** `shared` (many tenants) or `dedicated` (one tenant). */
+    kind: string;
+    name: string;
+    /** `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`. */
+    schema_state: string;
   }[];
 };
 
@@ -3276,6 +3337,18 @@ export type MoveRequest = {
 /** What happens when a post is published (by the `content` module). */
 export type NewPosts = "off" | "draft" | "send";
 
+/** A new tenant. */
+export type NewTenant = {
+  /** 1 to 200 characters. */
+  name: string;
+  /** Parent tenant, for chains. */
+  parent_id?: string | null;
+  /** Name of the placement for its data; `main` (the platform's database) when omitted. */
+  placement?: string | null;
+  /** 1 to 63 lower-case letters, digits and `-`, not starting or ending with `-`. */
+  slug: string;
+};
+
 /** One mail of a campaign to the person. */
 export type NewsletterDelivery = {
   campaign_id: string;
@@ -4165,6 +4238,26 @@ export type Page_TagResponse = {
 };
 
 /** One page of a list. */
+export type Page_Tenant = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    id: string;
+    name: string;
+    /** Parent tenant, when the tenant belongs to a chain. */
+    parent_id?: string | null;
+    /** Name of the placement (database) that keeps its data. */
+    placement: string;
+    /** Short name: lower-case letters, digits and `-`; unique on the platform. */
+    slug: string;
+    /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+    status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_TermResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -4295,6 +4388,19 @@ export type PermissionResponse = {
 export type PersonalDataResponse = Record<string, unknown> & {
   /** Your profile, roles, sessions, API keys, passkeys and two-step sign-in status. */
   auth: Record<string, unknown>;
+};
+
+/** Where tenants' data is kept: one database. Connection URLs are never shown. */
+export type Placement = {
+  /** `sqlite` or `postgres`. */
+  backend: string;
+  created_at: string;
+  id: string;
+  /** `shared` (many tenants) or `dedicated` (one tenant). */
+  kind: string;
+  name: string;
+  /** `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`. */
+  schema_state: string;
 };
 
 /** A comment just posted, for its author. */
@@ -5326,6 +5432,29 @@ export type TargetRequest = {
 
 /** What a term groups. */
 export type Taxonomy = "category" | "tag";
+
+/** A customer (tenant) of the platform. */
+export type Tenant = {
+  created_at: string;
+  id: string;
+  name: string;
+  /** Parent tenant, when the tenant belongs to a chain. */
+  parent_id?: string | null;
+  /** Name of the placement (database) that keeps its data. */
+  placement: string;
+  /** Short name: lower-case letters, digits and `-`; unique on the platform. */
+  slug: string;
+  /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+  status: string;
+  updated_at: string;
+};
+
+/** Changes to a tenant; omitted fields stay as they are. */
+export type TenantChanges = {
+  name?: string | null;
+  /** `active` or `suspended`. */
+  status?: string | null;
+};
 
 /** A setting the installed modules take per tenant, and its state in the current tenant. */
 export type TenantSettingState = {
@@ -7835,6 +7964,18 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/placements": {
+    /** List the placements. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_Placement;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/settings": {
     /** List this tenant's settings. */
     get: {
@@ -7867,6 +8008,71 @@ export interface paths {
         204: void;
         401: Problem;
         403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenant": {
+    /** Get my tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_CurrentTenant;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants": {
+    /** List the tenants of the platform. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; status?: string; parent_id?: string }; };
+      responses: {
+        200: Page_Tenant;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewTenant;
+      responses: {
+        201: Data_Tenant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}": {
+    /** Get a tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Tenant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Rename, suspend or resume a tenant. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: TenantChanges;
+      responses: {
+        200: Data_Tenant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
         422: Problem;
         default: Problem;
       };

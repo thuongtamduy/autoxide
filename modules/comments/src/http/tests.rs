@@ -315,12 +315,15 @@ async fn tool_mcp() {
             .map(|tool| tool.name.to_string())
             .collect();
         names.sort();
-        assert_eq!(names, ["comments.get", "comments.queue", "comments.unanswered"]);
+        assert_eq!(
+            names,
+            ["comments.get", "comments.queue", "comments.unanswered", "kernel.current_tenant"]
+        );
         reader.cancel().await.unwrap();
 
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 6);
+        assert_eq!(tools.len(), 7, "with `kernel.current_tenant`");
         for tool in &tools {
             assert!(
                 !serde_json::to_string(&tool.input_schema).unwrap().contains("$ref"),

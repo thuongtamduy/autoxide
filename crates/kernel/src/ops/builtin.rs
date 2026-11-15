@@ -40,6 +40,10 @@ pub(crate) struct KernelModule {
     tenant_settings: crate::tenancy::settings::Catalog,
     /// Service cấu hình theo khách; có sau `start`.
     settings: Option<Arc<crate::tenancy::settings::SettingsService>>,
+    /// Bộ gieo dữ liệu cho khách mới của mọi module.
+    seeds: crate::tenancy::admin::Seeds,
+    /// Service quản lý khách; có sau `start`.
+    admin: Option<Arc<crate::tenancy::TenantAdmin>>,
 }
 
 impl KernelModule {
@@ -48,11 +52,14 @@ impl KernelModule {
         flags: user_flags::Handle,
         keys: crate::secret::KeyConfig,
         tenant_settings: crate::tenancy::settings::Catalog,
+        seeds: crate::tenancy::admin::Seeds,
     ) -> Self {
         KernelModule {
             keys,
             tenant_settings,
             settings: None,
+            seeds,
+            admin: None,
             public_url: PublicUrl::default(),
             catalog,
             database: None,
@@ -107,11 +114,22 @@ impl Module for KernelModule {
     }
 
     fn permissions(&self) -> Vec<Permission> {
-        vec![module_catalog::MODULES_READ, TENANTS_OPERATE, crate::tenancy::SETTINGS_MANAGE]
+        vec![
+            module_catalog::MODULES_READ,
+            TENANTS_OPERATE,
+            crate::tenancy::SETTINGS_MANAGE,
+            crate::tenancy::TENANTS_READ,
+            crate::tenancy::TENANTS_MANAGE,
+            crate::tenancy::PLACEMENTS_READ,
+        ]
     }
 
     fn events(&self) -> Vec<crate::event::EventInfo> {
-        vec![crate::tenancy::settings::SETTING_CHANGED]
+        vec![
+            crate::tenancy::settings::SETTING_CHANGED,
+            crate::tenancy::admin::TENANT_CREATED,
+            crate::tenancy::admin::TENANT_UPDATED,
+        ]
     }
 
     fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
@@ -120,10 +138,14 @@ impl Module for KernelModule {
 
     fn routes(&self) -> OpenApiRouter {
         let catalog = self.catalog_state().map_or_else(OpenApiRouter::new, module_catalog::routes);
-        match &self.settings {
-            Some(settings) => catalog.merge(crate::tenancy::settings::routes(settings.clone())),
-            None => catalog,
+        let mut routes = catalog;
+        if let Some(settings) = &self.settings {
+            routes = routes.merge(crate::tenancy::settings::routes(settings.clone()));
         }
+        if let Some(admin) = &self.admin {
+            routes = routes.merge(crate::tenancy::admin::routes(admin.clone()));
+        }
+        routes
     }
 
     fn subscriptions(&self) -> Vec<crate::event::Subscription> {
@@ -137,6 +159,9 @@ impl Module for KernelModule {
         let mut tools = self.catalog_state().map_or_else(Vec::new, module_catalog::tools);
         if let Some(settings) = &self.settings {
             tools.extend(crate::tenancy::settings::tools(settings.clone()));
+        }
+        if let Some(admin) = &self.admin {
+            tools.extend(crate::tenancy::admin::tools(admin.clone()));
         }
         tools
     }
@@ -153,6 +178,13 @@ impl Module for KernelModule {
             context.outbox()?,
         ));
         self.settings = Some(settings.clone());
+        let admin = Arc::new(crate::tenancy::TenantAdmin::new(
+            context.tenancy().clone(),
+            self.seeds.clone(),
+            context.outbox()?,
+        ));
+        self.admin = Some(admin.clone());
+        context.provide::<crate::tenancy::TenantAdmin>(admin)?;
         context.provide::<dyn crate::tenancy::TenantSettings>(settings)?;
         context.provide::<SecretKey>(Arc::new(key))?;
         context.provide::<PublicUrl>(Arc::new(self.public_url.clone()))

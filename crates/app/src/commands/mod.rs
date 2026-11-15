@@ -12,6 +12,7 @@ pub mod openapi;
 pub mod secrets;
 pub mod serve;
 pub mod task;
+pub mod tenant;
 pub mod user;
 
 use std::future::Future;
