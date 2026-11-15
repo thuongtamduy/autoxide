@@ -11,6 +11,14 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `auth`: `GET /api/v1/auth/users` takes `status` (`active`, `disabled`) and `include=roles` (each user's roles in
+  the same answer); every user carries `has_password`, `mfa_enabled` and `last_sign_in_at`. `GET /api/v1/auth/me`
+  gives `has_password` and `pending_email` (an email change waiting for its link, with expiry);
+  `DELETE /api/v1/auth/me/email` cancels that change. New event `auth.email_change_cancelled`. Users are an object
+  type `auth.user` of the object directory (their display name), for other modules.
+- `audit`: `include=actor` adds `actor_name`, the display name of who made each change.
+- `webhooks`: each endpoint carries `last_delivery` (status, HTTP status, time) in the list and when read;
+  `status` (`active`, `disabled`) filters the list.
 - `GET /api/v1/me/permissions`: the caller's own permissions with description and risk, for anyone signed in
   (e.g. to pick the permissions of a new API key without `auth.roles.read`).
 - `GET /api/v1/auth/permissions` gives the `risk` of each permission. Permission descriptions (there, in

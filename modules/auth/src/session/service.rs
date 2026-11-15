@@ -340,6 +340,12 @@ impl SessionService {
             });
         }
         row.insert(&transaction).await?;
+        // Lúc mở phiên gần nhất, cho danh sách người dùng (đề bài giao diện B1).
+        crate::user::entity::Entity::update_many()
+            .col_expr(crate::user::entity::Column::LastSignInAt, Expr::value(now))
+            .filter(crate::user::entity::Column::Id.eq(user_id))
+            .exec(&transaction)
+            .await?;
         let event = events::SignedIn { before: None, after: Some(json!({"method": method})) };
         let subject = events::user_subject(user_id);
         self.outbox

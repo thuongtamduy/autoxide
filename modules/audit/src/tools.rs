@@ -112,7 +112,7 @@ mod tests {
                 recorder.handle(&event).await.unwrap();
             }
             let tenant = autoxide_kernel::tenancy::TenantContext::legacy_default(&database);
-            let tools = all(&Arc::new(AuditService::new(database)));
+            let tools = all(&Arc::new(AuditService::new(database, Default::default())));
             let auditor = Principal::new(Uuid::now_v7(), ["audit.read".to_owned()]);
             let nobody = Principal::new(Uuid::now_v7(), []);
             assert!(tools.iter().all(|tool| !tool.allows(&nobody)));

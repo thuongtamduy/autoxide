@@ -6,6 +6,7 @@ use autoxide_kernel::access::{Permission, Principal};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -48,6 +49,10 @@ pub(crate) struct AuditEntryResponse {
     actor_user_id: Option<Uuid>,
     /// API key used, when the change was made with one.
     actor_api_key_id: Option<Uuid>,
+    /// Display name of `actor_user_id`, with `include=actor`: `null` when the account no longer
+    /// exists; absent when no user made the change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    actor_name: Option<Option<String>>,
     /// Who made the change: `user` (a signed-in user or API key), `system` (command line,
     /// background jobs) or `public` (someone not signed in, such as a visitor sending a form).
     #[schema(example = "user")]
@@ -76,6 +81,7 @@ impl From<entity::Model> for AuditEntryResponse {
             action: row.action,
             actor_user_id: row.actor_user_id,
             actor_api_key_id: row.actor_api_key_id,
+            actor_name: None,
             // Dòng ghi trước khi có cột: hiểu theo `actor_user_id`.
             actor_kind: row.actor_kind.unwrap_or_else(|| {
                 if row.actor_user_id.is_some() { "user" } else { "system" }.to_owned()
@@ -102,12 +108,22 @@ pub(crate) struct AuditFilter {
     action: Option<String>,
     /// Only changes in this module, e.g. `auth`.
     module: Option<String>,
+    /// `actor`: add `actor_name`, the display name of who made each change, in the same answer.
+    #[param(inline)]
+    include: Option<AuditInclude>,
+}
+
+/// Extra data to add to each entry.
+#[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum AuditInclude {
+    Actor,
 }
 
 /// List the audit log.
 ///
 /// Requires `audit.read`. Newest first unless `order=asc`. Changes appear a moment
-/// after they happen.
+/// after they happen. With `include=actor`, each entry carries the name of who made it.
 #[utoipa::path(
     get,
     path = "/",
@@ -125,11 +141,13 @@ pub(crate) struct AuditFilter {
 )]
 async fn list_entries(
     State(service): State<Arc<AuditService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(filter): Query<AuditFilter>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<AuditEntryResponse>, Error> {
     principal.require(&AUDIT_READ)?;
+    let with_actor = matches!(filter.include, Some(AuditInclude::Actor));
     let filter = Filter {
         actor_user_id: filter.actor_user_id,
         subject: filter.subject,
@@ -137,7 +155,17 @@ async fn list_entries(
         module: filter.module,
     };
     let page = service.list(filter, &PageRequest::try_from(page)?).await?;
-    Ok(page.map(AuditEntryResponse::from))
+    if !with_actor {
+        return Ok(page.map(AuditEntryResponse::from));
+    }
+    let mut ids: Vec<Uuid> = page.data.iter().filter_map(|row| row.actor_user_id).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    let names = service.actor_names(&tenant, &ids).await?;
+    Ok(page.map(|row| {
+        let name = row.actor_user_id.map(|id| names.get(&id).cloned());
+        AuditEntryResponse { actor_name: name, ..AuditEntryResponse::from(row) }
+    }))
 }
 
 /// Get one audit entry.
@@ -254,6 +282,70 @@ mod tests {
             assert_eq!(denied["code"], "permission_denied");
             let (status, _) = get(&app, "/api/v1/audit?actor_user_id=not-a-uuid", "auditor").await;
             assert_eq!(status, StatusCode::BAD_REQUEST);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Module `auth` giả: chỉ đăng ký loại `auth.user` vào sổ đối tượng (tên của Ada).
+    struct FakeAuth(Uuid);
+
+    struct Names(Uuid);
+
+    #[async_trait::async_trait]
+    impl autoxide_kernel::resource::ResourceResolver for Names {
+        async fn resolve(
+            &self,
+            _: &TenantContext,
+            id: &str,
+        ) -> Result<Option<autoxide_kernel::resource::Resource>, Error> {
+            Ok((id == self.0.to_string()).then(|| autoxide_kernel::resource::Resource::new("Ada")))
+        }
+    }
+
+    impl autoxide_kernel::module::Module for FakeAuth {
+        fn name(&self) -> &'static str {
+            "auth"
+        }
+
+        fn start(
+            &mut self,
+            context: &mut autoxide_kernel::module::StartContext<'_>,
+        ) -> Result<(), Error> {
+            context.resource_type("auth.user", Arc::new(Names(self.0)))
+        }
+    }
+
+    /// Đề bài giao diện B2: `include=actor` trả tên người làm trong cùng câu trả lời.
+    #[tokio::test]
+    async fn kem_ten_nguoi_lam() {
+        TestDatabase::run(async |test| {
+            let ada = Uuid::now_v7();
+            let app = TestApp::builder(test)
+                .user("auditor", 0, &["audit.read"])
+                .module(FakeAuth(ada))
+                .module(crate::module())
+                .build()
+                .await
+                .unwrap();
+            let recorder = crate::recorder::Recorder::new(app.database().clone());
+            let gone = Uuid::now_v7();
+            recorder
+                .handle(&event(app.database(), "auth.user_updated", ada, "auth.user:1"))
+                .await
+                .unwrap();
+            recorder
+                .handle(&event(app.database(), "auth.user_updated", gone, "auth.user:2"))
+                .await
+                .unwrap();
+
+            let (status, page) =
+                get(&app, "/api/v1/audit?include=actor&order=asc", "auditor").await;
+            assert_eq!(status, StatusCode::OK, "{page}");
+            assert_eq!(page["data"][0]["actor_name"], "Ada");
+            assert!(page["data"][1]["actor_name"].is_null(), "{page}");
+            let (_, plain) = get(&app, "/api/v1/audit", "auditor").await;
+            assert!(plain["data"][0].get("actor_name").is_none());
         })
         .await
         .unwrap();

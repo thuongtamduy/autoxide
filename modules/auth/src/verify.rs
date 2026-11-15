@@ -121,6 +121,43 @@ impl EmailVerifications {
         self.send(Actor::user(user_id), &user, &email, language).await
     }
 
+    /// Email đang chờ xác minh sau khi `user` xin đổi (địa chỉ mới, hạn của link); `None` khi
+    /// không có (token xác minh còn dùng được mà địa chỉ khác email hiện tại).
+    pub(crate) async fn pending_change(
+        &self,
+        user: &User,
+    ) -> Result<Option<(String, DateTime<Utc>)>, Error> {
+        let tenant = TenantContext::legacy_default(&self.database);
+        let subject = user.id.to_string();
+        let live = tokens().live(self.database.read(), &tenant, PURPOSE, &subject).await?;
+        Ok(live.into_iter().find_map(|token| {
+            let email = token.data.filter(|email| *email != user.email)?;
+            Some((email, token.expires_at))
+        }))
+    }
+
+    /// Huỷ yêu cầu đổi email của người dùng `user_id`: link đã gửi tới địa chỉ mới hết dùng được
+    /// (cùng mọi link xác minh khác của tài khoản — xin lại được). Không có yêu cầu nào thì
+    /// `auth.no_pending_email_change`.
+    pub(crate) async fn cancel_change(&self, user_id: Uuid) -> Result<(), Error> {
+        let user = self.users.get(user_id).await?.ok_or_else(|| user::user_not_found(user_id))?;
+        let Some((email, _)) = self.pending_change(&user).await? else {
+            return Err(no_pending_change());
+        };
+        let tenant = TenantContext::legacy_default(&self.database);
+        let transaction = self.database.begin_write().await?;
+        tokens().revoke(&transaction, &tenant, PURPOSE, &user_id.to_string()).await?;
+        let event =
+            events::EmailChangeCancelled { before: Some(json!({"email": email})), after: None };
+        let actor = Actor::user(user_id);
+        self.outbox
+            .record(&transaction, &tenant, actor, events::user_subject(user_id), &event)
+            .await?;
+        transaction.commit().await?;
+        tracing::info!(user_id = %user_id, "pending email change cancelled");
+        Ok(())
+    }
+
     /// Xác nhận email bằng `token` lấy từ mail. Trả tài khoản sau khi xác minh. Email đổi thì
     /// xếp mail báo tới địa chỉ cũ (bằng `language`) trong cùng transaction.
     pub(crate) async fn confirm(&self, token: &str, language: Language) -> Result<User, Error> {
@@ -257,6 +294,13 @@ fn invalid_token() -> Error {
     Error::bad_request(
         "auth.invalid_verification_token",
         "This verification link is unknown, expired or already used. Ask for a new verification mail.",
+    )
+}
+
+fn no_pending_change() -> Error {
+    Error::not_found(
+        "auth.no_pending_email_change",
+        "There is no email change waiting to be confirmed.",
     )
 }
 

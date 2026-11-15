@@ -84,7 +84,8 @@ async fn export_personal_data(
 /// Delete your own account and everything it owns.
 ///
 /// Signed in with a password session only, and needs your current password (an account
-/// without a password must set one first). The account, its sessions, keys and passkeys
+/// without a password — `has_password: false` in `GET /api/v1/auth/me` — sets one first with
+/// `POST /api/v1/auth/password-reset`: the mail to its own address sets a first password too). The account, its sessions, keys and passkeys
 /// go at once; data kept by other modules (notes, files…) is deleted shortly after.
 /// This cannot be undone: download your data first with `GET /api/v1/auth/me/export`.
 #[utoipa::path(
@@ -206,6 +207,109 @@ mod tests {
             let (status, _, problem) = call(&app, "DELETE", &path, Some(&admin), None).await;
             assert_eq!(status, StatusCode::NOT_FOUND);
             assert_eq!(problem["code"], "auth.user_not_found");
+        })
+        .await
+        .unwrap();
+    }
+}
+
+/// Đề bài giao diện B1 (D-265): danh sách người dùng kèm dữ kiện tài khoản và role trong một lần
+/// gọi; lọc theo trạng thái; `/me` cho biết có mật khẩu chưa và email đang chờ xác minh, huỷ
+/// được yêu cầu đổi email.
+#[cfg(test)]
+mod web_requests {
+    use autoxide_kernel::event::Actor;
+    use autoxide_kernel::tenancy::TenantContext;
+    use autoxide_testkit::TestDatabase;
+    use axum::http::StatusCode;
+    use serde_json::json;
+
+    use crate::api::{Accounts, NewAccount};
+    use crate::http::test_support::{PASSWORD, app, bearer, call};
+
+    #[tokio::test]
+    async fn danh_sach_nguoi_dung_kem_du_kien_va_role() {
+        TestDatabase::run(async |test| {
+            let (app, services) = app(test).await;
+            let tenant = TenantContext::legacy_default(&services.database);
+            let root = NewAccount {
+                email: "root@example.com".to_owned(),
+                name: "Root".to_owned(),
+                password: Some(PASSWORD.to_owned()),
+                admin: true,
+            };
+            Accounts::create(services.users.as_ref(), &tenant, root).await.unwrap();
+            let passkey_only = NewAccount {
+                email: "pk@example.com".to_owned(),
+                name: "Passkey".to_owned(),
+                password: None,
+                admin: false,
+            };
+            let pk =
+                Accounts::create(services.users.as_ref(), &tenant, passkey_only).await.unwrap();
+            let changes = crate::user::UserChanges { name: None, disabled: Some(true) };
+            services.users.update(Actor::system(), pk.id, changes, None).await.unwrap();
+            let admin = bearer(&app, "root@example.com", PASSWORD).await;
+
+            let (status, _, page) =
+                call(&app, "GET", "/users?include=roles&order=asc", Some(&admin), None).await;
+            assert_eq!(status, StatusCode::OK, "{page}");
+            let rows = page["data"].as_array().unwrap();
+            let by_email = |email: &str| rows.iter().find(|row| row["email"] == email).unwrap();
+            let root = by_email("root@example.com");
+            assert_eq!(root["roles"][0]["name"], "admin");
+            assert_eq!(
+                (root["has_password"].as_bool(), root["mfa_enabled"].as_bool()),
+                (Some(true), Some(false))
+            );
+            assert!(root["last_sign_in_at"].is_string(), "signed in above: {root}");
+            let pk_row = by_email("pk@example.com");
+            assert_eq!(pk_row["has_password"], false);
+            assert_eq!(pk_row["roles"], json!([]));
+            assert!(pk_row["last_sign_in_at"].is_null());
+
+            // Không `include=roles`: không có trường `roles`.
+            let (_, _, plain) = call(&app, "GET", "/users", Some(&admin), None).await;
+            assert!(plain["data"][0].get("roles").is_none());
+            let (_, _, disabled) =
+                call(&app, "GET", "/users?status=disabled", Some(&admin), None).await;
+            let emails: Vec<_> =
+                disabled["data"].as_array().unwrap().iter().map(|r| r["email"].clone()).collect();
+            assert_eq!(emails, [json!("pk@example.com")]);
+            let (_, _, active) =
+                call(&app, "GET", "/users?status=active", Some(&admin), None).await;
+            assert_eq!(active["data"].as_array().unwrap().len(), 2);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn me_co_mat_khau_va_email_dang_cho_va_huy_doi_email() {
+        TestDatabase::run(async |test| {
+            let (app, _services) = app(test).await;
+            let ada = bearer(&app, "ada@example.com", PASSWORD).await;
+            let (_, _, me) = call(&app, "GET", "/me", Some(&ada), None).await;
+            assert_eq!(me["data"]["has_password"], true);
+            assert!(me["data"]["pending_email"].is_null());
+            let (status, _, problem) = call(&app, "DELETE", "/me/email", Some(&ada), None).await;
+            assert_eq!(
+                (status, problem["code"].as_str()),
+                (StatusCode::NOT_FOUND, Some("auth.no_pending_email_change"))
+            );
+
+            let change = json!({"current_password": PASSWORD, "new_email": "ada@new.example"});
+            let (status, _, _) = call(&app, "POST", "/me/email", Some(&ada), Some(change)).await;
+            assert_eq!(status, StatusCode::ACCEPTED);
+            let (_, _, me) = call(&app, "GET", "/me", Some(&ada), None).await;
+            assert_eq!(me["data"]["pending_email"]["email"], "ada@new.example");
+            assert!(me["data"]["pending_email"]["expires_at"].is_string());
+
+            let (status, _, _) = call(&app, "DELETE", "/me/email", Some(&ada), None).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+            let (_, _, me) = call(&app, "GET", "/me", Some(&ada), None).await;
+            assert!(me["data"]["pending_email"].is_null());
+            assert_eq!(me["data"]["email"], "ada@example.com");
         })
         .await
         .unwrap();

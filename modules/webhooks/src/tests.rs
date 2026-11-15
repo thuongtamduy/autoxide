@@ -467,3 +467,72 @@ async fn quan_ly_qua_api_khong_lo_secret() {
     .await
     .unwrap();
 }
+
+/// Đề bài giao diện B3: mỗi endpoint kèm lần gửi mới nhất (không phải gọi `/deliveries` cho
+/// từng endpoint), lọc endpoint theo trạng thái.
+#[tokio::test]
+async fn endpoint_kem_lan_gui_moi_nhat_va_loc_trang_thai() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["webhooks.manage"])
+            .module(Demo)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let post = async |url: &str| {
+            let body = json!({"url": url, "events": [DEMO_EVENT]});
+            let answer =
+                app.post("/api/v1/webhooks").token("admin").json(body).send().await.unwrap();
+            assert_eq!(answer.status(), StatusCode::CREATED);
+            answer.json()["data"]["id"].as_str().unwrap().parse::<Uuid>().unwrap()
+        };
+        let busy = post("https://example.com/busy").await;
+        let quiet = post("https://example.com/quiet").await;
+        let now = chrono::Utc::now();
+        for (minutes, status, code) in [(10, "failed", Some(500)), (1, "delivered", Some(204))] {
+            let row = delivery::Model {
+                id: Uuid::now_v7(),
+                endpoint_id: busy,
+                event_id: Uuid::now_v7(),
+                event_name: DEMO_EVENT.to_owned(),
+                body: "{}".to_owned(),
+                status: status.to_owned(),
+                attempts: 1,
+                response_status: code,
+                last_error: None,
+                created_at: chrono::SubsecRound::trunc_subsecs(
+                    now - chrono::Duration::minutes(minutes),
+                    6,
+                ),
+                last_attempt_at: Some(chrono::SubsecRound::trunc_subsecs(now, 6)),
+                delivered_at: None,
+            };
+            delivery::Entity::insert(sea_orm::IntoActiveModel::into_active_model(row))
+                .exec(app.database().write())
+                .await
+                .unwrap();
+        }
+        let disable = json!({"disabled": true});
+        let path = format!("/api/v1/webhooks/{quiet}");
+        let answer = app.patch(&path).token("admin").json(disable).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+
+        let list = app.get("/api/v1/webhooks?order=asc").token("admin").send().await.unwrap();
+        let rows = list.json()["data"].clone();
+        assert_eq!(rows[0]["last_delivery"]["status"], "delivered");
+        assert_eq!(rows[0]["last_delivery"]["response_status"], 204);
+        assert!(rows[1]["last_delivery"].is_null(), "{rows}");
+        let one = app.get(&format!("/api/v1/webhooks/{busy}")).token("admin").send().await.unwrap();
+        assert_eq!(one.json()["data"]["last_delivery"]["status"], "delivered");
+
+        let active = app.get("/api/v1/webhooks?status=active").token("admin").send().await.unwrap();
+        let ids: Vec<_> =
+            active.json()["data"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+        assert_eq!(ids, [json!(busy)]);
+        let off = app.get("/api/v1/webhooks?status=disabled").token("admin").send().await.unwrap();
+        assert_eq!(off.json()["data"][0]["id"], json!(quiet));
+    })
+    .await
+    .unwrap();
+}

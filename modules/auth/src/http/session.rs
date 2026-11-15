@@ -138,11 +138,33 @@ pub(crate) struct MeResponse {
     /// Permissions granted by the user's roles, sorted by name.
     #[schema(example = json!(["auth.roles.read"]))]
     permissions: Vec<String>,
+    /// Whether the account has a password. Without one (signed in with a passkey), set a first
+    /// password through `POST /api/v1/auth/password-reset`.
+    has_password: bool,
+    /// The new address of an email change waiting to be confirmed; `null` when there is none.
+    /// Cancel it with `DELETE /api/v1/auth/me/email`.
+    pending_email: Option<PendingEmail>,
+}
+
+/// An email change waiting for its confirmation link.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct PendingEmail {
+    #[schema(example = "ada@new.example")]
+    email: String,
+    /// When the confirmation link stops working.
+    expires_at: DateTime<Utc>,
 }
 
 impl MeResponse {
-    pub(crate) fn new(user: User, principal: &Principal) -> Self {
-        MeResponse {
+    /// Tài khoản của người gọi, kèm có mật khẩu chưa và email đang chờ xác minh.
+    pub(crate) async fn load(
+        state: &HttpState,
+        user: User,
+        principal: &Principal,
+    ) -> Result<Self, Error> {
+        let facts = state.users.facts(&[user.id]).await?.remove(&user.id).unwrap_or_default();
+        let pending = state.verifications.pending_change(&user).await?;
+        Ok(MeResponse {
             id: user.id,
             email: user.email,
             name: user.name,
@@ -150,7 +172,9 @@ impl MeResponse {
             created_at: user.created_at,
             all_permissions: principal.has_all_permissions(),
             permissions: principal.permissions(),
-        }
+            has_password: facts.has_password,
+            pending_email: pending.map(|(email, expires_at)| PendingEmail { email, expires_at }),
+        })
     }
 }
 
@@ -295,7 +319,7 @@ async fn me(
 ) -> Result<Data<MeResponse>, Error> {
     let user =
         state.users.get(principal.user_id()).await?.ok_or_else(crate::token::invalid_token)?;
-    Ok(Data { data: MeResponse::new(user, &principal) })
+    Ok(Data { data: MeResponse::load(&state, user, &principal).await? })
 }
 
 /// Change your own password.

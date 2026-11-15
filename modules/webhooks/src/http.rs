@@ -14,7 +14,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
@@ -59,8 +59,58 @@ pub(crate) struct EndpointResponse {
     events: Vec<String>,
     /// When it was turned off; `null` while it receives events.
     disabled_at: Option<DateTime<Utc>>,
+    /// The newest delivery to this endpoint; `null` when nothing was sent yet. Only in the list
+    /// and when reading one endpoint.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_delivery: Option<Option<LastDelivery>>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+}
+
+/// The newest delivery to an endpoint.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct LastDelivery {
+    id: Uuid,
+    #[schema(example = "auth.user_created")]
+    event_name: String,
+    /// `pending`, `delivered` or `failed`.
+    #[schema(example = "delivered")]
+    status: String,
+    /// HTTP status the endpoint answered with, on the last attempt; `null` when it did not answer.
+    response_status: Option<i32>,
+    /// When it was last tried; `null` while it waits for its first attempt.
+    last_attempt_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+}
+
+impl From<crate::entity::delivery::Model> for LastDelivery {
+    fn from(row: crate::entity::delivery::Model) -> Self {
+        LastDelivery {
+            id: row.id,
+            event_name: row.event_name,
+            status: row.status,
+            response_status: row.response_status,
+            last_attempt_at: row.last_attempt_at,
+            created_at: row.created_at,
+        }
+    }
+}
+
+/// Which endpoints to list.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct EndpointFilter {
+    /// `active`: only endpoints that receive events; `disabled`: only turned-off ones.
+    #[param(inline)]
+    status: Option<EndpointStatus>,
+}
+
+/// Whether an endpoint receives events.
+#[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum EndpointStatus {
+    Active,
+    Disabled,
 }
 
 impl From<Endpoint> for EndpointResponse {
@@ -71,6 +121,7 @@ impl From<Endpoint> for EndpointResponse {
             description: endpoint.description,
             events: endpoint.events,
             disabled_at: endpoint.disabled_at,
+            last_delivery: None,
             created_at: endpoint.created_at,
             updated_at: endpoint.updated_at,
         }
@@ -196,14 +247,15 @@ async fn list_event_types(
 
 /// List webhook endpoints.
 ///
-/// Requires `webhooks.manage`. Newest first unless `order=asc`.
+/// Requires `webhooks.manage`. Newest first unless `order=asc`. Each endpoint carries its
+/// newest delivery (`last_delivery`); `status` keeps only active or disabled endpoints.
 #[utoipa::path(
     get,
     path = "/",
     extensions(("x-permissions" = json!(["webhooks.manage"]))),
     operation_id = "list_webhook_endpoints",
     security(("bearer" = [])),
-    params(PageQuery),
+    params(EndpointFilter, PageQuery),
     responses(
         (status = 200, description = "One page of endpoints.", body = Page<EndpointResponse>),
         (status = 401, description = "Not signed in.", body = Problem),
@@ -214,10 +266,18 @@ async fn list_event_types(
 async fn list_endpoints(
     State(service): State<Arc<WebhookService>>,
     principal: Principal,
+    Query(filter): Query<EndpointFilter>,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<EndpointResponse>, Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
-    Ok(service.list(&PageRequest::try_from(query)?).await?.map(EndpointResponse::from))
+    let active = filter.status.map(|status| matches!(status, EndpointStatus::Active));
+    let page = service.list(active, &PageRequest::try_from(query)?).await?;
+    let ids: Vec<Uuid> = page.data.iter().map(|endpoint| endpoint.id).collect();
+    let mut last = service.last_deliveries(&ids).await?;
+    Ok(page.map(|endpoint| {
+        let delivery = last.remove(&endpoint.id).map(LastDelivery::from);
+        EndpointResponse { last_delivery: Some(delivery), ..EndpointResponse::from(endpoint) }
+    }))
 }
 
 /// Create a webhook endpoint.
@@ -281,7 +341,11 @@ async fn get_endpoint(
 ) -> Result<Tagged<EndpointResponse>, Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
     let endpoint = service.get(id).await?;
-    Ok(Tagged { version: endpoint.updated_at, data: endpoint.into() })
+    let delivery = service.last_deliveries(&[id]).await?.remove(&id).map(LastDelivery::from);
+    let version = endpoint.updated_at;
+    let data =
+        EndpointResponse { last_delivery: Some(delivery), ..EndpointResponse::from(endpoint) };
+    Ok(Tagged { version, data })
 }
 
 /// Change a webhook endpoint, or turn it off and on.

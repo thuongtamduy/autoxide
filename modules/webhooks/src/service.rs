@@ -1,13 +1,17 @@
 //! Service của webhook: quản lý nơi nhận (endpoint) và xem các lần gửi. Handler REST
 //! chỉ gọi vào đây.
 
+use std::collections::HashMap;
+
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, EventCatalog, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, SubsecRound, Utc};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QuerySelect, Set,
+};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -184,16 +188,60 @@ impl WebhookService {
         Ok(CreatedEndpoint { endpoint, secret })
     }
 
-    /// Một trang endpoint, mới tạo trước (mặc định).
-    pub(crate) async fn list(&self, page: &PageRequest) -> Result<Page<Endpoint>, Error> {
-        let rows = fetch_page(
-            endpoint::Entity::find(),
-            endpoint::Column::Id,
-            |row| row.id,
-            page,
-            self.database.read(),
-        )
-        .await?;
+    /// Lần gửi mới nhất của từng endpoint trong `ids` — hai câu truy vấn cho cả trang (đề bài
+    /// giao diện B3): thời điểm tạo mới nhất theo endpoint, rồi các dòng đúng thời điểm đó.
+    pub(crate) async fn last_deliveries(
+        &self,
+        ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, delivery::Model>, Error> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let read = self.database.read();
+        let latest: Vec<(Uuid, chrono::DateTime<chrono::Utc>)> = delivery::Entity::find()
+            .select_only()
+            .column(delivery::Column::EndpointId)
+            .column_as(delivery::Column::CreatedAt.max(), "latest")
+            .filter(delivery::Column::EndpointId.is_in(ids.iter().copied()))
+            .group_by(delivery::Column::EndpointId)
+            .into_tuple()
+            .all(read)
+            .await?;
+        if latest.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let wanted: HashMap<Uuid, chrono::DateTime<chrono::Utc>> = latest.into_iter().collect();
+        let rows = delivery::Entity::find()
+            .filter(delivery::Column::EndpointId.is_in(wanted.keys().copied()))
+            .filter(delivery::Column::CreatedAt.is_in(wanted.values().copied()))
+            .all(read)
+            .await?;
+        let mut found = HashMap::new();
+        for row in rows {
+            if wanted.get(&row.endpoint_id) == Some(&row.created_at) {
+                found.entry(row.endpoint_id).or_insert(row);
+            }
+        }
+        Ok(found)
+    }
+
+    /// Một trang endpoint, mới tạo trước (mặc định); `status`: chỉ endpoint đang nhận
+    /// (`Some(true)`) hay đã tắt (`Some(false)`).
+    pub(crate) async fn list(
+        &self,
+        active: Option<bool>,
+        page: &PageRequest,
+    ) -> Result<Page<Endpoint>, Error> {
+        let select = match active {
+            Some(true) => endpoint::Entity::find().filter(endpoint::Column::DisabledAt.is_null()),
+            Some(false) => {
+                endpoint::Entity::find().filter(endpoint::Column::DisabledAt.is_not_null())
+            }
+            None => endpoint::Entity::find(),
+        };
+        let rows =
+            fetch_page(select, endpoint::Column::Id, |row| row.id, page, self.database.read())
+                .await?;
         let mut endpoints = Vec::with_capacity(rows.data.len());
         for row in rows.data {
             endpoints.push(Endpoint::from_row(row)?);

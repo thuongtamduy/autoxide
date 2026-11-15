@@ -25,6 +25,7 @@ mod permissions;
 mod privacy;
 mod recovery;
 mod reset;
+mod resource;
 mod role;
 mod session;
 mod token;
@@ -172,6 +173,8 @@ impl Module for AuthModule {
         // `Arc<X>` tự đổi thành `Arc<dyn Trait>`: bên dùng chỉ thấy trait.
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
         context.provide::<dyn api::Users>(users.clone())?;
+        // Tên hiển thị của người dùng cho module khác (vd tên người làm trong audit log).
+        context.resource_type(resource::USER, Arc::new(resource::UserResolver(users.clone())))?;
         context.provide::<dyn api::Accounts>(users.clone())?;
         context.provide::<dyn api::AccountRecovery>(Arc::new(recovery::OperatorRecovery {
             users: users.clone(),

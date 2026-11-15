@@ -19,6 +19,7 @@ mod m0017_fold_user_search;
 mod m0018_move_login_throttle;
 mod m0019_move_tokens;
 mod m0021_add_cleanup_indexes;
+mod m0023_add_last_sign_in;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -58,5 +59,6 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                 autoxide_kernel::tokens::tenant_table("auth"),
             ],
         ),
+        Box::new(m0023_add_last_sign_in::Migration),
     ]
 }

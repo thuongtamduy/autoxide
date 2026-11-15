@@ -8,7 +8,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
-use sea_orm::sea_query::{Expr, Query};
+use sea_orm::sea_query::{Expr, ExprTrait as _, Query};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
     PaginatorTrait, QueryFilter, QueryOrder, Set, SqlErr,
@@ -223,6 +223,41 @@ impl RoleService {
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role deleted");
         Ok(())
+    }
+
+    /// Role (id, tên) của từng người trong `user_ids`, theo tên — một câu truy vấn cho cả trang
+    /// (`GET /auth/users?include=roles`, đề bài giao diện B1).
+    pub(crate) async fn names_of_users(
+        &self,
+        user_ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, Vec<(Uuid, String)>>, Error> {
+        let mut by_user: HashMap<Uuid, Vec<(Uuid, String)>> = HashMap::new();
+        if user_ids.is_empty() {
+            return Ok(by_user);
+        }
+        let select = Query::select()
+            .column((user_role::Entity, user_role::Column::UserId))
+            .column((role::Entity, role::Column::Id))
+            .column((role::Entity, role::Column::Name))
+            .from(user_role::Entity)
+            .inner_join(
+                role::Entity,
+                Expr::col((role::Entity, role::Column::Id))
+                    .equals((user_role::Entity, user_role::Column::RoleId)),
+            )
+            .and_where(
+                Expr::col((user_role::Entity, user_role::Column::UserId))
+                    .is_in(user_ids.iter().copied()),
+            )
+            .order_by((role::Entity, role::Column::Name), sea_orm::sea_query::Order::Asc)
+            .to_owned();
+        for row in self.database.read().query_all(&select).await? {
+            let user_id: Uuid = row.try_get("", "user_id")?;
+            let role_id: Uuid = row.try_get("", "id")?;
+            let name: String = row.try_get("", "name")?;
+            by_user.entry(user_id).or_default().push((role_id, name));
+        }
+        Ok(by_user)
     }
 
     /// Các role của người dùng `user_id`, theo thứ tự tên.

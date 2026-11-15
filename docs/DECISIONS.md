@@ -6706,3 +6706,23 @@ Luật "gate đầy đủ xanh mới merge" không đổi.
 
 Xếp vào lộ trình: các mục của đề bài này là việc sửa API của module đã có, làm ngay giữa bước 33 theo lệnh chủ dự án
 (15/11/2026); không thêm bước mới. Phần thuộc bước sau (mục E của đề bài) làm cùng bước đó.
+
+## D-265 · Đề bài giao diện, nhóm B (auth, audit, webhooks): dữ kiện theo lô, tên người qua sổ đối tượng, tự đặt mật khẩu qua thư — 2026-11-15 — agent quyết
+
+1. **Không gọi lặp theo từng dòng**: mọi trường mới của danh sách lấy bằng vài câu truy vấn gộp cho cả trang
+   (`has_password`/`last_sign_in_at` một câu, `mfa_enabled` một câu, role một câu nối bảng, lần gửi webhook mới nhất
+   hai câu). `include=…` là tham số chọn thêm (giá trị liệt kê, sai thì 400) — trường thêm vắng khi không chọn.
+2. **`api::User` không đổi** (kiểu công bố cho module khác — thêm trường là phá hợp đồng): dữ kiện tài khoản cho trang
+   quản trị (`AccountFacts`) chỉ ở tầng REST/MCP của `auth`. `last_sign_in_at` là cột mới của `auth_user`, ghi cùng
+   transaction mở phiên (đăng nhập, đổi mật khẩu); tài khoản có sẵn để `NULL` tới lần đăng nhập sau.
+3. **Tự đặt mật khẩu đầu tiên** (tài khoản vào bằng passkey): **không** thêm endpoint. Luồng đặt lại qua thư
+   (`POST /auth/password-reset`) đã đặt được mật khẩu cho tài khoản chưa có, và nhận thư ở chính địa chỉ của mình là
+   bằng chứng chủ tài khoản. Một endpoint "đặt mật khẩu bằng access token" sẽ cho kẻ lấy được access token tạo một
+   cách đăng nhập lâu dài — không làm. `has_password` cho giao diện biết để hiện nút đó; tài liệu `DELETE /me` chỉ rõ.
+4. **Email đang chờ**: đọc từ token xác minh còn dùng được mà địa chỉ khác email hiện tại (`OneTimeTokens::live`);
+   huỷ = thu hồi các token xác minh của tài khoản (`DELETE /auth/me/email`, event `auth.email_change_cancelled`).
+5. **Tên người làm trong audit** đi qua sổ đối tượng của kernel (D-123): `auth` đăng ký loại `auth.user` (tên hiển
+   thị, riêng tư, chủ là chính người đó); `audit` tra theo lô. `audit` không phụ thuộc `auth` (D-046); chương trình
+   không có `auth` thì không có tên. Các nơi khác cần tên người (người tải tệp media, người sửa phiên bản) dùng lại
+   loại này.
+6. Lọc người dùng theo role để cho bước 34 (`GET /memberships?role_id=`).

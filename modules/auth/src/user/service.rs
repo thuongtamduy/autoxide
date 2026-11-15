@@ -1,6 +1,8 @@
 //! Service của tài khoản người dùng: mọi logic về người dùng nằm ở đây. Handler REST,
 //! lệnh CLI và tool MCP (ở các mục sau) chỉ gọi vào đây.
 
+use std::collections::HashMap;
+
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
@@ -9,7 +11,8 @@ use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set, SqlErr,
+    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QuerySelect, Set,
+    SqlErr,
 };
 use uuid::Uuid;
 use validator::ValidateEmail;
@@ -55,6 +58,21 @@ pub(crate) struct UserChanges {
     pub disabled: Option<bool>,
 }
 
+/// Lọc danh sách người dùng theo trạng thái.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UserStatus {
+    Active,
+    Disabled,
+}
+
+/// Dữ kiện của một tài khoản cho trang quản trị (không có trong `api::User`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct AccountFacts {
+    pub has_password: bool,
+    pub mfa_enabled: bool,
+    pub last_sign_in_at: Option<DateTime<Utc>>,
+}
+
 pub(crate) struct UserService {
     database: Database,
     passwords: Passwords,
@@ -62,6 +80,11 @@ pub(crate) struct UserService {
 }
 
 impl UserService {
+    /// Database của module (cho bộ tra `auth.user` của sổ đối tượng).
+    pub(crate) fn database(&self) -> &Database {
+        &self.database
+    }
+
     pub(crate) fn new(database: Database, passwords: Passwords, outbox: Outbox) -> Self {
         UserService { database, passwords, outbox }
     }
@@ -187,6 +210,7 @@ impl UserService {
             email_verified_at: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
+            last_sign_in_at: Set(None),
         }
         .insert(&transaction)
         .await
@@ -385,6 +409,7 @@ impl UserService {
     pub(crate) async fn list(
         &self,
         search: Option<&str>,
+        status: Option<UserStatus>,
         page: &PageRequest,
     ) -> Result<Page<User>, Error> {
         let mut select = Entity::find();
@@ -392,8 +417,60 @@ impl UserService {
             // Không có index nào giúp được tìm "chứa": quét bảng người dùng.
             select = select.filter(autoxide_kernel::search::contains(Column::SearchText, search));
         }
+        select = match status {
+            Some(UserStatus::Active) => select.filter(Column::DisabledAt.is_null()),
+            Some(UserStatus::Disabled) => select.filter(Column::DisabledAt.is_not_null()),
+            None => select,
+        };
         let page = fetch_page(select, Column::Id, |row| row.id, page, self.database.read()).await?;
         Ok(page.map(User::from))
+    }
+
+    /// Dữ kiện tài khoản của những người `ids` cho trang quản trị (có mật khẩu chưa, đã bật đăng
+    /// nhập hai bước chưa, lần đăng nhập cuối) — hai câu truy vấn cho cả trang, không theo từng
+    /// người (đề bài giao diện B1).
+    pub(crate) async fn facts(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, AccountFacts>, Error> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let read = self.database.read();
+        let rows: Vec<(Uuid, Option<String>, Option<DateTime<Utc>>)> = Entity::find()
+            .select_only()
+            .column(Column::Id)
+            // Chỉ cần biết có hay không: không đọc hash ra (mỗi giá trị chỉ là `x` hay `NULL`).
+            .column_as(
+                Into::<sea_orm::sea_query::Expr>::into(
+                    sea_orm::sea_query::Expr::case(Column::PasswordHash.is_not_null(), "x")
+                        .finally(sea_orm::sea_query::Expr::val(Option::<String>::None)),
+                ),
+                "has_password",
+            )
+            .column(Column::LastSignInAt)
+            .filter(Column::Id.is_in(ids.iter().copied()))
+            .into_tuple()
+            .all(read)
+            .await?;
+        let with_mfa: std::collections::HashSet<Uuid> = crate::mfa::entity::totp::Entity::find()
+            .select_only()
+            .column(crate::mfa::entity::totp::Column::UserId)
+            .filter(crate::mfa::entity::totp::Column::ConfirmedAt.is_not_null())
+            .filter(crate::mfa::entity::totp::Column::UserId.is_in(ids.iter().copied()))
+            .into_tuple::<Uuid>()
+            .all(read)
+            .await?
+            .into_iter()
+            .collect();
+        Ok(rows
+            .into_iter()
+            .map(|(id, password, last_sign_in_at)| {
+                let facts = AccountFacts {
+                    has_password: password.is_some(),
+                    mfa_enabled: with_mfa.contains(&id),
+                    last_sign_in_at,
+                };
+                (id, facts)
+            })
+            .collect())
     }
 
     /// Đặt mật khẩu mới cho người dùng `id`.
@@ -941,10 +1018,12 @@ mod tests {
                 created.push(users.create(Actor::system(), input).await.unwrap().id);
             }
 
-            let first = users.list(None, &PageRequest::first(2, Order::Asc)).await.unwrap();
+            let first = users.list(None, None, &PageRequest::first(2, Order::Asc)).await.unwrap();
             let cursor: Uuid = first.pagination.next_cursor.as_deref().unwrap().parse().unwrap();
-            let second =
-                users.list(None, &PageRequest::first(2, Order::Asc).after(cursor)).await.unwrap();
+            let second = users
+                .list(None, None, &PageRequest::first(2, Order::Asc).after(cursor))
+                .await
+                .unwrap();
 
             let ids: Vec<Uuid> =
                 first.data.iter().chain(&second.data).map(|user| user.id).collect();
@@ -1097,7 +1176,7 @@ mod account_tests {
             assert_eq!(error.code(), "auth.email_taken");
             let page = services
                 .users
-                .list(None, &PageRequest::first(10, autoxide_kernel::pagination::Order::Asc))
+                .list(None, None, &PageRequest::first(10, autoxide_kernel::pagination::Order::Asc))
                 .await
                 .unwrap();
             assert_eq!(page.data.len(), 1);

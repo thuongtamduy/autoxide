@@ -4,6 +4,7 @@ pub(crate) mod entity;
 mod service;
 
 pub(crate) use service::NewUser;
+pub(crate) use service::{AccountFacts, UserStatus};
 pub(crate) use service::{
     PasswordWrite, UserChanges, UserService, check_email_field, email_taken, invalid_credentials,
     user_disabled, user_not_found,

@@ -43,6 +43,14 @@ pub struct Consumed {
     pub data: Option<String>,
 }
 
+/// Token còn dùng được (xem [`OneTimeTokens::live`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct Live {
+    pub data: Option<String>,
+    pub expires_at: DateTime<Utc>,
+}
+
 /// Vì sao một token bị từ chối.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenRejection {
@@ -150,6 +158,36 @@ impl OneTimeTokens {
                 Ok(Recent {
                     data: row.try_get::<Option<String>>("", "data")?,
                     created_at: row.try_get::<DateTime<Utc>>("", "created_at")?,
+                })
+            })
+            .collect()
+    }
+
+    /// Token của `subject` cho `purpose` còn dùng được (chưa dùng, còn hạn), mới nhất trước — vd
+    /// email đang chờ xác minh.
+    pub async fn live<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        tenant: &TenantContext,
+        purpose: &str,
+        subject: &str,
+    ) -> Result<Vec<Live>, Error> {
+        let select = Query::select()
+            .columns([Alias::new("data"), Alias::new("expires_at")])
+            .from(Alias::new(&self.table))
+            .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
+            .and_where(Expr::col(Alias::new("purpose")).eq(purpose))
+            .and_where(Expr::col(Alias::new("subject")).eq(subject))
+            .and_where(Expr::col(Alias::new("used_at")).is_null())
+            .and_where(Expr::col(Alias::new("expires_at")).gt(now()))
+            .order_by(Alias::new("created_at"), Order::Desc)
+            .to_owned();
+        let rows = connection.query_all(&select).await?;
+        rows.iter()
+            .map(|row| {
+                Ok(Live {
+                    data: row.try_get::<Option<String>>("", "data")?,
+                    expires_at: row.try_get::<DateTime<Utc>>("", "expires_at")?,
                 })
             })
             .collect()

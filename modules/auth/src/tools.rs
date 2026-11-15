@@ -19,7 +19,7 @@ use crate::http::HttpState;
 use crate::http::api_keys::{ApiKeyResponse, CreateApiKeyRequest, CreatedApiKeyResponse};
 use crate::http::roles::{PermissionResponse, RoleRequest, RoleResponse};
 use crate::http::session::MeResponse;
-use crate::http::users::UserResponse;
+use crate::http::users::{UserResponse, describe, describe_page};
 use crate::permissions::{ROLES_MANAGE, ROLES_READ, USERS_MANAGE, USERS_READ};
 use crate::role::RoleInput;
 use crate::user::UserChanges;
@@ -264,7 +264,7 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
                 async move {
                     let user = state.users.get(principal.user_id()).await?;
                     let user = user.ok_or_else(crate::token::invalid_token)?;
-                    Ok(MeResponse::new(user, &principal))
+                    MeResponse::load(&state, user, &principal).await
                 }
             },
         )
@@ -293,8 +293,10 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
                 let state = list.clone();
                 async move {
                     let page = PageInput::new(input.limit, input.cursor, input.order);
-                    let page = state.users.list(input.search.as_deref(), &page.page()?).await?;
-                    Ok::<Page<UserResponse>, Error>(page.map(UserResponse::from))
+                    let page =
+                        state.users.list(input.search.as_deref(), None, &page.page()?).await?;
+                    let page = describe_page(&state.users, &state.roles, page, false).await?;
+                    Ok::<Page<UserResponse>, Error>(page)
                 }
             },
         )
@@ -314,7 +316,7 @@ fn users(state: &Arc<HttpState>) -> Vec<Tool> {
                         .users
                         .update(Actor::from(&principal), input.id, changes, None)
                         .await?;
-                    Ok::<_, Error>(UserResponse::from(user))
+                    describe(&state.users, user).await
                 }
             },
         )

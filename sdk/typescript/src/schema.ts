@@ -102,6 +102,11 @@ export type AuditEntryResponse = {
    */
   actor_kind: string;
   /**
+   * Display name of `actor_user_id`, with `include=actor`: `null` when the account no longer
+   * exists; absent when no user made the change.
+   */
+  actor_name?: string | null;
+  /**
    * User who made the change; `null` for the system (command line, background jobs,
    * self-registration).
    */
@@ -804,6 +809,11 @@ export type Data_AuditEntryResponse = {
      */
     actor_kind: string;
     /**
+     * Display name of `actor_user_id`, with `include=actor`: `null` when the account no longer
+     * exists; absent when no user made the change.
+     */
+    actor_name?: string | null;
+    /**
      * User who made the change; `null` for the system (command line, background jobs,
      * self-registration).
      */
@@ -1188,6 +1198,7 @@ export type Data_EndpointResponse = {
     /** Event names it receives; `*` means every event. */
     events: string[];
     id: string;
+    last_delivery?: LastDelivery | null;
     updated_at: string;
     url: string;
   };
@@ -1484,9 +1495,15 @@ export type Data_MeResponse = {
      * not verified (ask for a new mail with `POST /api/v1/auth/me/email/verification`).
      */
     email_verified_at?: string | null;
+    /**
+     * Whether the account has a password. Without one (signed in with a passkey), set a first
+     * password through `POST /api/v1/auth/password-reset`.
+     */
+    has_password: boolean;
     id: string;
     /** Display name. */
     name: string;
+    pending_email?: PendingEmail | null;
     /** Permissions granted by the user's roles, sorted by name. */
     permissions: string[];
   };
@@ -2329,9 +2346,24 @@ export type Data_UserResponse = {
      * is not verified.
      */
     email_verified_at?: string | null;
+    /**
+     * Whether the account has a password. Without one it signs in with a passkey; its owner
+     * sets a first password through `POST /api/v1/auth/password-reset`, an administrator
+     * with `POST /api/v1/auth/users/{id}/password`.
+     */
+    has_password: boolean;
     id: string;
+    /**
+     * When the user last started a session (sign-in, password change); `null` if not since
+     * this field exists.
+     */
+    last_sign_in_at?: string | null;
+    /** Whether two-step sign-in (an authenticator app) is on. */
+    mfa_enabled: boolean;
     /** Display name. */
     name: string;
+    /** The user's roles, by name. Only with `include=roles` on the user list. */
+    roles?: UserRole[] | null;
     updated_at: string;
   };
 };
@@ -2664,6 +2696,7 @@ export type EndpointResponse = {
   /** Event names it receives; `*` means every event. */
   events: string[];
   id: string;
+  last_delivery?: LastDelivery | null;
   updated_at: string;
   url: string;
 };
@@ -3014,6 +3047,19 @@ export type ImportRequest = {
 /** What an entry is. */
 export type Kind = "post" | "page";
 
+/** The newest delivery to an endpoint. */
+export type LastDelivery = {
+  created_at: string;
+  event_name: string;
+  id: string;
+  /** When it was last tried; `null` while it waits for its first attempt. */
+  last_attempt_at?: string | null;
+  /** HTTP status the endpoint answered with, on the last attempt; `null` when it did not answer. */
+  response_status?: number | null;
+  /** `pending`, `delivered` or `failed`. */
+  status: string;
+};
+
 /** One list choice. */
 export type ListChoice = {
   key: string;
@@ -3086,9 +3132,15 @@ export type MeResponse = {
    * not verified (ask for a new mail with `POST /api/v1/auth/me/email/verification`).
    */
   email_verified_at?: string | null;
+  /**
+   * Whether the account has a password. Without one (signed in with a passkey), set a first
+   * password through `POST /api/v1/auth/password-reset`.
+   */
+  has_password: boolean;
   id: string;
   /** Display name. */
   name: string;
+  pending_email?: PendingEmail | null;
   /** Permissions granted by the user's roles, sorted by name. */
   permissions: string[];
 };
@@ -3452,6 +3504,11 @@ export type Page_AuditEntryResponse = {
      */
     actor_kind: string;
     /**
+     * Display name of `actor_user_id`, with `include=actor`: `null` when the account no longer
+     * exists; absent when no user made the change.
+     */
+    actor_name?: string | null;
+    /**
      * User who made the change; `null` for the system (command line, background jobs,
      * self-registration).
      */
@@ -3653,6 +3710,7 @@ export type Page_EndpointResponse = {
     /** Event names it receives; `*` means every event. */
     events: string[];
     id: string;
+    last_delivery?: LastDelivery | null;
     updated_at: string;
     url: string;
   }[];
@@ -4368,9 +4426,24 @@ export type Page_UserResponse = {
      * is not verified.
      */
     email_verified_at?: string | null;
+    /**
+     * Whether the account has a password. Without one it signs in with a passkey; its owner
+     * sets a first password through `POST /api/v1/auth/password-reset`, an administrator
+     * with `POST /api/v1/auth/users/{id}/password`.
+     */
+    has_password: boolean;
     id: string;
+    /**
+     * When the user last started a session (sign-in, password change); `null` if not since
+     * this field exists.
+     */
+    last_sign_in_at?: string | null;
+    /** Whether two-step sign-in (an authenticator app) is on. */
+    mfa_enabled: boolean;
     /** Display name. */
     name: string;
+    /** The user's roles, by name. Only with `include=roles` on the user list. */
+    roles?: UserRole[] | null;
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -4403,6 +4476,13 @@ export type PasskeyResponse = {
   last_used_at?: string | null;
   /** Name the user gave it, e.g. the device. */
   name: string;
+};
+
+/** An email change waiting for its confirmation link. */
+export type PendingEmail = {
+  email: string;
+  /** When the confirmation link stops working. */
+  expires_at: string;
 };
 
 /** A permission that roles can grant. */
@@ -5846,10 +5926,31 @@ export type UserResponse = {
    * is not verified.
    */
   email_verified_at?: string | null;
+  /**
+   * Whether the account has a password. Without one it signs in with a passkey; its owner
+   * sets a first password through `POST /api/v1/auth/password-reset`, an administrator
+   * with `POST /api/v1/auth/users/{id}/password`.
+   */
+  has_password: boolean;
   id: string;
+  /**
+   * When the user last started a session (sign-in, password change); `null` if not since
+   * this field exists.
+   */
+  last_sign_in_at?: string | null;
+  /** Whether two-step sign-in (an authenticator app) is on. */
+  mfa_enabled: boolean;
   /** Display name. */
   name: string;
+  /** The user's roles, by name. Only with `include=roles` on the user list. */
+  roles?: UserRole[] | null;
   updated_at: string;
+};
+
+/** A role a user holds. */
+export type UserRole = {
+  id: string;
+  name: string;
 };
 
 /** The complete list of roles a user should have. */
@@ -5919,7 +6020,7 @@ export interface paths {
   "/api/v1/audit": {
     /** List the audit log. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { actor_user_id?: string; subject?: string; action?: string; module?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { actor_user_id?: string; subject?: string; action?: string; module?: string; include?: "actor"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_AuditEntryResponse;
         400: Problem;
@@ -6116,6 +6217,16 @@ export interface paths {
         409: Problem;
         422: Problem;
         429: Problem;
+        default: Problem;
+      };
+    };
+    /** Cancel a pending email change. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -6456,7 +6567,7 @@ export interface paths {
   "/api/v1/auth/users": {
     /** List or search user accounts. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { search?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { search?: string; status?: "active" | "disabled"; include?: "roles"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_UserResponse;
         401: Problem;
@@ -9012,7 +9123,7 @@ export interface paths {
   "/api/v1/webhooks": {
     /** List webhook endpoints. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: "active" | "disabled"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_EndpointResponse;
         401: Problem;
