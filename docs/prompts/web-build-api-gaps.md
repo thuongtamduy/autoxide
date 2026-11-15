@@ -404,3 +404,25 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/customers.
 | [ ] | Chi trả | `GET /payouts` (ảnh chụp khấu trừ), `POST /{id}/mark-paid`, `/{id}/retry`; thuế TNCN khấu trừ thay có ngày hiệu lực | 49, 36 |
 | [ ] | Livestream | `GET/POST /live-sessions`, `/{id}/start\|end\|products\|log\|report` | 49 |
 | [ ] | Góc người tiếp thị | `GET /partners/me/stats`, `/me/links`, `/me/tax-statement` | 49 |
+
+## Tổng quan (`/`) và Việc và hoạt động (`/work`)
+
+Giao diện dựng sổ nguồn việc ở `src/work/` theo đúng hình dạng đặc tả bước 51 (W-020 của web): có API
+thì chỉ thay phần đọc. Ba nguồn đọc API thật (bình luận chờ duyệt, bài nộp form mới, bài chờ duyệt),
+13 nguồn còn lại đọc dữ liệu mẫu của các phân hệ.
+
+| [ ] | Màn | Cần | Bước | Giao diện đang làm gì |
+| --- | --- | --- | --- | --- |
+| [ ] | Hộp việc | `GET /kernel/work` gộp mọi nguồn theo permission, kèm `key`, `reason`, `incomplete` khi một nguồn không trả lời | 51 | 16 nguồn tự đọc từng module, hạn 2 giây mỗi nguồn |
+| [ ] | Số đếm trên menu | `GET /kernel/work/counts` theo `NavItem.counter`, cache ngắn | 51 | Tự đếm, giữ 10 giây trong bộ nhớ theo người xem |
+| [ ] | Hoãn, giao việc | `PUT/DELETE` trạng thái việc của từng người (bảng `kernel_work_states`), giao cho người có permission của nguồn | 51 | Giữ ở `src/sample/work.ts` |
+| [ ] | Hạn của việc | Mỗi module tự khai hạn gợi ý cho việc không có hạn (đơn chờ nhận, bình luận, bài nộp, bài chờ duyệt) | 51 | Hạn viết ở `sources.ts` của web |
+| [ ] | Ô số liệu Tổng quan | `GET /kernel/summary` (doanh thu hôm nay, đơn chờ, sắp hết hàng, bài chờ duyệt…) | 51 | 3 số thật, 3 số mẫu |
+| [ ] | Các bước thiết lập | `GET /kernel/setup` theo mô hình kinh doanh, bước pháp lý chặn bán đánh dấu | 51 | 8 bước tính ở `setup.ts` |
+| [ ] | Hoạt động | `GET /audit/activity` trả câu đã dịch (ai làm gì với gì), không chỉ bản ghi audit thô | 51 | Tự dựng câu từ `GET /audit` |
+| [ ] | Bài chờ duyệt | Tham số lọc `review_requested=true` cho `GET /content/posts` và tổng số thật | 51 | Lọc trên một trang bản nháp |
+| [ ] | Tổng số | `total` (hay `total_estimate`) trong pagination để ô số liệu không phải đếm từng trang | 51 | Đếm trên một trang, ghi "≥" khi còn trang |
+| [ ] | Thao tác hàng loạt | `dry_run` (GET, không ghi) và `expected_count` → 409 `kernel.bulk_count_changed` | 51 | `src/sample/bulk.ts` |
+| [ ] | Đã ghim | `GET/PUT/DELETE /me/pins` | chưa có trong lộ trình | Tab chỉ hiện khi bật dữ liệu mẫu |
+| [ ] | Tuỳ chọn thông báo | `GET/PUT /me/notification-preferences` theo loại việc và kênh | 37, 52 | Tab chỉ hiện khi bật dữ liệu mẫu |
+| [ ] | Ngôn ngữ ưa dùng | Lưu ngôn ngữ của người dùng ở core (`/me`) để email và thông báo theo đó | 52 | Chỉ nhớ bằng cookie của trình duyệt |
