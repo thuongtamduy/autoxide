@@ -4,6 +4,8 @@
 //!   nhất (xem `api_diff.rs`). `./gate.sh` gọi lệnh này ở cả hai mức.
 //! - `semver [--base <tag>] [--deny] [--markdown]` — báo thay đổi phá vỡ của hợp đồng Rust
 //!   (kernel, testkit) bằng `cargo semver-checks`; chạy lúc phát hành (xem `semver.rs`).
+//! - `sdk [--check | --extract-examples <dir>]` — sinh kiểu TypeScript của SDK từ
+//!   `docs/openapi.json`; `--check` (trong gate) báo khi file đã commit lệch (xem `sdk.rs`).
 //! - `check` — kiểm luật ranh giới của workspace (xem `boundaries.rs`), bản dịch i18n
 //!   (`i18n.rs`) và tài liệu EN / VI (`docs.rs`). `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
 //! - `new-module <module> <entity>` — sinh module mới từ khuôn `modules/notes` (xem
@@ -17,6 +19,7 @@ mod boundaries;
 mod docs;
 mod i18n;
 mod scaffold;
+mod sdk;
 mod semver;
 mod workspace;
 
@@ -25,6 +28,7 @@ use std::process::ExitCode;
 const USAGE: &str = "usage: cargo xtask check
        cargo xtask api-diff [--base <ref>]       default base: the last release tag before HEAD
        cargo xtask semver [--base <tag>] [--deny] [--markdown]
+       cargo xtask sdk [--check | --extract-examples <dir>]
        cargo xtask new-module <module> <entity>   e.g. new-module bookmarks bookmark
        cargo xtask test-affected [--base <ref>]   default base: origin/main";
 
@@ -38,6 +42,9 @@ fn main() -> ExitCode {
         ["api-diff"] => api_diff(None),
         ["api-diff", "--base", base] => api_diff(Some(base)),
         ["semver", rest @ ..] => semver(rest),
+        ["sdk"] => sdk(false),
+        ["sdk", "--check"] => sdk(true),
+        ["sdk", "--extract-examples", dir] => sdk_examples(dir),
         ["new-module", module, entity] => new_module(module, entity),
         ["test-affected"] => test_affected(None),
         ["test-affected", "--base", base] => test_affected(Some(base)),
@@ -93,6 +100,37 @@ fn semver(args: &[&str]) -> ExitCode {
         Ok(false) => ExitCode::FAILURE,
         Err(error) => {
             eprintln!("xtask semver: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn sdk(check: bool) -> ExitCode {
+    let result = workspace::load().map_err(|error| error.to_string()).and_then(|workspace| {
+        let version = semver::workspace_version(&workspace.root)?;
+        sdk::run(&workspace.root, check, &version)
+    });
+    match result {
+        Ok(true) => ExitCode::SUCCESS,
+        Ok(false) => ExitCode::FAILURE,
+        Err(error) => {
+            eprintln!("xtask sdk: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn sdk_examples(dir: &str) -> ExitCode {
+    let result = workspace::load()
+        .map_err(|error| error.to_string())
+        .and_then(|workspace| sdk::extract_examples(&workspace.root, std::path::Path::new(dir)));
+    match result {
+        Ok(count) => {
+            println!("sdk: wrote {count} TypeScript example(s) to {dir}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("xtask sdk: {error}");
             ExitCode::FAILURE
         }
     }

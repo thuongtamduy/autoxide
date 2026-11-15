@@ -16,7 +16,12 @@
 # So với tag phát hành gần nhất (tổ tiên của HEAD); cần lịch sử và tag (D-059, đặc tả 31 A1).
 step "api contract (cargo xtask api-diff)"
 cargo xtask api-diff
-#   4. hợp đồng API         cargo xtask api-diff: không phá vỡ /api/v1 so với tag phát hành gần nhất
+
+# Kiểu TypeScript của SDK sinh từ docs/openapi.json; không cần Node (D-243).
+step "TypeScript SDK matches the contract (cargo xtask sdk --check)"
+cargo xtask sdk --check
+#   4. hợp đồng API         cargo xtask api-diff: không phá vỡ /api/v1 so với tag phát hành gần nhất;
+#                           cargo xtask sdk --check: SDK TypeScript khớp docs/openapi.json
 #   5. thư viện             cargo deny check (license, lỗ hổng, nguồn)
 #   6. secret               gitleaks: toàn bộ lịch sử git và thay đổi chưa commit
 #   7. test trên SQLite

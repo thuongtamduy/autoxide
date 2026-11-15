@@ -40,8 +40,9 @@ bước 7.**
 1. Đưa nhánh lên `main` mới nhất: `git fetch origin`, rồi `git rebase origin/main`. Phiên
    khác có thể đã merge trong lúc mình làm — xem "Khi hai phiên đụng nhau" bên dưới.
 2. Đổi `version` trong `Cargo.toml` gốc; chạy `cargo check` để cập nhật `Cargo.lock`. Đổi
-   theo: `"version"` trong `docs/openapi.json`, bản phát hành mới nhất ở dòng "Trạng thái"
-   của `docs/ROADMAP.md`.
+   theo: `"version"` trong `docs/openapi.json`, `"version"` trong `sdk/typescript/package.json` và
+   `sdk/typescript/package-lock.json` (`cargo xtask sdk --check` của gate kiểm), bản phát hành mới
+   nhất ở dòng "Trạng thái" của `docs/ROADMAP.md`.
 3. Trong `CHANGELOG.md`: đổi `## [Unreleased]` thành `## [X.Y.Z] - YYYY-MM-DD`, thêm một
    mục `## [Unreleased]` trống ở trên, cập nhật hai dòng liên kết ở cuối file. Workflow kiểm
    có mục `## [X.Y.Z]` và tag khớp `version`, sai thì không phát hành.
@@ -96,6 +97,8 @@ Chủ dự án giữ repo riêng tư (D-199), nên đẩy tag không kích hoạ
 
    Không có `gh` hay quyền tạo bản phát hành thì dừng ở tag đã đẩy và báo chủ dự án tạo bản phát
    hành trên trang Releases (chọn tag, dán phần `## [X.Y.Z]` của `CHANGELOG.md`).
+   Đính kèm gói SDK TypeScript: `(cd sdk/typescript && npm pack)` tạo `autoxide-sdk-X.Y.Z.tgz`;
+   `gh release upload vX.Y.Z sdk/typescript/autoxide-sdk-X.Y.Z.tgz` (hoặc kéo file vào trang phát hành).
 2. Image Docker chỉ khi chủ dự án muốn và đưa token GitHub có quyền `write:packages` — thiếu thì
    bỏ qua và báo lại, không tự tạo hay lưu token. Chỉ build được `linux/amd64`, không kèm chứng
    thực:

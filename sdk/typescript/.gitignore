@@ -1,0 +1,3 @@
+node_modules/
+# Ví dụ TypeScript trích từ docs/guides bởi `cargo xtask sdk --extract-examples` (CI).
+examples/guides/
