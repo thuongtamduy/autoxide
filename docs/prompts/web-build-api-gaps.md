@@ -3,9 +3,14 @@
 File sống, cho team API. Mỗi lần dựng xong một màn của repo giao diện `autoxide-web`, agent giao diện thêm vào đây những
 gì màn đó cần mà `docs/openapi.json` chưa có.
 
-Luật của repo giao diện: chỉ gọi REST API công khai của core. Thiếu API thì thêm ở core trước (theo luật của core), rồi
-sinh lại SDK. Giao diện không làm giả dữ liệu: phần nào thiếu API thì chưa dựng, hoặc dựng phần đọc được và ghi rõ
-phần còn thiếu.
+Luật của repo giao diện: gọi REST API công khai của core cho mọi thứ core đã có. Phần core chưa có API thì giao diện
+dựng bằng **dữ liệu mẫu** (chủ dự án quyết ngày 15/11/2026, W-006 của `autoxide-web`):
+- dữ liệu và hàm mẫu nằm gọn trong `apps/admin/src/sample/`, có kiểu theo đúng hình dạng dự kiến của API trong đặc tả bước;
+- trên màn có nhãn "Dữ liệu mẫu · chờ API bước N";
+- tắt mặc định ở production.
+
+Khi team API làm xong một dòng, giao diện thay hàm mẫu bằng lời gọi thật. Nếu API thật khác hình dạng đã đoán, sửa
+giao diện theo API, không sửa API theo dữ liệu mẫu.
 
 File này khác các đề bài trước:
 - `ui-api-gaps.md`, `ui-phase2-api.md`, `ui-phase3-api.md` đối chiếu **bản thiết kế** với lộ trình.
