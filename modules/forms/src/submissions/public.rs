@@ -28,11 +28,11 @@ use uuid::Uuid;
 
 use crate::entity::{form as form_row, submission};
 use crate::events::{self, Change};
-use crate::fields::{self, FieldType, Locale};
+use crate::forms::fields::{self, FieldType, Locale};
 use crate::forms::{Form, FormStatus, normalize_origin};
-use crate::inbox::{SubmissionStatus, summary};
 use crate::permissions::FORMS_SUBMIT;
 use crate::service::{FormsService, form_not_found, now, to_json};
+use crate::submissions::inbox::{SubmissionStatus, summary};
 
 const HOUR: Duration = Duration::from_secs(3600);
 /// Cùng nội dung gửi tới cùng form trong chừng này giờ thì bị coi là trùng (giữ lại).

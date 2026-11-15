@@ -1,7 +1,8 @@
-//! Service của `forms`: MỌI logic nằm ở đây và các file cùng cấp (`forms.rs`, `inbox.rs`,
-//! `public.rs`…). Handler REST và tool MCP chỉ lấy dữ liệu vào rồi gọi service — cùng kết quả,
-//! cùng permission (luật kiến trúc 8). Mỗi lệnh ghi đi cùng event trong CÙNG transaction (luật
-//! kiến trúc 3); gọi mạng (chống spam, gửi mail) nằm NGOÀI transaction.
+//! Service của `forms`: MỌI logic nằm ở đây và các file theo tính năng — `forms.rs` + `forms/`
+//! (định nghĩa form, trường), `submissions/` (gửi công khai, hộp thư, CSV, mail báo),
+//! `retention.rs`, `privacy.rs`. Handler REST và tool MCP chỉ lấy dữ liệu vào rồi gọi service —
+//! cùng kết quả, cùng permission (luật kiến trúc 8). Mỗi lệnh ghi đi cùng event trong CÙNG
+//! transaction (luật kiến trúc 3); gọi mạng (chống spam, gửi mail) nằm NGOÀI transaction.
 
 use std::sync::Arc;
 

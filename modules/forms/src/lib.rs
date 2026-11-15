@@ -6,20 +6,16 @@
 //! Mailer` nên module đăng ký SAU module `mail`. Hướng dẫn dùng: `docs/FORMS.md`.
 
 mod config;
-mod csv;
 mod entity;
 mod events;
-mod fields;
 mod forms;
 mod http;
-mod inbox;
 mod migration;
-mod notify;
 mod permissions;
 mod privacy;
-mod public;
 mod retention;
 mod service;
+mod submissions;
 mod tools;
 
 #[cfg(test)]
@@ -106,10 +102,10 @@ impl Module for FormsModule {
     fn subscriptions(&self) -> Vec<Subscription> {
         self.service.clone().map_or_else(Vec::new, |service| {
             vec![
-                // Bài vào hộp thư: mail báo quản trị viên (`notify.rs`).
+                // Bài vào hộp thư: mail báo quản trị viên (`submissions/notify.rs`).
                 Subscription::new(
                     events::SubmissionReceived::NAME,
-                    Arc::new(notify::Notifier(service.clone())),
+                    Arc::new(submissions::notify::Notifier(service.clone())),
                 ),
                 // Tài khoản bị xoá: bỏ `created_by` (`privacy.rs`).
                 Subscription::new(autoxide_kernel::privacy::USER_DELETED, service),

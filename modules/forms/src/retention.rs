@@ -19,8 +19,8 @@ use serde_json::json;
 
 use crate::entity::{form, submission};
 use crate::events::{self, Change};
-use crate::inbox::SubmissionStatus;
 use crate::service::{FormsService, now};
+use crate::submissions::inbox::SubmissionStatus;
 
 pub(crate) const CLEANUP: &str = "forms.cleanup";
 

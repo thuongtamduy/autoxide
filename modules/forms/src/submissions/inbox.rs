@@ -19,8 +19,8 @@ use uuid::Uuid;
 
 use crate::entity::{form, form_version, submission};
 use crate::events::{self, Change};
-use crate::fields::{self, Field};
 use crate::forms::Form;
+use crate::forms::fields::{self, Field};
 use crate::permissions::{FORMS_EXPORT, FORMS_READ, FORMS_REVIEW};
 use crate::service::{FormsService, from_json, now, submission_not_found};
 
@@ -348,7 +348,7 @@ impl FormsService {
             }
         }
         let name = format!("{}-submissions.csv", form.row.key);
-        Ok((name, crate::csv::write(&header, &rows)))
+        Ok((name, crate::submissions::csv::write(&header, &rows)))
     }
 
     /// Đọc `rows` ra kèm `key` của form và trường của đúng phiên bản.

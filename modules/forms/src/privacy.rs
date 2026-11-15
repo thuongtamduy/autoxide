@@ -4,7 +4,7 @@
 //!   khoản bị xoá (`privacy::USER_DELETED`): bỏ trống `created_by`; form vẫn giữ (là của site).
 //!   Nhận lại cùng event thì kết quả không đổi (D-054).
 //! - Theo email (người gửi form không có tài khoản): `GET` / `DELETE /api/v1/forms/data?email=`
-//!   (`inbox.rs`), permission `forms.export`.
+//!   (`submissions/inbox.rs`), permission `forms.export`.
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
