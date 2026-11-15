@@ -487,7 +487,7 @@ export type CommentFollow = {
 
 /** A token from a mail link. */
 export type CommentMailToken = {
-  /** The `token` of the link. */
+  /** The `token` of the link, exactly as received (it may contain a `.`). */
   token: string;
 };
 
@@ -6307,7 +6307,7 @@ export type TranslationStatus = "queued" | "running" | "succeeded" | "failed";
 export type UnsubscribeRequest = {
   /** Stop mails about every comment followed with this address, not just this one. */
   all?: boolean;
-  /** The `token` of the link in a reply mail. */
+  /** The `token` of the link in a reply mail, exactly as received (it may contain a `.`). */
   token: string;
 };
 

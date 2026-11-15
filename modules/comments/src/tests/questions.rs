@@ -116,7 +116,7 @@ async fn person(shop: &Shop, name: &str, extra: &[&str]) -> Principal {
     let mut permissions = vec!["comments.post".to_owned()];
     permissions.extend(extra.iter().map(|permission| (*permission).to_owned()));
     let principal = Principal::new(Uuid::now_v7(), permissions);
-    shop.h.service.set_profile(&principal, name).await.unwrap();
+    shop.h.service.set_profile(&shop.h.tenant, &principal, name).await.unwrap();
     shop.verified.0.lock().unwrap().insert(principal.user_id());
     principal
 }
@@ -135,18 +135,40 @@ fn answer_to(id: Uuid, body: &str) -> NewComment {
 }
 
 async fn ask(service: &CommentsService, who: &Principal, body: &str) -> Uuid {
-    service.post(Some(who), &ClientInfo::default(), question(body)).await.unwrap().comment.row.id
+    service
+        .post(
+            &service.databases.default_tenant(),
+            Some(who),
+            &ClientInfo::default(),
+            question(body),
+        )
+        .await
+        .unwrap()
+        .comment
+        .row
+        .id
 }
 
 /// Nội dung các câu hỏi đang hiện của sản phẩm, theo thứ tự trả về.
 async fn shown(service: &CommentsService, search: Option<&str>) -> Vec<String> {
-    let found = service.thread(PRODUCTS, PRODUCT, &page(Order::Desc), 3, search).await.unwrap();
+    let found = service
+        .thread(
+            &service.databases.default_tenant(),
+            PRODUCTS,
+            PRODUCT,
+            &page(Order::Desc),
+            3,
+            search,
+        )
+        .await
+        .unwrap();
     found.data.into_iter().map(|thread| thread.root.row.body).collect()
 }
 
 /// (số câu hỏi đang hiện, số câu hỏi chờ duyệt) của sản phẩm.
 async fn question_counts(service: &CommentsService) -> (i32, i32) {
-    let target = service.target(PRODUCTS, PRODUCT).await.unwrap();
+    let target =
+        service.target(&service.databases.default_tenant(), PRODUCTS, PRODUCT).await.unwrap();
     (target.published_threads, target.pending_threads)
 }
 
@@ -157,22 +179,42 @@ async fn cau_hoi_chi_hien_sau_khi_duyet() {
         let service = &shop.h.service;
         let buyer = person(&shop, "Lan", &[]).await;
         let posted = service
-            .post(Some(&buyer), &ClientInfo::default(), question("Bếp có kèm nồi không?"))
+            .post(
+                &service.databases.default_tenant(),
+                Some(&buyer),
+                &ClientInfo::default(),
+                question("Bếp có kèm nồi không?"),
+            )
             .await
             .unwrap();
         assert_eq!(posted.shown, Status::Pending);
         assert!(shown(service, None).await.is_empty(), "waits for approval");
         assert_eq!(question_counts(service).await, (0, 1));
         assert_eq!(
-            service.counts(PRODUCTS, &[PRODUCT.to_owned()]).await.unwrap(),
+            service
+                .counts(&service.databases.default_tenant(), PRODUCTS, &[PRODUCT.to_owned()])
+                .await
+                .unwrap(),
             [(PRODUCT.to_owned(), 0, 0)]
         );
 
-        service.set_status(&admin(), posted.comment.row.id, Status::Published, None).await.unwrap();
+        service
+            .set_status(
+                &service.databases.default_tenant(),
+                &admin(),
+                posted.comment.row.id,
+                Status::Published,
+                None,
+            )
+            .await
+            .unwrap();
         assert_eq!(shown(service, None).await, ["Bếp có kèm nồi không?"]);
         assert_eq!(question_counts(service).await, (1, 0));
         assert_eq!(
-            service.counts(PRODUCTS, &[PRODUCT.to_owned()]).await.unwrap(),
+            service
+                .counts(&service.databases.default_tenant(), PRODUCTS, &[PRODUCT.to_owned()])
+                .await
+                .unwrap(),
             [(PRODUCT.to_owned(), 1, 1)]
         );
     })
@@ -189,11 +231,26 @@ async fn tra_loi_cua_nguoi_ban_co_nhan_seller() {
         let seller = person(&shop, "Bếp Mộc", &["catalog.manage"]).await;
         let id = ask(service, &buyer, "Bảo hành bao lâu?").await;
         let answer = service
-            .post(Some(&seller), &ClientInfo::default(), answer_to(id, "Bảo hành 24 tháng."))
+            .post(
+                &service.databases.default_tenant(),
+                Some(&seller),
+                &ClientInfo::default(),
+                answer_to(id, "Bảo hành 24 tháng."),
+            )
             .await
             .unwrap();
         assert_eq!(answer.comment.row.badges, "seller");
-        let thread = service.thread(PRODUCTS, PRODUCT, &page(Order::Desc), 3, None).await.unwrap();
+        let thread = service
+            .thread(
+                &service.databases.default_tenant(),
+                PRODUCTS,
+                PRODUCT,
+                &page(Order::Desc),
+                3,
+                None,
+            )
+            .await
+            .unwrap();
         let reply = crate::http::PublicComment::from(thread.data[0].replies[0].clone());
         assert_eq!(reply.badges, ["seller"]);
         assert_eq!(reply.author.name.as_deref(), Some("Bếp Mộc"));
@@ -214,16 +271,31 @@ async fn nguoi_chua_mua_khong_co_nhan_verified_buyer() {
         shop.buyers.0.lock().unwrap().insert(owner.user_id());
         let id = ask(service, &asker, "Bếp có ồn không?").await;
         let guess = service
-            .post(Some(&stranger), &ClientInfo::default(), answer_to(id, "Chắc là không."))
+            .post(
+                &service.databases.default_tenant(),
+                Some(&stranger),
+                &ClientInfo::default(),
+                answer_to(id, "Chắc là không."),
+            )
             .await
             .unwrap();
         let used = service
-            .post(Some(&owner), &ClientInfo::default(), answer_to(id, "Rất êm, mình dùng rồi."))
+            .post(
+                &service.databases.default_tenant(),
+                Some(&owner),
+                &ClientInfo::default(),
+                answer_to(id, "Rất êm, mình dùng rồi."),
+            )
             .await
             .unwrap();
         assert_eq!(guess.comment.row.badges, "");
         assert_eq!(used.comment.row.badges, "verified_buyer");
-        let detail = CommentDetail::from(service.find_named(used.comment.row.id).await.unwrap());
+        let detail = CommentDetail::from(
+            service
+                .find_named(&service.databases.default_tenant(), used.comment.row.id)
+                .await
+                .unwrap(),
+        );
         assert_eq!(detail.badges, ["verified_buyer"]);
     })
     .await
@@ -259,8 +331,17 @@ async fn tim_cau_hoi_khong_phan_biet_dau() {
         loop {
             let query = PageQuery::new(Some("1".to_owned()), cursor.clone(), None);
             let request = PageRequest::try_from(query).unwrap();
-            let found =
-                service.thread(PRODUCTS, PRODUCT, &request, 0, Some("bảo hành")).await.unwrap();
+            let found = service
+                .thread(
+                    &service.databases.default_tenant(),
+                    PRODUCTS,
+                    PRODUCT,
+                    &request,
+                    0,
+                    Some("bảo hành"),
+                )
+                .await
+                .unwrap();
             seen.extend(found.data.into_iter().map(|thread| thread.root.row.body));
             match found.pagination.next_cursor {
                 Some(next) => cursor = Some(next),
@@ -288,7 +369,7 @@ async fn luu_tru_dich_thi_dong_va_an_hoi_dap() {
             events: crate::posting::targets::owner_events(&declared, &service.config.target_types),
         };
         let event = Delivered::new(
-            autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
+            service.databases.default_tenant(),
             "catalog",
             "catalog.product_archived",
             json!({}),
@@ -297,29 +378,44 @@ async fn luu_tru_dich_thi_dong_va_an_hoi_dap() {
         handler.handle(&event).await.unwrap();
         handler.handle(&event).await.unwrap();
 
-        let target = service.target(PRODUCTS, PRODUCT).await.unwrap();
+        let target =
+            service.target(&service.databases.default_tenant(), PRODUCTS, PRODUCT).await.unwrap();
         assert!(target.hidden);
         assert_eq!(target.effective_state(), "closed");
         assert!(shown(service, None).await.is_empty());
         assert_eq!(
-            service.counts(PRODUCTS, &[PRODUCT.to_owned()]).await.unwrap(),
+            service
+                .counts(&service.databases.default_tenant(), PRODUCTS, &[PRODUCT.to_owned()])
+                .await
+                .unwrap(),
             [(PRODUCT.to_owned(), 0, 0)]
         );
         let refused = service
-            .post(Some(&asker), &ClientInfo::default(), question("Bao giờ có lại?"))
+            .post(
+                &service.databases.default_tenant(),
+                Some(&asker),
+                &ClientInfo::default(),
+                question("Bao giờ có lại?"),
+            )
             .await
             .unwrap_err();
         assert_eq!(refused.code(), "comments.target_closed");
         // Đích loại khác, hay event không khai: không đụng tới.
         let other = Delivered::new(
-            autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
+            service.databases.default_tenant(),
             "catalog",
             "catalog.product_archived",
             json!({}),
         )
         .subject(Some("content.entry:public-1".to_owned()));
         handler.handle(&other).await.unwrap();
-        assert!(service.target("content.entry", "public-1").await.is_err(), "kind not enabled");
+        assert!(
+            service
+                .target(&service.databases.default_tenant(), "content.entry", "public-1")
+                .await
+                .is_err(),
+            "kind not enabled"
+        );
     })
     .await
     .unwrap();
@@ -331,9 +427,14 @@ async fn tai_khoan_chua_xac_thuc_khong_hoi_duoc() {
         let shop = shop(test, Mode::Post).await;
         let service = &shop.h.service;
         let unverified = Principal::new(Uuid::now_v7(), ["comments.post".to_owned()]);
-        service.set_profile(&unverified, "Nam").await.unwrap();
+        service.set_profile(&service.databases.default_tenant(), &unverified, "Nam").await.unwrap();
         let refused = service
-            .post(Some(&unverified), &ClientInfo::default(), question("Có giao Đà Lạt không?"))
+            .post(
+                &service.databases.default_tenant(),
+                Some(&unverified),
+                &ClientInfo::default(),
+                question("Có giao Đà Lạt không?"),
+            )
             .await
             .unwrap_err();
         assert_eq!(refused.code(), "comments.verification_required");
@@ -342,16 +443,24 @@ async fn tai_khoan_chua_xac_thuc_khong_hoi_duoc() {
         let mut as_guest = question("Có giao Đà Lạt không?");
         as_guest.author_name = Some("Khách".to_owned());
         as_guest.form_token = Some(super::token(service, PRODUCTS).await);
-        let refused = service.post(None, &visitor("203.0.113.40"), as_guest).await.unwrap_err();
+        let refused = service
+            .post(&service.databases.default_tenant(), None, &visitor("203.0.113.40"), as_guest)
+            .await
+            .unwrap_err();
         assert_eq!(refused.code(), "comments.verification_required");
 
         // Xác thực xong thì hỏi được, và trả lời cũng cần xác thực.
         shop.verified.0.lock().unwrap().insert(unverified.user_id());
         let id = ask(service, &unverified, "Có giao Đà Lạt không?").await;
         let late = Principal::new(Uuid::now_v7(), ["comments.post".to_owned()]);
-        service.set_profile(&late, "Tú").await.unwrap();
+        service.set_profile(&service.databases.default_tenant(), &late, "Tú").await.unwrap();
         let refused = service
-            .post(Some(&late), &ClientInfo::default(), answer_to(id, "Có."))
+            .post(
+                &service.databases.default_tenant(),
+                Some(&late),
+                &ClientInfo::default(),
+                answer_to(id, "Có."),
+            )
             .await
             .unwrap_err();
         assert_eq!(refused.code(), "comments.verification_required");
@@ -368,9 +477,12 @@ async fn chua_co_bo_xac_thuc_thi_tai_khoan_dang_nhap_hoi_duoc() {
         let h = service(test, questions_config(Mode::Post)).await;
         h.service.resources.register("catalog", PRODUCTS, Arc::new(Products)).unwrap();
         let user = Principal::new(Uuid::now_v7(), ["comments.post".to_owned()]);
-        h.service.set_profile(&user, "Lan").await.unwrap();
-        let posted =
-            h.service.post(Some(&user), &ClientInfo::default(), question("Hỏi")).await.unwrap();
+        h.service.set_profile(&h.tenant, &user, "Lan").await.unwrap();
+        let posted = h
+            .service
+            .post(&h.tenant, Some(&user), &ClientInfo::default(), question("Hỏi"))
+            .await
+            .unwrap();
         assert_eq!(posted.shown, Status::Published);
         assert_eq!(posted.comment.row.badges, "", "no badge source registered");
     })
@@ -388,7 +500,12 @@ async fn cau_hoi_chua_tra_loi() {
         let first = ask(service, &asker, "Câu một").await;
         let second = ask(service, &asker, "Câu hai").await;
         service
-            .post(Some(&seller), &ClientInfo::default(), answer_to(first, "Đã trả lời"))
+            .post(
+                &service.databases.default_tenant(),
+                Some(&seller),
+                &ClientInfo::default(),
+                answer_to(first, "Đã trả lời"),
+            )
             .await
             .unwrap();
         let filter = QueueFilter {
@@ -397,7 +514,10 @@ async fn cau_hoi_chua_tra_loi() {
             unanswered: true,
             ..QueueFilter::default()
         };
-        let found = service.queue(&admin(), &filter, &page(Order::Asc)).await.unwrap();
+        let found = service
+            .queue(&service.databases.default_tenant(), &admin(), &filter, &page(Order::Asc))
+            .await
+            .unwrap();
         let ids: Vec<Uuid> = found.data.iter().map(|comment| comment.row.id).collect();
         assert_eq!(ids, [second]);
     })
@@ -423,14 +543,26 @@ async fn tra_loi_dong_thoi_khong_lam_lech_so_dem() {
             let service = Arc::clone(service);
             tasks.push(tokio::spawn(async move {
                 let input = answer_to(id, &format!("Trả lời của {}", principal.user_id()));
-                service.post(Some(&principal), &ClientInfo::default(), input).await.map(|_| ())
+                service
+                    .post(
+                        &service.databases.default_tenant(),
+                        Some(&principal),
+                        &ClientInfo::default(),
+                        input,
+                    )
+                    .await
+                    .map(|_| ())
             }));
         }
         for task in tasks {
             task.await.unwrap().unwrap();
         }
-        assert_eq!(service.find(id).await.unwrap().reply_count, 6);
-        let target = service.target(PRODUCTS, PRODUCT).await.unwrap();
+        assert_eq!(
+            service.find(&service.databases.default_tenant(), id).await.unwrap().reply_count,
+            6
+        );
+        let target =
+            service.target(&service.databases.default_tenant(), PRODUCTS, PRODUCT).await.unwrap();
         assert_eq!((target.published_count, target.pending_count), (7, 0));
         assert_eq!((target.published_threads, target.pending_threads), (1, 0));
     })

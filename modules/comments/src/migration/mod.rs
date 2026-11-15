@@ -8,6 +8,7 @@ mod m0010_add_format;
 mod m0012_target_ids;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::tenancy::migration::TenantTable;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -44,5 +45,50 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // ID của đích, để liệt kê theo trang (D-270).
         Box::new(m0012_target_ids::Migration),
+        // Bình luận, đích, hồ sơ, cấm, báo cáo, theo dõi trả lời thuộc một khách (bước 33). Cùng
+        // đích, cùng tên hiển thị ở hai khách không đụng nhau. Chỉ việc xoá dấu vết IP quét cả
+        // database (index `_sweep_idx`); bình luận hết hạn dọn theo từng khách.
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0013_tenancy",
+            vec![
+                TenantTable::new("comments_comments")
+                    .index(
+                        "comments_comments_thread_idx",
+                        ["tenant_id", "target_type", "target_id", "depth", "status", "id"],
+                    )
+                    .index(
+                        "comments_comments_replies_idx",
+                        ["tenant_id", "root_id", "status", "id"],
+                    )
+                    .index("comments_comments_queue_idx", ["tenant_id", "status", "id"])
+                    .index("comments_comments_user_idx", ["tenant_id", "user_id", "status"])
+                    .index("comments_comments_email_idx", ["tenant_id", "author_email"])
+                    .index(
+                        "comments_comments_hash_idx",
+                        ["tenant_id", "target_type", "target_id", "content_hash", "created_at"],
+                    )
+                    .index("comments_comments_retention_idx", ["tenant_id", "status", "created_at"])
+                    .drop_index("comments_comments_created_idx")
+                    .sweep_index("comments_comments_created_sweep_idx", ["created_at"]),
+                TenantTable::new("comments_targets")
+                    .primary_key(["tenant_id", "target_type", "target_id"])
+                    .unique("comments_targets_uid_key", ["tenant_id", "uid"]),
+                TenantTable::new("comments_bans")
+                    .index("comments_bans_value_idx", ["tenant_id", "kind", "value"])
+                    .index("comments_bans_created_by_idx", ["tenant_id", "created_by"]),
+                TenantTable::new("comments_reports")
+                    .unique("comments_reports_unique", ["tenant_id", "comment_id", "reporter_key"])
+                    .index("comments_reports_user_idx", ["tenant_id", "reporter_user_id"]),
+                TenantTable::new("comments_reply_subscriptions")
+                    .unique(
+                        "comments_reply_subscriptions_unique",
+                        ["tenant_id", "comment_id", "email"],
+                    )
+                    .index("comments_reply_subscriptions_email_idx", ["tenant_id", "email"]),
+                TenantTable::new("comments_profiles")
+                    .primary_key(["tenant_id", "user_id"])
+                    .unique("comments_profiles_name_unique", ["tenant_id", "name_key"]),
+            ],
+        ),
     ]
 }

@@ -1308,7 +1308,7 @@
         "description": "A token from a mail link.",
         "properties": {
           "token": {
-            "description": "The `token` of the link.",
+            "description": "The `token` of the link, exactly as received (it may contain a `.`).",
             "type": "string"
           }
         },
@@ -17991,7 +17991,7 @@
             "type": "boolean"
           },
           "token": {
-            "description": "The `token` of the link in a reply mail.",
+            "description": "The `token` of the link in a reply mail, exactly as received (it may contain a `.`).",
             "type": "string"
           }
         },
@@ -26881,7 +26881,7 @@
     },
     "/api/v1/comments/public/unsubscribe": {
       "post": {
-        "description": "The page at `AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL` sends the token of the link in a reply mail\nhere. Takes effect at once.",
+        "description": "The page at `AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL` sends the token of the link in a reply mail\nhere. Takes effect at once. The token tells the tenant: the call works on any host of the\nAPI, without `Autoxide-Tenant`.",
         "operationId": "comments_unsubscribe_comment_replies",
         "parameters": [
           {
@@ -26957,7 +26957,7 @@
     },
     "/api/v1/comments/public/verify": {
       "post": {
-        "description": "The page at `AUTOXIDE_COMMENTS_VERIFY_URL` sends the token of the mail link here (a `POST`,\nso mail scanners opening the link change nothing). From then on, the address gets a mail\nwhen that comment receives a shown reply.",
+        "description": "The page at `AUTOXIDE_COMMENTS_VERIFY_URL` sends the token of the mail link here (a `POST`,\nso mail scanners opening the link change nothing). From then on, the address gets a mail\nwhen that comment receives a shown reply. The token tells the tenant: the call works on any\nhost of the API, without `Autoxide-Tenant`.",
         "operationId": "comments_verify_comment_email",
         "parameters": [
           {

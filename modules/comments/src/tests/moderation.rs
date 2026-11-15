@@ -23,7 +23,6 @@ use crate::posting::targets::OwnerEvents;
 use crate::service::Status;
 use crate::testing::{admin, config, service};
 use autoxide_kernel::database::Database;
-use autoxide_kernel::tenancy::TenantContext;
 
 fn delivered(
     database: &Database,
@@ -32,7 +31,7 @@ fn delivered(
     payload: serde_json::Value,
 ) -> Delivered {
     Delivered::new(
-        autoxide_kernel::tenancy::TenantContext::legacy_default(database),
+        autoxide_kernel::tenancy::TenantContext::default_on(database.clone()),
         "test",
         name.to_owned(),
         payload,
@@ -55,6 +54,7 @@ async fn bao_cao_dong_thoi_toi_nguong_chi_giu_mot_lan() {
             tasks.push(tokio::spawn(async move {
                 service
                     .report(
+                        &service.databases.default_tenant(),
                         Some(&reporter),
                         &ClientInfo::default(),
                         id,
@@ -74,7 +74,7 @@ async fn bao_cao_dong_thoi_toi_nguong_chi_giu_mot_lan() {
             }
         }
         assert!(accepted >= 3, "{accepted}");
-        let row = h.service.find(id).await.unwrap();
+        let row = h.service.find(&h.tenant, id).await.unwrap();
         assert_eq!(
             (row.status.as_str(), row.hold_reason.as_deref(), row.report_count),
             ("pending", Some("reported"), accepted)
@@ -86,25 +86,28 @@ async fn bao_cao_dong_thoi_toi_nguong_chi_giu_mot_lan() {
             .filter(|(name, _)| name == "comments.comment_status_changed")
             .count();
         assert_eq!(held, 1);
-        let reports = h.service.reports_of(&admin(), id, &all_oldest()).await.unwrap();
+        let reports = h.service.reports_of(&h.tenant, &admin(), id, &all_oldest()).await.unwrap();
         assert_eq!(reports.data.len(), usize::try_from(accepted).unwrap());
         assert_eq!(reports.data[0].note.as_deref(), Some("rude"));
 
         // Bị giữ thì không còn báo cáo được (người lạ không thấy nó).
-        let guest_report =
-            h.service.report(None, &ClientInfo::default(), id, ReportReason::Spam, None).await;
+        let guest_report = h
+            .service
+            .report(&h.tenant, None, &ClientInfo::default(), id, ReportReason::Spam, None)
+            .await;
         assert_eq!(guest_report.unwrap_err().code(), "comments.not_found");
         // Duyệt lại: báo cáo sau không ẩn nữa; báo lại cùng người không thêm dòng.
-        h.service.set_status(&admin(), id, Status::Published, None).await.unwrap();
+        h.service.set_status(&h.tenant, &admin(), id, Status::Published, None).await.unwrap();
         for _ in 0..2 {
             h.service
-                .report(None, &ClientInfo::default(), id, ReportReason::Spam, None)
+                .report(&h.tenant, None, &ClientInfo::default(), id, ReportReason::Spam, None)
                 .await
                 .unwrap();
         }
         for _ in 0..3 {
             h.service
                 .report(
+                    &h.tenant,
                     Some(&crate::testing::user(&[])),
                     &ClientInfo::default(),
                     id,
@@ -114,7 +117,7 @@ async fn bao_cao_dong_thoi_toi_nguong_chi_giu_mot_lan() {
                 .await
                 .unwrap();
         }
-        let row = h.service.find(id).await.unwrap();
+        let row = h.service.find(&h.tenant, id).await.unwrap();
         assert_eq!((row.status.as_str(), row.report_count), ("published", accepted + 4));
         assert_eq!(counts(&h.database, POST).await, (1, 0));
     })
@@ -139,6 +142,7 @@ async fn duyet_xoa_han_hang_cho_va_event() {
         let queue = h
             .service
             .queue(
+                &h.tenant,
                 &moderator,
                 &QueueFilter {
                     search: Some("duong den da lat".to_owned()),
@@ -153,6 +157,7 @@ async fn duyet_xoa_han_hang_cho_va_event() {
         let none = h
             .service
             .queue(
+                &h.tenant,
                 &moderator,
                 &QueueFilter { status: Some(Status::Published), ..QueueFilter::default() },
                 &page(Order::Desc),
@@ -162,14 +167,18 @@ async fn duyet_xoa_han_hang_cho_va_event() {
         assert!(none.data.is_empty());
         let reader = crate::testing::user(&["read"]);
         assert_eq!(
-            h.service.set_status(&reader, id, Status::Published, None).await.unwrap_err().code(),
+            h.service
+                .set_status(&h.tenant, &reader, id, Status::Published, None)
+                .await
+                .unwrap_err()
+                .code(),
             "permission_denied"
         );
 
         let stale = posted.comment.row.updated_at - chrono::Duration::seconds(1);
         assert_eq!(
             h.service
-                .set_status(&moderator, id, Status::Published, Some(stale))
+                .set_status(&h.tenant, &moderator, id, Status::Published, Some(stale))
                 .await
                 .unwrap_err()
                 .code(),
@@ -177,18 +186,27 @@ async fn duyet_xoa_han_hang_cho_va_event() {
         );
         let approved = h
             .service
-            .set_status(&moderator, id, Status::Published, Some(posted.comment.row.updated_at))
+            .set_status(
+                &h.tenant,
+                &moderator,
+                id,
+                Status::Published,
+                Some(posted.comment.row.updated_at),
+            )
             .await
             .unwrap();
         assert!(approved.row.published_at.is_some() && approved.row.hold_reason.is_none());
         assert_eq!(counts(&h.database, POST).await, (1, 0));
-        h.service.set_status(&moderator, id, Status::Rejected, None).await.unwrap();
+        h.service.set_status(&h.tenant, &moderator, id, Status::Rejected, None).await.unwrap();
         assert_eq!(counts(&h.database, POST).await, (0, 0));
-        h.service.set_status(&moderator, id, Status::Published, None).await.unwrap();
+        h.service.set_status(&h.tenant, &moderator, id, Status::Published, None).await.unwrap();
         assert_eq!(
-            h.service.set_status(&moderator, id, Status::Deleted, None).await.unwrap_err().fields()
-                [0]
-            .field,
+            h.service
+                .set_status(&h.tenant, &moderator, id, Status::Deleted, None)
+                .await
+                .unwrap_err()
+                .fields()[0]
+                .field,
             "status"
         );
 
@@ -196,13 +214,13 @@ async fn duyet_xoa_han_hang_cho_va_event() {
         let mut reply = guest("Bea", "Trả lời");
         reply.parent_id = Some(id);
         let reply = as_guest(&h.service, &client, reply).await.unwrap().comment.row.id;
-        h.service.set_status(&moderator, reply, Status::Published, None).await.unwrap();
+        h.service.set_status(&h.tenant, &moderator, reply, Status::Published, None).await.unwrap();
         assert_eq!(counts(&h.database, POST).await, (2, 0));
-        assert_eq!(h.service.hard_delete(&moderator, id).await.unwrap(), 2);
+        assert_eq!(h.service.hard_delete(&h.tenant, &moderator, id).await.unwrap(), 2);
         assert_eq!(counts(&h.database, POST).await, (0, 0));
         assert_eq!(comment::Entity::find().count(h.database.read()).await.unwrap(), 0);
         assert_eq!(
-            h.service.hard_delete(&moderator, id).await.unwrap_err().code(),
+            h.service.hard_delete(&h.tenant, &moderator, id).await.unwrap_err().code(),
             "comments.not_found"
         );
 
@@ -253,15 +271,15 @@ async fn mail_bao_tra_loi() {
         let mut early = guest("Bea", "Trả lời sớm");
         early.parent_id = Some(root);
         let early = as_guest(&h.service, &client, early).await.unwrap().comment.row.id;
-        assert_eq!(h.service.notify_reply(early).await.unwrap(), 0);
-        h.service.verify(&token).await.unwrap();
+        assert_eq!(h.service.notify_reply(&h.tenant, early).await.unwrap(), 0);
+        h.service.verify(None, &token).await.unwrap();
 
         let mut reply = guest("Spammer Joe", "BUY CHEAP PILLS at shady.example");
         reply.parent_id = Some(root);
         let reply = as_guest(&h.service, &client, reply).await.unwrap().comment.row.id;
         let handler = crate::notify::ReplyNotifier(Arc::clone(&h.service));
         let event = delivered(
-            &h.service.database,
+            &h.database,
             "comments.comment_published",
             None,
             json!({"after": {"id": reply}}),
@@ -291,7 +309,7 @@ async fn mail_bao_tra_loi() {
         own.parent_id = Some(root);
         own.email = Some("ada@example.com".to_owned());
         let own = as_guest(&h.service, &client, own).await.unwrap().comment.row.id;
-        assert_eq!(h.service.notify_reply(own).await.unwrap(), 0);
+        assert_eq!(h.service.notify_reply(&h.tenant, own).await.unwrap(), 0);
 
         // Huỷ theo dõi bằng token trong mail; token lạ không phải lỗi.
         let unsubscribe: String = mail
@@ -302,13 +320,13 @@ async fn mail_bao_tra_loi() {
             .chars()
             .take_while(|c| !c.is_whitespace())
             .collect();
-        assert_eq!(h.service.unsubscribe("unknown", false).await.unwrap(), 0);
-        assert_eq!(h.service.unsubscribe(&unsubscribe, false).await.unwrap(), 1);
+        assert_eq!(h.service.unsubscribe(None, "unknown", false).await.unwrap(), 0);
+        assert_eq!(h.service.unsubscribe(None, &unsubscribe, false).await.unwrap(), 1);
         assert_eq!(subscription::Entity::find().count(h.database.read()).await.unwrap(), 0);
         let mut later = guest("Cid", "Muộn");
         later.parent_id = Some(root);
         let later = as_guest(&h.service, &client, later).await.unwrap().comment.row.id;
-        assert_eq!(h.service.notify_reply(later).await.unwrap(), 0);
+        assert_eq!(h.service.notify_reply(&h.tenant, later).await.unwrap(), 0);
     })
     .await
     .unwrap();
@@ -334,17 +352,21 @@ async fn du_lieu_ca_nhan() {
 
         let reader = crate::testing::user(&["read"]);
         assert_eq!(
-            h.service.email_data(&reader, "ada@example.com").await.unwrap_err().code(),
+            h.service.email_data(&h.tenant, &reader, "ada@example.com").await.unwrap_err().code(),
             "permission_denied"
         );
         assert_eq!(
-            h.service.email_data(&moderator, "nope").await.unwrap_err().fields()[0].field,
+            h.service.email_data(&h.tenant, &moderator, "nope").await.unwrap_err().fields()[0]
+                .field,
             "email"
         );
-        let data = h.service.email_data(&moderator, "Ada@Example.com").await.unwrap();
+        let data = h.service.email_data(&h.tenant, &moderator, "Ada@Example.com").await.unwrap();
         assert_eq!(data.comments.len(), 2);
-        assert_eq!(h.service.erase_email(&moderator, "ada@example.com").await.unwrap(), 2);
-        let cleared = h.service.find(root).await.unwrap();
+        assert_eq!(
+            h.service.erase_email(&h.tenant, &moderator, "ada@example.com").await.unwrap(),
+            2
+        );
+        let cleared = h.service.find(&h.tenant, root).await.unwrap();
         assert_eq!(
             (
                 cleared.status.as_str(),
@@ -355,12 +377,22 @@ async fn du_lieu_ca_nhan() {
             ("deleted", "", None, None)
         );
         assert!(
-            h.service.email_data(&moderator, "ada@example.com").await.unwrap().comments.is_empty()
+            h.service
+                .email_data(&h.tenant, &moderator, "ada@example.com")
+                .await
+                .unwrap()
+                .comments
+                .is_empty()
         );
         assert_eq!(counts(&h.database, POST).await, (1, 0));
         // Luồng vẫn còn chỗ của bình luận gốc (có trả lời).
         assert_eq!(
-            h.service.thread(KIND, POST, &page(Order::Desc), 3, None).await.unwrap().data.len(),
+            h.service
+                .thread(&h.tenant, KIND, POST, &page(Order::Desc), 3, None)
+                .await
+                .unwrap()
+                .data
+                .len(),
             1
         );
 
@@ -368,7 +400,7 @@ async fn du_lieu_ca_nhan() {
         let bob = member(&h.service, "Bob", &[]).await;
         let mine = h
             .service
-            .post(Some(&bob), &ClientInfo::default(), signed("Của Bob"))
+            .post(&h.tenant, Some(&bob), &ClientInfo::default(), signed("Của Bob"))
             .await
             .unwrap()
             .comment
@@ -376,6 +408,7 @@ async fn du_lieu_ca_nhan() {
             .id;
         h.service
             .report(
+                &h.tenant,
                 Some(&bob),
                 &ClientInfo::default(),
                 mine,
@@ -384,35 +417,23 @@ async fn du_lieu_ca_nhan() {
             )
             .await
             .unwrap();
-        let exported = h
-            .service
-            .export(&TenantContext::legacy_default(&h.service.database), bob.user_id())
-            .await
-            .unwrap();
+        let exported = h.service.export(&h.tenant, bob.user_id()).await.unwrap();
         assert_eq!(exported["profile"]["display_name"], "Bob");
         assert_eq!(exported["comments"][0]["body"], "Của Bob");
-        let event = delivered(
-            &h.service.database,
-            USER_DELETED,
-            None,
-            json!({"before": {"id": bob.user_id()}}),
-        );
+        let event =
+            delivered(&h.database, USER_DELETED, None, json!({"before": {"id": bob.user_id()}}));
         h.service.handle(&event).await.unwrap();
         h.service.handle(&event).await.unwrap();
-        let gone = h.service.find(mine).await.unwrap();
+        let gone = h.service.find(&h.tenant, mine).await.unwrap();
         assert_eq!((gone.status.as_str(), gone.user_id, gone.body.as_str()), ("deleted", None, ""));
         assert!(
-            profile::Entity::find_by_id(bob.user_id())
+            profile::Entity::find_by_id((h.tenant.id().as_uuid(), bob.user_id()))
                 .one(h.database.read())
                 .await
                 .unwrap()
                 .is_none()
         );
-        let exported = h
-            .service
-            .export(&TenantContext::legacy_default(&h.service.database), bob.user_id())
-            .await
-            .unwrap();
+        let exported = h.service.export(&h.tenant, bob.user_id()).await.unwrap();
         assert_eq!(
             (
                 exported["comments"].clone(),
@@ -447,34 +468,49 @@ async fn don_theo_thoi_han() {
         as_guest(&h.service, &client, reply).await.unwrap();
         let lonely =
             as_guest(&h.service, &client, guest("Cid", "Một mình")).await.unwrap().comment.row.id;
-        h.service.set_status(&moderator, root, Status::Pending, None).await.unwrap();
-        h.service.set_status(&moderator, lonely, Status::Spam, None).await.unwrap();
+        h.service.set_status(&h.tenant, &moderator, root, Status::Pending, None).await.unwrap();
+        h.service.set_status(&h.tenant, &moderator, lonely, Status::Spam, None).await.unwrap();
         assert_eq!(counts(&h.database, POST).await, (1, 1));
 
         let now = crate::service::now();
-        let early = h.service.cleanup(now).await.unwrap();
+        let early = h.service.cleanup(&h.service.databases, &h.database, now).await.unwrap();
         assert_eq!((early.deleted, early.cleared, early.fingerprints), (0, 0, 0));
         // Cả hai từng hiện (rồi bị giữ lại / đánh spam): không bao giờ tự bị xoá.
-        let shown_once = h.service.cleanup(now + chrono::Duration::days(31)).await.unwrap();
+        let shown_once = h
+            .service
+            .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(31))
+            .await
+            .unwrap();
         assert_eq!((shown_once.deleted, shown_once.cleared), (0, 0));
         // Coi như chưa từng hiện (gốc có trả lời mà chưa từng hiện không xảy ra qua API; đặt
         // thẳng để thử nhánh xoá mềm).
         for id in [root, lonely] {
-            let mut row = h.service.find(id).await.unwrap().into_active_model();
+            let mut row = h.service.find(&h.tenant, id).await.unwrap().into_active_model();
             row.published_at = Set(None);
             row.update(h.database.write()).await.unwrap();
         }
-        let later = h.service.cleanup(now + chrono::Duration::days(31)).await.unwrap();
+        let later = h
+            .service
+            .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(31))
+            .await
+            .unwrap();
         assert_eq!((later.deleted, later.cleared), (1, 1));
         assert!(
             comment::Entity::find_by_id(lonely).one(h.database.read()).await.unwrap().is_none()
         );
-        assert_eq!(h.service.find(root).await.unwrap().status, "deleted");
+        assert_eq!(h.service.find(&h.tenant, root).await.unwrap().status, "deleted");
         assert_eq!(counts(&h.database, POST).await, (1, 0));
-        let ips = h.service.cleanup(now + chrono::Duration::days(91)).await.unwrap();
+        let ips = h
+            .service
+            .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(91))
+            .await
+            .unwrap();
         assert_eq!((ips.deleted, ips.cleared, ips.fingerprints), (0, 0, 1));
         assert_eq!(
-            h.service.cleanup(now + chrono::Duration::days(91)).await.unwrap(),
+            h.service
+                .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(91))
+                .await
+                .unwrap(),
             crate::retention::Cleaned::default()
         );
     })
@@ -503,8 +539,7 @@ async fn event_cua_chu_dich_dong_va_an() {
             ),
         };
         let subject = Some(format!("{KIND}:{POST}"));
-        let archived =
-            delivered(&h.service.database, "content.entry_archived", subject.clone(), json!({}));
+        let archived = delivered(&h.database, "content.entry_archived", subject.clone(), json!({}));
         handler.handle(&archived).await.unwrap();
         handler.handle(&archived).await.unwrap();
         let closed = events(&h.database)
@@ -518,31 +553,39 @@ async fn event_cua_chu_dich_dong_va_an() {
             "comments.target_closed"
         );
         assert_eq!(
-            h.service.thread(KIND, POST, &page(Order::Desc), 3, None).await.unwrap().data.len(),
+            h.service
+                .thread(&h.tenant, KIND, POST, &page(Order::Desc), 3, None)
+                .await
+                .unwrap()
+                .data
+                .len(),
             1,
             "closed, still shown"
         );
 
         handler
-            .handle(&delivered(&h.service.database, "content.entry_deleted", subject, json!({})))
+            .handle(&delivered(&h.database, "content.entry_deleted", subject, json!({})))
             .await
             .unwrap();
         assert!(
             h.service
-                .thread(KIND, POST, &page(Order::Desc), 3, None)
+                .thread(&h.tenant, KIND, POST, &page(Order::Desc), 3, None)
                 .await
                 .unwrap()
                 .data
                 .is_empty()
         );
         assert_eq!(
-            h.service.counts(KIND, &[POST.to_owned()]).await.unwrap(),
+            h.service.counts(&h.tenant, KIND, &[POST.to_owned()]).await.unwrap(),
             [(POST.to_owned(), 0, 0)]
         );
-        assert_eq!(h.service.public_comment(id).await.unwrap_err().code(), "comments.not_found");
+        assert_eq!(
+            h.service.public_comment(&h.tenant, id).await.unwrap_err().code(),
+            "comments.not_found"
+        );
 
         // Mở lại bằng tay; `If-Match` cũ bị từ chối.
-        let target = h.service.target(KIND, POST).await.unwrap();
+        let target = h.service.target(&h.tenant, KIND, POST).await.unwrap();
         let change = || crate::posting::targets::TargetChange {
             state: Some("open".to_owned()),
             hidden: Some(false),
@@ -551,20 +594,23 @@ async fn event_cua_chu_dich_dong_va_an() {
         let stale = target.updated_at.unwrap() - chrono::Duration::seconds(1);
         assert_eq!(
             h.service
-                .set_target(&admin(), KIND, POST, change(), Some(stale))
+                .set_target(&h.tenant, &admin(), KIND, POST, change(), Some(stale))
                 .await
                 .unwrap_err()
                 .code(),
             "precondition_failed"
         );
-        let reopened =
-            h.service.set_target(&admin(), KIND, POST, change(), target.updated_at).await.unwrap();
+        let reopened = h
+            .service
+            .set_target(&h.tenant, &admin(), KIND, POST, change(), target.updated_at)
+            .await
+            .unwrap();
         assert!(reopened.is_open(crate::service::now()));
-        assert_eq!(h.service.public_comment(id).await.unwrap().row.id, id);
+        assert_eq!(h.service.public_comment(&h.tenant, id).await.unwrap().row.id, id);
         // Tự đóng sau `closes_at`.
         let past = Some(Some(crate::service::now() - chrono::Duration::minutes(1)));
         let auto = crate::posting::targets::TargetChange { closes_at: past, ..Default::default() };
-        h.service.set_target(&admin(), KIND, POST, auto, None).await.unwrap();
+        h.service.set_target(&h.tenant, &admin(), KIND, POST, auto, None).await.unwrap();
         assert_eq!(
             as_guest(&h.service, &client, guest("Ada", "Quá hạn")).await.unwrap_err().code(),
             "comments.target_closed"
@@ -588,8 +634,11 @@ async fn bao_cao_khong_lam_binh_luan_da_hien_bi_xoa() {
         };
         let h = service(test, config).await;
         let bob = member(&h.service, "Bob", &[]).await;
-        let shown =
-            h.service.post(Some(&bob), &ClientInfo::default(), signed("Ý kiến cũ")).await.unwrap();
+        let shown = h
+            .service
+            .post(&h.tenant, Some(&bob), &ClientInfo::default(), signed("Ý kiến cũ"))
+            .await
+            .unwrap();
         assert_eq!(shown.shown, Status::Published);
         let shown = shown.comment.row.id;
         let waiting =
@@ -599,15 +648,25 @@ async fn bao_cao_khong_lam_binh_luan_da_hien_bi_xoa() {
 
         // Hai địa chỉ trong cùng /48 là một người báo; khối /48 khác, IPv4 là người khác.
         for ip in ["2001:db8:1:1::1", "2001:db8:1:2::9", "2001:db8:2::1"] {
-            h.service.report(None, &visitor(ip), shown, ReportReason::Abuse, None).await.unwrap();
+            h.service
+                .report(&h.tenant, None, &visitor(ip), shown, ReportReason::Abuse, None)
+                .await
+                .unwrap();
         }
-        assert_eq!(h.service.find(shown).await.unwrap().report_count, 2);
+        assert_eq!(h.service.find(&h.tenant, shown).await.unwrap().report_count, 2);
         let user = crate::testing::user(&[]);
         h.service
-            .report(Some(&user), &ClientInfo::default(), shown, ReportReason::Abuse, None)
+            .report(
+                &h.tenant,
+                Some(&user),
+                &ClientInfo::default(),
+                shown,
+                ReportReason::Abuse,
+                None,
+            )
             .await
             .unwrap();
-        let held = h.service.find(shown).await.unwrap();
+        let held = h.service.find(&h.tenant, shown).await.unwrap();
         assert_eq!(
             (held.status.as_str(), held.hold_reason.as_deref()),
             ("pending", Some("reported"))
@@ -615,25 +674,35 @@ async fn bao_cao_khong_lam_binh_luan_da_hien_bi_xoa() {
         assert_eq!(counts(&h.database, POST).await, (0, 2));
 
         let now = crate::service::now();
-        let cleaned = h.service.cleanup(now + chrono::Duration::days(31)).await.unwrap();
+        let cleaned = h
+            .service
+            .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(31))
+            .await
+            .unwrap();
         assert_eq!((cleaned.deleted, cleaned.cleared), (1, 0));
         assert!(
             comment::Entity::find_by_id(waiting).one(h.database.read()).await.unwrap().is_none()
         );
-        let kept = h.service.find(shown).await.unwrap();
+        let kept = h.service.find(&h.tenant, shown).await.unwrap();
         assert_eq!((kept.status.as_str(), kept.body.as_str()), ("pending", "Ý kiến cũ"));
         assert_eq!(counts(&h.database, POST).await, (0, 1));
         // Người kiểm duyệt quyết: duyệt lại thì hiện như cũ.
-        h.service.set_status(&admin(), shown, Status::Published, None).await.unwrap();
+        h.service.set_status(&h.tenant, &admin(), shown, Status::Published, None).await.unwrap();
         assert_eq!(counts(&h.database, POST).await, (1, 0));
 
         // Quá hạn giữ dấu vết IP: khoá người báo của khách thành `expired:<id>`, của người dùng
         // giữ nguyên; chạy lại không đổi gì.
-        let before = h.service.reports_of(&admin(), shown, &all_oldest()).await.unwrap().data;
+        let before =
+            h.service.reports_of(&h.tenant, &admin(), shown, &all_oldest()).await.unwrap().data;
         assert_eq!(before.iter().filter(|r| r.reporter_key.starts_with("ip:")).count(), 2);
-        let later = h.service.cleanup(now + chrono::Duration::days(91)).await.unwrap();
+        let later = h
+            .service
+            .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(91))
+            .await
+            .unwrap();
         assert_eq!(later.reporters, 2);
-        let after = h.service.reports_of(&admin(), shown, &all_oldest()).await.unwrap().data;
+        let after =
+            h.service.reports_of(&h.tenant, &admin(), shown, &all_oldest()).await.unwrap().data;
         let keys: Vec<String> = after.iter().map(|r| r.reporter_key.clone()).collect();
         let expected: Vec<String> = before
             .iter()
@@ -647,7 +716,14 @@ async fn bao_cao_khong_lam_binh_luan_da_hien_bi_xoa() {
             .collect();
         assert_eq!(keys, expected);
         assert_eq!(keys.iter().filter(|key| key.starts_with("user:")).count(), 1);
-        assert_eq!(h.service.cleanup(now + chrono::Duration::days(91)).await.unwrap().reporters, 0);
+        assert_eq!(
+            h.service
+                .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(91))
+                .await
+                .unwrap()
+                .reporters,
+            0
+        );
     })
     .await
     .unwrap();
@@ -669,25 +745,28 @@ async fn duyet_trong_luc_don_thi_khong_xoa() {
             .comment
             .row;
         assert_eq!(counts(&h.database, POST).await, (0, 2));
-        let stale_approved = h.service.find(approved.id).await.unwrap();
-        let stale_marked = h.service.find(marked.id).await.unwrap();
+        let stale_approved = h.service.find(&h.tenant, approved.id).await.unwrap();
+        let stale_marked = h.service.find(&h.tenant, marked.id).await.unwrap();
 
-        h.service.set_status(&moderator, approved.id, Status::Published, None).await.unwrap();
-        h.service.set_status(&moderator, marked.id, Status::Spam, None).await.unwrap();
-        assert_eq!(h.service.expire(&stale_approved).await.unwrap(), None);
-        assert_eq!(h.service.expire(&stale_marked).await.unwrap(), None);
-        assert_eq!(h.service.find(approved.id).await.unwrap().status, "published");
-        assert_eq!(h.service.find(marked.id).await.unwrap().status, "spam");
+        h.service
+            .set_status(&h.tenant, &moderator, approved.id, Status::Published, None)
+            .await
+            .unwrap();
+        h.service.set_status(&h.tenant, &moderator, marked.id, Status::Spam, None).await.unwrap();
+        assert_eq!(h.service.expire(&h.tenant, &stale_approved).await.unwrap(), None);
+        assert_eq!(h.service.expire(&h.tenant, &stale_marked).await.unwrap(), None);
+        assert_eq!(h.service.find(&h.tenant, approved.id).await.unwrap().status, "published");
+        assert_eq!(h.service.find(&h.tenant, marked.id).await.unwrap().status, "spam");
         assert_eq!(counts(&h.database, POST).await, (1, 0));
 
         // Lần dọn sau (đọc mới): spam chưa từng hiện bị xoá, bình luận đã duyệt thì không.
         let later = crate::service::now() + chrono::Duration::days(31);
-        let cleaned = h.service.cleanup(later).await.unwrap();
+        let cleaned = h.service.cleanup(&h.service.databases, &h.database, later).await.unwrap();
         assert_eq!((cleaned.deleted, cleaned.cleared), (1, 0));
         assert!(
             comment::Entity::find_by_id(marked.id).one(h.database.read()).await.unwrap().is_none()
         );
-        assert_eq!(h.service.find(approved.id).await.unwrap().status, "published");
+        assert_eq!(h.service.find(&h.tenant, approved.id).await.unwrap().status, "published");
         assert_eq!(counts(&h.database, POST).await, (1, 0));
     })
     .await

@@ -174,6 +174,10 @@ feature cannot carry spam — and a link whose token goes to `POST
 /api/v1/comments/public/unsubscribe` (`"all": true` stops every comment followed with that
 address).
 
+On a server with several tenants, a token may start with `t<tenant id>.`: it names the tenant
+itself, so the verify and unsubscribe calls work on any host of the API without the
+`Autoxide-Tenant` header. Send tokens back exactly as received (they may contain a `.`).
+
 ## Personal data
 
 - `GET /api/v1/comments/data?email=…` lists, and `DELETE /api/v1/comments/data?email=…` clears,

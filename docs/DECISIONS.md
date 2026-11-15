@@ -6976,3 +6976,18 @@ Chủ dự án hỏi merge vào `main` mà không phát hành có được khôn
   dùng được). Tiền tố sai, khách không có hay bị khoá: cùng lỗi như token sai, không lộ khách nào tồn tại. Ghép ID khách
   khác vào phần ngẫu nhiên thì tra ở khách kia, không thấy. Database chỉ lưu băm phần ngẫu nhiên — không cần migration.
   Theo hướng đặc tả 33 đã chọn cho credential của `auth` (token mang khách để định tuyến trước khi tra bản băm).
+
+## D-282 · `comments` theo khách; công cụ token trong link mang khách đưa lên kernel (bước 33 B11) — 2026-11-15 — agent quyết
+
+- Công cụ của D-281 thành của chung: `autoxide_kernel::tenancy::{link_token, split_link_token, resolve_link_token,
+  OptionalTenant}`. Dựng token đặt vào link trong mail (khách mặc định giữ dạng cũ, khách khác `t<UUID>.<phần ngẫu
+  nhiên>`), tìm khách từ token (khách phải đang phục vụ; sai, không có, bị khoá → như token sai), và extractor cho
+  endpoint nhận token (thiếu khách ở tên miền chính thì `None`, lỗi khác vẫn từ chối). `newsletter` bỏ bản riêng, dùng
+  bản của kernel; `comments` dùng cho link xác minh email và link huỷ nhận mail trả lời; `auth` sẽ dùng ở B12.
+- Sáu bảng của `comments` mang `tenant_id`, migration `m0013_tenancy`: khoá chính `comments_profiles` thành
+  `(tenant_id, user_id)`, `comments_targets` thành `(tenant_id, target_type, target_id)` (`uid` duy nhất trong khách);
+  mọi index có `tenant_id` đứng đầu; `comments_comments_created_idx` thay bằng `comments_comments_created_sweep_idx` cho
+  việc xoá dấu vết IP quét cả database.
+- Job dọn hằng ngày chạy mỗi database: tìm khách qua `comments_targets` (mọi bình luận đều có dòng đích, bảng nhỏ, khoá
+  chính bắt đầu bằng `tenant_id`), xoá bình luận quá hạn theo từng khách (event đúng khách); dấu vết IP, khoá người báo
+  cáo theo IP, nonce, token, bộ đếm quét cả database. Subscriber event dùng `event.tenant`.

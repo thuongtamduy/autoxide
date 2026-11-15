@@ -166,6 +166,10 @@ lời, để tính năng này không thành công cụ gửi spam — và một 
 /api/v1/comments/public/unsubscribe` (`"all": true` thôi nhận mail về mọi bình luận theo dõi bằng
 địa chỉ đó).
 
+Trên máy chủ có nhiều khách, token có thể bắt đầu bằng `t<id khách>.`: token tự nêu khách của nó, nên
+lệnh xác nhận địa chỉ và thôi nhận mail chạy được trên mọi tên miền của API mà không cần header
+`Autoxide-Tenant`. Gửi lại token đúng nguyên văn (token có thể chứa dấu `.`).
+
 ## Dữ liệu cá nhân
 
 - `GET /api/v1/comments/data?email=…` liệt kê, và `DELETE /api/v1/comments/data?email=…` xoá, mọi

@@ -48,15 +48,15 @@ async fn khach_lan_dau_bi_giu_email_xac_minh_khong_vuot_duyet_nguoi_dung_thi_co(
         assert!(mails[0].subject.contains("Xác nhận"), "Vietnamese, as the comment");
         let link = mails[0].text.split("token=").nth(1).unwrap();
         let token_value: String = link.chars().take_while(|c| !c.is_whitespace()).collect();
-        h.service.verify(&token_value).await.unwrap();
+        h.service.verify(None, &token_value).await.unwrap();
         assert_eq!(
-            h.service.verify(&token_value).await.unwrap_err().code(),
+            h.service.verify(None, &token_value).await.unwrap_err().code(),
             "comments.link_invalid",
             "a token works once"
         );
         let approved = h
             .service
-            .set_status(&moderator, posted.comment.row.id, Status::Published, None)
+            .set_status(&h.tenant, &moderator, posted.comment.row.id, Status::Published, None)
             .await
             .unwrap();
         assert!(approved.row.email_verified);
@@ -76,7 +76,7 @@ async fn khach_lan_dau_bi_giu_email_xac_minh_khong_vuot_duyet_nguoi_dung_thi_co(
         let bob = member(&h.service, "Bob", &[]).await;
         let first = h
             .service
-            .post(Some(&bob), &ClientInfo::default(), signed("Chào mọi người"))
+            .post(&h.tenant, Some(&bob), &ClientInfo::default(), signed("Chào mọi người"))
             .await
             .unwrap();
         assert_eq!(
@@ -85,11 +85,14 @@ async fn khach_lan_dau_bi_giu_email_xac_minh_khong_vuot_duyet_nguoi_dung_thi_co(
         );
         assert_eq!(first.edit_token, None, "users edit as themselves");
         h.service
-            .set_status(&moderator, first.comment.row.id, Status::Published, None)
+            .set_status(&h.tenant, &moderator, first.comment.row.id, Status::Published, None)
             .await
             .unwrap();
-        let next =
-            h.service.post(Some(&bob), &ClientInfo::default(), signed("Lại là tôi")).await.unwrap();
+        let next = h
+            .service
+            .post(&h.tenant, Some(&bob), &ClientInfo::default(), signed("Lại là tôi"))
+            .await
+            .unwrap();
         assert_eq!(next.shown, Status::Published);
         assert_eq!(next.comment.name.as_deref(), Some("Bob"));
         assert_eq!(counts(&h.database, POST).await, (3, 2));
@@ -115,28 +118,31 @@ async fn chong_spam_cung_mot_cau_tra_loi_token_hong_la_loi() {
         assert_eq!(trapped.comment.row.id.get_version_num(), 7);
         // Xoá thử bằng ID / token giả: trả lời như xoá bài thật đang chờ duyệt.
         let fake_token = trapped.edit_token.as_deref();
-        h.service.delete_own(None, trapped.comment.row.id, fake_token).await.unwrap();
-        h.service.delete_own(None, held.comment.row.id, held.edit_token.as_deref()).await.unwrap();
+        h.service.delete_own(&h.tenant, None, trapped.comment.row.id, fake_token).await.unwrap();
+        h.service
+            .delete_own(&h.tenant, None, held.comment.row.id, held.edit_token.as_deref())
+            .await
+            .unwrap();
 
         as_guest(&h.service, &client, guest("Ada", "Lần hai")).await.unwrap();
         let limited = as_guest(&h.service, &client, guest("Ada", "Lần ba")).await.unwrap();
         assert_eq!(limited.shown, Status::Pending);
         assert_eq!(comment::Entity::find().count(h.database.read()).await.unwrap(), 2);
-        assert_eq!(h.service.find(held.comment.row.id).await.unwrap().status, "deleted");
+        assert_eq!(h.service.find(&h.tenant, held.comment.row.id).await.unwrap().status, "deleted");
 
         // Token thiếu, sai, của phạm vi khác.
         let mut missing = guest("Ada", "Không token");
         assert_eq!(
-            h.service.post(None, &client, missing.clone()).await.unwrap_err().code(),
+            h.service.post(&h.tenant, None, &client, missing.clone()).await.unwrap_err().code(),
             "antispam.token_missing"
         );
         missing.form_token = Some("garbage".to_owned());
-        let error = h.service.post(None, &client, missing.clone()).await.unwrap_err();
+        let error = h.service.post(&h.tenant, None, &client, missing.clone()).await.unwrap_err();
         assert_eq!(error.kind(), ErrorKind::BadRequest);
         assert_eq!(error.code(), "antispam.token_invalid");
         missing.form_token = Some(token(&h.service, "media.item").await);
         assert_eq!(
-            h.service.post(None, &client, missing).await.unwrap_err().code(),
+            h.service.post(&h.tenant, None, &client, missing).await.unwrap_err().code(),
             "antispam.token_invalid"
         );
 
@@ -146,7 +152,7 @@ async fn chong_spam_cung_mot_cau_tra_loi_token_hong_la_loi() {
         let fast =
             as_guest(&h2.service, &visitor("192.0.2.1"), guest("Bot", "Nhanh quá")).await.unwrap();
         assert_eq!(fast.shown, Status::Pending);
-        let stored = h2.service.find(fast.comment.row.id).await.unwrap();
+        let stored = h2.service.find(&h2.tenant, fast.comment.row.id).await.unwrap();
         assert_eq!(
             (stored.status.as_str(), stored.hold_reason.as_deref()),
             ("spam", Some("too_fast"))
@@ -169,21 +175,24 @@ async fn gui_lai_cung_token_ra_cung_binh_luan() {
             ..guest("Ada", "Một lần thôi")
         };
         let same = token(&h.service, KIND).await;
-        let first = h.service.post(None, &client, input(&same)).await.unwrap();
-        let again = h.service.post(None, &client, input(&same)).await.unwrap();
+        let first = h.service.post(&h.tenant, None, &client, input(&same)).await.unwrap();
+        let again = h.service.post(&h.tenant, None, &client, input(&same)).await.unwrap();
         assert_eq!(first.comment.row.id, again.comment.row.id);
         assert_ne!(first.edit_token, again.edit_token);
         // Token sửa cũ thôi dùng được, token mới dùng được.
         let id = first.comment.row.id;
         assert_eq!(
             h.service
-                .edit(None, id, first.edit_token.as_deref(), "Sửa", None)
+                .edit(&h.tenant, None, id, first.edit_token.as_deref(), "Sửa", None)
                 .await
                 .unwrap_err()
                 .code(),
             "comments.not_author"
         );
-        h.service.edit(None, id, again.edit_token.as_deref(), "Sửa", None).await.unwrap();
+        h.service
+            .edit(&h.tenant, None, id, again.edit_token.as_deref(), "Sửa", None)
+            .await
+            .unwrap();
 
         let shared = token(&h.service, KIND).await;
         let mut tasks = Vec::new();
@@ -193,7 +202,9 @@ async fn gui_lai_cung_token_ra_cung_binh_luan() {
                 client.clone(),
                 NewComment { form_token: Some(shared.clone()), ..guest("Ada", "Đồng thời") },
             );
-            tasks.push(tokio::spawn(async move { service.post(None, &client, input).await }));
+            tasks.push(tokio::spawn(async move {
+                service.post(&service.databases.default_tenant(), None, &client, input).await
+            }));
         }
         let mut ids = Vec::new();
         for task in tasks {
@@ -266,7 +277,7 @@ async fn pipeline_kiem_duyet() {
         let suspect = as_guest(&h.service, &client, guest("Ada", "Giảm giá sốc")).await.unwrap();
         assert_eq!(suspect.shown, Status::Pending);
         assert_eq!(
-            h.service.find(suspect.comment.row.id).await.unwrap().hold_reason.as_deref(),
+            h.service.find(&h.tenant, suspect.comment.row.id).await.unwrap().hold_reason.as_deref(),
             Some("suspect_word")
         );
         let links = as_guest(
@@ -277,7 +288,7 @@ async fn pipeline_kiem_duyet() {
         .await
         .unwrap();
         assert_eq!(
-            h.service.find(links.comment.row.id).await.unwrap().hold_reason.as_deref(),
+            h.service.find(&h.tenant, links.comment.row.id).await.unwrap().hold_reason.as_deref(),
             Some("too_many_links")
         );
         let shown =
@@ -298,39 +309,41 @@ async fn pipeline_kiem_duyet() {
             (deeper.root_id, deeper.parent_id, deeper.reply_to_id, deeper.depth),
             (shown.comment.row.id, Some(shown.comment.row.id), Some(reply.comment.row.id), 1)
         );
-        assert_eq!(h.service.find(shown.comment.row.id).await.unwrap().reply_count, 2);
+        assert_eq!(h.service.find(&h.tenant, shown.comment.row.id).await.unwrap().reply_count, 2);
 
         // Người dùng: cần `comments.post` và tên hiển thị; khách không được gửi tên của người dùng.
         let nobody = crate::testing::user(&["read"]);
         assert_eq!(
-            code(h.service.post(Some(&nobody), &client, signed("x")).await),
+            code(h.service.post(&h.tenant, Some(&nobody), &client, signed("x")).await),
             "permission_denied"
         );
         let fresh = crate::testing::user(&["post"]);
         assert_eq!(
-            code(h.service.post(Some(&fresh), &client, signed("x")).await),
+            code(h.service.post(&h.tenant, Some(&fresh), &client, signed("x")).await),
             "comments.profile_required"
         );
         let mut named = signed("x");
         named.author_name = Some("Me".to_owned());
         let dan = member(&h.service, "Dan", &[]).await;
         assert_eq!(
-            h.service.post(Some(&dan), &client, named).await.unwrap_err().fields()[0].field,
+            h.service.post(&h.tenant, Some(&dan), &client, named).await.unwrap_err().fields()[0]
+                .field,
             "author_name"
         );
         assert_eq!(
-            h.service.set_profile(&fresh, "Dan").await.unwrap_err().code(),
+            h.service.set_profile(&h.tenant, &fresh, "Dan").await.unwrap_err().code(),
             "comments.name_taken"
         );
         assert_eq!(
-            h.service.set_profile(&fresh, "Moderator").await.unwrap_err().fields()[0].code,
+            h.service.set_profile(&h.tenant, &fresh, "Moderator").await.unwrap_err().fields()[0]
+                .code,
             "reserved"
         );
         // Tên viết trọn chữ Kirin trông như tên Latin: vẫn là tên dành riêng, vẫn trùng tên
         // người khác (D-151).
         assert_eq!(
             h.service
-                .set_profile(&fresh, "\u{0430}\u{0501}\u{043C}\u{0456}\u{043F}")
+                .set_profile(&h.tenant, &fresh, "\u{0430}\u{0501}\u{043C}\u{0456}\u{043F}")
                 .await
                 .unwrap_err()
                 .fields()[0]
@@ -340,7 +353,7 @@ async fn pipeline_kiem_duyet() {
         member(&h.service, "Coco", &[]).await;
         assert_eq!(
             h.service
-                .set_profile(&fresh, "\u{0421}\u{041E}\u{0421}\u{041E}")
+                .set_profile(&h.tenant, &fresh, "\u{0421}\u{041E}\u{0421}\u{041E}")
                 .await
                 .unwrap_err()
                 .code(),
@@ -356,6 +369,7 @@ async fn pipeline_kiem_duyet() {
         // Đích đóng: từ chối. Tắt bình luận: từ chối.
         h.service
             .set_target(
+                &h.tenant,
                 &admin(),
                 KIND,
                 POST,
@@ -402,14 +416,21 @@ async fn tra_loi_dong_thoi_giu_so_dem_dung() {
             let mut input = signed(&format!("Trả lời số {index}"));
             input.parent_id = Some(root.comment.row.id);
             tasks.push(tokio::spawn(async move {
-                service.post(Some(&principal), &ClientInfo::default(), input).await
+                service
+                    .post(
+                        &service.databases.default_tenant(),
+                        Some(&principal),
+                        &ClientInfo::default(),
+                        input,
+                    )
+                    .await
             }));
         }
         for task in tasks {
             assert_eq!(task.await.unwrap().unwrap().shown, Status::Published);
         }
         assert_eq!(counts(&h.database, POST).await, (9, 0));
-        assert_eq!(h.service.find(root.comment.row.id).await.unwrap().reply_count, 8);
+        assert_eq!(h.service.find(&h.tenant, root.comment.row.id).await.unwrap().reply_count, 8);
     })
     .await
     .unwrap();
@@ -431,18 +452,24 @@ async fn sua_trong_thoi_han_va_xoa_mem() {
         let token = posted.edit_token.clone().unwrap();
         let eve = member(&h.service, "Eve", &[]).await;
         assert_eq!(
-            h.service.edit(Some(&eve), id, None, "Của tôi", None).await.unwrap_err().code(),
+            h.service
+                .edit(&h.tenant, Some(&eve), id, None, "Của tôi", None)
+                .await
+                .unwrap_err()
+                .code(),
             "comments.not_author"
         );
         assert_eq!(
-            h.service.edit(None, id, Some("wrong"), "x", None).await.unwrap_err().code(),
+            h.service.edit(&h.tenant, None, id, Some("wrong"), "x", None).await.unwrap_err().code(),
             "comments.not_author"
         );
-        let edited = h.service.edit(None, id, Some(&token), "Bản hai", None).await.unwrap();
+        let edited =
+            h.service.edit(&h.tenant, None, id, Some(&token), "Bản hai", None).await.unwrap();
         assert_eq!((edited.row.body.as_str(), edited.status()), ("Bản hai", Status::Published));
         assert!(edited.row.edited_at.is_some());
         // Sửa thành chữ nghi ngờ: về chờ duyệt, số đếm theo.
-        let held = h.service.edit(None, id, Some(&token), "Giảm giá!", None).await.unwrap();
+        let held =
+            h.service.edit(&h.tenant, None, id, Some(&token), "Giảm giá!", None).await.unwrap();
         assert_eq!(
             (held.status(), held.row.hold_reason.as_deref()),
             (Status::Pending, Some("suspect_word"))
@@ -450,28 +477,38 @@ async fn sua_trong_thoi_han_va_xoa_mem() {
         assert_eq!(counts(&h.database, POST).await, (0, 1));
 
         // Hết thời hạn sửa (đẩy lúc tạo về quá khứ).
-        let mut row = h.service.find(id).await.unwrap().into_active_model();
+        let mut row = h.service.find(&h.tenant, id).await.unwrap().into_active_model();
         row.created_at = Set(crate::service::now() - chrono::Duration::minutes(16));
         row.update(h.database.write()).await.unwrap();
         assert_eq!(
-            h.service.edit(None, id, Some(&token), "Muộn", None).await.unwrap_err().code(),
+            h.service
+                .edit(&h.tenant, None, id, Some(&token), "Muộn", None)
+                .await
+                .unwrap_err()
+                .code(),
             "comments.edit_window_passed"
         );
 
         // Người dùng tự xoá bình luận gốc có trả lời: chỗ trong luồng giữ lại.
-        let root =
-            h.service.post(Some(&eve), &client, signed("Gốc của Eve")).await.unwrap().comment.row;
+        let root = h
+            .service
+            .post(&h.tenant, Some(&eve), &client, signed("Gốc của Eve"))
+            .await
+            .unwrap()
+            .comment
+            .row;
         let mut reply = guest("Bea", "Trả lời Eve");
         reply.parent_id = Some(root.id);
         as_guest(&h.service, &client, reply).await.unwrap();
-        h.service.delete_own(Some(&eve), root.id, None).await.unwrap();
-        h.service.delete_own(Some(&eve), root.id, None).await.unwrap();
-        let gone = h.service.find(root.id).await.unwrap();
+        h.service.delete_own(&h.tenant, Some(&eve), root.id, None).await.unwrap();
+        h.service.delete_own(&h.tenant, Some(&eve), root.id, None).await.unwrap();
+        let gone = h.service.find(&h.tenant, root.id).await.unwrap();
         assert_eq!(
             (gone.status.as_str(), gone.body.as_str(), gone.reply_count),
             ("deleted", "", 1)
         );
-        let thread = h.service.thread(KIND, POST, &page(Order::Desc), 3, None).await.unwrap();
+        let thread =
+            h.service.thread(&h.tenant, KIND, POST, &page(Order::Desc), 3, None).await.unwrap();
         let shown: Vec<_> = thread
             .data
             .iter()
@@ -480,7 +517,11 @@ async fn sua_trong_thoi_han_va_xoa_mem() {
         assert_eq!(shown, [(root.id, None, 1)]);
         assert_eq!(counts(&h.database, POST).await, (1, 1));
         assert_eq!(
-            h.service.edit(Some(&eve), root.id, None, "x", None).await.unwrap_err().code(),
+            h.service
+                .edit(&h.tenant, Some(&eve), root.id, None, "x", None)
+                .await
+                .unwrap_err()
+                .code(),
             "comments.not_editable"
         );
         let deleted: Vec<String> = events(&h.database)
@@ -508,6 +549,7 @@ async fn lenh_cam_het_han_thi_gui_lai_duoc() {
         let ban = h
             .service
             .ban(
+                &h.tenant,
                 &moderator,
                 NewBan {
                     kind: "user".to_owned(),
@@ -519,12 +561,17 @@ async fn lenh_cam_het_han_thi_gui_lai_duoc() {
             .await
             .unwrap();
         assert_eq!(
-            h.service.post(Some(&bob), &client, signed("Xin chào")).await.unwrap_err().code(),
+            h.service
+                .post(&h.tenant, Some(&bob), &client, signed("Xin chào"))
+                .await
+                .unwrap_err()
+                .code(),
             "comments.banned"
         );
         // Cấm theo email và dấu vết IP.
         h.service
             .ban(
+                &h.tenant,
                 &moderator,
                 NewBan {
                     kind: "email".to_owned(),
@@ -550,6 +597,7 @@ async fn lenh_cam_het_han_thi_gui_lai_duoc() {
         .unwrap();
         h.service
             .ban(
+                &h.tenant,
                 &moderator,
                 NewBan {
                     kind: "ip".to_owned(),
@@ -572,6 +620,7 @@ async fn lenh_cam_het_han_thi_gui_lai_duoc() {
         let error = h
             .service
             .ban(
+                &h.tenant,
                 &moderator,
                 NewBan {
                     kind: "phone".to_owned(),
@@ -594,12 +643,13 @@ async fn lenh_cam_het_han_thi_gui_lai_duoc() {
         row.until = Set(Some(crate::service::now() - chrono::Duration::seconds(1)));
         row.update(h.database.write()).await.unwrap();
         assert_eq!(
-            h.service.post(Some(&bob), &client, signed("Xin chào")).await.unwrap().shown,
+            h.service.post(&h.tenant, Some(&bob), &client, signed("Xin chào")).await.unwrap().shown,
             Status::Published
         );
         let active = h
             .service
             .bans(
+                &h.tenant,
                 &moderator,
                 &crate::moderation::BanFilter { kind: None, active: true },
                 &page(Order::Desc),
@@ -607,9 +657,9 @@ async fn lenh_cam_het_han_thi_gui_lai_duoc() {
             .await
             .unwrap();
         assert_eq!(active.data.len(), 2);
-        h.service.unban(&moderator, ban.id).await.unwrap();
+        h.service.unban(&h.tenant, &moderator, ban.id).await.unwrap();
         assert_eq!(
-            h.service.unban(&moderator, ban.id).await.unwrap_err().code(),
+            h.service.unban(&h.tenant, &moderator, ban.id).await.unwrap_err().code(),
             "comments.ban_not_found"
         );
         // Event không mang giá trị bị cấm.
@@ -638,7 +688,7 @@ async fn cursor_cua_luong() {
         for index in 0..5 {
             roots.push(
                 h.service
-                    .post(Some(&writer), &client, signed(&format!("Gốc {index}")))
+                    .post(&h.tenant, Some(&writer), &client, signed(&format!("Gốc {index}")))
                     .await
                     .unwrap()
                     .comment
@@ -649,12 +699,12 @@ async fn cursor_cua_luong() {
         for index in 0..4 {
             let mut reply = signed(&format!("Trả lời {index}"));
             reply.parent_id = Some(roots[0]);
-            h.service.post(Some(&writer), &client, reply).await.unwrap();
+            h.service.post(&h.tenant, Some(&writer), &client, reply).await.unwrap();
         }
         let mut seen = Vec::new();
         let mut request = PageRequest::first(2, Order::Desc);
         loop {
-            let found = h.service.thread(KIND, POST, &request, 2, None).await.unwrap();
+            let found = h.service.thread(&h.tenant, KIND, POST, &request, 2, None).await.unwrap();
             seen.extend(found.data.iter().map(|root| root.root.row.id));
             for root in &found.data {
                 if root.root.row.id == roots[0] {
@@ -671,18 +721,27 @@ async fn cursor_cua_luong() {
         let mut newest_first = roots.clone();
         newest_first.reverse();
         assert_eq!(seen, newest_first);
-        let oldest = h.service.thread(KIND, POST, &page(Order::Asc), 0, None).await.unwrap();
+        let oldest =
+            h.service.thread(&h.tenant, KIND, POST, &page(Order::Asc), 0, None).await.unwrap();
         assert_eq!(oldest.data.iter().map(|root| root.root.row.id).collect::<Vec<_>>(), roots);
         assert!(oldest.data[0].replies.is_empty());
-        let replies =
-            h.service.replies(roots[0], &PageRequest::first(3, Order::Asc)).await.unwrap();
+        let replies = h
+            .service
+            .replies(&h.tenant, roots[0], &PageRequest::first(3, Order::Asc))
+            .await
+            .unwrap();
         assert_eq!(replies.data.len(), 3);
         assert!(replies.pagination.next_cursor.is_some());
         // Bình luận chờ duyệt không có trong luồng công khai.
         let held = service(test, config()).await;
         as_guest(&held.service, &visitor("203.0.113.3"), guest("Ada", "Chờ")).await.unwrap();
         assert_eq!(
-            held.service.thread(KIND, POST, &page(Order::Desc), 3, None).await.unwrap().data.len(),
+            held.service
+                .thread(&held.tenant, KIND, POST, &page(Order::Desc), 3, None)
+                .await
+                .unwrap()
+                .data
+                .len(),
             5
         );
     })
@@ -703,10 +762,12 @@ async fn sua_sau_khi_duyet_va_tin_tuong_chi_theo_binh_luan_dang_hien() {
         let posted = as_guest(&h.service, &client, guest("Ada", "Bản sạch")).await.unwrap();
         let id = posted.comment.row.id;
         let token = posted.edit_token.clone().unwrap();
-        h.service.set_status(&moderator, id, Status::Published, None).await.unwrap();
+        h.service.set_status(&h.tenant, &moderator, id, Status::Published, None).await.unwrap();
         assert_eq!(counts(&h.database, POST).await, (1, 0));
-        let edited =
-            h.service.edit(None, id, Some(&token), "Bản bẩn mà không có từ cấm", None).await;
+        let edited = h
+            .service
+            .edit(&h.tenant, None, id, Some(&token), "Bản bẩn mà không có từ cấm", None)
+            .await;
         let edited = edited.unwrap();
         assert_eq!(
             (edited.status(), edited.row.hold_reason.as_deref()),
@@ -715,33 +776,36 @@ async fn sua_sau_khi_duyet_va_tin_tuong_chi_theo_binh_luan_dang_hien() {
         assert!(edited.row.published_at.is_some());
         assert_eq!(counts(&h.database, POST).await, (0, 1));
         // Bình luận đang chờ duyệt mà sửa thì vẫn chờ.
-        let again = h.service.edit(None, id, Some(&token), "Bản ba", None).await.unwrap();
+        let again =
+            h.service.edit(&h.tenant, None, id, Some(&token), "Bản ba", None).await.unwrap();
         assert_eq!(again.status(), Status::Pending);
         assert_eq!(counts(&h.database, POST).await, (0, 1));
 
         // Người dùng `first_time`: lần đầu chờ, được duyệt, sửa vẫn hiện.
         let bob = member(&h.service, "Bob", &[]).await;
-        let first = h.service.post(Some(&bob), &client, signed("Lần đầu")).await.unwrap();
+        let first =
+            h.service.post(&h.tenant, Some(&bob), &client, signed("Lần đầu")).await.unwrap();
         assert_eq!(first.shown, Status::Pending);
         let first = first.comment.row.id;
-        h.service.set_status(&moderator, first, Status::Published, None).await.unwrap();
-        let edited = h.service.edit(Some(&bob), first, None, "Lần đầu, sửa", None).await.unwrap();
+        h.service.set_status(&h.tenant, &moderator, first, Status::Published, None).await.unwrap();
+        let edited =
+            h.service.edit(&h.tenant, Some(&bob), first, None, "Lần đầu, sửa", None).await.unwrap();
         assert_eq!(edited.status(), Status::Published);
         assert_eq!(
-            h.service.post(Some(&bob), &client, signed("Lần hai")).await.unwrap().shown,
+            h.service.post(&h.tenant, Some(&bob), &client, signed("Lần hai")).await.unwrap().shown,
             Status::Published
         );
 
         // Cara được duyệt một lần, rồi bình luận đó bị đánh spam: lần sau lại chờ duyệt.
         let cara = member(&h.service, "Cara", &[]).await;
-        let only = h.service.post(Some(&cara), &client, signed("Một")).await.unwrap();
+        let only = h.service.post(&h.tenant, Some(&cara), &client, signed("Một")).await.unwrap();
         let only = only.comment.row.id;
-        h.service.set_status(&moderator, only, Status::Published, None).await.unwrap();
-        h.service.set_status(&moderator, only, Status::Spam, None).await.unwrap();
-        let next = h.service.post(Some(&cara), &client, signed("Hai")).await.unwrap();
+        h.service.set_status(&h.tenant, &moderator, only, Status::Published, None).await.unwrap();
+        h.service.set_status(&h.tenant, &moderator, only, Status::Spam, None).await.unwrap();
+        let next = h.service.post(&h.tenant, Some(&cara), &client, signed("Hai")).await.unwrap();
         assert_eq!(next.shown, Status::Pending);
         assert_eq!(
-            h.service.find(next.comment.row.id).await.unwrap().hold_reason.as_deref(),
+            h.service.find(&h.tenant, next.comment.row.id).await.unwrap().hold_reason.as_deref(),
             Some("first_comment")
         );
     })
@@ -776,11 +840,21 @@ async fn tra_loi_dong_thoi_voi_xoa_han_luong() {
                 let mut input = signed(&format!("Trả lời {round} của {}", principal.user_id()));
                 input.parent_id = Some(root);
                 tasks.push(tokio::spawn(async move {
-                    service.post(Some(&principal), &ClientInfo::default(), input).await.map(|_| ())
+                    service
+                        .post(
+                            &service.databases.default_tenant(),
+                            Some(&principal),
+                            &ClientInfo::default(),
+                            input,
+                        )
+                        .await
+                        .map(|_| ())
                 }));
             }
             let (service, moderator) = (h.service.clone(), moderator.clone());
-            let deleting = tokio::spawn(async move { service.hard_delete(&moderator, root).await });
+            let deleting = tokio::spawn(async move {
+                service.hard_delete(&service.databases.default_tenant(), &moderator, root).await
+            });
             for task in tasks {
                 if let Err(error) = task.await.unwrap() {
                     assert_eq!(error.code(), "comments.parent_not_found");
@@ -810,13 +884,17 @@ async fn markdown_luu_dinh_dang_dem_link_va_tat_duoc() {
     TestDatabase::run(async |test| {
         let h = service(test, open_config()).await;
         let ada = member(&h.service, "Ada", &[]).await;
-        let plain =
-            h.service.post(Some(&ada), &ClientInfo::default(), signed("**x**")).await.unwrap();
+        let plain = h
+            .service
+            .post(&h.tenant, Some(&ada), &ClientInfo::default(), signed("**x**"))
+            .await
+            .unwrap();
         assert_eq!(plain.comment.row.format, "text");
 
         let mut input = signed("**Đậm** và [link](https://a.example)");
         input.format = Format::Markdown;
-        let posted = h.service.post(Some(&ada), &ClientInfo::default(), input).await.unwrap();
+        let posted =
+            h.service.post(&h.tenant, Some(&ada), &ClientInfo::default(), input).await.unwrap();
         assert_eq!(
             (posted.comment.row.format.as_str(), posted.shown),
             ("markdown", Status::Published)
@@ -825,16 +903,20 @@ async fn markdown_luu_dinh_dang_dem_link_va_tat_duoc() {
         // Ba link Markdown (giới hạn 2): giữ lại chờ duyệt, như ba địa chỉ trần.
         let mut input = signed("[a](https://a.example) [b](https://b.example) <https://c.example>");
         input.format = Format::Markdown;
-        let held = h.service.post(Some(&ada), &ClientInfo::default(), input).await.unwrap();
+        let held =
+            h.service.post(&h.tenant, Some(&ada), &ClientInfo::default(), input).await.unwrap();
         assert_eq!(held.shown, Status::Pending);
         assert_eq!(held.comment.row.hold_reason.as_deref(), Some("too_many_links"));
 
         // Sửa không gửi `format`: giữ `markdown`; gửi `text` thì đổi.
         let id = posted.comment.row.id;
-        let edited = h.service.edit(Some(&ada), id, None, "*mới*", None).await.unwrap();
+        let edited = h.service.edit(&h.tenant, Some(&ada), id, None, "*mới*", None).await.unwrap();
         assert_eq!(edited.row.format, "markdown");
-        let edited =
-            h.service.edit(Some(&ada), id, None, "*mới*", Some(Format::Text)).await.unwrap();
+        let edited = h
+            .service
+            .edit(&h.tenant, Some(&ada), id, None, "*mới*", Some(Format::Text))
+            .await
+            .unwrap();
         assert_eq!(edited.row.format, "text");
 
         // Tắt Markdown.
@@ -842,13 +924,21 @@ async fn markdown_luu_dinh_dang_dem_link_va_tat_duoc() {
         let bob = member(&off.service, "Bob", &[]).await;
         let mut input = signed("*x*");
         input.format = Format::Markdown;
-        let error = off.service.post(Some(&bob), &ClientInfo::default(), input).await.unwrap_err();
-        assert_eq!(error.code(), "validation_failed");
-        assert_eq!(error.fields()[0].field, "format");
-        let own = off.service.post(Some(&bob), &ClientInfo::default(), signed("x")).await.unwrap();
         let error = off
             .service
-            .edit(Some(&bob), own.comment.row.id, None, "*x*", Some(Format::Markdown))
+            .post(&off.tenant, Some(&bob), &ClientInfo::default(), input)
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), "validation_failed");
+        assert_eq!(error.fields()[0].field, "format");
+        let own = off
+            .service
+            .post(&off.tenant, Some(&bob), &ClientInfo::default(), signed("x"))
+            .await
+            .unwrap();
+        let error = off
+            .service
+            .edit(&off.tenant, Some(&bob), own.comment.row.id, None, "*x*", Some(Format::Markdown))
             .await
             .unwrap_err();
         assert_eq!(

@@ -9,10 +9,13 @@
 //!   sở hữu đích, event không mang email hay chữ.
 //! - `questions.rs`: hỏi đáp (D-202) — nhãn tác giả, tài khoản đã xác thực, tìm đúng dấu xếp
 //!   trước, số câu hỏi, câu hỏi chưa trả lời, event vòng đời của module sở hữu.
+//! - `tenancy.rs`: hai khách cùng database (bước 33) — cùng đích, cùng tên không đụng nhau, không
+//!   thấy bình luận của nhau, token trong link mail mang khách.
 
 mod moderation;
 mod posting;
 mod questions;
+mod tenancy;
 
 use std::net::IpAddr;
 
@@ -22,6 +25,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::pagination::{Order, PageRequest};
 use autoxide_kernel::resource::{ResourceChange, ResourceEvent};
+use autoxide_kernel::tenancy::DEFAULT_TENANT;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, Statement};
 
 use crate::config::{CommentsConfig, Mode};
@@ -40,10 +44,7 @@ pub(super) fn visitor(ip: &str) -> ClientInfo {
 pub(super) async fn token(service: &CommentsService, kind: &str) -> String {
     service
         .guard
-        .issue(
-            &autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
-            &format!("comments:{kind}"),
-        )
+        .issue(&service.databases.default_tenant(), &format!("comments:{kind}"))
         .await
         .unwrap()
         .token
@@ -77,7 +78,7 @@ pub(super) async fn as_guest(
     mut input: NewComment,
 ) -> Result<Posted, Error> {
     input.form_token = Some(token(service, &input.target_type).await);
-    service.post(None, client, input).await
+    service.post(&service.databases.default_tenant(), None, client, input).await
 }
 
 /// Người dùng có `comments.post` (và các permission khác) với tên hiển thị `name`.
@@ -89,7 +90,7 @@ pub(super) async fn member(
     let mut all = vec!["post"];
     all.extend_from_slice(permissions);
     let principal = crate::testing::user(&all);
-    service.set_profile(&principal, name).await.unwrap();
+    service.set_profile(&service.databases.default_tenant(), &principal, name).await.unwrap();
     principal
 }
 
@@ -101,11 +102,12 @@ pub(super) fn open_config() -> CommentsConfig {
 /// (đang hiện, chờ duyệt) của đích. Kiểm luôn số câu hỏi (bình luận gốc) đã lưu khớp số đếm
 /// lại từ bảng — mọi đường đổi trạng thái trong các test đều đi qua đây (D-202).
 pub(super) async fn counts(database: &Database, id: &str) -> (i32, i32) {
-    let row = target::Entity::find_by_id((KIND.to_owned(), id.to_owned()))
-        .one(database.read())
-        .await
-        .unwrap()
-        .unwrap();
+    let row =
+        target::Entity::find_by_id((DEFAULT_TENANT.as_uuid(), KIND.to_owned(), id.to_owned()))
+            .one(database.read())
+            .await
+            .unwrap()
+            .unwrap();
     let roots = |status: Status| {
         comment::Entity::find()
             .filter(comment::Column::TargetType.eq(KIND))

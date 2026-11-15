@@ -37,7 +37,7 @@ pub(crate) struct NewsletterService {
     pub(crate) tokens: OneTimeTokens,
     pub(crate) public_url: Arc<PublicUrl>,
     pub(crate) resources: ResourceDirectory,
-    /// Sổ database: token trong link mang khách của nó (`links.rs`).
+    /// Sổ database: token trong link mang khách của nó (`autoxide_kernel::tenancy::link_token`).
     pub(crate) databases: DatabaseRegistry,
     pub(crate) config: NewsletterConfig,
 }

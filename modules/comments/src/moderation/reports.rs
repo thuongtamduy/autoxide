@@ -18,7 +18,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::throttle::Throttle;
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -81,6 +81,7 @@ impl CommentsService {
     /// mà không lưu gì.
     pub(crate) async fn report(
         &self,
+        tenant: &TenantContext,
         principal: Option<&Principal>,
         client: &ClientInfo,
         id: Uuid,
@@ -96,9 +97,9 @@ impl CommentsService {
                 "must be at most 500 characters, on one line",
             )]));
         }
-        let row = self.find(id).await?;
+        let row = self.find(tenant, id).await?;
         if Status::of(&row) != Status::Published
-            || self.target(&row.target_type, &row.target_id).await?.hidden
+            || self.target(tenant, &row.target_type, &row.target_id).await?.hidden
         {
             return Err(comment_not_found(id));
         }
@@ -112,18 +113,15 @@ impl CommentsService {
             (None, None) => format!("{GUEST_REPORTER}unknown"),
         };
         let throttle = Throttle::new(MODULE, self.config.reports_per_hour, HOUR)?;
-        if !throttle
-            .hit(&TenantContext::legacy_default(&self.database), &format!("report:{reporter_key}"))
-            .await?
-            .is_allowed()
-        {
+        if !throttle.hit(tenant, &format!("report:{reporter_key}")).await?.is_allowed() {
             return Ok(());
         }
 
         let now = now();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let inserted = report::Entity::insert(report::ActiveModel {
             id: Set(Uuid::now_v7()),
+            tenant_id: Set(tenant.id().as_uuid()),
             comment_id: Set(id),
             reporter_key: Set(reporter_key),
             reporter_user_id: Set(principal.map(Principal::user_id)),
@@ -132,9 +130,13 @@ impl CommentsService {
             created_at: Set(now),
         })
         .on_conflict(
-            OnConflict::columns([report::Column::CommentId, report::Column::ReporterKey])
-                .do_nothing()
-                .to_owned(),
+            OnConflict::columns([
+                report::Column::TenantId,
+                report::Column::CommentId,
+                report::Column::ReporterKey,
+            ])
+            .do_nothing()
+            .to_owned(),
         )
         .exec_without_returning(&transaction)
         .await?;
@@ -143,12 +145,14 @@ impl CommentsService {
             return Ok(());
         }
         comment::Entity::update_many()
+            .scoped(tenant)
             .col_expr(comment::Column::ReportCount, Expr::col(comment::Column::ReportCount).add(1))
             .filter(comment::Column::Id.eq(id))
             .exec(&transaction)
             .await?;
         let threshold = i32::try_from(self.config.report_threshold).map_err(Error::internal)?;
         let held = comment::Entity::update_many()
+            .scoped(tenant)
             .col_expr(comment::Column::Status, Expr::value(Status::Pending.as_str()))
             .col_expr(comment::Column::HoldReason, Expr::value(Some("reported".to_owned())))
             .col_expr(comment::Column::ReportsHeldAt, Expr::value(Some(now)))
@@ -162,11 +166,18 @@ impl CommentsService {
             .rows_affected;
         if held == 1 {
             let after = comment::Entity::find_by_id(id)
+                .scoped(tenant)
                 .one(&transaction)
                 .await?
                 .ok_or_else(|| comment_not_found(id))?;
-            shift_counts(&transaction, &after, Some(Status::Published), Some(Status::Pending))
-                .await?;
+            shift_counts(
+                &transaction,
+                tenant,
+                &after,
+                Some(Status::Published),
+                Some(Status::Pending),
+            )
+            .await?;
             let before =
                 comment::Model { status: Status::Published.as_str().to_owned(), ..after.clone() };
             let change = Change { before: Some(summary(&before)), after: Some(summary(&after)) };
@@ -174,7 +185,7 @@ impl CommentsService {
             self.outbox
                 .record(
                     &transaction,
-                    &TenantContext::legacy_default(&self.database),
+                    tenant,
                     actor,
                     events::comment_subject(id),
                     &events::CommentStatusChanged(change),
@@ -189,14 +200,15 @@ impl CommentsService {
     /// Báo cáo của bình luận `id`, mới trước. Cần `comments.read`.
     pub(crate) async fn reports_of(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         page: &PageRequest,
     ) -> Result<Page<report::Model>, Error> {
         principal.require(&COMMENTS_READ)?;
-        self.find(id).await?;
-        let select = report::Entity::find().filter(report::Column::CommentId.eq(id));
-        fetch_page(select, report::Column::Id, |row| row.id, page, self.database.read()).await
+        self.find(tenant, id).await?;
+        let select = report::Entity::find().scoped(tenant).filter(report::Column::CommentId.eq(id));
+        fetch_page(select, report::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
 }
 

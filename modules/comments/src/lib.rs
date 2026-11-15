@@ -64,6 +64,8 @@ struct CommentsModule {
     service: Option<Arc<CommentsService>>,
     /// Event vòng đời của module sở hữu đích, cho các loại đích đang bật (D-202).
     owner_events: Vec<ResourceEvent>,
+    /// Sổ database, có sau `start`: job dọn dẹp tra ngữ cảnh từng khách.
+    databases: Option<autoxide_kernel::tenancy::DatabaseRegistry>,
 }
 
 impl Module for CommentsModule {
@@ -102,7 +104,7 @@ impl Module for CommentsModule {
         self.owner_events =
             posting::targets::owner_events(context.resource_events(), &config.target_types);
         let parts = Parts {
-            database: context.database().clone(),
+            databases: context.tenancy(),
             outbox: context.outbox()?,
             guard: context.require::<SpamGuard>()?,
             secret: (*context.require::<SecretKey>()?).clone(),
@@ -114,6 +116,7 @@ impl Module for CommentsModule {
         let service = Arc::new(CommentsService::new(parts, config));
         context.personal_data(service.clone())?;
         self.service = Some(service);
+        self.databases = Some(context.tenancy());
         Ok(())
     }
 
@@ -141,9 +144,13 @@ impl Module for CommentsModule {
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {
-        self.service.clone().map_or_else(Vec::new, |service| {
-            vec![JobRegistration::new(retention::CLEANUP, Arc::new(retention::Cleanup(service)))]
-        })
+        match (self.service.clone(), self.databases.clone()) {
+            (Some(service), Some(databases)) => vec![JobRegistration::new(
+                retention::CLEANUP,
+                Arc::new(retention::Cleanup { service, databases }),
+            )],
+            _ => Vec::new(),
+        }
     }
 
     fn schedules(&self) -> Vec<Schedule> {
@@ -171,7 +178,7 @@ impl Module for CommentsModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
-    use autoxide_kernel::tenancy::TenantContext;
+    use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
@@ -245,10 +252,13 @@ pub(crate) mod testing {
         }
     }
 
+    #[derive(Clone)]
     pub struct Harness {
         pub service: Arc<CommentsService>,
         pub mailer: Arc<FakeMailer>,
         pub database: Database,
+        /// Khách mặc định trên database của test.
+        pub tenant: TenantContext,
     }
 
     /// Service trên database (đã migrate) của test; chống spam không chờ 3 giây.
@@ -262,6 +272,25 @@ pub(crate) mod testing {
         test: &TestDatabase,
         config: CommentsConfig,
         antispam: AntispamConfig,
+    ) -> Harness {
+        build(test, config, antispam, None).await
+    }
+
+    /// Như [`service`], tra khách qua sổ `registry` (vd sổ nhiều khách của một `TestApp`).
+    pub async fn service_in(
+        test: &TestDatabase,
+        config: CommentsConfig,
+        registry: DatabaseRegistry,
+    ) -> Harness {
+        let antispam = AntispamConfig::default().min_fill(Duration::ZERO);
+        build(test, config, antispam, Some(registry)).await
+    }
+
+    async fn build(
+        test: &TestDatabase,
+        config: CommentsConfig,
+        antispam: AntispamConfig,
+        registry: Option<DatabaseRegistry>,
     ) -> Harness {
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
@@ -283,7 +312,7 @@ pub(crate) mod testing {
         let resources = ResourceDirectory::default();
         resources.register("content", "content.entry", Arc::new(Entries)).unwrap();
         let parts = Parts {
-            database: database.clone(),
+            databases: registry.unwrap_or_else(|| DatabaseRegistry::single(database.clone())),
             outbox: Outbox::standalone("comments"),
             guard,
             secret,
@@ -292,7 +321,9 @@ pub(crate) mod testing {
             resources,
             verification: PostingVerification::default(),
         };
-        Harness { service: Arc::new(CommentsService::new(parts, config)), mailer, database }
+        let tenant = TenantContext::default_on(database.clone());
+        let service = Arc::new(CommentsService::new(parts, config));
+        Harness { service, mailer, database, tenant }
     }
 
     /// Người có các permission `permissions` (`comments.` thêm sẵn).

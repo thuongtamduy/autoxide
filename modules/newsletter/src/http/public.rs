@@ -8,9 +8,10 @@
 //! thân và bỏ qua nó.
 //!
 //! Endpoint nhận token trong link (xác nhận, huỷ một chạm, trang lựa chọn) lấy khách TỪ TOKEN khi
-//! token mang khách (`links.rs`): người nhận bấm link có thể tới tên miền chính, không header
-//! `Autoxide-Tenant`. Vì vậy chúng nhận [`RequestTenant`] (khách của request nếu xác định được)
-//! thay cho `TenantContext` — extractor đó báo `tenant_required` khi không xác định được khách.
+//! token mang khách (`autoxide_kernel::tenancy::link_token`): người nhận bấm link có thể tới tên
+//! miền chính, không header `Autoxide-Tenant`. Vì vậy chúng nhận [`OptionalTenant`] (khách của
+//! request nếu xác định được) thay cho `TenantContext` — extractor đó báo `tenant_required` khi
+//! không xác định được khách.
 
 use std::sync::Arc;
 
@@ -18,11 +19,10 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::{ClientInfo, ValidJson};
 use autoxide_kernel::response::{Data, Problem};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use axum::body::Bytes;
-use axum::extract::{FromRequestParts, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
-use axum::http::request::Parts;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
@@ -33,29 +33,6 @@ use crate::audience::subscribers::SubscriptionStatus;
 use crate::public::{Preferences, PreferencesChange, SCOPE, SubscribeRequest};
 use crate::service::NewsletterService;
 use crate::text::{Locale, Localized};
-
-/// Khách của request nếu xác định được (tên miền của khách, header `Autoxide-Tenant`,
-/// credential); `None` khi không xác định được (`tenant_required`, vd tên miền chính không header).
-/// Lỗi khác (khách tạm khoá, header trỏ khách khác credential…) vẫn trả về như `TenantContext`.
-pub(crate) struct RequestTenant(Option<TenantContext>);
-
-impl RequestTenant {
-    fn get(&self) -> Option<&TenantContext> {
-        self.0.as_ref()
-    }
-}
-
-impl<S: Send + Sync> FromRequestParts<S> for RequestTenant {
-    type Rejection = Error;
-
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        match TenantContext::from_request_parts(parts, state).await {
-            Ok(tenant) => Ok(RequestTenant(Some(tenant))),
-            Err(error) if error.code() == "tenant_required" => Ok(RequestTenant(None)),
-            Err(error) => Err(error),
-        }
-    }
-}
 
 /// A list open to public sign-up, in one language.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -277,7 +254,7 @@ pub(crate) struct ConfirmResponse {
 )]
 pub(crate) async fn confirm(
     State(service): State<Arc<NewsletterService>>,
-    tenant: RequestTenant,
+    tenant: OptionalTenant,
     _principal: Option<Principal>,
     ValidJson(input): ValidJson<ConfirmBody>,
 ) -> Result<Data<ConfirmResponse>, Error> {
@@ -324,7 +301,7 @@ pub(crate) struct UnsubscribeResponse {
 )]
 pub(crate) async fn unsubscribe(
     State(service): State<Arc<NewsletterService>>,
-    tenant: RequestTenant,
+    tenant: OptionalTenant,
     _principal: Option<Principal>,
     Query(query): Query<TokenQuery>,
     _body: Bytes,
@@ -397,7 +374,7 @@ impl From<Preferences> for PreferencesResponse {
 )]
 pub(crate) async fn get_preferences(
     State(service): State<Arc<NewsletterService>>,
-    tenant: RequestTenant,
+    tenant: OptionalTenant,
     _principal: Option<Principal>,
     Query(query): Query<TokenQuery>,
 ) -> Result<Data<PreferencesResponse>, Error> {
@@ -455,7 +432,7 @@ pub(crate) struct PreferencesBody {
 )]
 pub(crate) async fn update_preferences(
     State(service): State<Arc<NewsletterService>>,
-    tenant: RequestTenant,
+    tenant: OptionalTenant,
     _principal: Option<Principal>,
     Query(query): Query<TokenQuery>,
     ValidJson(input): ValidJson<PreferencesBody>,

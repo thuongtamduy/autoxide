@@ -10,7 +10,7 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -24,16 +24,21 @@ use crate::text;
 
 #[async_trait::async_trait]
 impl PersonalData for CommentsService {
-    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
+    async fn export(&self, tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let mut rows = comment::Entity::find()
+            .scoped(tenant)
             .filter(comment::Column::UserId.eq(user_id))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         rows.sort_by_key(|row| row.id);
-        let profile = profile::Entity::find_by_id(user_id).one(self.database.read()).await?;
+        let profile = profile::Entity::find_by_id((tenant.id().as_uuid(), user_id))
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?;
         let reports = report::Entity::find()
+            .scoped(tenant)
             .filter(report::Column::ReporterUserId.eq(user_id))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         Ok(json!({
             "profile": profile.map(|row| json!({"display_name": row.display_name, "updated_at": row.updated_at})),
@@ -67,7 +72,7 @@ impl EventHandler for CommentsService {
         let Some(user_id) = deleted_user(event) else {
             return Ok(());
         };
-        let count = self.forget_user(user_id).await?;
+        let count = self.forget_user(&event.tenant, user_id).await?;
         tracing::info!(user_id = %user_id, count, "comments of a deleted user cleared");
         Ok(())
     }
@@ -75,9 +80,14 @@ impl EventHandler for CommentsService {
 
 impl CommentsService {
     /// Xoá dữ liệu của tài khoản `user_id` đã bị xoá. Trả số bình luận vừa xoá mềm.
-    pub(crate) async fn forget_user(&self, user_id: Uuid) -> Result<usize, Error> {
-        let transaction = self.database.begin_write().await?;
+    pub(crate) async fn forget_user(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<usize, Error> {
+        let transaction = tenant.database().begin_write().await?;
         let rows = comment::Entity::find()
+            .scoped(tenant)
             .filter(comment::Column::UserId.eq(user_id))
             .all(&transaction)
             .await?;
@@ -86,23 +96,29 @@ impl CommentsService {
             if Status::of(row) == Status::Deleted {
                 continue;
             }
-            soft_delete(self, &transaction, row, Deletion::Erased).await?;
+            soft_delete(self, &transaction, tenant, row, Deletion::Erased).await?;
             ids.push(row.id);
         }
         // Bình luận đã xoá từ trước vẫn còn `user_id`.
         comment::Entity::update_many()
+            .scoped(tenant)
             .col_expr(comment::Column::UserId, Expr::value(Option::<Uuid>::None))
             .filter(comment::Column::UserId.eq(user_id))
             .exec(&transaction)
             .await?;
-        profile::Entity::delete_by_id(user_id).exec(&transaction).await?;
+        profile::Entity::delete_by_id((tenant.id().as_uuid(), user_id))
+            .scoped(tenant)
+            .exec(&transaction)
+            .await?;
         // Báo cáo đã gửi giữ lại (người kiểm duyệt cần), nhưng không còn chỉ tới người đó.
         let reports = report::Entity::find()
+            .scoped(tenant)
             .filter(report::Column::ReporterUserId.eq(user_id))
             .all(&transaction)
             .await?;
         for found in reports {
             report::Entity::update_many()
+                .scoped(tenant)
                 .col_expr(report::Column::ReporterUserId, Expr::value(Option::<Uuid>::None))
                 .col_expr(report::Column::ReporterKey, Expr::value(format!("deleted:{}", found.id)))
                 .filter(report::Column::Id.eq(found.id))
@@ -119,7 +135,7 @@ impl CommentsService {
             self.outbox
                 .record(
                     &transaction,
-                    &TenantContext::legacy_default(&self.database),
+                    tenant,
                     Actor::system(),
                     None,
                     &events::CommentsErased(change),

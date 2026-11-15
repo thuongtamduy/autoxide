@@ -29,7 +29,7 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::secret::{random_token, sha256};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::throttle::Throttle;
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
@@ -133,6 +133,7 @@ impl CommentsService {
     /// Tạo bình luận. `principal`: người dùng đăng nhập (cần `comments.post`); `None`: khách.
     pub(crate) async fn post(
         &self,
+        tenant: &TenantContext,
         principal: Option<&Principal>,
         client: &ClientInfo,
         input: NewComment,
@@ -156,12 +157,7 @@ impl CommentsService {
         if self.config.verified_only.contains(&kind) {
             let verified = match principal {
                 Some(principal) => {
-                    self.verification
-                        .is_verified(
-                            &TenantContext::legacy_default(&self.database),
-                            principal.user_id(),
-                        )
-                        .await?
+                    self.verification.is_verified(tenant, principal.user_id()).await?
                 }
                 None => false,
             };
@@ -223,8 +219,9 @@ impl CommentsService {
         // Người dùng đăng nhập hiện tên ở hồ sơ của mình (phải có trước).
         let shown_name = match principal {
             Some(principal) => Some(
-                profile::Entity::find_by_id(principal.user_id())
-                    .one(self.database.read())
+                profile::Entity::find_by_id((tenant.id().as_uuid(), principal.user_id()))
+                    .scoped(tenant)
+                    .one(tenant.database().read())
                     .await?
                     .ok_or_else(profile_required)?
                     .display_name,
@@ -233,31 +230,25 @@ impl CommentsService {
         };
 
         // Đích có thật, công khai (sổ đối tượng — có thể gọi module khác), đang mở.
-        let resource = self.resolve_target(&kind, &target_id).await?;
+        let resource = self.resolve_target(tenant, &kind, &target_id).await?;
         // Nhãn của tác giả trên đích (vd `seller`, `verified_buyer`), tính một lần lúc ghi qua
         // sổ đối tượng — có thể gọi module khác nên ở NGOÀI transaction (D-202).
         let badges = match principal {
-            Some(principal) => self
-                .resources
-                .badges(
-                    &TenantContext::legacy_default(&self.database),
-                    &kind,
-                    &target_id,
-                    principal,
-                )
-                .await?
-                .join(","),
+            Some(principal) => {
+                self.resources.badges(tenant, &kind, &target_id, principal).await?.join(",")
+            }
             None => String::new(),
         };
         let now = now();
-        if !self.target(&kind, &target_id).await?.is_open(now) {
+        if !self.target(tenant, &kind, &target_id).await?.is_open(now) {
             return Err(target_closed());
         }
         let (root_id, parent_id, reply_to_id, depth) = match input.parent_id {
             None => (None, None, None, 0),
             Some(id) => {
                 let parent = comment::Entity::find_by_id(id)
-                    .one(self.database.read())
+                    .scoped(tenant)
+                    .one(tenant.database().read())
                     .await?
                     .filter(|parent| {
                         parent.target_type == kind
@@ -273,11 +264,12 @@ impl CommentsService {
         // Trùng: cùng chữ trên cùng đích gần đây.
         let content_hash = antispam::content_hash(&body);
         let duplicate = comment::Entity::find()
+            .scoped(tenant)
             .filter(comment::Column::TargetType.eq(kind.as_str()))
             .filter(comment::Column::TargetId.eq(target_id.as_str()))
             .filter(comment::Column::ContentHash.eq(content_hash.as_str()))
             .filter(comment::Column::CreatedAt.gt(now - chrono::Duration::hours(DUPLICATE_HOURS)))
-            .count(self.database.read())
+            .count(tenant.database().read())
             .await?
             > 0;
 
@@ -289,7 +281,7 @@ impl CommentsService {
             None => None,
         };
         let user_id = principal.map(Principal::user_id);
-        if self.is_banned(user_id, email.as_deref(), ip_fingerprint.as_deref()).await? {
+        if self.is_banned(tenant, user_id, email.as_deref(), ip_fingerprint.as_deref()).await? {
             return Err(banned());
         }
 
@@ -315,7 +307,7 @@ impl CommentsService {
         let checked = self
             .guard
             .check(
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 &Check::new(&scope, client)
                     .principal(principal)
                     .honeypot(input.trap.as_deref())
@@ -333,6 +325,7 @@ impl CommentsService {
                 tracing::info!(target_type = %kind, reason, "public comment dropped");
                 let row = comment::Model {
                     id: Uuid::now_v7(),
+                    tenant_id: tenant.id().as_uuid(),
                     target_type: kind,
                     target_id,
                     root_id: Uuid::nil(),
@@ -377,7 +370,7 @@ impl CommentsService {
                 (Status::Spam, Some(all.join(",")))
             }
             Verdict::Accept if !holds.is_empty() => (Status::Pending, Some(holds.join(","))),
-            Verdict::Accept => match self.mode_hold(&kind, principal, moderator).await? {
+            Verdict::Accept => match self.mode_hold(tenant, &kind, principal, moderator).await? {
                 None => (Status::Published, None),
                 Some(reason) => (Status::Pending, Some(reason.to_owned())),
             },
@@ -391,10 +384,7 @@ impl CommentsService {
                     && status != Status::Spam
                     && self.config.reply_mails()
                     && Throttle::new(MODULE, self.config.verify_mails_per_day, DAY)?
-                        .hit(
-                            &TenantContext::legacy_default(&self.database),
-                            &format!("verify:{email}"),
-                        )
+                        .hit(tenant, &format!("verify:{email}"))
                         .await?
                         .is_allowed() =>
             {
@@ -407,6 +397,7 @@ impl CommentsService {
         let id = Uuid::now_v7();
         let row = comment::Model {
             id,
+            tenant_id: tenant.id().as_uuid(),
             target_type: kind.clone(),
             target_id: target_id.clone(),
             root_id: root_id.unwrap_or(id),
@@ -445,11 +436,11 @@ impl CommentsService {
         };
 
         // Pha hai: một transaction ngắn.
-        let transaction = self.database.begin_write().await?;
-        ensure_target(&transaction, &self.config, &kind, &target_id, now).await?;
+        let transaction = tenant.database().begin_write().await?;
+        ensure_target(&transaction, tenant, &self.config, &kind, &target_id, now).await?;
         let row = row.into_active_model().insert(&transaction).await?;
         if row.depth == 0 {
-            shift_counts(&transaction, &row, None, Some(status)).await?;
+            shift_counts(&transaction, tenant, &row, None, Some(status)).await?;
         } else {
             // Bình luận gốc được kiểm ở trên, NGOÀI transaction: nó có thể vừa bị xoá hẳn (cả
             // luồng) hay bị giữ lại. Kiểm lại bằng chính câu tăng `reply_count`, có điều kiện
@@ -469,6 +460,7 @@ impl CommentsService {
                     comment::Column::Status
                         .is_in([Status::Published.as_str(), Status::Deleted.as_str()]),
                 )
+                .scoped(tenant)
                 .exec(&transaction)
                 .await?
                 .rows_affected;
@@ -476,30 +468,18 @@ impl CommentsService {
                 transaction.rollback().await?;
                 return Err(parent_not_found());
             }
-            shift_target_counts(&transaction, &row, None, Some(status)).await?;
+            shift_target_counts(&transaction, tenant, &row, None, Some(status)).await?;
         }
         let actor = principal.map_or_else(Actor::public, Actor::from);
         let subject = events::comment_subject(row.id);
         let created = Change { before: None, after: Some(summary(&row)) };
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                actor,
-                subject.clone(),
-                &events::CommentCreated(created),
-            )
+            .record(&transaction, tenant, actor, subject.clone(), &events::CommentCreated(created))
             .await?;
         if status == Status::Published {
             let published = Change { before: None, after: Some(summary(&row)) };
             self.outbox
-                .record(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    actor,
-                    subject,
-                    &events::CommentPublished(published),
-                )
+                .record(&transaction, tenant, actor, subject, &events::CommentPublished(published))
                 .await?;
         }
         let verification = match verify_to.as_deref() {
@@ -507,7 +487,7 @@ impl CommentsService {
                 self.tokens
                     .issue(
                         &transaction,
-                        &TenantContext::legacy_default(&self.database),
+                        tenant,
                         VERIFY,
                         &row.id.to_string(),
                         Some(email),
@@ -517,22 +497,15 @@ impl CommentsService {
             ),
             None => None,
         };
-        match checked
-            .claim(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                MODULE,
-                Some(&row.id.to_string()),
-            )
-            .await?
-        {
+        match checked.claim(&transaction, tenant, MODULE, Some(&row.id.to_string())).await? {
             Claim::New => {
                 transaction.commit().await?;
                 tracing::info!(comment_id = %row.id, target_type = %row.target_type, status = status.as_str(), "comment stored");
                 if let (Some(issued), Some(email)) = (verification, verify_to.as_deref()) {
                     // Mail vào hàng đợi của module `mail`; lỗi ở đây không làm hỏng bình luận.
-                    if let Err(error) =
-                        self.send_verification(&row, email, &issued, resource.as_ref()).await
+                    if let Err(error) = self
+                        .send_verification(tenant, &row, email, &issued, resource.as_ref())
+                        .await
                     {
                         tracing::warn!(comment_id = %row.id, error = %error, "verification mail not queued");
                     }
@@ -543,21 +516,30 @@ impl CommentsService {
             }
             Claim::Replay { result } => {
                 transaction.rollback().await?;
-                self.replay(result.as_deref(), guest).await
+                self.replay(tenant, result.as_deref(), guest).await
             }
         }
     }
 
     /// Gửi lại cùng token form: bình luận lần đầu; khách nhận token sửa mới.
-    async fn replay(&self, result: Option<&str>, guest: bool) -> Result<Posted, Error> {
+    async fn replay(
+        &self,
+        tenant: &TenantContext,
+        result: Option<&str>,
+        guest: bool,
+    ) -> Result<Posted, Error> {
         let id: Uuid =
             result.and_then(|id| id.parse().ok()).ok_or_else(|| comment_not_found(Uuid::nil()))?;
-        let found = self.find_named(id).await?;
+        let found = self.find_named(tenant, id).await?;
         let edit_token = if guest {
             let token = random_token(32)?;
             let mut row = found.row.clone().into_active_model();
             row.edit_token_hash = Set(Some(sha256(&token)));
-            row.update(self.database.write()).await?;
+            comment::Entity::update(row)
+                .validate()?
+                .scoped(tenant)
+                .exec(tenant.database().write())
+                .await?;
             Some(token)
         } else {
             None
@@ -571,6 +553,7 @@ impl CommentsService {
     /// ngay, không thì lý do giữ lại.
     pub(crate) async fn mode_hold(
         &self,
+        tenant: &TenantContext,
         kind: &str,
         principal: Option<&Principal>,
         moderator: bool,
@@ -587,9 +570,10 @@ impl CommentsService {
                 // Chỉ bình luận ĐANG hiện: bình luận từng hiện rồi bị đánh spam / từ chối / giữ
                 // lại không còn là bằng chứng đáng tin.
                 let approved = comment::Entity::find()
+                    .scoped(tenant)
                     .filter(comment::Column::UserId.eq(principal.user_id()))
                     .filter(comment::Column::Status.eq(Status::Published.as_str()))
-                    .count(self.database.read())
+                    .count(tenant.database().read())
                     .await?;
                 (approved == 0).then_some("first_comment")
             }
@@ -599,6 +583,7 @@ impl CommentsService {
     /// Có lệnh cấm nào còn hiệu lực cho người dùng, email hay dấu vết IP này không.
     pub(crate) async fn is_banned(
         &self,
+        tenant: &TenantContext,
         user_id: Option<Uuid>,
         email: Option<&str>,
         ip_fingerprint: Option<&str>,
@@ -616,6 +601,7 @@ impl CommentsService {
         let now = now();
         for (kind, value) in subjects {
             let active = ban::Entity::find()
+                .scoped(tenant)
                 .filter(ban::Column::Kind.eq(kind))
                 .filter(ban::Column::Value.eq(value))
                 .filter(
@@ -623,7 +609,7 @@ impl CommentsService {
                         .add(ban::Column::Until.is_null())
                         .add(ban::Column::Until.gt(now)),
                 )
-                .count(self.database.read())
+                .count(tenant.database().read())
                 .await?;
             if active > 0 {
                 return Ok(true);

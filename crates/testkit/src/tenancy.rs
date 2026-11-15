@@ -28,13 +28,6 @@ pub const PENDING_TENANCY: &[&str] = &[
     "auth_totp",
     "auth_user",
     "auth_user_role",
-    // comments
-    "comments_bans",
-    "comments_comments",
-    "comments_profiles",
-    "comments_reply_subscriptions",
-    "comments_reports",
-    "comments_targets",
     // content
     "content_authors",
     "content_embedding_state",

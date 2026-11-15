@@ -13,7 +13,6 @@ mod config;
 mod entity;
 mod events;
 mod http;
-mod links;
 mod migration;
 mod permissions;
 mod privacy;

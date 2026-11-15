@@ -10,12 +10,15 @@
 //!   (vị trí dữ liệu: chung `shared` hay riêng `dedicated`), mở lười, có giới hạn.
 //! - Chế độ ([`TenancyMode`], `AUTOXIDE_TENANCY_MODE`): `single` (mặc định — một khách, không truy
 //!   vấn gì thêm mỗi request) hay `multi`.
+//! - Token trong link của thư mang khách ([`link_token`], [`resolve_link_token`],
+//!   [`OptionalTenant`]): bấm link ở tên miền chính vẫn tới đúng khách (D-281).
 //!
 //! Bảng mặt điều khiển (`kernel_tenants`, `kernel_placements`, `kernel_tenant_domains`) do
 //! module nội bộ `kernel` tạo (`schema.rs`); chúng chỉ có dữ liệu ở database điều khiển.
 
 pub(crate) mod admin;
 mod config;
+mod link_token;
 pub mod migration;
 mod placements;
 mod registry;
@@ -38,6 +41,7 @@ pub use admin::{
     TenantAdmin, TenantChanges, TenantFilter, TenantSeed, require_platform,
 };
 pub use config::{TenancyConfig, WorkerPlacements};
+pub use link_token::{OptionalTenant, link_token, resolve_link_token, split_link_token};
 pub use placements::{NewPlacement, PlacementCheck, PlacementMigrations, Placements, SchemaState};
 pub use registry::{DatabaseRegistry, PLACEMENT_READ_URL, PLACEMENT_URL};
 pub use request::{TENANT_HEADER, TenantHint};

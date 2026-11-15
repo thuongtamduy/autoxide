@@ -34,7 +34,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext, link_token, resolve_link_token};
 use autoxide_kernel::throttle::Throttle;
 use chrono::{DateTime, Utc};
 use sea_orm::{
@@ -51,7 +51,6 @@ use crate::audience::subscribers::{
 };
 use crate::entity::{campaign, delivery, subscriber, subscription, suppression};
 use crate::events::{self, Change};
-use crate::links::link_token;
 use crate::permissions::NEWSLETTER_SUBSCRIBE;
 use crate::service::{MODULE, NewsletterService, now, to_json};
 use crate::text::{self, Locale};
@@ -382,7 +381,7 @@ impl NewsletterService {
             Ok(allowed) => match issued.filter(|_| allowed) {
                 Some(issued) => {
                     let locale = job.locale.unwrap_or_else(|| Locale::stored(&row.locale));
-                    // Link mang khách của token (`links.rs`).
+                    // Link mang khách của token (`autoxide_kernel::tenancy::link_token`).
                     let token = link_token(tenant, &issued.token);
                     match self.confirmation_mail(&job.email, locale, &to_confirm, &token, issued.id)
                     {
@@ -422,13 +421,15 @@ impl NewsletterService {
 
     /// Xác nhận bằng token trong mail: các đăng ký đang chờ thành `confirmed`. Trả các danh sách
     /// vừa (hay đã) được xác nhận. Khách lấy từ token khi token mang khách; không thì `request`
-    /// (khách của request, `None`: khách mặc định) — xem `links.rs`.
+    /// (khách của request, `None`: khách mặc định) — xem
+    /// `autoxide_kernel::tenancy::resolve_link_token`.
     pub(crate) async fn confirm(
         &self,
         request: Option<&TenantContext>,
         token: &str,
     ) -> Result<Vec<List>, Error> {
-        let Some((resolved, raw)) = self.token_tenant(request, token).await? else {
+        let Some((resolved, raw)) = resolve_link_token(&self.databases, request, token).await?
+        else {
             return Err(confirmation_invalid());
         };
         let tenant = &resolved;
@@ -518,7 +519,8 @@ impl NewsletterService {
         request: Option<&TenantContext>,
         token: &str,
     ) -> Result<(), Error> {
-        let Some((resolved, raw)) = self.token_tenant(request, token).await? else {
+        let Some((resolved, raw)) = resolve_link_token(&self.databases, request, token).await?
+        else {
             return Ok(());
         };
         let tenant = &resolved;
@@ -550,7 +552,8 @@ impl NewsletterService {
         request: Option<&TenantContext>,
         token: &str,
     ) -> Result<Preferences, Error> {
-        let (tenant, raw) = self.token_tenant(request, token).await?.ok_or_else(link_invalid)?;
+        let (tenant, raw) =
+            resolve_link_token(&self.databases, request, token).await?.ok_or_else(link_invalid)?;
         self.preferences_in(&tenant, raw).await
     }
 
@@ -614,7 +617,7 @@ impl NewsletterService {
         change: PreferencesChange,
     ) -> Result<Preferences, Error> {
         let (resolved, token) =
-            self.token_tenant(request, token).await?.ok_or_else(link_invalid)?;
+            resolve_link_token(&self.databases, request, token).await?.ok_or_else(link_invalid)?;
         let tenant = &resolved;
         let before = self.preferences_in(tenant, token).await?;
         // Thư mang token: huỷ danh sách của chính thư đó thì ghi vào lượt gửi (số huỷ của chiến
