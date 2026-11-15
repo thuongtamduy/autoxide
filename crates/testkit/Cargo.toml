@@ -11,6 +11,7 @@ publish.workspace = true
 async-trait.workspace = true
 autoxide-kernel.workspace = true
 axum.workspace = true
+chrono.workspace = true
 # Client MCP thật cho `TestApp::mcp` (testkit chỉ là dev-dependency, nên feature client không
 # lọt vào binary).
 rmcp = { workspace = true, features = [

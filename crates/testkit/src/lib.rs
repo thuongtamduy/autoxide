@@ -32,6 +32,7 @@
 
 pub mod ai;
 mod app;
+mod contract;
 mod ownership;
 mod postgres;
 mod s3;

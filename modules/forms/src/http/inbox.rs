@@ -33,7 +33,6 @@ pub(crate) struct AnswerResponse {
     pub label: Localized,
     /// A string; a number for `number`; an array of values for `checkbox`; `true` for
     /// `consent`.
-    #[schema(value_type = Object)]
     pub value: Value,
 }
 
