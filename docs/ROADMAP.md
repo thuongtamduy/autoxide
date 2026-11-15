@@ -103,9 +103,10 @@ Nhóm A — hợp đồng và người gọi API:
 
 Nhóm B — chống hồi quy:
 
-- [ ] Test nâng cấp từ bản phát hành trước: dựng database bằng image Docker của bản trước, ghi dữ
+- [x] Test nâng cấp từ bản phát hành trước: dựng database bằng image Docker của bản trước, ghi dữ
       liệu mẫu qua API của nó, rồi chạy bản hiện tại trên database đó (migration, đọc lại dữ liệu,
       vài lệnh ghi) — trên cả SQLite và Postgres; chạy trong CI và trước mỗi lần phát hành
+      (`cargo xtask upgrade-test`, D-246)
 - [x] Migration thật của mọi module chạy vòng up → down → up trên database trống và trên database
       có dữ liệu, trên cả hai database (hiện chỉ có test cơ chế bằng bảng mẫu,
       `crates/kernel/tests/migration.rs`)

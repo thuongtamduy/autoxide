@@ -46,6 +46,8 @@ rmcp = { workspace = true, features = [
   "transport-streamable-http-client-reqwest",
   "reqwest-tls-no-provider",
 ] }
+# Client HTTP thật cho test nâng cấp (gọi máy chủ chạy trong container).
+reqwest.workspace = true
 sea-orm.workspace = true
 tower.workspace = true
 
