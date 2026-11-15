@@ -12,8 +12,8 @@ use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
 use crate::entity::item;
+use crate::images::variants::{MakeVariants, SOURCES, variants_of, wanted_widths};
 use crate::service::{Item, MediaService};
-use crate::variants::{MakeVariants, SOURCES, variants_of, wanted_widths};
 
 /// Số item đọc mỗi lượt: đủ lớn để ít câu query, đủ nhỏ để transaction ghi ngắn.
 const BATCH: u64 = 200;
@@ -130,9 +130,9 @@ mod tests {
     use super::*;
     use image::ImageFormat;
 
+    use crate::images::variants::samples::encoded;
+    use crate::library::upload::NewUpload;
     use crate::testing::{body, editor, limits, service};
-    use crate::upload::NewUpload;
-    use crate::variants::samples::encoded;
 
     /// Cùng database và nơi lưu, cấu hình cỡ khác (như máy chủ khởi động lại sau khi đổi
     /// `AUTOXIDE_MEDIA_IMAGE_WIDTHS`).

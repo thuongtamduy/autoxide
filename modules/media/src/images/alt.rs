@@ -12,9 +12,9 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::entity::item;
+use crate::images::variants;
 use crate::permissions::MEDIA_WRITE;
 use crate::service::{Item, MediaService, Visibility, in_trash, item_not_found};
-use crate::variants;
 
 /// Cạnh dài nhất của ảnh gửi cho mô hình.
 pub(crate) const AI_MAX_SIDE: u32 = 1280;

@@ -18,8 +18,8 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{page_request, sort};
+use crate::library::tags::{TagSort, TagWithCount};
 use crate::service::MediaService;
-use crate::tags::{TagSort, TagWithCount};
 
 /// A tag. Items carry tags as names; tags are created when first given to an item.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

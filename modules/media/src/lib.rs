@@ -8,24 +8,18 @@
 //! REST ở `/api/v1/media` (hướng dẫn: `docs/MEDIA.md`), tool MCP, trait [`api::Media`]
 //! cho module khác, hai job định kỳ (dọn thùng rác, dọn nội dung mồ côi).
 
-mod alt;
-mod alts;
 pub mod api;
 mod config;
 mod entity;
 mod events;
-mod folders;
 mod http;
+mod images;
 mod jobs;
+mod library;
 mod migration;
 mod permissions;
-mod refresh;
 mod service;
-mod sniff;
-mod tags;
 mod tools;
-mod upload;
-mod variants;
 
 #[cfg(test)]
 mod tests;
@@ -47,9 +41,9 @@ use axum::http::Method;
 use utoipa_axum::router::OpenApiRouter;
 
 use crate::config::MediaConfig;
+use crate::images::variants::{Generator, MAKE_VARIANTS};
 use crate::jobs::{CLEAN_ORPHANS, CleanOrphans, PURGE_TRASH, PurgeTrash};
 use crate::service::MediaService;
-use crate::variants::{Generator, MAKE_VARIANTS};
 
 /// Module `media`, để binary đăng ký trong `crates/app/src/modules.rs` — SAU module `files`
 /// (cần `dyn Storage` của nó).
@@ -151,7 +145,7 @@ impl Module for MediaModule {
     }
 
     fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
-        self.service.clone().map_or_else(Vec::new, |service| vec![refresh::task(service)])
+        self.service.clone().map_or_else(Vec::new, |service| vec![images::refresh::task(service)])
     }
 
     fn tools(&self) -> Vec<Tool> {

@@ -275,7 +275,7 @@ databases.
 - Work an operator runs by hand now and then (rebuild derived data after a setting
   changed, a one-off clean-up) is a task in `Module::tasks`: a `Task` with its
   `TaskArgument`s and a `TaskRun`, run with `autoxide task <module>.<task> name=value`. It
-  calls the service, like REST does. See `modules/media/src/refresh.rs`.
+  calls the service, like REST does. See `modules/media/src/images/refresh.rs`.
 
 ### 10. Translations
 

@@ -272,7 +272,7 @@ Module giữ số tiền, số dư hay giao dịch dùng các công cụ của k
 - Việc người vận hành chạy tay thỉnh thoảng (làm lại dữ liệu dẫn xuất sau khi đổi cấu
   hình, dọn một lần) là một lệnh trong `Module::tasks`: một `Task` kèm các `TaskArgument`
   và một `TaskRun`, chạy bằng `autoxide task <module>.<lệnh> tên=giá_trị`. Nó gọi service,
-  như REST. Xem `modules/media/src/refresh.rs`.
+  như REST. Xem `modules/media/src/images/refresh.rs`.
 
 ### 10. Bản dịch
 

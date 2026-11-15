@@ -21,12 +21,12 @@ use crate::config::{Limits, normalize_type};
 use crate::entity::item::{self, Column, Entity, storage_key};
 use crate::entity::stored_folder;
 use crate::events::{self, Change};
+use crate::library::sniff;
 use crate::permissions::MEDIA_WRITE;
 use crate::service::{
     Item, MediaService, Visibility, check_name, folder_gone, in_trash, item_not_found, now,
     snapshot, too_large, touch_folder,
 };
-use crate::sniff;
 
 /// Một lần tải lên.
 #[derive(Debug, Clone, Default)]
@@ -84,7 +84,7 @@ impl MediaService {
         if let Some(folder) = input.folder_id {
             self.check_folder_exists(folder, "folder_id", &mut problems).await?;
         }
-        let tags = crate::tags::check_tags(&input.tags, "tags", &mut problems);
+        let tags = crate::library::tags::check_tags(&input.tags, "tags", &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -195,7 +195,7 @@ impl MediaService {
         let tags = if tags.is_empty() {
             Vec::new()
         } else {
-            crate::tags::set_item_tags(&transaction, id, tags).await?
+            crate::library::tags::set_item_tags(&transaction, id, tags).await?
         };
         self.enqueue_variants(&transaction, &item).await?;
         let after = crate::service::with_tags(snapshot(&item), &tags);
@@ -213,7 +213,7 @@ impl MediaService {
         version_id: Uuid,
         received: Received,
         expected: Option<DateTime<Utc>>,
-    ) -> Result<(Item, Item, Vec<crate::variants::Variant>), Error> {
+    ) -> Result<(Item, Item, Vec<crate::images::variants::Variant>), Error> {
         let transaction = self.database.begin_write().await?;
         let before =
             Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| item_not_found(id))?;
