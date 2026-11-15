@@ -1,9 +1,11 @@
 # Phát hành một phiên bản
 
-Quy trình cho agent và chủ dự án (D-078). **Agent tự phát hành khi xong trọn một bước của
-`docs/ROADMAP.md`** — mọi mục của bước là `[x]`, gate xanh — không hỏi (D-171). Ngoài lúc đó
-chỉ phát hành khi chủ dự án giao. Không phát hành giữa bước, không phát hành khi mục
-`[Unreleased]` của `CHANGELOG.md` trống.
+Quy trình cho agent và chủ dự án (D-078). **Phát hành gom nhiều bước thành một bản lớn**
+(D-248, thay D-171): xong một bước thì chỉ merge vào `main` (gate đầy đủ xanh, PR merge kiểu
+rebase), không phát hành. Agent tự phát hành, không hỏi, khi xong trọn một **giai đoạn** của
+`docs/ROADMAP.md` (A, B, C…: mọi bước của giai đoạn đã `[x]`). Ngoài lúc đó chỉ phát hành khi chủ
+dự án giao. Không phát hành giữa bước, không phát hành khi mục `[Unreleased]` của `CHANGELOG.md`
+trống.
 
 Cần quyền đẩy lên GitHub: `gh` đã đăng nhập, hoặc biến môi trường `GH_TOKEN` (token
 fine-grained chỉ cho repo này, quyền Contents và Pull requests: Read and write). Thiếu quyền

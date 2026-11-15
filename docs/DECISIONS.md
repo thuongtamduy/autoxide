@@ -6187,3 +6187,24 @@ không phải sửa dòng nào.
 - Re-export trong file nhóm (`pub(crate) use lists::List`) để khỏi sửa đường dẫn bên trong module: thành hai
   cách gọi một thứ.
 - Đặt tên nhóm vào đường dẫn công khai của kernel (`autoxide_kernel::contracts::ai`): phá vỡ hợp đồng module.
+
+## D-248 · Phát hành gom thành bản lớn, không phát hành sau từng bước — 2026-11-15 — chủ dự án quyết
+
+Bối cảnh: theo D-171, agent tự phát hành sau mỗi bước của lộ trình. Mỗi bản phát hành cần chủ dự án tự tạo
+trang phát hành trên GitHub, vì phiên làm việc không đẩy được tag. Chủ dự án (15/11/2026): "Làm xong rồi
+release 1 bản lớn thôi, đừng release từng cái nhỏ nữa".
+
+Quyết định (thay D-171):
+
+- **Xong một bước** (mọi mục `[x]`, gate đầy đủ xanh): merge vào `main` (PR, merge kiểu rebase), ghi thay đổi
+  vào `## [Unreleased]` của `CHANGELOG.md`. Không đổi số phiên bản, không gắn tag.
+- **Phát hành** theo `docs/RELEASING.md`, agent tự làm không hỏi, khi xong trọn một giai đoạn của lộ trình (A, B,
+  C…: mọi bước của giai đoạn đã `[x]`), hay khi chủ dự án bảo. Bản đầu tiên theo luật này gồm bước 32 trở đi của
+  giai đoạn A.
+- Phần còn lại của D-171 giữ nguyên: không phát hành giữa bước, không phát hành khi `[Unreleased]` trống, theo
+  luật SemVer của `RELEASING.md` (D-078).
+- Đặc tả bước 32 ghi "merge nhóm A vào `main` ngay khi xong, để bước 33 bắt đầu". Bước 33 làm tiếp trên cùng
+  nhánh này, nên nhóm A theo bước 32 vào `main` lúc bước 32 xong.
+
+Lý do: ít lần chủ dự án phải tạo bản phát hành bằng tay; mỗi bản có đủ thay đổi để người dùng đáng nâng cấp.
+`main` vẫn luôn xanh và mới sau mỗi bước.

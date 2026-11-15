@@ -68,8 +68,9 @@ hứng, đừng nhảy cóc.
    ```
 
    Kết thúc thông điệp bằng dòng ghi công mà phiên làm việc yêu cầu.
-4. Mục vừa xong là mục cuối của bước (mọi mục của bước đã `[x]`): **tự phát hành** theo
-   `docs/RELEASING.md` (D-171), không hỏi. Còn mục chưa xong thì **không push**.
+4. Mục vừa xong là mục cuối của bước (mọi mục của bước đã `[x]`): chạy gate đầy đủ rồi
+   **merge vào `main`**, không phát hành. Chỉ phát hành (theo `docs/RELEASING.md`, không hỏi) khi
+   bước đó là bước cuối của một giai đoạn của lộ trình, hay khi chủ dự án bảo (D-248).
 
 ## 6. Đi tiếp hay dừng
 
