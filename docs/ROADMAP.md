@@ -3,7 +3,7 @@
 Mỗi bước xong khi `./gate.sh` xanh trên **cả SQLite và Postgres**; agent đánh dấu `[x]` rồi commit. Chi tiết
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
-Trạng thái: **bước 0–31 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); bước 50 chờ
+Trạng thái: **bước 0–32 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228); bước 50 chờ
 chủ dự án công khai repo (D-199); bản phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai
 (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
 
@@ -15,7 +15,7 @@ thuộc đã xong.
 
 | Giai đoạn | Bước, theo thứ tự | Vì sao ở đây |
 |---|---|---|
-| A. Hợp đồng và nền lõi | 32 → 33 → 34 → 35, 36, 37 (song song) → 40 | giữ API không vỡ trước khi sửa mọi bảng; đa khách, tổ chức, tiền, tuân thủ là nền của mọi thứ sau |
+| A. Hợp đồng và nền lõi | 33 → 34 → 35, 36, 37 (song song) → 40 | giữ API không vỡ trước khi sửa mọi bảng; đa khách, tổ chức, tiền, tuân thủ là nền của mọi thứ sau |
 | B. Lớp cho giao diện và phân quyền | 51 → 68 → 54 → 52 | module thương mại khai luôn phần của mình (51 nên xong trước 41); 68 (menu của website) sau P6 của 51, trước 41; 54 cần P12 của 51 |
 | C. Vận hành | 38 → 39 | báo cáo xuyên database, backup, hiệu năng trước khi có dữ liệu thương mại thật |
 | D. Module nền dùng chung | 53, 57, 58, 67, 66, 65 | hỗ trợ khách (45 và 61 dùng), phân tích (64 dùng), tự động hoá, trang dựng từ khối và AI tạo trang, SCIM, chợ ứng dụng |
@@ -29,7 +29,6 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 
 | Bước | Bắt đầu khi | Song song được với |
 |---|---|---|
-| 32 Dọn bố cục | ngay; `media` của nhóm A làm sau khi WebP (30) merge | 30, 31 |
 | 33 Khách hàng, vị trí dữ liệu | 31 và nhóm A của 32 xong (31 giữ API và bản nâng cấp không vỡ khi mọi bảng đổi) | hai mục độc lập của 40 |
 | 34 Tổ chức, quyền, danh tính | 33 | — |
 | 35 Gói, thuê bao · 36 Tiền, thuế · 37 Tuân thủ | 34 | nhau; hai mục cuối của 35 chờ 36 và 37 |
@@ -63,38 +62,6 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
 ## Giai đoạn A — Hợp đồng và nền lõi
-
-## 32. Dọn bố cục và việc để lại (agent đề xuất ngày 13/11/2026)
-
-Đặc tả: [`docs/steps/32-layout-cleanup.md`](steps/32-layout-cleanup.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-Bước 29 đã merge — làm được ngay; riêng dời file của `media` làm sau khi WebP (bước 30) merge vì
-cùng sửa module đó. Làm nhóm A trước: nhóm B sửa đúng
-các module nhóm A dời file. Mỗi mục có test trên cả hai database và dòng CHANGELOG.
-
-Nhóm A — bố cục:
-
-- [x] Áp quy ước "File layout" của hướng dẫn viết module cho `newsletter`, `comments`, `media`,
-      `forms`: phần service chia theo tính năng, test dài thành thư mục `tests/`; không đổi hành vi,
-      đếm số test trước và sau phải bằng nhau
-- [x] `kernel`: gom các file nằm phẳng trong `src/` thành nhóm (vd hợp đồng cho module: `ai`,
-      `mail`, `storage`, `search`, `privacy`…), giữ nguyên đường dẫn công khai bằng `pub use` để
-      module ở repo riêng không phải sửa (D-167)
-
-Nhóm B — việc nhật ký quyết định đã ghi "để sau":
-
-- [x] `auth`: đổi email thì gửi thêm mail báo tới địa chỉ cũ (kèm cách báo "không phải tôi" — vd
-      khoá phiên và đặt lại mật khẩu), để chủ tài khoản biết khi tài khoản bị chiếm (đã ghi để sau
-      ở mục về xác minh email trong `docs/DECISIONS.md`); mail qua job, không làm chậm request
-- [x] `auth`: quản trị viên xem và gỡ passkey của người khác (permission riêng, ghi event cho
-      audit), và lệnh CLI gỡ passkey của một tài khoản cho khi admin duy nhất mất thiết bị —
-      `autoxide user reset-mfa` (D-159) hiện chỉ tắt TOTP, không gỡ passkey
-- [x] `forms`: xuất CSV lớn bằng job ghi file vào `Storage`, trả link tải có hạn; xuất đồng bộ hiện
-      tại giữ cho số bài nhỏ (cách xuất đang có: `modules/forms/src/submissions/csv.rs`)
-- [x] `comments`: Markdown giới hạn (đậm, nghiêng, link, trích dẫn, code) với bộ lọc HTML chống
-      XSS — thêm thư viện thì đo và ghi `STACK.md`; giữ test XSS sẵn có; chữ thường cũ hiển thị như cũ
-
-AVIF cho ảnh thu nhỏ: đã chuyển sang bước 39, đo trước rồi mới quyết (D-232).
 
 ## 33. Nền đa khách: khách hàng, vị trí dữ liệu, mặt điều khiển (D-185)
 
