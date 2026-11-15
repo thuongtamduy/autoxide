@@ -513,6 +513,14 @@ async fn tai_lieu_tu_gan_tag_ma_dinh_danh_va_loi_mac_dinh_cho_moi_endpoint() {
     // Response lỗi module tự khai thì được giữ nguyên.
     let get_one = &document["paths"]["/api/v1/notes/{id}"]["get"];
     assert!(get_one["responses"]["404"].is_object());
+    // `body = Problem` khai `application/json` trong `#[utoipa::path]`; kernel sửa thành media type
+    // lỗi thật trả (đặc tả 31 B4).
+    let not_found = &get_one["responses"]["404"]["content"];
+    assert_eq!(
+        not_found["application/problem+json"]["schema"]["$ref"],
+        "#/components/schemas/Problem"
+    );
+    assert!(not_found.get("application/json").is_none(), "{not_found}");
     assert_eq!(get_one["operationId"], "notes_get_note");
 }
 

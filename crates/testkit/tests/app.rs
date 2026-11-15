@@ -76,7 +76,7 @@ impl Module for Greet {
     get,
     path = "/",
     responses(
-        (status = 200, description = "The greeting.", body = String),
+        (status = 200, description = "The greeting.", body = Data<String>),
         (status = 401, description = "Not signed in.", body = autoxide_kernel::response::Problem),
     )
 )]
@@ -130,7 +130,7 @@ impl Module for WhoAmI {
 #[utoipa::path(
     post,
     path = "/bytes",
-    responses((status = 200, description = "Number of bytes received.", body = usize))
+    responses((status = 200, description = "Number of bytes received.", body = Data<usize>))
 )]
 async fn count_bytes(body: String) -> Data<usize> {
     Data { data: body.len() }
@@ -141,7 +141,7 @@ async fn count_bytes(body: String) -> Data<usize> {
     get,
     path = "/",
     responses(
-        (status = 200, description = "User id, then API key id.", body = [Option<String>]),
+        (status = 200, description = "User id, then API key id.", body = Data<Vec<Option<String>>>),
         (status = 401, description = "Not signed in.", body = autoxide_kernel::response::Problem),
     )
 )]
@@ -206,6 +206,55 @@ async fn cau_hinh_sai_hay_thieu_trait_thi_bao_ro() {
         let missing = TestApp::builder(test).module(Greet::default()).build().await;
         let error = missing.err().unwrap().to_string();
         assert!(error.starts_with("test app: start"), "{error}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Module có route khai sai: tài liệu hứa chuỗi, code trả số.
+struct Liar;
+
+impl Module for Liar {
+    fn name(&self) -> &'static str {
+        "liar"
+    }
+
+    fn routes(&self) -> OpenApiRouter {
+        OpenApiRouter::new().routes(routes!(lie))
+    }
+}
+
+/// Promise a string.
+#[utoipa::path(
+    get,
+    path = "/",
+    responses((status = 200, description = "A string, supposedly.", body = Data<String>))
+)]
+async fn lie() -> Data<i32> {
+    Data { data: 7 }
+}
+
+/// Mọi request qua `send()` được kiểm theo `docs/openapi.json` của chính app (đặc tả 31 B4).
+#[tokio::test]
+async fn response_lech_hop_dong_thi_send_bao_loi() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test).module(Liar).build().await.unwrap();
+        let error = app.get("/api/v1/liar").send().await.unwrap_err().to_string();
+        assert!(
+            error.contains("response does not match docs/openapi.json: GET /api/v1/liar 200: $.data: expected string"),
+            "{error}"
+        );
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn unchecked_bo_qua_kiem() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test).module(Liar).build().await.unwrap();
+        let answer = app.get("/api/v1/liar").unchecked().send().await.unwrap();
+        assert_eq!(answer.json()["data"], 7);
     })
     .await
     .unwrap();

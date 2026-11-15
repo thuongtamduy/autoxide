@@ -162,6 +162,14 @@ pub(super) fn finish(openapi: &mut OpenApi, idempotency: bool) {
     }
     for item in openapi.paths.paths.values_mut() {
         for (method, operation) in operations_mut(item) {
+            // Lỗi thật luôn trả `application/problem+json` (`response::Problem`), nhưng `body =
+            // Problem` trong `#[utoipa::path]` khai `application/json`: sửa thành đúng media type để
+            // tài liệu không hứa sai (đặc tả 31 B4).
+            for response in operation.responses.responses.values_mut() {
+                if let RefOr::T(response) = response {
+                    problem_media_type(response);
+                }
+            }
             // Mọi response 201 đến từ `response::Created`, luôn có `Location`.
             if let Some(RefOr::T(created)) = operation.responses.responses.get_mut("201") {
                 created.headers.entry("Location".to_owned()).or_insert_with(|| {
@@ -185,6 +193,21 @@ pub(super) fn finish(openapi: &mut OpenApi, idempotency: bool) {
                 parameters.push(RefOr::T(idempotency_key()));
             }
         }
+    }
+}
+
+/// Response có thân là `Problem` khai dưới `application/json` thì chuyển sang
+/// `application/problem+json`.
+fn problem_media_type(response: &mut utoipa::openapi::Response) {
+    let problem_ref = format!("#/components/schemas/{}", Problem::name());
+    let is_problem = response.content.get("application/json").is_some_and(|content| {
+        matches!(
+            content,
+            RefOr::T(content) if matches!(&content.schema, Some(RefOr::Ref(reference)) if reference.ref_location == problem_ref)
+        )
+    });
+    if is_problem && let Some(content) = response.content.shift_remove("application/json") {
+        response.content.insert(PROBLEM_CONTENT_TYPE.to_owned(), content);
     }
 }
 
