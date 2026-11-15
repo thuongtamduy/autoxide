@@ -1066,27 +1066,13 @@ pub fn apply_allowlist(
 pub fn run(root: &Path, base: Option<&str>, today: NaiveDate) -> Result<bool, String> {
     let base = match base {
         Some(base) => base.to_owned(),
-        None => {
-            let shallow = git(root, &["rev-parse", "--is-shallow-repository"])?;
-            if shallow.trim() == "true" {
-                return Err(
-                    "the repository is a shallow clone, so the last release tag cannot be \
-                            found; fetch the full history (`git fetch --unshallow --tags`, or \
-                            `fetch-depth: 0` in actions/checkout)"
-                        .to_owned(),
-                );
+        None => match last_release_tag(root)? {
+            Some(tag) => tag,
+            None => {
+                println!("api-diff: no release tag found; nothing to compare");
+                return Ok(true);
             }
-            match git(
-                root,
-                &["describe", "--tags", "--abbrev=0", "--match", "v[0-9]*.[0-9]*.[0-9]*", "HEAD"],
-            ) {
-                Ok(tag) => tag.trim().to_owned(),
-                Err(_) => {
-                    println!("api-diff: no release tag found; nothing to compare");
-                    return Ok(true);
-                }
-            }
-        }
+        },
     };
     let Ok(old_text) = git(root, &["show", &format!("{base}:docs/openapi.json")]) else {
         println!("api-diff: no docs/openapi.json in {base}; nothing to compare");
@@ -1138,6 +1124,22 @@ pub fn run(root: &Path, base: Option<&str>, today: NaiveDate) -> Result<bool, St
         );
         Ok(false)
     }
+}
+
+/// Tag phát hành gần nhất là tổ tiên của `HEAD` (`git describe`, không phải tag mới nhất của repo:
+/// tag gắn ở commit `release:`, có thể không nằm trên nhánh đang làm). `None` khi chưa có tag nào;
+/// lỗi khi repo là shallow clone (không tìm đúng được).
+pub fn last_release_tag(root: &Path) -> Result<Option<String>, String> {
+    let shallow = git(root, &["rev-parse", "--is-shallow-repository"])?;
+    if shallow.trim() == "true" {
+        return Err("the repository is a shallow clone, so the last release tag cannot be found; \
+                    fetch the full history (`git fetch --unshallow --tags`, or `fetch-depth: 0` in \
+                    actions/checkout)"
+            .to_owned());
+    }
+    Ok(git(root, &["describe", "--tags", "--abbrev=0", "--match", "v[0-9]*.[0-9]*.[0-9]*", "HEAD"])
+        .ok()
+        .map(|tag| tag.trim().to_owned()))
 }
 
 fn read_allowlist(root: &Path) -> Result<Vec<Allowed>, String> {

@@ -5911,3 +5911,66 @@ client đang đọc `data` không vỡ.
 Đã cân nhắc:
 - Gom `method` / `path` vào một enum đích: đổi trường công khai của `Deprecation`, phá vỡ hợp đồng Rust.
 - Thêm `Module::tool_deprecations`: thêm một hàm vào trait cho việc mà hàm sẵn có làm được.
+
+## D-241 · Response thật khớp hợp đồng: bộ kiểm tự viết trong testkit, media type của lỗi, ngoại lệ đầu tiên của `api-diff` (bước 31 B4) — 2026-11-15 — agent quyết
+
+Quyết định:
+- `TestRequest::send` (testkit) kiểm **mọi** response với tài liệu OpenAPI của chính app:
+  - mã trạng thái có khai (không có thì dùng `default`);
+  - `Content-Type` là một khoá trong `content`;
+  - thân JSON đúng schema;
+  - lệch thì `send()` trả lỗi, nêu chỗ lệch, vd `GET /api/v1/x 200: $.data.id: expected string (uuid)`.
+- `TestRequest::unchecked()` bỏ kiểm, chỉ cho test cố ý tạo câu trả lời ngoài hợp đồng. Hiện chỉ dùng ở module giả
+  trong test idempotency (trả 500 / 429 dạng chữ, panic).
+- **Bộ kiểm JSON Schema tự viết** (`crates/testkit/src/contract.rs`, khoảng 250 dòng) cho đúng tập con utoipa sinh ra.
+  Không dùng thư viện `jsonschema`.
+  - Kiểm: `type` / nullable, `properties`, `required`, `additionalProperties`, `items`, `enum`, `const`, `oneOf`,
+    `anyOf`, `allOf`, `$ref`, giới hạn số và độ dài, `format` `uuid` / `date-time` / `date`.
+  - Không kiểm `pattern` (cần thư viện regex).
+  - `oneOf` kiểm như "khớp ít nhất một", vì biến thể utoipa sinh ra có thể chồng nhau.
+  - Tài liệu khai `application/octet-stream` thì nhận mọi loại không phải JSON (tệp của media có loại thật như
+    `image/png`).
+- **Media type của lỗi:** `http::openapi::finish` đổi mọi response có thân `Problem` khai dưới `application/json`
+  thành `application/problem+json`, đúng thứ lỗi thật trả. Sửa 822 chỗ; `api-diff` coi hai media type này là một
+  cho lỗi (D-239).
+- **Lệch tìm ra khi bật kiểm:** chỉ một lỗi tài liệu thật. `answers[].value` của bài nộp `forms` khai là object,
+  nhưng thực tế là chuỗi, số, mảng hay `true`; đã sửa thành mọi kiểu JSON. Theo luật, đó là "kiểu response đổi",
+  nên ghi bốn ngoại lệ (cho bản gốc `v0.13.0`) vào `xtask/api-breaking-allow.json`, dẫn quyết định này. Còn lại là
+  tài liệu sai của các route giả trong test của testkit, đã sửa.
+
+Lý do:
+- Tập schema utoipa sinh ra nhỏ và biết trước, nên vài trăm dòng là đủ (CLAUDE.md: không thêm thư viện khi tự viết
+  được).
+- `jsonschema` kéo theo regex và nhiều crate khác vào cây phụ thuộc của mọi crate dùng testkit.
+
+Đã cân nhắc:
+- Kiểm hợp đồng bằng một lớp HTTP riêng chỉ bật trong test: phải đổi `crates/app` và mọi module.
+- Bật kiểm từng test một: dễ quên.
+
+## D-242 · `cargo xtask semver`: chỉ kernel và testkit, ép so như bản patch, báo cáo khi còn `0.x` (bước 31 A7) — 2026-11-15 — agent quyết
+
+Quyết định:
+- `cargo xtask semver [--base <tag>] [--deny] [--markdown]` (`xtask/src/semver.rs`) gọi `cargo semver-checks
+  check-release -p <crate> --baseline-rev <tag> --release-type patch` cho `autoxide-kernel` và `autoxide-testkit`.
+  - Tag mặc định chọn như `api-diff` (tổ tiên gần nhất của `HEAD`).
+  - Ghim `cargo-semver-checks` 0.51.0 (`STACK.md`).
+- **Ép `--release-type patch`:** với `0.x`, công cụ coi bản minor như major, nên không báo gì. So như patch thì mọi
+  thay đổi phá vỡ đều hiện. Thử tay: đổi tên `IfMatch::from_value` thì lệnh báo đúng `inherent_method_missing`.
+- **Chế độ:**
+  - còn `0.x`: chỉ báo cáo (thoát 0);
+  - từ `1.0.0`, hay với `--deny`: có phá vỡ thì thoát 1.
+- `--markdown` in mục `### Breaking (Rust)` để chép vào CHANGELOG. Đường dẫn trên máy build trong "previously in
+  file …" được cắt về đường dẫn trong repo, vì repo công khai.
+- Chạy ở bước 3 của `docs/RELEASING.md`, **không** trong `./gate.sh`.
+- **Không** kiểm crate của module.
+
+Lý do:
+- Đo trên máy làm việc, so với v0.13.0:
+  - kernel và testkit: 3 phút 11 giây, chiếm khoảng 7 GB ở `target/semver-checks` (dựng rustdoc JSON của bản cũ và
+    bản mới);
+  - thêm 9 module có `api` thì nhân lên nhiều lần, và đĩa đã đầy giữa chừng.
+- Phần `api` của module hiện chỉ do module trong cùng repo dùng: đổi phá vỡ thì `cargo check` của workspace đỏ
+  ngay.
+- Khi có module ở repo riêng (D-164), xem lại.
+
+Đã cân nhắc: chạy trong gate — lâu, cần mạng, và còn `0.x` thì chặn không có ích (D-167).
