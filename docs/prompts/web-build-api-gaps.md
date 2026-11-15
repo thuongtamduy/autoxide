@@ -160,3 +160,31 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Menu | Đọc menu kèm tiêu đề và trạng thái của từng đích, cho người có `menus.read` | mới (đề bài menus, điểm 3) | Dữ liệu mẫu |
 | [ ] | Menu | Lệnh nhập menu cũ có chạy thử; ghi lần nhập gần nhất | mới (đề bài menus, điểm 9) | Dữ liệu mẫu; nguồn là menu cũ thật |
 | [ ] | Menu | Header `Deprecation` / `Sunset` trên `/content/menus…` (core chưa gửi) | mới (đề bài menus, mục 3) | Ghi ngày sunset theo bản thiết kế |
+
+## Tổ chức › Cây tổ chức (`/org`) và Tuân thủ (`/compliance`)
+
+| | Màn | Cần | Bước | Giao diện đang làm gì |
+|---|---|---|---|---|
+| [ ] | Cây tổ chức | `GET /organizations/units` (`unit_type`, `code`, `status`), `GET /unit-types` | 34 | Dữ liệu mẫu (`src/sample/org.ts`) |
+| [ ] | Cây tổ chức | `POST /organizations/units` (nút `pending` khi thiếu `units.manage`), `POST /units/{id}/status` | 34 | Dữ liệu mẫu |
+| [ ] | Cây tổ chức | `GET /auth/memberships?org_id=` kèm tên, email người dùng, tên role, độ sâu rộng nhất của role | 34 (phần kèm tên và độ sâu: mới) | Dữ liệu mẫu (`src/sample/org-tree.ts`) |
+| [ ] | Cây tổ chức | `include_inherited=true` cho memberships: thêm người ở nút cha có độ sâu `subtree` / `tenant` | mới | Dữ liệu mẫu |
+| [ ] | Cây tổ chức | Số người làm được ở mỗi nút | mới | Tính từ memberships mẫu |
+| [ ] | Cây tổ chức | `GET /organizations/settings`, `GET/PUT/DELETE /units/{id}/settings/{key}` | 34 | Dữ liệu mẫu |
+| [ ] | Cây tổ chức | Yêu cầu tách nhánh từ phía khách: `GET/POST /organizations/units/{id}/split-requests` | mới (bước 38 chỉ có CLI) | Dữ liệu mẫu |
+| [ ] | Cây tổ chức | `POST /auth/invitations` (mời vào một nút) | 34 | Dữ liệu mẫu |
+| [ ] | Tuân thủ | `GET /compliance/rules?as_of=` kèm lịch sử phiên bản | 37 | Dữ liệu mẫu (`src/sample/compliance-rules.ts`) |
+| [ ] | Tuân thủ › Website | `GET /compliance/websites`, `GET …/{id}/checklist`, `GET …/{id}/dossier`, `POST …/{id}/status` (số hồ sơ, ngày nộp; kết quả: link và ảnh logo) | 37 (ngày nộp: mới) | Dữ liệu mẫu (`src/sample/compliance.ts`) |
+| [ ] | Tuân thủ | `GET /compliance/overview`: số việc chờ theo khu vực | mới | Tính từ hàm mẫu |
+| [ ] | Tuân thủ › KYC | `GET /kyc/profiles?status=` kèm tên chủ thể và cờ "thiếu giấy tờ"; `POST …/approve`, `POST …/reject {reason_code, note}` | 37 (tên và cờ: mới) | Dữ liệu mẫu |
+| [ ] | Tuân thủ › Dữ liệu cá nhân | `GET/POST /incidents`, `PATCH /incidents/{id}`, `POST …/entries` | 37 | Dữ liệu mẫu |
+| [ ] | Hồ sơ | `GET/PATCH /legal-profiles`, `GET/PUT /policies` | 37 | Dữ liệu mẫu |
+| [ ] | Hồ sơ › Mục đích | `GET/POST/PATCH /purposes` kèm số người đồng ý / đã rút | 37 (số đếm: mới) | Dữ liệu mẫu (`src/sample/compliance-records.ts`) |
+| [ ] | Hồ sơ › Hạn lưu | `GET /retention`, `GET /processing-register` | 37 | Dữ liệu mẫu; route của giao diện xuất JSON |
+| [ ] | Hồ sơ › Đăng nội dung | Thống kê người mua đã xác thực số điện thoại / định danh | mới | Dữ liệu mẫu |
+| [ ] | Hồ sơ › Văn bản | `GET /documents`, `POST /documents/{id}/versions`, `GET …/acceptances`; số người đã chấp nhận theo phiên bản | 37 (số đếm: mới) | Dữ liệu mẫu; trang nguồn đọc thật |
+| [ ] | Hồ sơ › Vụ việc | `GET /cases`, `POST /cases/{id}/restrict`, `…/restore`, `…/decision`, `POST …/entries` | 37 | Dữ liệu mẫu |
+| [ ] | Hồ sơ › Nhãn AI | Bộ lọc `ai_generated=true` trên `GET /content/entries` | mới | Đọc 100 bài sửa gần nhất rồi lọc (API thật) |
+| [ ] | Hồ sơ › Nhãn AI | Lọc và bỏ nhãn AI cho sản phẩm và alt media | mới | Dữ liệu mẫu |
+| [ ] | Hồ sơ › Yêu cầu của chủ thể | `GET/POST /compliance/subject-requests`, `POST …/{id}/status`; số lần tự xuất / tự xoá trong 30 ngày | mới | Dữ liệu mẫu |
+| [ ] | Hồ sơ › Yêu cầu của chủ thể | Một API tra / xoá dữ liệu cá nhân theo email chung cho mọi module | mới (bước 37 chỉ có `/consents?subject=`) | Dẫn tới 3 tab "dữ liệu theo email" thật |
