@@ -313,3 +313,33 @@ Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/finance.ts
 | [ ] | Kỳ kế toán | Kiểm trước khi khoá; mã `ledger.period_not_ended`; kết quả kiểm chuỗi băm qua API (`GET /ledger/integrity`) | mới |
 | [ ] | Xuất kế toán | `POST /invoices/exports`, `GET /exports/{id}`, `GET /exports/{id}/download` | 36 |
 | [ ] | Xuất kế toán | Danh sách bản xuất (`GET /exports`), lập lại bản lỗi (`POST /exports/{id}/retry`) | mới |
+
+## Bán hàng › Đơn hàng (`/sales/orders`), Cửa hàng (`/sales/stores`)
+
+Cột "Giao diện đang làm gì": dữ liệu mẫu ở `src/sample/orders.ts`, `stores.ts`, trừ chỗ ghi khác.
+
+| | Màn | Cần | Bước |
+|---|---|---|---|
+| [ ] | Đơn hàng | `GET /orders` (lọc `status`, `payment_status`, `org_id`, `channel`, `from`, `number`) và `GET /{id}` | 45 |
+| [ ] | Đơn hàng | Lọc `flow` (dòng tiền), `q` (mã hoặc tên người mua), số đếm theo bộ lọc (`count=true`) | mới |
+| [ ] | Đơn hàng | Số liệu đầu màn: đơn trong 30 ngày, đơn chờ xử lý, số đếm trên menu | 51 |
+| [ ] | Đơn hàng | View đã lưu `GET/POST /me/views` (hệ thống / nút / của tôi) | 51 |
+| [ ] | Đơn hàng | Hỏi bằng lời: `POST /ai/filters/parse` | 52 (mẫu chỉ bật khi `/ai/status` thật bật) |
+| [ ] | Đơn hàng | Thao tác hàng loạt kèm hoàn tác | 51 |
+| [ ] | Đơn hàng | Xuất CSV theo bộ lọc bằng job; in phiếu giao | 51 (route của giao diện đọc dữ liệu mẫu) |
+| [ ] | Chi tiết đơn | `POST /{id}/transitions` kèm `If-Match`; trạng thái `awaiting_acceptance` | 45 |
+| [ ] | Chi tiết đơn | Hoàn tác một lần chuyển trạng thái của nhân viên trong N phút | mới |
+| [ ] | Chi tiết đơn | `POST /{id}/refunds`, `POST /{id}/payments/manual`; nơi tiền về của từng khoản hoàn | 45 |
+| [ ] | Chi tiết đơn | `POST /{id}/payment-link` (gửi lại link thanh toán) | 45 |
+| [ ] | Chi tiết đơn | Ghi chú nội bộ: `POST /{id}/notes` | mới (51 có dòng hoạt động chung) |
+| [ ] | Chi tiết đơn | Bút toán của một đơn: đọc sổ cái theo `reference` | 36 |
+| [ ] | Chi tiết đơn | Duyệt / từ chối đề xuất của agent: `/kernel/approvals/{id}/approve\|reject` | 51 |
+| [ ] | Đổi trả | `GET /returns`, `POST /returns/{id}/transitions`; `media_ids`, `return_deadline_at`, `respond_by` | 45 |
+| [ ] | Đổi trả tại quầy | Nhân viên tạo yêu cầu đổi trả đã nhận tại quầy (`return_method=in_store`, tình trạng hàng) | mới |
+| [ ] | Bán tại quầy | `POST /pos/sales`; danh mục bán tại quầy (giá của cửa hàng + tồn bán được) | 45 |
+| [ ] | Bán tại quầy | Hoá đơn khởi tạo từ máy tính tiền (bản in) | 45, 36 |
+| [ ] | Giỏ bỏ dở | `GET /orders/carts?status=abandoned`, `POST /carts/{id}/reminders` (kèm huỷ lần nhắc), chỉ khách đã đồng ý, tối đa 2 lần | 45 + mới |
+| [ ] | Nhận tại cửa hàng | `POST /{id}/pickup/ready` (có hoàn tác), `/pickup/code`, `/pickup/handover`; lọc `pickup_org_id`, `pickup_status`; `hold_days` | 45 |
+| [ ] | Ca thu ngân | `GET /pos/shifts`; `difference_reason` khi đóng ca lệch; tiền mặt dự kiến của ca | 45 + mới |
+| [ ] | Đánh giá | `GET /reviews`, `/reply`, `/moderation`; trạng thái "đã xem"; danh sách lý do ẩn | 45 |
+| [ ] | Đánh giá | Bản nháp tóm tắt đánh giá bằng AI: tạo, duyệt, bỏ | 45 |
