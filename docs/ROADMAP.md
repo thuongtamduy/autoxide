@@ -77,7 +77,7 @@ khai ở `[dev-dependencies]`.
 
 Nhóm A — hợp đồng và người gọi API:
 
-- [ ] Gate chặn thay đổi phá vỡ của `/api/v1` (D-059): so `docs/openapi.json` với bản ở tag phát
+- [x] Gate chặn thay đổi phá vỡ của `/api/v1` (D-059, D-239): so `docs/openapi.json` với bản ở tag phát
       hành gần nhất (`git show vX.Y.Z:docs/openapi.json`) và báo đỏ khi xoá endpoint hay method,
       thêm tham số hay trường bắt buộc vào request, xoá trường hay đổi kiểu trong response, bỏ
       giá trị của enum. Endpoint đã khai deprecated và quá ngày `sunset` thì được bỏ. Viết bằng

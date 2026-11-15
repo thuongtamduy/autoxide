@@ -9,6 +9,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- `cargo xtask api-diff`: the gate refuses breaking changes to `/api/v1` against the last release tag
+  (removed operations, new required parameters or fields, removed response fields, narrowed types, removed
+  enum values…), each with a stable rule code and the way to do it right. Deprecated operations now carry
+  `x-sunset` in the OpenAPI document.
+
 ## [0.13.0] - 2026-11-14
 
 ### Added

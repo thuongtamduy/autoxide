@@ -1,5 +1,7 @@
 //! Công cụ cho người phát triển Autoxide. Chạy bằng `cargo xtask <lệnh>`.
 //!
+//! - `api-diff [--base <ref>]` — chặn thay đổi phá vỡ của `/api/v1` so với bản phát hành gần
+//!   nhất (xem `api_diff.rs`). `./gate.sh` gọi lệnh này ở cả hai mức.
 //! - `check` — kiểm luật ranh giới của workspace (xem `boundaries.rs`), bản dịch i18n
 //!   (`i18n.rs`) và tài liệu EN / VI (`docs.rs`). `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
 //! - `new-module <module> <entity>` — sinh module mới từ khuôn `modules/notes` (xem
@@ -8,6 +10,7 @@
 //!   thuộc vào chúng, trên SQLite; phần test của `./gate.sh --quick` (xem `affected.rs`).
 
 mod affected;
+mod api_diff;
 mod boundaries;
 mod docs;
 mod i18n;
@@ -17,6 +20,7 @@ mod workspace;
 use std::process::ExitCode;
 
 const USAGE: &str = "usage: cargo xtask check
+       cargo xtask api-diff [--base <ref>]       default base: the last release tag before HEAD
        cargo xtask new-module <module> <entity>   e.g. new-module bookmarks bookmark
        cargo xtask test-affected [--base <ref>]   default base: origin/main";
 
@@ -27,11 +31,31 @@ fn main() -> ExitCode {
     // số mà không phải tự kiểm độ dài.
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         ["check"] => check(),
+        ["api-diff"] => api_diff(None),
+        ["api-diff", "--base", base] => api_diff(Some(base)),
         ["new-module", module, entity] => new_module(module, entity),
         ["test-affected"] => test_affected(None),
         ["test-affected", "--base", base] => test_affected(Some(base)),
         _ => {
             eprintln!("{USAGE}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn api_diff(base: Option<&str>) -> ExitCode {
+    let root = match workspace::load() {
+        Ok(workspace) => workspace.root,
+        Err(error) => {
+            eprintln!("xtask api-diff: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    match api_diff::run(&root, base, chrono::Utc::now().date_naive()) {
+        Ok(true) => ExitCode::SUCCESS,
+        Ok(false) => ExitCode::FAILURE,
+        Err(error) => {
+            eprintln!("xtask api-diff: {error}");
             ExitCode::FAILURE
         }
     }

@@ -913,6 +913,7 @@ async fn endpoint_deprecated_co_header_va_danh_dau_trong_tai_lieu() {
     let description = operation["description"].as_str().unwrap();
     assert!(description.contains("Deprecated** since 2026-11-01"), "{description}");
     assert!(description.contains("removed on 2027-05-01"), "{description}");
+    assert_eq!(operation["x-sunset"], "2027-05-01", "read by `cargo xtask api-diff`");
     assert!(document["paths"]["/api/v1/notes"]["get"].get("deprecated").is_none());
 }
 

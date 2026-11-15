@@ -123,6 +123,15 @@ pub(super) fn apply(openapi: &mut OpenApi, deprecations: &[(&'static str, Deprec
         }
         operation.description =
             Some(format!("{}{note}", operation.description.clone().unwrap_or_default()));
+        // Ngày gỡ đọc được bằng máy, cho `cargo xtask api-diff` (đặc tả 31 A1). Một khoá duy nhất:
+        // `Extensions` của utoipa là `HashMap`, nhiều khoá thì thứ tự trong `openapi.json` đổi
+        // giữa các lần sinh.
+        if let Some(sunset) = sunset {
+            operation
+                .extensions
+                .get_or_insert_with(Default::default)
+                .insert("x-sunset".to_owned(), serde_json::Value::String(sunset.to_string()));
+        }
 
         let midnight = |date: NaiveDate| date.and_time(NaiveTime::MIN).and_utc();
         let headers = Headers {

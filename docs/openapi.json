@@ -12103,7 +12103,8 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-sunset": "2027-05-14"
       }
     },
     "/api/v1/content/menus/{key}": {
@@ -12211,7 +12212,8 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-sunset": "2027-05-14"
       },
       "put": {
         "tags": [
@@ -12369,7 +12371,8 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-sunset": "2027-05-14"
       }
     },
     "/api/v1/content/public/authors/{slug}": {
@@ -12614,7 +12617,8 @@
           {
             "bearer": []
           }
-        ]
+        ],
+        "x-sunset": "2027-05-14"
       }
     },
     "/api/v1/content/public/posts": {
