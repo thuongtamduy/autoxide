@@ -20,7 +20,7 @@ use validator::Validate;
 use super::views::{BanResponse, CommentDetail, ReportResponse, TargetResponse};
 use super::{choice, page_request};
 use crate::moderation::{BAN_KINDS, BanFilter, NewBan, QueueFilter};
-use crate::posting::targets::TargetChange;
+use crate::posting::targets::{TargetChange, TargetFilter};
 use crate::service::{CommentsService, STATUSES, Status};
 
 /// Which comments to list.
@@ -94,7 +94,29 @@ pub(crate) async fn list_comments(
     let mut problems = Vec::new();
     let filter = query.filter(&mut problems);
     let page = page_request(paging, problems)?;
-    Ok(service.queue(&principal, &filter, &page).await?.map(CommentDetail::from))
+    let page = service.queue(&principal, &filter, &page).await?.map(CommentDetail::from);
+    let autoxide_kernel::pagination::Page { data, pagination } = page;
+    Ok(autoxide_kernel::pagination::Page { data: with_targets(&service, data).await?, pagination })
+}
+
+/// Bình luận kèm tiêu đề và đường dẫn của đích (một lần tra cho mỗi loại đích của trang).
+async fn with_targets(
+    service: &CommentsService,
+    comments: Vec<CommentDetail>,
+) -> Result<Vec<CommentDetail>, Error> {
+    let targets: Vec<(String, String)> = comments
+        .iter()
+        .map(|comment| (comment.target_type.clone(), comment.target_id.clone()))
+        .collect();
+    let found = service.target_titles(&targets).await?;
+    Ok(comments
+        .into_iter()
+        .map(|comment| {
+            let key = (comment.target_type.clone(), comment.target_id.clone());
+            let (target_title, target_url) = super::views::described(found.get(&key));
+            CommentDetail { target_title, target_url, ..comment }
+        })
+        .collect())
 }
 
 /// Get a comment with its moderation details.
@@ -120,7 +142,10 @@ pub(crate) async fn get_comment(
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<CommentDetail>, Error> {
     let found = service.get(&principal, id).await?;
-    Ok(Tagged { version: found.row.updated_at, data: found.into() })
+    let version = found.row.updated_at;
+    let described = with_targets(&service, vec![found.into()]).await?.into_iter().next();
+    let data = described.ok_or_else(|| Error::internal("describing a comment returned nothing"))?;
+    Ok(Tagged { version, data })
 }
 
 /// A moderation decision.
@@ -396,6 +421,86 @@ pub(crate) async fn get_target(
         }
         None => Data { data: TargetResponse::new(target, true) }.into_response(),
     })
+}
+
+/// Which comment targets to list.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct TargetsQuery {
+    /// Only targets of this kind, e.g. `content.entry`.
+    pub target_type: Option<String>,
+    /// `open` or `closed`: the state that applies now (hidden targets and those past `closes_at`
+    /// are `closed`).
+    #[param(value_type = Option<TargetStateParam>, inline)]
+    pub state: Option<String>,
+    /// `true`: only targets with comments waiting for approval; `false`: only those without.
+    #[param(value_type = Option<bool>)]
+    pub pending: Option<String>,
+}
+
+/// State of a target's comments.
+#[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum TargetStateParam {
+    Open,
+    Closed,
+}
+
+/// List the targets that have comments.
+///
+/// Requires `comments.read`. Each target (a post, a product…) that got a comment or had its state
+/// set, newest first, with its counts and — when public — its title and path. Filter by kind,
+/// state, or targets waiting for moderation (`pending=true`). Follow `pagination.next_cursor` with
+/// the same filters for more.
+#[utoipa::path(
+    get,
+    path = "/targets",
+    extensions(("x-permissions" = json!(["comments.read"]))),
+    operation_id = "list_comment_targets",
+    security(("bearer" = [])),
+    params(TargetsQuery, PageQuery),
+    responses(
+        (status = 200, description = "One page of targets.", body = Page<TargetResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `comments.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
+    )
+)]
+pub(crate) async fn list_targets(
+    State(service): State<Arc<CommentsService>>,
+    principal: Principal,
+    Query(query): Query<TargetsQuery>,
+    Query(paging): Query<PageQuery>,
+) -> Result<Page<TargetResponse>, Error> {
+    let mut problems = Vec::new();
+    let state = match query.state.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(state @ ("open" | "closed")) => Some(state.to_owned()),
+        Some(_) => {
+            problems.push(FieldError::new("state", "invalid", "must be `open` or `closed`"));
+            None
+        }
+    };
+    let pending = match query.pending.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some("true") => Some(true),
+        Some("false") => Some(false),
+        Some(_) => {
+            problems.push(FieldError::new("pending", "invalid", "must be `true` or `false`"));
+            None
+        }
+    };
+    let page = page_request(paging, problems)?;
+    let filter = TargetFilter { kind: query.target_type, state, pending };
+    let page = service.list_targets(&principal, &filter, &page).await?;
+    let keys: Vec<(String, String)> =
+        page.data.iter().map(|target| (target.kind.clone(), target.id.clone())).collect();
+    let found = service.target_titles(&keys).await?;
+    Ok(page.map(|target| {
+        let key = (target.kind.clone(), target.id.clone());
+        let (title, url) = super::views::described(found.get(&key));
+        TargetResponse { title, url, ..TargetResponse::new(target, true) }
+    }))
 }
 
 // Trường JSON có ba trạng thái: không gửi (`None`), `null` (`Some(None)`), có giá trị.

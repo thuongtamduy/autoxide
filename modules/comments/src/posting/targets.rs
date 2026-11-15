@@ -88,6 +88,17 @@ impl Target {
     }
 }
 
+/// Bộ lọc danh sách đích của quản trị viên.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct TargetFilter {
+    /// Chỉ đích của loại này.
+    pub kind: Option<String>,
+    /// `Some("open")` / `Some("closed")`: trạng thái đang áp dụng (tính cả ẩn và hạn tự đóng).
+    pub state: Option<String>,
+    /// `true`: chỉ đích có bình luận chờ duyệt; `false`: chỉ đích không có.
+    pub pending: Option<bool>,
+}
+
 /// Thay đổi trạng thái đích do quản trị viên gửi.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct TargetChange {
@@ -165,6 +176,75 @@ impl CommentsService {
     ) -> Result<Target, Error> {
         principal.require(&COMMENTS_READ)?;
         self.target(kind, id).await
+    }
+
+    /// Một trang đích có bình luận (hoặc đã được đặt trạng thái), mới tạo trước. Cần
+    /// `comments.read`.
+    pub(crate) async fn list_targets(
+        &self,
+        principal: &Principal,
+        filter: &TargetFilter,
+        page: &autoxide_kernel::pagination::PageRequest,
+    ) -> Result<autoxide_kernel::pagination::Page<Target>, Error> {
+        principal.require(&COMMENTS_READ)?;
+        let mut select = target::Entity::find();
+        if let Some(kind) = filter.kind.as_deref().map(str::trim).filter(|kind| !kind.is_empty()) {
+            select = select.filter(target::Column::TargetType.eq(kind));
+        }
+        if let Some(state) = filter.state.as_deref() {
+            // Cùng luật với `Target::is_open`: mở, không ẩn, chưa tới hạn tự đóng.
+            let open = sea_orm::Condition::all()
+                .add(target::Column::State.eq("open"))
+                .add(target::Column::Hidden.eq(false))
+                .add(
+                    sea_orm::Condition::any()
+                        .add(target::Column::ClosesAt.is_null())
+                        .add(target::Column::ClosesAt.gt(now())),
+                );
+            select = select.filter(if state == "open" { open } else { open.not() });
+        }
+        if let Some(pending) = filter.pending {
+            let column = target::Column::PendingCount;
+            select = select.filter(if pending { column.gt(0) } else { column.eq(0) });
+        }
+        let found = autoxide_kernel::pagination::fetch_page(
+            select,
+            target::Column::Uid,
+            |row| row.uid,
+            page,
+            self.database.read(),
+        )
+        .await?;
+        Ok(found.map(Target::from_row))
+    }
+
+    /// Tiêu đề và đường dẫn công khai của các đích `targets` (loại, ID), tra theo lô qua sổ đối
+    /// tượng — một lần cho mỗi loại. Loại không có bộ tra, đích không còn hay chưa công khai:
+    /// vắng trong kết quả (không lộ tiêu đề của bản nháp).
+    pub(crate) async fn target_titles(
+        &self,
+        targets: &[(String, String)],
+    ) -> Result<HashMap<(String, String), Resource>, Error> {
+        let mut by_kind: HashMap<&str, Vec<String>> = HashMap::new();
+        for (kind, id) in targets {
+            let ids = by_kind.entry(kind.as_str()).or_default();
+            if !ids.contains(id) {
+                ids.push(id.clone());
+            }
+        }
+        let tenant = TenantContext::legacy_default(&self.database);
+        let mut found = HashMap::new();
+        for (kind, ids) in by_kind {
+            if !self.resources.knows(kind) {
+                continue;
+            }
+            for (id, resource) in self.resources.resolve_many(&tenant, kind, &ids, None).await? {
+                if resource.public {
+                    found.insert((kind.to_owned(), id), resource);
+                }
+            }
+        }
+        Ok(found)
     }
 
     /// Số bình luận đang hiện của nhiều đích cùng loại (tối đa [`COUNTS_MAX`]), theo thứ tự

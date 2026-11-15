@@ -16,6 +16,9 @@ endpoints are marked deprecated with a sunset date first.
   gives `has_password` and `pending_email` (an email change waiting for its link, with expiry);
   `DELETE /api/v1/auth/me/email` cancels that change. New event `auth.email_change_cancelled`. Users are an object
   type `auth.user` of the object directory (their display name), for other modules.
+- `comments`: comments in the moderation list and when read carry `target_title` and `target_url`
+  (from the module that owns the target, when public); `GET /api/v1/comments/targets` lists the
+  targets with comments, their counts, title and path, filtered by kind, state or pending.
 - `newsletter`: `GET /api/v1/newsletter/settings` (the settings in use and what is still missing
   to send); `GET /api/v1/newsletter/campaigns/{id}/preview` (the mail as sent, with footer);
   campaign `progress` gives `bounced` and `unsubscribed`; subscribers filter by `blocked`.

@@ -138,8 +138,8 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [x] | Chiến dịch | Số huỷ đăng ký / bounce sau thư này | mới | Không hiện |
 | [ ] | Danh sách nhận tin | Tổng số đăng ký và số địa chỉ không gửi của cả khách | 51 (số liệu tóm tắt) | Cộng các danh sách ở trang đầu (≤ 50) |
 | [x] | Người đăng ký | Lọc theo trạng thái người đăng ký (`blocked`); tham số `status` hiện lọc theo trạng thái đăng ký | mới | Không có chip "Bị chặn"; nhãn hiện trên dòng |
-| [ ] | Bình luận | `CommentDetail` kèm tiêu đề và link của đích (sổ đối tượng D-123) | mới | `content.entry`: đọc bài qua API `content`; loại khác hiện id |
-| [ ] | Bình luận › Theo bài | `GET /comments/targets`: danh sách đích có số đếm, lọc theo trạng thái | mới | Lấy đích từ 200 bình luận mới nhất |
+| [x] | Bình luận | `CommentDetail` kèm tiêu đề và link của đích (sổ đối tượng D-123) | mới | `content.entry`: đọc bài qua API `content`; loại khác hiện id |
+| [x] | Bình luận › Theo bài | `GET /comments/targets`: danh sách đích có số đếm, lọc theo trạng thái | mới | Lấy đích từ 200 bình luận mới nhất |
 | [ ] | Menu Bình luận, Biểu mẫu | Số việc đang chờ (bình luận chờ duyệt, bài nộp mới) | 51 (hộp việc) | Chưa hiện số |
 | [ ] | Bình luận › Cài đặt | Cài đặt bình luận theo khách (bật / tắt, chế độ duyệt) | 33 | Dữ liệu mẫu (`src/sample/engage.ts`) |
 | [ ] | Bình luận › Cài đặt | Chính sách `posting.comments` (xác thực tài khoản, NĐ 147/2024) | 37 | Dữ liệu mẫu (`src/sample/engage.ts`) |

@@ -6800,3 +6800,19 @@ Xếp vào lộ trình: các mục của đề bài này là việc sửa API c�
    gửi nào, nên không tính cho chiến dịch.
 5. Lọc người đăng ký `blocked=true|false` (REST và tool MCP `newsletter.find_subscribers`); `status` vẫn là trạng
    thái đăng ký trong danh sách như cũ (D-059).
+
+## D-270 · Đề bài giao diện, nhóm B (comments): tiêu đề của đích qua sổ đối tượng, danh sách đích có ID riêng — 2026-11-15 — agent quyết
+
+1. **`target_title` / `target_url` của bình luận** (danh sách kiểm duyệt và khi đọc một bình luận) tra qua sổ đối
+   tượng (D-123), một lần cho mỗi loại đích của trang. Chỉ trả khi đích **đang công khai** (`Resource.public`):
+   bộ tra không đưa tiêu đề bản nháp ra ngoài module của nó, và người kiểm duyệt bình luận không mặc nhiên có quyền
+   đọc bản nháp. Loại không có bộ tra (cấu hình cho phép mà không module nào mô tả): vắng, giao diện hiện ID.
+2. **`GET /comments/targets`**: đích đã có bình luận (hay đã được đặt trạng thái), lọc theo loại, trạng thái đang
+   áp dụng (`open` / `closed`, cùng luật `is_open`: ẩn hay quá `closes_at` là đóng) và `pending`. Để phân trang bằng
+   cursor như mọi danh sách (`fetch_page` cần một UUID duy nhất, khoá chính của bảng là hai chuỗi), bảng
+   `comments_targets` có thêm cột `uid` (UUIDv7, sinh trong ứng dụng; dòng có sẵn được cấp ở migration `m0012`,
+   index duy nhất). Cột để nullable trong database vì SQLite không thêm được cột `NOT NULL` không mặc định; mọi dòng
+   đều có giá trị và entity khai không null. Thứ tự: đích mới có bình luận đầu tiên trước.
+3. `title` / `url` trong `TargetResponse` chỉ có ở danh sách của quản trị viên; câu trả lời công khai giữ nguyên
+   hình dạng (D-059). Chưa thêm tool MCP cho danh sách đích: tool `comments.queue` đã đủ cho việc kiểm duyệt của
+   agent; thêm khi có nhu cầu (luật kiến trúc 8 chỉ cấm MCP làm hơn REST).

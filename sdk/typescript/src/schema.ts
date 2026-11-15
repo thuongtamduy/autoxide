@@ -400,7 +400,17 @@ export type CommentDetail = {
   root_id: string;
   status: CommentStatus;
   target_id: string;
+  /**
+   * Title of the target (e.g. the post's title), from the module that owns it; absent when
+   * that kind has no lookup or the target is not public now.
+   */
+  target_title?: string | null;
   target_type: string;
+  /**
+   * Public path of the target (without the domain), e.g. `/blog/hello`; absent like
+   * `target_title`.
+   */
+  target_url?: string | null;
   updated_at: string;
   /** The account, for a signed-in author. */
   user_id?: string | null;
@@ -499,6 +509,13 @@ export type CommentTarget = {
   target_type: string;
   /** Shown top-level comments, e.g. questions on a product (0 when hidden). */
   thread_count: number;
+  /**
+   * Title of the target, from the module that owns it (only in the admin list, and only for a
+   * target that is public now); absent otherwise.
+   */
+  title?: string | null;
+  /** Public path of the target (without the domain), like `title`. */
+  url?: string | null;
 };
 
 /** Whether a target takes comments. */
@@ -1022,7 +1039,17 @@ export type Data_CommentDetail = {
     root_id: string;
     status: CommentStatus;
     target_id: string;
+    /**
+     * Title of the target (e.g. the post's title), from the module that owns it; absent when
+     * that kind has no lookup or the target is not public now.
+     */
+    target_title?: string | null;
     target_type: string;
+    /**
+     * Public path of the target (without the domain), e.g. `/blog/hello`; absent like
+     * `target_title`.
+     */
+    target_url?: string | null;
     updated_at: string;
     /** The account, for a signed-in author. */
     user_id?: string | null;
@@ -1103,6 +1130,13 @@ export type Data_CommentTarget = {
     target_type: string;
     /** Shown top-level comments, e.g. questions on a product (0 when hidden). */
     thread_count: number;
+    /**
+     * Title of the target, from the module that owns it (only in the admin list, and only for a
+     * target that is public now); absent otherwise.
+     */
+    title?: string | null;
+    /** Public path of the target (without the domain), like `title`. */
+    url?: string | null;
   };
 };
 
@@ -3895,7 +3929,17 @@ export type Page_CommentDetail = {
     root_id: string;
     status: CommentStatus;
     target_id: string;
+    /**
+     * Title of the target (e.g. the post's title), from the module that owns it; absent when
+     * that kind has no lookup or the target is not public now.
+     */
+    target_title?: string | null;
     target_type: string;
+    /**
+     * Public path of the target (without the domain), e.g. `/blog/hello`; absent like
+     * `target_title`.
+     */
+    target_url?: string | null;
     updated_at: string;
     /** The account, for a signed-in author. */
     user_id?: string | null;
@@ -3915,6 +3959,37 @@ export type Page_CommentReport = {
     reason: string;
     /** The reporting account, when signed in. */
     reporter_user_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CommentTarget = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** When it closes by itself, if set. */
+    closes_at?: string | null;
+    /** Shown comments (0 when hidden). */
+    comment_count: number;
+    /** The comments are hidden from everyone (e.g. the target was deleted). */
+    hidden: boolean;
+    /** Comments waiting for approval (`null` in the public answer). */
+    pending_count?: number | null;
+    /** Top-level comments waiting for approval (`null` in the public answer). */
+    pending_thread_count?: number | null;
+    /** What applies now. */
+    state: CommentTargetState;
+    target_id: string;
+    target_type: string;
+    /** Shown top-level comments, e.g. questions on a product (0 when hidden). */
+    thread_count: number;
+    /**
+     * Title of the target, from the module that owns it (only in the admin list, and only for a
+     * target that is public now); absent otherwise.
+     */
+    title?: string | null;
+    /** Public path of the target (without the domain), like `title`. */
+    url?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -7303,6 +7378,19 @@ export interface paths {
       responses: {
         200: Data_VerifiedResponse;
         400: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/comments/targets": {
+    /** List the targets that have comments. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { target_type?: string; state?: "open" | "closed"; pending?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_CommentTarget;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };

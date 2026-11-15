@@ -169,6 +169,7 @@ pub(crate) async fn ensure_target<C: ConnectionTrait>(
     let row = target::ActiveModel {
         target_type: Set(kind.to_owned()),
         target_id: Set(id.to_owned()),
+        uid: Set(Uuid::now_v7()),
         state: Set("open".to_owned()),
         hidden: Set(false),
         closes_at: Set(closes_at),

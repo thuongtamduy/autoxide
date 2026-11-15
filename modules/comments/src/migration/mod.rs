@@ -5,6 +5,7 @@ mod m0001_create_comments;
 mod m0008_name_key_lookalikes;
 mod m0009_questions;
 mod m0010_add_format;
+mod m0012_target_ids;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -41,5 +42,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                 autoxide_kernel::antispam::tenant_table("comments"),
             ],
         ),
+        // ID của đích, để liệt kê theo trang (D-270).
+        Box::new(m0012_target_ids::Migration),
     ]
 }
