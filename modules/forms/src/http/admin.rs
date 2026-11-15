@@ -7,6 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -212,6 +213,7 @@ pub(crate) struct FormsQuery {
 )]
 pub(crate) async fn list_forms(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<FormsQuery>,
     Query(paging): Query<PageQuery>,
@@ -219,16 +221,17 @@ pub(crate) async fn list_forms(
     let mut problems = Vec::new();
     let status = choice(query.status.as_deref(), "status", "`open`, `closed`", &mut problems);
     let page = page_request(paging, problems)?;
-    counted(&service, service.list_forms(&principal, status, &page).await?).await
+    counted(&service, &tenant, service.list_forms(&tenant, &principal, status, &page).await?).await
 }
 
 /// Một trang form như API trả về, kèm số bài gửi theo trạng thái (một câu đếm cho cả trang).
 pub(crate) async fn counted(
     service: &FormsService,
+    tenant: &TenantContext,
     page: Page<Form>,
 ) -> Result<Page<FormResponse>, Error> {
     let ids: Vec<Uuid> = page.data.iter().map(|form| form.row.id).collect();
-    let counts = service.submission_counts(&ids).await?;
+    let counts = service.submission_counts(tenant, &ids).await?;
     Ok(page.map(|form| {
         let submissions = Some(counts.get(&form.row.id).copied().unwrap_or_default());
         FormResponse { submissions, ..FormResponse::from(form) }
@@ -258,10 +261,11 @@ pub(crate) async fn counted(
 )]
 pub(crate) async fn create_form(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CreateFormRequest>,
 ) -> Result<Created<FormResponse>, Error> {
-    let form = service.create_form(&principal, input.into()).await?;
+    let form = service.create_form(&tenant, &principal, input.into()).await?;
     Ok(Created::new(format!("/forms/{}", form.row.id), form.into()))
 }
 
@@ -284,11 +288,12 @@ pub(crate) async fn create_form(
 )]
 pub(crate) async fn get_form(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<FormResponse>, Error> {
-    let form = service.get_form(&principal, id).await?;
-    let counts = service.submission_counts(&[form.row.id]).await?;
+    let form = service.get_form(&tenant, &principal, id).await?;
+    let counts = service.submission_counts(&tenant, &[form.row.id]).await?;
     let submissions = Some(counts.get(&form.row.id).copied().unwrap_or_default());
     Ok(Tagged { version: form.row.updated_at, data: FormResponse { submissions, ..form.into() } })
 }
@@ -320,13 +325,14 @@ pub(crate) async fn get_form(
 )]
 pub(crate) async fn update_form(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
     ValidJson(input): ValidJson<UpdateFormRequest>,
 ) -> Result<Tagged<FormResponse>, Error> {
     let expected = if_match.required()?;
-    let form = service.update_form(&principal, id, input.into(), expected).await?;
+    let form = service.update_form(&tenant, &principal, id, input.into(), expected).await?;
     Ok(Tagged { version: form.row.updated_at, data: form.into() })
 }
 
@@ -353,11 +359,12 @@ pub(crate) async fn update_form(
 )]
 pub(crate) async fn delete_form(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
 ) -> Result<StatusCode, Error> {
     let expected = if_match.required()?;
-    service.delete_form(&principal, id, expected).await?;
+    service.delete_form(&tenant, &principal, id, expected).await?;
     Ok(StatusCode::NO_CONTENT)
 }

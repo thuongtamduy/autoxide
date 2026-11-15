@@ -24,6 +24,7 @@ use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::pagination::{Order, PageRequest};
 use autoxide_kernel::privacy::{PersonalData, USER_DELETED};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::TestDatabase;
 use sea_orm::{ConnectionTrait, EntityTrait, PaginatorTrait, Statement};
 use serde_json::{Value, json};
@@ -69,16 +70,8 @@ fn visitor(ip: &str) -> ClientInfo {
     ClientInfo::from_ip(ip.parse::<IpAddr>().unwrap())
 }
 
-async fn token(service: &FormsService, key: &str) -> String {
-    service
-        .guard
-        .issue(
-            &autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
-            &scope(key),
-        )
-        .await
-        .unwrap()
-        .token
+async fn token(tenant: &TenantContext, service: &FormsService, key: &str) -> String {
+    service.guard.issue(tenant, &scope(key)).await.unwrap().token
 }
 
 fn answers(name: &str, email: &str) -> serde_json::Map<String, Value> {
@@ -90,6 +83,7 @@ fn answers(name: &str, email: &str) -> serde_json::Map<String, Value> {
 
 /// Gửi một bài như người lạ, với token mới.
 async fn send(
+    tenant: &TenantContext,
     service: &FormsService,
     key: &str,
     client: &ClientInfo,
@@ -99,10 +93,10 @@ async fn send(
         data,
         locale: Some("vi".to_owned()),
         page_url: Some("https://example.com/contact".to_owned()),
-        form_token: Some(token(service, key).await),
+        form_token: Some(token(tenant, service, key).await),
         ..PublicSubmission::default()
     };
-    service.submit(key, None, client, input).await
+    service.submit(tenant, key, None, client, input).await
 }
 
 async fn count(database: &autoxide_kernel::database::Database) -> u64 {

@@ -5,6 +5,7 @@ mod m0001_create_forms;
 mod m0007_create_exports;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::tenancy::migration::TenantTable;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -29,6 +30,33 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                 autoxide_kernel::job::tenant_table("forms"),
                 autoxide_kernel::throttle::tenant_table("forms"),
                 autoxide_kernel::antispam::tenant_table("forms"),
+            ],
+        ),
+        // Form, phiên bản, bài gửi và bản xuất thuộc một khách (bước 33, D-279). Chỉ việc xoá
+        // dấu vết IP quét cả database (index `_sweep_idx`); việc dọn khác chạy theo từng khách.
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0009_tenancy",
+            vec![
+                TenantTable::new("forms_forms")
+                    .unique("forms_forms_key_unique", ["tenant_id", "key"])
+                    .index("forms_forms_status_idx", ["tenant_id", "status", "id"])
+                    .index("forms_forms_created_by_idx", ["tenant_id", "created_by"]),
+                TenantTable::new("forms_form_versions")
+                    .unique("forms_form_versions_unique", ["tenant_id", "form_id", "version"]),
+                TenantTable::new("forms_submissions")
+                    .index("forms_submissions_inbox_idx", ["tenant_id", "form_id", "status", "id"])
+                    .index("forms_submissions_form_idx", ["tenant_id", "form_id", "id"])
+                    .index("forms_submissions_email_idx", ["tenant_id", "email"])
+                    .index(
+                        "forms_submissions_hash_idx",
+                        ["tenant_id", "form_id", "content_hash", "created_at"],
+                    )
+                    .index("forms_submissions_retention_idx", ["tenant_id", "status", "created_at"])
+                    .drop_index("forms_submissions_created_idx")
+                    .sweep_index("forms_submissions_created_sweep_idx", ["created_at"]),
+                TenantTable::new("forms_exports")
+                    .index("forms_exports_form_idx", ["tenant_id", "form_id", "id"])
+                    .index("forms_exports_expires_idx", ["tenant_id", "expires_at"]),
             ],
         ),
     ]

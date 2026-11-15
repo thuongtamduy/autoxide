@@ -7,6 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::{ClientInfo, ValidJson};
 use autoxide_kernel::response::{Created, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::Tagged;
 use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
@@ -148,6 +149,7 @@ pub(crate) struct LocaleQuery {
 )]
 pub(crate) async fn get_public_form(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Path(key): Path<String>,
     Query(query): Query<LocaleQuery>,
@@ -158,7 +160,7 @@ pub(crate) async fn get_public_form(
             Error::validation(vec![FieldError::new("locale", "invalid", "must be `en` or `vi`")])
         })?,
     };
-    let form = service.public_form(&key).await?;
+    let form = service.public_form(&tenant, &key).await?;
     Ok(Tagged { version: form.row.updated_at, data: PublicFormResponse::new(&form, locale) })
 }
 
@@ -228,6 +230,7 @@ pub(crate) struct SubmitResponse {
 )]
 pub(crate) async fn submit_form(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Option<Principal>,
     client: ClientInfo,
     Path(key): Path<String>,
@@ -242,7 +245,7 @@ pub(crate) async fn submit_form(
         trap: input.trap,
         challenge: input.challenge,
     };
-    let receipt = service.submit(&key, principal.as_ref(), &client, submission).await?;
+    let receipt = service.submit(&tenant, &key, principal.as_ref(), &client, submission).await?;
     Ok(Created::new(
         format!("/forms/submissions/{}", receipt.id),
         SubmitResponse { id: receipt.id, message: receipt.message },

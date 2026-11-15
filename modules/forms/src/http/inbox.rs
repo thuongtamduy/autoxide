@@ -7,6 +7,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::{Disposition, ValidJson, content_disposition};
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header};
@@ -200,6 +201,7 @@ pub(crate) const STATUSES: &str = "`new`, `read`, `archived`, `spam`";
 )]
 pub(crate) async fn list_submissions(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     Query(query): Query<SubmissionsQuery>,
@@ -209,7 +211,7 @@ pub(crate) async fn list_submissions(
     let filter = query.filter(&mut problems);
     let page = page_request(paging, problems)?;
     Ok(service
-        .list_submissions(&principal, id, &filter, &page)
+        .list_submissions(&tenant, &principal, id, &filter, &page)
         .await?
         .map(SubmissionResponse::from))
 }
@@ -251,6 +253,7 @@ pub(crate) struct ExportQuery {
 )]
 pub(crate) async fn export_submissions(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     Query(query): Query<ExportQuery>,
@@ -263,7 +266,7 @@ pub(crate) async fn export_submissions(
     if !problems.is_empty() {
         return Err(Error::validation(problems));
     }
-    let (name, text) = service.export_csv(&principal, id, status).await?;
+    let (name, text) = service.export_csv(&tenant, &principal, id, status).await?;
     let mut response = text.into_response();
     let headers = response.headers_mut();
     headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/csv; charset=utf-8"));
@@ -293,10 +296,11 @@ pub(crate) async fn export_submissions(
 )]
 pub(crate) async fn get_submission(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<SubmissionResponse>, Error> {
-    let found = service.get_submission(&principal, id).await?;
+    let found = service.get_submission(&tenant, &principal, id).await?;
     Ok(Tagged { version: found.row.updated_at, data: found.into() })
 }
 
@@ -332,13 +336,15 @@ pub(crate) struct UpdateSubmissionRequest {
 )]
 pub(crate) async fn update_submission(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
     ValidJson(input): ValidJson<UpdateSubmissionRequest>,
 ) -> Result<Tagged<SubmissionResponse>, Error> {
     let expected = if_match.required()?;
-    let found = service.set_submission_status(&principal, id, input.status, expected).await?;
+    let found =
+        service.set_submission_status(&tenant, &principal, id, input.status, expected).await?;
     Ok(Tagged { version: found.row.updated_at, data: found.into() })
 }
 
@@ -361,10 +367,11 @@ pub(crate) async fn update_submission(
 )]
 pub(crate) async fn delete_submission(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    service.delete_submission(&principal, id).await?;
+    service.delete_submission(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -421,12 +428,13 @@ pub(crate) struct ErasedResponse {
 )]
 pub(crate) async fn get_email_data(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<EmailDataResponse>, Error> {
     // Kiểm quyền trước khi đọc `email`: người không có quyền nhận 403, không phải 422 (D-245).
     principal.require(&crate::permissions::FORMS_EXPORT)?;
-    let found = service.submissions_of_email(&principal, query.email()?).await?;
+    let found = service.submissions_of_email(&tenant, &principal, query.email()?).await?;
     let email = autoxide_kernel::email::normalize(query.email()?);
     let submissions = found.into_iter().map(SubmissionResponse::from).collect();
     Ok(Data { data: EmailDataResponse { email, submissions } })
@@ -453,11 +461,12 @@ pub(crate) async fn get_email_data(
 )]
 pub(crate) async fn delete_email_data(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<ErasedResponse>, Error> {
     // Kiểm quyền trước khi đọc `email`: người không có quyền nhận 403, không phải 422 (D-245).
     principal.require(&crate::permissions::FORMS_EXPORT)?;
-    let deleted = service.erase_email(&principal, query.email()?).await?;
+    let deleted = service.erase_email(&tenant, &principal, query.email()?).await?;
     Ok(Data { data: ErasedResponse { deleted } })
 }

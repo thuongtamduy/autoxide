@@ -6931,3 +6931,17 @@ Chủ dự án hỏi merge vào `main` mà không phát hành có được khôn
   chỉ mở lúc ký. Endpoint có sẵn được mã hoá bằng upgrade dữ liệu `u0001_seal_secrets` (chạy lại được, có `down`).
   Giá trị mã hoá dài hơn cột `varchar(100)` cũ: migration `m0007_widen_secret` đổi cột thành `text` trên Postgres
   (SQLite không giới hạn độ dài, không làm gì) — rẽ nhánh theo database chỉ trong migration này.
+
+## D-279 · `forms` theo khách: form, bài gửi, bản xuất theo khách; job dọn chạy theo từng khách trên database (bước 33 B8) — 2026-11-15 — agent quyết
+
+- `forms_forms`, `forms_form_versions`, `forms_submissions`, `forms_exports` mang `tenant_id`; index đều có
+  `tenant_id` đứng đầu, `key` của form duy nhất **trong khách** (hai khách dùng chung một `key` được). Service không
+  giữ database, mọi hàm nhận `&TenantContext`; endpoint công khai lấy khách theo tên miền / header `autoxide-tenant`.
+- File xuất CSV ghi qua `TenantStorage`: khách mặc định giữ `forms/exports/<id>.csv` (không phải dời), khách khác
+  dưới `tenants/<khách>/`. Cột `storage_key` vẫn lưu khoá không tiền tố.
+- Link tải bản xuất ký bằng khoá riêng mỗi khách (`SecretKey::derive_for`): link của khách này không mở được ở khách
+  khác. Khách mặc định dùng đúng khoá cũ, nên link đã phát trước khi nâng cấp vẫn dùng được tới hạn.
+- Job dọn hằng ngày chạy một lần cho mỗi database: tìm các khách có form hay bản xuất trên database đó, tra ngữ cảnh
+  qua sổ database, rồi dọn theo khách (thời hạn giữ của từng form, bản xuất quá hạn, event ghi đúng khách). Khách
+  không còn trong sổ thì bỏ qua (không đoán). Xoá dấu vết IP, bài mồ côi, nonce, bộ đếm quét cả database
+  (`forms_submissions_created_sweep_idx`).

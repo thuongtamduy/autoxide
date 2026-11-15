@@ -7,6 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::{Disposition, content_disposition};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::body::{Body, Bytes};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
@@ -102,6 +103,7 @@ impl From<ExportView> for ExportResponse {
 )]
 pub(crate) async fn create_export(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     body: Bytes,
@@ -122,7 +124,7 @@ pub(crate) async fn create_export(
     if !problems.is_empty() {
         return Err(Error::validation(problems));
     }
-    let view = service.request_export(&principal, id, status).await?;
+    let view = service.request_export(&tenant, &principal, id, status).await?;
     Ok(Created::new(format!("/forms/exports/{}", view.row.id), view.into()))
 }
 
@@ -146,10 +148,11 @@ pub(crate) async fn create_export(
 )]
 pub(crate) async fn get_export(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(export_id): Path<Uuid>,
 ) -> Result<Data<ExportResponse>, Error> {
-    Ok(Data { data: service.get_export(&principal, export_id).await?.into() })
+    Ok(Data { data: service.get_export(&tenant, &principal, export_id).await?.into() })
 }
 
 /// The signature of a download link.
@@ -182,10 +185,12 @@ pub(crate) struct DownloadQuery {
 )]
 pub(crate) async fn download_export(
     State(service): State<Arc<FormsService>>,
+    tenant: TenantContext,
     Path(export_id): Path<Uuid>,
     Query(query): Query<DownloadQuery>,
 ) -> Result<Response, Error> {
-    let (name, file) = service.download_export(export_id, query.expires, &query.signature).await?;
+    let (name, file) =
+        service.download_export(&tenant, export_id, query.expires, &query.signature).await?;
     let mut response = Body::from_stream(file.content).into_response();
     let headers = response.headers_mut();
     headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/csv; charset=utf-8"));

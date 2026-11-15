@@ -18,7 +18,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::rows;
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::throttle::Throttle;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
@@ -61,8 +61,12 @@ pub(crate) struct Receipt {
 
 impl FormsService {
     /// Form `key` cho website hiển thị; form đóng vẫn trả (để website báo "đã đóng").
-    pub(crate) async fn public_form(&self, key: &str) -> Result<Form, Error> {
-        self.find_by_key(key).await
+    pub(crate) async fn public_form(
+        &self,
+        tenant: &TenantContext,
+        key: &str,
+    ) -> Result<Form, Error> {
+        self.find_by_key(tenant, key).await
     }
 
     /// Nhận bài gửi cho form `key`. `principal` có `forms.submit` (máy chủ website gọi bằng API
@@ -71,12 +75,13 @@ impl FormsService {
     /// phải là bằng chứng "không phải bot". `principal` vẫn là người làm (actor) của event.
     pub(crate) async fn submit(
         &self,
+        tenant: &TenantContext,
         key: &str,
         principal: Option<&Principal>,
         client: &ClientInfo,
         input: PublicSubmission,
     ) -> Result<Receipt, Error> {
-        let form = self.find_by_key(key).await?;
+        let form = self.find_by_key(tenant, key).await?;
         if form.status() == FormStatus::Closed {
             return Err(Error::conflict(
                 "forms.closed",
@@ -129,10 +134,11 @@ impl FormsService {
         let content_hash = antispam::content_hash(&data);
         let since = now() - chrono::Duration::hours(DUPLICATE_HOURS);
         let duplicate = submission::Entity::find()
+            .scoped(tenant)
             .filter(submission::Column::FormId.eq(form.row.id))
             .filter(submission::Column::ContentHash.eq(content_hash.as_str()))
             .filter(submission::Column::CreatedAt.gt(since))
-            .count(self.database.read())
+            .count(tenant.database().read())
             .await?
             > 0;
 
@@ -143,7 +149,7 @@ impl FormsService {
         let checked = self
             .guard
             .check(
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 &Check::new(&scope, client)
                     .principal(trusted)
                     .honeypot(input.trap.as_deref())
@@ -190,6 +196,7 @@ impl FormsService {
             });
         let row = submission::Model {
             id: Uuid::now_v7(),
+            tenant_id: tenant.id().as_uuid(),
             form_id: form.row.id,
             form_version: form.row.version,
             data,
@@ -211,8 +218,8 @@ impl FormsService {
         // Pha hai: một transaction ngắn. Khoá dòng form trước (khoá dòng tới hết transaction
         // trên Postgres; SQLite chỉ có một bên ghi): form bị xoá giữa hai pha thì dừng ở đây,
         // không để lại bài mồ côi chứa dữ liệu cá nhân; xoá form chạy sau thì thấy và xoá cả bài này.
-        let transaction = self.database.begin_write().await?;
-        if !lock_form(&transaction, form.row.id).await? {
+        let transaction = tenant.database().begin_write().await?;
+        if !lock_form(&transaction, tenant, form.row.id).await? {
             transaction.rollback().await?;
             return Err(form_not_found());
         }
@@ -224,24 +231,10 @@ impl FormsService {
                 after: Some(summary(&row, &form.row.key)),
             });
             self.outbox
-                .record(
-                    &transaction,
-                    &TenantContext::legacy_default(&self.database),
-                    actor,
-                    events::submission_subject(row.id),
-                    &event,
-                )
+                .record(&transaction, tenant, actor, events::submission_subject(row.id), &event)
                 .await?;
         }
-        match checked
-            .claim(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                "forms",
-                Some(&row.id.to_string()),
-            )
-            .await?
-        {
+        match checked.claim(&transaction, tenant, "forms", Some(&row.id.to_string())).await? {
             Claim::New => {
                 transaction.commit().await?;
                 tracing::info!(form_id = %form.row.id, submission_id = %row.id, status = status.as_str(), "form submission stored");
@@ -273,8 +266,12 @@ impl FormsService {
 
 /// Khoá dòng form `id` tới hết transaction (`rows::lock_one`, D-181; không ghi gì nên ETag giữ
 /// nguyên). `false`: form không còn.
-async fn lock_form<C: ConnectionTrait>(connection: &C, id: Uuid) -> Result<bool, Error> {
-    Ok(rows::lock_one(connection, form_row::Entity::find_by_id(id)).await?.is_some())
+async fn lock_form<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    id: Uuid,
+) -> Result<bool, Error> {
+    Ok(rows::lock_one(connection, form_row::Entity::find_by_id(id).scoped(tenant)).await?.is_some())
 }
 
 /// Địa chỉ `http(s)` tuỳ chọn; sai thì thêm lỗi `field`.

@@ -243,7 +243,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
             "list",
             "List forms, newest first, with their fields and settings. Follow \
              `pagination.next_cursor` for more.",
-            move |_tenant: TenantContext, principal: Principal, input: ListFormsInput| {
+            move |tenant: TenantContext, principal: Principal, input: ListFormsInput| {
                 let service = list.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -259,8 +259,8 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                         None,
                     );
                     let page = page_request(paging, problems)?;
-                    let found = service.list_forms(&principal, state, &page).await?;
-                    crate::http::counted_forms(&service, found).await
+                    let found = service.list_forms(&tenant, &principal, state, &page).await?;
+                    crate::http::counted_forms(&service, &tenant, found).await
                 }
             },
         )
@@ -270,11 +270,11 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
             "get",
             "Get a form: its fields (keys, types, labels, options), status, settings, and its \
              `etag`, needed to change it.",
-            move |_tenant: TenantContext, principal: Principal, input: FormId| {
+            move |tenant: TenantContext, principal: Principal, input: FormId| {
                 let service = get.clone();
                 async move {
                     Ok::<VersionedForm, Error>(versioned_form(
-                        service.get_form(&principal, input.id).await?,
+                        service.get_form(&tenant, &principal, input.id).await?,
                     ))
                 }
             },
@@ -290,7 +290,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                  answers). ",
                 fields_help!()
             ),
-            move |_tenant: TenantContext, principal: Principal, input: CreateFormInput| {
+            move |tenant: TenantContext, principal: Principal, input: CreateFormInput| {
                 let service = create.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -317,7 +317,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                         email_limit_per_hour: input.email_limit_per_hour.map(Some),
                         retention_days: input.retention_days.map(Some),
                     };
-                    Ok(versioned_form(service.create_form(&principal, form).await?))
+                    Ok(versioned_form(service.create_form(&tenant, &principal, form).await?))
                 }
             },
         )
@@ -331,7 +331,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                  `forms.read` (the mails carry the answers). ",
                 fields_help!()
             ),
-            move |_tenant: TenantContext, principal: Principal, input: UpdateFormInput| {
+            move |tenant: TenantContext, principal: Principal, input: UpdateFormInput| {
                 let service = update.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -359,7 +359,8 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                         email_limit_per_hour: input.email_limit_per_hour,
                         retention_days: input.retention_days,
                     };
-                    let form = service.update_form(&principal, input.id, form, expected).await?;
+                    let form =
+                        service.update_form(&tenant, &principal, input.id, form, expected).await?;
                     Ok(versioned_form(form))
                 }
             },
@@ -370,7 +371,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
             "List the submissions of a form, newest first, with their answers and the labels \
              of the form version they were sent with. Spam is left out unless `status` is \
              `spam`. Follow `pagination.next_cursor` with the same filters for more.",
-            move |_tenant: TenantContext, principal: Principal, input: ListSubmissionsInput| {
+            move |tenant: TenantContext, principal: Principal, input: ListSubmissionsInput| {
                 let service = submissions.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -386,8 +387,9 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                         ),
                         problems,
                     )?;
-                    let found =
-                        service.list_submissions(&principal, input.form_id, &filter, &page).await?;
+                    let found = service
+                        .list_submissions(&tenant, &principal, input.form_id, &filter, &page)
+                        .await?;
                     Ok::<Page<SubmissionResponse>, Error>(found.map(SubmissionResponse::from))
                 }
             },
@@ -398,11 +400,11 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
             "get_submission",
             "Get a submission: answers with labels, sender email, status, and its `version`, \
              needed to change its status.",
-            move |_tenant: TenantContext, principal: Principal, input: SubmissionId| {
+            move |tenant: TenantContext, principal: Principal, input: SubmissionId| {
                 let service = submission.clone();
                 async move {
                     Ok::<Versioned, Error>(versioned(
-                        service.get_submission(&principal, input.id).await?,
+                        service.get_submission(&tenant, &principal, input.id).await?,
                     ))
                 }
             },
@@ -414,7 +416,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
             "Mark a submission `read`, `archived`, `spam`, or `new` (not spam after all: the \
              notification mail is then sent as for a new submission). Pass the `version` you \
              read.",
-            move |_tenant: TenantContext, principal: Principal, input: SetStatusInput| {
+            move |tenant: TenantContext, principal: Principal, input: SetStatusInput| {
                 let service = status.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -425,7 +427,7 @@ pub(crate) fn all(service: &Arc<FormsService>) -> Vec<Tool> {
                     };
                     let expected = IfMatch::from_value(&input.version).expected()?;
                     let found = service
-                        .set_submission_status(&principal, input.id, parsed, expected)
+                        .set_submission_status(&tenant, &principal, input.id, parsed, expected)
                         .await?;
                     Ok(versioned(found))
                 }

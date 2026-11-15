@@ -53,10 +53,6 @@ pub const PENDING_TENANCY: &[&str] = &[
     "content_translation_requests",
     "content_tree_locks",
     // forms
-    "forms_exports",
-    "forms_form_versions",
-    "forms_forms",
-    "forms_submissions",
     // media
     "media_alt_translations",
     "media_folder",
