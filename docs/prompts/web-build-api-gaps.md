@@ -464,4 +464,10 @@ giá, cửa hàng với dữ liệu mẫu của trang quản trị) tới khi c�
 | [ ] | Menu | Bộ biểu tượng của menu có biểu tượng ngành hàng (chảo, nồi, dao…) | mới (`menus`) | Dùng biểu tượng chung |
 | [ ] | Địa chỉ đã gỡ | `resolve` trả 410 cho địa chỉ đã gỡ; website (App Router) chưa trả được 410 nên đang trả 404 | — (ghi để biết) | 404 |
 | [ ] | Trang chủ, danh mục, sản phẩm, giỏ, đặt hàng, gian hàng | Catalog, giá theo cửa hàng, tồn theo cửa hàng, giá khi áp mã, giỏ, đơn, người bán (công khai) | 41–46 | Dữ liệu mẫu |
+| [ ] | Livestream | Danh sách phiên livestream công khai (lịch phát), không chỉ một phiên theo id | 49 (mới) | Dữ liệu mẫu (`src/sample/live.ts`) |
+| [ ] | Sản phẩm › Đánh giá | Số đếm đánh giá có ảnh và theo biến thể; "chủ đề người mua hay nhắc" kèm bản tóm tắt AI đã duyệt | 45 (mới) | Dữ liệu mẫu |
+| [ ] | Sản phẩm, đánh giá, livestream | Endpoint công khai để báo vi phạm (lý do theo danh sách cố định) | mới | Dữ liệu mẫu |
+| [ ] | Sản phẩm | Thông tin hiển thị theo biến thể trong `by-slug` (số người ăn, trong hộp có gì, cách dùng / chăm sóc theo ngôn ngữ, máy rửa bát) | 41 (mới) | Dữ liệu mẫu |
+| [ ] | Sản phẩm | Phí và ngày giao theo tỉnh khi chưa có giỏ, kèm giờ chốt đơn trong ngày | 44 (mới) | Dữ liệu mẫu, giờ chốt 16:00 |
+| [ ] | Khuyến mại | Số thông báo Sở Công Thương và trần giảm theo luật trong `GET /public/promotions` | 43 (mới) | Dữ liệu mẫu |
 
