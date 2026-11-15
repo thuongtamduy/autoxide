@@ -6,6 +6,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::Page;
+use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -50,7 +51,7 @@ pub(crate) fn all(service: &Arc<AuditService>) -> Vec<Tool> {
             "list_entries",
             "List audit log entries — who changed what, when, before and after — newest first; \
              filter by user, record, action or module. Follow `pagination.next_cursor` for more.",
-            move |_: Principal, input: ListEntriesInput| {
+            move |_tenant: TenantContext, _: Principal, input: ListEntriesInput| {
                 let service = list.clone();
                 async move {
                     let page = PageInput::new(input.limit, input.cursor, input.order);
@@ -67,7 +68,7 @@ pub(crate) fn all(service: &Arc<AuditService>) -> Vec<Tool> {
         )
         .requires(AUDIT_READ)
         .read_only(),
-        Tool::new("get_entry", "Get one audit log entry.", move |_: Principal, input: EntryId| {
+        Tool::new("get_entry", "Get one audit log entry.", move |_tenant: TenantContext, _: Principal, input: EntryId| {
             let service = get.clone();
             async move { Ok::<_, Error>(AuditEntryResponse::from(service.get(input.id).await?)) }
         })
@@ -102,23 +103,33 @@ mod tests {
                 .unwrap();
             let recorder = crate::recorder::Recorder::new(database.clone());
             for (module, name) in [("auth", "auth.user_updated"), ("files", "files.file_deleted")] {
-                let event = Delivered::new(module, name.to_owned(), json!({"after": {"x": 1}}));
+                let event = Delivered::new(
+                    autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                    module,
+                    name.to_owned(),
+                    json!({"after": {"x": 1}}),
+                );
                 recorder.handle(&event).await.unwrap();
             }
-            let tools = all(&Arc::new(AuditService::new(database)));
+            let tenant = autoxide_kernel::tenancy::TenantContext::legacy_default(&database);
+            let tools = all(&Arc::new(AuditService::new(database, Default::default())));
             let auditor = Principal::new(Uuid::now_v7(), ["audit.read".to_owned()]);
             let nobody = Principal::new(Uuid::now_v7(), []);
             assert!(tools.iter().all(|tool| !tool.allows(&nobody)));
 
             let list = tools.iter().find(|tool| tool.name() == "list_entries").unwrap();
-            let page = list.call(auditor.clone(), json!({"module": "files"})).await.unwrap();
+            let page = list
+                .call(tenant.clone(), auditor.clone(), json!({"module": "files"}))
+                .await
+                .unwrap();
             assert_eq!(page["data"].as_array().unwrap().len(), 1);
             assert_eq!(page["data"][0]["after"], json!({"x": 1}));
             let id = page["data"][0]["id"].clone();
             let get = tools.iter().find(|tool| tool.name() == "get_entry").unwrap();
-            let entry = get.call(auditor.clone(), json!({"id": id})).await.unwrap();
+            let entry = get.call(tenant.clone(), auditor.clone(), json!({"id": id})).await.unwrap();
             assert_eq!(entry["action"], "files.file_deleted");
-            let missing = get.call(auditor, json!({"id": Uuid::now_v7()})).await.unwrap_err();
+            let missing =
+                get.call(tenant.clone(), auditor, json!({"id": Uuid::now_v7()})).await.unwrap_err();
             assert_eq!(missing.code(), "audit.entry_not_found");
         })
         .await

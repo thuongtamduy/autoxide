@@ -138,11 +138,33 @@ pub(crate) struct MeResponse {
     /// Permissions granted by the user's roles, sorted by name.
     #[schema(example = json!(["auth.roles.read"]))]
     permissions: Vec<String>,
+    /// Whether the account has a password. Without one (signed in with a passkey), set a first
+    /// password through `POST /api/v1/auth/password-reset`.
+    has_password: bool,
+    /// The new address of an email change waiting to be confirmed; `null` when there is none.
+    /// Cancel it with `DELETE /api/v1/auth/me/email`.
+    pending_email: Option<PendingEmail>,
+}
+
+/// An email change waiting for its confirmation link.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct PendingEmail {
+    #[schema(example = "ada@new.example")]
+    email: String,
+    /// When the confirmation link stops working.
+    expires_at: DateTime<Utc>,
 }
 
 impl MeResponse {
-    pub(crate) fn new(user: User, principal: &Principal) -> Self {
-        MeResponse {
+    /// Tài khoản của người gọi, kèm có mật khẩu chưa và email đang chờ xác minh.
+    pub(crate) async fn load(
+        state: &HttpState,
+        user: User,
+        principal: &Principal,
+    ) -> Result<Self, Error> {
+        let facts = state.users.facts(&[user.id]).await?.remove(&user.id).unwrap_or_default();
+        let pending = state.verifications.pending_change(&user).await?;
+        Ok(MeResponse {
             id: user.id,
             email: user.email,
             name: user.name,
@@ -150,7 +172,9 @@ impl MeResponse {
             created_at: user.created_at,
             all_permissions: principal.has_all_permissions(),
             permissions: principal.permissions(),
-        }
+            has_password: facts.has_password,
+            pending_email: pending.map(|(email, expires_at)| PendingEmail { email, expires_at }),
+        })
     }
 }
 
@@ -184,7 +208,10 @@ async fn login(
     let user_agent = super::user_agent(&headers);
     // Hai kết quả, hai hình dạng: `Response` là kiểu chung của mọi response.
     Ok(match state.sessions.login(&input.email, &input.password, user_agent).await? {
-        LoginOutcome::Tokens(tokens) => Data { data: TokenResponse::from(tokens) }.into_response(),
+        LoginOutcome::Tokens(tokens) => {
+            super::note_country(&state, &headers, tokens.session_id).await;
+            Data { data: TokenResponse::from(tokens) }.into_response()
+        }
         LoginOutcome::MfaRequired { mfa_token, expires_in } => {
             let data = MfaChallengeResponse {
                 mfa_token,
@@ -225,6 +252,7 @@ async fn login_mfa(
 ) -> Result<Data<TokenResponse>, Error> {
     let user_agent = super::user_agent(&headers);
     let tokens = state.sessions.complete_mfa(&input.mfa_token, &input.code, user_agent).await?;
+    super::note_country(&state, &headers, tokens.session_id).await;
     Ok(Data { data: tokens.into() })
 }
 
@@ -240,7 +268,7 @@ async fn login_mfa(
     request_body = RefreshRequest,
     responses(
         (status = 200, description = "A new pair of tokens.", body = Data<TokenResponse>),
-        (status = 401, description = "The refresh token is unknown, expired or revoked (code `auth.invalid_refresh_token`), or was already used (code `auth.refresh_token_reused`); sign in again.", body = Problem),
+        (status = 401, description = "The refresh token is unknown, expired or revoked (code `auth.invalid_refresh_token`), or was already used (code `auth.refresh_token_reused`); sign in again with `POST /api/v1/auth/login`.", body = Problem),
         (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
         (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
     )
@@ -285,7 +313,7 @@ async fn logout(
     security(("bearer" = [])),
     responses(
         (status = 200, description = "The user the access token belongs to, with the permissions of their roles.", body = Data<MeResponse>),
-        (status = 401, description = "The access token is missing (code `auth.missing_token`), invalid (`auth.invalid_token`) or expired (`auth.token_expired`).", body = Problem),
+        (status = 401, description = "The access token is missing (code `auth.missing_token`), invalid (`auth.invalid_token`) or expired (`auth.token_expired`; get a new one with `POST /api/v1/auth/refresh`). Without a usable refresh token, sign in with `POST /api/v1/auth/login`.", body = Problem),
         (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
     )
 )]
@@ -295,7 +323,7 @@ async fn me(
 ) -> Result<Data<MeResponse>, Error> {
     let user =
         state.users.get(principal.user_id()).await?.ok_or_else(crate::token::invalid_token)?;
-    Ok(Data { data: MeResponse::new(user, &principal) })
+    Ok(Data { data: MeResponse::load(&state, user, &principal).await? })
 }
 
 /// Change your own password.
@@ -313,7 +341,7 @@ async fn me(
     request_body = ChangePasswordRequest,
     responses(
         (status = 200, description = "Changed; use these tokens from now on.", body = Data<TokenResponse>),
-        (status = 400, description = "The current password is wrong; code `auth.wrong_password`.", body = Problem),
+        (status = 400, description = "The current password is wrong; code `auth.wrong_password`. A user who forgot it resets it with `POST /api/v1/auth/password-reset`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Called with an API key (code `auth.session_required`), or the account is disabled (code `auth.user_disabled`).", body = Problem),
         (status = 422, description = "The body is missing a field, or the new password breaks the rules (see `errors`).", body = Problem),
@@ -337,6 +365,7 @@ async fn change_password(
             user_agent,
         )
         .await?;
+    super::note_country(&state, &headers, tokens.session_id).await;
     Ok(Data { data: tokens.into() })
 }
 

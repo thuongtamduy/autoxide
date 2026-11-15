@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
-use autoxide_kernel::error::Error;
+use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Data, Problem};
@@ -116,6 +116,9 @@ pub(crate) struct SubscribersQuery {
     /// Only subscriptions in this status (in `list_id`, or in any list).
     #[param(value_type = Option<SubscriptionStatus>, inline)]
     pub status: Option<String>,
+    /// `true`: only blocked subscribers (they get no mail); `false`: only the others.
+    #[param(value_type = Option<bool>)]
+    pub blocked: Option<String>,
 }
 
 /// One person to import.
@@ -206,6 +209,15 @@ pub(crate) async fn list_subscribers(
             "`unconfirmed`, `confirmed`, `unsubscribed`",
             &mut problems,
         ),
+        blocked: match query.blocked.as_deref().map(str::trim) {
+            None | Some("") => None,
+            Some("true") => Some(true),
+            Some("false") => Some(false),
+            Some(_) => {
+                problems.push(FieldError::new("blocked", "invalid", "must be `true` or `false`"));
+                None
+            }
+        },
     };
     let page = page_request(paging, problems)?;
     Ok(service.list_subscribers(&principal, &filter, &page).await?.map(Into::into))

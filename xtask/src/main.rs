@@ -23,6 +23,7 @@ mod i18n;
 mod scaffold;
 mod sdk;
 mod semver;
+mod tenancy;
 mod upgrade;
 mod workspace;
 
@@ -166,6 +167,7 @@ fn check() -> ExitCode {
     let violations = match boundaries::check_workspace(&workspace).and_then(|mut violations| {
         violations.extend(i18n::check_translations(&workspace)?);
         violations.extend(docs::check_docs(&workspace.root)?);
+        violations.extend(tenancy::check_entities(&workspace)?);
         Ok(violations)
     }) {
         Ok(violations) => violations,

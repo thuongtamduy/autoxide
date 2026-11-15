@@ -230,12 +230,22 @@ async fn module_nhan_database_va_khai_route() {
         assert_eq!(
             paths,
             [
-                vec!["/modules".to_owned(), "/modules/{name}".to_owned()],
+                vec![
+                    "/client-config".to_owned(),
+                    "/modules".to_owned(),
+                    "/modules/{name}".to_owned(),
+                    "/placements".to_owned(),
+                    "/settings".to_owned(),
+                    "/settings/{name}".to_owned(),
+                    "/tenant".to_owned(),
+                    "/tenants".to_owned(),
+                    "/tenants/{id}".to_owned()
+                ],
                 vec!["/token".to_owned()],
                 vec![],
                 vec!["/".to_owned()],
                 vec![],
-                vec!["/flags".to_owned(), "/flags/{key}".to_owned()]
+                vec!["/flags".to_owned(), "/flags/{key}".to_owned(), "/permissions".to_owned()]
             ]
         );
     })
@@ -280,8 +290,19 @@ async fn module_thay_danh_muc_permission_cua_moi_module() {
         modules.start(&db).unwrap();
 
         // Module đăng ký trước vẫn thấy permission của module đăng ký sau.
-        // (`kernel.modules.read` là của module nội bộ `kernel`.)
-        assert_eq!(*seen.lock().unwrap(), ["kernel.modules.read", "notes.write"]);
+        // (`kernel.*` là của module nội bộ `kernel`.)
+        assert_eq!(
+            *seen.lock().unwrap(),
+            [
+                "kernel.modules.read",
+                "kernel.placements.read",
+                "kernel.settings.manage",
+                "kernel.tenants.manage",
+                "kernel.tenants.operate",
+                "kernel.tenants.read",
+                "notes.write"
+            ]
+        );
         assert!(modules.permissions().contains("notes.write"));
     })
     .await

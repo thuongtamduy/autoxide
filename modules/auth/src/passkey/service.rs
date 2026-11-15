@@ -12,6 +12,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -127,8 +128,7 @@ impl PasskeyService {
             engine.finish_registration(&state, credential).map_err(|Rejected(reason)| {
                 Error::bad_request(
                     "auth.passkey_rejected",
-                    "The passkey was not accepted: {reason}. Start again with `POST \
-                 /api/v1/auth/me/passkeys/registration`.",
+                    "The passkey was not accepted: {reason}. Try adding it again.",
                 )
                 .with_param("reason", reason)
             })?;
@@ -147,6 +147,7 @@ impl PasskeyService {
             name: Set(name),
             created_at: Set(now()),
             last_used_at: Set(None),
+            aaguid: Set(registered.aaguid),
         }
         .insert(&transaction)
         .await
@@ -159,7 +160,13 @@ impl PasskeyService {
         })?;
         let event = events::PasskeyAdded { before: None, after: Some(json!({"name": row.name})) };
         self.outbox
-            .record(&transaction, Actor::user(user_id), events::user_subject(user_id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::user(user_id),
+                events::user_subject(user_id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, passkey_id = %row.id, "passkey added");
@@ -196,7 +203,15 @@ impl PasskeyService {
     /// đã gỡ.
     pub(crate) async fn remove_all_for(&self, actor: Actor, user_id: Uuid) -> Result<u64, Error> {
         let transaction = self.database.begin_write().await?;
-        let removed = remove_all_in(&transaction, &self.outbox, actor, user_id, true).await?;
+        let removed = remove_all_in(
+            &transaction,
+            &TenantContext::legacy_default(&self.database),
+            &self.outbox,
+            actor,
+            user_id,
+            true,
+        )
+        .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, removed, "passkeys removed by an administrator");
         Ok(removed)
@@ -221,7 +236,15 @@ impl PasskeyService {
             return Err(passkey_not_found(id));
         }
         let event = removed_event(&row.name, by_admin);
-        self.outbox.record(&transaction, actor, events::user_subject(user_id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(user_id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(())
     }
@@ -244,10 +267,41 @@ impl PasskeyService {
         credential: &Value,
         user_agent: Option<&str>,
     ) -> Result<Tokens, Error> {
+        let stored = self.verify_assertion(ceremony_id, credential).await?;
+        self.sessions.login_with_passkey(stored.user_id, stored.id, user_agent).await
+    }
+
+    /// Xác nhận lại người đang đăng nhập `user_id` bằng passkey (D-272), thay cho mật khẩu ở thao
+    /// tác nhạy cảm (tạo API key). Nghi thức lấy từ `POST /login/passkey/options` như khi đăng
+    /// nhập; passkey phải là của chính `user_id`. Trả ID của passkey đã dùng.
+    pub(crate) async fn reauthenticate(
+        &self,
+        user_id: Uuid,
+        ceremony_id: Uuid,
+        credential: &Value,
+    ) -> Result<Uuid, Error> {
+        let stored = self.verify_assertion(ceremony_id, credential).await?;
+        if stored.user_id != user_id {
+            tracing::info!(passkey_id = %stored.id, "passkey of another account used to confirm");
+            return Err(sign_in_failed());
+        }
+        Ok(stored.id)
+    }
+
+    /// Kiểm câu trả lời của nghi thức đăng nhập `ceremony_id` (dùng hết nghi thức), cập nhật bộ
+    /// đếm và lần dùng cuối; trả passkey đã ký.
+    async fn verify_assertion(
+        &self,
+        ceremony_id: Uuid,
+        credential: &Value,
+    ) -> Result<passkey::Model, Error> {
         let engine = self.engine()?;
         // Đọc câu trả lời trước khi dùng nghi thức: JSON hỏng thì nghi thức còn dùng được.
         let assertion = engine.read_assertion(credential).map_err(|Rejected(reason)| {
-            Error::validation(vec![FieldError::new("credential", "invalid", reason)])
+            Error::validation(vec![
+                FieldError::new("credential", "invalid", "is not valid: {reason}")
+                    .with_param("reason", reason),
+            ])
         })?;
         let state = self.take_ceremony(ceremony_id, None).await?;
         let stored = passkey::Entity::find()
@@ -279,7 +333,7 @@ impl PasskeyService {
             update = update.col_expr(passkey::Column::DynamicState, Expr::value(dynamic));
         }
         update.exec(self.database.write()).await?;
-        self.sessions.login_with_passkey(stored.user_id, stored.id, user_agent).await
+        Ok(stored)
     }
 
     async fn save_ceremony(
@@ -336,11 +390,10 @@ fn check_name(name: &str) -> Result<String, Error> {
     if (1..=NAME_MAX_LENGTH).contains(&length) && !name.chars().any(char::is_control) {
         return Ok(name.to_owned());
     }
-    Err(Error::validation(vec![FieldError::new(
-        "name",
-        "length",
-        format!("must be 1 to {NAME_MAX_LENGTH} characters"),
-    )]))
+    Err(Error::validation(vec![
+        FieldError::new("name", "length", "must be 1 to {name_max_length} characters")
+            .with_param("name_max_length", NAME_MAX_LENGTH),
+    ]))
 }
 
 fn invalid_ceremony() -> Error {
@@ -373,6 +426,7 @@ fn now() -> DateTime<Utc> {
 /// một event. Trả số passkey đã xoá.
 pub(crate) async fn remove_all_in<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     outbox: &Outbox,
     actor: Actor,
     user_id: Uuid,
@@ -383,7 +437,7 @@ pub(crate) async fn remove_all_in<C: ConnectionTrait>(
     for row in &rows {
         passkey::Entity::delete_by_id(row.id).exec(connection).await?;
         let event = removed_event(&row.name, by_admin);
-        outbox.record(connection, actor, events::user_subject(user_id), &event).await?;
+        outbox.record(connection, tenant, actor, events::user_subject(user_id), &event).await?;
     }
     Ok(rows.len() as u64)
 }

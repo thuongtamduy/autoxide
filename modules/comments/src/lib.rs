@@ -171,6 +171,7 @@ impl Module for CommentsModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
+    use autoxide_kernel::tenancy::TenantContext;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
@@ -203,7 +204,7 @@ pub(crate) mod testing {
 
     #[async_trait::async_trait]
     impl Mailer for FakeMailer {
-        async fn send(&self, mail: Mail) -> Result<(), Error> {
+        async fn send(&self, _tenant: &TenantContext, mail: Mail) -> Result<(), Error> {
             let mut mails = self.0.lock().unwrap();
             if mail.dedupe_key.is_none()
                 || mails.iter().all(|sent| sent.dedupe_key != mail.dedupe_key)
@@ -220,7 +221,11 @@ pub(crate) mod testing {
 
     #[async_trait::async_trait]
     impl ResourceResolver for Entries {
-        async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
+        async fn resolve(
+            &self,
+            _tenant: &TenantContext,
+            id: &str,
+        ) -> Result<Option<Resource>, Error> {
             Ok((id.starts_with("public") || id.starts_with("draft")).then(|| {
                 Resource::new("Hello world")
                     .public(id.starts_with("public"))

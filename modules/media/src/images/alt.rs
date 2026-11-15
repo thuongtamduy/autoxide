@@ -7,6 +7,7 @@
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::ai::{Effort, Part, Prompt};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::EntityTrait;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -56,11 +57,14 @@ impl MediaService {
             ));
         }
         if context.chars().count() > CONTEXT_MAX {
-            problems.push(FieldError::new(
-                "context",
-                "length",
-                format!("must be at most {CONTEXT_MAX} characters long"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "context",
+                    "length",
+                    "must be at most {context_max} characters long",
+                )
+                .with_param("context_max", CONTEXT_MAX),
+            );
         }
         if !problems.is_empty() {
             return Err(Error::validation(problems));
@@ -109,7 +113,8 @@ impl MediaService {
         ])
         .effort(Effort::Low)
         .max_output_tokens(1000);
-        let answer = self.ai.generate(prompt).await?;
+        let answer =
+            self.ai.generate(&TenantContext::legacy_default(&self.database), prompt).await?;
         let decorative = answer.output.get("decorative").and_then(Value::as_bool).unwrap_or(false);
         let alt = if decorative {
             String::new()

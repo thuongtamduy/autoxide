@@ -60,15 +60,18 @@ export type AltSuggestionResponse = {
 
 /** One answer, with the field as it was when the submission was sent. */
 export type AnswerResponse = {
+  /**
+   * For `select`, `radio` and `checkbox`: the chosen options with their labels in the form
+   * version the submission was sent with (in the order of `value`). A value no longer among
+   * that version's options comes with an empty label. Absent for other types.
+   */
+  choices?: FieldOption[] | null;
   key: string;
   /** The field's label in the form version the submission was sent with. */
   label: Localized;
   type: FieldType;
-  /**
-   * A string; a number for `number`; an array of values for `checkbox`; `true` for
-   * `consent`.
-   */
-  value: unknown;
+  /** A string; a number for `number`; an array of values for `checkbox`; `true` for `consent`. */
+  value: string | number | string[] | boolean;
 };
 
 /** An API key, without its secret. */
@@ -101,6 +104,11 @@ export type AuditEntryResponse = {
    * background jobs) or `public` (someone not signed in, such as a visitor sending a form).
    */
   actor_kind: string;
+  /**
+   * Display name of `actor_user_id`, with `include=actor`: `null` when the account no longer
+   * exists; absent when no user made the change.
+   */
+  actor_name?: string | null;
   /**
    * User who made the change; `null` for the system (command line, background jobs,
    * self-registration).
@@ -147,6 +155,8 @@ export type AuthorResponse = {
   bio: string;
   created_at: string;
   display_name: string;
+  /** How many entries (in any status) list this author. Only in the list. */
+  entry_count?: number | null;
   id: string;
   /** Unique. */
   slug: string;
@@ -225,6 +235,19 @@ export type BounceRequest = {
   type: BounceKind;
 };
 
+/** A campaign mail exactly as subscribers get it. */
+export type CampaignPreviewResponse = {
+  /**
+   * The HTML body with the preheader and the footer; `null` for a text-only campaign. Show it
+   * only inside a sandboxed `<iframe sandbox>`, like `body_html`.
+   */
+  body_html?: string | null;
+  /** The plain-text body with the footer (list name, preferences link, postal address). */
+  body_text: string;
+  /** The subject, with the advertising label when the campaign is advertising. */
+  subject: string;
+};
+
 /** A campaign: one mail sent to the confirmed subscribers of a list. */
 export type CampaignResponse = {
   /**
@@ -288,6 +311,69 @@ export type ChangePasswordRequest = {
   current_password: string;
   /** 12 to 128 characters. */
   new_password: string;
+};
+
+/** Settings of the server an interface needs, by module: only values safe to show anyone. A module without such settings is absent. */
+export type ClientConfigResponse = {
+  /** Content settings an interface needs. */
+  content: {
+    /** Language of a new entry when none is given. */
+    default_locale: string;
+    /** Hosts whose videos and posts may be embedded in an entry (`AUTOXIDE_CONTENT_EMBED_HOSTS`). */
+    embed_hosts: string[];
+    /** Languages entries may be written in (`AUTOXIDE_CONTENT_LOCALES`), the default first. */
+    locales: string[];
+    /** Largest entry body accepted, in bytes. */
+    max_body_bytes: number;
+    /** Path prefix of posts on the website (`AUTOXIDE_CONTENT_POST_PATH_PREFIX`), e.g. `/blog/`. */
+    post_path_prefix: string;
+  };
+  /** Kernel's own section. */
+  kernel: {
+    /**
+     * The public address of the API (`AUTOXIDE_HTTP_PUBLIC_URL`), used in links of mails and by
+     * MCP clients (`<public_url>/mcp`); `null` when the operator did not set it.
+     */
+    public_url?: string | null;
+    /** Version of the server. */
+    version: string;
+  };
+  /** Mail settings an interface needs. */
+  mail: {
+    /** Sender of every mail (`AUTOXIDE_MAIL_FROM`). */
+    from: string;
+    /**
+     * `true` when mail goes out through an SMTP server; `false` when it is only written to
+     * files on the server (`AUTOXIDE_MAIL_SMTP_URL` not set) — nobody receives it.
+     */
+    sends: boolean;
+  };
+  /** Media library settings an interface needs. */
+  media: {
+    /**
+     * Media types accepted at upload (`AUTOXIDE_MEDIA_ALLOWED_TYPES`): `type/subtype` or
+     * `type/*`.
+     */
+    allowed_types: string[];
+    /**
+     * Languages of `alt` translations (`AUTOXIDE_MEDIA_ALT_LOCALES`): show one alt field per
+     * language.
+     */
+    alt_locales: string[];
+    /** Widths of the smaller copies made of images, in pixels. */
+    image_widths: number[];
+    /** Largest upload, in bytes (`AUTOXIDE_MEDIA_MAX_BYTES`). */
+    max_bytes: number;
+    /** Days an item stays in the trash before it is deleted for good. */
+    trash_days: number;
+  };
+  /** Menu settings an interface needs. */
+  menus: {
+    /** Language of a menu when none is given. */
+    default_locale: string;
+    /** Languages menus may be written in (`AUTOXIDE_MENUS_LOCALES`), the default first. */
+    locales: string[];
+  };
 };
 
 /** A code from the authenticator app, or (where stated) a recovery code. */
@@ -377,7 +463,17 @@ export type CommentDetail = {
   root_id: string;
   status: CommentStatus;
   target_id: string;
+  /**
+   * Title of the target (e.g. the post's title), from the module that owns it; absent when
+   * that kind has no lookup or the target is not public now.
+   */
+  target_title?: string | null;
   target_type: string;
+  /**
+   * Public path of the target (without the domain), e.g. `/blog/hello`; absent like
+   * `target_title`.
+   */
+  target_url?: string | null;
   updated_at: string;
   /** The account, for a signed-in author. */
   user_id?: string | null;
@@ -476,6 +572,13 @@ export type CommentTarget = {
   target_type: string;
   /** Shown top-level comments, e.g. questions on a product (0 when hidden). */
   thread_count: number;
+  /**
+   * Title of the target, from the module that owns it (only in the admin list, and only for a
+   * target that is public now); absent otherwise.
+   */
+  title?: string | null;
+  /** Public path of the target (without the domain), like `title`. */
+  url?: string | null;
 };
 
 /** Whether a target takes comments. */
@@ -535,9 +638,10 @@ export type ConfirmedList = {
 export type CreateApiKeyRequest = {
   /**
    * Your current password: a stolen access token alone must not create a key that
-   * outlives it.
+   * outlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and
+   * `passkey_credential`) instead — exactly one of the three.
    */
-  current_password: string;
+  current_password?: string;
   /**
    * When the key stops working (RFC 3339, in the future). Omit for a key that does
    * not expire.
@@ -546,10 +650,26 @@ export type CreateApiKeyRequest = {
   /** What the key is for, 1 to 100 characters. */
   name: string;
   /**
+   * One of your passkeys, instead of the password: start with
+   * `POST /api/v1/auth/login/passkey/options`, let the browser sign its `options`, and send the
+   * `ceremony_id` here with the browser's answer in `passkey_credential`.
+   */
+  passkey_ceremony_id?: string | null;
+  /**
+   * The browser's `AuthenticationResponseJSON` (from `navigator.credentials.get`) for
+   * `passkey_ceremony_id`.
+   */
+  passkey_credential?: Record<string, unknown> | null;
+  /**
    * Permissions the key may use: at least one, each one you have yourself (see
    * `GET /api/v1/auth/me`). Give a key only what its job needs.
    */
   permissions: string[];
+  /**
+   * A code from your authenticator app, instead of the password (two-step sign-in must be
+   * on). Wrong codes count towards the same limit as at sign-in.
+   */
+  totp_code?: string | null;
 };
 
 /** A new draft campaign. */
@@ -740,6 +860,18 @@ export type CreatedEndpointResponse = EndpointResponse & {
   secret: string;
 };
 
+/** The tenant of the caller. */
+export type CurrentTenant = {
+  id: string;
+  /** `single` (one tenant) or `multi` (many tenants on one installation). */
+  mode: string;
+  name: string;
+  /** Whether this is the platform tenant (the operator's own). */
+  platform: boolean;
+  slug: string;
+  status: string;
+};
+
 /** Envelope of a single result. */
 export type Data_AiStatus = {
   /** What the AI features of this server can do now. */
@@ -792,6 +924,11 @@ export type Data_AuditEntryResponse = {
      */
     actor_kind: string;
     /**
+     * Display name of `actor_user_id`, with `include=actor`: `null` when the account no longer
+     * exists; absent when no user made the change.
+     */
+    actor_name?: string | null;
+    /**
      * User who made the change; `null` for the system (command line, background jobs,
      * self-registration).
      */
@@ -824,6 +961,8 @@ export type Data_AuthorResponse = {
     bio: string;
     created_at: string;
     display_name: string;
+    /** How many entries (in any status) list this author. Only in the list. */
+    entry_count?: number | null;
     id: string;
     /** Unique. */
     slug: string;
@@ -840,6 +979,22 @@ export type Data_BounceOutcome = {
   data: {
     /** The address is (now or already) suppressed. */
     suppressed: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CampaignPreviewResponse = {
+  /** A campaign mail exactly as subscribers get it. */
+  data: {
+    /**
+     * The HTML body with the preheader and the footer; `null` for a text-only campaign. Show it
+     * only inside a sandboxed `<iframe sandbox>`, like `body_html`.
+     */
+    body_html?: string | null;
+    /** The plain-text body with the footer (list name, preferences link, postal address). */
+    body_text: string;
+    /** The subject, with the advertising label when the campaign is advertising. */
+    subject: string;
   };
 };
 
@@ -894,6 +1049,17 @@ export type Data_CeremonyResponse = {
      * `navigator.credentials.create()` / `.get()`.
      */
     options: Record<string, unknown>;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ClientConfigResponse = {
+  /**
+   * Settings of the server an interface needs, by module (`kernel`, `content`, `media`…): only
+   * values safe to show anyone. A module without such settings is absent.
+   */
+  data: {
+    [key: string]: unknown;
   };
 };
 
@@ -964,7 +1130,17 @@ export type Data_CommentDetail = {
     root_id: string;
     status: CommentStatus;
     target_id: string;
+    /**
+     * Title of the target (e.g. the post's title), from the module that owns it; absent when
+     * that kind has no lookup or the target is not public now.
+     */
+    target_title?: string | null;
     target_type: string;
+    /**
+     * Public path of the target (without the domain), e.g. `/blog/hello`; absent like
+     * `target_title`.
+     */
+    target_url?: string | null;
     updated_at: string;
     /** The account, for a signed-in author. */
     user_id?: string | null;
@@ -1045,6 +1221,13 @@ export type Data_CommentTarget = {
     target_type: string;
     /** Shown top-level comments, e.g. questions on a product (0 when hidden). */
     thread_count: number;
+    /**
+     * Title of the target, from the module that owns it (only in the admin list, and only for a
+     * target that is public now); absent otherwise.
+     */
+    title?: string | null;
+    /** Public path of the target (without the domain), like `title`. */
+    url?: string | null;
   };
 };
 
@@ -1123,6 +1306,21 @@ export type Data_CreatedEndpointResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_CurrentTenant = {
+  /** The tenant of the caller. */
+  data: {
+    id: string;
+    /** `single` (one tenant) or `multi` (many tenants on one installation). */
+    mode: string;
+    name: string;
+    /** Whether this is the platform tenant (the operator's own). */
+    platform: boolean;
+    slug: string;
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_EditedComment = {
   /** A comment just changed, for its author. */
   data: PublicComment & {
@@ -1161,6 +1359,7 @@ export type Data_EndpointResponse = {
     /** Event names it receives; `*` means every event. */
     events: string[];
     id: string;
+    last_delivery?: LastDelivery | null;
     updated_at: string;
     url: string;
   };
@@ -1220,6 +1419,14 @@ export type Data_EntryResponse = {
     og_media_id?: string | null;
     /** The parent page (pages only); `null` at the root. */
     parent_id?: string | null;
+    /**
+     * Address of the public version, e.g. `/blog/duong-den-da-lat` or `/about/team` (a page
+     * carries the path of its parents); `null` while the entry is not public. It does not hold
+     * the language: the website decides how `locale` shows in its addresses.
+     */
+    path?: string | null;
+    /** When the public version was last published; `null` while the entry is not public. */
+    published_at?: string | null;
     reading_time_minutes: number;
     /**
      * When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no
@@ -1250,6 +1457,11 @@ export type Data_EntryResponse = {
      */
     translation_outdated: boolean;
     updated_at: string;
+    /**
+     * The entry's `ETag` (as `GET /entries/{id}` sends it): send it in `If-Match` to change the
+     * entry straight from a list.
+     */
+    version: string;
     /** Words in the body (for Vietnamese: syllables). */
     word_count: number;
   };
@@ -1326,6 +1538,8 @@ export type Data_FolderResponse = {
   data: {
     created_at: string;
     id: string;
+    /** Items directly in this folder (not in its subfolders), not counting the trash. */
+    item_count: number;
     name: string;
     /** The parent folder; `null` for a folder at the root. */
     parent_id?: string | null;
@@ -1363,6 +1577,7 @@ export type Data_FormResponse = {
     /** Days submissions are kept (`0`: until deleted); `null`: the server default. */
     retention_days?: number | null;
     status: FormStatus;
+    submissions?: SubmissionCounts | null;
     /** Shown to the sender after sending. */
     success_message: Localized;
     /** The `scope` to ask `GET /api/v1/antispam/token` for, e.g. `forms:contact`. */
@@ -1418,6 +1633,27 @@ export type Data_ImportReport = {
 };
 
 /** Envelope of a single result. */
+export type Data_LibrarySummaryResponse = {
+  /** Totals of the media library. */
+  data: {
+    /**
+     * Total size in bytes of the items not in the trash (their current content, without the
+     * smaller copies of images).
+     */
+    bytes: number;
+    /**
+     * Images not in the trash with no text alternative and not marked `decorative`: the items
+     * `GET /api/v1/media?alt_missing=true` lists.
+     */
+    images_missing_alt: number;
+    /** Items not in the trash. */
+    items: number;
+    /** Items in the trash. */
+    trashed_items: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ListResponse = {
   /** A newsletter list, as admins see it. */
   data: {
@@ -1457,9 +1693,15 @@ export type Data_MeResponse = {
      * not verified (ask for a new mail with `POST /api/v1/auth/me/email/verification`).
      */
     email_verified_at?: string | null;
+    /**
+     * Whether the account has a password. Without one (signed in with a passkey), set a first
+     * password through `POST /api/v1/auth/password-reset`.
+     */
+    has_password: boolean;
     id: string;
     /** Display name. */
     name: string;
+    pending_email?: PendingEmail | null;
     /** Permissions granted by the user's roles, sorted by name. */
     permissions: string[];
   };
@@ -1486,6 +1728,11 @@ export type Data_MediaItemResponse = {
     /** Real media type of the content (checked against its first bytes at upload). */
     content_type: string;
     created_at: string;
+    /**
+     * `true` for a purely decorative image: its empty `alt` is on purpose (render `alt=""`), so
+     * it does not count as missing one.
+     */
+    decorative: boolean;
     /** The folder holding the item; `null` for the root. */
     folder_id?: string | null;
     /** Height in pixels; only for raster images. */
@@ -1506,6 +1753,11 @@ export type Data_MediaItemResponse = {
     updated_at: string;
     /** The user who uploaded the item; `null` once that account is deleted. */
     uploaded_by?: string | null;
+    /**
+     * Display name of `uploaded_by`, with `include=uploader` on the list: `null` when the
+     * account no longer exists; absent otherwise.
+     */
+    uploaded_by_name?: string | null;
     /**
      * Where to load the content, with its version: the address changes when the content
      * does, so it may be cached for a long time. Public items load without signing in.
@@ -1622,9 +1874,68 @@ export type Data_NewsletterErased = {
 };
 
 /** Envelope of a single result. */
+export type Data_NewsletterSettingsResponse = {
+  /** The newsletter settings in use (set by the server's operator; no secrets). */
+  data: {
+    /**
+     * Put at the start of the subject of advertising campaigns
+     * (`AUTOXIDE_NEWSLETTER_ADVERTISING_LABEL`); empty: no label.
+     */
+    advertising_label: string;
+    /**
+     * Advertising mails one address gets at most per day
+     * (`AUTOXIDE_NEWSLETTER_ADVERTISING_MAX_PER_DAY`); `0`: no limit.
+     */
+    advertising_max_per_day: number;
+    /**
+     * The website's confirmation page is set (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by
+     * lists with double opt-in.
+     */
+    confirm_url_set: boolean;
+    /**
+     * Settings still to set before campaigns can be sent: names of environment variables,
+     * empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is listed:
+     * only advertising campaigns need it).
+     */
+    missing: string[];
+    /**
+     * The sender's postal address shown in every mail footer
+     * (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`); `null`: not set — advertising campaigns cannot
+     * be sent until it is.
+     */
+    postal_address?: string | null;
+    /**
+     * The website's preferences page is set (`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to
+     * send any campaign (the footer link).
+     */
+    preferences_url_set: boolean;
+    /**
+     * The server's public address is set (`AUTOXIDE_HTTP_PUBLIC_URL`); needed to send any
+     * campaign (the one-click unsubscribe link).
+     */
+    public_url_set: boolean;
+    /**
+     * Campaign mails handed to the mail queue per minute
+     * (`AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE`).
+     */
+    send_rate_per_minute: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PasskeyResponse = {
   /** A passkey of the signed-in user. Holds no secret. */
   data: {
+    /**
+     * Kind of authenticator, as it identified itself when registered (its AAGUID); `null` when
+     * it did not say (or registered before this was kept).
+     */
+    aaguid?: string | null;
+    /**
+     * Name of that kind of authenticator, e.g. `Windows Hello`, `Apple Passwords`,
+     * `Google Password Manager`; `null` when the kind is not known to the server.
+     */
+    authenticator?: string | null;
     created_at: string;
     id: string;
     /** When it was last used to sign in; `null` if never. */
@@ -1686,9 +1997,15 @@ export type Data_PreviewEntryResponse = {
     /** Authors, in order (the first is the main one). */
     author_ids: string[];
     body: BodyNode;
+    /**
+     * The public images used in `body`, in order of appearance (find one by the `mediaId` of
+     * its node). Images that are not public yet are left out.
+     */
+    body_media: PublicMedia[];
     body_schema_version: number;
     canonical_url: string;
     excerpt: string;
+    featured_media?: PublicMedia | null;
     featured_media_alt: string;
     /** Main image (a media item id). */
     featured_media_id?: string | null;
@@ -1949,6 +2266,8 @@ export type Data_ScheduleResponse = {
   /** A scheduled publish or take-down. */
   data: {
     action: Action;
+    /** `true` when whoever scheduled it confirmed that the AI-generated content was reviewed. */
+    ai_reviewed: boolean;
     created_at: string;
     created_by?: string | null;
     entry_id: string;
@@ -2130,10 +2449,48 @@ export type Data_TagResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Tenant = {
+  /** A customer (tenant) of the platform. */
+  data: {
+    created_at: string;
+    id: string;
+    name: string;
+    /** Parent tenant, when the tenant belongs to a chain. */
+    parent_id?: string | null;
+    /** Name of the placement (database) that keeps its data. */
+    placement: string;
+    /** Short name: lower-case letters, digits and `-`; unique on the platform. */
+    slug: string;
+    /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_TenantSettingState = {
+  /** A setting the installed modules take per tenant, and its state in the current tenant. */
+  data: {
+    description: string;
+    /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
+    is_set: boolean;
+    /** `<module>.<key>`, e.g. `mail.smtp_url`. */
+    name: string;
+    /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
+    secret: boolean;
+    updated_at?: string | null;
+    /** The value, for settings that are not secret and are set. */
+    value?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_TermResponse = {
   /** A category or tag, with its names in every language. */
   data: {
     created_at: string;
+    /** How many entries (in any status) have this term. Only in the list. */
+    entry_count?: number | null;
     id: string;
     names: TermName[];
     /** Parent category; `null` at the top (always for tags). */
@@ -2266,9 +2623,24 @@ export type Data_UserResponse = {
      * is not verified.
      */
     email_verified_at?: string | null;
+    /**
+     * Whether the account has a password. Without one it signs in with a passkey; its owner
+     * sets a first password through `POST /api/v1/auth/password-reset`, an administrator
+     * with `POST /api/v1/auth/users/{id}/password`.
+     */
+    has_password: boolean;
     id: string;
+    /**
+     * When the user last started a session (sign-in, password change); `null` if not since
+     * this field exists.
+     */
+    last_sign_in_at?: string | null;
+    /** Whether two-step sign-in (an authenticator app) is on. */
+    mfa_enabled: boolean;
     /** Display name. */
     name: string;
+    /** The user's roles, by name. Only with `include=roles` on the user list. */
+    roles?: UserRole[] | null;
     updated_at: string;
   };
 };
@@ -2336,12 +2708,43 @@ export type Data_Vec_ModuleInfo = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_MyPermission = {
+  data: {
+    /** What it allows, in the language of `Accept-Language`. */
+    description: string;
+    name: string;
+    /** How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`. */
+    risk: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_PermissionResponse = {
   data: {
-    /** What the permission allows. */
+    /** What the permission allows, in the language of `Accept-Language`. */
     description: string;
     /** `<module>.<action>`. */
     name: string;
+    /**
+     * How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or
+     * `money`.
+     */
+    risk: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_Placement = {
+  data: {
+    /** `sqlite` or `postgres`. */
+    backend: string;
+    created_at: string;
+    id: string;
+    /** `shared` (many tenants) or `dedicated` (one tenant). */
+    kind: string;
+    name: string;
+    /** `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`. */
+    schema_state: string;
   }[];
 };
 
@@ -2418,6 +2821,8 @@ export type Data_Vec_RoleResponse = {
 export type Data_Vec_ScheduleResponse = {
   data: {
     action: Action;
+    /** `true` when whoever scheduled it confirmed that the AI-generated content was reviewed. */
+    ai_reviewed: boolean;
     created_at: string;
     created_by?: string | null;
     entry_id: string;
@@ -2430,6 +2835,22 @@ export type Data_Vec_ScheduleResponse = {
     /** `scheduled`, `succeeded`, `failed` or `canceled`. */
     status: string;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_TenantSettingState = {
+  data: {
+    description: string;
+    /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
+    is_set: boolean;
+    /** `<module>.<key>`, e.g. `mail.smtp_url`. */
+    name: string;
+    /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
+    secret: boolean;
+    updated_at?: string | null;
+    /** The value, for settings that are not secret and are set. */
+    value?: string | null;
   }[];
 };
 
@@ -2469,6 +2890,8 @@ export type DeleteOwnRequest = {
 
 /** How far a campaign got, by delivery status. */
 export type DeliveryCounts = {
+  /** Sent mails the receiving server bounced for good (counted in `failed` too). */
+  bounced: number;
   /** Refused for good by the receiving server, or the outcome is unknown. */
   failed: number;
   /** Not handled yet. */
@@ -2482,6 +2905,11 @@ export type DeliveryCounts = {
   skipped: number;
   /** Recipients taken so far (every confirmed subscriber of the list when sending started). */
   total: number;
+  /**
+   * Recipients who unsubscribed with the link of this campaign's mail (one-click or the
+   * preferences page).
+   */
+  unsubscribed: number;
 };
 
 /** One attempt to deliver one event to one endpoint, with its retries. */
@@ -2554,6 +2982,7 @@ export type EndpointResponse = {
   /** Event names it receives; `*` means every event. */
   events: string[];
   id: string;
+  last_delivery?: LastDelivery | null;
   updated_at: string;
   url: string;
 };
@@ -2641,6 +3070,14 @@ export type EntryResponse = {
   og_media_id?: string | null;
   /** The parent page (pages only); `null` at the root. */
   parent_id?: string | null;
+  /**
+   * Address of the public version, e.g. `/blog/duong-den-da-lat` or `/about/team` (a page
+   * carries the path of its parents); `null` while the entry is not public. It does not hold
+   * the language: the website decides how `locale` shows in its addresses.
+   */
+  path?: string | null;
+  /** When the public version was last published; `null` while the entry is not public. */
+  published_at?: string | null;
   reading_time_minutes: number;
   /**
    * When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no
@@ -2671,6 +3108,11 @@ export type EntryResponse = {
    */
   translation_outdated: boolean;
   updated_at: string;
+  /**
+   * The entry's `ETag` (as `GET /entries/{id}` sends it): send it in `If-Match` to change the
+   * entry straight from a list.
+   */
+  version: string;
   /** Words in the body (for Vietnamese: syllables). */
   word_count: number;
 };
@@ -2790,6 +3232,8 @@ export type FindingLevel = "error" | "warning";
 export type FolderResponse = {
   created_at: string;
   id: string;
+  /** Items directly in this folder (not in its subfolders), not counting the trash. */
+  item_count: number;
   name: string;
   /** The parent folder; `null` for a folder at the root. */
   parent_id?: string | null;
@@ -2824,6 +3268,7 @@ export type FormResponse = {
   /** Days submissions are kept (`0`: until deleted); `null`: the server default. */
   retention_days?: number | null;
   status: FormStatus;
+  submissions?: SubmissionCounts | null;
   /** Shown to the sender after sending. */
   success_message: Localized;
   /** The `scope` to ask `GET /api/v1/antispam/token` for, e.g. `forms:contact`. */
@@ -2904,6 +3349,37 @@ export type ImportRequest = {
 /** What an entry is. */
 export type Kind = "post" | "page";
 
+/** The newest delivery to an endpoint. */
+export type LastDelivery = {
+  created_at: string;
+  event_name: string;
+  id: string;
+  /** When it was last tried; `null` while it waits for its first attempt. */
+  last_attempt_at?: string | null;
+  /** HTTP status the endpoint answered with, on the last attempt; `null` when it did not answer. */
+  response_status?: number | null;
+  /** `pending`, `delivered` or `failed`. */
+  status: string;
+};
+
+/** Totals of the media library. */
+export type LibrarySummaryResponse = {
+  /**
+   * Total size in bytes of the items not in the trash (their current content, without the
+   * smaller copies of images).
+   */
+  bytes: number;
+  /**
+   * Images not in the trash with no text alternative and not marked `decorative`: the items
+   * `GET /api/v1/media?alt_missing=true` lists.
+   */
+  images_missing_alt: number;
+  /** Items not in the trash. */
+  items: number;
+  /** Items in the trash. */
+  trashed_items: number;
+};
+
 /** One list choice. */
 export type ListChoice = {
   key: string;
@@ -2958,6 +3434,16 @@ export type LoginRequest = {
   password: string;
 };
 
+/** An API key of any user, for administrators. */
+export type ManagedApiKeyResponse = ApiKeyResponse & {
+  /** Email of that user; `null` like `user_name`. */
+  user_email?: string | null;
+  /** The user the key acts as. */
+  user_id: string;
+  /** Display name of that user; `null` when the account no longer exists. */
+  user_name?: string | null;
+};
+
 /** How a result matched. */
 export type MatchedBy = "meaning" | "text";
 
@@ -2976,9 +3462,15 @@ export type MeResponse = {
    * not verified (ask for a new mail with `POST /api/v1/auth/me/email/verification`).
    */
   email_verified_at?: string | null;
+  /**
+   * Whether the account has a password. Without one (signed in with a passkey), set a first
+   * password through `POST /api/v1/auth/password-reset`.
+   */
+  has_password: boolean;
   id: string;
   /** Display name. */
   name: string;
+  pending_email?: PendingEmail | null;
   /** Permissions granted by the user's roles, sorted by name. */
   permissions: string[];
 };
@@ -3008,6 +3500,11 @@ export type MediaItemResponse = {
   /** Real media type of the content (checked against its first bytes at upload). */
   content_type: string;
   created_at: string;
+  /**
+   * `true` for a purely decorative image: its empty `alt` is on purpose (render `alt=""`), so
+   * it does not count as missing one.
+   */
+  decorative: boolean;
   /** The folder holding the item; `null` for the root. */
   folder_id?: string | null;
   /** Height in pixels; only for raster images. */
@@ -3028,6 +3525,11 @@ export type MediaItemResponse = {
   updated_at: string;
   /** The user who uploaded the item; `null` once that account is deleted. */
   uploaded_by?: string | null;
+  /**
+   * Display name of `uploaded_by`, with `include=uploader` on the list: `null` when the
+   * account no longer exists; absent otherwise.
+   */
+  uploaded_by_name?: string | null;
   /**
    * Where to load the content, with its version: the address changes when the content
    * does, so it may be cached for a long time. Public items load without signing in.
@@ -3240,8 +3742,29 @@ export type MoveRequest = {
   parent_id?: string | null;
 };
 
+/** A permission the caller holds. */
+export type MyPermission = {
+  /** What it allows, in the language of `Accept-Language`. */
+  description: string;
+  name: string;
+  /** How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`. */
+  risk: string;
+};
+
 /** What happens when a post is published (by the `content` module). */
 export type NewPosts = "off" | "draft" | "send";
+
+/** A new tenant. */
+export type NewTenant = {
+  /** 1 to 200 characters. */
+  name: string;
+  /** Parent tenant, for chains. */
+  parent_id?: string | null;
+  /** Name of the placement for its data; `main` (the platform's database) when omitted. */
+  placement?: string | null;
+  /** 1 to 63 lower-case letters, digits and `-`, not starting or ending with `-`. */
+  slug: string;
+};
 
 /** One mail of a campaign to the person. */
 export type NewsletterDelivery = {
@@ -3276,6 +3799,52 @@ export type NewsletterLocale = "en" | "vi";
 export type NewsletterScheduleRequest = {
   /** A time in the future (at most 366 days ahead), with a time zone. */
   at: string;
+};
+
+/** The newsletter settings in use (set by the server's operator; no secrets). */
+export type NewsletterSettingsResponse = {
+  /**
+   * Put at the start of the subject of advertising campaigns
+   * (`AUTOXIDE_NEWSLETTER_ADVERTISING_LABEL`); empty: no label.
+   */
+  advertising_label: string;
+  /**
+   * Advertising mails one address gets at most per day
+   * (`AUTOXIDE_NEWSLETTER_ADVERTISING_MAX_PER_DAY`); `0`: no limit.
+   */
+  advertising_max_per_day: number;
+  /**
+   * The website's confirmation page is set (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by
+   * lists with double opt-in.
+   */
+  confirm_url_set: boolean;
+  /**
+   * Settings still to set before campaigns can be sent: names of environment variables,
+   * empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is listed:
+   * only advertising campaigns need it).
+   */
+  missing: string[];
+  /**
+   * The sender's postal address shown in every mail footer
+   * (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`); `null`: not set — advertising campaigns cannot
+   * be sent until it is.
+   */
+  postal_address?: string | null;
+  /**
+   * The website's preferences page is set (`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to
+   * send any campaign (the footer link).
+   */
+  preferences_url_set: boolean;
+  /**
+   * The server's public address is set (`AUTOXIDE_HTTP_PUBLIC_URL`); needed to send any
+   * campaign (the one-click unsubscribe link).
+   */
+  public_url_set: boolean;
+  /**
+   * Campaign mails handed to the mail queue per minute
+   * (`AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE`).
+   */
+  send_rate_per_minute: number;
 };
 
 /** A text in English and Vietnamese; a missing language falls back to the other one. */
@@ -3321,6 +3890,11 @@ export type Page_AuditEntryResponse = {
      */
     actor_kind: string;
     /**
+     * Display name of `actor_user_id`, with `include=actor`: `null` when the account no longer
+     * exists; absent when no user made the change.
+     */
+    actor_name?: string | null;
+    /**
      * User who made the change; `null` for the system (command line, background jobs,
      * self-registration).
      */
@@ -3354,6 +3928,8 @@ export type Page_AuthorResponse = {
     bio: string;
     created_at: string;
     display_name: string;
+    /** How many entries (in any status) list this author. Only in the list. */
+    entry_count?: number | null;
     id: string;
     /** Unique. */
     slug: string;
@@ -3464,7 +4040,17 @@ export type Page_CommentDetail = {
     root_id: string;
     status: CommentStatus;
     target_id: string;
+    /**
+     * Title of the target (e.g. the post's title), from the module that owns it; absent when
+     * that kind has no lookup or the target is not public now.
+     */
+    target_title?: string | null;
     target_type: string;
+    /**
+     * Public path of the target (without the domain), e.g. `/blog/hello`; absent like
+     * `target_title`.
+     */
+    target_url?: string | null;
     updated_at: string;
     /** The account, for a signed-in author. */
     user_id?: string | null;
@@ -3484,6 +4070,37 @@ export type Page_CommentReport = {
     reason: string;
     /** The reporting account, when signed in. */
     reporter_user_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CommentTarget = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** When it closes by itself, if set. */
+    closes_at?: string | null;
+    /** Shown comments (0 when hidden). */
+    comment_count: number;
+    /** The comments are hidden from everyone (e.g. the target was deleted). */
+    hidden: boolean;
+    /** Comments waiting for approval (`null` in the public answer). */
+    pending_count?: number | null;
+    /** Top-level comments waiting for approval (`null` in the public answer). */
+    pending_thread_count?: number | null;
+    /** What applies now. */
+    state: CommentTargetState;
+    target_id: string;
+    target_type: string;
+    /** Shown top-level comments, e.g. questions on a product (0 when hidden). */
+    thread_count: number;
+    /**
+     * Title of the target, from the module that owns it (only in the admin list, and only for a
+     * target that is public now); absent otherwise.
+     */
+    title?: string | null;
+    /** Public path of the target (without the domain), like `title`. */
+    url?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -3522,6 +4139,7 @@ export type Page_EndpointResponse = {
     /** Event names it receives; `*` means every event. */
     events: string[];
     id: string;
+    last_delivery?: LastDelivery | null;
     updated_at: string;
     url: string;
   }[];
@@ -3573,6 +4191,14 @@ export type Page_EntryResponse = {
     og_media_id?: string | null;
     /** The parent page (pages only); `null` at the root. */
     parent_id?: string | null;
+    /**
+     * Address of the public version, e.g. `/blog/duong-den-da-lat` or `/about/team` (a page
+     * carries the path of its parents); `null` while the entry is not public. It does not hold
+     * the language: the website decides how `locale` shows in its addresses.
+     */
+    path?: string | null;
+    /** When the public version was last published; `null` while the entry is not public. */
+    published_at?: string | null;
     reading_time_minutes: number;
     /**
      * When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no
@@ -3603,6 +4229,11 @@ export type Page_EntryResponse = {
      */
     translation_outdated: boolean;
     updated_at: string;
+    /**
+     * The entry's `ETag` (as `GET /entries/{id}` sends it): send it in `If-Match` to change the
+     * entry straight from a list.
+     */
+    version: string;
     /** Words in the body (for Vietnamese: syllables). */
     word_count: number;
   }[];
@@ -3635,6 +4266,8 @@ export type Page_FolderResponse = {
   data: {
     created_at: string;
     id: string;
+    /** Items directly in this folder (not in its subfolders), not counting the trash. */
+    item_count: number;
     name: string;
     /** The parent folder; `null` for a folder at the root. */
     parent_id?: string | null;
@@ -3673,6 +4306,7 @@ export type Page_FormResponse = {
     /** Days submissions are kept (`0`: until deleted); `null`: the server default. */
     retention_days?: number | null;
     status: FormStatus;
+    submissions?: SubmissionCounts | null;
     /** Shown to the sender after sending. */
     success_message: Localized;
     /** The `scope` to ask `GET /api/v1/antispam/token` for, e.g. `forms:contact`. */
@@ -3712,6 +4346,20 @@ export type Page_ListResponse = {
 };
 
 /** One page of a list. */
+export type Page_ManagedApiKeyResponse = {
+  /** The items of this page, in the requested order. */
+  data: (ApiKeyResponse & {
+    /** Email of that user; `null` like `user_name`. */
+    user_email?: string | null;
+    /** The user the key acts as. */
+    user_id: string;
+    /** Display name of that user; `null` when the account no longer exists. */
+    user_name?: string | null;
+  })[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_MediaItemResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -3732,6 +4380,11 @@ export type Page_MediaItemResponse = {
     /** Real media type of the content (checked against its first bytes at upload). */
     content_type: string;
     created_at: string;
+    /**
+     * `true` for a purely decorative image: its empty `alt` is on purpose (render `alt=""`), so
+     * it does not count as missing one.
+     */
+    decorative: boolean;
     /** The folder holding the item; `null` for the root. */
     folder_id?: string | null;
     /** Height in pixels; only for raster images. */
@@ -3752,6 +4405,11 @@ export type Page_MediaItemResponse = {
     updated_at: string;
     /** The user who uploaded the item; `null` once that account is deleted. */
     uploaded_by?: string | null;
+    /**
+     * Display name of `uploaded_by`, with `include=uploader` on the list: `null` when the
+     * account no longer exists; absent otherwise.
+     */
+    uploaded_by_name?: string | null;
     /**
      * Where to load the content, with its version: the address changes when the content
      * does, so it may be cached for a long time. Public items load without signing in.
@@ -3776,6 +4434,16 @@ export type Page_MediaItemResponse = {
 export type Page_PasskeyResponse = {
   /** The items of this page, in the requested order. */
   data: {
+    /**
+     * Kind of authenticator, as it identified itself when registered (its AAGUID); `null` when
+     * it did not say (or registered before this was kept).
+     */
+    aaguid?: string | null;
+    /**
+     * Name of that kind of authenticator, e.g. `Windows Hello`, `Apple Passwords`,
+     * `Google Password Manager`; `null` when the kind is not known to the server.
+     */
+    authenticator?: string | null;
     created_at: string;
     id: string;
     /** When it was last used to sign in; `null` if never. */
@@ -3949,6 +4617,29 @@ export type Page_RoleResponse = {
 };
 
 /** One page of a list. */
+export type Page_ScheduleResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    action: Action;
+    /** `true` when whoever scheduled it confirmed that the AI-generated content was reviewed. */
+    ai_reviewed: boolean;
+    created_at: string;
+    created_by?: string | null;
+    entry_id: string;
+    /** Why it failed, an error code such as `content.schedule_outdated`. */
+    error_code?: string | null;
+    id: string;
+    /** The revision that will be published (for `publish`). */
+    revision_id?: string | null;
+    run_at: string;
+    /** `scheduled`, `succeeded`, `failed` or `canceled`. */
+    status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_SearchHit = {
   /** The items of this page, in the requested order. */
   data: {
@@ -3981,12 +4672,24 @@ export type Page_SearchHit = {
 export type Page_SessionResponse = {
   /** The items of this page, in the requested order. */
   data: {
+    /**
+     * Approximate country of the sign-in (ISO 3166-1 two-letter code), from the server's
+     * reverse proxy when it is set up for it (`AUTOXIDE_AUTH_COUNTRY_HEADER`); `null` when not
+     * known. The IP address is never kept.
+     */
+    country?: string | null;
     /** When the session ends unless refreshed before. */
     expires_at: string;
     /** Same as `session_id` in the token response of the client that holds it. */
     id: string;
     /** Last time the session got tokens (sign-in or refresh). */
     last_active_at: string;
+    /**
+     * How the session was signed in: `password`, `password_and_mfa` (password and a code),
+     * `passkey`, or `password_change` (a new session after changing the password); `null` for
+     * sessions older than this information.
+     */
+    sign_in_method?: string | null;
     /** When the session was signed in. */
     started_at: string;
     /**
@@ -4004,9 +4707,16 @@ export type Page_SiteMenuSummary = {
   data: {
     created_at: string;
     id: string;
+    /** How many items the menu holds, at every level. */
+    item_count: number;
     key: string;
     locale: string;
     updated_at: string;
+    /**
+     * Who created the menu or last replaced its items; `null` when unknown (menus saved
+     * before this field existed, or changed by the system).
+     */
+    updated_by?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -4132,10 +4842,32 @@ export type Page_TagResponse = {
 };
 
 /** One page of a list. */
+export type Page_Tenant = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    id: string;
+    name: string;
+    /** Parent tenant, when the tenant belongs to a chain. */
+    parent_id?: string | null;
+    /** Name of the placement (database) that keeps its data. */
+    placement: string;
+    /** Short name: lower-case letters, digits and `-`; unique on the platform. */
+    slug: string;
+    /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+    status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_TermResponse = {
   /** The items of this page, in the requested order. */
   data: {
     created_at: string;
+    /** How many entries (in any status) have this term. Only in the list. */
+    entry_count?: number | null;
     id: string;
     names: TermName[];
     /** Parent category; `null` at the top (always for tags). */
@@ -4210,9 +4942,24 @@ export type Page_UserResponse = {
      * is not verified.
      */
     email_verified_at?: string | null;
+    /**
+     * Whether the account has a password. Without one it signs in with a passkey; its owner
+     * sets a first password through `POST /api/v1/auth/password-reset`, an administrator
+     * with `POST /api/v1/auth/users/{id}/password`.
+     */
+    has_password: boolean;
     id: string;
+    /**
+     * When the user last started a session (sign-in, password change); `null` if not since
+     * this field exists.
+     */
+    last_sign_in_at?: string | null;
+    /** Whether two-step sign-in (an authenticator app) is on. */
+    mfa_enabled: boolean;
     /** Display name. */
     name: string;
+    /** The user's roles, by name. Only with `include=roles` on the user list. */
+    roles?: UserRole[] | null;
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -4239,6 +4986,16 @@ export type PasskeyLoginRequest = {
 
 /** A passkey of the signed-in user. Holds no secret. */
 export type PasskeyResponse = {
+  /**
+   * Kind of authenticator, as it identified itself when registered (its AAGUID); `null` when
+   * it did not say (or registered before this was kept).
+   */
+  aaguid?: string | null;
+  /**
+   * Name of that kind of authenticator, e.g. `Windows Hello`, `Apple Passwords`,
+   * `Google Password Manager`; `null` when the kind is not known to the server.
+   */
+  authenticator?: string | null;
   created_at: string;
   id: string;
   /** When it was last used to sign in; `null` if never. */
@@ -4247,12 +5004,24 @@ export type PasskeyResponse = {
   name: string;
 };
 
+/** An email change waiting for its confirmation link. */
+export type PendingEmail = {
+  email: string;
+  /** When the confirmation link stops working. */
+  expires_at: string;
+};
+
 /** A permission that roles can grant. */
 export type PermissionResponse = {
-  /** What the permission allows. */
+  /** What the permission allows, in the language of `Accept-Language`. */
   description: string;
   /** `<module>.<action>`. */
   name: string;
+  /**
+   * How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or
+   * `money`.
+   */
+  risk: string;
 };
 
 /**
@@ -4262,6 +5031,19 @@ export type PermissionResponse = {
 export type PersonalDataResponse = Record<string, unknown> & {
   /** Your profile, roles, sessions, API keys, passkeys and two-step sign-in status. */
   auth: Record<string, unknown>;
+};
+
+/** Where tenants' data is kept: one database. Connection URLs are never shown. */
+export type Placement = {
+  /** `sqlite` or `postgres`. */
+  backend: string;
+  created_at: string;
+  id: string;
+  /** `shared` (many tenants) or `dedicated` (one tenant). */
+  kind: string;
+  name: string;
+  /** `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`. */
+  schema_state: string;
 };
 
 /** A comment just posted, for its author. */
@@ -4319,9 +5101,15 @@ export type PreviewEntryResponse = {
   /** Authors, in order (the first is the main one). */
   author_ids: string[];
   body: BodyNode;
+  /**
+   * The public images used in `body`, in order of appearance (find one by the `mediaId` of
+   * its node). Images that are not public yet are left out.
+   */
+  body_media: PublicMedia[];
   body_schema_version: number;
   canonical_url: string;
   excerpt: string;
+  featured_media?: PublicMedia | null;
   featured_media_alt: string;
   /** Main image (a media item id). */
   featured_media_id?: string | null;
@@ -4365,6 +5153,11 @@ export type Problem = {
   detail: string;
   /** One entry per invalid input field. Present only for validation problems. */
   errors?: ProblemField[];
+  /**
+   * Finer, stable reason for some codes, documented with the code — e.g. for a refused link
+   * token: `expired`, `used` or `unknown`.
+   */
+  reason?: string | null;
   /** The HTTP status code, repeated in the body. */
   status: number;
   /** The standard phrase for the HTTP status, e.g. `Not Found`. */
@@ -4888,6 +5681,11 @@ export type RoleResponse = {
 /** A new schedule. */
 export type ScheduleRequest = {
   action: Action;
+  /**
+   * For a `publish` of AI-generated content: you confirm a person reviewed it, as with
+   * `ai_reviewed` when publishing at once. Only a signed-in person may send `true`.
+   */
+  ai_reviewed?: boolean;
   /** When to run; must be in the future. */
   run_at: string;
 };
@@ -4895,6 +5693,8 @@ export type ScheduleRequest = {
 /** A scheduled publish or take-down. */
 export type ScheduleResponse = {
   action: Action;
+  /** `true` when whoever scheduled it confirmed that the AI-generated content was reviewed. */
+  ai_reviewed: boolean;
   created_at: string;
   created_by?: string | null;
   entry_id: string;
@@ -4949,7 +5749,7 @@ export type SeoFinding = {
   /** The field, or the place in the body JSON (e.g. `body.content[2].attrs.alt`). */
   field: string;
   level: FindingLevel;
-  /** What to fix, in English. */
+  /** What to fix, in the language of `Accept-Language`. */
   message: string;
 };
 
@@ -4978,12 +5778,24 @@ export type SeoSuggestion = {
  * tokens.
  */
 export type SessionResponse = {
+  /**
+   * Approximate country of the sign-in (ISO 3166-1 two-letter code), from the server's
+   * reverse proxy when it is set up for it (`AUTOXIDE_AUTH_COUNTRY_HEADER`); `null` when not
+   * known. The IP address is never kept.
+   */
+  country?: string | null;
   /** When the session ends unless refreshed before. */
   expires_at: string;
   /** Same as `session_id` in the token response of the client that holds it. */
   id: string;
   /** Last time the session got tokens (sign-in or refresh). */
   last_active_at: string;
+  /**
+   * How the session was signed in: `password`, `password_and_mfa` (password and a code),
+   * `passkey`, or `password_change` (a new session after changing the password); `null` for
+   * sessions older than this information.
+   */
+  sign_in_method?: string | null;
   /** When the session was signed in. */
   started_at: string;
   /**
@@ -5050,6 +5862,11 @@ export type SiteMenuItemInput = {
    */
   icon?: string | null;
   /**
+   * The item's id from the menu as read, to keep it across this save (the response of
+   * `PUT` shows the same id). Leave it out for a new item, and when creating a menu.
+   */
+  id?: string | null;
+  /**
    * Up to 200 characters. Needed unless `ref` is given; empty with `ref` shows the title of
    * the object, in the menu's language.
    */
@@ -5063,9 +5880,16 @@ export type SiteMenuItemInput = {
 export type SiteMenuSummary = {
   created_at: string;
   id: string;
+  /** How many items the menu holds, at every level. */
+  item_count: number;
   key: string;
   locale: string;
   updated_at: string;
+  /**
+   * Who created the menu or last replaced its items; `null` when unknown (menus saved
+   * before this field existed, or changed by the system).
+   */
+  updated_by?: string | null;
 };
 
 /** One address of the sitemap. */
@@ -5096,6 +5920,14 @@ export type StartTotpRequest = {
 
 /** Where an entry is in its life. */
 export type Status = "draft" | "published" | "archived";
+
+/** Submissions of a form by status. */
+export type SubmissionCounts = {
+  archived: number;
+  new: number;
+  read: number;
+  spam: number;
+};
 
 /** A submission. */
 export type SubmissionResponse = {
@@ -5294,6 +6126,49 @@ export type TargetRequest = {
 /** What a term groups. */
 export type Taxonomy = "category" | "tag";
 
+/** A customer (tenant) of the platform. */
+export type Tenant = {
+  created_at: string;
+  id: string;
+  name: string;
+  /** Parent tenant, when the tenant belongs to a chain. */
+  parent_id?: string | null;
+  /** Name of the placement (database) that keeps its data. */
+  placement: string;
+  /** Short name: lower-case letters, digits and `-`; unique on the platform. */
+  slug: string;
+  /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
+  status: string;
+  updated_at: string;
+};
+
+/** Changes to a tenant; omitted fields stay as they are. */
+export type TenantChanges = {
+  name?: string | null;
+  /** `active` or `suspended`. */
+  status?: string | null;
+};
+
+/** A setting the installed modules take per tenant, and its state in the current tenant. */
+export type TenantSettingState = {
+  description: string;
+  /** Whether this tenant has set it; otherwise the server-wide configuration applies. */
+  is_set: boolean;
+  /** `<module>.<key>`, e.g. `mail.smtp_url`. */
+  name: string;
+  /** Secret settings are stored encrypted and never returned: `value` is always `null`. */
+  secret: boolean;
+  updated_at?: string | null;
+  /** The value, for settings that are not secret and are set. */
+  value?: string | null;
+};
+
+/** The new value of a setting. */
+export type TenantSettingValue = {
+  /** 1 to 4000 characters. Secret values are stored encrypted and never returned. */
+  value: string;
+};
+
 /** The name of a term in one language, and its parent. Omitted fields stay as they are. */
 export type TermFields = {
   description?: string | null;
@@ -5326,6 +6201,8 @@ export type TermName = {
 /** A category or tag, with its names in every language. */
 export type TermResponse = {
   created_at: string;
+  /** How many entries (in any status) have this term. Only in the list. */
+  entry_count?: number | null;
   id: string;
   names: TermName[];
   /** Parent category; `null` at the top (always for tags). */
@@ -5513,6 +6390,8 @@ export type UpdateItemRequest = {
   alt?: string | null;
   /** Caption, up to 2000 characters; `""` clears it. */
   caption?: string | null;
+  /** `true` marks a purely decorative image, whose empty `alt` is on purpose. */
+  decorative?: boolean | null;
   /** Move to this folder; `null` moves to the root. */
   folder_id?: string | null;
   /** New file name, 1 to 255 characters, without `/` or `\`. */
@@ -5610,10 +6489,31 @@ export type UserResponse = {
    * is not verified.
    */
   email_verified_at?: string | null;
+  /**
+   * Whether the account has a password. Without one it signs in with a passkey; its owner
+   * sets a first password through `POST /api/v1/auth/password-reset`, an administrator
+   * with `POST /api/v1/auth/users/{id}/password`.
+   */
+  has_password: boolean;
   id: string;
+  /**
+   * When the user last started a session (sign-in, password change); `null` if not since
+   * this field exists.
+   */
+  last_sign_in_at?: string | null;
+  /** Whether two-step sign-in (an authenticator app) is on. */
+  mfa_enabled: boolean;
   /** Display name. */
   name: string;
+  /** The user's roles, by name. Only with `include=roles` on the user list. */
+  roles?: UserRole[] | null;
   updated_at: string;
+};
+
+/** A role a user holds. */
+export type UserRole = {
+  id: string;
+  name: string;
 };
 
 /** The complete list of roles a user should have. */
@@ -5683,7 +6583,7 @@ export interface paths {
   "/api/v1/audit": {
     /** List the audit log. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { actor_user_id?: string; subject?: string; action?: string; module?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { actor_user_id?: string; subject?: string; action?: string; module?: string; include?: "actor"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_AuditEntryResponse;
         400: Problem;
@@ -5700,6 +6600,33 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_AuditEntryResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/all-api-keys": {
+    /** List the API keys of every user. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { user_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ManagedApiKeyResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/all-api-keys/{id}": {
+    /** Revoke an API key of any user. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -5724,10 +6651,12 @@ export interface paths {
       requestBody: CreateApiKeyRequest;
       responses: {
         201: Data_CreatedApiKeyResponse;
+        400: Problem;
         401: Problem;
         403: Problem;
         409: Problem;
         422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -5880,6 +6809,16 @@ export interface paths {
         409: Problem;
         422: Problem;
         429: Problem;
+        default: Problem;
+      };
+    };
+    /** Cancel a pending email change. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -6220,7 +7159,7 @@ export interface paths {
   "/api/v1/auth/users": {
     /** List or search user accounts. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { search?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { search?: string; status?: "active" | "disabled"; include?: "roles"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_UserResponse;
         401: Problem;
@@ -6641,6 +7580,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/comments/targets": {
+    /** List the targets that have comments. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { target_type?: string; state?: "open" | "closed"; pending?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_CommentTarget;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/comments/targets/{target_type}/{target_id}": {
     /** Get the comment state of a target, with its pending count. */
     get: {
@@ -6726,7 +7678,7 @@ export interface paths {
   "/api/v1/content/authors": {
     /** List author profiles. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_AuthorResponse;
         401: Problem;
@@ -6792,7 +7744,7 @@ export interface paths {
   "/api/v1/content/entries": {
     /** List posts and pages (drafts included). */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: "post" | "page"; locale?: string; status?: "draft" | "published" | "archived"; parent_id?: string; q?: string; term_id?: string; author_id?: string; translation_group_id?: string; sort?: "created_at" | "updated_at"; review_requested?: boolean; scheduled?: boolean; created_by?: string; ai_generated?: boolean; missing_locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_EntryResponse;
         401: Problem;
@@ -7353,6 +8305,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/content/schedules": {
+    /** List the schedules of every entry. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_ScheduleResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/content/schedules/{id}": {
     /** Cancel a pending schedule. */
     delete: {
@@ -7383,7 +8348,7 @@ export interface paths {
   "/api/v1/content/terms": {
     /** List categories and tags. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { taxonomy?: "category" | "tag"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { taxonomy?: "category" | "tag"; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_TermResponse;
         401: Problem;
@@ -7757,6 +8722,17 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/client-config": {
+    /** Get the settings an interface needs. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_ClientConfigResponse;
+        500: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/modules": {
     /** List the installed modules. */
     get: {
@@ -7778,6 +8754,120 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/placements": {
+    /** List the placements. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_Placement;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/settings": {
+    /** List this tenant's settings. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_TenantSettingState;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/settings/{name}": {
+    /** Set one of this tenant's settings. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { name: string }; };
+      requestBody: TenantSettingValue;
+      responses: {
+        200: Data_TenantSettingState;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove one of this tenant's settings. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { name: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenant": {
+    /** Get my tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_CurrentTenant;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants": {
+    /** List the tenants of the platform. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; status?: string; parent_id?: string }; };
+      responses: {
+        200: Page_Tenant;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewTenant;
+      responses: {
+        201: Data_Tenant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}": {
+    /** Get a tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Tenant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Rename, suspend or resume a tenant. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: TenantChanges;
+      responses: {
+        200: Data_Tenant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -7818,10 +8908,21 @@ export interface paths {
       };
     };
   };
+  "/api/v1/me/permissions": {
+    /** List your own permissions. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_MyPermission;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/media": {
     /** List media items. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { folder_id?: string; type?: string; visibility?: "private" | "public"; trashed?: boolean; q?: string; tag?: string; sort?: "created_at" | "name" | "size"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { folder_id?: string; type?: string; visibility?: "private" | "public"; trashed?: boolean; q?: string; tag?: string; alt_missing?: boolean; include?: "uploader"; sort?: "created_at" | "name" | "size"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_MediaItemResponse;
         401: Problem;
@@ -7909,6 +9010,18 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/media/summary": {
+    /** Get the totals of the media library. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_LibrarySummaryResponse;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -8311,6 +9424,20 @@ export interface paths {
       };
     };
   };
+  "/api/v1/newsletter/campaigns/{id}/preview": {
+    /** Preview a campaign mail. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CampaignPreviewResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/newsletter/campaigns/{id}/resume": {
     /** Resume a paused campaign. */
     post: {
@@ -8544,10 +9671,22 @@ export interface paths {
       };
     };
   };
+  "/api/v1/newsletter/settings": {
+    /** Get the newsletter settings in use. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_NewsletterSettingsResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/newsletter/subscribers": {
     /** List subscribers. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { email?: string; list_id?: string; status?: "unconfirmed" | "confirmed" | "unsubscribed"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { email?: string; list_id?: string; status?: "unconfirmed" | "confirmed" | "unsubscribed"; blocked?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_SubscriberResponse;
         401: Problem;
@@ -8651,7 +9790,7 @@ export interface paths {
   "/api/v1/webhooks": {
     /** List webhook endpoints. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: "active" | "disabled"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_EndpointResponse;
         401: Problem;

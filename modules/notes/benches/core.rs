@@ -37,7 +37,11 @@ struct Writer;
 
 #[async_trait::async_trait]
 impl Authenticator for Writer {
-    async fn authenticate(&self, _: Option<&str>) -> Result<Principal, Error> {
+    async fn authenticate(
+        &self,
+        _: Option<&str>,
+        _: &autoxide_kernel::tenancy::TenantHint,
+    ) -> Result<Principal, Error> {
         let permissions = ["notes.read".to_owned(), "notes.write".to_owned()];
         Ok(Principal::new(Uuid::from_u128(1), permissions))
     }

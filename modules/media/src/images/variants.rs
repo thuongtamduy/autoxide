@@ -22,6 +22,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::rows;
 use autoxide_kernel::storage::StoredFile;
+use autoxide_kernel::tenancy::TenantContext;
 use bytes::Bytes;
 use futures_util::TryStreamExt as _;
 use image::codecs::jpeg::JpegEncoder;
@@ -131,7 +132,14 @@ impl MediaService {
             return Ok(());
         }
         let job = MakeVariants { item_id: item.id, version_id: item.version_id };
-        self.jobs.enqueue(transaction, &job, EnqueueOptions::default()).await?;
+        self.jobs
+            .enqueue(
+                transaction,
+                &TenantContext::legacy_default(&self.database),
+                &job,
+                EnqueueOptions::default(),
+            )
+            .await?;
         Ok(())
     }
 
@@ -458,6 +466,7 @@ mod tests {
             alt: String::new(),
             title: String::new(),
             caption: String::new(),
+            decorative: false,
             visibility: "private".into(),
             version_id: Uuid::nil(),
             uploaded_by: None,

@@ -8,6 +8,7 @@ use std::future::Future;
 use std::process::ExitCode;
 
 use autoxide_kernel::http::{self, Shutdown};
+use autoxide_kernel::tenancy::TenancyMode;
 use tokio::net::TcpListener;
 
 use super::{report_failure, report_invalid_configuration, run_with_observability};
@@ -49,6 +50,9 @@ async fn prepare(settings: Settings) -> Result<(Runtime, TcpListener), String> {
     }
 }
 
+/// Khoảng giữa hai lần kiểm migration của các placement.
+const PLACEMENT_CHECK_EVERY: std::time::Duration = std::time::Duration::from_secs(60);
+
 /// Phục vụ tới khi `shutdown` hoàn thành, rồi đóng kết nối database.
 async fn run_server<F>(runtime: Runtime, listener: TcpListener, shutdown: F) -> Result<(), String>
 where
@@ -71,10 +75,25 @@ where
         background.spawn(dispatcher.run(async move {
             let _ = stopped.wait_for(|stop| *stop).await;
         }));
-        let mut stopped = background_stopped;
+        let mut stopped = background_stopped.clone();
         background.spawn(worker.run(async move {
             let _ = stopped.wait_for(|stop| *stop).await;
         }));
+        // Chế độ nhiều khách: kiểm migration của các placement mỗi phút (đặc tả 33).
+        if let Some(registry) = modules.tenancy()
+            && registry.mode() == TenancyMode::Multi
+        {
+            // Lỗi khai báo migration đã bị chặn lúc khởi động (`RequireApplied`); ở đây chỉ ghi log.
+            match modules.placements(&registry) {
+                Ok(placements) => {
+                    let mut stopped = background_stopped;
+                    background.spawn(placements.watch(PLACEMENT_CHECK_EVERY, async move {
+                        let _ = stopped.wait_for(|stop| *stop).await;
+                    }));
+                }
+                Err(error) => tracing::error!(error = %error, "cannot watch the placements"),
+            }
+        }
     }
 
     // Tín hiệu dừng tới thì chưa ngừng nhận kết nối ngay: bật cờ để `/health/ready` trả 503, vẫn
@@ -188,8 +207,11 @@ mod tests {
 
             assert_eq!(
                 error,
-                "3 migrations have not been applied to the database: kernel/m0001_create_secrets, \
-                 kernel/m0002_create_user_flags, notes/m0001_create_note; run `autoxide migrate up` \
+                "9 migrations have not been applied to the database: kernel/m0001_create_secrets, \
+                 kernel/m0002_create_user_flags, kernel/m0003_create_tenancy, \
+                 kernel/m0004_tenancy_user_flags, kernel/m0005_create_tenant_settings, \
+                 kernel/m0006_create_events, kernel/m0007_add_event_actor, \
+                 kernel/m0008_tenancy_events, notes/m0001_create_note; run `autoxide migrate up` \
                  first"
             );
         })

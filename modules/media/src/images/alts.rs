@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, HashMap};
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
@@ -104,11 +105,14 @@ impl MediaService {
         let locale = self.alt_locale(locale)?;
         let alt = alt.map(str::trim);
         if alt.is_some_and(|alt| alt.chars().count() > ALT_MAX_LENGTH) {
-            return Err(Error::validation(vec![FieldError::new(
-                "alt",
-                "length",
-                format!("must be at most {ALT_MAX_LENGTH} characters long"),
-            )]));
+            return Err(Error::validation(vec![
+                FieldError::new(
+                    "alt",
+                    "length",
+                    "must be at most {alt_max_length} characters long",
+                )
+                .with_param("alt_max_length", ALT_MAX_LENGTH),
+            ]));
         }
 
         let transaction = self.database.begin_write().await?;
@@ -185,7 +189,13 @@ impl MediaService {
             after: Some(with_alts(snapshot(&after), &alts_after)),
         });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::item_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::item_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(media_item_id = %id, locale = %locale, removed = alt.is_none(), "media alt translation changed");

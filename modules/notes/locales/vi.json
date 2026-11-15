@@ -1,4 +1,11 @@
 {
+  "field:must be 1 to {title_max_length} characters, not only spaces": "phải dài 1 đến {title_max_length} ký tự, không chỉ có khoảng trắng",
+  "field:must be at most {body_max_length} characters long": "phải dài tối đa {body_max_length} ký tự",
   "notes.note_not_found": "Bạn không có ghi chú `{id}`.",
-  "notes.title_taken": "Bạn đã có một ghi chú tên `{title}`. Hãy chọn tên khác."
+  "notes.title_taken": "Bạn đã có một ghi chú tên `{title}`. Hãy chọn tên khác.",
+  "text:A note was created.": "Một ghi chú được tạo.",
+  "text:A note was deleted.": "Một ghi chú bị xoá.",
+  "text:A note's title or body changed.": "Tên hay nội dung một ghi chú thay đổi.",
+  "text:Create, change and delete your own notes.": "Tạo, sửa và xoá ghi chú của chính bạn.",
+  "text:See your own notes.": "Xem ghi chú của chính bạn."
 }

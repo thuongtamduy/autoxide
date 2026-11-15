@@ -142,22 +142,6 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn audit_khong_giu_email_cua_mail_bi_tu_choi() {
-        let event = Delivered::new(
-            "mail",
-            "mail.delivery_failed".to_owned(),
-            json!({"to": " Ada@Example.com", "dedupe_key": null, "code": "550"}),
-        );
-        let stored = redacted(&event);
-        let expected = autoxide_kernel::secret::sha256("ada@example.com");
-        assert_eq!(stored["to"], format!("sha256:{expected}"));
-        assert_eq!(stored["code"], "550");
-        let mut other = event.clone();
-        other.name = "mail.something_else".to_owned();
-        assert_eq!(redacted(&other)["to"], " Ada@Example.com");
-    }
-
-    #[test]
     fn tach_truoc_sau_va_phan_con_lai() {
         let (before, after, details) =
             split(&json!({"before": {"name": "a"}, "after": {"name": "b"}, "reason": "typo"}));
@@ -196,12 +180,35 @@ mod database_tests {
     }
 
     #[tokio::test]
+    async fn audit_khong_giu_email_cua_mail_bi_tu_choi() {
+        TestDatabase::run(async |test| {
+            let database = database(test).await;
+            let event = Delivered::new(
+                autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                "mail",
+                "mail.delivery_failed".to_owned(),
+                json!({"to": " Ada@Example.com", "dedupe_key": null, "code": "550"}),
+            );
+            let stored = redacted(&event);
+            let expected = autoxide_kernel::secret::sha256("ada@example.com");
+            assert_eq!(stored["to"], format!("sha256:{expected}"));
+            assert_eq!(stored["code"], "550");
+            let mut other = event.clone();
+            other.name = "mail.something_else".to_owned();
+            assert_eq!(redacted(&other)["to"], " Ada@Example.com");
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
     async fn moi_event_mot_dong_ke_ca_khi_giao_lai() {
         TestDatabase::run(async |test| {
             let database = database(test).await;
             let recorder = Recorder::new(database.clone());
             let user = Uuid::now_v7();
             let event = Delivered::new(
+                autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
                 "notes",
                 "notes.note_renamed".to_owned(),
                 json!({"before": {"title": "a"}, "after": {"title": "b"}}),
@@ -238,10 +245,15 @@ mod database_tests {
             let user = Uuid::now_v7();
             let subject = Some(format!("auth.user:{user}"));
             let happened = |name: &str, subject: Option<String>, payload| {
-                Delivered::new("auth", name.to_owned(), payload)
-                    .actor(Actor::user(user))
-                    .subject(subject)
-                    .occurred_at(Utc::now().trunc_subsecs(6))
+                Delivered::new(
+                    autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                    "auth",
+                    name.to_owned(),
+                    payload,
+                )
+                .actor(Actor::user(user))
+                .subject(subject)
+                .occurred_at(Utc::now().trunc_subsecs(6))
             };
             let created = happened(
                 "auth.user_created",

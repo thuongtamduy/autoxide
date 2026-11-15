@@ -9,6 +9,7 @@
 //! cho module khác, hai job định kỳ (dọn thùng rác, dọn nội dung mồ côi).
 
 pub mod api;
+mod client_config;
 mod config;
 mod entity;
 mod events;
@@ -86,6 +87,12 @@ impl Module for MediaModule {
         ]
     }
 
+    fn client_config(
+        &self,
+    ) -> Result<Option<autoxide_kernel::module::ClientSection>, autoxide_kernel::error::Error> {
+        self.config.as_ref().map_or(Ok(None), client_config::section)
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(MediaConfig::read(reader)?);
         Ok(())
@@ -102,14 +109,17 @@ impl Module for MediaModule {
             .ok_or_else(|| Error::internal("module `media` started before it was configured"))?;
         let storage = context.require::<dyn Storage>()?;
         let ai = context.require::<dyn autoxide_kernel::ai::TextModel>()?;
-        let service = Arc::new(MediaService::new(
-            context.database().clone(),
-            storage,
-            context.outbox()?,
-            context.jobs(),
-            ai,
-            config,
-        ));
+        let service = Arc::new(
+            MediaService::new(
+                context.database().clone(),
+                storage,
+                context.outbox()?,
+                context.jobs(),
+                ai,
+                config,
+            )
+            .with_resources(context.resources()),
+        );
         self.service = Some(service.clone());
         context.personal_data(service.clone())?;
         context.provide::<dyn api::Media>(service)

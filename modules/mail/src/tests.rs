@@ -8,6 +8,7 @@ use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::mail::{Mail, Mailer};
 use autoxide_kernel::module::Modules;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::TestDatabase;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
@@ -34,9 +35,9 @@ impl Drop for TempDir {
 async fn setup(
     test: &TestDatabase,
     pairs: &[(&str, &str)],
-) -> (Arc<dyn Mailer>, autoxide_kernel::job::Worker) {
-    let (mailer, worker, _) = setup_with_database(test, pairs).await;
-    (mailer, worker)
+) -> (Arc<dyn Mailer>, autoxide_kernel::job::Worker, TenantContext) {
+    let (mailer, worker, database) = setup_with_database(test, pairs).await;
+    (mailer, worker, TenantContext::legacy_default(&database))
 }
 
 async fn setup_with_database(
@@ -56,7 +57,7 @@ async fn setup_with_database(
     modules.migrator().unwrap().up(&database).await.unwrap();
     modules.start(&database).unwrap();
     let mailer = modules.api::<dyn Mailer>().unwrap();
-    let worker = modules.worker(&database, 4).unwrap();
+    let worker = modules.worker(4).unwrap();
     (mailer, worker, database)
 }
 
@@ -70,9 +71,10 @@ async fn chua_cau_hinh_smtp_thi_ghi_file_eml() {
     TestDatabase::run(async |test| {
         let directory = TempDir::new("file");
         let path = directory.0.to_string_lossy().into_owned();
-        let (mailer, worker) = setup(test, &[("AUTOXIDE_MAIL_FILE_DIR", path.as_str())]).await;
+        let (mailer, worker, tenant) =
+            setup(test, &[("AUTOXIDE_MAIL_FILE_DIR", path.as_str())]).await;
 
-        mailer.send(welcome("Ada <ada@example.com>")).await.unwrap();
+        mailer.send(&tenant, welcome("Ada <ada@example.com>")).await.unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 1);
 
         let files: Vec<_> = std::fs::read_dir(&directory.0).unwrap().collect();
@@ -93,9 +95,9 @@ async fn dia_chi_sai_bi_tu_choi_ngay() {
     TestDatabase::run(async |test| {
         let directory = TempDir::new("invalid");
         let path = directory.0.to_string_lossy().into_owned();
-        let (mailer, _) = setup(test, &[("AUTOXIDE_MAIL_FILE_DIR", path.as_str())]).await;
+        let (mailer, _, tenant) = setup(test, &[("AUTOXIDE_MAIL_FILE_DIR", path.as_str())]).await;
 
-        let error = mailer.send(welcome("not an address")).await.unwrap_err();
+        let error = mailer.send(&tenant, welcome("not an address")).await.unwrap_err();
 
         assert_eq!(error.code(), "validation_failed");
         assert_eq!(error.fields()[0].field, "to");
@@ -155,9 +157,10 @@ async fn co_smtp_thi_gui_qua_smtp() {
         let (port, received) = fake_smtp().await;
         // Không mã hoá: chỉ dùng cho máy chủ giả trong test.
         let url = format!("smtp://127.0.0.1:{port}");
-        let (mailer, worker) = setup(test, &[("AUTOXIDE_MAIL_SMTP_URL", url.as_str())]).await;
+        let (mailer, worker, tenant) =
+            setup(test, &[("AUTOXIDE_MAIL_SMTP_URL", url.as_str())]).await;
 
-        mailer.send(welcome("ada@example.com")).await.unwrap();
+        mailer.send(&tenant, welcome("ada@example.com")).await.unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 1);
 
         let lines = received.lock().unwrap().clone();
@@ -179,7 +182,8 @@ async fn reply_to_header_rieng_va_chong_trung() {
     TestDatabase::run(async |test| {
         let directory = TempDir::new("headers");
         let path = directory.0.to_string_lossy().into_owned();
-        let (mailer, worker) = setup(test, &[("AUTOXIDE_MAIL_FILE_DIR", path.as_str())]).await;
+        let (mailer, worker, tenant) =
+            setup(test, &[("AUTOXIDE_MAIL_FILE_DIR", path.as_str())]).await;
         let mut mail = welcome("ada@example.com");
         mail.reply_to = Some("Bob <bob@example.com>".to_owned());
         mail.headers = vec![
@@ -187,8 +191,8 @@ async fn reply_to_header_rieng_va_chong_trung() {
             ("List-Unsubscribe-Post".to_owned(), "List-Unsubscribe=One-Click".to_owned()),
         ];
         mail.dedupe_key = Some("delivery-1".to_owned());
-        mailer.send(mail.clone()).await.unwrap();
-        mailer.send(mail.clone()).await.unwrap();
+        mailer.send(&tenant, mail.clone()).await.unwrap();
+        mailer.send(&tenant, mail.clone()).await.unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 1, "the second one is a duplicate");
         let files: Vec<_> = std::fs::read_dir(&directory.0).unwrap().collect();
         assert_eq!(files.len(), 1);
@@ -203,7 +207,7 @@ async fn reply_to_header_rieng_va_chong_trung() {
             ("Bcc".to_owned(), "eve@example.com".to_owned()),
             ("List-Id".to_owned(), "x\r\nBcc: eve@example.com".to_owned()),
         ];
-        let error = mailer.send(bad).await.unwrap_err();
+        let error = mailer.send(&tenant, bad).await.unwrap_err();
         let fields: Vec<&str> = error.fields().iter().map(|field| field.field.as_str()).collect();
         assert_eq!(fields, ["reply_to", "headers[0].name", "headers[1].value"]);
     })
@@ -230,7 +234,7 @@ async fn tu_choi_han_thi_phat_event_tu_choi_tam_thi_thu_lai() {
             setup_with_database(test, &[("AUTOXIDE_MAIL_SMTP_URL", url.as_str())]).await;
         let mut mail = welcome("ghost@example.com");
         mail.dedupe_key = Some("delivery-9".to_owned());
-        mailer.send(mail).await.unwrap();
+        mailer.send(&TenantContext::legacy_default(&database), mail).await.unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 1);
         let done =
             worker.list("mail", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
@@ -250,7 +254,10 @@ async fn tu_choi_han_thi_phat_event_tu_choi_tam_thi_thu_lai() {
         let url = format!("smtp://127.0.0.1:{port}");
         let (mailer, worker, database) =
             setup_with_database(test, &[("AUTOXIDE_MAIL_SMTP_URL", url.as_str())]).await;
-        mailer.send(welcome("ada@example.com")).await.unwrap();
+        mailer
+            .send(&TenantContext::legacy_default(&database), welcome("ada@example.com"))
+            .await
+            .unwrap();
         assert_eq!(worker.run_once().await.unwrap(), 1);
         let done =
             worker.list("mail", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();

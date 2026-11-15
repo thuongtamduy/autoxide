@@ -53,9 +53,13 @@ curl -X POST "http://localhost:8080/api/v1/media?name=team.jpg" \
 - `GET /api/v1/media` — a page of items. Filters: `folder_id` (`root` or an id; only that
   folder, not its subfolders), `type` (`image/png` or `image/*`), `visibility` (`public` /
   `private`), `trashed=true` (the trash), `q` (name contains, ignoring case), `tag` (has
-  this tag, ignoring case). Order:
+  this tag, ignoring case), `alt_missing=true` (images with no alt text that are not marked
+  `decorative`). Order:
   `sort=created_at|name|size` with `order=asc|desc`. Follow `pagination.next_cursor` with
-  the same filters.
+  the same filters. `include=uploader` adds `uploaded_by_name`, the name of who uploaded each
+  item.
+- `GET /api/v1/media/summary` — totals of the library: `items`, `bytes`, `images_missing_alt`,
+  `trashed_items`.
 
 ## Change
 
@@ -63,7 +67,8 @@ Changes need the `ETag` you read, in `If-Match` (`*` to change whatever the vers
 Without it the answer is `428` (code `precondition_required`); if someone changed the item
 in between, `412` (code `precondition_failed`) — read it again and retry.
 
-- `PATCH /api/v1/media/{id}` — `name`, `alt`, `title`, `caption`, `folder_id` (`null`
+- `PATCH /api/v1/media/{id}` — `name`, `alt`, `title`, `caption`, `decorative` (`true` for
+  an image that only decorates: its empty alt text is on purpose), `folder_id` (`null`
   for the root), `visibility`, `tags` (replaces them all; `[]` removes them).
 - `PUT /api/v1/media/{id}/content` — replace the content, keeping the id (and every place
   that uses the item). Same checks as an upload. The `url`, `version_id` and `ETag` change;
@@ -162,7 +167,8 @@ or deletes one (`DELETE`, removing it from every item). Names are unique, ignori
 
 `/api/v1/media/folders`: create (`POST`, `name` and `parent_id`), list (`GET`, filter
 `parent_id=root|<id>`, `sort=created_at|name`), read, rename or move (`PATCH`, with
-`If-Match`), delete (`DELETE`). Folders nest. Names are unique in a parent, ignoring case.
+`If-Match`), delete (`DELETE`). Each folder gives `item_count`: the items directly in it,
+not counting the trash. Folders nest. Names are unique in a parent, ignoring case.
 A folder cannot move into itself or its subfolders (`409`, `media.folder_cycle`). Only
 empty folders can be deleted — items in the trash count (`409`, `media.folder_not_empty`).
 

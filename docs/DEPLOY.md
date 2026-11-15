@@ -35,9 +35,14 @@ chmod 600 .env
 - `POSTGRES_PASSWORD` protects the database.
 - `AUTOXIDE_AUTH_TOKEN_SECRET` signs access tokens. Keep it stable: changing it signs
   everyone out.
-- `AUTOXIDE_SECRET_KEY` signs short-lived tokens (forms, anti-spam) and keys the hashes of
-  visitors' IP addresses. Kept outside the database, a copy of the database (a backup)
-  does not reveal those addresses.
+- `AUTOXIDE_SECRET_KEY` signs short-lived tokens (forms, anti-spam), keys the hashes of
+  visitors' IP addresses and encrypts the secrets the server keeps (two-step sign-in, webhook
+  signing secrets). Kept outside the database, a copy of the database (a backup) reveals
+  neither those addresses nor those secrets.
+- To change `AUTOXIDE_SECRET_KEY` later: put the new value in it and the old one in
+  `AUTOXIDE_SECRET_KEY_PREVIOUS`, restart, run `autoxide secrets reseal`, then remove
+  `AUTOXIDE_SECRET_KEY_PREVIOUS`. Setting it for the first time on a server that ran without it
+  needs no extra step: the key the server kept in the database still opens what it encrypted.
 
 ### 2. Start
 
@@ -302,7 +307,8 @@ into a new database.
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (default) or `postgres://user:password@host:5432/db` |
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Signs access tokens; required in production, the same on every server |
-| `AUTOXIDE_SECRET_KEY` | Signs short-lived tokens of every module and keys the hashes of visitors' IP addresses; optional: when unset, one is generated once and kept in the database. Set it (outside the database, the same on every server) in production: with the key in the database, anyone holding a database backup can work the IP blocks back out of the stored hashes |
+| `AUTOXIDE_SECRET_KEY` | Signs short-lived tokens of every module and keys the hashes of visitors' IP addresses; optional: when unset, one is generated once and kept in the database. Set it (outside the database, the same on every server) in production: with the key in the database, anyone holding a database backup can open the secrets stored encrypted and work the IP blocks back out of the stored hashes |
+| `AUTOXIDE_SECRET_KEY_PREVIOUS` | Old values of `AUTOXIDE_SECRET_KEY`, separated by commas, while rotating the key; remove them after `autoxide secrets reseal` |
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Behind a reverse proxy: the header with the client address |
 | `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | How many of your proxies a request passes (default `1`) |
 | `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Instead of a count: the addresses and ranges of your proxies, e.g. `10.0.0.0/8, 192.0.2.7` |

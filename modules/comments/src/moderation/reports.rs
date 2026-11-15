@@ -18,6 +18,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::Throttle;
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -110,9 +111,12 @@ impl CommentsService {
             ),
             (None, None) => format!("{GUEST_REPORTER}unknown"),
         };
-        let throttle =
-            Throttle::new(self.database.clone(), MODULE, self.config.reports_per_hour, HOUR)?;
-        if !throttle.hit(&format!("report:{reporter_key}")).await?.is_allowed() {
+        let throttle = Throttle::new(MODULE, self.config.reports_per_hour, HOUR)?;
+        if !throttle
+            .hit(&TenantContext::legacy_default(&self.database), &format!("report:{reporter_key}"))
+            .await?
+            .is_allowed()
+        {
             return Ok(());
         }
 
@@ -170,6 +174,7 @@ impl CommentsService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     actor,
                     events::comment_subject(id),
                     &events::CommentStatusChanged(change),

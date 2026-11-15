@@ -43,6 +43,8 @@ pub(super) struct Registered {
     pub user_handle: Vec<u8>,
     pub static_state: Vec<u8>,
     pub dynamic_state: Vec<u8>,
+    /// Loại authenticator nó tự khai (AAGUID); `None` khi không khai.
+    pub aaguid: Option<uuid::Uuid>,
 }
 
 /// Câu trả lời đăng nhập đã đọc: credential nào, của user handle nào.
@@ -131,6 +133,7 @@ impl Engine {
             .verify(&self.rp_id, &response, &options)
             .map_err(|error| Rejected(error.to_string()))?;
         Ok(Registered {
+            aaguid: super::authenticators::from_bytes(registered.metadata().aaguid.data()),
             credential_id: registered.id().as_ref().to_vec(),
             user_handle: registered.user_id().as_ref().to_vec(),
             static_state: registered

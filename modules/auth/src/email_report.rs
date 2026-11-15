@@ -23,6 +23,7 @@ use autoxide_kernel::i18n::Language;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::mail::MailTemplate;
 use autoxide_kernel::rows;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
@@ -101,7 +102,14 @@ impl EmailVerifications {
         transaction: &sea_orm::DatabaseTransaction,
         job: &EmailChangedJob,
     ) -> Result<(), Error> {
-        self.jobs.enqueue(transaction, job, EnqueueOptions::default()).await?;
+        self.jobs
+            .enqueue(
+                transaction,
+                &TenantContext::legacy_default(&self.database),
+                job,
+                EnqueueOptions::default(),
+            )
+            .await?;
         Ok(())
     }
 
@@ -111,8 +119,17 @@ impl EmailVerifications {
         let ttl = chrono::Duration::days(REPORT_DAYS);
         let subject = job.user_id.to_string();
         let transaction = self.database.begin_write().await?;
-        let token =
-            tokens().issue(&transaction, PURPOSE, &subject, Some(&job.old_email), ttl).await?.token;
+        let token = tokens()
+            .issue(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &subject,
+                Some(&job.old_email),
+                ttl,
+            )
+            .await?
+            .token;
         transaction.commit().await?;
         let new_email = mask(&job.new_email);
         let at = job.changed_at.format("%Y-%m-%d %H:%M").to_string();
@@ -140,18 +157,22 @@ impl EmailVerifications {
                 CHANGED_CODE.mail(&job.old_email, &self.translations, language, &params)
             }
         };
-        self.mailer.send(mail).await
+        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await
     }
 
     /// Chủ tài khoản báo "không phải tôi" bằng `token` trong mail gửi tới địa chỉ cũ.
     pub(crate) async fn report(&self, token: &str, language: Language) -> Result<(), Error> {
         let transaction = self.database.begin_write().await?;
-        let consumed = tokens().consume(&transaction, PURPOSE, token).await?;
+        let consumed = tokens()
+            .consume(&transaction, &TenantContext::legacy_default(&self.database), PURPOSE, token)
+            .await?;
         let found = consumed
             .and_then(|consumed| Some((consumed.subject.parse::<Uuid>().ok()?, consumed.data?)));
         let Some((user_id, old_email)) = found else {
+            let tenant = TenantContext::legacy_default(&self.database);
+            let why = tokens().rejection(&transaction, &tenant, PURPOSE, token).await?;
             transaction.rollback().await?;
-            return Err(invalid_report_token());
+            return Err(invalid_report_token().with_reason(why.as_str()));
         };
         // Khoá dòng người dùng: hai lần báo cùng lúc (hay báo trong lúc đổi email) xét lần lượt.
         let Some(row) = rows::lock_one(&transaction, user_row::Entity::find_by_id(user_id)).await?
@@ -176,16 +197,38 @@ impl EmailVerifications {
         let actor = Actor::user(user_id);
         self.users.lock_out_in(&transaction, actor, user_id).await?;
         // Mọi token báo khác của người này cũng hết dùng được.
-        tokens().revoke(&transaction, PURPOSE, &user_id.to_string()).await?;
+        tokens()
+            .revoke(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &user_id.to_string(),
+            )
+            .await?;
         let after = if restored { old_email.clone() } else { current.clone() };
         let event = events::EmailChangeReported {
             before: Some(json!({"email": current})),
             after: Some(json!({"email": after, "restored": restored})),
         };
-        self.outbox.record(&transaction, actor, events::user_subject(user_id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(user_id),
+                &event,
+            )
+            .await?;
         if restored {
             let job = ResetJob { email: old_email, language: language.tag().to_owned() };
-            self.jobs.enqueue(&transaction, &job, EnqueueOptions::default()).await?;
+            self.jobs
+                .enqueue(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    &job,
+                    EnqueueOptions::default(),
+                )
+                .await?;
         }
         transaction.commit().await?;
         tracing::warn!(user_id = %user_id, restored, "an email change was reported as not made by the owner");
@@ -208,7 +251,7 @@ pub(crate) fn mask(email: &str) -> String {
 pub(crate) fn invalid_report_token() -> Error {
     Error::bad_request(
         "auth.invalid_email_change_report_token",
-        "The report token is unknown, expired or already used.",
+        "This link is unknown, expired or already used.",
     )
 }
 
@@ -327,6 +370,7 @@ mod tests {
                 permissions: vec!["auth.users.read".to_owned()],
                 expires_at: None,
                 current_password: PASSWORD.to_owned(),
+                second_factor: None,
             };
             let admin = autoxide_kernel::access::Principal::with_all_permissions(ada);
             services.api_keys.create(&admin, key).await.unwrap();

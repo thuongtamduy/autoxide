@@ -9,6 +9,7 @@ use std::time::Duration;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::Throttle;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Query;
@@ -77,15 +78,21 @@ impl NewsletterService {
                 after: None,
             };
             self.outbox
-                .record(&transaction, Actor::system(), None, &events::SubscriptionsExpired(change))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    Actor::system(),
+                    None,
+                    &events::SubscriptionsExpired(change),
+                )
                 .await?;
         }
         transaction.commit().await?;
         let write = self.database.write();
         self.tokens.purge(write, now - chrono::Duration::days(1)).await?;
         self.guard.purge_nonces(write, MODULE).await?;
-        Throttle::new(self.database.clone(), MODULE, 1, Duration::from_secs(3600))?
-            .purge(now - chrono::Duration::days(2))
+        Throttle::new(MODULE, 1, Duration::from_secs(3600))?
+            .purge(&self.database, now - chrono::Duration::days(2))
             .await?;
         let cleaned = Cleaned { subscriptions, subscribers };
         if cleaned != Cleaned::default() {

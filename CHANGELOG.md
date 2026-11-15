@@ -11,6 +11,80 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `auth`: `GET /api/v1/auth/users` takes `status` (`active`, `disabled`) and `include=roles` (each user's roles in
+  the same answer); every user carries `has_password`, `mfa_enabled` and `last_sign_in_at`. `GET /api/v1/auth/me`
+  gives `has_password` and `pending_email` (an email change waiting for its link, with expiry);
+  `DELETE /api/v1/auth/me/email` cancels that change. New event `auth.email_change_cancelled`. Users are an object
+  type `auth.user` of the object directory (their display name), for other modules.
+- `auth`: each session gives `sign_in_method` and an approximate `country` (ISO code from a trusted
+  proxy header, new setting `AUTOXIDE_AUTH_COUNTRY_HEADER`; the IP is never kept); each passkey
+  gives `aaguid` and `authenticator` (e.g. `Windows Hello`); `GET` and `DELETE
+  /api/v1/auth/all-api-keys…` let holders of the new permission `auth.api_keys.manage` see and
+  revoke every user's keys; creating an API key accepts `totp_code` or a passkey (`passkey_ceremony_id`,
+  `passkey_credential`) instead of `current_password`.
+- `GET /api/v1/kernel/client-config` (no sign-in): the settings an interface needs, by module —
+  `kernel` (public address, version), `content` (languages, post path prefix, embed hosts),
+  `media` (upload limit and types, alt languages), `menus` (languages), `mail` (sender, whether
+  mail is really sent). For module authors: `Module::client_config` with `ClientSection`.
+- `comments`: comments in the moderation list and when read carry `target_title` and `target_url`
+  (from the module that owns the target, when public); `GET /api/v1/comments/targets` lists the
+  targets with comments, their counts, title and path, filtered by kind, state or pending.
+- `newsletter`: `GET /api/v1/newsletter/settings` (the settings in use and what is still missing
+  to send); `GET /api/v1/newsletter/campaigns/{id}/preview` (the mail as sent, with footer);
+  campaign `progress` gives `bounced` and `unsubscribed`; subscribers filter by `blocked`.
+- `forms`: forms carry `submissions` (counts by status) in the list and when read; each answer to
+  a choice field carries `choices`, the chosen options with their labels in the form version it was
+  sent with; `value` of an answer is typed in the contract (`string | number | string[] | boolean`).
+- `media`: a `decorative` flag on items (an image whose empty alt text is on purpose);
+  `GET /api/v1/media` filters by `alt_missing` and takes `include=uploader` (`uploaded_by_name`);
+  `GET /api/v1/media/summary` gives the totals of the library; folders carry `item_count`.
+- `content`: `GET /api/v1/content/entries` filters by `review_requested`, `scheduled`, `created_by` (`me` for the
+  caller), `ai_generated` and `missing_locale`; each entry carries `published_at`, `path` (of the public version)
+  and `version` (the `ETag` value). Categories, tags and authors carry `entry_count`; categories and authors take
+  `q` (accents ignored). `GET /api/v1/content/schedules` lists the schedules of every entry; a schedule takes
+  `ai_reviewed`. SEO check messages follow `Accept-Language`; a preview gives the addresses of its public images.
+- `audit`: `include=actor` adds `actor_name`, the display name of who made each change.
+- `webhooks`: each endpoint carries `last_delivery` (status, HTTP status, time) in the list and when read;
+  `status` (`active`, `disabled`) filters the list.
+- `GET /api/v1/me/permissions`: the caller's own permissions with description and risk, for anyone signed in
+  (e.g. to pick the permissions of a new API key without `auth.roles.read`).
+- `GET /api/v1/auth/permissions` gives the `risk` of each permission. Permission descriptions (there, in
+  `GET /api/v1/kernel/modules`) and event descriptions (`GET /api/v1/webhooks/events`) follow `Accept-Language`.
+- Problem responses may carry `reason`: a refused link token (`auth.invalid_verification_token`,
+  `auth.invalid_reset_token`, `auth.invalid_email_change_report_token`) says `expired`, `used` or `unknown`.
+- `menus`: `POST /api/v1/menus` answers with an `ETag`; an item sent to `PUT /api/v1/menus/{id}` with the `id` it had
+  keeps that id; the menu list gives `item_count` and `updated_by`.
+- The text of each field problem (`errors[].detail` of a `422` Problem, and `errors` of an MCP tool error) follows
+  `Accept-Language` like `detail` already did. For module authors: `FieldError::new` takes an English template with
+  `{name}` placeholders filled by `.with_param(name, value)`; its translation is keyed by the template
+  (`"field:<template>"` in `locales/vi.json`), and `cargo xtask check` refuses a message built with `format!` or one
+  without a translation.
+- Foundations for serving many customers (tenants) from one installation: the control-plane tables
+  `kernel_tenants`, `kernel_placements` and `kernel_tenant_domains` (the existing data belongs to the default tenant),
+  and the settings `AUTOXIDE_TENANCY_*`. The default mode `single` changes nothing; `multi` is refused until every
+  module keeps its data per tenant.
+- Tenant management for platform staff (people of the default tenant): `GET /api/v1/kernel/tenant` (the caller's
+  tenant, any signed-in user), `GET`, `POST /api/v1/kernel/tenants`, `GET`, `PATCH /api/v1/kernel/tenants/{id}`
+  (rename, suspend, resume; `If-Match`), `GET /api/v1/kernel/placements` (connection URLs are never shown); MCP tools
+  `kernel.current_tenant`, `kernel.list_tenants`, `kernel.get_tenant`; CLI `autoxide tenant create|list|show|suspend|
+  resume|provision`. New permissions `kernel.tenants.read`, `kernel.tenants.manage`, `kernel.placements.read`, new
+  events `kernel.tenant_created`, `kernel.tenant_updated`. Creating a tenant is refused in the `single` mode.
+- Placements — the databases that keep tenants' data: `autoxide placement add <name> --url …` (the URL is checked
+  by connecting, then stored encrypted; `--url -` reads it from standard input), `autoxide placement list`,
+  `autoxide placement check`. `autoxide migrate up --all` / `status --all` run the main database, then every
+  placement by name, and can be run again after a failure. While a placement has migrations to apply, only the
+  tenants on it answer `503` (`tenant_maintenance`) and its jobs wait; `serve` checks the placements every minute in
+  the multi-tenant mode. New error codes `tenant_placement_taken`, `tenant_placement_behind` (creating a tenant on
+  a placement that is not up to date).
+- For module authors (testing): `TestApp::builder(…).tenant("a")` (a tenant on the shared database),
+  `.tenant_dedicated("b")` (a tenant on a database of its own), `.user_in("a", token, id, permissions)`, then
+  `app.tenant("a")` / `app.default_tenant()`; `autoxide_testkit::leak_check(&app, token_of_b, marker, ids)` calls every
+  `GET` endpoint and every read-only MCP tool as a user of another tenant and lists what shows data of the first.
+- `notes` (the example module) keeps its notes per tenant: the same title may exist in two tenants, a note of one
+  tenant is "not found" in another; existing notes belong to the default tenant.
+- For module authors: `Module::seed_tenant` gives the data a new tenant starts with (roles, counters…); it must be
+  safe to run again, because `autoxide tenant provision` repeats a creation that stopped half-way.
+
 - `forms`: large CSV exports in the background. `POST /api/v1/forms/{id}/submissions/exports` answers at once;
   `GET /api/v1/forms/exports/{export_id}` gives the state and, once ready, a signed download link that needs no
   sign-in and expires (`AUTOXIDE_FORMS_EXPORT_LINK_MINUTES`). The file has the same content as the existing
@@ -30,13 +104,71 @@ endpoints are marked deprecated with a sunset date first.
   only `http(s)` links). Plain text stays the default and old comments show as before; Markdown links count
   towards the link limit. New setting `AUTOXIDE_COMMENTS_MARKDOWN` (on), `markdown` in the public settings,
   `format` in every comment.
+- For module authors: `autoxide_kernel::tenancy::{TenantScoped, ScopeExt}` — an entity of a tenant-level table
+  implements `TenantScoped` (one line naming its `tenant_id` column) and every query of the service adds
+  `.scoped(&tenant)` (`Select`, `SelectTwo`, `SelectTwoMany`, `UpdateMany`, `DeleteMany`, and validated
+  `update` / `delete` of one row). `Module::control_plane_tables` declares the few tables shared by the whole
+  platform. testkit: `schema_tenancy_violations` checks a migrated database (every other table has
+  `tenant_id` NOT NULL without a default; unique keys and indexes start with it, except keys made only of UUIDs
+  and sweep indexes named `…_sweep_idx`); `cargo xtask check` refuses an entity without `tenant_id`.
+- Settings per tenant: `GET /api/v1/kernel/settings`, `PUT` and `DELETE /api/v1/kernel/settings/{name}` (new
+  permission `kernel.settings.manage`) and the MCP tool `kernel.list_settings`. Modules declare what they take
+  (`Module::tenant_settings`) and read it with `autoxide_kernel::tenancy::TenantSettings`; unset settings fall back
+  to the server-wide configuration. Secret values are stored encrypted and never returned, logged or put in events
+  (new event `kernel.setting_changed` carries the name only). The kernel declares `kernel.public_url`.
+- Secrets the server must read back are stored encrypted (AES-256-GCM) with a key derived from
+  `AUTOXIDE_SECRET_KEY`: `autoxide_kernel::secret::Sealer` (`SecretKey::sealer`). Rotating the key: new value in
+  `AUTOXIDE_SECRET_KEY`, old one in the new setting `AUTOXIDE_SECRET_KEY_PREVIOUS`, then the new command
+  `autoxide secrets reseal`. `autoxide doctor` and the startup log say plainly that a backup holds the key when
+  `AUTOXIDE_SECRET_KEY` is unset.
+- For module authors: data upgrades (`Module::upgrades`, `autoxide_kernel::migration::DataUpgrade`) — a change
+  of stored data that needs the configuration, such as encrypting old secrets. Named `u0001_…`, recorded with the
+  migrations of the module, run by `autoxide migrate up` right after the migration they name; `serve` refuses to
+  start while one is pending.
+- For module authors: `autoxide_kernel::storage::TenantStorage` keeps one tenant's files under its own prefix
+  (none for the default tenant, so existing files stay where they are; `tenants/<id>/` for others) and refuses
+  keys that climb out of it; `SecretKey::derive_for(tenant, purpose)` gives a signing key per tenant (the default
+  tenant keeps the key `derive` gives).
 - For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
   errors.
 
 ### Changed
 
+- The `detail` of some errors no longer names an endpoint: it says what the user can do (`auth.wrong_password`,
+  `auth.password_already_set`, the token errors of `auth`, `media.item_in_trash`…). Which endpoint to call is in the
+  description of the response in `docs/openapi.json`. Codes are unchanged.
+- For module authors: `Authenticator::authenticate` takes a second argument, the `TenantHint` of the request
+  (domain and `Autoxide-Tenant` header). `Principal` carries a tenant (`tenant_id`, `in_tenant`, `operator_from`).
+  Handlers may take `tenant: TenantContext` (`autoxide_kernel::tenancy`), and the module start context gives the
+  `DatabaseRegistry` (`StartContext::tenancy`).
+- For module authors: the kernel's helper tables (`<module>_events`, `_jobs`, `_throttle`, `_tokens`,
+  `_antispam_nonces`) carry `tenant_id`; a module adds one migration,
+  `tenancy::migration::adopt("…", vec![event::tenant_table("<module>"), job::tenant_table("<module>"), …])`, that
+  moves the existing rows to the default tenant. Every call that writes or reads them names the tenant:
+  `Outbox::record(conn, &tenant, …)`, `JobQueue::enqueue(conn, &tenant, …)` (and `enqueue_database` for a job of
+  the whole database), `OneTimeTokens::{issue, consume, recent, revoke, forget}(conn, &tenant, …)`,
+  `Throttle::new(module, limit, window)` without a database and `Throttle::{check, hit, record, refund,
+  clear}(&tenant, key)`, `Throttle::purge(&database, before)`, `SpamGuard::check(&tenant, …)` and
+  `Checked::claim(conn, &tenant, …)`. `Delivered` and `JobContext` carry the tenant (`Delivered::new(tenant, …)`,
+  `JobContext::for_tenant` / `for_database`; `JobContext::tenant` is `None` for a job of the whole database).
+  `Claim::claim` takes a `ClaimRequest`. `Modules::worker(concurrency)` and `Modules::dispatcher()` no longer take
+  a database: they run on every database of the registry, and the worker shares the free slots fairly between
+  the tenants that have jobs due. For tests: `TestDatabase::extra_database`.
+- For module authors: every kernel trait that reaches the data of a customer names the tenant:
+  `PersonalData::export(&tenant, user_id)`, `ResourceResolver::{resolve, resolve_many, children}(&tenant, …)`,
+  `BadgeResolver::badges(&tenant, …)`, `Mailer::send(&tenant, mail)`, `TextModel::generate(&tenant, prompt)`,
+  `Embedder::embed(&tenant, …)`, `IdempotencyStore::{begin, complete, abandon}(&tenant, …)`,
+  `PostingVerifier::is_verified(&tenant, user_id)`, and the matching `ResourceDirectory`,
+  `PersonalDataExport` and `PostingVerification` methods. An MCP tool's handler receives the tenant of the
+  request first: `Tool::new(name, description, |tenant: TenantContext, principal: Principal, input| …)`. The
+  `api` traits of modules take it too: `autoxide_auth::api::{Users, Accounts, AccountRecovery}`,
+  `autoxide_media::api::Media`, `autoxide_notes::api::Notes`, `autoxide_content::api::LegacyMenus`.
 - For module authors: the trait `autoxide_auth::api::AccountRecovery` has a new method `remove_passkeys`; only
   `auth` implements it.
+- Form tokens (`GET /api/v1/antispam/token`) and `Idempotency-Key` scopes belong to one tenant: a token or a key
+  of one tenant means nothing in another. `SpamGuard::issue` takes the tenant. Nothing changes for the default
+  tenant: tokens and keys already handed out keep working.
+- Interface flags (`/api/v1/me/flags`) are kept per tenant: the same account in two tenants has two sets.
 - Internal, no change in behaviour: the code of `newsletter`, `comments`, `media` and `forms` is grouped by
   feature like `content` and `auth`, and the kernel's files sit in private groups (`contracts`, `data`,
   `security`, `ops`, `values`). Every public path (`autoxide_kernel::ai::TextModel`, …) is unchanged, and a

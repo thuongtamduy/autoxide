@@ -5,6 +5,7 @@ mod m0001_create_content;
 mod m0004_agent_fields;
 mod m0005_translation_requests;
 mod m0006_embeddings;
+mod m0009_schedule_ai_review;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -23,5 +24,15 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0006_embeddings::Migration),
         // Cột `actor_kind` của bảng `content_events` (người lạ khác hệ thống, D-122).
         autoxide_kernel::event::outbox_actor_migration("m0007_add_event_actor", "content"),
+        // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0008_tenancy_helpers",
+            vec![
+                autoxide_kernel::event::tenant_table("content"),
+                autoxide_kernel::job::tenant_table("content"),
+            ],
+        ),
+        // Lịch đăng mang xác nhận đã duyệt nội dung AI (D-266).
+        Box::new(m0009_schedule_ai_review::Migration),
     ]
 }

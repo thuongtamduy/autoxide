@@ -11,6 +11,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::secret::sha256;
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
@@ -168,6 +169,7 @@ impl CommentsService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 actor,
                 events::comment_subject(id),
                 &events::CommentEdited(change),
@@ -331,7 +333,14 @@ pub(crate) async fn soft_delete<C: ConnectionTrait>(
         .filter(subscription::Column::CommentId.eq(before.id))
         .exec(connection)
         .await?;
-    service.tokens.forget(connection, &before.id.to_string()).await?;
+    service
+        .tokens
+        .forget(
+            connection,
+            &TenantContext::legacy_default(&service.database),
+            &before.id.to_string(),
+        )
+        .await?;
     if let Deletion::ByAuthor(actor) = how {
         let mut after_summary = summary(&after);
         after_summary["hard"] = json!(false);
@@ -340,6 +349,7 @@ pub(crate) async fn soft_delete<C: ConnectionTrait>(
             .outbox
             .record(
                 connection,
+                &TenantContext::legacy_default(&service.database),
                 actor,
                 events::comment_subject(before.id),
                 &events::CommentDeleted(change),

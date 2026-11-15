@@ -18,6 +18,8 @@ pub struct Model {
     pub status: String,
     pub error_code: Option<String>,
     pub created_by: Option<Uuid>,
+    /// Người xác nhận đã duyệt nội dung do AI tạo lúc đặt lịch; dùng khi lịch chạy.
+    pub ai_reviewed_by: Option<Uuid>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }

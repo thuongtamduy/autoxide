@@ -20,7 +20,7 @@ use utoipa_axum::routes;
 
 use crate::service::FormsService;
 
-pub(crate) use admin::FormResponse;
+pub(crate) use admin::{FormResponse, counted as counted_forms};
 pub(crate) use inbox::SubmissionResponse;
 
 pub(crate) fn routes(service: Arc<FormsService>) -> OpenApiRouter {
@@ -64,7 +64,10 @@ pub(crate) fn choice<T: for<'de> Deserialize<'de>>(
     let raw = raw.map(str::trim).filter(|raw| !raw.is_empty())?;
     serde_json::from_value(Value::String(raw.to_owned()))
         .map_err(|_| {
-            problems.push(FieldError::new(field, "invalid", format!("must be one of {allowed}")));
+            problems.push(
+                FieldError::new(field, "invalid", "must be one of {allowed}")
+                    .with_param("allowed", allowed),
+            );
         })
         .ok()
 }

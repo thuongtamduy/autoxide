@@ -21,5 +21,15 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::antispam::antispam_migration("m0006_create_antispam_nonces", "forms"),
         // Bảng `forms_exports`: bản xuất CSV lớn chạy bằng job (đặc tả 32 B3).
         Box::new(m0007_create_exports::Migration),
+        // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0008_tenancy_helpers",
+            vec![
+                autoxide_kernel::event::tenant_table("forms"),
+                autoxide_kernel::job::tenant_table("forms"),
+                autoxide_kernel::throttle::tenant_table("forms"),
+                autoxide_kernel::antispam::tenant_table("forms"),
+            ],
+        ),
     ]
 }

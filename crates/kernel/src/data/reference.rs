@@ -39,14 +39,15 @@ impl Reference {
         if valid {
             Some(Reference(raw.to_owned()))
         } else {
-            problems.push(FieldError::new(
-                field,
-                "reference",
-                format!(
-                    "must be 1 to {MAX_LENGTH} visible ASCII characters without spaces, e.g. \
-                     an invoice number or a UUID"
-                ),
-            ));
+            problems.push(
+                FieldError::new(
+                    field,
+                    "reference",
+                    "must be 1 to {max_length} visible ASCII characters without spaces, e.g. \
+                     an invoice number or a UUID",
+                )
+                .with_param("max_length", MAX_LENGTH),
+            );
             None
         }
     }

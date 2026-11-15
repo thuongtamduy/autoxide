@@ -136,6 +136,10 @@ vượt duyệt, kể cả khi đã xác nhận.
 
 - `GET /api/v1/comments?status=pending&target_type=&target_id=&q=` — hàng chờ (`q` tìm trong chữ
   và tên, không phân biệt hoa thường, dấu), kèm email, dấu vết mạng, lý do giữ lại và số báo cáo.
+  Mỗi bình luận có `target_title` và `target_url` khi module sở hữu đích mô tả được nó và đích đang
+  công khai.
+- `GET /api/v1/comments/targets?target_type=&state=open|closed&pending=true|false` — các đích có
+  bình luận, mới trước, kèm số đếm và (khi công khai) `title`, `url`.
 - `PATCH /api/v1/comments/{id} {"status": "published" | "rejected" | "spam" | "pending"}` kèm
   `If-Match`. `DELETE /api/v1/comments/{id}` xoá hẳn (bình luận gốc thì xoá cả luồng).
 - Đủ `AUTOXIDE_COMMENTS_REPORT_THRESHOLD` báo cáo thì bình luận đang hiện bị giữ lại một lần; người

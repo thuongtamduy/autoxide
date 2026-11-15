@@ -17,6 +17,7 @@ use std::sync::{Arc, Mutex};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::resource::{Resource, ResourceRef};
 use autoxide_kernel::response::Data;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_media::api::{MediaRef, MediaVisibility};
 use chrono::{DateTime, Duration, Utc};
 use serde::Serialize;
@@ -209,7 +210,16 @@ impl MenuService {
                         .auto_children_limit
                         .and_then(|limit| usize::try_from(limit).ok())
                         .unwrap_or(0);
-                    let children = self.resources.children(kind, id, Some(locale), limit).await?;
+                    let children = self
+                        .resources
+                        .children(
+                            &TenantContext::legacy_default(&self.database),
+                            kind,
+                            id,
+                            Some(locale),
+                            limit,
+                        )
+                        .await?;
                     for child in &children {
                         wanted.entry(child.kind.clone()).or_default().push(child.id.clone());
                     }
@@ -228,7 +238,15 @@ impl MenuService {
             }
             ids.sort_unstable();
             ids.dedup();
-            let found = self.resources.resolve_many(&kind, &ids, Some(locale)).await?;
+            let found = self
+                .resources
+                .resolve_many(
+                    &TenantContext::legacy_default(&self.database),
+                    &kind,
+                    &ids,
+                    Some(locale),
+                )
+                .await?;
             objects.extend(
                 found
                     .into_iter()
@@ -245,7 +263,7 @@ impl MenuService {
             HashMap::new()
         } else {
             self.media
-                .find_many_in(&image_ids, locale)
+                .find_many_in(&TenantContext::legacy_default(&self.database), &image_ids, locale)
                 .await?
                 .into_iter()
                 .filter(|media| media.visibility == MediaVisibility::Public)

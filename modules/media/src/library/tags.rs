@@ -15,6 +15,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::rows;
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{OnConflict, Query};
 use sea_orm::{
@@ -85,15 +86,14 @@ pub(crate) fn check_tags(
         problems.push(FieldError::new(
             field,
             "invalid",
-            format!("each tag must be 1 to {TAG_MAX_LENGTH} characters, without `,` or control characters"),
-        ));
+            "each tag must be 1 to {tag_max_length} characters, without `,` or control characters",
+        ).with_param("tag_max_length", TAG_MAX_LENGTH));
     }
     if kept.len() > MAX_TAGS_PER_ITEM {
-        problems.push(FieldError::new(
-            field,
-            "length",
-            format!("at most {MAX_TAGS_PER_ITEM} tags per item"),
-        ));
+        problems.push(
+            FieldError::new(field, "length", "at most {max_tags_per_item} tags per item")
+                .with_param("max_tags_per_item", MAX_TAGS_PER_ITEM),
+        );
     }
     kept
 }
@@ -317,7 +317,13 @@ impl MediaService {
         };
         let actor = Actor::from(principal);
         self.outbox
-            .record(&transaction, actor, events::tag_subject(id), &events::TagUpdated(change))
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::tag_subject(id),
+                &events::TagUpdated(change),
+            )
             .await?;
         transaction.commit().await?;
         let items = self.count_items(&[id]).await?.get(&id).copied().unwrap_or(0);
@@ -346,7 +352,13 @@ impl MediaService {
         let change = Change { before: Some(before), after: None };
         let actor = Actor::from(principal);
         self.outbox
-            .record(&transaction, actor, events::tag_subject(id), &events::TagDeleted(change))
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::tag_subject(id),
+                &events::TagDeleted(change),
+            )
             .await?;
         transaction.commit().await?;
         Ok(())

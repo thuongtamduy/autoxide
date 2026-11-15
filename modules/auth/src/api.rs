@@ -10,6 +10,7 @@
 //! Module đó phải đăng ký SAU `auth` trong `crates/app/src/modules.rs`.
 
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
@@ -43,8 +44,8 @@ impl User {
 // này đổi hàm `async` thành hàm trả về `Box<dyn Future>` để gọi được.
 #[async_trait::async_trait]
 pub trait Users: Send + Sync {
-    /// Người dùng có ID `id`, hoặc `None` nếu không có.
-    async fn find(&self, id: Uuid) -> Result<Option<User>, Error>;
+    /// Người dùng có ID `id` của khách `tenant`, hoặc `None` nếu không có.
+    async fn find(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<User>, Error>;
 }
 
 /// Dữ liệu để tạo một tài khoản.
@@ -65,7 +66,7 @@ pub struct NewAccount {
 pub trait Accounts: Send + Sync {
     /// Tạo tài khoản. Lỗi: email sai hoặc đã có (`auth.email_taken`), mật khẩu không
     /// đạt luật độ dài (`validation_failed`).
-    async fn create(&self, account: NewAccount) -> Result<User, Error>;
+    async fn create(&self, tenant: &TenantContext, account: NewAccount) -> Result<User, Error>;
 }
 
 /// Việc của người vận hành máy chủ khi không ai đăng nhập được để làm qua API. Binary dùng cho
@@ -76,10 +77,14 @@ pub trait AccountRecovery: Send + Sync {
     /// Tắt xác thực hai bước (TOTP và recovery code) của tài khoản có email `email`, như quản
     /// trị viên làm qua `DELETE /api/v1/auth/users/{id}/mfa`: cho admin duy nhất mất thiết bị.
     /// Lỗi: không có tài khoản này (`auth.account_not_found`).
-    async fn reset_mfa(&self, email: &str) -> Result<User, Error>;
+    async fn reset_mfa(&self, tenant: &TenantContext, email: &str) -> Result<User, Error>;
 
     /// Gỡ mọi passkey của tài khoản có email `email`, như quản trị viên làm qua
     /// `DELETE /api/v1/auth/users/{id}/passkeys`: cho admin duy nhất mất thiết bị (đăng nhập lại
     /// bằng mật khẩu). Trả tài khoản và số passkey đã gỡ. Lỗi: `auth.account_not_found`.
-    async fn remove_passkeys(&self, email: &str) -> Result<(User, u64), Error>;
+    async fn remove_passkeys(
+        &self,
+        tenant: &TenantContext,
+        email: &str,
+    ) -> Result<(User, u64), Error>;
 }

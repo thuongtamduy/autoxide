@@ -11,6 +11,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::storage::ByteStream;
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt as _;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
@@ -183,6 +184,7 @@ impl MediaService {
             alt: Set(String::new()),
             title: Set(String::new()),
             caption: Set(String::new()),
+            decorative: Set(false),
             visibility: Set(Visibility::Private.as_str().to_owned()),
             version_id: Set(version_id),
             uploaded_by: Set(Some(principal.user_id())),
@@ -201,7 +203,15 @@ impl MediaService {
         let after = crate::service::with_tags(snapshot(&item), &tags);
         let event = events::ItemUploaded(Change { before: None, after: Some(after) });
         let actor = Actor::from(principal);
-        self.outbox.record(&transaction, actor, events::item_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::item_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(item)
     }
@@ -252,7 +262,15 @@ impl MediaService {
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::ItemContentReplaced(change);
         let actor = Actor::from(principal);
-        self.outbox.record(&transaction, actor, events::item_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::item_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok((before, after, old_copies))
     }

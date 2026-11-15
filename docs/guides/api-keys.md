@@ -14,7 +14,7 @@ curl -sS "$API/api/v1/auth/login" \
 
 ## Create a key
 
-Creating a key asks for your current password, so a stolen access token alone cannot mint a key that outlives it. The key is shown **once**: store it now.
+Creating a key asks for your current password, so a stolen access token alone cannot mint a key that outlives it. Instead of the password you may send `totp_code` (a code from your authenticator app, when two-step sign-in is on) or a passkey (`passkey_ceremony_id` from `POST /api/v1/auth/login/passkey/options` and `passkey_credential`, the browser's answer) — exactly one of the three. The key is shown **once**: store it now.
 
 <!-- example: create-key -->
 ```bash
@@ -61,6 +61,10 @@ curl -sS -X DELETE "$API/api/v1/auth/api-keys/$KEY_ID" -H "Authorization: Bearer
 curl -sS "$API/api/v1/content/entries" -H "Authorization: Bearer $KEY"
 # expect: 401
 ```
+
+## Every user's keys (administrators)
+
+With the permission `auth.api_keys.manage`, `GET /api/v1/auth/all-api-keys` (filter `user_id=`) lists the keys of every user with their owner's name and email, never their secrets, and `DELETE /api/v1/auth/all-api-keys/{id}` revokes any of them — e.g. when a key leaks or its owner leaves. The audit log records who revoked it.
 
 ## With the SDK
 

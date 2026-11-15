@@ -107,6 +107,78 @@ pub fn slice(content: ByteStream, range: Range<u64>) -> ByteStream {
         .boxed()
 }
 
+/// Nơi lưu file của **một khách** (bước 33, D-259): bọc [`Storage`] chung, thêm tiền tố
+/// [`TenantContext::storage_prefix`](crate::tenancy::TenantContext::storage_prefix) vào mọi khoá
+/// (khách mặc định không có tiền tố — file cũ không phải dời; khách khác `tenants/<id>/`) và từ chối
+/// khoá có `..`, bắt đầu bằng `/` hay có đoạn rỗng: một khách không với tới file của khách khác.
+/// Liệt kê chỉ trả file của khách, khoá đã bỏ tiền tố.
+pub struct TenantStorage {
+    inner: std::sync::Arc<dyn Storage>,
+    prefix: String,
+}
+
+impl TenantStorage {
+    /// Nơi lưu của khách `tenant` trên `inner`.
+    pub fn new(inner: std::sync::Arc<dyn Storage>, tenant: &crate::tenancy::TenantContext) -> Self {
+        TenantStorage { inner, prefix: tenant.storage_prefix() }
+    }
+
+    /// Khoá thật của `key` (đã kiểm).
+    fn key(&self, key: &str) -> Result<String, Error> {
+        let bad = key.is_empty()
+            || key.starts_with('/')
+            || key.contains('\\')
+            || key.split('/').any(|part| part.is_empty() || part == "." || part == "..");
+        if bad {
+            return Err(Error::internal(format!(
+                "storage key `{key}` must be a relative path without `..`, `.` or empty parts"
+            )));
+        }
+        Ok(format!("{}{key}", self.prefix))
+    }
+
+    fn strip(&self, keys: Vec<String>) -> Vec<String> {
+        keys.into_iter()
+            .filter_map(|key| key.strip_prefix(&self.prefix).map(str::to_owned))
+            // Khách mặc định (không tiền tố): bỏ file của các khách khác.
+            .filter(|key| !self.prefix.is_empty() || !key.starts_with("tenants/"))
+            .collect()
+    }
+}
+
+#[async_trait::async_trait]
+impl Storage for TenantStorage {
+    async fn put(&self, key: &str, content: ByteStream) -> Result<u64, Error> {
+        self.inner.put(&self.key(key)?, content).await
+    }
+
+    async fn get(&self, key: &str) -> Result<Option<StoredFile>, Error> {
+        self.inner.get(&self.key(key)?).await
+    }
+
+    async fn delete(&self, key: &str) -> Result<(), Error> {
+        self.inner.delete(&self.key(key)?).await
+    }
+
+    async fn keys(&self) -> Result<Vec<String>, Error> {
+        let keys = if self.prefix.is_empty() {
+            self.inner.keys().await?
+        } else {
+            self.inner.keys_with_prefix(&self.prefix).await?
+        };
+        Ok(self.strip(keys))
+    }
+
+    async fn get_range(&self, key: &str, range: Range<u64>) -> Result<Option<StoredFile>, Error> {
+        self.inner.get_range(&self.key(key)?, range).await
+    }
+
+    async fn keys_with_prefix(&self, prefix: &str) -> Result<Vec<String>, Error> {
+        let keys = self.inner.keys_with_prefix(&format!("{}{prefix}", self.prefix)).await?;
+        Ok(self.strip(keys))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

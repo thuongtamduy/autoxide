@@ -17,6 +17,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::EnqueueOptions;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
@@ -99,6 +100,11 @@ pub(crate) struct DeliveryCounts {
     /// Not sent: suppressed, blocked, unsubscribed meanwhile, over the advertising limit,
     /// or the campaign was cancelled.
     pub skipped: u64,
+    /// Sent mails the receiving server bounced for good (counted in `failed` too).
+    pub bounced: u64,
+    /// Recipients who unsubscribed with the link of this campaign's mail (one-click or the
+    /// preferences page).
+    pub unsubscribed: u64,
 }
 
 /// Một chiến dịch kèm tiến độ.
@@ -211,7 +217,13 @@ impl NewsletterService {
         let row = row.into_active_model().insert(&transaction).await?;
         let event = events::CampaignCreated(Change { before: None, after: Some(summary(&row)) });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::campaign_subject(row.id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::campaign_subject(row.id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(campaign_id = %row.id, "newsletter campaign created");
@@ -268,19 +280,22 @@ impl NewsletterService {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
-        let rows: Vec<(Uuid, String, i64)> = delivery::Entity::find()
+        // Nhóm thêm theo `error` để đếm bounce trong cùng câu; số huỷ đăng ký là câu thứ hai.
+        let rows: Vec<(Uuid, String, Option<String>, i64)> = delivery::Entity::find()
             .select_only()
             .column(delivery::Column::CampaignId)
             .column(delivery::Column::Status)
+            .column(delivery::Column::Error)
             .column_as(Expr::col(delivery::Column::Id).count(), "count")
             .filter(delivery::Column::CampaignId.is_in(ids.to_vec()))
             .group_by(delivery::Column::CampaignId)
             .group_by(delivery::Column::Status)
+            .group_by(delivery::Column::Error)
             .into_tuple()
             .all(self.database.read())
             .await?;
         let mut counts: HashMap<Uuid, DeliveryCounts> = HashMap::new();
-        for (id, status, count) in rows {
+        for (id, status, error, count) in rows {
             let entry = counts.entry(id).or_default();
             let count = u64::try_from(count).unwrap_or_default();
             entry.total += count;
@@ -290,6 +305,24 @@ impl NewsletterService {
                 DeliveryStatus::Failed => entry.failed += count,
                 DeliveryStatus::Skipped => entry.skipped += count,
             }
+            if DeliveryStatus::stored(&status) == DeliveryStatus::Failed
+                && error.as_deref() == Some("hard_bounce")
+            {
+                entry.bounced += count;
+            }
+        }
+        let unsubscribed: Vec<(Uuid, i64)> = delivery::Entity::find()
+            .select_only()
+            .column(delivery::Column::CampaignId)
+            .column_as(Expr::col(delivery::Column::Id).count(), "count")
+            .filter(delivery::Column::CampaignId.is_in(ids.to_vec()))
+            .filter(delivery::Column::UnsubscribedAt.is_not_null())
+            .group_by(delivery::Column::CampaignId)
+            .into_tuple()
+            .all(self.database.read())
+            .await?;
+        for (id, count) in unsubscribed {
+            counts.entry(id).or_default().unsubscribed = u64::try_from(count).unwrap_or_default();
         }
         Ok(counts)
     }
@@ -355,7 +388,13 @@ impl NewsletterService {
             after: Some(summary(&after)),
         });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::campaign_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::campaign_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         if unscheduled {
@@ -401,7 +440,13 @@ impl NewsletterService {
         let event =
             events::CampaignDeleted(Change { before: Some(summary(&before.row)), after: None });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::campaign_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::campaign_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         Ok(())
@@ -432,11 +477,14 @@ impl NewsletterService {
         if let Action::Schedule(at) = action
             && (at <= now || at > now + chrono::Duration::days(SCHEDULE_MAX_DAYS))
         {
-            return Err(Error::validation(vec![FieldError::new(
-                "at",
-                "range",
-                format!("must be in the future, at most {SCHEDULE_MAX_DAYS} days ahead"),
-            )]));
+            return Err(Error::validation(vec![
+                FieldError::new(
+                    "at",
+                    "range",
+                    "must be in the future, at most {schedule_max_days} days ahead",
+                )
+                .with_param("schedule_max_days", SCHEDULE_MAX_DAYS),
+            ]));
         }
         if matches!(action, Action::Send | Action::Schedule(_) | Action::Resume) {
             // Thiếu cấu hình thì báo NGAY, không để job hỏng lặng lẽ.
@@ -515,27 +563,57 @@ impl NewsletterService {
         match action {
             Action::Send => {
                 self.outbox
-                    .record(&transaction, actor, subject, &events::CampaignStarted(change))
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        actor,
+                        subject,
+                        &events::CampaignStarted(change),
+                    )
                     .await?
             }
             Action::Schedule(_) => {
                 self.outbox
-                    .record(&transaction, actor, subject, &events::CampaignScheduled(change))
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        actor,
+                        subject,
+                        &events::CampaignScheduled(change),
+                    )
                     .await?
             }
             Action::Pause => {
                 self.outbox
-                    .record(&transaction, actor, subject, &events::CampaignPaused(change))
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        actor,
+                        subject,
+                        &events::CampaignPaused(change),
+                    )
                     .await?
             }
             Action::Resume => {
                 self.outbox
-                    .record(&transaction, actor, subject, &events::CampaignResumed(change))
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        actor,
+                        subject,
+                        &events::CampaignResumed(change),
+                    )
                     .await?
             }
             Action::Cancel => {
                 self.outbox
-                    .record(&transaction, actor, subject, &events::CampaignCancelled(change))
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        actor,
+                        subject,
+                        &events::CampaignCancelled(change),
+                    )
                     .await?
             }
         }
@@ -560,7 +638,7 @@ impl NewsletterService {
         let list = self.find_list(campaign.row.list_id).await?;
         let token = autoxide_kernel::secret::random_token(32)?;
         let mail = self.campaign_mail(&campaign.row, &list, &email, &token, None)?;
-        self.mailer.send(mail).await?;
+        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await?;
         tracing::info!(campaign_id = %id, "newsletter test mail queued");
         Ok(())
     }
@@ -592,7 +670,14 @@ impl NewsletterService {
         if let Some(run_at) = run_at {
             options = options.run_at(run_at);
         }
-        self.jobs.enqueue(connection, &PrepareJob { campaign_id: id, run, after }, options).await?;
+        self.jobs
+            .enqueue(
+                connection,
+                &TenantContext::legacy_default(&self.database),
+                &PrepareJob { campaign_id: id, run, after },
+                options,
+            )
+            .await?;
         Ok(())
     }
 
@@ -610,7 +695,14 @@ impl NewsletterService {
         if let Some(run_at) = run_at {
             options = options.run_at(run_at);
         }
-        self.jobs.enqueue(connection, &SendJob { campaign_id: id, run, seq }, options).await?;
+        self.jobs
+            .enqueue(
+                connection,
+                &TenantContext::legacy_default(&self.database),
+                &SendJob { campaign_id: id, run, seq },
+                options,
+            )
+            .await?;
         Ok(())
     }
 
@@ -647,11 +739,10 @@ impl NewsletterService {
         if let Some(html) = input.body_html {
             let html = html.map(|html| html.trim().to_owned()).filter(|html| !html.is_empty());
             if html.as_ref().is_some_and(|html| html.len() > HTML_MAX) {
-                problems.push(FieldError::new(
-                    "body_html",
-                    "length",
-                    format!("must be at most {HTML_MAX} bytes"),
-                ));
+                problems.push(
+                    FieldError::new("body_html", "length", "must be at most {html_max} bytes")
+                        .with_param("html_max", HTML_MAX),
+                );
             }
             row.body_html = html;
         }

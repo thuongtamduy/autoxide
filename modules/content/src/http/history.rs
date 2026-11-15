@@ -63,6 +63,8 @@ pub(crate) struct ScheduleResponse {
     /// Why it failed, an error code such as `content.schedule_outdated`.
     error_code: Option<String>,
     created_by: Option<Uuid>,
+    /// `true` when whoever scheduled it confirmed that the AI-generated content was reviewed.
+    ai_reviewed: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -78,6 +80,7 @@ impl From<Schedule> for ScheduleResponse {
             status: row.status,
             error_code: row.error_code,
             created_by: row.created_by,
+            ai_reviewed: row.ai_reviewed_by.is_some(),
             created_at: row.created_at,
             updated_at: row.updated_at,
         }
@@ -91,6 +94,10 @@ pub(crate) struct ScheduleRequest {
     action: Action,
     /// When to run; must be in the future.
     run_at: DateTime<Utc>,
+    /// For a `publish` of AI-generated content: you confirm a person reviewed it, as with
+    /// `ai_reviewed` when publishing at once. Only a signed-in person may send `true`.
+    #[serde(default)]
+    ai_reviewed: bool,
 }
 
 /// List the revisions of an entry.
@@ -179,6 +186,56 @@ pub(crate) async fn restore_revision(
     tagged(&service, service.restore(&principal, id, revision_id, expected).await?).await
 }
 
+/// Which schedules to list.
+#[derive(Debug, Clone, Default, Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct SchedulesQuery {
+    /// `scheduled` (waiting), `succeeded`, `failed` or `canceled`.
+    #[param(example = "scheduled")]
+    status: Option<String>,
+}
+
+/// List the schedules of every entry.
+///
+/// Requires `content.read`. Sorted by `run_at`, latest first unless `order=asc` (soonest
+/// first — what is about to be published or taken down). Filter with `status=scheduled` for the
+/// ones still waiting.
+#[utoipa::path(
+    get,
+    path = "/schedules",
+    extensions(("x-permissions" = json!(["content.read"]))),
+    operation_id = "list_all_content_schedules",
+    security(("bearer" = [])),
+    params(SchedulesQuery, PageQuery),
+    responses(
+        (status = 200, description = "One page of schedules.", body = Page<ScheduleResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A parameter is invalid; see `errors`.", body = Problem),
+    )
+)]
+pub(crate) async fn list_all_schedules(
+    State(service): State<Arc<ContentService>>,
+    principal: Principal,
+    Query(query): Query<SchedulesQuery>,
+    Query(paging): Query<PageQuery>,
+) -> Result<Page<ScheduleResponse>, Error> {
+    let mut problems = Vec::new();
+    let status = query.status.as_deref().map(str::trim).filter(|status| !status.is_empty());
+    if status
+        .is_some_and(|status| !["scheduled", "succeeded", "failed", "canceled"].contains(&status))
+    {
+        problems.push(autoxide_kernel::error::FieldError::new(
+            "status",
+            "invalid",
+            "must be `scheduled`, `succeeded`, `failed` or `canceled`",
+        ));
+    }
+    let page = page_request(paging, problems)?;
+    let page = service.list_all_schedules(&principal, status, &page).await?;
+    Ok(page.map(ScheduleResponse::from))
+}
+
 /// List the schedules of an entry.
 ///
 /// Requires `content.read`. Newest first.
@@ -237,7 +294,16 @@ pub(crate) async fn create_schedule(
     ValidJson(input): ValidJson<ScheduleRequest>,
 ) -> Result<Created<ScheduleResponse>, Error> {
     let expected = if_match.required()?;
-    let row = service.create_schedule(&principal, id, input.action, input.run_at, expected).await?;
+    let row = service
+        .create_schedule_reviewed(
+            &principal,
+            id,
+            input.action,
+            input.run_at,
+            expected,
+            input.ai_reviewed,
+        )
+        .await?;
     Ok(Created::new(format!("/content/entries/{id}/schedules"), row.into()))
 }
 

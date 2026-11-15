@@ -17,6 +17,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, etag};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -139,7 +140,7 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
             "List comments for moderation, newest first: by default those waiting for approval \
              (`pending`), with their text, author, email, hold reason and report count. Follow \
              `pagination.next_cursor` with the same filters for more.",
-            move |principal: Principal, input: QueueInput| {
+            move |_tenant: TenantContext, principal: Principal, input: QueueInput| {
                 let service = queue.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -169,7 +170,7 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
             "get",
             "Get a comment in any status with its moderation details and its `version`, needed \
              to approve, reject or mark it as spam.",
-            move |principal: Principal, input: CommentId| {
+            move |_tenant: TenantContext, principal: Principal, input: CommentId| {
                 let service = get.clone();
                 async move {
                     Ok::<Versioned, Error>(versioned(service.get(&principal, input.id).await?))
@@ -183,7 +184,7 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
             "Approve (`published`), reject (`rejected`), mark as spam (`spam`) or hold again \
              (`pending`) a comment. Approving shows it and mails people following the comment \
              it answers. Pass the `version` you read.",
-            move |principal: Principal, input: ModerateInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ModerateInput| {
                 let service = moderate.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -203,7 +204,7 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
             "set_target_state",
             "Open or close the comments of a target (`open` / `closed`); closed targets take no \
              new comments, existing ones stay shown.",
-            move |principal: Principal, input: TargetInput| {
+            move |_tenant: TenantContext, principal: Principal, input: TargetInput| {
                 let service = target.clone();
                 async move {
                     let change =
@@ -221,7 +222,7 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
             "List shown questions (top-level comments, e.g. on a product) that have no shown \
              answer yet, newest first, with their text, author and badges. Answer one with \
              `comments.answer`. Follow `pagination.next_cursor` with the same filters for more.",
-            move |principal: Principal, input: UnansweredInput| {
+            move |_tenant: TenantContext, principal: Principal, input: UnansweredInput| {
                 let service = unanswered.clone();
                 async move {
                     let filter = QueueFilter {
@@ -252,7 +253,7 @@ pub(crate) fn all(service: &Arc<CommentsService>) -> Vec<Tool> {
              on the website: the answer carries your badges on the target (e.g. `seller`), \
              follows the same moderation and may wait for approval. Needs a display name \
              (`PUT /api/v1/comments/profile`) and, on some kinds, a verified account.",
-            move |principal: Principal, input: AnswerInput| {
+            move |_tenant: TenantContext, principal: Principal, input: AnswerInput| {
                 let service = answer.clone();
                 async move {
                     let question = service.public_comment(input.id).await?;

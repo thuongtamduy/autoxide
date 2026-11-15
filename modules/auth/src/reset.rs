@@ -15,6 +15,7 @@ use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
 use autoxide_kernel::mail::{MailTemplate, Mailer};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use serde::{Deserialize, Serialize};
@@ -94,7 +95,14 @@ impl PasswordResets {
     /// — kể cả thời gian: việc tra tài khoản, tạo token, gửi mail chạy trong job (D-162).
     pub(crate) async fn request(&self, email: &str, language: Language) -> Result<(), Error> {
         let job = ResetJob { email: email.trim().to_owned(), language: language.tag().to_owned() };
-        self.jobs.enqueue(self.database.write(), &job, EnqueueOptions::default()).await?;
+        self.jobs
+            .enqueue(
+                self.database.write(),
+                &TenantContext::legacy_default(&self.database),
+                &job,
+                EnqueueOptions::default(),
+            )
+            .await?;
         Ok(())
     }
 
@@ -110,16 +118,44 @@ impl PasswordResets {
         let now = now();
         let subject = user.id.to_string();
         let since = now - chrono::Duration::seconds(COOLDOWN_SECONDS);
-        if !tokens().recent(self.database.write(), PURPOSE, &subject, since).await?.is_empty() {
+        if !tokens()
+            .recent(
+                self.database.write(),
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &subject,
+                since,
+            )
+            .await?
+            .is_empty()
+        {
             return Ok(());
         }
 
         let transaction = self.database.begin_write().await?;
         let ttl = chrono::Duration::minutes(TOKEN_MINUTES);
-        let token = tokens().issue(&transaction, PURPOSE, &subject, None, ttl).await?.token;
+        let token = tokens()
+            .issue(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &subject,
+                None,
+                ttl,
+            )
+            .await?
+            .token;
         let event = events::PasswordResetRequested::default();
         let subject = events::user_subject(user.id);
-        self.outbox.record(&transaction, Actor::system(), subject, &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::system(),
+                subject,
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
 
         let minutes = TOKEN_MINUTES.to_string();
@@ -136,7 +172,7 @@ impl PasswordResets {
                 RESET_CODE.mail(&user.email, &self.translations, language, &params)
             }
         };
-        self.mailer.send(mail).await
+        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await
     }
 
     /// Đặt mật khẩu mới bằng `token` lấy từ mail.
@@ -149,10 +185,20 @@ impl PasswordResets {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let consumed = tokens().consume(self.database.write(), PURPOSE, token).await?;
-        let user_id = consumed
-            .and_then(|consumed| consumed.subject.parse::<Uuid>().ok())
-            .ok_or_else(invalid_token)?;
+        let consumed = tokens()
+            .consume(
+                self.database.write(),
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                token,
+            )
+            .await?;
+        let Some(user_id) = consumed.and_then(|consumed| consumed.subject.parse::<Uuid>().ok())
+        else {
+            let tenant = TenantContext::legacy_default(&self.database);
+            let why = tokens().rejection(self.database.read(), &tenant, PURPOSE, token).await?;
+            return Err(invalid_token().with_reason(why.as_str()));
+        };
         let actor = Actor::user(user_id);
         // Một transaction: mật khẩu mới, thu hồi phiên, passkey, API key, token đặt lại và
         // đổi email khác (D-156).
@@ -163,8 +209,7 @@ impl PasswordResets {
 fn invalid_token() -> Error {
     Error::bad_request(
         "auth.invalid_reset_token",
-        "The password-reset token is unknown, expired or already used. Ask for a new reset mail \
-         (`POST /api/v1/auth/password-reset`).",
+        "This password-reset link is unknown, expired or already used. Ask for a new one.",
     )
 }
 
@@ -294,6 +339,7 @@ mod tests {
             let again = services.resets.confirm(&token, NEW.to_owned()).await.unwrap_err();
             assert_eq!(again.kind(), ErrorKind::BadRequest);
             assert_eq!(again.code(), "auth.invalid_reset_token");
+            assert_eq!(again.reason(), Some("used"));
             assert!(services.sessions.login("ada@example.com", OLD, None).await.is_err());
             let login = services.sessions.login("ada@example.com", NEW, None).await.unwrap();
             assert!(matches!(login, LoginOutcome::Tokens(_)));
@@ -327,6 +373,7 @@ mod tests {
             time_passes(&services, 31).await;
             let expired = services.resets.confirm(&expiring, NEW.to_owned()).await.unwrap_err();
             assert_eq!(expired.code(), "auth.invalid_reset_token");
+            assert_eq!(expired.reason(), Some("expired"));
         })
         .await
         .unwrap();

@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use uuid::Uuid;
@@ -67,7 +68,11 @@ impl NewsletterService {
         if !self.resources.knows(ENTRY) {
             return Ok(0);
         }
-        let Some(resource) = self.resources.resolve(ENTRY, &entry_id.to_string()).await? else {
+        let Some(resource) = self
+            .resources
+            .resolve(&TenantContext::legacy_default(&self.database), ENTRY, &entry_id.to_string())
+            .await?
+        else {
             return Ok(0);
         };
         if !resource.public {
@@ -133,6 +138,7 @@ impl NewsletterService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     Actor::system(),
                     subject.clone(),
                     &events::CampaignCreated(change),
@@ -144,6 +150,7 @@ impl NewsletterService {
                 self.outbox
                     .record(
                         &transaction,
+                        &TenantContext::legacy_default(&self.database),
                         Actor::system(),
                         subject,
                         &events::CampaignStarted(change),

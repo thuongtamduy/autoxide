@@ -141,7 +141,11 @@ can type any address — so it never lets a comment skip approval, even once con
 
 - `GET /api/v1/comments?status=pending&target_type=&target_id=&q=` — the queue (`q` searches
   text and names ignoring case and accents), with emails, network fingerprints, hold reasons
-  and report counts.
+  and report counts. Each comment carries `target_title` and `target_url` when the target's
+  module can describe it and the target is public.
+- `GET /api/v1/comments/targets?target_type=&state=open|closed&pending=true|false` — the
+  targets that have comments, newest first, with their counts and (when public) `title` and
+  `url`.
 - `PATCH /api/v1/comments/{id} {"status": "published" | "rejected" | "spam" | "pending"}` with
   `If-Match`. `DELETE /api/v1/comments/{id}` deletes for good (a top-level comment with its
   thread).

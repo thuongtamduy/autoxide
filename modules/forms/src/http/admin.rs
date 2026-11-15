@@ -20,6 +20,7 @@ use super::{choice, page_request, present};
 use crate::forms::fields::{Field, Localized};
 use crate::forms::{Form, FormInput, FormStatus};
 use crate::service::FormsService;
+use crate::submissions::inbox::SubmissionCounts;
 
 /// A form, as admins see it.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -55,6 +56,10 @@ pub(crate) struct FormResponse {
     /// The `scope` to ask `GET /api/v1/antispam/token` for, e.g. `forms:contact`.
     #[schema(example = "forms:contact")]
     pub token_scope: String,
+    /// Submissions by status (`new`, `read`, `archived`, `spam`), in the list and when one form is
+    /// read; absent in the answers of a create or a change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub submissions: Option<SubmissionCounts>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -76,6 +81,7 @@ impl From<Form> for FormResponse {
             ip_limit_per_hour: form.row.ip_limit_per_hour,
             email_limit_per_hour: form.row.email_limit_per_hour,
             retention_days: form.row.retention_days,
+            submissions: None,
             created_at: form.row.created_at,
             updated_at: form.row.updated_at,
         }
@@ -213,7 +219,20 @@ pub(crate) async fn list_forms(
     let mut problems = Vec::new();
     let status = choice(query.status.as_deref(), "status", "`open`, `closed`", &mut problems);
     let page = page_request(paging, problems)?;
-    Ok(service.list_forms(&principal, status, &page).await?.map(FormResponse::from))
+    counted(&service, service.list_forms(&principal, status, &page).await?).await
+}
+
+/// Một trang form như API trả về, kèm số bài gửi theo trạng thái (một câu đếm cho cả trang).
+pub(crate) async fn counted(
+    service: &FormsService,
+    page: Page<Form>,
+) -> Result<Page<FormResponse>, Error> {
+    let ids: Vec<Uuid> = page.data.iter().map(|form| form.row.id).collect();
+    let counts = service.submission_counts(&ids).await?;
+    Ok(page.map(|form| {
+        let submissions = Some(counts.get(&form.row.id).copied().unwrap_or_default());
+        FormResponse { submissions, ..FormResponse::from(form) }
+    }))
 }
 
 /// Create a form.
@@ -269,7 +288,9 @@ pub(crate) async fn get_form(
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<FormResponse>, Error> {
     let form = service.get_form(&principal, id).await?;
-    Ok(Tagged { version: form.row.updated_at, data: form.into() })
+    let counts = service.submission_counts(&[form.row.id]).await?;
+    let submissions = Some(counts.get(&form.row.id).copied().unwrap_or_default());
+    Ok(Tagged { version: form.row.updated_at, data: FormResponse { submissions, ..form.into() } })
 }
 
 /// Change a form.

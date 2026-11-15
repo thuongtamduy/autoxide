@@ -143,7 +143,10 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
   -H "Authorization: Bearer $TOKEN" -H 'If-Match: "1762934400000000"'
 ```
 
-- `POST /campaigns/{id}/test {"email": …}` gửi một mail thử.
+- `POST /campaigns/{id}/test {"email": …}` gửi một mail thử. `GET /campaigns/{id}/preview` cho
+  thư đúng như khi gửi (nhãn tiêu đề, chân thư), không gửi gì.
+- `GET /settings` cho cấu hình đang dùng (nhãn quảng cáo và giới hạn mỗi ngày, địa chỉ bưu chính)
+  và, trong `missing`, các cấu hình còn phải đặt trước khi gửi.
 - `send` lấy mọi người đã xác nhận của danh sách ở thời điểm đó (ảnh chụp), rồi đưa mail vào hàng
   đợi mail theo lô `AUTOXIDE_NEWSLETTER_BATCH_SIZE`, tối đa `AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE`
   mail mỗi phút. Ngay trước mỗi mail, người bị chặn, bị khoá hay vừa huỷ đăng ký bị bỏ qua.
@@ -158,7 +161,9 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
   giờ được chèn nó vào trang của mình: chỉ xem trước trong `<iframe sandbox>` (không chạy script,
   không cùng origin).
 - `GET /campaigns/{id}` có `progress`: `total`, `pending`, `sent` (đã giao cho hàng đợi mail),
-  `failed`, `skipped`.
+  `failed`, `skipped`, thêm `bounced`
+  (bounce cứng, cũng tính trong `failed`) và `unsubscribed` (người nhận huỷ đăng ký bằng link của thư
+  chiến dịch này).
 - Mỗi mail có chân thư (theo `locale` của chiến dịch) với link trang lựa chọn và địa chỉ bưu
   chính, cùng header `List-Unsubscribe` và `List-Unsubscribe-Post: List-Unsubscribe=One-Click`.
 - Một khe hở không đóng được: máy chủ chết ngay sau khi đưa mail vào hàng đợi, trước khi ghi lại,
@@ -180,7 +185,8 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
 
 ## Người đăng ký
 
-- `GET /subscribers?email=&list_id=&status=` — tìm theo một phần địa chỉ, danh sách, trạng thái.
+- `GET /subscribers?email=&list_id=&status=&blocked=` — tìm theo một phần địa chỉ, danh sách,
+  trạng thái đăng ký, bị chặn hay không.
 - `POST /subscribers/import` — tối đa 1000 người vào các danh sách ở trạng thái `confirmed`, bắt
   buộc `consent_source` (họ đã đồng ý ở đâu). Người đã huỷ một danh sách thì vẫn là đã huỷ.
 - `PATCH /subscribers/{id}` (`If-Match`) — tên, ngôn ngữ, thuộc tính, `blocked`,

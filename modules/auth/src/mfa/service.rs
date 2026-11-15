@@ -20,6 +20,7 @@ use super::recovery;
 use crate::events;
 use crate::session::LoginThrottle;
 use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::json;
 
 /// Độ dài secret: 160 bit, như RFC 4226 khuyến nghị cho HMAC-SHA1.
@@ -85,6 +86,16 @@ impl MfaService {
             return Err(invalid_code());
         }
         self.throttle.clear(&key).await
+    }
+
+    /// Xác nhận lại người đang đăng nhập bằng mã TOTP (D-272), thay cho mật khẩu ở thao tác nhạy
+    /// cảm. Như mọi lần nhập mã: tính vào giới hạn sai, mã đã dùng không dùng lại được. Chưa bật
+    /// TOTP thì báo `auth.mfa_not_enabled`.
+    pub(crate) async fn reauthenticate(&self, user_id: Uuid, code: &str) -> Result<(), Error> {
+        if !self.status(user_id).await?.totp_enabled {
+            return Err(not_enabled());
+        }
+        self.check_code_limited(user_id, code, false).await
     }
 
     pub(crate) async fn status(&self, user_id: Uuid) -> Result<MfaStatus, Error> {
@@ -164,7 +175,15 @@ impl MfaService {
         let codes = recovery::replace(&transaction, user_id, now).await?;
         let event = events::MfaEnabled { before: None, after: Some(json!({"method": "totp"})) };
         let subject = events::user_subject(user_id);
-        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::user(user_id),
+                subject,
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "two-step sign-in turned on");
         Ok(codes)
@@ -205,7 +224,15 @@ impl MfaService {
         let codes = recovery::replace(&transaction, user_id, now()).await?;
         let event = events::RecoveryCodesReplaced::default();
         let subject = events::user_subject(user_id);
-        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::user(user_id),
+                subject,
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "recovery codes replaced");
         Ok(codes)
@@ -255,7 +282,15 @@ impl MfaService {
 
     async fn remove(&self, actor: Actor, user_id: Uuid, by_admin: bool) -> Result<(), Error> {
         let transaction = self.database.begin_write().await?;
-        remove_in(&transaction, &self.outbox, actor, user_id, by_admin).await?;
+        remove_in(
+            &transaction,
+            &TenantContext::legacy_default(&self.database),
+            &self.outbox,
+            actor,
+            user_id,
+            by_admin,
+        )
+        .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "two-step sign-in turned off");
         Ok(())
@@ -301,6 +336,7 @@ impl MfaService {
 /// email (`email_report.rs`).
 pub(crate) async fn remove_in(
     transaction: &DatabaseTransaction,
+    tenant: &TenantContext,
     outbox: &Outbox,
     actor: Actor,
     user_id: Uuid,
@@ -315,7 +351,7 @@ pub(crate) async fn remove_in(
             before: Some(json!({"method": "totp"})),
             after: Some(json!({"by_administrator": by_admin})),
         };
-        outbox.record(transaction, actor, events::user_subject(user_id), &event).await?;
+        outbox.record(transaction, tenant, actor, events::user_subject(user_id), &event).await?;
     }
     Ok(())
 }
@@ -341,8 +377,7 @@ pub(crate) fn invalid_code() -> Error {
 fn setup_not_started() -> Error {
     Error::conflict(
         "auth.mfa_setup_not_started",
-        "There is no two-step sign-in setup to confirm. Start one with \
-         `POST /api/v1/auth/me/mfa/totp`.",
+        "There is no two-step sign-in setup to confirm. Start the setup again.",
     )
 }
 
@@ -373,7 +408,13 @@ pub(crate) mod tests {
             password: None,
             admin: false,
         };
-        let ada = Accounts::create(services.users.as_ref(), ada).await.unwrap();
+        let ada = Accounts::create(
+            services.users.as_ref(),
+            &TenantContext::legacy_default(&services.database),
+            ada,
+        )
+        .await
+        .unwrap();
         (services.mfa, ada.id)
     }
 
@@ -526,7 +567,13 @@ mod recovery_tests {
             password: None,
             admin: false,
         };
-        let ada = Accounts::create(services.users.as_ref(), ada).await.unwrap();
+        let ada = Accounts::create(
+            services.users.as_ref(),
+            &TenantContext::legacy_default(&services.database),
+            ada,
+        )
+        .await
+        .unwrap();
         let setup = services.mfa.start_totp(ada.id, "ada@example.com").await.unwrap();
         let codes =
             services.mfa.confirm_totp(ada.id, &code_at(&setup.secret, unix_now())).await.unwrap();

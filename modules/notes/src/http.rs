@@ -10,6 +10,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -103,11 +104,13 @@ pub(crate) struct UpdateNoteRequest {
 )]
 async fn list_notes(
     State(service): State<Arc<NoteService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<PageQuery>,
 ) -> Result<Page<NoteResponse>, Error> {
     principal.require(&NOTES_READ)?;
-    let page = service.list(Actor::from(&principal), &PageRequest::try_from(query)?).await?;
+    let page =
+        service.list(&tenant, Actor::from(&principal), &PageRequest::try_from(query)?).await?;
     Ok(page.map(NoteResponse::from))
 }
 
@@ -131,11 +134,12 @@ async fn list_notes(
 )]
 async fn create_note(
     State(service): State<Arc<NoteService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CreateNoteRequest>,
 ) -> Result<Created<NoteResponse>, Error> {
     principal.require(&NOTES_WRITE)?;
-    let note = service.create(Actor::from(&principal), input.into()).await?;
+    let note = service.create(&tenant, Actor::from(&principal), input.into()).await?;
     Ok(Created::new(format!("/notes/{}", note.id), note.into()))
 }
 
@@ -158,11 +162,12 @@ async fn create_note(
 )]
 async fn get_note(
     State(service): State<Arc<NoteService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<NoteResponse>, Error> {
     principal.require(&NOTES_READ)?;
-    let note = service.get(Actor::from(&principal), id).await?;
+    let note = service.get(&tenant, Actor::from(&principal), id).await?;
     Ok(Tagged { version: note.updated_at, data: note.into() })
 }
 
@@ -189,6 +194,7 @@ async fn get_note(
 )]
 async fn update_note(
     State(service): State<Arc<NoteService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
@@ -197,7 +203,7 @@ async fn update_note(
     principal.require(&NOTES_WRITE)?;
     let changes = NoteChanges { title: input.title, body: input.body };
     let expected = if_match.expected()?;
-    let note = service.update(Actor::from(&principal), id, changes, expected).await?;
+    let note = service.update(&tenant, Actor::from(&principal), id, changes, expected).await?;
     Ok(Tagged { version: note.updated_at, data: note.into() })
 }
 
@@ -220,10 +226,11 @@ async fn update_note(
 )]
 async fn delete_note(
     State(service): State<Arc<NoteService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
     principal.require(&NOTES_WRITE)?;
-    service.delete(Actor::from(&principal), id).await?;
+    service.delete(&tenant, Actor::from(&principal), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

@@ -43,6 +43,9 @@ pub(crate) struct TermResponse {
     /// Parent category; `null` at the top (always for tags).
     parent_id: Option<Uuid>,
     names: Vec<TermName>,
+    /// How many entries (in any status) have this term. Only in the list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    entry_count: Option<u64>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -56,6 +59,7 @@ impl From<TermWithTexts> for TermResponse {
                 Taxonomy::Tag
             },
             id: found.term.id,
+            entry_count: None,
             parent_id: found.term.parent_id,
             created_at: found.term.created_at,
             updated_at: found.term.updated_at,
@@ -124,6 +128,8 @@ pub(crate) struct TermsQuery {
     /// `category` or `tag`.
     #[param(value_type = Option<Taxonomy>, inline)]
     taxonomy: Option<String>,
+    /// Only terms whose name (in any language) contains this text, ignoring case and accents.
+    q: Option<String>,
 }
 
 /// List categories and tags.
@@ -153,7 +159,13 @@ pub(crate) async fn list_terms(
     let taxonomy =
         choice(query.taxonomy.as_deref(), "taxonomy", "`category`, `tag`", &mut problems);
     let page = page_request(paging, problems)?;
-    Ok(service.list_terms(&principal, taxonomy, &page).await?.map(TermResponse::from))
+    let page = service.list_terms(&principal, taxonomy, query.q.as_deref(), &page).await?;
+    let ids: Vec<Uuid> = page.data.iter().map(|found| found.term.id).collect();
+    let counts = service.term_entry_counts(&ids).await?;
+    Ok(page.map(|found| {
+        let count = counts.get(&found.term.id).copied().unwrap_or(0);
+        TermResponse { entry_count: Some(count), ..TermResponse::from(found) }
+    }))
 }
 
 /// Create a category or tag.
@@ -287,6 +299,9 @@ pub(crate) struct AuthorResponse {
     /// Picture (a media item id).
     avatar_media_id: Option<Uuid>,
     website_url: String,
+    /// How many entries (in any status) list this author. Only in the list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    entry_count: Option<u64>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -297,6 +312,7 @@ impl From<Author> for AuthorResponse {
             id: row.id,
             user_id: row.user_id,
             display_name: row.display_name,
+            entry_count: None,
             slug: row.slug,
             bio: row.bio,
             avatar_media_id: row.avatar_media_id,
@@ -351,7 +367,7 @@ impl From<AuthorFields> for AuthorInput {
     extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "list_content_authors",
     security(("bearer" = [])),
-    params(PageQuery),
+    params(AuthorsQuery, PageQuery),
     responses(
         (status = 200, description = "One page of authors.", body = Page<AuthorResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
@@ -362,10 +378,25 @@ impl From<AuthorFields> for AuthorInput {
 pub(crate) async fn list_authors(
     State(service): State<Arc<ContentService>>,
     principal: Principal,
+    Query(search): Query<AuthorsQuery>,
     Query(paging): Query<PageQuery>,
 ) -> Result<Page<AuthorResponse>, Error> {
     let page = page_request(paging, Vec::new())?;
-    Ok(service.list_authors(&principal, &page).await?.map(AuthorResponse::from))
+    let page = service.list_authors(&principal, search.q.as_deref(), &page).await?;
+    let ids: Vec<Uuid> = page.data.iter().map(|author| author.id).collect();
+    let counts = service.author_entry_counts(&ids).await?;
+    Ok(page.map(|author| {
+        let count = counts.get(&author.id).copied().unwrap_or(0);
+        AuthorResponse { entry_count: Some(count), ..AuthorResponse::from(author) }
+    }))
+}
+
+/// Which author profiles to list.
+#[derive(Debug, Clone, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct AuthorsQuery {
+    /// Only profiles whose display name contains this text, ignoring case and accents.
+    q: Option<String>,
 }
 
 /// Create an author profile.

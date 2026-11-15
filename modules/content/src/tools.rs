@@ -14,6 +14,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, etag};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -254,7 +255,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "List posts and pages, drafts included, newest first. Filter by kind, language, \
              status, parent page, text, category/tag or author. Follow `pagination.next_cursor` \
              with the same filters for more.",
-            move |principal: Principal, input: ListEntriesInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ListEntriesInput| {
                 let service = list.clone();
                 async move {
                     let query = EntriesQuery {
@@ -273,7 +274,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
                         input.order,
                     );
                     let mut problems = Vec::new();
-                    let filter = query.filter(&mut problems);
+                    let filter = query.filter(principal.user_id(), &mut problems);
                     let page = page_request(paging, problems)?;
                     let Page { data, pagination } =
                         service.list(&principal, &filter, &page).await?;
@@ -287,7 +288,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "get",
             "Get a post or page: its draft (title, slug, summary, body, images, SEO fields, \
              status) and its `version`, needed to change it.",
-            move |principal: Principal, input: EntryId| {
+            move |_tenant: TenantContext, principal: Principal, input: EntryId| {
                 let service = get.clone();
                 async move { versioned(&service, service.get(&principal, input.id).await?).await }
             },
@@ -298,7 +299,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "create_draft",
             "Create a post or page as a draft (not visible to readers until published). The \
              slug is made from the title unless given.",
-            move |principal: Principal, input: CreateDraftInput| {
+            move |_tenant: TenantContext, principal: Principal, input: CreateDraftInput| {
                 let service = create.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -328,7 +329,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "Change the draft of a post or page; omitted fields stay as they are. A published \
              entry keeps showing its published version until published again. Pass the \
              `version` you read.",
-            move |principal: Principal, mut input: UpdateDraftInput| {
+            move |_tenant: TenantContext, principal: Principal, mut input: UpdateDraftInput| {
                 let service = update.clone();
                 async move {
                     let expected = expected(&input.version)?;
@@ -346,7 +347,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "publish",
             "Publish the current draft of a post or page: readers see it at its address. \
              Pass the `version` you read. With `content.publish_own`, only entries you created.",
-            move |principal: Principal, input: ChangeStateInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ChangeStateInput| {
                 let service = publish.clone();
                 async move {
                     let entry = service
@@ -362,7 +363,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "unpublish",
             "Take a published post or page down; it goes back to draft and its address \
              answers 404. Pass the `version` you read.",
-            move |principal: Principal, input: ChangeStateInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ChangeStateInput| {
                 let service = unpublish.clone();
                 async move {
                     let entry =
@@ -377,7 +378,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
         Tool::new(
             "list_revisions",
             "List the saved revisions of an entry, newest first (without their fields).",
-            move |principal: Principal, input: ListRevisionsInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ListRevisionsInput| {
                 let service = revisions.clone();
                 async move {
                     let page = PageInput::new(input.limit, input.cursor, None).page()?;
@@ -392,7 +393,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "restore_revision",
             "Copy a revision back into the draft of its entry (the published version does \
              not change until published again). Pass the entry's `version`.",
-            move |principal: Principal, input: RestoreInput| {
+            move |_tenant: TenantContext, principal: Principal, input: RestoreInput| {
                 let service = restore.clone();
                 async move {
                     let entry = service
@@ -409,7 +410,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "Ask a person to review and publish the draft of a post or page you wrote (emits \
              `content.review_requested`). Use it when you may write but not publish. Pass the \
              `version` you read.",
-            move |principal: Principal, input: ChangeStateInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ChangeStateInput| {
                 let service = review.clone();
                 async move {
                     let entry = service
@@ -426,11 +427,16 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "Check the SEO of the draft of a post or page without AI: missing or too long title \
              and description for search engines, images without alt text, skipped heading \
              levels, duplicate titles, missing translations. Changes nothing.",
-            move |principal: Principal, input: EntryId| {
+            move |_tenant: TenantContext, principal: Principal, input: EntryId| {
                 let service = seo_check.clone();
                 async move {
                     let findings = service.seo_check(&principal, input.id).await?;
-                    Ok::<SeoReport, Error>(SeoReport::from(findings))
+                    let language = autoxide_kernel::i18n::Language::En;
+                    Ok::<SeoReport, Error>(SeoReport::new(
+                        findings,
+                        &service.translations,
+                        language,
+                    ))
                 }
             },
         )
@@ -441,7 +447,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "Ask the server's AI model to suggest a title and description for search engines, a \
              summary and up to 5 existing categories or tags for a draft. Saves nothing: apply \
              what you accept with `update`. Uses AI tokens.",
-            move |principal: Principal, input: EntryId| {
+            move |_tenant: TenantContext, principal: Principal, input: EntryId| {
                 let service = seo_suggest.clone();
                 async move {
                     let suggestion = service.suggest_seo(&principal, input.id).await?;
@@ -457,7 +463,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
              Returns a request at once; a background job writes the translation's draft (never \
              published, marked ai_generated) without overwriting changes made meanwhile. Check \
              it with `get_translation_request`. Uses AI tokens.",
-            move |principal: Principal, input: TranslateInput| {
+            move |_tenant: TenantContext, principal: Principal, input: TranslateInput| {
                 let service = translate.clone();
                 async move {
                     let request =
@@ -472,7 +478,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "get_translation_request",
             "Get an AI translation request: `status` (queued, running, succeeded, failed), the \
              translation's draft (`result_entry_id`) or why it failed (`error_code`).",
-            move |principal: Principal, input: EntryId| {
+            move |_tenant: TenantContext, principal: Principal, input: EntryId| {
                 let service = translation.clone();
                 async move {
                     let request = service.translation_request(&principal, input.id).await?;
@@ -488,7 +494,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "Search the posts and pages of one language (drafts included) by meaning and by \
              words, best first, each with how it matched and the best passage. Good for finding \
              related or duplicate content before writing.",
-            move |principal: Principal, input: SearchInput| {
+            move |_tenant: TenantContext, principal: Principal, input: SearchInput| {
                 let service = search.clone();
                 async move {
                     let query = crate::ai::semantic::SearchQuery {
@@ -508,7 +514,7 @@ pub(crate) fn all(service: &Arc<ContentService>) -> Vec<Tool> {
             "resolve",
             "Look up a public address in a language, as the website does: the published entry \
              there, a redirect, or `gone`. Drafts are never returned.",
-            move |_principal: Principal, input: ResolveInput| {
+            move |_tenant: TenantContext, _principal: Principal, input: ResolveInput| {
                 let service = resolve.clone();
                 async move {
                     let (found, _) = resolution(&service, &input.locale, &input.path).await?;

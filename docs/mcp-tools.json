@@ -139,7 +139,7 @@
         "description": "A key to create.",
         "properties": {
           "current_password": {
-            "description": "Your current password: a stolen access token alone must not create a key that\noutlives it.",
+            "description": "Your current password: a stolen access token alone must not create a key that\noutlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and\n`passkey_credential`) instead — exactly one of the three.",
             "type": "string"
           },
           "expires_at": {
@@ -155,6 +155,21 @@
             "example": "nightly report agent",
             "type": "string"
           },
+          "passkey_ceremony_id": {
+            "description": "One of your passkeys, instead of the password: start with\n`POST /api/v1/auth/login/passkey/options`, let the browser sign its `options`, and send the\n`ceremony_id` here with the browser's answer in `passkey_credential`.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "passkey_credential": {
+            "description": "The browser's `AuthenticationResponseJSON` (from `navigator.credentials.get`) for\n`passkey_ceremony_id`.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "permissions": {
             "description": "Permissions the key may use: at least one, each one you have yourself (see\n`GET /api/v1/auth/me`). Give a key only what its job needs.",
             "example": [
@@ -164,12 +179,19 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "totp_code": {
+            "description": "A code from your authenticator app, instead of the password (two-step sign-in must be\non). Wrong codes count towards the same limit as at sign-in.",
+            "example": "123456",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
           "name",
-          "permissions",
-          "current_password"
+          "permissions"
         ],
         "type": "object"
       },
@@ -2284,6 +2306,24 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Tell which tenant (customer) this request is for, and whether the installation runs one tenant or many.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "kernel.current_tenant",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Describe one installed module, like an item of `kernel.list_modules`, plus whether each of its migrations is applied to the database.",
       "input_schema": {
         "additionalProperties": false,
@@ -2313,6 +2353,35 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Get one tenant of the platform by id or slug (platform staff only).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which tenant to get.",
+        "properties": {
+          "tenant": {
+            "description": "Id or slug of the tenant.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.get_tenant",
+      "output_schema": null,
+      "permissions": [
+        "kernel.tenants.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the modules installed in this server, in start order, with the permissions, events, jobs, schedules, MCP tools, deprecated endpoints and migrations each declares. Use it to learn what this server can do.",
       "input_schema": {
         "additionalProperties": false,
@@ -2323,6 +2392,72 @@
       "output_schema": null,
       "permissions": [
         "kernel.modules.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the settings of the current tenant: every setting the installed modules take per tenant, whether it is set, and its value unless it is secret.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "kernel.list_settings",
+      "output_schema": null,
+      "permissions": [
+        "kernel.settings.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the tenants of the platform, newest first (platform staff only).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Paging of a list: the same as the `limit`, `cursor` and `order` query parameters of\nthe REST list endpoints.",
+        "properties": {
+          "cursor": {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the first page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.list_tenants",
+      "output_schema": null,
+      "permissions": [
+        "kernel.tenants.read"
       ]
     },
     {
@@ -2363,11 +2498,18 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List media items (images, video, audio, documents), newest first. Filter by folder, type, visibility, trash or name; sort by `created_at`, `name` or `size`. Follow `pagination.next_cursor` with the same filters for more.",
+      "description": "List media items (images, video, audio, documents), newest first. Filter by folder, type, visibility, trash, name or missing alt text; sort by `created_at`, `name` or `size`. Follow `pagination.next_cursor` with the same filters for more.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Filters, order and paging of the media list; omitted fields do not filter.",
         "properties": {
+          "alt_missing": {
+            "description": "`true`: only images missing a text alternative (empty `alt`, not `decorative`).",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [
@@ -2624,7 +2766,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Change the details of a media item: name, alt text, title, caption, folder or visibility. Pass the `updated_at` you read; the change is refused if someone changed the item since.",
+      "description": "Change the details of a media item: name, alt text, title, caption, decorative flag, folder or visibility. Pass the `updated_at` you read; the change is refused if someone changed the item since.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Changes to a media item; omitted fields stay as they are.",
@@ -2640,6 +2782,13 @@
             "description": "Caption, up to 2000 characters; `\"\"` clears it.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "decorative": {
+            "description": "`true` marks a purely decorative image, whose empty `alt` is on purpose.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -3037,6 +3186,13 @@
         "additionalProperties": false,
         "description": "Filters of a subscriber search.",
         "properties": {
+          "blocked": {
+            "description": "`true`: only blocked subscribers; `false`: only the others.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [

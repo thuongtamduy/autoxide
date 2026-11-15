@@ -26,6 +26,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::rows;
 use autoxide_kernel::storage::{ByteStream, StoredFile};
+use autoxide_kernel::tenancy::TenantContext;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt as _;
@@ -160,7 +161,12 @@ impl FormsService {
         .insert(&transaction)
         .await?;
         self.jobs
-            .enqueue(&transaction, &ExportJob { export_id: row.id }, EnqueueOptions::default())
+            .enqueue(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                &ExportJob { export_id: row.id },
+                EnqueueOptions::default(),
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(form_id = %form_id, export_id = %row.id, "forms export requested");
@@ -281,6 +287,7 @@ impl FormsService {
                     .outbox
                     .record(
                         &transaction,
+                        &TenantContext::legacy_default(&service.database),
                         actor,
                         events::form_subject(row.form_id),
                         &events::SubmissionsExported(change),
@@ -427,8 +434,7 @@ pub(crate) fn export_not_found() -> Error {
 fn in_progress(id: Uuid) -> Error {
     Error::conflict(
         "forms.export_in_progress",
-        "This form already has an export that is not finished: `{export_id}`. Wait for it \
-         (`GET /api/v1/forms/exports/{export_id}`) before asking for another.",
+        "This form already has an export that is not finished: `{export_id}`. Wait for it before asking for another.",
     )
     .with_param("export_id", id)
 }

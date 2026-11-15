@@ -11,19 +11,113 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
 use validator::Validate;
 
 use super::HttpState;
-use crate::api_key::{ApiKey, CreatedApiKey, NewApiKey};
+use crate::api_key::{ApiKey, CreatedApiKey, NewApiKey, Reauth};
 
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
         .routes(routes!(list_api_keys, create_api_key))
         .routes(routes!(revoke_api_key))
+        .routes(routes!(list_all_api_keys))
+        .routes(routes!(revoke_any_api_key))
+}
+
+/// An API key of any user, for administrators.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ManagedApiKeyResponse {
+    #[serde(flatten)]
+    key: ApiKeyResponse,
+    /// The user the key acts as.
+    user_id: Uuid,
+    /// Display name of that user; `null` when the account no longer exists.
+    #[schema(example = "Ada Lovelace")]
+    user_name: Option<String>,
+    /// Email of that user; `null` like `user_name`.
+    #[schema(example = "ada@example.com")]
+    user_email: Option<String>,
+}
+
+/// Which keys to list.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct AllApiKeysQuery {
+    /// Only the keys of this user.
+    user_id: Option<Uuid>,
+}
+
+/// List the API keys of every user.
+///
+/// Requires `auth.api_keys.manage`. Newest first unless `order=asc`, with the owner's name and
+/// email; secrets are never listed. Revoke one with `DELETE /api/v1/auth/all-api-keys/{id}`.
+#[utoipa::path(
+    get,
+    path = "/all-api-keys",
+    extensions(("x-permissions" = json!(["auth.api_keys.manage"]))),
+    operation_id = "list_all_api_keys",
+    security(("bearer" = [])),
+    params(AllApiKeysQuery, PageQuery),
+    responses(
+        (status = 200, description = "One page of keys.", body = Page<ManagedApiKeyResponse>),
+        (status = 400, description = "`user_id` is not a UUID.", body = Problem),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.api_keys.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
+    )
+)]
+async fn list_all_api_keys(
+    State(state): State<Arc<HttpState>>,
+    principal: Principal,
+    Query(filter): Query<AllApiKeysQuery>,
+    Query(query): Query<PageQuery>,
+) -> Result<Page<ManagedApiKeyResponse>, Error> {
+    let page = PageRequest::try_from(query)?;
+    let page = state.api_keys.list_all(&principal, filter.user_id, &page).await?;
+    let mut owners: Vec<Uuid> = page.data.iter().map(|key| key.user_id).collect();
+    owners.sort_unstable();
+    owners.dedup();
+    let users = state.users.by_ids(&owners).await?;
+    Ok(page.map(|key| {
+        let owner = users.get(&key.user_id);
+        ManagedApiKeyResponse {
+            user_id: key.user_id,
+            user_name: owner.map(|user| user.name.clone()),
+            user_email: owner.map(|user| user.email.clone()),
+            key: key.into(),
+        }
+    }))
+}
+
+/// Revoke an API key of any user.
+///
+/// Requires `auth.api_keys.manage`. The key stops working at once; the audit log records who
+/// revoked it.
+#[utoipa::path(
+    delete,
+    path = "/all-api-keys/{id}",
+    extensions(("x-permissions" = json!(["auth.api_keys.manage"]))),
+    operation_id = "revoke_any_api_key",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the key.")),
+    responses(
+        (status = 204, description = "The key was revoked."),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.api_keys.manage`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No key has this id; code `auth.api_key_not_found`.", body = Problem),
+    )
+)]
+async fn revoke_any_api_key(
+    State(state): State<Arc<HttpState>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, Error> {
+    state.api_keys.revoke_any(&principal, id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// An API key, without its secret.
@@ -86,8 +180,22 @@ pub(crate) struct CreateApiKeyRequest {
     /// not expire.
     expires_at: Option<DateTime<Utc>>,
     /// Your current password: a stolen access token alone must not create a key that
-    /// outlives it.
+    /// outlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and
+    /// `passkey_credential`) instead — exactly one of the three.
+    #[serde(default)]
     current_password: String,
+    /// A code from your authenticator app, instead of the password (two-step sign-in must be
+    /// on). Wrong codes count towards the same limit as at sign-in.
+    #[schema(example = "123456")]
+    totp_code: Option<String>,
+    /// One of your passkeys, instead of the password: start with
+    /// `POST /api/v1/auth/login/passkey/options`, let the browser sign its `options`, and send the
+    /// `ceremony_id` here with the browser's answer in `passkey_credential`.
+    passkey_ceremony_id: Option<Uuid>,
+    /// The browser's `AuthenticationResponseJSON` (from `navigator.credentials.get`) for
+    /// `passkey_ceremony_id`.
+    #[schema(value_type = Option<Object>)]
+    passkey_credential: Option<serde_json::Value>,
 }
 
 impl From<CreateApiKeyRequest> for NewApiKey {
@@ -97,6 +205,15 @@ impl From<CreateApiKeyRequest> for NewApiKey {
             permissions: input.permissions,
             expires_at: input.expires_at,
             current_password: input.current_password,
+            second_factor: match (input.totp_code, input.passkey_ceremony_id) {
+                (Some(code), _) => Some(Reauth::Totp(code)),
+                (None, Some(ceremony_id)) => Some(Reauth::Passkey {
+                    ceremony_id,
+                    // Thiếu câu trả lời thì kiểm passkey báo `credential` không hợp lệ.
+                    credential: input.passkey_credential.unwrap_or_default(),
+                }),
+                (None, None) => None,
+            },
         }
     }
 }
@@ -135,8 +252,9 @@ async fn list_api_keys(
 /// Create an API key for a program or an AI agent.
 ///
 /// Signed in with a password session only: an API key cannot create keys. The key
-/// acts as you, limited to the permissions listed. The response carries the key
-/// itself, shown only once.
+/// acts as you, limited to the permissions listed. Confirm it is you with your current
+/// password, a code from your authenticator app (`totp_code`) or one of your passkeys
+/// (`passkey_ceremony_id`, `passkey_credential`). The response carries the key itself, shown only once.
 #[utoipa::path(
     post,
     path = "/api-keys",
@@ -147,9 +265,12 @@ async fn list_api_keys(
     responses(
         (status = 201, description = "The key was created; `key` holds the secret.", body = Data<CreatedApiKeyResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 400, description = "The current password is wrong; code `auth.wrong_password`.", body = Problem),
+        (status = 401, description = "The passkey is not one of yours or its answer is not valid; code `auth.passkey_sign_in_failed`.", body = Problem),
         (status = 403, description = "The request used an API key; code `auth.api_key_cannot_create_keys`.", body = Problem),
-        (status = 409, description = "You have too many keys; code `auth.api_key_limit`.", body = Problem),
-        (status = 422, description = "A value is invalid, e.g. a permission you do not have (`not_granted`); see `errors`.", body = Problem),
+        (status = 409, description = "You have too many keys (code `auth.api_key_limit`), or sent `totp_code` without two-step sign-in on (code `auth.mfa_not_enabled`).", body = Problem),
+        (status = 422, description = "A value is invalid, e.g. a permission you do not have (`not_granted`), a wrong `totp_code`, or both a password and a second factor; see `errors`.", body = Problem),
+        (status = 429, description = "Too many wrong passwords or codes; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.", body = Problem),
     )
 )]
 async fn create_api_key(
@@ -188,6 +309,7 @@ async fn revoke_api_key(
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -205,7 +327,7 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(services.users.as_ref(), &TenantContext::legacy_default(&services.database), root).await.unwrap();
             let session = bearer(&app, "root@example.com", PASSWORD).await;
 
             // Thiếu hay sai mật khẩu hiện tại: không tạo được (token lộ không đủ).

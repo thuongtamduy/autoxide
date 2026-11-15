@@ -175,19 +175,19 @@ async fn tool_mcp_voi_version() {
         let reader = client("reader").await;
         let mut names: Vec<String> = reader.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name.to_string()).collect();
         names.sort();
-        assert_eq!(names, ["content.get", "content.get_translation_request", "content.list", "content.list_revisions", "content.resolve", "content.search", "content.seo_check"]);
+        assert_eq!(names, ["content.get", "content.get_translation_request", "content.list", "content.list_revisions", "content.resolve", "content.search", "content.seo_check", "kernel.current_tenant"]);
         reader.cancel().await.unwrap();
 
         // Agent chỉ có `content.write_own`: thấy tool viết, không thấy tool đăng.
         let agent = client("agent").await;
         let mut names: Vec<String> = agent.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name.to_string()).collect();
         names.sort();
-        assert_eq!(names, ["content.create_draft", "content.get", "content.get_translation_request", "content.list", "content.list_revisions", "content.request_review", "content.resolve", "content.restore_revision", "content.search", "content.seo_check", "content.suggest_seo", "content.translate", "content.update"]);
+        assert_eq!(names, ["content.create_draft", "content.get", "content.get_translation_request", "content.list", "content.list_revisions", "content.request_review", "content.resolve", "content.restore_revision", "content.search", "content.seo_check", "content.suggest_seo", "content.translate", "content.update", "kernel.current_tenant"]);
         agent.cancel().await.unwrap();
 
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 15);
+        assert_eq!(tools.len(), 16, "with `kernel.current_tenant`");
         let publish = tools.iter().find(|tool| tool.name == "content.publish").unwrap();
         assert!(publish.description.as_deref().unwrap_or_default().contains("Requires permission `content.publish` or `content.publish_own`."));
         for tool in &tools {
@@ -319,6 +319,7 @@ async fn da_duyet_ai_van_hien_sau_xoa_tai_khoan() {
         let entry = content.create(&ada, input).await.unwrap();
         content.publish(&ada, entry.id, None, None, true).await.unwrap();
         let deleted = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(&content.database),
             "auth",
             autoxide_kernel::privacy::USER_DELETED.to_owned(),
             json!({"before": {"id": ada.user_id()}}),

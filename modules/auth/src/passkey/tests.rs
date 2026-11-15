@@ -54,6 +54,14 @@ async fn dang_ky_roi_dang_nhap_bang_passkey() {
 
         let added = register(&services, ada, &mut phone).await;
         assert_eq!((added.name.as_str(), added.last_used_at), ("Phone", None));
+        assert_eq!(added.aaguid, None, "an authenticator that does not say has no kind");
+        // Authenticator tự khai loại (D-272): giữ AAGUID, biết tên.
+        let mut laptop = SoftAuthenticator::new(7);
+        let hello = Uuid::parse_str("08987058-cadc-4b81-b6e1-30de50dcbe96").unwrap();
+        laptop.aaguid = *hello.as_bytes();
+        let kind = register(&services, ada, &mut laptop).await;
+        assert_eq!(kind.aaguid, Some(hello));
+        assert_eq!(kind.aaguid.and_then(super::authenticators::name), Some("Windows Hello"));
 
         let (ceremony, response) = sign_in(&services.passkeys, &mut phone).await;
         let tokens = services.passkeys.finish_login(ceremony, &response, None).await.unwrap();
@@ -211,6 +219,7 @@ async fn can_mat_khau_va_dat_lai_mat_khau_thu_hoi_passkey() {
             permissions: vec!["auth.users.read".to_owned()],
             expires_at: None,
             current_password: PASSWORD.to_owned(),
+            second_factor: None,
         };
         // Ada chưa có role nào: thử với quyền admin để key tạo được.
         let admin = autoxide_kernel::access::Principal::with_all_permissions(ada);
@@ -360,6 +369,83 @@ async fn dat_lai_mat_khau_dong_moi_cua_mo_bang_mat_khau_cu() {
         services.verifications.confirm(&confirm, Language::En).await.unwrap();
         let stale = services.resets.confirm(&old_reset, "another new passphrase".to_owned()).await;
         assert_eq!(stale.unwrap_err().code(), "auth.invalid_reset_token");
+    })
+    .await
+    .unwrap();
+}
+
+/// Khoá mới cho test xác nhận lại (D-272).
+fn agent_key(
+    password: &str,
+    second_factor: Option<crate::api_key::Reauth>,
+) -> crate::api_key::NewApiKey {
+    crate::api_key::NewApiKey {
+        name: "agent".to_owned(),
+        permissions: vec!["auth.users.read".to_owned()],
+        expires_at: None,
+        current_password: password.to_owned(),
+        second_factor,
+    }
+}
+
+/// Đề bài giao diện D: tạo API key xác nhận bằng passkey hay mã TOTP thay cho mật khẩu; passkey
+/// của người khác, mã sai, gửi cả mật khẩu lẫn yếu tố khác đều bị từ chối. Quản trị viên có
+/// `auth.api_keys.manage` xem và thu hồi key của mọi người.
+#[tokio::test]
+async fn tao_api_key_xac_nhan_bang_passkey_hay_ma_va_quan_tri_thu_hoi() {
+    TestDatabase::run(async |test| {
+        use crate::api_key::Reauth;
+        let services = crate::testing::services(test).await;
+        let ada = user(&services, "ada@example.com").await;
+        let bob = user(&services, "bob@example.com").await;
+        let as_ada = autoxide_kernel::access::Principal::with_all_permissions(ada);
+        let mut ada_phone = SoftAuthenticator::new(3);
+        register(&services, ada, &mut ada_phone).await;
+        let mut bob_phone = SoftAuthenticator::new(4);
+        register(&services, bob, &mut bob_phone).await;
+
+        let (ceremony_id, credential) = sign_in(&services.passkeys, &mut ada_phone).await;
+        let proof = Reauth::Passkey { ceremony_id, credential };
+        let made = services.api_keys.create(&as_ada, agent_key("", Some(proof))).await.unwrap();
+        assert_eq!(made.key.user_id, ada);
+
+        let (ceremony_id, credential) = sign_in(&services.passkeys, &mut bob_phone).await;
+        let proof = Reauth::Passkey { ceremony_id, credential };
+        let refused = services.api_keys.create(&as_ada, agent_key("", Some(proof))).await;
+        assert_eq!(refused.err().unwrap().code(), "auth.passkey_sign_in_failed");
+
+        let both = agent_key(PASSWORD, Some(Reauth::Totp("123456".to_owned())));
+        let error = services.api_keys.create(&as_ada, both).await.err().unwrap();
+        assert_eq!(error.kind(), ErrorKind::Validation);
+        let no_totp = agent_key("", Some(Reauth::Totp("123456".to_owned())));
+        let error = services.api_keys.create(&as_ada, no_totp).await.err().unwrap();
+        assert_eq!(error.code(), "auth.mfa_not_enabled");
+
+        let setup = services.mfa.start_totp(ada, "ada@example.com").await.unwrap();
+        let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
+        let code = crate::mfa::service::tests::code_at(&setup.secret, now);
+        services.mfa.confirm_totp(ada, &code).await.unwrap();
+        let wrong = agent_key("", Some(Reauth::Totp("000000".to_owned())));
+        let error = services.api_keys.create(&as_ada, wrong).await.err().unwrap();
+        assert_eq!(error.fields()[0].field, "totp_code", "{error:?}");
+        let next = crate::mfa::service::tests::code_at(&setup.secret, now + 30);
+        let by_code = agent_key("", Some(Reauth::Totp(next)));
+        services.api_keys.create(&as_ada, by_code).await.unwrap();
+
+        // Quản trị viên: xem key của mọi người, thu hồi một key của Ada.
+        let first = PageRequest::first(50, Order::Asc);
+        let nobody = autoxide_kernel::access::Principal::new(bob, Vec::<String>::new());
+        let denied = services.api_keys.list_all(&nobody, None, &first).await.err().unwrap();
+        assert_eq!(denied.code(), "permission_denied");
+        let admin =
+            autoxide_kernel::access::Principal::new(bob, ["auth.api_keys.manage".to_owned()]);
+        let all = services.api_keys.list_all(&admin, Some(ada), &first).await.unwrap();
+        assert_eq!(all.data.len(), 2);
+        services.api_keys.revoke_any(&admin, made.key.id).await.unwrap();
+        let left = services.api_keys.list(ada, &first).await.unwrap();
+        assert_eq!(left.data.len(), 1);
+        let again = services.api_keys.revoke_any(&admin, made.key.id).await.err().unwrap();
+        assert_eq!(again.code(), "auth.api_key_not_found");
     })
     .await
     .unwrap();

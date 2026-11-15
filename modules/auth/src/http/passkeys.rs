@@ -67,6 +67,13 @@ pub(crate) struct PasskeyResponse {
     created_at: DateTime<Utc>,
     /// When it was last used to sign in; `null` if never.
     last_used_at: Option<DateTime<Utc>>,
+    /// Kind of authenticator, as it identified itself when registered (its AAGUID); `null` when
+    /// it did not say (or registered before this was kept).
+    aaguid: Option<Uuid>,
+    /// Name of that kind of authenticator, e.g. `Windows Hello`, `Apple Passwords`,
+    /// `Google Password Manager`; `null` when the kind is not known to the server.
+    #[schema(example = "Windows Hello")]
+    authenticator: Option<String>,
 }
 
 impl From<Passkey> for PasskeyResponse {
@@ -76,6 +83,11 @@ impl From<Passkey> for PasskeyResponse {
             name: passkey.name,
             created_at: passkey.created_at,
             last_used_at: passkey.last_used_at,
+            authenticator: passkey
+                .aaguid
+                .and_then(crate::passkey::authenticators::name)
+                .map(str::to_owned),
+            aaguid: passkey.aaguid,
         }
     }
 }
@@ -124,7 +136,7 @@ pub(crate) struct PasskeyLoginRequest {
     request_body = StartPasskeyRegistrationRequest,
     responses(
         (status = 200, description = "Options for the browser, and the ceremony to finish with `POST /api/v1/auth/me/passkeys`.", body = Data<CeremonyResponse>),
-        (status = 400, description = "The current password is wrong; code `auth.wrong_password`.", body = Problem),
+        (status = 400, description = "The current password is wrong; code `auth.wrong_password`. A user who forgot it resets it with `POST /api/v1/auth/password-reset`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Called with an API key (`auth.session_required`), or passkeys are off (`auth.passkeys_disabled`).", body = Problem),
         (status = 409, description = "You already have the most passkeys allowed; code `auth.passkey_limit`.", body = Problem),
@@ -368,11 +380,13 @@ async fn login(
     let user_agent = super::user_agent(&headers);
     let tokens =
         state.passkeys.finish_login(input.ceremony_id, &input.credential, user_agent).await?;
+    super::note_country(&state, &headers, tokens.session_id).await;
     Ok(Data { data: tokens.into() })
 }
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -445,7 +459,7 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            crate::api::Accounts::create(services.users.as_ref(), root).await.unwrap();
+            crate::api::Accounts::create(services.users.as_ref(), &TenantContext::legacy_default(&services.database), root).await.unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let body = json!({"name": "agent", "permissions": ["auth.users.read"], "current_password": PASSWORD});
             let (status, _, key) = call(&app, "POST", "/api-keys", Some(&admin), Some(body)).await;
@@ -478,12 +492,20 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin,
             };
-            let root = Accounts::create(services.users.as_ref(), account("root@example.com", true))
-                .await
-                .unwrap();
-            let bob = Accounts::create(services.users.as_ref(), account("bob@example.com", false))
-                .await
-                .unwrap();
+            let root = Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("root@example.com", true),
+            )
+            .await
+            .unwrap();
+            let bob = Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("bob@example.com", false),
+            )
+            .await
+            .unwrap();
             for (user, seed) in [(bob.id, 1), (bob.id, 2), (root.id, 3)] {
                 let mut device = SoftAuthenticator::new(seed);
                 let ceremony = services.passkeys.start_registration(user, PASSWORD).await.unwrap();

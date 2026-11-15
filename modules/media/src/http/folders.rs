@@ -17,7 +17,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{folder_filter, page_request, present, sort};
-use crate::library::folders::{FolderChanges, FolderSort};
+use crate::library::folders::{Folder, FolderChanges, FolderSort};
 use crate::service::MediaService;
 
 /// A media folder. Folders nest; names are unique (ignoring case) within a parent.
@@ -28,6 +28,9 @@ pub(crate) struct FolderResponse {
     pub(super) parent_id: Option<Uuid>,
     #[schema(example = "Products")]
     pub(super) name: String,
+    /// Items directly in this folder (not in its subfolders), not counting the trash.
+    #[schema(example = 12)]
+    pub(super) item_count: i64,
     pub(super) created_at: DateTime<Utc>,
     pub(super) updated_at: DateTime<Utc>,
 }
@@ -96,7 +99,31 @@ pub(crate) async fn list_folders(
     let parent = folder_filter(query.parent_id.as_deref(), "parent_id", &mut problems);
     let order: FolderSort = sort(query.sort.as_deref(), "`created_at`, `name`", &mut problems);
     let page = page_request(paging, problems)?;
-    Ok(service.list_folders(&principal, parent, order, &page).await?.map(FolderResponse::from))
+    let page = service.list_folders(&principal, parent, order, &page).await?;
+    let autoxide_kernel::pagination::Page { data, pagination } = page;
+    Ok(autoxide_kernel::pagination::Page { data: counted(&service, data).await?, pagination })
+}
+
+/// Thư mục như API trả về, kèm số item của từng cái (một câu đếm cho cả trang).
+async fn counted(
+    service: &MediaService,
+    folders: Vec<Folder>,
+) -> Result<Vec<FolderResponse>, Error> {
+    let ids: Vec<Uuid> = folders.iter().map(|folder| folder.id).collect();
+    let counts = service.folder_item_counts(&ids).await?;
+    Ok(folders
+        .into_iter()
+        .map(|folder| {
+            let item_count = counts.get(&folder.id).copied().unwrap_or(0);
+            FolderResponse { item_count, ..FolderResponse::from(folder) }
+        })
+        .collect())
+}
+
+/// Một thư mục kèm số item.
+async fn counted_one(service: &MediaService, folder: Folder) -> Result<FolderResponse, Error> {
+    let described = counted(service, vec![folder]).await?.into_iter().next();
+    described.ok_or_else(|| Error::internal("describing a media folder returned nothing"))
 }
 
 /// Create a media folder.
@@ -149,7 +176,7 @@ pub(crate) async fn get_folder(
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<FolderResponse>, Error> {
     let folder = service.get_folder(&principal, id).await?;
-    Ok(Tagged { version: folder.updated_at, data: folder.into() })
+    Ok(Tagged { version: folder.updated_at, data: counted_one(&service, folder).await? })
 }
 
 /// Rename or move a media folder.
@@ -184,7 +211,7 @@ pub(crate) async fn update_folder(
     let expected = if_match.required()?;
     let changes = FolderChanges { name: input.name, parent_id: input.parent_id };
     let folder = service.update_folder(&principal, id, changes, expected).await?;
-    Ok(Tagged { version: folder.updated_at, data: folder.into() })
+    Ok(Tagged { version: folder.updated_at, data: counted_one(&service, folder).await? })
 }
 
 /// Delete an empty media folder.

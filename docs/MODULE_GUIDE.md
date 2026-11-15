@@ -86,8 +86,9 @@ administrators from the permissions every module declares.
 
 `src/service.rs` holds every rule. It takes an `Actor` (who acts; from
 `Actor::from(&principal)`) so that events record who did it. Each write records its
-event in the same transaction with `Outbox::record(&transaction, actor, subject,
-&event)` — the change and its audit entry exist together or not at all.
+event in the same transaction with `Outbox::record(&transaction, &tenant, actor, subject,
+&event)` — the change and its audit entry exist together or not at all. `tenant` is the
+`TenantContext` of the customer the data belongs to (`autoxide_kernel::tenancy`).
 
 ### 5. REST API and OpenAPI
 
@@ -268,6 +269,10 @@ databases.
   `context.jobs()` to enqueue.
 - A route that needs a larger request body than the default declares it in
   `Module::body_limits`.
+- Settings an interface needs (languages, upload limits…) go in `Module::client_config`: a
+  `ClientSection::new(&value)` of a `Serialize + ToSchema` struct with plain fields. They appear
+  under the module's name in `GET /api/v1/kernel/client-config`, which needs no sign-in — put
+  only values safe to show anyone, never a secret.
 - Anything an installer can get wrong (a directory that is not writable, an external
   service that does not answer, missing initial data) gets a check in `Module::checks`:
   a `Check` whose `Probe` returns a `Finding` (ok, warning or failed, with a hint). It runs

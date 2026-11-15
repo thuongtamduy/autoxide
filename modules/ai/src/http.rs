@@ -8,6 +8,7 @@ use autoxide_kernel::ai::{Embedder, TextModel};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::mcp::{NoInput, Tool};
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -110,7 +111,7 @@ pub(crate) fn tools(status: &Arc<Status>) -> Vec<Tool> {
             "Tell whether the server's AI features are on (text generation, image reading, \
              embeddings), which provider and models they use, and today's token use against the \
              daily limit.",
-            move |principal: Principal, _: NoInput| {
+            move |_tenant: TenantContext, principal: Principal, _: NoInput| {
                 let status = status.clone();
                 async move { status.read(&principal).await }
             },

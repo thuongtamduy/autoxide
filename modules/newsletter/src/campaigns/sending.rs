@@ -28,6 +28,7 @@ use std::time::{Duration, Instant};
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{Job, JobContext, JobHandler};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set};
@@ -202,6 +203,7 @@ impl NewsletterService {
                 claimed_at: Set(None),
                 sent_at: Set(None),
                 error: Set(None),
+                unsubscribed_at: Set(None),
                 created_at: Set(now),
             });
             delivery::Entity::insert_many(rows)
@@ -245,6 +247,7 @@ impl NewsletterService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     Actor::system(),
                     events::campaign_subject(row.id),
                     &events::CampaignStarted(change),
@@ -371,7 +374,7 @@ impl NewsletterService {
         if claimed.rows_affected != 1 {
             return Ok(None);
         }
-        match self.mailer.send(mail).await {
+        match self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await {
             Ok(()) => {
                 delivery::Entity::update_many()
                     .col_expr(delivery::Column::Status, Expr::value(DeliveryStatus::Sent.as_str()))
@@ -458,6 +461,7 @@ impl NewsletterService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     Actor::system(),
                     events::campaign_subject(row.id),
                     &events::CampaignSent(change),

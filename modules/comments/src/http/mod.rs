@@ -46,6 +46,7 @@ pub(crate) fn routes(service: Arc<CommentsService>) -> OpenApiRouter {
         .routes(routes!(admin::list_reports))
         .routes(routes!(admin::list_bans, admin::create_ban))
         .routes(routes!(admin::delete_ban))
+        .routes(routes!(admin::list_targets))
         .routes(routes!(admin::get_target, admin::set_target))
         .routes(routes!(admin::get_email_data, admin::delete_email_data))
         .with_state(service)
@@ -76,7 +77,10 @@ pub(crate) fn choice<T: for<'de> Deserialize<'de>>(
     let raw = raw.map(str::trim).filter(|raw| !raw.is_empty())?;
     serde_json::from_value(Value::String(raw.to_owned()))
         .map_err(|_| {
-            problems.push(FieldError::new(field, "invalid", format!("must be one of {allowed}")));
+            problems.push(
+                FieldError::new(field, "invalid", "must be one of {allowed}")
+                    .with_param("allowed", allowed),
+            );
         })
         .ok()
 }

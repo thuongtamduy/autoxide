@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::{Authenticator, Principal};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantHint;
 
 use crate::api_key::{API_KEY_PREFIX, ApiKeyService};
 use crate::role::RoleService;
@@ -23,7 +24,13 @@ pub(crate) struct RequestAuthenticator {
 
 #[async_trait::async_trait]
 impl Authenticator for RequestAuthenticator {
-    async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
+    // `hint` chưa dùng: credential chưa mang khách cho tới khi `auth` chuyển sang theo khách (bước
+    // 33 B12); mọi credential hiện thuộc khách mặc định.
+    async fn authenticate(
+        &self,
+        authorization: Option<&str>,
+        _hint: &TenantHint,
+    ) -> Result<Principal, Error> {
         let token = bearer_token(authorization)?;
         if token.starts_with(API_KEY_PREFIX) {
             return self.api_keys.authenticate(token).await;

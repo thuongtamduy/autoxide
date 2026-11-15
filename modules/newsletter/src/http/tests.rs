@@ -20,7 +20,7 @@ struct App {
 impl App {
     /// Chạy các job tới hạn tới khi hết (như worker của chương trình).
     async fn work(&self) {
-        let worker = self.http.modules().worker(self.http.database(), 4).unwrap();
+        let worker = self.http.modules().worker(4).unwrap();
         for _ in 0..20 {
             if worker.run_once().await.unwrap() == 0 {
                 break;
@@ -208,6 +208,19 @@ async fn vong_doi_qua_http() {
         assert_eq!(edit.status(), StatusCode::OK, "{}", edit.json());
         assert_eq!(send(http, "POST", &path, Some("admin"), &[("if-match", &etag)], None).await.status(), StatusCode::PRECONDITION_FAILED);
         let fresh = edit.header(header::ETAG).to_owned();
+        // Xem trước: thư đúng như khi gửi, kèm chân thư (đề bài giao diện B7).
+        let preview = send(http, "GET", &format!("/newsletter/campaigns/{id}/preview"), Some("reader"), &[], None).await;
+        assert_eq!(preview.status(), StatusCode::OK, "{}", preview.json());
+        assert_eq!(preview.json()["data"]["subject"], "Hello again");
+        let text = preview.json()["data"]["body_text"].as_str().unwrap().to_owned();
+        assert!(text.starts_with("News of the week.") && text.contains("Example Ltd, Hanoi"), "{text}");
+        assert!(preview.json()["data"]["body_html"].is_null());
+        let settings = send(http, "GET", "/newsletter/settings", Some("reader"), &[], None).await;
+        assert_eq!(settings.status(), StatusCode::OK, "{}", settings.json());
+        assert_eq!(settings.json()["data"]["advertising_label"], "[QC]");
+        assert_eq!(settings.json()["data"]["postal_address"], "Example Ltd, Hanoi");
+        assert_eq!(settings.json()["data"]["missing"], json!([]));
+        assert_eq!(send(http, "GET", "/newsletter/settings", Some("member"), &[], None).await.status(), StatusCode::FORBIDDEN);
         let started = send(http, "POST", &path, Some("admin"), &[("if-match", &fresh)], None).await;
         assert_eq!((started.status(), started.json()["data"]["status"].as_str()), (StatusCode::OK, Some("sending")), "{}", started.json());
         app.work().await;
@@ -227,6 +240,16 @@ async fn vong_doi_qua_http() {
         assert_eq!((unknown.status(), unknown.body()), (one_click.status(), one_click.body()));
         let left = send(http, "GET", &format!("/newsletter/subscribers?list_id={list_id}&status=unsubscribed"), Some("reader"), &[], None).await;
         assert_eq!(left.json()["data"][0]["email"], "ada@example.com", "{}", left.json());
+        // Số huỷ đăng ký của chiến dịch: huỷ bằng link của chính thư.
+        let progress = send(http, "GET", &format!("/newsletter/campaigns/{id}"), Some("reader"), &[], None).await;
+        assert_eq!(progress.json()["data"]["progress"]["unsubscribed"], 1, "{}", progress.json());
+        assert_eq!(progress.json()["data"]["progress"]["bounced"], 0);
+        // Lọc người bị chặn.
+        let blocked = send(http, "GET", "/newsletter/subscribers?blocked=true", Some("reader"), &[], None).await;
+        assert_eq!(blocked.json()["data"], json!([]), "{}", blocked.json());
+        let active = send(http, "GET", "/newsletter/subscribers?blocked=false", Some("reader"), &[], None).await;
+        assert_eq!(active.json()["data"].as_array().unwrap().len(), 2, "{}", active.json());
+        assert_eq!(send(http, "GET", "/newsletter/subscribers?blocked=maybe", Some("reader"), &[], None).await.status(), StatusCode::UNPROCESSABLE_ENTITY);
         let back = send(http, "PUT", &format!("/newsletter/public/preferences?token={token}"), None, &[], Some(json!({"lists": [{"key": "weekly", "subscribed": true}]}))).await;
         assert_eq!(back.json()["data"]["lists"][0]["status"], "confirmed", "{}", back.json());
         assert_eq!(send(http, "GET", "/newsletter/public/preferences?token=nope", None, &[], None).await.status(), StatusCode::NOT_FOUND);
@@ -279,13 +302,18 @@ async fn tool_mcp() {
         };
         assert_eq!(
             names("reader").await,
-            ["newsletter.find_subscribers", "newsletter.get_campaign", "newsletter.list_lists"]
+            [
+                "kernel.current_tenant",
+                "newsletter.find_subscribers",
+                "newsletter.get_campaign",
+                "newsletter.list_lists"
+            ]
         );
-        assert_eq!(names("writer").await.len(), 4);
+        assert_eq!(names("writer").await.len(), 5, "with `kernel.current_tenant`");
 
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 6);
+        assert_eq!(tools.len(), 7, "with `kernel.current_tenant`");
         for tool in &tools {
             assert!(
                 !serde_json::to_string(&tool.input_schema).unwrap().contains("$ref"),

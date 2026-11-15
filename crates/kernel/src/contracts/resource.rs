@@ -26,6 +26,7 @@ use uuid::Uuid;
 
 use crate::access::Principal;
 use crate::error::Error;
+use crate::tenancy::TenantContext;
 
 /// Điều một event của module sở hữu nghĩa là với đối tượng của nó.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,7 +71,12 @@ impl ResourceEvent {
 pub trait BadgeResolver: Send + Sync {
     /// Các nhãn `author` có trên đối tượng `id` (chỉ trong số nhãn đã khai lúc đăng ký; nhãn
     /// khác bị bỏ). Đối tượng không có thì trả rỗng.
-    async fn badges(&self, id: &str, author: &Principal) -> Result<Vec<&'static str>, Error>;
+    async fn badges(
+        &self,
+        tenant: &TenantContext,
+        id: &str,
+        author: &Principal,
+    ) -> Result<Vec<&'static str>, Error>;
 }
 
 /// Bộ tính nhãn đã đăng ký: module, loại đối tượng, các nhãn nó có thể trả, bộ tính.
@@ -167,8 +173,8 @@ impl ResourceRef {
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait ResourceResolver: Send + Sync {
-    /// Đối tượng `id`; `None` khi không có.
-    async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error>;
+    /// Đối tượng `id` của khách `tenant`; `None` khi không có.
+    async fn resolve(&self, tenant: &TenantContext, id: &str) -> Result<Option<Resource>, Error>;
 
     /// Nhiều đối tượng một lần, với tiêu đề, đường dẫn theo ngôn ngữ `locale` khi loại có bản
     /// dịch (thiếu bản dịch thì bộ tra tự chọn ngôn ngữ mặc định của nó). Đối tượng không có thì
@@ -176,6 +182,7 @@ pub trait ResourceResolver: Send + Sync {
     /// loại hay được tra theo lô (vd mục menu) nên cài bằng một câu query.
     async fn resolve_many(
         &self,
+        tenant: &TenantContext,
         ids: &[String],
         locale: Option<&str>,
     ) -> Result<HashMap<String, Resource>, Error> {
@@ -185,7 +192,7 @@ pub trait ResourceResolver: Send + Sync {
             if found.contains_key(id) {
                 continue;
             }
-            if let Some(resource) = self.resolve(id).await? {
+            if let Some(resource) = self.resolve(tenant, id).await? {
                 found.insert(id.clone(), resource);
             }
         }
@@ -202,11 +209,12 @@ pub trait ResourceResolver: Send + Sync {
     /// chỉ những cái người lạ xem được. Mặc định rỗng.
     async fn children(
         &self,
+        tenant: &TenantContext,
         id: &str,
         locale: Option<&str>,
         limit: usize,
     ) -> Result<Vec<ResourceRef>, Error> {
-        let _ = (id, locale, limit);
+        let _ = (tenant, id, locale, limit);
         Ok(Vec::new())
     }
 }
@@ -278,8 +286,13 @@ impl ResourceDirectory {
 
     /// Đối tượng `id` thuộc loại `kind`. `Ok(None)` khi không có đối tượng đó; lỗi khi không
     /// có bộ tra cho loại này (hỏi [`knows`](Self::knows) trước nếu loại có thể chưa có).
-    pub async fn resolve(&self, kind: &str, id: &str) -> Result<Option<Resource>, Error> {
-        self.resolver(kind)?.resolve(id).await
+    pub async fn resolve(
+        &self,
+        tenant: &TenantContext,
+        kind: &str,
+        id: &str,
+    ) -> Result<Option<Resource>, Error> {
+        self.resolver(kind)?.resolve(tenant, id).await
     }
 
     /// Nhiều đối tượng loại `kind` một lần, theo ngôn ngữ `locale`: ID → đối tượng; ID không có
@@ -287,6 +300,7 @@ impl ResourceDirectory {
     /// transaction ghi.
     pub async fn resolve_many(
         &self,
+        tenant: &TenantContext,
         kind: &str,
         ids: &[String],
         locale: Option<&str>,
@@ -294,7 +308,7 @@ impl ResourceDirectory {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
-        self.resolver(kind)?.resolve_many(ids, locale).await
+        self.resolver(kind)?.resolve_many(tenant, ids, locale).await
     }
 
     /// Loại `kind` có cây không (có [`children`](Self::children)); `false` cả khi chưa đăng ký.
@@ -306,6 +320,7 @@ impl ResourceDirectory {
     /// cho loại này.
     pub async fn children(
         &self,
+        tenant: &TenantContext,
         kind: &str,
         id: &str,
         locale: Option<&str>,
@@ -314,7 +329,7 @@ impl ResourceDirectory {
         if limit == 0 {
             return Ok(Vec::new());
         }
-        let mut found = self.resolver(kind)?.children(id, locale, limit).await?;
+        let mut found = self.resolver(kind)?.children(tenant, id, locale, limit).await?;
         found.truncate(limit);
         Ok(found)
     }
@@ -376,6 +391,7 @@ impl ResourceDirectory {
     /// gọi NGOÀI transaction ghi.
     pub async fn badges(
         &self,
+        tenant: &TenantContext,
         kind: &str,
         id: &str,
         author: &Principal,
@@ -390,7 +406,7 @@ impl ResourceDirectory {
         };
         let mut found = Vec::new();
         for (codes, resolver) in sources {
-            for code in resolver.badges(id, author).await? {
+            for code in resolver.badges(tenant, id, author).await? {
                 if let Some(code) = codes.iter().find(|known| **known == code)
                     && !found.contains(code)
                 {
@@ -414,7 +430,11 @@ mod tests {
 
     #[async_trait::async_trait]
     impl ResourceResolver for Fixed {
-        async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
+        async fn resolve(
+            &self,
+            _tenant: &crate::tenancy::TenantContext,
+            id: &str,
+        ) -> Result<Option<Resource>, Error> {
             Ok((id == "1").then(|| Resource {
                 public: true,
                 title: "One".to_owned(),
@@ -428,12 +448,17 @@ mod tests {
 
     #[async_trait::async_trait]
     impl ResourceResolver for Tree {
-        async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
+        async fn resolve(
+            &self,
+            _tenant: &crate::tenancy::TenantContext,
+            id: &str,
+        ) -> Result<Option<Resource>, Error> {
             Ok(Some(Resource::new(id.to_uppercase()).public(true)))
         }
 
         async fn resolve_many(
             &self,
+            _tenant: &crate::tenancy::TenantContext,
             ids: &[String],
             locale: Option<&str>,
         ) -> Result<HashMap<String, Resource>, Error> {
@@ -450,6 +475,7 @@ mod tests {
 
         async fn children(
             &self,
+            _tenant: &crate::tenancy::TenantContext,
             id: &str,
             _: Option<&str>,
             _: usize,
@@ -470,24 +496,61 @@ mod tests {
 
         // Mặc định: tra từng cái, bỏ ID không có, không trùng.
         let ids = vec!["1".to_owned(), "2".to_owned(), "1".to_owned()];
-        let found = directory.resolve_many("content.entry", &ids, Some("vi")).await.unwrap();
+        let found = directory
+            .resolve_many(&crate::tenancy::test_tenant(), "content.entry", &ids, Some("vi"))
+            .await
+            .unwrap();
         assert_eq!(found.len(), 1);
         assert_eq!(found["1"].title, "One");
-        assert!(directory.resolve_many("forms.form", &ids, None).await.is_err());
-        assert!(directory.resolve_many("forms.form", &[], None).await.unwrap().is_empty());
+        assert!(
+            directory
+                .resolve_many(&crate::tenancy::test_tenant(), "forms.form", &ids, None)
+                .await
+                .is_err()
+        );
+        assert!(
+            directory
+                .resolve_many(&crate::tenancy::test_tenant(), "forms.form", &[], None)
+                .await
+                .unwrap()
+                .is_empty()
+        );
 
         // Cài riêng: theo ngôn ngữ.
-        let found = directory.resolve_many("shop.tree", &ids, Some("vi")).await.unwrap();
+        let found = directory
+            .resolve_many(&crate::tenancy::test_tenant(), "shop.tree", &ids, Some("vi"))
+            .await
+            .unwrap();
         assert_eq!(found["2"].title, "2@vi");
 
         assert!(!directory.has_children("content.entry"), "default: no tree");
         assert!(directory.has_children("shop.tree"));
         assert!(!directory.has_children("forms.form"), "unknown kinds have no tree");
-        assert!(directory.children("content.entry", "1", None, 5).await.unwrap().is_empty());
-        let children = directory.children("shop.tree", "p", None, 1).await.unwrap();
+        assert!(
+            directory
+                .children(&crate::tenancy::test_tenant(), "content.entry", "1", None, 5)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let children = directory
+            .children(&crate::tenancy::test_tenant(), "shop.tree", "p", None, 1)
+            .await
+            .unwrap();
         assert_eq!(children, [ResourceRef::new("shop.tree", "c1")], "cut at the limit");
-        assert!(directory.children("shop.tree", "p", None, 0).await.unwrap().is_empty());
-        assert!(directory.children("forms.form", "p", None, 5).await.is_err());
+        assert!(
+            directory
+                .children(&crate::tenancy::test_tenant(), "shop.tree", "p", None, 0)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            directory
+                .children(&crate::tenancy::test_tenant(), "forms.form", "p", None, 5)
+                .await
+                .is_err()
+        );
 
         let image = Uuid::now_v7();
         assert_eq!(Resource::new("A").image(Some(image)).image, Some(image));
@@ -505,16 +568,35 @@ mod tests {
         );
         assert!(directory.register("content", "content.Bad", Arc::new(Fixed)).is_err());
         assert!(early.knows("content.entry"), "clones see later registrations");
-        assert_eq!(early.resolve("content.entry", "1").await.unwrap().unwrap().title, "One");
-        assert!(early.resolve("content.entry", "2").await.unwrap().is_none());
-        assert!(early.resolve("forms.form", "1").await.is_err());
+        assert_eq!(
+            early
+                .resolve(&crate::tenancy::test_tenant(), "content.entry", "1")
+                .await
+                .unwrap()
+                .unwrap()
+                .title,
+            "One"
+        );
+        assert!(
+            early
+                .resolve(&crate::tenancy::test_tenant(), "content.entry", "2")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(early.resolve(&crate::tenancy::test_tenant(), "forms.form", "1").await.is_err());
     }
 
     struct Seller;
 
     #[async_trait::async_trait]
     impl BadgeResolver for Seller {
-        async fn badges(&self, id: &str, author: &Principal) -> Result<Vec<&'static str>, Error> {
+        async fn badges(
+            &self,
+            _tenant: &crate::tenancy::TenantContext,
+            id: &str,
+            author: &Principal,
+        ) -> Result<Vec<&'static str>, Error> {
             Ok(if id == "1" && author.allows("catalog.manage") {
                 vec!["seller", "unknown"]
             } else {
@@ -527,7 +609,12 @@ mod tests {
 
     #[async_trait::async_trait]
     impl BadgeResolver for Buyer {
-        async fn badges(&self, _: &str, _: &Principal) -> Result<Vec<&'static str>, Error> {
+        async fn badges(
+            &self,
+            _tenant: &crate::tenancy::TenantContext,
+            _: &str,
+            _: &Principal,
+        ) -> Result<Vec<&'static str>, Error> {
             Ok(vec!["verified_buyer", "verified_buyer"])
         }
     }
@@ -555,13 +642,25 @@ mod tests {
 
         let manager = Principal::new(Uuid::now_v7(), ["catalog.manage".to_owned()]);
         let buyer = Principal::new(Uuid::now_v7(), Vec::<String>::new());
-        let found = directory.badges("catalog.product", "1", &manager).await.unwrap();
+        let found = directory
+            .badges(&crate::tenancy::test_tenant(), "catalog.product", "1", &manager)
+            .await
+            .unwrap();
         assert_eq!(found, ["seller", "verified_buyer"], "undeclared badges are dropped");
         assert_eq!(
-            directory.badges("catalog.product", "1", &buyer).await.unwrap(),
+            directory
+                .badges(&crate::tenancy::test_tenant(), "catalog.product", "1", &buyer)
+                .await
+                .unwrap(),
             ["verified_buyer"]
         );
-        assert!(directory.badges("content.entry", "1", &manager).await.unwrap().is_empty());
+        assert!(
+            directory
+                .badges(&crate::tenancy::test_tenant(), "content.entry", "1", &manager)
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

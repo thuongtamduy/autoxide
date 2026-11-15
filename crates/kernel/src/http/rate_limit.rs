@@ -146,8 +146,12 @@ impl ApiKeyLimited {
 
 #[async_trait::async_trait]
 impl Authenticator for ApiKeyLimited {
-    async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
-        let principal = self.inner.authenticate(authorization).await?;
+    async fn authenticate(
+        &self,
+        authorization: Option<&str>,
+        hint: &crate::tenancy::TenantHint,
+    ) -> Result<Principal, Error> {
+        let principal = self.inner.authenticate(authorization, hint).await?;
         if let Some(key) = principal.api_key_id()
             && let Decision::Deny(wait) = self.cells.check(key, Instant::now())
         {
@@ -218,7 +222,11 @@ mod tests {
 
     #[async_trait::async_trait]
     impl Authenticator for Keys {
-        async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
+        async fn authenticate(
+            &self,
+            authorization: Option<&str>,
+            _: &crate::tenancy::TenantHint,
+        ) -> Result<Principal, Error> {
             let principal = Principal::new(Uuid::from_u128(1), Vec::<String>::new());
             Ok(match authorization {
                 Some("session") | None => principal,
@@ -232,19 +240,23 @@ mod tests {
         let limited = ApiKeyLimited::wrap(Arc::new(Keys), RateLimit { per_minute: 60, burst: 2 });
         let (a, b) = (Uuid::from_u128(10).to_string(), Uuid::from_u128(11).to_string());
         for _ in 0..2 {
-            limited.authenticate(Some(&a)).await.unwrap();
+            limited.authenticate(Some(&a), &crate::tenancy::TenantHint::none()).await.unwrap();
         }
-        let error = limited.authenticate(Some(&a)).await.unwrap_err();
+        let error =
+            limited.authenticate(Some(&a), &crate::tenancy::TenantHint::none()).await.unwrap_err();
         assert_eq!((error.code(), error.retry_after()), ("rate_limited", Some(1)));
         // Key khác vẫn chạy; phiên đăng nhập không bị đếm.
-        limited.authenticate(Some(&b)).await.unwrap();
+        limited.authenticate(Some(&b), &crate::tenancy::TenantHint::none()).await.unwrap();
         for _ in 0..5 {
-            limited.authenticate(Some("session")).await.unwrap();
+            limited
+                .authenticate(Some("session"), &crate::tenancy::TenantHint::none())
+                .await
+                .unwrap();
         }
         // Tắt: trả nguyên bộ xác thực.
         let off = ApiKeyLimited::wrap(Arc::new(Keys), RateLimit { per_minute: 0, burst: 1 });
         for _ in 0..5 {
-            off.authenticate(Some(&a)).await.unwrap();
+            off.authenticate(Some(&a), &crate::tenancy::TenantHint::none()).await.unwrap();
         }
     }
 

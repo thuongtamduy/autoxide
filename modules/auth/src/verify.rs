@@ -18,6 +18,7 @@ use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::job::JobQueue;
 use autoxide_kernel::mail::{MailTemplate, Mailer};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use serde_json::json;
@@ -120,25 +121,80 @@ impl EmailVerifications {
         self.send(Actor::user(user_id), &user, &email, language).await
     }
 
+    /// Email đang chờ xác minh sau khi `user` xin đổi (địa chỉ mới, hạn của link); `None` khi
+    /// không có (token xác minh còn dùng được mà địa chỉ khác email hiện tại).
+    pub(crate) async fn pending_change(
+        &self,
+        user: &User,
+    ) -> Result<Option<(String, DateTime<Utc>)>, Error> {
+        let tenant = TenantContext::legacy_default(&self.database);
+        let subject = user.id.to_string();
+        let live = tokens().live(self.database.read(), &tenant, PURPOSE, &subject).await?;
+        Ok(live.into_iter().find_map(|token| {
+            let email = token.data.filter(|email| *email != user.email)?;
+            Some((email, token.expires_at))
+        }))
+    }
+
+    /// Huỷ yêu cầu đổi email của người dùng `user_id`: link đã gửi tới địa chỉ mới hết dùng được
+    /// (cùng mọi link xác minh khác của tài khoản — xin lại được). Không có yêu cầu nào thì
+    /// `auth.no_pending_email_change`.
+    pub(crate) async fn cancel_change(&self, user_id: Uuid) -> Result<(), Error> {
+        let user = self.users.get(user_id).await?.ok_or_else(|| user::user_not_found(user_id))?;
+        let Some((email, _)) = self.pending_change(&user).await? else {
+            return Err(no_pending_change());
+        };
+        let tenant = TenantContext::legacy_default(&self.database);
+        let transaction = self.database.begin_write().await?;
+        tokens().revoke(&transaction, &tenant, PURPOSE, &user_id.to_string()).await?;
+        let event =
+            events::EmailChangeCancelled { before: Some(json!({"email": email})), after: None };
+        let actor = Actor::user(user_id);
+        self.outbox
+            .record(&transaction, &tenant, actor, events::user_subject(user_id), &event)
+            .await?;
+        transaction.commit().await?;
+        tracing::info!(user_id = %user_id, "pending email change cancelled");
+        Ok(())
+    }
+
     /// Xác nhận email bằng `token` lấy từ mail. Trả tài khoản sau khi xác minh. Email đổi thì
     /// xếp mail báo tới địa chỉ cũ (bằng `language`) trong cùng transaction.
     pub(crate) async fn confirm(&self, token: &str, language: Language) -> Result<User, Error> {
         let now = now();
         let transaction = self.database.begin_write().await?;
-        let consumed = tokens().consume(&transaction, PURPOSE, token).await?;
+        let consumed = tokens()
+            .consume(&transaction, &TenantContext::legacy_default(&self.database), PURPOSE, token)
+            .await?;
         let found = consumed
             .and_then(|consumed| Some((consumed.subject.parse::<Uuid>().ok()?, consumed.data?)));
         let Some((user_id, email)) = found else {
+            let tenant = TenantContext::legacy_default(&self.database);
+            let why = tokens().rejection(&transaction, &tenant, PURPOSE, token).await?;
             transaction.rollback().await?;
-            return Err(invalid_token());
+            return Err(invalid_token().with_reason(why.as_str()));
         };
         let old = self.users.apply_verified_email(&transaction, user_id, &email, now).await?;
         // Token khác của người này (mail cũ hơn, hay cho địa chỉ khác) hết dùng được.
         // Mọi token xác minh khác của người này hết hiệu lực.
-        tokens().revoke(&transaction, PURPOSE, &user_id.to_string()).await?;
+        tokens()
+            .revoke(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &user_id.to_string(),
+            )
+            .await?;
         // Email đổi: mail đặt lại mật khẩu đã gửi tới địa chỉ cũ hết dùng được (D-156).
         if old != email {
-            tokens().revoke(&transaction, "password_reset", &user_id.to_string()).await?;
+            tokens()
+                .revoke(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    "password_reset",
+                    &user_id.to_string(),
+                )
+                .await?;
             let job = EmailChangedJob {
                 user_id,
                 old_email: old.clone(),
@@ -151,7 +207,15 @@ impl EmailVerifications {
         let before = (old != email).then(|| json!({"email": old}));
         let event = events::EmailVerified { before, after: Some(json!({"email": email})) };
         let subject = events::user_subject(user_id);
-        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::user(user_id),
+                subject,
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, changed = old != email, "email verified");
         self.users.get(user_id).await?.ok_or_else(|| user::user_not_found(user_id))
@@ -169,19 +233,45 @@ impl EmailVerifications {
         let now = now();
         let subject = user.id.to_string();
         let since = now - chrono::Duration::seconds(COOLDOWN_SECONDS);
-        let recent = tokens().recent(self.database.write(), PURPOSE, &subject, since).await?;
+        let recent = tokens()
+            .recent(
+                self.database.write(),
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &subject,
+                since,
+            )
+            .await?;
         if recent.iter().any(|token| token.data.as_deref() == Some(email)) {
             return Ok(());
         }
 
         let transaction = self.database.begin_write().await?;
         let ttl = chrono::Duration::hours(TOKEN_HOURS);
-        let token = tokens().issue(&transaction, PURPOSE, &subject, Some(email), ttl).await?.token;
+        let token = tokens()
+            .issue(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                PURPOSE,
+                &subject,
+                Some(email),
+                ttl,
+            )
+            .await?
+            .token;
         let event = events::EmailVerificationRequested {
             before: None,
             after: Some(json!({"email": email})),
         };
-        self.outbox.record(&transaction, actor, events::user_subject(user.id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(user.id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
 
         let hours = TOKEN_HOURS.to_string();
@@ -196,15 +286,21 @@ impl EmailVerifications {
                 VERIFY_CODE.mail(email, &self.translations, language, &params)
             }
         };
-        self.mailer.send(mail).await
+        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await
     }
 }
 
 fn invalid_token() -> Error {
     Error::bad_request(
         "auth.invalid_verification_token",
-        "The email-verification token is unknown, expired or already used. Ask for a new \
-         verification mail (`POST /api/v1/auth/me/email/verification`).",
+        "This verification link is unknown, expired or already used. Ask for a new verification mail.",
+    )
+}
+
+fn no_pending_change() -> Error {
+    Error::not_found(
+        "auth.no_pending_email_change",
+        "There is no email change waiting to be confirmed.",
     )
 }
 
@@ -289,10 +385,13 @@ mod tests {
             assert!(verified.email_verified_at.is_some());
             let again = verifications.confirm(&token, Language::En).await.unwrap_err();
             assert_eq!(again.code(), "auth.invalid_verification_token");
+            // Giao diện nói được "link đã dùng rồi" thay vì "link sai".
+            assert_eq!(again.reason(), Some("used"));
             let done = verifications.send_current(ada.id, Language::En).await.unwrap_err();
             assert_eq!(done.code(), "auth.email_already_verified");
             let unknown = verifications.confirm("nope", Language::En).await.unwrap_err();
             assert_eq!(unknown.code(), "auth.invalid_verification_token");
+            assert_eq!(unknown.reason(), Some("unknown"));
         })
         .await
         .unwrap();
@@ -309,6 +408,7 @@ mod tests {
 
             let expired = services.verifications.confirm(&token, Language::En).await.unwrap_err();
             assert_eq!(expired.code(), "auth.invalid_verification_token");
+            assert_eq!(expired.reason(), Some("expired"));
         })
         .await
         .unwrap();

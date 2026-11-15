@@ -50,6 +50,9 @@ pub(super) struct Settings {
     pub body_limits: Arc<super::body_limit::BodyLimits>,
     /// Thời gian tối đa của một request: hết thì lần đầu coi như đã chết.
     pub request_timeout: Duration,
+    /// Sổ database: bản ghi idempotency nằm ở database của khách người gọi. `None`: ứng dụng
+    /// không có sổ database (chỉ ở test dựng router tay) — bỏ qua idempotency.
+    pub databases: Option<crate::tenancy::DatabaseRegistry>,
 }
 
 pub(super) async fn idempotency(
@@ -99,14 +102,28 @@ async fn run(
     let authorization =
         request.headers().get(header::AUTHORIZATION).and_then(|value| value.to_str().ok());
     let principal = match &settings.authenticator {
-        Some(authenticator) => authenticator.authenticate(authorization).await.ok(),
+        Some(authenticator) => {
+            let hint = crate::tenancy::TenantHint::from_headers(request.headers());
+            authenticator.authenticate(authorization, &hint).await.ok()
+        }
         None => None,
     };
     let Some(principal) = principal else {
         return Ok(next.run(request).await);
     };
+    let Some(databases) = &settings.databases else {
+        return Ok(next.run(request).await);
+    };
+    // Khách người gọi đang làm việc (kể cả nhân sự nền tảng vào khách khác bằng header).
+    let tenant = databases.tenant(principal.tenant_id()).await?;
+    // Người gọi trong khách: cùng tài khoản (cùng `user_id`) ở hai khách là hai phạm vi. Khách mặc
+    // định giữ phạm vi như trước bước 33: nâng cấp không làm mất key đang còn hiệu lực.
     let api_key = principal.api_key_id().map(|id| id.as_bytes().to_vec()).unwrap_or_default();
-    let scope = hash(&[principal.user_id().as_bytes(), &api_key]);
+    let scope = if tenant.is_platform() {
+        hash(&[principal.user_id().as_bytes(), &api_key])
+    } else {
+        hash(&[tenant.id().as_uuid().as_bytes(), principal.user_id().as_bytes(), &api_key])
+    };
     let limit = settings.body_limits.for_request(&request);
     let declared = request
         .headers()
@@ -156,7 +173,10 @@ async fn run(
     ]);
     let lock = chrono::Duration::from_std(settings.request_timeout + Duration::from_secs(30))
         .map_err(Error::internal)?;
-    let begin = settings.store.begin(&scope, &key, &fingerprint, chrono::Utc::now() + lock).await?;
+    let begin = settings
+        .store
+        .begin(&tenant, &scope, &key, &fingerprint, chrono::Utc::now() + lock)
+        .await?;
     let id = match begin {
         Begin::Started { id } => id,
         Begin::Replay(stored) => return Ok(replay(stored)),
@@ -181,7 +201,7 @@ async fn run(
     let response = next.run(Request::from_parts(parts, body)).await;
     // Lưu kết quả mà hỏng (database bận, mất kết nối): việc đã xong, client vẫn nhận đúng
     // response; dòng còn khoá tới `locked_until` rồi lần gửi lại chạy lại (đã ghi log).
-    let (response, outcome) = settle(settings, id, response).await;
+    let (response, outcome) = settle(settings, &tenant, id, response).await;
     if let Err(error) = outcome {
         tracing::error!(code = error.code(), "cannot save the idempotent result");
     }
@@ -191,6 +211,7 @@ async fn run(
 /// Quyết định lưu gì cho lần chạy `id` vừa trả `response`, rồi trả response cho client.
 async fn settle(
     settings: &Settings,
+    tenant: &crate::tenancy::TenantContext,
     id: uuid::Uuid,
     response: Response,
 ) -> (Response, Result<(), Error>) {
@@ -204,13 +225,13 @@ async fn settle(
              server cannot tell whether it took effect. Look the result up before repeating \
              it, then use a new key.",
         ));
-        let outcome = keep(settings, id, refusal).await;
+        let outcome = keep(settings, tenant, id, refusal).await;
         return (response, outcome);
     }
     if status.is_server_error() || is_temporary(status) {
         // Lỗi phía máy chủ, hay lỗi tạm (429 vượt giới hạn, 408): không lưu, để client gửi lại
         // được với cùng key khi hết giới hạn (D-157).
-        return (response, settings.store.abandon(id).await);
+        return (response, settings.store.abandon(tenant, id).await);
     }
     if status.is_success() && no_store(response.headers()) {
         // Response chứa secret chỉ trả một lần (API key mới, token, mã khôi phục): không lưu
@@ -221,7 +242,7 @@ async fn settle(
              a secret that the server does not keep. Do not repeat it: look the result up \
              instead (for example list your API keys), or use a new key to do it again.",
         ));
-        let outcome = keep(settings, id, refusal).await;
+        let outcome = keep(settings, tenant, id, refusal).await;
         return (response, outcome);
     }
     let (response_parts, body) = response.into_parts();
@@ -229,7 +250,7 @@ async fn settle(
         Ok(body) => body,
         Err(error) => {
             let error = Error::internal(error);
-            let abandoned = settings.store.abandon(id).await;
+            let abandoned = settings.store.abandon(tenant, id).await;
             return (error.into_response(), abandoned);
         }
     };
@@ -240,9 +261,9 @@ async fn settle(
              too large to keep. Do not repeat it: look the result up instead, or use a new \
              key to do it again.",
         ));
-        keep(settings, id, refusal).await
+        keep(settings, tenant, id, refusal).await
     } else {
-        settings.store.complete(id, stored(&response_parts, &body)).await
+        settings.store.complete(tenant, id, stored(&response_parts, &body)).await
     };
     (Response::from_parts(response_parts, Body::from(body)), outcome)
 }
@@ -261,10 +282,15 @@ fn not_kept(error: Error) -> Response {
 }
 
 /// Lưu `refusal` làm kết quả của lần chạy `id`.
-async fn keep(settings: &Settings, id: uuid::Uuid, refusal: Response) -> Result<(), Error> {
+async fn keep(
+    settings: &Settings,
+    tenant: &crate::tenancy::TenantContext,
+    id: uuid::Uuid,
+    refusal: Response,
+) -> Result<(), Error> {
     let (parts, body) = refusal.into_parts();
     let body = axum::body::to_bytes(body, usize::MAX).await.map_err(Error::internal)?;
-    settings.store.complete(id, stored(&parts, &body)).await
+    settings.store.complete(tenant, id, stored(&parts, &body)).await
 }
 
 /// Bản lưu của một response: status, các header cần giữ, thân.

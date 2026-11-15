@@ -9,6 +9,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
@@ -165,12 +166,24 @@ impl CommentsService {
         let subject = events::comment_subject(id);
         let change = Change { before: Some(summary(&before)), after: Some(summary(&after)) };
         self.outbox
-            .record(&transaction, actor, subject.clone(), &events::CommentStatusChanged(change))
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                subject.clone(),
+                &events::CommentStatusChanged(change),
+            )
             .await?;
         if to == Status::Published {
             let change = Change { before: Some(summary(&before)), after: Some(summary(&after)) };
             self.outbox
-                .record(&transaction, actor, subject, &events::CommentPublished(change))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::CommentPublished(change),
+                )
                 .await?;
         }
         transaction.commit().await?;
@@ -211,7 +224,13 @@ impl CommentsService {
         let ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
         for found in &rows {
             shift_counts(&transaction, found, Some(Status::of(found)), None).await?;
-            self.tokens.forget(&transaction, &found.id.to_string()).await?;
+            self.tokens
+                .forget(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    &found.id.to_string(),
+                )
+                .await?;
         }
         report::Entity::delete_many()
             .filter(report::Column::CommentId.is_in(ids.clone()))
@@ -233,6 +252,7 @@ impl CommentsService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::comment_subject(id),
                 &events::CommentDeleted(change),
@@ -296,11 +316,10 @@ impl CommentsService {
                 valid.then(|| raw.to_owned())
             }
             _ => {
-                problems.push(FieldError::new(
-                    "kind",
-                    "invalid",
-                    format!("must be one of {BAN_KINDS}"),
-                ));
+                problems.push(
+                    FieldError::new("kind", "invalid", "must be one of {ban_kinds}")
+                        .with_param("ban_kinds", BAN_KINDS),
+                );
                 None
             }
         };
@@ -331,6 +350,7 @@ impl CommentsService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::ban_subject(row.id),
                 &events::BanCreated(change),
@@ -353,6 +373,7 @@ impl CommentsService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::ban_subject(id),
                 &events::BanDeleted(change),
@@ -421,7 +442,13 @@ impl CommentsService {
                 after: None,
             };
             self.outbox
-                .record(&transaction, Actor::from(principal), None, &events::CommentsErased(change))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    Actor::from(principal),
+                    None,
+                    &events::CommentsErased(change),
+                )
                 .await?;
         }
         transaction.commit().await?;

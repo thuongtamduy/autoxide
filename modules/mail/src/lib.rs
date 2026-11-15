@@ -5,6 +5,7 @@
 //! không có thì ghi file `.eml` vào `AUTOXIDE_MAIL_FILE_DIR` (cho dev và test).
 
 pub mod api;
+mod client_config;
 mod config;
 mod doctor;
 mod service;
@@ -54,6 +55,14 @@ impl Module for MailModule {
             // Bảng `mail_events` (outbox) cho event mail bị từ chối hẳn.
             autoxide_kernel::event::outbox_migration("m0002_create_events", "mail"),
             autoxide_kernel::event::outbox_actor_migration("m0003_add_event_actor", "mail"),
+            // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+            autoxide_kernel::tenancy::migration::adopt(
+                "m0004_tenancy_helpers",
+                vec![
+                    autoxide_kernel::job::tenant_table("mail"),
+                    autoxide_kernel::event::tenant_table("mail"),
+                ],
+            ),
         ]
     }
 
@@ -64,6 +73,12 @@ impl Module for MailModule {
              5.1.x or 5.2.x: no such mailbox, for example); `to` is the address, `dedupe_key` \
              the sender's key.",
         )]
+    }
+
+    fn client_config(
+        &self,
+    ) -> Result<Option<autoxide_kernel::module::ClientSection>, autoxide_kernel::error::Error> {
+        self.config.as_ref().map_or(Ok(None), client_config::section)
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {

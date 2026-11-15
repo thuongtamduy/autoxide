@@ -6,6 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
+use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use axum::extract::{Path, Query, State};
@@ -42,20 +43,22 @@ pub(crate) struct SeoFinding {
     /// The field, or the place in the body JSON (e.g. `body.content[2].attrs.alt`).
     #[schema(example = "body.content[2].attrs.alt")]
     field: String,
-    /// What to fix, in English.
+    /// What to fix, in the language of `Accept-Language`.
     message: String,
 }
 
-impl From<Finding> for SeoFinding {
-    fn from(finding: Finding) -> Self {
+impl SeoFinding {
+    fn new(finding: Finding, translations: &Translations, language: Language) -> Self {
+        let params: Vec<(&str, &str)> =
+            finding.params.iter().map(|(name, value)| (*name, value.as_str())).collect();
         SeoFinding {
             code: finding.code.to_owned(),
             level: match finding.level {
                 Level::Error => FindingLevel::Error,
                 Level::Warning => FindingLevel::Warning,
             },
+            message: translations.describe_with(finding.template, &params, language),
             field: finding.field,
-            message: finding.message,
         }
     }
 }
@@ -67,9 +70,17 @@ pub(crate) struct SeoReport {
     findings: Vec<SeoFinding>,
 }
 
-impl From<Vec<Finding>> for SeoReport {
-    fn from(findings: Vec<Finding>) -> Self {
-        SeoReport { findings: findings.into_iter().map(SeoFinding::from).collect() }
+impl SeoReport {
+    pub(crate) fn new(
+        findings: Vec<Finding>,
+        translations: &Translations,
+        language: Language,
+    ) -> Self {
+        let findings = findings
+            .into_iter()
+            .map(|finding| SeoFinding::new(finding, translations, language))
+            .collect();
+        SeoReport { findings }
     }
 }
 
@@ -124,8 +135,10 @@ pub(crate) async fn seo_check(
     State(service): State<Arc<ContentService>>,
     principal: Principal,
     Path(id): Path<Uuid>,
+    language: Language,
 ) -> Result<Data<SeoReport>, Error> {
-    Ok(Data { data: SeoReport::from(service.seo_check(&principal, id).await?) })
+    let findings = service.seo_check(&principal, id).await?;
+    Ok(Data { data: SeoReport::new(findings, &service.translations, language) })
 }
 
 /// Suggest SEO fields with AI.
@@ -272,7 +285,7 @@ impl IntoResponse for Accepted {
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `content.write` or `content.write_own` (code `permission_denied`), or the entry (or its translation) is not yours and you only have `content.write_own` (code `content.not_owner`).", body = Problem),
         (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
-        (status = 409, description = "A translation into this language is already queued or running (code `content.translation_in_progress`), or the parent page has no translation yet (code `content.parent_not_translated`).", body = Problem),
+        (status = 409, description = "A translation into this language is already queued or running (code `content.translation_in_progress`; follow it with `GET /api/v1/content/entries/{id}/translation-requests`), or the parent page has no translation yet (code `content.parent_not_translated`).", body = Problem),
         (status = 422, description = "The language is not supported or is the entry's own; see `errors`.", body = Problem),
         (status = 503, description = "AI is off on this server; code `ai.disabled`.", body = Problem),
     )

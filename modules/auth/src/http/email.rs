@@ -21,7 +21,7 @@ use super::users::UserResponse;
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
         .routes(routes!(resend_verification))
-        .routes(routes!(change_email))
+        .routes(routes!(change_email, cancel_email_change))
         .routes(routes!(confirm_email))
         .routes(routes!(report_email_change))
 }
@@ -93,7 +93,7 @@ async fn resend_verification(
     request_body = ChangeEmailRequest,
     responses(
         (status = 202, description = "A verification mail is on its way to the new address."),
-        (status = 400, description = "The current password is wrong; code `auth.wrong_password`.", body = Problem),
+        (status = 400, description = "The current password is wrong; code `auth.wrong_password`. A user who forgot it resets it with `POST /api/v1/auth/password-reset`.", body = Problem),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Called with an API key (code `auth.session_required`), or the account is disabled (code `auth.user_disabled`).", body = Problem),
         (status = 409, description = "Another account has this email (code `auth.email_taken`), or it is already your verified address (code `auth.email_already_verified`).", body = Problem),
@@ -115,6 +115,31 @@ async fn change_email(
     Ok(StatusCode::ACCEPTED)
 }
 
+/// Cancel a pending email change.
+///
+/// Any signed-in user, for their own account. The link sent to the new address stops working
+/// (as does any other verification link of the account; ask for a new one if needed) and the
+/// email stays as it is. See the pending change in `pending_email` of `GET /api/v1/auth/me`.
+#[utoipa::path(
+    delete,
+    path = "/me/email",
+    extensions(("x-permissions" = json!([]))),
+    operation_id = "cancel_email_change",
+    security(("bearer" = [])),
+    responses(
+        (status = 204, description = "The change was cancelled."),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 404, description = "No change is waiting; code `auth.no_pending_email_change`.", body = Problem),
+    )
+)]
+async fn cancel_email_change(
+    State(state): State<Arc<HttpState>>,
+    principal: Principal,
+) -> Result<StatusCode, Error> {
+    state.verifications.cancel_change(principal.user_id()).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Confirm an email address with the token from a verification mail.
 ///
 /// Needs no sign-in: the token proves the mail was received. When the token was sent
@@ -129,7 +154,7 @@ async fn change_email(
     request_body = VerificationConfirmation,
     responses(
         (status = 200, description = "Verified; the account as it is now.", body = Data<UserResponse>),
-        (status = 400, description = "The token is unknown, expired or used; code `auth.invalid_verification_token`.", body = Problem),
+        (status = 400, description = "The token is unknown, expired or used; code `auth.invalid_verification_token`, with `reason` (`expired`, `used` or `unknown`). Ask for a new mail with `POST /api/v1/auth/me/email/verification`.", body = Problem),
         (status = 409, description = "Another account took this address meanwhile; code `auth.email_taken`.", body = Problem),
         (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
     )
@@ -140,7 +165,7 @@ async fn confirm_email(
     ValidJson(input): ValidJson<VerificationConfirmation>,
 ) -> Result<Data<UserResponse>, Error> {
     let user = state.verifications.confirm(&input.token, language).await?;
-    Ok(Data { data: user.into() })
+    Ok(Data { data: super::users::describe(&state.users, user).await? })
 }
 
 /// Report an email change you did not make.
@@ -159,7 +184,7 @@ async fn confirm_email(
     request_body = EmailChangeReport,
     responses(
         (status = 204, description = "Reported; the account is locked and, when the old address was free, given back to it."),
-        (status = 400, description = "The token is unknown, expired or used; code `auth.invalid_email_change_report_token`.", body = Problem),
+        (status = 400, description = "The token is unknown, expired or used; code `auth.invalid_email_change_report_token`, with `reason` (`expired`, `used` or `unknown`).", body = Problem),
         (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
     )
 )]

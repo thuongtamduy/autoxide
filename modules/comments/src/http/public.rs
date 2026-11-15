@@ -160,22 +160,24 @@ pub(crate) async fn list_thread(
         Some(raw) => match raw.parse::<u32>() {
             Ok(value) if value <= REPLIES_MAX => value,
             _ => {
-                problems.push(FieldError::new(
-                    "replies_limit",
-                    "range",
-                    format!("must be a whole number between 0 and {REPLIES_MAX}"),
-                ));
+                problems.push(
+                    FieldError::new(
+                        "replies_limit",
+                        "range",
+                        "must be a whole number between 0 and {replies_max}",
+                    )
+                    .with_param("replies_max", REPLIES_MAX),
+                );
                 0
             }
         },
     };
     let search = query.q.as_deref().map(str::trim).filter(|text| !text.is_empty());
     if search.is_some_and(|text| text.chars().count() > SEARCH_MAX) {
-        problems.push(FieldError::new(
-            "q",
-            "length",
-            format!("must be at most {SEARCH_MAX} characters long"),
-        ));
+        problems.push(
+            FieldError::new("q", "length", "must be at most {search_max} characters long")
+                .with_param("search_max", SEARCH_MAX),
+        );
     }
     let page = page_request(paging, problems)?;
     Ok(service.thread(&kind, &id, &page, replies, search).await?.map(ThreadComment::from))
@@ -289,7 +291,7 @@ pub(crate) struct CreateCommentRequest {
         (status = 400, description = "The form token or challenge is missing, invalid or expired (codes `antispam.token_missing`, `antispam.token_invalid`, `antispam.token_expired`, `antispam.challenge_required`, `antispam.challenge_failed`): reload the form.", body = Problem),
         (status = 403, description = "Comments are off (`comments.disabled`), guests may not comment here (`comments.guests_not_allowed`), the author is banned (`comments.banned`), or a signed-in caller lacks `comments.post` (`permission_denied`).", body = Problem),
         (status = 404, description = "The target takes no comments (`comments.target_not_found`), or the comment to reply to is not shown (`comments.parent_not_found`).", body = Problem),
-        (status = 409, description = "The target is closed (`comments.target_closed`), or a signed-in user has no display name yet (`comments.profile_required`).", body = Problem),
+        (status = 409, description = "The target is closed (`comments.target_closed`), or a signed-in user has no display name yet (`comments.profile_required`; set one with `PUT /api/v1/comments/profile`).", body = Problem),
         (status = 413, description = "The body is too large; code `payload_too_large`.", body = Problem),
         (status = 422, description = "Invalid input (see `errors`), or a banned word (`comments.banned_word`).", body = Problem),
         (status = 429, description = "A signed-in user posted too many; code `antispam.rate_limited`.", body = Problem),
@@ -516,11 +518,11 @@ pub(crate) async fn count_comments(
             problems
                 .into_iter()
                 .map(|problem| {
+                    let mut problem = problem;
                     if problem.field == "target_id" {
-                        FieldError::new("target_ids", problem.code, problem.message)
-                    } else {
-                        problem
+                        "target_ids".clone_into(&mut problem.field);
                     }
+                    problem
                 })
                 .collect(),
         ));

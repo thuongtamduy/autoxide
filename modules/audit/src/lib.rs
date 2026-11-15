@@ -51,7 +51,8 @@ impl Module for AuditModule {
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         self.recorder = Some(Arc::new(Recorder::new(context.database().clone())));
-        self.service = Some(Arc::new(AuditService::new(context.database().clone())));
+        self.service =
+            Some(Arc::new(AuditService::new(context.database().clone(), context.resources())));
         self.chain = Some(Arc::new(chain::ChainProbe { database: context.database().clone() }));
         Ok(())
     }

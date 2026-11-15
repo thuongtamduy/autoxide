@@ -50,7 +50,13 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         let _ = database.close().await;
         return Err(error);
     }
-    if let Err(error) = modules.start(&database) {
+    // Sổ database: chế độ (`AUTOXIDE_TENANCY_MODE`) và các placement (bước 33).
+    let registry = autoxide_kernel::tenancy::DatabaseRegistry::new(
+        database.clone(),
+        config.database.clone(),
+        config.tenancy.clone(),
+    );
+    if let Err(error) = modules.start_in(&registry) {
         // Đóng kết nối trước khi báo lỗi; lỗi khởi động quan trọng hơn lỗi lúc đóng.
         let _ = database.close().await;
         return Err(error.to_string());
@@ -61,13 +67,14 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         && modules.api::<SecretKey>().is_some_and(|key| !key.is_configured())
     {
         tracing::warn!(
-            "AUTOXIDE_SECRET_KEY is not set: the signing key is kept in the database, so anyone \
-             with a copy of the database can work visitors' IP blocks back out of the stored \
-             hashes. Set it (outside the database, the same on every server) in production."
+            "AUTOXIDE_SECRET_KEY is not set: the root key is kept in the database, so anyone with \
+             a copy of the database (a backup) can open the secrets stored encrypted and work \
+             visitors' IP blocks back out of the stored hashes. Set it (outside the database, \
+             the same on every server) in production."
         );
     }
-    let background = modules.dispatcher(&database).and_then(|dispatcher| {
-        let worker = modules.worker(&database, config.process.job_concurrency)?;
+    let background = modules.dispatcher().and_then(|dispatcher| {
+        let worker = modules.worker(config.process.job_concurrency)?;
         Ok((dispatcher, worker))
     });
     let (dispatcher, worker) = match background {
@@ -107,20 +114,23 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
     } else {
         (Vec::new(), None, Vec::new())
     };
-    let extras = http::Extras::default()
+    let mut extras = http::Extras::default()
         .authenticator(authenticator)
         .idempotency(modules.api::<dyn IdempotencyStore>())
         .translations(modules.translations().clone())
         .deprecations(modules.deprecations())
         .body_limits(modules.body_limits())
         .tools(tools);
+    if let Some(registry) = modules.tenancy() {
+        extras = extras.tenancy(registry);
+    }
     let api = http::build(&config.http, root, routes, extras);
     Ok(Runtime { config, database, modules, api, dispatcher, worker, draining })
 }
 
 /// Lỗi nếu database còn migration chưa áp dụng; thông báo nêu từng migration và
 /// lệnh cần chạy.
-async fn require_applied(modules: &Modules, database: &Database) -> Result<(), String> {
+pub(crate) async fn require_applied(modules: &Modules, database: &Database) -> Result<(), String> {
     let migrator = modules.migrator().map_err(|error| error.to_string())?;
     let pending = migrator.pending(database).await.map_err(|error| error.to_string())?;
     if pending.is_empty() {

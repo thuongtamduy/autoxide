@@ -159,3 +159,65 @@ fn escape(text: &str) -> String {
     }
     escaped
 }
+
+/// Thư của một chiến dịch đúng như người nhận thấy (tiêu đề có nhãn, chân thư).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Preview {
+    pub subject: String,
+    pub text: String,
+    pub html: Option<String>,
+}
+
+/// Cấu hình đang dùng của module, cho trang cài đặt (không có secret).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Settings {
+    pub advertising_label: String,
+    pub advertising_max_per_day: u32,
+    pub postal_address: Option<String>,
+    pub public_url_set: bool,
+    pub preferences_url_set: bool,
+    pub confirm_url_set: bool,
+    pub send_rate_per_minute: u32,
+}
+
+/// Token giữ chỗ trong link của bản xem trước: không phải token thật, link không làm gì.
+const PREVIEW_TOKEN: &str = "preview";
+
+impl NewsletterService {
+    /// Thư của chiến dịch `id` như khi gửi (cùng chân thư, cùng nhãn quảng cáo), với token giữ chỗ
+    /// trong link. Cần `newsletter.read`. Chưa đủ cấu hình để gửi thì báo đúng lỗi như khi gửi.
+    pub(crate) async fn preview(
+        &self,
+        principal: &autoxide_kernel::access::Principal,
+        id: uuid::Uuid,
+    ) -> Result<Preview, Error> {
+        principal.require(&crate::permissions::NEWSLETTER_READ)?;
+        let campaign = self.find_campaign(id).await?;
+        let list = self.find_list(campaign.row.list_id).await?;
+        let mail = self.campaign_mail(
+            &campaign.row,
+            &list,
+            "subscriber@example.invalid",
+            PREVIEW_TOKEN,
+            None,
+        )?;
+        Ok(Preview { subject: mail.subject, text: mail.text, html: mail.html })
+    }
+
+    /// Cấu hình đang dùng. Cần `newsletter.read`.
+    pub(crate) fn settings(
+        &self,
+        principal: &autoxide_kernel::access::Principal,
+    ) -> Result<Settings, Error> {
+        principal.require(&crate::permissions::NEWSLETTER_READ)?;
+        Ok(Settings {
+            advertising_label: self.config.advertising_label.clone(),
+            advertising_max_per_day: self.config.advertising_max_per_day,
+            postal_address: self.config.postal_address.clone(),
+            public_url_set: self.public_url.base().is_ok(),
+            preferences_url_set: self.config.preferences_url.is_some(),
+            confirm_url_set: self.config.confirm_url.is_some(),
+            send_rate_per_minute: self.config.send_rate_per_minute,
+        })
+    }
+}

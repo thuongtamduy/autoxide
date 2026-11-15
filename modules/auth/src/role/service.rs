@@ -8,7 +8,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use chrono::{DateTime, SubsecRound, Utc};
-use sea_orm::sea_query::{Expr, Query};
+use sea_orm::sea_query::{Expr, ExprTrait as _, Query};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
     PaginatorTrait, QueryFilter, QueryOrder, Set, SqlErr,
@@ -19,6 +19,7 @@ use super::entity::{role, role_permission, user_role};
 use crate::events;
 use crate::user::entity as user;
 use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::json;
 
 const NAME_MAX_LENGTH: usize = 64;
@@ -54,11 +55,31 @@ pub(crate) struct RoleService {
     database: Database,
     catalog: PermissionCatalog,
     outbox: Outbox,
+    /// Bản dịch mô tả permission (D-264); mặc định rỗng (tiếng Anh).
+    translations: autoxide_kernel::i18n::Translations,
 }
 
 impl RoleService {
     pub(crate) fn new(database: Database, catalog: PermissionCatalog, outbox: Outbox) -> Self {
-        RoleService { database, catalog, outbox }
+        RoleService { database, catalog, outbox, translations: Default::default() }
+    }
+
+    /// Dịch mô tả permission bằng `translations`.
+    pub(crate) fn with_translations(
+        mut self,
+        translations: autoxide_kernel::i18n::Translations,
+    ) -> Self {
+        self.translations = translations;
+        self
+    }
+
+    /// Mô tả permission `english` bằng `language`.
+    pub(crate) fn describe(
+        &self,
+        english: &str,
+        language: autoxide_kernel::i18n::Language,
+    ) -> String {
+        self.translations.describe(english, language)
     }
 
     /// Mọi permission của chương trình.
@@ -109,7 +130,15 @@ impl RoleService {
         let after =
             Some(json!({"name": name, "description": description, "permissions": permissions}));
         let event = events::RoleCreated { before: None, after };
-        self.outbox.record(&transaction, actor, role_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                role_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role created");
         self.get(id).await
@@ -155,7 +184,15 @@ impl RoleService {
         insert_permissions(&transaction, id, &permissions).await?;
         let after = json!({"name": name, "description": description, "permissions": permissions});
         let event = events::RoleUpdated { before: Some(before), after: Some(after) };
-        self.outbox.record(&transaction, actor, role_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                role_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role changed");
         self.get(id).await
@@ -174,10 +211,53 @@ impl RoleService {
         let before = role_snapshot(&transaction, &current).await?;
         role::Entity::delete_by_id(id).exec(&transaction).await?;
         let event = events::RoleDeleted { before: Some(before), after: None };
-        self.outbox.record(&transaction, actor, role_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                role_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(role_id = %id, "role deleted");
         Ok(())
+    }
+
+    /// Role (id, tên) của từng người trong `user_ids`, theo tên — một câu truy vấn cho cả trang
+    /// (`GET /auth/users?include=roles`, đề bài giao diện B1).
+    pub(crate) async fn names_of_users(
+        &self,
+        user_ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, Vec<(Uuid, String)>>, Error> {
+        let mut by_user: HashMap<Uuid, Vec<(Uuid, String)>> = HashMap::new();
+        if user_ids.is_empty() {
+            return Ok(by_user);
+        }
+        let select = Query::select()
+            .column((user_role::Entity, user_role::Column::UserId))
+            .column((role::Entity, role::Column::Id))
+            .column((role::Entity, role::Column::Name))
+            .from(user_role::Entity)
+            .inner_join(
+                role::Entity,
+                Expr::col((role::Entity, role::Column::Id))
+                    .equals((user_role::Entity, user_role::Column::RoleId)),
+            )
+            .and_where(
+                Expr::col((user_role::Entity, user_role::Column::UserId))
+                    .is_in(user_ids.iter().copied()),
+            )
+            .order_by((role::Entity, role::Column::Name), sea_orm::sea_query::Order::Asc)
+            .to_owned();
+        for row in self.database.read().query_all(&select).await? {
+            let user_id: Uuid = row.try_get("", "user_id")?;
+            let role_id: Uuid = row.try_get("", "id")?;
+            let name: String = row.try_get("", "name")?;
+            by_user.entry(user_id).or_default().push((role_id, name));
+        }
+        Ok(by_user)
     }
 
     /// Các role của người dùng `user_id`, theo thứ tự tên.
@@ -198,11 +278,14 @@ impl RoleService {
     ) -> Result<Vec<Role>, Error> {
         let role_ids: BTreeSet<Uuid> = role_ids.into_iter().collect();
         if role_ids.len() > MAX_ROLES_PER_USER {
-            return Err(Error::validation(vec![FieldError::new(
-                "role_ids",
-                "length",
-                format!("must list at most {MAX_ROLES_PER_USER} roles"),
-            )]));
+            return Err(Error::validation(vec![
+                FieldError::new(
+                    "role_ids",
+                    "length",
+                    "must list at most {max_roles_per_user} roles",
+                )
+                .with_param("max_roles_per_user", MAX_ROLES_PER_USER),
+            ]));
         }
         let transaction = self.database.begin_write().await?;
         // Cập nhật dòng người dùng trước: khoá dòng đó tới hết transaction, nên hai
@@ -253,7 +336,15 @@ impl RoleService {
         let after = roles_of_user(&transaction, user_id).await?;
         let event =
             events::UserRolesChanged { before: Some(before), after: Some(role_names(&after)) };
-        self.outbox.record(&transaction, actor, events::user_subject(user_id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(user_id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, roles = role_ids.len(), "user roles changed");
         Ok(after)
@@ -326,35 +417,42 @@ impl RoleService {
         let description = input.description.trim().to_owned();
         let mut problems = Vec::new();
         if !is_role_name(&name) {
-            problems.push(FieldError::new(
-                "name",
-                "pattern",
-                format!(
-                    "must be 1 to {NAME_MAX_LENGTH} characters: lowercase letters, digits, `_` \
-                     and `-`, starting with a letter"
-                ),
-            ));
+            problems.push(
+                FieldError::new(
+                    "name",
+                    "pattern",
+                    "must be 1 to {name_max_length} characters: lowercase letters, digits, `_` \
+                     and `-`, starting with a letter",
+                )
+                .with_param("name_max_length", NAME_MAX_LENGTH),
+            );
         }
         if description.chars().count() > DESCRIPTION_MAX_LENGTH {
-            problems.push(FieldError::new(
-                "description",
-                "length",
-                format!("must be at most {DESCRIPTION_MAX_LENGTH} characters long"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "description",
+                    "length",
+                    "must be at most {description_max_length} characters long",
+                )
+                .with_param("description_max_length", DESCRIPTION_MAX_LENGTH),
+            );
         }
         if input.permissions.len() > MAX_PERMISSIONS {
-            problems.push(FieldError::new(
-                "permissions",
-                "length",
-                format!("must list at most {MAX_PERMISSIONS} permissions"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "permissions",
+                    "length",
+                    "must list at most {max_permissions} permissions",
+                )
+                .with_param("max_permissions", MAX_PERMISSIONS),
+            );
         }
         for (index, permission) in input.permissions.iter().enumerate() {
             if !self.catalog.contains(permission) {
                 problems.push(FieldError::new(
                     format!("permissions[{index}]"),
                     "unknown",
-                    "is not a permission of this system; see `GET /api/v1/auth/permissions`",
+                    "is not a permission of this system",
                 ));
             }
         }

@@ -7,6 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
@@ -180,6 +181,7 @@ impl FormsService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::form_subject(created.row.id),
                 &event,
@@ -314,7 +316,13 @@ impl FormsService {
         let event =
             events::FormUpdated(Change { before: Some(before.summary()), after: Some(summary) });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::form_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::form_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         Ok(after)
@@ -355,7 +363,13 @@ impl FormsService {
         }
         let event = events::FormDeleted(Change { before: Some(summary), after: None });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::form_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::form_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(form_id = %id, submissions = submissions.rows_affected, "form deleted");
@@ -378,8 +392,8 @@ impl FormsService {
                 problems.push(FieldError::new(
                     "key",
                     "invalid",
-                    format!("must be lower-case letters and digits in groups joined by `-`, at most {KEY_MAX} characters"),
-                ));
+                    "must be lower-case letters and digits in groups joined by `-`, at most {key_max} characters",
+                ).with_param("key_max", KEY_MAX));
             }
             candidate.row.key = key;
         }
@@ -389,11 +403,14 @@ impl FormsService {
                 || name.chars().count() > NAME_MAX
                 || name.chars().any(char::is_control)
             {
-                problems.push(FieldError::new(
-                    "name",
-                    "length",
-                    format!("must be 1 to {NAME_MAX} characters, on one line"),
-                ));
+                problems.push(
+                    FieldError::new(
+                        "name",
+                        "length",
+                        "must be 1 to {name_max} characters, on one line",
+                    )
+                    .with_param("name_max", NAME_MAX),
+                );
             }
             candidate.row.name = name;
         }
@@ -405,11 +422,14 @@ impl FormsService {
         }
         if let Some(origins) = input.allowed_origins {
             if origins.len() > ORIGINS_MAX {
-                problems.push(FieldError::new(
-                    "allowed_origins",
-                    "length",
-                    format!("must have at most {ORIGINS_MAX} origins"),
-                ));
+                problems.push(
+                    FieldError::new(
+                        "allowed_origins",
+                        "length",
+                        "must have at most {origins_max} origins",
+                    )
+                    .with_param("origins_max", ORIGINS_MAX),
+                );
             }
             let mut clean = Vec::new();
             for (index, origin) in origins.iter().enumerate() {
@@ -431,11 +451,14 @@ impl FormsService {
         }
         if let Some(emails) = input.notify_emails {
             if emails.len() > NOTIFY_MAX {
-                problems.push(FieldError::new(
-                    "notify_emails",
-                    "length",
-                    format!("must have at most {NOTIFY_MAX} addresses"),
-                ));
+                problems.push(
+                    FieldError::new(
+                        "notify_emails",
+                        "length",
+                        "must have at most {notify_max} addresses",
+                    )
+                    .with_param("notify_max", NOTIFY_MAX),
+                );
             }
             let mut clean = Vec::new();
             for (index, email) in emails.iter().enumerate() {
@@ -479,22 +502,24 @@ impl FormsService {
         ] {
             if let Some(value) = value {
                 if value.is_some_and(|value| value == 0 || value > LIMIT_MAX) {
-                    problems.push(FieldError::new(
-                        name,
-                        "range",
-                        format!("must be 1 to {LIMIT_MAX}"),
-                    ));
+                    problems.push(
+                        FieldError::new(name, "range", "must be 1 to {limit_max}")
+                            .with_param("limit_max", LIMIT_MAX),
+                    );
                 }
                 *target = value.map(|value| to_i32(value.min(LIMIT_MAX))).transpose()?;
             }
         }
         if let Some(days) = input.retention_days {
             if days.is_some_and(|days| days > RETENTION_MAX) {
-                problems.push(FieldError::new(
-                    "retention_days",
-                    "range",
-                    format!("must be 0 (keep) to {RETENTION_MAX}"),
-                ));
+                problems.push(
+                    FieldError::new(
+                        "retention_days",
+                        "range",
+                        "must be 0 (keep) to {retention_max}",
+                    )
+                    .with_param("retention_max", RETENTION_MAX),
+                );
             }
             candidate.row.retention_days =
                 days.map(|days| to_i32(days.min(RETENTION_MAX))).transpose()?;

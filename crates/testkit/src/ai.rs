@@ -8,6 +8,7 @@ use autoxide_kernel::ai::{
     Capabilities, EmbedKind, Embedder, Generation, Prompt, TextModel, Usage, schema,
 };
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::Value;
 
 /// Hàm trả lời của [`FakeTextModel`].
@@ -72,7 +73,7 @@ impl TextModel for FakeTextModel {
         }
     }
 
-    async fn generate(&self, prompt: Prompt) -> Result<Generation, Error> {
+    async fn generate(&self, _tenant: &TenantContext, prompt: Prompt) -> Result<Generation, Error> {
         if let Ok(mut prompts) = self.prompts.lock() {
             prompts.push(prompt.clone());
         }
@@ -167,6 +168,7 @@ impl Embedder for FakeEmbedder {
 
     async fn embed(
         &self,
+        _tenant: &TenantContext,
         _purpose: &'static str,
         texts: &[String],
         _kind: EmbedKind,

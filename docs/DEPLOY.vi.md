@@ -35,9 +35,14 @@ chmod 600 .env
 - `POSTGRES_PASSWORD` bảo vệ database.
 - `AUTOXIDE_AUTH_TOKEN_SECRET` ký access token. Giữ nguyên giá trị: đổi nó thì mọi người
   bị đăng xuất.
-- `AUTOXIDE_SECRET_KEY` ký các token sống ngắn (biểu mẫu, chống spam) và làm khoá băm địa
-  chỉ IP của người lạ. Để ngoài database thì bản sao database (bản backup) không làm lộ các
-  địa chỉ đó.
+- `AUTOXIDE_SECRET_KEY` ký các token sống ngắn (biểu mẫu, chống spam), làm khoá băm địa chỉ
+  IP của người lạ và mã hoá các secret máy chủ giữ (đăng nhập hai bước, secret ký webhook). Để
+  ngoài database thì bản sao database (bản backup) không làm lộ các địa chỉ đó, cũng không làm
+  lộ các secret đó.
+- Muốn đổi `AUTOXIDE_SECRET_KEY` về sau: đặt giá trị mới vào nó, giá trị cũ vào
+  `AUTOXIDE_SECRET_KEY_PREVIOUS`, khởi động lại, chạy `autoxide secrets reseal`, rồi bỏ
+  `AUTOXIDE_SECRET_KEY_PREVIOUS`. Lần đầu đặt biến này trên máy chủ đã chạy mà chưa có nó thì
+  không cần làm gì thêm: khoá máy chủ đã giữ trong database vẫn mở được thứ nó đã mã hoá.
 
 ### 2. Khởi động
 
@@ -301,7 +306,8 @@ database mới.
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (mặc định) hoặc `postgres://user:password@host:5432/db` |
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Ký access token; bắt buộc ở production, giống nhau trên mọi máy chủ |
-| `AUTOXIDE_SECRET_KEY` | Ký các token sống ngắn của mọi module và làm khoá băm địa chỉ IP của người lạ; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database. Khi chạy thật nên đặt (ngoài database, giống nhau trên mọi máy chủ): khoá nằm trong database thì ai có bản backup database cũng tính ngược được khối IP từ các bản băm đã lưu |
+| `AUTOXIDE_SECRET_KEY` | Ký các token sống ngắn của mọi module và làm khoá băm địa chỉ IP của người lạ; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database. Khi chạy thật nên đặt (ngoài database, giống nhau trên mọi máy chủ): khoá nằm trong database thì ai có bản backup database cũng mở được các secret đã mã hoá và tính ngược được khối IP từ các bản băm đã lưu |
+| `AUTOXIDE_SECRET_KEY_PREVIOUS` | Các giá trị cũ của `AUTOXIDE_SECRET_KEY`, cách nhau dấu phẩy, trong lúc xoay khoá; bỏ đi sau khi chạy `autoxide secrets reseal` |
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Sau reverse proxy: header chứa địa chỉ client |
 | `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | Số proxy của bạn mà một request đi qua (mặc định `1`) |
 | `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Thay cho số proxy: địa chỉ và dải địa chỉ của proxy, vd `10.0.0.0/8, 192.0.2.7` |

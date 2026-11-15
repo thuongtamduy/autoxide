@@ -29,6 +29,7 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::secret::{random_token, sha256};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::Throttle;
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
@@ -125,10 +126,7 @@ pub(crate) fn banned_word() -> Error {
 }
 
 pub(crate) fn profile_required() -> Error {
-    Error::conflict(
-        "comments.profile_required",
-        "Choose a display name first with `PUT /api/v1/comments/profile`.",
-    )
+    Error::conflict("comments.profile_required", "Choose a display name for your comments first.")
 }
 
 impl CommentsService {
@@ -157,7 +155,14 @@ impl CommentsService {
         // dùng hỏi qua điểm nối của kernel (module giữ trạng thái xác thực, bước 37).
         if self.config.verified_only.contains(&kind) {
             let verified = match principal {
-                Some(principal) => self.verification.is_verified(principal.user_id()).await?,
+                Some(principal) => {
+                    self.verification
+                        .is_verified(
+                            &TenantContext::legacy_default(&self.database),
+                            principal.user_id(),
+                        )
+                        .await?
+                }
                 None => false,
             };
             if !verified {
@@ -232,7 +237,16 @@ impl CommentsService {
         // Nhãn của tác giả trên đích (vd `seller`, `verified_buyer`), tính một lần lúc ghi qua
         // sổ đối tượng — có thể gọi module khác nên ở NGOÀI transaction (D-202).
         let badges = match principal {
-            Some(principal) => self.resources.badges(&kind, &target_id, principal).await?.join(","),
+            Some(principal) => self
+                .resources
+                .badges(
+                    &TenantContext::legacy_default(&self.database),
+                    &kind,
+                    &target_id,
+                    principal,
+                )
+                .await?
+                .join(","),
             None => String::new(),
         };
         let now = now();
@@ -301,6 +315,7 @@ impl CommentsService {
         let checked = self
             .guard
             .check(
+                &TenantContext::legacy_default(&self.database),
                 &Check::new(&scope, client)
                     .principal(principal)
                     .honeypot(input.trap.as_deref())
@@ -375,15 +390,13 @@ impl CommentsService {
                 if input.notify_replies
                     && status != Status::Spam
                     && self.config.reply_mails()
-                    && Throttle::new(
-                        self.database.clone(),
-                        MODULE,
-                        self.config.verify_mails_per_day,
-                        DAY,
-                    )?
-                    .hit(&format!("verify:{email}"))
-                    .await?
-                    .is_allowed() =>
+                    && Throttle::new(MODULE, self.config.verify_mails_per_day, DAY)?
+                        .hit(
+                            &TenantContext::legacy_default(&self.database),
+                            &format!("verify:{email}"),
+                        )
+                        .await?
+                        .is_allowed() =>
             {
                 Some(email.to_owned())
             }
@@ -469,12 +482,24 @@ impl CommentsService {
         let subject = events::comment_subject(row.id);
         let created = Change { before: None, after: Some(summary(&row)) };
         self.outbox
-            .record(&transaction, actor, subject.clone(), &events::CommentCreated(created))
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                subject.clone(),
+                &events::CommentCreated(created),
+            )
             .await?;
         if status == Status::Published {
             let published = Change { before: None, after: Some(summary(&row)) };
             self.outbox
-                .record(&transaction, actor, subject, &events::CommentPublished(published))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::CommentPublished(published),
+                )
                 .await?;
         }
         let verification = match verify_to.as_deref() {
@@ -482,6 +507,7 @@ impl CommentsService {
                 self.tokens
                     .issue(
                         &transaction,
+                        &TenantContext::legacy_default(&self.database),
                         VERIFY,
                         &row.id.to_string(),
                         Some(email),
@@ -491,7 +517,15 @@ impl CommentsService {
             ),
             None => None,
         };
-        match checked.claim(&transaction, MODULE, Some(&row.id.to_string())).await? {
+        match checked
+            .claim(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                MODULE,
+                Some(&row.id.to_string()),
+            )
+            .await?
+        {
             Claim::New => {
                 transaction.commit().await?;
                 tracing::info!(comment_id = %row.id, target_type = %row.target_type, status = status.as_str(), "comment stored");
@@ -600,7 +634,7 @@ impl CommentsService {
 
     /// Giới hạn số lần (theo IP băm, email, người dùng), trên bảng `comments_throttle`.
     fn limits(&self) -> Result<Limits, Error> {
-        let throttle = |limit: u32| Throttle::new(self.database.clone(), MODULE, limit, HOUR);
+        let throttle = |limit: u32| Throttle::new(MODULE, limit, HOUR);
         Ok(Limits::default()
             .ip(Some(throttle(self.config.per_ip_per_hour)?))
             .email(Some(throttle(self.config.per_email_per_hour)?))

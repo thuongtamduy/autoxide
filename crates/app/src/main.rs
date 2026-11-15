@@ -85,6 +85,12 @@ enum Command {
     /// Connects to the database (modules build their services) but does not need migrations.
     McpManifest,
 
+    /// Manage the placements: the databases that keep tenants' data (multi-tenant mode).
+    ///
+    /// `add` stores the connection URL encrypted; `check` compares each placement's migrations
+    /// with the program. Run `autoxide migrate up --all` to bring placements up to date.
+    Placement(commands::placement::Arguments),
+
     /// Restore a backup made by `autoxide backup` into a new, empty database.
     ///
     /// Restores into the database of `DATABASE_URL` (which gets every migration first)
@@ -108,6 +114,18 @@ enum Command {
     /// or an argument is wrong, 1 when the task fails. Run `autoxide migrate up` first.
     Task(commands::task::Arguments),
 
+    /// Encrypt stored secrets again with the current key (after rotating AUTOXIDE_SECRET_KEY).
+    ///
+    /// `autoxide secrets reseal` runs the `reseal_secrets` task of every module that keeps
+    /// encrypted secrets. Run `autoxide migrate up` first.
+    Secrets(commands::secrets::Arguments),
+
+    /// Manage the tenants (customers) of the installation: create, list, show, suspend, resume.
+    ///
+    /// Runs with the rights of whoever operates the server. Creating tenants needs
+    /// AUTOXIDE_TENANCY_MODE=multi.
+    Tenant(commands::tenant::Arguments),
+
     /// Manage user accounts, e.g. create the first administrator.
     ///
     /// Runs with the rights of whoever operates the server: no sign-in needed.
@@ -127,9 +145,12 @@ fn main() -> ExitCode {
         Command::Migrate(arguments) => commands::migrate::run(&arguments),
         Command::Openapi => commands::openapi::run(),
         Command::McpManifest => commands::mcp_manifest::run(),
+        Command::Placement(arguments) => commands::placement::run(&arguments),
         Command::Restore(arguments) => commands::backup::restore(&arguments),
+        Command::Secrets(arguments) => commands::secrets::run(&arguments),
         Command::Serve => commands::serve::run(),
         Command::Task(arguments) => commands::task::run(&arguments),
+        Command::Tenant(arguments) => commands::tenant::run(&arguments),
         Command::User(arguments) => commands::user::run(&arguments),
     }
 }

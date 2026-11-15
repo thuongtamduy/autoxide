@@ -5,8 +5,9 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageQuery};
-use autoxide_kernel::response::{Created, Problem};
+use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::storage::ByteStream;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
@@ -49,9 +50,23 @@ pub(crate) struct ItemsQuery {
     /// Only items with this tag, ignoring case.
     #[param(example = "brand")]
     pub tag: Option<String>,
+    /// `true`: only images missing a text alternative (an image whose default `alt` is empty and
+    /// that is not marked `decorative`). `false`: every other item.
+    #[param(value_type = Option<bool>)]
+    pub alt_missing: Option<String>,
+    /// `uploader`: add `uploaded_by_name`, the display name of who uploaded each item.
+    #[param(inline)]
+    pub include: Option<ItemInclude>,
     /// `created_at` (the default), `name` or `size`; the direction is `order`.
     #[param(value_type = Option<ItemSort>, inline)]
     pub sort: Option<String>,
+}
+
+/// Extra data to add to each item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ItemInclude {
+    Uploader,
 }
 
 impl ItemsQuery {
@@ -94,7 +109,21 @@ impl ItemsQuery {
                 false
             }
         };
+        let alt_missing = match self.alt_missing.as_deref().map(str::trim) {
+            None | Some("") => None,
+            Some("true") => Some(true),
+            Some("false") => Some(false),
+            Some(_) => {
+                problems.push(FieldError::new(
+                    "alt_missing",
+                    "invalid",
+                    "must be `true` or `false`",
+                ));
+                None
+            }
+        };
         ItemFilter {
+            alt_missing,
             folder: folder_filter(self.folder_id.as_deref(), "folder_id", problems),
             content_type,
             visibility,
@@ -153,6 +182,8 @@ pub(crate) struct UpdateItemRequest {
     pub title: Option<String>,
     /// Caption, up to 2000 characters; `""` clears it.
     pub caption: Option<String>,
+    /// `true` marks a purely decorative image, whose empty `alt` is on purpose.
+    pub decorative: Option<bool>,
     /// Move to this folder; `null` moves to the root.
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<Uuid>, nullable)]
@@ -172,6 +203,7 @@ impl From<UpdateItemRequest> for ItemChanges {
             alt: input.alt,
             title: input.title,
             caption: input.caption,
+            decorative: input.decorative,
             folder_id: input.folder_id,
             visibility: input.visibility,
             tags: input.tags,
@@ -207,8 +239,9 @@ pub(super) fn content_type(headers: &HeaderMap) -> Result<Option<&str>, Error> {
 
 /// List media items.
 ///
-/// Requires `media.read`. Filter by folder, type, visibility, trash and name; sort by
-/// upload time, name or size. Keep the same filters, `sort` and `order` while following
+/// Requires `media.read`. Filter by folder, type, visibility, trash, name, tag and missing
+/// text alternative; sort by upload time, name or size. With `include=uploader`, each item
+/// carries the name of who uploaded it. Keep the same filters, `sort` and `order` while following
 /// `next_cursor`.
 #[utoipa::path(
     get,
@@ -226,6 +259,7 @@ pub(super) fn content_type(headers: &HeaderMap) -> Result<Option<&str>, Error> {
 )]
 pub(crate) async fn list_items(
     State(service): State<Arc<MediaService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<ItemsQuery>,
     Query(paging): Query<PageQuery>,
@@ -233,7 +267,65 @@ pub(crate) async fn list_items(
     let mut problems = Vec::new();
     let filter = query.filter(&mut problems);
     let page = page_request(paging, problems)?;
-    page_of(&service, service.list(&principal, &filter, &page).await?).await
+    let page = page_of(&service, service.list(&principal, &filter, &page).await?).await?;
+    if query.include != Some(ItemInclude::Uploader) {
+        return Ok(page);
+    }
+    let mut ids: Vec<Uuid> = page.data.iter().filter_map(MediaItemResponse::uploader).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    let names = service.uploader_names(&tenant, &ids).await?;
+    Ok(page.map(|item| item.with_uploader_name(&names)))
+}
+
+/// Totals of the media library.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct LibrarySummaryResponse {
+    /// Items not in the trash.
+    #[schema(example = 214)]
+    items: i64,
+    /// Total size in bytes of the items not in the trash (their current content, without the
+    /// smaller copies of images).
+    #[schema(example = 734003200)]
+    bytes: i64,
+    /// Images not in the trash with no text alternative and not marked `decorative`: the items
+    /// `GET /api/v1/media?alt_missing=true` lists.
+    #[schema(example = 9)]
+    images_missing_alt: i64,
+    /// Items in the trash.
+    #[schema(example = 3)]
+    trashed_items: i64,
+}
+
+/// Get the totals of the media library.
+///
+/// Requires `media.read`. Number of items and their total size, images missing a text
+/// alternative, items in the trash — for a library overview without paging through every item.
+#[utoipa::path(
+    get,
+    path = "/summary",
+    extensions(("x-permissions" = json!(["media.read"]))),
+    operation_id = "get_media_summary",
+    security(("bearer" = [])),
+    responses(
+        (status = 200, description = "The totals.", body = Data<LibrarySummaryResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `media.read`; code `permission_denied`.", body = Problem),
+    )
+)]
+pub(crate) async fn library_summary(
+    State(service): State<Arc<MediaService>>,
+    principal: Principal,
+) -> Result<Data<LibrarySummaryResponse>, Error> {
+    let summary = service.summary(&principal).await?;
+    Ok(Data {
+        data: LibrarySummaryResponse {
+            items: summary.items,
+            bytes: summary.bytes,
+            images_missing_alt: summary.images_missing_alt,
+            trashed_items: summary.trashed_items,
+        },
+    })
 }
 
 /// Upload a media item.
@@ -346,7 +438,7 @@ pub(crate) async fn get_item(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `media.write`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No media item has this id; code `media.item_not_found`.", body = Problem),
-        (status = 409, description = "The item is in the trash; code `media.item_in_trash`.", body = Problem),
+        (status = 409, description = "The item is in the trash; code `media.item_in_trash`. Restore it with `POST /api/v1/media/{id}/restore`.", body = Problem),
         (status = 412, description = "`If-Match` does not match: the item changed since you read it. Get it again and retry; code `precondition_failed`.", body = Problem),
         (status = 422, description = "A value is invalid or the folder does not exist; see `errors`.", body = Problem),
         (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
@@ -397,7 +489,7 @@ pub(crate) struct AltRequest {
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `media.write`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No media item has this id; code `media.item_not_found`.", body = Problem),
-        (status = 409, description = "The item is in the trash; code `media.item_in_trash`.", body = Problem),
+        (status = 409, description = "The item is in the trash; code `media.item_in_trash`. Restore it with `POST /api/v1/media/{id}/restore`.", body = Problem),
         (status = 412, description = "`If-Match` does not match: the item changed since you read it. Get it again and retry; code `precondition_failed`.", body = Problem),
         (status = 422, description = "The language is not offered (code `media.unsupported_locale`) or the text is too long; see `errors`.", body = Problem),
         (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
@@ -435,7 +527,7 @@ pub(crate) async fn set_alt(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `media.write`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No media item has this id; code `media.item_not_found`.", body = Problem),
-        (status = 409, description = "The item is in the trash; code `media.item_in_trash`.", body = Problem),
+        (status = 409, description = "The item is in the trash; code `media.item_in_trash`. Restore it with `POST /api/v1/media/{id}/restore`.", body = Problem),
         (status = 412, description = "`If-Match` does not match: the item changed since you read it. Get it again and retry; code `precondition_failed`.", body = Problem),
         (status = 422, description = "The language is not offered; code `media.unsupported_locale`.", body = Problem),
         (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),

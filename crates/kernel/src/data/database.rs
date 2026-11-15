@@ -78,6 +78,17 @@ impl Database {
         Ok(Database { read, write, backend })
     }
 
+    /// Database không nối tới đâu: mọi truy vấn lỗi. Chỉ cho test đơn vị của kernel cần một
+    /// [`TenantContext`](crate::tenancy::TenantContext) mà không truy vấn gì.
+    #[cfg(test)]
+    pub(crate) fn detached() -> Self {
+        Database {
+            read: DatabaseConnection::default(),
+            write: DatabaseConnection::default(),
+            backend: DatabaseBackend::Sqlite,
+        }
+    }
+
     /// Kết nối cho lệnh ĐỌC. Ghi qua kết nối này bị database từ chối.
     pub fn read(&self) -> &DatabaseConnection {
         &self.read

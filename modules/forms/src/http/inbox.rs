@@ -19,7 +19,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{choice, page_request};
-use crate::forms::fields::{FieldType, Localized};
+use crate::forms::fields::{FieldOption, FieldType, Localized};
 use crate::service::FormsService;
 use crate::submissions::inbox::{InboxFilter, Submission, SubmissionStatus};
 
@@ -33,7 +33,52 @@ pub(crate) struct AnswerResponse {
     pub label: Localized,
     /// A string; a number for `number`; an array of values for `checkbox`; `true` for
     /// `consent`.
+    #[schema(schema_with = answer_value)]
     pub value: Value,
+    /// For `select`, `radio` and `checkbox`: the chosen options with their labels in the form
+    /// version the submission was sent with (in the order of `value`). A value no longer among
+    /// that version's options comes with an empty label. Absent for other types.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub choices: Option<Vec<FieldOption>>,
+}
+
+/// Lược đồ của `value`: một trong bốn kiểu (thay cho "kiểu nào cũng được" của `Value`), để
+/// client sinh kiểu đúng — `string | number | string[] | boolean`.
+fn answer_value() -> utoipa::openapi::schema::Schema {
+    use utoipa::openapi::schema::{ArrayBuilder, ObjectBuilder, OneOfBuilder, Type};
+    let of = |kind: Type| ObjectBuilder::new().schema_type(kind).build();
+    OneOfBuilder::new()
+        .item(of(Type::String))
+        .item(of(Type::Number))
+        .item(ArrayBuilder::new().items(of(Type::String)).build())
+        .item(of(Type::Boolean))
+        .description(Some(
+            "A string; a number for `number`; an array of values for `checkbox`; `true` for `consent`.",
+        ))
+        .build()
+        .into()
+}
+
+/// Các lựa chọn đã chọn của một câu trả lời, kèm nhãn của đúng phiên bản form lúc gửi.
+fn chosen(field: &crate::forms::fields::Field, value: &Value) -> Option<Vec<FieldOption>> {
+    if !field.kind.has_options() {
+        return None;
+    }
+    let values: Vec<&str> = match value {
+        Value::String(one) => vec![one.as_str()],
+        Value::Array(many) => many.iter().filter_map(Value::as_str).collect(),
+        _ => Vec::new(),
+    };
+    Some(
+        values
+            .into_iter()
+            .map(|picked| {
+                field.options.iter().find(|option| option.value == picked).cloned().unwrap_or(
+                    FieldOption { value: picked.to_owned(), label: Localized::default() },
+                )
+            })
+            .collect(),
+    )
 }
 
 /// A submission.
@@ -83,6 +128,7 @@ impl From<Submission> for SubmissionResponse {
                     key: field.key.clone(),
                     kind: field.kind,
                     label: field.label.clone(),
+                    choices: chosen(field, value),
                     value: value.clone(),
                 })
             })

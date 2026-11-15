@@ -34,10 +34,11 @@ use crate::config::{ConfigReader, Invalid, Setting, parse_in_range};
 use crate::error::{Error, FieldError};
 use crate::http::ClientInfo;
 use crate::secret::SecretKey;
+use crate::tenancy::TenantContext;
 use crate::throttle::{Outcome, Throttle};
 
 pub use altcha::Altcha;
-pub use nonce::{Claim, antispam_migration};
+pub use nonce::{Claim, antispam_migration, tenant_table};
 
 pub(crate) mod module;
 
@@ -404,11 +405,14 @@ impl Checked {
     pub async fn claim<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         module: &str,
         result: Option<&str>,
     ) -> Result<Claim, Error> {
         match &self.nonce {
-            Some(nonce) => nonce::claim(connection, module, nonce, result, self.expires_at).await,
+            Some(nonce) => {
+                nonce::claim(connection, tenant, module, nonce, result, self.expires_at).await
+            }
             None => Ok(Claim::New),
         }
     }
@@ -463,14 +467,15 @@ impl SpamGuard {
         self
     }
 
-    /// Phát token form cho `scope`.
-    pub async fn issue(&self, scope: &str) -> Result<IssuedToken, Error> {
+    /// Phát token form cho `scope` của khách `tenant` (ký bằng khoá của khách: dùng ở khách khác
+    /// thì như token sai).
+    pub async fn issue(&self, tenant: &TenantContext, scope: &str) -> Result<IssuedToken, Error> {
         check_scope(scope)?;
         let now = Utc::now().trunc_subsecs(0);
         let mut nonce = [0u8; 16];
         getrandom::fill(&mut nonce)
             .map_err(|error| Error::internal(format!("random number generator: {error}")))?;
-        let key = self.secret.derive(token::PURPOSE).await?;
+        let key = self.secret.derive_for(tenant.id(), token::PURPOSE).await?;
         let binding = token::encode_nonce(&nonce);
         Ok(IssuedToken {
             token: token::sign(&key, scope, now, &nonce)?,
@@ -480,9 +485,10 @@ impl SpamGuard {
         })
     }
 
-    /// Pha một: xét `submission` trước transaction ghi.
+    /// Pha một: xét `submission` gửi tới khách `tenant`, trước transaction ghi.
     pub async fn check(
         &self,
+        tenant: &TenantContext,
         submission: &Submission<'_>,
         limits: &Limits,
     ) -> Result<Checked, Error> {
@@ -494,7 +500,7 @@ impl SpamGuard {
             Some(principal) => {
                 if let Some(throttle) = &limits.user
                     && let Outcome::Limited { retry_after } =
-                        throttle.hit(&format!("user:{}", principal.user_id())).await?
+                        throttle.hit(tenant, &format!("user:{}", principal.user_id())).await?
                 {
                     return Err(rate_limited(retry_after));
                 }
@@ -507,7 +513,7 @@ impl SpamGuard {
                     .form_token
                     .filter(|token| !token.trim().is_empty())
                     .ok_or_else(token_missing)?;
-                let key = self.secret.derive(token::PURPOSE).await?;
+                let key = self.secret.derive_for(tenant.id(), token::PURPOSE).await?;
                 let form = token::open(&key, raw)
                     .filter(|form| form.scope == submission.scope)
                     .ok_or_else(token_invalid)?;
@@ -521,8 +527,8 @@ impl SpamGuard {
                     .into_iter()
                     .flatten()
                     .find_map(Throttle::owner);
-                if let Some((database, module)) = owner
-                    && nonce::exists(database.read(), module, &form.nonce).await?
+                if let Some(module) = owner
+                    && nonce::exists(tenant.database().read(), tenant, module, &form.nonce).await?
                 {
                     return Ok(Checked {
                         verdict: Verdict::Accept,
@@ -552,7 +558,7 @@ impl SpamGuard {
                     let bucket =
                         crate::ip_hash::bucket(&self.secret, submission.scope, ip, now).await?;
                     if !throttle
-                        .hit(&format!("ip:{}:{bucket}", submission.scope))
+                        .hit(tenant, &format!("ip:{}:{bucket}", submission.scope))
                         .await?
                         .is_allowed()
                     {
@@ -565,7 +571,7 @@ impl SpamGuard {
                 }
                 if let (Some(throttle), Some(email)) = (&limits.email, submission.email) {
                     let key = format!("email:{}:{}", submission.scope, email.trim().to_lowercase());
-                    if !throttle.hit(&key).await?.is_allowed() {
+                    if !throttle.hit(tenant, &key).await?.is_allowed() {
                         return Ok(Checked {
                             verdict: Verdict::Discard { reason: "rate_limited" },
                             nonce: None,

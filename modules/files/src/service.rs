@@ -18,6 +18,7 @@ use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::storage::{ByteStream, Storage};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, SubsecRound, Utc};
 use futures_util::StreamExt as _;
 use sea_orm::{
@@ -45,7 +46,7 @@ pub(crate) struct Download {
 }
 
 pub(crate) struct FileService {
-    database: Database,
+    pub(crate) database: Database,
     storage: Arc<dyn Storage>,
     outbox: Outbox,
     limits: Limits,
@@ -158,7 +159,15 @@ impl FileService {
         }
         let event = events::FileDeleted { before: details(&file) };
         let actor = Actor::from(principal);
-        self.outbox.record(&transaction, actor, events::file_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::file_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         if let Err(error) = self.storage.delete(&file.storage_key()).await {
             tracing::warn!(file_id = %id, error = %error, "file deleted but its content remains");
@@ -230,7 +239,15 @@ impl FileService {
         .await?;
         let event = events::FileUploaded { after: details(&file) };
         let actor = Actor::from(principal);
-        self.outbox.record(&transaction, actor, events::file_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::file_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(file)
     }
@@ -260,14 +277,15 @@ fn check_name(name: &str) -> Result<String, Error> {
     if valid {
         return Ok(name.to_owned());
     }
-    Err(Error::validation(vec![FieldError::new(
-        "name",
-        "invalid",
-        format!(
-            "must be 1 to {NAME_MAX_LENGTH} characters, without `/`, `\\`, control or invisible \
-             formatting characters"
-        ),
-    )]))
+    Err(Error::validation(vec![
+        FieldError::new(
+            "name",
+            "invalid",
+            "must be 1 to {name_max_length} characters, without `/`, `\\`, control or invisible \
+             formatting characters",
+        )
+        .with_param("name_max_length", NAME_MAX_LENGTH),
+    ]))
 }
 
 /// Ký tự định dạng vô hình đổi cách tên hiện ra: đảo chiều chữ (`invoice\u{202E}fdp.exe` hiện
@@ -293,7 +311,11 @@ const ERASE_BATCH: u64 = 100;
 /// nhân. Nội dung tải từng file bằng `GET /api/v1/files/{id}/content`.
 #[async_trait::async_trait]
 impl PersonalData for FileService {
-    async fn export(&self, user_id: Uuid) -> Result<serde_json::Value, Error> {
+    async fn export(
+        &self,
+        _tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<serde_json::Value, Error> {
         let files = Entity::find()
             .filter(Column::OwnerId.eq(user_id))
             .order_by_asc(Column::Id)
@@ -461,20 +483,39 @@ mod tests {
             files.upload(&ada, "b.txt", None, body("b")).await.unwrap();
             files.upload(&bob, "c.txt", None, body("c")).await.unwrap();
 
-            let exported = files.export(ada.user_id()).await.unwrap();
+            let exported = files
+                .export(&TenantContext::legacy_default(&files.database), ada.user_id())
+                .await
+                .unwrap();
             assert_eq!(exported.as_array().unwrap().len(), 2);
             assert_eq!(exported[0]["name"], "a.txt");
 
             let deleted = Delivered::new(
+                autoxide_kernel::tenancy::TenantContext::legacy_default(&files.database),
                 "auth",
                 autoxide_kernel::privacy::USER_DELETED.to_owned(),
                 json!({"before": {"id": ada.user_id()}}),
             );
             files.handle(&deleted).await.unwrap();
             files.handle(&deleted).await.unwrap();
-            assert_eq!(files.export(ada.user_id()).await.unwrap(), json!([]));
+            assert_eq!(
+                files
+                    .export(&TenantContext::legacy_default(&files.database), ada.user_id())
+                    .await
+                    .unwrap(),
+                json!([])
+            );
             assert!(files.storage.get(&mine.storage_key()).await.unwrap().is_none());
-            assert_eq!(files.export(bob.user_id()).await.unwrap().as_array().unwrap().len(), 1);
+            assert_eq!(
+                files
+                    .export(&TenantContext::legacy_default(&files.database), bob.user_id())
+                    .await
+                    .unwrap()
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                1
+            );
         })
         .await
         .unwrap();

@@ -8,6 +8,7 @@
 
 mod ai;
 pub mod api;
+mod client_config;
 mod config;
 mod entity;
 mod entries;
@@ -105,6 +106,12 @@ impl Module for ContentModule {
         ]
     }
 
+    fn client_config(
+        &self,
+    ) -> Result<Option<autoxide_kernel::module::ClientSection>, autoxide_kernel::error::Error> {
+        self.config.as_ref().map_or(Ok(None), client_config::section)
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(ContentConfig::read(reader)?);
         Ok(())
@@ -124,13 +131,16 @@ impl Module for ContentModule {
             ai: context.require::<dyn autoxide_kernel::ai::TextModel>()?,
             embedder: context.require::<dyn autoxide_kernel::ai::Embedder>()?,
         };
-        let service = Arc::new(ContentService::new(
-            context.database().clone(),
-            context.outbox()?,
-            context.jobs(),
-            dependencies,
-            config,
-        ));
+        let service = Arc::new(
+            ContentService::new(
+                context.database().clone(),
+                context.outbox()?,
+                context.jobs(),
+                dependencies,
+                config,
+            )
+            .with_translations(context.translations().clone()),
+        );
         context.personal_data(service.clone())?;
         context
             .resource_type(resource::ENTRY, Arc::new(resource::EntryResolver(service.clone())))?;
@@ -189,6 +199,7 @@ impl Module for ContentModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
+    use autoxide_kernel::tenancy::TenantContext;
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
 
@@ -221,7 +232,11 @@ pub(crate) mod testing {
 
     #[async_trait::async_trait]
     impl Media for FakeMedia {
-        async fn find_many(&self, ids: &[Uuid]) -> Result<Vec<MediaRef>, Error> {
+        async fn find_many(
+            &self,
+            _tenant: &TenantContext,
+            ids: &[Uuid],
+        ) -> Result<Vec<MediaRef>, Error> {
             let known = self.0.lock().unwrap();
             Ok(ids
                 .iter()
@@ -241,8 +256,13 @@ pub(crate) mod testing {
         }
 
         /// `alt` theo ngôn ngữ: `[<ngôn ngữ>]`, để test thấy ảnh được tra theo ngôn ngữ nào.
-        async fn find_many_in(&self, ids: &[Uuid], locale: &str) -> Result<Vec<MediaRef>, Error> {
-            let mut found = self.find_many(ids).await?;
+        async fn find_many_in(
+            &self,
+            tenant: &TenantContext,
+            ids: &[Uuid],
+            locale: &str,
+        ) -> Result<Vec<MediaRef>, Error> {
+            let mut found = self.find_many(tenant, ids).await?;
             for item in &mut found {
                 item.alt = format!("[{locale}]");
             }
