@@ -13,6 +13,7 @@ mod config;
 mod entity;
 mod events;
 mod http;
+mod links;
 mod migration;
 mod permissions;
 mod privacy;
@@ -59,6 +60,8 @@ struct NewsletterModule {
     /// Event của module khác có trong chương trình (chỉ nghe khi có người phát).
     listens_published: bool,
     listens_failures: bool,
+    /// Sổ database, có sau `start`: job dọn dẹp tra ngữ cảnh từng khách.
+    databases: Option<autoxide_kernel::tenancy::DatabaseRegistry>,
 }
 
 impl Module for NewsletterModule {
@@ -92,7 +95,6 @@ impl Module for NewsletterModule {
             Error::internal("module `newsletter` started before it was configured")
         })?;
         let parts = Parts {
-            database: context.database().clone(),
             outbox: context.outbox()?,
             guard: context.require::<SpamGuard>()?,
             secret: (*context.require::<SecretKey>()?).clone(),
@@ -101,6 +103,7 @@ impl Module for NewsletterModule {
             jobs: context.jobs(),
             public_url: context.require::<PublicUrl>()?,
             resources: context.resources(),
+            databases: context.tenancy(),
         };
         // Nghe event của module khác bằng tên — chỉ khi module đó có trong chương trình (đăng ký
         // nhận một event không ai khai là lỗi khởi động).
@@ -109,6 +112,7 @@ impl Module for NewsletterModule {
         let service = Arc::new(NewsletterService::new(parts, config));
         context.personal_data(service.clone())?;
         self.service = Some(service);
+        self.databases = Some(context.tenancy());
         Ok(())
     }
 
@@ -136,8 +140,8 @@ impl Module for NewsletterModule {
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {
-        self.service.clone().map_or_else(Vec::new, |service| {
-            vec![
+        match (self.service.clone(), self.databases.clone()) {
+            (Some(service), Some(databases)) => vec![
                 JobRegistration::new(
                     campaigns::sending::PREPARE,
                     Arc::new(campaigns::sending::Preparer(service.clone())),
@@ -150,9 +154,13 @@ impl Module for NewsletterModule {
                     public::SUBSCRIBE,
                     Arc::new(public::Subscriber(service.clone())),
                 ),
-                JobRegistration::new(retention::CLEANUP, Arc::new(retention::Cleanup(service))),
-            ]
-        })
+                JobRegistration::new(
+                    retention::CLEANUP,
+                    Arc::new(retention::Cleanup { service, databases }),
+                ),
+            ],
+            _ => Vec::new(),
+        }
     }
 
     fn schedules(&self) -> Vec<Schedule> {
@@ -173,7 +181,7 @@ impl Module for NewsletterModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
-    use autoxide_kernel::tenancy::TenantContext;
+    use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
@@ -244,10 +252,13 @@ pub(crate) mod testing {
         }
     }
 
+    #[derive(Clone)]
     pub struct Harness {
         pub service: Arc<NewsletterService>,
         pub mailer: Arc<FakeMailer>,
         pub database: Database,
+        /// Khách mặc định trên database của test.
+        pub tenant: TenantContext,
         pub resources: ResourceDirectory,
     }
 
@@ -262,6 +273,25 @@ pub(crate) mod testing {
         test: &TestDatabase,
         config: NewsletterConfig,
         antispam: AntispamConfig,
+    ) -> Harness {
+        build(test, config, antispam, None).await
+    }
+
+    /// Như [`service`], tra khách qua sổ `registry` (vd sổ nhiều khách của một `TestApp`).
+    pub async fn service_in(
+        test: &TestDatabase,
+        config: NewsletterConfig,
+        registry: DatabaseRegistry,
+    ) -> Harness {
+        let antispam = AntispamConfig::default().min_fill(Duration::ZERO);
+        build(test, config, antispam, Some(registry)).await
+    }
+
+    async fn build(
+        test: &TestDatabase,
+        config: NewsletterConfig,
+        antispam: AntispamConfig,
+        registry: Option<DatabaseRegistry>,
     ) -> Harness {
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
@@ -286,7 +316,6 @@ pub(crate) mod testing {
         .unwrap();
         let resources = ResourceDirectory::default();
         let parts = Parts {
-            database: database.clone(),
             outbox: Outbox::standalone("newsletter"),
             guard,
             secret,
@@ -295,9 +324,11 @@ pub(crate) mod testing {
             jobs: JobQueue::new("newsletter"),
             public_url: Arc::new(PublicUrl::new(Some("https://api.example.com".to_owned()))),
             resources: resources.clone(),
+            databases: registry.unwrap_or_else(|| DatabaseRegistry::single(database.clone())),
         };
         let service = Arc::new(NewsletterService::new(parts, config));
-        Harness { service, mailer, database, resources }
+        let tenant = TenantContext::default_on(database.clone());
+        Harness { service, mailer, database, tenant, resources }
     }
 
     /// Người có các permission `permissions` (`newsletter.` thêm sẵn).

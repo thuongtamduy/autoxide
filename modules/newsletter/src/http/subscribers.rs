@@ -9,6 +9,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -195,6 +196,7 @@ pub(crate) struct UpdateSubscriberRequest {
 )]
 pub(crate) async fn list_subscribers(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<SubscribersQuery>,
     Query(paging): Query<PageQuery>,
@@ -220,7 +222,7 @@ pub(crate) async fn list_subscribers(
         },
     };
     let page = page_request(paging, problems)?;
-    Ok(service.list_subscribers(&principal, &filter, &page).await?.map(Into::into))
+    Ok(service.list_subscribers(&tenant, &principal, &filter, &page).await?.map(Into::into))
 }
 
 /// Import subscribers.
@@ -246,6 +248,7 @@ pub(crate) async fn list_subscribers(
 )]
 pub(crate) async fn import_subscribers(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<ImportRequest>,
 ) -> Result<Data<ImportReport>, Error> {
@@ -265,7 +268,7 @@ pub(crate) async fn import_subscribers(
         consent_text: input.consent_text,
         consent_version: input.consent_version,
     };
-    Ok(Data { data: service.import_subscribers(&principal, input).await? })
+    Ok(Data { data: service.import_subscribers(&tenant, &principal, input).await? })
 }
 
 /// Get a subscriber.
@@ -287,10 +290,11 @@ pub(crate) async fn import_subscribers(
 )]
 pub(crate) async fn get_subscriber(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Tagged<SubscriberResponse>, Error> {
-    let found = service.get_subscriber(&principal, id).await?;
+    let found = service.get_subscriber(&tenant, &principal, id).await?;
     Ok(Tagged { version: found.row.updated_at, data: found.into() })
 }
 
@@ -318,6 +322,7 @@ pub(crate) async fn get_subscriber(
 )]
 pub(crate) async fn update_subscriber(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
     if_match: IfMatch,
@@ -332,7 +337,7 @@ pub(crate) async fn update_subscriber(
         attributes: input.attributes,
         unsubscribe_list_ids: input.unsubscribe_list_ids,
     };
-    let found = service.update_subscriber(&principal, id, change, expected).await?;
+    let found = service.update_subscriber(&tenant, &principal, id, change, expected).await?;
     Ok(Tagged { version: found.row.updated_at, data: found.into() })
 }
 
@@ -356,10 +361,11 @@ pub(crate) async fn update_subscriber(
 )]
 pub(crate) async fn delete_subscriber(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    service.delete_subscriber(&principal, id).await?;
+    service.delete_subscriber(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -438,13 +444,14 @@ pub(crate) struct ErasedResponse {
 )]
 pub(crate) async fn get_email_data(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<EmailDataResponse>, Error> {
     // Kiểm quyền trước khi đọc `email`: người không có quyền nhận 403, không phải 422 (D-245).
     principal.require(&crate::permissions::NEWSLETTER_EXPORT)?;
     let email = required(query.email.as_deref(), "email")?;
-    let found = service.email_data(&principal, email).await?;
+    let found = service.email_data(&tenant, &principal, email).await?;
     Ok(Data {
         data: EmailDataResponse {
             email: autoxide_kernel::email::normalize(email),
@@ -478,12 +485,13 @@ pub(crate) async fn get_email_data(
 )]
 pub(crate) async fn delete_email_data(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<EmailQuery>,
 ) -> Result<Data<ErasedResponse>, Error> {
     // Kiểm quyền trước khi đọc `email`: người không có quyền nhận 403, không phải 422 (D-245).
     principal.require(&crate::permissions::NEWSLETTER_EXPORT)?;
     let email = required(query.email.as_deref(), "email")?;
-    let deleted = service.erase_email(&principal, email).await?;
+    let deleted = service.erase_email(&tenant, &principal, email).await?;
     Ok(Data { data: ErasedResponse { deleted } })
 }

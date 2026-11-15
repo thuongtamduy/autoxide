@@ -6959,3 +6959,20 @@ Chủ dự án hỏi merge vào `main` mà không phát hành có được khôn
   rồi xoá theo từng khách (event ghi đúng khách); dọn mồ côi liệt kê khoá của mọi khách, đối chiếu với database của
   chính khách đó, khoá của khách không còn trong sổ thì để nguyên. Lệnh `autoxide task media.refresh_variants` duyệt
   mọi database và mọi khách trên đó.
+
+## D-281 · `newsletter` theo khách; token trong link mang khách để huỷ đăng ký luôn chạy (bước 33 B10) — 2026-11-15 — agent quyết
+
+- Sáu bảng của `newsletter` mang `tenant_id`; mọi unique, index có `tenant_id` đứng đầu (cùng email, cùng `key`
+  danh sách ở hai khách không đụng nhau). Khoá chính `newsletter_subscriptions` thành `(tenant_id, subscriber_id,
+  list_id)` (đặc tả ghi "giữ", nhưng `adopt` đòi khoá chính ghép có `tenant_id`; ngữ nghĩa không đổi). Job gửi, chuẩn
+  bị, đăng ký là job theo khách; job dọn hằng ngày chạy mỗi database, tìm khách rồi dọn theo khách (event đúng khách),
+  còn token, nonce, bộ đếm quét cả database. Subscriber event (`auth.user_deleted`, `content` đăng bài, `mail` gửi
+  hỏng) ghi bằng `event.tenant`.
+- **Token trong link mang khách.** Link huỷ đăng ký (kể cả một chạm, RFC 8058), xác nhận và trang lựa chọn dựng từ
+  một địa chỉ chung (`AUTOXIDE_HTTP_PUBLIC_URL`, URL trang của website); nếu khách chỉ suy từ tên miền / header thì
+  người nhận thư của khách không mặc định sẽ không huỷ được — trái yêu cầu thư quảng cáo phải huỷ nhận được. Nên token
+  của khách không mặc định có dạng `t<UUID khách, 32 hex>.<phần ngẫu nhiên>`; endpoint tìm khách từ token (sổ database,
+  khách phải đang phục vụ) rồi mới tra bản băm trong khách đó. Token khách mặc định giữ nguyên dạng cũ (thư đã gửi vẫn
+  dùng được). Tiền tố sai, khách không có hay bị khoá: cùng lỗi như token sai, không lộ khách nào tồn tại. Ghép ID khách
+  khác vào phần ngẫu nhiên thì tra ở khách kia, không thấy. Database chỉ lưu băm phần ngẫu nhiên — không cần migration.
+  Theo hướng đặc tả 33 đã chọn cho credential của `auth` (token mang khách để định tuyến trước khi tra bản băm).

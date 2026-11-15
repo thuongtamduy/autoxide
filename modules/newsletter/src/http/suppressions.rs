@@ -8,6 +8,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
@@ -96,13 +97,14 @@ pub(crate) struct BounceRequest {
 )]
 pub(crate) async fn list_suppressions(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Query(query): Query<SuppressionsQuery>,
     Query(paging): Query<PageQuery>,
 ) -> Result<Page<SuppressionResponse>, Error> {
     let page = page_request(paging, Vec::new())?;
     let filter = SuppressionFilter { email: query.email };
-    Ok(service.list_suppressions(&principal, &filter, &page).await?.map(Into::into))
+    Ok(service.list_suppressions(&tenant, &principal, &filter, &page).await?.map(Into::into))
 }
 
 /// Suppress an address.
@@ -125,10 +127,12 @@ pub(crate) async fn list_suppressions(
 )]
 pub(crate) async fn create_suppression(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<CreateSuppressionRequest>,
 ) -> Result<Created<SuppressionResponse>, Error> {
-    let row = service.add_suppression(&principal, &input.email, input.note.as_deref()).await?;
+    let row =
+        service.add_suppression(&tenant, &principal, &input.email, input.note.as_deref()).await?;
     Ok(Created::new(format!("/newsletter/suppressions/{}", row.id), row.into()))
 }
 
@@ -151,10 +155,11 @@ pub(crate) async fn create_suppression(
 )]
 pub(crate) async fn delete_suppression(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
-    service.remove_suppression(&principal, id).await?;
+    service.remove_suppression(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -180,11 +185,12 @@ pub(crate) async fn delete_suppression(
 )]
 pub(crate) async fn report_bounce(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Principal,
     ValidJson(input): ValidJson<BounceRequest>,
 ) -> Result<Data<BounceOutcome>, Error> {
     let outcome = service
-        .report_bounce(&principal, &input.email, input.kind, input.reason.as_deref())
+        .report_bounce(&tenant, &principal, &input.email, input.kind, input.reason.as_deref())
         .await?;
     Ok(Data { data: outcome })
 }

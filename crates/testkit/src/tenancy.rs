@@ -58,12 +58,6 @@ pub const PENDING_TENANCY: &[&str] = &[
     "menus_items",
     "menus_menus",
     // newsletter
-    "newsletter_campaigns",
-    "newsletter_deliveries",
-    "newsletter_lists",
-    "newsletter_subscribers",
-    "newsletter_subscriptions",
-    "newsletter_suppressions",
 ];
 
 /// Các vi phạm (đã sắp xếp); rỗng nghĩa là hợp lệ. `control_plane`: bảng mặt điều khiển đã khai;

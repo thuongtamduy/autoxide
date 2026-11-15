@@ -28,7 +28,7 @@ use std::time::{Duration, Instant};
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{Job, JobContext, JobHandler};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set};
@@ -111,9 +111,13 @@ pub(crate) struct Preparer(pub Arc<NewsletterService>);
 #[async_trait::async_trait]
 impl JobHandler for Preparer {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let tenant = job
+            .tenant
+            .as_ref()
+            .ok_or_else(|| Error::internal("newsletter prepare job without a tenant"))?;
         let job: PrepareJob =
             serde_json::from_value(job.payload.clone()).map_err(Error::internal)?;
-        self.0.prepare(&job).await
+        self.0.prepare(tenant, &job).await
     }
 }
 
@@ -122,8 +126,12 @@ pub(crate) struct Sender(pub Arc<NewsletterService>);
 #[async_trait::async_trait]
 impl JobHandler for Sender {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let tenant = job
+            .tenant
+            .as_ref()
+            .ok_or_else(|| Error::internal("newsletter send job without a tenant"))?;
         let job: SendJob = serde_json::from_value(job.payload.clone()).map_err(Error::internal)?;
-        self.0.send_batch(&job).await.map(|_| ())
+        self.0.send_batch(tenant, &job).await.map(|_| ())
     }
 }
 
@@ -139,17 +147,29 @@ pub(crate) struct Batch {
 
 impl NewsletterService {
     /// Chiến dịch còn ở lượt `run` và đang gửi không (đọc lại mỗi khúc: tạm dừng có hiệu lực ngay).
-    async fn still_sending(&self, id: Uuid, run: i32) -> Result<Option<campaign::Model>, Error> {
-        let row = campaign::Entity::find_by_id(id).one(self.database.read()).await?;
+    async fn still_sending(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        run: i32,
+    ) -> Result<Option<campaign::Model>, Error> {
+        let row =
+            campaign::Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
         Ok(row.filter(|row| {
             row.run == run && CampaignStatus::stored(&row.status) == CampaignStatus::Sending
         }))
     }
 
     /// Chạy job chụp người nhận.
-    pub(crate) async fn prepare(&self, job: &PrepareJob) -> Result<(), Error> {
-        let Some(row) =
-            campaign::Entity::find_by_id(job.campaign_id).one(self.database.read()).await?
+    pub(crate) async fn prepare(
+        &self,
+        tenant: &TenantContext,
+        job: &PrepareJob,
+    ) -> Result<(), Error> {
+        let Some(row) = campaign::Entity::find_by_id(job.campaign_id)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
         else {
             return Ok(());
         };
@@ -157,17 +177,18 @@ impl NewsletterService {
             return Ok(());
         }
         match CampaignStatus::stored(&row.status) {
-            CampaignStatus::Scheduled => self.start_scheduled(&row).await?,
+            CampaignStatus::Scheduled => self.start_scheduled(tenant, &row).await?,
             CampaignStatus::Sending => {}
             _ => return Ok(()),
         }
         let started = Instant::now();
         let mut after = job.after;
         loop {
-            let Some(row) = self.still_sending(job.campaign_id, job.run).await? else {
+            let Some(row) = self.still_sending(tenant, job.campaign_id, job.run).await? else {
                 return Ok(());
             };
             let mut select = subscription::Entity::find()
+                .scoped(tenant)
                 .select_only()
                 .column(subscription::Column::SubscriberId)
                 .filter(subscription::Column::ListId.eq(row.list_id))
@@ -177,17 +198,18 @@ impl NewsletterService {
             if let Some(after) = after {
                 select = select.filter(subscription::Column::SubscriberId.gt(after));
             }
-            let chunk: Vec<Uuid> = select.into_tuple().all(self.database.read()).await?;
-            let transaction = self.database.begin_write().await?;
+            let chunk: Vec<Uuid> = select.into_tuple().all(tenant.database().read()).await?;
+            let transaction = tenant.database().begin_write().await?;
             let Some(last) = chunk.last().copied() else {
                 let marked = campaign::Entity::update_many()
+                    .scoped(tenant)
                     .col_expr(campaign::Column::PreparedAt, Expr::value(Some(now())))
                     .filter(campaign::Column::Id.eq(row.id))
                     .filter(campaign::Column::Run.eq(job.run))
                     .exec(&transaction)
                     .await?;
                 if marked.rows_affected == 1 {
-                    self.enqueue_send(&transaction, row.id, job.run, 0, None).await?;
+                    self.enqueue_send(&transaction, tenant, row.id, job.run, 0, None).await?;
                 }
                 transaction.commit().await?;
                 return Ok(());
@@ -195,6 +217,7 @@ impl NewsletterService {
             let now = now();
             let rows = chunk.iter().map(|subscriber_id| delivery::ActiveModel {
                 id: Set(Uuid::now_v7()),
+                tenant_id: Set(tenant.id().as_uuid()),
                 campaign_id: Set(row.id),
                 subscriber_id: Set(*subscriber_id),
                 status: Set(DeliveryStatus::Pending.as_str().to_owned()),
@@ -209,6 +232,7 @@ impl NewsletterService {
             delivery::Entity::insert_many(rows)
                 .on_conflict(
                     OnConflict::columns([
+                        delivery::Column::TenantId,
                         delivery::Column::CampaignId,
                         delivery::Column::SubscriberId,
                     ])
@@ -218,7 +242,8 @@ impl NewsletterService {
                 .exec_without_returning(&transaction)
                 .await?;
             if started.elapsed() > PREPARE_BUDGET {
-                self.enqueue_prepare(&transaction, row.id, job.run, Some(last), None).await?;
+                self.enqueue_prepare(&transaction, tenant, row.id, job.run, Some(last), None)
+                    .await?;
                 transaction.commit().await?;
                 return Ok(());
             }
@@ -228,10 +253,15 @@ impl NewsletterService {
     }
 
     /// Chiến dịch hẹn giờ tới giờ: `scheduled` → `sending`.
-    async fn start_scheduled(&self, row: &campaign::Model) -> Result<(), Error> {
+    async fn start_scheduled(
+        &self,
+        tenant: &TenantContext,
+        row: &campaign::Model,
+    ) -> Result<(), Error> {
         let now = now();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let started = campaign::Entity::update_many()
+            .scoped(tenant)
             .col_expr(campaign::Column::Status, Expr::value(CampaignStatus::Sending.as_str()))
             .col_expr(campaign::Column::StartedAt, Expr::value(Some(now)))
             .col_expr(campaign::Column::UpdatedAt, Expr::value(now))
@@ -247,7 +277,7 @@ impl NewsletterService {
             self.outbox
                 .record(
                     &transaction,
-                    &TenantContext::legacy_default(&self.database),
+                    tenant,
                     Actor::system(),
                     events::campaign_subject(row.id),
                     &events::CampaignStarted(change),
@@ -259,21 +289,26 @@ impl NewsletterService {
     }
 
     /// Chạy job gửi một lô.
-    pub(crate) async fn send_batch(&self, job: &SendJob) -> Result<Batch, Error> {
+    pub(crate) async fn send_batch(
+        &self,
+        tenant: &TenantContext,
+        job: &SendJob,
+    ) -> Result<Batch, Error> {
         let mut batch = Batch::default();
-        let Some(row) = self.still_sending(job.campaign_id, job.run).await? else {
+        let Some(row) = self.still_sending(tenant, job.campaign_id, job.run).await? else {
             return Ok(batch);
         };
-        let list = self.find_list(row.list_id).await?;
+        let list = self.find_list(tenant, row.list_id).await?;
         let pending = delivery::Entity::find()
+            .scoped(tenant)
             .filter(delivery::Column::CampaignId.eq(row.id))
             .filter(delivery::Column::Status.eq(DeliveryStatus::Pending.as_str()))
             .order_by_asc(delivery::Column::Id)
             .limit(u64::from(self.config.batch_size))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         if pending.is_empty() {
-            batch.finished = self.finish(&row, job.run).await?;
+            batch.finished = self.finish(tenant, &row, job.run).await?;
             return Ok(batch);
         }
         let now = now();
@@ -284,7 +319,10 @@ impl NewsletterService {
                 (false, _) => fresh.push(item),
                 // Đã có worker nhận mà quá thời hạn: không biết mail đã đi chưa — không gửi lại.
                 (true, Some(claimed)) if claimed < lease => {
-                    if self.mark(item.id, DeliveryStatus::Failed, "interrupted", true).await? {
+                    if self
+                        .mark(tenant, item.id, DeliveryStatus::Failed, "interrupted", true)
+                        .await?
+                    {
                         batch.failed += 1;
                     }
                 }
@@ -292,11 +330,11 @@ impl NewsletterService {
                 (true, _) => {}
             }
         }
-        let checks = self.recipient_checks(&row, &list, &fresh, now).await?;
+        let checks = self.recipient_checks(tenant, &row, &list, &fresh, now).await?;
         let mut ads = checks.ads;
         for item in fresh {
             let Some(person) = checks.subscribers.get(&item.subscriber_id) else {
-                self.mark(item.id, DeliveryStatus::Skipped, "erased", false).await?;
+                self.mark(tenant, item.id, DeliveryStatus::Skipped, "erased", false).await?;
                 batch.skipped += 1;
                 continue;
             };
@@ -316,12 +354,12 @@ impl NewsletterService {
                 None
             };
             if let Some(reason) = reason {
-                if self.mark(item.id, DeliveryStatus::Skipped, reason, false).await? {
+                if self.mark(tenant, item.id, DeliveryStatus::Skipped, reason, false).await? {
                     batch.skipped += 1;
                 }
                 continue;
             }
-            match self.deliver(&row, &list, &item, &person.email).await? {
+            match self.deliver(tenant, &row, &list, &item, &person.email).await? {
                 Some(DeliveryStatus::Sent) => {
                     batch.sent += 1;
                     if row.advertising {
@@ -336,8 +374,8 @@ impl NewsletterService {
         let millis = i64::from(self.config.batch_size) * 60_000
             / i64::from(Ord::max(self.config.send_rate_per_minute, 1));
         let next = Some(now + chrono::Duration::milliseconds(millis));
-        let transaction = self.database.begin_write().await?;
-        self.enqueue_send(&transaction, row.id, job.run, job.seq + 1, next).await?;
+        let transaction = tenant.database().begin_write().await?;
+        self.enqueue_send(&transaction, tenant, row.id, job.run, job.seq + 1, next).await?;
         transaction.commit().await?;
         tracing::info!(
             campaign_id = %row.id,
@@ -352,14 +390,18 @@ impl NewsletterService {
     /// Nhận dòng `item`, đưa mail vào hàng đợi, đánh `sent`. `None`: worker khác đã nhận.
     async fn deliver(
         &self,
+        tenant: &TenantContext,
         row: &campaign::Model,
         list: &List,
         item: &delivery::Model,
         email: &str,
     ) -> Result<Option<DeliveryStatus>, Error> {
+        // Database giữ bản băm của phần thô; link mang khách (`links.rs`).
         let token = autoxide_kernel::secret::random_token(32)?;
-        let mail = self.campaign_mail(row, list, email, &token, Some(item.id))?;
+        let link = crate::links::link_token(tenant, &token);
+        let mail = self.campaign_mail(row, list, email, &link, Some(item.id))?;
         let claimed = delivery::Entity::update_many()
+            .scoped(tenant)
             .col_expr(
                 delivery::Column::UnsubscribeTokenHash,
                 Expr::value(Some(autoxide_kernel::secret::sha256(&token))),
@@ -369,29 +411,31 @@ impl NewsletterService {
             .filter(delivery::Column::Id.eq(item.id))
             .filter(delivery::Column::Status.eq(DeliveryStatus::Pending.as_str()))
             .filter(delivery::Column::UnsubscribeTokenHash.is_null())
-            .exec(self.database.write())
+            .exec(tenant.database().write())
             .await?;
         if claimed.rows_affected != 1 {
             return Ok(None);
         }
-        match self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await {
+        match self.mailer.send(tenant, mail).await {
             Ok(()) => {
                 delivery::Entity::update_many()
+                    .scoped(tenant)
                     .col_expr(delivery::Column::Status, Expr::value(DeliveryStatus::Sent.as_str()))
                     .col_expr(delivery::Column::SentAt, Expr::value(Some(now())))
                     .filter(delivery::Column::Id.eq(item.id))
-                    .exec(self.database.write())
+                    .exec(tenant.database().write())
                     .await?;
                 Ok(Some(DeliveryStatus::Sent))
             }
             // Địa chỉ không gửi được (sai dạng): không thử lại.
             Err(error) if error.kind() == ErrorKind::Validation => {
-                self.mark(item.id, DeliveryStatus::Failed, "invalid_address", true).await?;
+                self.mark(tenant, item.id, DeliveryStatus::Failed, "invalid_address", true).await?;
                 Ok(Some(DeliveryStatus::Failed))
             }
             Err(error) => {
                 // Không xếp được mail: trả dòng lại để lần chạy sau gửi.
                 delivery::Entity::update_many()
+                    .scoped(tenant)
                     .col_expr(
                         delivery::Column::UnsubscribeTokenHash,
                         Expr::value(Option::<String>::None),
@@ -402,7 +446,7 @@ impl NewsletterService {
                     )
                     .filter(delivery::Column::Id.eq(item.id))
                     .filter(delivery::Column::Status.eq(DeliveryStatus::Pending.as_str()))
-                    .exec(self.database.write())
+                    .exec(tenant.database().write())
                     .await?;
                 Err(error)
             }
@@ -413,12 +457,14 @@ impl NewsletterService {
     /// nhận (`false`: chỉ đánh khi chưa ai nhận). Trả `true` nếu có đổi.
     async fn mark(
         &self,
+        tenant: &TenantContext,
         id: Uuid,
         status: DeliveryStatus,
         reason: &str,
         claimed: bool,
     ) -> Result<bool, Error> {
         let mut update = delivery::Entity::update_many()
+            .scoped(tenant)
             .col_expr(delivery::Column::Status, Expr::value(status.as_str()))
             .col_expr(delivery::Column::Error, Expr::value(Some(reason.to_owned())))
             .filter(delivery::Column::Id.eq(id))
@@ -426,15 +472,22 @@ impl NewsletterService {
         if !claimed {
             update = update.filter(delivery::Column::UnsubscribeTokenHash.is_null());
         }
-        Ok(update.exec(self.database.write()).await?.rows_affected == 1)
+        Ok(update.exec(tenant.database().write()).await?.rows_affected == 1)
     }
 
     /// Hết dòng `pending`: chiến dịch thành `sent`, kèm event có số đếm. Trả `true` nếu vừa xong.
-    async fn finish(&self, row: &campaign::Model, run: i32) -> Result<bool, Error> {
-        let counts = self.delivery_counts(&[row.id]).await?.remove(&row.id).unwrap_or_default();
+    async fn finish(
+        &self,
+        tenant: &TenantContext,
+        row: &campaign::Model,
+        run: i32,
+    ) -> Result<bool, Error> {
+        let counts =
+            self.delivery_counts(tenant, &[row.id]).await?.remove(&row.id).unwrap_or_default();
         let now = now();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let finished = campaign::Entity::update_many()
+            .scoped(tenant)
             .col_expr(campaign::Column::Status, Expr::value(CampaignStatus::Sent.as_str()))
             .col_expr(campaign::Column::FinishedAt, Expr::value(Some(now)))
             .col_expr(campaign::Column::UpdatedAt, Expr::value(now))
@@ -461,7 +514,7 @@ impl NewsletterService {
             self.outbox
                 .record(
                     &transaction,
-                    &TenantContext::legacy_default(&self.database),
+                    tenant,
                     Actor::system(),
                     events::campaign_subject(row.id),
                     &events::CampaignSent(change),
@@ -477,17 +530,19 @@ impl NewsletterService {
     /// cáo mỗi người đã nhận trong 24 giờ.
     async fn recipient_checks(
         &self,
+        tenant: &TenantContext,
         row: &campaign::Model,
         list: &List,
         items: &[delivery::Model],
         now: DateTime<Utc>,
     ) -> Result<Checks, Error> {
-        let read = self.database.read();
+        let read = tenant.database().read();
         let ids: Vec<Uuid> = items.iter().map(|item| item.subscriber_id).collect();
         if ids.is_empty() {
             return Ok(Checks::default());
         }
         let subscribers: HashMap<Uuid, subscriber::Model> = subscriber::Entity::find()
+            .scoped(tenant)
             .filter(subscriber::Column::Id.is_in(ids.clone()))
             .all(read)
             .await?
@@ -495,6 +550,7 @@ impl NewsletterService {
             .map(|row| (row.id, row))
             .collect();
         let confirmed: HashSet<Uuid> = subscription::Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(subscription::Column::SubscriberId)
             .filter(subscription::Column::ListId.eq(list.row.id))
@@ -507,6 +563,7 @@ impl NewsletterService {
             .collect();
         let emails: Vec<String> = subscribers.values().map(|row| row.email.clone()).collect();
         let suppressed: HashSet<String> = suppression::Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(suppression::Column::Email)
             .filter(suppression::Column::Email.is_in(emails))
@@ -519,11 +576,13 @@ impl NewsletterService {
         if row.advertising && self.config.advertising_max_per_day > 0 {
             let since = now - chrono::Duration::hours(24);
             let advertising = campaign::Entity::find()
+                .scoped(tenant)
                 .select_only()
                 .column(campaign::Column::Id)
                 .filter(campaign::Column::Advertising.eq(true))
                 .into_query();
             let sent: Vec<Uuid> = delivery::Entity::find()
+                .scoped(tenant)
                 .select_only()
                 .column(delivery::Column::SubscriberId)
                 .filter(delivery::Column::SubscriberId.is_in(ids))

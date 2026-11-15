@@ -619,7 +619,10 @@ export type CommentsUnsubscribed = {
 
 /** The token of a confirmation link. */
 export type ConfirmBody = {
-  /** The `{token}` of the link in the confirmation mail. */
+  /**
+   * The `{token}` of the link in the confirmation mail, exactly as received (it may contain a
+   * `.`).
+   */
   token: string;
 };
 

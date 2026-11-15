@@ -188,12 +188,13 @@ impl NewsletterService {
     /// trong link. Cần `newsletter.read`. Chưa đủ cấu hình để gửi thì báo đúng lỗi như khi gửi.
     pub(crate) async fn preview(
         &self,
+        tenant: &autoxide_kernel::tenancy::TenantContext,
         principal: &autoxide_kernel::access::Principal,
         id: uuid::Uuid,
     ) -> Result<Preview, Error> {
         principal.require(&crate::permissions::NEWSLETTER_READ)?;
-        let campaign = self.find_campaign(id).await?;
-        let list = self.find_list(campaign.row.list_id).await?;
+        let campaign = self.find_campaign(tenant, id).await?;
+        let list = self.find_list(tenant, campaign.row.list_id).await?;
         let mail = self.campaign_mail(
             &campaign.row,
             &list,

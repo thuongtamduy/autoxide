@@ -6,6 +6,11 @@
 //! như nhà cung cấp hộp thư gửi theo RFC 8058 — ngoại lệ của luật "thân JSON nhận bằng
 //! `ValidJson`". Thân không mang dữ liệu gì cần đọc (token nằm ở query), nên endpoint nhận mọi
 //! thân và bỏ qua nó.
+//!
+//! Endpoint nhận token trong link (xác nhận, huỷ một chạm, trang lựa chọn) lấy khách TỪ TOKEN khi
+//! token mang khách (`links.rs`): người nhận bấm link có thể tới tên miền chính, không header
+//! `Autoxide-Tenant`. Vì vậy chúng nhận [`RequestTenant`] (khách của request nếu xác định được)
+//! thay cho `TenantContext` — extractor đó báo `tenant_required` khi không xác định được khách.
 
 use std::sync::Arc;
 
@@ -13,9 +18,11 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::{ClientInfo, ValidJson};
 use autoxide_kernel::response::{Data, Problem};
+use autoxide_kernel::tenancy::TenantContext;
 use axum::body::Bytes;
-use axum::extract::{Query, State};
+use axum::extract::{FromRequestParts, Query, State};
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
@@ -26,6 +33,29 @@ use crate::audience::subscribers::SubscriptionStatus;
 use crate::public::{Preferences, PreferencesChange, SCOPE, SubscribeRequest};
 use crate::service::NewsletterService;
 use crate::text::{Locale, Localized};
+
+/// Khách của request nếu xác định được (tên miền của khách, header `Autoxide-Tenant`,
+/// credential); `None` khi không xác định được (`tenant_required`, vd tên miền chính không header).
+/// Lỗi khác (khách tạm khoá, header trỏ khách khác credential…) vẫn trả về như `TenantContext`.
+pub(crate) struct RequestTenant(Option<TenantContext>);
+
+impl RequestTenant {
+    fn get(&self) -> Option<&TenantContext> {
+        self.0.as_ref()
+    }
+}
+
+impl<S: Send + Sync> FromRequestParts<S> for RequestTenant {
+    type Rejection = Error;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        match TenantContext::from_request_parts(parts, state).await {
+            Ok(tenant) => Ok(RequestTenant(Some(tenant))),
+            Err(error) if error.code() == "tenant_required" => Ok(RequestTenant(None)),
+            Err(error) => Err(error),
+        }
+    }
+}
 
 /// A list open to public sign-up, in one language.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -99,11 +129,12 @@ fn locale(raw: Option<&str>) -> Result<Locale, Error> {
 )]
 pub(crate) async fn public_lists(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     _principal: Option<Principal>,
     Query(query): Query<LocaleQuery>,
 ) -> Result<Data<PublicListsResponse>, Error> {
     let locale = locale(query.locale.as_deref())?;
-    let lists = service.public_lists().await?;
+    let lists = service.public_lists(&tenant).await?;
     Ok(Data {
         data: PublicListsResponse {
             token_scope: SCOPE.to_owned(),
@@ -182,6 +213,7 @@ pub(crate) struct SubscribeResponse {
 )]
 pub(crate) async fn subscribe(
     State(service): State<Arc<NewsletterService>>,
+    tenant: TenantContext,
     principal: Option<Principal>,
     client: ClientInfo,
     ValidJson(input): ValidJson<SubscribeBody>,
@@ -198,7 +230,7 @@ pub(crate) async fn subscribe(
         trap: input.trap,
         challenge: input.challenge,
     };
-    service.subscribe(principal.as_ref(), &client, request).await?;
+    service.subscribe(&tenant, principal.as_ref(), &client, request).await?;
     Ok((StatusCode::ACCEPTED, Data { data: SubscribeResponse { accepted: true } }))
 }
 
@@ -206,7 +238,8 @@ pub(crate) async fn subscribe(
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ConfirmBody {
-    /// The `{token}` of the link in the confirmation mail.
+    /// The `{token}` of the link in the confirmation mail, exactly as received (it may contain a
+    /// `.`).
     token: String,
 }
 
@@ -228,7 +261,8 @@ pub(crate) struct ConfirmResponse {
 /// No sign-in needed. The confirmation mail links to the website's page
 /// (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); the page sends the token here with `POST` — opening the
 /// link alone (as mail scanners do) changes nothing. A link works once, within
-/// `AUTOXIDE_NEWSLETTER_CONFIRM_HOURS`.
+/// `AUTOXIDE_NEWSLETTER_CONFIRM_HOURS`. The token tells the tenant: the call works on any host of
+/// the API, without `Autoxide-Tenant`.
 #[utoipa::path(
     post,
     path = "/public/confirm",
@@ -243,10 +277,11 @@ pub(crate) struct ConfirmResponse {
 )]
 pub(crate) async fn confirm(
     State(service): State<Arc<NewsletterService>>,
+    tenant: RequestTenant,
     _principal: Option<Principal>,
     ValidJson(input): ValidJson<ConfirmBody>,
 ) -> Result<Data<ConfirmResponse>, Error> {
-    let lists = service.confirm(&input.token).await?;
+    let lists = service.confirm(tenant.get(), &input.token).await?;
     let lists = lists
         .into_iter()
         .map(|list| ConfirmedList { key: list.row.key, name: list.name })
@@ -258,7 +293,7 @@ pub(crate) async fn confirm(
 #[derive(Debug, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct TokenQuery {
-    /// The token in the links of a campaign mail.
+    /// The token in the links of a campaign mail, exactly as received (it may contain a `.`).
     token: Option<String>,
 }
 
@@ -273,7 +308,8 @@ pub(crate) struct UnsubscribeResponse {
 ///
 /// No sign-in needed. The `List-Unsubscribe` header of every campaign mail points here; mail
 /// apps send `POST` with the form body `List-Unsubscribe=One-Click` (RFC 8058). Unsubscribes
-/// the address from the list of that mail at once. The answer is the same for any token.
+/// the address from the list of that mail at once. The answer is the same for any token. The
+/// token tells the tenant: the link works on any host of the API, without `Autoxide-Tenant`.
 #[utoipa::path(
     post,
     path = "/public/unsubscribe",
@@ -288,11 +324,12 @@ pub(crate) struct UnsubscribeResponse {
 )]
 pub(crate) async fn unsubscribe(
     State(service): State<Arc<NewsletterService>>,
+    tenant: RequestTenant,
     _principal: Option<Principal>,
     Query(query): Query<TokenQuery>,
     _body: Bytes,
 ) -> Result<Data<UnsubscribeResponse>, Error> {
-    service.unsubscribe(query.token.as_deref().unwrap_or_default()).await?;
+    service.unsubscribe(tenant.get(), query.token.as_deref().unwrap_or_default()).await?;
     Ok(Data { data: UnsubscribeResponse { unsubscribed: true } })
 }
 
@@ -343,7 +380,8 @@ impl From<Preferences> for PreferencesResponse {
 /// Get the preferences of a subscriber (public).
 ///
 /// No sign-in needed: the token comes from a campaign mail (the footer links to
-/// `AUTOXIDE_NEWSLETTER_PREFERENCES_URL`). Reading changes nothing.
+/// `AUTOXIDE_NEWSLETTER_PREFERENCES_URL`). Reading changes nothing. The token tells the tenant:
+/// the call works on any host of the API, without `Autoxide-Tenant`.
 #[utoipa::path(
     get,
     path = "/public/preferences",
@@ -359,11 +397,12 @@ impl From<Preferences> for PreferencesResponse {
 )]
 pub(crate) async fn get_preferences(
     State(service): State<Arc<NewsletterService>>,
+    tenant: RequestTenant,
     _principal: Option<Principal>,
     Query(query): Query<TokenQuery>,
 ) -> Result<Data<PreferencesResponse>, Error> {
     let token = required(query.token.as_deref(), "token")?;
-    Ok(Data { data: service.preferences(token).await?.into() })
+    Ok(Data { data: service.preferences(tenant.get(), token).await?.into() })
 }
 
 /// One list choice.
@@ -398,7 +437,8 @@ pub(crate) struct PreferencesBody {
 ///
 /// No sign-in needed: the token comes from a campaign mail. Unsubscribing takes effect at
 /// once. Subscribing to a public list confirms it at once (the token proves the inbox), with
-/// the source `preferences` as proof of consent.
+/// the source `preferences` as proof of consent. The token tells the tenant: the call works on
+/// any host of the API, without `Autoxide-Tenant`.
 #[utoipa::path(
     put,
     path = "/public/preferences",
@@ -415,6 +455,7 @@ pub(crate) struct PreferencesBody {
 )]
 pub(crate) async fn update_preferences(
     State(service): State<Arc<NewsletterService>>,
+    tenant: RequestTenant,
     _principal: Option<Principal>,
     Query(query): Query<TokenQuery>,
     ValidJson(input): ValidJson<PreferencesBody>,
@@ -428,5 +469,5 @@ pub(crate) async fn update_preferences(
         consent_text: input.consent_text,
         consent_version: input.consent_version,
     };
-    Ok(Data { data: service.update_preferences(token, change).await?.into() })
+    Ok(Data { data: service.update_preferences(tenant.get(), token, change).await?.into() })
 }

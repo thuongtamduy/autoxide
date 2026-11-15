@@ -1667,7 +1667,7 @@
         "description": "The token of a confirmation link.",
         "properties": {
           "token": {
-            "description": "The `{token}` of the link in the confirmation mail.",
+            "description": "The `{token}` of the link in the confirmation mail, exactly as received (it may contain a\n`.`).",
             "type": "string"
           }
         },
@@ -45922,7 +45922,7 @@
     },
     "/api/v1/newsletter/public/confirm": {
       "post": {
-        "description": "No sign-in needed. The confirmation mail links to the website's page\n(`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); the page sends the token here with `POST` — opening the\nlink alone (as mail scanners do) changes nothing. A link works once, within\n`AUTOXIDE_NEWSLETTER_CONFIRM_HOURS`.",
+        "description": "No sign-in needed. The confirmation mail links to the website's page\n(`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); the page sends the token here with `POST` — opening the\nlink alone (as mail scanners do) changes nothing. A link works once, within\n`AUTOXIDE_NEWSLETTER_CONFIRM_HOURS`. The token tells the tenant: the call works on any host of\nthe API, without `Autoxide-Tenant`.",
         "operationId": "newsletter_confirm_newsletter_subscription",
         "parameters": [
           {
@@ -46085,11 +46085,11 @@
     },
     "/api/v1/newsletter/public/preferences": {
       "get": {
-        "description": "No sign-in needed: the token comes from a campaign mail (the footer links to\n`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`). Reading changes nothing.",
+        "description": "No sign-in needed: the token comes from a campaign mail (the footer links to\n`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`). Reading changes nothing. The token tells the tenant:\nthe call works on any host of the API, without `Autoxide-Tenant`.",
         "operationId": "newsletter_get_newsletter_preferences",
         "parameters": [
           {
-            "description": "The token in the links of a campaign mail.",
+            "description": "The token in the links of a campaign mail, exactly as received (it may contain a `.`).",
             "in": "query",
             "name": "token",
             "required": false,
@@ -46165,11 +46165,11 @@
         "x-public": true
       },
       "put": {
-        "description": "No sign-in needed: the token comes from a campaign mail. Unsubscribing takes effect at\nonce. Subscribing to a public list confirms it at once (the token proves the inbox), with\nthe source `preferences` as proof of consent.",
+        "description": "No sign-in needed: the token comes from a campaign mail. Unsubscribing takes effect at\nonce. Subscribing to a public list confirms it at once (the token proves the inbox), with\nthe source `preferences` as proof of consent. The token tells the tenant: the call works on\nany host of the API, without `Autoxide-Tenant`.",
         "operationId": "newsletter_update_newsletter_preferences",
         "parameters": [
           {
-            "description": "The token in the links of a campaign mail.",
+            "description": "The token in the links of a campaign mail, exactly as received (it may contain a `.`).",
             "in": "query",
             "name": "token",
             "required": false,
@@ -46386,11 +46386,11 @@
     },
     "/api/v1/newsletter/public/unsubscribe": {
       "post": {
-        "description": "No sign-in needed. The `List-Unsubscribe` header of every campaign mail points here; mail\napps send `POST` with the form body `List-Unsubscribe=One-Click` (RFC 8058). Unsubscribes\nthe address from the list of that mail at once. The answer is the same for any token.",
+        "description": "No sign-in needed. The `List-Unsubscribe` header of every campaign mail points here; mail\napps send `POST` with the form body `List-Unsubscribe=One-Click` (RFC 8058). Unsubscribes\nthe address from the list of that mail at once. The answer is the same for any token. The\ntoken tells the tenant: the link works on any host of the API, without `Autoxide-Tenant`.",
         "operationId": "newsletter_unsubscribe_newsletter",
         "parameters": [
           {
-            "description": "The token in the links of a campaign mail.",
+            "description": "The token in the links of a campaign mail, exactly as received (it may contain a `.`).",
             "in": "query",
             "name": "token",
             "required": false,

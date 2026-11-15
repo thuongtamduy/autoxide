@@ -6,7 +6,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
@@ -120,6 +120,7 @@ impl NewsletterService {
     /// Tạo danh sách. Cần `newsletter.manage`; `new_posts = send` cần thêm `newsletter.send`.
     pub(crate) async fn create_list(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         input: ListInput,
     ) -> Result<List, Error> {
@@ -133,6 +134,7 @@ impl NewsletterService {
         let now = now();
         let blank = list::Model {
             id: Uuid::now_v7(),
+            tenant_id: tenant.id().as_uuid(),
             key: String::new(),
             name: "{}".to_owned(),
             description: "{}".to_owned(),
@@ -152,8 +154,8 @@ impl NewsletterService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let transaction = self.database.begin_write().await?;
-        if key_taken(&transaction, &candidate.row.key, None).await? {
+        let transaction = tenant.database().begin_write().await?;
+        if key_taken(&transaction, tenant, &candidate.row.key, None).await? {
             return Err(key_conflict(&candidate.row.key));
         }
         let row = match candidate.row.clone().into_active_model().insert(&transaction).await {
@@ -168,7 +170,7 @@ impl NewsletterService {
         self.outbox
             .record(
                 &transaction,
-                &TenantContext::legacy_default(&self.database),
+                tenant,
                 Actor::from(principal),
                 events::list_subject(created.row.id),
                 &event,
@@ -180,14 +182,20 @@ impl NewsletterService {
     }
 
     /// Danh sách `id`. Cần `newsletter.read`.
-    pub(crate) async fn get_list(&self, principal: &Principal, id: Uuid) -> Result<List, Error> {
+    pub(crate) async fn get_list(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<List, Error> {
         principal.require(&NEWSLETTER_READ)?;
-        self.find_list(id).await
+        self.find_list(tenant, id).await
     }
 
-    pub(crate) async fn find_list(&self, id: Uuid) -> Result<List, Error> {
+    pub(crate) async fn find_list(&self, tenant: &TenantContext, id: Uuid) -> Result<List, Error> {
         let row = list::Entity::find_by_id(id)
-            .one(self.database.read())
+            .scoped(tenant)
+            .one(tenant.database().read())
             .await?
             .ok_or_else(list_not_found)?;
         List::parse(row)
@@ -197,29 +205,35 @@ impl NewsletterService {
     pub(crate) async fn lists_by_id<C: ConnectionTrait>(
         &self,
         connection: &C,
+        tenant: &TenantContext,
         ids: impl IntoIterator<Item = Uuid>,
     ) -> Result<HashMap<Uuid, List>, Error> {
         let ids: Vec<Uuid> = ids.into_iter().collect();
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
-        let rows = list::Entity::find().filter(list::Column::Id.is_in(ids)).all(connection).await?;
+        let rows = list::Entity::find()
+            .scoped(tenant)
+            .filter(list::Column::Id.is_in(ids))
+            .all(connection)
+            .await?;
         rows.into_iter().map(|row| List::parse(row).map(|list| (list.row.id, list))).collect()
     }
 
     /// Một trang danh sách, mới trước (mặc định). Cần `newsletter.read`.
     pub(crate) async fn list_lists(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         page: &PageRequest,
     ) -> Result<Page<List>, Error> {
         principal.require(&NEWSLETTER_READ)?;
         let found = fetch_page(
-            list::Entity::find(),
+            list::Entity::find().scoped(tenant),
             list::Column::Id,
             |row| row.id,
             page,
-            self.database.read(),
+            tenant.database().read(),
         )
         .await?;
         let Page { data, pagination } = found;
@@ -228,10 +242,11 @@ impl NewsletterService {
     }
 
     /// Mọi danh sách công khai, theo `key` (cho website).
-    pub(crate) async fn public_lists(&self) -> Result<Vec<List>, Error> {
+    pub(crate) async fn public_lists(&self, tenant: &TenantContext) -> Result<Vec<List>, Error> {
         let rows = list::Entity::find()
+            .scoped(tenant)
             .filter(list::Column::Public.eq(true))
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         let mut lists = rows.into_iter().map(List::parse).collect::<Result<Vec<_>, _>>()?;
         lists.sort_by(|a, b| a.row.key.cmp(&b.row.key));
@@ -241,12 +256,14 @@ impl NewsletterService {
     /// Số đăng ký theo trạng thái của từng danh sách trong `ids`.
     pub(crate) async fn subscription_counts(
         &self,
+        tenant: &TenantContext,
         ids: &[Uuid],
     ) -> Result<HashMap<Uuid, SubscriptionCounts>, Error> {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
         let rows: Vec<(Uuid, String, i64)> = subscription::Entity::find()
+            .scoped(tenant)
             .select_only()
             .column(subscription::Column::ListId)
             .column(subscription::Column::Status)
@@ -255,7 +272,7 @@ impl NewsletterService {
             .group_by(subscription::Column::ListId)
             .group_by(subscription::Column::Status)
             .into_tuple()
-            .all(self.database.read())
+            .all(tenant.database().read())
             .await?;
         let mut counts: HashMap<Uuid, SubscriptionCounts> = HashMap::new();
         for (list_id, status, count) in rows {
@@ -274,13 +291,14 @@ impl NewsletterService {
     /// đi, không ai duyệt) cần thêm `newsletter.send`.
     pub(crate) async fn update_list(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         input: ListInput,
         expected: Option<DateTime<Utc>>,
     ) -> Result<List, Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
-        let before = self.find_list(id).await?;
+        let before = self.find_list(tenant, id).await?;
         if expected.is_some_and(|expected| expected != before.row.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
@@ -294,9 +312,9 @@ impl NewsletterService {
             return Err(Error::validation(problems));
         }
         let now = now();
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         if candidate.row.key != before.row.key
-            && key_taken(&transaction, &candidate.row.key, Some(id)).await?
+            && key_taken(&transaction, tenant, &candidate.row.key, Some(id)).await?
         {
             return Err(key_conflict(&candidate.row.key));
         }
@@ -312,6 +330,7 @@ impl NewsletterService {
         row.updated_at = Set(now);
         let update = list::Entity::update(row)
             .validate()?
+            .scoped(tenant)
             .filter(list::Column::UpdatedAt.eq(expected.unwrap_or(before.row.updated_at)));
         let after = match update.exec(&transaction).await {
             Ok(after) => after,
@@ -329,13 +348,7 @@ impl NewsletterService {
             after: Some(after.summary()),
         });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                Actor::from(principal),
-                events::list_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, Actor::from(principal), events::list_subject(id), &event)
             .await?;
         transaction.commit().await?;
         Ok(after)
@@ -345,17 +358,19 @@ impl NewsletterService {
     /// xong (nháp, hẹn giờ, đang gửi, tạm dừng) thì từ chối: xoá hay huỷ chúng trước.
     pub(crate) async fn delete_list(
         &self,
+        tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
         expected: Option<DateTime<Utc>>,
     ) -> Result<(), Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
-        let before = self.find_list(id).await?;
+        let before = self.find_list(tenant, id).await?;
         if expected.is_some_and(|expected| expected != before.row.updated_at) {
             return Err(autoxide_kernel::version::changed());
         }
-        let transaction = self.database.begin_write().await?;
+        let transaction = tenant.database().begin_write().await?;
         let active = campaign::Entity::find()
+            .scoped(tenant)
             .filter(campaign::Column::ListId.eq(id))
             .filter(
                 campaign::Column::Status.is_in(
@@ -378,6 +393,7 @@ impl NewsletterService {
             ));
         }
         let deleted = list::Entity::delete_many()
+            .scoped(tenant)
             .filter(list::Column::Id.eq(id))
             .filter(list::Column::UpdatedAt.eq(expected.unwrap_or(before.row.updated_at)))
             .exec(&transaction)
@@ -386,6 +402,7 @@ impl NewsletterService {
             return Err(autoxide_kernel::version::changed());
         }
         let subscriptions = subscription::Entity::delete_many()
+            .scoped(tenant)
             .filter(subscription::Column::ListId.eq(id))
             .exec(&transaction)
             .await?;
@@ -395,13 +412,7 @@ impl NewsletterService {
         }
         let event = events::ListDeleted(Change { before: Some(summary), after: None });
         self.outbox
-            .record(
-                &transaction,
-                &TenantContext::legacy_default(&self.database),
-                Actor::from(principal),
-                events::list_subject(id),
-                &event,
-            )
+            .record(&transaction, tenant, Actor::from(principal), events::list_subject(id), &event)
             .await?;
         transaction.commit().await?;
         tracing::info!(list_id = %id, "newsletter list deleted");
@@ -456,10 +467,11 @@ fn apply(
 
 async fn key_taken<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     key: &str,
     except: Option<Uuid>,
 ) -> Result<bool, Error> {
-    let mut select = list::Entity::find().filter(list::Column::Key.eq(key));
+    let mut select = list::Entity::find().scoped(tenant).filter(list::Column::Key.eq(key));
     if let Some(id) = except {
         select = select.filter(list::Column::Id.ne(id));
     }
