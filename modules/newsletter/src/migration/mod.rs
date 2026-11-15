@@ -2,6 +2,7 @@
 //! mới và một dòng vào cuối [`all`].
 
 mod m0001_create_newsletter;
+mod m0009_delivery_unsubscribed;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -33,5 +34,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                 autoxide_kernel::tokens::tenant_table("newsletter"),
             ],
         ),
+        // Lần huỷ đăng ký bằng link của từng thư (D-269).
+        Box::new(m0009_delivery_unsubscribed::Migration),
     ]
 }

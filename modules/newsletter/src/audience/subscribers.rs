@@ -131,6 +131,8 @@ pub(crate) struct SubscriberFilter {
     pub list_id: Option<Uuid>,
     /// Trạng thái đăng ký (ở `list_id`, hoặc ở danh sách bất kỳ).
     pub status: Option<SubscriptionStatus>,
+    /// `true`: chỉ người bị chặn; `false`: chỉ người không bị chặn.
+    pub blocked: Option<bool>,
 }
 
 /// Một người cần nhập.
@@ -201,6 +203,11 @@ impl NewsletterService {
         {
             select =
                 select.filter(autoxide_kernel::search::contains(subscriber::Column::Email, email));
+        }
+        if let Some(blocked) = filter.blocked {
+            let status = subscriber::Column::Status;
+            select =
+                select.filter(if blocked { status.eq("blocked") } else { status.ne("blocked") });
         }
         if filter.list_id.is_some() || filter.status.is_some() {
             let mut inner = Query::select();

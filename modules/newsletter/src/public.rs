@@ -36,7 +36,10 @@ use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::Throttle;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use chrono::{DateTime, Utc};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -536,9 +539,13 @@ impl NewsletterService {
             return Ok(());
         };
         let transaction = self.database.begin_write().await?;
+        let now = now();
         let changed = self
-            .unsubscribe_in(&transaction, Actor::public(), found.subscriber_id, &list, now())
+            .unsubscribe_in(&transaction, Actor::public(), found.subscriber_id, &list, now)
             .await?;
+        if changed {
+            mark_unsubscribed(&transaction, found.id, now).await?;
+        }
         transaction.commit().await?;
         if changed {
             tracing::info!(subscriber_id = %found.subscriber_id, list_id = %list.row.id, "newsletter one-click unsubscribe");
@@ -593,6 +600,10 @@ impl NewsletterService {
         change: PreferencesChange,
     ) -> Result<Preferences, Error> {
         let before = self.preferences(token).await?;
+        // Thư mang token: huỷ danh sách của chính thư đó thì ghi vào lượt gửi (số huỷ của chiến
+        // dịch, D-269).
+        let origin =
+            self.by_token(token).await?.map(|(found, campaign)| (found.id, campaign.list_id));
         let mut problems = Vec::new();
         let name = change.name.map(|name| text::line(name.as_deref(), "name", 200, &mut problems));
         let locale = text::locale_param(change.locale.as_deref(), "locale", &mut problems);
@@ -650,7 +661,14 @@ impl NewsletterService {
         let subject = events::subscriber_subject(id);
         for (list, status, subscribed) in wanted {
             if change.unsubscribe_all || !subscribed {
-                self.unsubscribe_in(&transaction, Actor::public(), id, list, now).await?;
+                let changed =
+                    self.unsubscribe_in(&transaction, Actor::public(), id, list, now).await?;
+                if let Some((delivery_id, list_id)) = origin
+                    && changed
+                    && list_id == list.row.id
+                {
+                    mark_unsubscribed(&transaction, delivery_id, now).await?;
+                }
             } else if status != Some(SubscriptionStatus::Confirmed) {
                 let existing =
                     subscription::Entity::find_by_id((id, list.row.id)).one(&transaction).await?;
@@ -680,7 +698,14 @@ impl NewsletterService {
         if change.unsubscribe_all {
             for (list, status) in &before.lists {
                 if status.is_some() {
-                    self.unsubscribe_in(&transaction, Actor::public(), id, list, now).await?;
+                    let changed =
+                        self.unsubscribe_in(&transaction, Actor::public(), id, list, now).await?;
+                    if let Some((delivery_id, list_id)) = origin
+                        && changed
+                        && list_id == list.row.id
+                    {
+                        mark_unsubscribed(&transaction, delivery_id, now).await?;
+                    }
                 }
             }
         }
@@ -698,4 +723,19 @@ fn link_invalid() -> Error {
         "newsletter.link_invalid",
         "This link does not match any subscription. Use the link of a more recent newsletter.",
     )
+}
+
+/// Ghi lần huỷ đăng ký bằng link của lượt gửi `delivery_id` (chỉ lần đầu).
+async fn mark_unsubscribed<C: ConnectionTrait>(
+    connection: &C,
+    delivery_id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<(), Error> {
+    delivery::Entity::update_many()
+        .col_expr(delivery::Column::UnsubscribedAt, sea_orm::sea_query::Expr::value(Some(now)))
+        .filter(delivery::Column::Id.eq(delivery_id))
+        .filter(delivery::Column::UnsubscribedAt.is_null())
+        .exec(connection)
+        .await?;
+    Ok(())
 }

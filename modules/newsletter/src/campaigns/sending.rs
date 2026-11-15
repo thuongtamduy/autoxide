@@ -203,6 +203,7 @@ impl NewsletterService {
                 claimed_at: Set(None),
                 sent_at: Set(None),
                 error: Set(None),
+                unsubscribed_at: Set(None),
                 created_at: Set(now),
             });
             delivery::Entity::insert_many(rows)

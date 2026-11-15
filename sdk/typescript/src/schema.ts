@@ -235,6 +235,19 @@ export type BounceRequest = {
   type: BounceKind;
 };
 
+/** A campaign mail exactly as subscribers get it. */
+export type CampaignPreviewResponse = {
+  /**
+   * The HTML body with the preheader and the footer; `null` for a text-only campaign. Show it
+   * only inside a sandboxed `<iframe sandbox>`, like `body_html`.
+   */
+  body_html?: string | null;
+  /** The plain-text body with the footer (list name, preferences link, postal address). */
+  body_text: string;
+  /** The subject, with the advertising label when the campaign is advertising. */
+  subject: string;
+};
+
 /** A campaign: one mail sent to the confirmed subscribers of a list. */
 export type CampaignResponse = {
   /**
@@ -869,6 +882,22 @@ export type Data_BounceOutcome = {
   data: {
     /** The address is (now or already) suppressed. */
     suppressed: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CampaignPreviewResponse = {
+  /** A campaign mail exactly as subscribers get it. */
+  data: {
+    /**
+     * The HTML body with the preheader and the footer; `null` for a text-only campaign. Show it
+     * only inside a sandboxed `<iframe sandbox>`, like `body_html`.
+     */
+    body_html?: string | null;
+    /** The plain-text body with the footer (list name, preferences link, postal address). */
+    body_text: string;
+    /** The subject, with the advertising label when the campaign is advertising. */
+    subject: string;
   };
 };
 
@@ -1716,6 +1745,55 @@ export type Data_NewsletterErased = {
   data: {
     /** A subscriber was deleted. */
     deleted: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_NewsletterSettingsResponse = {
+  /** The newsletter settings in use (set by the server's operator; no secrets). */
+  data: {
+    /**
+     * Put at the start of the subject of advertising campaigns
+     * (`AUTOXIDE_NEWSLETTER_ADVERTISING_LABEL`); empty: no label.
+     */
+    advertising_label: string;
+    /**
+     * Advertising mails one address gets at most per day
+     * (`AUTOXIDE_NEWSLETTER_ADVERTISING_MAX_PER_DAY`); `0`: no limit.
+     */
+    advertising_max_per_day: number;
+    /**
+     * The website's confirmation page is set (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by
+     * lists with double opt-in.
+     */
+    confirm_url_set: boolean;
+    /**
+     * Settings still to set before campaigns can be sent: names of environment variables,
+     * empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is listed:
+     * only advertising campaigns need it).
+     */
+    missing: string[];
+    /**
+     * The sender's postal address shown in every mail footer
+     * (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`); `null`: not set — advertising campaigns cannot
+     * be sent until it is.
+     */
+    postal_address?: string | null;
+    /**
+     * The website's preferences page is set (`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to
+     * send any campaign (the footer link).
+     */
+    preferences_url_set: boolean;
+    /**
+     * The server's public address is set (`AUTOXIDE_HTTP_PUBLIC_URL`); needed to send any
+     * campaign (the one-click unsubscribe link).
+     */
+    public_url_set: boolean;
+    /**
+     * Campaign mails handed to the mail queue per minute
+     * (`AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE`).
+     */
+    send_rate_per_minute: number;
   };
 };
 
@@ -2677,6 +2755,8 @@ export type DeleteOwnRequest = {
 
 /** How far a campaign got, by delivery status. */
 export type DeliveryCounts = {
+  /** Sent mails the receiving server bounced for good (counted in `failed` too). */
+  bounced: number;
   /** Refused for good by the receiving server, or the outcome is unknown. */
   failed: number;
   /** Not handled yet. */
@@ -2690,6 +2770,11 @@ export type DeliveryCounts = {
   skipped: number;
   /** Recipients taken so far (every confirmed subscriber of the list when sending started). */
   total: number;
+  /**
+   * Recipients who unsubscribed with the link of this campaign's mail (one-click or the
+   * preferences page).
+   */
+  unsubscribed: number;
 };
 
 /** One attempt to deliver one event to one endpoint, with its retries. */
@@ -3569,6 +3654,52 @@ export type NewsletterLocale = "en" | "vi";
 export type NewsletterScheduleRequest = {
   /** A time in the future (at most 366 days ahead), with a time zone. */
   at: string;
+};
+
+/** The newsletter settings in use (set by the server's operator; no secrets). */
+export type NewsletterSettingsResponse = {
+  /**
+   * Put at the start of the subject of advertising campaigns
+   * (`AUTOXIDE_NEWSLETTER_ADVERTISING_LABEL`); empty: no label.
+   */
+  advertising_label: string;
+  /**
+   * Advertising mails one address gets at most per day
+   * (`AUTOXIDE_NEWSLETTER_ADVERTISING_MAX_PER_DAY`); `0`: no limit.
+   */
+  advertising_max_per_day: number;
+  /**
+   * The website's confirmation page is set (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by
+   * lists with double opt-in.
+   */
+  confirm_url_set: boolean;
+  /**
+   * Settings still to set before campaigns can be sent: names of environment variables,
+   * empty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is listed:
+   * only advertising campaigns need it).
+   */
+  missing: string[];
+  /**
+   * The sender's postal address shown in every mail footer
+   * (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`); `null`: not set — advertising campaigns cannot
+   * be sent until it is.
+   */
+  postal_address?: string | null;
+  /**
+   * The website's preferences page is set (`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to
+   * send any campaign (the footer link).
+   */
+  preferences_url_set: boolean;
+  /**
+   * The server's public address is set (`AUTOXIDE_HTTP_PUBLIC_URL`); needed to send any
+   * campaign (the one-click unsubscribe link).
+   */
+  public_url_set: boolean;
+  /**
+   * Campaign mails handed to the mail queue per minute
+   * (`AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE`).
+   */
+  send_rate_per_minute: number;
 };
 
 /** A text in English and Vietnamese; a missing language falls back to the other one. */
@@ -8996,6 +9127,20 @@ export interface paths {
       };
     };
   };
+  "/api/v1/newsletter/campaigns/{id}/preview": {
+    /** Preview a campaign mail. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CampaignPreviewResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/newsletter/campaigns/{id}/resume": {
     /** Resume a paused campaign. */
     post: {
@@ -9229,10 +9374,22 @@ export interface paths {
       };
     };
   };
+  "/api/v1/newsletter/settings": {
+    /** Get the newsletter settings in use. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_NewsletterSettingsResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/newsletter/subscribers": {
     /** List subscribers. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { email?: string; list_id?: string; status?: "unconfirmed" | "confirmed" | "unsubscribed"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { email?: string; list_id?: string; status?: "unconfirmed" | "confirmed" | "unsubscribed"; blocked?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
       responses: {
         200: Page_SubscriberResponse;
         401: Problem;

@@ -603,6 +603,31 @@
         ],
         "type": "object"
       },
+      "CampaignPreviewResponse": {
+        "description": "A campaign mail exactly as subscribers get it.",
+        "properties": {
+          "body_html": {
+            "description": "The HTML body with the preheader and the footer; `null` for a text-only campaign. Show it\nonly inside a sandboxed `<iframe sandbox>`, like `body_html`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body_text": {
+            "description": "The plain-text body with the footer (list name, preferences link, postal address).",
+            "type": "string"
+          },
+          "subject": {
+            "description": "The subject, with the advertising label when the campaign is advertising.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject",
+          "body_text"
+        ],
+        "type": "object"
+      },
       "CampaignResponse": {
         "description": "A campaign: one mail sent to the confirmed subscribers of a list.",
         "properties": {
@@ -2378,6 +2403,40 @@
             },
             "required": [
               "suppressed"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CampaignPreviewResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A campaign mail exactly as subscribers get it.",
+            "properties": {
+              "body_html": {
+                "description": "The HTML body with the preheader and the footer; `null` for a text-only campaign. Show it\nonly inside a sandboxed `<iframe sandbox>`, like `body_html`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "body_text": {
+                "description": "The plain-text body with the footer (list name, preferences link, postal address).",
+                "type": "string"
+              },
+              "subject": {
+                "description": "The subject, with the advertising label when the campaign is advertising.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "subject",
+              "body_text"
             ],
             "type": "object"
           }
@@ -4791,6 +4850,78 @@
             },
             "required": [
               "deleted"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_NewsletterSettingsResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The newsletter settings in use (set by the server's operator; no secrets).",
+            "properties": {
+              "advertising_label": {
+                "description": "Put at the start of the subject of advertising campaigns\n(`AUTOXIDE_NEWSLETTER_ADVERTISING_LABEL`); empty: no label.",
+                "example": "[QC]",
+                "type": "string"
+              },
+              "advertising_max_per_day": {
+                "description": "Advertising mails one address gets at most per day\n(`AUTOXIDE_NEWSLETTER_ADVERTISING_MAX_PER_DAY`); `0`: no limit.",
+                "example": 3,
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "confirm_url_set": {
+                "description": "The website's confirmation page is set (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by\nlists with double opt-in.",
+                "type": "boolean"
+              },
+              "missing": {
+                "description": "Settings still to set before campaigns can be sent: names of environment variables,\nempty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is listed:\nonly advertising campaigns need it).",
+                "example": [
+                  "AUTOXIDE_NEWSLETTER_PREFERENCES_URL"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "postal_address": {
+                "description": "The sender's postal address shown in every mail footer\n(`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`); `null`: not set — advertising campaigns cannot\nbe sent until it is.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "preferences_url_set": {
+                "description": "The website's preferences page is set (`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to\nsend any campaign (the footer link).",
+                "type": "boolean"
+              },
+              "public_url_set": {
+                "description": "The server's public address is set (`AUTOXIDE_HTTP_PUBLIC_URL`); needed to send any\ncampaign (the one-click unsubscribe link).",
+                "type": "boolean"
+              },
+              "send_rate_per_minute": {
+                "description": "Campaign mails handed to the mail queue per minute\n(`AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE`).",
+                "example": 300,
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "advertising_label",
+              "advertising_max_per_day",
+              "public_url_set",
+              "preferences_url_set",
+              "confirm_url_set",
+              "send_rate_per_minute",
+              "missing"
             ],
             "type": "object"
           }
@@ -7657,6 +7788,12 @@
       "DeliveryCounts": {
         "description": "How far a campaign got, by delivery status.",
         "properties": {
+          "bounced": {
+            "description": "Sent mails the receiving server bounced for good (counted in `failed` too).",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
           "failed": {
             "description": "Refused for good by the receiving server, or the outcome is unknown.",
             "format": "int64",
@@ -7686,6 +7823,12 @@
             "format": "int64",
             "minimum": 0,
             "type": "integer"
+          },
+          "unsubscribed": {
+            "description": "Recipients who unsubscribed with the link of this campaign's mail (one-click or the\npreferences page).",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [
@@ -7693,7 +7836,9 @@
           "pending",
           "sent",
           "failed",
-          "skipped"
+          "skipped",
+          "bounced",
+          "unsubscribed"
         ],
         "type": "object"
       },
@@ -10214,6 +10359,69 @@
         },
         "required": [
           "at"
+        ],
+        "type": "object"
+      },
+      "NewsletterSettingsResponse": {
+        "description": "The newsletter settings in use (set by the server's operator; no secrets).",
+        "properties": {
+          "advertising_label": {
+            "description": "Put at the start of the subject of advertising campaigns\n(`AUTOXIDE_NEWSLETTER_ADVERTISING_LABEL`); empty: no label.",
+            "example": "[QC]",
+            "type": "string"
+          },
+          "advertising_max_per_day": {
+            "description": "Advertising mails one address gets at most per day\n(`AUTOXIDE_NEWSLETTER_ADVERTISING_MAX_PER_DAY`); `0`: no limit.",
+            "example": 3,
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "confirm_url_set": {
+            "description": "The website's confirmation page is set (`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); needed by\nlists with double opt-in.",
+            "type": "boolean"
+          },
+          "missing": {
+            "description": "Settings still to set before campaigns can be sent: names of environment variables,\nempty when everything needed is set (`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` is listed:\nonly advertising campaigns need it).",
+            "example": [
+              "AUTOXIDE_NEWSLETTER_PREFERENCES_URL"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "postal_address": {
+            "description": "The sender's postal address shown in every mail footer\n(`AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS`); `null`: not set — advertising campaigns cannot\nbe sent until it is.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preferences_url_set": {
+            "description": "The website's preferences page is set (`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`); needed to\nsend any campaign (the footer link).",
+            "type": "boolean"
+          },
+          "public_url_set": {
+            "description": "The server's public address is set (`AUTOXIDE_HTTP_PUBLIC_URL`); needed to send any\ncampaign (the one-click unsubscribe link).",
+            "type": "boolean"
+          },
+          "send_rate_per_minute": {
+            "description": "Campaign mails handed to the mail queue per minute\n(`AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE`).",
+            "example": 300,
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "advertising_label",
+          "advertising_max_per_day",
+          "public_url_set",
+          "preferences_url_set",
+          "confirm_url_set",
+          "send_rate_per_minute",
+          "missing"
         ],
         "type": "object"
       },
@@ -43085,6 +43293,110 @@
         ]
       }
     },
+    "/api/v1/newsletter/campaigns/{id}/preview": {
+      "get": {
+        "description": "Requires `newsletter.read`. The mail as it will be sent — subject label, footer, HTML\nwrapping — with a placeholder token in its links (they do nothing). Needs the same settings\nas sending; see `GET /api/v1/newsletter/settings`.",
+        "operationId": "newsletter_preview_newsletter_campaign",
+        "parameters": [
+          {
+            "description": "Id of the campaign.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CampaignPreviewResponse"
+                }
+              }
+            },
+            "description": "The mail."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `newsletter.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No campaign has this id; code `newsletter.campaign_not_found`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A setting campaign mails need is missing: code `public_url_missing`, `newsletter.preferences_url_missing`, or `newsletter.postal_address_missing` (advertising campaigns); the message names the variable to set."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preview a campaign mail.",
+        "tags": [
+          "newsletter"
+        ],
+        "x-permissions": [
+          "newsletter.read"
+        ]
+      }
+    },
     "/api/v1/newsletter/campaigns/{id}/resume": {
       "post": {
         "description": "Requires `newsletter.send`. Sends to the recipients not handled yet — nobody gets the mail\ntwice. `If-Match` is checked when sent.",
@@ -45122,6 +45434,80 @@
         "x-public": true
       }
     },
+    "/api/v1/newsletter/settings": {
+      "get": {
+        "description": "Requires `newsletter.read`. The advertising label and daily limit, the sender's postal\naddress, and whether the addresses campaign mails need are set — so an interface can say\nwhat to set before sending. The operator changes them in the server's environment.",
+        "operationId": "newsletter_get_newsletter_settings",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_NewsletterSettingsResponse"
+                }
+              }
+            },
+            "description": "The settings in use."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `newsletter.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the newsletter settings in use.",
+        "tags": [
+          "newsletter"
+        ],
+        "x-permissions": [
+          "newsletter.read"
+        ]
+      }
+    },
     "/api/v1/newsletter/subscribers": {
       "get": {
         "description": "Requires `newsletter.read`. Newest first, with their subscriptions; follow\n`pagination.next_cursor` with the same filters for more.",
@@ -45159,6 +45545,15 @@
                 "unsubscribed"
               ],
               "type": "string"
+            }
+          },
+          {
+            "description": "`true`: only blocked subscribers (they get no mail); `false`: only the others.",
+            "in": "query",
+            "name": "blocked",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {

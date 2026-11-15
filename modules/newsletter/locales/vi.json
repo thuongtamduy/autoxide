@@ -65,5 +65,6 @@
   "text:Sending was paused.": "Việc gửi đã tạm dừng.",
   "text:Someone asked to join a list that needs confirming; a confirmation mail may be on its way. No address in the payload.": "Có người xin tham gia một danh sách cần xác nhận; thư xác nhận có thể đang được gửi. Nội dung event không có địa chỉ.",
   "text:Subscribers were imported into lists; counts only.": "Người đăng ký được nhập vào danh sách; chỉ có số đếm.",
-  "text:The daily job deleted subscriptions left unconfirmed too long.": "Việc chạy hằng ngày đã xoá các lượt đăng ký chưa xác nhận quá lâu."
+  "text:The daily job deleted subscriptions left unconfirmed too long.": "Việc chạy hằng ngày đã xoá các lượt đăng ký chưa xác nhận quá lâu.",
+  "field:must be `true` or `false`": "phải là `true` hay `false`"
 }

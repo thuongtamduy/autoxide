@@ -3164,6 +3164,13 @@
         "additionalProperties": false,
         "description": "Filters of a subscriber search.",
         "properties": {
+          "blocked": {
+            "description": "`true`: only blocked subscribers; `false`: only the others.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "cursor": {
             "description": "Where to continue: the `next_cursor` of the previous page.",
             "type": [

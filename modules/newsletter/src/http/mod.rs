@@ -5,6 +5,7 @@
 mod campaigns;
 mod lists;
 mod public;
+mod settings;
 mod subscribers;
 mod suppressions;
 #[cfg(test)]
@@ -49,6 +50,8 @@ pub(crate) fn routes(service: Arc<NewsletterService>) -> OpenApiRouter {
         .routes(routes!(campaigns::resume_campaign))
         .routes(routes!(campaigns::cancel_campaign))
         .routes(routes!(campaigns::test_campaign))
+        .routes(routes!(campaigns::preview_campaign))
+        .routes(routes!(settings::get_settings))
         .routes(routes!(suppressions::list_suppressions, suppressions::create_suppression))
         .routes(routes!(suppressions::delete_suppression))
         .routes(routes!(suppressions::report_bounce))

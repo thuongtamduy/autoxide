@@ -100,6 +100,11 @@ pub(crate) struct DeliveryCounts {
     /// Not sent: suppressed, blocked, unsubscribed meanwhile, over the advertising limit,
     /// or the campaign was cancelled.
     pub skipped: u64,
+    /// Sent mails the receiving server bounced for good (counted in `failed` too).
+    pub bounced: u64,
+    /// Recipients who unsubscribed with the link of this campaign's mail (one-click or the
+    /// preferences page).
+    pub unsubscribed: u64,
 }
 
 /// Một chiến dịch kèm tiến độ.
@@ -275,19 +280,22 @@ impl NewsletterService {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
-        let rows: Vec<(Uuid, String, i64)> = delivery::Entity::find()
+        // Nhóm thêm theo `error` để đếm bounce trong cùng câu; số huỷ đăng ký là câu thứ hai.
+        let rows: Vec<(Uuid, String, Option<String>, i64)> = delivery::Entity::find()
             .select_only()
             .column(delivery::Column::CampaignId)
             .column(delivery::Column::Status)
+            .column(delivery::Column::Error)
             .column_as(Expr::col(delivery::Column::Id).count(), "count")
             .filter(delivery::Column::CampaignId.is_in(ids.to_vec()))
             .group_by(delivery::Column::CampaignId)
             .group_by(delivery::Column::Status)
+            .group_by(delivery::Column::Error)
             .into_tuple()
             .all(self.database.read())
             .await?;
         let mut counts: HashMap<Uuid, DeliveryCounts> = HashMap::new();
-        for (id, status, count) in rows {
+        for (id, status, error, count) in rows {
             let entry = counts.entry(id).or_default();
             let count = u64::try_from(count).unwrap_or_default();
             entry.total += count;
@@ -297,6 +305,24 @@ impl NewsletterService {
                 DeliveryStatus::Failed => entry.failed += count,
                 DeliveryStatus::Skipped => entry.skipped += count,
             }
+            if DeliveryStatus::stored(&status) == DeliveryStatus::Failed
+                && error.as_deref() == Some("hard_bounce")
+            {
+                entry.bounced += count;
+            }
+        }
+        let unsubscribed: Vec<(Uuid, i64)> = delivery::Entity::find()
+            .select_only()
+            .column(delivery::Column::CampaignId)
+            .column_as(Expr::col(delivery::Column::Id).count(), "count")
+            .filter(delivery::Column::CampaignId.is_in(ids.to_vec()))
+            .filter(delivery::Column::UnsubscribedAt.is_not_null())
+            .group_by(delivery::Column::CampaignId)
+            .into_tuple()
+            .all(self.database.read())
+            .await?;
+        for (id, count) in unsubscribed {
+            counts.entry(id).or_default().unsubscribed = u64::try_from(count).unwrap_or_default();
         }
         Ok(counts)
     }

@@ -330,6 +330,7 @@ async fn bounce_chan_dia_chi() {
         handler.handle(&failed).await.unwrap();
         let done = h.service.find_campaign(draft.row.id).await.unwrap();
         assert_eq!((done.counts.sent, done.counts.failed), (2, 1));
+        assert_eq!(done.counts.bounced, 1, "a hard bounce counts in `bounced` too");
         assert_eq!(count_events(&h.database, "newsletter.suppression_added").await, 1);
 
         let manager = user(&["manage"]);

@@ -6780,3 +6780,23 @@ Xếp vào lộ trình: các mục của đề bài này là việc sửa API c�
    nào cũng được", D-241). Server chưa bao giờ trả kiểu khác, nên với client đây là thu hẹp an toàn; `api-diff`
    không chứng minh được điều đó cho `oneOf` nên bốn chỗ được ghi ngoại lệ trong `xtask/api-breaking-allow.json`
    với quyết định này. Bộ kiểm hợp đồng của testkit (D-241) kiểm mọi response thật theo kiểu mới.
+
+## D-269 · Đề bài giao diện, nhóm B (newsletter): trang cài đặt, xem trước thư, số huỷ và bounce của chiến dịch — 2026-11-15 — agent quyết
+
+1. **`GET /newsletter/settings`** chỉ đọc, chỉ giá trị không phải secret: nhãn quảng cáo, giới hạn thư quảng cáo
+   mỗi ngày, địa chỉ bưu chính, tốc độ gửi, và các URL cần để gửi đã đặt chưa; `missing` liệt kê tên biến môi
+   trường còn thiếu. Đổi cấu hình vẫn là việc của người vận hành (biến môi trường) — không có endpoint ghi. **Địa
+   chỉ người gửi** (`AUTOXIDE_MAIL_FROM`) thuộc module `mail`, `newsletter` không đọc cấu hình module khác; nó đi
+   vào endpoint cấu hình cho giao diện của phần C.
+2. **`GET /campaigns/{id}/preview`** dựng thư bằng **đúng hàm** dựng thư khi gửi (`campaign_mail`), với token giữ
+   chỗ `preview` trong link — không có hai bản logic lệch nhau. Thiếu cấu hình thì báo cùng lỗi như khi gửi (503,
+   mã nói rõ biến cần đặt). Quyền `newsletter.read`: nội dung thư đã đọc được qua `GET /campaigns/{id}`.
+3. **Số huỷ đăng ký của chiến dịch**: cột mới `unsubscribed_at` của `newsletter_deliveries`, ghi trong cùng
+   transaction với việc huỷ, khi người nhận huỷ **danh sách của chính thư đó** bằng link trong thư (huỷ một chạm hay
+   trang lựa chọn mở từ thư). Huỷ bằng cách khác (quản trị viên, xoá dữ liệu) không tính cho chiến dịch nào. Lượt
+   gửi có sẵn để `NULL`: số huỷ của chiến dịch cũ không dựng lại được.
+4. **`bounced`** = lượt gửi `failed` với lỗi `hard_bounce` (đã có, D-115), đếm trong cùng câu `GROUP BY` với tiến
+   độ (thêm cột `error` vào nhóm). Khiếu nại và bounce mềm báo theo email qua `POST /bounces`, không gắn với lượt
+   gửi nào, nên không tính cho chiến dịch.
+5. Lọc người đăng ký `blocked=true|false` (REST và tool MCP `newsletter.find_subscribers`); `status` vẫn là trạng
+   thái đăng ký trong danh sách như cũ (D-059).

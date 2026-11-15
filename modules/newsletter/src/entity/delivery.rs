@@ -21,6 +21,8 @@ pub struct Model {
     pub sent_at: Option<DateTimeUtc>,
     /// Lý do `skipped` / `failed` (`suppressed`, `unsubscribed`, `hard_bounce`…).
     pub error: Option<String>,
+    /// Người nhận huỷ đăng ký bằng link của chính thư này (D-269).
+    pub unsubscribed_at: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
 }
 

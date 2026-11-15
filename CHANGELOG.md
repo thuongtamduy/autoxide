@@ -16,6 +16,9 @@ endpoints are marked deprecated with a sunset date first.
   gives `has_password` and `pending_email` (an email change waiting for its link, with expiry);
   `DELETE /api/v1/auth/me/email` cancels that change. New event `auth.email_change_cancelled`. Users are an object
   type `auth.user` of the object directory (their display name), for other modules.
+- `newsletter`: `GET /api/v1/newsletter/settings` (the settings in use and what is still missing
+  to send); `GET /api/v1/newsletter/campaigns/{id}/preview` (the mail as sent, with footer);
+  campaign `progress` gives `bounced` and `unsubscribed`; subscribers filter by `blocked`.
 - `forms`: forms carry `submissions` (counts by status) in the list and when read; each answer to
   a choice field carries `choices`, the chosen options with their labels in the form version it was
   sent with; `value` of an answer is typed in the contract (`string | number | string[] | boolean`).

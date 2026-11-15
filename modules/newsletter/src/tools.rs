@@ -59,6 +59,8 @@ pub(crate) struct FindSubscribersInput {
     list_id: Option<Uuid>,
     /// `unconfirmed`, `confirmed` or `unsubscribed` (in `list_id`, or in any list).
     status: Option<String>,
+    /// `true`: only blocked subscribers; `false`: only the others.
+    blocked: Option<bool>,
     /// Maximum number of subscribers to return, 1 to 200. Defaults to 50.
     #[schema(minimum = 1, maximum = 200)]
     limit: Option<u32>,
@@ -171,6 +173,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                             "`unconfirmed`, `confirmed`, `unsubscribed`",
                             &mut problems,
                         ),
+                        blocked: input.blocked,
                     };
                     let paging = PageQuery::new(
                         input.limit.map(|limit| limit.to_string()),
