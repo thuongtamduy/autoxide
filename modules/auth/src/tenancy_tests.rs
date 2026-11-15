@@ -326,6 +326,13 @@ async fn email_trung_o_hai_khach_dang_nhap_dung_khach() {
             let (status, body) = me(&app, renewed["access_token"].as_str().unwrap(), None).await;
             assert_eq!(status, StatusCode::OK, "{body}");
             assert_eq!(body["data"]["id"].as_str(), Some(id.as_str()));
+            // Client gửi kèm access token hỏng / hết hạn khi refresh: bị bỏ qua, token tự nêu khách.
+            let stale = json!({"refresh_token": renewed["refresh_token"]});
+            let request =
+                app.post("/api/v1/auth/refresh").header("authorization", "Bearer stale.jwt.x");
+            let renewed = request.json(stale).send().await.unwrap();
+            assert_eq!(renewed.status(), StatusCode::OK, "{}", renewed.json());
+            let renewed = renewed.json()["data"].clone();
             // Refresh token của khách này kèm header khách kia: như token sai.
             let crossed = json!({"refresh_token": renewed["refresh_token"]});
             let request = app.post("/api/v1/auth/refresh").header("autoxide-tenant", other);

@@ -178,18 +178,45 @@ pub(crate) async fn tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
         let principal = authenticate(&authenticator, parts).await?;
         registry.tenant(principal.tenant_id()).await?
     } else {
-        let hint = TenantHint::from_headers(&parts.headers);
-        match (hint.tenant(), hint.host()) {
-            (Some(target), _) => lookup(&registry, target).await?,
-            (None, Some(host)) => {
-                registry.tenant_by_domain(host).await?.ok_or_else(errors::tenant_required)?
-            }
-            (None, None) => return Err(errors::tenant_required()),
-        }
+        by_hint(&registry, parts).await?
     };
     ensure_serving(&tenant)?;
     parts.extensions.insert(tenant.clone());
     Ok(tenant)
+}
+
+/// Khách theo header `autoxide-tenant` / tên miền, bỏ qua credential (request không đăng nhập).
+async fn by_hint(registry: &DatabaseRegistry, parts: &Parts) -> Result<TenantContext, Error> {
+    let hint = TenantHint::from_headers(&parts.headers);
+    match (hint.tenant(), hint.host()) {
+        (Some(target), _) => lookup(registry, target).await,
+        (None, Some(host)) => {
+            registry.tenant_by_domain(host).await?.ok_or_else(errors::tenant_required)
+        }
+        (None, None) => Err(errors::tenant_required()),
+    }
+}
+
+/// Khách của request cho endpoint nhận token tự mang khách (`OptionalTenant`): như [`tenant`],
+/// nhưng credential trong `Authorization` không hợp lệ (vd access token đã hết hạn mà client vẫn
+/// gửi kèm khi gọi `/refresh`) thì bỏ qua nó và chọn khách theo header / tên miền. Không xác định
+/// được khách: `tenant_required`.
+pub(crate) async fn tenant_ignoring_bad_credential(
+    parts: &mut Parts,
+) -> Result<TenantContext, Error> {
+    match tenant(parts).await {
+        Err(error) if error.kind() == crate::error::ErrorKind::Unauthenticated => {
+            let registry = parts.extensions.get::<DatabaseRegistry>().cloned().ok_or_else(|| {
+                Error::internal(
+                    "an endpoint needs the tenant of the request, but no tenancy registry is set",
+                )
+            })?;
+            let tenant = by_hint(&registry, parts).await?;
+            ensure_serving(&tenant)?;
+            Ok(tenant)
+        }
+        other => other,
+    }
 }
 
 // Handler viết `tenant: TenantContext` thì axum giải khách của request trước khi chạy handler.

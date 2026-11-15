@@ -97,8 +97,9 @@ impl OptionalTenant {
 impl<S: Send + Sync> FromRequestParts<S> for OptionalTenant {
     type Rejection = Error;
 
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        match TenantContext::from_request_parts(parts, state).await {
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        // Credential hỏng trong `Authorization` không chặn endpoint đổi token: token tự nêu khách.
+        match Box::pin(super::request::tenant_ignoring_bad_credential(parts)).await {
             Ok(tenant) => Ok(OptionalTenant(Some(tenant))),
             Err(error) if error.code() == "tenant_required" => Ok(OptionalTenant(None)),
             Err(error) => Err(error),

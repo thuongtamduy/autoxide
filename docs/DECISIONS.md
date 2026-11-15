@@ -7051,3 +7051,12 @@ Một lớp ở kernel thay cho việc mỗi module tự nhớ — áp cho cả 
   `tenant_maintenance` (503 + `Retry-After`) như trước bước này, không 401: 401 làm client vứt phiên và key còn hợp lệ
   trong lúc dời khách. Với JWT chữ ký được kiểm trước nên không lộ gì; với API key chỉ lộ trạng thái của một khách mà
   bên gọi đã biết ID (ID khách không phải bí mật — nằm trong key và link mail).
+
+## D-287 · `OptionalTenant` bỏ qua credential hỏng (bước 33) — 2026-11-15 — agent quyết
+
+Endpoint nhận token tự mang khách (`/refresh`, `/logout`, xác nhận email, huỷ đăng ký…) dùng `OptionalTenant`. Ở chế độ
+`multi`, client gửi kèm `Authorization` với access token đã hết hạn (nhiều SDK gắn header này vào mọi request) thì
+extractor khách xác thực trước và trả `auth.token_expired` — không refresh được đúng lúc cần. Nay lỗi xác thực
+(`Unauthenticated`) trong `OptionalTenant` bị bỏ qua: khách chọn theo header / tên miền như request không đăng nhập (không
+có thì `None`, token tự nêu khách). Lỗi khác (`tenant_mismatch`, khách tạm khoá…) vẫn từ chối. Extractor `TenantContext`
+và `Principal` không đổi.
