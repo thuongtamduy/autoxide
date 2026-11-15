@@ -69,7 +69,20 @@ impl Module for Notes {
                 Ok(json!({ "key": "secret-once" }))
             })
             .returns_secret(),
+            // Tool cũ, deprecated, thay bằng `whoami` (D-240).
+            Tool::new(
+                "who",
+                "Tell who is calling.",
+                |principal: Principal, _: NoInput| async move {
+                    Ok(json!({ "user_id": principal.user_id() }))
+                },
+            )
+            .read_only(),
         ]
+    }
+
+    fn deprecations(&self) -> Vec<http::Deprecation> {
+        vec![http::Deprecation::tool("who", "2026-11-01").sunset("2027-05-01").successor("whoami")]
     }
 }
 
@@ -134,8 +147,11 @@ async fn chi_liet_ke_va_goi_duoc_tool_co_permission() {
     let add = tools.iter().find(|tool| tool.name == "notes.add").unwrap();
     assert!(add.description.as_deref().unwrap().ends_with("Requires permission `notes.write`."));
     assert_eq!(add.input_schema["properties"]["a"]["type"], "integer");
-    assert_eq!(names(tools), ["notes.whoami", "notes.add", "notes.issue_key"]);
-    assert_eq!(names(reader.list_all_tools().await.unwrap()), ["notes.whoami", "notes.issue_key"]);
+    assert_eq!(names(tools), ["notes.whoami", "notes.add", "notes.issue_key", "notes.who"]);
+    assert_eq!(
+        names(reader.list_all_tools().await.unwrap()),
+        ["notes.whoami", "notes.issue_key", "notes.who"]
+    );
 
     let call =
         CallToolRequestParams::new("notes.add").with_arguments(arguments(json!({"a": 2, "b": 3})));
@@ -221,6 +237,82 @@ async fn tool_tra_secret_thi_response_no_store() {
         let cache = headers.get(header::CACHE_CONTROL);
         assert_eq!(cache.map(|value| value.to_str().unwrap()), expected, "{tool}");
     }
+}
+
+/// Tool deprecated: `tools/list` nói rõ, kết quả giữ envelope và kèm cảnh báo cho máy (`_meta`) lẫn
+/// cho mô hình (đoạn văn bản) (D-240).
+#[tokio::test]
+async fn tool_deprecated_co_cau_deprecated_va_canh_bao_trong_ket_qua() {
+    let url = serve().await;
+    let reader = client(&url, "reader").await;
+    let tools = reader.list_all_tools().await.unwrap();
+    let who = tools.iter().find(|tool| tool.name == "notes.who").unwrap();
+    let description = who.description.as_deref().unwrap();
+    assert!(
+        description.ends_with(
+            "Tool `notes.who` is deprecated since 2026-11-01. It will be removed on 2027-05-01. \
+             Use `notes.whoami` instead."
+        ),
+        "{description}"
+    );
+    let whoami = tools.iter().find(|tool| tool.name == "notes.whoami").unwrap();
+    assert!(!whoami.description.as_deref().unwrap().contains("deprecated"));
+
+    let result = reader.call_tool(CallToolRequestParams::new("notes.who")).await.unwrap();
+    assert_eq!(result.structured_content, Some(json!({"data": {"user_id": Uuid::max()}})));
+    let meta = result.meta.unwrap();
+    assert_eq!(
+        meta.0["autoxide/deprecation"],
+        json!({"since": "2026-11-01", "sunset": "2027-05-01", "successor": "notes.whoami"})
+    );
+    let warning = serde_json::to_string(&result.content).unwrap();
+    assert!(warning.contains("Warning: Tool `notes.who` is deprecated"), "{warning}");
+    let plain = reader.call_tool(CallToolRequestParams::new("notes.whoami")).await.unwrap();
+    assert!(plain.meta.is_none());
+    reader.cancel().await.unwrap();
+}
+
+#[test]
+fn khai_deprecation_cho_tool_khong_co_bi_tu_choi_luc_khoi_dong() {
+    struct Wrong;
+    impl Module for Wrong {
+        fn name(&self) -> &'static str {
+            "wrong"
+        }
+        fn tools(&self) -> Vec<Tool> {
+            vec![Tool::new("real", "x", |_: Principal, _: NoInput| async move { Ok(()) })]
+        }
+        fn deprecations(&self) -> Vec<http::Deprecation> {
+            vec![
+                http::Deprecation::tool("ghost", "2026-11-01"),
+                http::Deprecation::tool("real", "2026-11-01").successor("missing"),
+                http::Deprecation::tool("real", "not-a-date"),
+            ]
+        }
+    }
+
+    // Ngày sai: từ chối ngay khi dựng sổ module, như endpoint.
+    let error = Modules::new(vec![Box::new(Wrong)]).unwrap_err().to_string();
+    assert!(error.contains("deprecation of tool `real` of module `wrong`: `since`"), "{error}");
+
+    struct Missing;
+    impl Module for Missing {
+        fn name(&self) -> &'static str {
+            "wrong"
+        }
+        fn tools(&self) -> Vec<Tool> {
+            vec![Tool::new("real", "x", |_: Principal, _: NoInput| async move { Ok(()) })]
+        }
+        fn deprecations(&self) -> Vec<http::Deprecation> {
+            vec![
+                http::Deprecation::tool("ghost", "2026-11-01"),
+                http::Deprecation::tool("real", "2026-11-01").successor("missing"),
+            ]
+        }
+    }
+    let error = Modules::new(vec![Box::new(Missing)]).unwrap().tools().unwrap_err().to_string();
+    assert!(error.contains("tool deprecation `ghost`"), "{error}");
+    assert!(error.contains("tool successor `missing`"), "{error}");
 }
 
 #[test]

@@ -6,6 +6,7 @@ pub mod config;
 pub mod copy;
 pub mod doctor;
 pub mod jobs;
+pub mod mcp_manifest;
 pub mod migrate;
 pub mod openapi;
 pub mod serve;

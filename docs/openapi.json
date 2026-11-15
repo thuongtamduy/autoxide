@@ -35292,6 +35292,17 @@
           "destructive"
         ],
         "properties": {
+          "deprecation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ModuleToolDeprecation",
+                "description": "Set when the tool is deprecated: move to `successor` before `sunset`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "description": {
             "type": "string"
           },
@@ -35314,6 +35325,33 @@
           "read_only": {
             "type": "boolean",
             "description": "The tool changes nothing."
+          }
+        }
+      },
+      "ModuleToolDeprecation": {
+        "type": "object",
+        "description": "A deprecated MCP tool.",
+        "required": [
+          "since"
+        ],
+        "properties": {
+          "since": {
+            "type": "string",
+            "description": "Deprecated since this date (`YYYY-MM-DD`, UTC)."
+          },
+          "successor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Full name of the tool to use instead, if any."
+          },
+          "sunset": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The tool goes away on this date, if one is set."
           }
         }
       },

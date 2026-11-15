@@ -155,6 +155,7 @@ impl ModuleInfo {
             module.translations().into_iter().map(|(language, _)| language.to_owned()).collect();
         languages.sort();
         languages.dedup();
+        let deprecations = module.deprecations();
         ModuleInfo {
             name: name.to_owned(),
             internal: INTERNAL.contains(&name),
@@ -206,12 +207,26 @@ impl ModuleInfo {
                             .collect(),
                         read_only: tool.is_read_only(),
                         destructive: tool.is_destructive(),
+                        deprecation: deprecations
+                            .iter()
+                            .find(|deprecation| {
+                                deprecation
+                                    .tool
+                                    .is_some_and(|short| tool.name() == format!("{name}.{short}"))
+                            })
+                            .map(|deprecation| ModuleToolDeprecation {
+                                since: deprecation.since.to_owned(),
+                                sunset: deprecation.sunset.map(str::to_owned),
+                                successor: deprecation
+                                    .successor
+                                    .map(|successor| format!("{name}.{successor}")),
+                            }),
                     }
                 })
                 .collect(),
-            deprecations: module
-                .deprecations()
-                .into_iter()
+            deprecations: deprecations
+                .iter()
+                .filter(|deprecation| !deprecation.is_tool())
                 .map(|deprecation| ModuleDeprecation {
                     method: deprecation.method.to_string(),
                     path: format!("{}/{name}{}", crate::http::API_PREFIX, deprecation.path),
@@ -269,6 +284,19 @@ pub(crate) struct ModuleTool {
     read_only: bool,
     /// The tool deletes or overwrites data that cannot be recovered.
     destructive: bool,
+    /// Set when the tool is deprecated: move to `successor` before `sunset`.
+    deprecation: Option<ModuleToolDeprecation>,
+}
+
+/// A deprecated MCP tool.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ModuleToolDeprecation {
+    /// Deprecated since this date (`YYYY-MM-DD`, UTC).
+    since: String,
+    /// The tool goes away on this date, if one is set.
+    sunset: Option<String>,
+    /// Full name of the tool to use instead, if any.
+    successor: Option<String>,
 }
 
 /// A deprecated endpoint.

@@ -1,6 +1,9 @@
 //! Endpoint deprecated: module khai, kernel đánh dấu trong OpenAPI và gắn header chuẩn
 //! vào mỗi response — `Deprecation` (RFC 9745), `Sunset` (RFC 8594), `Link` tới endpoint
 //! thay thế (`rel="successor-version"`). Client (và AI agent) biết sớm để chuyển.
+//!
+//! Tool MCP deprecated khai cùng chỗ, bằng [`Deprecation::tool`] (D-240): lớp HTTP bỏ qua chúng;
+//! `Modules::tools` gắn chúng vào tool, `tools/list` và kết quả của tool báo cho agent.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -35,13 +38,43 @@ pub struct Deprecation {
     pub since: &'static str,
     /// Ngày endpoint bị bỏ hẳn, `YYYY-MM-DD` (UTC), nếu đã định.
     pub sunset: Option<&'static str>,
-    /// Endpoint dùng thay, nếu có (đường dẫn hoặc URL).
+    /// Endpoint dùng thay, nếu có (đường dẫn hoặc URL). Với tool: tên ngắn của tool dùng thay.
     pub successor: Option<&'static str>,
+    /// Tên ngắn của tool MCP bị deprecated (khai bằng [`Deprecation::tool`]); khi có thì `method`
+    /// và `path` không dùng.
+    pub tool: Option<&'static str>,
 }
 
 impl Deprecation {
     pub fn new(method: Method, path: &'static str, since: &'static str) -> Self {
-        Deprecation { method, path, since, sunset: None, successor: None }
+        Deprecation { method, path, since, sunset: None, successor: None, tool: None }
+    }
+
+    /// Tool MCP `name` (tên ngắn, như trong `Module::tools`) deprecated từ ngày `since`. Thay đổi
+    /// phá vỡ của tool thì làm tool mới (vd `create_draft_v2`), tool cũ chạy như cũ tới ngày
+    /// sunset:
+    ///
+    /// ```
+    /// use autoxide_kernel::http::Deprecation;
+    ///
+    /// let deprecation = Deprecation::tool("create_draft", "2026-12-01")
+    ///     .sunset("2027-06-01")
+    ///     .successor("create_draft_v2");
+    /// ```
+    pub fn tool(name: &'static str, since: &'static str) -> Self {
+        Deprecation {
+            method: Method::POST,
+            path: "",
+            since,
+            sunset: None,
+            successor: None,
+            tool: Some(name),
+        }
+    }
+
+    /// Khai báo này cho một tool MCP (không phải endpoint).
+    pub const fn is_tool(&self) -> bool {
+        self.tool.is_some()
     }
 
     pub fn sunset(mut self, date: &'static str) -> Self {
@@ -57,7 +90,10 @@ impl Deprecation {
     /// Các vấn đề của khai báo này (ngày sai dạng, sunset trước since…).
     pub fn problems(&self, module: &str) -> Vec<String> {
         let mut problems = Vec::new();
-        let endpoint = format!("{} {} of module `{module}`", self.method, self.path);
+        let endpoint = match self.tool {
+            Some(tool) => format!("tool `{tool}` of module `{module}`"),
+            None => format!("{} {} of module `{module}`", self.method, self.path),
+        };
         let since = parse_date(self.since);
         if since.is_none() {
             problems.push(format!("deprecation of {endpoint}: `since` must be a YYYY-MM-DD date"));
@@ -71,7 +107,7 @@ impl Deprecation {
                 _ => {}
             }
         }
-        if !self.path.starts_with('/') {
+        if self.tool.is_none() && !self.path.starts_with('/') {
             problems.push(format!("deprecation of {endpoint}: the path must start with `/`"));
         }
         problems
@@ -96,7 +132,9 @@ pub(super) struct Table(HashMap<(Method, String), Headers>);
 /// endpoint nào thì ghi log lỗi (test của module nên bắt được trước).
 pub(super) fn apply(openapi: &mut OpenApi, deprecations: &[(&'static str, Deprecation)]) -> Table {
     let mut table = HashMap::new();
-    for (module, deprecation) in deprecations {
+    for (module, deprecation) in
+        deprecations.iter().filter(|(_, deprecation)| !deprecation.is_tool())
+    {
         let suffix = if deprecation.path == "/" { "" } else { deprecation.path };
         let path = format!("{API_PREFIX}/{module}{suffix}");
         let (Some(since), sunset) =

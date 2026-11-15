@@ -15,6 +15,11 @@ endpoints are marked deprecated with a sunset date first.
   (removed operations, new required parameters or fields, removed response fields, narrowed types, removed
   enum values…), each with a stable rule code and the way to do it right. Deprecated operations now carry
   `x-sunset` in the OpenAPI document.
+- MCP tools have a contract like endpoints: `autoxide mcp-manifest` prints `docs/mcp-tools.json`, and
+  `cargo xtask api-diff` refuses breaking changes to tools (removed tool, new required parameter, a
+  read-only tool that now writes…). Modules deprecate a tool with `Deprecation::tool(…)` in
+  `Module::deprecations`; `tools/list` says so and every result carries `_meta.autoxide/deprecation` and a
+  warning. The module catalog lists a tool's `deprecation`.
 
 ## [0.13.0] - 2026-11-14
 
