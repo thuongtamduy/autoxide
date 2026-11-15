@@ -106,10 +106,10 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `content.translate` | `content.write` or `content.write_own` | writes |
 | `content.unpublish` | `content.publish` or `content.publish_own` | destructive |
 | `content.update` | `content.write` or `content.write_own` | writes |
-| `files.delete_file` | — | destructive |
-| `files.get_file` | — | read-only |
+| `files.delete_file` | `files.upload` or `files.manage` | destructive |
+| `files.get_file` | `files.upload` or `files.manage` | read-only |
 | `files.list_files` | `files.upload` | read-only |
-| `files.read_file` | — | read-only |
+| `files.read_file` | `files.upload` or `files.manage` | read-only |
 | `files.upload_file` | `files.upload` | writes |
 | `forms.create` | `forms.manage` | writes |
 | `forms.get` | `forms.read` | read-only |

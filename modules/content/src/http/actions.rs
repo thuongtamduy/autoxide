@@ -58,6 +58,7 @@ const IF_MATCH: &str = "Required: the `ETag` of the entry (or `*`). Done only if
 #[utoipa::path(
     post,
     path = "/entries/{id}/publish",
+    extensions(("x-permissions" = json!(["content.publish", "content.publish_own"]))),
     operation_id = "publish_content_entry",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),
@@ -107,6 +108,7 @@ pub(crate) async fn publish_entry(
 #[utoipa::path(
     post,
     path = "/entries/{id}/unpublish",
+    extensions(("x-permissions" = json!(["content.publish", "content.publish_own"]))),
     operation_id = "unpublish_content_entry",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),
@@ -138,6 +140,7 @@ pub(crate) async fn unpublish_entry(
 #[utoipa::path(
     post,
     path = "/entries/{id}/archive",
+    extensions(("x-permissions" = json!(["content.publish"]))),
     operation_id = "archive_content_entry",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),
@@ -170,6 +173,7 @@ pub(crate) async fn archive_entry(
 #[utoipa::path(
     post,
     path = "/entries/{id}/move",
+    extensions(("x-permissions" = json!(["content.write", "content.write_own", "content.publish"]))),
     operation_id = "move_content_page",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the page."), ("If-Match" = String, Header, description = IF_MATCH)),
@@ -203,6 +207,7 @@ pub(crate) async fn move_entry(
 #[utoipa::path(
     delete,
     path = "/entries/{id}",
+    extensions(("x-permissions" = json!(["content.delete"]))),
     operation_id = "delete_content_entry",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),
@@ -237,6 +242,7 @@ pub(crate) async fn delete_entry(
 #[utoipa::path(
     post,
     path = "/entries/{id}/request-review",
+    extensions(("x-permissions" = json!(["content.write", "content.write_own"]))),
     operation_id = "request_content_review",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),
@@ -266,6 +272,7 @@ pub(crate) async fn request_review(
 #[utoipa::path(
     delete,
     path = "/entries/{id}/request-review",
+    extensions(("x-permissions" = json!(["content.write", "content.write_own"]))),
     operation_id = "withdraw_content_review",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),

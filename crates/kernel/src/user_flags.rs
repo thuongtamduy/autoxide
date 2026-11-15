@@ -309,6 +309,7 @@ pub(crate) struct FlagValue {
 #[utoipa::path(
     get,
     path = "/flags",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "list_my_flags",
     security(("bearer" = [])),
     params(FlagsQuery),
@@ -333,6 +334,7 @@ async fn list_flags(
 #[utoipa::path(
     put,
     path = "/flags/{key}",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "set_my_flag",
     security(("bearer" = [])),
     params(("key" = String, Path, description = "Lower-case letters, digits, `.`, `_` and `-`, up to 100 characters, e.g. `hint.saved_views`.")),
@@ -359,6 +361,7 @@ async fn set_flag(
 #[utoipa::path(
     delete,
     path = "/flags/{key}",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "delete_my_flag",
     security(("bearer" = [])),
     params(("key" = String, Path, description = "Key of the flag.")),

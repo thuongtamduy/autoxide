@@ -60,6 +60,7 @@ impl From<AltSuggestion> for AltSuggestionResponse {
 #[utoipa::path(
     post,
     path = "/{id}/alt-suggestions",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "suggest_media_alt",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item.")),

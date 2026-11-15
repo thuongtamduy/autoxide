@@ -314,6 +314,7 @@ pub(crate) struct UpdateEntryRequest {
 #[utoipa::path(
     get,
     path = "/entries",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "list_content_entries",
     security(("bearer" = [])),
     params(EntriesQuery, PageQuery),
@@ -347,6 +348,7 @@ pub(crate) async fn list_entries(
 #[utoipa::path(
     post,
     path = "/entries",
+    extensions(("x-permissions" = json!(["content.write", "content.write_own"]))),
     operation_id = "create_content_entry",
     security(("bearer" = [])),
     request_body = CreateEntryRequest,
@@ -380,6 +382,7 @@ pub(crate) async fn create_entry(
 #[utoipa::path(
     get,
     path = "/entries/{id}",
+    extensions(("x-permissions" = json!(["content.read"]))),
     operation_id = "get_content_entry",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry.")),
@@ -406,6 +409,7 @@ pub(crate) async fn get_entry(
 #[utoipa::path(
     patch,
     path = "/entries/{id}",
+    extensions(("x-permissions" = json!(["content.write", "content.write_own"]))),
     operation_id = "update_content_entry",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the entry since; otherwise `412`.")),

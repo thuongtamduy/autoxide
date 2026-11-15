@@ -114,6 +114,7 @@ pub(crate) struct PasskeyLoginRequest {
 #[utoipa::path(
     post,
     path = "/me/passkeys/registration",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "start_passkey_registration",
     security(("bearer" = [])),
     request_body = StartPasskeyRegistrationRequest,
@@ -143,6 +144,7 @@ async fn start_registration(
 #[utoipa::path(
     post,
     path = "/me/passkeys",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "add_passkey",
     security(("bearer" = [])),
     request_body = AddPasskeyRequest,
@@ -174,6 +176,7 @@ async fn add_passkey(
 #[utoipa::path(
     get,
     path = "/me/passkeys",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "list_passkeys",
     security(("bearer" = [])),
     params(PageQuery),
@@ -199,6 +202,7 @@ async fn list_passkeys(
 #[utoipa::path(
     delete,
     path = "/me/passkeys/{id}",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "delete_passkey",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the passkey.")),
@@ -225,6 +229,7 @@ async fn delete_passkey(
 #[utoipa::path(
     post,
     path = "/login/passkey/options",
+    extensions(("x-public" = json!(true))),
     operation_id = "start_passkey_login",
     responses(
         (status = 200, description = "Options for the browser, and the ceremony to finish with `POST /api/v1/auth/login/passkey`.", body = Data<CeremonyResponse>),
@@ -242,6 +247,7 @@ async fn start_login(State(state): State<Arc<HttpState>>) -> Result<Data<Ceremon
 #[utoipa::path(
     post,
     path = "/login/passkey",
+    extensions(("x-public" = json!(true))),
     operation_id = "passkey_login",
     request_body = PasskeyLoginRequest,
     responses(

@@ -41,19 +41,19 @@ struct Note {
 }
 
 /// List notes.
-#[utoipa::path(get, path = "/", responses((status = 200, description = "The notes.", body = Data<Vec<Note>>)))]
+#[utoipa::path(get, path = "/", extensions(("x-public" = json!(true))), responses((status = 200, description = "The notes.", body = Data<Vec<Note>>)))]
 async fn list_notes() -> Data<Vec<Note>> {
     Data { data: vec![Note { id: 1, title: "first".to_owned() }] }
 }
 
 /// Create a note.
-#[utoipa::path(post, path = "/", request_body = CreateNote, responses((status = 201, description = "The created note.", body = Data<Note>)))]
+#[utoipa::path(post, path = "/", extensions(("x-public" = json!(true))), request_body = CreateNote, responses((status = 201, description = "The created note.", body = Data<Note>)))]
 async fn create_note(ValidJson(input): ValidJson<CreateNote>) -> (StatusCode, Data<Note>) {
     (StatusCode::CREATED, Data { data: Note { id: 2, title: input.title } })
 }
 
 /// Get one note.
-#[utoipa::path(get, path = "/{id}", responses(
+#[utoipa::path(get, path = "/{id}", extensions(("x-public" = json!(true))), responses(
         (status = 200, description = "The note.", body = Data<Note>),
         (status = 404, description = "No note has this id.", body = Problem),
     ))]
@@ -545,7 +545,7 @@ async fn undocumented() {}
 // Hai handler ở hai nơi nhưng cùng tên hàm sau khi ghép sẽ trùng operationId.
 mod duplicate {
     /// Same name as another operation.
-    #[utoipa::path(get, path = "/duplicate", operation_id = "list_notes", responses((status = 200, description = "ok")))]
+    #[utoipa::path(get, path = "/duplicate", operation_id = "list_notes", extensions(("x-permissions" = json!(["notes.purge"]))), responses((status = 200, description = "ok")))]
     pub async fn duplicate() {}
 }
 
@@ -566,8 +566,11 @@ async fn bo_kiem_tai_lieu_bat_endpoint_thieu_mo_ta() {
         http::lint(&api.openapi),
         [
             "GET /api/v1/notes/duplicate: operationId `notes_list_notes` is used twice",
+            // Hợp đồng quyền (D-245): permission khai phải được nói tới trong chữ; không khai gì là lỗi.
+            "GET /api/v1/notes/duplicate: `x-permissions` lists `notes.purge`, but neither the description nor the 403 response mentions it",
             "GET /api/v1/notes/undocumented: no summary — add a `///` doc comment to the handler",
             "GET /api/v1/notes/undocumented: no success response — declare what the endpoint returns",
+            "GET /api/v1/notes/undocumented: declare who may call it — add `extensions((\"x-permissions\" = json!([\"<module>.<permission>\"])))` (`[]`: any signed-in caller) or `extensions((\"x-public\" = json!(true)))` to `#[utoipa::path]` (D-245)",
         ]
     );
 }

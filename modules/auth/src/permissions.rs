@@ -1,6 +1,6 @@
 //! Permission của module `auth`.
 
-use autoxide_kernel::access::Permission;
+use autoxide_kernel::access::{Permission, Risk};
 
 pub(crate) const ROLES_READ: Permission = Permission::new(
     "auth.roles.read",
@@ -14,7 +14,8 @@ pub(crate) const ROLES_MANAGE: Permission = Permission::new(
 );
 
 pub(crate) const USERS_READ: Permission =
-    Permission::new("auth.users.read", "See user accounts and the roles assigned to them.");
+    Permission::new("auth.users.read", "See user accounts and the roles assigned to them.")
+        .with_risk(Risk::SensitiveData);
 
 pub(crate) const USERS_MANAGE: Permission = Permission::new(
     "auth.users.manage",

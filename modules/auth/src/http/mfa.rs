@@ -93,6 +93,7 @@ pub(crate) struct CodeRequest {
 #[utoipa::path(
     get,
     path = "/me/mfa",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "get_mfa",
     security(("bearer" = [])),
     responses(
@@ -117,6 +118,7 @@ async fn mfa_status(
 #[utoipa::path(
     post,
     path = "/me/mfa/totp",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "start_totp",
     security(("bearer" = [])),
     request_body = StartTotpRequest,
@@ -145,6 +147,7 @@ async fn start_totp(
 #[utoipa::path(
     post,
     path = "/me/mfa/totp/confirm",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "confirm_totp",
     security(("bearer" = [])),
     request_body = CodeRequest,
@@ -173,6 +176,7 @@ async fn confirm_totp(
 #[utoipa::path(
     post,
     path = "/me/mfa/recovery-codes",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "regenerate_recovery_codes",
     security(("bearer" = [])),
     request_body = CodeRequest,
@@ -202,6 +206,7 @@ async fn regenerate_recovery_codes(
 #[utoipa::path(
     post,
     path = "/me/mfa/totp/disable",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "disable_totp",
     security(("bearer" = [])),
     request_body = CodeRequest,
@@ -230,6 +235,7 @@ async fn disable_totp(
 #[utoipa::path(
     delete,
     path = "/users/{id}/mfa",
+    extensions(("x-permissions" = json!(["auth.users.manage"]))),
     operation_id = "reset_user_mfa",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the user.")),

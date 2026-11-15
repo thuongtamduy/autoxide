@@ -36,11 +36,21 @@ endpoints are marked deprecated with a sunset date first.
   tested up → down → up, on an empty database and with data, on both databases.
 - Property tests (`proptest`, tests only) for the input checks: email, pagination cursors, post bodies,
   slugs, CSV export, comment text and links (no HTML but safe links ever comes out).
+- A machine-readable access contract: every operation in the OpenAPI document carries `x-permissions`
+  (one of them is enough; `[]` for any signed-in caller) or `x-public: true`, and the module catalog gives
+  each permission a `risk` (`read`, `write`, `destructive`, `sensitive_data`, `money`). The gate checks
+  every endpoint answers 401 without a token and 403 `permission_denied` without the permission.
+- For module authors: `Permission::with_risk`, `Risk`, `Tool::for_any_signed_in`; the OpenAPI lint asks
+  every handler for `x-permissions` or `x-public`.
 
 ### Fixed
 
 - The OpenAPI document declared `application/json` for error responses; it now declares
   `application/problem+json`, the media type errors are sent with.
+- `GET` / `DELETE /api/v1/{comments,forms,newsletter}/data` answered a caller without the permission with
+  `422` when `email` was missing; the permission is checked first now (`403`).
+- MCP tools of `files` now require `files.upload` or `files.manage`, like their endpoints (a caller without
+  them no longer sees them in `tools/list`).
 - The OpenAPI document declared the `value` of a form answer as an object; it is any JSON value (a string,
   a number, an array or `true`), as it always was.
 

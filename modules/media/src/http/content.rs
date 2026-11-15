@@ -78,6 +78,7 @@ impl VersionQuery {
 #[utoipa::path(
     get,
     path = "/{id}/content",
+    extensions(("x-public" = json!(true))),
     operation_id = "download_media_item",
     security((), ("bearer" = [])),
     params(
@@ -117,6 +118,7 @@ pub(crate) async fn get_content(
 #[utoipa::path(
     head,
     path = "/{id}/content",
+    extensions(("x-public" = json!(true))),
     operation_id = "head_media_item",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item."), VersionQuery),
@@ -145,6 +147,7 @@ pub(crate) async fn head_content(
 #[utoipa::path(
     put,
     path = "/{id}/content",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "replace_media_content",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item."), ("If-Match" = String, Header, description = "Required: the `ETag` of the item (from `GET /api/v1/media/{id}`), or `*`. The content is replaced only if nobody changed the item since; otherwise `412`.")),

@@ -108,6 +108,7 @@ pub(crate) struct RedirectsQuery {
 #[utoipa::path(
     get,
     path = "/redirects",
+    extensions(("x-permissions" = json!(["content.manage"]))),
     operation_id = "list_content_redirects",
     security(("bearer" = [])),
     params(RedirectsQuery, PageQuery),
@@ -139,6 +140,7 @@ pub(crate) async fn list_redirects(
 #[utoipa::path(
     post,
     path = "/redirects",
+    extensions(("x-permissions" = json!(["content.manage"]))),
     operation_id = "create_content_redirect",
     security(("bearer" = [])),
     request_body = RedirectRequest,
@@ -165,6 +167,7 @@ pub(crate) async fn create_redirect(
 #[utoipa::path(
     get,
     path = "/redirects/{id}",
+    extensions(("x-permissions" = json!(["content.manage"]))),
     operation_id = "get_content_redirect",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the redirect.")),
@@ -191,6 +194,7 @@ pub(crate) async fn get_redirect(
 #[utoipa::path(
     patch,
     path = "/redirects/{id}",
+    extensions(("x-permissions" = json!(["content.manage"]))),
     operation_id = "update_content_redirect",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the redirect."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`).")),
@@ -224,6 +228,7 @@ pub(crate) async fn update_redirect(
 #[utoipa::path(
     delete,
     path = "/redirects/{id}",
+    extensions(("x-permissions" = json!(["content.manage"]))),
     operation_id = "delete_content_redirect",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the redirect.")),

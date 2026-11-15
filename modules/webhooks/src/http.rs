@@ -168,6 +168,7 @@ impl From<Delivery> for DeliveryResponse {
 #[utoipa::path(
     get,
     path = "/events",
+    extensions(("x-permissions" = json!(["webhooks.manage"]))),
     operation_id = "list_webhook_event_types",
     security(("bearer" = [])),
     responses(
@@ -198,6 +199,7 @@ async fn list_event_types(
 #[utoipa::path(
     get,
     path = "/",
+    extensions(("x-permissions" = json!(["webhooks.manage"]))),
     operation_id = "list_webhook_endpoints",
     security(("bearer" = [])),
     params(PageQuery),
@@ -228,6 +230,7 @@ async fn list_endpoints(
 #[utoipa::path(
     post,
     path = "/",
+    extensions(("x-permissions" = json!(["webhooks.manage"]))),
     operation_id = "create_webhook_endpoint",
     security(("bearer" = [])),
     request_body = CreateEndpointRequest,
@@ -259,6 +262,7 @@ async fn create_endpoint(
 #[utoipa::path(
     get,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["webhooks.manage"]))),
     operation_id = "get_webhook_endpoint",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the endpoint.")),
@@ -285,6 +289,7 @@ async fn get_endpoint(
 #[utoipa::path(
     patch,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["webhooks.manage"]))),
     operation_id = "update_webhook_endpoint",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the endpoint."), ("If-Match" = Option<String>, Header, description = "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.")),
@@ -323,6 +328,7 @@ async fn update_endpoint(
 #[utoipa::path(
     delete,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["webhooks.manage"]))),
     operation_id = "delete_webhook_endpoint",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the endpoint.")),
@@ -350,6 +356,7 @@ async fn delete_endpoint(
 #[utoipa::path(
     post,
     path = "/{id}/secret",
+    extensions(("x-permissions" = json!(["webhooks.manage"]))),
     operation_id = "rotate_webhook_secret",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the endpoint.")),
@@ -376,6 +383,7 @@ async fn rotate_secret(
 #[utoipa::path(
     get,
     path = "/{id}/deliveries",
+    extensions(("x-permissions" = json!(["webhooks.manage"]))),
     operation_id = "list_webhook_deliveries",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the endpoint."), PageQuery),

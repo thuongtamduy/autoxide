@@ -111,6 +111,7 @@ pub(crate) struct AuditFilter {
 #[utoipa::path(
     get,
     path = "/",
+    extensions(("x-permissions" = json!(["audit.read"]))),
     operation_id = "list_entries",
     security(("bearer" = [])),
     params(AuditFilter, PageQuery),
@@ -145,6 +146,7 @@ async fn list_entries(
 #[utoipa::path(
     get,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["audit.read"]))),
     operation_id = "get_entry",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry.")),

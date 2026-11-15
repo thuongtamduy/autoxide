@@ -166,6 +166,7 @@ impl ModuleInfo {
                 .map(|permission| ModulePermission {
                     name: permission.name().to_owned(),
                     description: permission.description().to_owned(),
+                    risk: permission.risk().as_str().to_owned(),
                 })
                 .collect(),
             events: module
@@ -250,6 +251,9 @@ pub(crate) struct ModulePermission {
     #[schema(example = "notes.write")]
     name: String,
     description: String,
+    /// How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`.
+    #[schema(example = "write")]
+    risk: String,
 }
 
 /// An event a module emits.
@@ -348,6 +352,7 @@ pub(crate) fn routes(state: CatalogState) -> OpenApiRouter {
 #[utoipa::path(
     get,
     path = "/modules",
+    extensions(("x-permissions" = json!(["kernel.modules.read"]))),
     operation_id = "list_modules",
     security(("bearer" = [])),
     responses(
@@ -371,6 +376,7 @@ async fn list_modules(
 #[utoipa::path(
     get,
     path = "/modules/{name}",
+    extensions(("x-permissions" = json!(["kernel.modules.read"]))),
     operation_id = "get_module",
     security(("bearer" = [])),
     params(("name" = String, Path, description = "Module name, e.g. `notes`.")),

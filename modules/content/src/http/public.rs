@@ -277,6 +277,7 @@ pub(crate) async fn resolution(
 #[utoipa::path(
     get,
     path = "/public/resolve",
+    extensions(("x-public" = json!(true))),
     operation_id = "resolve_content_path",
     security((), ("bearer" = [])),
     params(ResolveQuery),
@@ -357,6 +358,7 @@ pub(crate) struct PostsQuery {
 #[utoipa::path(
     get,
     path = "/public/posts",
+    extensions(("x-public" = json!(true))),
     operation_id = "list_public_content_posts",
     security((), ("bearer" = [])),
     params(PostsQuery, PageQuery),
@@ -445,6 +447,7 @@ pub(crate) struct LocaleQuery {
 #[utoipa::path(
     get,
     path = "/public/menus/{key}",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_public_content_menu",
     security((), ("bearer" = [])),
     params(("key" = String, Path, description = "Key of the menu, e.g. `main`."), LocaleQuery),
@@ -486,6 +489,7 @@ pub(crate) struct PublicTermPage {
 #[utoipa::path(
     get,
     path = "/public/terms/{taxonomy}/{slug}",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_public_content_term",
     security((), ("bearer" = [])),
     params(("taxonomy" = Taxonomy, Path, description = "`category` or `tag`."), ("slug" = String, Path, description = "Slug of the term."), LocaleQuery),
@@ -542,6 +546,7 @@ pub(crate) struct PublicAuthorPage {
 #[utoipa::path(
     get,
     path = "/public/authors/{slug}",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_public_content_author",
     security((), ("bearer" = [])),
     params(("slug" = String, Path, description = "Slug of the author.")),
@@ -604,6 +609,7 @@ pub(crate) struct SitemapQuery {
 #[utoipa::path(
     get,
     path = "/public/sitemap",
+    extensions(("x-public" = json!(true))),
     operation_id = "list_public_content_sitemap",
     security((), ("bearer" = [])),
     params(SitemapQuery, PageQuery),
@@ -661,6 +667,7 @@ pub(crate) struct FeedQuery {
 #[utoipa::path(
     get,
     path = "/public/feed",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_public_content_feed",
     security((), ("bearer" = [])),
     params(FeedQuery),
@@ -785,6 +792,7 @@ async fn preview_entry(
 #[utoipa::path(
     get,
     path = "/public/preview",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_public_content_preview",
     security((), ("bearer" = [])),
     params(PreviewQuery),
@@ -821,6 +829,7 @@ pub(crate) struct PreviewToken {
 #[utoipa::path(
     post,
     path = "/entries/{id}/preview-token",
+    extensions(("x-permissions" = json!(["content.write", "content.write_own"]))),
     operation_id = "create_content_preview_token",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the entry.")),

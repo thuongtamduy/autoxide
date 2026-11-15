@@ -213,6 +213,7 @@ pub(super) fn content_type(headers: &HeaderMap) -> Result<Option<&str>, Error> {
 #[utoipa::path(
     get,
     path = "/",
+    extensions(("x-permissions" = json!(["media.read"]))),
     operation_id = "list_media_items",
     security(("bearer" = [])),
     params(ItemsQuery, PageQuery),
@@ -246,6 +247,7 @@ pub(crate) async fn list_items(
 #[utoipa::path(
     post,
     path = "/",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "upload_media_item",
     security(("bearer" = [])),
     params(UploadQuery),
@@ -306,6 +308,7 @@ pub(crate) async fn upload_item(
 #[utoipa::path(
     get,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["media.read"]))),
     operation_id = "get_media_item",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item.")),
@@ -333,6 +336,7 @@ pub(crate) async fn get_item(
 #[utoipa::path(
     patch,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "update_media_item",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item."), ("If-Match" = String, Header, description = "Required: the `ETag` you read (or `*`). The change is made only if nobody changed the item since; otherwise `412`.")),
@@ -379,6 +383,7 @@ pub(crate) struct AltRequest {
 #[utoipa::path(
     put,
     path = "/{id}/alts/{locale}",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "set_media_alt_translation",
     security(("bearer" = [])),
     params(
@@ -417,6 +422,7 @@ pub(crate) async fn set_alt(
 #[utoipa::path(
     delete,
     path = "/{id}/alts/{locale}",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "delete_media_alt_translation",
     security(("bearer" = [])),
     params(
@@ -454,6 +460,7 @@ pub(crate) async fn delete_alt(
 #[utoipa::path(
     delete,
     path = "/{id}",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "trash_media_item",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item.")),
@@ -480,6 +487,7 @@ pub(crate) async fn trash_item(
 #[utoipa::path(
     post,
     path = "/{id}/restore",
+    extensions(("x-permissions" = json!(["media.write"]))),
     operation_id = "restore_media_item",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item.")),
@@ -507,6 +515,7 @@ pub(crate) async fn restore_item(
 #[utoipa::path(
     post,
     path = "/{id}/purge",
+    extensions(("x-permissions" = json!(["media.purge"]))),
     operation_id = "purge_media_item",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the media item.")),

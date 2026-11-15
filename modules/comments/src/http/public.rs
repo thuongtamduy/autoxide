@@ -57,6 +57,7 @@ pub(crate) struct CommentSettings {
 #[utoipa::path(
     get,
     path = "/public/settings",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_comment_settings",
     security((), ("bearer" = [])),
     responses((status = 200, description = "The settings.", body = Data<CommentSettings>))
@@ -130,6 +131,7 @@ fn target_of(
 #[utoipa::path(
     get,
     path = "/public/threads",
+    extensions(("x-public" = json!(true))),
     operation_id = "list_comment_thread",
     security((), ("bearer" = [])),
     params(ThreadQuery, PageQuery),
@@ -182,6 +184,7 @@ pub(crate) async fn list_thread(
 #[utoipa::path(
     get,
     path = "/public/comments/{id}",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_public_comment",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -205,6 +208,7 @@ pub(crate) async fn get_public_comment(
 #[utoipa::path(
     get,
     path = "/public/comments/{id}/replies",
+    extensions(("x-public" = json!(true))),
     operation_id = "list_comment_replies",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the top-level comment."), PageQuery),
@@ -269,6 +273,7 @@ pub(crate) struct CreateCommentRequest {
 #[utoipa::path(
     post,
     path = "/public/comments",
+    extensions(("x-public" = json!(true))),
     operation_id = "create_comment",
     security((), ("bearer" = [])),
     request_body = CreateCommentRequest,
@@ -331,6 +336,7 @@ pub(crate) struct EditCommentRequest {
 #[utoipa::path(
     patch,
     path = "/public/comments/{id}",
+    extensions(("x-public" = json!(true))),
     operation_id = "edit_comment",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -373,6 +379,7 @@ pub(crate) struct DeleteOwnRequest {
 #[utoipa::path(
     post,
     path = "/public/comments/{id}/delete",
+    extensions(("x-public" = json!(true))),
     operation_id = "delete_own_comment",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -425,6 +432,7 @@ pub(crate) struct ReportedResponse {
 #[utoipa::path(
     post,
     path = "/public/comments/{id}/reports",
+    extensions(("x-public" = json!(true))),
     operation_id = "report_comment",
     security((), ("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the comment.")),
@@ -474,6 +482,7 @@ pub(crate) struct CommentCount {
 #[utoipa::path(
     get,
     path = "/public/counts",
+    extensions(("x-public" = json!(true))),
     operation_id = "count_comments",
     security((), ("bearer" = [])),
     params(CountsQuery),
@@ -522,6 +531,7 @@ pub(crate) async fn count_comments(
 #[utoipa::path(
     get,
     path = "/public/targets/{target_type}/{target_id}",
+    extensions(("x-public" = json!(true))),
     operation_id = "get_public_comment_target",
     security((), ("bearer" = [])),
     params(
@@ -565,6 +575,7 @@ pub(crate) struct VerifiedResponse {
 #[utoipa::path(
     post,
     path = "/public/verify",
+    extensions(("x-public" = json!(true))),
     operation_id = "verify_comment_email",
     security((), ("bearer" = [])),
     request_body = TokenRequest,
@@ -607,6 +618,7 @@ pub(crate) struct UnsubscribedResponse {
 #[utoipa::path(
     post,
     path = "/public/unsubscribe",
+    extensions(("x-public" = json!(true))),
     operation_id = "unsubscribe_comment_replies",
     security((), ("bearer" = [])),
     request_body = UnsubscribeRequest,
@@ -635,6 +647,7 @@ pub(crate) struct ProfileResponse {
 #[utoipa::path(
     get,
     path = "/profile",
+    extensions(("x-permissions" = json!(["comments.post"]))),
     operation_id = "get_comment_profile",
     security(("bearer" = [])),
     responses(
@@ -672,6 +685,7 @@ pub(crate) struct ProfileRequest {
 #[utoipa::path(
     put,
     path = "/profile",
+    extensions(("x-permissions" = json!(["comments.post"]))),
     operation_id = "set_comment_profile",
     security(("bearer" = [])),
     request_body = ProfileRequest,

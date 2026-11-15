@@ -1,6 +1,6 @@
 //! Permission của module `media` (D-086).
 
-use autoxide_kernel::access::Permission;
+use autoxide_kernel::access::{Permission, Risk};
 
 pub(crate) const MEDIA_READ: Permission = Permission::new(
     "media.read",
@@ -13,7 +13,8 @@ pub(crate) const MEDIA_WRITE: Permission = Permission::new(
      who may also read the library.",
 );
 pub(crate) const MEDIA_PURGE: Permission =
-    Permission::new("media.purge", "Delete media items in the trash for good.");
+    Permission::new("media.purge", "Delete media items in the trash for good.")
+        .with_risk(Risk::Destructive);
 
 pub(crate) fn all() -> Vec<Permission> {
     vec![MEDIA_READ, MEDIA_WRITE, MEDIA_PURGE]

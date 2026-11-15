@@ -6034,3 +6034,52 @@ hẹp khoảng 300 dòng, không cần shell thật trong test (chạy được 
 
 Đã cân nhắc: chạy khối `bash` bằng shell thật với máy chủ thật — cần cổng mạng, `curl` trên máy và dọn tiến trình,
 chậm và dễ hỏng trên CI.
+
+## D-245 · Hợp đồng quyền đọc được bằng máy và test độ phủ phân quyền (bước 31, đặc tả 54 P1) — 2026-11-15 — agent quyết
+
+Quyết định (chi tiết D-205 / đặc tả 54 P1 giao cho bước 31):
+- **Khai trên handler bằng `extensions` của `#[utoipa::path]`** (utoipa 6 có sẵn, không cần macro riêng):
+  - `("x-permissions" = json!([...]))`: có một trong các permission là đủ; danh sách rỗng là mọi người đã đăng nhập;
+  - hoặc `("x-public" = json!(true))`.
+  - Khai cho cả 226 operation bằng script đọc thông tin từ tài liệu hiện có: `security` và câu "Missing permission"
+    của response 403. Kết quả: 45 công khai, 24 chỉ cần đăng nhập, 157 có permission. Test độ phủ bên dưới kiểm lại.
+- **Lint của kernel (`http::lint`):** operation thiếu cả hai là lỗi; mỗi permission khai phải được nêu trong
+  mô tả hay response 403.
+  - Đặc tả muốn câu "Requires …" *sinh từ* khai báo. Tôi giữ câu viết tay, vì nó giàu hơn (vd "`files.upload` cho
+    file của bạn, `files.manage` cho file của mọi người"), và cho lint kiểm khớp. Mục đích "chữ không lệch khai báo"
+    vẫn đạt.
+- **Tài liệu OpenAPI xuất qua `serde_json::Value`** để mọi khoá sắp theo tên. Extension của operation nằm trong
+  `HashMap` của utoipa; operation có cả `x-permissions` lẫn `x-sunset` thì thứ tự sẽ đổi giữa các lần sinh.
+  `docs/openapi.json` sắp lại toàn bộ một lần, không đổi nghĩa (`api-diff` xác nhận).
+- **`Permission` có `risk`:**
+  - mặc định suy từ tên (`….read` là `read`, còn lại `write`);
+  - `with_risk` đặt khác: `sensitive_data` cho xem / xuất dữ liệu cá nhân (`auth.users.read`, `comments.read`,
+    `comments.export`, `forms.read`, `forms.export`, `newsletter.read`, `newsletter.export`, `files.manage`),
+    `destructive` cho `media.purge`, `content.delete`, `read` cho `ai.view`;
+  - danh mục module trả `risk` cho từng permission.
+- **Test độ phủ** (`crates/app/src/e2e/access.rs`, mọi module của binary, cả hai database):
+  - Request mẫu sinh từ tài liệu: tham số bắt buộc, `If-Match: *`, thân tối thiểu theo schema. Nhờ vậy lỗi kiểm dữ
+    liệu không che bước kiểm quyền.
+  - Mọi operation không công khai: không token → 401. Tài khoản thật không role nào → 403 `permission_denied` (404
+    nếu operation khai `x-hides-existence`). Với `[]` thì không bị từ chối.
+  - Permission khai phải có module khai thật.
+- **Tool MCP:**
+  - mỗi tool `.requires(…)` hoặc khai `.for_any_signed_in()` (hàm mới, tương đương `x-permissions: []`);
+  - tool chỉ đọc phải gọi được bằng ít nhất một permission mức `read` / `sensitive_data` (đặc tả ghi "chỉ yêu cầu
+    permission mức read"; nới thành "ít nhất một", vì tool như `get_file` cho cả `files.upload` lẫn
+    `files.manage`);
+  - ngoại lệ ghi trong test: `files.list_files` (`files.upload` gồm cả xem file của mình; `files` không có
+    permission chỉ đọc).
+- **Lỗi thật test tìm ra, đã sửa:**
+  - sáu endpoint `…/data` của `comments`, `forms`, `newsletter` đọc `email` trước khi kiểm quyền (người không quyền
+    nhận 422); handler giờ gọi `principal.require` trước;
+  - tool `files.get_file` / `read_file` / `delete_file` và bốn tool của `auth` không khai permission; endpoint
+    `files` cho `files.manage` mà tài liệu chỉ ghi `files.upload`.
+
+Lý do: endpoint mới quên kiểm quyền (hay kiểm sau khi đọc đầu vào) làm gate đỏ; AI agent và giao diện biết trước
+quyền của từng endpoint từ tài liệu.
+
+Đã cân nhắc:
+- Macro riêng bọc `#[utoipa::path]`: thêm một thứ phải học, trong khi `extensions` đã đủ.
+- Sinh `x-permissions` tự động từ lời gọi `principal.require` trong code: không đọc được lúc biên dịch, và có
+  service kiểm quyền theo điều kiện.

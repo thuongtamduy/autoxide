@@ -49,6 +49,7 @@ pub(crate) struct VerificationConfirmation {
 #[utoipa::path(
     post,
     path = "/me/email/verification",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "resend_email_verification",
     security(("bearer" = [])),
     responses(
@@ -76,6 +77,7 @@ async fn resend_verification(
 #[utoipa::path(
     post,
     path = "/me/email",
+    extensions(("x-permissions" = json!([]))),
     operation_id = "change_email",
     security(("bearer" = [])),
     request_body = ChangeEmailRequest,
@@ -112,6 +114,7 @@ async fn change_email(
 #[utoipa::path(
     post,
     path = "/email-verification/confirm",
+    extensions(("x-public" = json!(true))),
     operation_id = "confirm_email_verification",
     request_body = VerificationConfirmation,
     responses(

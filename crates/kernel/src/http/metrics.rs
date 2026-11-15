@@ -23,6 +23,8 @@ pub fn metrics_routes(metrics: Metrics) -> OpenApiRouter {
 #[utoipa::path(
     get,
     path = "/metrics",
+    // Không đăng nhập: máy thu số đo gọi; chỉ có khi bật `AUTOXIDE_HTTP_METRICS` (D-245).
+    extensions(("x-public" = json!(true))),
     tag = "health",
     operation_id = "metrics",
     responses((status = 200, description = "Current metrics.", body = String, content_type = "text/plain"))
