@@ -14,7 +14,7 @@ curl -sS "$API/api/v1/auth/login" \
 
 ## Tạo key
 
-Tạo key phải nhập mật khẩu hiện tại, để access token bị đánh cắp không tự tạo được key sống lâu hơn nó. Key chỉ hiện **một lần**: cất ngay.
+Tạo key phải nhập mật khẩu hiện tại, để access token bị đánh cắp không tự tạo được key sống lâu hơn nó. Thay cho mật khẩu có thể gửi `totp_code` (mã của ứng dụng xác thực, khi đã bật đăng nhập hai bước) hoặc passkey (`passkey_ceremony_id` từ `POST /api/v1/auth/login/passkey/options` và `passkey_credential`, câu trả lời của trình duyệt) — đúng một trong ba. Key chỉ hiện **một lần**: cất ngay.
 
 <!-- example: create-key -->
 ```bash
@@ -61,6 +61,10 @@ curl -sS -X DELETE "$API/api/v1/auth/api-keys/$KEY_ID" -H "Authorization: Bearer
 curl -sS "$API/api/v1/content/entries" -H "Authorization: Bearer $KEY"
 # expect: 401
 ```
+
+## Key của mọi người (quản trị viên)
+
+Có permission `auth.api_keys.manage` thì `GET /api/v1/auth/all-api-keys` (lọc `user_id=`) liệt kê key của mọi người dùng kèm tên và email chủ key, không bao giờ có phần bí mật, và `DELETE /api/v1/auth/all-api-keys/{id}` thu hồi key bất kỳ — vd khi key bị lộ hay chủ của nó rời đi. Audit log ghi ai thu hồi.
 
 ## Với SDK
 

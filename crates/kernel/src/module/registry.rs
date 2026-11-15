@@ -60,8 +60,16 @@ pub struct Modules {
     verification: crate::access::PostingVerification,
     /// Sổ module đã cài (module `kernel` phục vụ); điền ở cuối [`start`](Self::start).
     catalog: crate::module_catalog::ModuleCatalog,
+    /// Cấu hình cho giao diện của mọi module (D-271), điền sau `start`.
+    client_configs: crate::ops::client_config::ClientConfigs,
     /// Cờ theo người dùng của module `kernel`, phục vụ dưới `/api/v1/me` (D-207).
     user_flags: crate::user_flags::Handle,
+    /// Cấu hình khoá gốc (module `kernel` điền lúc `configure`), cho upgrade dữ liệu.
+    keys: crate::secret::KeyConfig,
+    /// Bộ gieo dữ liệu cho khách mới của mọi module; điền sau khi mọi module khởi động.
+    seeds: crate::tenancy::admin::Seeds,
+    /// Sổ database (bước 33); có sau [`start`](Self::start).
+    tenancy: Option<crate::tenancy::DatabaseRegistry>,
 }
 
 impl Modules {
@@ -81,9 +89,20 @@ impl Modules {
             }
         }
         let catalog = crate::module_catalog::ModuleCatalog::default();
+        let client_configs = crate::ops::client_config::ClientConfigs::default();
         let user_flags = crate::user_flags::Handle::default();
+        let keys = crate::secret::KeyConfig::default();
+        let settings = crate::tenancy::settings::Catalog::default();
+        let seeds = crate::tenancy::admin::Seeds::default();
         let mut all: Vec<Box<dyn Module>> = vec![
-            Box::new(crate::builtin::KernelModule::new(catalog.clone(), user_flags.clone())),
+            Box::new(crate::builtin::KernelModule::new(
+                catalog.clone(),
+                client_configs.clone(),
+                user_flags.clone(),
+                keys.clone(),
+                settings.clone(),
+                seeds.clone(),
+            )),
             Box::new(crate::antispam::module::AntispamModule::default()),
         ];
         all.extend(modules);
@@ -101,6 +120,18 @@ impl Modules {
             EventCatalog::default()
         });
         let resource_events = checked_resource_events(&modules, &events, &mut problems);
+        let mut seen = Vec::new();
+        let mut declared_settings = Vec::new();
+        for module in &modules {
+            let declared = module.tenant_settings();
+            problems.extend(crate::tenancy::settings::declaration_problems(
+                module.name(),
+                &declared,
+                &mut seen,
+            ));
+            declared_settings.extend(declared);
+        }
+        settings.fill(declared_settings);
         for module in &modules {
             for deprecation in module.deprecations() {
                 problems.extend(deprecation.problems(module.name()));
@@ -125,7 +156,11 @@ impl Modules {
                 verification: crate::access::PostingVerification::default(),
                 apis: Apis::default(),
                 catalog,
+                client_configs,
                 user_flags,
+                keys,
+                seeds,
+                tenancy: None,
             })
         } else {
             Err(ModuleError(problems.join("; ")))
@@ -154,9 +189,19 @@ impl Modules {
         result
     }
 
-    /// Khởi động từng module theo thứ tự đăng ký. Module nào hỏng thì dừng và báo
-    /// tên module đó.
+    /// Khởi động từng module theo thứ tự đăng ký, chế độ một khách trên `database`. Module nào
+    /// hỏng thì dừng và báo tên module đó.
     pub fn start(&mut self, database: &Database) -> Result<(), ModuleError> {
+        self.start_in(&crate::tenancy::DatabaseRegistry::single(database.clone()))
+    }
+
+    /// Như [`start`](Self::start), với sổ database `registry` (chế độ của bản cài, các
+    /// placement): database của chương trình là database điều khiển của nó.
+    pub fn start_in(
+        &mut self,
+        registry: &crate::tenancy::DatabaseRegistry,
+    ) -> Result<(), ModuleError> {
+        let database = registry.control();
         let mut apis = Apis::default();
         for module in &mut self.modules {
             let name = module.name();
@@ -172,15 +217,36 @@ impl Modules {
                 resources: &self.resources,
                 resource_events: &self.resource_events,
                 verification: &self.verification,
+                tenancy: registry,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
             })?;
         }
         self.apis = apis;
+        self.tenancy = Some(registry.clone());
         // Sau khi MỌI module đã khởi động: tool, job, lịch của module chỉ có từ lúc này.
         self.catalog.fill(&self.modules);
+        self.client_configs.fill(&self.modules);
+        self.seeds.fill(
+            self.modules
+                .iter()
+                .filter_map(|module| module.seed_tenant().map(|seed| (module.name(), seed)))
+                .collect(),
+        );
         Ok(())
+    }
+
+    /// Sổ database đã dùng lúc khởi động; `None` trước [`start`](Self::start).
+    pub fn tenancy(&self) -> Option<crate::tenancy::DatabaseRegistry> {
+        self.tenancy.clone()
+    }
+
+    /// Sổ database, có sau [`start`](Self::start).
+    fn started(&self) -> Result<crate::tenancy::DatabaseRegistry, ModuleError> {
+        self.tenancy.clone().ok_or_else(|| {
+            ModuleError("start the modules (`Modules::start`) before building the worker".into())
+        })
     }
 
     /// Trait `T` mà một module đã công bố lúc khởi động, nếu có. Dùng ở binary để
@@ -286,6 +352,11 @@ impl Modules {
         if problems.is_empty() { Ok(tools) } else { Err(ModuleError(problems.join("; "))) }
     }
 
+    /// Bảng mặt điều khiển của mọi module (kể cả `kernel`), theo thứ tự đăng ký.
+    pub fn control_plane_tables(&self) -> Vec<&'static str> {
+        self.modules.iter().flat_map(|module| module.control_plane_tables()).collect()
+    }
+
     /// Giới hạn thân request riêng của mọi module: `(tên module, khai báo)`.
     pub fn body_limits(&self) -> Vec<(&'static str, crate::http::BodyLimit)> {
         self.modules
@@ -307,10 +378,11 @@ impl Modules {
         &self.events
     }
 
-    /// Worker chạy job của mọi module, `concurrency` job cùng lúc mỗi module. Gọi sau
-    /// [`start`](Self::start). Khai báo sai (loại job không thuộc module khai, hai bộ chạy
-    /// cho một loại, lịch cho loại job không ai chạy) là lỗi khởi động.
-    pub fn worker(&self, database: &Database, concurrency: u64) -> Result<Worker, ModuleError> {
+    /// Worker chạy job của mọi module trên mọi database của sổ database, `concurrency` job cùng
+    /// lúc mỗi module. Gọi sau [`start`](Self::start). Khai báo sai (loại job không thuộc module
+    /// khai, hai bộ chạy cho một loại, lịch cho loại job không ai chạy) là lỗi khởi động.
+    pub fn worker(&self, concurrency: u64) -> Result<Worker, ModuleError> {
+        let databases = self.started()?;
         let mut handlers: HashMap<&'static str, Arc<dyn JobHandler>> = HashMap::new();
         let mut modules = Vec::new();
         let mut schedules = Vec::new();
@@ -361,13 +433,14 @@ impl Modules {
         if !problems.is_empty() {
             return Err(ModuleError(problems.join("; ")));
         }
-        Ok(Worker::new(database.clone(), modules, handlers, schedules, concurrency))
+        Ok(Worker::new(databases, modules, handlers, schedules, concurrency))
     }
 
-    /// Bộ phát event: đọc bảng event của mọi module phát event, giao cho các đăng ký
-    /// nhận của mọi module. Gọi sau [`start`](Self::start). Đăng ký nhận một event
-    /// không ai khai là lỗi khởi động.
-    pub fn dispatcher(&self, database: &Database) -> Result<Dispatcher, ModuleError> {
+    /// Bộ phát event: đọc bảng event của mọi module phát event trên mọi database của sổ
+    /// database, giao cho các đăng ký nhận của mọi module. Gọi sau [`start`](Self::start). Đăng
+    /// ký nhận một event không ai khai là lỗi khởi động.
+    pub fn dispatcher(&self) -> Result<Dispatcher, ModuleError> {
+        let databases = self.started()?;
         let mut subscriptions = Vec::new();
         let mut problems = Vec::new();
         for module in &self.modules {
@@ -390,12 +463,7 @@ impl Modules {
         if !problems.is_empty() {
             return Err(ModuleError(problems.join("; ")));
         }
-        Ok(Dispatcher::new(
-            database.clone(),
-            self.events.modules(),
-            subscriptions,
-            Arc::clone(&self.wake),
-        ))
+        Ok(Dispatcher::new(databases, self.events.modules(), subscriptions, Arc::clone(&self.wake)))
     }
 
     /// Bước kiểm của từng module kèm tên module, theo thứ tự đăng ký (`autoxide doctor`). Gọi
@@ -453,19 +521,39 @@ impl Modules {
         let mut routes: Vec<(&'static str, OpenApiRouter)> =
             self.modules.iter().map(|module| (module.name(), module.routes())).collect();
         if let Some(flags) = self.user_flags.get() {
-            routes.push((crate::user_flags::ME, crate::user_flags::routes(flags)));
+            let mine = crate::ops::my_permissions::MyPermissions {
+                catalog: self.permissions.clone(),
+                translations: self.translations.clone(),
+            };
+            let me =
+                crate::user_flags::routes(flags).merge(crate::ops::my_permissions::routes(mine));
+            routes.push((crate::user_flags::ME, me));
         }
         routes
     }
 
     /// Migrator chạy migration của mọi module.
+    /// Quản lý placement trên `registry` (lệnh `autoxide placement`, `migrate --all`, kiểm định kỳ
+    /// của `serve`): đưa khoá gốc của chương trình vào sổ (mở URL placement đã mã hoá) và dùng
+    /// migration của mọi module.
+    pub fn placements(
+        &self,
+        registry: &crate::tenancy::DatabaseRegistry,
+    ) -> Result<crate::tenancy::Placements, MigrationError> {
+        registry.use_secret_key(self.keys.key_for(registry.control()));
+        Ok(crate::tenancy::Placements::new(registry.clone(), self.migrator()?))
+    }
+
     pub fn migrator(&self) -> Result<Migrator, MigrationError> {
-        Migrator::new(
-            self.modules
-                .iter()
-                .map(|module| ModuleMigrations::new(module.name(), module.migrations()))
-                .collect(),
-        )
+        let modules = self
+            .modules
+            .iter()
+            .map(|module| {
+                ModuleMigrations::new(module.name(), module.migrations())
+                    .with_upgrades(module.upgrades())
+            })
+            .collect();
+        Ok(Migrator::new(modules)?.with_keys(self.keys.clone()))
     }
 }
 
@@ -690,8 +778,13 @@ mod tests {
         // Chỉ biến của hai module nội bộ `kernel` và `antispam`.
         let names: Vec<&str> = reader.values().iter().map(|value| value.setting.name).collect();
         let internal = |name: &&str| {
-            ["AUTOXIDE_SECRET_KEY", "AUTOXIDE_HTTP_PUBLIC_URL", "AUTOXIDE_USER_FLAGS_MAX"]
-                .contains(name)
+            [
+                "AUTOXIDE_SECRET_KEY",
+                "AUTOXIDE_SECRET_KEY_PREVIOUS",
+                "AUTOXIDE_HTTP_PUBLIC_URL",
+                "AUTOXIDE_USER_FLAGS_MAX",
+            ]
+            .contains(name)
                 || name.starts_with("AUTOXIDE_ANTISPAM_")
         };
         assert!(names.iter().all(internal), "{names:?}");

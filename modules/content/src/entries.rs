@@ -13,6 +13,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::rows;
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::ExprTrait as _;
 use sea_orm::{
@@ -172,6 +173,16 @@ pub(crate) struct EntryFilter {
     pub author_id: Option<Uuid>,
     pub translation_group_id: Option<Uuid>,
     pub sort: EntrySort,
+    /// Chỉ bài đang (`true`) / không (`false`) chờ duyệt.
+    pub review_requested: Option<bool>,
+    /// Chỉ bài có (`true`) / không có (`false`) lịch đăng hay gỡ đang chờ.
+    pub scheduled: Option<bool>,
+    /// Chỉ bài do người này tạo (`created_by=me` đổi thành người gọi ở tầng HTTP).
+    pub created_by: Option<Uuid>,
+    /// Chỉ bài do AI viết (`true`) / không (`false`).
+    pub ai_generated: Option<bool>,
+    /// Chỉ bài chưa có bản dịch sang ngôn ngữ này (không mục nào cùng nhóm bản dịch mang nó).
+    pub missing_locale: Option<String>,
 }
 
 impl ContentService {
@@ -193,11 +204,10 @@ impl ContentService {
         let mut problems = Vec::new();
         let locale = self.check_locale(input.locale.as_deref(), "locale", &mut problems);
         if input.fields.title.as_deref().is_none_or(|title| title.trim().is_empty()) {
-            problems.push(FieldError::new(
-                "title",
-                "required",
-                format!("must be 1 to {TITLE_MAX} characters"),
-            ));
+            problems.push(
+                FieldError::new("title", "required", "must be 1 to {title_max} characters")
+                    .with_param("title_max", TITLE_MAX),
+            );
         }
         if input.parent_id.is_some() && input.kind == Kind::Post {
             problems.push(FieldError::new("parent_id", "not_allowed", "only pages have a parent"));
@@ -293,6 +303,7 @@ impl ContentService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     Actor::from(principal),
                     events::entry_subject(entry.id),
                     &event,
@@ -346,6 +357,39 @@ impl ContentService {
         if let Some(author) = filter.author_id {
             select = select.filter(crate::taxonomy::authors::has_author(author));
         }
+        select = match filter.review_requested {
+            Some(true) => select.filter(Column::ReviewRequestedAt.is_not_null()),
+            Some(false) => select.filter(Column::ReviewRequestedAt.is_null()),
+            None => select,
+        };
+        if let Some(scheduled) = filter.scheduled {
+            let waiting = sea_orm::sea_query::Query::select()
+                .column(crate::entity::schedule::Column::EntryId)
+                .from(crate::entity::schedule::Entity)
+                .and_where(crate::entity::schedule::Column::Status.eq("scheduled"))
+                .to_owned();
+            select = if scheduled {
+                select.filter(Column::Id.in_subquery(waiting))
+            } else {
+                select.filter(Column::Id.not_in_subquery(waiting))
+            };
+        }
+        if let Some(creator) = filter.created_by {
+            select = select.filter(Column::CreatedBy.eq(creator));
+        }
+        if let Some(ai) = filter.ai_generated {
+            select = select.filter(Column::AiGenerated.eq(ai));
+        }
+        if let Some(missing) = &filter.missing_locale {
+            // Nhóm bản dịch đã có mục bằng ngôn ngữ đó thì loại; mục chính nó bằng ngôn ngữ đó
+            // cũng bị loại theo (cùng nhóm).
+            let translated = sea_orm::sea_query::Query::select()
+                .column(Column::TranslationGroupId)
+                .from(Entity)
+                .and_where(Column::Locale.eq(missing.as_str()))
+                .to_owned();
+            select = select.filter(Column::TranslationGroupId.not_in_subquery(translated));
+        }
         let read = self.database.read();
         match filter.sort {
             EntrySort::CreatedAt => fetch_page(select, Column::Id, |row| row.id, page, read).await,
@@ -355,6 +399,27 @@ impl ContentService {
                     .await
             }
         }
+    }
+
+    /// Đường dẫn và lúc đăng của bản công khai của từng mục trong `ids` (một câu cho cả trang).
+    pub(crate) async fn published_paths(
+        &self,
+        ids: &[Uuid],
+    ) -> Result<std::collections::HashMap<Uuid, (String, DateTime<Utc>)>, Error> {
+        if ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        use crate::entity::published;
+        let rows: Vec<(Uuid, String, DateTime<Utc>)> = published::Entity::find()
+            .select_only()
+            .column(published::Column::EntryId)
+            .column(published::Column::Path)
+            .column(published::Column::PublishedAt)
+            .filter(published::Column::EntryId.is_in(ids.iter().copied()))
+            .into_tuple()
+            .all(self.database.read())
+            .await?;
+        Ok(rows.into_iter().map(|(id, path, at)| (id, (path, at))).collect())
     }
 
     /// Sửa bản nháp của mục `id`. Cần `content.write`. Mục đang công khai thì bật
@@ -446,10 +511,24 @@ impl ContentService {
         let subject = events::entry_subject(id);
         if restored_from.is_some() {
             self.outbox
-                .record(&transaction, actor, subject, &events::EntryRestored(change))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::EntryRestored(change),
+                )
                 .await?;
         } else {
-            self.outbox.record(&transaction, actor, subject, &events::EntryUpdated(change)).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::EntryUpdated(change),
+                )
+                .await?;
         }
         transaction.commit().await?;
         Ok(after)
@@ -470,11 +549,10 @@ impl ContentService {
         if (candidate.title.is_empty() || candidate.title.chars().count() > TITLE_MAX)
             && !problems.iter().any(|p| p.field == "title")
         {
-            problems.push(FieldError::new(
-                "title",
-                "length",
-                format!("must be 1 to {TITLE_MAX} characters"),
-            ));
+            problems.push(
+                FieldError::new("title", "length", "must be 1 to {title_max} characters")
+                    .with_param("title_max", TITLE_MAX),
+            );
         }
         match trim(fields.slug) {
             Some(slug) if slug.is_empty() => {
@@ -583,26 +661,26 @@ impl ContentService {
             wanted.iter().map(|(_, id)| *id).collect::<BTreeSet<_>>().into_iter().collect();
         let mut found = std::collections::HashMap::new();
         for chunk in ids.chunks(autoxide_media::api::MAX_IDS) {
-            for item in self.media.find_many(chunk).await? {
+            for item in
+                self.media.find_many(&TenantContext::legacy_default(&self.database), chunk).await?
+            {
                 found.insert(item.id, item);
             }
         }
         for (field, id) in wanted {
             match found.get(&id) {
-                None => problems.push(FieldError::new(
-                    field,
-                    "media_not_found",
-                    format!("media item {id} does not exist"),
-                )),
+                None => problems.push(
+                    FieldError::new(field, "media_not_found", "media item {id} does not exist")
+                        .with_param("id", id),
+                ),
                 Some(item)
                     if public
                         && item.visibility != autoxide_media::api::MediaVisibility::Public =>
                 {
-                    problems.push(FieldError::new(
-                        field,
-                        "media_not_public",
-                        format!("media item {id} is not public"),
-                    ));
+                    problems.push(
+                        FieldError::new(field, "media_not_public", "media item {id} is not public")
+                            .with_param("id", id),
+                    );
                 }
                 Some(_) => {}
             }
@@ -632,11 +710,14 @@ impl ContentService {
         }
         let below = subtree_height(connection, entry.id).await?;
         if depth(connection, parent).await? + below > MAX_TREE_DEPTH {
-            problems.push(FieldError::new(
-                "parent_id",
-                "tree_too_deep",
-                format!("pages may nest at most {MAX_TREE_DEPTH} levels"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "parent_id",
+                    "tree_too_deep",
+                    "pages may nest at most {max_tree_depth} levels",
+                )
+                .with_param("max_tree_depth", MAX_TREE_DEPTH),
+            );
         }
         Ok(())
     }

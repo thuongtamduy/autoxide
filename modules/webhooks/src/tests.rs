@@ -116,18 +116,28 @@ async fn setup(test: &TestDatabase, allow_http: bool) -> Setup {
     Setup { database, service, fanout, sender }
 }
 
-fn event(name: &str) -> Delivered {
-    Delivered::new("demo", name.to_owned(), json!({"after": {"size": 3}}))
-        .actor(Actor::user(Uuid::from_u128(0xada)))
-        .subject(Some("demo.thing:1".to_owned()))
+fn event(database: &Database, name: &str) -> Delivered {
+    Delivered::new(
+        autoxide_kernel::tenancy::TenantContext::legacy_default(database),
+        "demo",
+        name.to_owned(),
+        json!({"after": {"size": 3}}),
+    )
+    .actor(Actor::user(Uuid::from_u128(0xada)))
+    .subject(Some("demo.thing:1".to_owned()))
 }
 
 async fn deliveries(database: &Database) -> Vec<delivery::Model> {
     delivery::Entity::find().all(database.read()).await.unwrap()
 }
 
-fn job(delivery_id: Uuid, attempt: i32) -> JobContext {
-    JobContext::new(crate::delivery::SEND_KIND, json!({"delivery_id": delivery_id}), attempt)
+fn job(database: &Database, delivery_id: Uuid, attempt: i32) -> JobContext {
+    JobContext::for_tenant(
+        autoxide_kernel::tenancy::TenantContext::legacy_default(database),
+        crate::delivery::SEND_KIND,
+        json!({"delivery_id": delivery_id}),
+        attempt,
+    )
 }
 
 #[tokio::test]
@@ -145,8 +155,8 @@ async fn gui_co_chu_ky_thu_lai_khi_loi_va_khong_gui_trung() {
         let created = setup.service.create(Actor::system(), input).await.unwrap();
 
         // Event không ai đăng ký: không gửi. Event được giao hai lần: chỉ một lần gửi.
-        setup.fanout.handle(&event("webhooks.endpoint_created")).await.unwrap();
-        let happened = event(DEMO_EVENT);
+        setup.fanout.handle(&event(&setup.database, "webhooks.endpoint_created")).await.unwrap();
+        let happened = event(&setup.database, DEMO_EVENT);
         setup.fanout.handle(&happened).await.unwrap();
         setup.fanout.handle(&happened).await.unwrap();
         let rows = deliveries(&setup.database).await;
@@ -158,7 +168,7 @@ async fn gui_co_chu_ky_thu_lai_khi_loi_va_khong_gui_trung() {
         assert_eq!(jobs, 1);
 
         // Lần một: bên nhận trả 500 → job lỗi (để thử lại), lần gửi còn chờ.
-        let first = setup.sender.run(&job(rows[0].id, 1)).await;
+        let first = setup.sender.run(&job(&setup.database, rows[0].id, 1)).await;
         assert!(first.is_err());
         let row = &deliveries(&setup.database).await[0];
         assert_eq!(
@@ -166,7 +176,7 @@ async fn gui_co_chu_ky_thu_lai_khi_loi_va_khong_gui_trung() {
             ("pending", 1, Some(500))
         );
         // Lần hai: 200 → xong.
-        setup.sender.run(&job(rows[0].id, 2)).await.unwrap();
+        setup.sender.run(&job(&setup.database, rows[0].id, 2)).await.unwrap();
         let row = &deliveries(&setup.database).await[0];
         assert_eq!(
             (row.status.as_str(), row.attempts, row.response_status),
@@ -174,7 +184,7 @@ async fn gui_co_chu_ky_thu_lai_khi_loi_va_khong_gui_trung() {
         );
         assert!(row.delivered_at.is_some());
         // Chạy lại job đã xong: không gửi thêm.
-        setup.sender.run(&job(rows[0].id, 3)).await.unwrap();
+        setup.sender.run(&job(&setup.database, rows[0].id, 3)).await.unwrap();
 
         let requests = receiver.requests.lock().unwrap().clone();
         assert_eq!(requests.len(), 2);
@@ -208,7 +218,7 @@ async fn giao_dong_thoi_khong_gui_trung() {
         };
         setup.service.create(Actor::system(), input).await.unwrap();
         let fanout = Arc::new(setup.fanout);
-        let happened = event(DEMO_EVENT);
+        let happened = event(&setup.database, DEMO_EVENT);
         let handles: Vec<_> = (0..6)
             .map(|_| {
                 let (fanout, happened) = (fanout.clone(), happened.clone());
@@ -239,21 +249,21 @@ async fn het_lan_thu_hoac_endpoint_tat_thi_that_bai() {
         let input = NewEndpoint { url, description: String::new(), events: vec!["*".to_owned()] };
         let endpoint = setup.service.create(Actor::system(), input).await.unwrap().endpoint;
 
-        setup.fanout.handle(&event(DEMO_EVENT)).await.unwrap();
-        setup.fanout.handle(&event(DEMO_EVENT)).await.unwrap();
+        setup.fanout.handle(&event(&setup.database, DEMO_EVENT)).await.unwrap();
+        setup.fanout.handle(&event(&setup.database, DEMO_EVENT)).await.unwrap();
         let rows = deliveries(&setup.database).await;
         assert_eq!(rows.len(), 2);
 
         // Lần thử cuối cùng mà vẫn lỗi: thất bại hẳn.
         let last = crate::delivery::MAX_ATTEMPTS;
-        assert!(setup.sender.run(&job(rows[0].id, last)).await.is_err());
+        assert!(setup.sender.run(&job(&setup.database, rows[0].id, last)).await.is_err());
         let failed = delivery::Entity::find_by_id(rows[0].id).one(setup.database.read()).await;
         let failed = failed.unwrap().unwrap();
         assert_eq!(failed.status, "failed");
         assert!(failed.last_error.unwrap().contains("502"));
         // Job chạy lại sau khi hỏng (`autoxide jobs retry` đặt lại số lần thử): lần gửi được mở
         // lại và gửi thật (D-161). Bên nhận giờ trả 2xx.
-        setup.sender.run(&job(rows[0].id, 1)).await.unwrap();
+        setup.sender.run(&job(&setup.database, rows[0].id, 1)).await.unwrap();
         let resent = delivery::Entity::find_by_id(rows[0].id).one(setup.database.read()).await;
         assert_eq!(resent.unwrap().unwrap().status, "succeeded");
         assert_eq!(receiver.requests.lock().unwrap().len(), 2);
@@ -261,12 +271,12 @@ async fn het_lan_thu_hoac_endpoint_tat_thi_that_bai() {
         // Endpoint bị tắt: lần gửi còn chờ thất bại, không gửi đi.
         let off = EndpointChanges { disabled: Some(true), ..Default::default() };
         setup.service.update(Actor::system(), endpoint.id, off, None).await.unwrap();
-        setup.sender.run(&job(rows[1].id, 1)).await.unwrap();
+        setup.sender.run(&job(&setup.database, rows[1].id, 1)).await.unwrap();
         let skipped = delivery::Entity::find_by_id(rows[1].id).one(setup.database.read()).await;
         assert_eq!(skipped.unwrap().unwrap().status, "failed");
         assert_eq!(receiver.requests.lock().unwrap().len(), 2);
         // Endpoint tắt không nhận event mới.
-        setup.fanout.handle(&event(DEMO_EVENT)).await.unwrap();
+        setup.fanout.handle(&event(&setup.database, DEMO_EVENT)).await.unwrap();
         assert_eq!(deliveries(&setup.database).await.len(), 2);
     })
     .await
@@ -301,9 +311,9 @@ async fn khong_gui_vao_mang_rieng() {
         };
         setup.database.write().execute_unprepared(&sql).await.unwrap();
 
-        setup.fanout.handle(&event(DEMO_EVENT)).await.unwrap();
+        setup.fanout.handle(&event(&setup.database, DEMO_EVENT)).await.unwrap();
         let rows = deliveries(&setup.database).await;
-        setup.sender.run(&job(rows[0].id, 1)).await.unwrap();
+        setup.sender.run(&job(&setup.database, rows[0].id, 1)).await.unwrap();
         let row = delivery::Entity::find_by_id(rows[0].id).one(setup.database.read()).await;
         let row = row.unwrap().unwrap();
         assert_eq!(row.status, "failed");
@@ -453,6 +463,75 @@ async fn quan_ly_qua_api_khong_lo_secret() {
             (status, missing["code"].clone()),
             (StatusCode::NOT_FOUND, json!("webhooks.endpoint_not_found"))
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// Đề bài giao diện B3: mỗi endpoint kèm lần gửi mới nhất (không phải gọi `/deliveries` cho
+/// từng endpoint), lọc endpoint theo trạng thái.
+#[tokio::test]
+async fn endpoint_kem_lan_gui_moi_nhat_va_loc_trang_thai() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["webhooks.manage"])
+            .module(Demo)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let post = async |url: &str| {
+            let body = json!({"url": url, "events": [DEMO_EVENT]});
+            let answer =
+                app.post("/api/v1/webhooks").token("admin").json(body).send().await.unwrap();
+            assert_eq!(answer.status(), StatusCode::CREATED);
+            answer.json()["data"]["id"].as_str().unwrap().parse::<Uuid>().unwrap()
+        };
+        let busy = post("https://example.com/busy").await;
+        let quiet = post("https://example.com/quiet").await;
+        let now = chrono::Utc::now();
+        for (minutes, status, code) in [(10, "failed", Some(500)), (1, "delivered", Some(204))] {
+            let row = delivery::Model {
+                id: Uuid::now_v7(),
+                endpoint_id: busy,
+                event_id: Uuid::now_v7(),
+                event_name: DEMO_EVENT.to_owned(),
+                body: "{}".to_owned(),
+                status: status.to_owned(),
+                attempts: 1,
+                response_status: code,
+                last_error: None,
+                created_at: chrono::SubsecRound::trunc_subsecs(
+                    now - chrono::Duration::minutes(minutes),
+                    6,
+                ),
+                last_attempt_at: Some(chrono::SubsecRound::trunc_subsecs(now, 6)),
+                delivered_at: None,
+            };
+            delivery::Entity::insert(sea_orm::IntoActiveModel::into_active_model(row))
+                .exec(app.database().write())
+                .await
+                .unwrap();
+        }
+        let disable = json!({"disabled": true});
+        let path = format!("/api/v1/webhooks/{quiet}");
+        let answer = app.patch(&path).token("admin").json(disable).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+
+        let list = app.get("/api/v1/webhooks?order=asc").token("admin").send().await.unwrap();
+        let rows = list.json()["data"].clone();
+        assert_eq!(rows[0]["last_delivery"]["status"], "delivered");
+        assert_eq!(rows[0]["last_delivery"]["response_status"], 204);
+        assert!(rows[1]["last_delivery"].is_null(), "{rows}");
+        let one = app.get(&format!("/api/v1/webhooks/{busy}")).token("admin").send().await.unwrap();
+        assert_eq!(one.json()["data"]["last_delivery"]["status"], "delivered");
+
+        let active = app.get("/api/v1/webhooks?status=active").token("admin").send().await.unwrap();
+        let ids: Vec<_> =
+            active.json()["data"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+        assert_eq!(ids, [json!(busy)]);
+        let off = app.get("/api/v1/webhooks?status=disabled").token("admin").send().await.unwrap();
+        assert_eq!(off.json()["data"][0]["id"], json!(quiet));
     })
     .await
     .unwrap();

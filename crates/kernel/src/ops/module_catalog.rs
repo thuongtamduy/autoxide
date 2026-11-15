@@ -30,6 +30,7 @@ use validator::Validate;
 use crate::access::{Permission, Principal};
 use crate::database::Database;
 use crate::error::Error;
+use crate::i18n::Language;
 use crate::mcp::{NoInput, Tool};
 use crate::migration::{Migrator, ModuleMigrations};
 use crate::module::Module;
@@ -333,6 +334,20 @@ pub(crate) struct ModuleMigration {
 pub(crate) struct CatalogState {
     pub(crate) catalog: ModuleCatalog,
     pub(crate) database: Database,
+    pub(crate) translations: crate::i18n::Translations,
+}
+
+impl ModuleInfo {
+    /// Mô tả permission và event theo `language` (D-264).
+    fn localized(mut self, translations: &crate::i18n::Translations, language: Language) -> Self {
+        for permission in &mut self.permissions {
+            permission.description = translations.describe(&permission.description, language);
+        }
+        for event in &mut self.events {
+            event.description = translations.describe(&event.description, language);
+        }
+        self
+    }
 }
 
 /// Route của sổ, gắn dưới `/api/v1/kernel`.
@@ -364,9 +379,12 @@ pub(crate) fn routes(state: CatalogState) -> OpenApiRouter {
 async fn list_modules(
     State(state): State<Arc<CatalogState>>,
     principal: Principal,
+    language: Language,
 ) -> Result<Data<Vec<ModuleInfo>>, Error> {
     principal.require(&MODULES_READ)?;
-    Ok(Data { data: state.catalog.list()? })
+    let modules = state.catalog.list()?;
+    let data = modules.into_iter().map(|info| info.localized(&state.translations, language));
+    Ok(Data { data: data.collect() })
 }
 
 /// Get one installed module.
@@ -391,9 +409,11 @@ async fn get_module(
     State(state): State<Arc<CatalogState>>,
     principal: Principal,
     Path(name): Path<String>,
+    language: Language,
 ) -> Result<Data<ModuleInfo>, Error> {
     principal.require(&MODULES_READ)?;
-    Ok(Data { data: state.catalog.get(&state.database, &name).await? })
+    let info = state.catalog.get(&state.database, &name).await?;
+    Ok(Data { data: info.localized(&state.translations, language) })
 }
 
 // Đầu vào của tool `get_module`.
@@ -416,7 +436,7 @@ pub(crate) fn tools(state: CatalogState) -> Vec<Tool> {
             "List the modules installed in this server, in start order, with the permissions, \
              events, jobs, schedules, MCP tools, deprecated endpoints and migrations each \
              declares. Use it to learn what this server can do.",
-            move |_principal: Principal, _: NoInput| {
+            move |_tenant: crate::tenancy::TenantContext, _principal: Principal, _: NoInput| {
                 let catalog = list.catalog.clone();
                 async move { catalog.list() }
             },
@@ -427,7 +447,9 @@ pub(crate) fn tools(state: CatalogState) -> Vec<Tool> {
             "get_module",
             "Describe one installed module, like an item of `kernel.list_modules`, plus whether \
              each of its migrations is applied to the database.",
-            move |_principal: Principal, input: ModuleNameInput| {
+            move |_tenant: crate::tenancy::TenantContext,
+                  _principal: Principal,
+                  input: ModuleNameInput| {
                 let state = get.clone();
                 async move { state.catalog.get(&state.database, &input.name).await }
             },

@@ -24,7 +24,8 @@ use validator::Validate;
 use super::HttpState;
 use crate::api::User;
 use crate::permissions::{USERS_MANAGE, USERS_READ};
-use crate::user::{NewUser, UserChanges};
+use crate::role::RoleService;
+use crate::user::{AccountFacts, NewUser, UserChanges, UserService, UserStatus};
 
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
@@ -57,22 +58,73 @@ pub(crate) struct UserResponse {
     /// When the owner confirmed `email` through a verification mail; `null` while it
     /// is not verified.
     email_verified_at: Option<DateTime<Utc>>,
+    /// Whether the account has a password. Without one it signs in with a passkey; its owner
+    /// sets a first password through `POST /api/v1/auth/password-reset`, an administrator
+    /// with `POST /api/v1/auth/users/{id}/password`.
+    has_password: bool,
+    /// Whether two-step sign-in (an authenticator app) is on.
+    mfa_enabled: bool,
+    /// When the user last started a session (sign-in, password change); `null` if not since
+    /// this field exists.
+    last_sign_in_at: Option<DateTime<Utc>>,
+    /// The user's roles, by name. Only with `include=roles` on the user list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    roles: Option<Vec<UserRole>>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
 
-impl From<User> for UserResponse {
-    fn from(user: User) -> Self {
+/// A role a user holds.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct UserRole {
+    id: Uuid,
+    #[schema(example = "editor")]
+    name: String,
+}
+
+impl UserResponse {
+    fn new(user: User, facts: AccountFacts, roles: Option<Vec<UserRole>>) -> Self {
         UserResponse {
             id: user.id,
             email: user.email,
             name: user.name,
             disabled_at: user.disabled_at,
             email_verified_at: user.email_verified_at,
+            has_password: facts.has_password,
+            mfa_enabled: facts.mfa_enabled,
+            last_sign_in_at: facts.last_sign_in_at,
+            roles,
             created_at: user.created_at,
             updated_at: user.updated_at,
         }
     }
+}
+
+/// Dựng câu trả lời cho một trang người dùng: dữ kiện tài khoản (và role khi `with_roles`)
+/// lấy theo lô cho cả trang — không gọi một lần cho mỗi người (đề bài giao diện B1).
+pub(crate) async fn describe_page(
+    users: &UserService,
+    roles: &RoleService,
+    page: Page<User>,
+    with_roles: bool,
+) -> Result<Page<UserResponse>, Error> {
+    let ids: Vec<Uuid> = page.data.iter().map(|user| user.id).collect();
+    let facts = users.facts(&ids).await?;
+    let mut names = if with_roles { roles.names_of_users(&ids).await? } else { Default::default() };
+    Ok(page.map(|user| {
+        let found = facts.get(&user.id).copied().unwrap_or_default();
+        let held = with_roles.then(|| {
+            let held = names.remove(&user.id).unwrap_or_default();
+            held.into_iter().map(|(id, name)| UserRole { id, name }).collect()
+        });
+        UserResponse::new(user, found, held)
+    }))
+}
+
+/// Như [`describe_page`], cho một tài khoản (không kèm role).
+pub(crate) async fn describe(users: &UserService, user: User) -> Result<UserResponse, Error> {
+    let facts = users.facts(&[user.id]).await?.remove(&user.id).unwrap_or_default();
+    Ok(UserResponse::new(user, facts, None))
 }
 
 /// A new account.
@@ -119,12 +171,43 @@ pub(crate) struct UserSearchQuery {
     /// `Ada Lovelace` and `ada@example.com`). Up to 200 characters.
     #[validate(length(max = 200))]
     search: Option<String>,
+    /// Only `active` or only `disabled` accounts.
+    #[param(inline)]
+    status: Option<UserStatusFilter>,
+    /// `roles`: add each user's roles (`roles` in each item), in the same request.
+    #[param(inline)]
+    include: Option<UserInclude>,
+}
+
+/// Account state to filter on.
+#[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum UserStatusFilter {
+    Active,
+    Disabled,
+}
+
+/// Extra data to add to each user of the list.
+#[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum UserInclude {
+    Roles,
+}
+
+impl From<UserStatusFilter> for UserStatus {
+    fn from(filter: UserStatusFilter) -> Self {
+        match filter {
+            UserStatusFilter::Active => UserStatus::Active,
+            UserStatusFilter::Disabled => UserStatus::Disabled,
+        }
+    }
 }
 
 /// List or search user accounts.
 ///
 /// Requires `auth.users.read`. Newest first unless `order=asc`. Add `search` to find
-/// users by email or name.
+/// users by email or name, `status` to keep active or disabled ones, `include=roles` to get
+/// each user's roles in the same answer.
 #[utoipa::path(
     get,
     path = "/users",
@@ -147,8 +230,11 @@ async fn list_users(
 ) -> Result<Page<UserResponse>, Error> {
     principal.require(&USERS_READ)?;
     search.validate().map_err(Error::from)?;
-    let page = state.users.list(search.search.as_deref(), &PageRequest::try_from(query)?).await?;
-    Ok(page.map(UserResponse::from))
+    let status = search.status.map(UserStatus::from);
+    let page = PageRequest::try_from(query)?;
+    let page = state.users.list(search.search.as_deref(), status, &page).await?;
+    let with_roles = matches!(search.include, Some(UserInclude::Roles));
+    describe_page(&state.users, &state.roles, page, with_roles).await
 }
 
 /// Create a user account.
@@ -182,7 +268,8 @@ async fn create_user(
     let actor = Actor::from(&principal);
     let user = state.users.create(actor, input).await?;
     state.verifications.after_signup(actor, &user, language).await;
-    Ok(Created::new(format!("/auth/users/{}", user.id), user.into()))
+    let path = format!("/auth/users/{}", user.id);
+    Ok(Created::new(path, describe(&state.users, user).await?))
 }
 
 /// Get a user account.
@@ -209,7 +296,7 @@ async fn get_user(
 ) -> Result<Tagged<UserResponse>, Error> {
     principal.require(&USERS_READ)?;
     let user = state.users.get(id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
-    Ok(Tagged { version: user.updated_at, data: user.into() })
+    Ok(Tagged { version: user.updated_at, data: describe(&state.users, user).await? })
 }
 
 /// Rename, disable or enable a user account.
@@ -247,7 +334,7 @@ async fn update_user(
     let changes = UserChanges { name: input.name, disabled: input.disabled };
     let user = state.users.update(Actor::from(&principal), id, changes, if_match.expected()?);
     let user = user.await?;
-    Ok(Tagged { version: user.updated_at, data: user.into() })
+    Ok(Tagged { version: user.updated_at, data: describe(&state.users, user).await? })
 }
 
 /// Delete a user account and everything it owns.
@@ -315,7 +402,8 @@ async fn register(
     // Chưa đăng nhập, chưa có tài khoản: "hệ thống" tạo thay người đăng ký.
     let user = state.users.create(Actor::system(), input).await?;
     state.verifications.after_signup(Actor::system(), &user, language).await;
-    Ok(Created::new(format!("/auth/users/{}", user.id), user.into()))
+    let path = format!("/auth/users/{}", user.id);
+    Ok(Created::new(path, describe(&state.users, user).await?))
 }
 
 /// Set the password of an account created without one.
@@ -336,7 +424,7 @@ async fn register(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `auth.users.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).", body = Problem),
         (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
-        (status = 409, description = "The account already has a password; code `auth.password_already_set`.", body = Problem),
+        (status = 409, description = "The account already has a password; code `auth.password_already_set`. Its owner changes it with `POST /api/v1/auth/me/password` or resets it with `POST /api/v1/auth/password-reset`.", body = Problem),
         (status = 422, description = "The password breaks the rules; see `errors`.", body = Problem),
     )
 )]
@@ -354,6 +442,7 @@ async fn set_user_password(
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -377,7 +466,13 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
             let path = format!("/users/{}", ada.id);
@@ -430,7 +525,13 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let fields = |problem: &serde_json::Value| {
                 let mut fields: Vec<String> = problem["errors"]
@@ -481,7 +582,13 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             for (email, name) in [("dat@example.vn", "Trần Đạt"), ("x_y@example.com", "100% Bob")]
             {
                 let account = NewAccount {
@@ -490,7 +597,13 @@ mod tests {
                     password: None,
                     admin: false,
                 };
-                Accounts::create(services.users.as_ref(), account).await.unwrap();
+                Accounts::create(
+                    services.users.as_ref(),
+                    &TenantContext::legacy_default(&services.database),
+                    account,
+                )
+                .await
+                .unwrap();
             }
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let emails = async |search: &str| {
@@ -547,14 +660,26 @@ mod tests {
                 password: None,
                 admin: true,
             };
-            let root = Accounts::create(services.users.as_ref(), root).await.unwrap();
+            let root = Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             let bob = NewAccount {
                 email: "bob@example.com".to_owned(),
                 name: "Bob".to_owned(),
                 password: None,
                 admin: false,
             };
-            let bob = Accounts::create(services.users.as_ref(), bob).await.unwrap();
+            let bob = Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                bob,
+            )
+            .await
+            .unwrap();
             let helpdesk = crate::role::RoleInput {
                 name: "helpdesk".to_owned(),
                 description: String::new(),
@@ -606,7 +731,13 @@ mod tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let ada = bearer(&app, "ada@example.com", PASSWORD).await;
 
@@ -698,6 +829,7 @@ mod tests {
 
 #[cfg(test)]
 mod event_tests {
+    use autoxide_kernel::tenancy::TenantContext;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -718,7 +850,7 @@ mod event_tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            let root = Accounts::create(services.users.as_ref(), root).await.unwrap();
+            let root = Accounts::create(services.users.as_ref(), &TenantContext::legacy_default(&services.database), root).await.unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
 
             let body = json!({"email": "bob@example.com", "name": "Bob", "password": PASSWORD});
@@ -794,7 +926,13 @@ mod event_tests {
                 password: Some(PASSWORD.to_owned()),
                 admin: true,
             };
-            Accounts::create(services.users.as_ref(), root).await.unwrap();
+            Accounts::create(
+                services.users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                root,
+            )
+            .await
+            .unwrap();
             let admin = bearer(&app, "root@example.com", PASSWORD).await;
             let body = json!({"email": "bob@example.com", "name": "Bob"});
             let (_, _, created) = call(&app, "POST", "/users", Some(&admin), Some(body)).await;

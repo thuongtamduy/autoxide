@@ -10,6 +10,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::idempotency::{Begin, IdempotencyStore, StoredResponse};
 use autoxide_kernel::job::{JobContext, JobHandler, Schedule};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
@@ -74,6 +75,7 @@ impl Store {
 impl IdempotencyStore for Store {
     async fn begin(
         &self,
+        _tenant: &TenantContext,
         scope: &str,
         key: &str,
         fingerprint: &str,
@@ -133,7 +135,12 @@ impl IdempotencyStore for Store {
         Ok(Begin::InProgress)
     }
 
-    async fn complete(&self, id: Uuid, response: StoredResponse) -> Result<(), Error> {
+    async fn complete(
+        &self,
+        _tenant: &TenantContext,
+        id: Uuid,
+        response: StoredResponse,
+    ) -> Result<(), Error> {
         let headers = serde_json::to_string(&response.headers).map_err(Error::internal)?;
         Entity::update_many()
             .col_expr(Column::Status, Expr::value(Some(i32::from(response.status))))
@@ -145,7 +152,7 @@ impl IdempotencyStore for Store {
         Ok(())
     }
 
-    async fn abandon(&self, id: Uuid) -> Result<(), Error> {
+    async fn abandon(&self, _tenant: &TenantContext, id: Uuid) -> Result<(), Error> {
         Entity::delete_by_id(id).exec(self.database.write()).await?;
         Ok(())
     }
@@ -495,23 +502,51 @@ mod tests {
             let store = Store::new(database.clone());
             let soon = now() + chrono::Duration::seconds(60);
 
-            let Begin::Started { id } = store.begin("s", "k", "f", soon).await.unwrap() else {
+            let Begin::Started { id } = store
+                .begin(&TenantContext::legacy_default(&database), "s", "k", "f", soon)
+                .await
+                .unwrap()
+            else {
                 panic!("first request must start");
             };
-            assert_eq!(store.begin("s", "k", "f", soon).await.unwrap(), Begin::InProgress);
+            assert_eq!(
+                store
+                    .begin(&TenantContext::legacy_default(&database), "s", "k", "f", soon)
+                    .await
+                    .unwrap(),
+                Begin::InProgress
+            );
             // Lần đầu chết giữa chừng: quá hạn giữ thì request sau nhận quyền chạy.
             Entity::update_many()
                 .col_expr(Column::LockedUntil, Expr::value(now() - chrono::Duration::seconds(1)))
                 .exec(database.write())
                 .await
                 .unwrap();
-            assert_eq!(store.begin("s", "k", "f", soon).await.unwrap(), Begin::Started { id });
+            assert_eq!(
+                store
+                    .begin(&TenantContext::legacy_default(&database), "s", "k", "f", soon)
+                    .await
+                    .unwrap(),
+                Begin::Started { id }
+            );
             let stored = StoredResponse::new(201, vec![], b"ok".to_vec());
-            store.complete(id, stored.clone()).await.unwrap();
-            assert_eq!(store.begin("s", "k", "f", soon).await.unwrap(), Begin::Replay(stored));
+            store
+                .complete(&TenantContext::legacy_default(&database), id, stored.clone())
+                .await
+                .unwrap();
+            assert_eq!(
+                store
+                    .begin(&TenantContext::legacy_default(&database), "s", "k", "f", soon)
+                    .await
+                    .unwrap(),
+                Begin::Replay(stored)
+            );
             // Người gọi khác dùng cùng key: không đụng nhau.
             assert!(matches!(
-                store.begin("other", "k", "f", soon).await.unwrap(),
+                store
+                    .begin(&TenantContext::legacy_default(&database), "other", "k", "f", soon)
+                    .await
+                    .unwrap(),
                 Begin::Started { .. }
             ));
 
@@ -521,10 +556,18 @@ mod tests {
                 .exec(database.write())
                 .await
                 .unwrap();
-            let context = JobContext::new(CLEANUP, serde_json::Value::Null, 1);
+            let context = JobContext::for_tenant(
+                autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                CLEANUP,
+                serde_json::Value::Null,
+                1,
+            );
             Cleanup::new(database.clone()).run(&context).await.unwrap();
             assert!(matches!(
-                store.begin("s", "k", "different", soon).await.unwrap(),
+                store
+                    .begin(&TenantContext::legacy_default(&database), "s", "k", "different", soon)
+                    .await
+                    .unwrap(),
                 Begin::Started { .. }
             ));
         })

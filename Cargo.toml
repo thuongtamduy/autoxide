@@ -161,6 +161,10 @@ hmac = "0.13"
 sha2 = "0.11"
 base64 = "0.23"
 getrandom = "0.4"
+# Mã hoá secret khi lưu (AES-256-GCM, bước 33, D-257). Cả hai đã có trong cây phụ thuộc (`ring` qua
+# rustls / object_store, `zeroize` qua RustCrypto): không thêm crate nào để biên dịch.
+ring = "0.17"
+zeroize = "1"
 # TOTP (RFC 6238). Chỉ bật `std` và `otpauth` (đường dẫn `otpauth://` cho ứng dụng
 # authenticator); không bật `qr` (kéo thư viện ảnh) và `gen_secret` (secret tự sinh
 # bằng `getrandom` như mọi chỗ khác).

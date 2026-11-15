@@ -6,6 +6,7 @@
 //! ký SAU `content`). File này không tham chiếu phần bên trong module.
 
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantContext;
 use uuid::Uuid;
 
 /// Một menu cũ: khoá, ngôn ngữ và cây mục (đã theo thứ tự).
@@ -40,6 +41,6 @@ pub enum LegacyTarget {
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait LegacyMenus: Send + Sync {
-    /// Mọi menu cũ, theo khoá rồi ngôn ngữ.
-    async fn legacy_menus(&self) -> Result<Vec<LegacyMenu>, Error>;
+    /// Mọi menu cũ của khách `tenant`, theo khoá rồi ngôn ngữ.
+    async fn legacy_menus(&self, tenant: &TenantContext) -> Result<Vec<LegacyMenu>, Error>;
 }

@@ -141,8 +141,10 @@ pub(crate) fn check_rules(field: &str, password: &str) -> Option<FieldError> {
         FieldError::new(
             field,
             "length",
-            format!("must be between {MIN_LENGTH} and {MAX_LENGTH} characters long"),
+            "must be between {min_length} and {max_length} characters long",
         )
+        .with_param("min_length", MIN_LENGTH)
+        .with_param("max_length", MAX_LENGTH)
     })
 }
 

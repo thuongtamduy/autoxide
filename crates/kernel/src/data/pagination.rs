@@ -206,11 +206,14 @@ impl TryFrom<PageQuery> for PageRequest {
             Some(raw) => match raw.parse::<u32>() {
                 Ok(limit) if (1..=MAX_LIMIT).contains(&limit) => limit,
                 _ => {
-                    problems.push(FieldError::new(
-                        "limit",
-                        "range",
-                        format!("must be a whole number between 1 and {MAX_LIMIT}"),
-                    ));
+                    problems.push(
+                        FieldError::new(
+                            "limit",
+                            "range",
+                            "must be a whole number between 1 and {max_limit}",
+                        )
+                        .with_param("max_limit", MAX_LIMIT),
+                    );
                     DEFAULT_LIMIT
                 }
             },

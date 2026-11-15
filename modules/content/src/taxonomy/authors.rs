@@ -8,11 +8,12 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Query;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
-    QueryOrder, Set,
+    QueryOrder, QuerySelect, Set,
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -129,17 +130,49 @@ impl ContentService {
     pub(crate) async fn list_authors(
         &self,
         principal: &Principal,
+        search: Option<&str>,
         page: &PageRequest,
     ) -> Result<Page<Author>, Error> {
         principal.require(&CONTENT_READ)?;
-        fetch_page(
-            author::Entity::find(),
-            author::Column::Id,
-            |row| row.id,
-            page,
-            self.database.read(),
-        )
-        .await
+        let mut select = author::Entity::find();
+        if let Some(search) = search.map(str::trim).filter(|search| !search.is_empty()) {
+            // Như tìm danh mục: so tên bỏ dấu trong bộ nhớ.
+            let wanted = autoxide_kernel::search::fold(search);
+            let names: Vec<(Uuid, String)> = author::Entity::find()
+                .select_only()
+                .column(author::Column::Id)
+                .column(author::Column::DisplayName)
+                .into_tuple()
+                .all(self.database.read())
+                .await?;
+            let ids: Vec<Uuid> = names
+                .into_iter()
+                .filter(|(_, name)| autoxide_kernel::search::fold(name).contains(&wanted))
+                .map(|(id, _)| id)
+                .collect();
+            select = select.filter(author::Column::Id.is_in(ids));
+        }
+        fetch_page(select, author::Column::Id, |row| row.id, page, self.database.read()).await
+    }
+
+    /// Số bài (mọi trạng thái) của từng tác giả trong `ids` — một câu cho cả trang.
+    pub(crate) async fn author_entry_counts(
+        &self,
+        ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, u64>, Error> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let rows: Vec<(Uuid, i64)> = entry_author::Entity::find()
+            .select_only()
+            .column(entry_author::Column::AuthorId)
+            .column_as(entry_author::Column::EntryId.count(), "entries")
+            .filter(entry_author::Column::AuthorId.is_in(ids.iter().copied()))
+            .group_by(entry_author::Column::AuthorId)
+            .into_tuple()
+            .all(self.database.read())
+            .await?;
+        Ok(rows.into_iter().map(|(id, count)| (id, u64::try_from(count).unwrap_or(0))).collect())
     }
 
     pub(crate) async fn get_author(
@@ -182,6 +215,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::subject("author", id),
                 &events::AuthorChanged(change),
@@ -227,6 +261,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::subject("author", id),
                 &events::AuthorChanged(change),
@@ -263,6 +298,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 actor,
                 events::subject("author", id),
                 &events::AuthorChanged(change),
@@ -293,11 +329,10 @@ impl ContentService {
             }
         }
         if ids.len() > MAX_PER_ENTRY {
-            return Err(invalid(vec![FieldError::new(
-                "author_ids",
-                "length",
-                format!("at most {MAX_PER_ENTRY} authors"),
-            )]));
+            return Err(invalid(vec![
+                FieldError::new("author_ids", "length", "at most {max_per_entry} authors")
+                    .with_param("max_per_entry", MAX_PER_ENTRY),
+            ]));
         }
         let transaction = self.database.begin_write().await?;
         // Khoá dòng mục trước khi xoá rồi chèn lại liên kết (xem `set_entry_terms`).
@@ -389,13 +424,20 @@ impl ContentService {
         if let Some(avatar) = input.avatar_media_id {
             row.avatar_media_id = avatar;
             if let Some(id) = avatar
-                && self.media.find(id).await?.is_none()
+                && self
+                    .media
+                    .find(&TenantContext::legacy_default(&self.database), id)
+                    .await?
+                    .is_none()
             {
-                problems.push(FieldError::new(
-                    "avatar_media_id",
-                    "media_not_found",
-                    format!("media item {id} does not exist"),
-                ));
+                problems.push(
+                    FieldError::new(
+                        "avatar_media_id",
+                        "media_not_found",
+                        "media item {id} does not exist",
+                    )
+                    .with_param("id", id),
+                );
             }
         }
         match input.slug.as_deref().map(str::trim) {

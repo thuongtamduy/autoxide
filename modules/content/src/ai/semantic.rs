@@ -19,6 +19,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::ai::{EmbedKind, vector};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
@@ -142,7 +143,12 @@ impl ContentService {
     ) -> Result<(), Error> {
         if self.embedder.enabled() {
             self.jobs
-                .enqueue(connection, &IndexJob { entry_id }, EnqueueOptions::default())
+                .enqueue(
+                    connection,
+                    &TenantContext::legacy_default(&self.database),
+                    &IndexJob { entry_id },
+                    EnqueueOptions::default(),
+                )
                 .await?;
         }
         Ok(())
@@ -214,7 +220,15 @@ impl ContentService {
             .map(|(text, _)| text.clone())
             .collect();
         // Gọi embedding NGOÀI transaction (luật: không gọi mạng trong transaction ghi).
-        let mut fresh = self.embedder.embed("content.index", &missing, EmbedKind::Document).await?;
+        let mut fresh = self
+            .embedder
+            .embed(
+                &TenantContext::legacy_default(&self.database),
+                "content.index",
+                &missing,
+                EmbedKind::Document,
+            )
+            .await?;
         for vector in &mut fresh {
             vector::normalize(vector);
         }
@@ -292,7 +306,14 @@ impl ContentService {
         for entry_id in &missing {
             let options =
                 EnqueueOptions::default().unique_key(format!("content.index:{entry_id}:{day}"));
-            self.jobs.enqueue(&transaction, &IndexJob { entry_id: *entry_id }, options).await?;
+            self.jobs
+                .enqueue(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    &IndexJob { entry_id: *entry_id },
+                    options,
+                )
+                .await?;
         }
         transaction.commit().await?;
         tracing::info!(entries = missing.len(), "content entries queued for the search index");
@@ -311,8 +332,7 @@ impl ContentService {
             if !self.config.public_semantic_search {
                 return Err(Error::not_found(
                     "content.semantic_search_disabled",
-                    "Search by meaning is not offered to the public on this server \
-                     (AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH). Use `GET /api/v1/content/public/posts?q=`.",
+                    "Search by meaning is not offered to the public on this server (AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH); search by words instead.",
                 ));
             }
         } else {
@@ -324,15 +344,17 @@ impl ContentService {
         let q = query.q.trim();
         let mut problems = Vec::new();
         if q.is_empty() || q.chars().count() > QUERY_MAX {
-            problems.push(FieldError::new(
-                "q",
-                "length",
-                format!("must be 1 to {QUERY_MAX} characters"),
-            ));
+            problems.push(
+                FieldError::new("q", "length", "must be 1 to {query_max} characters")
+                    .with_param("query_max", QUERY_MAX),
+            );
         }
         let limit = query.limit.unwrap_or(LIMIT_DEFAULT);
         if !(1..=LIMIT_MAX).contains(&limit) {
-            problems.push(FieldError::new("limit", "range", format!("must be 1 to {LIMIT_MAX}")));
+            problems.push(
+                FieldError::new("limit", "range", "must be 1 to {limit_max}")
+                    .with_param("limit_max", LIMIT_MAX),
+            );
         }
         let locale = self.check_locale(query.locale.as_deref(), "locale", &mut problems);
         if !problems.is_empty() {
@@ -453,8 +475,15 @@ impl ContentService {
         {
             return Ok(found);
         }
-        let mut vectors =
-            self.embedder.embed("content.search", &[q.to_owned()], EmbedKind::Query).await?;
+        let mut vectors = self
+            .embedder
+            .embed(
+                &TenantContext::legacy_default(&self.database),
+                "content.search",
+                &[q.to_owned()],
+                EmbedKind::Query,
+            )
+            .await?;
         let mut vector = vectors.pop().unwrap_or_default();
         vector::normalize(&mut vector);
         let vector = Arc::new(vector);

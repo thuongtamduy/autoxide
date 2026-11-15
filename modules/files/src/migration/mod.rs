@@ -14,5 +14,13 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::event::outbox_actor_migration("m0003_add_event_actor", "files"),
         // Bảng `files_jobs` (job queue): job dọn nội dung mồ côi hằng ngày (D-160).
         autoxide_kernel::job::jobs_migration("m0004_create_jobs", "files"),
+        // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0005_tenancy_helpers",
+            vec![
+                autoxide_kernel::event::tenant_table("files"),
+                autoxide_kernel::job::tenant_table("files"),
+            ],
+        ),
     ]
 }

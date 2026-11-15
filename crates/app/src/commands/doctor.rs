@@ -188,8 +188,10 @@ async fn probe_migrations(modules: &Modules, database: &Database) -> Finding {
 fn probe_secret_key(modules: &Modules) -> Finding {
     match modules.api::<SecretKey>() {
         Some(key) if !key.is_configured() => Finding::warning(
-            "AUTOXIDE_SECRET_KEY is not set: the signing key is kept in the database, so a copy \
-             of the database is enough to work visitors' IP blocks back out of stored hashes.",
+            "AUTOXIDE_SECRET_KEY is not set: the root key is kept in the database, so a copy of \
+             the database (a backup) holds the key too — it can open the secrets stored \
+             encrypted (two-step sign-in, webhook signing secrets) and work visitors' IP blocks \
+             back out of stored hashes.",
         )
         .with_hint("Set AUTOXIDE_SECRET_KEY (the same on every server) before going live."),
         _ => Finding::ok("The signing key is configured outside the database."),

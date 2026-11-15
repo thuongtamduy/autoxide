@@ -1,6 +1,7 @@
 //! Dữ liệu đã gửi: CSV, xuất / xoá theo email, dọn theo thời hạn, tài khoản bị xoá.
 
 use super::*;
+use autoxide_kernel::tenancy::TenantContext;
 
 #[tokio::test]
 async fn xuat_csv_chan_injection_va_tim_theo_chu() {
@@ -148,10 +149,14 @@ async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
         let (service, _, _) = service(test, FormsConfig::default()).await;
         let owner = admin();
         let form: Form = service.create_form(&owner, contact("contact")).await.unwrap();
-        let exported = service.export(owner.user_id()).await.unwrap();
+        let exported = service
+            .export(&TenantContext::legacy_default(&service.database), owner.user_id())
+            .await
+            .unwrap();
         assert_eq!(exported["forms"][0]["key"], "contact");
 
         let deleted = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
             "auth",
             USER_DELETED.to_owned(),
             json!({"before": {"id": owner.user_id()}}),
@@ -159,7 +164,13 @@ async fn tai_khoan_bi_xoa_va_du_lieu_ca_nhan() {
         service.handle(&deleted).await.unwrap();
         service.handle(&deleted).await.unwrap();
         assert_eq!(service.get_form(&owner, form.row.id).await.unwrap().row.created_by, None);
-        assert_eq!(service.export(owner.user_id()).await.unwrap()["forms"], json!([]));
+        assert_eq!(
+            service
+                .export(&TenantContext::legacy_default(&service.database), owner.user_id())
+                .await
+                .unwrap()["forms"],
+            json!([])
+        );
     })
     .await
     .unwrap();

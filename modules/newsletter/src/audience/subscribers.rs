@@ -7,6 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{OnConflict, Query};
 use sea_orm::{
@@ -130,6 +131,8 @@ pub(crate) struct SubscriberFilter {
     pub list_id: Option<Uuid>,
     /// Trạng thái đăng ký (ở `list_id`, hoặc ở danh sách bất kỳ).
     pub status: Option<SubscriptionStatus>,
+    /// `true`: chỉ người bị chặn; `false`: chỉ người không bị chặn.
+    pub blocked: Option<bool>,
 }
 
 /// Một người cần nhập.
@@ -200,6 +203,11 @@ impl NewsletterService {
         {
             select =
                 select.filter(autoxide_kernel::search::contains(subscriber::Column::Email, email));
+        }
+        if let Some(blocked) = filter.blocked {
+            let status = subscriber::Column::Status;
+            select =
+                select.filter(if blocked { status.eq("blocked") } else { status.ne("blocked") });
         }
         if filter.list_id.is_some() || filter.status.is_some() {
             let mut inner = Query::select();
@@ -301,11 +309,10 @@ impl NewsletterService {
         principal.require(&NEWSLETTER_MANAGE)?;
         let mut problems = Vec::new();
         if input.people.is_empty() || input.people.len() > IMPORT_MAX {
-            problems.push(FieldError::new(
-                "subscribers",
-                "length",
-                format!("must have 1 to {IMPORT_MAX} people"),
-            ));
+            problems.push(
+                FieldError::new("subscribers", "length", "must have 1 to {import_max} people")
+                    .with_param("import_max", IMPORT_MAX),
+            );
         }
         let mut people = Vec::with_capacity(input.people.len());
         let mut seen = HashSet::new();
@@ -422,7 +429,15 @@ impl NewsletterService {
                     "kept_unsubscribed": part.kept_unsubscribed,
                 })),
             });
-            self.outbox.record(&transaction, Actor::from(principal), None, &event).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    Actor::from(principal),
+                    None,
+                    &event,
+                )
+                .await?;
             transaction.commit().await?;
             report.created += part.created;
             report.subscribed += part.subscribed;
@@ -514,7 +529,15 @@ impl NewsletterService {
             before: Some(summary(&before.row)),
             after: Some(summary(&after)),
         });
-        self.outbox.record(&transaction, actor, events::subscriber_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::subscriber_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         self.find_subscriber(id).await
     }
@@ -556,7 +579,13 @@ impl NewsletterService {
             })),
         });
         self.outbox
-            .record(connection, actor, events::subscriber_subject(subscriber_id), &event)
+            .record(
+                connection,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::subscriber_subject(subscriber_id),
+                &event,
+            )
             .await?;
         Ok(true)
     }
@@ -652,7 +681,9 @@ impl NewsletterService {
             .filter(delivery::Column::SubscriberId.eq(row.id))
             .exec(connection)
             .await?;
-        self.tokens.forget(connection, &row.id.to_string()).await?;
+        self.tokens
+            .forget(connection, &TenantContext::legacy_default(&self.database), &row.id.to_string())
+            .await?;
         subscriber::Entity::delete_by_id(row.id).exec(connection).await?;
         let event = events::SubscriberErased(Change {
             before: Some(json!({
@@ -662,7 +693,15 @@ impl NewsletterService {
             })),
             after: None,
         });
-        self.outbox.record(connection, actor, events::subscriber_subject(row.id), &event).await?;
+        self.outbox
+            .record(
+                connection,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::subscriber_subject(row.id),
+                &event,
+            )
+            .await?;
         Ok(())
     }
 }
@@ -777,11 +816,10 @@ fn check_attributes(
     problems: &mut Vec<FieldError>,
 ) -> Result<(), Error> {
     if to_json(attributes)?.len() > ATTRIBUTES_MAX {
-        problems.push(FieldError::new(
-            field,
-            "length",
-            format!("must be at most {ATTRIBUTES_MAX} bytes of JSON"),
-        ));
+        problems.push(
+            FieldError::new(field, "length", "must be at most {attributes_max} bytes of JSON")
+                .with_param("attributes_max", ATTRIBUTES_MAX),
+        );
     }
     Ok(())
 }

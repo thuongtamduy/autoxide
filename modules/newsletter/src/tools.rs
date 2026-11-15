@@ -11,6 +11,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::pagination::{Page, PageQuery};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, etag};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -58,6 +59,8 @@ pub(crate) struct FindSubscribersInput {
     list_id: Option<Uuid>,
     /// `unconfirmed`, `confirmed` or `unsubscribed` (in `list_id`, or in any list).
     status: Option<String>,
+    /// `true`: only blocked subscribers; `false`: only the others.
+    blocked: Option<bool>,
     /// Maximum number of subscribers to return, 1 to 200. Defaults to 50.
     #[schema(minimum = 1, maximum = 200)]
     limit: Option<u32>,
@@ -131,7 +134,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             "list_lists",
             "List the newsletter lists, newest first, with how many people are unconfirmed, \
              confirmed and unsubscribed. Follow `pagination.next_cursor` for more.",
-            move |principal: Principal, input: ListListsInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ListListsInput| {
                 let service = lists.clone();
                 async move {
                     let paging = PageQuery::new(
@@ -157,7 +160,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             "Find subscribers by part of their email address, list or subscription status, \
              newest first, with their subscriptions. Follow `pagination.next_cursor` with the \
              same filters for more.",
-            move |principal: Principal, input: FindSubscribersInput| {
+            move |_tenant: TenantContext, principal: Principal, input: FindSubscribersInput| {
                 let service = find.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -170,6 +173,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
                             "`unconfirmed`, `confirmed`, `unsubscribed`",
                             &mut problems,
                         ),
+                        blocked: input.blocked,
                     };
                     let paging = PageQuery::new(
                         input.limit.map(|limit| limit.to_string()),
@@ -189,7 +193,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             "Write a draft campaign for a list. Nothing is sent: a person (or an agent with \
              `newsletter.send`) sends or schedules it after review. Returns the campaign with \
              its `version`.",
-            move |principal: Principal, input: CreateCampaignInput| {
+            move |_tenant: TenantContext, principal: Principal, input: CreateCampaignInput| {
                 let service = create.clone();
                 async move {
                     let mut problems = Vec::new();
@@ -218,7 +222,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             "get_campaign",
             "Get a campaign: content, status and progress (`progress.total`, `pending`, \
              `sent`, `failed`, `skipped`), and the `version` needed to send or schedule it.",
-            move |principal: Principal, input: CampaignId| {
+            move |_tenant: TenantContext, principal: Principal, input: CampaignId| {
                 let service = get.clone();
                 async move {
                     Ok::<Versioned, Error>(versioned(
@@ -234,7 +238,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             "Send a draft or scheduled campaign now to every confirmed subscriber of its list. \
              Mails go out in batches; follow the progress with `get_campaign`. Pass the \
              `version` you read.",
-            move |principal: Principal, input: SendInput| {
+            move |_tenant: TenantContext, principal: Principal, input: SendInput| {
                 let service = send.clone();
                 async move {
                     let expected = IfMatch::from_value(&input.version).expected()?;
@@ -249,7 +253,7 @@ pub(crate) fn all(service: &Arc<NewsletterService>) -> Vec<Tool> {
             "schedule_campaign",
             "Schedule a draft or scheduled campaign to start sending at `at`. Pass the \
              `version` you read.",
-            move |principal: Principal, input: ScheduleInput| {
+            move |_tenant: TenantContext, principal: Principal, input: ScheduleInput| {
                 let service = schedule.clone();
                 async move {
                     if input.version.trim().is_empty() {

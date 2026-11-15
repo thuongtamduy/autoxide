@@ -8,6 +8,7 @@
 //! Module đó phải đăng ký SAU `notes` trong `crates/app/src/modules.rs`.
 
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantContext;
 use uuid::Uuid;
 
 /// Tóm tắt một ghi chú cho module khác (không kèm nội dung).
@@ -25,6 +26,6 @@ pub struct NoteSummary {
 // đổi hàm `async` thành hàm trả về `Box<dyn Future>` để gọi được.
 #[async_trait::async_trait]
 pub trait Notes: Send + Sync {
-    /// Ghi chú có ID `id`, hoặc `None` nếu không có.
-    async fn find(&self, id: Uuid) -> Result<Option<NoteSummary>, Error>;
+    /// Ghi chú có ID `id` của khách `tenant`, hoặc `None` nếu không có.
+    async fn find(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<NoteSummary>, Error>;
 }

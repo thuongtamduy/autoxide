@@ -1,6 +1,8 @@
 //! Service của tài khoản người dùng: mọi logic về người dùng nằm ở đây. Handler REST,
 //! lệnh CLI và tool MCP (ở các mục sau) chỉ gọi vào đây.
 
+use std::collections::HashMap;
+
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
@@ -9,7 +11,8 @@ use autoxide_kernel::tokens::OneTimeTokens;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set, SqlErr,
+    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QuerySelect, Set,
+    SqlErr,
 };
 use uuid::Uuid;
 use validator::ValidateEmail;
@@ -20,6 +23,7 @@ use crate::events;
 use crate::password::{self, Passwords, Verification};
 use crate::session::SessionService;
 use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::json;
 
 /// Độ dài tối đa của email (RFC 5321) và của tên hiển thị, theo ký tự.
@@ -54,6 +58,21 @@ pub(crate) struct UserChanges {
     pub disabled: Option<bool>,
 }
 
+/// Lọc danh sách người dùng theo trạng thái.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UserStatus {
+    Active,
+    Disabled,
+}
+
+/// Dữ kiện của một tài khoản cho trang quản trị (không có trong `api::User`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct AccountFacts {
+    pub has_password: bool,
+    pub mfa_enabled: bool,
+    pub last_sign_in_at: Option<DateTime<Utc>>,
+}
+
 pub(crate) struct UserService {
     database: Database,
     passwords: Passwords,
@@ -61,6 +80,11 @@ pub(crate) struct UserService {
 }
 
 impl UserService {
+    /// Database của module (cho bộ tra `auth.user` của sổ đối tượng).
+    pub(crate) fn database(&self) -> &Database {
+        &self.database
+    }
+
     pub(crate) fn new(database: Database, passwords: Passwords, outbox: Outbox) -> Self {
         UserService { database, passwords, outbox }
     }
@@ -186,6 +210,7 @@ impl UserService {
             email_verified_at: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
+            last_sign_in_at: Set(None),
         }
         .insert(&transaction)
         .await
@@ -199,7 +224,15 @@ impl UserService {
         }
         let after = Some(json!({"email": row.email, "name": row.name, "admin": admin}));
         let event = events::UserCreated { before: None, after };
-        self.outbox.record(&transaction, actor, events::user_subject(row.id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(row.id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %row.id, admin, "user created");
         Ok(row.into())
@@ -280,7 +313,15 @@ impl UserService {
             Entity::find_by_id(id).one(&transaction).await?.ok_or_else(|| user_not_found(id))?;
         let event =
             events::UserUpdated { before: Some(snapshot(&before)), after: Some(snapshot(&row)) };
-        self.outbox.record(&transaction, actor, events::user_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, disabled = ?changes.disabled, "user changed");
         Ok(row.into())
@@ -308,12 +349,20 @@ impl UserService {
             return Err(crate::role::last_admin());
         }
         autoxide_kernel::tokens::OneTimeTokens::new("auth")
-            .forget(&transaction, &id.to_string())
+            .forget(&transaction, &TenantContext::legacy_default(&self.database), &id.to_string())
             .await?;
         // Chỉ ghi id: audit log không giữ lại email hay tên của người đã xin xoá.
         let event =
             events::UserDeleted { before: Some(serde_json::json!({"id": id})), after: None };
-        self.outbox.record(&transaction, actor, events::user_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, "user deleted");
         Ok(())
@@ -360,6 +409,7 @@ impl UserService {
     pub(crate) async fn list(
         &self,
         search: Option<&str>,
+        status: Option<UserStatus>,
         page: &PageRequest,
     ) -> Result<Page<User>, Error> {
         let mut select = Entity::find();
@@ -367,8 +417,73 @@ impl UserService {
             // Không có index nào giúp được tìm "chứa": quét bảng người dùng.
             select = select.filter(autoxide_kernel::search::contains(Column::SearchText, search));
         }
+        select = match status {
+            Some(UserStatus::Active) => select.filter(Column::DisabledAt.is_null()),
+            Some(UserStatus::Disabled) => select.filter(Column::DisabledAt.is_not_null()),
+            None => select,
+        };
         let page = fetch_page(select, Column::Id, |row| row.id, page, self.database.read()).await?;
         Ok(page.map(User::from))
+    }
+
+    /// Những người `ids` (để hiện tên, email chủ của bản ghi) — một câu cho cả trang. Người đã
+    /// bị xoá: vắng.
+    pub(crate) async fn by_ids(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, User>, Error> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let rows = Entity::find()
+            .filter(Column::Id.is_in(ids.iter().copied()))
+            .all(self.database.read())
+            .await?;
+        Ok(rows.into_iter().map(|row| (row.id, User::from(row))).collect())
+    }
+
+    /// Dữ kiện tài khoản của những người `ids` cho trang quản trị (có mật khẩu chưa, đã bật đăng
+    /// nhập hai bước chưa, lần đăng nhập cuối) — hai câu truy vấn cho cả trang, không theo từng
+    /// người (đề bài giao diện B1).
+    pub(crate) async fn facts(&self, ids: &[Uuid]) -> Result<HashMap<Uuid, AccountFacts>, Error> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let read = self.database.read();
+        let rows: Vec<(Uuid, Option<String>, Option<DateTime<Utc>>)> = Entity::find()
+            .select_only()
+            .column(Column::Id)
+            // Chỉ cần biết có hay không: không đọc hash ra (mỗi giá trị chỉ là `x` hay `NULL`).
+            .column_as(
+                Into::<sea_orm::sea_query::Expr>::into(
+                    sea_orm::sea_query::Expr::case(Column::PasswordHash.is_not_null(), "x")
+                        .finally(sea_orm::sea_query::Expr::val(Option::<String>::None)),
+                ),
+                "has_password",
+            )
+            .column(Column::LastSignInAt)
+            .filter(Column::Id.is_in(ids.iter().copied()))
+            .into_tuple()
+            .all(read)
+            .await?;
+        let with_mfa: std::collections::HashSet<Uuid> = crate::mfa::entity::totp::Entity::find()
+            .select_only()
+            .column(crate::mfa::entity::totp::Column::UserId)
+            .filter(crate::mfa::entity::totp::Column::ConfirmedAt.is_not_null())
+            .filter(crate::mfa::entity::totp::Column::UserId.is_in(ids.iter().copied()))
+            .into_tuple::<Uuid>()
+            .all(read)
+            .await?
+            .into_iter()
+            .collect();
+        Ok(rows
+            .into_iter()
+            .map(|(id, password, last_sign_in_at)| {
+                let facts = AccountFacts {
+                    has_password: password.is_some(),
+                    mfa_enabled: with_mfa.contains(&id),
+                    last_sign_in_at,
+                };
+                (id, facts)
+            })
+            .collect())
     }
 
     /// Đặt mật khẩu mới cho người dùng `id`.
@@ -448,14 +563,51 @@ impl UserService {
         SessionService::drop_mfa_challenges(&transaction, id).await?;
         crate::passkey::drop_ceremonies_in(&transaction, id).await?;
         let subject = id.to_string();
-        OneTimeTokens::new("auth").revoke(&transaction, "email_verification", &subject).await?;
+        OneTimeTokens::new("auth")
+            .revoke(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                "email_verification",
+                &subject,
+            )
+            .await?;
         if mode == PasswordWrite::Recovery {
-            crate::passkey::remove_all_in(&transaction, &self.outbox, actor, id, false).await?;
-            crate::api_key::revoke_all_in(&transaction, &self.outbox, actor, id).await?;
-            OneTimeTokens::new("auth").revoke(&transaction, "password_reset", &subject).await?;
+            crate::passkey::remove_all_in(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                &self.outbox,
+                actor,
+                id,
+                false,
+            )
+            .await?;
+            crate::api_key::revoke_all_in(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                &self.outbox,
+                actor,
+                id,
+            )
+            .await?;
+            OneTimeTokens::new("auth")
+                .revoke(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    "password_reset",
+                    &subject,
+                )
+                .await?;
         }
         let event = events::PasswordChanged::default();
-        self.outbox.record(&transaction, actor, events::user_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::user_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, "password changed");
         Ok(())
@@ -483,12 +635,42 @@ impl UserService {
         SessionService::revoke_user(transaction, id).await?;
         SessionService::drop_mfa_challenges(transaction, id).await?;
         crate::passkey::drop_ceremonies_in(transaction, id).await?;
-        crate::passkey::remove_all_in(transaction, &self.outbox, actor, id, false).await?;
-        crate::api_key::revoke_all_in(transaction, &self.outbox, actor, id).await?;
-        crate::mfa::service::remove_in(transaction, &self.outbox, actor, id, false).await?;
+        crate::passkey::remove_all_in(
+            transaction,
+            &TenantContext::legacy_default(&self.database),
+            &self.outbox,
+            actor,
+            id,
+            false,
+        )
+        .await?;
+        crate::api_key::revoke_all_in(
+            transaction,
+            &TenantContext::legacy_default(&self.database),
+            &self.outbox,
+            actor,
+            id,
+        )
+        .await?;
+        crate::mfa::service::remove_in(
+            transaction,
+            &TenantContext::legacy_default(&self.database),
+            &self.outbox,
+            actor,
+            id,
+            false,
+        )
+        .await?;
         let subject = id.to_string();
         for purpose in ["email_verification", "password_reset"] {
-            OneTimeTokens::new("auth").revoke(transaction, purpose, &subject).await?;
+            OneTimeTokens::new("auth")
+                .revoke(
+                    transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    purpose,
+                    &subject,
+                )
+                .await?;
         }
         Ok(())
     }
@@ -496,7 +678,7 @@ impl UserService {
 
 #[async_trait::async_trait]
 impl Accounts for UserService {
-    async fn create(&self, account: NewAccount) -> Result<User, Error> {
+    async fn create(&self, _tenant: &TenantContext, account: NewAccount) -> Result<User, Error> {
         let input =
             NewUser { email: account.email, name: account.name, password: account.password };
         // Chỉ lệnh CLI dùng trait này: người vận hành máy chủ, tức "hệ thống".
@@ -506,7 +688,7 @@ impl Accounts for UserService {
 
 #[async_trait::async_trait]
 impl Users for UserService {
-    async fn find(&self, id: Uuid) -> Result<Option<User>, Error> {
+    async fn find(&self, _tenant: &TenantContext, id: Uuid) -> Result<Option<User>, Error> {
         self.get(id).await
     }
 }
@@ -544,19 +726,17 @@ pub(crate) fn check_email_field(field: &str, email: &str) -> Option<FieldError> 
         FieldError::new(
             field,
             "email",
-            format!("must be a valid email address of at most {EMAIL_MAX_LENGTH} characters"),
+            "must be a valid email address of at most {email_max_length} characters",
         )
+        .with_param("email_max_length", EMAIL_MAX_LENGTH)
     })
 }
 
 fn check_name(name: &str) -> Option<FieldError> {
     let length = name.chars().count();
     (!(1..=NAME_MAX_LENGTH).contains(&length)).then(|| {
-        FieldError::new(
-            "name",
-            "length",
-            format!("must be between 1 and {NAME_MAX_LENGTH} characters long"),
-        )
+        FieldError::new("name", "length", "must be between 1 and {name_max_length} characters long")
+            .with_param("name_max_length", NAME_MAX_LENGTH)
     })
 }
 
@@ -581,9 +761,7 @@ pub(crate) fn invalid_credentials() -> Error {
 fn password_already_set() -> Error {
     Error::conflict(
         "auth.password_already_set",
-        "This account already has a password. Only its owner can change it \
-         (`POST /api/v1/auth/me/password`), or reset it by email \
-         (`POST /api/v1/auth/password-reset`).",
+        "This account already has a password. Only its owner can change it, or reset it by email.",
     )
 }
 
@@ -853,10 +1031,12 @@ mod tests {
                 created.push(users.create(Actor::system(), input).await.unwrap().id);
             }
 
-            let first = users.list(None, &PageRequest::first(2, Order::Asc)).await.unwrap();
+            let first = users.list(None, None, &PageRequest::first(2, Order::Asc)).await.unwrap();
             let cursor: Uuid = first.pagination.next_cursor.as_deref().unwrap().parse().unwrap();
-            let second =
-                users.list(None, &PageRequest::first(2, Order::Asc).after(cursor)).await.unwrap();
+            let second = users
+                .list(None, None, &PageRequest::first(2, Order::Asc).after(cursor))
+                .await
+                .unwrap();
 
             let ids: Vec<Uuid> =
                 first.data.iter().chain(&second.data).map(|user| user.id).collect();
@@ -873,9 +1053,10 @@ mod tests {
             let service = std::sync::Arc::new(service(test).await);
             let created =
                 service.create(Actor::system(), new_user("ada@example.com")).await.unwrap();
+            let tenant = TenantContext::legacy_default(&service.database);
             let users: std::sync::Arc<dyn Users> = service;
 
-            assert_eq!(users.find(created.id).await.unwrap(), Some(created));
+            assert_eq!(users.find(&tenant, created.id).await.unwrap(), Some(created));
         })
         .await
         .unwrap();
@@ -960,8 +1141,20 @@ mod account_tests {
             let services = crate::testing::services(test).await;
             let accounts: &dyn Accounts = services.users.as_ref();
 
-            let admin = accounts.create(account("ada@example.com", true)).await.unwrap();
-            let plain = accounts.create(account("bob@example.com", false)).await.unwrap();
+            let admin = accounts
+                .create(
+                    &TenantContext::legacy_default(&services.database),
+                    account("ada@example.com", true),
+                )
+                .await
+                .unwrap();
+            let plain = accounts
+                .create(
+                    &TenantContext::legacy_default(&services.database),
+                    account("bob@example.com", false),
+                )
+                .await
+                .unwrap();
 
             assert!(services.roles.principal(admin.id).await.unwrap().has_all_permissions());
             let bob = services.roles.principal(plain.id).await.unwrap();
@@ -977,14 +1170,26 @@ mod account_tests {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
             let accounts: &dyn Accounts = services.users.as_ref();
-            accounts.create(account("ada@example.com", true)).await.unwrap();
+            accounts
+                .create(
+                    &TenantContext::legacy_default(&services.database),
+                    account("ada@example.com", true),
+                )
+                .await
+                .unwrap();
 
-            let error = accounts.create(account("ADA@example.com", true)).await.unwrap_err();
+            let error = accounts
+                .create(
+                    &TenantContext::legacy_default(&services.database),
+                    account("ADA@example.com", true),
+                )
+                .await
+                .unwrap_err();
 
             assert_eq!(error.code(), "auth.email_taken");
             let page = services
                 .users
-                .list(None, &PageRequest::first(10, autoxide_kernel::pagination::Order::Asc))
+                .list(None, None, &PageRequest::first(10, autoxide_kernel::pagination::Order::Asc))
                 .await
                 .unwrap();
             assert_eq!(page.data.len(), 1);
@@ -1020,9 +1225,20 @@ mod update_tests {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
             let users = &services.users;
-            Accounts::create(users.as_ref(), account("root@example.com", true)).await.unwrap();
-            let ada =
-                Accounts::create(users.as_ref(), account("ada@example.com", false)).await.unwrap();
+            Accounts::create(
+                users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("root@example.com", true),
+            )
+            .await
+            .unwrap();
+            let ada = Accounts::create(
+                users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("ada@example.com", false),
+            )
+            .await
+            .unwrap();
             let tokens =
                 services.sessions.login("ada@example.com", PASSWORD, None).await.unwrap().tokens();
 
@@ -1076,8 +1292,13 @@ mod update_tests {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
             let users = &services.users;
-            let root =
-                Accounts::create(users.as_ref(), account("root@example.com", true)).await.unwrap();
+            let root = Accounts::create(
+                users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("root@example.com", true),
+            )
+            .await
+            .unwrap();
 
             let error =
                 users.update(Actor::system(), root.id, disable(true), None).await.unwrap_err();
@@ -1086,7 +1307,13 @@ mod update_tests {
             assert_eq!(error.code(), "auth.last_admin");
             assert!(users.get(root.id).await.unwrap().unwrap().is_active());
             // Có admin khác còn hoạt động thì khoá được.
-            Accounts::create(users.as_ref(), account("second@example.com", true)).await.unwrap();
+            Accounts::create(
+                users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("second@example.com", true),
+            )
+            .await
+            .unwrap();
             users.update(Actor::system(), root.id, disable(true), None).await.unwrap();
         })
         .await
@@ -1100,8 +1327,20 @@ mod update_tests {
         TestDatabase::run(async |test| {
             let services = crate::testing::services(test).await;
             let users = services.users.clone();
-            let a = Accounts::create(users.as_ref(), account("a@example.com", true)).await.unwrap();
-            let b = Accounts::create(users.as_ref(), account("b@example.com", true)).await.unwrap();
+            let a = Accounts::create(
+                users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("a@example.com", true),
+            )
+            .await
+            .unwrap();
+            let b = Accounts::create(
+                users.as_ref(),
+                &TenantContext::legacy_default(&services.database),
+                account("b@example.com", true),
+            )
+            .await
+            .unwrap();
             let (first, second) = (users.clone(), users.clone());
             let delete_a = tokio::spawn(async move { first.delete(Actor::system(), a.id).await });
             let disable_b = tokio::spawn(async move {

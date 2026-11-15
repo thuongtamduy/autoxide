@@ -11,6 +11,9 @@ pub struct Model {
     pub target_type: String,
     #[sea_orm(primary_key, auto_increment = false)]
     pub target_id: String,
+    /// UUIDv7 cấp khi tạo (dòng cũ: cấp ở migration `m0012`), cho cursor của danh sách (D-270).
+    #[sea_orm(unique)]
+    pub uid: Uuid,
     /// `open` hoặc `closed`.
     pub state: String,
     /// Ẩn mọi bình luận khỏi phần công khai (vd đích đã bị xoá).

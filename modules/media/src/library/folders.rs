@@ -14,6 +14,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
@@ -93,7 +94,15 @@ impl MediaService {
         .map_err(|error| name_conflict(error, &name))?;
         let event = events::FolderCreated(Change { before: None, after: Some(snapshot(&folder)) });
         let actor = Actor::from(principal);
-        self.outbox.record(&transaction, actor, events::folder_subject(folder.id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::folder_subject(folder.id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(folder)
     }
@@ -199,7 +208,15 @@ impl MediaService {
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let actor = Actor::from(principal);
         let event = events::FolderUpdated(change);
-        self.outbox.record(&transaction, actor, events::folder_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::folder_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -233,7 +250,15 @@ impl MediaService {
         }
         let event = events::FolderDeleted(Change { before: Some(snapshot(&folder)), after: None });
         let actor = Actor::from(principal);
-        self.outbox.record(&transaction, actor, events::folder_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::folder_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(())
     }

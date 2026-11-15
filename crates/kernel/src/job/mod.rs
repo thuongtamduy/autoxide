@@ -10,6 +10,10 @@
 //!    và ghi kết quả. Lỗi thì thử lại với backoff; quá số lần cho phép thì job nằm lại
 //!    với `failed_at` (dead-letter queue), xem và chạy lại bằng `autoxide jobs`.
 //!
+//! Nhiều khách (bước 33): mỗi job mang khách (`tenant_id`; job của cả database mang
+//! [`NO_TENANT`](crate::tenancy::NO_TENANT)); worker duyệt mọi database được giao và chia lượt
+//! công bằng giữa các khách đang có job tới hạn — một khách không chiếm hết hàng đợi.
+//!
 //! Chạy **ít nhất một lần**: tiến trình chết giữa lúc chạy thì job được chạy lại khi
 //! hết hạn giữ. Bộ chạy phải chịu được việc chạy lại.
 
@@ -25,10 +29,12 @@ use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
+use crate::database::Database;
 use crate::error::Error;
+use crate::tenancy::TenantContext;
 
-pub use claim::{Claim, ClaimedJob, PostgresClaim, SqliteClaim, claim_for};
-pub use migration::jobs_migration;
+pub use claim::{Claim, ClaimRequest, ClaimedJob, PostgresClaim, SqliteClaim, claim_for};
+pub use migration::{jobs_migration, tenant_table};
 pub use queue::{EnqueueOptions, JobQueue, JobRecord, JobStatus};
 pub use worker::{DEFAULT_MAX_ATTEMPTS, Worker};
 
@@ -52,8 +58,9 @@ pub trait Job: Serialize {
     const KIND: &'static str;
 }
 
-/// Một job đang được chạy. Worker dựng; test dựng bằng [`JobContext::new`].
-#[derive(Debug, Clone, PartialEq)]
+/// Một job đang được chạy. Worker dựng; test dựng bằng [`JobContext::for_tenant`] /
+/// [`JobContext::for_database`].
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct JobContext {
     pub id: Uuid,
@@ -61,12 +68,48 @@ pub struct JobContext {
     pub payload: Value,
     /// Lần chạy thứ mấy (bắt đầu từ 1).
     pub attempt: i32,
+    /// Khách của job; `None`: job của cả database (lịch dọn dẹp, [`JobQueue::enqueue_database`]).
+    pub tenant: Option<TenantContext>,
+    /// Database chứa job (của khách, hay database job lịch đang quét).
+    pub database: Database,
 }
 
 impl JobContext {
-    /// Run number `attempt` (from 1) of a job of kind `kind` with `payload`, under a new id.
-    pub fn new(kind: impl Into<String>, payload: Value, attempt: i32) -> Self {
-        JobContext { id: Uuid::now_v7(), kind: kind.into(), payload, attempt }
+    /// Run number `attempt` (from 1) of a job of kind `kind` for `tenant`, with `payload`, under a
+    /// new id.
+    pub fn for_tenant(
+        tenant: TenantContext,
+        kind: impl Into<String>,
+        payload: Value,
+        attempt: i32,
+    ) -> Self {
+        let database = tenant.database().clone();
+        JobContext {
+            id: Uuid::now_v7(),
+            kind: kind.into(),
+            payload,
+            attempt,
+            tenant: Some(tenant),
+            database,
+        }
+    }
+
+    /// Run number `attempt` (from 1) of a job of the whole `database` (no tenant), of kind `kind`
+    /// with `payload`, under a new id.
+    pub fn for_database(
+        database: Database,
+        kind: impl Into<String>,
+        payload: Value,
+        attempt: i32,
+    ) -> Self {
+        JobContext {
+            id: Uuid::now_v7(),
+            kind: kind.into(),
+            payload,
+            attempt,
+            tenant: None,
+            database,
+        }
     }
 
     /// Sets the job id.

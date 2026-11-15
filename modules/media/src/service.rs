@@ -22,6 +22,7 @@ use autoxide_kernel::pagination::{
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::rows;
 use autoxide_kernel::storage::{Storage, StoredFile};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -112,6 +113,9 @@ pub(crate) struct ItemFilter {
     pub search: Option<String>,
     /// Chỉ item mang nhãn này (không phân biệt hoa thường).
     pub tag: Option<String>,
+    /// `true`: chỉ ảnh thiếu `alt` (ảnh, `alt` trống, không phải ảnh trang trí); `false`: mọi item
+    /// còn lại.
+    pub alt_missing: Option<bool>,
     pub sort: ItemSort,
 }
 
@@ -122,6 +126,8 @@ pub(crate) struct ItemChanges {
     pub alt: Option<String>,
     pub title: Option<String>,
     pub caption: Option<String>,
+    /// Ảnh trang trí (`alt` trống có chủ ý).
+    pub decorative: Option<bool>,
     /// `Some(None)`: chuyển về thư mục gốc.
     pub folder_id: Option<Option<Uuid>>,
     pub visibility: Option<Visibility>,
@@ -148,6 +154,8 @@ pub(crate) struct MediaService {
     /// Mô hình AI của module `ai` (bản "đã tắt" khi chưa cấu hình): gợi ý alt text (D-109).
     pub(crate) ai: Arc<dyn autoxide_kernel::ai::TextModel>,
     pub(crate) config: MediaConfig,
+    /// Sổ đối tượng của kernel: tên người tải lên (`auth.user`) mà không biết module `auth`.
+    pub(crate) resources: autoxide_kernel::resource::ResourceDirectory,
 }
 
 impl MediaService {
@@ -159,7 +167,17 @@ impl MediaService {
         ai: Arc<dyn autoxide_kernel::ai::TextModel>,
         config: MediaConfig,
     ) -> Self {
-        MediaService { database, storage, outbox, jobs, ai, config }
+        let resources = autoxide_kernel::resource::ResourceDirectory::default();
+        MediaService { database, storage, outbox, jobs, ai, config, resources }
+    }
+
+    /// Dùng sổ đối tượng của chương trình (tên người tải lên).
+    pub(crate) fn with_resources(
+        mut self,
+        resources: autoxide_kernel::resource::ResourceDirectory,
+    ) -> Self {
+        self.resources = resources;
+        self
     }
 
     /// Một trang item theo bộ lọc. Cần `media.read`.
@@ -192,6 +210,10 @@ impl MediaService {
         }
         if let Some(search) = filter.search.as_deref().filter(|search| !search.trim().is_empty()) {
             select = select.filter(autoxide_kernel::search::contains(Column::NameKey, search));
+        }
+        if let Some(missing) = filter.alt_missing {
+            let condition = alt_missing();
+            select = select.filter(if missing { condition } else { condition.not() });
         }
         if let Some(tag) = filter.tag.as_deref().filter(|tag| !tag.trim().is_empty()) {
             let Some(tag_id) = crate::library::tags::find_tag(self.database.read(), tag).await?
@@ -348,6 +370,9 @@ impl MediaService {
             }
             row.folder_id = Set(folder);
         }
+        if let Some(decorative) = changes.decorative {
+            row.decorative = Set(decorative);
+        }
         if let Some(visibility) = changes.visibility {
             row.visibility = Set(visibility.as_str().to_owned());
         }
@@ -377,7 +402,15 @@ impl MediaService {
             after: Some(with_tags(snapshot(&after), &tags_after)),
         });
         let actor = Actor::from(principal);
-        self.outbox.record(&transaction, actor, events::item_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::item_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -423,9 +456,25 @@ impl MediaService {
         let actor = Actor::from(principal);
         let subject = events::item_subject(id);
         if trash {
-            self.outbox.record(&transaction, actor, subject, &events::ItemTrashed(change)).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::ItemTrashed(change),
+                )
+                .await?;
         } else {
-            self.outbox.record(&transaction, actor, subject, &events::ItemRestored(change)).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::ItemRestored(change),
+                )
+                .await?;
         }
         transaction.commit().await?;
         tracing::info!(media_item_id = %id, trashed = trash, "media item trash state changed");
@@ -475,7 +524,15 @@ impl MediaService {
             .exec(&transaction)
             .await?;
         let event = events::ItemPurged(Change { before: Some(snapshot(item)), after: None });
-        self.outbox.record(&transaction, actor, events::item_subject(item.id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::item_subject(item.id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         let keys =
             std::iter::once(item.storage_key()).chain(copies.iter().map(|copy| copy.storage_key()));
@@ -534,7 +591,7 @@ impl MediaService {
 /// Thông tin item của một người dùng đã tải lên, cho bản xuất dữ liệu cá nhân.
 #[async_trait::async_trait]
 impl PersonalData for MediaService {
-    async fn export(&self, user_id: Uuid) -> Result<Value, Error> {
+    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let items = Entity::find()
             .filter(Column::UploadedBy.eq(user_id))
             .order_by_asc(Column::Id)
@@ -598,21 +655,18 @@ pub(crate) fn check_name(name: &str, problems: &mut Vec<FieldError>) -> String {
         problems.push(FieldError::new(
             "name",
             "invalid",
-            format!(
-                "must be 1 to {NAME_MAX_LENGTH} characters, without `/`, `\\` or control characters"
-            ),
-        ));
+            "must be 1 to {name_max_length} characters, without `/`, `\\` or control characters",
+        ).with_param("name_max_length", NAME_MAX_LENGTH));
     }
     name.to_owned()
 }
 
 fn check_length(field: &str, value: Option<&str>, max: usize, problems: &mut Vec<FieldError>) {
     if value.is_some_and(|value| value.trim().chars().count() > max) {
-        problems.push(FieldError::new(
-            field,
-            "length",
-            format!("must be at most {max} characters long"),
-        ));
+        problems.push(
+            FieldError::new(field, "length", "must be at most {max} characters long")
+                .with_param("max", max),
+        );
     }
 }
 
@@ -631,6 +685,15 @@ pub(crate) fn with_tags(mut snapshot: Value, tags: &[String]) -> Value {
 }
 
 /// Những gì audit cần biết về một item.
+/// Điều kiện "ảnh thiếu `alt`": ảnh, `alt` (bản mặc định) trống, không đánh dấu trang trí. `alt`
+/// lưu đã cắt khoảng trắng nên so với chuỗi rỗng là đủ.
+pub(crate) fn alt_missing() -> sea_orm::Condition {
+    sea_orm::Condition::all()
+        .add(Column::ContentType.starts_with("image/"))
+        .add(Column::Alt.eq(""))
+        .add(Column::Decorative.eq(false))
+}
+
 pub(crate) fn snapshot(item: &Item) -> Value {
     json!({
         "name": item.name,
@@ -643,6 +706,7 @@ pub(crate) fn snapshot(item: &Item) -> Value {
         "alt": item.alt,
         "title": item.title,
         "caption": item.caption,
+        "decorative": item.decorative,
         "visibility": item.visibility,
         "version_id": item.version_id,
         "trashed_at": item.trashed_at,
@@ -655,11 +719,8 @@ pub(crate) fn item_not_found(id: Uuid) -> Error {
 }
 
 pub(crate) fn in_trash(id: Uuid) -> Error {
-    Error::conflict(
-        "media.item_in_trash",
-        "Media item `{id}` is in the trash. Restore it first with `POST /api/v1/media/{id}/restore`.",
-    )
-    .with_param("id", id)
+    Error::conflict("media.item_in_trash", "Media item `{id}` is in the trash. Restore it first.")
+        .with_param("id", id)
 }
 
 fn not_in_trash(id: Uuid) -> Error {
@@ -694,10 +755,11 @@ pub(crate) fn too_large(max: u64) -> Error {
 impl crate::api::Media for MediaService {
     async fn find_many_in(
         &self,
+        tenant: &TenantContext,
         ids: &[Uuid],
         locale: &str,
     ) -> Result<Vec<crate::api::MediaRef>, Error> {
-        let mut found = self.find_many(ids).await?;
+        let mut found = self.find_many(tenant, ids).await?;
         // Ngôn ngữ không được khai thì không có bản dịch nào: giữ `alt` mặc định.
         let Ok(locale) = self.alt_locale(locale) else {
             return Ok(found);
@@ -713,7 +775,11 @@ impl crate::api::Media for MediaService {
         Ok(found)
     }
 
-    async fn find_many(&self, ids: &[Uuid]) -> Result<Vec<crate::api::MediaRef>, Error> {
+    async fn find_many(
+        &self,
+        _tenant: &TenantContext,
+        ids: &[Uuid],
+    ) -> Result<Vec<crate::api::MediaRef>, Error> {
         use crate::api::{MAX_IDS, MediaRef, MediaVisibility};
 
         if ids.len() > MAX_IDS {

@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::error::Error;
+use crate::error::{Error, FieldError};
 
 /// Một ngôn ngữ được hỗ trợ.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -81,6 +81,13 @@ fn parse_quality(raw: &str) -> u16 {
     std::cmp::min(whole + padded.parse::<u16>().unwrap_or(0), 1000)
 }
 
+/// Tiền tố khoá bản dịch của câu mẫu lỗi từng ô (D-262): `field:must not be empty`.
+pub const FIELD_PREFIX: &str = "field:";
+
+/// Tiền tố khoá bản dịch của câu mô tả cho người dùng (mô tả permission, event — D-264):
+/// `text:<câu tiếng Anh>`.
+pub const TEXT_PREFIX: &str = "text:";
+
 /// Mọi bản dịch của chương trình: kernel và các module.
 #[derive(Debug, Clone, Default)]
 pub struct Translations {
@@ -118,6 +125,20 @@ impl Translations {
                     }
                 };
                 for (code, text) in entries {
+                    // Câu mẫu của lỗi từng ô (`field:<câu tiếng Anh>`, D-262) là của chung: hai module
+                    // cùng câu thì phải cùng bản dịch.
+                    if code.starts_with(FIELD_PREFIX) || code.starts_with(TEXT_PREFIX) {
+                        if let Some(known) = vi.get(&code)
+                            && known != &text
+                        {
+                            problems.push(format!(
+                                "module `{module}` translates `{code}` differently from another \
+                                 module: `{text}` / `{known}`"
+                            ));
+                        }
+                        vi.insert(code, text);
+                        continue;
+                    }
                     let owned = module == "kernel" || code.starts_with(&format!("{module}."));
                     if !owned {
                         problems.push(format!(
@@ -144,6 +165,51 @@ impl Translations {
         };
         let params: Vec<(&str, &str)> = error.params().collect();
         fill_all(template, &params).unwrap_or_else(|| error.message())
+    }
+
+    /// Câu mô tả `english` (mô tả permission, event…) bằng `language`: bản dịch của khoá
+    /// `text:<english>`; chưa có thì nguyên câu tiếng Anh.
+    pub fn describe(&self, english: &str, language: Language) -> String {
+        match language {
+            Language::En => english.to_owned(),
+            Language::Vi => self
+                .vi
+                .get(&format!("{TEXT_PREFIX}{english}"))
+                .cloned()
+                .unwrap_or_else(|| english.to_owned()),
+        }
+    }
+
+    /// Như [`describe`](Self::describe), cho câu mẫu `template` có chỗ điền `{tên}`: dịch câu
+    /// mẫu (khoá `text:<câu mẫu>`) rồi điền `params` một lượt; chưa dịch thì câu tiếng Anh đã điền.
+    pub fn describe_with(
+        &self,
+        template: &str,
+        params: &[(&str, &str)],
+        language: Language,
+    ) -> String {
+        let english = || fill_all(template, params).unwrap_or_else(|| template.to_owned());
+        match language {
+            Language::En => english(),
+            Language::Vi => match self.vi.get(&format!("{TEXT_PREFIX}{template}")) {
+                Some(translated) => fill_all(translated, params).unwrap_or_else(english),
+                None => english(),
+            },
+        }
+    }
+
+    /// Câu của lỗi từng ô `field` bằng `language`: bản dịch của câu mẫu (khoá `field:<câu mẫu>`),
+    /// điền giá trị; chưa có bản dịch thì câu tiếng Anh.
+    pub fn field_message(&self, field: &FieldError, language: Language) -> String {
+        let template = match language {
+            Language::En => None,
+            Language::Vi => self.vi.get(&format!("{FIELD_PREFIX}{}", field.template())),
+        };
+        let Some(template) = template else {
+            return field.message.clone();
+        };
+        let params: Vec<(&str, &str)> = field.params().collect();
+        fill_all(template, &params).unwrap_or_else(|| field.message.clone())
     }
 
     /// Câu đã dịch của khoá `key` bằng `language`, nếu có (tiếng Anh: luôn `None`, câu
@@ -206,6 +272,37 @@ mod tests {
             fill_all("JSON {\"a\": 1} and { spaced }", &[]).as_deref(),
             Some("JSON {\"a\": 1} and { spaced }")
         );
+    }
+
+    #[test]
+    fn cau_loi_tung_o_dich_theo_cau_mau_va_dien_gia_tri() {
+        let translations = Translations::new(vec![
+            (
+                "notes",
+                vec![("vi", r#"{"field:must be at most {max} colours": "tối đa {max} màu"}"#)],
+            ),
+            // Module khác cùng câu mẫu, cùng bản dịch: được.
+            (
+                "tags",
+                vec![("vi", r#"{"field:must be at most {max} colours": "tối đa {max} màu"}"#)],
+            ),
+        ])
+        .unwrap();
+        let field = FieldError::new("title", "length", "must be at most {max} colours")
+            .with_param("max", 200);
+        assert_eq!(field.message, "must be at most 200 colours");
+        assert_eq!(translations.field_message(&field, Language::Vi), "tối đa 200 màu");
+        assert_eq!(translations.field_message(&field, Language::En), field.message);
+        // Câu chưa dịch: tiếng Anh.
+        let other = FieldError::new("body", "required", "is not a colour");
+        assert_eq!(translations.field_message(&other, Language::Vi), "is not a colour");
+
+        // Hai module dịch cùng câu khác nhau: lỗi khởi động.
+        let clash = Translations::new(vec![
+            ("notes", vec![("vi", r#"{"field:is a colour": "là màu"}"#)]),
+            ("tags", vec![("vi", r#"{"field:is a colour": "là một màu"}"#)]),
+        ]);
+        assert!(clash.unwrap_err()[0].contains("translates `field:is a colour` differently"));
     }
 
     #[test]

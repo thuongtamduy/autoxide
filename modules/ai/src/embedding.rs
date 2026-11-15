@@ -3,6 +3,7 @@
 
 use autoxide_kernel::ai::Usage;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::{Value, json};
 
 use crate::config::EmbeddingConfig;
@@ -35,6 +36,7 @@ impl OpenAiEmbeddings {
     /// Một vector cho mỗi chữ, cùng thứ tự; gửi theo lô `batch_size`.
     pub(crate) async fn embed(
         &self,
+        _tenant: &TenantContext,
         purpose: &'static str,
         texts: &[String],
     ) -> Result<(Vec<Vec<f32>>, Usage), Error> {

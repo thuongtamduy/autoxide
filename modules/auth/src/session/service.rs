@@ -35,6 +35,7 @@ use super::{LoginThrottle, challenge};
 use crate::events;
 use crate::mfa::MfaService;
 use autoxide_kernel::event::{Actor, Outbox};
+use autoxide_kernel::tenancy::TenantContext;
 use serde_json::json;
 
 /// Mã lỗi khi sai email hoặc mật khẩu (tạo ở `user::service`).
@@ -61,6 +62,10 @@ pub(crate) struct Tokens {
 pub(crate) struct Session {
     pub id: Uuid,
     pub user_agent: Option<String>,
+    /// Cách mở phiên; `None` với phiên cũ (D-272).
+    pub sign_in_method: Option<String>,
+    /// Quốc gia gần đúng, khi biết.
+    pub country: Option<String>,
     pub started_at: DateTime<Utc>,
     /// Lần cấp token gần nhất (đăng nhập hoặc refresh).
     pub last_active_at: DateTime<Utc>,
@@ -72,6 +77,8 @@ impl From<entity::Model> for Session {
         Session {
             id: row.family_id,
             user_agent: row.user_agent,
+            sign_in_method: row.sign_in_method,
+            country: row.country,
             started_at: row.session_started_at.unwrap_or(row.created_at),
             last_active_at: row.created_at,
             expires_at: row.expires_at,
@@ -237,8 +244,7 @@ impl SessionService {
             }
             Err(error) if error.code() == INVALID_CREDENTIALS => Err(Error::bad_request(
                 "auth.wrong_password",
-                "The current password is incorrect. If you forgot it, reset it by email \
-                     (`POST /api/v1/auth/password-reset`).",
+                "The current password is incorrect. If you forgot it, you can reset it by email.",
             )),
             Err(error) => Err(error),
         }
@@ -316,7 +322,12 @@ impl SessionService {
             .filter(|agent| !agent.is_empty())
             .map(|agent| agent.chars().take(USER_AGENT_MAX_CHARS).collect());
         let family_id = Uuid::now_v7();
-        let session = SessionDetails { started_at: now, user_agent };
+        let session = SessionDetails {
+            started_at: now,
+            user_agent,
+            sign_in_method: Some(method.to_owned()),
+            country: None,
+        };
         let (refresh_token, row) = new_refresh_token(user_id, family_id, now, expires_at, session)?;
         let transaction = self.database.begin_write().await?;
         let still_valid = match &proof {
@@ -340,9 +351,23 @@ impl SessionService {
             });
         }
         row.insert(&transaction).await?;
+        // Lúc mở phiên gần nhất, cho danh sách người dùng (đề bài giao diện B1).
+        crate::user::entity::Entity::update_many()
+            .col_expr(crate::user::entity::Column::LastSignInAt, Expr::value(now))
+            .filter(crate::user::entity::Column::Id.eq(user_id))
+            .exec(&transaction)
+            .await?;
         let event = events::SignedIn { before: None, after: Some(json!({"method": method})) };
         let subject = events::user_subject(user_id);
-        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::user(user_id),
+                subject,
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "signed in");
         self.tokens(user_id, family_id, refresh_token, expires_at, now)
@@ -377,6 +402,8 @@ impl SessionService {
         let session = SessionDetails {
             started_at: row.session_started_at.unwrap_or(row.created_at),
             user_agent: row.user_agent.clone(),
+            sign_in_method: row.sign_in_method.clone(),
+            country: row.country.clone(),
         };
         let (new_token, new_row) =
             new_refresh_token(user.id, row.family_id, now, expires_at, session)?;
@@ -420,7 +447,15 @@ impl SessionService {
             revoke_family(&transaction, row.family_id).await?;
             let event = events::SignedOut::default();
             let subject = events::user_subject(row.user_id);
-            self.outbox.record(&transaction, Actor::user(row.user_id), subject, &event).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    Actor::user(row.user_id),
+                    subject,
+                    &event,
+                )
+                .await?;
             transaction.commit().await?;
             tracing::info!(user_id = %row.user_id, "signed out");
         }
@@ -468,6 +503,19 @@ impl SessionService {
 
     /// Một trang phiên còn hiệu lực của người dùng `user_id`, mới bắt đầu trước (mặc
     /// định). Mỗi phiên là refresh token còn dùng được của một họ.
+    /// Ghi quốc gia gần đúng `country` (đã kiểm: hai chữ hoa ISO 3166-1) cho phiên `session_id`
+    /// vừa mở (D-272). Chỉ ghi khi phiên chưa có: phiên không đổi quốc gia giữa chừng. Thông tin
+    /// để người dùng nhận ra phiên, không dùng để quyết định gì — lỗi ghi thì bỏ qua ở bên gọi.
+    pub(crate) async fn note_country(&self, session_id: Uuid, country: &str) -> Result<(), Error> {
+        entity::Entity::update_many()
+            .col_expr(entity::Column::Country, Expr::value(Some(country.to_owned())))
+            .filter(entity::Column::FamilyId.eq(session_id))
+            .filter(entity::Column::Country.is_null())
+            .exec(self.database.write())
+            .await?;
+        Ok(())
+    }
+
     pub(crate) async fn list_sessions(
         &self,
         user_id: Uuid,
@@ -507,7 +555,15 @@ impl SessionService {
         let event =
             events::SignedOut { before: None, after: Some(json!({"session_id": session_id})) };
         let subject = events::user_subject(user_id);
-        self.outbox.record(&transaction, Actor::user(user_id), subject, &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::user(user_id),
+                subject,
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "session ended");
         Ok(())
@@ -541,7 +597,15 @@ impl SessionService {
                 after: Some(json!({"count": ended, "kept": keep})),
             };
             let subject = events::user_subject(user_id);
-            self.outbox.record(&transaction, actor, subject, &event).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &event,
+                )
+                .await?;
         }
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, sessions = ended, "sessions ended");
@@ -560,7 +624,15 @@ impl SessionService {
             revoke_family(&transaction, row.family_id).await?;
             let event = events::RefreshTokenReused::default();
             let subject = events::user_subject(row.user_id);
-            self.outbox.record(&transaction, Actor::user(row.user_id), subject, &event).await?;
+            self.outbox
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    Actor::user(row.user_id),
+                    subject,
+                    &event,
+                )
+                .await?;
             transaction.commit().await?;
             Ok::<(), Error>(())
         }
@@ -663,12 +735,8 @@ fn live_tokens(user_id: Uuid, now: DateTime<Utc>) -> sea_orm::Select<Entity> {
 }
 
 fn session_not_found(id: Uuid) -> Error {
-    Error::not_found(
-        "auth.session_not_found",
-        "You have no active session `{id}`. List your sessions with \
-         `GET /api/v1/auth/me/sessions`.",
-    )
-    .with_param("id", id)
+    Error::not_found("auth.session_not_found", "You have no active session `{id}`.")
+        .with_param("id", id)
 }
 
 /// Thu hồi mọi refresh token của họ `family_id`.
@@ -686,6 +754,8 @@ async fn revoke_family<C: ConnectionTrait>(connection: &C, family_id: Uuid) -> R
 struct SessionDetails {
     started_at: DateTime<Utc>,
     user_agent: Option<String>,
+    sign_in_method: Option<String>,
+    country: Option<String>,
 }
 
 /// Sinh một refresh token mới và dòng database tương ứng (chưa ghi).
@@ -708,6 +778,8 @@ fn new_refresh_token(
         created_at: Set(now),
         user_agent: Set(session.user_agent),
         session_started_at: Set(Some(session.started_at)),
+        sign_in_method: Set(session.sign_in_method),
+        country: Set(session.country),
     };
     Ok((token, row))
 }
@@ -715,13 +787,7 @@ fn new_refresh_token(
 /// Lấy token từ giá trị header `Authorization: Bearer <token>` (RFC 6750). Chữ
 /// `Bearer` không phân biệt hoa thường.
 pub(crate) fn bearer_token(authorization: Option<&str>) -> Result<&str, Error> {
-    let missing = || {
-        Error::unauthenticated(
-            "auth.missing_token",
-            "This endpoint needs an access token: send `Authorization: Bearer <access token>`. \
-             Get one with `POST /api/v1/auth/login`.",
-        )
-    };
+    let missing = || Error::unauthenticated("auth.missing_token", "You need to sign in.");
     let value = authorization.ok_or_else(missing)?.trim();
     let (scheme, token) = value.split_once(' ').ok_or_else(missing)?;
     let token = token.trim();
@@ -732,11 +798,7 @@ pub(crate) fn bearer_token(authorization: Option<&str>) -> Result<&str, Error> {
 }
 
 fn invalid_refresh_token() -> Error {
-    Error::unauthenticated(
-        "auth.invalid_refresh_token",
-        "The refresh token is unknown, expired or revoked. Sign in again \
-         (`POST /api/v1/auth/login`).",
-    )
+    Error::unauthenticated("auth.invalid_refresh_token", "Your session has ended. Sign in again.")
 }
 
 /// Bây giờ, cắt tới micro giây để hai database lưu cùng một giá trị.

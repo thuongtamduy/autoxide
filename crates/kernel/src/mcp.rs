@@ -7,20 +7,27 @@
 //!   JSON của REST (`ValidJson`), JSON Schema sinh từ cùng kiểu đó;
 //! - permission cần có (nếu có): người gọi thiếu permission thì không thấy và không gọi
 //!   được tool;
-//! - thân là một lời gọi vào service layer — cùng service với REST, nên tool không làm
+//! - thân nhận khách của request (`TenantContext`), người gọi và đầu vào, rồi gọi vào service
+//!   layer — cùng service với REST, nên tool không làm
 //!   được gì mà REST với cùng permission không làm được, và lệnh ghi đi qua event /
 //!   audit log như REST (luật kiến trúc 8).
 //!
 //! ```
 //! use autoxide_kernel::access::{Permission, Principal};
 //! use autoxide_kernel::mcp::{NoInput, Tool};
+//! use autoxide_kernel::tenancy::TenantContext;
 //!
 //! const NOTES_READ: Permission = Permission::new("notes.read", "Read notes.");
 //!
-//! let tool = Tool::new("count", "Count the notes of the caller.", |principal: Principal, _: NoInput| async move {
-//!     // Gọi service ở đây, vd `service.count(&principal).await`.
-//!     Ok(serde_json::json!({ "count": 0 }))
-//! })
+//! let tool = Tool::new(
+//!     "count",
+//!     "Count the notes of the caller.",
+//!     |tenant: TenantContext, principal: Principal, _: NoInput| async move {
+//!         // Gọi service ở đây, vd `service.count(&tenant, &principal).await`.
+//!         let _ = (tenant, principal);
+//!         Ok(serde_json::json!({ "count": 0 }))
+//!     },
+//! )
 //! .requires(NOTES_READ)
 //! .read_only();
 //! ```
@@ -38,6 +45,7 @@ use validator::Validate;
 use crate::access::{Permission, Principal};
 use crate::error::{Error, FieldError};
 use crate::pagination::{PageQuery, PageRequest};
+use crate::tenancy::TenantContext;
 
 // Đầu vào của tool không nhận tham số nào.
 /// The tool takes no arguments.
@@ -78,12 +86,17 @@ impl PageInput {
     }
 }
 
-/// Thân của một tool: nhận người gọi và đối số JSON, trả kết quả JSON.
+/// Thân của một tool: nhận khách, người gọi và đối số JSON, trả kết quả JSON.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait` (xem `api.rs` của module auth).
 #[async_trait::async_trait]
 pub trait ToolHandler: Send + Sync {
-    async fn call(&self, principal: Principal, arguments: Value) -> Result<Value, Error>;
+    async fn call(
+        &self,
+        tenant: TenantContext,
+        principal: Principal,
+        arguments: Value,
+    ) -> Result<Value, Error>;
 }
 
 /// Tool đã deprecated (khai bằng `Deprecation::tool` trong `Module::deprecations`, D-240): ngày,
@@ -145,7 +158,7 @@ impl Tool {
     where
         I: DeserializeOwned + Validate + ToSchema + Send + 'static,
         O: Serialize + Send + 'static,
-        F: Fn(Principal, I) -> Fut + Send + Sync + 'static,
+        F: Fn(TenantContext, Principal, I) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<O, Error>> + Send + 'static,
     {
         Tool {
@@ -263,8 +276,13 @@ impl Tool {
     }
 
     /// Gọi tool (không kiểm permission — bên gọi kiểm bằng [`allows`](Self::allows)).
-    pub async fn call(&self, principal: Principal, arguments: Value) -> Result<Value, Error> {
-        self.handler.call(principal, arguments).await
+    pub async fn call(
+        &self,
+        tenant: TenantContext,
+        principal: Principal,
+        arguments: Value,
+    ) -> Result<Value, Error> {
+        self.handler.call(tenant, principal, arguments).await
     }
 
     /// Đổi tên thành tên đầy đủ `<module>.<tên>`.
@@ -319,10 +337,15 @@ impl<I, O, F, Fut> ToolHandler for Typed<I, F>
 where
     I: DeserializeOwned + Validate + Send + 'static,
     O: Serialize + Send + 'static,
-    F: Fn(Principal, I) -> Fut + Send + Sync + 'static,
+    F: Fn(TenantContext, Principal, I) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<O, Error>> + Send + 'static,
 {
-    async fn call(&self, principal: Principal, arguments: Value) -> Result<Value, Error> {
+    async fn call(
+        &self,
+        tenant: TenantContext,
+        principal: Principal,
+        arguments: Value,
+    ) -> Result<Value, Error> {
         let arguments = match arguments {
             Value::Null => Value::Object(Map::new()),
             other => other,
@@ -331,10 +354,13 @@ where
             return Err(crate::http::nul_refused());
         }
         let input: I = serde_json::from_value(arguments).map_err(|error| {
-            Error::validation(vec![FieldError::new("arguments", "invalid", error.to_string())])
+            Error::validation(vec![
+                FieldError::new("arguments", "invalid", "is not valid: {reason}")
+                    .with_param("reason", error),
+            ])
         })?;
         input.validate()?;
-        let output = (self.handler)(principal, input).await?;
+        let output = (self.handler)(tenant, principal, input).await?;
         serde_json::to_value(output).map_err(Error::internal)
     }
 }

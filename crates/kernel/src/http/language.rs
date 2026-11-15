@@ -1,4 +1,4 @@
-//! Lớp HTTP chọn ngôn ngữ: đọc `Accept-Language`, dịch `detail` của lỗi, ghi
+//! Lớp HTTP chọn ngôn ngữ: đọc `Accept-Language`, dịch `detail` của lỗi (và của từng ô), ghi
 //! `Content-Language` (D-057).
 
 use std::sync::Arc;
@@ -53,6 +53,10 @@ pub(super) async fn localize(
     problem.status = status.as_u16();
     problem.title = status.canonical_reason().unwrap_or("Error").to_owned();
     problem.detail = translations.message(&error, language);
+    // Câu của từng ô cũng dịch (D-262); `errors` dựng theo đúng thứ tự `error.fields()`.
+    for (entry, field) in problem.errors.iter_mut().zip(error.fields()) {
+        entry.detail = translations.field_message(field, language);
+    }
     let Ok(body) = serde_json::to_vec(&problem) else {
         return response;
     };

@@ -15,6 +15,7 @@
 //! job, tool MCP) thêm một hàm vào [`Module`], luôn kèm cài đặt mặc định "không
 //! có gì" — module cũ không phải sửa khi hợp đồng thêm hàm mới.
 
+pub use crate::ops::client_config::ClientSection;
 use std::any::{Any, TypeId};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
@@ -76,6 +77,34 @@ pub trait Module: Send + Sync {
     /// Các migration của module, theo thứ tự áp dụng. Đã commit thì không sửa —
     /// thêm migration mới vào cuối.
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
+        Vec::new()
+    }
+
+    /// Upgrade dữ liệu của module (D-257): việc nâng dữ liệu cần cấu hình của chương trình (vd
+    /// mã hoá secret cũ). Mặc định rỗng. Xem `autoxide_kernel::migration::DataUpgrade`.
+    fn upgrades(&self) -> Vec<Box<dyn crate::migration::DataUpgrade>> {
+        Vec::new()
+    }
+
+    /// Cấu hình module nhận theo khách (D-258): tên `<module>.<khoá>`, đọc bằng
+    /// `context.require::<dyn TenantSettings>()` (`autoxide_kernel::tenancy`). Khách chưa đặt thì
+    /// module dùng cấu hình chung. Mặc định rỗng.
+    fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
+        Vec::new()
+    }
+
+    /// Gieo dữ liệu ban đầu của module cho một khách mới (vd role `admin`, dòng khoá) — gọi sau
+    /// `start`, khi tạo khách (`autoxide tenant create`, `POST /api/v1/kernel/tenants`). Phải chạy
+    /// lại được. Mặc định không gieo gì.
+    fn seed_tenant(&self) -> Option<std::sync::Arc<dyn crate::tenancy::TenantSeed>> {
+        None
+    }
+
+    /// Bảng mặt điều khiển của module (bước 33, D-253): bảng không có `tenant_id` vì chung cả nền
+    /// tảng, chỉ có dữ liệu ở database điều khiển. Mọi bảng khác của module (trừ `<m>_migrations`)
+    /// là bảng cấp khách hàng và phải có `tenant_id` — testkit và `cargo xtask check` kiểm.
+    /// Mặc định rỗng: module nghiệp vụ hầu như không có bảng loại này.
+    fn control_plane_tables(&self) -> Vec<&'static str> {
         Vec::new()
     }
 
@@ -179,6 +208,13 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Giá trị cấu hình không phải secret mà giao diện cần (ngôn ngữ, giới hạn tải lên…), phục vụ
+    /// ở `GET /api/v1/kernel/client-config` dưới tên module (D-271). Endpoint không cần đăng
+    /// nhập: chỉ đưa giá trị ai xem cũng được. Gọi một lần sau `start` của mọi module.
+    fn client_config(&self) -> Result<Option<ClientSection>, Error> {
+        Ok(None)
+    }
+
     /// Các route REST của module, kèm tài liệu OpenAPI của chúng. Gọi sau `start`.
     /// Core gắn chúng dưới `/api/v1/<tên module>`: route khai là `/` và `/{id}`
     /// của module `notes` thành `/api/v1/notes` và `/api/v1/notes/{id}`.
@@ -200,11 +236,19 @@ pub struct StartContext<'a> {
     resources: &'a crate::resource::ResourceDirectory,
     resource_events: &'a [crate::resource::ResourceEvent],
     verification: &'a crate::access::PostingVerification,
+    tenancy: &'a crate::tenancy::DatabaseRegistry,
 }
 
 impl StartContext<'_> {
-    /// Database của chương trình (hai pool đọc / ghi). `Database` clone rẻ: module
-    /// giữ một bản trong service của mình.
+    /// Sổ database (bước 33): chế độ của bản cài và database của từng khách. Service lấy database
+    /// của dữ liệu cấp khách hàng qua [`TenantContext`](crate::tenancy::TenantContext), không qua
+    /// [`database`](Self::database).
+    pub fn tenancy(&self) -> crate::tenancy::DatabaseRegistry {
+        self.tenancy.clone()
+    }
+
+    /// Database của chương trình (database điều khiển: hai pool đọc / ghi). Cho chỗ thật sự của
+    /// cả bản cài (vd khoá ký gốc); dữ liệu cấp khách hàng đi qua `TenantContext` (bước 33).
     pub fn database(&self) -> &Database {
         self.database
     }

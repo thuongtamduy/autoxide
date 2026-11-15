@@ -7,11 +7,14 @@
 use std::sync::Arc;
 
 use autoxide_kernel::access::{Authenticator, Permission, Principal};
-use autoxide_kernel::config::{ConfigReader, ConfigSource, HttpConfig};
+use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig, HttpConfig};
+use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::http::{self, MCP_PATH};
 use autoxide_kernel::mcp::{NoInput, Tool};
 use autoxide_kernel::module::{Module, Modules};
+use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
+use autoxide_testkit::TestDatabase;
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use rmcp::ServiceExt as _;
@@ -53,27 +56,35 @@ impl Module for Notes {
             Tool::new(
                 "whoami",
                 "Tell who is calling.",
-                |principal: Principal, _: NoInput| async move {
+                |_: TenantContext, principal: Principal, _: NoInput| async move {
                     Ok(json!({ "user_id": principal.user_id() }))
                 },
             )
             .read_only(),
-            Tool::new("add", "Add two numbers.", |_: Principal, input: AddInput| async move {
-                if input.b == 13 {
-                    return Err(Error::conflict("notes.unlucky", "13 is not allowed."));
-                }
-                Ok(input.a + input.b)
-            })
+            Tool::new(
+                "add",
+                "Add two numbers.",
+                |_: TenantContext, _: Principal, input: AddInput| async move {
+                    if input.b == 13 {
+                        return Err(Error::conflict("notes.unlucky", "13 is not allowed."));
+                    }
+                    Ok(input.a + input.b)
+                },
+            )
             .requires(NOTES_WRITE),
-            Tool::new("issue_key", "Issue a secret.", |_: Principal, _: NoInput| async move {
-                Ok(json!({ "key": "secret-once" }))
-            })
+            Tool::new(
+                "issue_key",
+                "Issue a secret.",
+                |_: TenantContext, _: Principal, _: NoInput| async move {
+                    Ok(json!({ "key": "secret-once" }))
+                },
+            )
             .returns_secret(),
             // Tool cũ, deprecated, thay bằng `whoami` (D-240).
             Tool::new(
                 "who",
                 "Tell who is calling.",
-                |principal: Principal, _: NoInput| async move {
+                |_: TenantContext, principal: Principal, _: NoInput| async move {
                     Ok(json!({ "user_id": principal.user_id() }))
                 },
             )
@@ -92,7 +103,11 @@ struct FakeAuthenticator;
 
 #[async_trait::async_trait]
 impl Authenticator for FakeAuthenticator {
-    async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
+    async fn authenticate(
+        &self,
+        authorization: Option<&str>,
+        _: &autoxide_kernel::tenancy::TenantHint,
+    ) -> Result<Principal, Error> {
         match authorization {
             Some("Bearer writer") => Ok(Principal::new(Uuid::nil(), ["notes.write".to_owned()])),
             Some("Bearer reader") => Ok(Principal::new(Uuid::max(), [])),
@@ -101,23 +116,31 @@ impl Authenticator for FakeAuthenticator {
     }
 }
 
-fn router() -> axum::Router {
-    let source = ConfigSource::default();
+/// App chỉ có endpoint MCP; khách của request là khách mặc định trên database của test.
+async fn router(test: &TestDatabase) -> axum::Router {
+    let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
     let mut reader = ConfigReader::new(&source);
     let config = HttpConfig::read(&mut reader);
-    let (config, _) = reader.finish(config).unwrap();
+    let database = DatabaseConfig::read(&mut reader);
+    let (config, database) = reader
+        .finish(config.and_then(|config| database.map(|database| (config, database))))
+        .unwrap()
+        .0;
+    let database = Database::connect(&database).await.unwrap();
     let modules = Modules::new(vec![Box::new(Notes)]).unwrap();
     let extras = http::Extras::default()
         .authenticator(Some(Arc::new(FakeAuthenticator)))
-        .tools(modules.tools().unwrap());
+        .tools(modules.tools().unwrap())
+        .tenancy(DatabaseRegistry::single(database));
     http::build(&config, axum::Router::new().into(), Vec::new(), extras).router
 }
 
 /// Máy chủ thật trên một port ngẫu nhiên; trả URL của endpoint MCP.
-async fn serve() -> String {
+async fn serve(test: &TestDatabase) -> String {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
-    tokio::spawn(async move { axum::serve(listener, router()).await.unwrap() });
+    let app = router(test).await;
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
     format!("http://{address}{MCP_PATH}")
 }
 
@@ -136,140 +159,163 @@ fn arguments(value: Value) -> serde_json::Map<String, Value> {
 
 #[tokio::test]
 async fn chi_liet_ke_va_goi_duoc_tool_co_permission() {
-    let url = serve().await;
-    let writer = client(&url, "writer").await;
-    let reader = client(&url, "reader").await;
+    TestDatabase::run(async |test| {
+        let url = serve(test).await;
+        let writer = client(&url, "writer").await;
+        let reader = client(&url, "reader").await;
 
-    let names = |tools: Vec<rmcp::model::Tool>| -> Vec<String> {
-        tools.into_iter().map(|tool| tool.name.into_owned()).collect()
-    };
-    let tools = writer.list_all_tools().await.unwrap();
-    let add = tools.iter().find(|tool| tool.name == "notes.add").unwrap();
-    assert!(add.description.as_deref().unwrap().ends_with("Requires permission `notes.write`."));
-    assert_eq!(add.input_schema["properties"]["a"]["type"], "integer");
-    assert_eq!(names(tools), ["notes.whoami", "notes.add", "notes.issue_key", "notes.who"]);
-    assert_eq!(
-        names(reader.list_all_tools().await.unwrap()),
-        ["notes.whoami", "notes.issue_key", "notes.who"]
-    );
+        let names = |tools: Vec<rmcp::model::Tool>| -> Vec<String> {
+            tools.into_iter().map(|tool| tool.name.into_owned()).collect()
+        };
+        let tools = writer.list_all_tools().await.unwrap();
+        let add = tools.iter().find(|tool| tool.name == "notes.add").unwrap();
+        assert!(
+            add.description.as_deref().unwrap().ends_with("Requires permission `notes.write`.")
+        );
+        assert_eq!(add.input_schema["properties"]["a"]["type"], "integer");
+        assert_eq!(names(tools), ["notes.whoami", "notes.add", "notes.issue_key", "notes.who"]);
+        assert_eq!(
+            names(reader.list_all_tools().await.unwrap()),
+            ["notes.whoami", "notes.issue_key", "notes.who"]
+        );
 
-    let call =
-        CallToolRequestParams::new("notes.add").with_arguments(arguments(json!({"a": 2, "b": 3})));
-    let result = writer.call_tool(call.clone()).await.unwrap();
-    assert_eq!(result.is_error, Some(false));
-    assert_eq!(result.structured_content, Some(json!({"data": 5})));
-    // Không có permission: như tool không tồn tại.
-    let denied = reader.call_tool(call).await.unwrap_err().to_string();
-    assert!(denied.contains("Unknown tool `notes.add`"), "{denied}");
+        let call = CallToolRequestParams::new("notes.add")
+            .with_arguments(arguments(json!({"a": 2, "b": 3})));
+        let result = writer.call_tool(call.clone()).await.unwrap();
+        assert_eq!(result.is_error, Some(false));
+        assert_eq!(result.structured_content, Some(json!({"data": 5})));
+        // Không có permission: như tool không tồn tại.
+        let denied = reader.call_tool(call).await.unwrap_err().to_string();
+        assert!(denied.contains("Unknown tool `notes.add`"), "{denied}");
 
-    let whoami = reader.call_tool(CallToolRequestParams::new("notes.whoami")).await.unwrap();
-    assert_eq!(whoami.structured_content, Some(json!({"data": {"user_id": Uuid::max()}})));
-    writer.cancel().await.unwrap();
-    reader.cancel().await.unwrap();
+        let whoami = reader.call_tool(CallToolRequestParams::new("notes.whoami")).await.unwrap();
+        assert_eq!(whoami.structured_content, Some(json!({"data": {"user_id": Uuid::max()}})));
+        writer.cancel().await.unwrap();
+        reader.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
 async fn loi_cua_tool_co_code_va_thong_bao() {
-    let url = serve().await;
-    let writer = client(&url, "writer").await;
+    TestDatabase::run(async |test| {
+        let url = serve(test).await;
+        let writer = client(&url, "writer").await;
 
-    let call =
-        |value: Value| CallToolRequestParams::new("notes.add").with_arguments(arguments(value));
-    let invalid = writer.call_tool(call(json!({"a": 500, "b": 1}))).await.unwrap();
-    assert_eq!(invalid.is_error, Some(true));
-    let body = invalid.structured_content.unwrap();
-    assert_eq!(body["code"], "validation_failed");
-    assert_eq!(body["errors"][0]["field"], "a");
-    let missing = writer.call_tool(call(json!({"a": 1}))).await.unwrap();
-    assert_eq!(missing.structured_content.unwrap()["code"], "validation_failed");
-    let conflict = writer.call_tool(call(json!({"a": 1, "b": 13}))).await.unwrap();
-    let body = conflict.structured_content.unwrap();
-    assert_eq!(
-        (body["code"].as_str(), body["message"].as_str()),
-        (Some("notes.unlucky"), Some("13 is not allowed."))
-    );
-    writer.cancel().await.unwrap();
+        let call =
+            |value: Value| CallToolRequestParams::new("notes.add").with_arguments(arguments(value));
+        let invalid = writer.call_tool(call(json!({"a": 500, "b": 1}))).await.unwrap();
+        assert_eq!(invalid.is_error, Some(true));
+        let body = invalid.structured_content.unwrap();
+        assert_eq!(body["code"], "validation_failed");
+        assert_eq!(body["errors"][0]["field"], "a");
+        let missing = writer.call_tool(call(json!({"a": 1}))).await.unwrap();
+        assert_eq!(missing.structured_content.unwrap()["code"], "validation_failed");
+        let conflict = writer.call_tool(call(json!({"a": 1, "b": 13}))).await.unwrap();
+        let body = conflict.structured_content.unwrap();
+        assert_eq!(
+            (body["code"].as_str(), body["message"].as_str()),
+            (Some("notes.unlucky"), Some("13 is not allowed."))
+        );
+        writer.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
 async fn thieu_hay_sai_token_thi_401() {
-    for authorization in [None, Some("Bearer wrong")] {
-        let mut request = Request::builder()
-            .method("POST")
-            .uri(MCP_PATH)
-            .header(header::CONTENT_TYPE, "application/json")
-            .header(header::ACCEPT, "application/json, text/event-stream");
-        if let Some(value) = authorization {
-            request = request.header(header::AUTHORIZATION, value);
-        }
-        let body = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
-        let response = router().oneshot(request.body(Body::from(body)).unwrap()).await.unwrap();
+    TestDatabase::run(async |test| {
+        for authorization in [None, Some("Bearer wrong")] {
+            let mut request = Request::builder()
+                .method("POST")
+                .uri(MCP_PATH)
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::ACCEPT, "application/json, text/event-stream");
+            if let Some(value) = authorization {
+                request = request.header(header::AUTHORIZATION, value);
+            }
+            let body = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
+            let response =
+                router(test).await.oneshot(request.body(Body::from(body)).unwrap()).await.unwrap();
 
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(response.headers()[header::WWW_AUTHENTICATE], "Bearer");
-    }
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+            assert_eq!(response.headers()[header::WWW_AUTHENTICATE], "Bearer");
+        }
+    })
+    .await
+    .unwrap();
 }
 
 /// Tool trả secret: response mang `Cache-Control: no-store` (không ai lưu lại, kể cả lớp
 /// idempotency); tool khác thì không (D-149).
 #[tokio::test]
 async fn tool_tra_secret_thi_response_no_store() {
-    for (tool, expected) in [("notes.issue_key", Some("no-store")), ("notes.whoami", None)] {
-        let body = json!({
-            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-            "params": {"name": tool, "arguments": {}}
-        });
-        let request = Request::builder()
-            .method("POST")
-            .uri(MCP_PATH)
-            .header(header::CONTENT_TYPE, "application/json")
-            .header(header::ACCEPT, "application/json, text/event-stream")
-            .header(header::AUTHORIZATION, "Bearer writer")
-            .header(header::HOST, "localhost")
-            .body(Body::from(body.to_string()))
-            .unwrap();
-        let response = router().oneshot(request).await.unwrap();
+    TestDatabase::run(async |test| {
+        for (tool, expected) in [("notes.issue_key", Some("no-store")), ("notes.whoami", None)] {
+            let body = json!({
+                "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": tool, "arguments": {}}
+            });
+            let request = Request::builder()
+                .method("POST")
+                .uri(MCP_PATH)
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::ACCEPT, "application/json, text/event-stream")
+                .header(header::AUTHORIZATION, "Bearer writer")
+                .header(header::HOST, "localhost")
+                .body(Body::from(body.to_string()))
+                .unwrap();
+            let response = router(test).await.oneshot(request).await.unwrap();
 
-        let status = response.status();
-        let headers = response.headers().clone();
-        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        assert_eq!(status, StatusCode::OK, "{tool}: {}", String::from_utf8_lossy(&bytes));
-        let cache = headers.get(header::CACHE_CONTROL);
-        assert_eq!(cache.map(|value| value.to_str().unwrap()), expected, "{tool}");
-    }
+            let status = response.status();
+            let headers = response.headers().clone();
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+            assert_eq!(status, StatusCode::OK, "{tool}: {}", String::from_utf8_lossy(&bytes));
+            let cache = headers.get(header::CACHE_CONTROL);
+            assert_eq!(cache.map(|value| value.to_str().unwrap()), expected, "{tool}");
+        }
+    })
+    .await
+    .unwrap();
 }
 
 /// Tool deprecated: `tools/list` nói rõ, kết quả giữ envelope và kèm cảnh báo cho máy (`_meta`) lẫn
 /// cho mô hình (đoạn văn bản) (D-240).
 #[tokio::test]
 async fn tool_deprecated_co_cau_deprecated_va_canh_bao_trong_ket_qua() {
-    let url = serve().await;
-    let reader = client(&url, "reader").await;
-    let tools = reader.list_all_tools().await.unwrap();
-    let who = tools.iter().find(|tool| tool.name == "notes.who").unwrap();
-    let description = who.description.as_deref().unwrap();
-    assert!(
-        description.ends_with(
-            "Tool `notes.who` is deprecated since 2026-11-01. It will be removed on 2027-05-01. \
-             Use `notes.whoami` instead."
-        ),
-        "{description}"
-    );
-    let whoami = tools.iter().find(|tool| tool.name == "notes.whoami").unwrap();
-    assert!(!whoami.description.as_deref().unwrap().contains("deprecated"));
+    TestDatabase::run(async |test| {
+        let url = serve(test).await;
+        let reader = client(&url, "reader").await;
+        let tools = reader.list_all_tools().await.unwrap();
+        let who = tools.iter().find(|tool| tool.name == "notes.who").unwrap();
+        let description = who.description.as_deref().unwrap();
+        assert!(
+            description.ends_with(
+                "Tool `notes.who` is deprecated since 2026-11-01. It will be removed on 2027-05-01. \
+                 Use `notes.whoami` instead."
+            ),
+            "{description}"
+        );
+        let whoami = tools.iter().find(|tool| tool.name == "notes.whoami").unwrap();
+        assert!(!whoami.description.as_deref().unwrap().contains("deprecated"));
 
-    let result = reader.call_tool(CallToolRequestParams::new("notes.who")).await.unwrap();
-    assert_eq!(result.structured_content, Some(json!({"data": {"user_id": Uuid::max()}})));
-    let meta = result.meta.unwrap();
-    assert_eq!(
-        meta.0["autoxide/deprecation"],
-        json!({"since": "2026-11-01", "sunset": "2027-05-01", "successor": "notes.whoami"})
-    );
-    let warning = serde_json::to_string(&result.content).unwrap();
-    assert!(warning.contains("Warning: Tool `notes.who` is deprecated"), "{warning}");
-    let plain = reader.call_tool(CallToolRequestParams::new("notes.whoami")).await.unwrap();
-    assert!(plain.meta.is_none());
-    reader.cancel().await.unwrap();
+        let result = reader.call_tool(CallToolRequestParams::new("notes.who")).await.unwrap();
+        assert_eq!(result.structured_content, Some(json!({"data": {"user_id": Uuid::max()}})));
+        let meta = result.meta.unwrap();
+        assert_eq!(
+            meta.0["autoxide/deprecation"],
+            json!({"since": "2026-11-01", "sunset": "2027-05-01", "successor": "notes.whoami"})
+        );
+        let warning = serde_json::to_string(&result.content).unwrap();
+        assert!(warning.contains("Warning: Tool `notes.who` is deprecated"), "{warning}");
+        let plain = reader.call_tool(CallToolRequestParams::new("notes.whoami")).await.unwrap();
+        assert!(plain.meta.is_none());
+        reader.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 #[test]
@@ -280,7 +326,9 @@ fn khai_deprecation_cho_tool_khong_co_bi_tu_choi_luc_khoi_dong() {
             "wrong"
         }
         fn tools(&self) -> Vec<Tool> {
-            vec![Tool::new("real", "x", |_: Principal, _: NoInput| async move { Ok(()) })]
+            vec![Tool::new("real", "x", |_: TenantContext, _: Principal, _: NoInput| async move {
+                Ok(())
+            })]
         }
         fn deprecations(&self) -> Vec<http::Deprecation> {
             vec![
@@ -301,7 +349,9 @@ fn khai_deprecation_cho_tool_khong_co_bi_tu_choi_luc_khoi_dong() {
             "wrong"
         }
         fn tools(&self) -> Vec<Tool> {
-            vec![Tool::new("real", "x", |_: Principal, _: NoInput| async move { Ok(()) })]
+            vec![Tool::new("real", "x", |_: TenantContext, _: Principal, _: NoInput| async move {
+                Ok(())
+            })]
         }
         fn deprecations(&self) -> Vec<http::Deprecation> {
             vec![
@@ -323,7 +373,7 @@ fn khai_tool_sai_bi_tu_choi() {
             "broken"
         }
         fn tools(&self) -> Vec<Tool> {
-            let noop = |_: Principal, _: NoInput| async move { Ok(()) };
+            let noop = |_: TenantContext, _: Principal, _: NoInput| async move { Ok(()) };
             vec![
                 Tool::new("Bad-Name", "x", noop),
                 Tool::new("twice", "x", noop),
@@ -354,7 +404,7 @@ fn khai_tool_sai_bi_tu_choi() {
 #[test]
 fn permission_thay_the() {
     let own = Permission::new("notes.write_own", "Write own notes.");
-    let noop = |_: Principal, _: NoInput| async move { Ok(()) };
+    let noop = |_: TenantContext, _: Principal, _: NoInput| async move { Ok(()) };
     let tool = Tool::new("edit", "x", noop).requires(NOTES_WRITE).or_requires(own);
     let with = |permission: &str| Principal::new(Uuid::nil(), [permission.to_owned()]);
     assert!(tool.allows(&with("notes.write")));

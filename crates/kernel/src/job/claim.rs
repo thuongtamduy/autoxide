@@ -19,11 +19,14 @@ use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection};
 use uuid::Uuid;
 
 use crate::error::Error;
+use crate::tenancy::TenantId;
 
 /// Một job vừa được claim.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct ClaimedJob {
+    /// Khách của job ([`NO_TENANT`](crate::tenancy::NO_TENANT): job của cả database).
+    pub tenant: TenantId,
     pub id: Uuid,
     pub kind: String,
     pub payload: String,
@@ -32,19 +35,46 @@ pub struct ClaimedJob {
     pub max_attempts: i32,
 }
 
-/// Cách claim job của một database.
-#[async_trait::async_trait]
-pub trait Claim: Send + Sync {
-    /// Claim tối đa `limit` job đang chờ của bảng `table` cho worker `worker`, giữ tới
-    /// `until`. Mỗi job claim được tăng `attempts` thêm một.
-    async fn claim(
-        &self,
-        connection: &DatabaseConnection,
-        table: &str,
-        worker: &str,
+/// Một lần claim: tối đa `limit` job đang chờ của bảng `table` (chỉ của khách `tenant` nếu có)
+/// cho worker `worker`, giữ tới `until`.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct ClaimRequest<'a> {
+    pub table: &'a str,
+    pub tenant: Option<TenantId>,
+    pub worker: &'a str,
+    pub now: DateTime<Utc>,
+    pub until: DateTime<Utc>,
+    pub limit: u64,
+}
+
+impl<'a> ClaimRequest<'a> {
+    /// Up to `limit` due jobs of `table` (any tenant) for `worker`, held until `until`.
+    pub fn new(
+        table: &'a str,
+        worker: &'a str,
         now: DateTime<Utc>,
         until: DateTime<Utc>,
         limit: u64,
+    ) -> Self {
+        ClaimRequest { table, tenant: None, worker, now, until, limit }
+    }
+
+    /// Only jobs of `tenant`.
+    pub const fn tenant(mut self, tenant: TenantId) -> Self {
+        self.tenant = Some(tenant);
+        self
+    }
+}
+
+/// Cách claim job của một database.
+#[async_trait::async_trait]
+pub trait Claim: Send + Sync {
+    /// Claim theo `request`. Mỗi job claim được tăng `attempts` thêm một.
+    async fn claim(
+        &self,
+        connection: &DatabaseConnection,
+        request: &ClaimRequest<'_>,
     ) -> Result<Vec<ClaimedJob>, Error>;
 }
 
@@ -67,15 +97,11 @@ impl Claim for PostgresClaim {
     async fn claim(
         &self,
         connection: &DatabaseConnection,
-        table: &str,
-        worker: &str,
-        now: DateTime<Utc>,
-        until: DateTime<Utc>,
-        limit: u64,
+        request: &ClaimRequest<'_>,
     ) -> Result<Vec<ClaimedJob>, Error> {
-        let mut candidates = candidates(table, now, limit);
+        let mut candidates = candidates(request);
         candidates.lock_with_behavior(LockType::Update, LockBehavior::SkipLocked);
-        run(connection, update(table, worker, until, candidates)).await
+        run(connection, update(request, candidates)).await
     }
 }
 
@@ -84,13 +110,9 @@ impl Claim for SqliteClaim {
     async fn claim(
         &self,
         connection: &DatabaseConnection,
-        table: &str,
-        worker: &str,
-        now: DateTime<Utc>,
-        until: DateTime<Utc>,
-        limit: u64,
+        request: &ClaimRequest<'_>,
     ) -> Result<Vec<ClaimedJob>, Error> {
-        run(connection, update(table, worker, until, candidates(table, now, limit))).await
+        run(connection, update(request, candidates(request))).await
     }
 }
 
@@ -110,30 +132,30 @@ pub(crate) fn pending(now: DateTime<Utc>) -> Condition {
         )
 }
 
-fn candidates(table: &str, now: DateTime<Utc>, limit: u64) -> SelectStatement {
+fn candidates(request: &ClaimRequest<'_>) -> SelectStatement {
+    let mut condition = pending(request.now);
+    if let Some(tenant) = request.tenant {
+        condition = condition.add(Expr::col(Alias::new("tenant_id")).eq(tenant.as_uuid()));
+    }
     Query::select()
         .column(Alias::new("id"))
-        .from(Alias::new(table))
-        .cond_where(pending(now))
+        .from(Alias::new(request.table))
+        .cond_where(condition)
         .order_by(Alias::new("run_at"), Order::Asc)
         .order_by(Alias::new("id"), Order::Asc)
-        .limit(limit)
+        .limit(request.limit)
         .to_owned()
 }
 
-fn update(
-    table: &str,
-    worker: &str,
-    until: DateTime<Utc>,
-    candidates: SelectStatement,
-) -> UpdateStatement {
+fn update(request: &ClaimRequest<'_>, candidates: SelectStatement) -> UpdateStatement {
     Query::update()
-        .table(Alias::new(table))
-        .value(Alias::new("claimed_by"), worker)
-        .value(Alias::new("claimed_until"), until)
+        .table(Alias::new(request.table))
+        .value(Alias::new("claimed_by"), request.worker)
+        .value(Alias::new("claimed_until"), request.until)
         .value(Alias::new("attempts"), Expr::col(Alias::new("attempts")).add(1))
         .and_where(Expr::col(Alias::new("id")).in_subquery(candidates))
         .returning(Query::returning().columns([
+            Alias::new("tenant_id"),
             Alias::new("id"),
             Alias::new("kind"),
             Alias::new("payload"),
@@ -152,6 +174,7 @@ async fn run(
     rows.iter()
         .map(|row| {
             Ok(ClaimedJob {
+                tenant: TenantId::from_uuid(row.try_get("", "tenant_id")?),
                 id: row.try_get("", "id")?,
                 kind: row.try_get("", "kind")?,
                 payload: row.try_get("", "payload")?,

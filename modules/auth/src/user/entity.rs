@@ -20,6 +20,8 @@ pub struct Model {
     pub email_verified_at: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
+    /// Lúc mở phiên gần nhất (đăng nhập, đổi mật khẩu); `None`: chưa biết.
+    pub last_sign_in_at: Option<DateTimeUtc>,
     /// Email và tên viết thường, để tìm (`user::service::search_text`).
     pub search_text: String,
 }

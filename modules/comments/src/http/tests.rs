@@ -315,12 +315,15 @@ async fn tool_mcp() {
             .map(|tool| tool.name.to_string())
             .collect();
         names.sort();
-        assert_eq!(names, ["comments.get", "comments.queue", "comments.unanswered"]);
+        assert_eq!(
+            names,
+            ["comments.get", "comments.queue", "comments.unanswered", "kernel.current_tenant"]
+        );
         reader.cancel().await.unwrap();
 
         let admin = client("admin").await;
         let tools = admin.list_all_tools().await.unwrap();
-        assert_eq!(tools.len(), 6);
+        assert_eq!(tools.len(), 7, "with `kernel.current_tenant`");
         for tool in &tools {
             assert!(
                 !serde_json::to_string(&tool.input_schema).unwrap().contains("$ref"),
@@ -431,6 +434,112 @@ async fn tool_mcp() {
         .await;
         assert!(wrong);
         admin.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// Đề bài giao diện B8: bình luận kèm tiêu đề và đường dẫn của đích (sổ đối tượng), danh sách đích
+/// có số đếm và bộ lọc.
+#[tokio::test]
+async fn dich_kem_tieu_de_va_danh_sach_dich() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let token = form_token(&app).await;
+        let held = send(
+            &app,
+            "POST",
+            "/comments/public/comments",
+            None,
+            &[],
+            Some(comment(&token, "Ada", "ada@example.com", "Nice post")),
+        )
+        .await;
+        assert_eq!(held.status(), StatusCode::CREATED, "{}", held.json());
+        let id = held.json()["data"]["id"].as_str().unwrap().to_owned();
+
+        let queue = send(&app, "GET", "/comments", Some("reader"), &[], None).await;
+        assert_eq!(queue.status(), StatusCode::OK, "{}", queue.json());
+        assert_eq!(queue.json()["data"][0]["target_title"], "Hello world");
+        assert_eq!(queue.json()["data"][0]["target_url"], "/posts/public-1");
+        let one = send(&app, "GET", &format!("/comments/{id}"), Some("reader"), &[], None).await;
+        assert_eq!(one.json()["data"]["target_title"], "Hello world", "{}", one.json());
+
+        let targets = send(&app, "GET", "/comments/targets", Some("reader"), &[], None).await;
+        assert_eq!(targets.status(), StatusCode::OK, "{}", targets.json());
+        let first = &targets.json()["data"][0];
+        assert_eq!(
+            (first["target_id"].as_str(), first["pending_count"].as_i64()),
+            (Some("public-1"), Some(1))
+        );
+        assert_eq!(
+            (first["title"].as_str(), first["url"].as_str()),
+            (Some("Hello world"), Some("/posts/public-1"))
+        );
+        let count = |answer: TestResponse| answer.json()["data"].as_array().unwrap().len();
+        assert_eq!(
+            count(
+                send(&app, "GET", "/comments/targets?pending=true", Some("reader"), &[], None)
+                    .await
+            ),
+            1
+        );
+        assert_eq!(
+            count(
+                send(&app, "GET", "/comments/targets?pending=false", Some("reader"), &[], None)
+                    .await
+            ),
+            0
+        );
+        assert_eq!(
+            count(
+                send(&app, "GET", "/comments/targets?state=closed", Some("reader"), &[], None)
+                    .await
+            ),
+            0
+        );
+
+        let closed = send(
+            &app,
+            "PUT",
+            "/comments/targets/content.entry/public-1",
+            Some("admin"),
+            &[],
+            Some(json!({"state": "closed"})),
+        )
+        .await;
+        assert_eq!(closed.status(), StatusCode::OK, "{}", closed.json());
+        assert_eq!(
+            count(
+                send(&app, "GET", "/comments/targets?state=closed", Some("reader"), &[], None)
+                    .await
+            ),
+            1
+        );
+        assert_eq!(
+            count(
+                send(
+                    &app,
+                    "GET",
+                    "/comments/targets?state=open&target_type=content.entry",
+                    Some("reader"),
+                    &[],
+                    None
+                )
+                .await
+            ),
+            0
+        );
+        let wrong =
+            send(&app, "GET", "/comments/targets?state=maybe&pending=1", Some("reader"), &[], None)
+                .await;
+        assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(wrong.json()["errors"].as_array().unwrap().len(), 2, "{}", wrong.json());
+        // Phần công khai không đổi hình dạng: không có `title`.
+        let public =
+            send(&app, "GET", "/comments/public/targets/content.entry/public-1", None, &[], None)
+                .await;
+        assert!(public.json()["data"].get("title").is_none(), "{}", public.json());
     })
     .await
     .unwrap();

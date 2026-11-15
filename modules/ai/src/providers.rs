@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use autoxide_kernel::ai::{Effort, Part, Prompt, Usage};
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantContext;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use serde_json::{Value, json};
@@ -32,7 +33,7 @@ pub(crate) struct Raw {
 /// Một nhà cung cấp sinh chữ.
 #[async_trait::async_trait]
 pub(crate) trait Provider: Send + Sync {
-    async fn generate(&self, prompt: &Prompt) -> Result<Raw, Error>;
+    async fn generate(&self, _tenant: &TenantContext, prompt: &Prompt) -> Result<Raw, Error>;
 }
 
 /// HTTP client dùng chung: giới hạn thời gian chờ, không theo chuyển hướng (gửi key tới địa chỉ
@@ -209,7 +210,7 @@ impl Anthropic {
 
 #[async_trait::async_trait]
 impl Provider for Anthropic {
-    async fn generate(&self, prompt: &Prompt) -> Result<Raw, Error> {
+    async fn generate(&self, _tenant: &TenantContext, prompt: &Prompt) -> Result<Raw, Error> {
         let mut headers =
             vec![("x-api-key", self.api_key.as_str()), ("anthropic-version", ANTHROPIC_VERSION)];
         if self.fallback {
@@ -330,7 +331,7 @@ impl OpenAi {
 
 #[async_trait::async_trait]
 impl Provider for OpenAi {
-    async fn generate(&self, prompt: &Prompt) -> Result<Raw, Error> {
+    async fn generate(&self, _tenant: &TenantContext, prompt: &Prompt) -> Result<Raw, Error> {
         let mut headers = Vec::new();
         if let Some(authorization) = &self.authorization {
             headers.push(("authorization", authorization.as_str()));

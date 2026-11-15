@@ -13,6 +13,7 @@
 use chrono::{DateTime, Utc};
 
 use crate::error::Error;
+use crate::tenancy::TenantContext;
 
 /// Response đã lưu của một lệnh ghi.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,6 +53,7 @@ pub trait IdempotencyStore: Send + Sync {
     /// Ghi nhận request; giữ quyền chạy tới `locked_until`.
     async fn begin(
         &self,
+        tenant: &TenantContext,
         scope: &str,
         key: &str,
         fingerprint: &str,
@@ -59,8 +61,13 @@ pub trait IdempotencyStore: Send + Sync {
     ) -> Result<Begin, Error>;
 
     /// Lưu response của lần chạy `id`.
-    async fn complete(&self, id: uuid::Uuid, response: StoredResponse) -> Result<(), Error>;
+    async fn complete(
+        &self,
+        tenant: &TenantContext,
+        id: uuid::Uuid,
+        response: StoredResponse,
+    ) -> Result<(), Error>;
 
     /// Lần chạy `id` hỏng phía máy chủ: bỏ ghi nhận, để client gửi lại được.
-    async fn abandon(&self, id: uuid::Uuid) -> Result<(), Error>;
+    async fn abandon(&self, tenant: &TenantContext, id: uuid::Uuid) -> Result<(), Error>;
 }

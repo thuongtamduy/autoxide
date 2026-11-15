@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use autoxide_kernel::resource::Resource;
+
 use crate::entity::{ban, report};
 use crate::posting::Posted;
 use crate::posting::targets::Target;
@@ -187,6 +189,14 @@ pub(crate) struct CommentDetail {
     pub id: Uuid,
     pub target_type: String,
     pub target_id: String,
+    /// Title of the target (e.g. the post's title), from the module that owns it; absent when
+    /// that kind has no lookup or the target is not public now.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_title: Option<String>,
+    /// Public path of the target (without the domain), e.g. `/blog/hello`; absent like
+    /// `target_title`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_url: Option<String>,
     pub root_id: Uuid,
     pub parent_id: Option<Uuid>,
     pub reply_to_id: Option<Uuid>,
@@ -231,6 +241,8 @@ impl From<Comment> for CommentDetail {
             id: row.id,
             target_type: row.target_type,
             target_id: row.target_id,
+            target_title: None,
+            target_url: None,
             root_id: row.root_id,
             parent_id: row.parent_id,
             reply_to_id: row.reply_to_id,
@@ -292,6 +304,13 @@ pub(crate) struct TargetResponse {
     pub thread_count: i32,
     /// Top-level comments waiting for approval (`null` in the public answer).
     pub pending_thread_count: Option<i32>,
+    /// Title of the target, from the module that owns it (only in the admin list, and only for a
+    /// target that is public now); absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Public path of the target (without the domain), like `title`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 impl TargetResponse {
@@ -310,7 +329,19 @@ impl TargetResponse {
             closes_at: target.closes_at,
             target_type: target.kind,
             target_id: target.id,
+            title: None,
+            url: None,
         }
+    }
+}
+
+/// Tiêu đề và đường dẫn của đích từ sổ đối tượng (`None`: không biết hay chưa công khai).
+pub(crate) fn described(resource: Option<&Resource>) -> (Option<String>, Option<String>) {
+    match resource {
+        Some(resource) => {
+            (Some(resource.title.clone()).filter(|title| !title.is_empty()), resource.url.clone())
+        }
+        None => (None, None),
     }
 }
 

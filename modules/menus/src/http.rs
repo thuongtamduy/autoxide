@@ -64,6 +64,9 @@ pub(crate) struct MenuBadge {
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SiteMenuItemInput {
+    /// The item's id from the menu as read, to keep it across this save (the response of
+    /// `PUT` shows the same id). Leave it out for a new item, and when creating a menu.
+    id: Option<Uuid>,
     /// Up to 200 characters. Needed unless `ref` is given; empty with `ref` shows the title of
     /// the object, in the menu's language.
     label: Option<String>,
@@ -103,6 +106,7 @@ impl From<MenuTarget> for RefInput {
 impl From<SiteMenuItemInput> for ItemInput {
     fn from(input: SiteMenuItemInput) -> Self {
         ItemInput {
+            id: input.id,
             label: input.label,
             url: input.url,
             target: input.target.map(RefInput::from),
@@ -241,16 +245,24 @@ pub(crate) struct SiteMenuSummary {
     key: String,
     #[schema(example = "vi")]
     locale: String,
+    /// How many items the menu holds, at every level.
+    #[schema(example = 12)]
+    item_count: u64,
+    /// Who created the menu or last replaced its items; `null` when unknown (menus saved
+    /// before this field existed, or changed by the system).
+    updated_by: Option<Uuid>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
 
-impl From<Menu> for SiteMenuSummary {
-    fn from(menu: Menu) -> Self {
+impl SiteMenuSummary {
+    pub(crate) fn new(menu: Menu, item_count: u64) -> Self {
         SiteMenuSummary {
             id: menu.id,
             key: menu.key,
             locale: menu.locale,
+            item_count,
+            updated_by: menu.updated_by,
             created_at: menu.created_at,
             updated_at: menu.updated_at,
         }
@@ -281,7 +293,7 @@ async fn list_menus(
     Query(query): Query<PageQuery>,
 ) -> Result<Page<SiteMenuSummary>, Error> {
     let page = service.list(&principal, &PageRequest::try_from(query)?).await?;
-    Ok(page.map(SiteMenuSummary::from))
+    Ok(page.map(|(menu, items)| SiteMenuSummary::new(menu, items)))
 }
 
 /// Create a website menu.
@@ -297,7 +309,7 @@ async fn list_menus(
     security(("bearer" = [])),
     request_body = CreateSiteMenuRequest,
     responses(
-        (status = 201, description = "Created; `Location` is the new menu.", body = Data<SiteMenu>),
+        (status = 201, description = "Created; `Location` is the new menu.", body = Data<SiteMenu>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `menus.manage`; code `permission_denied`.", body = Problem),
         (status = 409, description = "A menu with this key and language exists; code `menus.menu_exists`.", body = Problem),
@@ -310,7 +322,8 @@ async fn create_menu(
     ValidJson(input): ValidJson<CreateSiteMenuRequest>,
 ) -> Result<Created<SiteMenu>, Error> {
     let (menu, nodes) = service.create(&principal, input.into()).await?;
-    Ok(Created::new(format!("/menus/{}", menu.id), menu_response(menu, nodes)))
+    let version = menu.updated_at;
+    Ok(Created::new(format!("/menus/{}", menu.id), menu_response(menu, nodes)).tagged(version))
 }
 
 /// Get a website menu.

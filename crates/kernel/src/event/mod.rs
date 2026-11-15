@@ -26,9 +26,10 @@ use uuid::Uuid;
 
 use crate::error::Error;
 use crate::module::is_identifier;
+use crate::tenancy::TenantContext;
 
 pub use dispatcher::{Dispatcher, MAX_ATTEMPTS};
-pub use migration::{outbox_actor_migration, outbox_migration};
+pub use migration::{outbox_actor_migration, outbox_migration, tenant_table};
 pub use outbox::Outbox;
 
 /// Một loại event, khai bởi module phát nó.
@@ -141,6 +142,9 @@ impl From<&crate::access::Principal> for Actor {
 #[non_exhaustive]
 pub struct Delivered {
     pub id: Uuid,
+    /// Khách của event: bên nhận đọc / ghi dữ liệu của đúng khách này (database:
+    /// `tenant.database()`).
+    pub tenant: TenantContext,
     /// Module phát event.
     pub module: &'static str,
     pub name: String,
@@ -152,11 +156,17 @@ pub struct Delivered {
 }
 
 impl Delivered {
-    /// Event `name` of module `module`, with a new id, done by the system just now, about no
-    /// particular record.
-    pub fn new(module: &'static str, name: impl Into<String>, payload: serde_json::Value) -> Self {
+    /// Event `name` of module `module` for `tenant`, with a new id, done by the system just now,
+    /// about no particular record.
+    pub fn new(
+        tenant: TenantContext,
+        module: &'static str,
+        name: impl Into<String>,
+        payload: serde_json::Value,
+    ) -> Self {
         Delivered {
             id: Uuid::now_v7(),
+            tenant,
             module,
             name: name.into(),
             actor: Actor::system(),

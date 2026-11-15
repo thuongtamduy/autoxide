@@ -99,11 +99,15 @@ pub(crate) fn check(
 ) -> Result<BodyInfo, Vec<FieldError>> {
     let size = serde_json::to_vec(body).map(|bytes| bytes.len()).unwrap_or(usize::MAX);
     if size > max_bytes {
-        return Err(vec![FieldError::new(
-            "body",
-            "too_large",
-            format!("is {size} bytes of JSON; at most {max_bytes} are accepted"),
-        )]);
+        return Err(vec![
+            FieldError::new(
+                "body",
+                "too_large",
+                "is {size} bytes of JSON; at most {max_bytes} are accepted",
+            )
+            .with_param("size", size)
+            .with_param("max_bytes", max_bytes),
+        ]);
     }
     let mut checker =
         Checker { embed_hosts, errors: Vec::new(), nodes: 0, info: BodyInfo::default() };
@@ -112,17 +116,17 @@ pub(crate) fn check(
             checker.keys(doc, "body", &["type", "content"]);
             checker.children(doc, "body", Place::Block, 1);
         }
-        _ => checker.error(
+        _ => checker.error(FieldError::new(
             "body",
             "invalid",
-            "must be an object with `\"type\": \"doc\"`".to_owned(),
-        ),
+            "must be an object with `\"type\": \"doc\"`",
+        )),
     }
     if checker.nodes > MAX_NODES {
         checker.error(
-            "body",
-            "too_many_nodes",
-            format!("has {} nodes; at most {MAX_NODES}", checker.nodes),
+            FieldError::new("body", "too_many_nodes", "has {nodes} nodes; at most {max_nodes}")
+                .with_param("nodes", checker.nodes)
+                .with_param("max_nodes", MAX_NODES),
         );
     }
     if !checker.errors.is_empty() {
@@ -144,9 +148,9 @@ pub(crate) fn reading_minutes(words: i32, words_per_minute: u32) -> i32 {
 }
 
 impl Checker<'_> {
-    fn error(&mut self, field: &str, code: &str, message: String) {
+    fn error(&mut self, error: FieldError) {
         if self.errors.len() < MAX_ERRORS {
-            self.errors.push(FieldError::new(field, code, message));
+            self.errors.push(error);
         }
     }
 
@@ -155,9 +159,12 @@ impl Checker<'_> {
         for key in node.keys() {
             if !allowed.contains(&key.as_str()) {
                 self.error(
-                    &format!("{path}.{key}"),
-                    "not_allowed",
-                    format!("`{key}` is not allowed here"),
+                    FieldError::new(
+                        format!("{path}.{key}"),
+                        "not_allowed",
+                        "`{key}` is not allowed here",
+                    )
+                    .with_param("key", key),
                 );
             }
         }
@@ -167,7 +174,7 @@ impl Checker<'_> {
     fn children(&mut self, node: &Map<String, Value>, path: &str, place: Place, depth: usize) {
         let Some(content) = node.get("content") else { return };
         let Some(items) = content.as_array() else {
-            self.error(&format!("{path}.content"), "invalid", "must be an array".to_owned());
+            self.error(FieldError::new(format!("{path}.content"), "invalid", "must be an array"));
             return;
         };
         for (index, child) in items.iter().enumerate() {
@@ -178,15 +185,18 @@ impl Checker<'_> {
     fn node(&mut self, value: &Value, path: &str, place: Place, depth: usize) {
         self.nodes += 1;
         if depth > MAX_DEPTH {
-            self.error(path, "too_deep", format!("nodes may nest at most {MAX_DEPTH} levels"));
+            self.error(
+                FieldError::new(path, "too_deep", "nodes may nest at most {max_depth} levels")
+                    .with_param("max_depth", MAX_DEPTH),
+            );
             return;
         }
         let Some(node) = value.as_object() else {
-            self.error(path, "invalid", "must be an object".to_owned());
+            self.error(FieldError::new(path, "invalid", "must be an object"));
             return;
         };
         let Some(kind) = node.get("type").and_then(Value::as_str) else {
-            self.error(&format!("{path}.type"), "required", "must be a node type".to_owned());
+            self.error(FieldError::new(format!("{path}.type"), "required", "must be a node type"));
             return;
         };
         let fits = match kind {
@@ -199,18 +209,20 @@ impl Checker<'_> {
             | "horizontalRule" | "image" | "table" | "embed" => place == Place::Block,
             _ => {
                 self.error(
-                    &format!("{path}.type"),
-                    "not_allowed",
-                    format!("`{kind}` is not an allowed node type"),
+                    FieldError::new(
+                        format!("{path}.type"),
+                        "not_allowed",
+                        "`{kind}` is not an allowed node type",
+                    )
+                    .with_param("kind", kind),
                 );
                 return;
             }
         };
         if !fits {
             self.error(
-                &format!("{path}.type"),
-                "misplaced",
-                format!("`{kind}` cannot appear here"),
+                FieldError::new(format!("{path}.type"), "misplaced", "`{kind}` cannot appear here")
+                    .with_param("kind", kind),
             );
             return;
         }
@@ -228,11 +240,11 @@ impl Checker<'_> {
                 let level =
                     attrs.as_ref().and_then(|attrs| attrs.get("level")).and_then(Value::as_i64);
                 if !matches!(level, Some(2..=4)) {
-                    self.error(
-                        &format!("{path}.attrs.level"),
+                    self.error(FieldError::new(
+                        format!("{path}.attrs.level"),
                         "range",
-                        "must be 2, 3 or 4".to_owned(),
-                    );
+                        "must be 2, 3 or 4",
+                    ));
                 }
                 self.children(node, path, Place::Inline, depth);
             }
@@ -246,11 +258,11 @@ impl Checker<'_> {
                     && let Some(start) = attrs.get("start")
                     && !start.as_u64().is_some_and(|start| start >= 1)
                 {
-                    self.error(
-                        &format!("{path}.attrs.start"),
+                    self.error(FieldError::new(
+                        format!("{path}.attrs.start"),
                         "range",
-                        "must be a whole number from 1".to_owned(),
-                    );
+                        "must be a whole number from 1",
+                    ));
                 }
                 self.children(node, path, Place::ListItem, depth);
             }
@@ -268,11 +280,11 @@ impl Checker<'_> {
                         if let Some(value) = attrs.get(span)
                             && !value.as_u64().is_some_and(|n| (1..=100).contains(&n))
                         {
-                            self.error(
-                                &format!("{path}.attrs.{span}"),
+                            self.error(FieldError::new(
+                                format!("{path}.attrs.{span}"),
                                 "range",
-                                "must be 1 to 100".to_owned(),
-                            );
+                                "must be 1 to 100",
+                            ));
                         }
                     }
                     if let Some(widths) = attrs.get("colwidth") {
@@ -281,11 +293,11 @@ impl Checker<'_> {
                                 items.iter().all(|w| w.as_u64().is_some_and(|w| w <= 10_000))
                             });
                         if !valid {
-                            self.error(
-                                &format!("{path}.attrs.colwidth"),
+                            self.error(FieldError::new(
+                                format!("{path}.attrs.colwidth"),
                                 "invalid",
-                                "must be a list of widths in pixels, or null".to_owned(),
-                            );
+                                "must be a list of widths in pixels, or null",
+                            ));
                         }
                     }
                 }
@@ -303,11 +315,11 @@ impl Checker<'_> {
                                     .all(|c| c.is_ascii_alphanumeric() || "+#-_.".contains(c))
                         });
                     if !valid {
-                        self.error(
-                            &format!("{path}.attrs.language"),
+                        self.error(FieldError::new(
+                            format!("{path}.attrs.language"),
                             "invalid",
-                            "must be a short language name like `rust`".to_owned(),
-                        );
+                            "must be a short language name like `rust`",
+                        ));
                     }
                 }
                 self.children(node, path, Place::PlainText, depth);
@@ -348,7 +360,11 @@ impl Checker<'_> {
                 Some(attrs)
             }
             Some(_) => {
-                self.error(&format!("{path}.attrs"), "invalid", "must be an object".to_owned());
+                self.error(FieldError::new(
+                    format!("{path}.attrs"),
+                    "invalid",
+                    "must be an object",
+                ));
                 None
             }
         }
@@ -360,18 +376,18 @@ impl Checker<'_> {
         self.keys(node, path, allowed);
         match node.get("text").and_then(Value::as_str) {
             Some(text) if !text.is_empty() => self.info.plain_text.push_str(text),
-            _ => self.error(
-                &format!("{path}.text"),
+            _ => self.error(FieldError::new(
+                format!("{path}.text"),
                 "required",
-                "must be a non-empty string".to_owned(),
-            ),
+                "must be a non-empty string",
+            )),
         }
         if place == Place::PlainText {
             return;
         }
         let Some(marks) = node.get("marks") else { return };
         let Some(marks) = marks.as_array() else {
-            self.error(&format!("{path}.marks"), "invalid", "must be an array".to_owned());
+            self.error(FieldError::new(format!("{path}.marks"), "invalid", "must be an array"));
             return;
         };
         for (index, mark) in marks.iter().enumerate() {
@@ -381,7 +397,7 @@ impl Checker<'_> {
 
     fn mark(&mut self, value: &Value, path: &str) {
         let Some(mark) = value.as_object() else {
-            self.error(path, "invalid", "must be an object".to_owned());
+            self.error(FieldError::new(path, "invalid", "must be an object"));
             return;
         };
         match mark.get("type").and_then(Value::as_str) {
@@ -394,21 +410,26 @@ impl Checker<'_> {
                 let href =
                     attrs.as_ref().and_then(|attrs| attrs.get("href")).and_then(Value::as_str);
                 if !href.is_some_and(safe_link) {
-                    self.error(
-                        &format!("{path}.attrs.href"),
+                    self.error(FieldError::new(
+                        format!("{path}.attrs.href"),
                         "unsafe_link",
-                        "must start with `http://`, `https://`, `mailto:` or `/`".to_owned(),
-                    );
+                        "must start with `http://`, `https://`, `mailto:` or `/`",
+                    ));
                 }
             }
             Some(other) => self.error(
-                &format!("{path}.type"),
-                "not_allowed",
-                format!("`{other}` is not an allowed mark"),
+                FieldError::new(
+                    format!("{path}.type"),
+                    "not_allowed",
+                    "`{other}` is not an allowed mark",
+                )
+                .with_param("other", other),
             ),
-            None => {
-                self.error(&format!("{path}.type"), "required", "must be a mark type".to_owned())
-            }
+            None => self.error(FieldError::new(
+                format!("{path}.type"),
+                "required",
+                "must be a mark type",
+            )),
         }
     }
 
@@ -419,11 +440,11 @@ impl Checker<'_> {
             Some(id) => {
                 self.info.media_ids.insert(id);
             }
-            None => self.error(
-                &format!("{path}.attrs.mediaId"),
+            None => self.error(FieldError::new(
+                format!("{path}.attrs.mediaId"),
                 "required",
-                "must be the id of a media item".to_owned(),
-            ),
+                "must be the id of a media item",
+            )),
         }
         for (key, max) in [("alt", 1000), ("caption", 2000)] {
             if let Some(value) = attrs.get(key)
@@ -431,9 +452,12 @@ impl Checker<'_> {
                     || value.as_str().is_some_and(|text| text.chars().count() <= max))
             {
                 self.error(
-                    &format!("{path}.attrs.{key}"),
-                    "invalid",
-                    format!("must be text of at most {max} characters"),
+                    FieldError::new(
+                        format!("{path}.attrs.{key}"),
+                        "invalid",
+                        "must be text of at most {max} characters",
+                    )
+                    .with_param("max", max),
                 );
             }
         }
@@ -466,9 +490,12 @@ impl Checker<'_> {
         });
         if !allowed {
             self.error(
-                &format!("{path}.attrs.url"),
-                "host_not_allowed",
-                format!("must be an `https://` address on one of: {}", self.embed_hosts.join(", ")),
+                FieldError::new(
+                    format!("{path}.attrs.url"),
+                    "host_not_allowed",
+                    "must be an `https://` address on one of: {hosts}",
+                )
+                .with_param("hosts", self.embed_hosts.join(", ")),
             );
         }
     }

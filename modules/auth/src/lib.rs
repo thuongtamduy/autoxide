@@ -25,6 +25,7 @@ mod permissions;
 mod privacy;
 mod recovery;
 mod reset;
+mod resource;
 mod role;
 mod session;
 mod token;
@@ -144,17 +145,18 @@ impl Module for AuthModule {
             url: config.email_verification_url.clone(),
             report_url: config.email_change_report_url.clone(),
         });
-        let roles = Arc::new(RoleService::new(
-            database.clone(),
-            context.permissions().clone(),
-            outbox.clone(),
-        ));
+        let roles = Arc::new(
+            RoleService::new(database.clone(), context.permissions().clone(), outbox.clone())
+                .with_translations(context.translations().clone()),
+        );
         let api_keys = Arc::new(ApiKeyService::new(
             database.clone(),
             users.clone(),
             roles.clone(),
             sessions.clone(),
             outbox.clone(),
+            mfa.clone(),
+            passkeys.clone(),
         ));
         let resets = Arc::new(reset::PasswordResets {
             database: database.clone(),
@@ -173,6 +175,8 @@ impl Module for AuthModule {
         // `Arc<X>` tự đổi thành `Arc<dyn Trait>`: bên dùng chỉ thấy trait.
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
         context.provide::<dyn api::Users>(users.clone())?;
+        // Tên hiển thị của người dùng cho module khác (vd tên người làm trong audit log).
+        context.resource_type(resource::USER, Arc::new(resource::UserResolver(users.clone())))?;
         context.provide::<dyn api::Accounts>(users.clone())?;
         context.provide::<dyn api::AccountRecovery>(Arc::new(recovery::OperatorRecovery {
             users: users.clone(),
@@ -198,6 +202,7 @@ impl Module for AuthModule {
             verifications: verifications.clone(),
             passkeys,
             self_registration: config.self_registration,
+            country_header: config.country_header.clone(),
         });
         self.resets = Some(resets);
         self.verifications = Some(verifications);
@@ -362,13 +367,6 @@ pub(crate) mod testing {
         .unwrap();
         let roles =
             Arc::new(crate::role::RoleService::new(database.clone(), catalog, outbox.clone()));
-        let api_keys = Arc::new(crate::api_key::ApiKeyService::new(
-            database.clone(),
-            users.clone(),
-            roles.clone(),
-            sessions.clone(),
-            outbox,
-        ));
         let mails = Arc::new(FakeMailer::default());
         let translations = autoxide_kernel::i18n::Translations::new(vec![(
             "auth",
@@ -401,6 +399,15 @@ pub(crate) mod testing {
             )
             .unwrap(),
         );
+        let api_keys = Arc::new(crate::api_key::ApiKeyService::new(
+            database.clone(),
+            users.clone(),
+            roles.clone(),
+            sessions.clone(),
+            outbox,
+            mfa.clone(),
+            passkeys.clone(),
+        ));
         let resets = Arc::new(crate::reset::PasswordResets {
             database: database.clone(),
             jobs: autoxide_kernel::job::JobQueue::new("auth"),
@@ -522,6 +529,7 @@ pub(crate) mod testing {
     impl autoxide_kernel::mail::Mailer for FakeMailer {
         async fn send(
             &self,
+            _tenant: &autoxide_kernel::tenancy::TenantContext,
             mail: autoxide_kernel::mail::Mail,
         ) -> Result<(), autoxide_kernel::error::Error> {
             self.sent.lock().unwrap().push(mail);

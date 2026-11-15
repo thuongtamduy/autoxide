@@ -144,7 +144,10 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
   -H "Authorization: Bearer $TOKEN" -H 'If-Match: "1762934400000000"'
 ```
 
-- `POST /campaigns/{id}/test {"email": …}` sends one test mail.
+- `POST /campaigns/{id}/test {"email": …}` sends one test mail. `GET /campaigns/{id}/preview`
+  gives the mail as it will be sent (subject label, footer), without sending anything.
+- `GET /settings` gives the settings in use (advertising label and daily limit, postal address)
+  and, in `missing`, the settings still to set before sending.
 - `send` takes every confirmed subscriber of the list at that moment (the snapshot), then hands
   mails to the mail queue in batches of `AUTOXIDE_NEWSLETTER_BATCH_SIZE`, at most
   `AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE` a minute. Right before each mail, suppressed,
@@ -161,7 +164,8 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
   insert it into its own page: preview it only inside a sandboxed `<iframe sandbox>` (no
   scripts, no same origin).
 - `GET /campaigns/{id}` shows `progress`: `total`, `pending`, `sent` (handed to the mail
-  queue), `failed`, `skipped`.
+  queue), `failed`, `skipped`, plus `bounced` (hard bounces, also in `failed`) and
+  `unsubscribed` (recipients who unsubscribed with the link of this campaign's mail).
 - Every mail gets a footer (in the campaign's `locale`) with the preferences link and the
   postal address, and the headers `List-Unsubscribe` and
   `List-Unsubscribe-Post: List-Unsubscribe=One-Click`.
@@ -185,7 +189,8 @@ curl -X POST http://localhost:8080/api/v1/newsletter/campaigns/$ID/send \
 
 ## Subscribers
 
-- `GET /subscribers?email=&list_id=&status=` — search by part of the address, list, status.
+- `GET /subscribers?email=&list_id=&status=&blocked=` — search by part of the address, list,
+  subscription status, blocked or not.
 - `POST /subscribers/import` — up to 1000 people into lists as `confirmed`, with a required
   `consent_source` (where they agreed). Someone who unsubscribed from a list stays unsubscribed.
 - `PATCH /subscribers/{id}` (`If-Match`) — name, language, attributes, `blocked`,

@@ -10,6 +10,7 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -23,7 +24,7 @@ use crate::text;
 
 #[async_trait::async_trait]
 impl PersonalData for CommentsService {
-    async fn export(&self, user_id: Uuid) -> Result<Value, Error> {
+    async fn export(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<Value, Error> {
         let mut rows = comment::Entity::find()
             .filter(comment::Column::UserId.eq(user_id))
             .all(self.database.read())
@@ -116,7 +117,13 @@ impl CommentsService {
                 after: None,
             };
             self.outbox
-                .record(&transaction, Actor::system(), None, &events::CommentsErased(change))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    Actor::system(),
+                    None,
+                    &events::CommentsErased(change),
+                )
                 .await?;
         }
         transaction.commit().await?;

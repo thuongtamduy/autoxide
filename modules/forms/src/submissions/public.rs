@@ -18,6 +18,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::rows;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::Throttle;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
@@ -114,11 +115,10 @@ impl FormsService {
         let answers = fields::check_answers(&form.fields, &input.data, &mut problems);
         let data = to_json(&answers.data)?;
         if data.len() > self.config.max_submission_bytes {
-            problems.push(FieldError::new(
-                "data",
-                "length",
-                format!("must be at most {} bytes of JSON", self.config.max_submission_bytes),
-            ));
+            problems.push(
+                FieldError::new("data", "length", "must be at most {max} bytes of JSON")
+                    .with_param("max", self.config.max_submission_bytes),
+            );
         }
         if !problems.is_empty() {
             return Err(Error::validation(problems));
@@ -143,6 +143,7 @@ impl FormsService {
         let checked = self
             .guard
             .check(
+                &TenantContext::legacy_default(&self.database),
                 &Check::new(&scope, client)
                     .principal(trusted)
                     .honeypot(input.trap.as_deref())
@@ -223,10 +224,24 @@ impl FormsService {
                 after: Some(summary(&row, &form.row.key)),
             });
             self.outbox
-                .record(&transaction, actor, events::submission_subject(row.id), &event)
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    events::submission_subject(row.id),
+                    &event,
+                )
                 .await?;
         }
-        match checked.claim(&transaction, "forms", Some(&row.id.to_string())).await? {
+        match checked
+            .claim(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                "forms",
+                Some(&row.id.to_string()),
+            )
+            .await?
+        {
             Claim::New => {
                 transaction.commit().await?;
                 tracing::info!(form_id = %form.row.id, submission_id = %row.id, status = status.as_str(), "form submission stored");
@@ -245,7 +260,7 @@ impl FormsService {
         let limit = |own: Option<i32>, default: u32| {
             own.and_then(|own| u32::try_from(own).ok()).filter(|own| *own > 0).unwrap_or(default)
         };
-        let throttle = |limit: u32| Throttle::new(self.database.clone(), "forms", limit, HOUR);
+        let throttle = |limit: u32| Throttle::new("forms", limit, HOUR);
         Ok(Limits::default()
             .ip(Some(throttle(limit(form.row.ip_limit_per_hour, self.config.per_ip_per_hour))?))
             .email(Some(throttle(limit(

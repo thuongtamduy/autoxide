@@ -6,6 +6,7 @@ use autoxide_auth::api::{Accounts, NewAccount};
 use autoxide_kernel::config::ConfigSource;
 use autoxide_kernel::database::Database;
 use autoxide_kernel::storage::Storage;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::TestDatabase;
 use axum::body::Body;
 use axum::http::{HeaderMap, Request, StatusCode, header};
@@ -55,7 +56,7 @@ pub(crate) async fn admin_token(runtime: &Runtime, email: &str) -> String {
         password: Some(password.to_owned()),
         admin: true,
     };
-    accounts.create(account).await.unwrap();
+    accounts.create(&TenantContext::legacy_default(&runtime.database), account).await.unwrap();
     let login = json!({"email": email, "password": password}).to_string();
     let (_, _, body) = call(
         runtime,

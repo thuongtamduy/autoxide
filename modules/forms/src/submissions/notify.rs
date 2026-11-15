@@ -14,6 +14,7 @@ use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::{Delivered, Event, EventHandler};
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::mail::MailTemplate;
+use autoxide_kernel::tenancy::TenantContext;
 use uuid::Uuid;
 
 use crate::events::SubmissionReceived;
@@ -92,7 +93,11 @@ impl FormsService {
             // Khoá ngắn (cột `unique_key` của job giới hạn độ dài): địa chỉ băm.
             mail.dedupe_key =
                 Some(format!("forms.notify:{id}:{}", autoxide_kernel::secret::sha256(to)));
-            match self.mailer.send(mail.clone()).await {
+            match self
+                .mailer
+                .send(&TenantContext::legacy_default(&self.database), mail.clone())
+                .await
+            {
                 Ok(()) => {}
                 // Bên gửi mail không nhận địa chỉ người gửi làm `Reply-To` (địa chỉ cũ lưu từ
                 // trước khi kiểm chặt hơn…): vẫn báo quản trị viên, chỉ bỏ `Reply-To` — không để
@@ -103,7 +108,7 @@ impl FormsService {
                         "the mailer refused the sender's address as Reply-To; notifying without it"
                     );
                     mail.reply_to = None;
-                    self.mailer.send(mail).await?;
+                    self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await?;
                 }
                 Err(error) => return Err(error),
             }

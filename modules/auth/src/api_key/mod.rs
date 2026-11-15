@@ -4,5 +4,5 @@ mod entity;
 mod service;
 
 pub(crate) use service::{
-    API_KEY_PREFIX, ApiKey, ApiKeyService, CreatedApiKey, NewApiKey, revoke_all_in,
+    API_KEY_PREFIX, ApiKey, ApiKeyService, CreatedApiKey, NewApiKey, Reauth, revoke_all_in,
 };

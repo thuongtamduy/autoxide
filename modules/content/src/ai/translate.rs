@@ -16,6 +16,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
@@ -169,8 +170,7 @@ impl ContentService {
             Err(error) if is_unique_violation(&error) => {
                 return Err(Error::conflict(
                     "content.translation_in_progress",
-                    "A translation of this entry into `{locale}` is already queued or running. \
-                     Wait for it to finish (`GET /api/v1/content/entries/{id}/translation-requests`).",
+                    "A translation of this entry into `{locale}` is already queued or running. Wait for it to finish.",
                 )
                 .with_param("locale", &target_locale)
                 .with_param("id", source.id));
@@ -178,10 +178,18 @@ impl ContentService {
             Err(error) => return Err(error.into()),
         };
         let options = EnqueueOptions::default().max_attempts(MAX_ATTEMPTS);
-        self.jobs.enqueue(&transaction, &TranslateJob { request_id: request.id }, options).await?;
+        self.jobs
+            .enqueue(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                &TranslateJob { request_id: request.id },
+                options,
+            )
+            .await?;
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::entry_subject(source.id),
                 &events::TranslationRequested(Change {
@@ -421,7 +429,13 @@ impl ContentService {
         let ids: Vec<String> = batch.iter().map(|segment| segment.id.clone()).collect();
         let size: usize = batch.iter().map(|segment| segment.text.len()).sum();
         for attempt in 1..=2 {
-            let answer = self.ai.generate(batch_prompt(batch, from, to, size)).await?;
+            let answer = self
+                .ai
+                .generate(
+                    &TenantContext::legacy_default(&self.database),
+                    batch_prompt(batch, from, to, size),
+                )
+                .await?;
             let mut found = BTreeMap::new();
             for item in
                 answer.output.get("segments").and_then(Value::as_array).into_iter().flatten()
@@ -480,6 +494,7 @@ impl ContentService {
             self.outbox
                 .record(
                     &transaction,
+                    &TenantContext::legacy_default(&self.database),
                     Actor::system(),
                     subject,
                     &events::TranslationSucceeded(change),
@@ -487,7 +502,13 @@ impl ContentService {
                 .await?;
         } else {
             self.outbox
-                .record(&transaction, Actor::system(), subject, &events::TranslationFailed(change))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    Actor::system(),
+                    subject,
+                    &events::TranslationFailed(change),
+                )
                 .await?;
         }
         transaction.commit().await?;

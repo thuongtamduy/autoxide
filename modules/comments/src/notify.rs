@@ -21,6 +21,7 @@ use autoxide_kernel::event::{Delivered, Event, EventHandler};
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::mail::MailTemplate;
 use autoxide_kernel::resource::Resource;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tokens::Issued;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
@@ -94,7 +95,13 @@ impl CommentsService {
         if !self.resources.knows(&row.target_type) {
             return Ok(None);
         }
-        self.resources.resolve(&row.target_type, &row.target_id).await
+        self.resources
+            .resolve(
+                &TenantContext::legacy_default(&self.database),
+                &row.target_type,
+                &row.target_id,
+            )
+            .await
     }
 
     /// Đường dẫn đầy đủ tới trang của đích, khi biết địa chỉ website và đường dẫn.
@@ -123,14 +130,23 @@ impl CommentsService {
             [("target", target.as_str()), ("link", link.as_str()), ("hours", hours.as_str())];
         let mut mail = VERIFY_MAIL.mail(email, &self.translations, language, &params);
         mail.dedupe_key = Some(format!("comments.verify:{}", issued.id));
-        self.mailer.send(mail).await
+        self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await
     }
 
     /// Xác minh email bằng token trong mail: bình luận được đánh dấu email đã xác minh và email đó
     /// theo dõi trả lời của nó.
     pub(crate) async fn verify(&self, token: &str) -> Result<(), Error> {
         let transaction = self.database.begin_write().await?;
-        let Some(consumed) = self.tokens.consume(&transaction, VERIFY, token.trim()).await? else {
+        let Some(consumed) = self
+            .tokens
+            .consume(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                VERIFY,
+                token.trim(),
+            )
+            .await?
+        else {
             transaction.rollback().await?;
             return Err(link_invalid());
         };
@@ -169,7 +185,15 @@ impl CommentsService {
     /// Token lạ / đã dùng không phải lỗi (không lộ gì). Trả số dòng theo dõi đã xoá.
     pub(crate) async fn unsubscribe(&self, token: &str, all: bool) -> Result<u64, Error> {
         let transaction = self.database.begin_write().await?;
-        let Some(consumed) = self.tokens.consume(&transaction, UNSUBSCRIBE, token.trim()).await?
+        let Some(consumed) = self
+            .tokens
+            .consume(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                UNSUBSCRIBE,
+                token.trim(),
+            )
+            .await?
         else {
             transaction.rollback().await?;
             return Ok(0);
@@ -229,6 +253,7 @@ impl CommentsService {
                 .tokens
                 .issue(
                     self.database.write(),
+                    &TenantContext::legacy_default(&self.database),
                     UNSUBSCRIBE,
                     &follower.id.to_string(),
                     None,
@@ -243,7 +268,7 @@ impl CommentsService {
             ];
             let mut mail = REPLY_MAIL.mail(&follower.email, &self.translations, language, &params);
             mail.dedupe_key = Some(format!("comments.reply:{id}:{}", follower.id));
-            self.mailer.send(mail).await?;
+            self.mailer.send(&TenantContext::legacy_default(&self.database), mail).await?;
             sent += 1;
         }
         Ok(sent)

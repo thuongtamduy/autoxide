@@ -7,10 +7,12 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Order, Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
+    QuerySelect, Set,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
@@ -109,7 +111,50 @@ pub(crate) fn summary(row: &submission::Model, form_key: &str) -> Value {
     })
 }
 
+/// Submissions of a form by status.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub(crate) struct SubmissionCounts {
+    pub new: i64,
+    pub read: i64,
+    pub archived: i64,
+    pub spam: i64,
+}
+
 impl FormsService {
+    /// Số bài gửi theo trạng thái của từng form trong `form_ids`: một câu `GROUP BY` cho cả trang.
+    /// Form chưa có bài nào thì vắng trong kết quả.
+    pub(crate) async fn submission_counts(
+        &self,
+        form_ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, SubmissionCounts>, Error> {
+        if form_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let rows: Vec<(Uuid, String, i64)> = submission::Entity::find()
+            .select_only()
+            .column(submission::Column::FormId)
+            .column(submission::Column::Status)
+            .expr(sea_orm::sea_query::Func::count(Expr::col(submission::Column::Id)))
+            .filter(submission::Column::FormId.is_in(form_ids.iter().copied()))
+            .group_by(submission::Column::FormId)
+            .group_by(submission::Column::Status)
+            .into_tuple()
+            .all(self.database.read())
+            .await?;
+        let mut counts: HashMap<Uuid, SubmissionCounts> = HashMap::new();
+        for (form_id, status, count) in rows {
+            let entry = counts.entry(form_id).or_default();
+            match SubmissionStatus::parse(&status) {
+                Some(SubmissionStatus::New) => entry.new = count,
+                Some(SubmissionStatus::Read) => entry.read = count,
+                Some(SubmissionStatus::Archived) => entry.archived = count,
+                Some(SubmissionStatus::Spam) => entry.spam = count,
+                None => {}
+            }
+        }
+        Ok(counts)
+    }
+
     /// Một trang bài gửi của form `form_id`, mới trước (mặc định). Cần `forms.read`.
     pub(crate) async fn list_submissions(
         &self,
@@ -199,12 +244,24 @@ impl FormsService {
             after: Some(summary(&after, &before.form_key)),
         };
         self.outbox
-            .record(&transaction, actor, subject.clone(), &events::SubmissionStatusChanged(change))
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                subject.clone(),
+                &events::SubmissionStatusChanged(change),
+            )
             .await?;
         if before.status() == SubmissionStatus::Spam {
             let received = Change { before: None, after: Some(summary(&after, &before.form_key)) };
             self.outbox
-                .record(&transaction, actor, subject, &events::SubmissionReceived(received))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::SubmissionReceived(received),
+                )
                 .await?;
         }
         transaction.commit().await?;
@@ -228,6 +285,7 @@ impl FormsService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::submission_subject(id),
                 &events::SubmissionDeleted(change),
@@ -277,7 +335,13 @@ impl FormsService {
             after: None,
         };
         self.outbox
-            .record(&transaction, Actor::from(principal), None, &events::SubmissionsErased(change))
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                None,
+                &events::SubmissionsErased(change),
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(count = deleted.rows_affected, "submissions of an email address erased");

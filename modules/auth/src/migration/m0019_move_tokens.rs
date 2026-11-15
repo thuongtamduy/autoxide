@@ -189,20 +189,35 @@ mod tests {
 
             let tokens = OneTimeTokens::new("auth");
             let reset = tokens
-                .consume(database.write(), "password_reset", "reset-live")
+                .consume(
+                    database.write(),
+                    &autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                    "password_reset",
+                    "reset-live",
+                )
                 .await
                 .unwrap()
                 .unwrap();
             assert_eq!(reset.subject, user.to_string());
             assert!(
                 tokens
-                    .consume(database.write(), "password_reset", "reset-used")
+                    .consume(
+                        database.write(),
+                        &autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                        "password_reset",
+                        "reset-used"
+                    )
                     .await
                     .unwrap()
                     .is_none()
             );
             let verify = tokens
-                .consume(database.write(), "email_verification", "verify-live")
+                .consume(
+                    database.write(),
+                    &autoxide_kernel::tenancy::TenantContext::legacy_default(&database),
+                    "email_verification",
+                    "verify-live",
+                )
                 .await
                 .unwrap()
                 .unwrap();

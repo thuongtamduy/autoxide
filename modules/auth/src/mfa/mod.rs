@@ -2,7 +2,7 @@
 //! authenticator trên điện thoại (RFC 6238) — và recovery code dùng một lần khi mất
 //! thiết bị.
 
-mod entity;
+pub(crate) mod entity;
 mod recovery;
 pub(crate) mod service;
 

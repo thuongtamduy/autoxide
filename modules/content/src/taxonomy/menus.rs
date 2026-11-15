@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
@@ -109,7 +110,10 @@ impl ContentService {
         let mut flat = Vec::new();
         flatten(&items, None, 1, "items", &mut flat, &mut problems);
         if flat.len() > MAX_ITEMS {
-            problems.push(FieldError::new("items", "length", format!("at most {MAX_ITEMS} items")));
+            problems.push(
+                FieldError::new("items", "length", "at most {max_items} items")
+                    .with_param("max_items", MAX_ITEMS),
+            );
         }
         self.check_targets(&flat, &locale, &mut problems).await?;
         if !problems.is_empty() {
@@ -189,6 +193,7 @@ impl ContentService {
         self.outbox
             .record(
                 &transaction,
+                &TenantContext::legacy_default(&self.database),
                 Actor::from(principal),
                 events::subject("menu", saved.id),
                 &events::MenuChanged(change),
@@ -351,11 +356,10 @@ fn flatten(
     for (index, input) in items.iter().enumerate() {
         let here = format!("{path}[{index}]");
         if depth > MAX_DEPTH {
-            problems.push(FieldError::new(
-                here,
-                "too_deep",
-                format!("menus nest at most {MAX_DEPTH} levels"),
-            ));
+            problems.push(
+                FieldError::new(here, "too_deep", "menus nest at most {max_depth} levels")
+                    .with_param("max_depth", MAX_DEPTH),
+            );
             continue;
         }
         let label = input.label.trim();
@@ -461,7 +465,10 @@ fn menu_not_found(key: &str, locale: &str) -> Error {
 // của người vận hành máy chủ.
 #[async_trait::async_trait]
 impl crate::api::LegacyMenus for ContentService {
-    async fn legacy_menus(&self) -> Result<Vec<crate::api::LegacyMenu>, Error> {
+    async fn legacy_menus(
+        &self,
+        _tenant: &TenantContext,
+    ) -> Result<Vec<crate::api::LegacyMenu>, Error> {
         let menus = menu::Entity::find()
             .order_by_asc(menu::Column::Key)
             .order_by_asc(menu::Column::Locale)

@@ -1,3 +1,17 @@
 {
+  "field:is not an event of this system; see `GET /api/v1/webhooks/events`": "không phải event của hệ thống này; xem `GET /api/v1/webhooks/events`",
+  "field:must be an absolute URL": "phải là URL đầy đủ",
+  "field:must be at most {description_max_length} characters long": "phải dài tối đa {description_max_length} ký tự",
+  "field:must be at most {max} characters long": "phải dài tối đa {max} ký tự",
+  "field:must list 1 to {max_events} event names, or `*` for every event": "phải liệt kê 1 đến {max_events} tên event, hoặc `*` cho mọi event",
+  "field:must name a host": "phải có tên máy chủ (host)",
+  "field:must not contain a user name or password": "không được chứa tên đăng nhập hay mật khẩu",
+  "field:must start with `https://` (`http://` only when the server sets `AUTOXIDE_WEBHOOKS_ALLOW_HTTP=true`, for development)": "phải bắt đầu bằng `https://` (`http://` chỉ khi máy chủ đặt `AUTOXIDE_WEBHOOKS_ALLOW_HTTP=true`, để phát triển)",
+  "field:points to a private or local network address; webhooks are sent only to public addresses unless the server sets `AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true`": "trỏ tới địa chỉ mạng riêng hay mạng cục bộ; webhook chỉ gửi tới địa chỉ công khai, trừ khi máy chủ đặt `AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true`",
+  "text:A webhook endpoint was created.": "Một endpoint webhook được tạo.",
+  "text:A webhook endpoint was deleted.": "Một endpoint webhook bị xoá.",
+  "text:A webhook endpoint's address, events or state changed, or its secret was replaced.": "Địa chỉ, event hay trạng thái của một endpoint webhook thay đổi, hoặc secret của nó được thay.",
+  "text:Create, change and delete webhook endpoints and see their deliveries. An endpoint receives every event it subscribes to, including users' personal data: give it to administrators only.": "Tạo, sửa và xoá endpoint webhook, xem các lần gửi. Endpoint nhận mọi event nó đăng ký, kể cả dữ liệu cá nhân của người dùng: chỉ cấp cho quản trị viên.",
+  "text:Something happened.": "Có việc xảy ra.",
   "webhooks.endpoint_not_found": "Không có webhook `{id}`."
 }

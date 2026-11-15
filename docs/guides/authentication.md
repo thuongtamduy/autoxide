@@ -62,6 +62,10 @@ curl -sS "$API/api/v1/auth/logout" --json '{"refresh_token":"'"$REFRESH"'"}'
 # expect: 204
 ```
 
+## Your sessions
+
+`GET /api/v1/auth/me/sessions` lists the devices signed in to your account: `user_agent`, `sign_in_method` (`password`, `password_and_mfa`, `passkey`, `password_change`) and, when the server's reverse proxy tells it (`AUTOXIDE_AUTH_COUNTRY_HEADER`, e.g. `CF-IPCountry`), the approximate `country`. The IP address is never kept. End a session you do not know with `DELETE /api/v1/auth/me/sessions/{id}`.
+
 ## With the SDK
 
 Give the client a function for the token, so each request reads the current one:

@@ -5,6 +5,7 @@ mod m0001_create_comments;
 mod m0008_name_key_lookalikes;
 mod m0009_questions;
 mod m0010_add_format;
+mod m0012_target_ids;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -30,5 +31,18 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0009_questions::Migration),
         // Định dạng của bài: chữ thường hay Markdown giới hạn (D-252).
         Box::new(m0010_add_format::Migration),
+        // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0011_tenancy_helpers",
+            vec![
+                autoxide_kernel::event::tenant_table("comments"),
+                autoxide_kernel::job::tenant_table("comments"),
+                autoxide_kernel::throttle::tenant_table("comments"),
+                autoxide_kernel::tokens::tenant_table("comments"),
+                autoxide_kernel::antispam::tenant_table("comments"),
+            ],
+        ),
+        // ID của đích, để liệt kê theo trang (D-270).
+        Box::new(m0012_target_ids::Migration),
     ]
 }

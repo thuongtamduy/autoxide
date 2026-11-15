@@ -53,6 +53,8 @@ pub(crate) struct BadgeInput {
 /// Một mục như người gọi gửi (cây).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ItemInput {
+    /// Id của mục đã lưu, để giữ id qua lần lưu này; `None`: mục mới.
+    pub id: Option<Uuid>,
     pub label: Option<String>,
     pub url: Option<String>,
     pub target: Option<RefInput>,
@@ -69,6 +71,8 @@ pub(crate) struct ItemInput {
 pub(crate) struct Flat {
     pub row: item::Model,
     pub path: String,
+    /// Id do người gọi gửi (giữ id của mục đã lưu).
+    pub kept: bool,
 }
 
 /// Một mục kèm các mục con.
@@ -82,8 +86,21 @@ pub(crate) struct Node {
 pub(crate) fn flatten(items: &[ItemInput], problems: &mut Vec<FieldError>) -> Vec<Flat> {
     let mut flat = Vec::new();
     walk(items, None, 1, "items", &mut flat, problems);
+    let mut seen = std::collections::HashSet::new();
+    for entry in flat.iter().filter(|entry| entry.kept) {
+        if !seen.insert(entry.row.id) {
+            problems.push(FieldError::new(
+                format!("{}.id", entry.path),
+                "duplicate",
+                "is given to another item too",
+            ));
+        }
+    }
     if flat.len() > MAX_ITEMS {
-        problems.push(FieldError::new("items", "length", format!("at most {MAX_ITEMS} items")));
+        problems.push(
+            FieldError::new("items", "length", "at most {max_items} items")
+                .with_param("max_items", MAX_ITEMS),
+        );
     }
     for (position, entry) in flat.iter_mut().enumerate() {
         entry.row.position = i32::try_from(position).unwrap_or(i32::MAX);
@@ -102,17 +119,19 @@ fn walk(
     for (index, input) in items.iter().enumerate() {
         let here = format!("{path}[{index}]");
         if depth > MAX_DEPTH {
-            problems.push(FieldError::new(
-                here,
-                "too_deep",
-                format!("menus nest at most {MAX_DEPTH} levels"),
-            ));
+            problems.push(
+                FieldError::new(here, "too_deep", "menus nest at most {max_depth} levels")
+                    .with_param("max_depth", MAX_DEPTH),
+            );
             continue;
         }
         let mut row = check(input, depth, &here, problems);
         row.parent_id = parent;
+        if let Some(kept) = input.id {
+            row.id = kept;
+        }
         let id = row.id;
-        flat.push(Flat { row, path: here.clone() });
+        flat.push(Flat { row, path: here.clone(), kept: input.id.is_some() });
         walk(&input.children, Some(id), depth + 1, &format!("{here}.children"), flat, problems);
     }
 }
@@ -136,11 +155,14 @@ fn check(
     }
     // Nhãn: bắt buộc trừ khi mục trỏ tới đối tượng (khi đó bỏ trống là lấy tiêu đề của nó).
     if label.chars().count() > MAX_LABEL || (label.is_empty() && target.is_none()) {
-        problems.push(FieldError::new(
-            format!("{here}.label"),
-            "length",
-            format!("must be 1 to {MAX_LABEL} characters (it may be empty when `ref` is given)"),
-        ));
+        problems.push(
+            FieldError::new(
+                format!("{here}.label"),
+                "length",
+                "must be 1 to {max_label} characters (it may be empty when `ref` is given)",
+            )
+            .with_param("max_label", MAX_LABEL),
+        );
     }
     if let Some(url) = url
         && !is_link(url)
@@ -166,19 +188,25 @@ fn check(
             ));
         }
         if depth >= MAX_DEPTH {
-            problems.push(FieldError::new(
-                format!("{here}.auto_children"),
-                "too_deep",
-                format!("sub-items would go past {MAX_DEPTH} levels"),
-            ));
+            problems.push(
+                FieldError::new(
+                    format!("{here}.auto_children"),
+                    "too_deep",
+                    "sub-items would go past {max_depth} levels",
+                )
+                .with_param("max_depth", MAX_DEPTH),
+            );
         }
         let limit = input.auto_children_limit.unwrap_or(DEFAULT_AUTO_CHILDREN);
         if !(1..=MAX_AUTO_CHILDREN).contains(&limit) {
-            problems.push(FieldError::new(
-                format!("{here}.auto_children_limit"),
-                "range",
-                format!("must be 1 to {MAX_AUTO_CHILDREN}"),
-            ));
+            problems.push(
+                FieldError::new(
+                    format!("{here}.auto_children_limit"),
+                    "range",
+                    "must be 1 to {max_auto_children}",
+                )
+                .with_param("max_auto_children", MAX_AUTO_CHILDREN),
+            );
         }
         Some(limit)
     } else {
@@ -195,38 +223,42 @@ fn check(
     if let Some(icon) = icon
         && !ICONS.contains(&icon)
     {
-        problems.push(FieldError::new(
-            format!("{here}.icon"),
-            "invalid",
-            format!("must be one of: {}", ICONS.join(", ")),
-        ));
+        problems.push(
+            FieldError::new(format!("{here}.icon"), "invalid", "must be one of: {allowed}")
+                .with_param("allowed", ICONS.join(", ")),
+        );
     }
     let highlight = input.highlight.as_deref().map(str::trim).filter(|value| !value.is_empty());
     if let Some(highlight) = highlight
         && !HIGHLIGHTS.contains(&highlight)
     {
-        problems.push(FieldError::new(
-            format!("{here}.highlight"),
-            "invalid",
-            format!("must be one of: {}", HIGHLIGHTS.join(", ")),
-        ));
+        problems.push(
+            FieldError::new(format!("{here}.highlight"), "invalid", "must be one of: {allowed}")
+                .with_param("allowed", HIGHLIGHTS.join(", ")),
+        );
     }
     let badge = input.badge.as_ref();
     if let Some(badge) = badge {
         let text = badge.text.trim().chars().count();
         if text == 0 || text > MAX_BADGE {
-            problems.push(FieldError::new(
-                format!("{here}.badge.text"),
-                "length",
-                format!("must be 1 to {MAX_BADGE} characters"),
-            ));
+            problems.push(
+                FieldError::new(
+                    format!("{here}.badge.text"),
+                    "length",
+                    "must be 1 to {max_badge} characters",
+                )
+                .with_param("max_badge", MAX_BADGE),
+            );
         }
         if !BADGE_TONES.contains(&badge.tone.as_str()) {
-            problems.push(FieldError::new(
-                format!("{here}.badge.tone"),
-                "invalid",
-                format!("must be one of: {}", BADGE_TONES.join(", ")),
-            ));
+            problems.push(
+                FieldError::new(
+                    format!("{here}.badge.tone"),
+                    "invalid",
+                    "must be one of: {allowed}",
+                )
+                .with_param("allowed", BADGE_TONES.join(", ")),
+            );
         }
         if let (Some(from), Some(until)) = (badge.from, badge.until)
             && until <= from

@@ -12,6 +12,9 @@ pub struct Model {
     pub locale: String,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
+    /// Người tạo hay thay cây mục gần nhất; `None`: không biết (menu trước bản này, hay lệnh
+    /// chạy bằng hệ thống).
+    pub updated_by: Option<Uuid>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

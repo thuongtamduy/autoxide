@@ -60,7 +60,11 @@ impl ContentService {
         for (locale, ids) in wanted {
             let ids: Vec<Uuid> = ids.into_iter().collect();
             for chunk in ids.chunks(autoxide_media::api::MAX_IDS) {
-                for item in self.media.find_many_in(chunk, &locale).await? {
+                for item in self
+                    .media
+                    .find_many_in(&TenantContext::legacy_default(&self.database), chunk, &locale)
+                    .await?
+                {
                     if item.visibility == MediaVisibility::Public {
                         public.insert(item.id);
                         media.insert((locale.clone(), item.id), item);
@@ -122,6 +126,7 @@ impl ContentService {
 }
 
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
+use autoxide_kernel::tenancy::TenantContext;
 
 /// Bộ lọc danh sách bài công khai.
 #[derive(Debug, Clone, Default)]

@@ -21,6 +21,8 @@ pub struct Model {
     pub alt: String,
     pub title: String,
     pub caption: String,
+    /// Ảnh chỉ để trang trí: `alt` để trống có chủ ý (D-267).
+    pub decorative: bool,
     /// `private` hoặc `public`.
     pub visibility: String,
     pub version_id: Uuid,

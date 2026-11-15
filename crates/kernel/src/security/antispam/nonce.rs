@@ -13,6 +13,7 @@ use sea_orm_migration::schema;
 
 use crate::error::Error;
 use crate::secret::sha256;
+use crate::tenancy::TenantContext;
 
 /// Kết quả chèn nonce.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,12 +31,14 @@ pub(crate) fn table_name(module: &str) -> String {
 /// `nonce` đã được nhận (bài đã gửi rồi) chưa — đọc, không ghi.
 pub(crate) async fn exists<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     module: &str,
     nonce: &str,
 ) -> Result<bool, Error> {
     let select = Query::select()
         .expr(Expr::val(1))
         .from(Alias::new(table_name(module)))
+        .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
         .and_where(Expr::col(Alias::new("nonce_hash")).eq(sha256(nonce)))
         .to_owned();
     Ok(connection.query_one(&select).await?.is_some())
@@ -44,6 +47,7 @@ pub(crate) async fn exists<C: ConnectionTrait>(
 /// Chèn `nonce` (đã băm) kèm `result` của lần gửi này; giữ tới `expires_at`.
 pub(crate) async fn claim<C: ConnectionTrait>(
     connection: &C,
+    tenant: &TenantContext,
     module: &str,
     nonce: &str,
     result: Option<&str>,
@@ -51,15 +55,21 @@ pub(crate) async fn claim<C: ConnectionTrait>(
 ) -> Result<Claim, Error> {
     let table = Alias::new(table_name(module));
     let hash = sha256(nonce);
+    let id = tenant.id().as_uuid();
     let insert = Query::insert()
         .into_table(table.clone())
-        .columns([Alias::new("nonce_hash"), Alias::new("result"), Alias::new("expires_at")])
+        .columns(["tenant_id", "nonce_hash", "result", "expires_at"].map(Alias::new))
         .values_panic([
+            id.into(),
             hash.as_str().into(),
             result.map(str::to_owned).into(),
             expires_at.trunc_subsecs(6).into(),
         ])
-        .on_conflict(OnConflict::column(Alias::new("nonce_hash")).do_nothing().to_owned())
+        .on_conflict(
+            OnConflict::columns([Alias::new("tenant_id"), Alias::new("nonce_hash")])
+                .do_nothing()
+                .to_owned(),
+        )
         .to_owned();
     if connection.execute(&insert).await?.rows_affected() == 1 {
         return Ok(Claim::New);
@@ -67,6 +77,7 @@ pub(crate) async fn claim<C: ConnectionTrait>(
     let select = Query::select()
         .column(Alias::new("result"))
         .from(table)
+        .and_where(Expr::col(Alias::new("tenant_id")).eq(id))
         .and_where(Expr::col(Alias::new("nonce_hash")).eq(hash.as_str()))
         .to_owned();
     let result = match connection.query_one(&select).await? {
@@ -76,7 +87,7 @@ pub(crate) async fn claim<C: ConnectionTrait>(
     Ok(Claim::Replay { result })
 }
 
-/// Xoá nonce đã hết hạn trước `before`.
+/// Xoá nonce (mọi khách) đã hết hạn trước `before`.
 pub(crate) async fn purge<C: ConnectionTrait>(
     connection: &C,
     module: &str,
@@ -136,4 +147,15 @@ impl MigrationTrait for NoncesMigration {
             .drop_table(Table::drop().table(Alias::new(table_name(self.module))).to_owned())
             .await
     }
+}
+
+/// Bảng `<module>_antispam_nonces` sau khi nâng theo khách (bước 33 A4): khoá chính `(tenant_id,
+/// nonce_hash)`; index dọn dẹp (mọi khách) `…_expires_sweep_idx`. Thêm vào migration của module
+/// như [`event::tenant_table`](crate::event::tenant_table).
+pub fn tenant_table(module: &str) -> crate::tenancy::migration::TenantTable {
+    let table = table_name(module);
+    crate::tenancy::migration::TenantTable::new(&table)
+        .primary_key(["tenant_id", "nonce_hash"])
+        .sweep_index(format!("{table}_expires_sweep_idx"), ["expires_at"])
+        .drop_index(format!("{table}_expires_idx"))
 }

@@ -324,12 +324,13 @@ async fn bounce_chan_dia_chi() {
         send(&h.service, draft.row.id).await;
         drain(&h).await;
         let mail = h.mailer.to(&people[0]).remove(0);
-        let failed = Delivered::new("mail", autoxide_kernel::mail::DELIVERY_FAILED.to_owned(), json!({"to": format!("Reader <{}>", people[0]), "dedupe_key": mail.dedupe_key, "code": "550"}));
+        let failed = Delivered::new(autoxide_kernel::tenancy::TenantContext::legacy_default(&h.database), "mail", autoxide_kernel::mail::DELIVERY_FAILED.to_owned(), json!({"to": format!("Reader <{}>", people[0]), "dedupe_key": mail.dedupe_key, "code": "550"}));
         let handler = DeliveryFailures(h.service.clone());
         handler.handle(&failed).await.unwrap();
         handler.handle(&failed).await.unwrap();
         let done = h.service.find_campaign(draft.row.id).await.unwrap();
         assert_eq!((done.counts.sent, done.counts.failed), (2, 1));
+        assert_eq!(done.counts.bounced, 1, "a hard bounce counts in `bounced` too");
         assert_eq!(count_events(&h.database, "newsletter.suppression_added").await, 1);
 
         let manager = user(&["manage"]);

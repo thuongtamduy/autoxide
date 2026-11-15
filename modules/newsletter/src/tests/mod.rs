@@ -48,7 +48,12 @@ pub(crate) async fn list(service: &NewsletterService, key: &str, double_opt_in: 
 }
 
 pub(crate) async fn form_token(service: &NewsletterService) -> String {
-    service.guard.issue(SCOPE).await.unwrap().token
+    service
+        .guard
+        .issue(&autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database), SCOPE)
+        .await
+        .unwrap()
+        .token
 }
 
 /// Đăng ký `email` vào `lists` như người lạ, với token mới.

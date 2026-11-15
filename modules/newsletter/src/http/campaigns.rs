@@ -264,6 +264,53 @@ pub(crate) async fn get_campaign(
     Ok(Tagged { version: campaign.row.updated_at, data: campaign.into() })
 }
 
+/// A campaign mail exactly as subscribers get it.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct CampaignPreviewResponse {
+    /// The subject, with the advertising label when the campaign is advertising.
+    subject: String,
+    /// The plain-text body with the footer (list name, preferences link, postal address).
+    body_text: String,
+    /// The HTML body with the preheader and the footer; `null` for a text-only campaign. Show it
+    /// only inside a sandboxed `<iframe sandbox>`, like `body_html`.
+    body_html: Option<String>,
+}
+
+/// Preview a campaign mail.
+///
+/// Requires `newsletter.read`. The mail as it will be sent — subject label, footer, HTML
+/// wrapping — with a placeholder token in its links (they do nothing). Needs the same settings
+/// as sending; see `GET /api/v1/newsletter/settings`.
+#[utoipa::path(
+    get,
+    path = "/campaigns/{id}/preview",
+    extensions(("x-permissions" = json!(["newsletter.read"]))),
+    operation_id = "preview_newsletter_campaign",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the campaign.")),
+    responses(
+        (status = 200, description = "The mail.", body = Data<CampaignPreviewResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `newsletter.read`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No campaign has this id; code `newsletter.campaign_not_found`.", body = Problem),
+        (status = 503, description = "A setting campaign mails need is missing: code `public_url_missing`, `newsletter.preferences_url_missing`, or `newsletter.postal_address_missing` (advertising campaigns); the message names the variable to set.", body = Problem),
+    )
+)]
+pub(crate) async fn preview_campaign(
+    State(service): State<Arc<NewsletterService>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<Data<CampaignPreviewResponse>, Error> {
+    let preview = service.preview(&principal, id).await?;
+    Ok(Data {
+        data: CampaignPreviewResponse {
+            subject: preview.subject,
+            body_text: preview.text,
+            body_html: preview.html,
+        },
+    })
+}
+
 /// Change a campaign.
 ///
 /// Requires `newsletter.manage`. `If-Match` is required. Only a draft or scheduled campaign

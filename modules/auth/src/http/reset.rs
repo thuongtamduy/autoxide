@@ -76,7 +76,7 @@ async fn request_reset(
     request_body = ResetConfirmation,
     responses(
         (status = 204, description = "The password was changed."),
-        (status = 400, description = "The token is unknown, expired or used; code `auth.invalid_reset_token`.", body = Problem),
+        (status = 400, description = "The token is unknown, expired or used; code `auth.invalid_reset_token`, with `reason` (`expired`, `used` or `unknown`). Ask for a new mail with `POST /api/v1/auth/password-reset`.", body = Problem),
         (status = 422, description = "The password does not follow the rules (12 to 128 characters); see `errors`.", body = Problem),
     )
 )]

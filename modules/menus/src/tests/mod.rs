@@ -17,6 +17,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Outbox;
 use autoxide_kernel::migration::{Migrator, ModuleMigrations};
 use autoxide_kernel::resource::{Resource, ResourceDirectory, ResourceRef, ResourceResolver};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_media::api::{Media, MediaRef, MediaVisibility};
 use autoxide_testkit::TestDatabase;
 use uuid::Uuid;
@@ -34,12 +35,13 @@ pub(crate) struct Items;
 
 #[async_trait::async_trait]
 impl ResourceResolver for Items {
-    async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
-        Ok(self.resolve_many(&[id.to_owned()], None).await?.remove(id))
+    async fn resolve(&self, tenant: &TenantContext, id: &str) -> Result<Option<Resource>, Error> {
+        Ok(self.resolve_many(tenant, &[id.to_owned()], None).await?.remove(id))
     }
 
     async fn resolve_many(
         &self,
+        _tenant: &TenantContext,
         ids: &[String],
         locale: Option<&str>,
     ) -> Result<HashMap<String, Resource>, Error> {
@@ -71,7 +73,7 @@ pub(crate) struct Categories;
 
 #[async_trait::async_trait]
 impl ResourceResolver for Categories {
-    async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
+    async fn resolve(&self, _tenant: &TenantContext, id: &str) -> Result<Option<Resource>, Error> {
         let public = !id.starts_with('h');
         Ok((id.starts_with('c') || id.starts_with('h')).then(|| {
             Resource::new(if public { format!("Category {id}") } else { String::new() })
@@ -86,6 +88,7 @@ impl ResourceResolver for Categories {
 
     async fn children(
         &self,
+        _tenant: &TenantContext,
         id: &str,
         _: Option<&str>,
         limit: usize,
@@ -107,7 +110,7 @@ pub(crate) struct Anything;
 
 #[async_trait::async_trait]
 impl ResourceResolver for Anything {
-    async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
+    async fn resolve(&self, _tenant: &TenantContext, id: &str) -> Result<Option<Resource>, Error> {
         Ok(Some(Resource::new(format!("Old {id}")).public(true).url(Some(format!("/old/{id}")))))
     }
 }
@@ -127,7 +130,11 @@ pub(crate) struct FakeMedia;
 
 #[async_trait::async_trait]
 impl Media for FakeMedia {
-    async fn find_many(&self, ids: &[Uuid]) -> Result<Vec<MediaRef>, Error> {
+    async fn find_many(
+        &self,
+        _tenant: &TenantContext,
+        ids: &[Uuid],
+    ) -> Result<Vec<MediaRef>, Error> {
         Ok(ids
             .iter()
             .filter(|id| [PUBLIC_IMAGE, PRIVATE_IMAGE].contains(id))
@@ -148,8 +155,13 @@ impl Media for FakeMedia {
             .collect())
     }
 
-    async fn find_many_in(&self, ids: &[Uuid], locale: &str) -> Result<Vec<MediaRef>, Error> {
-        let mut found = self.find_many(ids).await?;
+    async fn find_many_in(
+        &self,
+        tenant: &TenantContext,
+        ids: &[Uuid],
+        locale: &str,
+    ) -> Result<Vec<MediaRef>, Error> {
+        let mut found = self.find_many(tenant, ids).await?;
         for media in &mut found {
             media.alt = format!("[{locale}]");
         }
@@ -163,7 +175,7 @@ pub(crate) struct FakeLegacy(pub Mutex<Vec<LegacyMenu>>);
 
 #[async_trait::async_trait]
 impl LegacyMenus for FakeLegacy {
-    async fn legacy_menus(&self) -> Result<Vec<LegacyMenu>, Error> {
+    async fn legacy_menus(&self, _tenant: &TenantContext) -> Result<Vec<LegacyMenu>, Error> {
         Ok(self.0.lock().unwrap().clone())
     }
 }

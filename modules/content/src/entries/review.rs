@@ -6,6 +6,7 @@
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
@@ -57,11 +58,23 @@ impl ContentService {
         let subject = events::entry_subject(id);
         if withdraw {
             self.outbox
-                .record(&transaction, actor, subject, &events::ReviewWithdrawn(change))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::ReviewWithdrawn(change),
+                )
                 .await?;
         } else {
             self.outbox
-                .record(&transaction, actor, subject, &events::ReviewRequested(change))
+                .record(
+                    &transaction,
+                    &TenantContext::legacy_default(&self.database),
+                    actor,
+                    subject,
+                    &events::ReviewRequested(change),
+                )
                 .await?;
         }
         transaction.commit().await?;

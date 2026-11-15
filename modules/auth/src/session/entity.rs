@@ -20,6 +20,11 @@ pub struct Model {
     pub user_agent: Option<String>,
     /// Lúc phiên (họ token) bắt đầu; `None` với phiên tạo trước m0015.
     pub session_started_at: Option<DateTimeUtc>,
+    /// Cách mở phiên (`password`, `password_and_mfa`, `passkey`, `password_change`); `None` với
+    /// phiên tạo trước m0024.
+    pub sign_in_method: Option<String>,
+    /// Quốc gia gần đúng (ISO 3166-1 hai chữ) từ header của proxy tin cậy, khi có (D-272).
+    pub country: Option<String>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

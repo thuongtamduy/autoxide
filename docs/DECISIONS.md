@@ -6378,3 +6378,499 @@ Quyết định:
   nằm ở cấu hình bộ lọc thay vì ở mã.
 - Tự viết bộ đọc Markdown: Markdown có nhiều ca biên (link kiểu tham chiếu, lồng nhau, escape); thư viện chuẩn
   CommonMark đáng tin hơn vài trăm dòng tự viết.
+
+## D-253 · Thiết kế đa khách: quyết định nền (bước 33) — 2026-11-15 — agent quyết
+
+Bối cảnh: đặc tả `docs/steps/33-tenancy.md` (thiết kế D-185, D-190) đưa ra bảy quyết định nền và vài lựa chọn để agent
+quyết. Mục này chốt chúng trước khi viết code. Các bước 34–38 dựng trên đây.
+
+Quyết định nền:
+
+1. **Ngữ cảnh khách là tham số tường minh.** Mọi hàm service chạm database nhận `tenant: &TenantContext`.
+   `TenantContext` là nguồn duy nhất của `Database` cho dữ liệu cấp khách hàng (`tenant.database()`): quên khách
+   thì không có database để truy vấn, và trình biên dịch bắt được. Không dùng `tokio::task_local!`: nó mất khi
+   `tokio::spawn`, khó đọc, và chỉ hỏng lúc chạy.
+2. **Mọi database có cùng schema** (mọi module, kể cả bảng mặt điều khiển của `kernel`). Bảng mặt điều khiển chỉ
+   có dữ liệu ở database điều khiển (`DATABASE_URL`). Một `Migrator` cho mọi database.
+3. **Khách mặc định có ID cố định** `tenancy::DEFAULT_TENANT` = `00000000-0000-7000-8000-000000000001`, đúng dạng
+   UUIDv7. Đây là ngoại lệ có chủ đích của luật "UUIDv7 sinh trong ứng dụng": migration của module gán dữ liệu cũ
+   cho khách này mà không phải đọc bảng của `kernel`. Khách mặc định cũng là **khách nền tảng**.
+   Placement `main` cũng có ID cố định: `tenancy::MAIN_PLACEMENT` = `00000000-0000-7000-8000-000000000002`.
+4. **`tenancy::NO_TENANT`** = UUID toàn số 0, chỉ cho job của cả database (lịch dọn dẹp). Không dùng `NULL`, vì
+   unique index coi các `NULL` là khác nhau trên cả hai database.
+5. **Nâng bảng bằng cách dựng lại bảng** (tạo bảng mới → chép → xoá bảng cũ → đổi tên), qua một helper của kernel,
+   một đường code cho cả hai database. `tenant_id` không có `DEFAULT`: một `INSERT` quên khách thì lỗi `NOT NULL`
+   ngay, thay vì âm thầm ghi vào khách mặc định.
+6. **Chế độ `multi` bị khoá tới khi mọi module chuyển xong.** Hằng `tenancy::MULTI_TENANT_READY` là `false` tới
+   commit đóng phần B. Khi đó `AUTOXIDE_TENANCY_MODE=multi` là lỗi cấu hình nói rõ lý do; testkit vẫn bật được.
+7. **Đổi chữ ký trait và hàm kernel là thay đổi phá vỡ hợp đồng module** (D-167): được phép ở bản minor khi còn
+   `0.x`, ghi **Changed** trong `CHANGELOG.md`. Hàm chuyển tiếp bị bỏ thì `#[deprecated]` ở commit đóng phần B
+   (khi không còn ai gọi) và xoá ở đầu bước 34.
+
+Lựa chọn của agent (đặc tả mục "Agent làm bước này tự quyết"):
+
+- **`TenantId` là newtype `TenantId(Uuid)`** ở API của kernel (an toàn kiểu ở chữ ký hàm). Entity của module giữ
+  cột `tenant_id: Uuid` trần: ít ma sát với SeaORM, và lọc theo khách đi qua `ScopeExt` chứ không qua tay.
+- **Mã hoá: AES-256-GCM qua `ring`**, sẵn có trong cây phụ thuộc, không thêm thư viện (chi tiết ở mục của phần A6).
+- **DNS: `hickory-resolver`** (chi tiết ở mục của phần C1).
+- **Chế độ `multi` bắt buộc `AUTOXIDE_SECRET_KEY`.** Khi nhiều khách dùng chung một bản cài, khoá nằm trong database
+  không bảo vệ được bản backup của ai cả. Chế độ `single` chỉ cảnh báo.
+- **Gate phủ `multi` bằng `TEST_TENANCY=multi` ở lượt Postgres:** `TestApp` mặc định đưa người dùng giả vào một khách
+  không mặc định. Mọi test sẵn có chạy ở cả hai chế độ mà thời gian gate không tăng gấp đôi.
+- **Bộ canh SQL trong test:** làm nếu bản SeaORM đang ghim có callback số đo dùng được (tra khi làm phần A5).
+- **Mặc định:** cache khách 10 giây, tối đa 32 database mở, pool mỗi placement 2 kết nối ghi và 4 kết nối đọc. Đo
+  lại ở phần C4.
+- **Hàm chuyển tiếp của phần A4:** `TenantContext::legacy_default(&database)`, `#[doc(hidden)]`.
+
+Lý do: mỗi quyết định giữ một đường duy nhất cho việc lọc theo khách, và để trình biên dịch (thay vì thói quen) bắt
+lỗi quên khách. Chế độ `single` không truy vấn thêm gì mỗi request.
+
+Căn cứ pháp lý (ghi ở mục mã hoá và vị trí dữ liệu khi làm): Luật An ninh mạng 116/2025/QH15, NĐ 53/2022/NĐ-CP
+(lưu dữ liệu tại Việt Nam, chọn được theo từng khách); Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, NĐ 356/2025/NĐ-CP
+(tách biệt dữ liệu, mã hoá khi lưu). Điều khoản cụ thể cần đối chiếu văn bản gốc hay người có chuyên môn pháp lý
+(D-186).
+
+## D-254 · Bảng phụ trợ theo khách, worker và bộ phát trên nhiều database (bước 33 A4) — 2026-11-15 — agent quyết
+
+Phần A4 của bước 33: bảng phụ trợ kernel tạo cho module (`<m>_events`, `<m>_jobs`, `<m>_throttle`, `<m>_tokens`,
+`<m>_antispam_nonces`) mang `tenant_id`; mọi hàm ghi / đọc chúng nhận khách; worker và bộ phát event duyệt mọi
+database của sổ database. Thực thi D-253.
+
+1. **Nâng bảng bằng một dòng migration mỗi module.** Kernel cho `event::tenant_table`, `job::tenant_table`,
+   `throttle::tenant_table`, `tokens::tenant_table`, `antispam::tenant_table` (khai khoá, index của bảng sau khi
+   nâng); module gom chúng vào một `tenancy::migration::adopt("m00xx_tenancy_helpers", …)`. Migration tạo bảng cũ
+   (`jobs_migration`…) giữ nguyên: đã chạy ở bản cài cũ, không được sửa. Module mới vẫn tạo rồi nâng (chép một bảng
+   rỗng, không tốn gì). Index quét mọi khách (bộ phát, worker, dọn dẹp) đổi tên `…_sweep_idx`; khoá chống trùng
+   job thành `(tenant_id, unique_key)`; khoá chính của `throttle` và nonce thành `(tenant_id, …)`; token duy nhất
+   trong khách.
+2. **`Throttle` không giữ database nữa.** Số đếm nằm ở database của khách, nên mỗi hàm nhận `&TenantContext`
+   (nguồn duy nhất của database — D-253 mục 1). `purge` của job dọn dẹp nhận database (quét mọi khách).
+3. **`Delivered` và `JobContext` mang khách**; hàm tạo nhận khách (`Delivered::new(tenant, …)`,
+   `JobContext::for_tenant` / `for_database`) — không có giá trị "khách rỗng" nào để quên. Job của cả database
+   (lịch, `enqueue_database`) ghi `NO_TENANT` và bộ chạy nhận `tenant: None` kèm `database`.
+4. **Chia lượt công bằng**: mỗi lượt, với mỗi database × module, lấy các khách đang có job tới hạn (tối đa 256,
+   `SELECT DISTINCT tenant_id` trên index quét), chia số chỗ trống đều (ít nhất một mỗi khách), điểm bắt đầu xoay
+   vòng giữa các lượt; chỗ thừa đi cho job tới hạn sớm nhất của bất kỳ ai. Chỉ một khách có job thì claim như cũ.
+   Không có job thì câu `DISTINCT` thay câu claim: số truy vấn lúc rảnh không tăng.
+5. **`Claim::claim` nhận `ClaimRequest`** (bảng, khách tuỳ chọn, worker, thời điểm, hạn giữ, số lượng) thay vì
+   bảy tham số rời — thêm điều kiện về sau không phá chữ ký nữa.
+6. **`Modules::worker(concurrency)` / `Modules::dispatcher()` lấy sổ database từ `start`**; giới hạn
+   `concurrency` của mỗi module tính chung mọi database của tiến trình. Bộ phát dựng ngữ cảnh khách cho mỗi event
+   qua `DatabaseRegistry::tenant` (cache có TTL ở `multi`, không truy vấn ở `single`); khách không còn thì event
+   bị đánh dấu hỏng như dòng không đọc được. Outbox chỉ đánh thức bộ phát (lượt sau duyệt mọi database) — không
+   cần kèm placement.
+7. **Module chưa chuyển (phần B) truyền `TenantContext::legacy_default(&database)`** ở mọi chỗ gọi — một chuỗi
+   duy nhất để tìm khi chuyển từng module.
+
+Bài học khi đổi hàng loạt chỗ gọi bằng gợi ý của `rustc`: với hai tham số liền nhau cùng kiểu (`purpose` và
+`token` đều là `&str`), gợi ý "provide the argument" có thể **đổi chỗ** chúng. Mọi lời gọi đã được so lại thứ tự
+tham số với bản trước khi đổi (bỏ tham số khách) trước khi commit.
+
+Thay thế: không. Bổ sung D-253.
+
+## D-255 · Trait của kernel và `api` của module nhận khách (bước 33 A4b) — 2026-11-15 — agent quyết
+
+Phần còn lại của bảng "Chữ ký đổi" (đặc tả 33): `PersonalData`, `ResourceResolver`, `Mailer`, `TextModel`,
+`Embedder`, `IdempotencyStore`, `ToolHandler` và trait `api` của `auth`, `media`, `notes` nhận khách. Bổ sung so
+với bảng của đặc tả (cùng lý do: mọi hàm chạm dữ liệu của khách nhận khách — D-253 mục 1):
+
+1. **`BadgeResolver::badges`, `PostingVerifier::is_verified`, `content::api::LegacyMenus`** cũng nhận khách: chúng
+   đọc dữ liệu cấp khách hàng (người mua, trạng thái xác thực, menu cũ).
+2. **Tool MCP nhận `TenantContext` theo giá trị, đứng đầu** (`|tenant, principal, input|`): lớp xác thực của
+   `/mcp` giải khách của request (như extractor REST) và đặt vào request; tool nào cũng có, không cần tra lại.
+3. **Lớp idempotency lấy khách từ người gọi** (`DatabaseRegistry::tenant(principal.tenant_id())`, kể cả nhân sự
+   nền tảng đang vào khách khác). Lớp này nằm ngoài lớp đặt sổ database vào request nên nhận sổ qua cấu hình
+   của nó; app không có sổ database (chỉ ở test dựng router tay) thì bỏ qua idempotency.
+4. **Trait nội bộ của module `ai`** (nhà cung cấp, embedding) cũng nhận khách và chuyển tiếp — chỗ cho khoá AI theo
+   khách ở phần B4.
+5. Kernel có `Database::detached()` và `tenancy::test_tenant()` chỉ trong `cfg(test)`, cho test đơn vị cần một
+   ngữ cảnh khách mà không truy vấn gì. Test MCP của kernel chuyển sang `TestDatabase` (cần sổ database).
+
+Thay thế: không. Bổ sung D-253, D-254.
+
+## D-256 · Lọc theo khách và kiểm schema theo khách (bước 33 A5) — 2026-11-15 — agent quyết
+
+1. **`TenantScoped` + `ScopeExt`** (`autoxide_kernel::tenancy`): entity cấp khách hàng khai cột `tenant_id` của nó;
+   `.scoped(&tenant)` thêm `WHERE tenant_id = ?` cho `Select`, `SelectTwo`, `SelectTwoMany`, `UpdateMany`,
+   `DeleteMany`, `ValidatedUpdateOne`, `ValidatedDeleteOne` (bản SeaORM 2.0 ghim chỉ cho lọc thêm trên bản đã
+   `validate()` của sửa / xoá một dòng; `delete_by_id` trả sẵn bản đã kiểm). Truy vấn kèm entity thứ hai lọc theo
+   entity chính: entity đi kèm cùng module, nối theo khoá ngoại trong module, nên cùng khách.
+2. **Luật khoá unique**: bắt đầu bằng `tenant_id`, **trừ khoá chỉ gồm cột UUID** — ID sinh trong ứng dụng duy
+   nhất toàn cục nên duy nhất trong khách cũng là duy nhất toàn cục. Luật này phủ đúng các ngoại lệ đặc tả liệt kê
+   (khoá chính `id`, `content_published.entry_id`, `newsletter_subscriptions (subscriber_id, list_id)`) mà không
+   cần danh sách riêng. Index thường: bắt đầu bằng `tenant_id`, hay tên `…_sweep_idx`.
+3. **Ba lớp kiểm**: testkit `schema_tenancy_violations` trên database đã migrate (chạy trong bài sở hữu bảng của
+   binary, cả SQLite và Postgres); `cargo xtask check` luật `entity-tenant` trên mã nguồn (entity thiếu
+   `tenant_id`); trình biên dịch (service không có database nếu không có khách — D-253 mục 1). Danh sách tạm
+   `PENDING_TENANCY` (testkit) là nguồn duy nhất cho cả hai bộ kiểm; bảng đã có `tenant_id` mà còn trong danh sách
+   cũng là vi phạm, để danh sách chỉ ngắn đi.
+4. **Bài rò rỉ `leak_check` và `TestApp` nhiều khách làm cùng phần B1 (`notes`)**: trước khi có module nào lọc
+   theo khách, bài rò rỉ chỉ có thể đỏ; dựng nó cùng module đầu tiên dùng nó, theo đúng cách dùng thật.
+   `kernel_user_flags` (bảng cấp khách hàng của kernel) nằm trong `PENDING_TENANCY`, chuyển ở phần A7 cùng
+   `kernel_tenant_settings`.
+
+Bổ sung D-253.
+
+## D-257 · Mã hoá secret khi lưu, upgrade dữ liệu, xoay khoá (bước 33 A6, dời từ bước 37) — 2026-11-15 — agent quyết
+
+1. **Thuật toán và thư viện: AES-256-GCM qua `ring` 0.17** (đã có trong cây phụ thuộc qua rustls / object_store —
+   không thêm crate để biên dịch; `zeroize` cũng vậy). Nonce 96 bit ngẫu nhiên mỗi lần mã hoá; số lần mã hoá mỗi khoá
+   nhỏ (secret cấu hình, không phải dữ liệu lớn) nên giới hạn 2^32 của nonce ngẫu nhiên không chạm tới. Không tự chế
+   thuật toán.
+2. **Định dạng** `sealed:v1:<key_id>:<base64url(nonce || ciphertext || tag)>`; AAD = mục đích + khách + định danh
+   dòng: chép giá trị sang dòng khác, khách khác hay mục đích khác thì không mở được. `key_id` = 8 ký tự hex đầu của
+   SHA-256 khoá (đây là "số phiên bản khoá" của ROADMAP).
+3. **Khoá** = `SecretKey::derive("autoxide/kernel/seal/v1")`. Khoá cũ: `AUTOXIDE_SECRET_KEY_PREVIOUS` (danh sách) và —
+   khi `AUTOXIDE_SECRET_KEY` đã đặt — khoá gốc kernel từng sinh trong `kernel_secrets`, để lần đầu đặt biến môi trường
+   không làm mất secret nào. Xoay khoá: `autoxide secrets reseal` chạy mọi task `<module>.reseal_secrets`.
+4. **Upgrade dữ liệu (`Module::upgrades`)**: ghi vào cùng bảng `<m>_migrations` như đặc tả. sea-orm-migration báo lỗi
+   khi bảng lịch sử có dòng không nằm trong danh sách, nên upgrade là một mục của danh sách chạy, đặt **ngay sau
+   migration schema nó khai** (`DataUpgrade::after`) — thứ tự trong bảng lịch sử khớp thứ tự chạy, `down` gỡ đúng
+   thứ tự. Upgrade chạy **ngoài** transaction của migration (nó cần đọc / ghi khoá gốc qua kết nối khác — trong
+   transaction ghi của SQLite sẽ tự chờ chính mình) và phải chạy lại được từ đầu; `down` đưa dữ liệu về như cũ để
+   bản trước của chương trình đọc được. Khoá dùng trong upgrade là khoá của chương trình (`Modules::migrator` mang
+   cấu hình khoá module `kernel` đọc); dựng `Migrator` tay thì dùng khoá gốc trong database.
+5. **Cảnh báo**: `autoxide doctor` (bước `secret_key`) và log khởi động nói rõ khi `AUTOXIDE_SECRET_KEY` chưa đặt thì
+   bản backup chứa cả khoá lẫn secret đã mã hoá.
+
+Căn cứ pháp lý: Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15 và Nghị định 356/2025/NĐ-CP yêu cầu biện pháp kỹ thuật
+bảo vệ dữ liệu (mã hoá là biện pháp được nêu); Luật An ninh mạng 116/2025/QH15. Điều khoản cụ thể cần đối chiếu
+văn bản gốc hay người có chuyên môn pháp lý (D-186).
+
+Bổ sung D-253. Thay phần "mã hoá dữ liệu nhạy cảm" của bước 37 (D-190 đã dời sang bước 33).
+
+## D-258 · Cấu hình và secret theo khách (bước 33 A7, D-190) — 2026-11-15 — agent quyết
+
+1. **Khai báo tĩnh, đọc qua trait**: module khai `Module::tenant_settings()` (`TenantSetting::new(name, mô tả)`,
+   `.secret()`), kernel kiểm tên `<module>.<khoá>`, không trùng, có mô tả — lỗi khai báo báo lúc dựng `Modules`.
+   Module đọc bằng `dyn TenantSettings` (`get(&tenant, &SETTING)` → `Option<SettingValue>`); khách chưa đặt thì
+   module tự rơi về cấu hình chung (biến môi trường) — kernel không tự trộn hai nguồn, vì mỗi module biết cấu hình
+   chung của nó.
+2. **Bảng `kernel_tenant_settings`** cấp khách hàng (PK `(tenant_id, name)`), nằm ở database của khách. Secret mã
+   hoá bằng `Sealer` (D-257), AAD = khách + tên cấu hình. `SettingValue` xoá bộ nhớ khi bỏ (`Zeroizing`), `Debug`
+   không in secret. API, tool và event `kernel.setting_changed` không bao giờ mang giá trị secret; event chỉ mang
+   tên (cấu hình thường cũng không mang giá trị — audit log không cần nó, và một cấu hình thường hôm nay có thể
+   thành secret mai sau).
+3. **Một tool MCP chỉ đọc** (`kernel.list_settings`), không tool ghi: đặt khoá đối tác là việc của người quản trị
+   qua REST (đặc tả 33).
+4. **Áp cho `mail` và `ai`** (đặc tả liệt kê `mail.smtp_url`, `mail.from`, `ai.provider`, `ai.api_key`,
+   `ai.model`): làm cùng lúc chuyển hai module đó (phần B3, B4) — chúng cần nhận khách ở mọi đường gửi / gọi trước.
+5. Cùng phần này, `kernel_user_flags` chuyển sang theo khách (bảng cấp khách hàng đầu tiên của kernel): cùng
+   tài khoản ở hai khách là hai bộ cờ. Bảng `kernel_events` (để ghi `kernel.setting_changed`) tạo bằng helper và
+   nâng theo khách như mọi module.
+
+Bổ sung D-253.
+
+## D-259 · Thứ ngoài bảng theo khách ở kernel (bước 33 A8, D-190) — 2026-11-15 — agent quyết
+
+1. **Khoá ký theo khách**: `SecretKey::derive_for(tenant, purpose)` = HMAC của `purpose \0tenant\0 <id>` trên khoá
+   gốc; **khách mặc định dùng đúng khoá `derive(purpose)`** — bản cài một khách nâng cấp không đổi khoá nào, token
+   đã phát vẫn dùng được. Token form chống spam ký bằng khoá của khách (`SpamGuard::issue(&tenant, …)`); endpoint
+   `GET /api/v1/antispam/token` nhận khách của request (tên miền / header ở chế độ nhiều khách).
+2. **Idempotency**: phạm vi băm thêm ID khách; khách mặc định giữ phạm vi cũ (key đang còn hiệu lực không mất khi
+   nâng cấp). Bản ghi nằm ở database của khách (module `idempotency` chuyển ở phần B2).
+3. **`TenantStorage`** bọc `dyn Storage`: tiền tố `storage_prefix()` (khách mặc định không tiền tố — file cũ không
+   phải dời; khách khác `tenants/<id>/`), từ chối khoá có `..`, `.`, `\`, đoạn rỗng hay bắt đầu bằng `/`; liệt kê
+   chỉ trả file của khách (khách mặc định bỏ phần `tenants/`). Module `files` / `media` dùng nó ở phần B6, B9.
+4. **Rate limiting theo IP giữ khoá theo IP, không thêm khách** — khác đặc tả ("khoá theo `(tenant, IP)` khi đã biết
+   khách"). Ở lớp rate limit (chạy trước xác thực), "biết khách" chỉ có thể từ `Host` / header do client gửi: thêm
+   vào khoá thì kẻ tấn công né giới hạn bằng cách đổi `Host` mỗi request; tra sổ khách để chỉ nhận tên miền thật thì
+   mỗi request lạ thành một truy vấn database trước khi bị chặn. Giới hạn theo IP là để chặn một client gửi dồn, không
+   giữ dữ liệu của khách nào nên không có gì để lộ giữa khách. Giới hạn theo API key vốn riêng từng key (ID toàn cục).
+   Login throttling theo khách qua `Throttle` (D-254).
+5. **Con trỏ pagination** không đổi định dạng: dữ liệu đã lọc theo khách nên con trỏ của khách khác không lộ gì —
+   bài kiểm làm cùng module đầu tiên chuyển sang theo khách (B1).
+
+Bổ sung D-253.
+
+## D-260 · Quản lý khách: `TenantAdmin`, `Module::seed_tenant`, REST / MCP / CLI (bước 33 A9a) — 2026-11-15 — agent quyết
+
+1. **Chỉ nhân sự nền tảng quản lý khách.** Role `admin` của khách nào cũng có mọi permission, nên kiểm
+   `kernel.tenants.*` thôi là lỗ hổng: admin của một khách sẽ xem / khoá được khách khác. Mọi thao tác quản lý khách
+   kiểm thêm người gọi thuộc khách mặc định và không đang "vào" khách khác bằng header vận hành
+   (`operator_from` rỗng). Không có permission ở khách thường nào mở được việc này.
+2. **Tạo khách là ba bước chạy lại được**: ghi `kernel_tenants` trạng thái `provisioning` → gọi `TenantSeed` của mọi
+   module theo thứ tự đăng ký → `active`, ghi event `kernel.tenant_created`. Hỏng giữa chừng thì khách giữ
+   `provisioning` (request vào khách đó nhận 503) và `autoxide tenant provision <slug>` chạy lại từ đầu; vì vậy
+   `seed_tenant` của module phải idempotent. Không gói cả ba bước trong một transaction: seed của module ghi vào
+   database của khách, có thể là database khác với control plane.
+3. **`Module::seed_tenant` có cài mặc định** (không gieo gì) — module cũ không phải sửa (D-038). Danh sách seed lấy sau
+   vòng `start` vì seed dùng service module vừa dựng.
+4. **Tên tool MCP** là `kernel.current_tenant`, `kernel.list_tenants`, `kernel.get_tenant` thay vì tên có dấu chấm của
+   đặc tả (`kernel.tenants.current`…): tool của mọi module đặt tên `<module>.<động_từ>_<danh_từ>`, đặc tả viết trước
+   quy ước đó. `kernel.current_tenant` mở cho mọi người đã đăng nhập (chỉ đọc), nên số tool mỗi người dùng thấy tăng
+   một.
+5. **Đổi trạng thái khách dùng `If-Match`** như mọi tài nguyên có phiên bản; khách mặc định không tạm khoá được (khoá
+   nó là khoá cả nhân sự nền tảng).
+6. **Placement chỉ xem, không lộ URL**: `GET /api/v1/kernel/placements` trả tên, trạng thái, số khách; URL kết nối
+   (sẽ mã hoá bằng `Sealer` ở A9b) không bao giờ ra API.
+
+Bổ sung D-253.
+
+## D-261 · Placement: URL mã hoá, `schema_state`, `migrate --all` (bước 33 A9b) — 2026-11-15 — agent quyết
+
+1. **URL kết nối của placement lưu mã hoá** bằng `Sealer` (D-257): mục đích `kernel.placement_url` /
+   `kernel.placement_read_url`, khách `NO_TENANT`, dòng = ID placement. Sổ database mở bằng khoá gốc của chương
+   trình (module `kernel` đưa vào lúc khởi động; CLI qua `Modules::placements`). Giá trị chưa mã hoá vẫn đọc được
+   (chép tay vào bảng) — `autoxide secrets reseal` về sau mã hoá lại như mọi secret. Placement chỉ tạo bằng CLI
+   (`autoxide placement add`), thử kết nối trước khi lưu; `--url -` đọc URL từ stdin để mật khẩu không nằm trong
+   lịch sử shell hay danh sách tiến trình. API không bao giờ trả URL.
+2. **Placement chạy đúng bộ migration của database điều khiển** (D-253 mục 2: mọi database cùng schema). Upgrade
+   dữ liệu trên placement dùng khoá gốc của **database điều khiển** (`Migrator::keyed_on`): module mã hoá secret của
+   mọi khách bằng khoá đó; dùng khoá tự sinh của chính placement thì secret không mở được.
+3. **`schema_state`**: `ready` / `behind` / `migrating`. Khách trên placement khác `ready` nhận `tenant_maintenance`
+   (503) — `TenantContext` mang cờ `schema_ready` (đọc cùng câu tra khách, nối `kernel_placements`, cache theo TTL
+   như khách); worker và dispatcher bỏ qua placement chưa `ready`. Placement `main` luôn `ready` (`serve` đòi database
+   điều khiển đủ migration). Tạo khách trên placement chưa `ready` → `tenant_placement_behind` (409), vì gieo dữ liệu
+   vào bảng chưa có sẽ hỏng giữa chừng.
+4. **Kiểm `schema_state`**: `autoxide placement check`, `migrate up` (chế độ `multi` in placement còn chờ), và `serve`
+   kiểm mỗi phút bằng một tác vụ nền — **không** dùng job lịch `kernel.check_placements` như đặc tả: lịch chạy mỗi
+   database một lần, mà việc này chỉ cần chạy trên database điều khiển, và kernel chưa có bảng job. Lệnh kiểm không
+   đè `migrating`; mọi lệnh đổi trạng thái chỉ ghi khi trạng thái vẫn là giá trị vừa đọc (hai máy chủ cùng kiểm
+   không ghi đè nhau). **Không** kiểm lúc mở pool lần đầu (đặc tả) — tránh một truy vấn migration trên đường request;
+   kiểm định kỳ đã đủ (chậm nhất một phút + TTL cache).
+5. **`migrate up --all`**: `main` trước, rồi từng placement theo tên; mỗi placement `migrating` → migrate + upgrade →
+   `ready`; hỏng thì đặt `behind`, dừng, báo tên placement. Chạy lại tiếp từ chỗ dừng (bảng `<m>_migrations` của từng
+   database nhớ phần đã xong). Một lần migrate chết giữa chừng để lại `migrating`: chạy lại `migrate up --all`.
+6. **Lỗi ở CLI in đủ nguyên nhân** (`describe_error`): lỗi nội bộ giấu nguyên nhân với API nhưng người vận hành máy
+   chủ cần thấy (URL trong thông báo kết nối đã che mật khẩu).
+
+Bổ sung D-253, D-257.
+
+## D-262 · Câu lỗi từng ô dịch theo `Accept-Language`: câu mẫu tiếng Anh làm khoá (đề bài giao diện A1) — 2026-11-15 — agent quyết
+
+Bối cảnh: `detail` chung của Problem đã dịch (D-057), nhưng `errors[].detail` luôn là tiếng Anh — câu được ghép
+sẵn bằng `format!` ở 250 chỗ, không có khoá dịch. Giao diện quản trị hiện nguyên câu đó dưới ô
+(`docs/prompts/web-api-requests.md` mục A1).
+
+Quyết định:
+
+1. `FieldError::new(ô, mã, câu)` nhận **câu mẫu** tiếng Anh; chỗ thay đổi viết `{tên}` và điền bằng
+   `.with_param(tên, giá trị)` (điền một lượt như D-150). `message` vẫn là câu tiếng Anh đã điền — code cũ đọc nó
+   không đổi. Mã (`code`) của từng ô không đổi.
+2. **Khoá dịch là chính câu mẫu**, tiền tố `field:` (cách của gettext: câu gốc làm khoá). Lý do không đặt khoá
+   theo mã: cùng mã `length` có hàng chục câu khác nhau; đặt khoá riêng cho từng chỗ thì 250 khoá đặt tay. Câu mẫu
+   đổi thì bản dịch cũ không còn khớp và gate báo thiếu — bản dịch không bao giờ lặng lẽ cũ đi.
+3. Bản dịch nằm ở `locales/vi.json` của crate phát ra câu; khoá `field:` là của chung (không cần tiền tố module),
+   hai crate cùng câu thì phải cùng bản dịch (khác nhau là lỗi khởi động).
+4. REST (lớp ngôn ngữ) và MCP dịch từng ô; câu chưa dịch thì tiếng Anh. Câu của validator (`#[validate]`) cũng
+   thành câu mẫu, dịch ở `crates/kernel/locales/vi.json`.
+5. `cargo xtask check` (luật `i18n-field`): câu của `FieldError::new` phải là chuỗi viết sẵn (chặn `format!` và biến
+   — không dịch được) và có bản dịch; bản dịch không dùng nữa bị báo thừa. Lỗi của thư viện (JSON hỏng, WebAuthn)
+   đi qua câu mẫu `is not valid: {reason}` — phần `{reason}` là chữ của thư viện, giữ tiếng Anh.
+
+Thay đổi: 231 câu mẫu, bản dịch ở 12 crate. Thêm `FieldError::with_param`, `template`, `params`,
+`Translations::field_message`, `i18n::FIELD_PREFIX` (chỉ thêm; `FieldError::new` nhận thêm `Cow`).
+
+## D-263 · Nhịp chạy gate khi làm việc: gom theo nhóm, gate đầy đủ chỉ trước khi merge — 2026-11-15 — chủ dự án yêu cầu, agent chọn cách
+
+Bối cảnh: chủ dự án (15/11/2026): "Có cách nào coding nhanh hơn không? chứ mỗi lần xong 1 phần mà gate full thì hơi
+tốn thời gian và tài nguyên quá". Sửa `kernel` thì gate nhanh dựng lại và chạy test của mọi crate phụ thuộc (≈ 54 bộ
+test); đặc tả bước 33 còn tự đặt thêm một lượt gate đầy đủ ở cuối mỗi nhóm.
+
+Quyết định (giữ D-173, bỏ phần thêm của đặc tả 33):
+
+1. Trong lúc làm một nhóm việc: `cargo check` và test của đúng crate đang sửa (`cargo test -p <crate> <bộ lọc>`);
+   phần chạm database chạy thêm bài đó trên Postgres.
+2. `./gate.sh --quick` **một lần cho mỗi nhóm việc**, trước commit của nhóm — không sau từng mục nhỏ.
+3. `./gate.sh` (đầy đủ, cả hai database) **chỉ trước khi merge vào `main`** (D-173); bỏ lượt "gate đầy đủ ở cuối mỗi
+   phần" của `docs/steps/33-tenancy.md`.
+4. Thay đổi ở `kernel` gom một lượt, để cả workspace chỉ dựng lại một lần.
+
+Luật "gate đầy đủ xanh mới merge" không đổi.
+
+## D-264 · Đề bài giao diện, nhóm A: câu lỗi cho người dùng, `reason` của token, mô tả theo ngôn ngữ, `/me/permissions`, menu giữ id mục — 2026-11-15 — agent quyết
+
+Đề bài `docs/prompts/web-api-requests.md` mục A (sau A1 ở D-262). Mọi thay đổi chỉ thêm (D-059): không đổi `code`.
+
+1. **Câu `detail` viết cho người dùng** (A2): các lỗi đang nhắc tên endpoint (`auth.wrong_password`,
+   `auth.password_already_set`, các lỗi token của `auth`, `comments.profile_required`, `media.item_in_trash`…) giờ
+   nói người dùng làm gì; endpoint cần gọi chuyển vào mô tả response của OpenAPI (máy và agent đọc ở đó). Đổi câu
+   không phá hợp đồng: `code` mới là hợp đồng (CLAUDE.md "Luật code").
+2. **`reason` của Problem** (A3): trường mở rộng tuỳ chọn (RFC 9457 cho phép), `Error::with_reason`. Token dùng một
+   lần bị từ chối thì `OneTimeTokens::rejection` đọc lại dòng token: `used` (đã dùng hay bị thu hồi), `expired`,
+   `unknown` (không có, hay đã bị dọn sau khi hết hạn). Chỉ người giữ token mới hỏi được về token đó, nên không lộ gì
+   về token của người khác. Áp cho ba mã của `auth` mà trang `/verify-email`, `/reset-password` cần; mã token ở
+   module khác thêm khi giao diện cần.
+3. **Mô tả permission và event theo `Accept-Language`** (A4): cùng cách D-262 — câu tiếng Anh là khoá, tiền tố
+   `text:`; `Translations::describe`. Áp ở `GET /auth/permissions`, `GET /kernel/modules`, `GET /webhooks/events` và
+   `/me/permissions`. `cargo xtask check` đòi bản dịch cho mọi `Permission::new`, `EventInfo::new` và event khai bằng
+   macro `events!`. Tool MCP giữ tiếng Anh (agent đọc, kết quả tool không theo ngôn ngữ).
+4. **`risk` trong `GET /auth/permissions` và `GET /api/v1/me/permissions`** (A5): endpoint mới của kernel, mọi người
+   đã đăng nhập gọi được (`x-permissions: []`), chỉ trả permission người gọi đang có — đúng tập một API key của họ được
+   phép có; không mở sổ permission của cả hệ thống cho người không có `auth.roles.read`.
+5. **`menus`** (A6): `Created::tagged(version)` cho `POST` trả `ETag` như `GET`/`PUT`. `PUT` nhận `id` tuỳ chọn của
+   từng mục: mục có `id` đang thuộc chính menu đó giữ id; `id` lạ hay trùng là lỗi đúng ô (không âm thầm cấp id mới
+   — agent gửi nhầm id sẽ biết); `POST` không nhận `id`. Danh sách có `item_count` (một câu đếm cho cả trang) và
+   `updated_by` (cột mới, `NULL` với menu cũ).
+
+Xếp vào lộ trình: các mục của đề bài này là việc sửa API của module đã có, làm ngay giữa bước 33 theo lệnh chủ dự án
+(15/11/2026); không thêm bước mới. Phần thuộc bước sau (mục E của đề bài) làm cùng bước đó.
+
+## D-265 · Đề bài giao diện, nhóm B (auth, audit, webhooks): dữ kiện theo lô, tên người qua sổ đối tượng, tự đặt mật khẩu qua thư — 2026-11-15 — agent quyết
+
+1. **Không gọi lặp theo từng dòng**: mọi trường mới của danh sách lấy bằng vài câu truy vấn gộp cho cả trang
+   (`has_password`/`last_sign_in_at` một câu, `mfa_enabled` một câu, role một câu nối bảng, lần gửi webhook mới nhất
+   hai câu). `include=…` là tham số chọn thêm (giá trị liệt kê, sai thì 400) — trường thêm vắng khi không chọn.
+2. **`api::User` không đổi** (kiểu công bố cho module khác — thêm trường là phá hợp đồng): dữ kiện tài khoản cho trang
+   quản trị (`AccountFacts`) chỉ ở tầng REST/MCP của `auth`. `last_sign_in_at` là cột mới của `auth_user`, ghi cùng
+   transaction mở phiên (đăng nhập, đổi mật khẩu); tài khoản có sẵn để `NULL` tới lần đăng nhập sau.
+3. **Tự đặt mật khẩu đầu tiên** (tài khoản vào bằng passkey): **không** thêm endpoint. Luồng đặt lại qua thư
+   (`POST /auth/password-reset`) đã đặt được mật khẩu cho tài khoản chưa có, và nhận thư ở chính địa chỉ của mình là
+   bằng chứng chủ tài khoản. Một endpoint "đặt mật khẩu bằng access token" sẽ cho kẻ lấy được access token tạo một
+   cách đăng nhập lâu dài — không làm. `has_password` cho giao diện biết để hiện nút đó; tài liệu `DELETE /me` chỉ rõ.
+4. **Email đang chờ**: đọc từ token xác minh còn dùng được mà địa chỉ khác email hiện tại (`OneTimeTokens::live`);
+   huỷ = thu hồi các token xác minh của tài khoản (`DELETE /auth/me/email`, event `auth.email_change_cancelled`).
+5. **Tên người làm trong audit** đi qua sổ đối tượng của kernel (D-123): `auth` đăng ký loại `auth.user` (tên hiển
+   thị, riêng tư, chủ là chính người đó); `audit` tra theo lô. `audit` không phụ thuộc `auth` (D-046); chương trình
+   không có `auth` thì không có tên. Các nơi khác cần tên người (người tải tệp media, người sửa phiên bản) dùng lại
+   loại này.
+6. Lọc người dùng theo role để cho bước 34 (`GET /memberships?role_id=`).
+
+## D-266 · Đề bài giao diện, nhóm B (content): lọc bài, đường dẫn công khai, lịch đăng mọi bài, SEO theo ngôn ngữ — 2026-11-15 — agent quyết
+
+1. **Lọc bài** (`GET /content/entries`): `review_requested`, `scheduled` (có lịch đăng/gỡ đang chờ — subquery trên
+   `content_schedule`), `created_by` (`me` đổi thành người gọi ở tầng HTTP), `ai_generated`, `missing_locale` (nhóm
+   bản dịch chưa có mục mang ngôn ngữ đó). Một câu truy vấn, chạy như nhau trên SQLite và Postgres.
+2. **`path` của bài là đường dẫn đã lưu ở bản công khai** (`content_published.path`), **không** kèm tiền tố ngôn ngữ:
+   core không quyết website đặt ngôn ngữ vào đường dẫn thế nào (`/vi/…`, tên miền riêng, tham số) — đó là việc của
+   website. `published_at` và `path` lấy cho cả trang bằng một câu; `version` là chính giá trị của `ETag`, dùng cho
+   `If-Match` khi sửa từ danh sách.
+3. **`entry_count` và `q`** cho danh mục, thẻ, tác giả: đếm theo lô một câu `GROUP BY`; tìm theo chữ so trên tên đã
+   bỏ dấu (`search::fold`) trong bộ nhớ, vì số danh mục/tác giả của một website nhỏ (hàng trăm) — không thêm cột
+   khoá tìm kiếm. Đo thấy chậm thì thêm cột gấp chữ như `media` (D-117).
+4. **`GET /content/schedules`**: lịch đăng của mọi bài, lọc `status`, phân trang chuẩn. Lịch đăng nhận `ai_reviewed`
+   (cột `ai_reviewed_by` mới): người duyệt là người đặt lịch; API key không được đánh dấu đã duyệt
+   (`content.ai_review_requires_human`), giữ luật "AI không tự đăng" (D-109). Khi chạy lịch, dấu duyệt ghi theo
+   người đã duyệt lúc đặt.
+5. **Câu của kết quả kiểm SEO** là câu mẫu tiếng Anh làm khoá (`"text:<câu>"`, cùng cơ chế mô tả D-264), dịch theo
+   `Accept-Language`; `code` giữ nguyên cho máy.
+6. **Bản xem trước** trả `featured_media` và `body_media` (địa chỉ ảnh) chỉ cho tệp media công khai, đọc qua trait
+   của `media` — không lộ tệp riêng tư qua link xem trước.
+
+## D-267 · Đề bài giao diện, nhóm B (media): cờ `decorative`, `alt_missing`, tóm tắt thư viện; "đang dùng ở đâu" dời sang bước 51 — 2026-11-15 — agent quyết
+
+1. **`decorative`** là cột mới của `media_item` (mặc định `false`), sửa qua `PATCH` như `alt`. "Ảnh thiếu alt"
+   = ảnh (`image/*`), `alt` mặc định trống, không `decorative` — một điều kiện dùng chung cho bộ lọc
+   `alt_missing` và cho `images_missing_alt` của `GET /media/summary`, để hai con số luôn khớp. Bản dịch `alt`
+   (D-202) không tính: thiếu bản dịch là việc của từng ngôn ngữ, không phải "ảnh không có alt".
+2. **`GET /media/summary`**: ba câu đếm (số item và tổng dung lượng, ảnh thiếu alt, thùng rác). `SUM` của
+   cột BIGINT ép về `BIGINT` vì Postgres trả NUMERIC; không có dòng nào thì 0. Dung lượng chỉ tính nội dung
+   hiện tại, không tính ảnh thu nhỏ.
+3. **`item_count` của thư mục**: item nằm thẳng trong thư mục, không tính thùng rác, đếm theo lô một câu
+   `GROUP BY` cho cả trang. Trường luôn có (kể cả khi tạo, sửa, đọc một thư mục).
+4. **Tên người tải lên** (`include=uploader` → `uploaded_by_name`) qua sổ đối tượng, loại `auth.user` (D-265
+   mục 5); `media` không phụ thuộc `auth`. Chỉ ở danh sách REST; tool MCP `media.list` nhận `alt_missing`,
+   `media.update` nhận `decorative` (luật kiến trúc 8).
+5. **`GET /media/{id}/usages` ("đang dùng ở đâu") không làm ở đây**, dời sang bước 51. Trả lời đúng cần sổ
+   "ai đang trỏ tới đối tượng nào" cho MỌI module (bài, trang, menu, sản phẩm, form…): `media` không được đọc
+   bảng của module khác (luật kiến trúc 1), và bắt từng module tự báo qua một trait riêng cho media sẽ lặp lại
+   đúng thứ sổ đối tượng của bước 51 dựng chung. Đến bước 51: mỗi module khai tham chiếu tới đối tượng khác qua
+   sổ đối tượng, `media` trả danh sách đó. Trong lúc chờ, giao diện giữ dòng "máy chủ chưa liệt kê được".
+
+## D-268 · Đề bài giao diện, nhóm B (forms): số bài theo trạng thái, nhãn lựa chọn theo phiên bản, kiểu của `value` — 2026-11-15 — agent quyết
+
+1. **`submissions` của form** (`new`, `read`, `archived`, `spam`): một câu `GROUP BY form_id, status` cho cả trang;
+   có ở danh sách và khi đọc một form (REST và tool MCP `forms.list`), vắng trong câu trả lời của tạo / sửa — ở
+   đó con số không phải thứ người gọi vừa hỏi, và bớt một câu truy vấn trên đường ghi.
+2. **`answers[].choices`** cho trường `select`, `radio`, `checkbox`: lựa chọn đã chọn kèm nhãn của **đúng phiên
+   bản form lúc gửi** (ảnh chụp trường đã lưu theo phiên bản, D-150). Giá trị không còn trong phiên bản đó (dữ liệu
+   cũ hơn luật kiểm) đi kèm nhãn rỗng thay vì bị bỏ — giao diện hiện giá trị thô.
+3. **Kiểu của `value`** trong hợp đồng: `oneOf` bốn kiểu `string | number | string[] | boolean` (trước là "kiểu
+   nào cũng được", D-241). Server chưa bao giờ trả kiểu khác, nên với client đây là thu hẹp an toàn; `api-diff`
+   không chứng minh được điều đó cho `oneOf` nên bốn chỗ được ghi ngoại lệ trong `xtask/api-breaking-allow.json`
+   với quyết định này. Bộ kiểm hợp đồng của testkit (D-241) kiểm mọi response thật theo kiểu mới.
+
+## D-269 · Đề bài giao diện, nhóm B (newsletter): trang cài đặt, xem trước thư, số huỷ và bounce của chiến dịch — 2026-11-15 — agent quyết
+
+1. **`GET /newsletter/settings`** chỉ đọc, chỉ giá trị không phải secret: nhãn quảng cáo, giới hạn thư quảng cáo
+   mỗi ngày, địa chỉ bưu chính, tốc độ gửi, và các URL cần để gửi đã đặt chưa; `missing` liệt kê tên biến môi
+   trường còn thiếu. Đổi cấu hình vẫn là việc của người vận hành (biến môi trường) — không có endpoint ghi. **Địa
+   chỉ người gửi** (`AUTOXIDE_MAIL_FROM`) thuộc module `mail`, `newsletter` không đọc cấu hình module khác; nó đi
+   vào endpoint cấu hình cho giao diện của phần C.
+2. **`GET /campaigns/{id}/preview`** dựng thư bằng **đúng hàm** dựng thư khi gửi (`campaign_mail`), với token giữ
+   chỗ `preview` trong link — không có hai bản logic lệch nhau. Thiếu cấu hình thì báo cùng lỗi như khi gửi (503,
+   mã nói rõ biến cần đặt). Quyền `newsletter.read`: nội dung thư đã đọc được qua `GET /campaigns/{id}`.
+3. **Số huỷ đăng ký của chiến dịch**: cột mới `unsubscribed_at` của `newsletter_deliveries`, ghi trong cùng
+   transaction với việc huỷ, khi người nhận huỷ **danh sách của chính thư đó** bằng link trong thư (huỷ một chạm hay
+   trang lựa chọn mở từ thư). Huỷ bằng cách khác (quản trị viên, xoá dữ liệu) không tính cho chiến dịch nào. Lượt
+   gửi có sẵn để `NULL`: số huỷ của chiến dịch cũ không dựng lại được.
+4. **`bounced`** = lượt gửi `failed` với lỗi `hard_bounce` (đã có, D-115), đếm trong cùng câu `GROUP BY` với tiến
+   độ (thêm cột `error` vào nhóm). Khiếu nại và bounce mềm báo theo email qua `POST /bounces`, không gắn với lượt
+   gửi nào, nên không tính cho chiến dịch.
+5. Lọc người đăng ký `blocked=true|false` (REST và tool MCP `newsletter.find_subscribers`); `status` vẫn là trạng
+   thái đăng ký trong danh sách như cũ (D-059).
+
+## D-270 · Đề bài giao diện, nhóm B (comments): tiêu đề của đích qua sổ đối tượng, danh sách đích có ID riêng — 2026-11-15 — agent quyết
+
+1. **`target_title` / `target_url` của bình luận** (danh sách kiểm duyệt và khi đọc một bình luận) tra qua sổ đối
+   tượng (D-123), một lần cho mỗi loại đích của trang. Chỉ trả khi đích **đang công khai** (`Resource.public`):
+   bộ tra không đưa tiêu đề bản nháp ra ngoài module của nó, và người kiểm duyệt bình luận không mặc nhiên có quyền
+   đọc bản nháp. Loại không có bộ tra (cấu hình cho phép mà không module nào mô tả): vắng, giao diện hiện ID.
+2. **`GET /comments/targets`**: đích đã có bình luận (hay đã được đặt trạng thái), lọc theo loại, trạng thái đang
+   áp dụng (`open` / `closed`, cùng luật `is_open`: ẩn hay quá `closes_at` là đóng) và `pending`. Để phân trang bằng
+   cursor như mọi danh sách (`fetch_page` cần một UUID duy nhất, khoá chính của bảng là hai chuỗi), bảng
+   `comments_targets` có thêm cột `uid` (UUIDv7, sinh trong ứng dụng; dòng có sẵn được cấp ở migration `m0012`,
+   index duy nhất). Cột để nullable trong database vì SQLite không thêm được cột `NOT NULL` không mặc định; mọi dòng
+   đều có giá trị và entity khai không null. Thứ tự: đích mới có bình luận đầu tiên trước.
+3. `title` / `url` trong `TargetResponse` chỉ có ở danh sách của quản trị viên; câu trả lời công khai giữ nguyên
+   hình dạng (D-059). Chưa thêm tool MCP cho danh sách đích: tool `comments.queue` đã đủ cho việc kiểm duyệt của
+   agent; thêm khi có nhu cầu (luật kiến trúc 8 chỉ cấm MCP làm hơn REST).
+
+## D-271 · Cấu hình cho giao diện: `Module::client_config` và `GET /api/v1/kernel/client-config` (đề bài giao diện C) — 2026-11-15 — agent quyết
+
+1. **Một endpoint chỉ đọc**, `GET /api/v1/kernel/client-config`, gom phần của từng module dưới tên module.
+   **Không cần đăng nhập** (giao diện cần ngôn ngữ, địa chỉ công khai ngay cả ở trang đăng nhập); đổi lại, luật cho
+   module: chỉ đưa giá trị ai xem cũng được — không secret, không URL có mật khẩu (`mail` chỉ cho địa chỉ người gửi
+   và cờ `sends`, không bao giờ `AUTOXIDE_MAIL_SMTP_URL`).
+2. **Hàm mới của `Module`** có cài đặt mặc định trả `None` (D-038): `fn client_config(&self) ->
+   Result<Option<ClientSection>, Error>`. `ClientSection::new(&value)` nhận struct `Serialize + ToSchema`; giá trị
+   đọc một lần sau khi mọi module khởi động (cấu hình không đổi khi chương trình đang chạy).
+3. **Tài liệu OpenAPI đủ từng trường** mà kernel không biết module nào: lược đồ `ClientConfigResponse` được ghép
+   lúc dựng route từ lược đồ của từng phần (`T::schema()`), mỗi module một thuộc tính bắt buộc. Testkit kiểm câu
+   trả lời thật theo lược đồ ghép này (D-241). Struct của phần chỉ nên có trường đơn giản: lược đồ được chép nguyên,
+   không kéo theo component khác.
+4. Phần đã khai: `kernel` (`public_url`, `version`), `content` (ngôn ngữ, ngôn ngữ mặc định, tiền tố đường dẫn
+   bài, host được nhúng, cỡ thân bài tối đa), `media` (cỡ tải lên, loại cho phép, ngôn ngữ alt, cỡ ảnh thu nhỏ, số
+   ngày trong thùng rác), `menus` (ngôn ngữ), `mail` (người gửi, có gửi thật không). "Địa chỉ công khai theo
+   khách" (dòng của đề bài ở mục Kết nối đối tác) chưa làm: địa chỉ theo khách thuộc tên miền của khách, bước 33 C1.
+
+## D-272 · Đề bài giao diện, nhóm D (auth): cách đăng nhập và quốc gia của phiên, tên loại passkey, quản trị API key, xác nhận lại bằng passkey/TOTP — 2026-11-15 — agent quyết
+
+1. **Phiên đăng nhập** mang `sign_in_method` (`password`, `password_and_mfa`, `passkey`, `password_change`) và
+   `country`: hai cột mới của `auth_refresh_token`, chép sang mỗi token mới của cùng họ như `user_agent`.
+   - **Vị trí gần đúng = mã quốc gia ISO 3166-1, không lưu IP, không tra cơ sở dữ liệu GeoIP.** Lấy từ header do
+     reverse proxy / CDN tin cậy đặt (`AUTOXIDE_AUTH_COUNTRY_HEADER`, vd `CF-IPCountry`); không đặt thì không có. Lý
+     do: tối thiểu hoá dữ liệu cá nhân — quốc gia đủ để người dùng nhận ra phiên lạ; IP và thành phố là dữ liệu chi
+     tiết hơn mức cần, và một cơ sở GeoIP là thư viện / dữ liệu ngoài cần cập nhật. Mã lạ (`XX` "không biết") bị bỏ.
+   - **Hạn lưu = đời của phiên**: dòng token bị job dọn xoá khi phiên hết hạn hay bị thu hồi (D-079), quốc gia mất
+     theo. Căn cứ: nguyên tắc hạn chế mục đích, tối thiểu hoá và hạn lưu trữ của Nghị định 13/2023/NĐ-CP (hiệu lực
+     1/7/2023) và Luật Bảo vệ dữ liệu cá nhân 2025 (hiệu lực 1/1/2026) — cần đối chiếu văn bản gốc / người có
+     chuyên môn pháp lý về thông báo cho chủ thể dữ liệu trong chính sách bảo mật của từng website.
+   - Ghi quốc gia là một lệnh ghi riêng ngay sau khi mở phiên (không đổi chữ ký các hàm đăng nhập); lỗi ghi chỉ ghi
+     log — đây là thông tin để nhận ra phiên, không dùng để quyết định gì.
+2. **Tên loại passkey**: cột `aaguid` của `auth_passkey`, lấy từ dữ liệu đăng ký (`NULL` khi authenticator không
+   khai — mã toàn 0 — hay passkey cũ). Tên tra trong `modules/auth/data/passkey-authenticators.json`: **chỉ cặp mã →
+   tên sản phẩm** (sự kiện do hãng công bố), đối chiếu với danh sách cộng đồng
+   `passkeydeveloper/passkey-authenticator-aaguids`; không chép biểu tượng (danh sách đó không ghi giấy phép). Cập
+   nhật bảng là sửa tệp dữ liệu, không sửa code.
+3. **Quản trị API key**: permission mới `auth.api_keys.manage` (rủi ro `destructive`), `GET /auth/all-api-keys`
+   (lọc `user_id`, kèm tên và email chủ key, không bao giờ có secret) và `DELETE /auth/all-api-keys/{id}`; event
+   `auth.api_key_revoked` ghi người thu hồi. Đặt dưới một đường dẫn riêng để `/auth/api-keys` vẫn chỉ là key của
+   chính mình (D-059). Chưa theo khách: `auth` chưa chuyển sang theo khách (bước 33 B), khi chuyển thì danh sách tự
+   giới hạn trong khách.
+4. **Xác nhận lại khi tạo API key**: ngoài `current_password`, nhận `totp_code` hoặc passkey (`passkey_ceremony_id` từ
+   `POST /auth/login/passkey/options` và `passkey_credential`, câu trả lời của trình duyệt; hai trường phẳng vì tool
+   MCP dùng chung kiểu đầu vào và không nhận kiểu lồng) — đúng một trong ba. Mã TOTP đi qua cùng giới
+   hạn sai và chống dùng lại như lúc đăng nhập; passkey phải là của chính người gọi. Dùng lại nghi thức đăng nhập
+   passkey sẵn có thay vì thêm endpoint "bắt đầu xác nhận lại". Khi không dùng mật khẩu, transaction tạo key vẫn khoá
+   dòng người dùng (`lock_grant`) để tài khoản vừa bị khoá không tạo được key.
+
+## D-273 · Merge vào `main` giữa bước 33 để giao diện dùng API mới, không phát hành — 2026-11-15 — chủ dự án quyết
+
+Chủ dự án hỏi merge vào `main` mà không phát hành có được không, rồi bảo "làm hết luôn đừng chờ gì". Quyết định:
+- Merge nhánh làm việc vào `main` khi **gate đầy đủ xanh** (SQLite + Postgres), kể cả khi bước 33 còn mục `[ ]` —
+  ngoại lệ cho D-248 ("merge khi xong trọn một bước"), vì team giao diện cần các endpoint của đề bài A–D ngay.
+- Không phát hành, không tạo tag: bản phát hành vẫn theo D-248 (cuối giai đoạn A hay khi chủ dự án bảo).
+- Điều kiện để `main` luôn dùng được: phần dở của bước 33 không đổi hành vi mặc định (chế độ `single`; `multi` vẫn bị
+  từ chối tới khi mọi module theo khách), và mọi thay đổi chỉ thêm (D-059).

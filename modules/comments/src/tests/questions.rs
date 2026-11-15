@@ -13,6 +13,7 @@ use autoxide_kernel::pagination::{Order, PageQuery, PageRequest};
 use autoxide_kernel::resource::{
     BadgeResolver, Resource, ResourceChange, ResourceEvent, ResourceResolver,
 };
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::TestDatabase;
 use serde_json::json;
 use uuid::Uuid;
@@ -34,7 +35,7 @@ struct Products;
 
 #[async_trait::async_trait]
 impl ResourceResolver for Products {
-    async fn resolve(&self, id: &str) -> Result<Option<Resource>, Error> {
+    async fn resolve(&self, _tenant: &TenantContext, id: &str) -> Result<Option<Resource>, Error> {
         Ok(id.starts_with('p').then(|| Resource::new("Bếp từ").public(true)))
     }
 }
@@ -44,7 +45,12 @@ struct Sellers;
 
 #[async_trait::async_trait]
 impl BadgeResolver for Sellers {
-    async fn badges(&self, _: &str, author: &Principal) -> Result<Vec<&'static str>, Error> {
+    async fn badges(
+        &self,
+        _tenant: &TenantContext,
+        _: &str,
+        author: &Principal,
+    ) -> Result<Vec<&'static str>, Error> {
         Ok(if author.allows("catalog.manage") { vec!["seller"] } else { Vec::new() })
     }
 }
@@ -55,7 +61,12 @@ struct Buyers(Mutex<HashSet<Uuid>>);
 
 #[async_trait::async_trait]
 impl BadgeResolver for Buyers {
-    async fn badges(&self, _: &str, author: &Principal) -> Result<Vec<&'static str>, Error> {
+    async fn badges(
+        &self,
+        _tenant: &TenantContext,
+        _: &str,
+        author: &Principal,
+    ) -> Result<Vec<&'static str>, Error> {
         let bought = self.0.lock().unwrap().contains(&author.user_id());
         Ok(if bought { vec!["verified_buyer"] } else { Vec::new() })
     }
@@ -67,7 +78,7 @@ struct Verified(Mutex<HashSet<Uuid>>);
 
 #[async_trait::async_trait]
 impl PostingVerifier for Verified {
-    async fn is_verified(&self, user_id: Uuid) -> Result<bool, Error> {
+    async fn is_verified(&self, _tenant: &TenantContext, user_id: Uuid) -> Result<bool, Error> {
         Ok(self.0.lock().unwrap().contains(&user_id))
     }
 }
@@ -276,8 +287,13 @@ async fn luu_tru_dich_thi_dong_va_an_hoi_dap() {
             service: Arc::clone(service),
             events: crate::posting::targets::owner_events(&declared, &service.config.target_types),
         };
-        let event = Delivered::new("catalog", "catalog.product_archived", json!({}))
-            .subject(Some(format!("{PRODUCTS}:{PRODUCT}")));
+        let event = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
+            "catalog",
+            "catalog.product_archived",
+            json!({}),
+        )
+        .subject(Some(format!("{PRODUCTS}:{PRODUCT}")));
         handler.handle(&event).await.unwrap();
         handler.handle(&event).await.unwrap();
 
@@ -295,8 +311,13 @@ async fn luu_tru_dich_thi_dong_va_an_hoi_dap() {
             .unwrap_err();
         assert_eq!(refused.code(), "comments.target_closed");
         // Đích loại khác, hay event không khai: không đụng tới.
-        let other = Delivered::new("catalog", "catalog.product_archived", json!({}))
-            .subject(Some("content.entry:public-1".to_owned()));
+        let other = Delivered::new(
+            autoxide_kernel::tenancy::TenantContext::legacy_default(&service.database),
+            "catalog",
+            "catalog.product_archived",
+            json!({}),
+        )
+        .subject(Some("content.entry:public-1".to_owned()));
         handler.handle(&other).await.unwrap();
         assert!(service.target("content.entry", "public-1").await.is_err(), "kind not enabled");
     })

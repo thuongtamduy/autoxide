@@ -54,9 +54,13 @@ curl -X POST "http://localhost:8080/api/v1/media?name=team.jpg" \
 - `GET /api/v1/media` — một trang item. Bộ lọc: `folder_id` (`root` hay một ID; chỉ thư
   mục đó, không gồm thư mục con), `type` (`image/png` hay `image/*`), `visibility`
   (`public` / `private`), `trashed=true` (thùng rác), `q` (tên chứa chuỗi, không phân biệt
-  hoa thường), `tag` (mang nhãn này, không phân biệt hoa thường). Thứ tự:
+  hoa thường), `tag` (mang nhãn này, không phân biệt hoa thường), `alt_missing=true` (ảnh
+  chưa có alt và không đánh dấu `decorative`). Thứ tự:
   `sort=created_at|name|size` với `order=asc|desc`. Lật trang theo
-  `pagination.next_cursor`, giữ nguyên bộ lọc.
+  `pagination.next_cursor`, giữ nguyên bộ lọc. `include=uploader` thêm `uploaded_by_name`, tên
+  người tải lên từng item.
+- `GET /api/v1/media/summary` — số liệu cả thư viện: `items`, `bytes`, `images_missing_alt`,
+  `trashed_items`.
 
 ## Sửa
 
@@ -64,7 +68,8 @@ Lệnh sửa cần `ETag` đã đọc, gửi trong `If-Match` (`*` để sửa b
 thì nhận `428` (mã `precondition_required`); ai đó vừa sửa trước thì `412` (mã
 `precondition_failed`) — đọc lại rồi thử lại.
 
-- `PATCH /api/v1/media/{id}` — `name`, `alt`, `title`, `caption`, `folder_id` (`null` là
+- `PATCH /api/v1/media/{id}` — `name`, `alt`, `title`, `caption`, `decorative` (`true` cho ảnh
+  chỉ để trang trí: alt để trống có chủ ý), `folder_id` (`null` là
   thư mục gốc), `visibility`, `tags` (thay cả bộ nhãn; `[]` gỡ hết).
 - `PUT /api/v1/media/{id}/content` — thay nội dung, GIỮ ID (mọi chỗ đang dùng item vẫn
   đúng). Kiểm như khi tải lên. `url`, `version_id` và `ETag` đổi; nội dung cũ bị xoá.
@@ -157,7 +162,8 @@ gỡ khỏi mọi item). Tên nhãn không trùng, không phân biệt hoa thư�
 
 `/api/v1/media/folders`: tạo (`POST`, `name` và `parent_id`), liệt kê (`GET`, lọc
 `parent_id=root|<id>`, `sort=created_at|name`), đọc, đổi tên hay chuyển (`PATCH`, kèm
-`If-Match`), xoá (`DELETE`). Thư mục lồng nhau được. Tên không trùng trong cùng thư mục
+`If-Match`), xoá (`DELETE`). Mỗi thư mục có `item_count`: số item nằm thẳng trong nó, không
+tính thùng rác. Thư mục lồng nhau được. Tên không trùng trong cùng thư mục
 cha, không phân biệt hoa thường. Không chuyển được thư mục vào chính nó hay thư mục con
 của nó (`409`, `media.folder_cycle`). Chỉ xoá được thư mục trống — item trong thùng rác
 cũng tính (`409`, `media.folder_not_empty`).

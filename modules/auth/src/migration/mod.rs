@@ -19,6 +19,9 @@ mod m0017_fold_user_search;
 mod m0018_move_login_throttle;
 mod m0019_move_tokens;
 mod m0021_add_cleanup_indexes;
+mod m0023_add_last_sign_in;
+mod m0024_session_sign_in;
+mod m0025_passkey_aaguid;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -48,5 +51,20 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         // Cột `actor_kind` của bảng `auth_events` (người lạ khác hệ thống, D-122).
         autoxide_kernel::event::outbox_actor_migration("m0020_add_event_actor", "auth"),
         Box::new(m0021_add_cleanup_indexes::Migration),
+        // Bảng phụ trợ của kernel (event, job, throttle, token, nonce) mang `tenant_id` (D-253).
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0022_tenancy_helpers",
+            vec![
+                autoxide_kernel::event::tenant_table("auth"),
+                autoxide_kernel::job::tenant_table("auth"),
+                autoxide_kernel::throttle::tenant_table("auth"),
+                autoxide_kernel::tokens::tenant_table("auth"),
+            ],
+        ),
+        Box::new(m0023_add_last_sign_in::Migration),
+        // Cách đăng nhập và quốc gia gần đúng của phiên (D-272).
+        Box::new(m0024_session_sign_in::Migration),
+        // Loại authenticator của passkey (D-272).
+        Box::new(m0025_passkey_aaguid::Migration),
     ]
 }

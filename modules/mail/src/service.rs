@@ -7,6 +7,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Event, Outbox};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
 use autoxide_kernel::mail::{DELIVERY_FAILED, Mail, Mailer};
+use autoxide_kernel::tenancy::TenantContext;
 use lettre::Message;
 use lettre::message::header::{HeaderName, HeaderValue};
 use lettre::message::{Mailbox, MultiPart, SinglePart};
@@ -63,7 +64,7 @@ impl MailService {
 
 #[async_trait::async_trait]
 impl Mailer for MailService {
-    async fn send(&self, mail: Mail) -> Result<(), Error> {
+    async fn send(&self, tenant: &TenantContext, mail: Mail) -> Result<(), Error> {
         let mut problems = Vec::new();
         if mail.to.parse::<Mailbox>().is_err() {
             problems.push(FieldError::new(
@@ -97,7 +98,7 @@ impl Mailer for MailService {
             headers: mail.headers,
             dedupe_key: mail.dedupe_key,
         };
-        let id = self.queue.enqueue(self.database.write(), &job, options).await?;
+        let id = self.queue.enqueue(self.database.write(), tenant, &job, options).await?;
         // Không ghi địa chỉ hay nội dung vào log: chỉ ID của job.
         tracing::info!(job_id = ?id, "mail queued");
         Ok(())
@@ -157,7 +158,15 @@ impl JobHandler for Sender {
                 tracing::warn!(job_id = %job.id, code = %code, "mail rejected for good by the receiving server");
                 let event = DeliveryFailed { to: mail.to, dedupe_key: mail.dedupe_key, code };
                 let transaction = self.database.begin_write().await?;
-                self.outbox.record(&transaction, Actor::system(), None, &event).await?;
+                self.outbox
+                    .record(
+                        &transaction,
+                        &TenantContext::legacy_default(&self.database),
+                        Actor::system(),
+                        None,
+                        &event,
+                    )
+                    .await?;
                 transaction.commit().await?;
                 metrics::counter!("mail_rejected_total").increment(1);
             }

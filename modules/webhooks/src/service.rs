@@ -1,12 +1,17 @@
 //! Service của webhook: quản lý nơi nhận (endpoint) và xem các lần gửi. Handler REST
 //! chỉ gọi vào đây.
 
+use std::collections::HashMap;
+
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, EventCatalog, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::tenancy::TenantContext;
 use chrono::{DateTime, SubsecRound, Utc};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QuerySelect, Set,
+};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -98,6 +103,8 @@ pub(crate) struct WebhookService {
     catalog: EventCatalog,
     allow_http: bool,
     allow_private_networks: bool,
+    /// Bản dịch mô tả event (D-264); mặc định rỗng (tiếng Anh).
+    translations: autoxide_kernel::i18n::Translations,
 }
 
 impl WebhookService {
@@ -108,7 +115,32 @@ impl WebhookService {
         allow_http: bool,
         allow_private_networks: bool,
     ) -> Self {
-        WebhookService { database, outbox, catalog, allow_http, allow_private_networks }
+        WebhookService {
+            database,
+            outbox,
+            catalog,
+            allow_http,
+            allow_private_networks,
+            translations: Default::default(),
+        }
+    }
+
+    /// Dịch mô tả event bằng `translations`.
+    pub(crate) fn with_translations(
+        mut self,
+        translations: autoxide_kernel::i18n::Translations,
+    ) -> Self {
+        self.translations = translations;
+        self
+    }
+
+    /// Mô tả event `english` bằng `language`.
+    pub(crate) fn describe(
+        &self,
+        english: &str,
+        language: autoxide_kernel::i18n::Language,
+    ) -> String {
+        self.translations.describe(english, language)
     }
 
     /// Mọi loại event có thể đăng ký, theo tên.
@@ -143,23 +175,73 @@ impl WebhookService {
         let event =
             events::EndpointCreated(Change { before: None, after: Some(snapshot(&endpoint)) });
         self.outbox
-            .record(&transaction, actor, events::endpoint_subject(endpoint.id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::endpoint_subject(endpoint.id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         tracing::info!(endpoint_id = %endpoint.id, "webhook endpoint created");
         Ok(CreatedEndpoint { endpoint, secret })
     }
 
-    /// Một trang endpoint, mới tạo trước (mặc định).
-    pub(crate) async fn list(&self, page: &PageRequest) -> Result<Page<Endpoint>, Error> {
-        let rows = fetch_page(
-            endpoint::Entity::find(),
-            endpoint::Column::Id,
-            |row| row.id,
-            page,
-            self.database.read(),
-        )
-        .await?;
+    /// Lần gửi mới nhất của từng endpoint trong `ids` — hai câu truy vấn cho cả trang (đề bài
+    /// giao diện B3): thời điểm tạo mới nhất theo endpoint, rồi các dòng đúng thời điểm đó.
+    pub(crate) async fn last_deliveries(
+        &self,
+        ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, delivery::Model>, Error> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let read = self.database.read();
+        let latest: Vec<(Uuid, chrono::DateTime<chrono::Utc>)> = delivery::Entity::find()
+            .select_only()
+            .column(delivery::Column::EndpointId)
+            .column_as(delivery::Column::CreatedAt.max(), "latest")
+            .filter(delivery::Column::EndpointId.is_in(ids.iter().copied()))
+            .group_by(delivery::Column::EndpointId)
+            .into_tuple()
+            .all(read)
+            .await?;
+        if latest.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let wanted: HashMap<Uuid, chrono::DateTime<chrono::Utc>> = latest.into_iter().collect();
+        let rows = delivery::Entity::find()
+            .filter(delivery::Column::EndpointId.is_in(wanted.keys().copied()))
+            .filter(delivery::Column::CreatedAt.is_in(wanted.values().copied()))
+            .all(read)
+            .await?;
+        let mut found = HashMap::new();
+        for row in rows {
+            if wanted.get(&row.endpoint_id) == Some(&row.created_at) {
+                found.entry(row.endpoint_id).or_insert(row);
+            }
+        }
+        Ok(found)
+    }
+
+    /// Một trang endpoint, mới tạo trước (mặc định); `status`: chỉ endpoint đang nhận
+    /// (`Some(true)`) hay đã tắt (`Some(false)`).
+    pub(crate) async fn list(
+        &self,
+        active: Option<bool>,
+        page: &PageRequest,
+    ) -> Result<Page<Endpoint>, Error> {
+        let select = match active {
+            Some(true) => endpoint::Entity::find().filter(endpoint::Column::DisabledAt.is_null()),
+            Some(false) => {
+                endpoint::Entity::find().filter(endpoint::Column::DisabledAt.is_not_null())
+            }
+            None => endpoint::Entity::find(),
+        };
+        let rows =
+            fetch_page(select, endpoint::Column::Id, |row| row.id, page, self.database.read())
+                .await?;
         let mut endpoints = Vec::with_capacity(rows.data.len());
         for row in rows.data {
             endpoints.push(Endpoint::from_row(row)?);
@@ -217,7 +299,15 @@ impl WebhookService {
         let after = Endpoint::from_row(updated)?;
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::EndpointUpdated(change);
-        self.outbox.record(&transaction, actor, events::endpoint_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::endpoint_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -241,7 +331,15 @@ impl WebhookService {
             before: None,
             after: Some(json!({"secret_replaced": true})),
         });
-        self.outbox.record(&transaction, actor, events::endpoint_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::endpoint_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(endpoint_id = %id, "webhook secret replaced");
         Ok(secret)
@@ -262,7 +360,15 @@ impl WebhookService {
         let before = Endpoint::from_row(row)?;
         let event =
             events::EndpointDeleted(Change { before: Some(snapshot(&before)), after: None });
-        self.outbox.record(&transaction, actor, events::endpoint_subject(id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::endpoint_subject(id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         tracing::info!(endpoint_id = %id, "webhook endpoint deleted");
         Ok(())
@@ -291,16 +397,19 @@ impl WebhookService {
         let url = url.and_then(|url| match self.check_url(url) {
             Ok(url) => Some(url),
             Err(problem) => {
-                problems.push(FieldError::new("url", "invalid", problem));
+                problems.push(problem);
                 None
             }
         });
         if description.is_some_and(|text| text.trim().chars().count() > DESCRIPTION_MAX_LENGTH) {
-            problems.push(FieldError::new(
-                "description",
-                "length",
-                format!("must be at most {DESCRIPTION_MAX_LENGTH} characters long"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "description",
+                    "length",
+                    "must be at most {description_max_length} characters long",
+                )
+                .with_param("description_max_length", DESCRIPTION_MAX_LENGTH),
+            );
         }
         let events = events.map(|events| self.check_events(events, &mut problems));
         if !problems.is_empty() {
@@ -311,27 +420,43 @@ impl WebhookService {
 
     /// Địa chỉ đã kiểm: URL tuyệt đối tới 2048 ký tự, `https` (hoặc `http` khi cấu hình
     /// cho phép), không chứa tên đăng nhập / mật khẩu. Sai thì câu nói rõ phải sửa gì.
-    fn check_url(&self, raw: &str) -> Result<String, String> {
+    fn check_url(&self, raw: &str) -> Result<String, FieldError> {
         let raw = raw.trim();
         if raw.chars().count() > URL_MAX_LENGTH {
-            return Err(format!("must be at most {URL_MAX_LENGTH} characters long"));
+            return Err(FieldError::new("url", "invalid", "must be at most {max} characters long")
+                .with_param("max", URL_MAX_LENGTH));
         }
-        let url = reqwest::Url::parse(raw).map_err(|_| "must be an absolute URL".to_owned())?;
+        let Ok(url) = reqwest::Url::parse(raw) else {
+            return Err(FieldError::new("url", "invalid", "must be an absolute URL"));
+        };
         if url.host_str().is_none_or(str::is_empty) {
-            return Err("must name a host".to_owned());
+            return Err(FieldError::new("url", "invalid", "must name a host"));
         }
         if !url.username().is_empty() || url.password().is_some() {
-            return Err("must not contain a user name or password".to_owned());
+            return Err(FieldError::new(
+                "url",
+                "invalid",
+                "must not contain a user name or password",
+            ));
         }
         if !self.allow_private_networks && !crate::network::is_public_host(&url) {
-            return Err(crate::network::PRIVATE_ADDRESS.to_owned());
+            return Err(FieldError::new(
+                "url",
+                "invalid",
+                // Cùng câu với `network::PRIVATE_ADDRESS` (lỗi lúc gửi).
+                "points to a private or local network address; webhooks are sent only to public \
+                 addresses unless the server sets `AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS=true`",
+            ));
         }
         match url.scheme() {
             "https" => Ok(url.to_string()),
             "http" if self.allow_http => Ok(url.to_string()),
-            _ => Err("must start with `https://` (`http://` only when the server sets \
-                      `AUTOXIDE_WEBHOOKS_ALLOW_HTTP=true`, for development)"
-                .to_owned()),
+            _ => Err(FieldError::new(
+                "url",
+                "invalid",
+                "must start with `https://` (`http://` only when the server sets \
+                 `AUTOXIDE_WEBHOOKS_ALLOW_HTTP=true`, for development)",
+            )),
         }
     }
 
@@ -339,11 +464,14 @@ impl WebhookService {
     /// `problems`.
     fn check_events(&self, events: Vec<String>, problems: &mut Vec<FieldError>) -> Vec<String> {
         if events.is_empty() || events.len() > MAX_EVENTS {
-            problems.push(FieldError::new(
-                "events",
-                "length",
-                format!("must list 1 to {MAX_EVENTS} event names, or `*` for every event"),
-            ));
+            problems.push(
+                FieldError::new(
+                    "events",
+                    "length",
+                    "must list 1 to {max_events} event names, or `*` for every event",
+                )
+                .with_param("max_events", MAX_EVENTS),
+            );
         }
         for (index, event) in events.iter().enumerate() {
             let event = event.trim();

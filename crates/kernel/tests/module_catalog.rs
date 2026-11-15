@@ -20,6 +20,7 @@ use autoxide_kernel::job::{JobContext, JobHandler, JobRegistration, Schedule};
 use autoxide_kernel::mcp::{NoInput, Tool};
 use autoxide_kernel::migration::prelude::*;
 use autoxide_kernel::module::{Module, Modules};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::TestDatabase;
 use axum::Router;
 use axum::body::Body;
@@ -127,9 +128,11 @@ impl Module for Notes {
 
     fn tools(&self) -> Vec<Tool> {
         vec![
-            Tool::new("count", "Count notes.", |_: Principal, _: NoInput| async {
-                Ok(json!({ "count": 0 }))
-            })
+            Tool::new(
+                "count",
+                "Count notes.",
+                |_: TenantContext, _: Principal, _: NoInput| async { Ok(json!({ "count": 0 })) },
+            )
             .requires(NOTES_WRITE)
             .read_only(),
         ]
@@ -145,7 +148,11 @@ struct FakeAuthenticator;
 
 #[async_trait::async_trait]
 impl Authenticator for FakeAuthenticator {
-    async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
+    async fn authenticate(
+        &self,
+        authorization: Option<&str>,
+        _: &autoxide_kernel::tenancy::TenantHint,
+    ) -> Result<Principal, Error> {
         match authorization {
             Some("Bearer admin") => Ok(Principal::new(
                 Uuid::nil(),
@@ -218,7 +225,17 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
         assert_eq!(modules[0]["permissions"][0]["name"], "kernel.modules.read");
         let tools: Vec<&str> =
             modules[0]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
-        assert_eq!(tools, ["kernel.list_modules", "kernel.get_module"]);
+        assert_eq!(
+            tools,
+            [
+                "kernel.list_modules",
+                "kernel.get_module",
+                "kernel.list_settings",
+                "kernel.current_tenant",
+                "kernel.list_tenants",
+                "kernel.get_tenant"
+            ]
+        );
 
         let notes = &modules[2];
         assert_eq!(
@@ -328,23 +345,26 @@ async fn tool_mcp_tra_cung_ket_qua_voi_rest() {
         let tools = modules.tools().unwrap();
         let tool = |name: &str| tools.iter().find(|tool| tool.name() == name).unwrap().clone();
         let admin = Principal::new(Uuid::nil(), ["kernel.modules.read".to_owned()]);
+        let tenant = TenantContext::legacy_default(&db);
         let writer = Principal::new(Uuid::nil(), ["notes.write".to_owned()]);
 
         let list = tool("kernel.list_modules");
         assert!(list.is_read_only());
         assert!(list.allows(&admin) && !list.allows(&writer));
-        let listed = list.call(admin.clone(), json!({})).await.unwrap();
+        let listed = list.call(tenant.clone(), admin.clone(), json!({})).await.unwrap();
         let (_, rest) = get(app.clone(), "/api/v1/kernel/modules", Some("admin")).await;
         assert_eq!(listed, rest["data"]);
 
         let one = tool("kernel.get_module");
-        let described = one.call(admin.clone(), json!({ "name": "notes" })).await.unwrap();
+        let described =
+            one.call(tenant.clone(), admin.clone(), json!({ "name": "notes" })).await.unwrap();
         let (_, rest) = get(app, "/api/v1/kernel/modules/notes", Some("admin")).await;
         assert_eq!(described, rest["data"]);
 
-        let missing = one.call(admin.clone(), json!({ "name": "shop" })).await.unwrap_err();
+        let missing =
+            one.call(tenant.clone(), admin.clone(), json!({ "name": "shop" })).await.unwrap_err();
         assert_eq!(missing.code(), "kernel.module_not_found");
-        let invalid = one.call(admin, json!({ "name": "" })).await.unwrap_err();
+        let invalid = one.call(tenant.clone(), admin, json!({ "name": "" })).await.unwrap_err();
         assert_eq!(invalid.code(), "validation_failed");
     })
     .await

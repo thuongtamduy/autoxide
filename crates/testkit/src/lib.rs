@@ -33,6 +33,7 @@
 pub mod ai;
 mod app;
 mod contract;
+mod leak;
 mod ownership;
 mod postgres;
 mod s3;
@@ -40,14 +41,17 @@ mod schema;
 mod sqlite;
 mod stale;
 mod storage;
+mod tenancy;
 
 pub use app::{TestApp, TestAppBuilder, TestAppError, TestRequest, TestResponse, tool};
+pub use leak::leak_check;
 pub use ownership::schema_ownership_violations;
 pub use s3::{
     TEST_S3_ACCESS_KEY_ID, TEST_S3_BUCKET, TEST_S3_ENDPOINT, TEST_S3_SECRET_ACCESS_KEY, s3_settings,
 };
 pub use schema::{ColumnSnapshot, IndexSnapshot, SchemaSnapshot, TableSnapshot, schema_snapshot};
 pub use storage::MemoryStorage;
+pub use tenancy::{PENDING_TENANCY, schema_tenancy_violations};
 
 use std::fmt;
 use std::path::PathBuf;
@@ -118,6 +122,8 @@ pub struct TestDatabase {
     url: String,
     backend: DbBackend,
     cleanup: Cleanup,
+    /// Database thêm của cùng bài test ([`TestDatabase::extra_database`]), dọn cùng lúc.
+    extras: std::sync::Mutex<Vec<Cleanup>>,
 }
 
 /// Việc phải dọn sau khi bài test chạy xong.
@@ -179,6 +185,7 @@ impl TestDatabase {
                     url,
                     backend: DbBackend::Sqlite,
                     cleanup: Cleanup::SqliteDirectory(directory),
+                    extras: std::sync::Mutex::default(),
                 })
             }
             Target::Postgres(admin_url) => {
@@ -196,6 +203,7 @@ impl TestDatabase {
                     url,
                     backend: DbBackend::Postgres,
                     cleanup: Cleanup::PostgresDatabase { admin_url: admin_url.to_owned(), name },
+                    extras: std::sync::Mutex::default(),
                 })
             }
         }
@@ -204,7 +212,16 @@ impl TestDatabase {
     /// Xoá database. Nhận `self` (không phải `&self`): sau lời gọi này giá trị
     /// không còn dùng được nữa — trình biên dịch chặn việc dùng database đã xoá.
     async fn destroy(self) -> Result<(), TestDatabaseError> {
-        match self.cleanup {
+        // Mutex hỏng (một luồng panic khi đang giữ) vẫn lấy được dữ liệu bên trong.
+        let extras = self.extras.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
+        for extra in extras {
+            Self::remove(extra).await?;
+        }
+        Self::remove(self.cleanup).await
+    }
+
+    async fn remove(cleanup: Cleanup) -> Result<(), TestDatabaseError> {
+        match cleanup {
             Cleanup::SqliteDirectory(directory) => Ok(std::fs::remove_dir_all(directory)?),
             Cleanup::PostgresDatabase { admin_url, name } => {
                 let admin = postgres::connect_admin(&admin_url).await?;
@@ -223,6 +240,19 @@ impl TestDatabase {
     /// Database này là SQLite hay Postgres.
     pub fn backend(&self) -> DbBackend {
         self.backend
+    }
+
+    /// Thêm một database trống cùng loại (vd placement riêng của một khách ở chế độ nhiều khách);
+    /// trả URL của nó. Database thêm bị xoá cùng lúc với database chính.
+    pub async fn extra_database(&self) -> Result<String, TestDatabaseError> {
+        let target = match &self.cleanup {
+            Cleanup::SqliteDirectory(_) => Target::Sqlite,
+            Cleanup::PostgresDatabase { admin_url, .. } => Target::Postgres(admin_url),
+        };
+        let extra = Self::create(target).await?;
+        let url = extra.url.clone();
+        self.extras.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(extra.cleanup);
+        Ok(url)
     }
 
     /// Mở một pool kết nối tới database này.

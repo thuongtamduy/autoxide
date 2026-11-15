@@ -162,7 +162,7 @@ pub(crate) async fn head_content(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing permission `media.write`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No media item has this id; code `media.item_not_found`.", body = Problem),
-        (status = 409, description = "The item is in the trash; code `media.item_in_trash`.", body = Problem),
+        (status = 409, description = "The item is in the trash; code `media.item_in_trash`. Restore it with `POST /api/v1/media/{id}/restore`.", body = Problem),
         (status = 412, description = "`If-Match` does not match: the item changed since you read it; code `precondition_failed`.", body = Problem),
         (status = 413, description = "The content is too large; code `media.too_large` (or `payload_too_large`).", body = Problem),
         (status = 415, description = "The type is not accepted or the content is not of that type; codes as for an upload.", body = Problem),

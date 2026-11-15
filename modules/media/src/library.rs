@@ -3,5 +3,6 @@
 
 pub(crate) mod folders;
 pub(crate) mod sniff;
+pub(crate) mod summary;
 pub(crate) mod tags;
 pub(crate) mod upload;

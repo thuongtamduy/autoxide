@@ -9,6 +9,7 @@
 
 use crate::error::{Error, FieldError};
 use crate::i18n::{Language, Translations};
+use crate::tenancy::TenantContext;
 
 /// Event phát khi một mail bị máy chủ nhận từ chối hẳn. Payload:
 /// `{"to": "<địa chỉ>", "dedupe_key": "<khoá của bên gửi>" | null, "code": "<mã SMTP>"}`. Module
@@ -84,11 +85,14 @@ impl Mail {
         let mut problems = Vec::new();
         for (index, (name, value)) in self.headers.iter().enumerate() {
             if !ALLOWED_HEADERS.iter().any(|allowed| allowed.eq_ignore_ascii_case(name)) {
-                problems.push(FieldError::new(
-                    format!("headers[{index}].name"),
-                    "not_allowed",
-                    format!("must be one of {}", ALLOWED_HEADERS.join(", ")),
-                ));
+                problems.push(
+                    FieldError::new(
+                        format!("headers[{index}].name"),
+                        "not_allowed",
+                        "must be one of {allowed}",
+                    )
+                    .with_param("allowed", ALLOWED_HEADERS.join(", ")),
+                );
             }
             if value.chars().any(|c| c == '\r' || c == '\n' || c == '\0') || value.len() > 998 {
                 problems.push(FieldError::new(
@@ -105,9 +109,10 @@ impl Mail {
 /// Bên gửi mail của chương trình.
 #[async_trait::async_trait]
 pub trait Mailer: Send + Sync {
-    /// Đưa `mail` vào hàng đợi gửi. Lỗi khi địa chỉ người nhận sai dạng
-    /// (`validation_failed`, trường `to`) hay không ghi được hàng đợi.
-    async fn send(&self, mail: Mail) -> Result<(), Error>;
+    /// Đưa `mail` của khách `tenant` vào hàng đợi gửi (máy chủ gửi mail theo cấu hình của khách).
+    /// Lỗi khi địa chỉ người nhận sai dạng (`validation_failed`, trường `to`) hay không ghi được
+    /// hàng đợi.
+    async fn send(&self, tenant: &TenantContext, mail: Mail) -> Result<(), Error>;
 }
 
 /// Mẫu mail: tiêu đề và nội dung tiếng Anh nằm trong code (có chỗ điền `{tên}`), bản

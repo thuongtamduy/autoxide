@@ -22,6 +22,12 @@
 //!
 //! Dựng giống `crates/app/src/runtime.rs`: cùng bộ xác thực (module công bố, hoặc bộ giả khi
 //! test khai `user`), cùng idempotency, deprecation, giới hạn thân request, tool MCP, bản dịch.
+//!
+//! Nhiều khách (bước 33): `.tenant("a")` thêm khách trên database của app (placement chung),
+//! `.tenant_dedicated("b")` thêm khách trên database riêng (một database trống nữa cùng loại);
+//! `.user_in("a", "token-a", 1, &[…])` là người của khách `a`. Khai khách nào thì app chạy chế độ
+//! `multi` (bỏ qua việc chế độ này chưa mở cho người dùng); `app.tenant("a")` cho ngữ cảnh của
+//! khách để gọi service trực tiếp.
 
 use std::collections::HashMap;
 use std::fmt;
@@ -34,6 +40,10 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::{self, Extras};
 use autoxide_kernel::idempotency::IdempotencyStore;
 use autoxide_kernel::module::{Module, Modules, StartContext};
+use autoxide_kernel::tenancy::{
+    DatabaseRegistry, NewPlacement, NewTenant, PlacementKind, TenancyConfig, TenancyMode,
+    TenantAdmin, TenantContext,
+};
 use axum::Router;
 use axum::body::Body;
 use axum::http::{HeaderMap, HeaderName, HeaderValue, Method, Request, StatusCode, header};
@@ -61,6 +71,12 @@ impl fmt::Display for TestAppError {
 
 impl std::error::Error for TestAppError {}
 
+impl TestAppError {
+    pub(crate) fn new(message: String) -> Self {
+        TestAppError(message)
+    }
+}
+
 fn fail(step: &str, error: impl fmt::Display) -> TestAppError {
     TestAppError(format!("{step}: {error}"))
 }
@@ -74,6 +90,7 @@ pub struct TestApp {
     // Giữ module sống cùng app: chúng sở hữu service của mình.
     modules: Modules,
     database: Database,
+    registry: DatabaseRegistry,
 }
 
 /// Cấu hình của [`TestApp`] trước khi dựng.
@@ -83,6 +100,11 @@ pub struct TestAppBuilder<'a> {
     modules: Vec<Box<dyn Module>>,
     provided: Vec<Provision>,
     users: HashMap<String, Principal>,
+    multi: bool,
+    /// Khách khai thêm: (slug, có database riêng không).
+    tenants: Vec<(String, bool)>,
+    /// Người của khách: (slug, token, bên gọi).
+    tenant_users: Vec<(String, String, Principal)>,
 }
 
 // `for<'c>`: hàm nhận `StartContext` với lifetime bất kỳ — lifetime thật chỉ biết lúc
@@ -98,7 +120,26 @@ impl TestApp {
             modules: Vec::new(),
             provided: Vec::new(),
             users: HashMap::new(),
+            multi: false,
+            tenants: Vec::new(),
+            tenant_users: Vec::new(),
         }
+    }
+
+    /// Sổ database của app (chế độ, placement, tra khách).
+    pub fn registry(&self) -> &DatabaseRegistry {
+        &self.registry
+    }
+
+    /// Khách mặc định (khách nền tảng) trên database của app.
+    pub fn default_tenant(&self) -> TenantContext {
+        self.registry.default_tenant()
+    }
+
+    /// Ngữ cảnh của khách đã khai bằng [`TestAppBuilder::tenant`] /
+    /// [`TestAppBuilder::tenant_dedicated`] (theo slug).
+    pub async fn tenant(&self, slug: &str) -> Result<TenantContext, TestAppError> {
+        self.registry.tenant_by_slug(slug).await.map_err(|e| fail("tenant", e))
     }
 
     /// Router đầy đủ (mọi lớp HTTP của kernel), để tự gửi request khi helper không đủ.
@@ -231,6 +272,36 @@ impl<'a> TestAppBuilder<'a> {
         self
     }
 
+    /// Chạy chế độ nhiều khách (`AUTOXIDE_TENANCY_MODE=multi`) dù chưa khai khách nào.
+    pub fn multi_tenant(mut self) -> Self {
+        self.multi = true;
+        self
+    }
+
+    /// Thêm khách `slug` trên database của app (placement chung `main`). Bật chế độ nhiều khách.
+    pub fn tenant(mut self, slug: &str) -> Self {
+        self.multi = true;
+        self.tenants.push((slug.to_owned(), false));
+        self
+    }
+
+    /// Thêm khách `slug` trên database riêng (placement `dedicated` tên `slug`, một database trống
+    /// cùng loại, dọn cùng bài test). Bật chế độ nhiều khách.
+    pub fn tenant_dedicated(mut self, slug: &str) -> Self {
+        self.multi = true;
+        self.tenants.push((slug.to_owned(), true));
+        self
+    }
+
+    /// Như [`user`](Self::user), cho người của khách `slug` (khai bằng [`tenant`](Self::tenant)
+    /// hay [`tenant_dedicated`](Self::tenant_dedicated)).
+    pub fn user_in(mut self, slug: &str, token: &str, user_id: u128, permissions: &[&str]) -> Self {
+        let permissions = permissions.iter().map(|p| (*p).to_owned());
+        let principal = Principal::new(Uuid::from_u128(user_id), permissions);
+        self.tenant_users.push((slug.to_owned(), token.to_owned(), principal));
+        self
+    }
+
     /// Đọc cấu hình, chạy mọi migration, khởi động module, ghép router.
     pub async fn build(self) -> Result<TestApp, TestAppError> {
         let mut pairs = vec![("DATABASE_URL".to_owned(), self.test.url().to_owned())];
@@ -254,27 +325,76 @@ impl<'a> TestAppBuilder<'a> {
             Database::connect(&config.database).await.map_err(|e| fail("database", e))?;
         let migrator = modules.migrator().map_err(|e| fail("migrations", e))?;
         migrator.up(&database).await.map_err(|e| fail("migrations", e))?;
-        modules.start(&database).map_err(|e| fail("start", e))?;
+        let registry = if self.multi {
+            // Dựng thẳng cấu hình: chế độ `multi` chưa mở cho người dùng (đọc từ biến môi trường
+            // bị từ chối) nhưng test của module cần nó.
+            let tenancy = TenancyConfig::with_mode(TenancyMode::Multi);
+            DatabaseRegistry::new(database.clone(), config.database.clone(), tenancy)
+        } else {
+            DatabaseRegistry::single(database.clone())
+        };
+        modules.start_in(&registry).map_err(|e| fail("start", e))?;
 
-        let authenticator: Option<Arc<dyn Authenticator>> = if self.users.is_empty() {
+        let mut users = self.users;
+        if !self.tenants.is_empty() {
+            let placements = modules.placements(&registry).map_err(|e| fail("placements", e))?;
+            for (slug, dedicated) in &self.tenants {
+                if *dedicated {
+                    let url = self.test.extra_database().await.map_err(|e| fail("placement", e))?;
+                    let url = url.parse().map_err(|e| fail("placement", e))?;
+                    let new = NewPlacement::new(slug.clone(), PlacementKind::Dedicated, url);
+                    placements.add(new).await.map_err(|e| fail("placement", e))?;
+                }
+            }
+            placements.up_all().await.map_err(|e| fail("placement migrations", e))?;
+            let admin = modules
+                .api::<TenantAdmin>()
+                .ok_or_else(|| fail("tenants", "the kernel did not start its tenant service"))?;
+            for (slug, dedicated) in &self.tenants {
+                let input = NewTenant {
+                    slug: slug.clone(),
+                    name: slug.clone(),
+                    parent_id: None,
+                    placement: dedicated.then(|| slug.clone()),
+                };
+                let actor = autoxide_kernel::event::Actor::system();
+                admin.create(actor, input).await.map_err(|e| fail("tenant", e))?;
+            }
+        }
+        for (slug, token, principal) in self.tenant_users {
+            let tenant = registry.tenant_by_slug(&slug).await.map_err(|e| fail("user_in", e))?;
+            users.insert(token, principal.in_tenant(tenant.id()));
+        }
+
+        let authenticator: Option<Arc<dyn Authenticator>> = if users.is_empty() {
             modules.api::<dyn Authenticator>()
         } else {
-            Some(Arc::new(FakeAuthenticator(self.users)))
+            Some(Arc::new(FakeAuthenticator(users)))
         };
-        let extras = Extras::default()
+        let mut extras = Extras::default()
             .authenticator(authenticator)
             .idempotency(modules.api::<dyn IdempotencyStore>())
             .deprecations(modules.deprecations())
             .body_limits(modules.body_limits())
             .tools(modules.tools().map_err(|e| fail("tools", e))?)
             .translations(modules.translations().clone());
+        if let Some(registry) = modules.tenancy() {
+            extras = extras.tenancy(registry);
+        }
         let root = http::health_routes(database.clone(), http::Draining::default());
         let api = http::build(&config.http, root, modules.routes(), extras);
         if !api.schema_conflicts.is_empty() {
             return Err(fail("openapi", api.schema_conflicts.join(", ")));
         }
         let contract = serde_json::to_value(&api.openapi).map_err(|e| fail("openapi", e))?;
-        Ok(TestApp { router: api.router, openapi: api.openapi, contract, modules, database })
+        Ok(TestApp {
+            router: api.router,
+            openapi: api.openapi,
+            contract,
+            modules,
+            database,
+            registry,
+        })
     }
 }
 
@@ -300,7 +420,11 @@ struct FakeAuthenticator(HashMap<String, Principal>);
 
 #[async_trait::async_trait]
 impl Authenticator for FakeAuthenticator {
-    async fn authenticate(&self, authorization: Option<&str>) -> Result<Principal, Error> {
+    async fn authenticate(
+        &self,
+        authorization: Option<&str>,
+        _: &autoxide_kernel::tenancy::TenantHint,
+    ) -> Result<Principal, Error> {
         let user = authorization
             .and_then(|value| value.strip_prefix("Bearer "))
             .and_then(|token| self.0.get(token));

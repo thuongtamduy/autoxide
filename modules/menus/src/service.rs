@@ -14,11 +14,12 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::resource::ResourceDirectory;
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_media::api::Media;
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
-    QueryFilter, QueryOrder, SqlErr,
+    QueryFilter, QueryOrder, QuerySelect, SqlErr,
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -79,15 +80,37 @@ impl MenuService {
         }
     }
 
-    /// Một trang menu, theo ID (mặc định mới tạo trước).
+    /// Một trang menu, theo ID (mặc định mới tạo trước), kèm số mục của từng menu (một câu
+    /// đếm cho cả trang, không đếm từng menu).
     pub(crate) async fn list(
         &self,
         principal: &Principal,
         page: &PageRequest,
-    ) -> Result<Page<Menu>, Error> {
+    ) -> Result<Page<(Menu, u64)>, Error> {
         principal.require(&MENUS_READ)?;
-        fetch_page(menu::Entity::find(), menu::Column::Id, |row| row.id, page, self.database.read())
-            .await
+        let read = self.database.read();
+        let page =
+            fetch_page(menu::Entity::find(), menu::Column::Id, |row| row.id, page, read).await?;
+        let ids: Vec<Uuid> = page.data.iter().map(|menu| menu.id).collect();
+        let counts: HashMap<Uuid, i64> = if ids.is_empty() {
+            HashMap::new()
+        } else {
+            item::Entity::find()
+                .select_only()
+                .column(item::Column::MenuId)
+                .column_as(item::Column::Id.count(), "items")
+                .filter(item::Column::MenuId.is_in(ids))
+                .group_by(item::Column::MenuId)
+                .into_tuple::<(Uuid, i64)>()
+                .all(read)
+                .await?
+                .into_iter()
+                .collect()
+        };
+        Ok(page.map(|menu| {
+            let count = counts.get(&menu.id).copied().unwrap_or(0);
+            (menu, u64::try_from(count).unwrap_or(0))
+        }))
     }
 
     /// Menu `id` kèm cây mục như đã lưu.
@@ -133,6 +156,14 @@ impl MenuService {
             ));
         }
         let flat = flatten(&input.items, &mut problems);
+        // Menu mới chưa có mục nào để giữ id.
+        for entry in flat.iter().filter(|entry| entry.kept) {
+            problems.push(FieldError::new(
+                format!("{}.id", entry.path),
+                "invalid",
+                "must be left out when creating a menu",
+            ));
+        }
         self.check_targets(&flat, &locale, check_targets, &mut problems).await?;
         if !problems.is_empty() {
             return Err(invalid(problems));
@@ -145,6 +176,7 @@ impl MenuService {
             locale: locale.clone(),
             created_at: now,
             updated_at: now,
+            updated_by: actor.user_id,
         }
         .into_active_model()
         .insert(&transaction)
@@ -159,7 +191,15 @@ impl MenuService {
         let rows = insert_items(&transaction, saved.id, flat).await?;
         let event =
             events::MenuCreated(Change { before: None, after: Some(snapshot(&saved, rows.len())) });
-        self.outbox.record(&transaction, actor, events::menu_subject(saved.id), &event).await?;
+        self.outbox
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                actor,
+                events::menu_subject(saved.id),
+                &event,
+            )
+            .await?;
         transaction.commit().await?;
         self.cache.clear();
         tracing::info!(menu_id = %saved.id, items = rows.len(), "menu created");
@@ -179,6 +219,26 @@ impl MenuService {
         let found = self.find(id).await?;
         let mut problems = Vec::new();
         let flat = flatten(&items, &mut problems);
+        // Chỉ giữ được id của mục đang thuộc chính menu này.
+        if flat.iter().any(|entry| entry.kept) {
+            let current: std::collections::HashSet<Uuid> = item::Entity::find()
+                .select_only()
+                .column(item::Column::Id)
+                .filter(item::Column::MenuId.eq(id))
+                .into_tuple::<Uuid>()
+                .all(self.database.read())
+                .await?
+                .into_iter()
+                .collect();
+            for entry in flat.iter().filter(|entry| entry.kept && !current.contains(&entry.row.id))
+            {
+                problems.push(FieldError::new(
+                    format!("{}.id", entry.path),
+                    "not_found",
+                    "is not an item of this menu; leave `id` out for a new item",
+                ));
+            }
+        }
         self.check_targets(&flat, &found.locale, true, &mut problems).await?;
         if !problems.is_empty() {
             return Err(invalid(problems));
@@ -186,8 +246,10 @@ impl MenuService {
         let now = micros(Utc::now());
         let transaction = self.database.begin_write().await?;
         // Kiểm phiên bản trong chính câu UPDATE: hai người sửa cùng lúc thì một người nhận 412.
+        let editor = Actor::from(principal).user_id;
         let updated = menu::Entity::update_many()
             .col_expr(menu::Column::UpdatedAt, sea_orm::sea_query::Expr::value(now))
+            .col_expr(menu::Column::UpdatedBy, sea_orm::sea_query::Expr::value(editor))
             .filter(menu::Column::Id.eq(id))
             .filter(menu::Column::UpdatedAt.eq(expected.unwrap_or(found.updated_at)))
             .exec(&transaction)
@@ -203,13 +265,19 @@ impl MenuService {
             item::Entity::find().filter(item::Column::MenuId.eq(id)).count(&transaction).await?;
         item::Entity::delete_many().filter(item::Column::MenuId.eq(id)).exec(&transaction).await?;
         let rows = insert_items(&transaction, id, flat).await?;
-        let saved = Menu { updated_at: now, ..found };
+        let saved = Menu { updated_at: now, updated_by: editor, ..found };
         let event = events::MenuReplaced(Change {
             before: Some(snapshot(&saved, usize::try_from(before).unwrap_or(usize::MAX))),
             after: Some(snapshot(&saved, rows.len())),
         });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::menu_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::menu_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         self.cache.clear();
@@ -236,7 +304,13 @@ impl MenuService {
             after: None,
         });
         self.outbox
-            .record(&transaction, Actor::from(principal), events::menu_subject(id), &event)
+            .record(
+                &transaction,
+                &TenantContext::legacy_default(&self.database),
+                Actor::from(principal),
+                events::menu_subject(id),
+                &event,
+            )
             .await?;
         transaction.commit().await?;
         self.cache.clear();
@@ -280,11 +354,10 @@ impl MenuService {
         match canonical_locale(raw.trim()).filter(|locale| self.config.locales.contains(locale)) {
             Some(locale) => locale,
             None => {
-                problems.push(FieldError::new(
-                    "locale",
-                    "locale_not_supported",
-                    format!("must be one of: {}", self.config.locales.join(", ")),
-                ));
+                problems.push(
+                    FieldError::new("locale", "locale_not_supported", "must be one of: {allowed}")
+                        .with_param("allowed", self.config.locales.join(", ")),
+                );
                 self.config.default_locale.clone()
             }
         }
@@ -309,11 +382,14 @@ impl MenuService {
                     && self.resources.knows(kind)
                     && !self.resources.has_children(kind)
                 {
-                    problems.push(FieldError::new(
-                        format!("{}.auto_children", entry.path),
-                        "children_unsupported",
-                        format!("`{kind}` has no sub-items to take"),
-                    ));
+                    problems.push(
+                        FieldError::new(
+                            format!("{}.auto_children", entry.path),
+                            "children_unsupported",
+                            "`{kind}` has no sub-items to take",
+                        )
+                        .with_param("kind", kind),
+                    );
                 }
             }
             if let (Some(kind), Some(id)) = (&row.feature_kind, &row.feature_id) {
@@ -325,14 +401,15 @@ impl MenuService {
             if self.resources.knows(kind) {
                 by_kind.entry(kind).or_default().push((*id).to_owned());
             } else {
-                problems.push(FieldError::new(
-                    format!("{path}.kind"),
-                    "ref_unknown_kind",
-                    format!(
-                        "no module provides `{kind}`; known: {}",
-                        self.resources.types().join(", ")
-                    ),
-                ));
+                problems.push(
+                    FieldError::new(
+                        format!("{path}.kind"),
+                        "ref_unknown_kind",
+                        "no module provides `{kind}`; known: {known}",
+                    )
+                    .with_param("kind", kind)
+                    .with_param("known", self.resources.types().join(", ")),
+                );
             }
         }
         if !check_exists {
@@ -340,18 +417,29 @@ impl MenuService {
         }
         let mut found: HashSet<(String, String)> = HashSet::new();
         for (kind, ids) in by_kind {
-            let resolved = self.resources.resolve_many(kind, &ids, Some(locale)).await?;
+            let resolved = self
+                .resources
+                .resolve_many(
+                    &TenantContext::legacy_default(&self.database),
+                    kind,
+                    &ids,
+                    Some(locale),
+                )
+                .await?;
             found.extend(resolved.into_keys().map(|id| (kind.to_owned(), id)));
         }
         for (path, kind, id) in &wanted {
             if self.resources.knows(kind)
                 && !found.contains(&((*kind).to_owned(), (*id).to_owned()))
             {
-                problems.push(FieldError::new(
-                    format!("{path}.id"),
-                    "ref_not_found",
-                    format!("no `{kind}` has this id"),
-                ));
+                problems.push(
+                    FieldError::new(
+                        format!("{path}.id"),
+                        "ref_not_found",
+                        "no `{kind}` has this id",
+                    )
+                    .with_param("kind", kind),
+                );
             }
         }
         Ok(())
