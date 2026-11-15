@@ -6487,3 +6487,26 @@ với bảng của đặc tả (cùng lý do: mọi hàm chạm dữ liệu củ
    ngữ cảnh khách mà không truy vấn gì. Test MCP của kernel chuyển sang `TestDatabase` (cần sổ database).
 
 Thay thế: không. Bổ sung D-253, D-254.
+
+## D-256 · Lọc theo khách và kiểm schema theo khách (bước 33 A5) — 2026-11-15 — agent quyết
+
+1. **`TenantScoped` + `ScopeExt`** (`autoxide_kernel::tenancy`): entity cấp khách hàng khai cột `tenant_id` của nó;
+   `.scoped(&tenant)` thêm `WHERE tenant_id = ?` cho `Select`, `SelectTwo`, `SelectTwoMany`, `UpdateMany`,
+   `DeleteMany`, `ValidatedUpdateOne`, `ValidatedDeleteOne` (bản SeaORM 2.0 ghim chỉ cho lọc thêm trên bản đã
+   `validate()` của sửa / xoá một dòng; `delete_by_id` trả sẵn bản đã kiểm). Truy vấn kèm entity thứ hai lọc theo
+   entity chính: entity đi kèm cùng module, nối theo khoá ngoại trong module, nên cùng khách.
+2. **Luật khoá unique**: bắt đầu bằng `tenant_id`, **trừ khoá chỉ gồm cột UUID** — ID sinh trong ứng dụng duy
+   nhất toàn cục nên duy nhất trong khách cũng là duy nhất toàn cục. Luật này phủ đúng các ngoại lệ đặc tả liệt kê
+   (khoá chính `id`, `content_published.entry_id`, `newsletter_subscriptions (subscriber_id, list_id)`) mà không
+   cần danh sách riêng. Index thường: bắt đầu bằng `tenant_id`, hay tên `…_sweep_idx`.
+3. **Ba lớp kiểm**: testkit `schema_tenancy_violations` trên database đã migrate (chạy trong bài sở hữu bảng của
+   binary, cả SQLite và Postgres); `cargo xtask check` luật `entity-tenant` trên mã nguồn (entity thiếu
+   `tenant_id`); trình biên dịch (service không có database nếu không có khách — D-253 mục 1). Danh sách tạm
+   `PENDING_TENANCY` (testkit) là nguồn duy nhất cho cả hai bộ kiểm; bảng đã có `tenant_id` mà còn trong danh sách
+   cũng là vi phạm, để danh sách chỉ ngắn đi.
+4. **Bài rò rỉ `leak_check` và `TestApp` nhiều khách làm cùng phần B1 (`notes`)**: trước khi có module nào lọc
+   theo khách, bài rò rỉ chỉ có thể đỏ; dựng nó cùng module đầu tiên dùng nó, theo đúng cách dùng thật.
+   `kernel_user_flags` (bảng cấp khách hàng của kernel) nằm trong `PENDING_TENANCY`, chuyển ở phần A7 cùng
+   `kernel_tenant_settings`.
+
+Bổ sung D-253.

@@ -313,6 +313,11 @@ impl Modules {
         if problems.is_empty() { Ok(tools) } else { Err(ModuleError(problems.join("; "))) }
     }
 
+    /// Bảng mặt điều khiển của mọi module (kể cả `kernel`), theo thứ tự đăng ký.
+    pub fn control_plane_tables(&self) -> Vec<&'static str> {
+        self.modules.iter().flat_map(|module| module.control_plane_tables()).collect()
+    }
+
     /// Giới hạn thân request riêng của mọi module: `(tên module, khai báo)`.
     pub fn body_limits(&self) -> Vec<(&'static str, crate::http::BodyLimit)> {
         self.modules

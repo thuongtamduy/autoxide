@@ -21,6 +21,7 @@
 //!    có tài liệu OpenAPI; không dùng `.route(…)` trần.
 //! 8. `handler-database` — handler (`src/http…`) và tool MCP (`src/tools…`) không tự
 //!    đọc hay ghi database: việc đó thuộc service (luật kiến trúc 5 và 8 của CLAUDE.md).
+//! 9. `entity-tenant` — entity là bảng cấp khách hàng, có `tenant_id` (bước 33; ở `tenancy.rs`).
 //!
 //! Luật 4–6 đọc mã nguồn theo dòng, dựa vào việc `cargo fmt` đã chuẩn hoá định
 //! dạng (gate chạy fmt trước). Đây là lưới chặn lỗi vô ý, không phải bộ phân

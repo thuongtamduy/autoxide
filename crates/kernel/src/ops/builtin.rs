@@ -69,6 +69,11 @@ impl Module for KernelModule {
         ]
     }
 
+    fn control_plane_tables(&self) -> Vec<&'static str> {
+        // Khoá ký gốc của bản cài và sổ khách / vị trí dữ liệu / tên miền (D-253).
+        vec!["kernel_secrets", "kernel_tenants", "kernel_placements", "kernel_tenant_domains"]
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         let secret = crate::secret::read_setting(reader);
         let public_url = crate::public_url::read_setting(reader);

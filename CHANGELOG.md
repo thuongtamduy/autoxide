@@ -35,6 +35,13 @@ endpoints are marked deprecated with a sunset date first.
   only `http(s)` links). Plain text stays the default and old comments show as before; Markdown links count
   towards the link limit. New setting `AUTOXIDE_COMMENTS_MARKDOWN` (on), `markdown` in the public settings,
   `format` in every comment.
+- For module authors: `autoxide_kernel::tenancy::{TenantScoped, ScopeExt}` — an entity of a tenant-level table
+  implements `TenantScoped` (one line naming its `tenant_id` column) and every query of the service adds
+  `.scoped(&tenant)` (`Select`, `SelectTwo`, `SelectTwoMany`, `UpdateMany`, `DeleteMany`, and validated
+  `update` / `delete` of one row). `Module::control_plane_tables` declares the few tables shared by the whole
+  platform. testkit: `schema_tenancy_violations` checks a migrated database (every other table has
+  `tenant_id` NOT NULL without a default; unique keys and indexes start with it, except keys made only of UUIDs
+  and sweep indexes named `…_sweep_idx`); `cargo xtask check` refuses an entity without `tenant_id`.
 - For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
   errors.
 
