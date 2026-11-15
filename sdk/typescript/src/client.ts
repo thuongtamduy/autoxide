@@ -76,9 +76,11 @@ export class AutoxideError extends Error {
   readonly errors: NonNullable<Problem["errors"]>;
   /** Seconds to wait before retrying, from `Retry-After` (429, 503). */
   readonly retryAfter: number | undefined;
+  /** The `X-Request-Id` of the answer: quote it when you report a problem. */
+  readonly requestId: string | undefined;
   readonly problem: Problem;
 
-  constructor(problem: Problem, retryAfter: number | undefined) {
+  constructor(problem: Problem, retryAfter: number | undefined, requestId?: string) {
     super(`${problem.code}: ${problem.detail}`);
     this.name = "AutoxideError";
     this.status = problem.status;
@@ -86,6 +88,7 @@ export class AutoxideError extends Error {
     this.detail = problem.detail;
     this.errors = problem.errors ?? [];
     this.retryAfter = retryAfter;
+    this.requestId = requestId;
     this.problem = problem;
   }
 }
@@ -149,7 +152,7 @@ export function createClient(options: ClientOptions): Client {
         ? ((await response.json()) as Problem)
         : ({ type: "about:blank", title: response.statusText, status: response.status, code: "http_error", detail: await response.text() } as Problem);
       const after = response.headers.get("Retry-After");
-      throw new AutoxideError(problem, after === null ? undefined : Number(after));
+      throw new AutoxideError(problem, after === null ? undefined : Number(after), response.headers.get("X-Request-Id") ?? undefined);
     }
     if (response.status === 204) return undefined;
     if (!type.includes("json")) return response.blob();

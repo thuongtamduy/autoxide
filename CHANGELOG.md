@@ -26,6 +26,11 @@ endpoints are marked deprecated with a sunset date first.
 - A typed TypeScript SDK in `sdk/typescript/` (no dependencies; not on npm): `createClient`, typed paths,
   parameters, bodies and results generated from `docs/openapi.json` by `cargo xtask sdk`, `AutoxideError`,
   `paginate()`. The gate checks it matches the contract; each release attaches `autoxide-sdk-X.Y.Z.tgz`.
+- Task-by-task guides in `docs/guides/` (English and Vietnamese): a website (public endpoints, `srcset`
+  and WebP, ETag / 304), signing in and refreshing, API keys, safe retries, pagination, errors, and
+  connecting an AI agent over MCP with every tool and its permission. Their `curl` examples run as tests
+  on every build; their TypeScript examples are type-checked against the SDK in CI.
+- SDK: `AutoxideError.requestId` (the `X-Request-Id` of the answer).
 
 ### Fixed
 

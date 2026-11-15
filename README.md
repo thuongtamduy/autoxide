@@ -194,6 +194,9 @@ matching REST endpoint, so writes land in the audit log. For example, with Claud
 claude mcp add --transport http autoxide http://127.0.0.1:8080/mcp --header "Authorization: Bearer <api key>"
 ```
 
+[`docs/guides/mcp.md`](docs/guides/mcp.md) walks through it: a key with the least
+permissions, other MCP clients, every tool with the permission it needs, and the limits.
+
 Back up everything — the data of every module and every stored file — into a
 directory, and restore it into a new, empty database (with any file storage) later. The
 database is read in one consistent snapshot, so the server may keep running:
@@ -341,6 +344,11 @@ never share foreign keys. These rules are checked automatically by the gate.
 - [`CLAUDE.md`](CLAUDE.md) — the rules for contributors, human or AI agent
 - [`CHANGELOG.md`](CHANGELOG.md) — what changed in each release; released Docker images
   are at `ghcr.io/<owner>/autoxide`
+- [`docs/guides/`](docs/guides/README.md) — task-by-task guides to the API, with `curl` and
+  TypeScript examples that run as tests: a website, signing in, API keys, retries,
+  pagination, errors, connecting an AI agent over MCP
+- [`sdk/typescript/`](sdk/typescript/README.md) — a typed TypeScript client generated from
+  `docs/openapi.json`; [`docs/mcp-tools.json`](docs/mcp-tools.json) — the contract of every MCP tool
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — installing and deploying: Docker Compose with
   PostgreSQL or one binary with SQLite, reverse proxy, updates, backups
 - [`docs/MEDIA.md`](docs/MEDIA.md) — using the media library: upload, folders, public

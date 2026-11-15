@@ -1,5 +1,5 @@
 // Checked by `tsc --noEmit` in CI: the types of the SDK follow docs/openapi.json.
-import { AutoxideError, createClient } from "../src/index.ts";
+import { AutoxideError, createClient } from "@autoxide/sdk";
 
 const api = createClient({ baseUrl: "https://api.example.com", token: "axk_example", language: "vi" });
 

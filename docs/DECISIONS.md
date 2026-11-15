@@ -6005,3 +6005,32 @@ Lý do:
 
 Đã cân nhắc: `openapi-typescript` qua image Docker `node` ghim phiên bản — thêm Docker vào gate nhanh, và kiểu sinh
 ra theo cách riêng của nó, khó đọc hơn.
+
+## D-244 · Hướng dẫn theo tình huống: dạng `curl` hẹp chạy như test, bảng tool kiểm theo code (bước 31 A3–A5) — 2026-11-15 — agent quyết
+
+Quyết định:
+- `docs/guides/` gồm 7 tình huống, mỗi file có bản `.vi.md` cùng nội dung: `website`, `authentication`, `api-keys`,
+  `retries`, `pagination`, `errors`, `mcp`, cộng `README` làm mục lục. Tệp mẫu (ảnh PNG nhỏ) nằm ở `files/`.
+- **Ví dụ `curl` dạng hẹp**, chạy bằng `crates/app/src/e2e/guides.rs`:
+  - khối `bash` có dòng `<!-- example: <tên> -->` ngay trước là một bước, gồm đúng một lệnh
+    `curl -sS [-X] "$API/…" [-H …] [--json '…' | --data-binary @tệp]`;
+  - chú thích `# save: TÊN=.đường.dẫn` hay `=header:<tên>`, `# expect: <mã>`, `# expect-header: <tên>: <giá trị>`;
+  - biến tách theo luật shell (`'…'` không thay, `"…"` có thay), nên lệnh trong tài liệu chạy thật được trong
+    terminal;
+  - mỗi hướng dẫn một database trống, dựng bằng `TestApp` với mọi module của binary (`TestAppBuilder::boxed_module`,
+    hàm mới của testkit), đăng nhập thật;
+  - response được kiểm theo hợp đồng (D-241), trừ bước chờ `304`.
+- **Khối code của bản tiếng Việt giống hệt bản tiếng Anh** (test kiểm). Chú thích trong code viết tiếng Anh.
+- **Ví dụ TypeScript** trích bằng `cargo xtask sdk --extract-examples`, kiểm kiểu cùng SDK trong job `sdk` của CI.
+  - Lần đầu, `tsc` bắt ba lỗi của ví dụ: `me.user` không có, `Problem` không có `request_id` (mã request nằm ở header
+    `X-Request-Id` — SDK thêm `AutoxideError.requestId`), `process` cần kiểu của Node (ví dụ không đọc
+    `process.env` nữa).
+- **Bảng tool của `mcp.md`** nằm giữa `<!-- tools:start -->` / `<!-- tools:end -->`, mỗi dòng
+  `| \`tên\` | permission | read-only / writes / destructive |`. Test so với `Modules::tools()`, sai thì in đúng
+  các dòng phải có.
+
+Lý do: tài liệu viết tay lệch code rất nhanh; khi ví dụ chạy trong gate, lệch là đỏ ngay. Bộ chạy riêng cho dạng
+hẹp khoảng 300 dòng, không cần shell thật trong test (chạy được trên mọi máy, mọi database).
+
+Đã cân nhắc: chạy khối `bash` bằng shell thật với máy chủ thật — cần cổng mạng, `curl` trên máy và dọn tiến trình,
+chậm và dễ hỏng trên CI.

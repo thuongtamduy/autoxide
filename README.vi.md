@@ -189,6 +189,9 @@ audit log. Ví dụ với Claude Code:
 claude mcp add --transport http autoxide http://127.0.0.1:8080/mcp --header "Authorization: Bearer <api key>"
 ```
 
+[`docs/guides/mcp.vi.md`](docs/guides/mcp.vi.md) hướng dẫn từng bước: key với ít permission
+nhất, client MCP khác, mọi tool kèm permission cần có, và các giới hạn.
+
 Backup mọi thứ — dữ liệu của mọi module và mọi file đã lưu — vào một thư mục, rồi về
 sau khôi phục vào một database mới, trống (với nơi lưu file bất kỳ). Database được đọc
 trong một snapshot nhất quán, nên máy chủ vẫn chạy được trong lúc backup:
@@ -336,6 +339,11 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
 - [`CLAUDE.md`](CLAUDE.md) — luật cho người đóng góp, là người hay AI agent
 - [`CHANGELOG.md`](CHANGELOG.md) — thay đổi của từng bản phát hành (tiếng Anh); image
   Docker đã phát hành ở `ghcr.io/<owner>/autoxide`
+- [`docs/guides/`](docs/guides/README.vi.md) — hướng dẫn API theo tình huống, có ví dụ `curl` và
+  TypeScript chạy như test: website, đăng nhập, API key, gọi lại an toàn, pagination, lỗi,
+  nối AI agent qua MCP
+- [`sdk/typescript/`](sdk/typescript/README.vi.md) — client TypeScript có kiểu, sinh từ
+  `docs/openapi.json`; [`docs/mcp-tools.json`](docs/mcp-tools.json) — hợp đồng của mọi tool MCP
 - [`docs/DEPLOY.vi.md`](docs/DEPLOY.vi.md) — cài đặt và deploy: Docker Compose với
   PostgreSQL hoặc một binary với SQLite, reverse proxy, cập nhật, backup
 - [`docs/MEDIA.vi.md`](docs/MEDIA.vi.md) — dùng thư viện media: tải lên, thư mục, link

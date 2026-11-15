@@ -87,14 +87,14 @@ Nhóm A — hợp đồng và người gọi API:
       request, response, lỗi `Problem` và pagination; gate kiểm SDK khớp hợp đồng như cách test
       đang kiểm `openapi.json`. Gate không bắt người lạ cài Node: nếu công cụ sinh cần Node thì chạy
       qua image Docker ghim phiên bản (như gitleaks) hoặc chỉ kiểm trong CI — chọn và ghi quyết định
-- [ ] Hướng dẫn theo tình huống (EN + VI, thư mục mới trong `docs/`): website đọc bài và ảnh
+- [x] Hướng dẫn theo tình huống (D-244; EN + VI, thư mục mới trong `docs/`): website đọc bài và ảnh
       (`srcset`, `body_media`, ETag / 304, cache), đăng nhập và làm mới token, API key cho máy,
       gọi lại an toàn bằng `Idempotency-Key`, pagination, đọc lỗi (`code`, `errors`, `Retry-After`).
       Mỗi tình huống có ví dụ `curl` và TypeScript dùng SDK
-- [ ] Hướng dẫn nối AI agent qua MCP (EN + VI), mở rộng đoạn ngắn trong README: tạo API key quyền
+- [x] Hướng dẫn nối AI agent qua MCP (D-244) (EN + VI), mở rộng đoạn ngắn trong README: tạo API key quyền
       tối thiểu cho agent, cấu hình Claude Code và client MCP khác, danh sách tool theo module và
       permission cần, giới hạn (rate limit theo API key, bản nháp chờ duyệt — D-109)
-- [ ] Ví dụ trong tài liệu được test: các ví dụ của hai mục trên chạy thật trên app dựng bằng
+- [x] Ví dụ trong tài liệu được test (D-244): các ví dụ của hai mục trên chạy thật trên app dựng bằng
       `TestApp` trong gate (hay một lệnh `xtask` gate gọi), để tài liệu không lệch code
 - [x] Hợp đồng tool MCP (D-233, D-240): `docs/mcp-tools.json` sinh từ code, `api-diff` chặn thay đổi phá vỡ của tool
       (bỏ tool, thêm tham số bắt buộc, `read_only` thành ghi…), tool cũ khai deprecated như endpoint
