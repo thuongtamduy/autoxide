@@ -83,7 +83,7 @@ Nhóm A — hợp đồng và người gọi API:
       giá trị của enum. Endpoint đã khai deprecated và quá ngày `sunset` thì được bỏ. Viết bằng
       Rust trong `xtask` (thêm lệnh), có test cho từng loại thay đổi; thông báo nói rõ chỗ nào
       phá và cách làm đúng (endpoint mới + deprecate endpoint cũ)
-- [ ] SDK TypeScript sinh từ `docs/openapi.json` (D-177: trong repo, không đăng npm), đủ kiểu cho
+- [x] SDK TypeScript sinh từ `docs/openapi.json` (D-177, D-243: trong repo, không đăng npm), đủ kiểu cho
       request, response, lỗi `Problem` và pagination; gate kiểm SDK khớp hợp đồng như cách test
       đang kiểm `openapi.json`. Gate không bắt người lạ cài Node: nếu công cụ sinh cần Node thì chạy
       qua image Docker ghim phiên bản (như gitleaks) hoặc chỉ kiểm trong CI — chọn và ghi quyết định

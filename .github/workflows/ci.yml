@@ -70,6 +70,24 @@ jobs:
           exit 1
       - run: ./gate.sh
 
+  sdk:
+    name: TypeScript SDK and guide examples (tsc)
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.23.4"
+      # Ví dụ TypeScript của docs/guides kiểm kiểu cùng SDK (đặc tả 31 A5).
+      - run: cargo xtask sdk --extract-examples sdk/typescript/examples/guides
+      - name: tsc --noEmit
+        working-directory: sdk/typescript
+        run: npm ci && npx tsc --noEmit
+
   secrets:
     name: secret scan (gitleaks)
     if: ${{ !github.event.repository.private }}

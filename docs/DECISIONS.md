@@ -5974,3 +5974,34 @@ Lý do:
 - Khi có module ở repo riêng (D-164), xem lại.
 
 Đã cân nhắc: chạy trong gate — lâu, cần mạng, và còn `0.x` thì chặn không có ích (D-167).
+
+## D-243 · SDK TypeScript: bộ sinh viết bằng Rust trong `xtask`, gate kiểm khớp không cần Node, `tsc` trong CI (bước 31 A2) — 2026-11-15 — agent quyết
+
+Quyết định (D-177 giao cho agent):
+- `cargo xtask sdk` (`xtask/src/sdk.rs`) sinh `sdk/typescript/src/schema.ts` từ `docs/openapi.json`:
+  - mỗi schema một `export type`, kèm mô tả làm chú thích;
+  - interface `paths` với tham số theo vị trí, thân request và response theo mã của từng operation;
+  - thứ tự sắp theo tên.
+- Gate (cả hai mức) chạy `cargo xtask sdk --check`: file lệch hay `version` của `package.json` khác workspace thì đỏ,
+  kèm lệnh sinh lại. Người chạy `./gate.sh` không cần Node.
+- `client.ts` viết tay, không phụ thuộc thư viện:
+  - `createClient`; `get` / `post` / `put` / `patch` / `delete` có kiểu suy từ `paths`;
+  - `{data}` trả `data`, trang giữ nguyên;
+  - lỗi ném `AutoxideError` (`code`, `detail`, `errors`, `retryAfter`);
+  - `paginate()` theo `next_cursor`;
+  - 304 trả `{ notModified: true }`.
+- Gói là mã nguồn `.ts`, `private`, không đăng npm (D-177).
+- CI:
+  - job `sdk` chạy `npm ci && npx tsc --noEmit` trên SDK, `examples/smoke.ts` và ví dụ TypeScript trích từ
+    `docs/guides` (A5);
+  - Node 22.23.4 và `typescript` 5.9.3 ghim trong `package-lock.json`;
+  - workflow `Release` đính kèm `autoxide-sdk-X.Y.Z.tgz` (`npm pack`);
+  - khi repo còn riêng tư thì đính tay theo `docs/RELEASING.md`.
+
+Lý do:
+- Tập schema utoipa sinh ra nhỏ và biết trước; bộ sinh khoảng 300 dòng.
+- Thử trên `docs/openapi.json` thật (366 schema, 225 operation): `tsc --strict` sạch ngay. Ví dụ dùng thử bắt đúng
+  kiểu sai (`limit` là số).
+
+Đã cân nhắc: `openapi-typescript` qua image Docker `node` ghim phiên bản — thêm Docker vào gate nhanh, và kiểu sinh
+ra theo cách riêng của nó, khó đọc hơn.

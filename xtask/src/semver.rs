@@ -196,7 +196,7 @@ pub fn run(root: &Path, base: Option<&str>, deny: bool, as_markdown: bool) -> Re
 }
 
 /// `version` của `[workspace.package]` trong `Cargo.toml` gốc.
-fn workspace_version(root: &Path) -> Result<String, String> {
+pub fn workspace_version(root: &Path) -> Result<String, String> {
     let text = std::fs::read_to_string(root.join("Cargo.toml"))
         .map_err(|error| format!("cannot read Cargo.toml: {error}"))?;
     let mut in_package = false;

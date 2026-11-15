@@ -23,6 +23,9 @@ endpoints are marked deprecated with a sunset date first.
 - `cargo xtask semver`: lists breaking changes to the Rust contract (`autoxide-kernel`, `autoxide-testkit`)
   against the last release, with `cargo-semver-checks`; run when releasing. It only reports while the
   version is `0.x`, and refuses breaking changes from `1.0` or with `--deny`.
+- A typed TypeScript SDK in `sdk/typescript/` (no dependencies; not on npm): `createClient`, typed paths,
+  parameters, bodies and results generated from `docs/openapi.json` by `cargo xtask sdk`, `AutoxideError`,
+  `paginate()`. The gate checks it matches the contract; each release attaches `autoxide-sdk-X.Y.Z.tgz`.
 
 ### Fixed
 
