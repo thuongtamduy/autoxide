@@ -34,11 +34,12 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | | Màn | Cần | Bước | Giao diện đang làm gì |
 |---|---|---|---|---|
 | [ ] | Mọi màn: thanh bên, menu con, bảng lệnh | Sổ điều hướng: nhóm phân hệ, màn, permission, tính năng của gói, thứ tự; đã lọc theo người gọi | 51 (`Module::navigation`) | Danh sách viết ở `apps/admin/src/nav/nav.ts`, lọc theo `GET /kernel/modules` và `permissions` của `GET /auth/me`. Có API thì bỏ file này |
-| [ ] | Mọi màn: số đếm trên menu | Số việc đang chờ cho từng mục menu, cùng nguồn với hộp việc | 51 (hộp việc) | Chưa hiện số |
+| [ ] | Mọi màn: số đếm trên menu | Số việc đang chờ cho từng mục menu, cùng nguồn với hộp việc | 51 (hộp việc) | Tự đếm từ 16 nguồn việc (`src/work/`, W-020), giữ 10 giây; xem mục Tổng quan và Việc ở cuối file |
 | [ ] | Ctrl K | Tìm dữ liệu xuyên phân hệ (đơn, bài viết, người dùng…), tìm không dấu, theo quyền | 51 (`FinderSource`) | Chỉ tìm tên màn để "Đi tới" |
-| [ ] | `/` Tổng quan | Hộp việc, số liệu tóm tắt, hoạt động gần đây | 51 | Chỉ lời chào và lối vào các phân hệ |
+| [ ] | `/` Tổng quan | Hộp việc, số liệu tóm tắt, hoạt động gần đây | 51 | Hộp việc, số liệu, các bước thiết lập, doanh thu hôm nay, hoạt động (audit thật); phần chưa có API là dữ liệu mẫu (W-020) |
 | [ ] | Góc trên bên trái | Khách hàng và nút tổ chức đang chọn, đổi phạm vi | 33, 34 | Hiện "Autoxide Quản trị", chưa đổi phạm vi được |
 | [ ] | Menu tài khoản: giao diện sáng / tối | Lưu lựa chọn theo tài khoản để theo người dùng sang thiết bị khác. Nên gộp vào `/me/preferences` của bước 37 | mới (gộp vào 37) | Lưu cookie `ax_theme` trên từng trình duyệt |
+| [ ] | Bộ chọn permission (role, API key) | `risk` trong `GET /auth/permissions` (hiện chỉ có ở `GET /kernel/modules`, cần thêm `kernel.modules.read`) | mới | Gọi thêm sổ module; thiếu quyền thì không có nhãn rủi ro |
 
 ## Tài khoản của tôi (`/account`)
 
@@ -145,7 +146,9 @@ Team API làm xong một dòng thì đánh dấu `[x]` ở đầu dòng; agent g
 | [ ] | Thư viện media | Lọc "thiếu alt" (`alt_missing=true`) và số ảnh thiếu alt | mới | Lọc trên trang đang xem (48 tệp) |
 | [ ] | Thư viện media | Tóm tắt cả thư viện: tổng tệp, dung lượng, số ảnh thiếu alt | mới | Tính trên trang đang xem |
 | [ ] | Thư viện media | Số tệp trong mỗi thư mục (`item_count` trong `FolderResponse`) | mới | Không hiện số |
-| [ ] | Thư viện media | Alt theo từng ngôn ngữ và cờ "ảnh trang trí" (`GET/PUT /media/{id}/alts`) | mới | Alt ngôn ngữ mặc định là `alt` thật; ngôn ngữ khác và cờ trang trí là dữ liệu mẫu (`src/sample/media.ts`) |
+| [x] | Thư viện media | Alt theo từng ngôn ngữ (`PUT/DELETE /media/{id}/alts/{locale}`, `alts` trong tệp) | v0.14.0 | Đã nối API thật (W-021 của web) |
+| [ ] | Thư viện media | Cờ "ảnh chỉ để trang trí" (alt để trống có chủ ý, khác "chưa có alt") | mới | Dữ liệu mẫu (`src/sample/media.ts`) |
+| [ ] | Thư viện media | Danh sách ngôn ngữ alt máy chủ mở (`AUTOXIDE_MEDIA_ALT_LOCALES`) qua API, để giao diện chỉ hiện ô của ngôn ngữ được nhận | mới | Hiện ô theo ngôn ngữ của nội dung; ngôn ngữ không mở thì hiện lỗi `media.unsupported_locale` của core |
 | [ ] | Thư viện media | "Đang dùng ở": bài, trang, sản phẩm nào dùng tệp (`GET /media/{id}/usages`) | mới | Ghi "máy chủ chưa liệt kê được" |
 | [ ] | Thư viện media | Tên người tải lên (hiện chỉ có id) | mới | Không hiện |
 | [ ] | Thư viện media | Giới hạn tải lên cho giao diện: dung lượng tối đa, loại cho phép | mới (cùng loại "cấu hình cho giao diện") | Để core báo lỗi theo `code` sau khi gửi |
