@@ -22,8 +22,8 @@ use crate::config::{CommentsConfig, Mode};
 use crate::http::CommentDetail;
 use crate::moderation::QueueFilter;
 use crate::posting::NewComment;
+use crate::posting::targets::OwnerEvents;
 use crate::service::{CommentsService, Status};
-use crate::targets::OwnerEvents;
 use crate::testing::{Harness, admin, service};
 
 const PRODUCTS: &str = "catalog.product";
@@ -274,7 +274,7 @@ async fn luu_tru_dich_thi_dong_va_an_hoi_dap() {
             [ResourceEvent::new("catalog.product_archived", PRODUCTS, ResourceChange::Removed)];
         let handler = OwnerEvents {
             service: Arc::clone(service),
-            events: crate::targets::owner_events(&declared, &service.config.target_types),
+            events: crate::posting::targets::owner_events(&declared, &service.config.target_types),
         };
         let event = Delivered::new("catalog", "catalog.product_archived", json!({}))
             .subject(Some(format!("{PRODUCTS}:{PRODUCT}")));

@@ -1,4 +1,5 @@
-//! Service của thư viện media: MỌI logic nằm ở đây (và ở `upload.rs`, `folders.rs`).
+//! Service của thư viện media: MỌI logic nằm ở đây và ở các file theo tính năng — `library/`
+//! (tải lên, loại thật, thư mục, nhãn), `images/` (ảnh thu nhỏ, alt), `jobs.rs` (dọn định kỳ).
 //! Handler REST và tool MCP chỉ lấy dữ liệu vào rồi gọi service — hai đường cho cùng kết
 //! quả, cùng permission (luật kiến trúc 8). Mỗi lệnh ghi đi cùng một event trong CÙNG
 //! transaction (luật kiến trúc 3).
@@ -136,7 +137,7 @@ pub(crate) struct ItemDetails {
     /// `alt` theo ngôn ngữ (ngôn ngữ → alt), D-202.
     pub alts: std::collections::BTreeMap<String, String>,
     /// Ảnh thu nhỏ theo cỡ, hẹp trước.
-    pub variants: Vec<crate::variants::VariantPair>,
+    pub variants: Vec<crate::images::variants::VariantPair>,
 }
 
 pub(crate) struct MediaService {
@@ -193,12 +194,13 @@ impl MediaService {
             select = select.filter(autoxide_kernel::search::contains(Column::NameKey, search));
         }
         if let Some(tag) = filter.tag.as_deref().filter(|tag| !tag.trim().is_empty()) {
-            let Some(tag_id) = crate::tags::find_tag(self.database.read(), tag).await? else {
+            let Some(tag_id) = crate::library::tags::find_tag(self.database.read(), tag).await?
+            else {
                 // Không có nhãn đó: không item nào mang nó.
                 let pagination = Pagination::new(page.limit(), None);
                 return Ok(Page { data: Vec::new(), pagination });
             };
-            select = select.filter(crate::tags::has_tag(tag_id));
+            select = select.filter(crate::library::tags::has_tag(tag_id));
         }
         let read = self.database.read();
         match filter.sort {
@@ -220,15 +222,17 @@ impl MediaService {
     pub(crate) async fn describe(&self, items: Vec<Item>) -> Result<Vec<ItemDetails>, Error> {
         let read = self.database.read();
         let ids: Vec<Uuid> = items.iter().map(|item| item.id).collect();
-        let mut tags = crate::tags::tags_of(read, &ids).await?;
-        let mut alts = crate::alts::alts_of(read, &ids).await?;
-        let mut variants = crate::variants::variants_of(read, &items).await?;
+        let mut tags = crate::library::tags::tags_of(read, &ids).await?;
+        let mut alts = crate::images::alts::alts_of(read, &ids).await?;
+        let mut variants = crate::images::variants::variants_of(read, &items).await?;
         Ok(items
             .into_iter()
             .map(|item| ItemDetails {
                 tags: tags.remove(&item.id).unwrap_or_default(),
                 alts: alts.remove(&item.id).unwrap_or_default(),
-                variants: crate::variants::pair(variants.remove(&item.id).unwrap_or_default()),
+                variants: crate::images::variants::pair(
+                    variants.remove(&item.id).unwrap_or_default(),
+                ),
                 item,
             })
             .collect())
@@ -312,7 +316,7 @@ impl MediaService {
         let tags = changes
             .tags
             .as_deref()
-            .map(|tags| crate::tags::check_tags(tags, "tags", &mut problems));
+            .map(|tags| crate::library::tags::check_tags(tags, "tags", &mut problems));
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -360,10 +364,12 @@ impl MediaService {
             }
             Err(error) => return Err(error.into()),
         };
-        let tags_before =
-            crate::tags::tags_of(&transaction, &[id]).await?.remove(&id).unwrap_or_default();
+        let tags_before = crate::library::tags::tags_of(&transaction, &[id])
+            .await?
+            .remove(&id)
+            .unwrap_or_default();
         let tags_after = match &tags {
-            Some(tags) => crate::tags::set_item_tags(&transaction, id, tags).await?,
+            Some(tags) => crate::library::tags::set_item_tags(&transaction, id, tags).await?,
             None => tags_before.clone(),
         };
         let event = events::ItemUpdated(Change {
@@ -459,7 +465,7 @@ impl MediaService {
             .filter(crate::entity::item_tag::Column::ItemId.eq(item.id))
             .exec(&transaction)
             .await?;
-        crate::alts::delete_alts(&transaction, item.id).await?;
+        crate::images::alts::delete_alts(&transaction, item.id).await?;
         let copies = crate::entity::variant::Entity::find()
             .filter(crate::entity::variant::Column::ItemId.eq(item.id))
             .all(&transaction)
@@ -697,7 +703,8 @@ impl crate::api::Media for MediaService {
             return Ok(found);
         };
         let ids: Vec<Uuid> = found.iter().map(|item| item.id).collect();
-        let mut translated = crate::alts::alts_in(self.database.read(), &ids, &locale).await?;
+        let mut translated =
+            crate::images::alts::alts_in(self.database.read(), &ids, &locale).await?;
         for item in &mut found {
             if let Some(alt) = translated.remove(&item.id) {
                 item.alt = alt;
@@ -723,7 +730,7 @@ impl crate::api::Media for MediaService {
             .filter(Column::TrashedAt.is_null())
             .all(self.database.read())
             .await?;
-        let mut copies = crate::variants::variants_of(self.database.read(), &rows).await?;
+        let mut copies = crate::images::variants::variants_of(self.database.read(), &rows).await?;
         let mut found: std::collections::HashMap<Uuid, Item> =
             rows.into_iter().map(|item| (item.id, item)).collect();
         Ok(ids
@@ -731,17 +738,18 @@ impl crate::api::Media for MediaService {
             .filter_map(|id| found.remove(id))
             .map(|item| {
                 let url = content_url(&item);
-                let variants = crate::variants::pair(copies.remove(&item.id).unwrap_or_default())
-                    .into_iter()
-                    .map(|copy| crate::api::MediaVariant {
-                        url: format!("{url}&w={}", copy.main.width),
-                        webp_url: copy
-                            .webp
-                            .map(|webp| format!("{url}&w={}&format=webp", webp.width)),
-                        width: copy.main.width,
-                        height: copy.main.height,
-                    })
-                    .collect();
+                let variants =
+                    crate::images::variants::pair(copies.remove(&item.id).unwrap_or_default())
+                        .into_iter()
+                        .map(|copy| crate::api::MediaVariant {
+                            url: format!("{url}&w={}", copy.main.width),
+                            webp_url: copy
+                                .webp
+                                .map(|webp| format!("{url}&w={}&format=webp", webp.width)),
+                            width: copy.main.width,
+                            height: copy.main.height,
+                        })
+                        .collect();
                 MediaRef {
                     id: item.id,
                     visibility: match Visibility::of(&item) {

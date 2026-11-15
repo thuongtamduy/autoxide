@@ -4,6 +4,7 @@
 mod m0001_create_comments;
 mod m0008_name_key_lookalikes;
 mod m0009_questions;
+mod m0010_add_format;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -27,5 +28,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0008_name_key_lookalikes::Migration),
         // Hỏi đáp: nhãn tác giả, khoá tìm đúng dấu, số câu hỏi theo đích (D-202).
         Box::new(m0009_questions::Migration),
+        // Định dạng của bài: chữ thường hay Markdown giới hạn (D-252).
+        Box::new(m0010_add_format::Migration),
     ]
 }

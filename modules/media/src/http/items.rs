@@ -20,10 +20,10 @@ use validator::Validate;
 use super::{MediaItemResponse, folder_filter, page_of, page_request, present, sort, tagged};
 use crate::config::normalize_type;
 use crate::entity::api_folder;
+use crate::library::upload::NewUpload;
 use crate::service::{
     ItemChanges, ItemFilter, ItemSort, MediaService, Visibility, content_url, too_large,
 };
-use crate::upload::NewUpload;
 
 /// Filters and order of the media list. Combine any of them.
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
@@ -62,7 +62,7 @@ impl ItemsQuery {
             let wildcard = raw.strip_suffix("/*").map(|kind| format!("{kind}/x"));
             match normalize_type(wildcard.as_deref().unwrap_or(raw)) {
                 Some(_) if wildcard.is_some() => Some(raw.to_ascii_lowercase()),
-                Some(normalized) => Some(crate::sniff::canonical(&normalized).to_owned()),
+                Some(normalized) => Some(crate::library::sniff::canonical(&normalized).to_owned()),
                 None => {
                     problems.push(FieldError::new(
                         "type",

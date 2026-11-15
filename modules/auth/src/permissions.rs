@@ -23,7 +23,14 @@ pub(crate) const USERS_MANAGE: Permission = Permission::new(
      of an account created without one.",
 );
 
+pub(crate) const PASSKEYS_MANAGE: Permission = Permission::new(
+    "auth.passkeys.manage",
+    "See and remove the passkeys of other users. Give it only to people who handle account \
+     recovery.",
+)
+.with_risk(Risk::Destructive);
+
 /// Mọi permission module `auth` khai.
 pub(crate) fn all() -> Vec<Permission> {
-    vec![ROLES_READ, ROLES_MANAGE, USERS_READ, USERS_MANAGE]
+    vec![ROLES_READ, ROLES_MANAGE, USERS_READ, USERS_MANAGE, PASSKEYS_MANAGE]
 }

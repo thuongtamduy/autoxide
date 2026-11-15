@@ -15,10 +15,10 @@ use super::{
     campaign, count_events, drain, emails, events, import, list, subscribe, subscribers,
     subscriptions,
 };
+use crate::audience::lists::{ListInput, NewPosts};
+use crate::audience::subscribers::{ImportInput, ImportPerson, SubscriberChange};
+use crate::campaigns::new_posts::{ENTRY_PUBLISHED, NewPostHandler};
 use crate::campaigns::{Action, CampaignFilter, CampaignStatus};
-use crate::lists::{ListInput, NewPosts};
-use crate::new_posts::{ENTRY_PUBLISHED, NewPostHandler};
-use crate::subscribers::{ImportInput, ImportPerson, SubscriberChange};
 use crate::testing::{admin, config, service, user};
 use crate::text::{Locale, Localized};
 
@@ -136,7 +136,7 @@ async fn nhap_nguoi_dang_ky() {
             .service
             .list_subscribers(
                 &admin(),
-                &crate::subscribers::SubscriberFilter {
+                &crate::audience::subscribers::SubscriberFilter {
                     email: Some("ADA@".to_owned()),
                     ..Default::default()
                 },
@@ -183,9 +183,9 @@ async fn nhap_nguoi_dang_ky() {
             (ada.row.name.as_deref(), ada.subscriptions[0].row.status.as_str()),
             (Some("Ada"), "unsubscribed")
         );
-        let filter = crate::subscribers::SubscriberFilter {
+        let filter = crate::audience::subscribers::SubscriberFilter {
             list_id: Some(weekly.row.id),
-            status: Some(crate::subscribers::SubscriptionStatus::Confirmed),
+            status: Some(crate::audience::subscribers::SubscriptionStatus::Confirmed),
             ..Default::default()
         };
         assert_eq!(

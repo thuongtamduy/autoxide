@@ -17,7 +17,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{folder_filter, page_request, present, sort};
-use crate::folders::{FolderChanges, FolderSort};
+use crate::library::folders::{FolderChanges, FolderSort};
 use crate::service::MediaService;
 
 /// A media folder. Folders nest; names are unique (ignoring case) within a parent.

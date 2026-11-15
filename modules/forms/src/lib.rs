@@ -3,23 +3,20 @@
 //! viên, xuất / xoá theo email, tự xoá theo thời hạn.
 //!
 //! Chỉ API: website hiển thị form và gửi bài (repo giao diện riêng). Mail báo đi qua `dyn
-//! Mailer` nên module đăng ký SAU module `mail`. Hướng dẫn dùng: `docs/FORMS.md`.
+//! Mailer`, file xuất CSV lớn lưu qua `dyn Storage`, nên module đăng ký SAU module `mail` và
+//! `files`. Hướng dẫn dùng: `docs/FORMS.md`.
 
 mod config;
-mod csv;
 mod entity;
 mod events;
-mod fields;
 mod forms;
 mod http;
-mod inbox;
 mod migration;
-mod notify;
 mod permissions;
 mod privacy;
-mod public;
 mod retention;
 mod service;
+mod submissions;
 mod tools;
 
 #[cfg(test)]
@@ -38,14 +35,17 @@ use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
+use autoxide_kernel::public_url::PublicUrl;
 use autoxide_kernel::secret::SecretKey;
+use autoxide_kernel::storage::Storage;
 use axum::http::Method;
 use utoipa_axum::router::OpenApiRouter;
 
 use crate::config::FormsConfig;
 use crate::service::{FormsService, Parts};
 
-/// Module `forms`, để binary đăng ký trong `crates/app/src/modules.rs` — SAU module `mail`.
+/// Module `forms`, để binary đăng ký trong `crates/app/src/modules.rs` — SAU module `mail` và
+/// `files`.
 pub fn module() -> impl Module {
     FormsModule::default()
 }
@@ -96,6 +96,9 @@ impl Module for FormsModule {
             secret: (*context.require::<SecretKey>()?).clone(),
             mailer: context.require::<dyn Mailer>()?,
             translations: context.translations().clone(),
+            storage: context.require::<dyn Storage>()?,
+            jobs: context.jobs(),
+            public_url: context.require::<PublicUrl>()?,
         };
         let service = Arc::new(FormsService::new(parts, config));
         context.personal_data(service.clone())?;
@@ -106,10 +109,10 @@ impl Module for FormsModule {
     fn subscriptions(&self) -> Vec<Subscription> {
         self.service.clone().map_or_else(Vec::new, |service| {
             vec![
-                // Bài vào hộp thư: mail báo quản trị viên (`notify.rs`).
+                // Bài vào hộp thư: mail báo quản trị viên (`submissions/notify.rs`).
                 Subscription::new(
                     events::SubmissionReceived::NAME,
-                    Arc::new(notify::Notifier(service.clone())),
+                    Arc::new(submissions::notify::Notifier(service.clone())),
                 ),
                 // Tài khoản bị xoá: bỏ `created_by` (`privacy.rs`).
                 Subscription::new(autoxide_kernel::privacy::USER_DELETED, service),
@@ -119,7 +122,16 @@ impl Module for FormsModule {
 
     fn jobs(&self) -> Vec<JobRegistration> {
         self.service.clone().map_or_else(Vec::new, |service| {
-            vec![JobRegistration::new(retention::CLEANUP, Arc::new(retention::Cleanup(service)))]
+            vec![
+                JobRegistration::new(
+                    retention::CLEANUP,
+                    Arc::new(retention::Cleanup(service.clone())),
+                ),
+                JobRegistration::new(
+                    submissions::exports::EXPORT,
+                    Arc::new(submissions::exports::Exporter(service)),
+                ),
+            ]
         })
     }
 
@@ -157,10 +169,12 @@ pub(crate) mod testing {
     use autoxide_kernel::error::{Error, FieldError};
     use autoxide_kernel::event::Outbox;
     use autoxide_kernel::i18n::Translations;
+    use autoxide_kernel::job::JobQueue;
     use autoxide_kernel::mail::{Mail, Mailer};
     use autoxide_kernel::migration::{Migrator, ModuleMigrations};
+    use autoxide_kernel::public_url::PublicUrl;
     use autoxide_kernel::secret::SecretKey;
-    use autoxide_testkit::TestDatabase;
+    use autoxide_testkit::{MemoryStorage, TestDatabase};
     use uuid::Uuid;
 
     use crate::config::FormsConfig;
@@ -210,6 +224,16 @@ pub(crate) mod testing {
         config: FormsConfig,
         antispam: AntispamConfig,
     ) -> (Arc<FormsService>, Arc<FakeMailer>, Database) {
+        let (service, mailer, database, _) = service_with_storage(test, config, antispam).await;
+        (service, mailer, database)
+    }
+
+    /// Như [`service_with`], trả thêm nơi lưu trong bộ nhớ mà service ghi file xuất vào.
+    pub async fn service_with_storage(
+        test: &TestDatabase,
+        config: FormsConfig,
+        antispam: AntispamConfig,
+    ) -> (Arc<FormsService>, Arc<FakeMailer>, Database, Arc<MemoryStorage>) {
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
         let kernel = Config::read(&mut reader);
@@ -224,6 +248,7 @@ pub(crate) mod testing {
             SecretKey::new(database.clone(), Some(b"forms-test-secret-key-0123456789".to_vec()));
         let guard = Arc::new(SpamGuard::new(secret.clone(), antispam));
         let mailer = Arc::new(FakeMailer::default());
+        let storage = Arc::new(MemoryStorage::new());
         let translations =
             Translations::new(vec![("forms", vec![("vi", include_str!("../locales/vi.json"))])])
                 .unwrap();
@@ -234,8 +259,11 @@ pub(crate) mod testing {
             secret,
             mailer: mailer.clone(),
             translations,
+            storage: storage.clone(),
+            jobs: JobQueue::new("forms"),
+            public_url: Arc::new(PublicUrl::default()),
         };
-        (Arc::new(FormsService::new(parts, config)), mailer, database)
+        (Arc::new(FormsService::new(parts, config)), mailer, database, storage)
     }
 
     /// Người có các permission `permissions` (`forms.` thêm sẵn).

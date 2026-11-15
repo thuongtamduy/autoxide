@@ -15,10 +15,10 @@ use sea_orm::sea_query::Query;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::json;
 
+use crate::audience::subscribers::SubscriptionStatus;
 use crate::entity::{delivery, subscriber, subscription};
 use crate::events::{self, Change};
 use crate::service::{MODULE, NewsletterService, now};
-use crate::subscribers::SubscriptionStatus;
 
 pub(crate) const CLEANUP: &str = "newsletter.cleanup";
 

@@ -3,6 +3,8 @@
 //! (module `audit` ghi lại: ai, lúc nào, làm gì — phục vụ yêu cầu gỡ trong 24 giờ của Nghị định
 //! 147/2024 nếu áp dụng). Event không mang chữ hay email.
 
+pub(crate) mod reports;
+
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
@@ -15,10 +17,10 @@ use sea_orm::{
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::authoring::{Deletion, soft_delete, update_if_unchanged};
 use crate::entity::{ban, comment, report, subscription};
 use crate::events::{self, Change};
 use crate::permissions::{COMMENTS_EXPORT, COMMENTS_MANAGE, COMMENTS_MODERATE, COMMENTS_READ};
+use crate::posting::authoring::{Deletion, soft_delete, update_if_unchanged};
 use crate::service::{
     Comment, CommentsService, Status, comment_not_found, now, shift_counts, summary,
 };

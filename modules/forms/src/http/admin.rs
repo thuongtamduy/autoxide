@@ -17,7 +17,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{choice, page_request, present};
-use crate::fields::{Field, Localized};
+use crate::forms::fields::{Field, Localized};
 use crate::forms::{Form, FormInput, FormStatus};
 use crate::service::FormsService;
 

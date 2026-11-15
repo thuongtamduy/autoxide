@@ -6125,3 +6125,256 @@ workspace thì không được, vì hai bản trùng tên crate.
   hành.
 - Chạy trong gate: mỗi lần gate lại tốn thêm một lần build bản release và cần Docker. Trong khi đó gate phải chạy
   được trên máy chỉ có Postgres (`GATE_POSTGRES_URL`).
+
+## D-247 · Bố cục theo tính năng của bốn module và nhóm file của kernel (bước 32 A1, A2) — 2026-11-15 — agent quyết
+
+Bối cảnh: `newsletter`, `comments`, `media`, `forms` (6–10 nghìn dòng mỗi module) và kernel (37 file nằm phẳng)
+chưa theo quy ước "File layout" của `docs/MODULE_GUIDE.md`. Bước 33 sẽ sửa mọi bảng của mọi module và thêm
+khoảng tám module vào kernel; người sửa cần tìm đúng chỗ ngay.
+
+Quyết định:
+
+- **Module: theo cách của `content`.**
+  - File tính năng chính giữ logic và khai các file con trong thư mục cùng tên: `campaigns.rs` + `campaigns/`,
+    `posting.rs` + `posting/`, `moderation.rs` + `moderation/`, `forms.rs` + `forms/`.
+  - Nhóm không có file chính thì là file nhóm chỉ khai module con: `audience.rs`, `submissions.rs`,
+    `library.rs`, `images.rs`.
+  - Tính năng chỉ có một file giữ ở trên cùng, không bọc thêm nhóm: `public.rs` của `newsletter` (cùng tên
+    với `http/public.rs`), `threads.rs` của `comments`. Bảng của đặc tả đặt chúng vào `signup/`, `reading/`;
+    nhóm một file không giúp tìm nhanh hơn mà còn đổi tên.
+  - Bố cục cụ thể:
+
+    | Module | Nhóm |
+    | --- | --- |
+    | `newsletter` | `audience/` (`lists`, `subscribers`, `bounces`); `campaigns/` (`sending`, `new_posts`, `compose`) |
+    | `comments` | `posting/` (`authoring`, `targets`); `moderation/` (`reports`) |
+    | `forms` | `forms/` (`fields`); `submissions/` (`public`, `inbox`, `csv`, `notify`) |
+    | `media` | `library/` (`upload`, `sniff`, `folders`, `tags`); `images/` (`variants`, `refresh`, `alt`, `alts`) |
+
+  - `tests.rs` của `forms` và `media` thành `tests/`: đồ dùng chung ở `mod.rs`, mỗi tính năng một file;
+    file con viết `use super::*;` như `mod tests` thường làm.
+  - Chỉ dời, không đổi tên hàm, kiểu, mã lỗi, job, event, permission hay tool. Số test và tên lá của từng
+    crate trước và sau như nhau: `newsletter` 28, `comments` 40, `forms` 29, `media` 49, kernel 324 (doc test
+    đổi tên vì tên của chúng mang đường dẫn file).
+- **Kernel: năm nhóm riêng tư, đường dẫn công khai không đổi.**
+  - Năm nhóm:
+
+    | Nhóm | Module | Bước 33+ thêm vào |
+    | --- | --- | --- |
+    | `contracts/` | `ai`, `mail`, `privacy`, `resource`, `storage` | `payment`, `einvoice`, `identity`, `sms`, `entitlement` |
+    | `data/` | `database`, `migration`, `pagination`, `reference`, `rows`, `search`, `transfer`, `version` | `tenancy`, `numbering` |
+    | `security/` | `access`, `antispam`, `idempotency`, `ip_hash`, `secret`, `throttle`, `tls`, `tokens` | — |
+    | `ops/` | `doctor`, `logging`, `metrics`, `task`, `telemetry`; riêng tư: `builtin`, `module_catalog`, `user_flags` | — |
+    | `values/` | `email`, `money`, `public_url` | `decimal` |
+
+  - Giữ trên cùng: `error`, `response`, `i18n`, `module`, `config`, `http`, `event`, `job`, `mcp`. Đây là
+    phần mọi module chạm tới. `mcp` không có trong bảng của đặc tả; nó là hợp đồng như `http`.
+  - `user_flags` (D-207) vào `ops/` cạnh `builtin`, vì module nội bộ `kernel` phục vụ nó.
+  - `lib.rs` khai `mod <nhóm>;` riêng tư và `pub use <nhóm>::{…};`. `autoxide_kernel::ai::TextModel` và
+    `crate::ai::…` vẫn chạy. Không có đường thứ hai qua tên nhóm.
+  - `crates/kernel/tests/public_paths.rs` `use` mọi module công khai cùng một kiểu tiêu biểu: mất đường dẫn
+    nào là lỗi biên dịch.
+  - Đã sửa theo đường dẫn mới: allowlist của `.gitleaks.toml` cho `security/antispam/fixtures/altcha_v2.json`.
+    Không phải sửa: `ENV_ACCESS_FILE` (`config/` giữ trên cùng), `include_str!` của `i18n` (giữ trên cùng) và của
+    `antispam` (dời cả thư mục). `cargo doc` với `-D warnings` sạch.
+- Tài liệu đang dùng (MODULE_GUIDE, đặc tả bước sau, ROADMAP) sửa theo đường dẫn mới. Nhật ký và đặc tả của
+  bước đã xong giữ nguyên: chúng ghi lại lúc đó.
+
+Lý do: bước 33 sửa từng module và thêm module vào kernel theo đúng một chỗ dễ đoán. Module ở repo riêng (D-167)
+không phải sửa dòng nào.
+
+Đã cân nhắc:
+- Re-export trong file nhóm (`pub(crate) use lists::List`) để khỏi sửa đường dẫn bên trong module: thành hai
+  cách gọi một thứ.
+- Đặt tên nhóm vào đường dẫn công khai của kernel (`autoxide_kernel::contracts::ai`): phá vỡ hợp đồng module.
+
+## D-248 · Phát hành gom thành bản lớn, không phát hành sau từng bước — 2026-11-15 — chủ dự án quyết
+
+Bối cảnh: theo D-171, agent tự phát hành sau mỗi bước của lộ trình. Mỗi bản phát hành cần chủ dự án tự tạo
+trang phát hành trên GitHub, vì phiên làm việc không đẩy được tag. Chủ dự án (15/11/2026): "Làm xong rồi
+release 1 bản lớn thôi, đừng release từng cái nhỏ nữa".
+
+Quyết định (thay D-171):
+
+- **Xong một bước** (mọi mục `[x]`, gate đầy đủ xanh): merge vào `main` (PR, merge kiểu rebase), ghi thay đổi
+  vào `## [Unreleased]` của `CHANGELOG.md`. Không đổi số phiên bản, không gắn tag.
+- **Phát hành** theo `docs/RELEASING.md`, agent tự làm không hỏi, khi xong trọn một giai đoạn của lộ trình (A, B,
+  C…: mọi bước của giai đoạn đã `[x]`), hay khi chủ dự án bảo. Bản đầu tiên theo luật này gồm bước 32 trở đi của
+  giai đoạn A.
+- Phần còn lại của D-171 giữ nguyên: không phát hành giữa bước, không phát hành khi `[Unreleased]` trống, theo
+  luật SemVer của `RELEASING.md` (D-078).
+- Đặc tả bước 32 ghi "merge nhóm A vào `main` ngay khi xong, để bước 33 bắt đầu". Bước 33 làm tiếp trên cùng
+  nhánh này, nên nhóm A theo bước 32 vào `main` lúc bước 32 xong.
+
+Lý do: ít lần chủ dự án phải tạo bản phát hành bằng tay; mỗi bản có đủ thay đổi để người dùng đáng nâng cấp.
+`main` vẫn luôn xanh và mới sau mỗi bước.
+
+## D-249 · `forms`: xuất CSV lớn bằng job, link tải ký, file theo dữ liệu cá nhân (bước 32 B3) — 2026-11-15 — agent quyết
+
+Bối cảnh: `GET /api/v1/forms/{id}/submissions/export` dựng cả file trong bộ nhớ và giữ request tới khi xong. Form
+có hàng chục nghìn bài thì chậm và tốn bộ nhớ. Thêm giới hạn từ chối cho endpoint cũ là thay đổi phá vỡ (D-059).
+
+Quyết định:
+
+- Giữ endpoint đồng bộ như cũ. Thêm ba endpoint:
+  - `POST /{id}/submissions/exports`: thân không bắt buộc, `status` như bản đồng bộ; trả 201 + `Location`.
+  - `GET /exports/{export_id}`: trạng thái `pending` / `running` / `ready` / `failed`, `row_count`, `size`,
+    `expires_at`, và `download_url` khi `ready`.
+  - `GET /exports/{export_id}/file?expires=&signature=`: `x-public`, không cần đăng nhập.
+  - Bảng `forms_exports` (migration `m0007_create_exports`), job `forms.export_submissions` xếp trong cùng
+    transaction với dòng.
+- **Một bản đang chạy mỗi form; trùng thì 409** `forms.export_in_progress`, id bản đang chạy nằm trong thông báo.
+  Không trả lại bản đang chạy, để mỗi yêu cầu có một câu trả lời rõ. Transaction khoá dòng form (`rows::lock_one`)
+  trước khi xét, nên yêu cầu đồng thời ra đúng một 201 trên cả hai database (có test).
+- **Cùng nội dung từng byte với bản đồng bộ.** `csv::write` tách thành `csv::BOM` và `csv::line`. Cột
+  (`export_columns`) và đọc trang 200 bài (`export_page`) là hàm dùng chung. Job ghi theo luồng
+  (`futures_util::stream::try_unfold`) vào `dyn Storage`, khoá `forms/exports/<id>.csv`: không giữ cả file trong
+  bộ nhớ.
+- **Lỗi thì `failed`, không thử lại.** Job trả `Ok`, người dùng yêu cầu bản mới. Lỗi giữa chừng mà thử lại thì
+  file dở bị ghi đè và dễ lặp vô ích. Job chạy lại khi bản xuất đã `ready` / `failed` thì không làm gì.
+- **Link ký:**
+  - Khoá ký: HMAC-SHA256 bằng `SecretKey::derive("forms.export_download")`, trên `export_id` (16 byte) và
+    `expires` (giây Unix, 8 byte big-endian); chữ ký là hex.
+  - So chữ ký bằng `verify_slice` (thời gian không đổi). Sai chữ ký, sửa hạn hay đã hết hạn: cùng một mã 403
+    `forms.export_link_invalid`. File hay dòng đã xoá: 404.
+  - Link sống `AUTOXIDE_FORMS_EXPORT_LINK_MINUTES` (mặc định 60, 1–10080) và không quá hạn giữ file. Mỗi lần đọc
+    bản xuất ra link mới.
+  - Link là URL tuyệt đối khi có `AUTOXIDE_HTTP_PUBLIC_URL`, không thì đường dẫn trên API.
+- **File chứa dữ liệu cá nhân:**
+  - Giữ `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` (mặc định 24, 1–720) sau khi xong; bản `failed` cũng có hạn.
+  - Job `forms.cleanup` xoá file trước, dòng sau; xoá file lỗi thì để dòng cho lần sau.
+  - `DELETE /api/v1/forms/data?email=` và xoá form xoá mọi bản xuất của form liên quan, sau transaction (nơi lưu
+    có thể ở xa).
+  - Tài khoản bị xoá thì `requested_by` thành `NULL`.
+  - Event mới `forms.submissions_exported` (subject là form, `after`: `export_id`, `row_count`, không email):
+    audit biết ai lấy dữ liệu ra.
+- `forms` cần `dyn Storage` (đăng ký sau `files` — đã đúng) và `PublicUrl`.
+- `MemoryStorage` dời từ `media` sang testkit (API mới, công khai) kèm `fail_writes` để thử đường lỗi của nơi lưu;
+  `media` dùng lại.
+- Không có tool MCP: dữ liệu cá nhân hàng loạt, như việc xuất / xoá theo email.
+
+Căn cứ: Nghị định 13/2023/NĐ-CP (hiệu lực 01/7/2023) và Luật Bảo vệ dữ liệu cá nhân 2025 (hiệu lực 01/01/2026) —
+quyền xoá dữ liệu, nên file xuất phải bị xoá theo. Thời hạn giữ file xuất là cấu hình; cần đối chiếu văn bản gốc
+hay người có chuyên môn pháp lý cho trường hợp cụ thể (D-186).
+
+Đã cân nhắc:
+- Trả bản đang chạy thay vì 409: client không biết đó là bản cũ hay bản mình vừa yêu cầu.
+- Link tải cần đăng nhập: không mở được trong trình duyệt khi client dùng token. Chữ ký gắn với id và hạn là đủ.
+
+## D-250 · `auth`: đổi email thì báo địa chỉ cũ, kèm cách báo "không phải tôi" (bước 32 B1) — 2026-11-15 — agent quyết
+
+Bối cảnh: D-065 ghi "báo địa chỉ cũ để sau". Kẻ biết mật khẩu đổi được email sang địa chỉ của nó: chủ thật mất cả
+đường đặt lại mật khẩu, mà không hay biết gì.
+
+Quyết định:
+
+- **Mail báo đi qua job, xếp trong transaction của `confirm`.**
+  - `EmailVerifications::confirm` (khi email thực sự đổi) xếp job `auth.send_email_changed` trong cùng
+    transaction. Xác nhận rollback (vd địa chỉ bị người khác lấy) thì không có mail. Request không chờ mail.
+  - Payload: `user_id`, hai địa chỉ, lúc đổi, ngôn ngữ (`Accept-Language` của người xác nhận). Job queue xoá
+    payload khi xong (D-079).
+- **Job:** tạo token một lần (`OneTimeTokens::new("auth")`, mục đích `email_change_report`, `subject` = id,
+  `data` = địa chỉ cũ, sống **7 ngày** — hằng số `REPORT_DAYS`, vì mail báo hay được đọc muộn). Mail tới **địa chỉ
+  cũ** ghi địa chỉ mới **che bớt** (`n***@example.org`: đủ để chủ nhận ra, không lộ trọn địa chỉ kẻ chiếm cho ai
+  đọc trộm hộp thư cũ). Mẫu `auth.mail.email_changed_link` dẫn tới Setting mới
+  `AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL` (có `{token}`); không đặt thì `auth.mail.email_changed_code` chứa token.
+- **`POST /api/v1/auth/email-change/report`** (`x-public`, thân `{ "token" }`, trả 204). Một transaction:
+  1. dùng token; khoá dòng người dùng (`rows::lock_one`), nên hai lần báo đồng thời chỉ một bên được (có test);
+  2. địa chỉ cũ còn trống thì trả email về đó (kiểm trước, vì lỗi unique làm hỏng cả transaction trên Postgres);
+  3. khoá tài khoản bằng `UserService::lock_out_in`: bỏ mật khẩu (`NULL`: không đăng nhập bằng mật khẩu được
+     nữa), thu hồi phiên và refresh token, API key, passkey, token xác minh / đặt lại / báo đang chờ, tắt TOTP
+     kèm recovery code (`mfa::service::remove_in`, tách từ hàm tắt MFA sẵn có);
+  4. event mới `auth.email_change_reported` (`before.email`, `after.email`, `after.restored`);
+  5. khi email đã về địa chỉ cũ: xếp job `auth.send_password_reset` (D-162) tới đó.
+- **Địa chỉ cũ đã bị người khác lấy:** tài khoản vẫn bị khoá nhưng không gửi mail đặt lại nào. Mail đó sẽ tới
+  người khác, hay tới kẻ chiếm. Chủ tài khoản nhờ quản trị viên (`autoxide user …`).
+- Token sai, hết hạn, đã dùng, hay tài khoản đã bị xoá: cùng một lỗi 400 `auth.invalid_email_change_report_token`,
+  không cho dò gì.
+- Không thêm giới hạn lượt riêng cho endpoint: token 256 bit ngẫu nhiên không đoán được, như
+  `/password-reset/confirm`.
+- `EmailVerifications::confirm` nhận thêm `Language` (cho mail báo).
+
+Lý do: chủ tài khoản biết ngay khi email bị đổi, và lấy lại được tài khoản chỉ bằng hộp thư cũ. Kẻ chiếm mất mọi
+đường vào đã tạo (phiên, API key, passkey, MFA).
+
+Đã cân nhắc:
+- Gửi mail báo trực tiếp trong request: chậm request, và gửi cả khi transaction rollback.
+- Giữ mật khẩu cũ, chỉ thu hồi phiên: kẻ chiếm đã biết mật khẩu nên đăng nhập lại ngay được.
+
+## D-251 · `auth`: quản trị viên xem và gỡ passkey của người khác; `autoxide user remove-passkeys` (bước 32 B2) — 2026-11-15 — agent quyết
+
+Bối cảnh: người dùng mất thiết bị giữ passkey thì chỉ tự gỡ được khi còn đăng nhập. `autoxide user reset-mfa`
+(D-159) chỉ tắt TOTP, không gỡ passkey, nên admin duy nhất mất thiết bị không có đường nào.
+
+Quyết định:
+
+- **Permission mới `auth.passkeys.manage`** (`Risk::Destructive`): "See and remove the passkeys of other users".
+  Tách khỏi `auth.users.manage`, vì gỡ passkey là việc khôi phục tài khoản, nên giao riêng cho người lo việc đó.
+- **Ba endpoint dưới `/api/v1/auth/users/{id}/passkeys`:**
+  - `GET`: danh sách, cùng dạng `GET /me/passkeys`, không có khoá.
+  - `DELETE …/{passkey_id}`: gỡ một passkey.
+  - `DELETE`: gỡ hết; vẫn 204 khi người đó không có passkey nào. Có cả hai kiểu gỡ: mất một thiết bị hay mất
+    hết đều là việc thường gặp.
+  - Mỗi endpoint kiểm permission, người đích có tồn tại, rồi `require_covers` (không tác động lên người quyền
+    cao hơn, D-079).
+- **Không đổi mật khẩu, không đăng xuất phiên khác**, giống `DELETE /users/{id}/mfa`: đây là giúp người mất thiết
+  bị, không phải khoá kẻ chiếm. Việc khoá kẻ chiếm có `POST /auth/email-change/report` (D-250) và đặt lại mật
+  khẩu.
+- **Event:** dùng lại `auth.passkey_removed`, actor là quản trị viên. Thêm `after.by_administrator: true` (như
+  `auth.mfa_disabled`, D-159); người dùng tự gỡ thì `after` vắng như cũ. `passkey::remove_all_in` nhận thêm cờ
+  `by_admin`.
+- **CLI `autoxide user remove-passkeys --email …`** cạnh `reset-mfa`, in số passkey đã gỡ. Trait công khai
+  `autoxide_auth::api::AccountRecovery` thêm `remove_passkeys(email) -> (User, u64)`, chạy với
+  `Actor::system()`; không có tài khoản thì `auth.account_not_found`. Đây là thay đổi phá vỡ cho ai tự cài trait
+  này (chỉ `auth` cài): ghi CHANGELOG, chấp nhận ở `0.x` (D-167).
+- Hai lệnh khôi phục của CLI dùng chung một đường (`enum Recovery`, `recover`).
+- `docs/DEPLOY.md` (EN + VI): cách dùng cạnh `reset-mfa`.
+- **Không có tool MCP:** việc khôi phục tài khoản không giao cho agent.
+
+## D-252 · `comments`: Markdown giới hạn bằng `pulldown-cmark` và bộ dựng theo danh sách cho phép (bước 32 B4) — 2026-11-15 — agent quyết
+
+Bối cảnh: D-112 ghi "bình luận chữ thường; Markdown + sanitizer để sau". Người viết muốn in đậm, trích dẫn, đặt
+link có chữ.
+
+Quyết định:
+
+- **Cột mới `format`** trên `comments_comments` (migration `m0010_add_format`: `string_len(16)` NOT NULL DEFAULT
+  `'text'`; `down` bỏ cột — test migration up → down → up của mọi module chạy nó trên cả hai database). Dòng có
+  sẵn là `text` nên hiển thị như cũ.
+- **Request:**
+  - `POST /public/comments` nhận `format` (`text` mặc định: client cũ gửi chữ có `*` không bị đổi nghĩa).
+  - `PATCH …/{id}` nhận `format`; không gửi thì giữ định dạng đang có.
+  - Setting `AUTOXIDE_COMMENTS_MARKDOWN` (mặc định `true`); tắt mà gửi `markdown` thì 422 ở trường `format`, gom
+    cùng các lỗi khác.
+  - `GET /public/settings` thêm `markdown`.
+  - Response có `format`; `body_html` dựng theo nó.
+  - Tool MCP `comments.answer` giữ chữ thường. Input tool không lồng được `$ref`, và tool làm ít hơn REST là được
+    (luật kiến trúc 8 chỉ cấm làm nhiều hơn).
+- **`pulldown-cmark` 0.13 chỉ để phân tích** (`default-features = false`, `Options::empty()`: không bảng, chú
+  thích, gạch ngang…). HTML do `text::markdown` tự dựng trên luồng event, theo danh sách cho phép:
+  - Thẻ ra được: `<p>`, `<br>`, `<strong>`, `<em>`, `<a href rel>`, `<blockquote>`, `<code>`, `<pre><code>`.
+    Mọi chữ qua `escape`.
+  - `Event::Html` / `InlineHtml` thành chữ đã escape.
+  - Link chỉ `http(s)`, kèm `rel="nofollow ugc noopener"`; link khác thành chữ của nó; không bao giờ lồng `<a>`.
+  - Ảnh thành chữ `alt`, không `<img>`: chặn ảnh theo dõi.
+  - Tiêu đề, mục danh sách thành đoạn văn; đường kẻ bỏ; xuống dòng mềm thành `<br>` (như bình luận chữ thường).
+  - Địa chỉ trần trong chữ vẫn thành link như bài chữ thường.
+- **Không thêm `ammonia`:** bộ dựng chỉ ra thẻ cố định, nên không có HTML lạ nào cần lọc. Thêm `ammonia` (kéo
+  `html5ever`) là thêm nhiều mã để giải một vấn đề không có. `pulldown-cmark` nhỏ, thuần Rust, chỉ kéo
+  `bitflags`, `memchr`, `unicase`; không đo kích thước binary riêng, vì đặc tả chỉ đòi đo khi chọn đường
+  `ammonia`.
+- **`text::links(body, format)`** đếm link Markdown (`[a](url)`, `<url>`, link kiểu tham chiếu) cộng địa chỉ trần:
+  giới hạn link của chống spam không bị lách. Từ cấm vẫn so trên chữ gốc.
+- **Test:**
+  - Bài `text` ra `body_html` y như trước: `plain_html` giữ nguyên thuật toán; mọi test cũ giữ nguyên, kể cả
+    `xss_bi_chan`.
+  - Markdown: đúng thẻ; XSS gồm `<script>`, `javascript:`, `data:`, HTML thô, link lồng, ảnh, thực thể HTML,
+    `onclick`.
+  - Property test của bước 31 chạy cả `markdown`, với danh sách thẻ cho phép mở rộng.
+  - Service: lưu `format`, đếm link, sửa giữ định dạng, tắt Setting.
+
+Đã cân nhắc:
+- Markdown → HTML (`pulldown-cmark` feature `html`) rồi lọc bằng `ammonia`: hai bước, phụ thuộc nặng, và an toàn
+  nằm ở cấu hình bộ lọc thay vì ở mã.
+- Tự viết bộ đọc Markdown: Markdown có nhiều ca biên (link kiểu tham chiếu, lồng nhau, escape); thư viện chuẩn
+  CommonMark đáng tin hơn vài trăm dòng tự viết.

@@ -17,9 +17,9 @@ use autoxide_kernel::mail::MailTemplate;
 use uuid::Uuid;
 
 use crate::events::SubmissionReceived;
-use crate::fields::{self, Locale};
-use crate::inbox::SubmissionStatus;
+use crate::forms::fields::{self, Locale};
 use crate::service::FormsService;
+use crate::submissions::inbox::SubmissionStatus;
 
 pub(crate) const SUBMISSION_MAIL: MailTemplate = MailTemplate::new(
     "forms.mail.submission",

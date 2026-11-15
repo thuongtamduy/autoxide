@@ -5,5 +5,8 @@
   "forms.closed": "Form này đã đóng, không nhận bài gửi nữa.",
   "forms.origin_not_allowed": "Không được gửi form này từ website này (`Origin` không nằm trong `allowed_origins` của form).",
   "forms.mail.submission.subject": "Bài gửi mới: {form}",
-  "forms.mail.submission.text": "Form \"{form}\" vừa nhận một bài gửi.\n\n{answers}\n\nBài gửi: {id}\nGửi lúc: {sent_at} (UTC)\n\nTrả lời mail này để trả lời người gửi, khi form có hỏi địa chỉ email.\n"
+  "forms.mail.submission.text": "Form \"{form}\" vừa nhận một bài gửi.\n\n{answers}\n\nBài gửi: {id}\nGửi lúc: {sent_at} (UTC)\n\nTrả lời mail này để trả lời người gửi, khi form có hỏi địa chỉ email.\n",
+  "forms.export_not_found": "Không có bản xuất này, hoặc đã bị xoá.",
+  "forms.export_in_progress": "Form này đang có một bản xuất chưa xong: `{export_id}`. Hãy chờ nó xong (`GET /api/v1/forms/exports/{export_id}`) rồi mới yêu cầu bản khác.",
+  "forms.export_link_invalid": "Link tải không đúng hoặc đã hết hạn; hãy lấy link mới từ `GET /api/v1/forms/exports/<id bản xuất>`."
 }

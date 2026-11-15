@@ -7,7 +7,6 @@
 //! module đăng ký SAU module `mail`; đích được kiểm qua sổ đối tượng của kernel (D-123) nên đăng
 //! ký SAU module sở hữu đích (`content`). Hướng dẫn dùng: `docs/COMMENTS.md`.
 
-mod authoring;
 mod config;
 mod entity;
 mod events;
@@ -18,10 +17,8 @@ mod notify;
 mod permissions;
 mod posting;
 mod privacy;
-mod reports;
 mod retention;
 mod service;
-mod targets;
 mod text;
 mod threads;
 mod tools;
@@ -102,7 +99,8 @@ impl Module for CommentsModule {
             .ok_or_else(|| Error::internal("module `comments` started before it was configured"))?;
         // Nghe event vòng đời do module sở hữu đích khai (`Module::resource_events`) cho các loại
         // đích được bật — kernel đã kiểm event có thật, nên không cần biết module nào có mặt.
-        self.owner_events = targets::owner_events(context.resource_events(), &config.target_types);
+        self.owner_events =
+            posting::targets::owner_events(context.resource_events(), &config.target_types);
         let parts = Parts {
             database: context.database().clone(),
             outbox: context.outbox()?,
@@ -132,7 +130,7 @@ impl Module for CommentsModule {
             // Tài khoản bị xoá: xoá mềm bình luận, bỏ `user_id` (`privacy.rs`).
             Subscription::new(autoxide_kernel::privacy::USER_DELETED, service.clone()),
         ];
-        let owner = Arc::new(targets::OwnerEvents {
+        let owner = Arc::new(posting::targets::OwnerEvents {
             service: service.clone(),
             events: self.owner_events.clone(),
         });

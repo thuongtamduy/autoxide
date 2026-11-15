@@ -21,7 +21,9 @@ regexes = [
 [[allowlists]]
 description = "Vector thử của ALTCHA v2 sinh bằng thư viện chính thức (đề, lời giải và khoá dẫn ra đều công khai, D-120) — không phải secret"
 paths = [
+  # Đường dẫn cũ còn trong lịch sử git; dời sang `security/` ở bước 32 (D-247).
   '''^crates/kernel/src/antispam/fixtures/altcha_v2\.json$''',
+  '''^crates/kernel/src/security/antispam/fixtures/altcha_v2\.json$''',
 ]
 
 [[allowlists]]

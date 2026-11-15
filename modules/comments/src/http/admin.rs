@@ -20,8 +20,8 @@ use validator::Validate;
 use super::views::{BanResponse, CommentDetail, ReportResponse, TargetResponse};
 use super::{choice, page_request};
 use crate::moderation::{BAN_KINDS, BanFilter, NewBan, QueueFilter};
+use crate::posting::targets::TargetChange;
 use crate::service::{CommentsService, STATUSES, Status};
-use crate::targets::TargetChange;
 
 /// Which comments to list.
 #[derive(Debug, Default, Deserialize, IntoParams)]

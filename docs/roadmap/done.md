@@ -1,4 +1,4 @@
-# Lộ trình — các bước đã xong (0–31)
+# Lộ trình — các bước đã xong (0–32)
 
 Chuyển nguyên văn từ `docs/ROADMAP.md` theo D-228 để lộ trình chỉ còn việc đang mở. Lịch sử từng bước
 xem `CHANGELOG.md` và `docs/DECISIONS.md`.
@@ -520,3 +520,35 @@ Nhóm B — chống hồi quy:
 - [x] Test độ phủ phân quyền trong gate (D-205, D-245): mọi operation không công khai trả 401 khi không token và
       403 khi token không có quyền; operation thiếu khai báo quyền làm gate đỏ; tool MCP `read_only` chỉ
       đòi quyền mức `read`
+
+## 32. Dọn bố cục và việc để lại (agent đề xuất ngày 13/11/2026)
+
+Đặc tả: [`docs/steps/32-layout-cleanup.md`](../steps/32-layout-cleanup.md) — đọc cùng [`docs/steps/README.md`](../steps/README.md).
+
+Bước 29 đã merge — làm được ngay; riêng dời file của `media` làm sau khi WebP (bước 30) merge vì
+cùng sửa module đó. Làm nhóm A trước: nhóm B sửa đúng
+các module nhóm A dời file. Mỗi mục có test trên cả hai database và dòng CHANGELOG.
+
+Nhóm A — bố cục:
+
+- [x] Áp quy ước "File layout" của hướng dẫn viết module cho `newsletter`, `comments`, `media`,
+      `forms`: phần service chia theo tính năng, test dài thành thư mục `tests/`; không đổi hành vi,
+      đếm số test trước và sau phải bằng nhau
+- [x] `kernel`: gom các file nằm phẳng trong `src/` thành nhóm (vd hợp đồng cho module: `ai`,
+      `mail`, `storage`, `search`, `privacy`…), giữ nguyên đường dẫn công khai bằng `pub use` để
+      module ở repo riêng không phải sửa (D-167)
+
+Nhóm B — việc nhật ký quyết định đã ghi "để sau":
+
+- [x] `auth`: đổi email thì gửi thêm mail báo tới địa chỉ cũ (kèm cách báo "không phải tôi" — vd
+      khoá phiên và đặt lại mật khẩu), để chủ tài khoản biết khi tài khoản bị chiếm (đã ghi để sau
+      ở mục về xác minh email trong `docs/DECISIONS.md`); mail qua job, không làm chậm request
+- [x] `auth`: quản trị viên xem và gỡ passkey của người khác (permission riêng, ghi event cho
+      audit), và lệnh CLI gỡ passkey của một tài khoản cho khi admin duy nhất mất thiết bị —
+      `autoxide user reset-mfa` (D-159) hiện chỉ tắt TOTP, không gỡ passkey
+- [x] `forms`: xuất CSV lớn bằng job ghi file vào `Storage`, trả link tải có hạn; xuất đồng bộ hiện
+      tại giữ cho số bài nhỏ (cách xuất đang có: `modules/forms/src/submissions/csv.rs`)
+- [x] `comments`: Markdown giới hạn (đậm, nghiêng, link, trích dẫn, code) với bộ lọc HTML chống
+      XSS — thêm thư viện thì đo và ghi `STACK.md`; giữ test XSS sẵn có; chữ thường cũ hiển thị như cũ
+
+AVIF cho ảnh thu nhỏ: đã chuyển sang bước 39, đo trước rồi mới quyết (D-232).

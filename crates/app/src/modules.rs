@@ -30,7 +30,8 @@ pub fn all() -> Vec<Box<dyn Module>> {
         Box::new(autoxide_media::module()),
         // Sau `media`: `content` cần `dyn Media` mà `media` công bố.
         Box::new(autoxide_content::module()),
-        // Biểu mẫu: cần `dyn Mailer` (mail báo quản trị viên), nên đứng sau `mail`.
+        // Biểu mẫu: cần `dyn Mailer` (mail báo quản trị viên) và `dyn Storage` (file xuất CSV lớn),
+        // nên đứng sau `mail` và `files`.
         Box::new(autoxide_forms::module()),
         // Bản tin: cần `dyn Mailer` (sau `mail`), nghe bài mới của `content` qua sổ đối tượng của
         // kernel (sau `content`).

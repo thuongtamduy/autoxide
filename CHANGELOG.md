@@ -9,6 +9,44 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+### Added
+
+- `forms`: large CSV exports in the background. `POST /api/v1/forms/{id}/submissions/exports` answers at once;
+  `GET /api/v1/forms/exports/{export_id}` gives the state and, once ready, a signed download link that needs no
+  sign-in and expires (`AUTOXIDE_FORMS_EXPORT_LINK_MINUTES`). The file has the same content as the existing
+  export. It is kept `AUTOXIDE_FORMS_EXPORT_KEEP_HOURS`, and deleted with the submissions of an address or with
+  the form. New event `forms.submissions_exported`.
+- `auth`: when an account's email changes, the old address gets a mail saying so, with a token (valid 7 days)
+  to report a change the owner did not make. `POST /api/v1/auth/email-change/report` signs the account out
+  everywhere, removes its password, passkeys, API keys and two-step sign-in, gives the old address back when it is
+  free, and sends a password-reset mail there. New setting `AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL`, new event
+  `auth.email_change_reported`.
+- `auth`: administrators with the new permission `auth.passkeys.manage` see and remove the passkeys of other
+  users (`GET`, `DELETE /api/v1/auth/users/{id}/passkeys`, `DELETE …/passkeys/{passkey_id}`); the event
+  `auth.passkey_removed` then records `by_administrator`. `autoxide user remove-passkeys --email …` does the same
+  from the server for an only administrator who lost their devices.
+- `comments`: comments may be written in a small part of Markdown (`format: markdown`: bold, italics, links,
+  quotes, code), rendered to safe HTML from a fixed list of tags (raw HTML shows as text, images as their text,
+  only `http(s)` links). Plain text stays the default and old comments show as before; Markdown links count
+  towards the link limit. New setting `AUTOXIDE_COMMENTS_MARKDOWN` (on), `markdown` in the public settings,
+  `format` in every comment.
+- For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
+  errors.
+
+### Changed
+
+- For module authors: the trait `autoxide_auth::api::AccountRecovery` has a new method `remove_passkeys`; only
+  `auth` implements it.
+- Internal, no change in behaviour: the code of `newsletter`, `comments`, `media` and `forms` is grouped by
+  feature like `content` and `auth`, and the kernel's files sit in private groups (`contracts`, `data`,
+  `security`, `ops`, `values`). Every public path (`autoxide_kernel::ai::TextModel`, …) is unchanged, and a
+  test keeps it so.
+
+### Fixed
+
+- `./gate.sh` ran `cargo xtask api-diff` and `cargo xtask sdk --check` before it stopped on errors, so a
+  breaking API change or an outdated SDK did not turn the gate red. They now run as steps like the others.
+
 ## [0.14.0] - 2026-11-15
 
 ### Added

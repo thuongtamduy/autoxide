@@ -1,5 +1,6 @@
-//! Service của `newsletter`: MỌI logic nằm ở đây và các file cùng cấp (`lists.rs`,
-//! `subscribers.rs`, `public.rs`, `campaigns.rs`, `sending.rs`…). Handler REST và tool MCP chỉ
+//! Service của `newsletter`: MỌI logic nằm ở đây và các file theo tính năng — `audience/` (danh
+//! sách, người đăng ký, chặn), `public.rs` (đăng ký công khai), `campaigns.rs` + `campaigns/`
+//! (soạn, gửi, bài mới, dựng mail), `retention.rs`, `privacy.rs`. Handler REST và tool MCP chỉ
 //! lấy dữ liệu vào rồi gọi service — cùng kết quả, cùng permission (luật kiến trúc 8). Mỗi lệnh
 //! ghi đi cùng event trong CÙNG transaction (luật kiến trúc 3); gọi mạng (chống spam) và xếp mail
 //! nằm NGOÀI transaction.

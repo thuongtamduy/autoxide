@@ -276,7 +276,7 @@ Endpoint (mỗi module, dưới tiền tố của nó):
   `AUTOXIDE_FILES_DIRECT_MAX_BYTES`, loại thuộc `AUTOXIDE_FILES_ALLOWED_TYPES`, tên hợp lệ — gom lỗi
   một lần (D-083). Giữ chỗ hạn mức dung lượng của khách (`Entitlements::reserve`, mã tham chiếu = id).
 - `POST /api/v1/files/uploads/{id}/complete` → `head` (cỡ đúng), đọc `get_range(0..HEAD_BYTES)` kiểm
-  loại thật (cách của `media/src/sniff.rs`), nếu nơi lưu không xác nhận checksum thì đọc luồng băm
+  loại thật (cách của `media/src/library/sniff.rs`), nếu nơi lưu không xác nhận checksum thì đọc luồng băm
   SHA-256; đạt → tạo bản ghi + event `files.file_uploaded` trong một transaction, xác nhận hạn mức;
   không đạt → xoá object, `files.upload_mismatch` (422, nói rõ cỡ / loại / hash nào sai). Gọi lại sau
   khi đã xong → 200 trả cùng bản ghi (agent hay retry; có `Idempotency-Key` càng tốt).

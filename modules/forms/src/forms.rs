@@ -1,6 +1,8 @@
 //! Định nghĩa form: tạo, đọc, liệt kê, sửa, xoá. Đổi danh sách trường thì tăng `version` và
 //! chụp lại trường vào `forms_form_versions`: bài gửi cũ luôn đọc được với nhãn lúc gửi.
 
+pub(crate) mod fields;
+
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
@@ -17,7 +19,7 @@ use uuid::Uuid;
 
 use crate::entity::{form, form_version, submission};
 use crate::events::{self, Change};
-use crate::fields::{self, Field, FieldType, Localized};
+use crate::forms::fields::{Field, FieldType, Localized};
 use crate::permissions::{FORMS_MANAGE, FORMS_READ};
 use crate::service::{
     FormsService, form_not_found, from_json, is_unique_violation, now, to_i32, to_json,
@@ -357,6 +359,9 @@ impl FormsService {
             .await?;
         transaction.commit().await?;
         tracing::info!(form_id = %id, submissions = submissions.rows_affected, "form deleted");
+        // File xuất của form chứa bài vừa xoá (sau transaction: nơi lưu có thể ở xa).
+        let exports = self.exports_of(vec![id]).await?;
+        self.purge_exports(exports).await?;
         Ok(())
     }
 

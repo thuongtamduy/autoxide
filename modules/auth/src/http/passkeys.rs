@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::event::Actor;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
@@ -24,12 +25,15 @@ use validator::Validate;
 use super::session::TokenResponse;
 use super::{HttpState, require_session};
 use crate::passkey::{Ceremony, Passkey};
+use crate::permissions::PASSKEYS_MANAGE;
 
 pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
     OpenApiRouter::new()
         .routes(routes!(start_registration))
         .routes(routes!(list_passkeys, add_passkey))
         .routes(routes!(delete_passkey))
+        .routes(routes!(list_user_passkeys, remove_user_passkeys))
+        .routes(routes!(remove_user_passkey))
         .routes(routes!(start_login))
         .routes(routes!(login))
 }
@@ -223,6 +227,104 @@ async fn delete_passkey(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Checks for the administrator endpoints: permission, the user exists, and the user has no
+/// permission the caller lacks.
+async fn check_admin(state: &HttpState, principal: &Principal, id: Uuid) -> Result<(), Error> {
+    principal.require(&PASSKEYS_MANAGE)?;
+    state.users.get(id).await?.ok_or_else(|| crate::user::user_not_found(id))?;
+    state.roles.require_covers(principal, id).await
+}
+
+/// List the passkeys of a user.
+///
+/// Requires `auth.passkeys.manage`, and that the user has no permission you lack. The same
+/// fields as `GET /api/v1/auth/me/passkeys`: no key material. Newest first unless
+/// `order=asc`.
+#[utoipa::path(
+    get,
+    path = "/users/{id}/passkeys",
+    extensions(("x-permissions" = json!(["auth.passkeys.manage"]))),
+    operation_id = "list_user_passkeys",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the user."), PageQuery),
+    responses(
+        (status = 200, description = "One page of the user's passkeys.", body = Page<PasskeyResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.passkeys.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).", body = Problem),
+        (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
+    )
+)]
+async fn list_user_passkeys(
+    State(state): State<Arc<HttpState>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    Query(query): Query<PageQuery>,
+) -> Result<Page<PasskeyResponse>, Error> {
+    let page = PageRequest::try_from(query)?;
+    check_admin(&state, &principal, id).await?;
+    Ok(state.passkeys.list(id, &page).await?.map(PasskeyResponse::from))
+}
+
+/// Remove one passkey of a user who lost the device.
+///
+/// Requires `auth.passkeys.manage`, and that the user has no permission you lack. The passkey
+/// stops working at once. The password and the user's sessions stay as they are (like
+/// `DELETE /api/v1/auth/users/{id}/mfa`). Check who is asking before using this. The event
+/// `auth.passkey_removed` records `by_administrator`.
+#[utoipa::path(
+    delete,
+    path = "/users/{id}/passkeys/{passkey_id}",
+    extensions(("x-permissions" = json!(["auth.passkeys.manage"]))),
+    operation_id = "remove_user_passkey",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the user."), ("passkey_id" = Uuid, Path, description = "Id of the passkey.")),
+    responses(
+        (status = 204, description = "Removed."),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.passkeys.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).", body = Problem),
+        (status = 404, description = "No user has this id (code `auth.user_not_found`), or the user has no passkey with this id (code `auth.passkey_not_found`).", body = Problem),
+    )
+)]
+async fn remove_user_passkey(
+    State(state): State<Arc<HttpState>>,
+    principal: Principal,
+    Path((id, passkey_id)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, Error> {
+    check_admin(&state, &principal, id).await?;
+    state.passkeys.remove_for(Actor::from(&principal), id, passkey_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Remove every passkey of a user who lost their devices.
+///
+/// Requires `auth.passkeys.manage`, and that the user has no permission you lack. The user
+/// signs in with the password and can add new passkeys. The password and sessions stay as they
+/// are. Answers 204 also when the user had none.
+#[utoipa::path(
+    delete,
+    path = "/users/{id}/passkeys",
+    extensions(("x-permissions" = json!(["auth.passkeys.manage"]))),
+    operation_id = "remove_user_passkeys",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the user.")),
+    responses(
+        (status = 204, description = "Every passkey of the user is removed."),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.passkeys.manage` (code `permission_denied`), or the user has permissions you lack (code `auth.target_has_more_permissions`).", body = Problem),
+        (status = 404, description = "No user has this id; code `auth.user_not_found`.", body = Problem),
+    )
+)]
+async fn remove_user_passkeys(
+    State(state): State<Arc<HttpState>>,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, Error> {
+    check_admin(&state, &principal, id).await?;
+    state.passkeys.remove_all_for(Actor::from(&principal), id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Start signing in with a passkey.
 ///
 /// Needs no email: the browser lets the user pick one of their passkeys for this site.
@@ -355,6 +457,123 @@ mod tests {
 
             assert_eq!(status, StatusCode::FORBIDDEN);
             assert_eq!(problem["code"], "auth.session_required");
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Quản trị viên có `auth.passkeys.manage` xem và gỡ passkey của người khác (từng cái hay
+    /// tất cả), không tác động lên người quyền cao hơn mình; event ghi `by_administrator`.
+    #[tokio::test]
+    async fn quan_tri_vien_xem_va_go_passkey_cua_nguoi_khac() {
+        use autoxide_kernel::event::Actor;
+
+        use crate::api::{Accounts, NewAccount};
+
+        TestDatabase::run(async |test| {
+            let (app, services) = app(test).await;
+            let account = |email: &str, admin: bool| NewAccount {
+                email: email.to_owned(),
+                name: "Someone".to_owned(),
+                password: Some(PASSWORD.to_owned()),
+                admin,
+            };
+            let root = Accounts::create(services.users.as_ref(), account("root@example.com", true))
+                .await
+                .unwrap();
+            let bob = Accounts::create(services.users.as_ref(), account("bob@example.com", false))
+                .await
+                .unwrap();
+            for (user, seed) in [(bob.id, 1), (bob.id, 2), (root.id, 3)] {
+                let mut device = SoftAuthenticator::new(seed);
+                let ceremony = services.passkeys.start_registration(user, PASSWORD).await.unwrap();
+                let credential = device.register(&ceremony.options);
+                services
+                    .passkeys
+                    .finish_registration(user, ceremony.id, "Phone", &credential)
+                    .await
+                    .unwrap();
+            }
+            let helpdesk = crate::role::RoleInput {
+                name: "helpdesk".to_owned(),
+                description: String::new(),
+                permissions: vec!["auth.passkeys.manage".to_owned()],
+            };
+            let helpdesk = services.roles.create(Actor::system(), helpdesk).await.unwrap();
+            let ada = services.users.find_by_email("ada@example.com").await.unwrap().unwrap();
+            services
+                .roles
+                .set_user_roles(Actor::system(), ada.id, vec![helpdesk.id])
+                .await
+                .unwrap();
+            let ada = bearer(&app, "ada@example.com", PASSWORD).await;
+            let bob_token = bearer(&app, "bob@example.com", PASSWORD).await;
+
+            // Không có permission: 403.
+            let list = format!("/users/{}/passkeys", bob.id);
+            let (status, _, problem) = call(&app, "GET", &list, Some(&bob_token), None).await;
+            assert_eq!(
+                (status, problem["code"].as_str()),
+                (StatusCode::FORBIDDEN, Some("permission_denied"))
+            );
+            // Người quyền cao hơn: 403.
+            for (method, path) in [
+                ("GET", format!("/users/{}/passkeys", root.id)),
+                ("DELETE", format!("/users/{}/passkeys", root.id)),
+            ] {
+                let (status, _, problem) = call(&app, method, &path, Some(&ada), None).await;
+                assert_eq!(
+                    (status, problem["code"].as_str()),
+                    (StatusCode::FORBIDDEN, Some("auth.target_has_more_permissions")),
+                    "{method} {path}"
+                );
+            }
+
+            let (status, _, page) = call(&app, "GET", &list, Some(&ada), None).await;
+            assert_eq!(status, StatusCode::OK, "{page}");
+            let ids: Vec<String> = page["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|item| item["id"].as_str().unwrap().to_owned())
+                .collect();
+            assert_eq!(ids.len(), 2);
+            let one = format!("/users/{}/passkeys/{}", bob.id, ids[0]);
+            let (status, _, _) = call(&app, "DELETE", &one, Some(&ada), None).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+            let (status, _, problem) = call(&app, "DELETE", &one, Some(&ada), None).await;
+            assert_eq!(
+                (status, problem["code"].as_str()),
+                (StatusCode::NOT_FOUND, Some("auth.passkey_not_found"))
+            );
+            let (status, _, _) = call(&app, "DELETE", &list, Some(&ada), None).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+            let (_, _, page) = call(&app, "GET", &list, Some(&ada), None).await;
+            assert_eq!(page["data"], json!([]));
+            let missing = format!("/users/{}/passkeys", uuid::Uuid::now_v7());
+            let (status, _, problem) = call(&app, "DELETE", &missing, Some(&ada), None).await;
+            assert_eq!(
+                (status, problem["code"].as_str()),
+                (StatusCode::NOT_FOUND, Some("auth.user_not_found"))
+            );
+
+            // Hai event `auth.passkey_removed`, đều do quản trị viên.
+            use sea_orm::ConnectionTrait as _;
+            let backend = services.database.read().get_database_backend();
+            let rows = services
+                .database
+                .read()
+                .query_all_raw(sea_orm::Statement::from_string(
+                    backend,
+                    "SELECT payload FROM auth_events WHERE name = 'auth.passkey_removed'",
+                ))
+                .await
+                .unwrap();
+            assert_eq!(rows.len(), 2);
+            for row in rows {
+                let payload: String = row.try_get("", "payload").unwrap();
+                assert!(payload.contains("\"by_administrator\":true"), "{payload}");
+            }
         })
         .await
         .unwrap();

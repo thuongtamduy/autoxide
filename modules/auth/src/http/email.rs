@@ -23,6 +23,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
         .routes(routes!(resend_verification))
         .routes(routes!(change_email))
         .routes(routes!(confirm_email))
+        .routes(routes!(report_email_change))
 }
 
 /// A new email address for the signed-in account.
@@ -37,6 +38,13 @@ pub(crate) struct ChangeEmailRequest {
 /// The token from a verification mail.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub(crate) struct VerificationConfirmation {
+    #[validate(length(min = 1, max = 256))]
+    token: String,
+}
+
+/// The token from the mail sent to the old address after an email change.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub(crate) struct EmailChangeReport {
     #[validate(length(min = 1, max = 256))]
     token: String,
 }
@@ -73,7 +81,9 @@ async fn resend_verification(
 /// cannot do this). A verification mail goes to the NEW address; the email changes
 /// only when its token is confirmed with `POST /api/v1/auth/email-verification/confirm`,
 /// within 24 hours. Until then the old address stays in use. Wrong passwords count
-/// towards the sign-in lock of the email.
+/// towards the sign-in lock of the email. Once the change is confirmed, the OLD address gets
+/// a mail saying so, with a token to report the change if the owner did not make it
+/// (`POST /api/v1/auth/email-change/report`, valid 7 days).
 #[utoipa::path(
     post,
     path = "/me/email",
@@ -126,10 +136,40 @@ async fn change_email(
 )]
 async fn confirm_email(
     State(state): State<Arc<HttpState>>,
+    language: Language,
     ValidJson(input): ValidJson<VerificationConfirmation>,
 ) -> Result<Data<UserResponse>, Error> {
-    let user = state.verifications.confirm(&input.token).await?;
+    let user = state.verifications.confirm(&input.token, language).await?;
     Ok(Data { data: user.into() })
+}
+
+/// Report an email change you did not make.
+///
+/// Needs no sign-in: the token comes from the mail sent to the old address after the
+/// account's email changed. The account is then locked against whoever changed it: signed
+/// out everywhere, its password removed (sign-in with a password stops working), its API
+/// keys, passkeys, two-step sign-in and pending tokens removed. When no other account took
+/// the old address meanwhile, the email goes back to it and a mail to choose a new password
+/// is sent there (in the language of `Accept-Language`); otherwise ask an administrator.
+#[utoipa::path(
+    post,
+    path = "/email-change/report",
+    extensions(("x-public" = json!(true))),
+    operation_id = "report_email_change",
+    request_body = EmailChangeReport,
+    responses(
+        (status = 204, description = "Reported; the account is locked and, when the old address was free, given back to it."),
+        (status = 400, description = "The token is unknown, expired or used; code `auth.invalid_email_change_report_token`.", body = Problem),
+        (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
+    )
+)]
+async fn report_email_change(
+    State(state): State<Arc<HttpState>>,
+    language: Language,
+    ValidJson(input): ValidJson<EmailChangeReport>,
+) -> Result<StatusCode, Error> {
+    state.verifications.report(&input.token, language).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[cfg(test)]

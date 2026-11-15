@@ -12,14 +12,6 @@
 #   1. định dạng            cargo fmt --check
 #   2. lint                 cargo clippy, cảnh báo tính là lỗi
 #   3. ranh giới workspace  cargo xtask check
-
-# So với tag phát hành gần nhất (tổ tiên của HEAD); cần lịch sử và tag (D-059, đặc tả 31 A1).
-step "api contract (cargo xtask api-diff)"
-cargo xtask api-diff
-
-# Kiểu TypeScript của SDK sinh từ docs/openapi.json; không cần Node (D-243).
-step "TypeScript SDK matches the contract (cargo xtask sdk --check)"
-cargo xtask sdk --check
 #   4. hợp đồng API         cargo xtask api-diff: không phá vỡ /api/v1 so với tag phát hành gần nhất;
 #                           cargo xtask sdk --check: SDK TypeScript khớp docs/openapi.json
 #   5. thư viện             cargo deny check (license, lỗ hổng, nguồn)
@@ -107,6 +99,14 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 
 step "workspace boundaries (cargo xtask check)"
 cargo xtask check
+
+# So với tag phát hành gần nhất (tổ tiên của HEAD); cần lịch sử và tag (D-059, đặc tả 31 A1).
+step "api contract (cargo xtask api-diff)"
+cargo xtask api-diff
+
+# Kiểu TypeScript của SDK sinh từ docs/openapi.json; không cần Node (D-243).
+step "TypeScript SDK matches the contract (cargo xtask sdk --check)"
+cargo xtask sdk --check
 
 step "dependencies (cargo deny)"
 # -D ...-not-detected / -not-encountered: ngoại lệ trong deny.toml không còn cần

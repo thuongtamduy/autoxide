@@ -5,13 +5,24 @@
 //! kép bên trong viết đôi. Đầu file có BOM UTF-8 để Excel đọc đúng chữ tiếng Việt; xuống dòng
 //! là CRLF.
 
+/// Đầu file: BOM UTF-8.
+pub(crate) const BOM: &str = "\u{feff}";
+
+/// Một dòng CSV (kèm CRLF). Bản xuất đồng bộ và bản xuất qua job ghi bằng cùng hàm này, từng
+/// dòng một, nên ra cùng nội dung.
+pub(crate) fn line(row: &[String]) -> String {
+    let cells: Vec<String> = row.iter().map(|cell| cell_text(cell)).collect();
+    let mut out = cells.join(",");
+    out.push_str("\r\n");
+    out
+}
+
 /// Nội dung CSV của `header` và `rows`.
+#[cfg(test)]
 pub(crate) fn write(header: &[String], rows: &[Vec<String>]) -> String {
-    let mut out = String::from('\u{feff}');
+    let mut out = String::from(BOM);
     for row in std::iter::once(header).chain(rows.iter().map(Vec::as_slice)) {
-        let cells: Vec<String> = row.iter().map(|cell| cell_text(cell)).collect();
-        out.push_str(&cells.join(","));
-        out.push_str("\r\n");
+        out.push_str(&line(row));
     }
     out
 }

@@ -17,12 +17,13 @@ use serde_json::{Map, Value, json};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::entity::{form, form_version, submission};
+use crate::entity::{export, form, form_version, submission};
 use crate::events::{self, Change};
-use crate::fields::{self, Field};
 use crate::forms::Form;
+use crate::forms::fields::{self, Field};
 use crate::permissions::{FORMS_EXPORT, FORMS_READ, FORMS_REVIEW};
 use crate::service::{FormsService, from_json, now, submission_not_found};
+use crate::submissions::csv;
 
 /// Where a submission is in the inbox.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -85,6 +86,20 @@ pub(crate) struct InboxFilter {
 }
 
 /// Tóm tắt bài gửi cho event: không có câu trả lời, không có email.
+/// Số bài mỗi trang khi xuất CSV.
+const EXPORT_PAGE: u32 = 200;
+
+/// Cột của bản xuất CSV: dòng tiêu đề, và `key` của các trường theo thứ tự cột.
+pub(crate) struct ExportColumns {
+    pub header: Vec<String>,
+    pub keys: Vec<String>,
+}
+
+/// Tên file của bản xuất: `<key>-submissions.csv`.
+pub(crate) fn export_file_name(form: &Form) -> String {
+    format!("{}-submissions.csv", form.row.key)
+}
+
 pub(crate) fn summary(row: &submission::Model, form_key: &str) -> Value {
     json!({
         "id": row.id,
@@ -251,6 +266,8 @@ impl FormsService {
             return Ok(0);
         }
         let ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
+        let form_ids: Vec<Uuid> =
+            rows.iter().map(|row| row.form_id).collect::<HashSet<_>>().into_iter().collect();
         let deleted = submission::Entity::delete_many()
             .filter(submission::Column::Id.is_in(ids.clone()))
             .exec(&transaction)
@@ -264,11 +281,16 @@ impl FormsService {
             .await?;
         transaction.commit().await?;
         tracing::info!(count = deleted.rows_affected, "submissions of an email address erased");
+        // File xuất của các form đó có thể còn chứa bài vừa xoá: xoá hết (sau transaction — nơi
+        // lưu có thể ở xa). Xoá file lỗi thì dòng còn lại, job dọn hằng ngày thử lại.
+        let exports = self.exports_of(form_ids).await?;
+        self.purge_exports(exports).await?;
         Ok(deleted.rows_affected)
     }
 
     /// Bài gửi của form `form_id` dạng CSV (tên file, nội dung). Cần `forms.export`. `status`
-    /// `None`: mọi trạng thái trừ `spam`.
+    /// `None`: mọi trạng thái trừ `spam`. Form nhiều bài thì xuất qua job
+    /// (`submissions/exports.rs`): cùng nội dung, từng byte.
     pub(crate) async fn export_csv(
         &self,
         principal: &Principal,
@@ -277,8 +299,28 @@ impl FormsService {
     ) -> Result<(String, String), Error> {
         principal.require(&FORMS_EXPORT)?;
         let form = self.find_form(form_id).await?;
+        let columns = self.export_columns(&form).await?;
+        let mut text = String::from(csv::BOM);
+        text.push_str(&csv::line(&columns.header));
+        let mut cursor = None;
+        loop {
+            let (rows, next) = self.export_page(form_id, status, &columns.keys, cursor).await?;
+            for row in &rows {
+                text.push_str(&csv::line(row));
+            }
+            match next {
+                Some(next) => cursor = Some(next),
+                None => break,
+            }
+        }
+        Ok((export_file_name(&form), text))
+    }
+
+    /// Cột của bản xuất: cột cố định, rồi trường của phiên bản hiện hành, rồi trường chỉ có ở
+    /// phiên bản cũ.
+    pub(crate) async fn export_columns(&self, form: &Form) -> Result<ExportColumns, Error> {
+        let form_id = form.row.id;
         let versions = self.versions(&[form_id]).await?;
-        // Cột: trường của phiên bản hiện hành, rồi trường chỉ có ở phiên bản cũ.
         let mut keys: Vec<String> = form.fields.iter().map(|field| field.key.clone()).collect();
         let mut older: Vec<(&i32, &Vec<Field>)> = versions
             .iter()
@@ -306,49 +348,50 @@ impl FormsService {
         .map(str::to_owned)
         .to_vec();
         header.extend(keys.iter().cloned());
-        let mut rows = Vec::new();
-        let mut page = PageRequest::first(200, Order::Asc);
-        loop {
-            let mut select =
-                submission::Entity::find().filter(submission::Column::FormId.eq(form_id));
-            select = match status {
-                Some(status) => select.filter(submission::Column::Status.eq(status.as_str())),
-                None => {
-                    select.filter(submission::Column::Status.ne(SubmissionStatus::Spam.as_str()))
-                }
-            };
-            let found = fetch_page(
-                select,
-                submission::Column::Id,
-                |row| row.id,
-                &page,
-                self.database.read(),
-            )
-            .await?;
-            for row in &found.data {
-                let data: Map<String, Value> = from_json(&row.data)?;
-                let mut cells = vec![
-                    row.id.to_string(),
-                    row.created_at.to_rfc3339(),
-                    row.status.clone(),
-                    row.form_version.to_string(),
-                    row.locale.clone().unwrap_or_default(),
-                    row.email.clone().unwrap_or_default(),
-                    row.page_url.clone().unwrap_or_default(),
-                    row.referrer.clone().unwrap_or_default(),
-                ];
-                cells.extend(
-                    keys.iter().map(|key| data.get(key).map(fields::display).unwrap_or_default()),
-                );
-                rows.push(cells);
-            }
-            match found.pagination.next_cursor.as_deref().and_then(|cursor| cursor.parse().ok()) {
-                Some(cursor) => page = PageRequest::first(200, Order::Asc).after(cursor),
-                None => break,
-            }
+        Ok(ExportColumns { header, keys })
+    }
+
+    /// Một trang (200 bài, cũ trước) của bản xuất, sau bài `after`: các dòng, và con trỏ của
+    /// trang sau (`None`: hết).
+    pub(crate) async fn export_page(
+        &self,
+        form_id: Uuid,
+        status: Option<SubmissionStatus>,
+        keys: &[String],
+        after: Option<Uuid>,
+    ) -> Result<(Vec<Vec<String>>, Option<Uuid>), Error> {
+        let mut page = PageRequest::first(EXPORT_PAGE, Order::Asc);
+        if let Some(after) = after {
+            page = page.after(after);
         }
-        let name = format!("{}-submissions.csv", form.row.key);
-        Ok((name, crate::csv::write(&header, &rows)))
+        let mut select = submission::Entity::find().filter(submission::Column::FormId.eq(form_id));
+        select = match status {
+            Some(status) => select.filter(submission::Column::Status.eq(status.as_str())),
+            None => select.filter(submission::Column::Status.ne(SubmissionStatus::Spam.as_str())),
+        };
+        let found =
+            fetch_page(select, submission::Column::Id, |row| row.id, &page, self.database.read())
+                .await?;
+        let mut rows = Vec::with_capacity(found.data.len());
+        for row in &found.data {
+            let data: Map<String, Value> = from_json(&row.data)?;
+            let mut cells = vec![
+                row.id.to_string(),
+                row.created_at.to_rfc3339(),
+                row.status.clone(),
+                row.form_version.to_string(),
+                row.locale.clone().unwrap_or_default(),
+                row.email.clone().unwrap_or_default(),
+                row.page_url.clone().unwrap_or_default(),
+                row.referrer.clone().unwrap_or_default(),
+            ];
+            cells.extend(
+                keys.iter().map(|key| data.get(key).map(fields::display).unwrap_or_default()),
+            );
+            rows.push(cells);
+        }
+        let next = found.pagination.next_cursor.as_deref().and_then(|cursor| cursor.parse().ok());
+        Ok((rows, next))
     }
 
     /// Đọc `rows` ra kèm `key` của form và trường của đúng phiên bản.
@@ -400,6 +443,11 @@ impl FormsService {
         let updated = form::Entity::update_many()
             .col_expr(form::Column::CreatedBy, Expr::value(Option::<Uuid>::None))
             .filter(form::Column::CreatedBy.eq(user_id))
+            .exec(self.database.write())
+            .await?;
+        export::Entity::update_many()
+            .col_expr(export::Column::RequestedBy, Expr::value(Option::<Uuid>::None))
+            .filter(export::Column::RequestedBy.eq(user_id))
             .exec(self.database.write())
             .await?;
         Ok(updated.rows_affected)

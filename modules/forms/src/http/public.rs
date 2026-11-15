@@ -15,10 +15,10 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::fields::{Field, FieldType, Locale};
+use crate::forms::fields::{Field, FieldType, Locale};
 use crate::forms::{Form, FormStatus};
-use crate::public::PublicSubmission;
 use crate::service::FormsService;
+use crate::submissions::public::PublicSubmission;
 
 /// A choice, in the asked language.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

@@ -60,7 +60,7 @@ product, `verified_buyer` for someone who received it); show your own label for 
 ## The website
 
 1. `GET /api/v1/comments/public/settings` — limits and switches (guests allowed, edit minutes,
-   maximum length, whether reply mails are on).
+   maximum length, whether reply mails are on, whether Markdown is on).
 2. `GET /api/v1/comments/public/threads?target_type=content.entry&target_id=…&order=desc&limit=20&replies_limit=3`
    — shown top-level comments with their first replies and `reply_count`; follow
    `pagination.next_cursor`. More replies: `GET /api/v1/comments/public/comments/{id}/replies`.
@@ -68,7 +68,7 @@ product, `verified_buyer` for someone who received it); show your own label for 
    (up to 100). Whether the box is open: `GET /api/v1/comments/public/targets/{type}/{id}`.
 3. Show `body_html` (everything escaped, line breaks as `<br>`, `http(s)` addresses as links
    with `rel="nofollow ugc noopener"`); never insert `body` as HTML. Label guests as guests
-   (`author.kind`).
+   (`author.kind`). See "Text and Markdown" below.
 4. Each time the box is shown (never in cached HTML): `GET /api/v1/antispam/token?scope=comments:content.entry`.
    Show a hidden trap input that people leave empty.
 5. `POST /api/v1/comments/public/comments`:
@@ -109,6 +109,24 @@ product, `verified_buyer` for someone who received it); show your own label for 
 - Report: `POST /api/v1/comments/public/comments/{id}/reports {"reason": "spam" | "abuse" |
   "illegal" | "other", "note": "…"}`. Each account reports a comment once; guests are counted
   by network block (`/24` for IPv4, `/48` for IPv6).
+
+## Text and Markdown
+
+A comment is sent with `format`: `text` (the default) or `markdown`, the latter only when
+`GET /api/v1/comments/public/settings` says `markdown: true` (`AUTOXIDE_COMMENTS_MARKDOWN`, on by
+default; when off, `markdown` is refused on the field `format`). An edit without `format` keeps
+the comment's format. Old comments are `text` and show as before.
+
+- `text`: plain text. A `*` stays a `*`; line breaks are kept; `http(s)` addresses become links.
+- `markdown`: a small part of Markdown — `**bold**`, `*italics*`, `[links](https://…)` and
+  `<https://…>`, `> quotes`, `` `code` `` and code blocks. Headings and list items show as
+  paragraphs; images show as their text (no image is ever loaded); raw HTML shows as text.
+  Only `http(s)` links work, all with `rel="nofollow ugc noopener"`.
+
+The server builds `body_html` from a fixed list of tags (`p`, `br`, `strong`, `em`, `a`,
+`blockquote`, `code`, `pre`), so the website inserts `body_html` as it is in either format.
+Markdown links count towards `AUTOXIDE_COMMENTS_MAX_LINKS` like bare addresses. Banned words
+are checked on the text as written.
 
 ## Moderation
 
@@ -218,6 +236,7 @@ website) and no tool to delete a comment for good (use REST).
 | `AUTOXIDE_COMMENTS_MODERATION_BY_TYPE`     | —                                           |
 | `AUTOXIDE_COMMENTS_MAX_LENGTH`             | `4000`                                      |
 | `AUTOXIDE_COMMENTS_MAX_LINKS`              | `2`                                         |
+| `AUTOXIDE_COMMENTS_MARKDOWN`               | `true`                                      |
 | `AUTOXIDE_COMMENTS_EDIT_MINUTES`           | `15`                                        |
 | `AUTOXIDE_COMMENTS_REPORT_THRESHOLD`       | `3`                                         |
 | `AUTOXIDE_COMMENTS_AUTO_CLOSE_DAYS`        | `0` (never)                                 |

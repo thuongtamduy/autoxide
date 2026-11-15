@@ -18,6 +18,9 @@
 //! được (kể cả email người khác đã xác minh), nên email không bao giờ giúp vượt kiểm duyệt. Chỉ
 //! bình luận ĐANG hiện mới tính (bình luận về sau bị đánh spam / từ chối thì không).
 
+pub(crate) mod authoring;
+pub(crate) mod targets;
+
 use std::time::Duration;
 
 use autoxide_kernel::access::Principal;
@@ -38,12 +41,12 @@ use crate::entity::{ban, comment, profile};
 use crate::events::{self, Change};
 use crate::notify::VERIFY;
 use crate::permissions::{COMMENTS_MODERATE, COMMENTS_POST};
+use crate::posting::targets::target_closed;
 use crate::service::{
     Comment, CommentsService, MODULE, Status, comment_not_found, delta, ensure_target, now,
     shift_counts, shift_target_counts, summary,
 };
-use crate::targets::target_closed;
-use crate::text;
+use crate::text::{self, Format};
 
 const HOUR: Duration = Duration::from_secs(3600);
 const DAY: Duration = Duration::from_secs(24 * 3600);
@@ -60,6 +63,8 @@ pub(crate) struct NewComment {
     /// Trả lời bình luận này (gốc hay trả lời khác cùng luồng).
     pub parent_id: Option<Uuid>,
     pub body: String,
+    /// `text` (mặc định) hay `markdown` (D-252).
+    pub format: Format,
     /// Tên của khách (người dùng đăng nhập lấy tên ở hồ sơ).
     pub author_name: Option<String>,
     pub email: Option<String>,
@@ -164,6 +169,7 @@ impl CommentsService {
         // Độ dài và lọc nội dung; mọi lỗi của đầu vào báo một lần (D-083).
         let mut problems = Vec::new();
         let body = text::clean_body(&input.body, self.config.max_length, &mut problems);
+        let format = self.check_format(input.format, &mut problems);
         let locale = locale(input.locale.as_deref(), &mut problems);
         let name = if guest {
             match input.author_name.as_deref() {
@@ -285,7 +291,7 @@ impl CommentsService {
         if text::contains_word(&body, &self.config.suspect_words) {
             holds.push("suspect_word");
         }
-        if text::link_count(&body) > self.config.max_links {
+        if text::links(&body, format) > self.config.max_links {
             holds.push("too_many_links");
         }
 
@@ -324,6 +330,7 @@ impl CommentsService {
                     author_email: None,
                     email_verified: false,
                     body,
+                    format: format.as_str().to_owned(),
                     status: Status::Pending.as_str().to_owned(),
                     hold_reason: None,
                     edit_token_hash: None,
@@ -408,6 +415,7 @@ impl CommentsService {
             )),
             badges,
             body,
+            format: format.as_str().to_owned(),
             status: status.as_str().to_owned(),
             hold_reason,
             edit_token_hash: edit_token.as_deref().map(sha256),
@@ -601,6 +609,21 @@ impl CommentsService {
 }
 
 /// `en` / `vi` tuỳ chọn; sai thì thêm lỗi.
+impl CommentsService {
+    /// Định dạng của bài: Markdown chỉ khi máy chủ bật `AUTOXIDE_COMMENTS_MARKDOWN`; tắt mà
+    /// gửi `markdown` thì lỗi ở trường `format` (gom cùng các lỗi khác).
+    pub(crate) fn check_format(&self, format: Format, problems: &mut Vec<FieldError>) -> Format {
+        if format == Format::Markdown && !self.config.markdown {
+            problems.push(FieldError::new(
+                "format",
+                "disabled",
+                "Markdown is turned off on this server (`AUTOXIDE_COMMENTS_MARKDOWN`); send `text`",
+            ));
+        }
+        format
+    }
+}
+
 pub(crate) fn locale(raw: Option<&str>, problems: &mut Vec<FieldError>) -> Option<&'static str> {
     match raw.map(str::trim).filter(|raw| !raw.is_empty())?.to_ascii_lowercase().as_str() {
         "en" => Some("en"),

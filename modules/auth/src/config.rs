@@ -74,6 +74,15 @@ pub(crate) const EMAIL_VERIFICATION_URL: Setting = Setting::new(
 )
 .with_example("https://app.example.com/verify-email?token={token}");
 
+pub(crate) const EMAIL_CHANGE_REPORT_URL: Setting = Setting::new(
+    "AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL",
+    "Page of your app where the owner of an account reports an email change they did not make, \
+     with `{token}` where the report token goes. The mail sent to the old address after an \
+     email change links there. When unset, the mail contains the token and says to call \
+     `POST /api/v1/auth/email-change/report`.",
+)
+.with_example("https://app.example.com/not-me?token={token}");
+
 pub(crate) const PASSKEY_RP_ID: Setting = Setting::new(
     "AUTOXIDE_AUTH_PASSKEY_RP_ID",
     "Domain that passkeys belong to (the WebAuthn relying party id), usually your site's \
@@ -112,6 +121,8 @@ pub(crate) struct AuthConfig {
     pub password_reset_url: Option<String>,
     /// Trang xác minh email của giao diện, có `{token}`.
     pub email_verification_url: Option<String>,
+    /// Trang báo "không phải tôi" sau khi đổi email, có `{token}`; `None`: mail chứa token.
+    pub email_change_report_url: Option<String>,
     /// `None`: passkey tắt.
     pub passkey: Option<PasskeyConfig>,
 }
@@ -158,6 +169,7 @@ impl AuthConfig {
         });
         let password_reset_url = reader.optional_with(&PASSWORD_RESET_URL, token_url);
         let email_verification_url = reader.optional_with(&EMAIL_VERIFICATION_URL, token_url);
+        let email_change_report_url = reader.optional_with(&EMAIL_CHANGE_REPORT_URL, token_url);
         let rp_id = reader.optional_with(&PASSKEY_RP_ID, |raw| {
             let domain = raw.trim().to_ascii_lowercase();
             let valid = !domain.is_empty()
@@ -203,6 +215,7 @@ impl AuthConfig {
             totp_issuer: totp_issuer?,
             password_reset_url: password_reset_url?,
             email_verification_url: email_verification_url?,
+            email_change_report_url: email_change_report_url?,
             passkey: passkey_config(reader, rp_id?, origins?)?,
         })
     }

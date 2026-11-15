@@ -353,6 +353,8 @@ export type CommentDetail = {
   created_at: string;
   edited_at?: string | null;
   email_verified: boolean;
+  /** How `body` is written: `text` or `markdown`. */
+  format: Format;
   /**
    * Why it is held: `moderation`, `first_comment`, `reported`, `suspect_word`,
    * `too_many_links`, or the anti-spam reasons (`too_fast`, `duplicate`, `classifier`…),
@@ -429,6 +431,8 @@ export type CommentSettings = {
   enabled: boolean;
   /** Guests (no account) may comment. */
   guests_allowed: boolean;
+  /** Comments may be written in Markdown (`format: markdown`): show formatting buttons. */
+  markdown: boolean;
   /** Longest comment, in characters. */
   max_length: number;
   /** More links than this hold a comment for approval. */
@@ -575,7 +579,7 @@ export type CreateCampaignRequest = {
 export type CreateCommentRequest = {
   /** Guests: the name to show (required). Signed-in users show the name of their profile. */
   author_name?: string | null;
-  /** Plain text; line breaks are kept, `http(s)` addresses become links. */
+  /** The text, as `format` says; line breaks are kept, `http(s)` addresses become links. */
   body: string;
   /** The value of the `altcha` widget, when the server uses a challenge. */
   challenge?: string | null;
@@ -586,6 +590,7 @@ export type CreateCommentRequest = {
    * signed in.
    */
   form_token?: string | null;
+  format?: Format | null;
   /** Language of the author: `en` or `vi` (for the mails). */
   locale?: string | null;
   /** Mail me when someone replies (a confirmation mail is sent to `email` first). */
@@ -623,6 +628,11 @@ export type CreateEntryRequest = EntryFieldsInput & {
   locale?: string | null;
   /** Parent page (pages only). */
   parent_id?: string | null;
+};
+
+/** What to export. The body may be omitted. */
+export type CreateExportRequest = {
+  status?: SubmissionStatus | null;
 };
 
 /** A new folder. */
@@ -930,6 +940,8 @@ export type Data_CommentDetail = {
     created_at: string;
     edited_at?: string | null;
     email_verified: boolean;
+    /** How `body` is written: `text` or `markdown`. */
+    format: Format;
     /**
      * Why it is held: `moderation`, `first_comment`, `reported`, `suspect_word`,
      * `too_many_links`, or the anti-spam reasons (`too_fast`, `duplicate`, `classifier`…),
@@ -988,6 +1000,8 @@ export type Data_CommentSettings = {
     enabled: boolean;
     /** Guests (no account) may comment. */
     guests_allowed: boolean;
+    /** Comments may be written in Markdown (`format: markdown`): show formatting buttons. */
+    markdown: boolean;
     /** Longest comment, in characters. */
     max_length: number;
     /** More links than this hold a comment for approval. */
@@ -1256,6 +1270,34 @@ export type Data_ErasedResponse = {
   data: {
     /** Submissions deleted. */
     deleted: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ExportResponse = {
+  /** A CSV export made in the background. */
+  data: {
+    created_at: string;
+    download_expires_at?: string | null;
+    /**
+     * Link to the file, only while `ready`: it needs no sign-in, so it can be opened in a
+     * browser, and it works until `download_expires_at`. An absolute URL when
+     * `AUTOXIDE_HTTP_PUBLIC_URL` is set, otherwise a path on this API. Get the export again
+     * for a fresh link.
+     */
+    download_url?: string | null;
+    /** When the file is deleted (`AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` after it was finished). */
+    expires_at?: string | null;
+    finished_at?: string | null;
+    form_id: string;
+    id: string;
+    /** Rows in the file (without the header line), once `ready`. */
+    row_count?: number | null;
+    /** Size of the file in bytes, once `ready`. */
+    size?: number | null;
+    /** `pending` and `running` until the file is written; then `ready` or `failed`. */
+    state: ExportState;
+    status?: SubmissionStatus | null;
   };
 };
 
@@ -1707,11 +1749,13 @@ export type Data_PublicComment = {
      * label for each code.
      */
     badges: string[];
-    /** The text as written (plain text, line breaks kept). Never insert it as HTML. */
+    /** The text as written (plain text or Markdown, see `format`). Never insert it as HTML. */
     body: string;
     /**
      * The text as safe HTML: everything escaped, line breaks as `<br>`, `http(s)` addresses as
-     * links with `rel="nofollow ugc noopener"`.
+     * links with `rel="nofollow ugc noopener"`. For `markdown`, only `<p>`, `<strong>`, `<em>`,
+     * `<a>`, `<blockquote>`, `<code>` and `<pre>` besides: raw HTML shows as text, images as
+     * their text. Insert this, never `body`.
      */
     body_html: string;
     created_at: string;
@@ -1719,6 +1763,8 @@ export type Data_PublicComment = {
     deleted: boolean;
     /** When the author last changed it. */
     edited_at?: string | null;
+    /** How `body` is written: `text` or `markdown`. */
+    format: Format;
     id: string;
     /** The top-level comment, for a reply; `null` for a top-level comment. */
     parent_id?: string | null;
@@ -2472,12 +2518,18 @@ export type EditCommentRequest = {
   body: string;
   /** Guests: the `edit_token` received when posting. Signed-in authors omit it. */
   edit_token?: string | null;
+  format?: Format | null;
 };
 
 /** A comment just changed, for its author. */
 export type EditedComment = PublicComment & {
   /** `pending` when the change waits for approval (show "your change awaits approval"). */
   status: CommentVisibility;
+};
+
+/** The token from the mail sent to the old address after an email change. */
+export type EmailChangeReport = {
+  token: string;
 };
 
 /** Everything the forms hold about one email address. */
@@ -2641,6 +2693,37 @@ export type EventTypeResponse = {
   name: string;
 };
 
+/** A CSV export made in the background. */
+export type ExportResponse = {
+  created_at: string;
+  download_expires_at?: string | null;
+  /**
+   * Link to the file, only while `ready`: it needs no sign-in, so it can be opened in a
+   * browser, and it works until `download_expires_at`. An absolute URL when
+   * `AUTOXIDE_HTTP_PUBLIC_URL` is set, otherwise a path on this API. Get the export again
+   * for a fresh link.
+   */
+  download_url?: string | null;
+  /** When the file is deleted (`AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` after it was finished). */
+  expires_at?: string | null;
+  finished_at?: string | null;
+  form_id: string;
+  id: string;
+  /** Rows in the file (without the header line), once `ready`. */
+  row_count?: number | null;
+  /** Size of the file in bytes, once `ready`. */
+  size?: number | null;
+  /** `pending` and `running` until the file is written; then `ready` or `failed`. */
+  state: ExportState;
+  status?: SubmissionStatus | null;
+};
+
+/**
+ * Where an export is: `pending` (asked for, waiting for the job), `running` (the file is being
+ * written), `ready` (get `download_url`) or `failed` (ask for a new one).
+ */
+export type ExportState = "pending" | "running" | "ready" | "failed";
+
 /** A field of a form. */
 export type Field = {
   help?: Localized | null;
@@ -2769,6 +2852,12 @@ export type FormTokenResponse = {
   /** Send it with the form (the receiving endpoint says in which field). Valid once. */
   token: string;
 };
+
+/**
+ * How the body of a comment is written: `text` (plain text; addresses become links) or
+ * `markdown` (a small part of Markdown: bold, italics, links, quotes, code).
+ */
+export type Format = "text" | "markdown";
 
 /** Health of the service. */
 export type Health = {
@@ -3351,6 +3440,8 @@ export type Page_CommentDetail = {
     created_at: string;
     edited_at?: string | null;
     email_verified: boolean;
+    /** How `body` is written: `text` or `markdown`. */
+    format: Format;
     /**
      * Why it is held: `moderation`, `first_comment`, `reported`, `suspect_word`,
      * `too_many_links`, or the anti-spam reasons (`too_fast`, `duplicate`, `classifier`…),
@@ -3706,11 +3797,13 @@ export type Page_PublicComment = {
      * label for each code.
      */
     badges: string[];
-    /** The text as written (plain text, line breaks kept). Never insert it as HTML. */
+    /** The text as written (plain text or Markdown, see `format`). Never insert it as HTML. */
     body: string;
     /**
      * The text as safe HTML: everything escaped, line breaks as `<br>`, `http(s)` addresses as
-     * links with `rel="nofollow ugc noopener"`.
+     * links with `rel="nofollow ugc noopener"`. For `markdown`, only `<p>`, `<strong>`, `<em>`,
+     * `<a>`, `<blockquote>`, `<code>` and `<pre>` besides: raw HTML shows as text, images as
+     * their text. Insert this, never `body`.
      */
     body_html: string;
     created_at: string;
@@ -3718,6 +3811,8 @@ export type Page_PublicComment = {
     deleted: boolean;
     /** When the author last changed it. */
     edited_at?: string | null;
+    /** How `body` is written: `text` or `markdown`. */
+    format: Format;
     id: string;
     /** The top-level comment, for a reply; `null` for a top-level comment. */
     parent_id?: string | null;
@@ -4324,11 +4419,13 @@ export type PublicComment = {
    * label for each code.
    */
   badges: string[];
-  /** The text as written (plain text, line breaks kept). Never insert it as HTML. */
+  /** The text as written (plain text or Markdown, see `format`). Never insert it as HTML. */
   body: string;
   /**
    * The text as safe HTML: everything escaped, line breaks as `<br>`, `http(s)` addresses as
-   * links with `rel="nofollow ugc noopener"`.
+   * links with `rel="nofollow ugc noopener"`. For `markdown`, only `<p>`, `<strong>`, `<em>`,
+   * `<a>`, `<blockquote>`, `<code>` and `<pre>` besides: raw HTML shows as text, images as
+   * their text. Insert this, never `body`.
    */
   body_html: string;
   created_at: string;
@@ -4336,6 +4433,8 @@ export type PublicComment = {
   deleted: boolean;
   /** When the author last changed it. */
   edited_at?: string | null;
+  /** How `body` is written: `text` or `markdown`. */
+  format: Format;
   id: string;
   /** The top-level comment, for a reply; `null` for a top-level comment. */
   parent_id?: string | null;
@@ -5645,6 +5744,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/email-change/report": {
+    /** Report an email change you did not make. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: EmailChangeReport;
+      responses: {
+        204: void;
+        400: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/email-verification/confirm": {
     /** Confirm an email address with the token from a verification mail. */
     post: {
@@ -6175,6 +6287,44 @@ export interface paths {
     /** Turn off two-step sign-in for a user who lost their device. */
     delete: {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/users/{id}/passkeys": {
+    /** List the passkeys of a user. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_PasskeyResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove every passkey of a user who lost their devices. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/users/{id}/passkeys/{passkey_id}": {
+    /** Remove one passkey of a user who lost the device. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; passkey_id: string }; };
       responses: {
         204: void;
         401: Problem;
@@ -7425,6 +7575,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/forms/exports/{export_id}": {
+    /** Get a CSV export made in the background. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { export_id: string }; };
+      responses: {
+        200: Data_ExportResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/forms/exports/{export_id}/file": {
+    /** Download the file of a CSV export. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { export_id: string }; query: { expires: number; signature: string }; };
+      responses: {
+        200: string;
+        400: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/forms/public/{key}": {
     /** Get a form to show (public). */
     get: {
@@ -7560,6 +7736,22 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/forms/{id}/submissions/exports": {
+    /** Export the submissions of a form as CSV, in the background. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CreateExportRequest;
+      responses: {
+        201: Data_ExportResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };

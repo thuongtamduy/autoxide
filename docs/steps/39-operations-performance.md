@@ -82,7 +82,7 @@ pub async fn backlog(database: &Database, key: &str, modules: &Modules) -> Resul
 pub fn publish(snapshots: &[BacklogSnapshot], max_database_labels: usize);   // đặt gauge
 pub const KNOWN_METRICS: &[&str];   // mọi tên số đo kernel phát ra; test của dashboard/alert so với nó
 
-// crates/kernel/src/secret.rs — xoay khoá gốc (API mới, không đổi hàm cũ).
+// crates/kernel/src/security/secret.rs — xoay khoá gốc (API mới, không đổi hàm cũ).
 impl SecretKey {
     pub async fn derive(&self, purpose: &str) -> Result<[u8; 32], Error>;            // khoá HIỆN TẠI: ký
     pub async fn derive_all(&self, purpose: &str) -> Result<Vec<[u8; 32]>, Error>;   // hiện tại + cũ: kiểm

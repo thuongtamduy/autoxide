@@ -77,4 +77,9 @@ pub trait AccountRecovery: Send + Sync {
     /// trị viên làm qua `DELETE /api/v1/auth/users/{id}/mfa`: cho admin duy nhất mất thiết bị.
     /// Lỗi: không có tài khoản này (`auth.account_not_found`).
     async fn reset_mfa(&self, email: &str) -> Result<User, Error>;
+
+    /// Gỡ mọi passkey của tài khoản có email `email`, như quản trị viên làm qua
+    /// `DELETE /api/v1/auth/users/{id}/passkeys`: cho admin duy nhất mất thiết bị (đăng nhập lại
+    /// bằng mật khẩu). Trả tài khoản và số passkey đã gỡ. Lỗi: `auth.account_not_found`.
+    async fn remove_passkeys(&self, email: &str) -> Result<(User, u64), Error>;
 }

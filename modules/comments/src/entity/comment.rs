@@ -30,6 +30,8 @@ pub struct Model {
     pub email_verified: bool,
     /// Chữ thường, đã lọc.
     pub body: String,
+    /// `text` hay `markdown` (D-252): cách dựng `body_html` từ `body`.
+    pub format: String,
     /// `pending`, `published`, `rejected`, `spam` hoặc `deleted`.
     pub status: String,
     /// Lý do giữ lại (`moderation`, `too_many_links`, `too_fast,duplicate`…).

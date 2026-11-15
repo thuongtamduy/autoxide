@@ -20,9 +20,9 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 
 use crate::entity::api_folder;
-use crate::folders::Folder;
+use crate::images::variants::VariantPair;
+use crate::library::folders::Folder;
 use crate::service::{FolderFilter, Item, ItemDetails, MediaService, Visibility, content_url};
-use crate::variants::VariantPair;
 
 pub(crate) use assist::AltSuggestionResponse;
 pub(crate) use folders::FolderResponse;

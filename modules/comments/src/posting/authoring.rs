@@ -25,7 +25,7 @@ use crate::posting::{banned, banned_word};
 use crate::service::{
     Comment, CommentsService, Status, is_unique_violation, now, shift_counts, summary,
 };
-use crate::text;
+use crate::text::{self, Format};
 
 fn not_author() -> Error {
     Error::forbidden(
@@ -86,6 +86,7 @@ impl CommentsService {
         id: Uuid,
         edit_token: Option<&str>,
         body: &str,
+        format: Option<Format>,
     ) -> Result<Comment, Error> {
         let before = self.find(id).await?;
         self.check_author(&before, principal, edit_token)?;
@@ -100,6 +101,9 @@ impl CommentsService {
         }
         let mut problems = Vec::new();
         let body = text::clean_body(body, self.config.max_length, &mut problems);
+        // Không gửi `format`: giữ định dạng đang có của bình luận.
+        let format = format.unwrap_or_else(|| Format::from_column(&before.format));
+        let format = self.check_format(format, &mut problems);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -120,7 +124,7 @@ impl CommentsService {
         if text::contains_word(&body, &self.config.suspect_words) {
             holds.push("suspect_word");
         }
-        if text::link_count(&body) > self.config.max_links {
+        if text::links(&body, format) > self.config.max_links {
             holds.push("too_many_links");
         }
         // Bình luận đang hiện mà sửa: dính từ nghi ngờ / quá nhiều link thì giữ lại; không thì
@@ -149,6 +153,7 @@ impl CommentsService {
         )));
         row.content_hash = Set(autoxide_kernel::antispam::content_hash(&body));
         row.body = Set(body);
+        row.format = Set(format.as_str().to_owned());
         row.edited_at = Set(Some(now));
         row.updated_at = Set(now);
         if to != from {

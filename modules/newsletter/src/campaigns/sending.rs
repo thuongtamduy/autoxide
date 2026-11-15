@@ -35,12 +35,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::audience::lists::List;
+use crate::audience::subscribers::{SubscriberStatus, SubscriptionStatus};
 use crate::campaigns::{CampaignStatus, summary};
 use crate::entity::{campaign, delivery, subscriber, subscription, suppression};
 use crate::events::{self, Change};
-use crate::lists::List;
 use crate::service::{NewsletterService, now};
-use crate::subscribers::{SubscriberStatus, SubscriptionStatus};
 
 pub(crate) const PREPARE: &str = "newsletter.prepare";
 pub(crate) const SEND: &str = "newsletter.send";

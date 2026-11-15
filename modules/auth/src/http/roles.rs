@@ -385,7 +385,7 @@ mod tests {
 
             let (status, _, catalog) = call(&app, "GET", "/permissions", Some(&ada), None).await;
             assert_eq!(status, StatusCode::OK, "{catalog}");
-            assert_eq!(catalog["data"][0]["name"], "auth.roles.manage");
+            assert_eq!(catalog["data"][0]["name"], "auth.passkeys.manage");
 
             let body = json!({"name": "editor", "permissions": ["notes.write"]});
             let (status, _, created) = call(&app, "POST", "/roles", Some(&ada), Some(body)).await;

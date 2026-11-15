@@ -1,7 +1,7 @@
 //! Dữ liệu cá nhân trong module `newsletter`.
 //!
 //! - Theo email (người đăng ký không có tài khoản): `GET` / `DELETE
-//!   /api/v1/newsletter/data?email=` (`subscribers.rs`), permission `newsletter.export`.
+//!   /api/v1/newsletter/data?email=` (`audience/subscribers.rs`), permission `newsletter.export`.
 //!   Người đăng ký KHÔNG gắn với tài khoản: đăng ký công khai chỉ có email, nên mọi yêu cầu của
 //!   chủ dữ liệu đi theo email.
 //! - Theo tài khoản: chỉ `created_by` của danh sách và chiến dịch. Xuất: những thứ người đó tạo.

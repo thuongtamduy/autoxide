@@ -218,6 +218,14 @@ chủ, rồi đăng nhập bằng mật khẩu và bật lại:
 sudo -u autoxide autoxide user reset-mfa --email you@example.com
 ```
 
+Mất các thiết bị giữ passkey của tài khoản đó? Gỡ chúng ngay trên máy chủ, rồi đăng nhập bằng
+mật khẩu và thêm passkey mới. Quản trị viên khác làm được điều tương tự qua API với permission
+`auth.passkeys.manage` (`DELETE /api/v1/auth/users/{id}/passkeys`).
+
+```bash
+sudo -u autoxide autoxide user remove-passkeys --email you@example.com
+```
+
 ### 4. Chạy như một service
 
 `/etc/systemd/system/autoxide.service`:

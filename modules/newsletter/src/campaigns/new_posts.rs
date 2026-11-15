@@ -18,11 +18,11 @@ use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use uuid::Uuid;
 
+use crate::audience::lists::{List, NewPosts};
+use crate::campaigns::compose::NEW_POST;
 use crate::campaigns::{CampaignStatus, blank, summary};
-use crate::compose::NEW_POST;
 use crate::entity::{campaign, list};
 use crate::events::{self, Change};
-use crate::lists::{List, NewPosts};
 use crate::service::{NewsletterService, now};
 use crate::text::Locale;
 

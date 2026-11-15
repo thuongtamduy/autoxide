@@ -29,8 +29,8 @@ use uuid::Uuid;
 
 use super::MediaItemResponse;
 use super::items::{body_stream, content_type};
+use crate::library::sniff::is_raster_image;
 use crate::service::{Item, MediaService, Visibility};
-use crate::sniff::is_raster_image;
 
 /// Cache của URL có phiên bản: một năm, nội dung không bao giờ đổi.
 const LONG_CACHE: u32 = 365 * 24 * 3600;
@@ -209,7 +209,8 @@ async fn serve(
     // Bản xin chưa làm xong (sẽ có): bản đang gửi là tạm, không được cache lâu dưới địa chỉ này.
     let pending = query.w.is_some_and(|width| {
         (copy.is_none() || fallback)
-            && crate::variants::wanted_widths(&service.config.image_widths, &item).contains(&width)
+            && crate::images::variants::wanted_widths(&service.config.image_widths, &item)
+                .contains(&width)
     });
     let (etag, content_type, size) = match &copy {
         Some(copy) => (

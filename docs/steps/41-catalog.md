@@ -38,7 +38,7 @@ không đọc bảng `catalog_…`.
 - Crate mới `modules/catalog` (`autoxide-catalog`), đăng ký trong `crates/app/src/modules.rs` sau
   `notifications`, trước `inventory`.
 - **Commit chuẩn bị chung cho 42–44** (làm ở đây để ba bước song song sau không đụng nhau ở kernel):
-  1. `autoxide_kernel::csv` — dời `modules/forms/src/csv.rs` (ghi RFC 4180, chặn CSV injection, BOM,
+  1. `autoxide_kernel::csv` — dời `modules/forms/src/submissions/csv.rs` (ghi RFC 4180, chặn CSV injection, BOM,
      CRLF) vào kernel, thêm bộ đọc; `forms` gọi bản của kernel. **API mới cần thêm**:
      `pub fn write(header: &[String], rows: &[Vec<String>]) -> String`;
      `pub fn read(text: &str, max_rows: usize) -> Result<Vec<Vec<String>>, CsvError>` (bỏ BOM, nhận

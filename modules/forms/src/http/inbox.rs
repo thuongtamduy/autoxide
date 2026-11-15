@@ -19,9 +19,9 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{choice, page_request};
-use crate::fields::{FieldType, Localized};
-use crate::inbox::{InboxFilter, Submission, SubmissionStatus};
+use crate::forms::fields::{FieldType, Localized};
 use crate::service::FormsService;
+use crate::submissions::inbox::{InboxFilter, Submission, SubmissionStatus};
 
 /// One answer, with the field as it was when the submission was sent.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

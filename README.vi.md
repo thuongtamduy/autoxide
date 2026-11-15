@@ -284,8 +284,12 @@ Tài khoản mới nhận một mail đề nghị xác nhận địa chỉ; toke
 được xác nhận bằng `POST /api/v1/auth/email-verification/confirm`, sau đó
 `email_verified_at` cho biết lúc xác minh. Muốn đổi email, người dùng gọi
 `POST /api/v1/auth/me/email` kèm địa chỉ mới và mật khẩu: email chỉ đổi khi địa chỉ
-mới được xác nhận theo cùng cách. Đặt `AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` để mail
-dẫn tới trang của bạn.
+mới được xác nhận theo cùng cách. Khi đó địa chỉ cũ nhận một mail báo, kèm token (hạn 7
+ngày) để báo một lần đổi mà chủ tài khoản không làm: `POST /api/v1/auth/email-change/report`
+đăng xuất tài khoản ở mọi nơi, bỏ mật khẩu, passkey, API key và xác thực hai bước, trả lại địa
+chỉ cũ khi nó còn trống, rồi gửi mail đặt lại mật khẩu tới đó. Đặt
+`AUTOXIDE_AUTH_EMAIL_VERIFICATION_URL` và `AUTOXIDE_AUTH_EMAIL_CHANGE_REPORT_URL` để các mail
+này dẫn tới trang của bạn.
 
 Khi chạy thật (production), đặt `AUTOXIDE_AUTH_TOKEN_SECRET` (khoá ký access token)
 bằng một chuỗi ngẫu nhiên dài, giống nhau trên mọi máy chủ:

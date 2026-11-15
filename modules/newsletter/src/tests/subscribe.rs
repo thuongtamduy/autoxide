@@ -10,9 +10,9 @@ use super::{
     count_events, events, form_token, list, store_subscriptions, subscribe, subscribers,
     subscriptions, token_in, visitor,
 };
+use crate::audience::subscribers::{SubscriberChange, SubscriberStatus, SubscriptionStatus};
 use crate::config::NewsletterConfig;
 use crate::public::SubscribeRequest;
-use crate::subscribers::{SubscriberChange, SubscriberStatus, SubscriptionStatus};
 use crate::testing::{admin, config, service, service_with, user};
 
 /// Mới, đang chờ, đã xác nhận, bị khoá, dính bẫy, quá nhiều lần: cùng `Ok(())`; chỉ "mới" và
@@ -84,7 +84,7 @@ async fn dang_ky_moi_truong_hop_cung_ket_qua_chi_mail_khi_can() {
             .service
             .list_subscribers(
                 &admin(),
-                &crate::subscribers::SubscriberFilter {
+                &crate::audience::subscribers::SubscriberFilter {
                     email: Some("bob@".to_owned()),
                     ..Default::default()
                 },
@@ -376,7 +376,7 @@ async fn request_chi_xep_job_nhu_nhau_moi_dia_chi() {
             .service
             .list_subscribers(
                 &admin(),
-                &crate::subscribers::SubscriberFilter {
+                &crate::audience::subscribers::SubscriberFilter {
                     email: Some("blocked@".to_owned()),
                     ..Default::default()
                 },

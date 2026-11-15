@@ -12,8 +12,8 @@ use axum::http::{Method, StatusCode, header};
 use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 
-use crate::sniff::samples;
-use crate::testing::MemoryStorage;
+use crate::library::sniff::samples;
+use autoxide_testkit::MemoryStorage;
 
 struct App {
     http: TestApp,
@@ -505,7 +505,7 @@ async fn anh_thu_nho_qua_worker_va_tham_so_w() {
 
     TestDatabase::run(async |test| {
         let app = app(test).await;
-        let png = crate::variants::samples::encoded(240, 120, ImageFormat::Png, false);
+        let png = crate::images::variants::samples::encoded(240, 120, ImageFormat::Png, false);
         let item = upload(&app, "wide.png", "image/png", &png).await;
         assert_eq!(item["variants"], json!([]), "made in the background");
 
