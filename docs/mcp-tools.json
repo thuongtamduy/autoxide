@@ -155,6 +155,14 @@
             "example": "nightly report agent",
             "type": "string"
           },
+          "org_id": {
+            "description": "Bind the key to an organization unit you work in: it then acts only on data of that unit\nand the units below it. Omit for the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "passkey_ceremony_id": {
             "description": "One of your passkeys, instead of the password: start with\n`POST /api/v1/auth/login/passkey/options`, let the browser sign its `options`, and send the\n`ceremony_id` here with the browser's answer in `passkey_credential`.",
             "format": "uuid",
@@ -214,6 +222,35 @@
           "description": {
             "description": "What the role is for. Optional.",
             "type": "string"
+          },
+          "grants": {
+            "description": "Permissions to grant with a scope in the organization tree (`own`, `unit`, `subtree`,\n`tenant`). A permission is listed once, in `permissions` (whole tenant) or here.",
+            "items": {
+              "additionalProperties": false,
+              "description": "A permission a role grants, with how far it reaches in the organization tree.",
+              "properties": {
+                "permission": {
+                  "example": "notes.read",
+                  "type": "string"
+                },
+                "scope": {
+                  "description": "How far a permission reaches in the organization tree, from the unit of the membership:\n`own` (records the person owns), `unit` (that unit), `subtree` (that unit and every unit below\nit), `tenant` (the whole tenant).",
+                  "enum": [
+                    "own",
+                    "unit",
+                    "subtree",
+                    "tenant"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "permission",
+                "scope"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           },
           "name": {
             "description": "Unique. Lowercase letters, digits, `_` and `-`, starting with a letter.",
@@ -384,6 +421,79 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List who works in which organization unit with which role; filter by unit, role or user, and with `inherited` also count memberships on the units above.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which memberships to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inherited": {
+            "description": "With `org_id`: also memberships on the units above it.",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Only memberships on this unit (with `inherited`: also on the units above it).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role_id": {
+            "description": "Only memberships with this role.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "description": "Only the memberships of this user.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "auth.list_memberships",
+      "output_schema": null,
+      "permissions": [
+        "auth.users.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List every permission that roles can grant, with what each allows.",
       "input_schema": {
         "additionalProperties": false,
@@ -512,6 +622,35 @@
             "description": "What the role is for.",
             "type": "string"
           },
+          "grants": {
+            "description": "Permissions granted with a scope in the organization tree; each permission is listed once.",
+            "items": {
+              "additionalProperties": false,
+              "description": "A permission a role grants, with how far it reaches in the organization tree.",
+              "properties": {
+                "permission": {
+                  "example": "notes.read",
+                  "type": "string"
+                },
+                "scope": {
+                  "description": "How far a permission reaches in the organization tree, from the unit of the membership:\n`own` (records the person owns), `unit` (that unit), `subtree` (that unit and every unit below\nit), `tenant` (the whole tenant).",
+                  "enum": [
+                    "own",
+                    "unit",
+                    "subtree",
+                    "tenant"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "permission",
+                "scope"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
           "id": {
             "description": "Id of the role.",
             "format": "uuid",
@@ -522,7 +661,7 @@
             "type": "string"
           },
           "permissions": {
-            "description": "Every permission the role grants (replaces the old list); see `list_permissions`.",
+            "description": "Every permission the role grants for the whole tenant (replaces the old list); see\n`list_permissions`.",
             "items": {
               "type": "string"
             },
@@ -568,6 +707,65 @@
       "name": "auth.revoke_api_key",
       "output_schema": null,
       "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Replace every organization unit a user works in and the roles there. You can only give roles whose permissions you have, in units you work in.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The units a user should work in, with the roles there.",
+        "properties": {
+          "memberships": {
+            "description": "Replaces every membership; `[]` removes all.",
+            "items": {
+              "additionalProperties": false,
+              "description": "The roles to give in one unit.",
+              "properties": {
+                "org_id": {
+                  "description": "The unit; the id of the tenant is the root.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "role_ids": {
+                  "description": "Ids of the roles in this unit.",
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "org_id",
+                "role_ids"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "user_id": {
+            "description": "Id of the user.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "memberships"
+        ],
+        "type": "object"
+      },
+      "name": "auth.set_memberships",
+      "output_schema": null,
+      "permissions": [
+        "auth.roles.manage"
+      ]
     },
     {
       "annotations": {

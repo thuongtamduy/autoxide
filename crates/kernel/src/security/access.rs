@@ -50,11 +50,13 @@ pub struct Permission {
     scoped: bool,
 }
 
-/// Độ sâu của một quyền trong cây tổ chức (bước 34, như "access level" của Dynamics 365). Thứ tự
-/// khai báo là thứ tự rộng dần: `own < unit < subtree < tenant`.
-///
-/// Với membership tại nút N: `own` — bản ghi mình sở hữu; `unit` — bản ghi của đúng nút N;
-/// `subtree` — bản ghi của N và mọi nút dưới N; `tenant` — mọi bản ghi của khách.
+// Độ sâu của một quyền trong cây tổ chức (bước 34, như "access level" của Dynamics 365). Thứ tự
+// khai báo là thứ tự rộng dần: `own < unit < subtree < tenant`. Với membership tại nút N: `own` —
+// bản ghi mình sở hữu; `unit` — bản ghi của đúng nút N; `subtree` — bản ghi của N và mọi nút dưới
+// N; `tenant` — mọi bản ghi của khách.
+/// How far a permission reaches in the organization tree, from the unit of the membership:
+/// `own` (records the person owns), `unit` (that unit), `subtree` (that unit and every unit below
+/// it), `tenant` (the whole tenant).
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema,
 )]
@@ -120,8 +122,10 @@ impl OrgTarget {
     }
 }
 
-/// Loại tài khoản (bước 34): nhân sự (`staff`) có permission; người mua (`customer`) là tài khoản
-/// của một khách, không có permission nào.
+// Loại tài khoản (bước 34): nhân sự (`staff`) có permission; người mua (`customer`) là tài khoản
+// của một khách, không có permission nào.
+/// The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of
+/// one tenant's shop, without permissions).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Realm {
@@ -417,6 +421,53 @@ impl Principal {
     /// Đường vào khách hiện tại.
     pub fn access(&self) -> AccessPath {
         self.access
+    }
+
+    /// Chỉ giữ các permission trong `names`, mỗi cái với đúng grant (nút, độ sâu) đang có — vd
+    /// quyền của API key = permission của key ∩ quyền hiện tại của chủ key.
+    #[must_use]
+    pub fn only<'a>(mut self, names: impl IntoIterator<Item = &'a str>) -> Self {
+        let root = root_of(self.tenant);
+        let mut kept: BTreeMap<String, Vec<Grant>> = BTreeMap::new();
+        for name in names {
+            let grants = match &self.grants {
+                Grants::All => vec![Grant::new(root, Scope::Tenant)],
+                Grants::Only(map) => map.get(name).cloned().unwrap_or_default(),
+            };
+            if !grants.is_empty() {
+                kept.insert(name.to_owned(), grants);
+            }
+        }
+        self.grants = Grants::Only(Arc::new(kept));
+        self
+    }
+
+    /// Mọi grant theo permission (tên → grant); `None` khi có mọi permission ở độ sâu `tenant`.
+    pub fn grant_map(&self) -> Option<&BTreeMap<String, Vec<Grant>>> {
+        match &self.grants {
+            Grants::All => None,
+            Grants::Only(map) => Some(map),
+        }
+    }
+
+    /// Bên gọi có làm việc ở nút `org` không: một grant bất kỳ (permission bất kỳ) ở độ sâu
+    /// `tenant`, hay `unit` / `subtree` phủ nút đó. Dùng khi bên gọi tự nêu một nút cho thứ không
+    /// gắn với một permission riêng (vd API key gắn nút).
+    pub async fn reaches<D: ConnectionTrait>(&self, db: &D, org: OrgId) -> Result<bool, Error> {
+        let Grants::Only(map) = &self.grants else { return Ok(true) };
+        let mut subtrees = Vec::new();
+        for grant in map.values().flatten() {
+            match grant.scope {
+                Scope::Tenant => return Ok(true),
+                Scope::Unit | Scope::Own if grant.org == org => return Ok(true),
+                Scope::Subtree => subtrees.push(grant.org),
+                Scope::Unit | Scope::Own => {}
+            }
+        }
+        if subtrees.is_empty() {
+            return Ok(false);
+        }
+        OrgTree::is_within(db, self.tenant, org, &subtrees).await
     }
 
     /// Các grant của `permission`; rỗng khi không có. Permission không `scoped` có grant ở đâu

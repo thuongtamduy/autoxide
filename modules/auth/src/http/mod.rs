@@ -4,6 +4,7 @@
 mod account;
 pub(crate) mod api_keys;
 mod email;
+pub(crate) mod memberships;
 mod mfa;
 mod passkeys;
 mod reset;
@@ -48,6 +49,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
     session::routes()
         .merge(account::routes())
         .merge(roles::routes())
+        .merge(memberships::routes())
         .merge(users::routes())
         .merge(api_keys::routes())
         .merge(mfa::routes())

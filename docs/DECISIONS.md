@@ -7436,3 +7436,32 @@ vào hỗ trợ (mục 10, 13 — chỉ hai mục đó sinh đường vào khác
 Đã cân nhắc: cây ở `organizations` (`organizations_closure`) — module khác không được đọc bảng của nó nên không lọc theo
 nhánh trong SQL được; `WITH RECURSIVE` — mỗi lần kiểm quyền một câu đệ quy, khó có index; khoá theo thứ tự nút khi dời —
 hai lệnh dời chéo nhau dễ deadlock.
+
+## D-304 · Membership, role và API key theo nút trong `auth` (bước 34 mục 2) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Membership = (người, nút, role).** `auth_user_role.org_id`, khoá unique `(tenant_id, user_id, org_id, role_id)`. Dòng
+   cũ gắn ở nút gốc (= ID của khách). `PUT /users/{id}/roles` cũ giữ nghĩa: thay membership **ở gốc**, không đụng
+   membership ở nút khác. API mới: `GET` / `PUT /users/{id}/memberships`, `GET /memberships?org_id=&role_id=&user_id=
+   &inherited=`, `GET /me/memberships`; tool MCP `auth.list_memberships`, `auth.set_memberships`; event
+   `auth.memberships_changed`.
+2. **Role cấp permission kèm độ sâu:** `auth_role_permission.scope` (dòng cũ `tenant`). Thân role nhận `permissions`
+   (độ sâu `tenant`, như cũ) và `grants: [{permission, scope}]`; trả cả hai. Permission không `scoped` mà nêu độ sâu
+   hẹp hơn → lỗi của ô (`errors[].code = scope_not_supported`) trong `422 validation_failed`, thay cho mã riêng
+   `auth.scope_not_supported` của đặc tả: lỗi đầu vào của role vẫn báo một lần cho mọi ô (D-083).
+3. **Role `admin` (mọi permission) chỉ gán ở nút gốc** — `Principal` "mọi permission" không mang nút; cho phép ở nút
+   khác thì phải có thêm kiểu "mọi permission trong nhánh", chưa ai cần.
+4. **Người gán membership** (`auth.roles.manage`) phải làm việc ở nút đó (`Principal::reaches`) và có mọi permission
+   của role mình gán (ở bất kỳ độ sâu nào). Nút phải có trong cây của khách (bảng của kernel) — `auth` không phụ
+   thuộc module `organizations`.
+5. **API key gắn nút:** `auth_api_key.org_id` (mặc định gốc = không rào). Quyền của key = permission của key ∩ quyền
+   của chủ key, giữ nút và độ sâu của chủ key (`Principal::only`), cộng hàng rào ở nút của key.
+6. **Cột `org_id` mới là NULL được ở database**, điền ngay trong migration (`= tenant_id`) và service luôn ghi: thêm cột
+   NOT NULL không `DEFAULT` vào bảng có dữ liệu cần dựng lại bảng (như `tenancy::migration::adopt`), không đáng cho một
+   giá trị mà ứng dụng luôn đặt. Đọc ra mà gặp NULL thì hiểu là nút gốc.
+7. `GET /auth/permissions` trả thêm `scoped`.
+
+Đã cân nhắc: membership trong bảng riêng `auth_membership` — trùng nghĩa với `auth_user_role`, phải chép dữ liệu và đổi
+mọi câu truy vấn; giữ `PUT /users/{id}/roles` thay mọi membership — xoá mất membership ở nút khác của người dùng khi
+giao diện cũ gọi.

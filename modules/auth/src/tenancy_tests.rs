@@ -30,7 +30,12 @@ fn new_user(email: &str, password: &str) -> NewUser {
 }
 
 fn role(name: &str) -> RoleInput {
-    RoleInput { name: name.to_owned(), description: String::new(), permissions: Vec::new() }
+    RoleInput {
+        name: name.to_owned(),
+        description: String::new(),
+        permissions: Vec::new(),
+        grants: Vec::new(),
+    }
 }
 
 /// Cùng email, cùng tên role ở hai khách đều tạo được; đăng nhập ở khách nào thì tìm tài khoản của
@@ -210,6 +215,7 @@ async fn khong_ro_ri_giua_khach() {
         let owner = Principal::new(user_id.parse().unwrap(), ["auth.users.read".to_owned()])
             .in_tenant(a.id());
         let key = NewApiKey {
+            org_id: None,
             name: marker.to_owned(),
             permissions: vec!["auth.users.read".to_owned()],
             expires_at: None,
@@ -389,6 +395,7 @@ async fn api_key_dinh_tuyen_dung_database() {
         let services = crate::testing::services(test).await;
         let (app, a, b) = two_tenant_app(test, &services).await;
         let new_key = || NewApiKey {
+            org_id: None,
             name: "agent".to_owned(),
             permissions: vec!["auth.users.read".to_owned()],
             expires_at: None,

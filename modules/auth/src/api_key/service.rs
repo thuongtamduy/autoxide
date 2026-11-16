@@ -24,7 +24,9 @@ use crate::role::RoleService;
 use crate::token;
 use crate::user::UserService;
 use autoxide_kernel::event::{Actor, Outbox};
-use autoxide_kernel::tenancy::{DEFAULT_TENANT, ScopeExt, TenantContext, TenantId};
+use autoxide_kernel::tenancy::{
+    DEFAULT_TENANT, OrgId, OrgTree, ScopeExt, TenantContext, TenantId, root_of,
+};
 use serde_json::json;
 use uuid::fmt::Simple;
 
@@ -62,6 +64,8 @@ pub(crate) struct ApiKey {
     pub prefix: String,
     /// Theo thứ tự tên.
     pub permissions: Vec<String>,
+    /// Nút của hàng rào (bước 34): key chỉ có quyền trong nhánh này; nút gốc = không rào.
+    pub org_id: Uuid,
     pub expires_at: Option<DateTime<Utc>>,
     pub last_used_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
@@ -78,6 +82,8 @@ pub(crate) struct CreatedApiKey {
 pub(crate) struct NewApiKey {
     pub name: String,
     pub permissions: Vec<String>,
+    /// Nút của hàng rào; `None`: nút gốc (không rào). Phải là nút người tạo làm việc ở đó.
+    pub org_id: Option<Uuid>,
     /// `None`: không hết hạn.
     pub expires_at: Option<DateTime<Utc>>,
     /// Mật khẩu hiện tại của người tạo: access token bị lộ không đủ để tạo key sống lâu
@@ -143,7 +149,19 @@ impl ApiKeyService {
                 "give either the current password or a second factor, not both",
             )),
         };
-        let checked = self.check(creator, input.name, input.permissions, input.expires_at, now);
+        let org_id = input.org_id.unwrap_or(root_of(tenant.id()).as_uuid());
+        let mut checked = self.check(creator, input.name, input.permissions, input.expires_at, now);
+        if let Some(problem) = fence_problem(tenant, creator, org_id).await? {
+            checked = match checked {
+                Ok(_) => Err(Error::validation(vec![problem])),
+                Err(error) if error.kind() == ErrorKind::Validation => {
+                    let mut problems = error.fields().to_vec();
+                    problems.push(problem);
+                    Err(Error::validation(problems))
+                }
+                Err(error) => Err(error),
+            };
+        }
         let (name, permissions) = match (checked, blank) {
             (Ok(checked), None) => checked,
             (Ok(_), Some(problem)) => return Err(Error::validation(vec![problem])),
@@ -220,6 +238,7 @@ impl ApiKeyService {
             prefix: Set(prefix.clone()),
             key_hash: Set(token::sha256(&secret)),
             expires_at: Set(input.expires_at),
+            org_id: Set(Some(org_id)),
             last_used_at: Set(None),
             created_at: Set(now),
         }
@@ -240,6 +259,7 @@ impl ApiKeyService {
             "name": name,
             "prefix": prefix,
             "permissions": permissions,
+            "org_id": org_id,
             "expires_at": input.expires_at,
         });
         let event = events::ApiKeyCreated { before: None, after: Some(after) };
@@ -254,6 +274,7 @@ impl ApiKeyService {
             name,
             prefix,
             permissions,
+            org_id,
             expires_at: input.expires_at,
             last_used_at: None,
             created_at: now,
@@ -380,15 +401,20 @@ impl ApiKeyService {
             return Err(crate::user::user_disabled());
         }
         let owner = self.roles.principal(tenant, user.id).await?;
-        let granted = api_key_permission::Entity::find()
+        let granted: Vec<String> = api_key_permission::Entity::find()
             .filter(api_key_permission::Column::ApiKeyId.eq(row.id))
             .scoped(tenant)
             .all(tenant.database().read())
             .await?
             .into_iter()
             .map(|row| row.permission)
-            .filter(|permission| owner.allows(permission));
-        let principal = Principal::new(user.id, granted).via_api_key(row.id).in_tenant(tenant.id());
+            .collect();
+        // Quyền của key = permission của key ∩ quyền hiện tại của chủ key, giữ nguyên nút và độ
+        // sâu của chủ key; key gắn nút thì thêm hàng rào ở nút đó (bước 34).
+        let mut principal = owner.only(granted.iter().map(String::as_str)).via_api_key(row.id);
+        if let Some(org) = row.org_id {
+            principal = principal.with_fence(OrgId::from_uuid(org));
+        }
         self.touch(tenant, &row, now).await;
         Ok(principal)
     }
@@ -501,6 +527,7 @@ fn to_api_key(row: api_key::Model, permissions: Vec<String>) -> ApiKey {
         name: row.name,
         prefix: row.prefix,
         permissions,
+        org_id: row.org_id.unwrap_or(row.tenant_id),
         expires_at: row.expires_at,
         last_used_at: row.last_used_at,
         created_at: row.created_at,
@@ -570,6 +597,35 @@ pub(crate) async fn revoke_all_in<C: ConnectionTrait>(
     Ok(rows.len() as u64)
 }
 
+/// Lỗi của ô `org_id` khi tạo key gắn nút: nút phải có trong cây của khách và người tạo phải làm
+/// việc ở đó (một grant bất kỳ phủ nút). Nút gốc luôn được.
+async fn fence_problem(
+    tenant: &TenantContext,
+    creator: &Principal,
+    org_id: Uuid,
+) -> Result<Option<FieldError>, Error> {
+    let org = OrgId::from_uuid(org_id);
+    if org == root_of(tenant.id()) {
+        return Ok(None);
+    }
+    let read = tenant.database().read();
+    if OrgTree::ancestors(read, tenant.id(), org).await?.is_empty() {
+        return Ok(Some(FieldError::new(
+            "org_id",
+            "unknown",
+            "is not an organization unit of this tenant",
+        )));
+    }
+    if !creator.reaches(read, org).await? {
+        return Ok(Some(FieldError::new(
+            "org_id",
+            "out_of_scope",
+            "must be a unit you work in (one of your roles covers it)",
+        )));
+    }
+    Ok(None)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -624,6 +680,7 @@ mod tests {
                 &tenant,
                 Actor::system(),
                 RoleInput {
+                    grants: Vec::new(),
                     name: "reader".to_owned(),
                     description: String::new(),
                     permissions: vec!["auth.users.read".to_owned(), "auth.roles.read".to_owned()],
@@ -642,6 +699,7 @@ mod tests {
 
     fn new_key(permissions: &[&str]) -> NewApiKey {
         NewApiKey {
+            org_id: None,
             name: "agent".to_owned(),
             permissions: permissions.iter().map(|p| (*p).to_owned()).collect(),
             expires_at: None,
@@ -697,6 +755,7 @@ mod tests {
             let tenant = services.tenant.clone();
             let past = Utc::now() - chrono::Duration::hours(1);
             let input = NewApiKey {
+                org_id: None,
                 name: " ".to_owned(),
                 permissions: vec![
                     "auth.users.read".to_owned(),

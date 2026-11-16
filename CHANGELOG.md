@@ -172,6 +172,14 @@ endpoints are marked deprecated with a sunset date first.
   structure of the tree is in the kernel: `autoxide_kernel::tenancy::{OrgTree, nearest, root_of}`. New error codes
   `org_out_of_scope`, `org_frozen`, `org_not_found`, `org_cycle`, `org_depth_exceeded`, `org_root_immutable`. Testkit:
   `TestApp::builder(…).member(token, user, org, &[(permission, scope)])`.
+- `auth`: people work in organization units. `GET`, `PUT /api/v1/auth/users/{id}/memberships` (the units a user works
+  in and the roles there), `GET /api/v1/auth/memberships` (filter by `org_id`, `role_id`, `user_id`; `inherited=true`
+  also counts memberships on the units above), `GET /api/v1/auth/me/memberships`; MCP tools `auth.list_memberships`,
+  `auth.set_memberships`; event `auth.memberships_changed`. Roles take `grants: [{permission, scope}]` next to
+  `permissions` (scope `own`, `unit`, `subtree` or `tenant`) and return both; `GET /api/v1/auth/permissions` gives
+  `scoped`. An API key can be bound to a unit (`org_id`): it then acts only on that unit and the units below it.
+  Existing roles, role assignments and keys keep their meaning (the whole tenant); `PUT /users/{id}/roles` sets the
+  roles at the root unit.
 - For module authors (testkit): `MemoryStorage`, an in-memory `dyn Storage` with `fail_writes` to test storage
   errors.
 

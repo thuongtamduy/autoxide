@@ -46,6 +46,7 @@ events! {
     ROLE_UPDATED, RoleUpdated, "auth.role_updated", "A role's name, description or permissions changed.";
     ROLE_DELETED, RoleDeleted, "auth.role_deleted", "A role was deleted.";
     USER_ROLES_CHANGED, UserRolesChanged, "auth.user_roles_changed", "The roles of a user changed.";
+    MEMBERSHIPS_CHANGED, MembershipsChanged, "auth.memberships_changed", "The organization units a user works in, or their roles there, changed.";
     API_KEY_CREATED, ApiKeyCreated, "auth.api_key_created", "An API key was created.";
     API_KEY_REVOKED, ApiKeyRevoked, "auth.api_key_revoked", "An API key was revoked.";
     MFA_ENABLED, MfaEnabled, "auth.mfa_enabled", "A user turned on two-step sign-in.";

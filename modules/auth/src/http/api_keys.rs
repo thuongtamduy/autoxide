@@ -139,6 +139,9 @@ pub(crate) struct ApiKeyResponse {
     /// owner has at the moment of the request.
     #[schema(example = json!(["auth.users.read"]))]
     permissions: Vec<String>,
+    /// The organization unit the key is bound to: it acts only on data of this unit and the
+    /// units below it. The root unit (the id of the tenant) means no limit.
+    org_id: Uuid,
     /// When the key stops working; `null`: never.
     expires_at: Option<DateTime<Utc>>,
     /// Last time the key was used, to the minute; `null`: never used.
@@ -153,6 +156,7 @@ impl From<ApiKey> for ApiKeyResponse {
             name: key.name,
             prefix: key.prefix,
             permissions: key.permissions,
+            org_id: key.org_id,
             expires_at: key.expires_at,
             last_used_at: key.last_used_at,
             created_at: key.created_at,
@@ -183,6 +187,9 @@ pub(crate) struct CreateApiKeyRequest {
     /// `GET /api/v1/auth/me`). Give a key only what its job needs.
     #[schema(example = json!(["auth.users.read"]))]
     permissions: Vec<String>,
+    /// Bind the key to an organization unit you work in: it then acts only on data of that unit
+    /// and the units below it. Omit for the whole tenant.
+    org_id: Option<Uuid>,
     /// When the key stops working (RFC 3339, in the future). Omit for a key that does
     /// not expire.
     expires_at: Option<DateTime<Utc>>,
@@ -210,6 +217,7 @@ impl From<CreateApiKeyRequest> for NewApiKey {
         NewApiKey {
             name: input.name,
             permissions: input.permissions,
+            org_id: input.org_id,
             expires_at: input.expires_at,
             current_password: input.current_password,
             second_factor: match (input.totp_code, input.passkey_ceremony_id) {

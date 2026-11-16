@@ -16,6 +16,8 @@ pub(crate) mod api_key {
         pub prefix: String,
         pub key_hash: String,
         pub expires_at: Option<DateTimeUtc>,
+        /// Nút của hàng rào (bước 34); nút gốc = không rào. Luôn có giá trị.
+        pub org_id: Option<Uuid>,
         pub last_used_at: Option<DateTimeUtc>,
         pub created_at: DateTimeUtc,
     }

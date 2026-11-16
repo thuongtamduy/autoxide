@@ -19,6 +19,8 @@ mod events;
 mod http;
 mod mfa;
 mod migration;
+#[cfg(test)]
+mod org_tests;
 mod passkey;
 mod password;
 mod permissions;
@@ -375,7 +377,11 @@ pub(crate) mod testing {
             ("auth", crate::permissions::all()),
             (
                 "notes",
-                vec![autoxide_kernel::access::Permission::new("notes.write", "Write notes.")],
+                vec![
+                    autoxide_kernel::access::Permission::new("notes.write", "Write notes."),
+                    // Permission theo nút (bước 34), cho test độ sâu của role.
+                    autoxide_kernel::access::Permission::new("notes.read", "Read notes.").scoped(),
+                ],
             ),
         ])
         .unwrap();

@@ -361,6 +361,7 @@ mod tests {
                 .await
                 .unwrap();
             let key = crate::api_key::NewApiKey {
+                org_id: None,
                 name: "agent".to_owned(),
                 permissions: vec!["auth.users.read".to_owned()],
                 expires_at: None,

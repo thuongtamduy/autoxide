@@ -90,6 +90,11 @@ export type ApiKeyResponse = {
   /** What the key is for. */
   name: string;
   /**
+   * The organization unit the key is bound to: it acts only on data of this unit and the
+   * units below it. The root unit (the id of the tenant) means no limit.
+   */
+  org_id: string;
+  /**
    * Permissions the key may use, sorted by name. The key never has more than its
    * owner has at the moment of the request.
    */
@@ -671,6 +676,11 @@ export type CreateApiKeyRequest = {
   expires_at?: string | null;
   /** What the key is for, 1 to 100 characters. */
   name: string;
+  /**
+   * Bind the key to an organization unit you work in: it then acts only on data of that unit
+   * and the units below it. Omit for the whole tenant.
+   */
+  org_id?: string | null;
   /**
    * One of your passkeys, instead of the password: start with
    * `POST /api/v1/auth/login/passkey/options`, let the browser sign its `options`, and send the
@@ -2314,6 +2324,11 @@ export type Data_RoleResponse = {
     all_permissions: boolean;
     created_at: string;
     description: string;
+    /**
+     * The same permissions with their scope in the organization tree. Empty when
+     * `all_permissions`.
+     */
+    grants: RoleGrant[];
     id: string;
     name: string;
     /** Permissions the role grants, sorted by name. Empty when `all_permissions`. */
@@ -2873,6 +2888,19 @@ export type Data_Vec_EventTypeResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_MembershipResponse = {
+  data: {
+    /** The unit; the root unit has the id of the tenant. */
+    org_id: string;
+    /**
+     * The roles there, sorted by name. A role grants each permission at its scope from this
+     * unit (`unit`: this unit, `subtree`: this unit and the units below it).
+     */
+    roles: RoleResponse[];
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_MenuSummary = {
   data: {
     id: string;
@@ -2938,6 +2966,12 @@ export type Data_Vec_PermissionResponse = {
      * `money`.
      */
     risk: string;
+    /**
+     * `true` when the permission applies to data of an organization unit: a role can grant it
+     * for one unit (`unit`), a unit and everything below it (`subtree`), or only the records
+     * a person owns (`own`). `false`: it can only be granted for the whole tenant.
+     */
+    scoped: boolean;
   }[];
 };
 
@@ -3018,6 +3052,11 @@ export type Data_Vec_RoleResponse = {
     all_permissions: boolean;
     created_at: string;
     description: string;
+    /**
+     * The same permissions with their scope in the organization tree. Empty when
+     * `all_permissions`.
+     */
+    grants: RoleGrant[];
     id: string;
     name: string;
     /** Permissions the role grants, sorted by name. Empty when `all_permissions`. */
@@ -3799,6 +3838,47 @@ export type MediaItemResponse = {
   width?: number | null;
 };
 
+/** The roles to give in one unit. */
+export type MembershipRequest = {
+  /** The unit (see `GET /api/v1/organizations/units`); the id of the tenant is the root. */
+  org_id: string;
+  /** Ids of the roles in this unit. */
+  role_ids: string[];
+};
+
+/** The roles a user has in one organization unit. */
+export type MembershipResponse = {
+  /** The unit; the root unit has the id of the tenant. */
+  org_id: string;
+  /**
+   * The roles there, sorted by name. A role grants each permission at its scope from this
+   * unit (`unit`: this unit, `subtree`: this unit and the units below it).
+   */
+  roles: RoleResponse[];
+};
+
+/** One role a user has in one unit. */
+export type MembershipRowResponse = {
+  created_at: string;
+  id: string;
+  /**
+   * `true` when the membership is on a unit above the one asked for with `org_id`: the user
+   * works there through it.
+   */
+  inherited: boolean;
+  /** The unit of the membership. */
+  org_id: string;
+  role_id: string;
+  role_name: string;
+  user_id: string;
+};
+
+/** Every unit a user should work in, with the roles there. */
+export type MembershipsRequest = {
+  /** Replaces every membership the user had; `[]` removes all. */
+  memberships: MembershipRequest[];
+};
+
 /** A small label on an item, e.g. "-50%" or "New". */
 export type MenuBadge = {
   /** Shown from this moment; omitted: at once. */
@@ -4131,6 +4211,11 @@ export type Page_ApiKeyResponse = {
     last_used_at?: string | null;
     /** What the key is for. */
     name: string;
+    /**
+     * The organization unit the key is bound to: it acts only on data of this unit and the
+     * units below it. The root unit (the id of the tenant) means no limit.
+     */
+    org_id: string;
     /**
      * Permissions the key may use, sorted by name. The key never has more than its
      * owner has at the moment of the request.
@@ -4702,6 +4787,26 @@ export type Page_MediaItemResponse = {
 };
 
 /** One page of a list. */
+export type Page_MembershipRowResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    id: string;
+    /**
+     * `true` when the membership is on a unit above the one asked for with `org_id`: the user
+     * works there through it.
+     */
+    inherited: boolean;
+    /** The unit of the membership. */
+    org_id: string;
+    role_id: string;
+    role_name: string;
+    user_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_PasskeyResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -4888,6 +4993,11 @@ export type Page_RoleResponse = {
     all_permissions: boolean;
     created_at: string;
     description: string;
+    /**
+     * The same permissions with their scope in the organization tree. Empty when
+     * `all_permissions`.
+     */
+    grants: RoleGrant[];
     id: string;
     name: string;
     /** Permissions the role grants, sorted by name. Empty when `all_permissions`. */
@@ -5371,6 +5481,12 @@ export type PermissionResponse = {
    * `money`.
    */
   risk: string;
+  /**
+   * `true` when the permission applies to data of an organization unit: a role can grant it
+   * for one unit (`unit`), a unit and everything below it (`subtree`), or only the records
+   * a person owns (`own`). `false`: it can only be granted for the whole tenant.
+   */
+  scoped: boolean;
 };
 
 /**
@@ -6026,10 +6142,34 @@ export type RevisionResponse = {
   snapshot?: Record<string, unknown> | null;
 };
 
+/** A permission a role grants, with how far it reaches in the organization tree. */
+export type RoleGrant = {
+  permission: string;
+  /**
+   * How far a permission reaches in the organization tree, from the unit of the membership:
+   * `own` (records the person owns), `unit` (that unit), `subtree` (that unit and every unit below
+   * it), `tenant` (the whole tenant).
+   */
+  scope: "own" | "unit" | "subtree" | "tenant";
+};
+
 /** The full content of a role. */
 export type RoleRequest = {
   /** What the role is for. Optional. */
   description?: string;
+  /**
+   * Permissions to grant with a scope in the organization tree (`own`, `unit`, `subtree`,
+   * `tenant`). A permission is listed once, in `permissions` (whole tenant) or here.
+   */
+  grants?: {
+    permission: string;
+    /**
+     * How far a permission reaches in the organization tree, from the unit of the membership:
+     * `own` (records the person owns), `unit` (that unit), `subtree` (that unit and every unit below
+     * it), `tenant` (the whole tenant).
+     */
+    scope: "own" | "unit" | "subtree" | "tenant";
+  }[];
   /** Unique. Lowercase letters, digits, `_` and `-`, starting with a letter. */
   name: string;
   /**
@@ -6048,6 +6188,11 @@ export type RoleResponse = {
   all_permissions: boolean;
   created_at: string;
   description: string;
+  /**
+   * The same permissions with their scope in the organization tree. Empty when
+   * `all_permissions`.
+   */
+  grants: RoleGrant[];
   id: string;
   name: string;
   /** Permissions the role grants, sorted by name. Empty when `all_permissions`. */
@@ -7451,6 +7596,17 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/me/memberships": {
+    /** List the organization units you work in, with your roles there. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_MembershipResponse;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/me/mfa": {
     /** Get your two-step sign-in settings. */
     get: {
@@ -7625,6 +7781,20 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/memberships": {
+    /** List who works in which organization unit, with which role. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; role_id?: string; user_id?: string; inherited?: boolean; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_MembershipRowResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -7822,6 +7992,33 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/users/{id}/memberships": {
+    /** List the organization units a user works in, with the roles there. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_MembershipResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace every organization unit a user works in, and the roles there. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: MembershipsRequest;
+      responses: {
+        200: Data_Vec_MembershipResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };

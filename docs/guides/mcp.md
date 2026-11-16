@@ -77,11 +77,13 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `auth.get_role` | `auth.roles.read` | read-only |
 | `auth.get_user_roles` | `auth.users.read` | read-only |
 | `auth.list_api_keys` | — | read-only |
+| `auth.list_memberships` | `auth.users.read` | read-only |
 | `auth.list_permissions` | `auth.roles.read` | read-only |
 | `auth.list_roles` | `auth.roles.read` | read-only |
 | `auth.list_users` | `auth.users.read` | read-only |
 | `auth.replace_role` | `auth.roles.manage` | writes |
 | `auth.revoke_api_key` | — | destructive |
+| `auth.set_memberships` | `auth.roles.manage` | writes |
 | `auth.set_user_roles` | `auth.roles.manage` | writes |
 | `auth.update_user` | `auth.users.manage` | writes |
 | `auth.whoami` | — | read-only |

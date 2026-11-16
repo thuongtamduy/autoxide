@@ -552,6 +552,7 @@ mod tests {
                     .unwrap();
             }
             let helpdesk = crate::role::RoleInput {
+                grants: Vec::new(),
                 name: "helpdesk".to_owned(),
                 description: String::new(),
                 permissions: vec!["auth.passkeys.manage".to_owned()],
