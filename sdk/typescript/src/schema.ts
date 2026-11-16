@@ -334,7 +334,10 @@ export type ClientConfigResponse = {
     locales: string[];
     /** Largest entry body accepted, in bytes. */
     max_body_bytes: number;
-    /** Path prefix of posts on the website (`AUTOXIDE_CONTENT_POST_PATH_PREFIX`), e.g. `/blog/`. */
+    /**
+     * First segment of the address of every post (`AUTOXIDE_CONTENT_POST_PATH_PREFIX`), without
+     * slashes: `blog` gives posts at `/blog/<slug>`.
+     */
     post_path_prefix: string;
   };
   /** Kernel's own section. */
@@ -473,8 +476,9 @@ export type CommentDetail = {
   status: CommentStatus;
   target_id: string;
   /**
-   * Title of the target (e.g. the post's title), from the module that owns it; absent when
-   * that kind has no lookup or the target is not public now.
+   * Title of the target (e.g. the post's title), from the module that owns it. Only given while
+   * the target is public: for a draft, unpublished or deleted target (or a kind with no
+   * lookup) the field is absent and only `target_type` and `target_id` identify it.
    */
   target_title?: string | null;
   target_type: string;
@@ -1153,8 +1157,9 @@ export type Data_CommentDetail = {
     status: CommentStatus;
     target_id: string;
     /**
-     * Title of the target (e.g. the post's title), from the module that owns it; absent when
-     * that kind has no lookup or the target is not public now.
+     * Title of the target (e.g. the post's title), from the module that owns it. Only given while
+     * the target is public: for a draft, unpublished or deleted target (or a kind with no
+     * lookup) the field is absent and only `target_type` and `target_id` identify it.
      */
     target_title?: string | null;
     target_type: string;
@@ -3475,7 +3480,10 @@ export type LastDelivery = {
   last_attempt_at?: string | null;
   /** HTTP status the endpoint answered with, on the last attempt; `null` when it did not answer. */
   response_status?: number | null;
-  /** `pending`, `delivered` or `failed`. */
+  /**
+   * `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up) — the same values
+   * as a delivery's `status`.
+   */
   status: string;
 };
 
@@ -4171,8 +4179,9 @@ export type Page_CommentDetail = {
     status: CommentStatus;
     target_id: string;
     /**
-     * Title of the target (e.g. the post's title), from the module that owns it; absent when
-     * that kind has no lookup or the target is not public now.
+     * Title of the target (e.g. the post's title), from the module that owns it. Only given while
+     * the target is public: for a draft, unpublished or deleted target (or a kind with no
+     * lookup) the field is absent and only `target_type` and `target_id` identify it.
      */
     target_title?: string | null;
     target_type: string;

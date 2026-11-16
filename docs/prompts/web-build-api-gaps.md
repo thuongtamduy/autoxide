@@ -444,12 +444,12 @@ thì chỉ thay phần đọc. Ba nguồn đọc API thật (bình luận chờ 
 
 Giao diện đã chịu được cả hai dạng; nên sửa mô tả hoặc giá trị cho khớp nhau.
 
-| [ ] | Chỗ | Mô tả OpenAPI | Core trả |
+| [x] | Chỗ | Mô tả OpenAPI | Core trả |
 |---|---|---|---|
-| [ ] | `LastDelivery.status` (webhook) | `pending` / `delivered` / `failed` | `succeeded` thay cho `delivered` |
-| [ ] | `POST /kernel/tenants`, header `Location` | đường dẫn đầy đủ | `/kernel/tenants/{id}`, thiếu tiền tố `/api/v1` |
-| [ ] | `GET /kernel/client-config`, `content.post_path_prefix` | ví dụ `/blog/` | `blog` (không có dấu `/`) |
-| [ ] | `CommentDetail.target_title` | — | chỉ có khi đích đang công khai; bình luận trên bài nháp chỉ có id (nên ghi rõ trong mô tả) |
+| [x] | `LastDelivery.status` (webhook) | `pending` / `delivered` / `failed` | `succeeded` thay cho `delivered` — **đã sửa mô tả** (16/11): giá trị đúng là `pending` / `succeeded` / `failed`, như `status` của lần gửi |
+| [x] | `POST /kernel/tenants`, header `Location` | đường dẫn đầy đủ | `/kernel/tenants/{id}`, thiếu tiền tố `/api/v1` — **core trả `/api/v1/kernel/tenants/{id}`** (16/11, test `tenant_admin.rs` giữ hành vi này; mọi 201 dùng chung một chỗ ghép tiền tố). Thấy thiếu tiền tố thì kiểm lớp giữa (proxy của web) có cắt `/api/v1` không |
+| [x] | `GET /kernel/client-config`, `content.post_path_prefix` | ví dụ `/blog/` | `blog` (không có dấu `/`) — **đã sửa mô tả** (16/11): giá trị là đoạn đầu của đường dẫn, không có `/`; `blog` cho `/blog/<slug>` |
+| [x] | `CommentDetail.target_title` | — | chỉ có khi đích đang công khai; bình luận trên bài nháp chỉ có id (nên ghi rõ trong mô tả) — **đã ghi rõ** (16/11) |
 
 ## Website bán hàng (`apps/storefront`, W-026 của web)
 

@@ -851,8 +851,8 @@
                 "type": "integer"
               },
               "post_path_prefix": {
-                "description": "Path prefix of posts on the website (`AUTOXIDE_CONTENT_POST_PATH_PREFIX`), e.g. `/blog/`.",
-                "example": "/blog/",
+                "description": "First segment of the address of every post (`AUTOXIDE_CONTENT_POST_PATH_PREFIX`), without\nslashes: `blog` gives posts at `/blog/<slug>`.",
+                "example": "blog",
                 "type": "string"
               }
             },
@@ -1250,7 +1250,7 @@
             "type": "string"
           },
           "target_title": {
-            "description": "Title of the target (e.g. the post's title), from the module that owns it; absent when\nthat kind has no lookup or the target is not public now.",
+            "description": "Title of the target (e.g. the post's title), from the module that owns it. Only given while\nthe target is public: for a draft, unpublished or deleted target (or a kind with no\nlookup) the field is absent and only `target_type` and `target_id` identify it.",
             "type": [
               "string",
               "null"
@@ -3084,7 +3084,7 @@
                 "type": "string"
               },
               "target_title": {
-                "description": "Title of the target (e.g. the post's title), from the module that owns it; absent when\nthat kind has no lookup or the target is not public now.",
+                "description": "Title of the target (e.g. the post's title), from the module that owns it. Only given while\nthe target is public: for a draft, unpublished or deleted target (or a kind with no\nlookup) the field is absent and only `target_type` and `target_id` identify it.",
                 "type": [
                   "string",
                   "null"
@@ -9763,8 +9763,8 @@
             ]
           },
           "status": {
-            "description": "`pending`, `delivered` or `failed`.",
-            "example": "delivered",
+            "description": "`pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up) — the same values\nas a delivery's `status`.",
+            "example": "succeeded",
             "type": "string"
           }
         },
@@ -11675,7 +11675,7 @@
                   "type": "string"
                 },
                 "target_title": {
-                  "description": "Title of the target (e.g. the post's title), from the module that owns it; absent when\nthat kind has no lookup or the target is not public now.",
+                  "description": "Title of the target (e.g. the post's title), from the module that owns it. Only given while\nthe target is public: for a draft, unpublished or deleted target (or a kind with no\nlookup) the field is absent and only `target_type` and `target_id` identify it.",
                   "type": [
                     "string",
                     "null"

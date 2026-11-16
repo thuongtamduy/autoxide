@@ -524,7 +524,7 @@ async fn endpoint_kem_lan_gui_moi_nhat_va_loc_trang_thai() {
         let busy = post("https://example.com/busy").await;
         let quiet = post("https://example.com/quiet").await;
         let now = chrono::Utc::now();
-        for (minutes, status, code) in [(10, "failed", Some(500)), (1, "delivered", Some(204))] {
+        for (minutes, status, code) in [(10, "failed", Some(500)), (1, "succeeded", Some(204))] {
             let row = delivery::Model {
                 tenant_id: app.default_tenant().id().as_uuid(),
                 id: Uuid::now_v7(),
@@ -555,11 +555,11 @@ async fn endpoint_kem_lan_gui_moi_nhat_va_loc_trang_thai() {
 
         let list = app.get("/api/v1/webhooks?order=asc").token("admin").send().await.unwrap();
         let rows = list.json()["data"].clone();
-        assert_eq!(rows[0]["last_delivery"]["status"], "delivered");
+        assert_eq!(rows[0]["last_delivery"]["status"], "succeeded");
         assert_eq!(rows[0]["last_delivery"]["response_status"], 204);
         assert!(rows[1]["last_delivery"].is_null(), "{rows}");
         let one = app.get(&format!("/api/v1/webhooks/{busy}")).token("admin").send().await.unwrap();
-        assert_eq!(one.json()["data"]["last_delivery"]["status"], "delivered");
+        assert_eq!(one.json()["data"]["last_delivery"]["status"], "succeeded");
 
         let active = app.get("/api/v1/webhooks?status=active").token("admin").send().await.unwrap();
         let ids: Vec<_> =

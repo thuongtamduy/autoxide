@@ -74,8 +74,9 @@ pub(crate) struct LastDelivery {
     id: Uuid,
     #[schema(example = "auth.user_created")]
     event_name: String,
-    /// `pending`, `delivered` or `failed`.
-    #[schema(example = "delivered")]
+    /// `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up) — the same values
+    /// as a delivery's `status`.
+    #[schema(example = "succeeded")]
     status: String,
     /// HTTP status the endpoint answered with, on the last attempt; `null` when it did not answer.
     response_status: Option<i32>,
