@@ -2412,6 +2412,41 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Get a move of a tenant to another placement (platform staff only): its `state` (`copying`, `copied`, `switched`, `done`, `aborted`), rows copied per table and the `error` that stopped the last run, if any.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which move to get.",
+        "properties": {
+          "move_id": {
+            "description": "Id of the move, from `kernel.move_tenant`.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "tenant": {
+            "description": "Id or slug of the tenant.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "move_id"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.get_tenant_move",
+      "output_schema": null,
+      "permissions": [
+        "kernel.tenants.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the current tenant's own domains, newest first, with their status (`pending`, `verified`, `failed`) and the DNS TXT record that verifies each.",
       "input_schema": {
         "additionalProperties": false,
@@ -2534,6 +2569,49 @@
       "output_schema": null,
       "permissions": [
         "kernel.tenants.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Move a tenant's data to another placement (database) (platform staff only). Dry run by default: returns what blocks the move and the rows that would be copied, changing nothing. With `dry_run: false` the tenant is unavailable (503) while a background job copies its data, switches it and deletes the old copy (unless `keep_source`); follow it with `kernel.get_tenant_move`. Calling again with the same `to` resumes a move that stopped.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which tenant to move, and where.",
+        "properties": {
+          "dry_run": {
+            "default": true,
+            "description": "Only report what the move would do, changing nothing. Defaults to `true`.",
+            "type": "boolean"
+          },
+          "keep_source": {
+            "description": "Keep the old copy of the data as a backup. Defaults to `false`.",
+            "type": "boolean"
+          },
+          "tenant": {
+            "description": "Id or slug of the tenant.",
+            "type": "string"
+          },
+          "to": {
+            "description": "Name of the placement (database) to move the data to.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.move_tenant",
+      "output_schema": null,
+      "permissions": [
+        "kernel.tenants.move"
       ]
     },
     {

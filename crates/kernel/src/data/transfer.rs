@@ -12,16 +12,21 @@
 //!   thời gian, chữ, số nguyên, boolean, byte, số thực), nên cách mỗi database lưu kiểu
 //!   đó không quan trọng.
 //! - Mọi thứ ghi trong MỘT transaction ở đích: hỏng giữa chừng thì đích vẫn trống.
+//!
+//! Dời một khách giữa hai placement (đặc tả 33 "Cấp phát và dời khách") dùng [`TenantTables`]:
+//! cùng cách đọc / ghi theo kiểu cột, nhưng chỉ dòng `tenant_id = X` của bảng cấp khách hàng (bỏ
+//! bảng mặt điều khiển), và bên gọi tự mở transaction ở đích.
 
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use futures_util::TryStreamExt as _;
-use sea_orm::sea_query::{Alias, Expr, Query, SimpleExpr, Value};
+use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query, SimpleExpr, Value};
 use sea_orm::{ConnectionTrait, DatabaseBackend, QueryResult, Statement, StreamTrait};
 use uuid::Uuid;
 
 use crate::database::Database;
+use crate::tenancy::TenantId;
 
 /// Số dòng mỗi câu `INSERT` (SQLite giới hạn số tham số mỗi câu).
 const BATCH_ROWS: usize = 100;
@@ -115,7 +120,7 @@ pub async fn copy_modules(
     }
     let mut copied = Vec::with_capacity(tables.len());
     for (table, from, to) in plans {
-        let rows = copy_table(&snapshot, &transaction, table, &from, &to).await?;
+        let rows = copy_table(&snapshot, &transaction, table, &from, &to, None).await?;
         tracing::info!(table, rows, "table copied");
         copied.push(CopiedTable { table: table.clone(), rows });
     }
@@ -234,6 +239,7 @@ async fn copy_table<S: ConnectionTrait + StreamTrait, C: ConnectionTrait>(
     table: &str,
     from: &[Column],
     to: &[Column],
+    tenant: Option<TenantId>,
 ) -> Result<u64, TransferError> {
     let target_kinds: HashMap<&str, Kind> =
         to.iter().map(|column| (column.name.as_str(), column.kind)).collect();
@@ -249,6 +255,9 @@ async fn copy_table<S: ConnectionTrait + StreamTrait, C: ConnectionTrait>(
     select.from(Alias::new(table));
     for column in from {
         select.column(Alias::new(&column.name));
+    }
+    if let Some(tenant) = tenant {
+        select.and_where(Expr::col(Alias::new(TENANT_COLUMN)).eq(tenant.as_uuid()));
     }
     let backend = ConnectionTrait::get_database_backend(source);
     let rows = source.stream_raw(backend.build(&select)).await?;
@@ -333,8 +342,19 @@ async fn insert<C: ConnectionTrait>(
 }
 
 async fn count<C: ConnectionTrait>(connection: &C, table: &str) -> Result<u64, TransferError> {
+    count_where(connection, table, None).await
+}
+
+async fn count_where<C: ConnectionTrait>(
+    connection: &C,
+    table: &str,
+    tenant: Option<TenantId>,
+) -> Result<u64, TransferError> {
     let mut select = Query::select();
     select.expr_as(Expr::cust("COUNT(*)"), Alias::new("rows")).from(Alias::new(table));
+    if let Some(tenant) = tenant {
+        select.and_where(Expr::col(Alias::new(TENANT_COLUMN)).eq(tenant.as_uuid()));
+    }
     let backend = connection.get_database_backend();
     let row = connection.query_one_raw(backend.build(&select)).await?;
     let rows: i64 = match row {
@@ -342,6 +362,217 @@ async fn count<C: ConnectionTrait>(connection: &C, table: &str) -> Result<u64, T
         None => 0,
     };
     u64::try_from(rows).map_err(|error| TransferError(error.to_string()))
+}
+
+/// Cột khách của bảng cấp khách hàng.
+const TENANT_COLUMN: &str = "tenant_id";
+
+/// Một bảng cấp khách hàng: cột ở nguồn và ở đích.
+#[derive(Debug, Clone)]
+struct TablePlan {
+    name: String,
+    from: Vec<Column>,
+    to: Vec<Column>,
+}
+
+/// Loại một bảng cấp khách hàng, nhận theo cột.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum TableKind {
+    /// Dữ liệu của module.
+    Data,
+    /// Hàng đợi job `<module>_jobs` (có `run_at`, `claimed_until`, `completed_at`).
+    Jobs,
+    /// Outbox `<module>_events` (có `next_attempt_at`, `claimed_until`, `delivered_at`).
+    Events,
+}
+
+impl TablePlan {
+    fn kind(&self) -> TableKind {
+        let has = |name: &str| self.from.iter().any(|column| column.name == name);
+        if has("claimed_until") && has("run_at") && has("completed_at") {
+            TableKind::Jobs
+        } else if has("claimed_until") && has("next_attempt_at") && has("delivered_at") {
+            TableKind::Events
+        } else {
+            TableKind::Data
+        }
+    }
+}
+
+/// Bảng cấp khách hàng của các module ở hai database cùng schema, theo thứ tự tạo bảng ở đích —
+/// để đếm, chép và xoá dòng của MỘT khách (dời khách giữa hai placement, đặc tả 33).
+///
+/// - Bỏ bảng `<module>_migrations` và bảng mặt điều khiển (chỉ database điều khiển có dữ liệu).
+/// - Mọi bảng còn lại phải có cột `tenant_id` (luật bảng cấp khách hàng, D-253); thiếu thì báo lỗi
+///   thay vì chép cả bảng.
+/// - Dòng của khách được đọc qua kết nối luôn thấy dữ liệu mới nhất ([`fresh`]): SQLite đọc qua
+///   pool đọc (không giữ kết nối ghi duy nhất của database chung), Postgres qua pool ghi (pool đọc
+///   có thể là read replica đang trễ).
+#[derive(Debug, Clone)]
+pub struct TenantTables {
+    tables: Vec<TablePlan>,
+}
+
+/// Kết nối thấy mọi thay đổi đã commit của `database` (xem [`TenantTables`]).
+fn fresh(database: &Database) -> &sea_orm::DatabaseConnection {
+    match database.backend() {
+        crate::config::DatabaseBackend::Sqlite => database.read(),
+        crate::config::DatabaseBackend::Postgres => database.write(),
+    }
+}
+
+impl TenantTables {
+    /// Bảng cấp khách hàng của `modules` (trừ `control_plane`) có ở `target`, kèm cột của chúng ở
+    /// `source` và `target`. Bảng thiếu ở nguồn hay thiếu cột: hai database chưa cùng schema.
+    pub async fn read(
+        source: &Database,
+        target: &Database,
+        modules: &[&str],
+        control_plane: &[&str],
+    ) -> Result<Self, TransferError> {
+        let keep = |table: &String| !control_plane.contains(&table.as_str());
+        let names: Vec<String> =
+            module_tables(target.write(), modules).await?.into_iter().filter(keep).collect();
+        let source_names = module_tables(source.write(), modules).await?;
+        let mut tables = Vec::with_capacity(names.len());
+        for name in names {
+            if !source_names.contains(&name) {
+                return Err(TransferError(format!(
+                    "table `{name}` exists in the target but not in the source: apply the same \
+                     migrations to both (`autoxide migrate up --all`)"
+                )));
+            }
+            let from = columns(source.write(), &name).await?;
+            let to = columns(target.write(), &name).await?;
+            if !from.iter().any(|column| column.name == TENANT_COLUMN) {
+                return Err(TransferError(format!(
+                    "table `{name}` has no `{TENANT_COLUMN}` column: tenant-level tables carry it; \
+                     a table shared by the whole platform is declared in \
+                     `Module::control_plane_tables`"
+                )));
+            }
+            tables.push(TablePlan { name, from, to });
+        }
+        Ok(TenantTables { tables })
+    }
+
+    /// Tên bảng, theo thứ tự tạo.
+    pub fn names(&self) -> Vec<&str> {
+        self.tables.iter().map(|table| table.name.as_str()).collect()
+    }
+
+    /// Loại của bảng `name` (bảng không có trong danh sách: [`TableKind::Data`]).
+    pub fn kind(&self, name: &str) -> TableKind {
+        self.tables.iter().find(|table| table.name == name).map_or(TableKind::Data, TablePlan::kind)
+    }
+
+    /// Hàng đợi job và outbox trong các bảng, kèm loại.
+    pub fn queues(&self) -> Vec<(&str, TableKind)> {
+        self.tables
+            .iter()
+            .map(|table| (table.name.as_str(), table.kind()))
+            .filter(|(_, kind)| *kind != TableKind::Data)
+            .collect()
+    }
+
+    /// Số dòng của khách `tenant` trong từng bảng của `database`, theo thứ tự tạo.
+    pub async fn count(
+        &self,
+        database: &Database,
+        tenant: TenantId,
+    ) -> Result<Vec<CopiedTable>, TransferError> {
+        let connection = fresh(database);
+        let mut counts = Vec::with_capacity(self.tables.len());
+        for table in &self.tables {
+            let rows = count_where(connection, &table.name, Some(tenant)).await?;
+            counts.push(CopiedTable { table: table.name.clone(), rows });
+        }
+        Ok(counts)
+    }
+
+    /// Xoá dòng của khách `tenant` trong mọi bảng có tên thoả `only`, qua `connection` (thường
+    /// là transaction của bên gọi): bảng tham chiếu trước bảng được tham chiếu (ngược thứ tự tạo).
+    /// Trả số dòng đã xoá.
+    pub async fn delete<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        tenant: TenantId,
+        only: impl Fn(&str) -> bool,
+    ) -> Result<u64, TransferError> {
+        let mut deleted = 0;
+        for table in self.tables.iter().rev().filter(|table| only(&table.name)) {
+            let mut delete = Query::delete();
+            delete
+                .from_table(Alias::new(table.name.as_str()))
+                .and_where(Expr::col(Alias::new(TENANT_COLUMN)).eq(tenant.as_uuid()));
+            deleted += connection.execute(&delete).await?.rows_affected();
+        }
+        Ok(deleted)
+    }
+
+    /// Chép dòng của khách `tenant` từ `source` vào `target` (transaction ở database đích của bên
+    /// gọi): xoá dòng của khách đang có ở đích trước (lần chép trước bị ngắt, bản giữ lại của lần
+    /// dời trước), rồi chép từng bảng theo thứ tự tạo. Trả số dòng đã chép mỗi bảng.
+    pub async fn copy<C: ConnectionTrait>(
+        &self,
+        source: &Database,
+        target: &C,
+        tenant: TenantId,
+    ) -> Result<Vec<CopiedTable>, TransferError> {
+        self.delete(target, tenant, |_| true).await?;
+        let connection = fresh(source);
+        let mut copied = Vec::with_capacity(self.tables.len());
+        for table in &self.tables {
+            let rows =
+                copy_table(connection, target, &table.name, &table.from, &table.to, Some(tenant))
+                    .await?;
+            tracing::info!(table = %table.name, rows, tenant_id = %tenant, "tenant rows copied");
+            copied.push(CopiedTable { table: table.name.clone(), rows });
+        }
+        Ok(copied)
+    }
+}
+
+/// `a` và `b` là cùng một database không (hai placement trỏ tới cùng một chỗ): SQLite so file,
+/// Postgres so tên database, schema và lúc máy chủ khởi động (`pg_postmaster_start_time`, khác
+/// nhau giữa hai máy chủ dù cùng tên database). Dời khách giữa hai "database" thật ra là một sẽ
+/// xoá mất dữ liệu ở bước dọn nguồn — bên gọi phải từ chối.
+pub async fn same_database(a: &Database, b: &Database) -> Result<bool, TransferError> {
+    if a.backend() != b.backend() {
+        return Ok(false);
+    }
+    Ok(identity(a).await? == identity(b).await?)
+}
+
+async fn identity(database: &Database) -> Result<String, TransferError> {
+    let connection = database.write();
+    let backend = connection.get_database_backend();
+    let sql = match backend {
+        DatabaseBackend::Sqlite => {
+            "SELECT file AS id FROM pragma_database_list WHERE name = 'main'"
+        }
+        DatabaseBackend::Postgres => {
+            "SELECT current_database()::text || '/' || current_schema()::text || '/' || \
+             pg_postmaster_start_time()::text AS id"
+        }
+        other => return Err(TransferError(format!("unsupported database {other:?}"))),
+    };
+    let row = connection.query_one_raw(Statement::from_string(backend, sql)).await?;
+    let id: String = match row {
+        Some(row) => row.try_get::<Option<String>>("", "id")?.unwrap_or_default(),
+        None => String::new(),
+    };
+    if backend == DatabaseBackend::Sqlite {
+        // Database trong bộ nhớ (không file): mỗi kết nối một database riêng.
+        if id.is_empty() {
+            return Ok(uuid::Uuid::now_v7().to_string());
+        }
+        return Ok(
+            std::fs::canonicalize(&id).map_or(id, |path| path.to_string_lossy().into_owned())
+        );
+    }
+    Ok(id)
 }
 
 #[cfg(test)]

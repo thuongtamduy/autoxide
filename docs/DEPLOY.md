@@ -400,6 +400,73 @@ tenant. When another proxy in front rewrites `Host`, it must send the visitor's 
 certificate. Verifying, removing a domain or suspending its tenant reaches every server within
 `AUTOXIDE_TENANCY_CACHE_SECONDS` (default `10`).
 
+## Moving a tenant to another database
+
+With several tenants, each tenant's data lives on a *placement*: `main` (the database of
+`DATABASE_URL`, shared by many tenants) or another database added with `autoxide placement add`.
+Move a tenant to give a growing customer a database of its own, or to bring it back:
+
+1. Add the target and apply the migrations to it:
+
+   ```bash
+   printf '%s' 'postgres://autoxide:<password>@db2.example.com:5432/acme' \
+     | autoxide placement add acme-db --kind dedicated --url -
+   autoxide migrate up --all
+   ```
+
+2. Try it first. A dry run changes nothing:
+
+   ```bash
+   autoxide tenant move acme --to acme-db --dry-run
+   ```
+
+   It lists the rows of the tenant that would be copied, per table, and everything that blocks
+   the move: migrations not applied on one side, a target that is the same database as the
+   source, a tenant that is not active, another move of the tenant. The platform tenant
+   (`default`) always stays on `main`.
+
+3. Move, in a maintenance window:
+
+   ```bash
+   autoxide tenant move acme --to acme-db
+   ```
+
+   From the start, the tenant answers `503 tenant_maintenance` with `Retry-After`; other tenants
+   are not affected. The command waits until every server has seen the move
+   (`AUTOXIDE_TENANCY_CACHE_SECONDS`) and requests in progress are done
+   (`AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`), and until jobs and events of the tenant already
+   being run have finished. Then it copies every row of the tenant, queued jobs and undelivered
+   events included, in one transaction; compares the row counts of every table; switches the
+   tenant to the new placement (it works again from there); and deletes the old copy. SQLite and
+   PostgreSQL can be mixed in either direction. Files are not copied: they stay where they are
+   (local disk or S3, shared by every placement, under `tenants/<id>/`).
+
+`--keep-source` keeps the old copy as a backup instead of deleting it (its queued jobs and events
+are deleted, so nothing runs twice). Nothing uses it; delete it once you are satisfied:
+
+```bash
+autoxide tenant purge-copy acme --placement main
+```
+
+Over the API, platform staff with `kernel.tenants.move` call
+`POST /api/v1/kernel/tenants/{id}/move` with `{"to": "acme-db"}`: that is a dry run. Add
+`"dry_run": false` to start the move as a background job, and follow it at the `Location` of the
+answer (`GET /api/v1/kernel/tenants/{id}/moves/{move_id}`); the MCP tool is `kernel.move_tenant`.
+A job may run for about four minutes: move large tenants (the dry run shows the row count) with
+the command, which has no time limit.
+
+**When a move stops half-way** (the process dies, a database cannot be reached, row counts
+differ), nothing is lost. Before the switch the tenant keeps answering `503` on its old placement;
+after it, the tenant works from the new placement and only the old copy waits to be deleted.
+
+- Run the same `autoxide tenant move acme --to acme-db` again: it resumes where it stopped
+  (before the switch it deletes the rows it had copied to the target and copies again).
+- Or, before the switch, give up: `autoxide tenant move acme --abort` deletes what was copied and
+  makes the tenant active again on its old placement.
+- `GET /api/v1/kernel/tenants/{id}/moves/{move_id}` shows the `state` of the move and the `error`
+  that stopped it. A move started over the API is retried by its job; starting another run while
+  one is running answers `tenant_move_running`.
+
 ## Running several servers
 
 With PostgreSQL, run as many `app` processes as you need behind the reverse proxy: they

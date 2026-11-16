@@ -397,6 +397,69 @@ cũng bị tính vào rate limiting theo địa chỉ như mọi endpoint khác;
 chứng chỉ mới. Xác minh, gỡ tên miền hay tạm khoá khách có hiệu lực trên mọi máy chủ sau tối đa
 `AUTOXIDE_TENANCY_CACHE_SECONDS` giây (mặc định `10`).
 
+## Dời khách hàng sang database khác
+
+Khi chạy nhiều khách hàng, dữ liệu của mỗi khách nằm ở một *placement* (vị trí dữ liệu): `main`
+(database của `DATABASE_URL`, nhiều khách dùng chung) hay một database khác thêm bằng
+`autoxide placement add`. Dời khách để cho một khách đang lớn database riêng, hay đưa khách về lại:
+
+1. Thêm database đích và áp dụng migration cho nó:
+
+   ```bash
+   printf '%s' 'postgres://autoxide:<password>@db2.example.com:5432/acme' \
+     | autoxide placement add acme-db --kind dedicated --url -
+   autoxide migrate up --all
+   ```
+
+2. Thử trước. Chạy thử (dry run) không đổi gì:
+
+   ```bash
+   autoxide tenant move acme --to acme-db --dry-run
+   ```
+
+   Lệnh liệt kê số dòng của khách sẽ được chép theo từng bảng, và mọi thứ đang chặn việc dời: một
+   bên còn migration chưa áp dụng, đích là cùng database với nguồn, khách không ở trạng thái hoạt
+   động, khách đang có một lượt dời khác. Khách nền tảng (`default`) luôn ở `main`.
+
+3. Dời, trong một khoảng bảo trì:
+
+   ```bash
+   autoxide tenant move acme --to acme-db
+   ```
+
+   Ngay từ đầu, khách trả `503 tenant_maintenance` kèm `Retry-After`; khách khác không bị ảnh
+   hưởng. Lệnh chờ tới khi mọi máy chủ đã thấy việc dời (`AUTOXIDE_TENANCY_CACHE_SECONDS`) và
+   request đang chạy đã xong (`AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`), và tới khi job và event của
+   khách đang được chạy đã xong. Rồi lệnh chép mọi dòng của khách, kể cả job đang chờ và event chưa
+   giao, trong một transaction; so số dòng của từng bảng; chuyển khách sang placement mới (khách
+   chạy lại từ đó); và xoá bản cũ. SQLite và PostgreSQL trộn được theo cả hai chiều. File không được
+   chép: chúng ở nguyên chỗ cũ (ổ đĩa hay S3, mọi placement dùng chung, dưới `tenants/<id>/`).
+
+`--keep-source` giữ bản cũ làm bản dự phòng thay vì xoá (job đang chờ và event của bản cũ bị xoá,
+để không gì chạy hai lần). Không gì dùng bản đó; xoá nó khi đã yên tâm:
+
+```bash
+autoxide tenant purge-copy acme --placement main
+```
+
+Qua API, nhân sự nền tảng có `kernel.tenants.move` gọi `POST /api/v1/kernel/tenants/{id}/move`
+với `{"to": "acme-db"}`: đó là chạy thử. Thêm `"dry_run": false` để bắt đầu dời bằng một job nền, và
+theo dõi ở `Location` của câu trả lời (`GET /api/v1/kernel/tenants/{id}/moves/{move_id}`); tool MCP
+là `kernel.move_tenant`. Một job chạy được khoảng bốn phút: khách lớn (chạy thử cho biết số dòng)
+thì dời bằng lệnh, lệnh không giới hạn thời gian.
+
+**Khi việc dời dừng giữa chừng** (tiến trình chết, không kết nối được database, số dòng không
+khớp), không mất gì. Trước bước chuyển, khách vẫn trả `503` ở placement cũ; sau bước chuyển, khách
+chạy từ placement mới và chỉ còn bản cũ chờ xoá.
+
+- Chạy lại đúng lệnh `autoxide tenant move acme --to acme-db`: lệnh chạy tiếp từ chỗ dừng (trước
+  bước chuyển thì xoá các dòng đã chép sang đích rồi chép lại).
+- Hoặc, trước bước chuyển, bỏ cuộc: `autoxide tenant move acme --abort` xoá những gì đã chép và cho
+  khách hoạt động lại ở placement cũ.
+- `GET /api/v1/kernel/tenants/{id}/moves/{move_id}` cho biết `state` của lượt dời và `error` đã làm
+  nó dừng. Lượt dời bắt đầu qua API được job của nó thử lại; bắt đầu một lượt khác khi một lượt
+  đang chạy thì nhận `tenant_move_running`.
+
 ## Chạy nhiều máy chủ
 
 Với PostgreSQL, chạy bao nhiêu tiến trình `app` cũng được sau reverse proxy: chúng chỉ

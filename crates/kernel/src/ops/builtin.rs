@@ -50,6 +50,13 @@ pub(crate) struct KernelModule {
     dns: crate::tenancy::domains::DnsSlot,
     /// Service tên miền riêng của khách; có sau `start`.
     domains: Option<Arc<crate::tenancy::TenantDomains>>,
+    /// Thứ việc dời khách cần từ mọi module (điền sau khi mọi module khởi động).
+    move_setup: crate::tenancy::moves::MoveSetup,
+    /// Service dời khách giữa các placement; có sau `start`.
+    moves: Option<Arc<crate::tenancy::TenantMoves>>,
+    /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` (đọc ở cấu hình kernel): dời khách chờ request đang
+    /// chạy xong trong chừng này.
+    request_timeout: std::time::Duration,
     /// Bản dịch của mọi module (dịch mô tả permission, event trong sổ module); có sau `start`.
     translations: crate::i18n::Translations,
 }
@@ -61,12 +68,15 @@ impl KernelModule {
         flags: user_flags::Handle,
         keys: crate::secret::KeyConfig,
         tenant_settings: crate::tenancy::settings::Catalog,
-        seeds: crate::tenancy::admin::Seeds,
-        dns: crate::tenancy::domains::DnsSlot,
+        slots: crate::tenancy::Slots,
     ) -> Self {
+        let crate::tenancy::Slots { seeds, dns, moves: move_setup } = slots;
         KernelModule {
             dns,
             domains: None,
+            move_setup,
+            moves: None,
+            request_timeout: std::time::Duration::from_secs(30),
             keys,
             tenant_settings,
             settings: None,
@@ -118,12 +128,20 @@ impl Module for KernelModule {
                 "m0010_tenancy_jobs",
                 vec![crate::job::tenant_table(NAME)],
             ),
+            // Lượt dời khách giữa các placement (mặt điều khiển).
+            Box::new(crate::tenancy::moves::CreateTenantMoves),
         ]
     }
 
     fn control_plane_tables(&self) -> Vec<&'static str> {
         // Khoá ký gốc của bản cài và sổ khách / vị trí dữ liệu / tên miền (D-253).
-        vec!["kernel_secrets", "kernel_tenants", "kernel_placements", "kernel_tenant_domains"]
+        vec![
+            "kernel_secrets",
+            "kernel_tenants",
+            "kernel_placements",
+            "kernel_tenant_domains",
+            "kernel_tenant_moves",
+        ]
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
@@ -141,6 +159,9 @@ impl Module for KernelModule {
         let previous = crate::secret::read_previous(reader);
         let public_url = crate::public_url::read_setting(reader);
         let max_flags = user_flags::read_setting(reader);
+        if let Some(seconds) = request_timeout(reader) {
+            self.request_timeout = std::time::Duration::from_secs(seconds);
+        }
         self.keys.set(secret?, previous?);
         self.public_url = public_url?;
         self.max_flags = max_flags?;
@@ -156,6 +177,7 @@ impl Module for KernelModule {
             crate::tenancy::TENANTS_MANAGE,
             crate::tenancy::PLACEMENTS_READ,
             crate::tenancy::DOMAINS_MANAGE,
+            crate::tenancy::TENANTS_MOVE,
         ]
     }
 
@@ -167,6 +189,7 @@ impl Module for KernelModule {
             crate::tenancy::domains::DOMAIN_ADDED,
             crate::tenancy::domains::DOMAIN_VERIFIED,
             crate::tenancy::domains::DOMAIN_REVOKED,
+            crate::tenancy::moves::TENANT_MOVED,
         ]
     }
 
@@ -186,6 +209,9 @@ impl Module for KernelModule {
         }
         if let Some(domains) = &self.domains {
             routes = routes.merge(crate::tenancy::domains::routes(domains.clone()));
+        }
+        if let Some(moves) = &self.moves {
+            routes = routes.merge(crate::tenancy::moves::routes(moves.clone()));
         }
         routes
     }
@@ -216,16 +242,27 @@ impl Module for KernelModule {
         if let Some(domains) = &self.domains {
             tools.extend(crate::tenancy::domains::tools(domains.clone()));
         }
+        if let Some(moves) = &self.moves {
+            tools.extend(crate::tenancy::moves::tools(moves.clone()));
+        }
         tools
     }
 
     fn jobs(&self) -> Vec<crate::job::JobRegistration> {
-        self.domains.as_ref().map_or_else(Vec::new, |domains| {
-            vec![crate::job::JobRegistration::new(
+        let mut jobs = Vec::new();
+        if let Some(domains) = &self.domains {
+            jobs.push(crate::job::JobRegistration::new(
                 crate::tenancy::domains::VERIFY_DOMAINS,
                 Arc::new(crate::tenancy::domains::VerifyDomains(domains.clone())),
-            )]
-        })
+            ));
+        }
+        if let Some(moves) = &self.moves {
+            jobs.push(crate::job::JobRegistration::new(
+                crate::tenancy::moves::MOVE_TENANT,
+                Arc::new(crate::tenancy::moves::MoveTenantRunner(moves.clone())),
+            ));
+        }
+        jobs
     }
 
     fn schedules(&self) -> Vec<crate::job::Schedule> {
@@ -268,6 +305,16 @@ impl Module for KernelModule {
         ));
         self.domains = Some(domains.clone());
         context.provide::<crate::tenancy::TenantDomains>(domains)?;
+        let moves = Arc::new(crate::tenancy::TenantMoves::new(
+            context.tenancy().clone(),
+            self.move_setup.clone(),
+            context.outbox()?,
+            context.jobs(),
+            self.request_timeout,
+            context.translations().clone(),
+        ));
+        self.moves = Some(moves.clone());
+        context.provide::<crate::tenancy::TenantMoves>(moves)?;
         context.provide::<dyn crate::tenancy::TenantSettings>(settings)?;
         context.provide::<SecretKey>(Arc::new(key))?;
         context.provide::<PublicUrl>(Arc::new(self.public_url.clone()))
@@ -310,6 +357,15 @@ impl MigrationTrait for CreateSecrets {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.drop_table(Table::drop().table("kernel_secrets").to_owned()).await
     }
+}
+
+/// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` mà cấu hình kernel (đọc trước module) đã đọc.
+fn request_timeout(reader: &ConfigReader<'_>) -> Option<u64> {
+    reader
+        .values()
+        .iter()
+        .find(|value| value.setting.name == "AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS")
+        .and_then(|value| value.display_value().trim().parse().ok())
 }
 
 /// Cấu hình kernel (đọc trước module) đặt `AUTOXIDE_TENANCY_MODE=multi`.

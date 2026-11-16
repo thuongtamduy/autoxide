@@ -2517,6 +2517,62 @@ export type Data_TenantDomain = {
 };
 
 /** Envelope of a single result. */
+export type Data_TenantMove = {
+  /** A move of a tenant to another placement. */
+  data: {
+    created_at: string;
+    /** Why the last run stopped, when it did; running the move again resumes it. */
+    error?: string | null;
+    finished_at?: string | null;
+    from: string;
+    id: string;
+    keep_source: boolean;
+    /** Sum of `tables[].rows`. */
+    rows: number;
+    /**
+     * `copying` (the tenant answers `503`), `copied`, `switched` (the tenant works from `to`;
+     * the old placement is being cleaned), `done` or `aborted`.
+     */
+    state: string;
+    /** Rows copied per table (after `copied`). */
+    tables: TenantTableRows[];
+    tenant_id: string;
+    to: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_TenantMovePlan = {
+  /** What a move would do (dry run). Nothing is changed. */
+  data: {
+    /** What must be fixed first; empty when the move can run. */
+    blocking: TenantMoveBlocker[];
+    /** Placement that keeps the tenant's data now. */
+    from: string;
+    keep_source: boolean;
+    /** `true` when nothing blocks the move (`blocking` is empty). */
+    ready: boolean;
+    /** An interrupted move to `to` that a real run resumes. */
+    resumes?: string | null;
+    /** Sum of `tables[].rows`. */
+    rows: number;
+    /**
+     * Seconds the tenant answers `503 tenant_maintenance` before copying starts (other servers
+     * see the move and requests in progress finish); copying takes longer for many rows.
+     */
+    settle_seconds: number;
+    /** Rows of the tenant that would be copied, per table, in copy order. */
+    tables: TenantTableRows[];
+    /** Slug of the tenant. */
+    tenant: string;
+    tenant_id: string;
+    /** Placement the data would move to. */
+    to: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_TenantSettingState = {
   /** A setting the installed modules take per tenant, and its state in the current tenant. */
   data: {
@@ -6269,6 +6325,79 @@ export type TenantDomainRecord = {
   value: string;
 };
 
+/** A move of a tenant to another placement. */
+export type TenantMove = {
+  created_at: string;
+  /** Why the last run stopped, when it did; running the move again resumes it. */
+  error?: string | null;
+  finished_at?: string | null;
+  from: string;
+  id: string;
+  keep_source: boolean;
+  /** Sum of `tables[].rows`. */
+  rows: number;
+  /**
+   * `copying` (the tenant answers `503`), `copied`, `switched` (the tenant works from `to`;
+   * the old placement is being cleaned), `done` or `aborted`.
+   */
+  state: string;
+  /** Rows copied per table (after `copied`). */
+  tables: TenantTableRows[];
+  tenant_id: string;
+  to: string;
+  updated_at: string;
+};
+
+/** Why the move cannot run now. */
+export type TenantMoveBlocker = {
+  /** Stable code, the same as the error a real run would answer. */
+  code: string;
+  message: string;
+};
+
+/** What a move would do (dry run). Nothing is changed. */
+export type TenantMovePlan = {
+  /** What must be fixed first; empty when the move can run. */
+  blocking: TenantMoveBlocker[];
+  /** Placement that keeps the tenant's data now. */
+  from: string;
+  keep_source: boolean;
+  /** `true` when nothing blocks the move (`blocking` is empty). */
+  ready: boolean;
+  /** An interrupted move to `to` that a real run resumes. */
+  resumes?: string | null;
+  /** Sum of `tables[].rows`. */
+  rows: number;
+  /**
+   * Seconds the tenant answers `503 tenant_maintenance` before copying starts (other servers
+   * see the move and requests in progress finish); copying takes longer for many rows.
+   */
+  settle_seconds: number;
+  /** Rows of the tenant that would be copied, per table, in copy order. */
+  tables: TenantTableRows[];
+  /** Slug of the tenant. */
+  tenant: string;
+  tenant_id: string;
+  /** Placement the data would move to. */
+  to: string;
+};
+
+/** Where to move the tenant's data. */
+export type TenantMoveRequest = {
+  /**
+   * Only report what the move would do, changing nothing. Defaults to `true`: send `false` to
+   * move.
+   */
+  dry_run?: boolean;
+  /**
+   * Keep the tenant's data at the old placement as a backup copy (its queued jobs and events
+   * are removed there so nothing runs twice). Defaults to `false`: the old copy is deleted.
+   */
+  keep_source?: boolean;
+  /** Name of the placement (database) to move the data to. */
+  to: string;
+};
+
 /** A setting the installed modules take per tenant, and its state in the current tenant. */
 export type TenantSettingState = {
   description: string;
@@ -6287,6 +6416,12 @@ export type TenantSettingState = {
 export type TenantSettingValue = {
   /** 1 to 4000 characters. Secret values are stored encrypted and never returned. */
   value: string;
+};
+
+/** Rows of the tenant in one table. */
+export type TenantTableRows = {
+  rows: number;
+  table: string;
 };
 
 /** The name of a term in one language, and its parent. Omitted fields stay as they are. */
@@ -9053,6 +9188,37 @@ export interface paths {
         404: Problem;
         412: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/move": {
+    /** Move a tenant to another placement. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: TenantMoveRequest;
+      responses: {
+        200: Data_TenantMovePlan;
+        201: Data_TenantMove;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/moves/{move_id}": {
+    /** Get a move of a tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string; move_id: string }; };
+      responses: {
+        200: Data_TenantMove;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

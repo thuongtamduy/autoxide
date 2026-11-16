@@ -30,7 +30,7 @@ use super::{
 };
 use crate::database::Database;
 use crate::error::Error;
-use crate::tenancy::{DatabaseRegistry, NO_TENANT, PlacementId, TenantId};
+use crate::tenancy::{DatabaseRegistry, NO_TENANT, PlacementId, TenantId, TenantStatus};
 
 /// Số lần chạy tối đa mặc định của một job.
 pub const DEFAULT_MAX_ATTEMPTS: i32 = 10;
@@ -100,11 +100,11 @@ impl Worker {
         self.cleanup(&databases).await?;
         let mut running = JoinSet::new();
         let mut ran = 0;
-        for (_, _, database) in &databases {
+        for (placement, _, database) in &databases {
             for module in &self.modules {
                 for job in self.claim(database, module, self.concurrency).await? {
                     ran += 1;
-                    running.spawn(self.job_task(database, module, job, None));
+                    running.spawn(self.job_task(*placement, database, module, job, None));
                 }
             }
         }
@@ -168,7 +168,7 @@ impl Worker {
         self.enqueue_schedules(&databases).await?;
         self.cleanup(&databases).await?;
         let mut claimed = 0;
-        for (_, _, database) in &databases {
+        for (placement, _, database) in &databases {
             for module in &self.modules {
                 let Some(slots) = slots.get(module) else { continue };
                 let free = u64::try_from(slots.available_permits()).unwrap_or(0);
@@ -179,7 +179,7 @@ impl Worker {
                     // Còn chỗ (vừa đếm, và chỉ vòng này lấy chỗ): `try_acquire` không hụt.
                     let Ok(permit) = Arc::clone(slots).try_acquire_owned() else { break };
                     claimed += 1;
-                    running.spawn(self.job_task(database, module, job, Some(permit)));
+                    running.spawn(self.job_task(*placement, database, module, job, Some(permit)));
                 }
             }
         }
@@ -231,9 +231,11 @@ impl Worker {
         Ok(claimed)
     }
 
-    /// Task chạy `job` của `module`; giữ `permit` (chỗ của module) tới khi xong.
+    /// Task chạy `job` của `module` trên `database` (placement `placement`); giữ `permit` (chỗ của
+    /// module) tới khi xong.
     fn job_task(
         &self,
+        placement: PlacementId,
         database: &Database,
         module: &str,
         job: ClaimedJob,
@@ -244,7 +246,7 @@ impl Worker {
         let handlers = Arc::clone(&self.handlers);
         let (table, worker) = (table_name(module), self.id.clone());
         async move {
-            let run = run_job(&database, &registry, &handlers, &table, &worker, job);
+            let run = run_job(placement, &database, &registry, &handlers, &table, &worker, job);
             if let Err(error) = run.await {
                 tracing::error!(error = %error, "cannot record a job result");
             }
@@ -441,7 +443,12 @@ fn log_task(result: Result<(), tokio::task::JoinError>) {
 }
 
 /// Chạy một job đã claim và ghi kết quả.
+///
+/// Khách đang dời sang placement khác (`moving`): trả job về hàng đợi, không tính lần chạy — dữ liệu
+/// của khách đang được chép, job chạy ở đích sau khi dời xong. Khách đã ở placement khác: dòng job
+/// này là bản sao còn sót ở nguồn (dời với `keep_source`) — không chạy, đánh dấu hỏng hẳn.
 async fn run_job(
+    placement: PlacementId,
     database: &Database,
     registry: &DatabaseRegistry,
     handlers: &HashMap<&'static str, Arc<dyn JobHandler>>,
@@ -455,6 +462,14 @@ async fn run_job(
     } else {
         registry.tenant(job.tenant).await.map(Some).map_err(|error| describe(&error))
     };
+    if let Ok(Some(tenant)) = &tenant {
+        if tenant.status() == TenantStatus::Moving {
+            return put_back(database, table, worker, &job).await;
+        }
+        if tenant.placement() != placement {
+            return left_over(database, table, worker, &job, tenant.placement()).await;
+        }
+    }
     let outcome = match (handlers.get(job.kind.as_str()), tenant) {
         (None, _) => Err(format!("no handler is registered for job kind `{}`", job.kind)),
         (_, Err(error)) => Err(format!("tenant `{}`: {error}", job.tenant)),
@@ -527,6 +542,56 @@ async fn run_job(
         }
     }
     database.write().execute(&update).await?;
+    Ok(())
+}
+
+/// Khách đang dời: chờ sau chừng này rồi mới nhận lại job của khách.
+const MOVING_DELAY: chrono::Duration = chrono::Duration::seconds(30);
+
+/// Trả job vừa claim về hàng đợi (khách đang dời), không tính lần chạy này.
+async fn put_back(
+    database: &Database,
+    table: &str,
+    worker: &str,
+    job: &ClaimedJob,
+) -> Result<(), Error> {
+    let mut update = Query::update();
+    update
+        .table(Alias::new(table))
+        .value(Alias::new("claimed_by"), Option::<String>::None)
+        .value(Alias::new("claimed_until"), Option::<DateTime<Utc>>::None)
+        .value(Alias::new("attempts"), Expr::col(Alias::new("attempts")).sub(1))
+        .value(Alias::new("run_at"), now() + MOVING_DELAY)
+        .and_where(Expr::col(Alias::new("id")).eq(job.id))
+        .and_where(Expr::col(Alias::new("claimed_by")).eq(worker));
+    database.write().execute(&update).await?;
+    tracing::debug!(job_id = %job.id, tenant_id = %job.tenant, "tenant is moving; job put back");
+    Ok(())
+}
+
+/// Job của khách đã dời sang placement khác: bản sao còn sót ở nguồn, không chạy.
+async fn left_over(
+    database: &Database,
+    table: &str,
+    worker: &str,
+    job: &ClaimedJob,
+    now_at: PlacementId,
+) -> Result<(), Error> {
+    let message = format!(
+        "the tenant's data moved to placement {now_at}; this job is a left-over copy at the old \
+         placement and is not run"
+    );
+    let mut update = Query::update();
+    update
+        .table(Alias::new(table))
+        .value(Alias::new("claimed_by"), Option::<String>::None)
+        .value(Alias::new("claimed_until"), Option::<DateTime<Utc>>::None)
+        .value(Alias::new("failed_at"), now())
+        .value(Alias::new("last_error"), message)
+        .and_where(Expr::col(Alias::new("id")).eq(job.id))
+        .and_where(Expr::col(Alias::new("claimed_by")).eq(worker));
+    database.write().execute(&update).await?;
+    tracing::warn!(job_id = %job.id, tenant_id = %job.tenant, "left-over job of a moved tenant not run");
     Ok(())
 }
 

@@ -86,7 +86,7 @@ một người làm tuần tự. Mọi mục chạy và có test trên cả SQLi
       `resolve_many`, `children` và cache menu công khai của `menus` theo khách (D-238)
 - [x] Mọi truy vấn của service lọc theo khách qua một công cụ của kernel; testkit có bài **rò rỉ
       giữa khách** chạy cho mọi module (ghi ở khách A, đọc bằng người của khách B: không thấy gì)
-- [ ] Job, event, outbox, lịch chạy theo từng database; worker và bộ phát event duyệt mọi database
+- [x] Job, event, outbox, lịch chạy theo từng database; worker và bộ phát event duyệt mọi database
       được giao; `autoxide migrate up --all` cho cả đội database; dời một khách `shared` ↔ `dedicated`
       bằng chép dữ liệu (mở rộng `autoxide copy`)
 - [ ] Đo đường nóng trước và sau (`scripts/loadtest.sh`); hướng dẫn viết module (EN + VI) có quy

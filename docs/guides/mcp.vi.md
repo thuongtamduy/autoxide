@@ -122,10 +122,12 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `kernel.current_tenant` | — | read-only |
 | `kernel.get_module` | `kernel.modules.read` | read-only |
 | `kernel.get_tenant` | `kernel.tenants.read` | read-only |
+| `kernel.get_tenant_move` | `kernel.tenants.read` | read-only |
 | `kernel.list_domains` | `kernel.domains.manage` | read-only |
 | `kernel.list_modules` | `kernel.modules.read` | read-only |
 | `kernel.list_settings` | `kernel.settings.manage` | read-only |
 | `kernel.list_tenants` | `kernel.tenants.read` | read-only |
+| `kernel.move_tenant` | `kernel.tenants.move` | destructive |
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |
 | `media.get` | `media.read` | read-only |
 | `media.list` | `media.read` | read-only |

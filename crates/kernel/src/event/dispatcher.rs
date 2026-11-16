@@ -25,7 +25,7 @@ use uuid::Uuid;
 use super::{Actor, Delivered, Subscription, table_name};
 use crate::database::Database;
 use crate::error::Error;
-use crate::tenancy::{DatabaseRegistry, PlacementId, TenantId};
+use crate::tenancy::{DatabaseRegistry, PlacementId, TenantId, TenantStatus};
 
 /// Số lần giao tối đa của một event; quá thì đánh dấu hỏng (`failed_at`) — trừ event xoá
 /// tài khoản ([`USER_DELETED`](crate::privacy::USER_DELETED)), thử lại mãi.
@@ -80,9 +80,9 @@ impl Dispatcher {
         let databases = self.databases.databases().await?;
         self.cleanup(&databases).await?;
         let mut handled = 0;
-        for (_, _, database) in &databases {
+        for (placement, _, database) in &databases {
             for module in &self.modules {
-                handled += self.run_table(database, module).await?;
+                handled += self.run_table(*placement, database, module).await?;
             }
         }
         Ok(handled)
@@ -134,7 +134,16 @@ impl Dispatcher {
         Ok(())
     }
 
-    async fn run_table(&self, database: &Database, module: &'static str) -> Result<usize, Error> {
+    /// Giao event chờ trong bảng event của `module` ở `database` (placement `placement`).
+    ///
+    /// Khách đang dời (`moving`): hẹn event lại sau, không tính lần giao — event đi theo dữ liệu
+    /// sang đích. Khách đã ở placement khác: dòng này là bản sao còn sót ở nguồn, không giao.
+    async fn run_table(
+        &self,
+        placement: PlacementId,
+        database: &Database,
+        module: &'static str,
+    ) -> Result<usize, Error> {
         let table = Alias::new(table_name(module));
         let mut select = Query::select();
         select
@@ -168,6 +177,19 @@ impl Dispatcher {
                     continue;
                 }
             };
+            if event.tenant.status() == TenantStatus::Moving {
+                postpone(database, &table, event.id).await?;
+                continue;
+            }
+            if event.tenant.placement() != placement {
+                let error = Error::internal(format!(
+                    "the tenant's data moved to placement {}; this event is a left-over copy at \
+                     the old placement and is not delivered",
+                    event.tenant.placement()
+                ));
+                mark_unreadable(database, &table, id, &error).await?;
+                continue;
+            }
             // Giờ mới cho mỗi lần nhận: giao các event trước có thể đã mất thời gian.
             if !claim(database, &table, event.id, now()).await? {
                 continue; // tiến trình khác vừa nhận việc giao event này
@@ -257,6 +279,18 @@ async fn claim(
         .value(Alias::new("claimed_until"), now + chrono::Duration::seconds(CLAIM_SECONDS))
         .cond_where(Condition::all().add(Expr::col(Alias::new("id")).eq(id)).add(pending(now)));
     Ok(database.write().execute(&update).await?.rows_affected() == 1)
+}
+
+/// Khách của event `id` đang dời: thử lại sau, không tính lần giao.
+async fn postpone(database: &Database, table: &Alias, id: Uuid) -> Result<(), Error> {
+    let now = now();
+    let mut update = Query::update();
+    update
+        .table(table.clone())
+        .value(Alias::new("next_attempt_at"), now + chrono::Duration::seconds(30))
+        .cond_where(Condition::all().add(Expr::col(Alias::new("id")).eq(id)).add(pending(now)));
+    database.write().execute(&update).await?;
+    Ok(())
 }
 
 /// Dòng event `id` không đọc được: hỏng hẳn, kèm lý do.

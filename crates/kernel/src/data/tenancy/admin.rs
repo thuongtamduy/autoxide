@@ -91,7 +91,7 @@ pub fn require_platform(principal: &Principal) -> Result<(), Error> {
     }
 }
 
-mod tenant {
+pub(super) mod tenant {
     //! Bảng `kernel_tenants` (mặt điều khiển).
     use sea_orm::entity::prelude::*;
 
@@ -473,6 +473,10 @@ impl TenantAdmin {
         let row = self.find(id).await?;
         if expected.is_some_and(|expected| expected != row.updated_at) {
             return Err(crate::version::changed());
+        }
+        // Dữ liệu của khách đang được chép: đổi gì (kể cả mở lại) cũng ghi vào database cũ.
+        if row.status == TenantStatus::Moving.as_str() {
+            return Err(errors::tenant_moving());
         }
         let mut problems = Vec::new();
         let name = changes.name.map(|name| name.trim().to_owned());

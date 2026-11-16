@@ -236,7 +236,9 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
                 "kernel.get_tenant",
                 "kernel.list_domains",
                 "kernel.add_domain",
-                "kernel.verify_domain"
+                "kernel.verify_domain",
+                "kernel.move_tenant",
+                "kernel.get_tenant_move"
             ]
         );
 

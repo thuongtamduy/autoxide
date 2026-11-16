@@ -7127,3 +7127,29 @@ bản backup. Chế độ `single` không đổi gì.
 7. Một permission `kernel.domains.manage` (mức `write`); tool chỉ đọc `kernel.list_domains` là ngoại lệ của luật "tool
    chỉ đọc cần permission mức xem", như `files.list_files`. Không có tool MCP xoá tên miền (làm qua REST).
 8. Chưa làm (dòng lộ trình riêng): kiểm lại hằng ngày tên miền `verified`, `failed` sau 3 lần trượt liên tiếp.
+
+## D-292 · Dời khách giữa placement (bước 33 C2) — 2026-11-16 — agent quyết
+
+- Lượt dời là dòng `kernel_tenant_moves` (mặt điều khiển) đi qua `copying` → `copied` → `switched` → `done` (hoặc
+  `aborted`), có lease (`runner` / `runner_until` 120 giây, gia hạn khi đang chạy) để hai bên không chạy cùng một
+  lượt. Khách thành `moving` (request nhận 503 `tenant_maintenance` + `Retry-After`) cùng transaction với việc ghi lượt
+  dời. Trước khi chép: chờ TTL cache khách cộng thời gian tối đa của một request (máy chủ khác kịp thấy `moving`), và
+  chờ hết job / event của khách đang bị giữ (tối đa 330 giây, quá thì `tenant_move_busy`). Hai database phải đủ
+  migration và không phải cùng một database (SQLite so file; Postgres so `current_database` / `current_schema` /
+  `pg_postmaster_start_time`).
+- Chép mọi bảng cấp khách hàng (kể cả `<m>_jobs`, `<m>_events`, `kernel_tenant_settings`) trong **một transaction ở
+  đích**: xoá dòng của khách ở đích trước (chạy lại an toàn), chép theo thứ tự tạo bảng, ghi event
+  `kernel.tenant_moved`, rồi so số dòng từng bảng. Bảng mặt điều khiển và `<m>_migrations` không chép.
+- **Khác thứ tự của đặc tả 33:** đổi `placement_id` và đặt lại `active` trong cùng một bước, **trước** khi xoá nguồn —
+  khách chạy lại sớm hơn, nguồn hỏng lúc xoá không làm khách ngừng; vẫn chỉ một bản sống vì nguồn chỉ bị xoá sau khi đã
+  đổi, và worker / bộ phát không chạy dòng job / event còn sót ở placement khách không còn dùng. Trong lúc `moving`,
+  worker và bộ phát trả việc của khách về hàng đợi (không tính lần chạy); `TenantAdmin::update` từ chối thay đổi.
+- `keep_source` vẫn xoá hàng đợi job và outbox ở nguồn (không gì chạy hai lần); bản sao dữ liệu còn lại xoá bằng
+  `autoxide tenant purge-copy`. Huỷ (`--abort`) chỉ được trước bước đổi placement; chết giữa chừng thì gọi lại cùng
+  `--to` để chạy tiếp từ trạng thái đã ghi. Khách mặc định (nền tảng) không dời được.
+- REST `POST /api/v1/kernel/tenants/{id}/move` (dry-run mặc định, trả kế hoạch: bảng, số dòng, lý do chặn) và MCP
+  `kernel.move_tenant` chỉ cho nhân sự nền tảng (`kernel.tenants.move`); chạy thật bằng job `kernel.move_tenant` của
+  database điều khiển (giới hạn thời gian như mọi job), xem trạng thái ở `GET …/moves/{id}`. Khách lớn dời bằng CLI
+  `autoxide tenant move <khách> --to <placement>` (đồng bộ, không giới hạn; phải chạy với cùng cấu hình như máy chủ vì
+  thời gian chờ đọc từ cấu hình).
+- File không chép: nơi lưu dùng chung (khoá dưới `tenants/<id>/`); bucket theo placement là dòng lộ trình riêng.

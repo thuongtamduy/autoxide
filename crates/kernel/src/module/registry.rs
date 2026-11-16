@@ -71,6 +71,9 @@ pub struct Modules {
     /// Bộ tra DNS cho tên miền riêng của khách: bản một module công bố (`dyn DnsTxtLookup`), không
     /// thì bộ tra của hệ điều hành; điền sau khi mọi module khởi động.
     dns: crate::tenancy::domains::DnsSlot,
+    /// Thứ việc dời khách cần (module, bảng mặt điều khiển, migration); điền sau khi mọi module
+    /// khởi động.
+    moves: crate::tenancy::moves::MoveSetup,
     /// Sổ database (bước 33); có sau [`start`](Self::start).
     tenancy: Option<crate::tenancy::DatabaseRegistry>,
 }
@@ -98,6 +101,7 @@ impl Modules {
         let settings = crate::tenancy::settings::Catalog::default();
         let seeds = crate::tenancy::admin::Seeds::default();
         let dns = crate::tenancy::domains::DnsSlot::default();
+        let moves = crate::tenancy::moves::MoveSetup::default();
         let mut all: Vec<Box<dyn Module>> = vec![
             Box::new(crate::builtin::KernelModule::new(
                 catalog.clone(),
@@ -105,8 +109,11 @@ impl Modules {
                 user_flags.clone(),
                 keys.clone(),
                 settings.clone(),
-                seeds.clone(),
-                dns.clone(),
+                crate::tenancy::Slots {
+                    seeds: seeds.clone(),
+                    dns: dns.clone(),
+                    moves: moves.clone(),
+                },
             )),
             Box::new(crate::antispam::module::AntispamModule::default()),
         ];
@@ -166,6 +173,7 @@ impl Modules {
                 keys,
                 seeds,
                 dns,
+                moves,
                 tenancy: None,
             })
         } else {
@@ -241,6 +249,8 @@ impl Modules {
                 .filter_map(|module| module.seed_tenant().map(|seed| (module.name(), seed)))
                 .collect(),
         );
+        let migrator = self.migrator().map_err(|error| ModuleError(error.to_string()))?;
+        self.moves.fill(self.names(), self.control_plane_tables(), migrator);
         Ok(())
     }
 

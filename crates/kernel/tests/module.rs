@@ -243,7 +243,9 @@ async fn module_nhan_database_va_khai_route() {
                     "/settings/{name}".to_owned(),
                     "/tenant".to_owned(),
                     "/tenants".to_owned(),
-                    "/tenants/{id}".to_owned()
+                    "/tenants/{id}".to_owned(),
+                    "/tenants/{id}/move".to_owned(),
+                    "/tenants/{id}/moves/{move_id}".to_owned()
                 ],
                 vec!["/token".to_owned()],
                 vec![],
@@ -303,6 +305,7 @@ async fn module_thay_danh_muc_permission_cua_moi_module() {
                 "kernel.placements.read",
                 "kernel.settings.manage",
                 "kernel.tenants.manage",
+                "kernel.tenants.move",
                 "kernel.tenants.operate",
                 "kernel.tenants.read",
                 "notes.write"
