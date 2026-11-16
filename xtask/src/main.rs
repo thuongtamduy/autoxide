@@ -12,8 +12,11 @@
 //!   (`i18n.rs`) và tài liệu EN / VI (`docs.rs`). `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
 //! - `new-module <module> <entity>` — sinh module mới từ khuôn `modules/notes` (xem
 //!   `scaffold.rs`).
-//! - `test-affected [--base <ref>]` — chạy test của crate bị sửa so với `main` và crate phụ
-//!   thuộc vào chúng, trên SQLite; phần test của `./gate.sh --quick` (xem `affected.rs`).
+//! - `test-all [--doc]` — mọi test của workspace, các file test chạy song song, trên database của
+//!   `TEST_DATABASE_URL`; phần test của `./gate.sh` đầy đủ (xem `affected.rs`).
+//! - `test-affected [--base <ref>]` — chạy test của crate bị sửa kể từ lần chạy xanh gần nhất
+//!   (chưa có thì so với `main`) và crate phụ thuộc vào chúng, trên SQLite; phần test của
+//!   `./gate.sh --quick` (xem `affected.rs`).
 
 mod affected;
 mod api_diff;
@@ -35,7 +38,8 @@ const USAGE: &str = "usage: cargo xtask check
        cargo xtask sdk [--check | --extract-examples <dir>]
        cargo xtask upgrade-test [--from <tag>] [--image <image>] [--database sqlite|postgres|both]
        cargo xtask new-module <module> <entity>   e.g. new-module bookmarks bookmark
-       cargo xtask test-affected [--base <ref>]   default base: origin/main";
+       cargo xtask test-affected [--base <ref>]   default base: the last green run, else origin/main
+       cargo xtask test-all [--doc]               every test, on TEST_DATABASE_URL (default SQLite)";
 
 fn main() -> ExitCode {
     // `skip(1)`: phần tử đầu của args là tên chương trình.
@@ -52,6 +56,8 @@ fn main() -> ExitCode {
         ["sdk", "--extract-examples", dir] => sdk_examples(dir),
         ["upgrade-test", rest @ ..] => upgrade_test(rest),
         ["new-module", module, entity] => new_module(module, entity),
+        ["test-all"] => test_all(false),
+        ["test-all", "--doc"] => test_all(true),
         ["test-affected"] => test_affected(None),
         ["test-affected", "--base", base] => test_affected(Some(base)),
         _ => {
@@ -220,6 +226,16 @@ fn new_module(module: &str, entity: &str) -> ExitCode {
         }
         Err(error) => {
             eprintln!("xtask new-module: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn test_all(doc: bool) -> ExitCode {
+    match workspace::load().and_then(|workspace| affected::run_all(&workspace, doc)) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("xtask test-all: {error}");
             ExitCode::FAILURE
         }
     }

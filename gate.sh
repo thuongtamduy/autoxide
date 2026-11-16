@@ -2,8 +2,9 @@
 # Gate của Autoxide: định nghĩa "xong". Hai mức (D-173):
 #
 #   ./gate.sh --quick   gate nhanh, trước mỗi commit lúc đang làm một bước: như dưới đây
-#                       nhưng chỉ chạy test của crate bị sửa (so với origin/main) và crate
-#                       phụ thuộc vào chúng, chỉ trên SQLite, không cần Docker.
+#                       nhưng chỉ chạy test của crate bị sửa (kể từ lần gate nhanh xanh gần
+#                       nhất, chưa có thì so với origin/main) và crate phụ thuộc vào chúng, chỉ
+#                       trên SQLite, không cần Docker.
 #   ./gate.sh           gate đầy đủ: bắt buộc trước khi merge vào main và trước khi phát hành.
 #
 # Cả hai chạy ở mức ưu tiên CPU thấp (`renice`) để máy vẫn dùng được trong lúc build.
@@ -18,6 +19,8 @@
 #   6. secret               gitleaks: toàn bộ lịch sử git và thay đổi chưa commit
 #   7. test trên SQLite
 #   8. test trên Postgres   (tự dựng một container Docker dùng xong bỏ)
+#   Bước 7 và 8 chạy các file test song song (`cargo xtask test-all`, D-299); trên Postgres giới
+#   hạn tổng số test chạy cùng lúc để không vượt số kết nối của máy chủ.
 #   Bước 7 và 8 chạy thêm test lưu file trên S3: gate dựng một máy chủ S3 giả lập
 #   (moto) trong Docker, dùng xong bỏ.
 #
@@ -178,7 +181,7 @@ export TEST_S3_ENDPOINT="$S3_ENDPOINT"
 
 step "tests on SQLite"
 # `env -u`: bỏ biến nếu người chạy lỡ đặt sẵn, để bước này chắc chắn là SQLite.
-env -u TEST_DATABASE_URL cargo test --workspace --locked
+env -u TEST_DATABASE_URL cargo xtask test-all --doc
 
 # --- 8: Postgres ----------------------------------------------------------------
 
@@ -224,6 +227,6 @@ else
   step "tests on Postgres ($POSTGRES_IMAGE in Docker)"
   start_postgres
 fi
-TEST_DATABASE_URL="$POSTGRES_URL" cargo test --workspace --locked
+TEST_DATABASE_URL="$POSTGRES_URL" cargo xtask test-all
 
 printf '\n\033[32mgate: green — fmt, clippy, boundaries, api contract, dependencies, secrets, tests on SQLite and Postgres (files also on S3)\033[0m\n'

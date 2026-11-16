@@ -1,6 +1,13 @@
-//! `cargo xtask test-affected [--base <ref>]`: chạy test của các crate bị sửa so với `main` và
-//! của mọi crate phụ thuộc vào chúng, trên SQLite. Đây là phần test của gate nhanh
-//! (`./gate.sh --quick`, D-173); gate đầy đủ vẫn chạy toàn bộ test trên cả hai database.
+//! `cargo xtask test-affected [--base <ref>]`: chạy test của các crate bị sửa và của mọi crate
+//! phụ thuộc vào chúng, trên SQLite. Đây là phần test của gate nhanh (`./gate.sh --quick`, D-173);
+//! gate đầy đủ vẫn chạy toàn bộ test trên cả hai database.
+//!
+//! "Bị sửa" so với đâu (D-299): mặc định so với **cây file của lần chạy xanh gần nhất** (ref cục
+//! bộ `refs/autoxide/quick-green`, không bao giờ được push), chưa có thì so với `origin/main`.
+//! Trước đây luôn so với `main`: một nhánh đã sửa `kernel` ở commit đầu thì mọi lần gate nhanh về
+//! sau chạy lại test của mọi crate, dù commit đó chỉ sửa một module. So với lần xanh gần nhất vẫn
+//! đúng: crate không bị chạm có mã nguồn và phụ thuộc y hệt lúc nó đã xanh. `--base <ref>` giữ
+//! cách cũ (so với chỗ rẽ nhánh với `<ref>`).
 //!
 //! Vì sao không dùng `cargo test -p <crate>`: chỉ chọn vài crate thì cargo hợp feature của thư
 //! viện theo riêng các crate đó, khác lúc build cả workspace, nên phải build lại sqlx, sea-orm…
@@ -8,13 +15,17 @@
 //! (`resolver.feature-unification`) còn là tính năng nightly. Vì vậy ở đây build cả workspace —
 //! dùng chung cache với gate đầy đủ, cargo chỉ build lại phần đã sửa — rồi chỉ chạy các file
 //! test của crate bị ảnh hưởng, giống cách `cargo test` chạy chúng: thư mục làm việc là thư mục
-//! crate, có `CARGO_MANIFEST_DIR`.
+//! crate, có `CARGO_MANIFEST_DIR`. Các file test chạy **song song** (D-299): `cargo test` chạy
+//! chúng lần lượt, nên một file test chậm làm cả máy ngồi chờ.
 //!
 //! Doc-test không chạy ở đây (cần `rustdoc`); gate đầy đủ chạy chúng.
 
 use std::collections::BTreeSet;
+use std::num::NonZero;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, Output, Stdio};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use serde::Deserialize;
 
@@ -81,13 +92,33 @@ pub fn affected(workspace: &Workspace, changed: &[String]) -> Affected {
     }
 }
 
-/// Lệnh `test-affected`. `Err` là lỗi chạy công cụ (git, cargo); test đỏ cũng là `Err`.
+/// Cây file của lần `test-affected` xanh gần nhất. Ref cục bộ: `git push` chỉ đẩy nhánh và tag.
+const GREEN_REF: &str = "refs/autoxide/quick-green";
+
+/// Mốc để so: chuỗi mô tả cho người đọc và danh sách file đã đổi.
+fn changed_since(
+    root: &Path,
+    base: Option<&str>,
+    current: &str,
+) -> Result<(String, Vec<String>), String> {
+    if let Some(base) = base {
+        return Ok((base.to_owned(), changed_files(root, base)?));
+    }
+    if let Ok(green) = git(root, &["rev-parse", "--verify", "--quiet", GREEN_REF]) {
+        let files = git(root, &["diff", "--name-only", "--no-renames", green.trim(), current])?
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        return Ok(("the last green run".to_owned(), files));
+    }
+    let base = default_base(root);
+    Ok((base.clone(), changed_files(root, &base)?))
+}
+
 pub fn run(workspace: &Workspace, base: Option<&str>) -> Result<(), String> {
-    let base = match base {
-        Some(base) => base.to_owned(),
-        None => default_base(&workspace.root),
-    };
-    let changed = changed_files(&workspace.root, &base)?;
+    // Chụp cây file TRƯỚC khi build: xanh thì đúng cây này được ghi là đã xanh.
+    let current = snapshot_tree(&workspace.root)?;
+    let (base, changed) = changed_since(&workspace.root, base, &current)?;
     let selected = affected(workspace, &changed);
     let dirs: Vec<(String, PathBuf)> = match &selected {
         Affected::All => {
@@ -100,6 +131,7 @@ pub fn run(workspace: &Workspace, base: Option<&str>) -> Result<(), String> {
         }
         Affected::Crates(crates) if crates.is_empty() => {
             println!("test-affected: no crate changed since {base}, nothing to test");
+            git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
             return Ok(());
         }
         Affected::Crates(crates) => {
@@ -117,34 +149,202 @@ pub fn run(workspace: &Workspace, base: Option<&str>) -> Result<(), String> {
         }
     };
 
-    let mut failed = Vec::new();
-    let mut ran = 0;
-    for test in build_tests(&workspace.root)? {
-        let Some((name, dir)) = dirs.iter().find(|(_, dir)| *dir == test.dir) else {
-            continue;
-        };
-        let display = test.executable.strip_prefix(&workspace.root).unwrap_or(&test.executable);
-        println!("\n     Running {} ({name})", display.display());
-        ran += 1;
-        let status = without_cargo_run_env(&mut Command::new(&test.executable))
-            .current_dir(dir)
-            .env("CARGO_MANIFEST_DIR", dir)
-            .env("CARGO_PKG_NAME", name)
-            // Gate nhanh chỉ chạy SQLite, lưu file trên đĩa (D-173): bỏ biến nếu lỡ đặt sẵn.
-            .env_remove("TEST_DATABASE_URL")
-            .env_remove("TEST_S3_ENDPOINT")
-            .status()
-            .map_err(|error| format!("cannot run {}: {error}", display.display()))?;
-        if !status.success() {
-            failed.push(display.display().to_string());
-        }
-    }
+    let jobs: Vec<Job> = build_tests(&workspace.root)?
+        .into_iter()
+        .filter_map(|test| {
+            let (name, dir) = dirs.iter().find(|(_, dir)| *dir == test.dir)?;
+            Some(Job { name: name.clone(), dir: dir.clone(), executable: test.executable })
+        })
+        .collect();
+    let workers = workers();
+    println!("test-affected: running {} test binaries, {workers} at a time", jobs.len());
+    let started = Instant::now();
+    let failed = run_parallel(&workspace.root, jobs, workers, &Mode::SqliteOnly)?;
     if failed.is_empty() {
-        println!("\ntest-affected: {ran} test binaries passed");
+        git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
+        println!("\ntest-affected: all test binaries passed in {:.0?}", started.elapsed());
         Ok(())
     } else {
         Err(format!("{} test binaries failed: {}", failed.len(), failed.join(", ")))
     }
+}
+
+/// `cargo xtask test-all`: mọi test của workspace trên database của `TEST_DATABASE_URL` (trống là
+/// SQLite), các file test chạy song song — phần test của gate đầy đủ (D-299). `--doc` chạy thêm
+/// doc-test (gate chạy một lần, ở lượt SQLite).
+pub fn run_all(workspace: &Workspace, doc: bool) -> Result<(), String> {
+    let postgres = std::env::var("TEST_DATABASE_URL")
+        .is_ok_and(|url| url.starts_with("postgres:") || url.starts_with("postgresql:"));
+    let workers = workers();
+    let mode = if postgres {
+        // Mỗi test giữ tới vài kết nối; đo được 16 test cùng lúc ≈ 141 kết nối đỉnh, dưới trần
+        // 300 của gate. Chia đều trần này cho các file test chạy cùng lúc.
+        Mode::Postgres { test_threads: (POSTGRES_CONCURRENT_TESTS / workers).max(1) }
+    } else {
+        Mode::Inherit
+    };
+    let jobs: Vec<Job> = build_tests(&workspace.root)?
+        .into_iter()
+        .filter_map(|test| {
+            let package = workspace
+                .packages
+                .iter()
+                .find(|package| workspace.root.join(&package.dir) == test.dir)?;
+            Some(Job { name: package.name.clone(), dir: test.dir, executable: test.executable })
+        })
+        .collect();
+    println!("test-all: running {} test binaries, {workers} at a time", jobs.len());
+    let started = Instant::now();
+    let failed = run_parallel(&workspace.root, jobs, workers, &mode)?;
+    if !failed.is_empty() {
+        return Err(format!("{} test binaries failed: {}", failed.len(), failed.join(", ")));
+    }
+    println!("\ntest-all: all test binaries passed in {:.0?}", started.elapsed());
+    if doc {
+        let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned());
+        let status = without_cargo_run_env(&mut Command::new(&cargo))
+            .args(["test", "--workspace", "--locked", "--doc"])
+            .current_dir(&workspace.root)
+            .status()
+            .map_err(|error| format!("cannot run `{cargo} test --doc`: {error}"))?;
+        if !status.success() {
+            return Err("doc tests failed (see above)".to_owned());
+        }
+    }
+    Ok(())
+}
+
+/// Số test chạy cùng lúc trên Postgres, cộng mọi file test. Xem `run_all`.
+const POSTGRES_CONCURRENT_TESTS: usize = 16;
+
+/// Cách chạy một file test.
+enum Mode {
+    /// Gate nhanh: luôn SQLite, bỏ biến database và S3 người chạy lỡ đặt.
+    SqliteOnly,
+    /// Giữ nguyên môi trường (gate đầy đủ, lượt SQLite).
+    Inherit,
+    /// Giữ nguyên môi trường, giới hạn số test mỗi file chạy cùng lúc.
+    Postgres { test_threads: usize },
+}
+
+fn workers() -> usize {
+    std::thread::available_parallelism().map_or(1, NonZero::get).min(MAX_WORKERS)
+}
+
+/// Trần số file test chạy cùng lúc. Mỗi file test tự chạy các test của nó trên nhiều thread,
+/// nên không cần nhiều hơn số nhân; trần giữ RAM vừa phải trên máy nhiều nhân.
+const MAX_WORKERS: usize = 8;
+
+struct Job {
+    name: String,
+    dir: PathBuf,
+    executable: PathBuf,
+}
+
+/// Chạy các file test, `workers` file cùng lúc; trả tên các file đỏ.
+///
+/// Output của từng file được giữ lại và chỉ in khi file đó đỏ, để log không trộn lẫn nhau.
+fn run_parallel(
+    root: &Path,
+    jobs: Vec<Job>,
+    workers: usize,
+    mode: &Mode,
+) -> Result<Vec<String>, String> {
+    // `Mutex<Iter>`: hàng đợi chung, mỗi thread lấy việc kế tiếp tới khi hết.
+    let queue = Mutex::new(jobs.into_iter());
+    let failed = Mutex::new(Vec::new());
+    let errors = Mutex::new(Vec::new());
+    // `thread::scope`: các thread mượn được `queue`, `failed`… vì scope chờ chúng xong mới
+    // trả về — Rust biết các biến sống lâu hơn thread, không cần `Arc`.
+    std::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| {
+                // Guard của `lock()` bị huỷ ngay trong closure: lấy việc xong là nhả hàng đợi,
+                // không giữ nó suốt lúc chạy test.
+                while let Some(job) = queue.lock().ok().and_then(|mut queue| queue.next()) {
+                    let display = job
+                        .executable
+                        .strip_prefix(root)
+                        .unwrap_or(&job.executable)
+                        .display()
+                        .to_string();
+                    let started = Instant::now();
+                    match run_one(&job, mode) {
+                        Ok(output) if output.status.success() => {
+                            println!(
+                                "     ok {display} ({}) {}",
+                                job.name,
+                                seconds(started.elapsed())
+                            );
+                        }
+                        Ok(output) => {
+                            // Cả khối in một lần, giữ lock của stdout cho khỏi xen dòng file khác.
+                            let mut text = format!(
+                                "\n---- FAILED {display} ({}) {} ----\n",
+                                job.name,
+                                seconds(started.elapsed())
+                            );
+                            text.push_str(&String::from_utf8_lossy(&output.stdout));
+                            text.push_str(&String::from_utf8_lossy(&output.stderr));
+                            println!("{text}");
+                            if let Ok(mut failed) = failed.lock() {
+                                failed.push(display);
+                            }
+                        }
+                        Err(error) => {
+                            if let Ok(mut errors) = errors.lock() {
+                                errors.push(format!("cannot run {display}: {error}"));
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    });
+    let errors = errors.into_inner().unwrap_or_default();
+    if !errors.is_empty() {
+        return Err(errors.join("; "));
+    }
+    Ok(failed.into_inner().unwrap_or_default())
+}
+
+fn run_one(job: &Job, mode: &Mode) -> std::io::Result<Output> {
+    let mut command = Command::new(&job.executable);
+    without_cargo_run_env(&mut command)
+        .current_dir(&job.dir)
+        .env("CARGO_MANIFEST_DIR", &job.dir)
+        .env("CARGO_PKG_NAME", &job.name)
+        .stdin(Stdio::null());
+    match mode {
+        Mode::SqliteOnly => {
+            command.env_remove("TEST_DATABASE_URL").env_remove("TEST_S3_ENDPOINT");
+        }
+        Mode::Inherit => {}
+        Mode::Postgres { test_threads } => {
+            command.arg(format!("--test-threads={test_threads}"));
+        }
+    }
+    command.output()
+}
+
+fn seconds(elapsed: Duration) -> String {
+    format!("{:.1}s", elapsed.as_secs_f64())
+}
+
+/// Cây file (git tree) của thư mục làm việc như nó đang có: file đã commit, đã sửa, file mới
+/// (trừ file bị `.gitignore`), không tính file đã xoá. Dùng một index tạm riêng nên không đụng
+/// tới phần người dùng đã `git add`.
+fn snapshot_tree(root: &Path) -> Result<String, String> {
+    let git_dir = git(root, &["rev-parse", "--absolute-git-dir"])?;
+    let index = PathBuf::from(git_dir.trim()).join("autoxide-test-affected.index");
+    let index = index.to_str().ok_or("the git directory path is not UTF-8")?.to_owned();
+    let with_index = |args: &[&str]| -> Result<String, String> {
+        git_with(root, args, &[("GIT_INDEX_FILE", index.as_str())])
+    };
+    with_index(&["read-tree", "HEAD"])?;
+    with_index(&["add", "--all", "--", "."])?;
+    let tree = with_index(&["write-tree"])?;
+    Ok(tree.trim().to_owned())
 }
 
 /// Mặc định so với `origin/main` (bản đã lên GitHub), không có thì `main`.
@@ -167,8 +367,13 @@ fn changed_files(root: &Path, base: &str) -> Result<Vec<String>, String> {
 }
 
 fn git(root: &Path, args: &[&str]) -> Result<String, String> {
+    git_with(root, args, &[])
+}
+
+fn git_with(root: &Path, args: &[&str], env: &[(&str, &str)]) -> Result<String, String> {
     let output = Command::new("git")
         .args(args)
+        .envs(env.iter().copied())
         .current_dir(root)
         .output()
         .map_err(|error| format!("cannot run git: {error}"))?;
@@ -360,6 +565,74 @@ mod tests {
     fn file_sinh_tu_code_chay_test_cua_binary() {
         assert_eq!(changed(&["docs/openapi.json"]), crates(&["autoxide"]));
         assert_eq!(changed(&[".env.example"]), crates(&["autoxide"]));
+    }
+
+    /// Repo git tạm có một commit; tự xoá khi ra khỏi scope.
+    struct TempRepo(PathBuf);
+
+    impl TempRepo {
+        fn new(name: &str) -> Self {
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let dir =
+                std::env::temp_dir().join(format!("xtask-{name}-{}-{nanos}", std::process::id()));
+            std::fs::create_dir_all(dir.join("modules/notes")).unwrap();
+            std::fs::write(dir.join(".gitignore"), "target/\n").unwrap();
+            std::fs::write(dir.join("modules/notes/a.rs"), "a").unwrap();
+            std::fs::write(dir.join("modules/notes/b.rs"), "b").unwrap();
+            let repo = TempRepo(dir);
+            repo.git(&["init", "--quiet"]);
+            repo.git(&["add", "--all"]);
+            repo.git(&["commit", "--quiet", "--message", "init"]);
+            repo
+        }
+
+        fn git(&self, args: &[&str]) -> String {
+            let mut all = vec!["-c", "user.name=test", "-c", "user.email=test@example.invalid"];
+            all.extend_from_slice(args);
+            git(&self.0, &all).unwrap()
+        }
+
+        fn write(&self, file: &str, content: &str) {
+            std::fs::create_dir_all(self.0.join(file).parent().unwrap()).unwrap();
+            std::fs::write(self.0.join(file), content).unwrap();
+        }
+    }
+
+    impl Drop for TempRepo {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn so_voi_lan_xanh_gan_nhat_chi_lay_file_doi_sau_do() {
+        let repo = TempRepo::new("green");
+        // Chưa có mốc xanh: so với nhánh được nêu, như cách cũ.
+        repo.write("modules/notes/a.rs", "a2");
+        let tree = snapshot_tree(&repo.0).unwrap();
+        let (_, files) = changed_since(&repo.0, Some("HEAD"), &tree).unwrap();
+        assert_eq!(files, vec!["modules/notes/a.rs".to_owned()]);
+
+        // Ghi mốc xanh tại cây đó; sau đó sửa b, thêm c, xoá a, thêm file bị .gitignore.
+        repo.git(&["update-ref", GREEN_REF, &tree]);
+        repo.write("modules/notes/b.rs", "b2");
+        repo.write("modules/notes/c.rs", "c");
+        repo.write("target/debug/x", "ignored");
+        std::fs::remove_file(repo.0.join("modules/notes/a.rs")).unwrap();
+        let tree = snapshot_tree(&repo.0).unwrap();
+        let (base, mut files) = changed_since(&repo.0, None, &tree).unwrap();
+        files.sort();
+        assert_eq!(base, "the last green run");
+        assert_eq!(files, ["modules/notes/a.rs", "modules/notes/b.rs", "modules/notes/c.rs"]);
+
+        // Cây không đổi thì không có file nào; phần đã `git add` của người dùng giữ nguyên.
+        repo.git(&["update-ref", GREEN_REF, &tree]);
+        let (_, files) = changed_since(&repo.0, None, &snapshot_tree(&repo.0).unwrap()).unwrap();
+        assert!(files.is_empty(), "{files:?}");
+        assert_eq!(repo.git(&["diff", "--cached", "--name-only"]), "");
     }
 
     #[test]
