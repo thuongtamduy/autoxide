@@ -486,4 +486,8 @@ giá, cửa hàng với dữ liệu mẫu của trang quản trị) tới khi c�
 | [ ] | Gian hàng người bán | Catalog công khai lọc theo người bán và đường dẫn trang sản phẩm cho hàng người bán; hồ sơ người bán có số sản phẩm theo nhóm, tỉ lệ giao đúng hạn, trạng thái tạm ngừng | 41, 46 (mới) | Dữ liệu mẫu; hàng người bán mở ở gian hàng — đã thêm vào lộ trình bước 41, 46 (16/11) |
 | [ ] | Mời người bán | Phí sàn công khai (hiện `/fee-rules/preview` cần `marketplace.sell`); đăng ký bán trước khi có tài khoản | 46 (mới) | Dữ liệu mẫu; form đăng ký dùng `forms/public/ban-tren-cho` nếu cửa hàng đã tạo — đã thêm vào lộ trình bước 46 (16/11) |
 | [ ] | Quyền riêng tư của người mua | Đối chiếu đủ endpoint tải về / xoá dữ liệu cá nhân từ website | 37 | Dữ liệu mẫu |
+| [ ] | Tài khoản › Tải hàng số | `GET /api/v1/orders/me/downloads` (file, lượt còn, hạn); `POST /me/downloads/{id}/link` (link riêng sống 5 phút, trừ một lượt; tải tiếp bằng cùng link không trừ thêm); `POST …/resend` (email mới, link cũ hết hiệu lực, lượt giữ nguyên) | 41, 45 (mới) | Dữ liệu mẫu (`src/sample/account-more.ts`, W-044 của web) |
+| [ ] | Tài khoản › Bảo hành | `GET /api/v1/orders/me/warranties` (món, số tháng, hạn tính từ ngày giao, phạm vi); `POST …/{id}/claims` (mô tả lỗi, ảnh qua `media`; cửa hàng trả lời cách gửi) | 45 (mới) | Dữ liệu mẫu |
+| [ ] | Tài khoản › Tranh chấp (phía người mua) | `GET /api/v1/marketplace/me/disputes/{id}` (trạng thái, mốc, đề nghị hai bên, nơi giữ tiền), `POST …/messages` (lời + ảnh, không sửa / xoá), `POST …/transitions` (`accept_offer`, `escalate`, `withdraw`) | 46 | Dữ liệu mẫu; ảnh chỉ giữ tên file |
+| [ ] | Tài khoản › Đăng nhập và bảo mật | Phiên của người mua (xem, đăng xuất nơi khác), thêm passkey cho người mua | 47 | Dữ liệu mẫu; passkey ghi "sắp có" |
 
