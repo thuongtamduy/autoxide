@@ -52,6 +52,10 @@ pub(crate) struct LoginRequest {
     #[validate(length(min = 1, max = 1024))]
     #[schema(example = "correct horse battery staple")]
     password: String,
+    /// `staff` (default) or `customer`: a customer account of this tenant's shop is separate
+    /// from a staff account with the same email.
+    #[serde(default)]
+    realm: autoxide_kernel::access::Realm,
 }
 
 /// Two-step sign-in: the password was right, a code is needed.
@@ -231,20 +235,26 @@ async fn login(
 ) -> Result<Response, Error> {
     let user_agent = super::user_agent(&headers);
     // Hai kết quả, hai hình dạng: `Response` là kiểu chung của mọi response.
-    Ok(match state.sessions.login(&tenant, &input.email, &input.password, user_agent).await? {
-        LoginOutcome::Tokens(tokens) => {
-            super::note_country(&state, &tenant, &headers, tokens.session_id).await;
-            Data { data: TokenResponse::from(tokens) }.into_response()
-        }
-        LoginOutcome::MfaRequired { mfa_token, expires_in } => {
-            let data = MfaChallengeResponse {
-                mfa_token,
-                expires_in,
-                methods: METHODS.map(String::from).to_vec(),
-            };
-            (StatusCode::ACCEPTED, Data { data }).into_response()
-        }
-    })
+    Ok(
+        match state
+            .sessions
+            .login_in(&tenant, input.realm, &input.email, &input.password, user_agent)
+            .await?
+        {
+            LoginOutcome::Tokens(tokens) => {
+                super::note_country(&state, &tenant, &headers, tokens.session_id).await;
+                Data { data: TokenResponse::from(tokens) }.into_response()
+            }
+            LoginOutcome::MfaRequired { mfa_token, expires_in } => {
+                let data = MfaChallengeResponse {
+                    mfa_token,
+                    expires_in,
+                    methods: METHODS.map(String::from).to_vec(),
+                };
+                (StatusCode::ACCEPTED, Data { data }).into_response()
+            }
+        },
+    )
 }
 
 /// Cách nhập lớp thứ hai mà `/login/mfa` nhận.

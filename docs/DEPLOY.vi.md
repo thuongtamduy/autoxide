@@ -459,6 +459,25 @@ cũng bị tính vào rate limiting theo địa chỉ như mọi endpoint khác;
 chứng chỉ mới. Xác minh, gỡ tên miền hay tạm khoá khách có hiệu lực trên mọi máy chủ sau tối đa
 `AUTOXIDE_TENANCY_CACHE_SECONDS` giây (mặc định `10`).
 
+## Tài khoản của một khách: nhân sự, người mua, uỷ quyền
+
+Mỗi khách có hai loại tài khoản. **Nhân sự** (`realm: staff`, mặc định) làm việc bằng role và
+permission. **Người mua** (`realm: customer`) là tài khoản của cửa hàng: đăng nhập được, không có
+permission nào, tách khỏi nhân sự dù trùng email. Người mua đăng ký bằng
+`POST /api/v1/auth/register` và đăng nhập bằng `POST /api/v1/auth/login`, cùng với
+`"realm": "customer"`; khách đóng đăng ký người mua bằng cài đặt theo cây tổ chức
+`auth.customer_registration` (`false`). Nhân sự quản lý người mua bằng `GET /api/v1/auth/customers`
+và `PATCH /api/v1/auth/customers/{id}` (permission `auth.customers.read`, `auth.customers.manage`).
+
+Trong chuỗi khách (khách có `parent_id`), khách cha cho người giữ một role của mình làm việc ở khách
+con: `POST /api/v1/auth/delegations` với `child_tenant_id`, `role_id`, `org_id` tuỳ chọn (một nút của
+khách con), `expires_at` tuỳ chọn và `reason` (permission `auth.delegations.manage`). Những người đó
+giữ cách đăng nhập của mình và thêm header `Autoxide-Tenant: <id khách con>`;
+`GET /api/v1/auth/me/tenants` liệt kê những nơi họ vào được. Mọi thay đổi họ làm ở khách con ghi kèm
+đường vào là uỷ quyền (`actor_access` trong event và audit log của khách con); thu hồi
+(`DELETE /api/v1/auth/delegations/{id}`) có hiệu lực từ request kế. Khách con xem những gì nhận được
+bằng `GET /api/v1/auth/delegations?direction=incoming`.
+
 ## Dời khách hàng sang database khác
 
 Khi chạy nhiều khách hàng, dữ liệu của mỗi khách nằm ở một *placement* (vị trí dữ liệu): `main`

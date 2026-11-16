@@ -141,6 +141,8 @@ impl Module for Reports {
                     autoxide_kernel::event::tenant_table("reports"),
                 ],
             ),
+            // Đường người làm vào khách (bước 34, D-310).
+            autoxide_kernel::event::outbox_access_migration("k0001_event_access", "reports"),
         ]
     }
 

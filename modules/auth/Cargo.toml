@@ -11,6 +11,7 @@ publish.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 autoxide-kernel.workspace = true
+autoxide-organizations.workspace = true
 axum.workspace = true
 base64.workspace = true
 chrono.workspace = true

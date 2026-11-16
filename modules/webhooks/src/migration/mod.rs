@@ -48,6 +48,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0008_tenant_list_index",
             vec!["webhooks_endpoint"],
         ),
+        // Đường người làm vào khách (bước 34, D-310).
+        autoxide_kernel::event::outbox_access_migration("k0001_event_access", "webhooks"),
     ]
 }
 

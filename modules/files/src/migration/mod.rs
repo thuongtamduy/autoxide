@@ -31,5 +31,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                     .index("files_file_owner_idx", ["tenant_id", "owner_id", "id"]),
             ],
         ),
+        // Đường người làm vào khách (bước 34, D-310).
+        autoxide_kernel::event::outbox_access_migration("k0001_event_access", "files"),
     ]
 }

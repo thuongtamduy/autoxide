@@ -135,5 +135,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0012_org::Migration),
         // Đường dẫn công khai riêng theo website (bước 34, D-307).
         Box::new(m0013_site_paths::Migration),
+        // Đường người làm vào khách (bước 34, D-310).
+        autoxide_kernel::event::outbox_access_migration("k0001_event_access", "content"),
     ]
 }

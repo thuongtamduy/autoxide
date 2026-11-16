@@ -22,6 +22,7 @@ pub(crate) struct Recorder;
 impl EventHandler for Recorder {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         let (before, after, details) = split(&redacted(event));
+        let details = with_access(details, event.actor.access);
         let payload_hash =
             chain::payload_hash(before.as_deref(), after.as_deref(), details.as_deref());
         // Lưu và băm ở độ chính xác micro giây — độ chính xác của cả hai database.
@@ -125,6 +126,26 @@ fn redacted(event: &Delivered) -> Value {
 }
 
 /// Tách payload thành (trước, sau, phần còn lại), mỗi phần dạng JSON chữ.
+/// Người làm vào khách qua uỷ quyền hay quyền hỗ trợ (bước 34, D-310): ghi `access` vào
+/// `details` — phần đã nằm trong chuỗi băm, không đổi cách băm của dòng cũ.
+fn with_access(
+    details: Option<String>,
+    access: autoxide_kernel::access::AccessPath,
+) -> Option<String> {
+    let Some(id) = access.id() else { return details };
+    let mut fields = match details.as_deref().map(serde_json::from_str::<Value>) {
+        Some(Ok(Value::Object(fields))) => fields,
+        Some(Ok(other)) => {
+            let mut fields = serde_json::Map::new();
+            fields.insert("value".to_owned(), other);
+            fields
+        }
+        _ => serde_json::Map::new(),
+    };
+    fields.insert("access".to_owned(), serde_json::json!({"kind": access.as_str(), "id": id}));
+    Some(Value::Object(fields).to_string())
+}
+
 fn split(payload: &Value) -> (Option<String>, Option<String>, Option<String>) {
     let Value::Object(fields) = payload else {
         return (None, None, Some(payload.to_string()));

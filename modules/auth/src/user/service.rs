@@ -1,6 +1,7 @@
 //! Service của tài khoản người dùng: mọi logic về người dùng nằm ở đây. Handler REST,
 //! lệnh CLI và tool MCP (ở các mục sau) chỉ gọi vào đây.
 
+use autoxide_kernel::access::Realm;
 use std::collections::HashMap;
 
 use autoxide_kernel::error::{Error, FieldError};
@@ -129,10 +130,22 @@ impl UserService {
         email: &str,
         password: &str,
     ) -> Result<(User, String), Error> {
+        self.verify_credentials_in(tenant, Realm::Staff, email, password).await
+    }
+
+    /// Như [`verify_credentials`](Self::verify_credentials), cho tài khoản `realm` (D-309).
+    pub(crate) async fn verify_credentials_in(
+        &self,
+        tenant: &TenantContext,
+        realm: Realm,
+        email: &str,
+        password: &str,
+    ) -> Result<(User, String), Error> {
         if password.chars().count() > password::MAX_LENGTH {
             return Err(invalid_credentials());
         }
         let row = Entity::find()
+            .filter(Column::Realm.eq(entity::realm_str(realm)))
             .filter(Column::Email.eq(autoxide_kernel::email::normalize(email)))
             .scoped(tenant)
             .one(tenant.database().read())
@@ -209,6 +222,27 @@ impl UserService {
         input: NewUser,
         admin: bool,
     ) -> Result<User, Error> {
+        self.create_in(tenant, actor, input, admin, Realm::Staff).await
+    }
+
+    /// Tạo tài khoản người mua của khách `tenant` (D-309): không role, không permission.
+    pub(crate) async fn create_customer(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        input: NewUser,
+    ) -> Result<User, Error> {
+        self.create_in(tenant, actor, input, false, Realm::Customer).await
+    }
+
+    async fn create_in(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        input: NewUser,
+        admin: bool,
+        realm: Realm,
+    ) -> Result<User, Error> {
         let email = autoxide_kernel::email::normalize(&input.email);
         let name = input.name.trim().to_owned();
         let mut problems = Vec::new();
@@ -242,6 +276,7 @@ impl UserService {
             last_sign_in_at: Set(None),
             locale: Set(None),
             time_zone: Set(None),
+            realm: Set(entity::realm_str(realm).to_owned()),
         }
         .insert(&transaction)
         .await
@@ -425,13 +460,24 @@ impl UserService {
         Ok(())
     }
 
-    /// Người dùng có email `email` (so sánh sau khi chuẩn hoá).
+    /// Nhân sự có email `email` (so sánh sau khi chuẩn hoá).
     pub(crate) async fn find_by_email(
         &self,
         tenant: &TenantContext,
         email: &str,
     ) -> Result<Option<User>, Error> {
+        self.find_by_email_in(tenant, Realm::Staff, email).await
+    }
+
+    /// Tài khoản `realm` có email `email` (D-309: cùng email có thể là nhân sự và người mua).
+    pub(crate) async fn find_by_email_in(
+        &self,
+        tenant: &TenantContext,
+        realm: Realm,
+        email: &str,
+    ) -> Result<Option<User>, Error> {
         let row = Entity::find()
+            .filter(Column::Realm.eq(entity::realm_str(realm)))
             .filter(Column::Email.eq(autoxide_kernel::email::normalize(email)))
             .scoped(tenant)
             .one(tenant.database().read())
@@ -480,7 +526,20 @@ impl UserService {
         status: Option<UserStatus>,
         page: &PageRequest,
     ) -> Result<Page<User>, Error> {
-        let mut select = Entity::find().scoped(tenant);
+        self.list_in(tenant, Realm::Staff, search, status, page).await
+    }
+
+    /// Như [`list`](Self::list), cho tài khoản `realm` (người mua: `GET /customers`).
+    pub(crate) async fn list_in(
+        &self,
+        tenant: &TenantContext,
+        realm: Realm,
+        search: Option<&str>,
+        status: Option<UserStatus>,
+        page: &PageRequest,
+    ) -> Result<Page<User>, Error> {
+        let mut select =
+            Entity::find().filter(Column::Realm.eq(entity::realm_str(realm))).scoped(tenant);
         if let Some(search) = search.map(str::trim).filter(|search| !search.is_empty()) {
             // Không có index nào giúp được tìm "chứa": quét bảng người dùng.
             select = select.filter(autoxide_kernel::search::contains(Column::SearchText, search));

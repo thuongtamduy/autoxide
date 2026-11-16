@@ -469,6 +469,26 @@ tenant. When another proxy in front rewrites `Host`, it must send the visitor's 
 certificate. Verifying, removing a domain or suspending its tenant reaches every server within
 `AUTOXIDE_TENANCY_CACHE_SECONDS` (default `10`).
 
+## Accounts of a tenant: staff, customers, delegation
+
+Each tenant has two kinds of accounts. **Staff** (`realm: staff`, the default) work with roles and
+permissions. **Customers** (`realm: customer`) are the accounts of the tenant's shop: they sign in,
+have no permission, and are separate from staff even with the same email. Customers register with
+`POST /api/v1/auth/register` and sign in with `POST /api/v1/auth/login`, both with
+`"realm": "customer"`; a tenant closes customer sign-up with the organization setting
+`auth.customer_registration` (`false`). Staff manage them with `GET /api/v1/auth/customers` and
+`PATCH /api/v1/auth/customers/{id}` (permissions `auth.customers.read`, `auth.customers.manage`).
+
+In a chain of tenants (a tenant with `parent_id`), the parent can let holders of one of its roles
+work in a child: `POST /api/v1/auth/delegations` with `child_tenant_id`, `role_id`, optional
+`org_id` (a unit of the child) and `expires_at`, and a `reason` (permission
+`auth.delegations.manage`). Those people keep their own sign-in and add the header
+`Autoxide-Tenant: <child id>`; `GET /api/v1/auth/me/tenants` lists where they can go. Every change
+they make in the child is recorded with the delegation as the way in (`actor_access` in the
+child's events and audit log); revoking (`DELETE /api/v1/auth/delegations/{id}`) takes effect at
+their next request. The child sees what it received with
+`GET /api/v1/auth/delegations?direction=incoming`.
+
 ## Moving a tenant to another database
 
 With several tenants, each tenant's data lives on a *placement*: `main` (the database of

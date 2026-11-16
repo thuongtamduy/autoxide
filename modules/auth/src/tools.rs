@@ -378,6 +378,13 @@ mod tests {
             verifications: services.verifications.clone(),
             passkeys: services.passkeys.clone(),
             reauth: services.reauth.clone(),
+            orgs: None,
+            delegations: Arc::new(crate::delegation::DelegationService {
+                databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
+                    services.database.clone(),
+                ),
+                outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+            }),
             personal_data: services.personal_data.clone(),
             self_registration: false,
             country_header: None,

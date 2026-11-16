@@ -353,6 +353,8 @@ impl RoleService {
         let touched = user::Entity::update_many()
             .col_expr(user::Column::UpdatedAt, Expr::value(now()))
             .filter(user::Column::Id.eq(user_id))
+            // Người mua không có role (D-309): như không có người dùng này.
+            .filter(user::Column::Realm.eq("staff"))
             .scoped(tenant)
             .exec(&transaction)
             .await?;
@@ -470,6 +472,8 @@ impl RoleService {
         let touched = user::Entity::update_many()
             .col_expr(user::Column::UpdatedAt, Expr::value(now()))
             .filter(user::Column::Id.eq(user_id))
+            // Người mua không có role (D-309): như không có người dùng này.
+            .filter(user::Column::Realm.eq("staff"))
             .scoped(tenant)
             .exec(&transaction)
             .await?;
@@ -719,6 +723,15 @@ impl RoleService {
         actor: &Principal,
         target: Uuid,
     ) -> Result<(), Error> {
+        // Người mua không quản lý qua đây (D-309): `GET /customers`, `PATCH /customers/{id}`.
+        let staff = user::Entity::find_by_id(target)
+            .filter(user::Column::Realm.eq("staff"))
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?;
+        if staff.is_none() {
+            return Err(crate::user::user_not_found(target));
+        }
         let target = self.principal(tenant, target).await?;
         let covered = if target.has_all_permissions() {
             actor.has_all_permissions()
@@ -1154,6 +1167,46 @@ fn builtin_role() -> Error {
 
 fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
+}
+
+/// Role người dùng `user_id` giữ ở nút gốc của khách `tenant` (uỷ quyền theo cây khách hàng,
+/// D-310).
+pub(crate) async fn root_roles(tenant: &TenantContext, user_id: Uuid) -> Result<Vec<Uuid>, Error> {
+    let root = root_of(tenant.id()).as_uuid();
+    Ok(user_role::Entity::find()
+        .filter(user_role::Column::UserId.eq(user_id))
+        .filter(user_role::Column::OrgId.eq(root))
+        .scoped(tenant)
+        .all(tenant.database().read())
+        .await?
+        .into_iter()
+        .map(|row| row.role_id)
+        .collect())
+}
+
+/// Role có `all_permissions` không và permission (kèm độ sâu) của từng role trong `ids` của khách
+/// `tenant`. Role không có: vắng.
+pub(crate) async fn role_grants(
+    tenant: &TenantContext,
+    ids: &[Uuid],
+) -> Result<std::collections::HashMap<Uuid, (bool, Vec<(String, Scope)>)>, Error> {
+    if ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let read = tenant.database().read();
+    let rows = role::Entity::find()
+        .filter(role::Column::Id.is_in(ids.iter().copied()))
+        .scoped(tenant)
+        .all(read)
+        .await?;
+    let mut permissions = permissions_of(read, tenant, rows.iter().map(|row| row.id)).await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            let granted = permissions.remove(&row.id).unwrap_or_default();
+            (row.id, (row.all_permissions, granted))
+        })
+        .collect())
 }
 
 /// Tài khoản `user_id` đã bật MFA: TOTP đã xác nhận, hay có ít nhất một passkey.

@@ -7577,3 +7577,42 @@ Quyết định:
 
 Đã cân nhắc: chặn đăng nhập khi role bắt buộc MFA mà chưa bật — người dùng không vào được để bật; giữ token trong
 bộ nhớ — không chạy khi nhiều máy chủ.
+
+## D-309 · Danh tính hai lớp: nhân sự và người mua (bước 34 mục 8) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **`auth_user.realm`** = `staff` (mặc định; mọi tài khoản cũ) hay `customer`. Unique email thành `(tenant_id, realm,
+   email)`: cùng email là hai tài khoản khác nhau. Mọi câu tra theo email lọc cả `realm` (đăng nhập, đặt lại mật
+   khẩu, đổi email, khôi phục). Bộ đếm sai mật khẩu của người mua có tiền tố riêng.
+2. **Người mua không có permission**: bộ xác thực trả `Principal::customer`; không gán role / membership được
+   (như không có người dùng); `/users` chỉ thấy nhân sự, người mua quản lý qua `/customers`
+   (`auth.customers.read` / `.manage`).
+3. **Đăng ký người mua** (`POST /register` với `realm: customer`) mở theo cài đặt theo cây `auth.customer_registration`
+   (mặc định `true`, đọc ở nút gốc qua `OrgDirectory` — `auth` lấy nó tuỳ chọn), độc lập với
+   `AUTOXIDE_AUTH_SELF_REGISTRATION` (nhân sự). Email người mua chưa xác minh không chặn đăng nhập (đặc tả, khuyến nghị 6).
+4. **Giữ tài khoản theo từng khách** (bước 33) thay vì chuyển nhân sự lên mặt điều khiển: một người làm cho nhiều khách
+   bằng uỷ quyền (D-310) hay quyền vào hỗ trợ (bước 34 mục 13) từ khách nhà của mình, không cần bảng tài khoản
+   toàn nền tảng. Đã cân nhắc chuyển `auth_user`, role, membership lên database điều khiển như đặc tả gợi ý — phải
+   dời dữ liệu của mọi khách `dedicated`, đổi đường nóng xác thực sang hai database, trong khi đường vào qua header
+   đã đủ cho "một người nhiều khách". Role `admin` cho mỗi khách mới đã có từ bước 33 (`AdminRoleSeed`).
+
+## D-310 · Uỷ quyền theo cây khách hàng và đường vào trong event (bước 34 mục 10) — 2026-11-16 — agent quyết
+
+Quyết định:
+
+1. **Vào khách khác bằng header**, không cấp token mới: người dùng gửi credential của khách nhà kèm
+   `Autoxide-Tenant: <khách đích>`; kernel hỏi `Authenticator::enter(principal, target)` (mặc định: không) trước luật
+   nhân sự nền tảng sẵn có. `POST /me/tenant` của đặc tả không cần (bước 33 đã có header). Tính lại mỗi request: thu
+   hồi / hết hạn có hiệu lực request kế.
+2. **Bảng `auth_delegation` thuộc khách CHA** (tenant_id = cha, `child_tenant_id`, `role_id` của cha, `org_id` của
+   con, `reason`, `expires_at`, `revoked_at`): cấp / thu hồi cùng transaction với event ở cha; khách con đọc
+   `incoming` qua database của các khách cấp trên (`DatabaseRegistry::tenant_ancestors`). Chỉ cấp cho khách con cháu;
+   role toàn quyền chỉ ở nút gốc của con (toàn quyền ở nút con nghĩa là cả permission cấp khách).
+3. **Quyền khi vào** = permission của các role được uỷ quyền mà người đó giữ **ở nút gốc** của khách cha, gắn ở nút
+   của uỷ quyền trong khách con, theo độ sâu của role. API key và người mua không vào bằng uỷ quyền.
+4. **`Actor.access`** (`direct` / `delegation` / `support` + id) ghi vào mọi outbox bằng migration kernel chung
+   `outbox_access_migration` (mỗi module phát event thêm `k0001_event_access` vào cuối danh sách), audit lưu nó trong
+   `details` (đã nằm trong chuỗi băm — không đổi cách băm). Không ghi event "bắt đầu vào" riêng mỗi request: mỗi thay
+   đổi ở khách con đã mang đường vào; khách cha có `auth.delegation_granted` / `revoked`. Đã cân nhắc job
+   `auth.mirror_event` ghi event ở cả hai phía mỗi lần vào — một event cho mỗi request đọc, không thêm thông tin.

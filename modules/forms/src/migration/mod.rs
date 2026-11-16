@@ -67,5 +67,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         // Form có thể thuộc một nút của cây tổ chức (bước 34, D-208).
         Box::new(m0011_org::Migration),
+        // Đường người làm vào khách (bước 34, D-310).
+        autoxide_kernel::event::outbox_access_migration("k0001_event_access", "forms"),
     ]
 }

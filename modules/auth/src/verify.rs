@@ -142,7 +142,9 @@ impl EmailVerifications {
         if email == user.email && user.email_verified_at.is_some() {
             return Err(already_verified());
         }
-        if email != user.email && self.users.find_by_email(tenant, &email).await?.is_some() {
+        if email != user.email
+            && self.users.find_by_email_in(tenant, user.realm, &email).await?.is_some()
+        {
             return Err(user::email_taken(&email));
         }
         self.send(tenant, Actor::user(user_id), &user, &email, language).await

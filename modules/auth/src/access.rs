@@ -30,6 +30,8 @@ pub(crate) struct RequestAuthenticator {
     pub api_keys: Arc<ApiKeyService>,
     /// Sổ database: tìm khách của credential.
     pub databases: DatabaseRegistry,
+    /// Uỷ quyền theo cây khách hàng: vào khách con (D-310).
+    pub delegations: Arc<crate::delegation::DelegationService>,
 }
 
 #[async_trait::async_trait]
@@ -51,7 +53,19 @@ impl Authenticator for RequestAuthenticator {
         let (tenant, user_id) = self.sessions.verify_access(token)?;
         let tenant = self.tenant(tenant, crate::token::invalid_token).await?;
         let user = self.sessions.token_user(&tenant, user_id).await?;
+        // Người mua: chỉ là tài khoản của khách, không permission nào (D-309).
+        if user.realm == autoxide_kernel::access::Realm::Customer {
+            return Ok(Principal::customer(user.id).in_tenant(tenant.id()));
+        }
         self.roles.principal(&tenant, user.id).await
+    }
+
+    async fn enter(
+        &self,
+        principal: &Principal,
+        target: &TenantContext,
+    ) -> Result<Option<Principal>, Error> {
+        self.delegations.enter(principal, target).await
     }
 }
 

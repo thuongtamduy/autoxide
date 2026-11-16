@@ -953,6 +953,19 @@ export type CurrentTenant = {
   status: string;
 };
 
+/** A customer account of the tenant's shop. */
+export type CustomerResponse = {
+  created_at: string;
+  /** When the account was disabled; `null` while active. */
+  disabled_at?: string | null;
+  email: string;
+  /** When the email was confirmed; `null` while not verified. */
+  email_verified_at?: string | null;
+  id: string;
+  name: string;
+  updated_at: string;
+};
+
 /** Envelope of a single result. */
 export type Data_AiStatus = {
   /** What the AI features of this server can do now. */
@@ -1411,6 +1424,47 @@ export type Data_CurrentTenant = {
     read_only?: boolean;
     slug: string;
     status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CustomerResponse = {
+  /** A customer account of the tenant's shop. */
+  data: {
+    created_at: string;
+    /** When the account was disabled; `null` while active. */
+    disabled_at?: string | null;
+    email: string;
+    /** When the email was confirmed; `null` while not verified. */
+    email_verified_at?: string | null;
+    id: string;
+    name: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_DelegationResponse = {
+  /** A delegation: holders of a role of the parent tenant work in a child tenant with it. */
+  data: {
+    /** The tenant they may enter, with the header `Autoxide-Tenant`. */
+    child_tenant_id: string;
+    created_at: string;
+    /** When it stops working by itself; `null`: until revoked. */
+    expires_at?: string | null;
+    id: string;
+    /** The unit of the child tenant the permissions apply at. */
+    org_id: string;
+    /** The tenant that granted it (owner of the role). */
+    parent_tenant_id: string;
+    reason: string;
+    /** When it was revoked; `null` while in force. */
+    revoked_at?: string | null;
+    /**
+     * The role of the parent tenant; its holders (at the parent's root unit) get its
+     * permissions in the child.
+     */
+    role_id: string;
   };
 };
 
@@ -2953,6 +3007,30 @@ export type Data_Vec_CommentCount = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_DelegationResponse = {
+  data: {
+    /** The tenant they may enter, with the header `Autoxide-Tenant`. */
+    child_tenant_id: string;
+    created_at: string;
+    /** When it stops working by itself; `null`: until revoked. */
+    expires_at?: string | null;
+    id: string;
+    /** The unit of the child tenant the permissions apply at. */
+    org_id: string;
+    /** The tenant that granted it (owner of the role). */
+    parent_tenant_id: string;
+    reason: string;
+    /** When it was revoked; `null` while in force. */
+    revoked_at?: string | null;
+    /**
+     * The role of the parent tenant; its holders (at the parent's root unit) get its
+     * permissions in the child.
+     */
+    role_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_EventTypeResponse = {
   data: {
     description: string;
@@ -3024,6 +3102,23 @@ export type Data_Vec_MyPermission = {
     name: string;
     /** How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`. */
     risk: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_MyTenantResponse = {
+  data: {
+    /**
+     * `direct` (your own tenant), `delegation` (a parent tenant let your role in) or
+     * `support` (time-limited platform support access).
+     */
+    access: string;
+    /** The delegation or support grant; `null` for `direct`. */
+    access_id?: string | null;
+    /** Send it in the header `Autoxide-Tenant` to work there. */
+    id: string;
+    name: string;
+    slug: string;
   }[];
 };
 
@@ -3263,6 +3358,45 @@ export type Data_VerifiedResponse = {
   data: {
     verified: boolean;
   };
+};
+
+/** A new delegation to a child tenant. */
+export type DelegationRequest = {
+  /** A tenant below this one (its child, or a child of a child). */
+  child_tenant_id: string;
+  /** When it stops working by itself; omit for "until revoked". */
+  expires_at?: string | null;
+  /** The unit of the child tenant the permissions apply at; omit for its root unit. */
+  org_id?: string | null;
+  /** Why, 1 to 500 characters; kept in both audit logs. */
+  reason: string;
+  /**
+   * A role of this tenant. A role with every permission can only be delegated at the root
+   * unit of the child.
+   */
+  role_id: string;
+};
+
+/** A delegation: holders of a role of the parent tenant work in a child tenant with it. */
+export type DelegationResponse = {
+  /** The tenant they may enter, with the header `Autoxide-Tenant`. */
+  child_tenant_id: string;
+  created_at: string;
+  /** When it stops working by itself; `null`: until revoked. */
+  expires_at?: string | null;
+  id: string;
+  /** The unit of the child tenant the permissions apply at. */
+  org_id: string;
+  /** The tenant that granted it (owner of the role). */
+  parent_tenant_id: string;
+  reason: string;
+  /** When it was revoked; `null` while in force. */
+  revoked_at?: string | null;
+  /**
+   * The role of the parent tenant; its holders (at the parent's root unit) get its
+   * permissions in the child.
+   */
+  role_id: string;
 };
 
 /** Confirms deleting your own account. */
@@ -3831,6 +3965,11 @@ export type LoginRequest = {
   /** Email of the account. Case and surrounding spaces do not matter. */
   email: string;
   password: string;
+  /**
+   * `staff` (default) or `customer`: a customer account of this tenant's shop is separate
+   * from a staff account with the same email.
+   */
+  realm?: Realm;
 };
 
 /** An API key of any user, for administrators. */
@@ -4210,6 +4349,21 @@ export type MyPermission = {
   risk: string;
 };
 
+/** A tenant you can work in. */
+export type MyTenantResponse = {
+  /**
+   * `direct` (your own tenant), `delegation` (a parent tenant let your role in) or
+   * `support` (time-limited platform support access).
+   */
+  access: string;
+  /** The delegation or support grant; `null` for `direct`. */
+  access_id?: string | null;
+  /** Send it in the header `Autoxide-Tenant` to work there. */
+  id: string;
+  name: string;
+  slug: string;
+};
+
 /** What happens when a post is published (by the `content` module). */
 export type NewPosts = "off" | "draft" | "send";
 
@@ -4579,6 +4733,23 @@ export type Page_CommentTarget = {
     title?: string | null;
     /** Public path of the target (without the domain), like `title`. */
     url?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CustomerResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** When the account was disabled; `null` while active. */
+    disabled_at?: string | null;
+    email: string;
+    /** When the email was confirmed; `null` while not verified. */
+    email_verified_at?: string | null;
+    id: string;
+    name: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -6151,6 +6322,12 @@ export type PutMenuRequest = {
   items: MenuItemInput[];
 };
 
+/**
+ * The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of
+ * one tenant's shop, without permissions).
+ */
+export type Realm = "staff" | "customer";
+
 /** Proof that you are the account owner, for one sensitive change. */
 export type ReauthRequest = {
   /** How you prove it is you. */
@@ -6234,6 +6411,12 @@ export type RegisterRequest = {
   name: string;
   /** 12 to 128 characters. */
   password: string;
+  /**
+   * `staff` (default; needs self-registration on the server) or `customer`: a customer
+   * account of this tenant's shop, without any permission (open unless the tenant turns off
+   * the setting `auth.customer_registration`).
+   */
+  realm?: Realm;
 };
 
 /** A new name for a tag. */
@@ -6265,6 +6448,11 @@ export type ResetConfirmation = {
 /** The account whose password to reset. */
 export type ResetRequest = {
   email: string;
+  /**
+   * `staff` (default) or `customer`: a customer account of this tenant's shop is separate
+   * from a staff account with the same email.
+   */
+  realm?: Realm;
 };
 
 /** What lives at an address. */
@@ -7274,6 +7462,14 @@ export type UpdateCommentRequest = {
   status: CommentStatus;
 };
 
+/** Changes to a customer account. Omitted fields stay as they are. */
+export type UpdateCustomerRequest = {
+  /** `true` disables the account and signs it out everywhere; `false` enables it. */
+  disabled?: boolean | null;
+  /** New display name, 1 to 200 characters. */
+  name?: string | null;
+};
+
 /** Changes to an endpoint. Omitted fields stay as they are. */
 export type UpdateEndpointRequest = {
   description?: string | null;
@@ -7633,6 +7829,83 @@ export interface paths {
       responses: {
         204: void;
         401: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/customers": {
+    /** List or search the customer accounts of the shop. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; status?: "active" | "disabled"; limit?: number; cursor?: string; order?: "asc" | "desc" }; };
+      responses: {
+        200: Page_CustomerResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/customers/{id}": {
+    /** Get a customer account. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CustomerResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Rename, disable or enable a customer account. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateCustomerRequest;
+      responses: {
+        200: Data_CustomerResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/delegations": {
+    /** List the delegations of this tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { direction?: "outgoing" | "incoming" }; };
+      responses: {
+        200: Data_Vec_DelegationResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Let holders of a role work in a child tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: DelegationRequest;
+      responses: {
+        201: Data_DelegationResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/delegations/{id}": {
+    /** Revoke a delegation. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_DelegationResponse;
+        401: Problem;
+        403: Problem;
         404: Problem;
         default: Problem;
       };
@@ -8025,6 +8298,17 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/me/tenants": {
+    /** List the tenants you can work in. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_MyTenantResponse;
+        401: Problem;
         default: Problem;
       };
     };

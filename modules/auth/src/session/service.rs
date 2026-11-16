@@ -19,6 +19,7 @@
 //! chính không header: khách lấy từ chính token ([`token::resolve`]). Database chỉ giữ bản băm
 //! của phần thô.
 
+use autoxide_kernel::access::Realm;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
@@ -155,6 +156,7 @@ impl SessionService {
     /// Email đang bị khoá vì sai quá nhiều lần thì trả 429 ngay, KHÔNG kiểm mật khẩu
     /// — kẻ đoán không biết được lần đoán nào đúng.
     /// `user_agent`: header `User-Agent` của client, để người dùng nhận ra phiên này.
+    #[cfg(test)]
     pub(crate) async fn login(
         &self,
         tenant: &TenantContext,
@@ -162,9 +164,26 @@ impl SessionService {
         password: &str,
         user_agent: Option<&str>,
     ) -> Result<LoginOutcome, Error> {
+        self.login_in(tenant, Realm::Staff, email, password, user_agent).await
+    }
+
+    /// Như [`login`](Self::login), cho tài khoản `realm` (D-309). Bộ đếm lần sai của người mua
+    /// tách khỏi của nhân sự cùng email.
+    pub(crate) async fn login_in(
+        &self,
+        tenant: &TenantContext,
+        realm: Realm,
+        email: &str,
+        password: &str,
+        user_agent: Option<&str>,
+    ) -> Result<LoginOutcome, Error> {
+        let throttled = throttle_key(realm, email);
+        let email_for_check = email;
+        let email = throttled.as_str();
         // Lượt thử được đếm TRƯỚC khi kiểm mật khẩu; đúng thì xoá bộ đếm bên dưới.
         self.throttle.reserve(tenant, email).await?;
-        let (user, hash) = self.users.verify_credentials(tenant, email, password).await?;
+        let (user, hash) =
+            self.users.verify_credentials_in(tenant, realm, email_for_check, password).await?;
         if self.mfa.status(tenant, user.id).await?.totp_enabled {
             // Mật khẩu đúng: trả lại lượt vừa xin, nhưng chưa xoá các lần sai trước — đúng
             // mật khẩu mới là nửa đường.
@@ -909,6 +928,15 @@ fn invalid_refresh_token() -> Error {
 /// Bây giờ, cắt tới micro giây để hai database lưu cùng một giá trị.
 fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
+}
+
+/// Khoá của login throttling: email của nhân sự giữ nguyên (bộ đếm cũ còn hiệu lực), của người
+/// mua có tiền tố — sai mật khẩu ở cửa hàng không khoá đăng nhập của nhân sự cùng email.
+fn throttle_key(realm: Realm, email: &str) -> String {
+    match realm {
+        Realm::Staff => email.to_owned(),
+        Realm::Customer => format!("customer:{email}"),
+    }
 }
 
 #[cfg(test)]

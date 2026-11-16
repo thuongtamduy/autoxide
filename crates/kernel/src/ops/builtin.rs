@@ -142,6 +142,8 @@ impl Module for KernelModule {
             Box::new(crate::tenancy::admin::AddReadOnly),
             // Cấu trúc cây tổ chức trong mỗi khách (bước 34): nút và bảng tổ tiên – con cháu.
             Box::new(crate::tenancy::org_tree::CreateOrgTree),
+            // Đường người làm vào khách (bước 34, D-310).
+            crate::event::outbox_access_migration("k0001_event_access", NAME),
         ]
     }
 

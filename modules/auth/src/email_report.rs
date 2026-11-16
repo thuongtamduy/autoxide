@@ -193,6 +193,7 @@ impl EmailVerifications {
         // cả transaction trên Postgres).
         let taken = user_row::Entity::find()
             .filter(user_row::Column::Email.eq(old_email.as_str()))
+            .filter(user_row::Column::Realm.eq(row.realm.as_str()))
             .filter(user_row::Column::Id.ne(user_id))
             .scoped(tenant)
             .one(&transaction)
@@ -217,7 +218,11 @@ impl EmailVerifications {
             .record(&transaction, tenant, actor, events::user_subject(user_id), &event)
             .await?;
         if restored {
-            let job = ResetJob { email: old_email, language: language.tag().to_owned() };
+            let job = ResetJob {
+                email: old_email,
+                realm: crate::user::realm_of(&row.realm),
+                language: language.tag().to_owned(),
+            };
             self.jobs.enqueue(&transaction, tenant, &job, EnqueueOptions::default()).await?;
         }
         transaction.commit().await?;

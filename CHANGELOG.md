@@ -11,6 +11,18 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `auth`: customer accounts (`realm: customer`) separate from staff in each tenant — register and
+  sign in with `"realm": "customer"` (setting `auth.customer_registration` per tenant), no
+  permission; `GET /api/v1/auth/customers`, `GET`/`PATCH /api/v1/auth/customers/{id}`
+  (`auth.customers.read`, `auth.customers.manage`). Password reset takes `realm`.
+- `auth`: delegation down a chain of tenants — `GET`/`POST /api/v1/auth/delegations`,
+  `DELETE /api/v1/auth/delegations/{id}` (`auth.delegations.read`, `auth.delegations.manage`): holders
+  of a parent's role work in a child with the header `Autoxide-Tenant`; `GET /api/v1/auth/me/tenants`
+  lists where you can work. Events and the audit log record how the person came in
+  (`actor_access`: `direct`, `delegation`, `support`). For module authors: every module's events
+  table gets the migration `outbox_access_migration`; `Authenticator::enter` decides who may enter
+  another tenant.
+
 - `auth`: `POST /api/v1/auth/me/reauth` gives a short-lived, single-use confirmation token (by
   password, authenticator code, passkey or a mail) that sensitive changes accept as `reauth_token`
   instead of `current_password` — creating an API key, changing the email, turning on two-step

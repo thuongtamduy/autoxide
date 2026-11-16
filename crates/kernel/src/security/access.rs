@@ -699,6 +699,20 @@ pub trait Authenticator: Send + Sync {
         authorization: Option<&str>,
         hint: &TenantHint,
     ) -> Result<Principal, Error>;
+
+    /// Người đã xác thực ở khách nhà (`principal.tenant_id()`) xin vào khách `target` (header
+    /// `Autoxide-Tenant`, bước 34): uỷ quyền từ khách cha, quyền vào hỗ trợ có thời hạn. Trả
+    /// `Principal` mới ở khách `target` (quyền theo đường vào, [`Principal::with_access`]) hay
+    /// `None` khi không có đường vào nào. Tính lại mỗi request: thu hồi, hết hạn có hiệu lực
+    /// ngay request kế. Mặc định: không có đường vào.
+    async fn enter(
+        &self,
+        principal: &Principal,
+        target: &TenantContext,
+    ) -> Result<Option<Principal>, Error> {
+        let _ = (principal, target);
+        Ok(None)
+    }
 }
 
 /// Hỏi "tài khoản này đã xác thực (số điện thoại / định danh) để đăng nội dung chưa" — điểm nối

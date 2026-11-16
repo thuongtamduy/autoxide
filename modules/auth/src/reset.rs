@@ -59,6 +59,9 @@ pub(crate) const SEND_RESET: &str = "auth.send_password_reset";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ResetJob {
     pub email: String,
+    /// Tài khoản nhân sự hay người mua có email này (D-309); job cũ không có: nhân sự.
+    #[serde(default)]
+    pub realm: autoxide_kernel::access::Realm,
     /// Mã ngôn ngữ của mail (`en`, `vi`).
     pub language: String,
 }
@@ -101,9 +104,11 @@ impl PasswordResets {
         &self,
         tenant: &TenantContext,
         email: &str,
+        realm: autoxide_kernel::access::Realm,
         language: Language,
     ) -> Result<(), Error> {
-        let job = ResetJob { email: email.trim().to_owned(), language: language.tag().to_owned() };
+        let job =
+            ResetJob { email: email.trim().to_owned(), realm, language: language.tag().to_owned() };
         let write = tenant.database().write();
         self.jobs.enqueue(write, tenant, &job, EnqueueOptions::default()).await?;
         Ok(())
@@ -112,7 +117,7 @@ impl PasswordResets {
     /// Job: gửi mail đặt lại mật khẩu nếu email là của một tài khoản đang hoạt động.
     pub(crate) async fn send(&self, tenant: &TenantContext, job: &ResetJob) -> Result<(), Error> {
         let language = if job.language == Language::Vi.tag() { Language::Vi } else { Language::En };
-        let Some(user) = self.users.find_by_email(tenant, &job.email).await? else {
+        let Some(user) = self.users.find_by_email_in(tenant, job.realm, &job.email).await? else {
             return Ok(());
         };
         if !user.is_active() {

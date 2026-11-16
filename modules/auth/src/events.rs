@@ -59,6 +59,8 @@ events! {
     EMAIL_CHANGE_CANCELLED, EmailChangeCancelled, "auth.email_change_cancelled", "A user cancelled a pending email change; the link sent to the new address (`before.email`) stopped working.";
     PASSKEY_REMOVED, PasskeyRemoved, "auth.passkey_removed", "A passkey was removed; `before.name` is its name, `after.by_administrator` is `true` when an administrator (or the server operator) removed it.";
     RECOVERY_CODES_REPLACED, RecoveryCodesReplaced, "auth.recovery_codes_replaced", "A user made new recovery codes.";
+    DELEGATION_GRANTED, DelegationGranted, "auth.delegation_granted", "This tenant let holders of one of its roles work in a child tenant (`after`: child tenant, role, unit, expiry, reason).";
+    DELEGATION_REVOKED, DelegationRevoked, "auth.delegation_revoked", "A delegation to a child tenant was revoked; holders of the role lose access at their next request.";
 }
 
 /// Chủ thể (subject) của event về người dùng `id`.

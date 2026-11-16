@@ -28,6 +28,8 @@ pub struct User {
     pub email_verified_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Nhân sự (có role) hay người mua của khách (không permission nào) — bước 34, D-309.
+    pub realm: autoxide_kernel::access::Realm,
 }
 
 impl User {

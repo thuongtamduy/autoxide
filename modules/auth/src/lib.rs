@@ -13,6 +13,9 @@ pub mod api;
 mod api_key;
 mod cleanup;
 mod config;
+mod delegation;
+#[cfg(test)]
+mod delegation_tests;
 mod doctor;
 mod email_report;
 mod events;
@@ -31,6 +34,7 @@ mod reset;
 mod resource;
 mod role;
 mod session;
+mod settings;
 #[cfg(test)]
 mod tenancy_tests;
 mod token;
@@ -91,6 +95,10 @@ impl Module for AuthModule {
     }
 
     /// Khách mới có role `admin` (mọi permission) như khách mặc định (bước 33).
+    fn org_settings(&self) -> Vec<autoxide_kernel::tenancy::OrgSetting> {
+        settings::all()
+    }
+
     fn seed_tenant(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::TenantSeed>> {
         Some(Arc::new(role::AdminRoleSeed))
     }
@@ -180,11 +188,16 @@ impl Module for AuthModule {
             url: config.password_reset_url.clone(),
             databases: databases.clone(),
         });
+        let delegations = Arc::new(delegation::DelegationService {
+            databases: databases.clone(),
+            outbox: outbox.clone(),
+        });
         let authenticator = RequestAuthenticator {
             sessions: sessions.clone(),
             roles: roles.clone(),
             api_keys: api_keys.clone(),
             databases,
+            delegations: delegations.clone(),
         };
         // `Arc<X>` tự đổi thành `Arc<dyn Trait>`: bên dùng chỉ thấy trait.
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
@@ -215,6 +228,8 @@ impl Module for AuthModule {
                 .unwrap_or_else(|_| chrono::Duration::minutes(10)),
         });
         self.state = Some(http::HttpState {
+            delegations,
+            orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             reauth,
             personal_data: context.personal_data_export(),
             sessions,
@@ -492,7 +507,11 @@ pub(crate) mod testing {
         email: &str,
         language: autoxide_kernel::i18n::Language,
     ) {
-        services.resets.request(&services.tenant, email, language).await.unwrap();
+        services
+            .resets
+            .request(&services.tenant, email, Default::default(), language)
+            .await
+            .unwrap();
         send_resets(services).await;
     }
 

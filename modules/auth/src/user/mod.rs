@@ -1,6 +1,7 @@
 //! Tài khoản người dùng: bảng `auth_user` và service làm việc với nó.
 
 pub(crate) mod entity;
+pub(crate) use entity::realm_of;
 mod service;
 
 pub(crate) use service::NewUser;

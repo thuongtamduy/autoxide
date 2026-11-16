@@ -37,7 +37,41 @@ pub(crate) const API_KEYS_MANAGE: Permission = Permission::new(
 )
 .with_risk(Risk::Destructive);
 
+pub(crate) const CUSTOMERS_READ: Permission = Permission::new(
+    "auth.customers.read",
+    "See the customer accounts of the tenant's shop (email, name, status), never their passwords.",
+)
+.with_risk(Risk::SensitiveData);
+
+pub(crate) const CUSTOMERS_MANAGE: Permission = Permission::new(
+    "auth.customers.manage",
+    "Rename, disable and enable customer accounts of the tenant's shop.",
+);
+
+pub(crate) const DELEGATIONS_READ: Permission = Permission::new(
+    "auth.delegations.read",
+    "See the delegations of this tenant: given to child tenants, and received from parents.",
+);
+
+pub(crate) const DELEGATIONS_MANAGE: Permission = Permission::new(
+    "auth.delegations.manage",
+    "Let holders of one of this tenant's roles work in a child tenant with that role, and \
+     revoke it. Whoever holds this extends this tenant's roles to its children.",
+)
+.with_risk(Risk::Destructive);
+
 /// Mọi permission module `auth` khai.
 pub(crate) fn all() -> Vec<Permission> {
-    vec![ROLES_READ, ROLES_MANAGE, USERS_READ, USERS_MANAGE, PASSKEYS_MANAGE, API_KEYS_MANAGE]
+    vec![
+        ROLES_READ,
+        ROLES_MANAGE,
+        USERS_READ,
+        USERS_MANAGE,
+        PASSKEYS_MANAGE,
+        API_KEYS_MANAGE,
+        CUSTOMERS_READ,
+        CUSTOMERS_MANAGE,
+        DELEGATIONS_READ,
+        DELEGATIONS_MANAGE,
+    ]
 }

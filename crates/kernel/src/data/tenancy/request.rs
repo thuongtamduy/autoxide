@@ -124,7 +124,7 @@ pub(crate) async fn authenticate(
     let principal = authenticator.authenticate(authorization, &hint).await?;
     let principal = match parts.extensions.get::<DatabaseRegistry>() {
         Some(registry) if registry.mode() == TenancyMode::Multi => {
-            check(registry, principal, &hint).await?
+            check(registry, authenticator.as_ref(), principal, &hint).await?
         }
         _ => principal,
     };
@@ -135,6 +135,7 @@ pub(crate) async fn authenticate(
 /// Khách của credential khớp với tên miền / header; nhân sự nền tảng vào khách khác.
 async fn check(
     registry: &DatabaseRegistry,
+    authenticator: &dyn Authenticator,
     principal: Principal,
     hint: &TenantHint,
 ) -> Result<Principal, Error> {
@@ -142,6 +143,16 @@ async fn check(
         let target = lookup(registry, target).await?;
         if target.id() == principal.tenant_id() {
             return Ok(principal);
+        }
+        // Đường vào do module xác thực quyết (uỷ quyền, hỗ trợ — bước 34).
+        if let Some(entered) = authenticator.enter(&principal, &target).await? {
+            tracing::info!(
+                user_id = %principal.user_id(),
+                tenant_id = %target.id(),
+                access = entered.access().as_str(),
+                "tenancy entered"
+            );
+            return Ok(entered);
         }
         let home = registry.tenant(principal.tenant_id()).await?;
         if home.is_platform() && principal.allows(OPERATE) {

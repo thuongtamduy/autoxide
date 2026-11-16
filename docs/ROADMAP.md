@@ -97,13 +97,14 @@ Thiết kế: trụ 2. Bắt đầu SAU bước 33.
       tại quầy, ảnh, tên miền gắn với nút; ghi qua `PATCH …/public-profile`; endpoint công khai cửa hàng theo
       tên miền (chỉ nút "hiện công khai"), ETag / cache — cho "cửa hàng gần bạn", chọn nơi nhận hàng; loại
       cửa hàng công khai trong sổ đối tượng để menu của website trỏ tới (D-238)
-- [ ] Danh tính hai lớp: nhân sự là tài khoản toàn nền tảng (mặt điều khiển), một người làm cho nhiều khách /
+- [x] Danh tính hai lớp: nhân sự là tài khoản toàn nền tảng (mặt điều khiển), một người làm cho nhiều khách /
       nút; người mua là tài khoản theo từng khách; API key gắn với khách và nút. Nâng cấp: tài khoản, role và
-      API key có sẵn thành nhân sự của khách mặc định, giữ quyền cũ
+      API key có sẵn thành nhân sự của khách mặc định, giữ quyền cũ — D-309: tài khoản giữ theo từng khách, một người
+      làm cho nhiều khách qua uỷ quyền / quyền vào hỗ trợ (header `Autoxide-Tenant`)
 - [x] Tài khoản: xác nhận lại danh tính `POST /auth/me/reauth` thay `current_password`; ngôn ngữ, múi giờ ưa
       thích và tự đổi tên hiển thị qua `PATCH /auth/me`; bắt buộc MFA theo role; `last_login_at`
-- [ ] Uỷ quyền theo cây khách hàng: role ở khách cha có hiệu lực ở các khách con khi được cấp; vào ngữ cảnh
-      khách con bằng cùng API; audit ghi ở cả hai phía
+- [x] Uỷ quyền theo cây khách hàng: role ở khách cha có hiệu lực ở các khách con khi được cấp; vào ngữ cảnh
+      khách con bằng cùng API; audit ghi ở cả hai phía — D-310
 - [ ] Đăng nhập bằng link qua email (không cần mật khẩu): token dùng một lần, hết hạn ngắn, gắn thiết bị yêu cầu
       khi được; MFA vẫn áp dụng; trả lời như nhau về thời gian dù email có hay không (như D-154, D-162); tắt mặc
       định, bật bằng cấu hình

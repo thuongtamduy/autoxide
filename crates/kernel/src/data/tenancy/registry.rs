@@ -159,6 +159,27 @@ impl DatabaseRegistry {
         &self.0.control
     }
 
+    /// Các khách cấp trên của khách `id` (chuỗi khách cha – con, bước 34): khách cha trước, tới
+    /// khách gốc của chuỗi. Rỗng khi không có cha hay không có khách này. Đọc ở database điều
+    /// khiển, mỗi cấp một câu (chuỗi ngắn); dừng ở 16 cấp để dữ liệu hỏng không lặp mãi.
+    pub async fn tenant_ancestors(&self, id: TenantId) -> Result<Vec<TenantId>, Error> {
+        use sea_orm::EntityTrait;
+        let mut found = Vec::new();
+        let mut current = id.as_uuid();
+        for _ in 0..16 {
+            let row = super::admin::tenant::Entity::find_by_id(current)
+                .one(self.control().read())
+                .await?;
+            let Some(parent) = row.and_then(|row| row.parent_id) else { break };
+            if parent == id.as_uuid() || found.contains(&TenantId::from_uuid(parent)) {
+                break;
+            }
+            found.push(TenantId::from_uuid(parent));
+            current = parent;
+        }
+        Ok(found)
+    }
+
     /// Khách mặc định (khách nền tảng) trên database điều khiển.
     pub fn default_tenant(&self) -> TenantContext {
         self.0.default.clone()

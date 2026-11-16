@@ -483,6 +483,7 @@ async fn token_trong_mail_mang_khach() {
         // Đặt lại mật khẩu: job của khách `b` gửi mail.
         let job = crate::reset::ResetJob {
             email: "bob@example.com".to_owned(),
+            realm: Default::default(),
             language: "en".to_owned(),
         };
         services.resets.send(&b, &job).await.unwrap();
